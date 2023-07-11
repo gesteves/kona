@@ -28,7 +28,7 @@ module CustomHelpers
       end
     end
 
-    smartypants([title, data.site.name].reject(&:blank?).uniq.join(separator))
+    smartypants([title, data.site.metaTitle].reject(&:blank?).uniq.join(separator))
   end
 
   def hide_from_search_engines?(content)

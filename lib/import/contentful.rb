@@ -78,7 +78,8 @@ module Import
         }
         site: siteCollection(limit: 1, order: [sys_firstPublishedAt_ASC]) {
           items {
-            name
+            title
+            metaTitle
             description
             metaDescription
             copyright
