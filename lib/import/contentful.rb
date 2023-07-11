@@ -68,6 +68,7 @@ module Import
             strava
             bluesky
             mastodon
+            instagram
             profilePicture {
               width
               height
