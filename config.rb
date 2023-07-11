@@ -26,9 +26,9 @@ end
 
 data.blog.each do |page|
   if page.current_page == 1
-    proxy "/index.html", "/blog.html", locals: { content: page }
+    proxy "/index.html", "/blog.html", locals: { content: page }, ignore: true
   else
-    proxy "/page/#{page.current_page}/index.html", "/blog.html", locals: { content: page }
+    proxy "/page/#{page.current_page}/index.html", "/blog.html", locals: { content: page }, ignore: true
   end
 end
 
