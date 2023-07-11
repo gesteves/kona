@@ -2,7 +2,6 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc><%= full_url('index.html') %></loc>
-    <lastmod><%= DateTime.parse(data.home.sys.publishedAt).strftime('%Y-%m-%d') %></lastmod>
   </url>
   <% data.pages.reject(&:draft).each do |page| %>
     <url>
@@ -14,12 +13,6 @@
     <url>
       <loc><%= full_url(article.path) %></loc>
       <lastmod><%= DateTime.parse(article.updated_at).strftime('%Y-%m-%d') %></lastmod>
-    </url>
-  <% end %>
-  <% data.links.reject(&:draft).each do |link| %>
-    <url>
-      <loc><%= full_url(link.path) %></loc>
-      <lastmod><%= DateTime.parse(link.updated_at).strftime('%Y-%m-%d') %></lastmod>
     </url>
   <% end %>
 </urlset>

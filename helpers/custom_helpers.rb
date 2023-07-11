@@ -19,13 +19,8 @@ module CustomHelpers
     tag.join('/')
   end
 
-  def page_title(title: nil, section: nil, content: nil, separator: ' · ')
+  def page_title(title: nil, content: nil, separator: ' · ')
     if content.present?
-      section = if content.entry_type == "Link"
-        "Links"
-      elsif content.entry_type == "Article"
-        "Blog"
-      end
       title = if content.current_page.present? && content.current_page > 1
         [content.title, "Page #{content.current_page}"]
       else
@@ -33,7 +28,7 @@ module CustomHelpers
       end
     end
 
-    smartypants([title, section, data.home.title].reject(&:blank?).uniq.join(separator))
+    smartypants([title, data.site.name].reject(&:blank?).uniq.join(separator))
   end
 
   def hide_from_search_engines?(content)
@@ -80,15 +75,10 @@ module CustomHelpers
   end
 
   def pagination_path(entry_type:, page:)
-    prefix = if entry_type == "Article"
-      "blog"
-    elsif entry_type == "Link"
-      "links"
-    end
     if page == 1
-      "/#{prefix}/index.html"
+      "/index.html"
     else
-      "/#{prefix}/page/#{page}/index.html"
+      "/page/#{page}/index.html"
     end
   end
 

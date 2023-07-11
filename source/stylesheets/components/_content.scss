@@ -5,6 +5,12 @@
 
 .content__header {
   @extend .extend-entry-header;
+  max-width: var(--content-max-width);
   padding-left: var(--padding-article);
   padding-right: var(--padding-article);
+}
+
+.content__header--no-padding {
+  padding-left: 0;
+  padding-right: 0;
 }

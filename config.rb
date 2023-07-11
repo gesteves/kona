@@ -16,10 +16,6 @@ data.articles.each do |article|
   proxy article.path, "/article.html", locals: { content: article }, ignore: true
 end
 
-data.links.each do |link|
-  proxy link.path, "/link.html", locals: { content: link }, ignore: true
-end
-
 data.pages.each do |page|
   proxy page.path, "/page.html", locals: { content: page }, ignore: true
 end
@@ -30,17 +26,9 @@ end
 
 data.blog.each do |page|
   if page.current_page == 1
-    proxy "/blog/index.html", "/blog.html", locals: { content: page }
+    proxy "/index.html", "/blog.html", locals: { content: page }
   else
-    proxy "/blog/page/#{page.current_page}/index.html", "/blog.html", locals: { content: page }
-  end
-end
-
-data.link_blog.each do |page|
-  if page.current_page == 1
-    proxy "/links/index.html", "/blog.html", locals: { content: page }
-  else
-    proxy "/links/page/#{page.current_page}/index.html", "/blog.html", locals: { content: page }
+    proxy "/page/#{page.current_page}/index.html", "/blog.html", locals: { content: page }
   end
 end
 

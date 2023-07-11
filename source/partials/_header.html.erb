@@ -2,11 +2,11 @@
   <a href="/" class="header__link">
     <picture>
       <% ["avif", "webp", "jpg"].each do |format| %>
-        <%= source_tag(data.author.profilePicture.url, sizes: '(min-width: 768px) 48px, 36px', type: "image/#{format}", format: format, widths: [36, 72, 108, 48, 96, 144]) %>
+        <%= source_tag(data.site.logo.url, sizes: '(min-width: 768px) 48px, 36px', type: "image/#{format}", format: format, widths: [36, 72, 108, 48, 96, 144]) %>
       <% end %>
-      <img src="<%= data.author.profilePicture.url %>" alt="<%= data.author.profilePicture.title %>" width="<%= data.author.profilePicture.width %>" height="<%= data.author.profilePicture.height %>" loading="eager" decoding="async" class="header__avatar" >
+      <img src="<%= data.site.logo.url %>" alt="<%= data.site.logo.title %>" width="<%= data.site.logo.width %>" height="<%= data.site.logo.height %>" loading="eager" decoding="async" class="header__avatar" >
     </picture>
-    <h1 class="header__hed" id="title"><%= data.author.name %></h1>
+    <h1 class="header__hed" id="title"><%= data.site.name %></h1>
   </a>
   <%= partial 'partials/nav' %>
 </header>
