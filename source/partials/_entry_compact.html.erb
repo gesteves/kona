@@ -6,7 +6,7 @@
         <% end %>
         <span><%= link_to DateTime.parse(entry.published_at).strftime('%A, %B %-e, %Y'), entry.path %></span>
         <% if entry.contentfulMetadata.tags.present? && entry.entry_type != "Link" %>
-          <span><%= entry.contentfulMetadata.tags.sort { |a, b| a.name <=> b.name }.map { |t| link_to t.name, "/tag/#{t.id}/index.html" }.join(', ') %></span>
+          <span><%= entry.contentfulMetadata.tags.sort { |a, b| a.name <=> b.name }.map { |t| link_to t.name, "/tagged/#{t.id}/index.html" }.join(', ') %></span>
         <% end %>
       </p>
     <h2 id="hed-<%= entry.sys.id.parameterize %>">
