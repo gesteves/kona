@@ -1,9 +1,11 @@
-<nav class="nav" id="nav">
-  <ul class="nav__links" id="nav-menu" >
-    <% pages = data.pages.select { |p| !p.draft && p.showInNav.presence }.map { |p| [p.menuLabel.presence || p.title, p.path] }.compact %>
-    <% pages.sort { |a,b| a.first <=> b.first }.each do |p| %>
-      <li><%= link_to p.first, p.last %></li>
-    <% end %>
-  </ul>
-  <button id="nav-button" aria-expanded="false" aria-controls="nav-menu" class="nav__hamburger">Open menu</button>
-</nav>
+<% pages = data.pages.select { |p| !p.draft && p.showInNav.presence }.map { |p| [p.menuLabel.presence || p.title, p.path] }.compact %>
+<% if pages.present? %>
+  <nav class="nav" id="nav">
+    <ul class="nav__links" id="nav-menu" >
+      <% pages.sort { |a,b| a.first <=> b.first }.each do |p| %>
+        <li><%= link_to p.first, p.last %></li>
+      <% end %>
+    </ul>
+    <button id="nav-button" aria-expanded="false" aria-controls="nav-menu" class="nav__hamburger">Open menu</button>
+  </nav>
+<% end %>
