@@ -82,11 +82,14 @@ module Import
             metaTitle
             description
             metaDescription
+            blurb
+            svgLogo
             copyright
             email
             strava
             mastodon
             bluesky
+            instagram
             logo {
               width
               height
