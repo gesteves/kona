@@ -1,3 +1,3 @@
-# Gateway
+# Kona
 
-This is a very simple personal homepage written in Middleman and powered by Contentful.
+This is a very simple blog system written in Middleman and powered by Contentful.
