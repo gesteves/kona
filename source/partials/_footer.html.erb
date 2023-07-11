@@ -1,11 +1,11 @@
 <footer class="footer">
   <section class="footer__section">
     <h2 class="footer__section-hed">© <%= data.articles.reject(&:draft).map { |a| DateTime.parse(a.published_at) }.min.strftime('%Y') %>–<%= Time.now.strftime('%Y') %></h2>
-    <%= data.author.name %>
+    <%= data.site.copyright %>
   </section>
   <section class="footer__section">
     <h2 class="footer__section-hed">Email</h2>
-    <%= mail_to data.author.email %>
+    <%= mail_to data.site.email %>
   </section>
   <section class="footer__section">
     <h2 class="footer__section-hed">Links</h2>
@@ -20,29 +20,17 @@
   <section class="footer__section">
     <h2 class="footer__section-hed">Elsewhere</h2>
     <ul class="footer__links">
-      <% if data.author.instagram.present? %>
-        <li><%= link_to "Instagram", data.author.instagram, rel: "me noopener", target: "_blank" %></li>
+      <% if data.site.bluesky.present? %>
+        <li><%= link_to "Bluesky", data.site.bluesky, rel: "me noopener", target: "_blank" %></li>
       <% end %>
-      <% if data.author.flickr.present? %>
-        <li><%= link_to "Flickr", data.author.flickr, rel: "me noopener", target: "_blank" %></li>
+      <% if data.site.instagram.present? %>
+        <li><%= link_to "Instagram", data.site.instagram, rel: "me noopener", target: "_blank" %></li>
       <% end %>
-      <% if data.author.github.present? %>
-        <li><%= link_to "GitHub", data.author.github, rel: "me noopener", target: "_blank" %></li>
+      <% if data.site.mastodon.present? %>
+        <li><%= link_to "Mastodon", data.site.mastodon, rel: "me noopener", target: "_blank" %></li>
       <% end %>
-      <% if data.author.linkedin.present? %>
-        <li><%= link_to "LinkedIn", data.author.linkedin, rel: "me noopener", target: "_blank" %></li>
-      <% end %>
-      <% if data.author.mastodon.present? %>
-        <li><%= link_to "Mastodon", data.author.mastodon, rel: "me noopener", target: "_blank" %></li>
-      <% end %>
-      <% if data.author.strava.present? %>
-        <li><%= link_to "Strava", data.author.strava, rel: "me noopener", target: "_blank" %></li>
-      <% end %>
-      <% if data.author.tumblr.present? %>
-        <li><%= link_to "Tumblr", data.author.tumblr, rel: "me noopener", target: "_blank" %></li>
-      <% end %>
-      <% if data.author.twitter.present? %>
-        <li><%= link_to "Twitter", data.author.twitter, rel: "me noopener", target: "_blank" %></li>
+      <% if data.site.strava.present? %>
+        <li><%= link_to "Strava", data.site.strava, rel: "me noopener", target: "_blank" %></li>
       <% end %>
     </ul>
   </section>

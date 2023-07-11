@@ -81,6 +81,7 @@ module Import
             name
             description
             metaDescription
+            copyright
             email
             strava
             mastodon
