@@ -250,7 +250,8 @@ module Import
           next_page: index == sliced.size - 1 ? nil : index + 2,
           title: "",
           items: page,
-          entry_type: "Article"
+          entry_type: "Article",
+          indexInSearchEngines: true
         }
       end
       blog
