@@ -1,5 +1,4 @@
 @import 'vendors/reset';
-@import 'vendors/prism';
 @import 'fonts/lato';
 @import 'fonts/playfair';
 @import 'fonts/ibm-plex-mono';
@@ -8,10 +7,9 @@
 @import 'base/extends';
 @import 'base/accessibility';
 @import 'components/header';
-@import 'components/nav';
+@import 'components/sidebar';
 @import 'components/content';
 @import 'components/entry';
 @import 'components/related';
 @import 'components/pagination';
-@import 'components/footer';
 

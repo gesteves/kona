@@ -1,16 +1,30 @@
 .content {
-  padding-bottom: var(--padding-article);
-  padding-top: var(--padding-article);
+  display: grid;
+  max-width: var(--max-width-content);
+  padding: var(--gutter);
+  grid-gap: var(--gutter);
+
+  @media (min-width: 1280px) {
+    grid-template-columns: auto 320px;
+  }
 }
 
 .content__header {
   @extend .extend-entry-header;
-  max-width: var(--content-max-width);
-  padding-left: var(--padding-article);
-  padding-right: var(--padding-article);
+  margin-bottom: var(--gutter);
 }
 
 .content__header--no-padding {
   padding-left: 0;
   padding-right: 0;
+}
+
+.content__secondary {
+  border-top: 1px solid var(--color-code-border);
+  padding-top: var(--gutter);
+  
+  @media (min-width: 1280px) {
+    border: none;
+    padding: 0;
+  }
 }

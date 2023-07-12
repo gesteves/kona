@@ -1,24 +1,22 @@
-<section class="content" id="main-content" aria-labelledby="hed">
-  <main>
-    <ol class="content__list">
-      <% content.items.each do |entry| %>
-        <li><%= partial 'partials/entry_compact', locals: { entry: entry, in_list: true } %></li>
-      <% end %>
-    </ol>
-
-    <% if content.next_page.present? || content.previous_page.present? %>
-      <nav class="pagination">
-      <% if content.previous_page.present? %>
-        <%= link_to "Previous", pagination_path(entry_type: content.entry_type, page: content.previous_page), class: "pagination__link pagination__link--previous" %>
-      <% else %>
-        <span class="pagination__link pagination__link--previous pagination__link--inactive">Previous</span>
-      <% end %>
-      <% if content.next_page.present? %>
-        <%= link_to "Next", pagination_path(entry_type: content.entry_type, page: content.next_page), class: "pagination__link pagination__link--next" %>
-      <% else %>
-        <span class="pagination__link pagination__link--next pagination__link--inactive">Next</span>
-      <% end %>
-      </nav>
+<main>
+  <ol class="content__list">
+    <% content.items.each do |entry| %>
+      <li><%= partial 'partials/entry_compact', locals: { entry: entry, in_list: true } %></li>
     <% end %>
-  </main>
-</section>
+  </ol>
+
+  <% if content.next_page.present? || content.previous_page.present? %>
+    <nav class="pagination">
+    <% if content.previous_page.present? %>
+      <%= link_to "Previous", pagination_path(entry_type: content.entry_type, page: content.previous_page), class: "pagination__link pagination__link--previous" %>
+    <% else %>
+      <span class="pagination__link pagination__link--previous pagination__link--inactive">Previous</span>
+    <% end %>
+    <% if content.next_page.present? %>
+      <%= link_to "Next", pagination_path(entry_type: content.entry_type, page: content.next_page), class: "pagination__link pagination__link--next" %>
+    <% else %>
+      <span class="pagination__link pagination__link--next pagination__link--inactive">Next</span>
+    <% end %>
+    </nav>
+  <% end %>
+</main>

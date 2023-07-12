@@ -1,29 +1,12 @@
 .header {
-  background: var(--color-header-background);
-  display: flex;
-  flex-flow: row nowrap;
-  justify-content: space-between;
-  padding: 1rem 0;
-  width: 100%;
-}
-
-.header__avatar {
-  border-radius: 100%;
-  margin: 0 1rem 0 0;
-  width: var(--avatar-size);
+  grid-column: 1 / -1;
 }
 
 .header__link {
-  align-items: center;
-  display: flex;
-  flex-flow: nowrap;
-  margin: 0 0 0 1rem;
+  display: block;
   text-decoration: none;
-
-  @media (min-width: 768px) {
-    margin: 0 0 0 2rem;
-  }
-
+  width: var(--width-logo);
+  
   &:link,
   &:visited {
     color: var(--color-text);
@@ -32,6 +15,15 @@
   &:hover,
   &:active {
     color: var(--color-link);
+    text-decoration: none;
+
+    g {
+      fill: currentColor;
+    }
+  }
+
+  g {
+    transition: fill var(--transition-duration);
   }
 }
 

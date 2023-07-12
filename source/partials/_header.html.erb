@@ -1,12 +1,12 @@
 <header class="header" aria-labelledby="title">
   <a href="/" class="header__link">
-    <picture>
-      <% ["avif", "webp", "jpg"].each do |format| %>
-        <%= source_tag(data.site.logo.url, sizes: '(min-width: 768px) 48px, 36px', type: "image/#{format}", format: format, widths: [36, 72, 108, 48, 96, 144]) %>
+    <h1 class="header__hed" id="title">
+      <% if data.site.svgLogo.present? %>
+        <span class="sr-only" id="header-blog-name"><%= data.site.title %></span>
+        <%= data.site.svgLogo %>
+      <% else %>
+        <%= data.site.title %>
       <% end %>
-      <img src="<%= data.site.logo.url %>" alt="<%= data.site.logo.title %>" width="<%= data.site.logo.width %>" height="<%= data.site.logo.height %>" loading="eager" decoding="async" class="header__avatar" >
-    </picture>
-    <h1 class="header__hed" id="title"><%= data.site.title %></h1>
+    </h1>
   </a>
-  <%= partial 'partials/nav' %>
 </header>

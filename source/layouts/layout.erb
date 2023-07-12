@@ -3,8 +3,14 @@
   <%= partial 'partials/head' %>
   <body>
     <%= partial 'partials/skip' %>
-    <%= partial 'partials/header' %>
-    <%= yield %>
-    <%= partial 'partials/footer' %>
+    <div class="content">
+      <%= partial 'partials/header' %>
+      <div class="content__primary" class="content" id="main-content" aria-labelledby="hed">
+        <%= yield %>
+      </div>
+      <div class="content__secondary">
+        <%= partial 'partials/sidebar' %>
+      </div>
+    </div>
   </body>
 </html>

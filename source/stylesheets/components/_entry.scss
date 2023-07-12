@@ -1,12 +1,7 @@
-.entry {
-  flex-grow: 1;
-  max-width: var(--content-max-width);
-  padding: var(--padding-article);
-  width: calc(100vw - (var(--padding-article) * 2));
-}
+
 
 .entry--in-list {
-  padding-bottom: 0;
+  margin-bottom: var(--gutter);
 }
 
 .entry__header {
@@ -18,7 +13,6 @@
   font-family: var(--monospace);
   font-size: var(--font-x-small);
   line-height: 2;
-  margin: 1rem 0 0 0;
   text-transform: uppercase;
 
   & + h2 {
@@ -125,7 +119,7 @@
   }
 
   figure {
-    margin: 1.5rem calc(var(--padding-article) * -1) 1.5rem calc(var(--padding-article) * -1);
+    margin: 1.5rem 0;
   }
 
   figcaption {
@@ -136,7 +130,6 @@
     font-weight: 300;
     line-height: 2;
     margin-top: 0.5rem;
-    padding: 0 var(--padding-article);
 
     i,
     em,
@@ -287,7 +280,7 @@
 }
 
 .entry--related {
-  padding-top: 0;
+  margin-bottom: 0;
 
   .entry__header {
     h4 {

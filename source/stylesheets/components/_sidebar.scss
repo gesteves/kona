@@ -1,0 +1,27 @@
+.sidebar {
+  p {
+    color: var(--color-text);
+    font-family: var(--monospace);
+    font-size: var(--font-x-small);
+    font-weight: 300;
+    line-height: 2;
+    margin-top: 1rem;
+  }
+
+  i,
+  em,
+  cite {
+    font-style: italic;
+  }
+
+  b,
+  strong {
+    font-weight: 600;
+  }
+}
+
+.sidebar__avatar {
+  border-radius: 100%;
+  margin: 0 1rem 0 0;
+  width: var(--avatar-size);
+}

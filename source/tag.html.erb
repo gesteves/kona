@@ -1,14 +1,12 @@
-<section class="content" id="main-content" aria-labelledby="hed">
-  <header class="content__header">
-    <h2 id="hed">
-      <%= content.title %>
-    </h2>
-  </header>
-  <main>
-    <ol class="content__list">
-      <% content.items.reject(&:draft).each do |entry| %>
-        <li><%= partial 'partials/entry_compact', locals: { entry: entry, in_list: true } %></li>
-      <% end %>
-    </ol>
-  </main>
-</section>
+<header class="content__header">
+  <h2 id="hed">
+    <%= content.title %>
+  </h2>
+</header>
+<main>
+  <ol class="content__list">
+    <% content.items.reject(&:draft).each do |entry| %>
+      <li><%= partial 'partials/entry_compact', locals: { entry: entry, in_list: true } %></li>
+    <% end %>
+  </ol>
+</main>

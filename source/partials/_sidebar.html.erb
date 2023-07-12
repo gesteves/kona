@@ -1,0 +1,10 @@
+<aside class="sidebar">
+  <picture>
+      <% ["avif", "webp", "jpg"].each do |format| %>
+        <%= source_tag(data.site.author.profilePicture.url, sizes: '(min-width: 768px) 96px, 48px', type: "image/#{format}", format: format, widths: [48, 96, 144]) %>
+      <% end %>
+      <img src="<%= data.site.author.profilePicture.url %>" alt="<%= data.site.author.profilePicture.title %>" width="<%= data.site.author.profilePicture.width %>" height="<%= data.site.author.profilePicture.height %>" loading="eager" decoding="async" class="sidebar__avatar" >
+    </picture>
+
+  <%= render_body(data.site.blurb) %>
+</aside>

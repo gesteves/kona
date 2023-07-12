@@ -24,7 +24,5 @@
   <% end %>
   <link rel="alternate" type="application/atom+xml" href="<%= full_url("/feed.xml") %>" />
   <%= stylesheet_link_tag 'site' %>
-  <%= javascript_include_tag 'all', defer: true %>
-  <%= javascript_include_tag 'prism', defer: true %>
   <%= yield_content :assets %>
 </head>

@@ -1,6 +1,7 @@
 .related {
   border-top: 2px solid var(--color-code-border);
-  padding: var(--padding-article) 0;
+  margin: var(--gutter) 0 0 0; 
+  padding: var(--gutter) 0 0 0;
 }
 
 .related__heading {
@@ -8,6 +9,4 @@
   font-size: var(--font-medium);
   font-weight: 700;
   line-height: 1.5;
-  margin-top: 1.5rem;
-  padding: 0 var(--padding-article);
 }

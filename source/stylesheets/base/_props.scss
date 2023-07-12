@@ -14,10 +14,9 @@
   --color-spanish-gray: #999999;
 
   // Basics
-  --content-max-width: 800px;
-  --padding-article: 1rem;
-  --padding-footer: 1rem 0;
-  --padding-intro: 2rem 1rem;
+  --max-width-content: 1480px;
+  --gutter: 1rem;
+
   // Colors
   --color-accent: var(--color-firebrick);
   --color-background: white;
@@ -39,7 +38,7 @@
   --font-small: 12px;
   --font-x-small: 10px;
   // Avatar
-  --avatar-size: 36px;
+  --avatar-size: 48px;
   // Fonts
   --monospace: 'IBM Plex Mono', Menlo, monospace;
   --sans-serif: 'Lato', 'Helvetica Neue', sans-serif;
@@ -47,16 +46,16 @@
   // Other
   --intro-text-background: linear-gradient(to top, rgba(255, 255, 255, 1) 33%, rgba(255, 255, 255, 0));
   --transition-duration: 150ms;
+  --width-logo: 200px;
 
   @media (min-width: 768px) {
-    --avatar-size: 48px;
+    --avatar-size: 96px;
     --font-large: 48px;
     --font-medium: 24px;
     --font-small: 18px;
     --font-x-small: 12px;
-    --padding-article: 4rem;
-    --padding-footer: 4rem 0;
-    --padding-intro: 4rem;
+    --gutter: 4rem;
+    --width-logo: 320px;
   }
 
   @media (prefers-color-scheme: dark) {
