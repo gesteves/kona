@@ -119,7 +119,11 @@
   }
 
   figure {
-    margin: 1.5rem 0;
+    margin: 1.5rem calc(var(--gutter) * -1) 1.5rem calc(var(--gutter) * -1);
+
+    @media (min-width: 1280px) {
+      margin-right: 0;
+    }
   }
 
   figcaption {
@@ -129,7 +133,11 @@
     font-style: italic;
     font-weight: 300;
     line-height: 2;
-    margin-top: 0.5rem;
+    margin: 0.5rem var(--gutter) 0 var(--gutter);
+
+    @media (min-width: 1280px) {
+      margin-right: 0;
+    }
 
     i,
     em,
