@@ -6,7 +6,7 @@
   display: block;
   text-decoration: none;
   width: var(--width-logo);
-  
+
   &:link,
   &:visited {
     color: var(--color-text);
@@ -16,13 +16,10 @@
   &:active {
     color: var(--color-link);
     text-decoration: none;
-
-    g {
-      fill: currentColor;
-    }
   }
 
   g {
+    fill: currentColor;
     transition: fill var(--transition-duration);
   }
 }
