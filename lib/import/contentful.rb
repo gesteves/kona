@@ -91,6 +91,15 @@ module Import
             mastodon
             bluesky
             instagram
+            author {
+              name
+              profilePicture {
+                width
+                height
+                url
+                title
+              }
+            }
             logo {
               width
               height
