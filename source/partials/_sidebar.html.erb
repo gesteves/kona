@@ -11,33 +11,29 @@
     <%= render_body(data.site.blurb) %>
   </section>
 
-  <section class="sidebar__section">
-    <h2>Links</h2>
-    <ul>
-      <% pages = data.site.navigationCollection.items.compact.map { |p| [p.navigationTitle.presence || p.title, "/#{p.slug}/index.html"] } %>
-      <% pages.each do |p| %>
-        <li><%= link_to p.first, p.last %></li>
-      <% end %>
-    </ul>
-  </section>
+  <% menu_items = data.site.navigationCollection.items.compact  %>
+  <% if menu_items.present? %>
+    <section class="sidebar__section">
+      <h2>Links</h2>
+      <ul>
+        <% menu_items.each do |i| %>
+          <li><%= link_to i.title, i.destination %></li>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
 
-  <section class="sidebar__section">
-    <h2>Elsewhere</h2>
-    <ul>
-      <% if data.site.bluesky.present? %>
-        <li><%= link_to "Bluesky", data.site.bluesky, rel: "me noopener", target: "_blank" %></li>
-      <% end %>
-      <% if data.site.instagram.present? %>
-        <li><%= link_to "Instagram", data.site.instagram, rel: "me noopener", target: "_blank" %></li>
-      <% end %>
-      <% if data.site.mastodon.present? %>
-        <li><%= link_to "Mastodon", data.site.mastodon, rel: "me noopener", target: "_blank" %></li>
-      <% end %>
-      <% if data.site.strava.present? %>
-        <li><%= link_to "Strava", data.site.strava, rel: "me noopener", target: "_blank" %></li>
-      <% end %>
-    </ul>
-  </section>
+  <% socials = data.site.socialsCollection.items.compact %>
+  <% if socials.present? %>
+    <section class="sidebar__section">
+      <h2>Elsewhere</h2>
+      <ul>
+        <% socials.each do |i| %>
+          <li><%= link_to i.title, i.destination, rel: "me noopener", target: "_blank" %></li>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
 
   <section class="sidebar__section">
     <h2>© <%= data.articles.reject(&:draft).map { |a| DateTime.parse(a.published_at) }.min.strftime('%Y') %>–<%= Time.now.strftime('%Y') %></h2>

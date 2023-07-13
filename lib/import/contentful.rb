@@ -86,10 +86,6 @@ module Import
             svgLogo
             copyright
             email
-            strava
-            mastodon
-            bluesky
-            instagram
             author {
               name
               profilePicture {
@@ -99,14 +95,16 @@ module Import
                 title
               }
             }
-            navigationCollection(limit: 5) {
+            navigationCollection {
 							items {
 								title
-								navigationTitle
-								slug
-                sys {
-                  publishedVersion
-                }
+								destination
+							}
+						}
+            socialsCollection {
+							items {
+								title
+								destination
 							}
 						}
             logo {
