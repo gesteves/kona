@@ -20,7 +20,8 @@
     </h2>
   </header>
   <main class="entry__body">
-    <%= render_body(entry.summary.presence || entry.body) %>
+    <%= render_body(entry.intro) %>
+    <%= link_to "Read more", entry.path, class: "entry__read-more" %>
   </main>
   <% unless defined?(in_list) && in_list %>
     <%= partial 'partials/disclosure', locals: { entry: entry } %>

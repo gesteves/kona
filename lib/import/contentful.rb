@@ -20,6 +20,7 @@ module Import
           items {
             title
             slug
+            intro
             body
             author {
               name
