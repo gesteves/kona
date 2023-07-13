@@ -252,6 +252,7 @@
   form {
     display: flex;
     flex-flow: column;
+    margin: 1.5rem 0;
   }
   
   label {
@@ -293,6 +294,9 @@
     line-height: 2;
     padding: 0 2rem;
 
+    &:hover {
+      cursor: pointer;
+    }
   
     &:active {
       transform: translateY(1px);
