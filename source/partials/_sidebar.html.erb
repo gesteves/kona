@@ -14,7 +14,7 @@
   <section class="sidebar__section">
     <h2>Links</h2>
     <ul>
-      <% pages = data.pages.select { |p| !p.draft }.map { |p| [p.menuLabel.presence || p.title, p.path] }.compact %>
+      <% pages = data.pages.select { |p| !p.draft }.map { |p| [p.navigationTitle.presence || p.title, p.path] }.compact %>
       <% pages << ['Feed', '/feed.xml'] %>
       <% pages << ['Contact', "mailto:#{data.site.email}"] %>
       <% pages.sort { |a,b| a.first <=> b.first }.each do |p| %>
