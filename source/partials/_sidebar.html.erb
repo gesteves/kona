@@ -14,7 +14,7 @@
   <section class="sidebar__section">
     <h2>Links</h2>
     <ul>
-      <% pages = data.site.navigationCollection.items.select { |p| p.sys.publishedVersion.present? }.map { |p| [p.navigationTitle.presence || p.title, "/#{p.slug}/index.html"] }.compact %>
+      <% pages = data.site.navigationCollection.items.compact.map { |p| [p.navigationTitle.presence || p.title, "/#{p.slug}/index.html"] } %>
       <% pages.each do |p| %>
         <li><%= link_to p.first, p.last %></li>
       <% end %>
