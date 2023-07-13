@@ -28,6 +28,7 @@ module Import
             published
             indexInSearchEngines
             canonicalUrl
+            externalUrl
             sys {
               id
               firstPublishedAt
@@ -51,7 +52,6 @@ module Import
             indexInSearchEngines
             canonicalUrl
             showInNav
-            showInFooter
             menuLabel
             sys {
               id
@@ -81,7 +81,6 @@ module Import
           items {
             title
             metaTitle
-            description
             metaDescription
             blurb
             svgLogo
