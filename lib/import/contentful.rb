@@ -99,6 +99,13 @@ module Import
                 title
               }
             }
+            navigationCollection(limit: 100) {
+							items {
+								title
+								navigationTitle
+								slug
+							}
+						}
             logo {
               width
               height
