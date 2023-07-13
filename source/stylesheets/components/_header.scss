@@ -10,16 +10,23 @@
   &:link,
   &:visited {
     color: var(--color-text);
+
+    g {
+      fill: var(--color-text);
+    }
   }
 
   &:hover,
   &:active {
     color: var(--color-link);
     text-decoration: none;
+
+    g {
+      fill: var(--color-link);
+    }
   }
 
   g {
-    fill: currentColor;
     transition: fill var(--transition-duration);
   }
 }
