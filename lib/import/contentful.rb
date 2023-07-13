@@ -95,13 +95,13 @@ module Import
                 title
               }
             }
-            navigationCollection(limit: 10) {
+            navigationCollection {
 							items {
 								title
 								destination
 							}
 						}
-            socialsCollection(limit: 10) {
+            socialsCollection {
 							items {
 								title
 								destination
