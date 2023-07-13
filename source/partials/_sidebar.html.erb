@@ -1,20 +1,31 @@
 <aside class="sidebar">
-  <picture>
+
+  <section class="sidebar__section sidebar__section--full">
+    <picture>
       <% ["avif", "webp", "jpg"].each do |format| %>
         <%= source_tag(data.site.author.profilePicture.url, sizes: '(min-width: 768px) 96px, 48px', type: "image/#{format}", format: format, widths: [48, 96, 144]) %>
       <% end %>
       <img src="<%= data.site.author.profilePicture.url %>" alt="<%= data.site.author.profilePicture.title %>" width="<%= data.site.author.profilePicture.width %>" height="<%= data.site.author.profilePicture.height %>" loading="eager" decoding="async" class="sidebar__avatar" >
     </picture>
 
-  <%= render_body(data.site.blurb) %>
+    <%= render_body(data.site.blurb) %>
+  </section>
 
-  <ul class="sidebar__links">
+  <section class="sidebar__section">
+    <h2>Links</h2>
+    <ul>
       <% pages = data.pages.select { |p| !p.draft }.map { |p| [p.menuLabel.presence || p.title, p.path] }.compact %>
+      <% pages << ['Feed', '/feed.xml'] %>
+      <% pages << ['Contact', "mailto:#{data.site.email}"] %>
       <% pages.sort { |a,b| a.first <=> b.first }.each do |p| %>
         <li><%= link_to p.first, p.last %></li>
       <% end %>
-      <li><%= link_to "Contact", "mailto:#{data.site.email}" %></li>
-      <li><%= link_to "Feed", "/feed.xml" %></li>
+    </ul>
+  </section>
+
+  <section class="sidebar__section">
+    <h2>Elsewhere</h2>
+    <ul>
       <% if data.site.bluesky.present? %>
         <li><%= link_to "Bluesky", data.site.bluesky, rel: "me noopener", target: "_blank" %></li>
       <% end %>
@@ -28,6 +39,10 @@
         <li><%= link_to "Strava", data.site.strava, rel: "me noopener", target: "_blank" %></li>
       <% end %>
     </ul>
+  </section>
 
-    <p>© <%= data.articles.reject(&:draft).map { |a| DateTime.parse(a.published_at) }.min.strftime('%Y') %>–<%= Time.now.strftime('%Y') %> <%= data.site.copyright %></p>
+  <section class="sidebar__section">
+    <h2>© <%= data.articles.reject(&:draft).map { |a| DateTime.parse(a.published_at) }.min.strftime('%Y') %>–<%= Time.now.strftime('%Y') %></h2>
+    <p><%= data.site.copyright %></p>
+  </section>
 </aside>
