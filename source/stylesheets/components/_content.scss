@@ -3,7 +3,7 @@
   max-width: var(--max-width-content);
   padding: var(--gutter);
   grid-gap: var(--gutter);
-  width: 100%;
+  width: calc(100% - (var(--gutter) * 2));
 
   @media (min-width: 1280px) {
     grid-template-columns: auto 320px;
