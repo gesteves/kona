@@ -52,7 +52,6 @@ module Import
             summary
             indexInSearchEngines
             canonicalUrl
-            navigationTitle
             sys {
               id
               firstPublishedAt
