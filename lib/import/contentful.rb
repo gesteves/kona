@@ -99,11 +99,14 @@ module Import
                 title
               }
             }
-            navigationCollection(limit: 100) {
+            navigationCollection(limit: 5) {
 							items {
 								title
 								navigationTitle
 								slug
+                sys {
+                  publishedVersion
+                }
 							}
 						}
             logo {
