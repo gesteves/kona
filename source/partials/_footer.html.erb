@@ -5,7 +5,7 @@
         <% ["avif", "webp", "jpg"].each do |format| %>
           <%= source_tag(data.site.author.profilePicture.url, sizes: '48px', type: "image/#{format}", format: format, widths: [48, 96, 144]) %>
         <% end %>
-        <img src="<%= data.site.author.profilePicture.url %>" alt="<%= data.site.author.profilePicture.title %>" width="<%= data.site.author.profilePicture.width %>" height="<%= data.site.author.profilePicture.height %>" loading="eager" decoding="async" class="footer__avatar" >
+        <img src="<%= data.site.author.profilePicture.url %>" alt="<%= data.site.author.profilePicture.title %>" width="<%= data.site.author.profilePicture.width %>" height="<%= data.site.author.profilePicture.height %>" loading="lazy" decoding="async" class="footer__avatar" >
       </picture>
 
       <%= render_body(data.site.blurb) %>
