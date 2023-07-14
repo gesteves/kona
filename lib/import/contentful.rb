@@ -64,10 +64,6 @@ module Import
           items {
             name
             email
-            strava
-            bluesky
-            mastodon
-            instagram
             profilePicture {
               width
               height
