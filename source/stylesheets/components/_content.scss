@@ -1,13 +1,15 @@
 .content {
-  display: grid;
-  max-width: var(--max-width-content);
+  box-sizing: border-box;
+  display: flex;
+  flex-flow: column;
+  align-items: center;
   padding: var(--gutter);
-  grid-gap: var(--gutter);
-  width: calc(100% - (var(--gutter) * 2));
+  max-width: var(--max-width-container);
+  width: 100%;
+}
 
-  @media (min-width: 1280px) {
-    grid-template-columns: auto 320px;
-  }
+.content__primary {
+  max-width: var(--max-width-content);
 }
 
 .content__header {
@@ -20,12 +22,3 @@
   padding-right: 0;
 }
 
-.content__secondary {
-  border-top: 1px solid var(--color-code-border);
-  padding-top: var(--gutter);
-  
-  @media (min-width: 1280px) {
-    border: none;
-    padding: 0;
-  }
-}

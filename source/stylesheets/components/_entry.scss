@@ -3,6 +3,17 @@
   @extend .extend-entry-header;
 }
 
+.entry--large .entry__header {
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--gutter);
+  padding-bottom: var(--gutter);
+  text-align: center;
+
+  h2 {
+    margin: 0;
+  }
+}
+
 .entry__meta {
   color: var(--color-secondary-text);
   font-family: var(--monospace);
@@ -114,11 +125,7 @@
   }
 
   figure {
-    margin: 1.5rem calc(var(--gutter) * -1) 1.5rem calc(var(--gutter) * -1);
-
-    @media (min-width: 1280px) {
-      margin-right: 0;
-    }
+    margin: 1.5rem calc(var(--picture-outdent) * -1) 1.5rem calc(var(--picture-outdent) * -1);
   }
 
   figcaption {
@@ -128,11 +135,7 @@
     font-style: italic;
     font-weight: 300;
     line-height: 2;
-    margin: 0.5rem var(--gutter) 0 var(--gutter);
-
-    @media (min-width: 1280px) {
-      margin-right: 0;
-    }
+    margin: 0.5rem var(--picture-outdent) 0 var(--picture-outdent);
 
     i,
     em,

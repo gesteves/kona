@@ -14,7 +14,8 @@
   --color-spanish-gray: #999999;
 
   // Basics
-  --max-width-content: 1280px;
+  --max-width-container: 1280px;
+  --max-width-content: 720px;
   --gutter: 1rem;
 
   // Colors
@@ -49,9 +50,9 @@
   --intro-text-background: linear-gradient(to top, rgba(255, 255, 255, 1) 33%, rgba(255, 255, 255, 0));
   --transition-duration: 150ms;
   --width-logo: 200px;
+  --picture-outdent: var(--gutter);
 
   @media (min-width: 768px) {
-    --avatar-size: 96px;
     --font-large: 48px;
     --font-medium: 24px;
     --font-small: 18px;

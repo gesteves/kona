@@ -5,12 +5,10 @@
     <%= partial 'partials/skip' %>
     <div class="content">
       <%= partial 'partials/header' %>
-      <div class="content__primary" class="content" id="main-content" aria-labelledby="hed">
+      <div class="content__primary" id="main-content" aria-labelledby="hed">
         <%= yield %>
       </div>
-      <div class="content__secondary">
-        <%= partial 'partials/sidebar' %>
-      </div>
     </div>
+    <%= partial 'partials/footer' %>
   </body>
 </html>

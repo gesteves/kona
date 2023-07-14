@@ -1,9 +1,11 @@
 entry:
   sizes:
-    - "(min-width: 1410px) 960px"
+    - "(min-width: 848px) 848px"
     - "(min-width: 1200px) calc(100vw - 320px - 8rem)"
     - "100vw"
   widths:
+    - 848
+    - 1696
     - 960
     - 1920
     - 1284
