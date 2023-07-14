@@ -31,7 +31,12 @@
 
   a:hover,
   a:active {
+    box-shadow: 0 2px 0 var(--color-link);
     color: var(--color-link);
     text-decoration: none;
+  }
+
+  a.current {
+    box-shadow: 0 2px 0 var(--color-link);
   }
 }
