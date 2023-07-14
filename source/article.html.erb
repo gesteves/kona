@@ -14,7 +14,8 @@
     </h2>
   </header>
   <main class="entry__body">
-    <%= render_body(content.intro + "\n\n" + content.body) %>
+    <%= render_body(content.intro) %>
+    <%= render_body(content.body) %>
   </main>
   <%= partial 'partials/disclosure', locals: { entry: content } %>
 </article>

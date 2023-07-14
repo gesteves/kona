@@ -27,6 +27,7 @@
         <summary><%= entry.summary %></summary>
       <% end %>
       <content type="html">
+        <%= escape_html set_alt_text(add_figure_elements(markdown_to_html(entry.intro))) %>
         <%= escape_html set_alt_text(add_figure_elements(markdown_to_html(entry.body))) %>
       </content>
       <% if entry.contentfulMetadata.tags.present? %>
