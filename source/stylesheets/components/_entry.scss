@@ -37,7 +37,7 @@
 
   span::after {
     color: var(--color-tertiary-text);
-    content: ' • ';
+    content: ' / ';
   }
 
   span:last-of-type::after {
