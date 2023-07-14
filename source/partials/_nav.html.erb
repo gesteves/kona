@@ -1,8 +1,8 @@
 <% if items.present? %>
-  <nav class="nav">
-    <ol>
+  <nav>
+    <ol class="nav">
     <% items.each do |i| %>
-      <li class="nav-item"><%= link_to i.title, i.destination %><li>
+      <li class="nav-item"><%= link_to i.title, i.destination %></li>
     <% end %>
     </ol>
   </nav>

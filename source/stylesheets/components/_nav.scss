@@ -12,7 +12,6 @@
   &::after {
     color: var(--color-tertiary-text);
     content: "/";
-    padding: 0 1rem;
   }
 
   &:last-child::after {
@@ -20,7 +19,8 @@
   }
 
   a {
-    display: block;
+    display: inline-block;
+    padding: 0 1rem;
   }
 
   a:link,
