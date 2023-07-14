@@ -9,14 +9,5 @@
       <% end %>
     </h1>
   </a>
-
-  <% menu_items = data.site.navigationCollection.items.compact  %>
-  <% if menu_items.present? %>
-    <nav class="header__nav">
-      <% menu_items.each do |i| %>
-        <%= link_to i.title, i.destination, class: "header__nav-item" %>
-      <% end %>
-    </nav>
-  <% end %>
-  
+  <%= partial 'partials/nav', locals: { items: data.site.navigationCollection.items.compact } %>
 </header>

@@ -1,0 +1,9 @@
+<% if items.present? %>
+  <nav class="nav">
+    <ol>
+    <% items.each do |i| %>
+      <li class="nav-item"><%= link_to i.title, i.destination %><li>
+    <% end %>
+    </ol>
+  </nav>
+<% end %>
