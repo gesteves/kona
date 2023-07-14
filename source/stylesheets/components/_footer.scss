@@ -55,7 +55,7 @@
 
   @media (min-width: 768px) {
     grid-gap: 2rem;
-    grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+    grid-template-columns: 320px 1fr 1fr 1fr;
   }
 }
 
@@ -67,7 +67,8 @@
 
   @media (min-width: 768px) {
     align-items: flex-start;
-    grid-column: 1 / 3;
+    align-self: self-start;
+    grid-column: auto;
   }
 
   picture {
