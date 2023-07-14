@@ -266,6 +266,10 @@
     line-height: 2;
     margin: 0 0 2rem 0;
     text-indent: 0;
+
+    &.hp {
+      display: none;
+    }
   }
   
   input,
