@@ -181,7 +181,7 @@ module Import
       articles, pages, assets, redirects, author, site = query_contentful
 
       articles = articles
-                  .map { |item| set_entry_type(item, 'Article') }
+                  .map { |item| set_entry_type(item) }
                   .map { |item| set_draft_status(item) }
                   .map { |item| set_timestamps(item) }
                   .map { |item| set_article_path(item) }
@@ -207,8 +207,16 @@ module Import
       File.open('data/assets.json','w'){ |f| f << assets.to_json }
     end
 
-    def self.set_entry_type(item, type)
-      item[:entry_type] = type
+    def self.set_entry_type(item, type = nil)
+      if type.present?
+        item[:entry_type] = type
+      elsif item[:externalUrl].present?
+        item[:entry_type] = 'Link'
+      elsif item[:intro].present?
+        item[:entry_type] = 'Article'
+      else
+        item[:entry_type] = 'Page'
+      end
       item
     end
 
