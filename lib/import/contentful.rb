@@ -30,6 +30,11 @@ module Import
             indexInSearchEngines
             canonicalUrl
             externalUrl
+            openGraphImage {
+              width
+              height
+              url
+            }
             sys {
               id
               firstPublishedAt
@@ -52,6 +57,11 @@ module Import
             summary
             indexInSearchEngines
             canonicalUrl
+            openGraphImage {
+              width
+              height
+              url
+            }
             sys {
               id
               firstPublishedAt
@@ -68,7 +78,7 @@ module Import
               width
               height
               url
-              title
+              description
             }
           }
         }
@@ -78,7 +88,6 @@ module Import
             metaTitle
             metaDescription
             blurb
-            svgLogo
             copyright
             email
             author {
@@ -87,7 +96,7 @@ module Import
                 width
                 height
                 url
-                title
+                description
               }
             }
             navigationCollection {
@@ -107,6 +116,11 @@ module Import
               height
               url
               title
+            }
+            openGraphImage {
+              width
+              height
+              url
             }
             sys {
               publishedAt
