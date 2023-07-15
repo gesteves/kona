@@ -14,7 +14,7 @@
       <id><%= atom_tag(full_url(entry.path), DateTime.parse(entry.published_at)) %></id>
       <title><%= escape_html entry.title %></title>
       <% if entry.entry_type == "Link" %>
-        <link rel="alternate" type="text/html" href="<%= entry.linkUrl %>"/>
+        <link rel="alternate" type="text/html" href="<%= entry.externalUrl %>"/>
       <% else %>
         <link rel="alternate" type="text/html" href="<%= full_url(entry.path) %>"/>
       <% end %>
