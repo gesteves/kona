@@ -12,19 +12,19 @@ end
 activate :asset_hash
 activate :directory_indexes
 
-data.articles.each do |article|
+@app.data.articles.each do |article|
   proxy article.path, "/article.html", locals: { content: article }, ignore: true
 end
 
-data.pages.each do |page|
+@app.data.pages.each do |page|
   proxy page.path, "/page.html", locals: { content: page }, ignore: true
 end
 
-data.tags.each do |tag|
+@app.data.tags.each do |tag|
   proxy tag.path, "/tag.html", locals: { content: tag }, ignore: true
 end
 
-data.blog.each do |page|
+@app.data.blog.each do |page|
   if page.current_page == 1
     proxy "/index.html", "/blog.html", locals: { content: page }, ignore: true
   else
