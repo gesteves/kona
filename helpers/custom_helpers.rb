@@ -27,8 +27,31 @@ module CustomHelpers
         content.title
       end
     end
+    smartypants([title, data.site.metaTitle].flatten.reject(&:blank?).uniq.join(separator))
+  end
 
-    smartypants([title, data.site.metaTitle].reject(&:blank?).uniq.join(separator))
+  def og_title(title: nil, content: nil, separator: ' · ')
+    if content.present?
+      title = if content.current_page.present? && content.current_page > 1
+        [content.title, "Page #{content.current_page}"]
+      else
+        content.title
+      end
+    end
+    title = data.site.metaTitle if title.blank?
+    smartypants([title].flatten.reject(&:blank?).uniq.join(separator))
+  end
+
+  def content_summary(content)
+    if content.summary.present?
+      content.summary
+    elsif content.intro.present?
+      truncate(markdown_to_text(content.intro), length: 280)
+    elsif content.body.present?
+      truncate(markdown_to_text(content.body), length: 280)
+    else
+      data.site.metaDescription
+    end
   end
 
   def hide_from_search_engines?(content)
@@ -67,11 +90,6 @@ module CustomHelpers
       "#{url.to_s} #{w}w"
     end
     srcset.join(', ')
-  end
-
-  def content_summary(content)
-    return content.summary if content.summary.present?
-    truncate(markdown_to_text(content.body), length: 280) if content.body.present?
   end
 
   def pagination_path(entry_type:, page:)

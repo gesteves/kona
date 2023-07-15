@@ -1,22 +1,7 @@
 <head>
   <meta charset="utf-8">
-  <% if defined?(content) %>
-    <title><%= page_title(content: content) %></title>
-  <% elsif current_page.data.title.present? %>
-    <title><%= page_title(title: current_page.data.title) %></title>
-  <% else %>
-    <title><%= page_title %></title>
-  <% end %>
-  <% if defined?(content) %>
-    <meta name="description" content="<%= content_summary(content) %>">
-  <% elsif current_page.data.description.present? %>
-    <meta name="description" content="<%= current_page.data.description %>">
-  <% end %>
-  <meta name="viewport" content="width=device-width,minimum-scale=1">
-  <meta name="theme-color" content="#BF0222">
-  <% if config[:context] != 'production' || (defined?(content) && hide_from_search_engines?(content)) %>
-    <meta name="robots" content="noindex">
-  <% end %>
+  <%= partial 'partials/meta' %>
+  <%= partial 'partials/open_graph' %>
   <% if defined?(content) && content.canonicalUrl.present? %>
     <link rel="canonical" href="<%= content.canonicalUrl %>">
   <% else %>
