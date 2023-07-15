@@ -2,6 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc><%= full_url('index.html') %></loc>
+    <lastmod><%= site_updated_at.strftime('%Y-%m-%d') %></lastmod>
   </url>
   <% data.pages.reject { |a| a.draft || !a.indexInSearchEngines }.each do |page| %>
     <url>
