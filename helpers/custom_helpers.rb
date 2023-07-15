@@ -259,9 +259,9 @@ module CustomHelpers
 
   def site_updated_at
     [
-      data.pages.reject { |p| p.draft || !p.indexInSearchEngines }.map { |p| DateTime.parse(p.sys.publishedAt) }.max,
-      data.articles.reject { |a| a.draft || !a.indexInSearchEngines }.map { |a| DateTime.parse(a.sys.publishedAt) }.max,
+      data.pages.reject { |p| p.draft || !p.indexInSearchEngines }.map { |p| DateTime.parse(p.sys.publishedAt) },
+      data.articles.reject { |a| a.draft || !a.indexInSearchEngines }.map { |a| DateTime.parse(a.sys.publishedAt) },
       DateTime.parse(data.site.sys.publishedAt)
-    ].max
+    ].flatten.max
   end
 end
