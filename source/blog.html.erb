@@ -1,32 +1,30 @@
-<main>
-  <% if content.title.present? %>
-    <header class="content__header">
-      <h2 id="hed">
-        <%= content.title %>
-      </h2>
-    </header>
-  <% end %>
+<% if content.title.present? %>
+  <header class="content__header">
+    <h2 id="hed">
+      <%= content.title %>
+    </h2>
+  </header>
+<% end %>
 
-  <% if content.items.present? %>
-    <ol class="content__list">
-      <% content.items.each do |item| %>
-        <li><%= partial 'partials/article_compact', locals: { article: item } %></li>
-      <% end %>
-    </ol>
-  <% end %>
+<% if content.items.present? %>
+  <ol class="content__list">
+    <% content.items.each do |item| %>
+      <li><%= partial 'partials/article_compact', locals: { article: item } %></li>
+    <% end %>
+  </ol>
+<% end %>
 
-  <% if content.next_page.present? || content.previous_page.present? %>
-    <nav class="pagination">
-    <% if content.previous_page.present? %>
-      <%= link_to "Previous", pagination_path(entry_type: content.entry_type, page: content.previous_page), class: "pagination__link pagination__link--previous" %>
-    <% else %>
-      <span class="pagination__link pagination__link--previous pagination__link--inactive">Previous</span>
-    <% end %>
-    <% if content.next_page.present? %>
-      <%= link_to "Next", pagination_path(entry_type: content.entry_type, page: content.next_page), class: "pagination__link pagination__link--next" %>
-    <% else %>
-      <span class="pagination__link pagination__link--next pagination__link--inactive">Next</span>
-    <% end %>
-    </nav>
+<% if content.next_page.present? || content.previous_page.present? %>
+  <nav class="pagination">
+  <% if content.previous_page.present? %>
+    <%= link_to "Previous", pagination_path(entry_type: content.entry_type, page: content.previous_page), class: "pagination__link pagination__link--previous" %>
+  <% else %>
+    <span class="pagination__link pagination__link--previous pagination__link--inactive">Previous</span>
   <% end %>
-</main>
+  <% if content.next_page.present? %>
+    <%= link_to "Next", pagination_path(entry_type: content.entry_type, page: content.next_page), class: "pagination__link pagination__link--next" %>
+  <% else %>
+    <span class="pagination__link pagination__link--next pagination__link--inactive">Next</span>
+  <% end %>
+  </nav>
+<% end %>
