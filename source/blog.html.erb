@@ -1,7 +1,7 @@
 <main>
   <ol class="content__list">
-    <% content.items.each do |entry| %>
-      <li><%= partial 'partials/entry_compact', locals: { entry: entry, in_list: true } %></li>
+    <% content.items.each do |item| %>
+      <li><%= partial 'partials/article_compact', locals: { article: item } %></li>
     <% end %>
   </ol>
 

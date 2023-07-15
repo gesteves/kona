@@ -1,22 +1,2 @@
-<article class="entry entry--large" aria-labelledby="hed-<%= content.sys.id.parameterize %>">
-  <header class="entry__header">
-      <p class="entry__meta">
-        <% if content.draft %>
-          <span class="entry__draft">Draft</span>
-        <% end %>
-        <span><%= link_to DateTime.parse(content.published_at).strftime('%A, %B %-e, %Y'), content.path %></span>
-        <% if content.contentfulMetadata.tags.present? %>
-          <span><%= content.contentfulMetadata.tags.sort { |a, b| a.name <=> b.name }.map { |tag| link_to tag.name, "/tagged/#{tag.id}/index.html" }.join(', ') %></span>
-        <% end %>
-      </p>
-    <h2 id="hed-<%= content.sys.id.parameterize %>">
-      <%= smartypants(content.title) %>
-    </h2>
-  </header>
-  <main class="entry__body">
-    <%= render_body(content.intro) %>
-    <%= render_body(content.body) %>
-  </main>
-  <%= partial 'partials/disclosure', locals: { entry: content } %>
-</article>
-<%= partial 'partials/related', locals: { entry: content } %>
+<%= partial 'partials/article_full', locals: { article: content } %>
+<%= partial 'partials/related', locals: { article: content } %>
