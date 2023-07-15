@@ -21,7 +21,7 @@ end
 end
 
 @app.data.tags.each do |tag|
-  proxy tag.path, "/tag.html", locals: { content: tag }, ignore: true
+  proxy tag.path, "/blog.html", locals: { content: tag }, ignore: true
 end
 
 @app.data.blog.each do |page|
