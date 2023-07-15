@@ -230,4 +230,12 @@ module CustomHelpers
       .slice(0, count) # Slice the specified number of articles
       .sort { |a,b| DateTime.parse(b.published_at) <=> DateTime.parse(a.published_at) } # Sort them again in reverse chron
   end
+
+  def site_icon(w:)
+    url = URI.parse(data.site.logo.url)
+    url.query = URI.encode_www_form(w: w)
+    url.to_s
+  rescue
+    nil
+  end
 end

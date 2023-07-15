@@ -115,7 +115,7 @@ module Import
               width
               height
               url
-              title
+              contentType
             }
             openGraphImage {
               width

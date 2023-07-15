@@ -23,6 +23,11 @@
     <link rel="canonical" href="<%= full_url(current_page.url) %>">
   <% end %>
   <link rel="alternate" type="application/atom+xml" href="<%= full_url("/feed.xml") %>" />
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <% if data.site.logo.present? %>
+    <link rel="apple-touch-icon" href="<%= site_icon(w: 180) %>">
+    <link rel="manifest" href="/manifest.json">
+  <% end %>
   <%= stylesheet_link_tag 'site' %>
   <%= yield_content :assets %>
 </head>
