@@ -1,12 +1,8 @@
 <header class="header" aria-labelledby="title">
   <a href="/" class="header__link">
     <h1 class="header__hed" id="title">
-      <% if data.site.svgLogo.present? %>
-        <span class="sr-only" id="header-blog-name"><%= data.site.title %></span>
-        <%= data.site.svgLogo %>
-      <% else %>
-        <%= data.site.title %>
-      <% end %>
+      <span class="sr-only" id="header-blog-name"><%= data.site.title %></span>
+      <%= partial 'partials/logo.svg.erb' %>
     </h1>
   </a>
   <%= partial 'partials/nav', locals: { items: data.site.navigationCollection.items.compact } %>

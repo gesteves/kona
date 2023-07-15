@@ -3,7 +3,7 @@
   box-sizing: border-box;
   display: flex;
   flex-flow: column;
-  margin: calc(var(--gutter) * 4) 0;
+  margin: 0 0 calc(var(--gutter) * 2) 0;
   width: 100%;
 
   @media (min-width: 768px) {
