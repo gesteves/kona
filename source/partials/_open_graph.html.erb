@@ -21,7 +21,7 @@
 <% end %>
 
 <meta property="og:url" content="<%= full_url(current_page.url) %>">
-<% if defined?(content) && ['Article', 'Link'].include?(content.entry_type) %>
+<% if defined?(content) && content.entry_type == 'Article' %>
   <meta property="og:type" content="Article">
 <% else %>
   <meta property="og:type" content="Website">

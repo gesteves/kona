@@ -29,7 +29,6 @@ module Import
             published
             indexInSearchEngines
             canonicalUrl
-            externalUrl
             openGraphImage {
               width
               height
@@ -224,8 +223,6 @@ module Import
     def self.set_entry_type(item, type = nil)
       if type.present?
         item[:entry_type] = type
-      elsif item[:externalUrl].present?
-        item[:entry_type] = 'Link'
       elsif item[:intro].present? && item[:body].present?
         item[:entry_type] = 'Article'
       elsif item[:intro].present?
