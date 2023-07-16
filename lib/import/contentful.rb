@@ -226,10 +226,10 @@ module Import
         item[:entry_type] = type
       elsif item[:externalUrl].present?
         item[:entry_type] = 'Link'
-      elsif item[:intro].present?
+      elsif item[:intro].present? && item[:body].present?
         item[:entry_type] = 'Article'
-      else
-        item[:entry_type] = 'Page'
+      elsif item[:intro].present?
+        item[:entry_type] = 'Short'
       end
       item
     end
