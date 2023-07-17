@@ -79,15 +79,15 @@
     color: var(--color-link);
     text-decoration: none;
   }
+
+  a:hover, a:active {
+    color: var(--color-link);
+    text-decoration: underline;
+  }
 }
 
 .footer__avatar {
   border-radius: 100%;
   min-width: var(--avatar-size);
   width: var(--avatar-size);
-}
-
-
-.footer__section {
-
 }
