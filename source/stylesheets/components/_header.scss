@@ -1,23 +1,24 @@
 .header {
   align-items: center;
   box-sizing: border-box;
-  display: flex;
-  flex-flow: column;
-  margin: calc(var(--gutter) * 2) 0;
+  display: grid;
+  grid-template-areas: "logo"
+                       "nav";
+  grid-area: header;
+  grid-gap: var(--gutter);
+  justify-content: center;
   width: 100%;
 
   @media (min-width: 768px) {
-    flex-flow: row nowrap;
-    justify-content: space-between;
-    margin: 0 0 calc(var(--gutter) * 2) 0;
+    grid-template-areas: "logo logo nav nav nav nav";
+    grid-template-columns: repeat(6, 1fr);
   }
 }
 
 .header__link {
   display: block;
-  margin-bottom: var(--gutter);
+  grid-area: logo;
   text-decoration: none;
-  width: var(--width-logo);
 
   &:link,
   &:visited {

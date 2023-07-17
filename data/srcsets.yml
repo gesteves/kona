@@ -1,10 +1,11 @@
 entry:
   sizes:
-    - "(min-width: 848px) 848px"
+    - "(min-width: 1280px) 875px"
+    - "(min-width: 768px) calc((4 * ((100vw - 28rem)/6)) + 20rem)"
     - "100vw"
   widths:
-    - 848
-    - 1696
+    - 875
+    - 1750
     - 1284
     - 1290
     - 1179
@@ -15,6 +16,7 @@ entry:
     - 1125
     - 828
     - 320
+    - 1408
   formats:
     - avif
     - webp
