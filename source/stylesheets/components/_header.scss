@@ -2,16 +2,15 @@
   align-items: center;
   box-sizing: border-box;
   display: grid;
-  grid-template-areas: "logo"
-                       "nav";
   grid-area: header;
   grid-gap: var(--gutter);
-  justify-content: center;
+  grid-template-areas: ". logo logo logo logo ."
+                       "nav nav nav nav nav nav";
+  grid-template-columns: repeat(6, 1fr);
   width: 100%;
 
   @media (min-width: 768px) {
     grid-template-areas: "logo logo nav nav nav nav";
-    grid-template-columns: repeat(6, 1fr);
   }
 }
 
@@ -45,6 +44,7 @@
 
   @media (min-width: 768px) {
     margin-bottom: 0;
+    max-width: none;
   }
 }
 

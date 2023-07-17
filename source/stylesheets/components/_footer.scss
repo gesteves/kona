@@ -48,14 +48,10 @@
   box-sizing: border-box;
   display: grid;
   grid-gap: var(--gutter);
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   max-width: var(--max-width-container);
   padding: var(--gutter);
   width: 100%;
-
-  @media (min-width: 768px) {
-    grid-template-columns: repeat(6, 1fr);
-  }
 }
 
 .footer__header {
@@ -90,4 +86,12 @@
   border-radius: 100%;
   min-width: var(--avatar-size);
   width: var(--avatar-size);
+}
+
+.footer__section {
+  grid-column: span 2;
+
+  @media (min-width: 768px) {
+    grid-column: span 1;
+  }
 }

@@ -1,24 +1,24 @@
 .content {
   box-sizing: border-box;
   display: grid;
-  grid-template-areas: "header  header  header"
-                       "content content content";
   grid-gap: var(--gutter);
-  padding: var(--gutter);
+  grid-template-areas: "header header header header header header"
+                       "content content content content content content";
+  grid-template-columns: repeat(6, 1fr);
   max-width: var(--max-width-container);
+  padding: var(--gutter);
   width: 100%;
 
   @media (min-width: 768px) {
-    grid-template-areas: "header header  header  header  header  header"
-                         ".      content content content content .     ";
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-areas: "header header header header header header"
+                         ". content content content content .";
   }
 }
 
 .content__primary {
   display: grid;
-  grid-gap: var(--gutter);
   grid-area: content;
+  grid-gap: var(--gutter);
   width: 100%;
 }
 
