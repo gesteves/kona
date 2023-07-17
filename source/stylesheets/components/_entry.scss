@@ -337,6 +337,10 @@
       margin: 0 0 0 0.5rem;
     }
   }
+
+  *:last-child {
+    margin-bottom: 0;
+  }
 }
 
 .entry--large {
