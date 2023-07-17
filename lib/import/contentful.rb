@@ -89,6 +89,7 @@ module Import
             blurb
             copyright
             email
+            entriesPerPage
             author {
               name
               profilePicture {
@@ -201,10 +202,10 @@ module Import
                   .sort { |a,b| DateTime.parse(b[:published_at]) <=> DateTime.parse(a[:published_at]) }
       File.open('data/articles.json','w'){ |f| f << articles.to_json }
 
-      blog = generate_blog(articles)
+      blog = generate_blog(articles, site[:entriesPerPage])
       File.open('data/blog.json','w'){ |f| f << blog.to_json }
 
-      tags = generate_tags(articles)
+      tags = generate_tags(articles, site[:entriesPerPage])
       File.open('data/tags.json','w'){ |f| f << tags.to_json }
 
       pages = pages
@@ -263,7 +264,7 @@ module Import
       item
     end
 
-    def self.generate_tags(articles)
+    def self.generate_tags(articles, entries_per_page = 10)
       tags = articles.map { |a| a.dig(:contentfulMetadata, :tags) }.flatten.uniq
       tags.map! do |tag|
         tag = tag.dup
@@ -276,9 +277,9 @@ module Import
       tags.select { |t| t[:items].present? }.sort { |a, b| a[:id] <=> b[:id] }
     end
 
-    def self.generate_blog(articles)
+    def self.generate_blog(articles, entries_per_page = 10)
       blog = []
-      sliced = articles.reject { |a| a[:draft] }.each_slice(10)
+      sliced = articles.reject { |a| a[:draft] }.each_slice(entries_per_page)
       sliced.each_with_index do |page, index|
         blog << {
           current_page: index + 1,
