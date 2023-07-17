@@ -340,7 +340,11 @@
   border: none;
   border-top: 1px solid var(--color-border);
   margin: var(--gutter) 0;
-  width: 33%;
+  width: calc((100% - (5 * var(--gutter)))/6);
+
+  @media (min-width: 768px) {
+    width: calc((100% - (3 * var(--gutter)))/4);
+  }
 }
 
 .entry--large {
