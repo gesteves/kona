@@ -9,7 +9,10 @@
 <% if content.items.present? %>
   <ol class="content__list">
     <% content.items.each do |item| %>
-      <li><%= partial 'partials/article_compact', locals: { article: item } %></li>
+      <li class="content__list-item">
+        <%= partial 'partials/article_compact', locals: { article: item } %>
+        <% unless item == content.items.last %><hr class="content__separator"><% end %>
+      </li>
     <% end %>
   </ol>
 <% end %>
