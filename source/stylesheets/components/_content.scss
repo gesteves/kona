@@ -16,7 +16,9 @@
 }
 
 .content__primary {
+  display: grid;
   grid-area: content;
+  grid-gap: var(--gutter);
   width: 100%;
 }
 
