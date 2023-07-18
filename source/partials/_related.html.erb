@@ -4,7 +4,10 @@
     <h3 class="related__heading">You May Also Like</h3>
     <ol class="content__list">
       <% related_entries.each do |item| %>
-        <li class="content__list-item"><%= partial 'partials/article_related', locals: { article: item } %></li>
+        <li class="content__list-item">
+          <%= partial 'partials/article_related', locals: { article: item } %>
+          <% unless item == related_entries.last %><hr class="content__separator"><% end %>
+        </li>
       <% end %>
     </ol>
   </section>
