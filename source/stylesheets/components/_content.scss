@@ -41,6 +41,10 @@
   @media (min-width: 768px) {
     grid-template-columns: repeat(4, 1fr);
   }
+
+  &::last-of-type {
+    margin-bottom: 0;
+  }
 }
 
 .content__separator {

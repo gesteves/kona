@@ -377,7 +377,7 @@
 }
 
 .entry--related {
-  margin-bottom: 0;
+  margin-bottom: var(--gutter);
 
   .entry__header {
     h4 {
