@@ -99,7 +99,13 @@ module Import
                 description
               }
             }
-            navigationCollection {
+            navLinksCollection {
+							items {
+								title
+								destination
+							}
+						}
+            footerLinksCollection {
 							items {
 								title
 								destination
