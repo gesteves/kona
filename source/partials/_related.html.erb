@@ -4,7 +4,7 @@
     <h3 class="related__heading">You May Also Like</h3>
     <ol class="content__list">
       <% related_entries.each do |item| %>
-        <li><%= partial 'partials/article_related', locals: { article: item } %></li>
+        <li class="content__list-item"><%= partial 'partials/article_related', locals: { article: item } %></li>
       <% end %>
     </ol>
   </section>
