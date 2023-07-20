@@ -1,11 +1,13 @@
 entry:
   sizes:
-    - "(min-width: 1280px) 875px"
-    - "(min-width: 768px) calc((4 * ((100vw - 28rem)/6)) + 20rem)"
+    - "(min-width: 1280px) 1008px"
+    - "(min-width: 768px) calc((((100vw - 4rem - (11 * 2rem))/12) * 10) + (9 * 2rem))"
     - "100vw"
   widths:
-    - 875
-    - 1750
+    - 1008
+    - 2016
+    - 581
+    - 1162
     - 1284
     - 1290
     - 1179
@@ -17,6 +19,22 @@ entry:
     - 828
     - 320
     - 1408
+  formats:
+    - avif
+    - webp
+    - jpg
+avatar:
+  sizes:
+    - "(min-width: 1280px) 72px"
+    - "(min-width: 768px) calc(((100vw - 4rem - (11 * 2rem))/12))"
+    - "calc((((100vw - 4rem - (11 * 2rem))/12) * 2) + 2rem)"
+  widths:
+    - 72
+    - 144
+    - 141
+    - 126
+    - 123
+    - 208
   formats:
     - avif
     - webp

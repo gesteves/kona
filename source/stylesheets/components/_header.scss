@@ -3,15 +3,16 @@
   box-sizing: border-box;
   display: grid;
   grid-area: header;
-  grid-gap: var(--gutter);
-  grid-template-areas: ". logo logo logo logo ."
-                       "nav nav nav nav nav nav";
-  grid-template-columns: repeat(6, 1fr);
-  padding-bottom: var(--gutter);
+  grid-gap: var(--row-gap) var(--column-gap);
+  grid-template-areas:
+    ".   .   logo logo logo logo logo logo logo logo .   ."
+    "nav nav nav  nav  nav  nav  nav  nav  nav  nav  nav nav";
+  grid-template-columns: repeat(12, 1fr);
+  padding-bottom: var(--padding);
   width: 100%;
 
   @media (min-width: 768px) {
-    grid-template-areas: "logo logo nav nav nav nav";
+    grid-template-areas: "logo logo logo logo nav nav nav nav nav nav nav nav";
   }
 }
 

@@ -15,8 +15,10 @@
 
   // Basics
   --max-width-container: 1280px;
-  --max-width-content: 720px;
-  --gutter: 1rem;
+  --padding: 2rem;
+  --content-padding: 2rem;
+  --column-gap: 1rem;
+  --row-gap: 1rem;
 
   // Colors
   --color-accent: var(--color-firebrick);
@@ -50,14 +52,21 @@
   // Other
   --intro-text-background: linear-gradient(to top, rgba(255, 255, 255, 1) 33%, rgba(255, 255, 255, 0));
   --transition-duration: 150ms;
-  --picture-outdent: var(--gutter);
+  --picture-outdent: var(--content-padding);
 
   @media (min-width: 768px) {
     --font-large: 48px;
     --font-medium: 24px;
     --font-small: 18px;
     --font-x-small: 12px;
-    --gutter: 4rem;
+    --padding: 4rem;
+    --column-gap: 2rem;
+    --row-gap: 4rem;
+    --picture-outdent: calc((100vw - (var(--content-padding) * 2) - (11 * var(--column-gap)))/12 + var(--column-gap));
+  }
+
+  @media (min-width: 1280px) {
+    --picture-outdent: calc((var(--max-width-container) - (var(--content-padding) * 2) - (11 * var(--column-gap)))/12 + var(--column-gap));
   }
 
   @media (prefers-color-scheme: dark) {

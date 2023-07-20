@@ -8,8 +8,8 @@
 
 .entry--large .entry__header {
   border-bottom: 1px solid var(--color-border);
-  margin-bottom: var(--gutter);
-  padding-bottom: var(--gutter);
+  margin-bottom: var(--padding);
+  padding-bottom: var(--padding);
   text-align: center;
 
   h2 {
@@ -377,7 +377,7 @@
 }
 
 .entry--related {
-  margin-bottom: var(--gutter);
+  margin-bottom: var(--padding);
 
   .entry__header {
     h4 {

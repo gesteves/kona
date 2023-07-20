@@ -1,13 +1,15 @@
 <footer class="footer">
   <div class="footer__wrapper">
-    <section class="footer__header">
+    <section class="footer__avatar">
       <picture>
-        <% ["avif", "webp", "jpg"].each do |format| %>
-          <%= source_tag(data.site.author.profilePicture.url, sizes: '48px', type: "image/#{format}", format: format, widths: [48, 96, 144]) %>
+        <% data.srcsets.avatar.formats.each do |format| %>
+          <%= source_tag(data.site.author.profilePicture.url, sizes: data.srcsets.avatar.sizes.join(', '), type: "image/#{format}", format: format, widths: data.srcsets.avatar.widths.sort) %>
         <% end %>
-        <img src="<%= data.site.author.profilePicture.url %>" alt="<%= data.site.author.profilePicture.description %>" width="<%= data.site.author.profilePicture.width %>" height="<%= data.site.author.profilePicture.height %>" loading="lazy" decoding="async" class="footer__avatar" >
+        <img src="<%= data.site.author.profilePicture.url %>" alt="<%= data.site.author.profilePicture.description %>" width="<%= data.site.author.profilePicture.width %>" height="<%= data.site.author.profilePicture.height %>" loading="lazy" decoding="async" >
       </picture>
+    </section>
 
+    <section class="footer__blurb">
       <%= render_body(data.site.blurb) %>
     </section>
 
