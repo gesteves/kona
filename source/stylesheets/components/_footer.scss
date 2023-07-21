@@ -48,18 +48,24 @@
   box-sizing: border-box;
   display: grid;
   grid-gap: var(--row-gap) var(--column-gap);
+  grid-template-areas:
+    ".        .        .        .        .        avatar   avatar   .        .        .        .        ."
+    "blurb    blurb    blurb    blurb    blurb    blurb    blurb    blurb    blurb    blurb    blurb    blurb"
+    "section1 section1 section1 section1 section2 section2 section2 section2 section3 section3 section3 section3";
   grid-template-columns: repeat(12, 1fr);
   max-width: var(--max-width-container);
   padding: var(--content-padding);
   width: 100%;
+
+  @media (min-width: 768px) {
+  grid-template-areas:
+    ".        .        avatar   avatar   .        .     section1 section1 section2 section2 section3 section3"
+    "blurb    blurb    blurb    blurb    blurb    blurb section1 section1 section2 section2 section3 section3";
+  }
 }
 
 .footer__avatar {
-  grid-column: span 2;
-
-  @media (min-width: 768px) {
-    grid-column: span 1;
-  }
+  grid-area: avatar;
 
   img {
     border-radius: 100%;
@@ -71,13 +77,7 @@
   align-items: center;
   display: flex;
   flex-flow: row nowrap;
-  grid-column: 3 / -1;
-
-  @media (min-width: 768px) {
-    align-items: flex-start;
-    align-self: self-start;
-    grid-column: span 5;
-  }
+  grid-area: blurb;
 
   picture {
     align-self: center;
@@ -96,9 +96,15 @@
 }
 
 .footer__section {
-  grid-column: span 4;
+  &::nth-of-type(1) {
+    grid-area: section1;
+  }
 
-  @media (min-width: 768px) {
-    grid-column: span 2;
+  &::nth-of-type(2) {
+    grid-area: section2;
+  }
+
+  &::nth-of-type(3) {
+    grid-area: section3;
   }
 }
