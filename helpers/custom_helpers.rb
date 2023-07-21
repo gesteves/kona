@@ -71,6 +71,7 @@ module CustomHelpers
   end
 
   def smartypants(text)
+    return '' if text.blank?
     Redcarpet::Render::SmartyPants.render(text)
   end
 
