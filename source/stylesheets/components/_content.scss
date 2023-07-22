@@ -21,7 +21,7 @@
   display: grid;
   grid-area: content;
   grid-gap: var(--row-gap) var(--column-gap);
-  padding-bottom: var(--padding) 0;
+  padding: var(--padding) 0;
   width: 100%;
 }
 
