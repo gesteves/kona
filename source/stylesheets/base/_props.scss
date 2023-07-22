@@ -38,6 +38,11 @@
   --color-tertiary-text: var(--color-spanish-gray);
   --color-text: var(--color-jet);
   --color-form-text: var(--color-jet);
+  --color-table-header-background: var(--color-platinum);
+  --color-table-cell-background: var(--color-background);
+  --color-table-cell-border: var(--color-gainsboro);
+  --color-even-table-cell-background: var(--color-cultured);
+  --color-last-table-cell-border: var(--color-table-header-background);
   // Font sizes
   --font-large: 24px;
   --font-medium: 16px;
@@ -81,7 +86,11 @@
     --color-secondary-text: var(--color-silver-chalice);
     --color-tertiary-text: var(--color-sonic-silver);
     --color-text: var(--color-platinum);
-    --intro-text-background: linear-gradient(to top, rgba(0, 0, 0, 1) 33%, rgba(0, 0, 0, 0));
+    --color-table-header-background: var(--color-granite-gray);
+    --color-table-cell-background: var(--color-background);
+    --color-table-cell-border: var(--color-jet);
+    --color-even-table-cell-background: var(--color-eerie-black);
+    --color-last-table-cell-border: var(--color-table-header-background);
   }
 
   @media (prefers-reduced-motion) {
