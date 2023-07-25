@@ -27,7 +27,7 @@ module CustomHelpers
         content.title
       end
     end
-    smartypants([title, data.site.metaTitle].flatten.reject(&:blank?).uniq.join(separator))
+    strip_tags(smartypants([title, data.site.metaTitle].flatten.reject(&:blank?).uniq.join(separator)))
   end
 
   def og_title(title: nil, content: nil, separator: ' · ')
@@ -39,7 +39,7 @@ module CustomHelpers
       end
     end
     title = data.site.metaTitle if title.blank?
-    smartypants([title].flatten.reject(&:blank?).uniq.join(separator))
+    strip_tags(smartypants([title].flatten.reject(&:blank?).uniq.join(separator)))
   end
 
   def content_summary(content)
