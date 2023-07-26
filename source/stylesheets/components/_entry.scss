@@ -348,10 +348,13 @@
   }
 
   .entry__read-more {
-    font-family: var(--sans-serif);
-    font-size: var(--font-small);
-    font-weight: 300;
-    line-height: 1.5;
+    color: var(--color-secondary-text);
+    display: block;
+    font-family: var(--monospace);
+    font-size: var(--font-x-small);
+    line-height: 2;
+    margin: 1rem 0 0 0;
+    text-transform: uppercase;
   
     &:link,
     &:visited {
@@ -364,11 +367,11 @@
       color: var(--color-link);
       text-decoration: none;
     }
-  
+
     &::after {
-      color: var(--color-tertiary-text);
+      color: currentColor;
       content: "»";
-      margin: 0 0 0 0.5rem;
+      margin: 0 0 0 .5rem;
     }
   }
 
