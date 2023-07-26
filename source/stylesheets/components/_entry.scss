@@ -51,6 +51,10 @@
 .entry__draft {
   color: var(--color-firebrick);
   font-weight: 600;
+
+  &::after {
+    font-weight: normal;
+  }
 }
 
 .entry__body {
