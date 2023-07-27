@@ -8,10 +8,11 @@
     ".   .   logo logo logo logo logo logo logo logo .   ."
     "nav nav nav  nav  nav  nav  nav  nav  nav  nav  nav nav";
   grid-template-columns: repeat(12, 1fr);
+  padding-top: var(--padding);
   width: 100%;
 
   @media (min-width: 768px) {
-    grid-template-areas: "logo logo logo nav nav nav nav nav nav nav nav nav";
+    grid-template-areas: "logo logo logo logo nav nav nav nav nav nav nav nav";
   }
 }
 
@@ -34,12 +35,14 @@
     color: var(--color-link);
     text-decoration: none;
 
-    g {
+    g,
+    path {
       fill: var(--color-link);
     }
   }
 
-  g {
+  g,
+  path {
     transition: fill var(--transition-duration);
   }
 
