@@ -12,7 +12,7 @@
     <entry>
       <% updated = DateTime.parse(entry.updated_at) %>
       <id><%= atom_tag(full_url(entry.path), DateTime.parse(entry.published_at)) %></id>
-      <title><%= escape_html entry.title %></title>
+      <title><%= strip_tags entry.title %></title>
       <link rel="alternate" type="text/html" href="<%= full_url(entry.path) %>"/>
       <published><%= DateTime.parse(entry.published_at).rfc3339 %></published>
       <updated><%= updated.rfc3339 %></updated>
