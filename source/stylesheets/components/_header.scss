@@ -25,7 +25,8 @@
   &:visited {
     color: var(--color-text);
 
-    g {
+    g,
+    path {
       fill: var(--color-text);
     }
   }
