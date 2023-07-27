@@ -8,7 +8,6 @@
     ".   .   logo logo logo logo logo logo logo logo .   ."
     "nav nav nav  nav  nav  nav  nav  nav  nav  nav  nav nav";
   grid-template-columns: repeat(12, 1fr);
-  padding-top: var(--padding);
   width: 100%;
 
   @media (min-width: 768px) {
