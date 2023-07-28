@@ -268,7 +268,7 @@ module CustomHelpers
 
   def open_graph_image_url(url)
     url = URI.parse(url)
-    query = { w: 1200, h: 630, f: 'faces', fit: 'crop' }
+    query = { w: 1200, h: 630, fit: 'fill', f: 'faces' }
     url.query = URI.encode_www_form(query)
     url.to_s
   end
