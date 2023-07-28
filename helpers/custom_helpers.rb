@@ -265,4 +265,11 @@ module CustomHelpers
       DateTime.parse(data.site.sys.publishedAt)
     ].flatten.max
   end
+
+  def open_graph_image_url(url)
+    url = URI.parse(url)
+    query = { w: 1200, h: 630, f: 'face', fit: 'crop' }
+    url.query = URI.encode_www_form(query)
+    url.to_s
+  end
 end
