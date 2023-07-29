@@ -230,7 +230,8 @@ module CustomHelpers
   end
 
   def has_affiliate_links?(content)
-    doc = Nokogiri::HTML::DocumentFragment.parse(markdown_to_html(content.intro + "\n\n" + content.body))
+    text = [content.intro, content.body].compact.join("/n/n")
+    doc = Nokogiri::HTML::DocumentFragment.parse(markdown_to_html(text))
     doc.css('a').each do |a|
       return true if is_affiliate_link?(a['href'])
     end
