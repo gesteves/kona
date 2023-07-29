@@ -105,18 +105,21 @@ module Import
 							items {
 								title
 								destination
+                openInNewTab
 							}
 						}
             footerLinksCollection {
 							items {
 								title
 								destination
+                openInNewTab
 							}
 						}
             socialsCollection {
 							items {
 								title
 								destination
+                openInNewTab
 							}
 						}
             logo {

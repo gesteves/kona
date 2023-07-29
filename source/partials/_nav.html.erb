@@ -2,7 +2,13 @@
   <nav class="nav">
     <ol class="nav__list">
     <% items.each do |i| %>
-      <li class="nav__item"><%= link_to i.title, i.destination %></li>
+      <li class="nav__item">
+        <% if i.openInNewTab %>
+          <%= link_to i.title, i.destination, target: "_blank" %>
+        <% else %>
+          <%= link_to i.title, i.destination %>
+        <% end %>
+      </li>
     <% end %>
     </ol>
   </nav>
