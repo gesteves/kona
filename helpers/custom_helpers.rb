@@ -193,16 +193,6 @@ module CustomHelpers
     "#{parts.first} <cite>#{parts.last}</cite>"
   end
 
-  def set_code_language(html)
-    return if html.blank?
-
-    doc = Nokogiri::HTML::DocumentFragment.parse(html)
-    doc.css('code').each do |code|
-      code['class'] = "language-#{code['class']}" if code['class'].present?
-    end
-    doc.to_html
-  end
-
   def responsivize_tables(html)
     return if html.blank?
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
@@ -218,7 +208,13 @@ module CustomHelpers
   end
 
   def render_body(text)
-    responsivize_tables(mark_affiliate_links(set_code_language(set_alt_text(responsivize_images(add_figure_elements(markdown_to_html(text)), widths: data.srcsets.entry.widths.sort, sizes: data.srcsets.entry.sizes.join(', '), formats: data.srcsets.entry.formats)))))
+    html = markdown_to_html(text)
+    html = add_figure_elements(html)
+    html = responsivize_images(html, widths: data.srcsets.entry.widths.sort, sizes: data.srcsets.entry.sizes.join(', '), formats: data.srcsets.entry.formats)
+    html = set_alt_text(html)
+    html = mark_affiliate_links(html)
+    html = responsivize_tables(html)
+    html
   end
 
   def mark_affiliate_links(html)
