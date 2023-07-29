@@ -33,6 +33,7 @@ module Import
               width
               height
               url
+              description
             }
             sys {
               id
@@ -60,6 +61,7 @@ module Import
               width
               height
               url
+              description
             }
             sys {
               id
@@ -127,6 +129,7 @@ module Import
               width
               height
               url
+              description
             }
             sys {
               publishedAt
