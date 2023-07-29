@@ -10,7 +10,7 @@
   padding: var(--content-padding);
   width: 100%;
 
-  @media (min-width: 768px) {
+  @media (min-width: #{$bp-medium}) {
     grid-template-areas:
       "header header header  header  header  header  header  header  header  header  header header"
       ".      .      content content content content content content content content .      .";
@@ -41,7 +41,7 @@
   grid-gap: var(--padding) var(--column-gap);
   grid-template-columns: repeat(12, 1fr);
 
-  @media (min-width: 768px) {
+  @media (min-width: #{$bp-medium}) {
     grid-template-columns: repeat(8, 1fr);
   }
 

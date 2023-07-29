@@ -10,13 +10,13 @@
   grid-template-columns: repeat(12, 1fr);
   width: 100%;
 
-  @media (min-width: 400px) {
+  @media (min-width: #{$bp-small}) {
     grid-template-areas:
       ".   .   .    logo logo logo logo logo logo .    .   ."
       "nav nav nav  nav  nav  nav  nav  nav  nav  nav  nav nav";
   }
 
-  @media (min-width: 768px) {
+  @media (min-width: #{$bp-medium}) {
     grid-template-areas: "logo logo logo nav nav nav nav nav nav nav nav nav";
   }
 }
@@ -52,7 +52,7 @@
     transition: fill var(--transition-duration);
   }
 
-  @media (min-width: 768px) {
+  @media (min-width: #{$bp-medium}) {
     margin-bottom: 0;
     max-width: none;
   }

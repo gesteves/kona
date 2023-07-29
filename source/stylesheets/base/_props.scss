@@ -1,93 +1,93 @@
 :root {
   // Swatches
   //   Reds
-  --color-firebrick: #BF0222;
+  --color-firebrick:      #BF0222;
   //   Grays
-  --color-cultured: #FAFAFA;
-  --color-eerie-black: #141414;
-  --color-gainsboro: #E0E0E0;
-  --color-granite-gray: #666666;
-  --color-jet: #292929;
-  --color-platinum: #EBEBEB;
+  --color-cultured:       #FAFAFA;
+  --color-platinum:       #EBEBEB;
+  --color-gainsboro:      #E0E0E0;
   --color-silver-chalice: #ADADAD;
-  --color-sonic-silver: #7A7A7A;
-  --color-spanish-gray: #999999;
+  --color-spanish-gray:   #999999;
+  --color-sonic-silver:   #7A7A7A;
+  --color-granite-gray:   #666666;
+  --color-jet:            #292929;
+  --color-eerie-black:    #141414;
 
   // Basics
   --max-width-container: 1280px;
-  --padding: 2rem;
-  --content-padding: 2rem;
-  --column-gap: 1rem;
-  --row-gap: 1rem;
+  --padding:             2rem;
+  --content-padding:     2rem;
+  --column-gap:          1rem;
+  --row-gap:             1rem;
 
   // Colors
-  --color-accent: var(--color-firebrick);
-  --color-background: white;
-  --color-blockquote-border: var(--color-gainsboro);
-  --color-blockquote-text: var(--color-secondary-text);
-  --color-button: var(--color-firebrick);
-  --color-button-text: var(--color-cultured);
-  --color-border: var(--color-platinum);
-  --color-code-background: var(--color-platinum);
-  --color-code-border: var(--color-gainsboro);
-  --color-footer-background: var(--color-cultured);
-  --color-link: var(--color-firebrick);
-  --color-nav-background: rgba(255,255,255,0.5);
-  --color-secondary-text: var(--color-granite-gray);
-  --color-tertiary-text: var(--color-spanish-gray);
-  --color-text: var(--color-jet);
-  --color-form-text: var(--color-jet);
-  --color-table-header-background: var(--color-platinum);
-  --color-table-cell-background: var(--color-background);
-  --color-table-cell-border: var(--color-gainsboro);
+  --color-accent:                     var(--color-firebrick);
+  --color-background:                 white;
+  --color-blockquote-border:          var(--color-gainsboro);
+  --color-blockquote-text:            var(--color-secondary-text);
+  --color-border:                     var(--color-platinum);
+  --color-button-text:                var(--color-cultured);
+  --color-button:                     var(--color-firebrick);
+  --color-code-background:            var(--color-platinum);
+  --color-code-border:                var(--color-gainsboro);
   --color-even-table-cell-background: var(--color-cultured);
-  --color-last-table-cell-border: var(--color-table-header-background);
+  --color-footer-background:          var(--color-cultured);
+  --color-form-text:                  var(--color-jet);
+  --color-last-table-cell-border:     var(--color-table-header-background);
+  --color-link:                       var(--color-firebrick);
+  --color-secondary-text:             var(--color-granite-gray);
+  --color-table-cell-background:      var(--color-background);
+  --color-table-cell-border:          var(--color-gainsboro);
+  --color-table-header-background:    var(--color-platinum);
+  --color-tertiary-text:              var(--color-spanish-gray);
+  --color-text:                       var(--color-jet);
+
   // Font sizes
-  --font-large: 24px;
-  --font-medium: 16px;
-  --font-small: 12px;
+  --font-large:   24px;
+  --font-medium:  16px;
+  --font-small:   12px;
   --font-x-small: 10px;
-  // Avatar
-  --avatar-size: 48px;
+
   // Fonts
-  --monospace: 'IBM Plex Mono', Menlo, monospace;
+  --monospace:  'IBM Plex Mono', Menlo, monospace;
   --sans-serif: 'Lato', 'Helvetica Neue', sans-serif;
-  --serif: 'Playfair Display', Georgia, serif;
+  --serif:      'Playfair Display', Georgia, serif;
+
   // Other
   --transition-duration: 150ms;
-  --picture-outdent: var(--content-padding);
+  --picture-outdent:     var(--content-padding);
+  --avatar-size:         48px;
 
-  @media (min-width: 768px) {
-    --font-large: 48px;
-    --font-medium: 24px;
-    --font-small: 18px;
-    --font-x-small: 12px;
-    --padding: 4rem;
-    --column-gap: 2rem;
-    --row-gap: 4rem;
+  @media (min-width: #{$bp-medium}) {
+    --column-gap:      2rem;
+    --font-large:      48px;
+    --font-medium:     24px;
+    --font-small:      18px;
+    --font-x-small:    12px;
+    --padding:         4rem;
     --picture-outdent: calc((100vw - (var(--content-padding) * 2) - (11 * var(--column-gap)))/12 + var(--column-gap));
+    --row-gap:         4rem;
   }
 
-  @media (min-width: 1280px) {
+  @media (min-width: #{$bp-large}) {
     --picture-outdent: calc((var(--max-width-container) - (var(--content-padding) * 2) - (11 * var(--column-gap)))/12 + var(--column-gap));
   }
 
   @media (prefers-color-scheme: dark) {
-    --color-background: black;
-    --color-blockquote-border: var(--color-jet);
-    --color-border: var(--color-jet);
-    --color-code-background: var(--color-eerie-black);
-    --color-code-border: var(--color-jet);
-    --color-footer-background: var(--color-eerie-black);
-    --color-nav-background: rgba(0,0,0,0.5);
-    --color-secondary-text: var(--color-silver-chalice);
-    --color-tertiary-text: var(--color-sonic-silver);
-    --color-text: var(--color-platinum);
-    --color-table-header-background: var(--color-granite-gray);
-    --color-table-cell-background: var(--color-background);
-    --color-table-cell-border: var(--color-jet);
+    --color-background:                 black;
+    --color-blockquote-border:          var(--color-jet);
+    --color-border:                     var(--color-jet);
+    --color-code-background:            var(--color-eerie-black);
+    --color-code-border:                var(--color-jet);
     --color-even-table-cell-background: var(--color-eerie-black);
-    --color-last-table-cell-border: var(--color-table-header-background);
+    --color-footer-background:          var(--color-eerie-black);
+    --color-last-table-cell-border:     var(--color-table-header-background);
+    --color-secondary-text:             var(--color-silver-chalice);
+    --color-table-cell-background:      var(--color-background);
+    --color-table-cell-border:          var(--color-jet);
+    --color-table-header-background:    var(--color-granite-gray);
+    --color-tertiary-text:              var(--color-sonic-silver);
+    --color-text:                       var(--color-platinum);
   }
 
   @media (prefers-reduced-motion) {

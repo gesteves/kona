@@ -57,7 +57,7 @@
 .footer__avatar {
   grid-column: span 2;
 
-  @media (min-width: 768px) {
+  @media (min-width: #{$bp-medium}) {
     grid-column: span 1;
   }
 
@@ -73,7 +73,7 @@
   flex-flow: row nowrap;
   grid-column: 3 / -1;
 
-  @media (min-width: 768px) {
+  @media (min-width: #{$bp-medium}) {
     align-items: flex-start;
     align-self: self-start;
     grid-column: span 5;
@@ -98,7 +98,7 @@
 .footer__section {
   grid-column: span 4;
 
-  @media (min-width: 768px) {
+  @media (min-width: #{$bp-medium}) {
     grid-column: span 2;
   }
 }
