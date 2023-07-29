@@ -265,6 +265,55 @@
         border-bottom: 2px solid var(--color-last-table-cell-border);
       }
     }
+
+    @media screen and (max-width: 768px) {  
+      border-bottom: 2px solid var(--color-last-table-cell-border);
+      border-top: 2px solid var(--color-last-table-cell-border);
+
+      thead {
+        visibility: hidden;
+        height: 0;
+        position: absolute;
+      }
+
+      tbody {
+        tr {
+          border: none;
+          display: block;
+
+          &:last-of-type {
+            &, td:last-of-type {
+              border: none;
+            }
+          }
+        }
+        
+        td {
+          border-bottom: 1px solid var(--color-table-cell-border);
+          display: block;
+          text-align: right;
+
+          &:nth-of-type(odd) {
+            background-color: var(--color-background);
+          }
+
+          &:nth-of-type(even) {
+            background-color: var(--color-even-table-cell-background);
+          }
+
+          &:last-of-type {
+            border-bottom: 2px solid var(--color-last-table-cell-border);
+          }
+        }
+        
+        td::before {
+          content: attr(data-label);
+          float: left;
+          font-weight: bold;
+          text-transform: uppercase;
+        }
+      }
+    }
   }
 
   .gist,

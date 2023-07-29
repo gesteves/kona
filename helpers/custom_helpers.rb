@@ -203,8 +203,22 @@ module CustomHelpers
     doc.to_html
   end
 
+  def responsivize_tables(html)
+    return if html.blank?
+    doc = Nokogiri::HTML::DocumentFragment.parse(html)
+      doc.css('table').each do |table|
+        labels = table.css('thead th').to_a.map(&:inner_html)
+        table.css('tbody tr').each do |row|
+          row.css('td').each_with_index do |td, i|
+            td['data-label'] = labels[i]
+          end
+        end
+      end
+    doc.to_html
+  end
+
   def render_body(text)
-    mark_affiliate_links(set_code_language(set_alt_text(responsivize_images(add_figure_elements(markdown_to_html(text)), widths: data.srcsets.entry.widths.sort, sizes: data.srcsets.entry.sizes.join(', '), formats: data.srcsets.entry.formats))))
+    responsivize_tables(mark_affiliate_links(set_code_language(set_alt_text(responsivize_images(add_figure_elements(markdown_to_html(text)), widths: data.srcsets.entry.widths.sort, sizes: data.srcsets.entry.sizes.join(', '), formats: data.srcsets.entry.formats)))))
   end
 
   def mark_affiliate_links(html)
