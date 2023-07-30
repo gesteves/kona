@@ -19,7 +19,7 @@
 
 .entry__meta {
   color: var(--color-secondary-text);
-  font-family: var(--monospace);
+  font-family: var(--ibm-plex-mono);
   font-size: var(--font-x-small);
   line-height: 2;
   text-transform: uppercase;
@@ -60,7 +60,7 @@
 .entry__body {
   h3,
   h4 {
-    font-family: var(--serif);
+    font-family: var(--ibm-plex-sans-condensed);
     font-size: var(--font-medium);
     font-weight: 700;
     line-height: 1.5;
@@ -74,7 +74,7 @@
   p,
   ul,
   ol {
-    font-family: var(--sans-serif);
+    font-family: var(--lato);
     font-size: var(--font-medium);
     font-weight: 300;
     line-height: 1.5;
@@ -84,7 +84,7 @@
       background-color: var(--color-code-background);
       border-radius: 2px;
       border: 1px solid var(--color-code-border);
-      font-family: var(--monospace);
+      font-family: var(--ibm-plex-mono);
       font-size: var(--font-small);
       padding: 0 4px;
     }
@@ -119,7 +119,7 @@
     li::before {
       color: var(--color-secondary-text);
       content: counter(ol-counter) ".";
-      font-family: var(--monospace);
+      font-family: var(--ibm-plex-mono);
       font-size: var(--font-small);
       left: -1rem;
       line-height: 2;
@@ -137,7 +137,7 @@
 
   figcaption {
     color: var(--color-text);
-    font-family: var(--monospace);
+    font-family: var(--ibm-plex-mono);
     font-size: var(--font-x-small);
     font-style: italic;
     font-weight: 300;
@@ -212,7 +212,7 @@
 
   pre {
     code {
-      font-family: var(--monospace);
+      font-family: var(--ibm-plex-mono);
       font-size: var(--font-x-small);
     }
   }
@@ -225,7 +225,7 @@
       color: var(--color-accent);
       content: "❖";
       display: block;
-      font-family: var(--serif);
+      font-family: var(--ibm-plex-sans-condensed);
       font-size: var(--font-medium);
       line-height: 1.5;
       margin: 1.5rem auto;
@@ -235,7 +235,7 @@
 
   table {
     border-collapse: collapse;
-    font-family: var(--monospace);
+    font-family: var(--ibm-plex-mono);
     font-size: var(--font-x-small);
     margin: 1.5rem 0;
     width: 100%;
@@ -353,7 +353,7 @@
   label {
     display: flex;
     flex-flow: column;
-    font-family: var(--monospace);
+    font-family: var(--ibm-plex-mono);
     font-size: var(--font-x-small);
     line-height: 2;
     margin: 0 0 2rem 0;
@@ -369,7 +369,7 @@
     border: 1px solid var(--color-border);
     border-radius: 2px;
     color: var(--color-form-text);
-    font-family: var(--sans-serif);
+    font-family: var(--lato);
     font-size: var(--font-x-small);
     font-style: normal;
     font-weight: 300;
@@ -386,7 +386,7 @@
     border-radius: 2px;
     border: none;
     color: var(--color-button-text);
-    font-family: var(--monospace);
+    font-family: var(--ibm-plex-mono);
     font-size: var(--font-x-small);
     font-style: normal;
     font-weight: 300;
@@ -405,7 +405,7 @@
   .entry__read-more {
     color: var(--color-secondary-text);
     display: block;
-    font-family: var(--monospace);
+    font-family: var(--ibm-plex-mono);
     font-size: var(--font-x-small);
     line-height: 2;
     margin: 1rem 0 0 0;
@@ -463,7 +463,7 @@
 
 .entry__disclosure {
   color: var(--color-tertiary-text);
-  font-family: var(--monospace);
+  font-family: var(--ibm-plex-mono);
   font-size: var(--font-x-small);
   line-height: 2;
 }
