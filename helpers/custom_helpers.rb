@@ -45,10 +45,6 @@ module CustomHelpers
   def content_summary(content)
     if content.summary.present?
       content.summary
-    elsif content.intro.present?
-      truncate(markdown_to_text(content.intro), length: 280)
-    elsif content.body.present?
-      truncate(markdown_to_text(content.body), length: 280)
     else
       data.site.metaDescription
     end
