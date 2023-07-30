@@ -6,8 +6,8 @@
 
 <% if defined?(content) %>
   <meta property="og:description" content="<%= content_summary(content) %>">
-<% elsif current_page.data.description.present? %>
-  <meta property="og:description" content="<%= current_page.data.description %>">
+<% elsif current_page.data.summary.present? %>
+  <meta property="og:description" content="<%= current_page.data.summary %>">
 <% end %>
 
 <% if defined?(content) && content.openGraphImage.present? %>
