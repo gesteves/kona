@@ -128,8 +128,8 @@ module CustomHelpers
       content_type = get_asset_content_type(asset_id)
 
       if width.present?
+        widths << width if width < widths.max
         widths = widths.reject { |w| w > width }
-        widths << width
       end
       widths = widths.uniq.sort
 
