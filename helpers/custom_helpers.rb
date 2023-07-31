@@ -127,9 +127,9 @@ module CustomHelpers
       width, height = get_asset_dimensions(asset_id)
       content_type = get_asset_content_type(asset_id)
 
-      img_widths = widths
+      img_widths = widths.dup
       if width.present?
-        img_widths << width if width < widths.max
+        img_widths << width if width < img_widths.max
         img_widths = img_widths.reject { |w| w > width }
       end
       img_widths = img_widths.uniq.sort
@@ -149,7 +149,7 @@ module CustomHelpers
       # Add a source element for each image format,
       # as a sibling of the img element in the picture tag.
       formats.each do |format|
-        img.add_previous_sibling(source_tag(img['src'], sizes: sizes, type: "image/#{format}", format: format, widths: widths))
+        img.add_previous_sibling(source_tag(img['src'], sizes: sizes, type: "image/#{format}", format: format, widths: img_widths))
       end
     end
     doc.to_html
