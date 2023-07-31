@@ -129,7 +129,7 @@ module CustomHelpers
 
       if width.present?
         widths = widths.reject { |w| w > width }
-        widths << width if width > widths.max
+        widths << width
       end
       widths = widths.uniq.sort
 
