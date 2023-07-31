@@ -173,10 +173,16 @@ module CustomHelpers
       caption = set_caption_credit(parent.inner_html)
       # ...then put the image back
       parent.prepend_child(img)
+
+      # Get the corresponding image asset
+      asset_id = get_asset_id(img['src'])
+      content_type = get_asset_content_type(asset_id)
+      figure_class = "entry__figure entry__figure--#{content_type.split('/').last}"
+
       # Wrap the whole thing in a figure element,
       # with the caption in a figcaption, if present,
       # then replace the original paragraph with it.
-      img.wrap('<figure></figure>')
+      img.wrap("<figure class=\"#{figure_class}\"></figure>")
       img.add_next_sibling("<figcaption>#{caption}</figcaption>") if caption.present?
       parent.replace(img.parent)
     end
