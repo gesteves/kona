@@ -127,11 +127,12 @@ module CustomHelpers
       width, height = get_asset_dimensions(asset_id)
       content_type = get_asset_content_type(asset_id)
 
+      img_widths = widths
       if width.present?
-        widths << width if width < widths.max
-        widths = widths.reject { |w| w > width }
+        img_widths << width if width < widths.max
+        img_widths = img_widths.reject { |w| w > width }
       end
-      widths = widths.uniq.sort
+      img_widths = img_widths.uniq.sort
 
       img['loading'] = 'lazy'
       if width.present? && height.present?
