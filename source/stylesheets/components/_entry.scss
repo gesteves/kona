@@ -18,7 +18,7 @@
 }
 
 .entry__meta {
-  color: var(--color-secondary-text);
+  color: var(--color-text-secondary);
   font-family: var(--ibm-plex-mono);
   font-size: var(--font-x-small);
   line-height: 2;
@@ -29,7 +29,7 @@
   }
 
   a:link, a:visited {
-    color: var(--color-secondary-text);
+    color: var(--color-text-secondary);
     text-decoration: none;
   }
 
@@ -39,7 +39,7 @@
   }
 
   span::after {
-    color: var(--color-tertiary-text);
+    color: var(--color-text-tertiary);
     content: ' / ';
   }
 
@@ -84,6 +84,7 @@
       background-color: var(--color-code-background);
       border-radius: 2px;
       border: 1px solid var(--color-code-border);
+      color: var(--color-code-text);
       font-family: var(--ibm-plex-mono);
       font-size: var(--font-small);
       padding: 0 4px;
@@ -94,7 +95,7 @@
     list-style-type: disc;
 
     &::marker {
-      color: var(--color-secondary-text);
+      color: var(--color-text-secondary);
     }
   }
 
@@ -117,7 +118,7 @@
     }
 
     li::before {
-      color: var(--color-secondary-text);
+      color: var(--color-text-secondary);
       content: counter(ol-counter) ".";
       font-family: var(--ibm-plex-mono);
       font-size: var(--font-small);
@@ -147,16 +148,17 @@
   }
 
   small {
-    color: var(--color-secondary-text);
+    color: var(--color-text-secondary);
     font-size: var(--font-x-small);
     font-weight: 300;
     line-height: 2;
   }
 
   aside {
-    background-color: var(--color-code-background);
+    background-color: var(--color-aside-background);
     border-radius: 2px;
-    border: 1px solid var(--color-code-border);
+    border: 1px solid var(--color-aside-border);
+    color: var(--color-aside-text);
     font-size: var(--font-small);
     line-height: 2;
     margin: 2rem 0;
@@ -169,7 +171,7 @@
     padding: 0 1.5rem;
 
     p {
-      color: var(--color-secondary-text);
+      color: var(--color-text-secondary);
       font-style: italic;
     }
 
@@ -228,17 +230,17 @@
       border-bottom: 1px solid var(--color-table-cell-border);
 
       &:nth-of-type(even) {
-        background-color: var(--color-even-table-cell-background);
+        background-color: var(--color-table-even-cell-background);
       }
 
       &:last-of-type {
-        border-bottom: 2px solid var(--color-last-table-cell-border);
+        border-bottom: 2px solid var(--color-table-last-cell-border:);
       }
     }
 
     @media screen and (max-width: 768px) {  
-      border-bottom: 2px solid var(--color-last-table-cell-border);
-      border-top: 2px solid var(--color-last-table-cell-border);
+      border-bottom: 2px solid var(--color-table-last-cell-border:);
+      border-top: 2px solid var(--color-table-last-cell-border:);
 
       thead {
         height: 1px;
@@ -270,11 +272,11 @@
           }
 
           &:nth-of-type(even) {
-            background-color: var(--color-even-table-cell-background);
+            background-color: var(--color-table-even-cell-background);
           }
 
           &:last-of-type {
-            border-bottom: 2px solid var(--color-last-table-cell-border);
+            border-bottom: 2px solid var(--color-table-last-cell-border:);
           }
         }
         
@@ -352,7 +354,7 @@
   
   button[type=submit] {
     align-self: flex-start;
-    background-color: var(--color-button);
+    background-color: var(--color-button-background);
     border-radius: 2px;
     border: none;
     color: var(--color-button-text);
@@ -364,6 +366,7 @@
     padding: 0 2rem;
 
     &:hover {
+      background-color: var(--color-button-hover);
       cursor: pointer;
     }
   
@@ -397,7 +400,7 @@
       }
   
       cite {
-        color: var(--color-secondary-text);
+        color: var(--color-text-secondary);
       }
     }
   }
@@ -411,7 +414,7 @@
   }
 
   .entry__read-more {
-    color: var(--color-secondary-text);
+    color: var(--color-text-secondary);
     display: block;
     font-family: var(--ibm-plex-mono);
     font-size: var(--font-x-small);
@@ -421,7 +424,7 @@
   
     &:link,
     &:visited {
-      color: var(--color-secondary-text);
+      color: var(--color-text-secondary);
       text-decoration: none;
     }
   
@@ -470,7 +473,7 @@
 }
 
 .entry__disclosure {
-  color: var(--color-tertiary-text);
+  color: var(--color-text-tertiary);
   font-family: var(--ibm-plex-mono);
   font-size: var(--font-x-small);
   line-height: 2;

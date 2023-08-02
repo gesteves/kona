@@ -5,7 +5,7 @@
 }
 
 .pagination__link {
-  color: var(--color-secondary-text);
+  color: var(--color-text-secondary);
   display: block;
   font-family: var(--ibm-plex-mono);
   font-size: var(--font-x-small);
@@ -14,7 +14,7 @@
   text-transform: uppercase;
 
   &:link, &:visited {
-    color: var(--color-secondary-text);
+    color: var(--color-text-secondary);
     text-decoration: none;
   }
 

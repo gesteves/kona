@@ -28,22 +28,17 @@
 
   &:link,
   &:visited {
-    color: var(--color-text);
-
     g,
     path {
-      fill: var(--color-text);
+      fill: var(--color-logo);
     }
   }
 
   &:hover,
   &:active {
-    color: var(--color-link);
-    text-decoration: none;
-
     g,
     path {
-      fill: var(--color-link);
+      fill: var(--color-logo-hover);
     }
   }
 

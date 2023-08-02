@@ -46,24 +46,33 @@
 
   // Colors
   --color-accent:                     var(--color-firebrick);
+  --color-aside-background:           var(--color-platinum);
+  --color-aside-border:               var(--color-gainsboro);
+  --color-aside-text:                 var(--color-text);
   --color-background:                 white;
   --color-blockquote-border:          var(--color-gainsboro);
-  --color-blockquote-text:            var(--color-secondary-text);
+  --color-blockquote-text:            var(--color-text-secondary);
   --color-border:                     var(--color-platinum);
+  --color-button-background:          var(--color-firebrick);
+  --color-button-border:              var(--color-firebrick);
+  --color-button-hover:               var(--color-firebrick);
   --color-button-text:                var(--color-cultured);
-  --color-button:                     var(--color-firebrick);
   --color-code-background:            var(--color-platinum);
   --color-code-border:                var(--color-gainsboro);
-  --color-even-table-cell-background: var(--color-cultured);
+  --color-code-text:                  var(--color-text);
   --color-footer-background:          var(--color-cultured);
   --color-form-text:                  var(--color-jet);
-  --color-last-table-cell-border:     var(--color-table-header-background);
+  --color-heading:                    var(--color-text);
   --color-link:                       var(--color-firebrick);
-  --color-secondary-text:             var(--color-granite-gray);
+  --color-logo-hover:                 var(--color-firebrick);
+  --color-logo:                       var(--color-eerie-black);
   --color-table-cell-background:      var(--color-background);
   --color-table-cell-border:          var(--color-gainsboro);
+  --color-table-even-cell-background: var(--color-cultured);
   --color-table-header-background:    var(--color-platinum);
-  --color-tertiary-text:              var(--color-spanish-gray);
+  --color-table-last-cell-border:     var(--color-table-header-background);
+  --color-text-secondary:             var(--color-granite-gray);
+  --color-text-tertiary:              var(--color-spanish-gray);
   --color-text:                       var(--color-jet);
 
   // Font sizes
@@ -98,19 +107,23 @@
   }
 
   @media (prefers-color-scheme: dark) {
+    --color-aside-background:           var(--color-eerie-black);
+    --color-aside-border:               var(--color-jet);
+    --color-aside-text:                 var(--color-text);
     --color-background:                 black;
     --color-blockquote-border:          var(--color-jet);
     --color-border:                     var(--color-jet);
     --color-code-background:            var(--color-eerie-black);
     --color-code-border:                var(--color-jet);
-    --color-even-table-cell-background: var(--color-eerie-black);
     --color-footer-background:          var(--color-eerie-black);
-    --color-last-table-cell-border:     var(--color-table-header-background);
-    --color-secondary-text:             var(--color-silver-chalice);
+    --color-logo:                       var(--color-cultured);
     --color-table-cell-background:      var(--color-background);
     --color-table-cell-border:          var(--color-jet);
+    --color-table-even-cell-background: var(--color-eerie-black);
     --color-table-header-background:    var(--color-granite-gray);
-    --color-tertiary-text:              var(--color-sonic-silver);
+    --color-table-last-cell-border::     var(--color-table-header-background);
+    --color-text-secondary:             var(--color-silver-chalice);
+    --color-text-tertiary:              var(--color-sonic-silver);
     --color-text:                       var(--color-platinum);
   }
 
