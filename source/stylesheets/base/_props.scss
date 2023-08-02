@@ -1,8 +1,32 @@
 :root {
   // Swatches
-  //   Reds
-  --color-firebrick:      #BF0222;
-  //   Grays
+  // Whites
+  --color-ghost-white: #F7F3F7;
+  --color-magnolia:    #EFE7EF;
+  --color-pale-purple: #E7DAE7;
+    // Blues
+  --color-prussian-blue-lighter: #0F3557;
+  --color-prussian-blue:         #0C2A45;
+  --color-oxford-blue:           #091E34;
+  --color-rich-black:            #061423;
+  --color-rich-black-darker:     #030A11;
+    //   Reds
+  --color-red-cmyk:         #F2022A;
+  --color-rojo:             #DE0227;
+  --color-firebrick:        #BF0222;
+  --color-firebrick-darker: #B60220;
+  --color-madder:           #A2021C;
+    // Yellows
+  --color-yasmine:        #FBD974;
+  --color-naples-yellow:  #FAD461;
+  --color-sunglow:        #F9CB40;
+  --color-sunglow-darker: #F9C939;
+  --color-saffron:        #F8C425;
+    // Blacks
+  --color-raisin-black-lighter: #1C1C22;
+  --color-raisin-black:         #1C1C22;
+  --color-night:                #121216;
+    //   Grays
   --color-cultured:       #FAFAFA;
   --color-platinum:       #EBEBEB;
   --color-gainsboro:      #E0E0E0;
