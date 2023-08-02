@@ -234,13 +234,13 @@
       }
 
       &:last-of-type {
-        border-bottom: 2px solid var(--color-table-last-cell-border:);
+        border-bottom: 2px solid var(--color-table-last-cell-border);
       }
     }
 
     @media screen and (max-width: 768px) {  
-      border-bottom: 2px solid var(--color-table-last-cell-border:);
-      border-top: 2px solid var(--color-table-last-cell-border:);
+      border-bottom: 2px solid var(--color-table-last-cell-border);
+      border-top: 2px solid var(--color-table-last-cell-border);
 
       thead {
         height: 1px;
@@ -276,7 +276,7 @@
           }
 
           &:last-of-type {
-            border-bottom: 2px solid var(--color-table-last-cell-border:);
+            border-bottom: 2px solid var(--color-table-last-cell-border);
           }
         }
         
