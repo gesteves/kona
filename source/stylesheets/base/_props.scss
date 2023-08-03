@@ -1,32 +1,28 @@
 :root {
   // Swatches: https://coolors.co/faf7fa-092034-bf0222-f9cb40-121216
-    // Whites
-  --color-snow:        #FAF7FA;
-  --color-ghost-white: #F7F2F7;
-  --color-magnolia:    #EFE6EF;
-      // Blues
+  // Blues
+  --alice-blue:                  #EEF5FC;
+  --alice-blue-darker:           #DCECF9;
+  --columbia-blue:               #CBE2F6;
+  --columbia-blue-darker:        #BAD8F3;
   --color-prussian-blue-lighter: #0F3557;
   --color-prussian-blue:         #0C2B45;
   --color-oxford-blue:           #092034;
   --color-rich-black:            #061523;
   --color-rich-black-darker:     #030B11;
-      //   Reds
+  // Reds
   --color-red-cmyk:         #F2022A;
   --color-rojo:             #DE0227;
   --color-firebrick:        #BF0222;
   --color-firebrick-darker: #B60220;
   --color-madder:           #A2021C;
-      // Yellows
+  // Yellows
   --color-yasmine:        #FBD974;
   --color-naples-yellow:  #FAD461;
   --color-sunglow:        #F9CB40;
   --color-sunglow-darker: #F9C939;
   --color-saffron:        #F8C425;
-      // Blacks
-  --color-raisin-black-lighter: #25252D;
-  --color-raisin-black:         #1C1C22;
-  --color-night:                #121216;
-      // Pure Grays
+  // Pure Grays
   --color-cultured:       #FAFAFA;
   --color-platinum:       #EBEBEB;
   --color-gainsboro:      #E0E0E0;
@@ -52,7 +48,7 @@
   --color-background:                 white;
   --color-blockquote-border:          var(--color-border);
   --color-blockquote-text:            var(--color-text-secondary);
-  --color-border:                     var(--color-magnolia);
+  --color-border:                     var(--color-columbia-blue);
   --color-button-background:          var(--color-firebrick);
   --color-button-border:              var(--color-madder);
   --color-button-hover:               var(--color-rojo);
@@ -60,17 +56,17 @@
   --color-code-background:            var(--color-platinum);
   --color-code-border:                var(--color-gainsboro);
   --color-code-text:                  var(--color-text);
-  --color-footer-background:          linear-gradient(135deg, var(--color-snow), var(--color-magnolia));
+  --color-footer-background:          linear-gradient(135deg, var(--color-alice-blue), var(--color-alice-blue-darker));
   --color-form-text:                  var(--color-jet);
   --color-heading:                    var(--color-oxford-blue);
   --color-link:                       var(--color-firebrick);
   --color-list-marker:                var(--color-oxford-blue);
   --color-logo-hover:                 var(--color-firebrick);
-  --color-logo:                       var(--color-eerie-black);
+  --color-logo:                       var(--color-jet);
   --color-table-cell-background:      var(--color-background);
   --color-table-cell-border:          var(--color-border);
-  --color-table-even-cell-background: var(--color-snow);
-  --color-table-header-background:    var(--color-ghost-white);
+  --color-table-even-cell-background: var(--color-alice-blue);
+  --color-table-header-background:    var(--color-alice-blue-darker);
   --color-table-last-cell-border:     var(--color-border);
   --color-text-secondary:             var(--color-granite-gray);
   --color-text-tertiary:              var(--color-spanish-gray);
@@ -112,15 +108,15 @@
     --color-aside-border:               var(--color-jet);
     --color-aside-text:                 var(--color-text);
     --color-background:                 black;
-    --color-border:                     var(--color-raisin-black-lighter);
+    --color-border:                     var(--color-oxford-blue);
     --color-code-background:            var(--color-eerie-black);
     --color-code-border:                var(--color-jet);
-    --color-footer-background:          linear-gradient(135deg, var(--color-raisin-black-lighter), var(--color-night));
-    --color-heading:                    var(--color-magnolia);
-    --color-logo:                       var(--color-cultured);
-    --color-list-marker:                var(--color-magnolia);
-    --color-table-even-cell-background: var(--color-night);
-    --color-table-header-background:    var(--color-raisin-black);
+    --color-footer-background:          linear-gradient(135deg, var(--color-rich-black), var(--color-rich-black-darker));
+    --color-heading:                    var(--color-alice-blue);
+    --color-logo:                       var(--color-platinum);
+    --color-list-marker:                var(--color-alice-blue);
+    --color-table-even-cell-background: var(--color-rich-black-darker);
+    --color-table-header-background:    var(--color-rich-black);
     --color-text-secondary:             var(--color-silver-chalice);
     --color-text-tertiary:              var(--color-sonic-silver);
     --color-text:                       var(--color-platinum);
