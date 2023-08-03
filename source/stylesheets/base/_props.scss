@@ -64,7 +64,7 @@
   --color-form-text:                  var(--color-jet);
   --color-heading:                    var(--color-oxford-blue);
   --color-link:                       var(--color-firebrick);
-  --color-list-marker:                var(--color-text-secondary);
+  --color-list-marker:                var(--color-oxford-blue);
   --color-logo-hover:                 var(--color-firebrick);
   --color-logo:                       var(--color-eerie-black);
   --color-table-cell-background:      var(--color-background);
@@ -118,11 +118,12 @@
     --color-footer-background:          linear-gradient(135deg, var(--color-raisin-black-lighter), var(--color-night));
     --color-heading:                    var(--color-magnolia);
     --color-logo:                       var(--color-cultured);
+    --color-list-marker:                var(--color-magnolia);
     --color-table-even-cell-background: var(--color-night);
     --color-table-header-background:    var(--color-raisin-black);
-    --color-text-secondary: var(--color-silver-chalice);
-    --color-text-tertiary:  var(--color-sonic-silver);
-    --color-text:           var(--color-platinum);
+    --color-text-secondary:             var(--color-silver-chalice);
+    --color-text-tertiary:              var(--color-sonic-silver);
+    --color-text:                       var(--color-platinum);
   }
 
   @media (prefers-reduced-motion) {
