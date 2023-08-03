@@ -316,44 +316,6 @@
     text-decoration: underline;
   }
 
-  .entry__figure {
-    margin: 1.5rem calc(var(--picture-outdent) * -1) 1.5rem calc(var(--picture-outdent) * -1); 
-
-    figcaption {
-      color: var(--color-text);
-      font-family: var(--ibm-plex-mono);
-      font-size: var(--font-x-small);
-      font-style: italic;
-      font-weight: 300;
-      line-height: 2;
-      margin: 0.5rem var(--picture-outdent) 0 var(--picture-outdent);
-  
-      i,
-      em,
-      cite {
-        font-style: normal;
-      }
-  
-      b,
-      strong {
-        font-style: normal;
-        font-weight: 600;
-      }
-  
-      cite {
-        color: var(--color-text-secondary);
-      }
-    }
-  }
-
-  .entry__figure--gif {
-    margin: 1.5rem 0;
-
-    figcaption {
-      margin: 0.5rem 0 0 0;
-    }
-  }
-
   .entry__read-more {
     color: var(--color-text-secondary);
     display: block;
@@ -384,6 +346,44 @@
 
   & > *:last-child {
     margin-bottom: 0;
+  }
+}
+
+.entry__figure {
+  margin: 1.5rem calc(var(--picture-outdent) * -1) 1.5rem calc(var(--picture-outdent) * -1); 
+
+  figcaption {
+    color: var(--color-text);
+    font-family: var(--ibm-plex-mono);
+    font-size: var(--font-x-small);
+    font-style: italic;
+    font-weight: 300;
+    line-height: 2;
+    margin: 0.5rem var(--picture-outdent) 0 var(--picture-outdent);
+
+    i,
+    em,
+    cite {
+      font-style: normal;
+    }
+
+    b,
+    strong {
+      font-style: normal;
+      font-weight: 600;
+    }
+
+    cite {
+      color: var(--color-text-secondary);
+    }
+  }
+}
+
+.entry__figure--gif {
+  margin: 1.5rem 0;
+
+  figcaption {
+    margin: 0.5rem 0 0 0;
   }
 }
 
