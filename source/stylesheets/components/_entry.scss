@@ -95,7 +95,7 @@
     list-style-type: disc;
 
     &::marker {
-      color: var(--color-text-secondary);
+      color: var(--color-list-marker);
     }
   }
 
@@ -118,7 +118,7 @@
     }
 
     li::before {
-      color: var(--color-text-secondary);
+      color: var(--color-list-marker);
       content: counter(ol-counter) ".";
       font-family: var(--ibm-plex-mono);
       font-size: var(--font-small);

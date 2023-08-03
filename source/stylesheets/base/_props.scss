@@ -1,32 +1,32 @@
 :root {
   // Swatches
-  // Whites
+    // Whites
   --color-snow:        #FAF7FA;
   --color-ghost-white: #F7F3F7;
   --color-magnolia:    #EFE7EF;
-    // Blues
+      // Blues
   --color-prussian-blue-lighter: #0F3557;
   --color-prussian-blue:         #0C2A45;
   --color-oxford-blue:           #091E34;
   --color-rich-black:            #061423;
   --color-rich-black-darker:     #030A11;
-    //   Reds
+      //   Reds
   --color-red-cmyk:         #F2022A;
   --color-rojo:             #DE0227;
   --color-firebrick:        #BF0222;
   --color-firebrick-darker: #B60220;
   --color-madder:           #A2021C;
-    // Yellows
+      // Yellows
   --color-yasmine:        #FBD974;
   --color-naples-yellow:  #FAD461;
   --color-sunglow:        #F9CB40;
   --color-sunglow-darker: #F9C939;
   --color-saffron:        #F8C425;
-    // Blacks
+      // Blacks
   --color-raisin-black-lighter: #1C1C22;
   --color-raisin-black:         #1C1C22;
   --color-night:                #121216;
-    //   Grays
+      // Pure Grays
   --color-cultured:       #FAFAFA;
   --color-platinum:       #EBEBEB;
   --color-gainsboro:      #E0E0E0;
@@ -64,6 +64,7 @@
   --color-form-text:                  var(--color-jet);
   --color-heading:                    var(--color-oxford-blue);
   --color-link:                       var(--color-firebrick);
+  --color-list-marker:                var(--color-text-secondary);
   --color-logo-hover:                 var(--color-firebrick);
   --color-logo:                       var(--color-eerie-black);
   --color-table-cell-background:      var(--color-background);
