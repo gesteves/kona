@@ -36,9 +36,9 @@
 
   // Colors
   --color-accent:                     var(--color-firebrick);
-  --color-aside-background:           var(--color-oxford-blue);
-  --color-aside-border:               var(--color-rich-black-darker);
-  --color-aside-text:                 var(--color-alice-blue);
+  --color-aside-background:           var(--color-alice-blue);
+  --color-aside-border:               var(--color-columbia-blue);
+  --color-aside-text:                 var(--color-oxford-blue);
   --color-background:                 white;
   --color-blockquote-border:          var(--color-border);
   --color-blockquote-text:            var(--color-text-secondary);
@@ -98,15 +98,17 @@
   }
 
   @media (prefers-color-scheme: dark) {
-    --color-aside-border:               var(--color-prussian-blue);
+    --color-aside-background:           var(--color-rich-black-darker);
+    --color-aside-border:               var(--color-oxford-blue);
+    --color-aside-text:                 var(--color-alice-blue);
     --color-background:                 black;
     --color-border:                     var(--color-oxford-blue);
     --color-code-background:            var(--color-eerie-black);
     --color-code-border:                var(--color-jet);
     --color-footer-background:          linear-gradient(135deg, var(--color-rich-black), var(--color-rich-black-darker));
     --color-heading:                    var(--color-alice-blue);
-    --color-logo:                       var(--color-platinum);
     --color-list-marker:                var(--color-alice-blue);
+    --color-logo:                       var(--color-platinum);
     --color-table-cell-border:          var(--color-rich-black);
     --color-table-even-cell-background: var(--color-rich-black-darker);
     --color-table-header-background:    var(--color-oxford-blue);
