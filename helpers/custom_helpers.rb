@@ -2,15 +2,18 @@ require 'redcarpet'
 require 'nokogiri'
 
 module CustomHelpers
-  def full_url(resource)
-    domain = if config[:netlify] && config[:context] == 'production'
+  def full_url(resource, params = {})
+    base_url = if config[:netlify] && config[:context] == 'production'
       config[:url]
     elsif config[:netlify] && config[:context] != 'production'
       config[:deploy_url]
     else
       'http://localhost:4567'
     end
-    "#{domain}#{url_for(resource)}"
+    url = URI.parse(base_url)
+    url.path = url_for(resource)
+    url.query = URI.encode_www_form(params) if params.present?
+    url.to_s
   end
 
   def atom_tag(url, date = nil)
