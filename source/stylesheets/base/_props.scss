@@ -46,9 +46,9 @@
 
   // Colors
   --color-accent:                     var(--color-firebrick);
-  --color-aside-background:           var(--color-platinum);
-  --color-aside-border:               var(--color-gainsboro);
-  --color-aside-text:                 var(--color-text);
+  --color-aside-background:           var(--color-oxford-blue);
+  --color-aside-border:               var(--color-rich-black-darker);
+  --color-aside-text:                 var(--color-snow);
   --color-background:                 white;
   --color-blockquote-border:          var(--color-gainsboro);
   --color-blockquote-text:            var(--color-text-secondary);
@@ -62,7 +62,7 @@
   --color-code-text:                  var(--color-text);
   --color-footer-background:          var(--color-cultured);
   --color-form-text:                  var(--color-jet);
-  --color-heading:                    var(--color-text);
+  --color-heading:                    var(--color-oxford-blue);
   --color-link:                       var(--color-firebrick);
   --color-logo-hover:                 var(--color-firebrick);
   --color-logo:                       var(--color-eerie-black);
@@ -116,15 +116,16 @@
     --color-code-background:            var(--color-eerie-black);
     --color-code-border:                var(--color-jet);
     --color-footer-background:          var(--color-eerie-black);
+    --color-heading:                    var(--color-magnolia);
     --color-logo:                       var(--color-cultured);
     --color-table-cell-background:      var(--color-background);
     --color-table-cell-border:          var(--color-jet);
     --color-table-even-cell-background: var(--color-eerie-black);
     --color-table-header-background:    var(--color-granite-gray);
     --color-table-last-cell-border::    var(--color-table-header-background);
-    --color-text-secondary:             var(--color-silver-chalice);
-    --color-text-tertiary:              var(--color-sonic-silver);
-    --color-text:                       var(--color-platinum);
+    --color-text-secondary: var(--color-silver-chalice);
+    --color-text-tertiary:  var(--color-sonic-silver);
+    --color-text:           var(--color-platinum);
   }
 
   @media (prefers-reduced-motion) {
