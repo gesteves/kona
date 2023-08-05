@@ -415,6 +415,7 @@
         -webkit-initial-letter: 3;
         color: var(--color-dropcap);
         initial-letter: 3;
+        font-style: normal;
         font-variant: normal;
         font-weight: bold;
         margin-right: 0.5rem;
@@ -428,6 +429,7 @@
 .entry--page {
   .entry__body {
     & > p:first-of-type::first-line {
+      font-style: normal;
       font-variant: small-caps;
       text-transform: lowercase;
     }
