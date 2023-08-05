@@ -412,6 +412,7 @@
   .entry__body {
     @supports (initial-letter: 3) {
       & > p:first-of-type::first-letter {
+        -webkit-initial-letter: 3;
         color: var(--color-dropcap);
         initial-letter: 3;
         font-variant: normal;
