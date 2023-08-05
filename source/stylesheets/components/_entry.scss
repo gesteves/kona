@@ -221,92 +221,6 @@
     }
   }
 
-  table {
-    border-collapse: collapse;
-    font-family: var(--ibm-plex-mono);
-    font-size: var(--font-x-small);
-    line-height: 1.5;
-    margin: 1.5rem 0;
-    width: 100%;
-
-    thead tr {
-      background-color: var(--color-table-header-background);
-      color: var(--color-text);
-      font-weight: bold;
-      text-align: left;
-      text-transform: uppercase;
-    }
-
-    th,
-    td {
-      padding: 1rem 1rem;
-    }
-
-    tbody tr {
-      background-color: var(--color-table-cell-background);
-      border-bottom: 1px solid var(--color-table-cell-border);
-
-      &:nth-of-type(even) {
-        background-color: var(--color-table-even-cell-background);
-      }
-
-      &:last-of-type {
-        border-bottom: 2px solid var(--color-table-last-cell-border);
-      }
-    }
-
-    @media screen and (max-width: 768px) {  
-      border-bottom: 2px solid var(--color-table-last-cell-border);
-      border-top: 2px solid var(--color-table-last-cell-border);
-
-      thead {
-        height: 1px;
-        overflow: hidden;
-        position: absolute;
-        white-space: nowrap;
-        width: 1px;
-      }
-
-      tbody {
-        tr {
-          border: none;
-          display: block;
-
-          &:last-of-type {
-            &, td:last-of-type {
-              border: none;
-            }
-          }
-        }
-        
-        td {
-          border-bottom: 1px solid var(--color-table-cell-border);
-          display: block;
-          text-align: right;
-
-          &:nth-of-type(odd) {
-            background-color: var(--color-background);
-          }
-
-          &:nth-of-type(even) {
-            background-color: var(--color-table-even-cell-background);
-          }
-
-          &:last-of-type {
-            border-bottom: 2px solid var(--color-table-last-cell-border);
-          }
-        }
-        
-        td::before {
-          content: attr(data-label);
-          float: left;
-          font-weight: bold;
-          text-transform: uppercase;
-        }
-      }
-    }
-  }
-
   .gist,
   .cp_embed_wrapper  {
     display: block;
@@ -402,6 +316,92 @@
 
   figcaption {
     margin: 0.5rem 0 0 0;
+  }
+}
+
+.entry__table {
+  border-collapse: collapse;
+  font-family: var(--ibm-plex-mono);
+  font-size: var(--font-x-small);
+  line-height: 1.5;
+  margin: 1.5rem 0;
+  width: 100%;
+
+  thead tr {
+    background-color: var(--color-table-header-background);
+    color: var(--color-text);
+    font-weight: bold;
+    text-align: left;
+    text-transform: uppercase;
+  }
+
+  th,
+  td {
+    padding: 1rem 1rem;
+  }
+
+  tbody tr {
+    background-color: var(--color-table-cell-background);
+    border-bottom: 1px solid var(--color-table-cell-border);
+
+    &:nth-of-type(even) {
+      background-color: var(--color-table-even-cell-background);
+    }
+
+    &:last-of-type {
+      border-bottom: 2px solid var(--color-table-last-cell-border);
+    }
+  }
+
+  @media screen and (max-width: 768px) {  
+    border-bottom: 2px solid var(--color-table-last-cell-border);
+    border-top: 2px solid var(--color-table-last-cell-border);
+
+    thead {
+      height: 1px;
+      overflow: hidden;
+      position: absolute;
+      white-space: nowrap;
+      width: 1px;
+    }
+
+    tbody {
+      tr {
+        border: none;
+        display: block;
+
+        &:last-of-type {
+          &, td:last-of-type {
+            border: none;
+          }
+        }
+      }
+      
+      td {
+        border-bottom: 1px solid var(--color-table-cell-border);
+        display: block;
+        text-align: right;
+
+        &:nth-of-type(odd) {
+          background-color: var(--color-background);
+        }
+
+        &:nth-of-type(even) {
+          background-color: var(--color-table-even-cell-background);
+        }
+
+        &:last-of-type {
+          border-bottom: 2px solid var(--color-table-last-cell-border);
+        }
+      }
+      
+      td::before {
+        content: attr(data-label);
+        float: left;
+        font-weight: bold;
+        text-transform: uppercase;
+      }
+    }
   }
 }
 

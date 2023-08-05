@@ -217,6 +217,7 @@ module CustomHelpers
     return if html.blank?
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
       doc.css('table').each do |table|
+        table['class'] = 'entry__table'
         labels = table.css('thead th').to_a.map(&:inner_html)
         table.css('tbody tr').each do |row|
           row.css('td').each_with_index do |td, i|
