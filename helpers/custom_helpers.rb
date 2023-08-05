@@ -74,6 +74,14 @@ module CustomHelpers
     Redcarpet::Render::SmartyPants.render(text)
   end
 
+  def remove_widows(text)
+    return if text.blank?
+    words = text.split(/\s+/)
+    return text if words.size == 1
+    last_words = words.pop(2).join('&nbsp;')
+    words.append(last_words).join(' ')
+  end
+
   def source_tag(url, options = {})
     srcset_opts = { fm: options[:format] }.compact
     options[:srcset] = srcset(url: url, widths: options[:widths], options: srcset_opts)

@@ -6,7 +6,7 @@
       </p>
     <% end %>
     <h2 id="hed">
-      <%= smartypants(content.title) %>
+      <%= smartypants(remove_widows(content.title)) %>
     </h2>
   </header>
   <main class="entry__body">

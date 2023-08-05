@@ -10,7 +10,7 @@
         <% end %>
       </p>
     <h2 id="hed-<%= article.sys.id.parameterize %>">
-      <%= link_to smartypants(article.title), article.path %>
+      <%= link_to smartypants(remove_widows(article.title)), article.path %>
     </h2>
   </header>
   <main class="entry__body">

@@ -1,7 +1,7 @@
 <% if content.title.present? %>
   <header class="content__header">
     <h2 id="hed">
-      <%= content.title %>
+      <%= remove_widows(content.title) %>
     </h2>
   </header>
 <% end %>
