@@ -156,23 +156,39 @@
 
   aside {
     background-color: var(--color-aside-background);
-    border-radius: 2px;
-    border: 1px solid var(--color-aside-border);
+    border-radius: 4px;
+    box-shadow: inset 4px 0 0 var(--color-aside-border);
     color: var(--color-aside-text);
     font-size: var(--font-small);
-    line-height: 2;
-    margin: 2rem 0;
-    padding: 0 2rem;
+    padding: 1.5rem;
+
+    p {
+      &:first-of-type {
+        margin-top: 0;
+      }
+
+      &:last-of-type {
+        margin-bottom: 0;
+      }
+    }
   }
 
   blockquote {
-    border-left: 4px solid var(--color-blockquote-border);
-    margin: 1.5rem 0;
-    padding: 0 1.5rem;
+    border-radius: 4px;
+    box-shadow: inset 4px 0 0 var(--color-blockquote-border);
+    padding: 1.5rem;
 
     p {
       color: var(--color-text-secondary);
       font-style: italic;
+
+      &:first-of-type {
+        margin-top: 0;
+      }
+
+      &:last-of-type {
+        margin-bottom: 0;
+      }
     }
 
     i,
