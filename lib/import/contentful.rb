@@ -27,6 +27,7 @@ module Import
             }
             summary
             published
+            showDropCap
             indexInSearchEngines
             canonicalUrl
             openGraphImage {
