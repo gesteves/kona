@@ -13,7 +13,7 @@
   text-align: center;
 
   h2 {
-    margin: 0;
+    margin: 1rem 0 0 0;
   }
 }
 
@@ -23,10 +23,6 @@
   font-size: var(--font-x-small);
   line-height: 2;
   text-transform: uppercase;
-
-  & + h2 {
-    margin-top: 0;
-  }
 
   a:link, a:visited {
     color: var(--color-text-secondary);
