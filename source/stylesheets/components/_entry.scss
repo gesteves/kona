@@ -406,16 +406,23 @@
 }
 
 .entry--large {
-  .entry__body > p:last-of-type::after {
-    background-color: var(--color-accent);
-    content: "";
-    display: inline-block;
-    height: 0.5rem;
-    margin-left: 0.25rem;
-    vertical-align: middle;
-    width: 0.5rem;
+  .entry__body {
+    & > p:first-of-type::first-line {
+      font-variant: small-caps;
+      text-transform: lowercase;
+    }
+
+    & > p:last-of-type::after {
+      background-color: var(--color-accent);
+      content: "";
+      display: inline-block;
+      height: 0.5rem;
+      margin-left: 0.25rem;
+      vertical-align: middle;
+      width: 0.5rem;
+    }
   }
-}
+  }
 
 .entry--compact {
   .entry__header {
