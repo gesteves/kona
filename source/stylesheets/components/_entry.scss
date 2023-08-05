@@ -410,6 +410,12 @@
 
 .entry--article.entry--has-drop-cap {
   .entry__body {
+    & > p:first-of-type::first-line {
+      font-style: normal;
+      font-variant: small-caps;
+      text-transform: lowercase;
+    }
+    
     @supports (initial-letter: 3) or (-webkit-initial-letter: 3) {
       & > p:first-of-type::first-letter {
         -webkit-initial-letter: 3;
@@ -428,12 +434,6 @@
 .entry--article,
 .entry--page {
   .entry__body {
-    & > p:first-of-type::first-line {
-      font-style: normal;
-      font-variant: small-caps;
-      text-transform: lowercase;
-    }
-
     & > p:last-of-type::after {
       background-color: var(--color-accent);
       content: "";
