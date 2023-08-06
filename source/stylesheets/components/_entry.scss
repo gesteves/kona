@@ -356,7 +356,7 @@
     }
   }
 
-  @media screen and (max-width: 768px) {  
+  @media (max-width: #{$bp-medium}) {  
     border-bottom: 2px solid var(--color-table-last-cell-border);
     border-top: 2px solid var(--color-table-last-cell-border);
 
@@ -418,19 +418,48 @@
   }
 }
 
-.entry--article.entry--has-drop-cap .entry__body {  
-    @supports (initial-letter: 3) or (-webkit-initial-letter: 3) {
-      & > p:first-of-type::first-letter {
-        -webkit-initial-letter: 3;
-        color: var(--color-dropcap);
-        initial-letter: 3;
-        font-family: var(--ibm-plex-sans-condensed);
-        font-style: normal;
-        font-variant: normal;
-        font-weight: bold;
-        margin-right: 0.5rem;
-        text-transform: none;
-     }
+.entry--article.entry--has-drop-cap .entry__body {
+  & > p:first-of-type::first-letter {
+    color: var(--color-dropcap);
+    font-family: var(--ibm-plex-sans-condensed);
+    font-style: normal;
+    font-variant: normal;
+    font-weight: bold;
+    text-transform: none;
+  }
+
+  @supports (initial-letter: 3) {
+    & > p:first-of-type::first-letter {
+      initial-letter: 3;
+      margin-right: 0.5rem;
+    }
+}
+
+  @supports (-webkit-initial-letter: 3) {
+    & > p:first-of-type::first-letter {
+      float: left;
+      font-size: 80px;
+      line-height: 0.9;
+      margin-right: 0.25rem;
+
+      @media (min-width: #{$bp-medium}) {
+        font-size: 120px;
+      }
+   }
+  }
+
+  @supports not (-webkit-initial-letter: 3) {
+    & > p:first-of-type::first-letter {
+      float: left;
+      font-size: 80px;
+      margin-right: 0.25rem;
+      margin-top: 9px;
+
+      @media (min-width: #{$bp-medium}) {
+        font-size: 120px;
+        margin-top: 12px;
+      }
+   }
   }
 }
 
