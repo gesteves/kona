@@ -417,7 +417,7 @@
   }
 }
 
-.entry--article.entry--has-drop-cap .entry__body {
+.entry--article.has-drop-cap .entry__body {
   & > p:first-of-type::first-letter {
     color: var(--color-dropcap);
     font-family: var(--ibm-plex-sans-condensed);
