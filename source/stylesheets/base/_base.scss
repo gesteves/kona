@@ -32,6 +32,11 @@ h6 {
   color: var(--color-heading);
 }
 
+::selection {
+  background-color: var(--color-selection-background);
+  color: var(--color-selection-text);
+}
+
 @media screen and (prefers-reduced-motion: no-preference) {
   html,
   body {

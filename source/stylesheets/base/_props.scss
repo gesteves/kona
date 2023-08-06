@@ -16,6 +16,8 @@
   --color-firebrick:        #BF0222;
   --color-firebrick-darker: #B60220;
   --color-madder:           #A2021C;
+  // Yellows
+  --color-sunglow:        #F9CB40;
   // Pure Grays
   --color-cultured:       #FAFAFA;
   --color-platinum:       #EBEBEB;
@@ -58,6 +60,8 @@
   --color-list-marker:                var(--color-oxford-blue);
   --color-logo-hover:                 var(--color-firebrick);
   --color-logo:                       var(--color-jet);
+  --color-selection-background:       var(--color-sunglow);
+  --color-selection-text:             var(--color-oxford-blue);
   --color-table-cell-background:      var(--color-background);
   --color-table-cell-border:          var(--color-alice-blue-darker);
   --color-table-even-cell-background: var(--color-alice-blue);
@@ -111,6 +115,8 @@
     --color-heading:                    var(--color-alice-blue);
     --color-list-marker:                var(--color-alice-blue);
     --color-logo:                       var(--color-platinum);
+    --color-selection-background:       var(--color-oxford-blue);
+    --color-selection-text:             var(--color-sunglow);
     --color-table-cell-border:          var(--color-rich-black);
     --color-table-even-cell-background: var(--color-rich-black-darker);
     --color-table-header-background:    var(--color-oxford-blue);
