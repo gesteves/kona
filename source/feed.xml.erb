@@ -12,7 +12,7 @@
     <entry>
       <% updated = DateTime.parse(entry.updated_at) %>
       <id><%= atom_tag(full_url(entry.path), DateTime.parse(entry.published_at)) %></id>
-      <title><%= strip_tags entry.title %></title>
+      <title><%= escape_html(strip_tags(entry.title)) %></title>
       <link rel="alternate" type="text/html" href="<%= full_url(entry.path, { ref: 'Feed' }) %>"/>
       <published><%= DateTime.parse(entry.published_at).rfc3339 %></published>
       <updated><%= updated.rfc3339 %></updated>
@@ -21,12 +21,12 @@
       </author>
       <summary><%= entry.summary %></summary>
       <content type="html">
-        <%= escape_html set_alt_text(add_figure_elements(markdown_to_html(entry.intro))) %>
-        <%= escape_html set_alt_text(add_figure_elements(markdown_to_html(entry.body))) %>
+        <%= escape_html(set_alt_text(add_figure_elements(markdown_to_html(entry.intro)))) %>
+        <%= escape_html(set_alt_text(add_figure_elements(markdown_to_html(entry.body)))) %>
       </content>
       <% if entry.contentfulMetadata.tags.present? %>
         <% entry.contentfulMetadata.tags.sort { |a, b| a.name <=> b.name }.each do |tag| %>
-          <category term="<%= tag.name %>" />
+          <category term="<%= escape_html(tag.name) %>" />
         <% end %>
       <% end %>
     </entry>
