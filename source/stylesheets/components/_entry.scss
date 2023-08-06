@@ -408,14 +408,17 @@
   }
 }
 
-.entry--article.entry--has-drop-cap {
+.entry--article {
   .entry__body {
     & > p:first-of-type::first-line {
       font-style: normal;
       font-variant: small-caps;
       text-transform: lowercase;
     }
-    
+  }
+}
+
+.entry--article.entry--has-drop-cap .entry__body {  
     @supports (initial-letter: 3) or (-webkit-initial-letter: 3) {
       & > p:first-of-type::first-letter {
         -webkit-initial-letter: 3;
@@ -427,7 +430,6 @@
         margin-right: 0.5rem;
         text-transform: none;
      }
-    }
   }
 }
 
