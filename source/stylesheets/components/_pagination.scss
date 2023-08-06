@@ -1,18 +1,21 @@
 .pagination {
+  border-top: 2px solid var(--color-border);
   display: flex;
   flex-flow: row nowrap;
   justify-content: space-between;
+  padding-top: var(--row-gap);
 }
 
 .pagination__link {
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
   display: block;
   font-family: var(--ibm-plex-mono);
   font-size: var(--font-x-small);
   line-height: 2;
-  margin: 1rem 0 0 0;
   text-transform: uppercase;
+}
 
+.pagination__link--active {
   &:link, &:visited {
     color: var(--color-text-secondary);
     text-decoration: none;
@@ -22,10 +25,6 @@
     color: var(--color-link);
     text-decoration: none;
   }
-}
-
-.pagination__link--inactive {
-  visibility: hidden;
 }
 
 .pagination__link--next::after {
