@@ -439,12 +439,12 @@
   @supports (-webkit-initial-letter: 3) {
     & > p:first-of-type::first-letter {
       float: left;
-      font-size: 80px;
-      line-height: 0.9;
+      font-size: 85px;
+      line-height: 0.8;
       margin-right: 0.25rem;
 
       @media (min-width: #{$bp-medium}) {
-        font-size: 120px;
+        font-size: 130px;
       }
     }
   }
@@ -452,13 +452,13 @@
   @supports not ((initial-letter: 3) or (-webkit-initial-letter: 3)) {
     & > p:first-of-type::first-letter {
       float: left;
-      font-size: 80px;
+      font-size: 86px;
       margin-right: 0.25rem;
-      margin-top: 9px;
+      margin-top: 6px;
 
       @media (min-width: #{$bp-medium}) {
-        font-size: 122px;
-        margin-top: 14px;
+        font-size: 130px;
+        margin-top: 9px;
       }
     }
   }
