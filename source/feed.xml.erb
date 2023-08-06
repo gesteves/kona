@@ -21,8 +21,8 @@
       </author>
       <summary><%=h entry.summary %></summary>
       <content type="html">
-        <%=h set_alt_text(add_figure_elements(markdown_to_html(entry.intro))) %>
-        <%=h set_alt_text(add_figure_elements(markdown_to_html(entry.body))) %>
+        <%=h  render_feed_body(entry.intro) %>
+        <%=h  render_feed_body(entry.body) %>
       </content>
       <% if entry.contentfulMetadata.tags.present? %>
         <% entry.contentfulMetadata.tags.sort { |a, b| a.name <=> b.name }.each do |tag| %>

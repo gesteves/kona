@@ -132,8 +132,6 @@ module CustomHelpers
 
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
     doc.css('img').each do |img|
-      # Set the width & height of the image,
-      # and make it lazy-load.
       asset_id = get_asset_id(img['src'])
       width, height = get_asset_dimensions(asset_id)
       content_type = get_asset_content_type(asset_id)
@@ -145,6 +143,8 @@ module CustomHelpers
       end
       img_widths = img_widths.uniq.sort
 
+      # Set the width & height of the image,
+      # and make it lazy-load.
       img['loading'] = 'lazy'
       if width.present? && height.present?
         img['width'] = width
@@ -162,6 +162,28 @@ module CustomHelpers
       formats.each do |format|
         img.add_previous_sibling(source_tag(img['src'], sizes: sizes, type: "image/#{format}", format: format, widths: img_widths))
       end
+    end
+    doc.to_html
+  end
+
+  def resize_images(html, width: 1000)
+    return if html.blank?
+
+    doc = Nokogiri::HTML::DocumentFragment.parse(html)
+    doc.css('img').each do |img|
+      # Set the width & height of the image,
+      # and make it lazy-load.
+      asset_id = get_asset_id(img['src'])
+      asset_width, asset_height = get_asset_dimensions(asset_id)
+      content_type = get_asset_content_type(asset_id)
+
+      # Skip to the next image if it's a gif.
+      next if content_type == 'image/gif'
+
+      width = [width, asset_width].compact.min
+      url = URI.parse(img['src'])
+      url.query = URI.encode_www_form({ w: width })
+      img['src'] = url.to_s
     end
     doc.to_html
   end
@@ -231,10 +253,19 @@ module CustomHelpers
   def render_body(text)
     html = markdown_to_html(text)
     html = add_figure_elements(html)
-    html = responsivize_images(html, widths: data.srcsets.entry.widths.sort, sizes: data.srcsets.entry.sizes.join(', '), formats: data.srcsets.entry.formats)
+    html = responsivize_images(html, widths: data.srcsets.entry.widths, sizes: data.srcsets.entry.sizes.join(', '), formats: data.srcsets.entry.formats)
     html = set_alt_text(html)
     html = mark_affiliate_links(html)
     html = responsivize_tables(html)
+    html
+  end
+
+  def render_feed_body(text)
+    html = markdown_to_html(text)
+    html = add_figure_elements(html)
+    html = resize_images(html, width: data.srcsets.entry.widths.max)
+    html = set_alt_text(html)
+    html = mark_affiliate_links(html)
     html
   end
 
