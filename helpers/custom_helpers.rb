@@ -171,8 +171,6 @@ module CustomHelpers
 
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
     doc.css('img').each do |img|
-      # Set the width & height of the image,
-      # and make it lazy-load.
       asset_id = get_asset_id(img['src'])
       asset_width, asset_height = get_asset_dimensions(asset_id)
       content_type = get_asset_content_type(asset_id)
