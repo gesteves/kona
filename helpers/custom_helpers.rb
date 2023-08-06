@@ -100,7 +100,7 @@ module CustomHelpers
     srcset.join(', ')
   end
 
-  def pagination_path(entry_type:, page:)
+  def pagination_path(page:)
     if page == 1
       "/index.html"
     else
