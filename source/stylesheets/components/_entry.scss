@@ -464,13 +464,14 @@
 .entry--page {
   .entry__body {
     & > p:last-of-type::after {
-      background-color: var(--color-accent);
+      background-color: var(--color-dropcap);
       content: "";
       display: inline-block;
       height: 0.5rem;
       margin-left: 0.25rem;
       vertical-align: middle;
       width: 0.5rem;
+      box-shadow:  1px 1px 0 var(--color-background), 2px 2px 0 var(--color-dropcap-shadow);
     }
   }
 }
