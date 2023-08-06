@@ -433,7 +433,7 @@
       initial-letter: 3;
       margin-right: 0.5rem;
     }
-}
+  }
 
   @supports (-webkit-initial-letter: 3) {
     & > p:first-of-type::first-letter {
@@ -445,7 +445,7 @@
       @media (min-width: #{$bp-medium}) {
         font-size: 120px;
       }
-   }
+    }
   }
 
   @supports not (-webkit-initial-letter: 3) {
@@ -459,7 +459,7 @@
         font-size: 120px;
         margin-top: 12px;
       }
-   }
+    }
   }
 }
 
