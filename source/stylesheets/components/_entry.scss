@@ -436,7 +436,7 @@
   }
 
   // TODO: Switch to `initial-letter` when this bug is fixed https://bugs.webkit.org/show_bug.cgi?id=195002
-  @supports (-webkit-initial-letter: 3) {
+  @supports (-webkit-initial-letter: 3) and (not (initial-letter: 3)) {
     & > p:first-of-type::first-letter {
       float: left;
       font-size: 85px;
