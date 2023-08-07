@@ -15,12 +15,12 @@ summary: The page you were looking for could not be found.
 </article>
 <% articles = random_articles %>
 <% if articles.present? %>
-  <section class="related">
-    <h3 class="related__heading">Articles You May Like</h3>
+  <section class="recirculation">
+    <h3 class="recirculation__heading">Articles You May Like</h3>
     <ol class="content__list">
       <% articles.each do |item| %>
         <li class="content__list-item">
-          <%= partial 'partials/article_related', locals: { article: item } %>
+          <%= partial 'partials/article_summary', locals: { article: item } %>
         </li>
       <% end %>
     </ol>
