@@ -398,17 +398,15 @@
   }
 }
 
-.entry--article {
-  .entry__body {
-    & > p:first-of-type::first-line {
-      font-style: normal;
-      font-variant: small-caps;
-      text-transform: lowercase;
-    }
+.entry.has-lead-in .entry__body {
+  & > p:first-of-type::first-line {
+    font-style: normal;
+    font-variant: small-caps;
+    text-transform: lowercase;
   }
 }
 
-.entry--article.has-drop-cap .entry__body {
+.entry.has-drop-cap .entry__body {
   & > p:first-of-type::first-letter {
     color: var(--color-dropcap);
     font-family: var(--ibm-plex-sans-condensed);
@@ -460,19 +458,16 @@
   }
 }
 
-.entry--article,
-.entry--page {
-  .entry__body {
-    & > p:last-of-type::after {
-      background-color: var(--color-dropcap);
-      content: "";
-      display: inline-block;
-      height: 0.5rem;
-      margin-left: 0.25rem;
-      vertical-align: middle;
-      width: 0.5rem;
-      box-shadow:  1px 1px 0 var(--color-background), 2px 2px 0 var(--color-dropcap-shadow);
-    }
+.entry.has-end-mark .entry__body {
+  & > p:last-of-type::after {
+    background-color: var(--color-dropcap);
+    content: "";
+    display: inline-block;
+    height: 0.5rem;
+    margin-left: 0.25rem;
+    vertical-align: middle;
+    width: 0.5rem;
+    box-shadow:  1px 1px 0 var(--color-background), 2px 2px 0 var(--color-dropcap-shadow);
   }
 }
 
