@@ -13,10 +13,10 @@ summary: The page you were looking for could not be found.
     <p><strong>Sorry.</strong> The page you’re looking for does not exist.</p>
   </main>
 </article>
-<% articles = random_articles %>
+<% articles = recent_articles %>
 <% if articles.present? %>
   <section class="recirculation">
-    <h3 class="recirculation__heading">Articles You May Like</h3>
+    <h3 class="recirculation__heading">Recent Articles You May Like</h3>
     <ol class="content__list">
       <% articles.each do |item| %>
         <li class="content__list-item">

@@ -314,6 +314,10 @@ module CustomHelpers
     data.articles.reject(&:draft).shuffle.slice(0, count)
   end
 
+  def recent_articles(count: 5)
+    data.articles.reject(&:draft).slice(0, count)
+  end
+
   def site_icon(w:)
     url = URI.parse(data.site.logo.url)
     url.query = URI.encode_www_form(w: w)
