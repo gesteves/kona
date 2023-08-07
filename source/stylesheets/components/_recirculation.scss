@@ -1,6 +1,11 @@
 .recirculation {
   border-top: 2px solid var(--color-border);
   padding: var(--padding) 0 0 0;
+
+  &.no-border {
+    border: none;
+    padding: 0;
+  }
 }
 
 .recirculation__heading {
