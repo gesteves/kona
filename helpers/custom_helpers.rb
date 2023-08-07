@@ -304,7 +304,6 @@ module CustomHelpers
     data.articles
       .reject { |a| a.path == article.path } # Reject the article itself
       .reject { |a| a.draft } # Reject drafts
-      .select { |a| (a.contentfulMetadata.tags.map(&:id) & tags).present? } # Select the articles with common tags
       .sort { |a,b| (b.contentfulMetadata.tags.map(&:id) & tags).size <=> (a.contentfulMetadata.tags.map(&:id) & tags).size } # Fake relevancy sorting by sorting by number of common tags
       .slice(0, count) # Slice the specified number of articles
       .sort { |a,b| DateTime.parse(b.published_at) <=> DateTime.parse(a.published_at) } # Sort them again in reverse chron
