@@ -1,9 +1,9 @@
 ---
-title: Page not found
+title: Page Not Found
 summary: The page you were looking for could not be found.
 ---
 
-<article class="entry entry--large" id="main-content" aria-labelledby="hed">
+<article class="entry entry--page" id="main-content" aria-labelledby="hed">
   <header class="entry__header">
     <h2 id="hed">
       <%= remove_widows(current_page.data.title) %>
@@ -13,3 +13,16 @@ summary: The page you were looking for could not be found.
     <p><strong>Sorry.</strong> The page you’re looking for does not exist.</p>
   </main>
 </article>
+<% articles = random_articles %>
+<% if articles.present? %>
+  <section class="related">
+    <h3 class="related__heading">Articles You May Like</h3>
+    <ol class="content__list">
+      <% articles.each do |item| %>
+        <li class="content__list-item">
+          <%= partial 'partials/article_related', locals: { article: item } %>
+        </li>
+      <% end %>
+    </ol>
+  </section>
+<% end %>

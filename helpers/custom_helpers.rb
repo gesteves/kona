@@ -310,6 +310,10 @@ module CustomHelpers
       .sort { |a,b| DateTime.parse(b.published_at) <=> DateTime.parse(a.published_at) } # Sort them again in reverse chron
   end
 
+  def random_articles(count: 5)
+    data.articles.reject(&:draft).shuffle.slice(0, count)
+  end
+
   def site_icon(w:)
     url = URI.parse(data.site.logo.url)
     url.query = URI.encode_www_form(w: w)
