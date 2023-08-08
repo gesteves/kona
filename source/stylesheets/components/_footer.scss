@@ -85,16 +85,6 @@
     align-self: center;
     margin-right: 1rem;
   }
-
-  a:link, a:visited {
-    color: var(--color-link);
-    text-decoration: none;
-  }
-
-  a:hover, a:active {
-    color: var(--color-link);
-    text-decoration: underline;
-  }
 }
 
 .footer__section {

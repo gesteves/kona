@@ -41,7 +41,7 @@
   }
 
   a:hover, a:active {
-    color: var(--color-link);
+    color: var(--color-link-hover);
     text-decoration: none;
   }
 
@@ -265,7 +265,7 @@
   
     &:hover,
     &:active {
-      color: var(--color-link);
+      color: var(--color-link-hover);
       text-decoration: none;
     }
 

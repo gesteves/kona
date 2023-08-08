@@ -43,8 +43,8 @@
 
   a:hover,
   a:active {
-    box-shadow: 0 2px 0 var(--color-link);
-    color: var(--color-link);
+    box-shadow: 0 2px 0 var(--color-link-hover);
+    color: var(--color-link-hover);
     text-decoration: none;
   }
 
