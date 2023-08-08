@@ -16,6 +16,13 @@
   
     h2 {
       margin: 1rem 0 0 0;
+
+      @supports (background-clip: text) or (-webkit-background-clip: text) {
+        background: var(--gradient-heading);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
     }
   }
 }
