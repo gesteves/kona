@@ -73,6 +73,7 @@
 
   // Gradients
   --gradient-footer-background:       linear-gradient(135deg, var(--color-alice-blue), var(--color-alice-blue-darker));
+  --gradient-heading:                 linear-gradient(135deg, var(--color-prussian-blue), var(--color-oxford-blue));
 
   // Font sizes
   --font-large:   24px;
@@ -114,7 +115,6 @@
     --color-blockquote-border:          var(--color-sonic-silver);
     --color-code-background:            var(--color-eerie-black);
     --color-code-border:                var(--color-jet);
-    --gradient-footer-background:          linear-gradient(135deg, var(--color-rich-black), var(--color-rich-black-darker));
     --color-dropcap-shadow:             var(--color-alice-blue); 
     --color-heading:                    var(--color-alice-blue);
     --color-list-marker:                var(--color-alice-blue);
@@ -128,6 +128,9 @@
     --color-text-secondary:             var(--color-silver-chalice);
     --color-text-tertiary:              var(--color-sonic-silver);
     --color-text:                       var(--color-platinum);
+
+    --gradient-footer-background:       linear-gradient(135deg, var(--color-rich-black), var(--color-rich-black-darker));
+    --gradient-heading:                 linear-gradient(135deg, var(--color-alice-blue), var(--color-alice-blue-darker));
   }
 
   @media (prefers-reduced-motion) {
