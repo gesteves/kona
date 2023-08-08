@@ -6,6 +6,10 @@
     line-height: 1;
     margin: 1rem 0;
 
+    a {
+      padding-right: 1px;
+    }
+
     a:link,
     a:visited {
       color: var(--color-link);
