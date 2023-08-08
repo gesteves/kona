@@ -31,6 +31,13 @@ h4,
 h5,
 h6 {
   color: var(--color-heading);
+
+  @supports (background-clip: text) or (-webkit-background-clip: text) {
+    background: var(--gradient-heading);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
 }
 
 ::selection {
