@@ -54,7 +54,6 @@
   --color-code-text:                  var(--color-text);
   --color-dropcap:                    var(--color-firebrick); 
   --color-dropcap-shadow:             var(--color-oxford-blue); 
-  --color-footer-background:          linear-gradient(135deg, var(--color-alice-blue), var(--color-alice-blue-darker));
   --color-form-text:                  var(--color-jet);
   --color-heading:                    var(--color-oxford-blue);
   --color-link:                       var(--color-firebrick);
@@ -71,6 +70,9 @@
   --color-text-secondary:             var(--color-granite-gray);
   --color-text-tertiary:              var(--color-spanish-gray);
   --color-text:                       var(--color-jet);
+
+  // Gradients
+  --gradient-footer-background:       linear-gradient(135deg, var(--color-alice-blue), var(--color-alice-blue-darker));
 
   // Font sizes
   --font-large:   24px;
@@ -112,7 +114,7 @@
     --color-blockquote-border:          var(--color-sonic-silver);
     --color-code-background:            var(--color-eerie-black);
     --color-code-border:                var(--color-jet);
-    --color-footer-background:          linear-gradient(135deg, var(--color-rich-black), var(--color-rich-black-darker));
+    --gradient-footer-background:          linear-gradient(135deg, var(--color-rich-black), var(--color-rich-black-darker));
     --color-dropcap-shadow:             var(--color-alice-blue); 
     --color-heading:                    var(--color-alice-blue);
     --color-list-marker:                var(--color-alice-blue);
