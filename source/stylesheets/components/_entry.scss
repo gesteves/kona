@@ -19,9 +19,9 @@
 
       @supports (background-clip: text) or (-webkit-background-clip: text) {
         background: var(--gradient-heading);
-        color: transparent;
         -webkit-background-clip: text;
         background-clip: text;
+        color: transparent;
       }
     }
   }
@@ -246,6 +246,14 @@
   a:active {
     color: var(--color-link);
     text-decoration: underline;
+
+    @supports (background-clip: text) or (-webkit-background-clip: text) {
+      background: var(--gradient-link);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-decoration-color: var(--color-link);
+    }
   }
 
   .entry__read-more {
