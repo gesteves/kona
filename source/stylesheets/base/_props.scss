@@ -84,9 +84,9 @@
   --font-x-small: 10px;
 
   // Fonts
-  --ibm-plex-mono:           'IBM Plex Mono', Menlo, monospace;
-  --lato:                    'Lato', 'Helvetica Neue', sans-serif;
-  --ibm-plex-sans-condensed: 'IBM Plex Sans Condensed', 'DIN Condensed', sans-serif;
+  --ibm-plex-mono:           'IBM Plex Mono', ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+  --lato:                    'Lato', Inter, Roboto, 'Helvetica Neue', 'Arial Nova', 'Nimbus Sans', Arial, sans-serif;
+  --ibm-plex-sans-condensed: 'IBM Plex Sans Condensed', 'DIN Alternate', Bahnschrift, 'Franklin Gothic Medium', 'Nimbus Sans Narrow', sans-serif-condensed, sans-serif;
 
   // Other
   --transition-duration: 150ms;
