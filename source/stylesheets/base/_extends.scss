@@ -19,7 +19,8 @@
     a:hover,
     a:active {
       color: var(--color-link);
-      text-decoration: underline;
+      text-decoration: underline 1px;
+      text-underline-position: under;
 
       @supports (background-clip: text) or (-webkit-background-clip: text) {
         background: var(--gradient-link);

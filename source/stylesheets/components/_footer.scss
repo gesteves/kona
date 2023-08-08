@@ -39,8 +39,9 @@
   }
 
   a:hover, a:active {
-    color: var(--color-link);
-    text-decoration: underline;
+    color: var(--color-rojo);
+    text-decoration: underline 1px;
+    text-underline-position: under;
   }
 }
 
