@@ -15,8 +15,8 @@
     text-align: center;
   
     h2 {
-      margin: 1rem 0 0 0;
-
+      line-height: 1.5;
+      
       @supports (background-clip: text) or (-webkit-background-clip: text) {
         background: var(--gradient-heading);
         -webkit-background-clip: text;
