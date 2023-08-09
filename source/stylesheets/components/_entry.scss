@@ -272,7 +272,9 @@
     &::after {
       color: currentColor;
       content: "»";
-      margin: 0 0 0 .5rem;
+      left: 0.5rem;
+      position: relative;
+      top: -0.06rem;
     }
   }
 
