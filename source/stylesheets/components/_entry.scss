@@ -66,15 +66,27 @@
 
 .entry__body {
   h3,
-  h4 {
+  h4,
+  h5,
+  h6 {
     font-family: var(--ibm-plex-sans-condensed);
     font-size: var(--font-medium);
-    font-weight: 700;
     line-height: 1.5;
     margin: 1.5rem 0;
   }
 
-  h4 {
+  h3 {
+    font-weight: 700;
+  }
+
+  h4,
+  h5,
+  h6 {
+    font-weight: 600;
+  }
+
+  h5,
+  h6 {
     font-weight: 400;
   }
 
