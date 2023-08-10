@@ -1,33 +1,35 @@
-<% if content.title.present? %>
-  <header class="content__header">
-    <h2 id="hed">
-      <%= remove_widows(content.title) %>
-    </h2>
-  </header>
-<% end %>
+<div class="blog">
+  <% if content.title.present? %>
+    <header class="blog__header">
+      <h2 id="hed">
+        <%= remove_widows(content.title) %>
+      </h2>
+    </header>
+  <% end %>
 
-<% if content.items.present? %>
-  <ol class="content__list">
-    <% content.items.each do |item| %>
-      <li class="content__list-item">
-        <%= partial 'partials/article_compact', locals: { article: item } %>
-        <% unless item == content.items.last %><hr class="content__separator"><% end %>
-      </li>
+  <% if content.items.present? %>
+    <ol class="blog__list">
+      <% content.items.each do |item| %>
+        <li class="blog__list-item">
+          <%= partial 'partials/article_compact', locals: { article: item } %>
+          <% unless item == content.items.last %><hr class="blog__separator"><% end %>
+        </li>
+      <% end %>
+    </ol>
+  <% end %>
+
+  <% if content.next_page.present? || content.previous_page.present? %>
+    <nav class="pagination">
+    <% if content.previous_page.present? %>
+      <%= link_to "Previous", pagination_path(page: content.previous_page), class: "pagination__link pagination__link--active pagination__link--previous" %>
+    <% else %>
+      <span class="pagination__link pagination__link--previous">Previous</span>
     <% end %>
-  </ol>
-<% end %>
-
-<% if content.next_page.present? || content.previous_page.present? %>
-  <nav class="pagination">
-  <% if content.previous_page.present? %>
-    <%= link_to "Previous", pagination_path(page: content.previous_page), class: "pagination__link pagination__link--active pagination__link--previous" %>
-  <% else %>
-    <span class="pagination__link pagination__link--previous">Previous</span>
+    <% if content.next_page.present? %>
+      <%= link_to "Next", pagination_path(page: content.next_page), class: "pagination__link pagination__link--active pagination__link--next" %>
+    <% else %>
+      <span class="pagination__link pagination__link--next">Next</span>
+    <% end %>
+    </nav>
   <% end %>
-  <% if content.next_page.present? %>
-    <%= link_to "Next", pagination_path(page: content.next_page), class: "pagination__link pagination__link--active pagination__link--next" %>
-  <% else %>
-    <span class="pagination__link pagination__link--next">Next</span>
-  <% end %>
-  </nav>
-<% end %>
+</div>

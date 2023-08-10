@@ -2,7 +2,7 @@
   align-items: center;
   box-sizing: border-box;
   display: grid;
-  grid-area: header;
+  grid-column: 1 / -1;
   grid-gap: var(--row-gap) var(--column-gap);
   grid-template-areas:
     ".   .   logo logo logo logo logo logo logo logo .   ."

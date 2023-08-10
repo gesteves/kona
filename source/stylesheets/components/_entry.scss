@@ -1,5 +1,9 @@
 .entry {
   grid-column: 1 / -1;
+
+  @media (min-width: #{$bp-medium}) {
+    grid-column: 3 / -3;
+  }
 }
 
 .entry__header {

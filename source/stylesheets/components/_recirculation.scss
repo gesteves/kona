@@ -1,6 +1,11 @@
 .recirculation {
   border-top: 2px solid var(--color-border);
+  grid-column: 1 / -1;
   padding: var(--padding) 0 0 0;
+
+  @media (min-width: #{$bp-medium}) {
+    grid-column: 3 / -3;
+  }
 
   &.no-border {
     border: none;
