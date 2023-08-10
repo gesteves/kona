@@ -282,7 +282,7 @@ module Import
         tag = tag.dup
         tag[:items] = articles.select { |a| !a[:draft] && a.dig(:contentfulMetadata, :tags).include?(tag) }
         tag[:path] = "/tagged/#{tag[:id]}/index.html"
-        tag[:title] = "Articles tagged “#{tag[:name]}”"
+        tag[:title] = tag[:name]
         tag[:indexInSearchEngines] = true
         tag
       end
