@@ -5,5 +5,5 @@
 /id/<%= page.sys.id %>/ <%= url_for page.path %> 301
 <% end %>
 <% data.redirects.each do |redirect| %>
-<%= redirect.from %> <%= redirect.to %> <%= redirect.status %>
+<%= redirect.from %> <%= redirect.to %> <%= redirect.status %><%= "!" if redirect.from.match? /^https?:\/\// %>
 <% end %>
