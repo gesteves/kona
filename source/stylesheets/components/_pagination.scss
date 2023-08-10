@@ -3,6 +3,7 @@
   display: flex;
   flex-flow: row nowrap;
   justify-content: space-between;
+  margin-top: var(--row-gap);
   padding-top: var(--row-gap);
 }
 

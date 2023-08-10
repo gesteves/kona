@@ -1,5 +1,4 @@
 .blog {
-  display: grid;
   grid-column: 1 / -1;
   grid-gap: var(--row-gap) var(--column-gap);
   width: 100%;
@@ -12,7 +11,9 @@
 .blog__header {
   @extend .extend-entry-header;
   border-bottom: 1px solid var(--color-border);
-  padding-bottom: var(--padding);
+  margin-bottom: var(--row-gap);
+  padding-bottom: var(--row-gap);
+
   text-align: center;
 
   h2 {
