@@ -10,8 +10,8 @@
       <%= link_to smartypants(remove_widows(article.title)), article.path %>
     </h2>
   </header>
-  <main class="entry__body">
+  <div class="entry__body">
     <%= render_body(article.intro) %>
     <%= link_to "Continue reading", article.path, class: "entry__read-more" %>
-  </main>
+  </div>
 </article>

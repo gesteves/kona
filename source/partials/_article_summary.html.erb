@@ -10,7 +10,7 @@
       <%= link_to smartypants(remove_widows(article.title)), article.path %>
     </h4>
   </header>
-  <main class="entry__body">
+  <div class="entry__body">
     <%= render_body(article.summary) %>
-  </main>
+  </div>
 </article>
