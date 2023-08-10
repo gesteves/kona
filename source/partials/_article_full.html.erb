@@ -13,9 +13,9 @@
       <%= smartypants(remove_widows(article.title)) %>
     </h2>
   </header>
-  <main class="entry__body">
+  <div class="entry__body">
     <%= render_body(article.intro) %>
     <%= render_body(article.body) %>
-  </main>
+  </div>
   <%= partial 'partials/disclosure', locals: { entry: article } %>
 </article>
