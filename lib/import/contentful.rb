@@ -235,6 +235,7 @@ module Import
 
       pages = pages
                 .map { |item| set_entry_type(item, 'Page') }
+                .map { |item| set_home_page_status(item) }
                 .map { |item| set_draft_status(item) }
                 .map { |item| set_timestamps(item) }
                 .map { |item| set_page_path(item) }
@@ -266,6 +267,11 @@ module Import
       item
     end
 
+    def self.set_home_page_status(item)
+      item[:is_home_page] = item[:slug] == 'index'
+      item
+    end
+
     def self.set_article_path(item)
       item[:path] = if item[:draft]
         "/id/#{item.dig(:sys, :id)}/index.html"
@@ -279,7 +285,7 @@ module Import
     def self.set_page_path(item)
       item[:path] = if item[:draft]
         "/id/#{item.dig(:sys, :id)}/index.html"
-      elsif item[:slug].blank?
+      elsif item[:is_home_page]
         "/index.html"
       else
         "/#{item[:slug]}/index.html"
@@ -292,7 +298,7 @@ module Import
         "/article.html"
       elsif item[:entry_type] == 'Short'
         "/article.html"
-      elsif item[:entry_type] == 'Page' && item[:slug].blank?
+      elsif item[:entry_type] == 'Page' && item[:is_home_page]
         "/home.html"
       else
         "/page.html"

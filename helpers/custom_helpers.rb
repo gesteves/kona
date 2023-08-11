@@ -26,7 +26,7 @@ module CustomHelpers
     if content.present?
       title = if content.current_page.present? && content.current_page > 1
         [content.title, "Page #{content.current_page}"]
-      else
+      elsif content.is_home_page.blank?
         content.title
       end
     end
