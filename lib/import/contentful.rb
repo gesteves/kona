@@ -15,7 +15,7 @@ module Import
     Client = GraphQL::Client.new(schema: Schema, execute: HTTP)
 
     Queries = Client.parse <<-'GRAPHQL'
-      query Content($skip: Int, $limit: Int) {
+      query Content($skip: Int, $limit: Int, $date: DateTime) {
         articles: articleCollection(skip: $skip, limit: $limit, preview: true) {
           items {
             title
@@ -146,6 +146,15 @@ module Import
             status
           }
         }
+        events: eventCollection(skip: $skip, limit: $limit, where: { date_gte: $date }, order: [date_ASC]) {
+          items {
+            title
+            description
+						location
+						url
+						date
+          }
+        }
         assets: assetCollection(skip: $skip, limit: $limit, preview: true, order: [sys_firstPublishedAt_DESC]) {
           items {
             sys {
@@ -169,6 +178,7 @@ module Import
       redirects = []
       author = []
       site = []
+      events = []
 
       skip = 0
       limit = 1000
@@ -176,11 +186,11 @@ module Import
       fetch = true
 
       while fetch
-        response = Client.query(Queries::Content, variables: { skip: skip, limit: limit })
+        response = Client.query(Queries::Content, variables: { skip: skip, limit: limit, date: DateTime.now.strftime("%F") })
         loops += 1
         skip = loops * limit
 
-        if response.data.articles.items.blank? && response.data.pages.items.blank? && response.data.assets.items.blank? && response.data.redirects.items.blank?
+        if response.data.articles.items.blank? && response.data.pages.items.blank? && response.data.assets.items.blank? && response.data.redirects.items.blank? && response.data.events.items.blank?
           fetch = false
         end
 
@@ -188,6 +198,7 @@ module Import
         pages += response.data.pages.items
         assets += response.data.assets.items
         redirects += response.data.redirects.items
+        events += response.data.events.items
         author += response.data.author.items
         site += response.data.site.items
 
@@ -198,13 +209,14 @@ module Import
       pages = pages.compact.map(&:to_h).map(&:with_indifferent_access)
       assets = assets.compact.map(&:to_h).map(&:with_indifferent_access)
       redirects = redirects.compact.map(&:to_h).map(&:with_indifferent_access)
+      events = events.compact.map(&:to_h).map(&:with_indifferent_access)
       author = author.compact.map(&:to_h).map(&:with_indifferent_access).first
       site = site.compact.map(&:to_h).map(&:with_indifferent_access).first
-      return articles, pages, assets, redirects, author, site
+      return articles, pages, assets, redirects, events, author, site
     end
 
     def self.content
-      articles, pages, assets, redirects, author, site = query_contentful
+      articles, pages, assets, redirects, events, author, site = query_contentful
 
       articles = articles
                   .map { |item| set_entry_type(item) }
@@ -232,6 +244,7 @@ module Import
       File.open('data/author.json','w'){ |f| f << author.to_json }
       File.open('data/site.json','w'){ |f| f << site.to_json }
       File.open('data/redirects.json','w'){ |f| f << redirects.to_json }
+      File.open('data/events.json','w'){ |f| f << events.to_json }
       File.open('data/assets.json','w'){ |f| f << assets.to_json }
     end
 
