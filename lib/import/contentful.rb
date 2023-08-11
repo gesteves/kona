@@ -280,7 +280,7 @@ module Import
       elsif item[:entry_type] == 'Short'
         "/article.html"
       elsif item[:entry_type] == 'Page' && item[:slug].blank?
-        "/index.html"
+        "/home.html"
       else
         "/page.html"
       end
