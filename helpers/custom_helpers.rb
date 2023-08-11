@@ -102,9 +102,9 @@ module CustomHelpers
 
   def pagination_path(page:)
     if page == 1
-      "/index.html"
+      "/blog/index.html"
     else
-      "/page/#{page}/index.html"
+      "/blog/page/#{page}/index.html"
     end
   end
 

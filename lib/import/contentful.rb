@@ -297,6 +297,7 @@ module Import
           current_page: index + 1,
           previous_page: index == 0 ? nil : index,
           next_page: index == sliced.size - 1 ? nil : index + 2,
+          title: "Blog",
           items: page,
           indexInSearchEngines: true
         }
