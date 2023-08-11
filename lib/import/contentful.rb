@@ -211,6 +211,7 @@ module Import
                   .map { |item| set_draft_status(item) }
                   .map { |item| set_timestamps(item) }
                   .map { |item| set_article_path(item) }
+                  .map { |item| set_template(item) }
                   .sort { |a,b| DateTime.parse(b[:published_at]) <=> DateTime.parse(a[:published_at]) }
       File.open('data/articles.json','w'){ |f| f << articles.to_json }
 
@@ -225,6 +226,7 @@ module Import
                 .map { |item| set_draft_status(item) }
                 .map { |item| set_timestamps(item) }
                 .map { |item| set_page_path(item) }
+                .map { |item| set_template(item) }
       File.open('data/pages.json','w'){ |f| f << pages.to_json }
 
       File.open('data/author.json','w'){ |f| f << author.to_json }
@@ -234,12 +236,12 @@ module Import
     end
 
     def self.set_entry_type(item, type = nil)
-      if type.present?
-        item[:entry_type] = type
+      item[:entry_type] = if type.present?
+        type
       elsif item[:intro].present? && item[:body].present?
-        item[:entry_type] = 'Article'
+        'Article'
       elsif item[:intro].present?
-        item[:entry_type] = 'Short'
+        'Short'
       end
       item
     end
@@ -252,20 +254,35 @@ module Import
     end
 
     def self.set_article_path(item)
-      if item[:draft]
-        item[:path] = "/id/#{item.dig(:sys, :id)}/index.html"
+      item[:path] = if item[:draft]
+        "/id/#{item.dig(:sys, :id)}/index.html"
       else
         published = DateTime.parse(item[:published_at])
-        item[:path] = "/#{published.strftime('%Y')}/#{published.strftime('%m')}/#{published.strftime('%d')}/#{item[:slug]}/index.html"
+        "/#{published.strftime('%Y')}/#{published.strftime('%m')}/#{published.strftime('%d')}/#{item[:slug]}/index.html"
       end
       item
     end
 
     def self.set_page_path(item)
-      if item[:draft]
-        item[:path] = "/id/#{item.dig(:sys, :id)}/index.html"
+      item[:path] = if item[:draft]
+        "/id/#{item.dig(:sys, :id)}/index.html"
+      elsif item[:slug].blank?
+        "/index.html"
       else
-        item[:path] = "/#{item[:slug]}/index.html"
+        "/#{item[:slug]}/index.html"
+      end
+      item
+    end
+
+    def self.set_template(item)
+      item[:template] = if item[:entry_type] == 'Article'
+        "/article.html"
+      elsif item[:entry_type] == 'Short'
+        "/article.html"
+      elsif item[:entry_type] == 'Page' && item[:slug].blank?
+        "/index.html"
+      else
+        "/page.html"
       end
       item
     end
@@ -282,6 +299,7 @@ module Import
         tag = tag.dup
         tag[:items] = articles.select { |a| !a[:draft] && a.dig(:contentfulMetadata, :tags).include?(tag) }
         tag[:path] = "/tagged/#{tag[:id]}/index.html"
+        tag[:template] = "/blog.html"
         tag[:title] = tag[:name]
         tag[:indexInSearchEngines] = true
         tag
@@ -297,6 +315,7 @@ module Import
           current_page: index + 1,
           previous_page: index == 0 ? nil : index,
           next_page: index == sliced.size - 1 ? nil : index + 2,
+          template: "/blog.html",
           title: "Blog",
           items: page,
           indexInSearchEngines: true
