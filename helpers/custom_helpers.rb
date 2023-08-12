@@ -131,7 +131,7 @@ module CustomHelpers
     url.split('/')[4]
   end
 
-  def responsivize_images(html, widths: [100, 200, 300], sizes: '100vw', formats: ['avif', 'webp', 'jpg'], square: false)
+  def responsivize_images(html, widths: [100, 200, 300], sizes: '100vw', formats: ['avif', 'webp', 'jpg'], lazy: true, square: false)
     return if html.blank?
 
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
@@ -149,7 +149,7 @@ module CustomHelpers
 
       # Set the width & height of the image,
       # and make it lazy-load.
-      img['loading'] = 'lazy'
+      img['loading'] = 'lazy' if lazy
       if width.present? && height.present?
         img['width'] = width
         img['height'] = square ? width : height
@@ -279,7 +279,7 @@ module CustomHelpers
   def render_home_body(text)
     html = markdown_to_html(text)
     html = add_figure_elements(html, base_class: 'home')
-    html = responsivize_images(html, widths: data.srcsets.home.widths, sizes: data.srcsets.home.sizes.join(', '), formats: data.srcsets.entry.formats, square: true)
+    html = responsivize_images(html, widths: data.srcsets.home.widths, sizes: data.srcsets.home.sizes.join(', '), formats: data.srcsets.entry.formats, lazy: false, square: true)
     html = set_alt_text(html)
     html
   end
