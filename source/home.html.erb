@@ -7,7 +7,7 @@
       <%= render_home_body(content.body) %>
     </div>
   </section>
-  <% if data.strava.present? %>
+  <% if data.strava&.totals&.activities.present? %>
     <%= partial 'partials/stats' %>
   <% end %>
   <% if data.articles.reject { |a| a.draft }.present? %>

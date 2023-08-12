@@ -19,6 +19,7 @@ module Import
       activities = JSON.parse(response.body)
 
       totals = {
+        totals: { distance: 0.0, activities: 0 },
         swim: { distance: 0.0, activities: 0 },
         bike: { distance: 0.0, activities: 0 },
         run: { distance: 0.0, activities: 0 }
@@ -40,6 +41,9 @@ module Import
           totals[:run][:activities] += 1
         end
       end
+
+      totals[:totals][:activities] = totals[:swim][:activities] + totals[:bike][:activities] + totals[:run][:activities]
+      totals[:totals][:distance] = totals[:swim][:distance] + totals[:bike][:distance] + totals[:run][:distance]
 
       File.open('data/strava.json','w'){ |f| f << totals.to_json }
     end
