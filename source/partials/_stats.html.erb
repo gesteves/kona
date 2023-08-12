@@ -6,7 +6,7 @@
   </div>
   <div class="stats__stat">
     <span class="stats__meta">Swimming</span>
-    <span class="stats__number"><%= formatted_number(data.strava.swim.distance, precision: 1) %></span>
+    <span class="stats__number"><%= formatted_number(data.strava.swim.distance) %></span>
     <span class="stats__meta"><%= "Kilometer".pluralize(data.strava.swim.distance) %> <%= "😬" if data.strava.swim.distance == 0 %></span>
   </div>
   <div class="stats__stat">

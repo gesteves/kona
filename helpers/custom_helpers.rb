@@ -356,7 +356,7 @@ module CustomHelpers
     url.to_s
   end
 
-  def formatted_number(number, precision: 0)
+  def formatted_number(number, precision: 1)
     precision = 0 if number == 0 || number > 100
     number_to_delimited(number_to_rounded(number, precision: precision))
   end
