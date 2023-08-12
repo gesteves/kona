@@ -316,11 +316,15 @@
 .extend-heading-gradient {
   color: var(--color-heading);
   font-weight: 700;
-  
+
   @supports (background-clip: text) or (-webkit-background-clip: text) {
     background: var(--gradient-heading);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
   }
+}
+
+.extend-box-shadow {
+  box-shadow: 0 1px 1px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.05), 0 4px 8px rgba(0,0,0,0.05), 0 8px 16px rgba(0,0,0,0.05), 0 16px 32px rgba(0,0,0,0.05);
 }

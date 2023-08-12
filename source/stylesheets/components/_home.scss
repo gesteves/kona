@@ -48,8 +48,8 @@
   width: calc((((100vw - (2 * var(--content-padding)) - (11 * var(--column-gap)))/12) * 5) + (4 * var(--column-gap)));
 
   img { 
+    @extend .extend-box-shadow;
     border-radius: 100%;
-    box-shadow: 0 1px 1px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.05), 0 4px 8px rgba(0,0,0,0.05), 0 8px 16px rgba(0,0,0,0.05), 0 16px 32px rgba(0,0,0,0.05);
   }
 
   @media (min-width: #{$bp-medium}) {
