@@ -15,11 +15,17 @@
 .nav__item {
   display: block;
   font-family: var(--ibm-plex-mono);
-  font-size: var(--font-x-small);
+  font-size: var(--font-small);
+  line-height: 1.3333;
   text-transform: uppercase;
   display: flex;
   flex-flow: nowrap;
   align-items: center;
+
+  @media (min-width: #{$bp-medium}) {
+    font-size: var(--font-x-small);
+    line-height: 2;
+  }
 
   &::after {
     color: var(--color-text-tertiary);
@@ -32,7 +38,11 @@
 
   a {
     display: inline-block;
-    padding: 0.5rem 1rem;
+    padding: 0.5rem;
+
+    @media (min-width: #{$bp-medium}) {
+      padding: 0.5rem 1rem;
+    }
   }
 
   a:link,
