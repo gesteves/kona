@@ -13,17 +13,11 @@
 }
 
 .home__headline {
+  @extend .extend-heading-gradient;
   font-family: var(--ibm-plex-sans-condensed);
   font-size: var(--font-x-large);
   grid-column: 1 / -1;
   line-height: 1.5;
-
-  @supports (background-clip: text) or (-webkit-background-clip: text) {
-    background: var(--gradient-heading);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
 
   @media (min-width: #{$bp-medium}) {
     grid-column: 2 / -2;

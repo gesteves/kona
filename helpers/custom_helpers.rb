@@ -1,7 +1,9 @@
 require 'redcarpet'
 require 'nokogiri'
+require 'active_support/all'
 
 module CustomHelpers
+  include ActiveSupport::NumberHelper
   def full_url(resource, params = {})
     base_url = if config[:netlify] && config[:context] == 'production'
       config[:url]
@@ -352,5 +354,10 @@ module CustomHelpers
     query = { w: 1200, h: 630, fit: 'fill', f: 'faces' }
     url.query = URI.encode_www_form(query)
     url.to_s
+  end
+
+  def formatted_number(number, precision: 0)
+    precision = 0 if number == 0 || number > 100
+    number_to_delimited(number_to_rounded(number, precision: precision))
   end
 end

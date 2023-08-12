@@ -312,3 +312,15 @@
     box-shadow:  1px 1px 0 var(--color-background), 2px 2px 0 var(--color-dropcap-shadow);
   }
 }
+
+.extend-heading-gradient {
+  color: var(--color-heading);
+  font-weight: 700;
+  
+  @supports (background-clip: text) or (-webkit-background-clip: text) {
+    background: var(--gradient-heading);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}

@@ -35,6 +35,9 @@ GEM
       concurrent-ruby (~> 1.0)
     hashie (3.6.0)
     htmlcompressor (0.2.0)
+    httparty (0.21.0)
+      mini_mime (>= 1.0.0)
+      multi_xml (>= 0.5.2)
     i18n (1.6.0)
       concurrent-ruby (~> 1.0)
     kramdown (2.4.0)
@@ -85,7 +88,9 @@ GEM
     middleman-minify-html (3.4.1)
       htmlcompressor (~> 0.2.0)
       middleman-core (>= 3.2)
+    mini_mime (1.1.5)
     minitest (5.19.0)
+    multi_xml (0.6.0)
     nokogiri (1.15.4-arm64-darwin)
       racc (~> 1.4)
     nokogiri (1.15.4-x86_64-darwin)
@@ -132,6 +137,7 @@ DEPENDENCIES
   activesupport
   dotenv
   graphql-client
+  httparty
   middleman (~> 4.5)
   middleman-autoprefixer (~> 3.0)
   middleman-dotenv

@@ -20,11 +20,18 @@ namespace :import do
     Import::Contentful.content
   end
 
+  desc 'Imports content from Strava'
+  task :strava => [:dotenv, :set_up_directories] do
+    puts 'Importing content from Strava'
+    Import::Strava.fetch_totals
+  end
+
 end
 
 task :import => %w{
   clobber
   import:contentful
+  import:strava
 }
 
 desc 'Import content and build the site'
