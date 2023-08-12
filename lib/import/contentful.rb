@@ -154,6 +154,15 @@ module Import
 						location
 						url
 						date
+            sys {
+              id
+            }
+            contentfulMetadata {
+              tags {
+                id
+                name
+              }
+            }
           }
         }
         assets: assetCollection(skip: $skip, limit: $limit, preview: true, order: [sys_firstPublishedAt_DESC]) {
@@ -187,7 +196,7 @@ module Import
       fetch = true
 
       while fetch
-        response = Client.query(Queries::Content, variables: { skip: skip, limit: limit, date: DateTime.now.strftime("%F") })
+        response = Client.query(Queries::Content, variables: { skip: skip, limit: limit, date: DateTime.now.beginning_of_day.strftime("%F") })
         loops += 1
         skip = loops * limit
 
