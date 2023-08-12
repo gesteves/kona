@@ -1,34 +1,16 @@
 <div class="home" aria-labelledby="hed">
-  <div class="home__intro">
+  <section class="home__intro">
     <h2 class="home__headline" id="hed">
       <%= smartypants(content.title) %>
     </h2>
-    <div class="home__body">
+    <div class="home__body home__body--fancy">
       <%= render_home_body(content.body) %>
     </div>
-  </div>
+  </section>
   <% if data.articles.reject { |a| a.draft }.present? %>
-    <div class="home__entries">
-      <h3 class="home__heading">Recent Articles</h3>
-      <ol class="home__entries-list">
-        <% data.articles.reject { |a| a.draft }.slice(0, 4).each do |article| %>
-          <li class="home__entries-articles">
-            <%= partial 'partials/article_summary', locals: { article: article } %>
-          </li>
-        <% end %>
-      </ol>
-    </div>
+    <%= partial 'partials/collection', locals: { title: "Recent Articles", items: data.articles.reject { |a| a.draft }.slice(0, 4), variant: "halves" } %>
   <% end %>
   <% if data.events.present? %>
-    <div class="home__entries">
-      <h3 class="home__heading">Upcoming Races</h3>
-      <ol class="home__entries-list">
-        <% data.events.slice(0, 3).each do |event| %>
-          <li class="home__entries-races">
-            <%= partial 'partials/event', locals: { event: event } %>
-          </li>
-        <% end %>
-      </ol>
-    </div>
+    <%= partial 'partials/collection', locals: { title: "Upcoming Races", items: data.events.slice(0, 3), variant: "thirds" } %>
   <% end %>
 </div>

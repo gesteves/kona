@@ -1,13 +1,4 @@
 <% related_entries = related_articles(article) %>
 <% if related_entries.present? %>
-  <section class="recirculation">
-    <h3 class="recirculation__heading">You May Also Like</h3>
-    <ol class="content__list">
-      <% related_entries.each do |item| %>
-        <li class="content__list-item">
-          <%= partial 'partials/article_summary', locals: { article: item } %>
-        </li>
-      <% end %>
-    </ol>
-  </section>
+  <%= partial 'partials/collection', locals: { title: "You May Also Like", items: related_entries, variant: "centered" } %>
 <% end %>
