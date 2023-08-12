@@ -21,7 +21,7 @@
             <% menu_items.each do |i| %>
               <li>
                 <% if i.openInNewTab %>
-                  <%= link_to i.title, i.destination, target: "_blank" %>
+                  <%= link_to i.title, i.destination, rel: "noopener", target: "_blank" %>
                 <% else %>
                   <%= link_to i.title, i.destination %>
                 <% end %>
