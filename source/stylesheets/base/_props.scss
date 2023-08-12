@@ -78,6 +78,7 @@
   --gradient-link:                    linear-gradient(180deg, var(--color-red-cmyk), var(--color-firebrick));
 
   // Font sizes
+  --font-x-large: 32px;
   --font-large:   24px;
   --font-medium:  16px;
   --font-small:   12px;
@@ -95,6 +96,7 @@
 
   @media (min-width: #{$bp-medium}) {
     --column-gap:      2rem;
+    --font-x-large:    72px;
     --font-large:      48px;
     --font-medium:     24px;
     --font-small:      18px;

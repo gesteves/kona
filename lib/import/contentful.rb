@@ -15,7 +15,7 @@ module Import
     Client = GraphQL::Client.new(schema: Schema, execute: HTTP)
 
     Queries = Client.parse <<-'GRAPHQL'
-      query Content($skip: Int, $limit: Int) {
+      query Content($skip: Int, $limit: Int, $date: DateTime) {
         articles: articleCollection(skip: $skip, limit: $limit, preview: true) {
           items {
             title
@@ -57,6 +57,7 @@ module Import
             summary
             indexInSearchEngines
             canonicalUrl
+            isHomePage
             openGraphImage {
               width
               height
@@ -146,6 +147,24 @@ module Import
             status
           }
         }
+        events: eventCollection(skip: $skip, limit: $limit, where: { date_gte: $date }, order: [date_ASC]) {
+          items {
+            title
+            description
+						location
+						url
+						date
+            sys {
+              id
+            }
+            contentfulMetadata {
+              tags {
+                id
+                name
+              }
+            }
+          }
+        }
         assets: assetCollection(skip: $skip, limit: $limit, preview: true, order: [sys_firstPublishedAt_DESC]) {
           items {
             sys {
@@ -169,6 +188,7 @@ module Import
       redirects = []
       author = []
       site = []
+      events = []
 
       skip = 0
       limit = 1000
@@ -176,11 +196,11 @@ module Import
       fetch = true
 
       while fetch
-        response = Client.query(Queries::Content, variables: { skip: skip, limit: limit })
+        response = Client.query(Queries::Content, variables: { skip: skip, limit: limit, date: DateTime.now.beginning_of_day.strftime("%F") })
         loops += 1
         skip = loops * limit
 
-        if response.data.articles.items.blank? && response.data.pages.items.blank? && response.data.assets.items.blank? && response.data.redirects.items.blank?
+        if response.data.articles.items.blank? && response.data.pages.items.blank? && response.data.assets.items.blank? && response.data.redirects.items.blank? && response.data.events.items.blank?
           fetch = false
         end
 
@@ -188,6 +208,7 @@ module Import
         pages += response.data.pages.items
         assets += response.data.assets.items
         redirects += response.data.redirects.items
+        events += response.data.events.items
         author += response.data.author.items
         site += response.data.site.items
 
@@ -198,19 +219,21 @@ module Import
       pages = pages.compact.map(&:to_h).map(&:with_indifferent_access)
       assets = assets.compact.map(&:to_h).map(&:with_indifferent_access)
       redirects = redirects.compact.map(&:to_h).map(&:with_indifferent_access)
+      events = events.compact.map(&:to_h).map(&:with_indifferent_access)
       author = author.compact.map(&:to_h).map(&:with_indifferent_access).first
       site = site.compact.map(&:to_h).map(&:with_indifferent_access).first
-      return articles, pages, assets, redirects, author, site
+      return articles, pages, assets, redirects, events, author, site
     end
 
     def self.content
-      articles, pages, assets, redirects, author, site = query_contentful
+      articles, pages, assets, redirects, events, author, site = query_contentful
 
       articles = articles
                   .map { |item| set_entry_type(item) }
                   .map { |item| set_draft_status(item) }
                   .map { |item| set_timestamps(item) }
                   .map { |item| set_article_path(item) }
+                  .map { |item| set_template(item) }
                   .sort { |a,b| DateTime.parse(b[:published_at]) <=> DateTime.parse(a[:published_at]) }
       File.open('data/articles.json','w'){ |f| f << articles.to_json }
 
@@ -225,21 +248,23 @@ module Import
                 .map { |item| set_draft_status(item) }
                 .map { |item| set_timestamps(item) }
                 .map { |item| set_page_path(item) }
+                .map { |item| set_template(item) }
       File.open('data/pages.json','w'){ |f| f << pages.to_json }
 
       File.open('data/author.json','w'){ |f| f << author.to_json }
       File.open('data/site.json','w'){ |f| f << site.to_json }
       File.open('data/redirects.json','w'){ |f| f << redirects.to_json }
+      File.open('data/events.json','w'){ |f| f << events.to_json }
       File.open('data/assets.json','w'){ |f| f << assets.to_json }
     end
 
     def self.set_entry_type(item, type = nil)
-      if type.present?
-        item[:entry_type] = type
+      item[:entry_type] = if type.present?
+        type
       elsif item[:intro].present? && item[:body].present?
-        item[:entry_type] = 'Article'
+        'Article'
       elsif item[:intro].present?
-        item[:entry_type] = 'Short'
+        'Short'
       end
       item
     end
@@ -252,20 +277,35 @@ module Import
     end
 
     def self.set_article_path(item)
-      if item[:draft]
-        item[:path] = "/id/#{item.dig(:sys, :id)}/index.html"
+      item[:path] = if item[:draft]
+        "/id/#{item.dig(:sys, :id)}/index.html"
       else
         published = DateTime.parse(item[:published_at])
-        item[:path] = "/#{published.strftime('%Y')}/#{published.strftime('%m')}/#{published.strftime('%d')}/#{item[:slug]}/index.html"
+        "/#{published.strftime('%Y')}/#{published.strftime('%m')}/#{published.strftime('%d')}/#{item[:slug]}/index.html"
       end
       item
     end
 
     def self.set_page_path(item)
-      if item[:draft]
-        item[:path] = "/id/#{item.dig(:sys, :id)}/index.html"
+      item[:path] = if item[:draft]
+        "/id/#{item.dig(:sys, :id)}/index.html"
+      elsif item[:isHomePage]
+        "/index.html"
       else
-        item[:path] = "/#{item[:slug]}/index.html"
+        "/#{item[:slug]}/index.html"
+      end
+      item
+    end
+
+    def self.set_template(item)
+      item[:template] = if item[:entry_type] == 'Article'
+        "/article.html"
+      elsif item[:entry_type] == 'Short'
+        "/article.html"
+      elsif item[:entry_type] == 'Page' && item[:isHomePage]
+        "/home.html"
+      else
+        "/page.html"
       end
       item
     end
@@ -282,6 +322,7 @@ module Import
         tag = tag.dup
         tag[:items] = articles.select { |a| !a[:draft] && a.dig(:contentfulMetadata, :tags).include?(tag) }
         tag[:path] = "/tagged/#{tag[:id]}/index.html"
+        tag[:template] = "/blog.html"
         tag[:title] = tag[:name]
         tag[:indexInSearchEngines] = true
         tag
@@ -297,6 +338,8 @@ module Import
           current_page: index + 1,
           previous_page: index == 0 ? nil : index,
           next_page: index == sliced.size - 1 ? nil : index + 2,
+          template: "/blog.html",
+          title: "Blog",
           items: page,
           indexInSearchEngines: true
         }

@@ -1,5 +1,5 @@
 <div class="blog">
-  <% if content.title.present? %>
+  <% if content.title.present? && content.title != "Blog" %>
     <header class="blog__header">
       <h2 id="hed">
         <%= remove_widows(content.title) %>

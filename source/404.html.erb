@@ -1,27 +1,22 @@
 ---
 title: Page Not Found
-summary: The page you were looking for could not be found.
+summary: I'm sorry, but the page you were looking for can't be found.
+body: I'm sorry, but the page you were looking for can't be found.
 ---
 
-<article class="entry entry--page" id="main-content" aria-labelledby="hed">
-  <header class="entry__header">
-    <h2 id="hed">
-      <%= remove_widows(current_page.data.title) %>
+<div class="home" aria-labelledby="hed">
+  <section class="home__intro">
+    <h2 class="home__headline" id="hed">
+      <%= smartypants(remove_widows(current_page.data.title)) %>
     </h2>
-  </header>
-  <main class="entry__body">
-    <p>The page you’re looking for can’t be found, but here are some recent articles you may enjoy instead:</p>
-  </main>
-</article>
-<% articles = recent_articles %>
-<% if articles.present? %>
-  <section class="recirculation no-border">
-    <ol class="content__list">
-      <% articles.each do |item| %>
-        <li class="content__list-item">
-          <%= partial 'partials/article_summary', locals: { article: item } %>
-        </li>
-      <% end %>
-    </ol>
+    <div class="home__body">
+      <%= smartypants(markdown_to_html(current_page.data.body)) %>
+    </div>
   </section>
-<% end %>
+  <% if data.articles.reject { |a| a.draft }.present? %>
+    <%= partial 'partials/collection', locals: { title: "Recent Articles", items: data.articles.reject { |a| a.draft }.slice(0, 4) } %>
+  <% end %>
+  <% if data.events.present? %>
+    <%= partial 'partials/collection', locals: { title: "Upcoming Races", items: data.events } %>
+  <% end %>
+</div>

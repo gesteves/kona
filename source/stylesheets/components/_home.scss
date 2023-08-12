@@ -1,0 +1,93 @@
+.home {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-gap: var(--row-gap) var(--column-gap);
+  grid-template-columns: repeat(12, 1fr);
+}
+
+.home__intro {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-gap: 0 var(--column-gap);
+  grid-template-columns: repeat(12, 1fr);
+}
+
+.home__headline {
+  font-family: var(--ibm-plex-sans-condensed);
+  font-size: var(--font-x-large);
+  grid-column: 1 / -1;
+  line-height: 1.5;
+
+  @supports (background-clip: text) or (-webkit-background-clip: text) {
+    background: var(--gradient-heading);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  @media (min-width: #{$bp-medium}) {
+    grid-column: 2 / -2;
+  }
+}
+
+.home__body {
+  @extend .extend-body-styles;
+  grid-column: 1 / -1;
+
+  @media (min-width: #{$bp-medium}) {
+    grid-column: 3 / -2;
+  }
+}
+
+.home__body--fancy {
+  @extend .extend-drop-cap;
+  @extend .extend-lead-in;
+  @extend .extend-end-mark;
+}
+
+
+.home__figure {
+  border-radius: 100%;
+  float: right;
+  margin: 2rem 0 1rem 1rem;
+  shape-outside: margin-box;
+  width: calc((((100vw - (2 * var(--content-padding)) - (11 * var(--column-gap)))/12) * 5) + (4 * var(--column-gap)));
+
+  img { 
+    border-radius: 100%;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.05), 0 4px 8px rgba(0,0,0,0.05), 0 8px 16px rgba(0,0,0,0.05), 0 16px 32px rgba(0,0,0,0.05);
+  }
+
+  @media (min-width: #{$bp-medium}) {
+    margin: 2rem calc(-1 * ((((100vw - (2 * var(--content-padding)) - (11 * var(--column-gap)))/12)) + var(--column-gap))) 1rem 1rem;
+  }
+
+  @media (min-width: #{$bp-large}) {
+    margin: 0 calc(-1 * ((((var(--max-width-container) - (2 * var(--content-padding)) - (11 * var(--column-gap)))/12)) + var(--column-gap))) 1rem 1rem;
+    width: calc((((var(--max-width-container) - (2 * var(--content-padding)) - (11 * var(--column-gap)))/12) * 5) + (4 * var(--column-gap)));
+  }
+}
+
+.home__heading {
+  font-family: var(--ibm-plex-sans-condensed);
+  font-size: var(--font-medium);
+  font-weight: 700;
+  line-height: 1.5;
+  margin-bottom: 1.5rem;
+}
+
+.home__entries-articles {
+  grid-column: span 12;
+
+  @media (min-width: #{$bp-medium}) {
+    grid-column: span 6;
+  }
+}
+
+.home__entries-races {
+  grid-column: span 12;
+
+  @media (min-width: #{$bp-medium}) {
+    grid-column: span 4;
+  }
+}

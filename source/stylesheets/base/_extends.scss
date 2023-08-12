@@ -44,3 +44,269 @@
     font-style: italic;
   }
 }
+
+.extend-body-styles {
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--ibm-plex-sans-condensed);
+    font-size: var(--font-medium);
+    line-height: 1.5;
+    margin: 1.5rem 0;
+  }
+
+  h4,
+  h5,
+  h6 {
+    font-size: var(--font-small);
+  }
+
+  p,
+  ul,
+  ol {
+    font-family: var(--lato);
+    font-size: var(--font-medium);
+    font-weight: 300;
+    line-height: 1.5;
+    margin: 1.5rem 0;
+
+    code {
+      background-color: var(--color-code-background);
+      border-radius: 2px;
+      border: 1px solid var(--color-code-border);
+      color: var(--color-code-text);
+      font-family: var(--ibm-plex-mono);
+      font-size: var(--font-small);
+      padding: 0 4px;
+    }
+  }
+
+  ul li {
+    list-style-type: disc;
+
+    &::marker {
+      color: var(--color-list-marker);
+    }
+  }
+
+  ol,
+  ul {
+    margin: 0 1rem;
+
+    @media (min-width: #{$bp-medium}) {
+      margin: 0;
+    }
+  }
+
+  ol {
+    counter-reset: ol-counter;
+    list-style: none;
+
+    li {
+      counter-increment: ol-counter;
+      position: relative;
+    }
+
+    li::before {
+      color: var(--color-list-marker);
+      content: counter(ol-counter) ".";
+      font-family: var(--ibm-plex-mono);
+      font-size: var(--font-small);
+      left: -1rem;
+      line-height: 2;
+      position: absolute;
+
+      @media (min-width: #{$bp-medium}) {
+        left: -2rem;
+      }
+    }
+  }
+
+  strong,
+  b {
+    font-weight: bold;
+  }
+
+  em,
+  i,
+  cite {
+    font-style: italic;
+  }
+
+  abbr {
+    text-decoration: none;
+  }
+
+  small {
+    color: var(--color-text-secondary);
+    font-size: var(--font-x-small);
+    font-weight: 300;
+    line-height: 2;
+  }
+
+  aside {
+    background-color: var(--color-aside-background);
+    border-radius: 4px;
+    box-shadow: inset 4px 0 0 var(--color-aside-border);
+    color: var(--color-aside-text);
+    font-size: var(--font-small);
+    padding: 1.5rem;
+
+    p {
+      &:first-of-type {
+        margin-top: 0;
+      }
+
+      &:last-of-type {
+        margin-bottom: 0;
+      }
+    }
+  }
+
+  blockquote {
+    border-radius: 4px;
+    box-shadow: inset 4px 0 0 var(--color-blockquote-border);
+    padding: 1.5rem;
+
+    p {
+      color: var(--color-text-secondary);
+      font-style: italic;
+
+      &:first-of-type {
+        margin-top: 0;
+      }
+
+      &:last-of-type {
+        margin-bottom: 0;
+      }
+    }
+
+    i,
+    em,
+    cite {
+      font-style: normal;
+    }
+  }
+
+  pre {
+    code {
+      font-family: var(--ibm-plex-mono);
+      font-size: var(--font-x-small);
+    }
+  }
+
+  sup {
+    vertical-align: super;
+  }
+
+  hr {
+    border: none;
+    border-bottom: 1px solid var(--color-accent);
+    margin: var(--padding) auto;
+    width: 25%;
+  }
+
+  .gist,
+  .cp_embed_wrapper  {
+    display: block;
+    margin: 1.5rem 0;
+    max-width: 100%;
+  }
+
+  iframe {
+    aspect-ratio: var(--aspect-ratio, 16 / 9);
+    display: block;
+    margin: 1.5rem 0;
+    width: 100%;
+  }
+
+  a:link,
+  a:visited {
+    color: var(--color-link);
+    text-decoration: none;
+  }
+
+  a:hover,
+  a:active {
+    color: var(--color-link-hover);
+    text-decoration: underline 2px;
+  }
+
+  & > *:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.extend-drop-cap {
+  & > p:first-of-type::first-letter {
+    color: var(--color-dropcap);
+    font-family: var(--ibm-plex-sans-condensed);
+    font-style: normal;
+    font-variant: normal;
+    font-weight: bold;
+    text-shadow: -1px 1px 0 var(--color-background), -3px 3px 0 var(--color-dropcap-shadow);
+    text-transform: none;
+  }
+
+  @supports (initial-letter: 3) {
+    & > p:first-of-type::first-letter {
+      initial-letter: 3;
+      margin-right: 0.5rem;
+    }
+  }
+
+  // `-webkit-initial-letter` doesn't work correctly with @font-face in WebKit:
+  // https://bugs.webkit.org/show_bug.cgi?id=195002
+  // Use a float instead.
+  @supports (-webkit-initial-letter: 3) and (not (initial-letter: 3)) {
+    & > p:first-of-type::first-letter {
+      float: left;
+      font-size: 85px;
+      line-height: 0.8;
+      margin-right: 0.25rem;
+
+      @media (min-width: #{$bp-medium}) {
+        font-size: 130px;
+      }
+    }
+  }
+
+  // Browsers that don't support `initial-letter` or `-webkit-initial-letter`.
+  // (AKA Firefox).
+  // Target it separately to deal with weird alignment issues.
+  @supports not ((initial-letter: 3) or (-webkit-initial-letter: 3)) {
+    & > p:first-of-type::first-letter {
+      float: left;
+      font-size: 86px;
+      margin-right: 0.25rem;
+      margin-top: 6px;
+
+      @media (min-width: #{$bp-medium}) {
+        font-size: 130px;
+        margin-top: 9px;
+      }
+    }
+  }
+}
+
+.extend-lead-in {
+  & > p:first-of-type::first-line {
+    font-style: normal;
+    font-variant: small-caps;
+    text-transform: lowercase;
+  }
+}
+
+.extend-end-mark {
+  & > p:last-of-type::after {
+    background-color: var(--color-dropcap);
+    content: "";
+    display: inline-block;
+    height: 0.5rem;
+    margin-left: 0.25rem;
+    vertical-align: middle;
+    width: 0.5rem;
+    box-shadow:  1px 1px 0 var(--color-background), 2px 2px 0 var(--color-dropcap-shadow);
+  }
+}

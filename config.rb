@@ -13,22 +13,22 @@ activate :asset_hash
 activate :directory_indexes
 
 @app.data.articles.each do |article|
-  proxy article.path, "/article.html", locals: { content: article }, ignore: true
+  proxy article.path, article.template, locals: { content: article }, ignore: true
 end
 
 @app.data.pages.each do |page|
-  proxy page.path, "/page.html", locals: { content: page }, ignore: true
+  proxy page.path, page.template, locals: { content: page }, ignore: true
 end
 
 @app.data.tags.each do |tag|
-  proxy tag.path, "/blog.html", locals: { content: tag }, ignore: true
+  proxy tag.path, tag.template, locals: { content: tag }, ignore: true
 end
 
 @app.data.blog.each do |page|
   if page.current_page == 1
-    proxy "/index.html", "/blog.html", locals: { content: page }, ignore: true
+    proxy "/blog/index.html", page.template, locals: { content: page }, ignore: true
   else
-    proxy "/page/#{page.current_page}/index.html", "/blog.html", locals: { content: page }, ignore: true
+    proxy "/blog/page/#{page.current_page}/index.html", page.template, locals: { content: page }, ignore: true
   end
 end
 
