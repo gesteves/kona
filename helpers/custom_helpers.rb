@@ -26,7 +26,7 @@ module CustomHelpers
     if content.present?
       title = if content.current_page.present? && content.current_page > 1
         [content.title, "Page #{content.current_page}"]
-      elsif content.is_home_page.blank?
+      elsif content.isHomePage.blank?
         content.title
       end
     end
@@ -84,16 +84,17 @@ module CustomHelpers
 
   def source_tag(url, options = {})
     srcset_opts = { fm: options[:format] }.compact
-    options[:srcset] = srcset(url: url, widths: options[:widths], options: srcset_opts)
+    options[:srcset] = srcset(url: url, widths: options[:widths], square: options[:square], options: srcset_opts)
     options.delete(:widths)
     options.delete(:format)
     tag :source, options
   end
 
-  def srcset(url:, widths:, options: {})
+  def srcset(url:, widths:, square: false, options: {})
     url = URI.parse(url)
     srcset = widths.map do |w|
       query = options.merge!({ w: w })
+      query.merge!({ h: w, fit: "fill", f: "faces"}) if square
       url.query = URI.encode_www_form(query)
       "#{url.to_s} #{w}w"
     end
@@ -127,7 +128,7 @@ module CustomHelpers
     url.split('/')[4]
   end
 
-  def responsivize_images(html, widths: [100, 200, 300], sizes: '100vw', formats: ['avif', 'webp', 'jpg'])
+  def responsivize_images(html, widths: [100, 200, 300], sizes: '100vw', formats: ['avif', 'webp', 'jpg'], square: false)
     return if html.blank?
 
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
@@ -148,7 +149,7 @@ module CustomHelpers
       img['loading'] = 'lazy'
       if width.present? && height.present?
         img['width'] = width
-        img['height'] = height
+        img['height'] = square ? width : height
       end
 
       # Skip to the next image if it's a gif.
@@ -160,7 +161,7 @@ module CustomHelpers
       # Add a source element for each image format,
       # as a sibling of the img element in the picture tag.
       formats.each do |format|
-        img.add_previous_sibling(source_tag(img['src'], sizes: sizes, type: "image/#{format}", format: format, widths: img_widths))
+        img.add_previous_sibling(source_tag(img['src'], sizes: sizes, type: "image/#{format}", format: format, widths: img_widths, square: square))
       end
     end
     doc.to_html
@@ -198,7 +199,7 @@ module CustomHelpers
     doc.to_html
   end
 
-  def add_figure_elements(html)
+  def add_figure_elements(html, base_class: nil)
     return if html.blank?
 
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
@@ -215,12 +216,17 @@ module CustomHelpers
       # Get the corresponding image asset
       asset_id = get_asset_id(img['src'])
       content_type = get_asset_content_type(asset_id)
-      figure_class = "entry__figure entry__figure--#{content_type.split('/').last}"
 
       # Wrap the whole thing in a figure element,
       # with the caption in a figcaption, if present,
       # then replace the original paragraph with it.
-      img.wrap("<figure class=\"#{figure_class}\"></figure>")
+      figure = if base_class.present?
+        figure_class = "#{base_class}__figure #{base_class}__figure--#{content_type.split('/').last}"
+        "<figure class=\"#{figure_class}\"></figure>"
+      else
+        "<figure></figure>"
+      end
+      img.wrap(figure)
       img.add_next_sibling("<figcaption>#{caption}</figcaption>") if caption.present?
       parent.replace(img.parent)
     end
@@ -250,7 +256,7 @@ module CustomHelpers
 
   def render_body(text)
     html = markdown_to_html(text)
-    html = add_figure_elements(html)
+    html = add_figure_elements(html, base_class: 'entry')
     html = responsivize_images(html, widths: data.srcsets.entry.widths, sizes: data.srcsets.entry.sizes.join(', '), formats: data.srcsets.entry.formats)
     html = set_alt_text(html)
     html = mark_affiliate_links(html)
@@ -264,6 +270,14 @@ module CustomHelpers
     html = resize_images(html, width: data.srcsets.entry.widths.max)
     html = set_alt_text(html)
     html = mark_affiliate_links(html)
+    html
+  end
+
+  def render_home_body(text)
+    html = markdown_to_html(text)
+    html = add_figure_elements(html, base_class: 'home')
+    html = responsivize_images(html, widths: data.srcsets.home.widths, sizes: data.srcsets.home.sizes.join(', '), formats: data.srcsets.entry.formats, square: true)
+    html = set_alt_text(html)
     html
   end
 

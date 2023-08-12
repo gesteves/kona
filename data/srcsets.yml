@@ -39,3 +39,24 @@ avatar:
     - avif
     - webp
     - jpg
+home:
+  sizes:
+    - "(min-width: 1280px) 452px"
+    - "(min-width: 768px) calc((((100vw - 4rem - (11 * 2rem))/12) * 4.5) + (4 * 2rem))"
+    - "calc((100vw - 4rem) * 0.5)"
+  widths:
+    - 452
+    - 904
+    - 546
+    - 549
+    - 495
+    - 312
+    - 489
+    - 468
+    - 520
+    - 712
+    - 256
+  formats:
+    - avif
+    - webp
+    - jpg
