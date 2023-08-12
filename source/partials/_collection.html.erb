@@ -6,7 +6,7 @@
     <% items.each do |item| %>
       <li class="collection__item">
         <% if item.entry_type.present? %>
-          <%= partial 'partials/article_summary', locals: { article: item } %>
+          <%= partial 'partials/article/summary', locals: { article: item } %>
         <% else %>
           <%= partial 'partials/event', locals: { event: item } %>
         <% end %>
