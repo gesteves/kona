@@ -26,6 +26,14 @@
   font-size: var(--font-x-large);
   font-weight: 700;
   line-height: 1;
+
+  @media (min-width: #{$bp-medium}) {
+    font-size: var(--font-large);
+  }
+
+  @media (min-width: #{$bp-large}) {
+    font-size: var(--font-x-large);
+  }
 }
 
 .stats__meta {
