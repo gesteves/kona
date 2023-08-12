@@ -1,7 +1,7 @@
 <% if defined?(content) %>
-  <meta property="og:title" content="<%= og_title(content: content) %>">
+  <meta property="og:title" content="<%= og_title(content) %>">
 <% elsif current_page.data.title.present? %>
-  <meta property="og:title" content="<%= og_title(title: current_page.data.title) %>">
+  <meta property="og:title" content="<%= og_title(current_page.data.title) %>">
 <% end %>
 
 <% if defined?(content) %>

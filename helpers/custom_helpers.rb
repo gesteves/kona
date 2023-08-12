@@ -22,26 +22,27 @@ module CustomHelpers
     tag.join('/')
   end
 
-  def page_title(title: nil, content: nil, separator: ' · ')
-    if content.present?
-      title = if content.current_page.present? && content.current_page > 1
+  def page_title(content)
+    if content.is_a? Hash
+      if content&.current_page.to_i > 1
         [content.title, "Page #{content.current_page}"]
-      elsif content.isHomePage.blank?
+      elsif content.title.present? && content.isHomePage.blank?
         content.title
       end
+    elsif content.is_a? String
+      content
+    else
+      data.site.metaTitle
     end
+  end
+
+  def title_tag(content, separator: ' · ')
+    title = page_title(content)
     strip_tags(smartypants([title, data.site.metaTitle].flatten.reject(&:blank?).uniq.join(separator)))
   end
 
-  def og_title(title: nil, content: nil, separator: ' · ')
-    if content.present?
-      title = if content.current_page.present? && content.current_page > 1
-        [content.title, "Page #{content.current_page}"]
-      else
-        content.title
-      end
-    end
-    title = data.site.metaTitle if title.blank?
+  def og_title(content, separator: ' · ')
+    title = page_title(content)
     strip_tags(smartypants([title].flatten.reject(&:blank?).uniq.join(separator)))
   end
 
