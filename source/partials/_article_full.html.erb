@@ -1,12 +1,14 @@
-<article class="entry entry--article has-drop-cap has-lead-in has-end-mark" aria-labelledby="hed-<%= article.sys.id.parameterize %>">
+<article class="entry entry--full <%= css_class %>" aria-labelledby="hed-<%= article.sys.id.parameterize %>">
   <header class="entry__header">
       <p class="entry__meta">
         <% if article.draft %>
           <span class="entry__draft">Draft</span>
         <% end %>
-        <span><%= link_to DateTime.parse(article.published_at).strftime('%A, %B %-e, %Y'), article.path %></span>
-        <% if article.contentfulMetadata.tags.present? %>
-          <span><%= article.contentfulMetadata.tags.sort { |a, b| a.name <=> b.name }.map { |tag| link_to tag.name, "/tagged/#{tag.id}/index.html" }.join(', ') %></span>
+        <% unless article.entry_type == 'Page' %>
+          <span><%= link_to DateTime.parse(article.published_at).strftime('%A, %B %-e, %Y'), article.path %></span>
+          <% if article.contentfulMetadata.tags.present? %>
+            <span><%= article.contentfulMetadata.tags.sort { |a, b| a.name <=> b.name }.map { |tag| link_to tag.name, "/tagged/#{tag.id}/index.html" }.join(', ') %></span>
+          <% end %>
         <% end %>
       </p>
     <h2 id="hed-<%= article.sys.id.parameterize %>">

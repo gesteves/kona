@@ -1,16 +1,1 @@
-<article class="entry entry--page" aria-labelledby="hed">
-  <header class="entry__header">
-    <% if content.draft %>
-      <p class="entry__meta">
-        <span class="entry__draft">Draft</span>
-      </p>
-    <% end %>
-    <h2 id="hed">
-      <%= smartypants(remove_widows(content.title)) %>
-    </h2>
-  </header>
-  <main class="entry__body">
-    <%= render_body(content.body) %>
-  </main>
-  <%= partial 'partials/disclosure', locals: { entry: content } %>
-</article>
+<%= partial 'partials/article_full', locals: { article: content, css_class: "entry--page" } %>

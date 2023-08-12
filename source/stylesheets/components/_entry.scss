@@ -1,35 +1,5 @@
-.entry {
-  grid-column: 1 / -1;
-
-  @media (min-width: #{$bp-medium}) {
-    grid-column: 3 / -3;
-  }
-}
-
 .entry__header {
   @extend .extend-entry-header;
-}
-
-.entry--page,
-.entry--article {
-  .entry__header {
-    border-bottom: 1px solid var(--color-border);
-    margin-bottom: var(--padding);
-    padding-bottom: var(--padding);
-    text-align: center;
-  
-    h2 {
-      margin: 1rem 0 -0.25rem 0;
-      padding: 0 0 0.25rem 0;
-
-      @supports (background-clip: text) or (-webkit-background-clip: text) {
-        background: var(--gradient-heading);
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
-      }
-    }
-  }
 }
 
 .entry__meta {
@@ -226,16 +196,46 @@
   }
 }
 
-.entry.has-lead-in .entry__body {
-  @extend .extend-lead-in;
+.entry__disclosure {
+  color: var(--color-text-tertiary);
+  font-family: var(--ibm-plex-mono);
+  font-size: var(--font-x-small);
+  line-height: 2;
 }
 
-.entry.has-drop-cap .entry__body {
+.entry--article .entry__body {
   @extend .extend-drop-cap;
+  @extend .extend-lead-in;
+  @extend .extend-end-mark;
 }
 
-.entry.has-end-mark .entry__body {
-  @extend .extend-end-mark;
+.entry--full {
+  grid-column: 1 / -1;
+
+  @media (min-width: #{$bp-medium}) {
+    grid-column: 3 / -3;
+  }
+}
+
+.entry--full {
+  .entry__header {
+    border-bottom: 1px solid var(--color-border);
+    margin-bottom: var(--padding);
+    padding-bottom: var(--padding);
+    text-align: center;
+  
+    h2 {
+      margin: 1rem 0 -0.25rem 0;
+      padding: 0 0 0.25rem 0;
+
+      @supports (background-clip: text) or (-webkit-background-clip: text) {
+        background: var(--gradient-heading);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+    }
+  }
 }
 
 .entry--compact {
@@ -250,13 +250,6 @@
   .entry__body > p:first-child {
     margin-top: 0;
   }
-}
-
-.entry__disclosure {
-  color: var(--color-text-tertiary);
-  font-family: var(--ibm-plex-mono);
-  font-size: var(--font-x-small);
-  line-height: 2;
 }
 
 .entry--summary {
