@@ -38,10 +38,7 @@
 
   a {
     display: inline-block;
-
-    @media (min-width: #{$bp-medium}) {
-      padding: 0 1rem;
-    }
+    padding: 0 1rem;
   }
 
   a:link,
