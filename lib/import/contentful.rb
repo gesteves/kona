@@ -196,7 +196,7 @@ module Import
       fetch = true
 
       while fetch
-        response = Client.query(Queries::Content, variables: { skip: skip, limit: limit, date: DateTime.now.beginning_of_day.strftime("%F") })
+        response = Client.query(Queries::Content, variables: { skip: skip, limit: limit, date: Time.now.beginning_of_day.strftime("%F") })
         loops += 1
         skip = loops * limit
 

@@ -12,7 +12,7 @@ module Import
         "Content-Type" => "application/json"
       }
 
-      after_time = (Time.now - 1.month).to_i
+      after_time = (Time.now.beginning_of_day - 1.month).to_i
 
       response = HTTParty.get("#{STRAVA_API_URL}/athlete/activities", headers: headers, query: { after: after_time, per_page: 200 })
 
