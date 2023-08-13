@@ -27,13 +27,13 @@ module Import
 
       activities.each do |activity|
         distance_km = activity['distance'] / 1000.0
-        type = activity['type']
+        type = activity['sport_type']
 
         case type
         when 'Swim'
           totals[:swim][:distance] += distance_km
           totals[:swim][:activities] += 1
-        when 'Ride', 'VirtualRide'
+        when 'Ride', 'VirtualRide', 'GravelRide', 'MountainBikeRide'
           totals[:bike][:distance] += distance_km
           totals[:bike][:activities] += 1
         when 'Run', 'VirtualRun'
