@@ -243,6 +243,7 @@ module CustomHelpers
   end
 
   def set_caption_credit(html)
+    return if html.blank?
     parts = html.split(' | ')
     return html if parts.size == 1
     "#{parts.first} <cite>#{parts.last}</cite>"
