@@ -81,7 +81,7 @@
     font-style: italic;
     font-weight: 300;
     line-height: var(--line-height-x-small);
-    margin: 0.5rem var(--picture-outdent) 0 var(--picture-outdent);
+    margin: 0 var(--picture-outdent) 0 var(--picture-outdent);
     text-wrap: balance;
 
     i,
@@ -106,7 +106,7 @@
   margin: 1.5rem 0;
 
   figcaption {
-    margin: 0.5rem 0 0 0;
+    margin: 0;
   }
 }
 
