@@ -18,6 +18,6 @@
   <div class="entry__body">
     <%= render_body(article.intro) %>
     <%= render_body(article.body) %>
+    <%= partial 'partials/disclosure', locals: { entry: article } %>
   </div>
-  <%= partial 'partials/disclosure', locals: { entry: article } %>
 </article>

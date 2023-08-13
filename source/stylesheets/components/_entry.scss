@@ -201,13 +201,6 @@
   }
 }
 
-.entry__disclosure {
-  color: var(--color-text-tertiary);
-  font-family: var(--ibm-plex-mono);
-  font-size: var(--font-x-small);
-  line-height: var(--line-height-x-small);
-}
-
 .entry--article .entry__body {
   @extend .extend-drop-cap;
   @extend .extend-lead-in;
