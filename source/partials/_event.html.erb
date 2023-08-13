@@ -4,7 +4,7 @@
       <span><%= DateTime.parse(event.date).strftime('%A, %B %-e, %Y') %></span>
       <span><%= remove_widows(event.location) %></span>
     </p>
-    <h4 id="hed-<%= event.sys.id.parameterize %>">
+    <h4 class="entry__hed" id="hed-<%= event.sys.id.parameterize %>">
       <%= link_to smartypants(remove_widows(event.title)), event.url, rel: "noopener", target: "_blank" %>
     </h4>
   </header>
