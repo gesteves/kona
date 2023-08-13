@@ -363,7 +363,7 @@ module CustomHelpers
   end
 
   def formatted_distance(meters, precision: 3)
-    number_to_human(meters, units: DISTANCE_UNITS, precision: 3, strip_insignificant_zeros: true, significant: true, delimiter: ',')
+    number_to_human(meters, units: DISTANCE_UNITS, precision: precision, strip_insignificant_zeros: true, significant: true, delimiter: ',')
   end
 
   def formatted_distance_number(meters)
