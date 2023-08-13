@@ -1,6 +1,6 @@
 <article class="entry entry--summary" aria-labelledby="hed-<%= event.sys.id.parameterize %>">
   <header class="entry__header">
-    <p class="entry__meta">
+    <p class="entry__meta entry__meta--truncated">
       <span><%= DateTime.parse(event.date).strftime('%B %-e, %Y') %></span>
       <span><%= remove_widows(event.location) %></span>
     </p>

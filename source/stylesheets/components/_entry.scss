@@ -29,6 +29,12 @@
   }
 }
 
+.entry__meta--truncated {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .entry__draft {
   color: var(--color-firebrick);
   font-weight: 600;
