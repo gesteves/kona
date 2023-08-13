@@ -1,4 +1,4 @@
-<article class="entry entry--compact entry--summary" aria-labelledby="hed-<%= article.sys.id.parameterize %>">
+<article class="entry entry--summary" aria-labelledby="hed-<%= article.sys.id.parameterize %>">
   <header class="entry__header">
     <p class="entry__meta">
       <span><%= link_to DateTime.parse(article.published_at).strftime('%A, %B %-e, %Y'), article.path %></span>

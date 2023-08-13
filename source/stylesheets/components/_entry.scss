@@ -230,7 +230,8 @@
   }
 }
 
-.entry--compact {
+.entry--compact,
+.entry--summary {
   .entry__hed {
     font-size: var(--font-medium);
     line-height: var(--line-height-medium);
@@ -243,16 +244,11 @@
 }
 
 .entry--summary {
-  .entry__hed {
-    font-size: var(--font-medium);
-    line-height: var(--line-height-medium);
-    margin: 0;
-  }
-
   .entry__body {
     p {
       font-size: var(--font-small);
       line-height: var(--line-height-small);
+      margin-top: 0;
     }
   }
 }
