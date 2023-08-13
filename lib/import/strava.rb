@@ -12,40 +12,18 @@ module Import
         "Content-Type" => "application/json"
       }
 
-      after_time = (Time.now.beginning_of_day - 1.month).to_i
+      response = HTTParty.get("#{STRAVA_API_URL}/athlete", headers: headers)
+      athlete_id = JSON.parse(response.body)['id']
 
-      response = HTTParty.get("#{STRAVA_API_URL}/athlete/activities", headers: headers, query: { after: after_time, per_page: 200 })
+      response = HTTParty.get("#{STRAVA_API_URL}/athletes/#{athlete_id}/stats", headers: headers)
+      stats = JSON.parse(response.body)
 
-      activities = JSON.parse(response.body)
-
-      totals = {
-        totals: { distance: 0.0, activities: 0 },
-        swim: { distance: 0.0, activities: 0 },
-        bike: { distance: 0.0, activities: 0 },
-        run: { distance: 0.0, activities: 0 }
-      }
-
-      activities.each do |activity|
-        distance_km = activity['distance'] / 1000.0
-        type = activity['sport_type']
-
-        case type
-        when 'Swim'
-          totals[:swim][:distance] += distance_km
-          totals[:swim][:activities] += 1
-        when 'Ride', 'VirtualRide', 'GravelRide', 'MountainBikeRide'
-          totals[:bike][:distance] += distance_km
-          totals[:bike][:activities] += 1
-        when 'Run', 'VirtualRun'
-          totals[:run][:distance] += distance_km
-          totals[:run][:activities] += 1
-        end
+      # Rename key to avoid warning about conflict with a built-in Ruby method
+      stats.each_key do |k|
+        stats[k]['activities'] = stats[k].delete('count') if stats[k].is_a?(Hash) && stats[k]['count'].present?
       end
 
-      totals[:totals][:activities] = totals[:swim][:activities] + totals[:bike][:activities] + totals[:run][:activities]
-      totals[:totals][:distance] = totals[:swim][:distance] + totals[:bike][:distance] + totals[:run][:distance]
-
-      File.open('data/strava.json','w'){ |f| f << totals.to_json }
+      File.open('data/strava.json','w'){ |f| f << stats.to_json }
     end
 
     def self.refresh_access_token

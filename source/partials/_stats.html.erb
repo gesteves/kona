@@ -1,22 +1,6 @@
 <section class="stats">
-  <div class="stats__stat">
-    <span class="stats__meta"><%= "Activity".pluralize(data.strava.totals.activities) %></span>
-    <span class="stats__number"><%= data.strava.totals.activities %></span>
-    <span class="stats__meta">In the past month</span>
-  </div>
-  <div class="stats__stat">
-    <span class="stats__meta">Swimming</span>
-    <span class="stats__number"><%= formatted_number(data.strava.swim.distance) %></span>
-    <span class="stats__meta"><%= "Kilometer".pluralize(data.strava.swim.distance) %> <%= "😬" if data.strava.swim.distance == 0 %></span>
-  </div>
-  <div class="stats__stat">
-    <span class="stats__meta">Cycling</span>
-    <span class="stats__number"><%= formatted_number(data.strava.bike.distance) %></span>
-    <span class="stats__meta"><%= "Kilometer".pluralize(data.strava.bike.distance) %> <%= "😬" if data.strava.bike.distance == 0 %></span>
-  </div>
-  <div class="stats__stat">
-    <span class="stats__meta">Running</span>
-    <span class="stats__number"><%= formatted_number(data.strava.run.distance) %></span>
-    <span class="stats__meta"><%= "Kilometer".pluralize(data.strava.run.distance) %> <%= "😬" if data.strava.run.distance == 0 %></span>
-  </div>
+  <%= partial 'partials/stats/total',    locals: { timeframe: 'In the past month', activities: data.strava.recent_swim_totals.activities + data.strava.recent_ride_totals.activities + data.strava.recent_run_totals.activities } %>
+  <%= partial 'partials/stats/activity', locals: { activity: 'Swimming', distance: data.strava.recent_swim_totals.distance } %>
+  <%= partial 'partials/stats/activity', locals: { activity: 'Cycling', distance: data.strava.recent_ride_totals.distance } %>
+  <%= partial 'partials/stats/activity', locals: { activity: 'Running', distance: data.strava.recent_run_totals.distance } %>
 </section>
