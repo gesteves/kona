@@ -32,7 +32,7 @@
     line-height: var(--line-height-large);
   }
 
-  @media (min-width: 1024px) {
+  @media (min-width: #{$bp-large}) {
     font-size: var(--font-x-large);
     line-height: var(--line-height-x-large);
   }
