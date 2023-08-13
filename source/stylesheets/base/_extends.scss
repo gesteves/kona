@@ -19,7 +19,8 @@
     a:hover,
     a:active {
       color: var(--color-link-hover);
-      text-decoration: underline 2px;
+      text-decoration: underline;
+      text-decoration-thickness: 2px;
 
       @supports (background-clip: text) or (-webkit-background-clip: text) {
         background: var(--gradient-link);
@@ -234,7 +235,8 @@
   a:hover,
   a:active {
     color: var(--color-link-hover);
-    text-decoration: underline 2px;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
   }
 
   & > *:last-child {
