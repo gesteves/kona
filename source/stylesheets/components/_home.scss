@@ -43,7 +43,7 @@
 .home__figure {
   border-radius: 100%;
   float: right;
-  margin: 2rem 0 1rem 1rem;
+  margin: 0 0 1rem 1rem;
   shape-outside: margin-box;
   width: calc((((100vw - (2 * var(--content-padding)) - (11 * var(--column-gap)))/12) * 5) + (4 * var(--column-gap)));
 
@@ -53,7 +53,7 @@
   }
 
   @media (min-width: #{$bp-medium}) {
-    margin: 2rem calc(-1 * ((((100vw - (2 * var(--content-padding)) - (11 * var(--column-gap)))/12)) + var(--column-gap))) 1rem 1rem;
+    margin: 0 calc(-1 * ((((100vw - (2 * var(--content-padding)) - (11 * var(--column-gap)))/12)) + var(--column-gap))) 1rem 1rem;
   }
 
   @media (min-width: #{$bp-large}) {
