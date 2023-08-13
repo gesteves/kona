@@ -12,10 +12,7 @@ module Import
         "Content-Type" => "application/json"
       }
 
-      response = HTTParty.get("#{STRAVA_API_URL}/athlete", headers: headers)
-      athlete_id = JSON.parse(response.body)['id']
-
-      response = HTTParty.get("#{STRAVA_API_URL}/athletes/#{athlete_id}/stats", headers: headers)
+      response = HTTParty.get("#{STRAVA_API_URL}/athletes/#{ENV['STRAVA_ATHLETE_ID']}/stats", headers: headers)
       stats = JSON.parse(response.body)
 
       # Rename key to avoid warning about conflict with a built-in Ruby method
