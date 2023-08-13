@@ -78,8 +78,8 @@
   --gradient-link:                    linear-gradient(180deg, var(--color-red-cmyk), var(--color-firebrick));
 
   // Font sizes
-  --font-x-large: 48px;
-  --font-large:   48px;
+  --font-x-large: clamp(36px, 10vw, 72px);
+  --font-large:   clamp(24px, 10vw, 48px);
   --font-medium:  16px;
   --font-small:   12px;
   --font-x-small: 10px;
@@ -101,14 +101,10 @@
   --picture-outdent:     var(--content-padding);
   --avatar-size:         48px;
 
-  @media (min-width: 500px) {
-    --font-x-large: 72px;
-  }
-
   @media (min-width: #{$bp-medium}) {
     --column-gap:          2rem;
-    --font-x-large:        108px;
-    --font-large:          72px;
+    --font-x-large:        clamp(36px, 10vw, 108px);
+    --font-large:          clamp(36px, 6vw, 72px);
     --font-medium:         24px;
     --font-small:          18px;
     --font-x-small:        12px;
