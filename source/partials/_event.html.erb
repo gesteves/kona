@@ -2,7 +2,7 @@
   <header class="entry__header">
     <p class="entry__meta">
       <span><%= DateTime.parse(event.date).strftime('%A, %B %-e, %Y') %></span>
-      <span><%= event.location %></span>
+      <span><%= remove_widows(event.location) %></span>
     </p>
     <h4 id="hed-<%= event.sys.id.parameterize %>">
       <%= link_to smartypants(remove_widows(event.title)), event.url, rel: "noopener", target: "_blank" %>

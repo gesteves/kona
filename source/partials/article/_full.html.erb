@@ -7,7 +7,7 @@
         <% unless article.entry_type == 'Page' %>
           <span><%= link_to DateTime.parse(article.published_at).strftime('%A, %B %-e, %Y'), article.path %></span>
           <% if article.contentfulMetadata.tags.present? %>
-            <span><%= article.contentfulMetadata.tags.sort { |a, b| a.name <=> b.name }.map { |tag| link_to tag.name, "/tagged/#{tag.id}/index.html" }.join(', ') %></span>
+            <span><%= article.contentfulMetadata.tags.sort { |a, b| a.name <=> b.name }.map { |tag| link_to remove_widows(tag.name), "/tagged/#{tag.id}/index.html" }.join(', ') %></span>
           <% end %>
         <% end %>
       </p>

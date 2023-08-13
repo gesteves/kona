@@ -3,7 +3,7 @@
     <p class="entry__meta">
       <span><%= link_to DateTime.parse(article.published_at).strftime('%A, %B %-e, %Y'), article.path %></span>
       <% if article.contentfulMetadata.tags.present? %>
-        <span><%= article.contentfulMetadata.tags.sort { |a, b| a.name <=> b.name }.map { |t| link_to t.name, "/tagged/#{t.id}/index.html" }.join(', ') %></span>
+        <span><%= article.contentfulMetadata.tags.sort { |a, b| a.name <=> b.name }.map { |t| link_to remove_widows(t.name), "/tagged/#{t.id}/index.html" }.join(', ') %></span>
       <% end %>
     </p>
     <h4 id="hed-<%= article.sys.id.parameterize %>">
