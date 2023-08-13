@@ -1,5 +1,4 @@
 require 'httparty'
-require 'active_support/all'
 
 module Import
   module Strava
