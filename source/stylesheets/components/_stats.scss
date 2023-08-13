@@ -25,14 +25,16 @@
   font-family: var(--ibm-plex-sans-condensed);
   font-size: var(--font-x-large);
   font-weight: 700;
-  line-height: 1;
+  line-height: var(--line-height-x-large);
 
   @media (min-width: #{$bp-medium}) {
     font-size: var(--font-large);
+    line-height: var(--line-height-large);
   }
 
   @media (min-width: #{$bp-large}) {
     font-size: var(--font-x-large);
+    line-height: var(--line-height-x-large);
   }
 }
 
@@ -40,6 +42,6 @@
   color: var(--color-text-secondary);
   font-family: var(--ibm-plex-mono);
   font-size: var(--font-x-small);
-  line-height: 2;
+  line-height: var(--line-height-x-small);
   text-transform: uppercase;
 }

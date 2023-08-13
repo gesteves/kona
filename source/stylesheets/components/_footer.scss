@@ -1,4 +1,5 @@
 .footer {
+  --line-height-x-small: 2;
   align-items: center;
   background: var(--gradient-footer-background);
   box-sizing: border-box;
@@ -12,7 +13,7 @@
     font-family: var(--lato);
     font-size: var(--font-x-small);
     font-weight: 300;
-    line-height: 2;
+    line-height: var(--line-height-x-small);
   }
 
   i,
@@ -30,7 +31,7 @@
     font-family: var(--ibm-plex-sans-condensed);
     font-size: var(--font-x-small);
     font-weight: 700;
-    line-height: 2;
+    line-height: var(--line-height-x-small);
   }
 
   a:link, a:visited {

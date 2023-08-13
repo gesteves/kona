@@ -33,13 +33,13 @@
 
   h2 {
     font-size: var(--font-large);
-    line-height: 1;
+    line-height: var(--line-height-large);
   }
 
   h3,
   h4 {
     font-size: var(--font-medium);
-    line-height: 1.5;
+    line-height: var(--line-height-medium);
   }
 
   cite {
@@ -54,7 +54,7 @@
   h6 {
     font-family: var(--ibm-plex-sans-condensed);
     font-size: var(--font-medium);
-    line-height: 1.5;
+    line-height: var(--line-height-medium);
     margin: 1.5rem 0;
   }
 
@@ -62,7 +62,7 @@
   h5,
   h6 {
     font-size: var(--font-small);
-    line-height: 1.3333;
+    line-height: var(--line-height-small);
   }
 
   p,
@@ -71,7 +71,7 @@
     font-family: var(--lato);
     font-size: var(--font-medium);
     font-weight: 300;
-    line-height: 1.5;
+    line-height: var(--line-height-medium);
     margin: 1.5rem 0;
 
     code {
@@ -81,7 +81,7 @@
       color: var(--color-code-text);
       font-family: var(--ibm-plex-mono);
       font-size: var(--font-small);
-      line-height: 1.3333;
+      line-height: var(--line-height-small);
       padding: 0 4px;
     }
   }
@@ -118,7 +118,7 @@
       font-family: var(--ibm-plex-mono);
       font-size: var(--font-small);
       left: -1rem;
-      line-height: 2;
+      line-height: var(--line-height-small);
       position: absolute;
 
       @media (min-width: #{$bp-medium}) {
@@ -146,7 +146,7 @@
     color: var(--color-text-secondary);
     font-size: var(--font-x-small);
     font-weight: 300;
-    line-height: 2;
+    line-height: var(--line-height-x-small);
   }
 
   aside {
@@ -196,6 +196,7 @@
     code {
       font-family: var(--ibm-plex-mono);
       font-size: var(--font-x-small);
+      line-height: var(--line-height-x-small);
     }
   }
 

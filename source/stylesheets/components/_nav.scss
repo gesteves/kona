@@ -16,7 +16,7 @@
   display: block;
   font-family: var(--ibm-plex-mono);
   font-size: var(--font-small);
-  line-height: 1.3333;
+  line-height: var(--line-height-small);
   text-transform: uppercase;
   display: flex;
   flex-flow: nowrap;
@@ -24,7 +24,7 @@
 
   @media (min-width: #{$bp-medium}) {
     font-size: var(--font-x-small);
-    line-height: 2;
+    line-height: var(--line-height-x-small);
   }
 
   &::after {

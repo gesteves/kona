@@ -8,7 +8,7 @@
     flex-flow: column;
     font-family: var(--ibm-plex-mono);
     font-size: var(--font-x-small);
-    line-height: 2;
+    line-height: var(--line-height-x-small);
     margin: 0 0 2rem 0;
     text-indent: 0;
   
@@ -26,7 +26,7 @@
     font-size: var(--font-x-small);
     font-style: normal;
     font-weight: 300;
-    line-height: 2;
+    line-height: var(--line-height-x-small);
   }
   
   textarea {
@@ -44,7 +44,7 @@
     font-size: var(--font-x-small);
     font-style: normal;
     font-weight: 300;
-    line-height: 2;
+    line-height: var(--line-height-x-small);
     padding: 0 2rem;
     text-shadow: 0 -1px 0 var(--color-button-border);
   

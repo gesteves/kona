@@ -82,7 +82,15 @@
   --font-large:   32px;
   --font-medium:  16px;
   --font-small:   12px;
-  --font-x-small: 8px;
+  --font-x-small: 10px;
+
+  // Line height
+  --line-height: 24px;
+  --line-height-x-large: 1;
+  --line-height-large:   1;
+  --line-height-medium:  1.5;
+  --line-height-small:   2;
+  --line-height-x-small: 2.4;
 
   // Fonts
   --ibm-plex-mono:           'IBM Plex Mono', ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
@@ -95,15 +103,16 @@
   --avatar-size:         48px;
 
   @media (min-width: #{$bp-medium}) {
-    --column-gap:      2rem;
-    --font-x-large:    72px;
-    --font-large:      48px;
-    --font-medium:     24px;
-    --font-small:      18px;
-    --font-x-small:    12px;
-    --padding:         4rem;
-    --picture-outdent: calc((100vw - (var(--content-padding) * 2) - (11 * var(--column-gap)))/12 + var(--column-gap));
-    --row-gap:         4rem;
+    --column-gap:          2rem;
+    --font-x-large:        72px;
+    --font-large:          48px;
+    --font-medium:         24px;
+    --font-small:          18px;
+    --font-x-small:        12px;
+    --line-height-x-small: 3;
+    --padding:             4rem;
+    --picture-outdent:     calc((100vw - (var(--content-padding) * 2) - (11 * var(--column-gap)))/12 + var(--column-gap));
+    --row-gap:             4rem;
   }
 
   @media (min-width: #{$bp-large}) {

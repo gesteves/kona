@@ -17,7 +17,7 @@
   font-family: var(--ibm-plex-sans-condensed);
   font-size: var(--font-x-large);
   grid-column: 1 / -1;
-  line-height: 1.5;
+  line-height: var(--line-height-x-large);
 
   @media (min-width: #{$bp-medium}) {
     grid-column: 2 / -2;
@@ -66,7 +66,7 @@
   font-family: var(--ibm-plex-sans-condensed);
   font-size: var(--font-medium);
   font-weight: 700;
-  line-height: 1.5;
+  line-height: var(--line-height-medium);
   margin-bottom: 1.5rem;
 }
 
