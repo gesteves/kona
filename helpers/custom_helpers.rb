@@ -362,7 +362,7 @@ module CustomHelpers
     url.to_s
   end
 
-  def formatted_distance(meters, precision: 3)
+  def formatted_distance(meters, precision: 5)
     number_to_human(meters, units: DISTANCE_UNITS, precision: precision, strip_insignificant_zeros: true, significant: true, delimiter: ',')
   end
 
