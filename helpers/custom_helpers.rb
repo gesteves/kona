@@ -323,7 +323,7 @@ module CustomHelpers
     end
   end
 
-  def related_articles(article, count: 6)
+  def related_articles(article, count: 4)
     tags = article.contentfulMetadata.tags.map(&:id)
     data.articles
       .reject { |a| a.path == article.path } # Reject the article itself
