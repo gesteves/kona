@@ -301,7 +301,7 @@ module Import
       item[:template] = if item[:entry_type] == 'Article'
         "/article.html"
       elsif item[:entry_type] == 'Short'
-        "/article.html"
+        "/short.html"
       elsif item[:entry_type] == 'Page' && item[:isHomePage]
         "/home.html"
       else

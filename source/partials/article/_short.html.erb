@@ -1,0 +1,10 @@
+<article class="entry entry--compact" id="main-content">
+  <header class="entry__header">
+    <p class="entry__meta">
+      <span><%= link_to DateTime.parse(article.published_at).strftime('%A, %B %-e, %Y'), article.path %></span>
+    </p>
+  </header>
+  <div class="entry__body">
+    <%= render_body(article.intro) %>
+  </div>
+</article>

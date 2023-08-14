@@ -11,7 +11,11 @@
     <ol class="blog__list">
       <% content.items.each do |item| %>
         <li class="blog__list-item">
-          <%= partial 'partials/article/compact', locals: { article: item } %>
+          <% if item.entry_type == 'Short' %>
+            <%= partial 'partials/article/short', locals: { article: item } %>
+          <% else %>
+            <%= partial 'partials/article/compact', locals: { article: item } %>
+          <% end %>
           <% unless item == content.items.last %><hr class="blog__separator"><% end %>
         </li>
       <% end %>

@@ -323,21 +323,22 @@ module CustomHelpers
     end
   end
 
-  def related_articles(article, count: 4)
+  def related_articles(article, count: 6)
     tags = article.contentfulMetadata.tags.map(&:id)
     data.articles
       .reject { |a| a.path == article.path } # Reject the article itself
       .reject { |a| a.draft } # Reject drafts
+      .reject { |a| a.entry_type == 'Short' } # Reject short posts
       .sort { |a,b| (b.contentfulMetadata.tags.map(&:id) & tags).size <=> (a.contentfulMetadata.tags.map(&:id) & tags).size } # Fake relevancy sorting by sorting by number of common tags
       .slice(0, count) # Slice the specified number of articles
   end
 
   def random_articles(count: 5)
-    data.articles.reject(&:draft).shuffle.slice(0, count)
+    data.articles.reject { |a| a.draft || a.entry_type == 'Short' }.shuffle.slice(0, count)
   end
 
   def recent_articles(count: 5)
-    data.articles.reject(&:draft).slice(0, count)
+    data.articles.reject { |a| a.draft || a.entry_type == 'Short' }.slice(0, count)
   end
 
   def site_icon(w:)
