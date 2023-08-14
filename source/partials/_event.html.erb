@@ -2,10 +2,10 @@
   <header class="entry__header">
     <p class="entry__meta entry__meta--truncated">
       <span><%= DateTime.parse(event.date).strftime('%B %-e, %Y') %></span>
-      <span><%= remove_widows(event.location) %></span>
+      <span><%= event.location %></span>
     </p>
     <h4 class="entry__hed" id="hed-<%= event.sys.id.parameterize %>">
-      <%= link_to smartypants(remove_widows(event.title)), event.url, rel: "noopener", target: "_blank" %>
+      <%= link_to smartypants(event.title), event.url, rel: "noopener", target: "_blank" %>
     </h4>
   </header>
   <% if event.description.present? %>
