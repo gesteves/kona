@@ -3,7 +3,7 @@ require 'httparty'
 module Strava
   STRAVA_API_URL = 'https://www.strava.com/api/v3'
 
-  def self.fetch_totals
+  def self.stats
     access_token = refresh_access_token
     headers = {
       "Authorization" => "Bearer #{access_token}",

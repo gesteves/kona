@@ -17,14 +17,14 @@ namespace :import do
 
   desc 'Imports content from Contentful'
   task :contentful => [:dotenv, :set_up_directories] do
-    puts 'Importing content from Contentful'
+    puts 'Importing site content from Contentful'
     Contentful.content
   end
 
   desc 'Imports content from Strava'
   task :strava => [:dotenv, :set_up_directories] do
-    puts 'Importing content from Strava'
-    Strava.fetch_totals
+    puts 'Importing Strava stats'
+    Strava.stats
   end
 
 end
