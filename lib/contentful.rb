@@ -134,6 +134,10 @@ module Contentful
             url
             description
           }
+          location {
+						lat
+						lon
+					}
           sys {
             publishedAt
           }
