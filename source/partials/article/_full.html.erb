@@ -1,4 +1,4 @@
-<article class="entry entry--full <%= "entry--#{variant}" if defined?(variant) %>" aria-labelledby="hed-<%= article.sys.id.parameterize %>">
+<article class="entry entry--full <%= "entry--#{variant}" if defined?(variant) %>" id="entry-<%= article.sys.id.parameterize %>" aria-labelledby="hed-<%= article.sys.id.parameterize %>">
   <header class="entry__header">
       <p class="entry__meta">
         <% if article.draft %>

@@ -1,4 +1,4 @@
-<article class="entry entry--compact" id="main-content">
+<article class="entry entry--compact" id="entry-<%= article.sys.id.parameterize %>">
   <header class="entry__header">
     <p class="entry__meta">
       <span><%= link_to DateTime.parse(article.published_at).strftime('%A, %B %-e, %Y'), article.path %></span>
