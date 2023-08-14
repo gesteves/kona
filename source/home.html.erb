@@ -7,11 +7,11 @@
       <%= render_home_body(content.body) %>
     </div>
   </section>
-  <% if data.strava.present? %>
-    <%= partial 'partials/stats' %>
-  <% end %>
   <% if data.articles.reject { |a| a.draft }.present? %>
     <%= partial 'partials/collection', locals: { title: "Recent Articles", items: data.articles.reject { |a| a.draft }.slice(0, 4), variant: "halves" } %>
+  <% end %>
+  <% if data.strava.present? %>
+    <%= partial 'partials/stats' %>
   <% end %>
   <% if data.events.present? %>
     <%= partial 'partials/collection', locals: { title: "Upcoming Races", items: data.events.slice(0, 3), variant: "thirds" } %>
