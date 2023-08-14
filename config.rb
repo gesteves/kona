@@ -12,6 +12,12 @@ end
 activate :asset_hash
 activate :directory_indexes
 
+ignore "/article.html"
+ignore "/short.html"
+ignore "/page.html"
+ignore "/home.html"
+ignore "/blog.html"
+
 @app.data.articles.each do |article|
   proxy article.path, article.template, locals: { content: article }, ignore: true
 end
