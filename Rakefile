@@ -1,6 +1,7 @@
 require 'rake/clean'
 require 'dotenv/tasks'
-require_relative 'lib/import'
+require_relative 'lib/strava'
+require_relative 'lib/contentful'
 require 'yaml'
 
 CLOBBER.include %w{
@@ -17,13 +18,13 @@ namespace :import do
   desc 'Imports content from Contentful'
   task :contentful => [:dotenv, :set_up_directories] do
     puts 'Importing content from Contentful'
-    Import::Contentful.content
+    Contentful.content
   end
 
   desc 'Imports content from Strava'
   task :strava => [:dotenv, :set_up_directories] do
     puts 'Importing content from Strava'
-    Import::Strava.fetch_totals
+    Strava.fetch_totals
   end
 
 end
