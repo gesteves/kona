@@ -376,4 +376,10 @@ module CustomHelpers
   def formatted_distance_unit(meters)
     formatted_distance(meters).split(/\s+/).last
   end
+
+  def is_today(date)
+    event_date = Time.rfc3339(date)
+    today = Time.current.in_time_zone(event_date.zone)
+    event_date.to_date == today.to_date
+  end
 end
