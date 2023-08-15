@@ -2,7 +2,7 @@
   <header class="entry__header">
       <p class="entry__meta">
         <% if article.draft %>
-          <span class="entry__draft">Draft</span>
+          <span class="entry__highlight">Draft</span>
         <% end %>
         <% unless article.entry_type == 'Page' %>
           <span><%= link_to DateTime.parse(article.published_at).strftime('%A, %B %-e, %Y'), article.path %></span>
