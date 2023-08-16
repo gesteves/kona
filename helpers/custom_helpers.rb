@@ -365,8 +365,7 @@ module CustomHelpers
   end
 
   def formatted_distance(meters)
-    precision = meters >= 10000 ? 1 : 2
-    number_to_human(meters, units: DISTANCE_UNITS, precision: precision, strip_insignificant_zeros: true, significant: false, delimiter: ',')
+    number_to_human(meters, units: DISTANCE_UNITS, precision: 4, strip_insignificant_zeros: true, significant: true, delimiter: ',')
   end
 
   def formatted_distance_number(meters)
