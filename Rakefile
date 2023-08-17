@@ -24,8 +24,8 @@ namespace :import do
 
   desc 'Imports content from Strava'
   task :strava => [:dotenv, :set_up_directories] do
-    puts 'Importing Strava stats'
-    Strava.stats
+    puts 'Importing Strava data'
+    Strava.new.save_data
   end
 
   desc 'Imports weather from WeatherKit'

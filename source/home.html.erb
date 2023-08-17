@@ -7,8 +7,8 @@
       <%= render_home_body(content.body) %>
     </div>
   </section>
-  <% if data.strava.present? %>
-    <%= partial 'partials/stats' %>
+  <% if data.strava.stats.present? %>
+    <%= partial 'partials/stats', locals: { stats: data.strava.stats } %>
   <% end %>
   <% if data.articles.reject { |a| a.draft }.present? %>
     <%= partial 'partials/collection', locals: { title: "Recent Articles", items: data.articles.reject { |a| a.draft }.slice(0, 4), variant: "halves" } %>

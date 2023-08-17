@@ -365,8 +365,14 @@ module CustomHelpers
   end
 
   def formatted_distance(meters)
-    precision = (meters.round.to_s.chars.size - 3).clamp(3, 5)
-    number_to_human(meters, units: DISTANCE_UNITS, precision: precision, strip_insignificant_zeros: true, significant: true, delimiter: ',')
+    precision = if meters < 10000
+      2
+    elsif meters < 1000000
+      1
+    else
+      0
+    end
+    number_to_human(meters, units: DISTANCE_UNITS, precision: precision, strip_insignificant_zeros: true, significant: false, delimiter: ',')
   end
 
   def formatted_distance_number(meters)
