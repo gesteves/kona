@@ -14,8 +14,8 @@ class Spotify
     )
   end
 
-  def top_tracks(limit = 5)
-    cache_key = "spotify:v1:top_tracks:#{limit}"
+  def top_tracks(limit = 1)
+    cache_key = "spotify:top_tracks:#{limit}"
     data = @redis.get(cache_key)
     return JSON.parse(data) if data.present?
 
