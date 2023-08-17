@@ -4,6 +4,7 @@ require_relative 'lib/strava'
 require_relative 'lib/contentful'
 require_relative 'lib/weather_kit'
 require_relative 'lib/google_maps'
+require_relative 'lib/purple_air'
 require 'yaml'
 
 CLOBBER.include %w{
@@ -39,6 +40,7 @@ namespace :import do
     time_zone = maps.time_zone
     weather = WeatherKit.new(latitude, longitude, time_zone, country)
     weather.save_data
+    PurpleAir.new(latitude, longitude).save_data
   end
 
 end
