@@ -17,6 +17,7 @@ class PurpleAir
 
   def save_data
     sensor = nearest_sensor
+    return if sensor.nil?
     sensor[:aqi] = formatted_aqi(nearest_sensor[:'pm2.5_atm'])
     sensor
     File.open('data/purple_air.json', 'w') { |f| f << sensor.to_json }
@@ -49,12 +50,13 @@ class PurpleAir
   end
 
   def nearest_sensor
-    data = find_sensors
-    fields = data['fields'].map(&:to_sym)
+    sensors = find_sensors
+    return if sensors['data'].nil? || sensors['data'].empty?
+    fields = sensors['fields'].map(&:to_sym)
     lat_index = fields.index(:latitude)
     lon_index = fields.index(:longitude)
 
-    nearest_sensor_data = data['data'].min_by do |sensor|
+    nearest_sensor_data = sensors['data'].min_by do |sensor|
       lat, lon = sensor[lat_index], sensor[lon_index]
       Math.sqrt((lat - @latitude)**2 + (lon - @longitude)**2)
     end
