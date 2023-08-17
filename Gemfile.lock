@@ -40,6 +40,7 @@ GEM
       multi_xml (>= 0.5.2)
     i18n (1.6.0)
       concurrent-ruby (~> 1.0)
+    jwt (2.7.1)
     kramdown (2.4.0)
       rexml
     listen (3.8.0)
@@ -138,6 +139,7 @@ DEPENDENCIES
   dotenv
   graphql-client
   httparty
+  jwt
   middleman (~> 4.5)
   middleman-autoprefixer (~> 3.0)
   middleman-dotenv

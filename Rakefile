@@ -2,6 +2,7 @@ require 'rake/clean'
 require 'dotenv/tasks'
 require_relative 'lib/strava'
 require_relative 'lib/contentful'
+require_relative 'lib/weather_kit'
 require 'yaml'
 
 CLOBBER.include %w{
@@ -27,12 +28,20 @@ namespace :import do
     Strava.stats
   end
 
+  desc 'Imports weather from WeatherKit'
+  task :weather => [:dotenv, :set_up_directories] do
+    puts 'Importing weather'
+    latitude, longitude = Contentful.site_location
+    WeatherKit.new.save_data(latitude, longitude)
+  end
+
 end
 
 task :import => %w{
   clobber
   import:contentful
   import:strava
+  import:weather
 }
 
 desc 'Import content and build the site'
