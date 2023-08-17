@@ -182,6 +182,16 @@ module Contentful
         }
       }
     }
+    query Location {
+      site: siteCollection(limit: 1, order: [sys_firstPublishedAt_ASC]) {
+        items {
+          location {
+						lat
+						lon
+					}
+        }
+      }
+    }
   GRAPHQL
 
   def self.query_contentful
@@ -226,6 +236,12 @@ module Contentful
     author = author.compact.map(&:to_h).map(&:with_indifferent_access).first
     site = site.compact.map(&:to_h).map(&:with_indifferent_access).first
     return articles, pages, assets, redirects, events, author, site
+  end
+
+  def self.site_location
+    response = Client.query(Queries::Location)
+    site = response&.data&.site&.items&.first
+    return site&.location&.lat, site&.location&.lon
   end
 
   def self.content
