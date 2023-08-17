@@ -1,12 +1,12 @@
-require 'rake/clean'
 require 'dotenv/tasks'
-require_relative 'lib/strava'
+require 'rake/clean'
+require 'yaml'
 require_relative 'lib/contentful'
-require_relative 'lib/weather_kit'
 require_relative 'lib/google_maps'
 require_relative 'lib/purple_air'
 require_relative 'lib/spotify'
-require 'yaml'
+require_relative 'lib/strava'
+require_relative 'lib/weather_kit'
 
 CLOBBER.include %w{
   data/*.json
