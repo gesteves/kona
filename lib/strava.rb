@@ -63,7 +63,7 @@ module Strava
     end
 
     if refresh_token.present?
-      REDIS.setex('strava:refresh_token', refresh_token)
+      REDIS.set('strava:refresh_token', refresh_token)
     end
 
     access_token
