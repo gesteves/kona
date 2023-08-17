@@ -1,27 +1,34 @@
 require 'jwt'
-require 'time'
-require 'openssl'
-require 'base64'
 require 'httparty'
+require 'redis'
 
 class WeatherKit
   WEATHERKIT_API_URL = 'https://weatherkit.apple.com/api/v1/'
 
   def initialize
-
+    @redis = Redis.new(
+      host: ENV['REDIS_HOST'] || 'localhost',
+      port: ENV['REDIS_PORT'] || 6379,
+      username: ENV['REDIS_USERNAME'],
+      password: ENV['REDIS_PASSWORD']
+    )
   end
 
-  def weather(latitude, longitude)
+  def weather(latitude, longitude, timezone = '-0600')
+    datasets = availability(latitude, longitude)&.join(',')
+    return unless datasets.nil? || datasets.empty?
+
     headers = {
       "Authorization" => "Bearer #{token}"
     }
 
     query = {
-      timezone: '-0600',
-      dataSets: 'currentWeather,forecastDaily,weatherAlerts'
+      timezone: timezone,
+      dataSets: availability(latitude, longitude)&.join(',')
     }
 
     response = HTTParty.get("#{WEATHERKIT_API_URL}/weather/en/#{latitude}/#{longitude}", query: query, headers: headers)
+    return unless response.code == 200
     JSON.parse(response.body)
   end
 
@@ -30,6 +37,20 @@ class WeatherKit
   end
 
   private
+
+  def availability(latitude, longitude, country = 'US')
+    headers = {
+      "Authorization" => "Bearer #{token}"
+    }
+
+    query = {
+      country: country
+    }
+
+    response = HTTParty.get("#{WEATHERKIT_API_URL}/availability/#{latitude}/#{longitude}", query: query, headers: headers)
+    return unless response.code == 200
+    JSON.parse(response.body)
+  end
 
   def token
     key_id = ENV['WEATHERKIT_KEY_ID']
