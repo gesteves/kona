@@ -194,6 +194,8 @@ class Contentful
     @pages = []
     @redirects = []
     @site = []
+    @blog = []
+    @tags = []
     process_content!
   end
 
@@ -234,17 +236,8 @@ class Contentful
       set_template(item)
     end
 
-    {
-      articles: @articles,
-      blog: generate_blog(@site[:entriesPerPage]),
-      tags: generate_tags(@site[:entriesPerPage]),
-      pages: @pages,
-      author: @author,
-      site: @site,
-      redirects: @redirects,
-      events: @events,
-      assets: @assets
-    }
+    generate_blog!(@site[:entriesPerPage])
+    generate_tags!(@site[:entriesPerPage])
   end
 
   def query_contentful!
@@ -342,9 +335,9 @@ class Contentful
     item
   end
 
-  def generate_tags(entries_per_page = 10)
-    tags = @articles.map { |a| a.dig(:contentfulMetadata, :tags) }.flatten.uniq
-    tags.map! do |tag|
+  def generate_tags!(entries_per_page = 10)
+    @tags = @articles.map { |a| a.dig(:contentfulMetadata, :tags) }.flatten.uniq
+    @tags.map! do |tag|
       tag = tag.dup
       tag[:items] = @articles.select { |a| !a[:draft] && a.dig(:contentfulMetadata, :tags).include?(tag) }
       tag[:path] = "/tagged/#{tag[:id]}/index.html"
@@ -353,14 +346,14 @@ class Contentful
       tag[:indexInSearchEngines] = true
       tag
     end
-    tags.select { |t| t[:items].present? }.sort { |a, b| a[:id] <=> b[:id] }
+    @tags.select { |t| t[:items].present? }.sort { |a, b| a[:id] <=> b[:id] }
   end
 
-  def generate_blog(entries_per_page = 10)
-    blog = []
+  def generate_blog!(entries_per_page = 10)
+    @blog = []
     sliced = @articles.reject { |a| a[:draft] }.each_slice(entries_per_page)
     sliced.each_with_index do |page, index|
-      blog << {
+      @blog << {
         current_page: index + 1,
         previous_page: index == 0 ? nil : index,
         next_page: index == sliced.size - 1 ? nil : index + 2,
@@ -370,7 +363,6 @@ class Contentful
         indexInSearchEngines: true
       }
     end
-    blog
   end
 
 end
