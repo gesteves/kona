@@ -30,16 +30,19 @@ namespace :import do
     Strava.new.save_data
   end
 
-  desc 'Imports weather from WeatherKit'
+  desc 'Imports location & weather data'
   task :weather => [:dotenv, :set_up_directories] do
-    puts 'Importing weather'
+    puts 'Importing location from Contentful'
     latitude, longitude = Contentful.site_location
+    puts 'Geocoding location'
     maps = GoogleMaps.new(latitude, longitude)
     maps.save_data
     country = maps.country_code
     time_zone = maps.time_zone
+    puts 'Importing weather data from WeatherKit'
     weather = WeatherKit.new(latitude, longitude, time_zone, country)
     weather.save_data
+    puts 'Importing air quality data from Purple Air'
     PurpleAir.new(latitude, longitude).save_data
   end
 
