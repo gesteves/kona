@@ -3,6 +3,7 @@ require 'dotenv/tasks'
 require_relative 'lib/strava'
 require_relative 'lib/contentful'
 require_relative 'lib/weather_kit'
+require_relative 'lib/google_maps'
 require 'yaml'
 
 CLOBBER.include %w{
@@ -32,7 +33,12 @@ namespace :import do
   task :weather => [:dotenv, :set_up_directories] do
     puts 'Importing weather'
     latitude, longitude = Contentful.site_location
-    WeatherKit.new.save_data(latitude, longitude)
+    maps = GoogleMaps.new(latitude, longitude)
+    maps.save_data
+    country = maps.country_code
+    time_zone = maps.time_zone
+    weather = WeatherKit.new(latitude, longitude, time_zone, country)
+    weather.save_data
   end
 
 end

@@ -5,50 +5,68 @@ require 'redis'
 class WeatherKit
   WEATHERKIT_API_URL = 'https://weatherkit.apple.com/api/v1/'
 
-  def initialize
+  def initialize(latitude, longitude, time_zone, country)
     @redis = Redis.new(
       host: ENV['REDIS_HOST'] || 'localhost',
       port: ENV['REDIS_PORT'] || 6379,
       username: ENV['REDIS_USERNAME'],
       password: ENV['REDIS_PASSWORD']
     )
+    @latitude = latitude
+    @longitude = longitude
+    @time_zone = time_zone
+    @country = country
   end
 
-  def weather(latitude, longitude, timezone = '-0600')
-    datasets = availability(latitude, longitude)&.join(',')
-    return unless datasets.nil? || datasets.empty?
+  def weather
+    cache_key = "weatherkit:weather:#{@latitude}:#{@longitude}"
+    data = @redis.get(cache_key)
+
+    return JSON.parse(data) unless data.nil?
+
+    datasets = availability
+    return if datasets.nil? || datasets.empty?
 
     headers = {
       "Authorization" => "Bearer #{token}"
     }
 
     query = {
-      timezone: timezone,
-      dataSets: availability(latitude, longitude)&.join(',')
+      timezone: @time_zone,
+      dataSets: datasets&.join(',')
     }
 
-    response = HTTParty.get("#{WEATHERKIT_API_URL}/weather/en/#{latitude}/#{longitude}", query: query, headers: headers)
-    return unless response.code == 200
+    response = HTTParty.get("#{WEATHERKIT_API_URL}/weather/en/#{@latitude}/#{@longitude}", query: query, headers: headers)
+    return if response.code != 200
+
+    @redis.setex(cache_key, 300, response.body)
     JSON.parse(response.body)
   end
 
-  def save_data(latitude, longitude)
-    File.open('data/weather.json','w'){ |f| f << weather(latitude, longitude).to_json }
+  def save_data
+    File.open('data/weather.json','w'){ |f| f << weather.to_json }
   end
 
   private
 
-  def availability(latitude, longitude, country = 'US')
+  def availability
+    cache_key = "weatherkit:availability:#{@latitude}:#{@longitude}"
+    data = @redis.get(cache_key)
+
+    return JSON.parse(data) unless data.nil?
+
     headers = {
       "Authorization" => "Bearer #{token}"
     }
 
     query = {
-      country: country
+      country: @country
     }
 
-    response = HTTParty.get("#{WEATHERKIT_API_URL}/availability/#{latitude}/#{longitude}", query: query, headers: headers)
-    return unless response.code == 200
+    response = HTTParty.get("#{WEATHERKIT_API_URL}/availability/#{@latitude}/#{@longitude}", query: query, headers: headers)
+    return if response.code != 200
+
+    @redis.setex(cache_key, 300, response.body)
     JSON.parse(response.body)
   end
 
