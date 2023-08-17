@@ -367,7 +367,7 @@ module CustomHelpers
   def formatted_distance(meters)
     precision = if meters < 10000
       2
-    elsif meters < 100000
+    elsif meters < 1000000
       1
     else
       0
