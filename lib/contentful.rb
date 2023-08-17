@@ -196,7 +196,7 @@ class Contentful
     @site = []
     @blog = []
     @tags = []
-    process_content!
+    generate_content!
   end
 
   def save_data
@@ -217,7 +217,7 @@ class Contentful
 
   private
 
-  def process_content!
+  def generate_content!
     query_contentful!
 
     @articles.map! do |item|
