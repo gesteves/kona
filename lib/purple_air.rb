@@ -1,5 +1,6 @@
 require 'httparty'
 require 'redis'
+require 'active_support/all'
 
 class PurpleAir
   PURPLE_AIR_API_URL = 'https://api.purpleair.com/v1/sensors'
@@ -17,7 +18,7 @@ class PurpleAir
 
   def save_data
     sensor = nearest_sensor
-    return if sensor.nil?
+    return if sensor.blank?
     sensor[:aqi] = formatted_aqi(nearest_sensor[:'pm2.5_atm'])
     sensor
     File.open('data/purple_air.json', 'w') { |f| f << sensor.to_json }
@@ -29,12 +30,12 @@ class PurpleAir
     cache_key = "purple_air:sensors:#{@latitude}:#{@longitude}"
     data = @redis.get(cache_key)
 
-    return JSON.parse(data) unless data.nil?
+    return JSON.parse(data) if data.present?
 
     response = HTTParty.get(PURPLE_AIR_API_URL, query: api_query_params, headers: { 'X-API-Key' => ENV['PURPLEAIR_API_KEY'] })
-    return if response.code != 200
+    return unless response.success?
 
-    @redis.setex(cache_key, 3600, response.body)
+    @redis.setex(cache_key, 1.hour, response.body)
     JSON.parse(response.body)
   end
 
@@ -51,7 +52,8 @@ class PurpleAir
 
   def nearest_sensor
     sensors = find_sensors
-    return if sensors['data'].nil? || sensors['data'].empty?
+    return if sensors['data'].blank?
+
     fields = sensors['fields'].map(&:to_sym)
     lat_index = fields.index(:latitude)
     lon_index = fields.index(:longitude)
@@ -66,7 +68,7 @@ class PurpleAir
   end
 
   def formatted_aqi(pm25)
-    return {} if pm25.nil?
+    return {} if pm25.blank?
 
     aqi, label = case pm25
                  when 0..12.0

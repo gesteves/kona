@@ -1,5 +1,6 @@
 require 'httparty'
 require 'redis'
+require 'active_support/all'
 
 class GoogleMaps
   GOOGLE_MAPS_API_URL = 'https://maps.googleapis.com/maps/api'
@@ -18,7 +19,7 @@ class GoogleMaps
 
   def location
     data = geocode
-    return if data.nil?
+    return if data.blank?
 
     components = data['results'][0]['address_components']
     city = components.find { |component| component['types'].include?('locality') }['long_name']
@@ -34,20 +35,20 @@ class GoogleMaps
 
   def time_zone
     data = time_zone_data
-    return if data.nil?
+    return if data.blank?
     formatted_time_zone = format_time_zone_offset(data['rawOffset'])
   end
 
   def country_code
     data = geocode
-    return if data.nil?
+    return if data.blank?
 
     data['results'][0]['address_components'].find { |component| component['types'].include?('country') }['short_name']
   end
 
   def save_data
     data = geocode
-    return if data.nil?
+    return if data.blank?
 
     File.open('data/location.json', 'w') { |f| f << data.to_json }
   end
@@ -58,12 +59,12 @@ class GoogleMaps
     cache_key = "google_maps:geocoded:#{@latitude}:#{@longitude}"
     data = @redis.get(cache_key)
 
-    return JSON.parse(data) unless data.nil?
+    return JSON.parse(data) if data.present?
 
     response = HTTParty.get("#{GOOGLE_MAPS_API_URL}/geocode/json?latlng=#{@latitude},#{@longitude}&key=#{GOOGLE_MAPS_API_KEY}")
-    return if response.code != 200
+    return unless response.success?
 
-    @redis.setex(cache_key, 86400, response.body)
+    @redis.setex(cache_key, 1.year, response.body)
     JSON.parse(response.body)
   end
 
@@ -71,13 +72,13 @@ class GoogleMaps
     cache_key = "google_maps:time_zone:#{@latitude}:#{@longitude}"
     data = @redis.get(cache_key)
 
-    return JSON.parse(data) unless data.nil?
+    return JSON.parse(data) if data.present?
 
     timestamp = Time.now.to_i
     response = HTTParty.get("#{GOOGLE_MAPS_API_URL}/timezone/json?location=#{@latitude},#{@longitude}&timestamp=#{timestamp}&key=#{GOOGLE_MAPS_API_KEY}")
-    return if response.code != 200
+    return unless response.success?
 
-    @redis.setex(cache_key, 86400, response.body)
+    @redis.setex(cache_key, 1.day, response.body)
     JSON.parse(response.body)
   end
 

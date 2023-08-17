@@ -1,5 +1,6 @@
 require 'httparty'
 require 'redis'
+require 'active_support/all'
 
 class Spotify
   SPOTIFY_API_URL = 'https://api.spotify.com/v1'
@@ -14,23 +15,23 @@ class Spotify
   end
 
   def top_tracks(limit = 5)
-    cache_key = "spotify:top_tracks:#{limit}"
+    cache_key = "spotify:v1:top_tracks:#{limit}"
     data = @redis.get(cache_key)
-    return JSON.parse(data) unless data.nil?
+    return JSON.parse(data) if data.present?
 
     access_token = get_access_token
-    return if access_token.nil?
+    return if access_token.blank?
 
     headers = { 'Authorization' => "Bearer #{access_token}" }
 
     ['short_term', 'medium_term', 'long_term'].each do |time_range|
       response = HTTParty.get("#{SPOTIFY_API_URL}/me/top/tracks?time_range=#{time_range}&limit=#{limit}", headers: headers)
 
-      next if response.code != 200
+      next unless response.success?
 
       items = JSON.parse(response.body)['items']
-      if !items.empty?
-        @redis.setex(cache_key, 86400, items.to_json)
+      if items.present?
+        @redis.setex(cache_key, 1.day, items.to_json)
         return items
       end
     end
@@ -47,10 +48,10 @@ class Spotify
   def get_access_token
     cache_key = 'spotify:access_token'
     access_token = @redis.get(cache_key)
-    return access_token unless access_token.nil?
+    return access_token if access_token.present?
 
     access_token = refresh_access_token
-    @redis.setex(cache_key, 3600, access_token)
+    @redis.setex(cache_key, 1.hour, access_token)
     access_token
   end
 
@@ -62,7 +63,7 @@ class Spotify
     }
 
     response = HTTParty.post('https://accounts.spotify.com/api/token', body: body, headers: auth_header)
-    return if response.code != 200
+    return unless response.success?
 
     JSON.parse(response.body)['access_token']
   end

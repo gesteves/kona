@@ -1,6 +1,7 @@
 require 'jwt'
 require 'httparty'
 require 'redis'
+require 'active_support/all'
 
 class WeatherKit
   WEATHERKIT_API_URL = 'https://weatherkit.apple.com/api/v1/'
@@ -22,10 +23,10 @@ class WeatherKit
     cache_key = "weatherkit:weather:#{@latitude}:#{@longitude}"
     data = @redis.get(cache_key)
 
-    return JSON.parse(data) unless data.nil?
+    return JSON.parse(data) if data.present?
 
     datasets = availability
-    return if datasets.nil? || datasets.empty?
+    return if datasets.blank?
 
     headers = {
       "Authorization" => "Bearer #{token}"
@@ -37,9 +38,9 @@ class WeatherKit
     }
 
     response = HTTParty.get("#{WEATHERKIT_API_URL}/weather/en/#{@latitude}/#{@longitude}", query: query, headers: headers)
-    return if response.code != 200
+    return unless response.success?
 
-    @redis.setex(cache_key, 300, response.body)
+    @redis.setex(cache_key, 1.hour, response.body)
     JSON.parse(response.body)
   end
 
@@ -53,7 +54,7 @@ class WeatherKit
     cache_key = "weatherkit:availability:#{@latitude}:#{@longitude}"
     data = @redis.get(cache_key)
 
-    return JSON.parse(data) unless data.nil?
+    return JSON.parse(data) if data.present?
 
     headers = {
       "Authorization" => "Bearer #{token}"
@@ -64,9 +65,9 @@ class WeatherKit
     }
 
     response = HTTParty.get("#{WEATHERKIT_API_URL}/availability/#{@latitude}/#{@longitude}", query: query, headers: headers)
-    return if response.code != 200
+    return unless response.success?
 
-    @redis.setex(cache_key, 300, response.body)
+    @redis.setex(cache_key, 1.day, response.body)
     JSON.parse(response.body)
   end
 
