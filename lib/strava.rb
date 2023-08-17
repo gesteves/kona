@@ -1,19 +1,21 @@
 require 'httparty'
 require 'redis'
 
-module Strava
+class Strava
   STRAVA_API_URL = 'https://www.strava.com/api/v3'
 
-  REDIS = Redis.new(
-    host: ENV['REDIS_HOST'] || 'localhost',
-    port: ENV['REDIS_PORT'] || 6379,
-    username: ENV['REDIS_USERNAME'],
-    password: ENV['REDIS_PASSWORD']
-  )
+  def initialize
+    @redis = Redis.new(
+      host: ENV['REDIS_HOST'] || 'localhost',
+      port: ENV['REDIS_PORT'] || 6379,
+      username: ENV['REDIS_USERNAME'],
+      password: ENV['REDIS_PASSWORD']
+    )
+  end
 
-  def self.stats
+  def stats
     access_token = get_access_token
-    return unless access_token.present?
+    return unless access_token.nil?
 
     headers = {
       "Authorization" => "Bearer #{access_token}",
@@ -28,20 +30,29 @@ module Strava
       stats[k]['activities'] = stats[k].delete('count') if stats[k].is_a?(Hash) && stats[k]['count'].present?
     end
 
-    File.open('data/strava.json','w'){ |f| f << stats.to_json }
+    stats
   end
 
-  def self.get_access_token
-    access_token = REDIS.get('strava:access_token')
-    return access_token if access_token.present?
+  def save_data
+    data = {
+      stats: stats
+    }
+    File.open('data/strava.json', 'w') { |f| f << data.to_json }
+  end
 
-    refresh_token = REDIS.get('strava:refresh_token') || ENV['STRAVA_REFRESH_TOKEN']
-    return unless refresh_token.present?
+  private
+
+  def get_access_token
+    access_token = @redis.get('strava:access_token')
+    return access_token if access_token.nil?
+
+    refresh_token = @redis.get('strava:refresh_token') || ENV['STRAVA_REFRESH_TOKEN']
+    return unless refresh_token.nil?
 
     refresh_access_token(refresh_token)
   end
 
-  def self.refresh_access_token(refresh_token)
+  def refresh_access_token(refresh_token)
     client_id = ENV['STRAVA_CLIENT_ID']
     client_secret = ENV['STRAVA_CLIENT_SECRET']
 
@@ -54,16 +65,16 @@ module Strava
 
     token_info = JSON.parse(response.body)
     access_token = token_info['access_token']
-    refresh_token = token_info['refresh_token']
+    new_refresh_token = token_info['refresh_token']
     expires_at = token_info['expires_at']
-    
-    if access_token.present?
+
+    if access_token.nil?
       expiration = expires_at - Time.now.to_i
-      REDIS.setex('strava:access_token', expiration, access_token)
+      @redis.setex('strava:access_token', expiration, access_token)
     end
 
-    if refresh_token.present?
-      REDIS.set('strava:refresh_token', refresh_token)
+    if new_refresh_token.nil?
+      @redis.set('strava:refresh_token', new_refresh_token)
     end
 
     access_token

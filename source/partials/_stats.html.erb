@@ -1,6 +1,6 @@
 <section class="stats">
-  <%= partial 'partials/stats/total',    locals: { timeframe: 'In the past month', activities: data.strava.recent_swim_totals.activities + data.strava.recent_ride_totals.activities + data.strava.recent_run_totals.activities } %>
-  <%= partial 'partials/stats/activity', locals: { activity: 'Swimming', distance: data.strava.recent_swim_totals.distance } %>
-  <%= partial 'partials/stats/activity', locals: { activity: 'Cycling', distance: data.strava.recent_ride_totals.distance } %>
-  <%= partial 'partials/stats/activity', locals: { activity: 'Running', distance: data.strava.recent_run_totals.distance } %>
+  <%= partial 'partials/stats/total',    locals: { timeframe: 'In the past month', activities: stats.recent_swim_totals.activities + stats.recent_ride_totals.activities + stats.recent_run_totals.activities } %>
+  <%= partial 'partials/stats/activity', locals: { activity: 'Swimming', distance: stats.recent_swim_totals.distance } %>
+  <%= partial 'partials/stats/activity', locals: { activity: 'Cycling', distance: stats.recent_ride_totals.distance } %>
+  <%= partial 'partials/stats/activity', locals: { activity: 'Running', distance: stats.recent_run_totals.distance } %>
 </section>
