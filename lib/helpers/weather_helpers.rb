@@ -128,19 +128,6 @@ module WeatherHelpers
     }
   }
 
-  def format_location
-    components = data.location['results'][0]['address_components']
-    city = components.find { |component| component['types'].include?('locality') }['long_name']
-    region = components.find { |component| component['types'].include?('administrative_area_level_1') }['long_name']
-    country = components.find { |component| component['types'].include?('country') }['long_name']
-
-    if country == 'United States' || country == 'Canada'
-      "#{city}, #{region}"
-    else
-      "#{city}, #{country}"
-    end
-  end
-
   def format_temperature(temp)
     "#{number_to_human(temp, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')}ºC"
   end
@@ -185,8 +172,8 @@ module WeatherHelpers
       "Thunderstorm", "Tornado", "TropicalStorm"].include?(data.weather.forecastDaily.days.first.conditionCode)
   end
 
-  def aqi_quality(aqi)
-    case aqi
+  def aqi_quality
+    case data.purple_air.aqi.value
     when 0..25
       "_great_"
     when 25..50
@@ -213,7 +200,7 @@ module WeatherHelpers
     weather += "I'm currently in **#{format_location}**, where the weather is"
     weather += " #{format_condition(data.weather.currentWeather.conditionCode).downcase}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
     weather += " (which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)})" if data.weather.currentWeather.temperature.round != data.weather.currentWeather.temperatureApparent.round
-    weather += " and a #{aqi_quality(data.purple_air.aqi.value)} <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.purple_air.aqi.value.round}" if data&.purple_air&.aqi&.value.present?
+    weather += " and a #{aqi_quality} <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.purple_air.aqi.value.round}" if data&.purple_air&.aqi&.value.present?
 
     if data.weather.forecastDaily.present?
       day = data.weather.forecastDaily.days.first
