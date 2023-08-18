@@ -104,7 +104,6 @@
 }
 
 .home__block-icon {
-  align-self: center;
   grid-column: span 3;
 
   @media (min-width: #{$bp-small}) {
@@ -112,6 +111,10 @@
   }
 
   @media (min-width: #{$bp-medium}) {
+    align-self: center;
+  }
+
+  @media (min-width: 1024px) {
     grid-column: span 1;
   }
 
@@ -123,14 +126,13 @@
 
 .home__block-text {
   @extend .extend-body-styles;
-  align-self: center;
-  grid-column: span 9;
+  grid-column: span 12;
 
   @media (min-width: #{$bp-small}) {
     grid-column: span 10;
   }
 
-  @media (min-width: #{$bp-medium}) {
+  @media (min-width: 1024px) {
     grid-column: span 11;
   }
 
