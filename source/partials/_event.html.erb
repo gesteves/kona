@@ -1,7 +1,7 @@
 <article class="entry entry--summary" aria-labelledby="hed-<%= event.sys.id.parameterize %>">
   <header class="entry__header">
     <p class="entry__meta entry__meta--truncated">
-      <% if is_today(event.date) %>
+      <% if is_today?(event.date) %>
         <span class="entry__highlight">Today</span>
       <% else %>
         <span><%= Time.parse(event.date).strftime('%B %-e, %Y') %></span>

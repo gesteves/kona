@@ -1,5 +1,6 @@
 require 'httparty'
 require 'redis'
+require 'active_support/all'
 
 class Strava
   STRAVA_API_URL = 'https://www.strava.com/api/v3'
@@ -15,7 +16,7 @@ class Strava
 
   def stats
     access_token = get_access_token
-    return if access_token.nil?
+    return if access_token.blank?
 
     headers = {
       "Authorization" => "Bearer #{access_token}",
@@ -23,7 +24,7 @@ class Strava
     }
 
     response = HTTParty.get("#{STRAVA_API_URL}/athletes/#{ENV['STRAVA_ATHLETE_ID']}/stats", headers: headers)
-    return if response.code != 200
+    return unless response.success?
 
     stats = JSON.parse(response.body)
 
@@ -46,10 +47,10 @@ class Strava
 
   def get_access_token
     access_token = @redis.get('strava:access_token')
-    return access_token unless access_token.nil?
+    return access_token if access_token.present?
 
     refresh_token = @redis.get('strava:refresh_token') || ENV['STRAVA_REFRESH_TOKEN']
-    return if refresh_token.nil?
+    return if refresh_token.blank?
 
     refresh_access_token(refresh_token)
   end
@@ -70,12 +71,12 @@ class Strava
     new_refresh_token = token_info['refresh_token']
     expires_at = token_info['expires_at']
 
-    if !access_token.nil?
+    if access_token.present?
       expiration = expires_at - Time.now.to_i
       @redis.setex('strava:access_token', expiration, access_token)
     end
 
-    if !new_refresh_token.nil?
+    if new_refresh_token.present?
       @redis.set('strava:refresh_token', new_refresh_token)
     end
 

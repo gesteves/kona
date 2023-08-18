@@ -1,8 +1,11 @@
-require 'rake/clean'
 require 'dotenv/tasks'
-require_relative 'lib/strava'
-require_relative 'lib/contentful'
+require 'rake/clean'
 require 'yaml'
+require_relative 'lib/contentful'
+require_relative 'lib/google_maps'
+require_relative 'lib/purple_air'
+require_relative 'lib/strava'
+require_relative 'lib/weather_kit'
 
 CLOBBER.include %w{
   data/*.json
@@ -15,16 +18,37 @@ namespace :import do
     data
   }
 
+  contentful = Contentful.new
+
   desc 'Imports content from Contentful'
   task :contentful => [:dotenv, :set_up_directories] do
     puts 'Importing site content from Contentful'
-    Contentful.content
+    contentful.save_data
   end
 
   desc 'Imports content from Strava'
   task :strava => [:dotenv, :set_up_directories] do
-    puts 'Importing Strava data'
+    puts 'Importing activity stats from Strava'
     Strava.new.save_data
+  end
+
+  desc 'Imports location & weather data'
+  task :weather => [:dotenv, :set_up_directories] do
+    latitude = contentful.location[:lat]
+    longitude = contentful.location[:lon]
+
+    puts 'Importing geocoded location data from Google Maps'
+    maps = GoogleMaps.new(latitude, longitude)
+    maps.save_data
+    country = maps.country_code
+    time_zone = maps.time_zone
+
+    puts 'Importing weather data from WeatherKit'
+    weather = WeatherKit.new(latitude, longitude, time_zone, country)
+    weather.save_data
+
+    puts 'Importing air quality data from PurpleAir'
+    PurpleAir.new(latitude, longitude).save_data
   end
 
 end
@@ -33,6 +57,7 @@ task :import => %w{
   clobber
   import:contentful
   import:strava
+  import:weather
 }
 
 desc 'Import content and build the site'

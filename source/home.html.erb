@@ -13,6 +13,11 @@
   <% if data.articles.reject { |a| a.draft }.present? %>
     <%= partial 'partials/collection', locals: { title: "Recent Articles", items: data.articles.reject { |a| a.draft }.slice(0, 4), variant: "halves" } %>
   <% end %>
+  <% if data.location.results.present? && data.weather.currentWeather.present? %>
+    <div class="home__section">
+      <%= partial 'partials/weather' %>
+    </div>
+  <% end %>
   <% if data.events.present? %>
     <%= partial 'partials/collection', locals: { title: "Upcoming Races", items: data.events.slice(0, 3), variant: "thirds" } %>
   <% end %>
