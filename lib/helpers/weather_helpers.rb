@@ -226,6 +226,7 @@ module WeatherHelpers
 
   def weather_icon
     condition = CONDITIONS[data.weather.currentWeather.conditionCode]
+    return 'cloud-question' if condition.blank?
     if data.weather.currentWeather.daylight
       condition[:icon_day] || condition[:icon]
     else
