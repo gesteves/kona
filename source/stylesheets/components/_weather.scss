@@ -1,0 +1,41 @@
+.weather {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-gap: var(--row-gap) var(--column-gap);
+  grid-template-columns: repeat(12, 1fr);
+}
+
+.weather__icon {
+  align-self: center;
+  grid-column: span 3;
+
+  @media (min-width: #{$bp-small}) {
+    grid-column: span 2;
+  }
+
+  @media (min-width: #{$bp-medium}) {
+    grid-column: span 1;
+  }
+
+  g,
+  path {
+    fill: var(--color-heading);
+  }
+}
+
+.weather__forecast {
+  @extend .extend-body-styles;
+  grid-column: span 9;
+
+  @media (min-width: #{$bp-small}) {
+    grid-column: span 10;
+  }
+
+  @media (min-width: #{$bp-medium}) {
+    grid-column: span 11;
+  }
+
+  p {
+    margin: 0;
+  }
+}

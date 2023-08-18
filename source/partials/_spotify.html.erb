@@ -1,0 +1,3 @@
+<div class="spotify">
+  On heavy rotation: <%= link_to data.spotify.first.name, data.spotify.first.external_urls.spotify %>, from <%= link_to data.spotify.first.album.name, data.spotify.first.album.external_urls.spotify %>, by <%= data.spotify.first.artists.map { |a| link_to a.name, a.external_urls.spotify }.join(', ') %>.
+</div>

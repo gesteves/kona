@@ -4,7 +4,6 @@ require 'yaml'
 require_relative 'lib/contentful'
 require_relative 'lib/google_maps'
 require_relative 'lib/purple_air'
-require_relative 'lib/spotify'
 require_relative 'lib/strava'
 require_relative 'lib/weather_kit'
 
@@ -52,12 +51,6 @@ namespace :import do
     PurpleAir.new(latitude, longitude).save_data
   end
 
-  desc 'Imports content from Spotify'
-  task :spotify => [:dotenv, :set_up_directories] do
-    puts 'Importing top tracks data from Spotify'
-    Spotify.new.save_data
-  end
-
 end
 
 task :import => %w{
@@ -65,7 +58,6 @@ task :import => %w{
   import:contentful
   import:strava
   import:weather
-  import:spotify
 }
 
 desc 'Import content and build the site'

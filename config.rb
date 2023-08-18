@@ -1,3 +1,8 @@
+Dir["lib/helpers/*.rb"].each do |file|
+  require file
+  helpers File.basename(file, ".rb").camelcase.constantize
+end
+
 # Activate and configure extensions
 # https://middlemanapp.com/advanced/configuration/#configuring-extensions
 
