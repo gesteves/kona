@@ -117,8 +117,8 @@ module WeatherHelpers
     "SevereThunderstorm" => {
       :description => "Severe Thunderstorm", :icon => "cloud-bolt"
     },
-    "Thunderstorm" => {
-      :description => "Thunderstorm", :icon => "cloud-bolt"
+    "Thunderstorms" => {
+      :description => "Thunderstorms", :icon => "cloud-bolt"
     },
     "Tornado" => {
       :description => "Tornado", :icon => "tornado"
@@ -145,8 +145,12 @@ module WeatherHelpers
     "#{number_to_human(temp, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')}ºC"
   end
 
-  def today_or_tonight(daylight)
-    daylight.presence ? "Today" : "Tonight"
+  def daylight?
+    data.weather.currentWeather.daylight.presence
+  end
+
+  def today_or_tonight
+    daylight? ? "Today" : "Tonight"
   end
 
   def format_precipitation(amount)
@@ -154,7 +158,7 @@ module WeatherHelpers
   end
 
   def format_condition(condition_code)
-    CONDITIONS.dig(condition_code, :description)
+    CONDITIONS.dig(condition_code, :description) || condition_code.underscore.gsub('_', ' ')
   end
 
   def format_precipitation(type)
@@ -172,7 +176,7 @@ module WeatherHelpers
     return true if data.purple_air&.aqi&.value&.to_i > 75
     return true if data.weather.forecastDaily.days.first.temperatureMax >= 32
     return true if data.weather.forecastDaily.days.first.temperatureMin <= -12
-    return true if data.weather.forecastDaily.days.first.precipitationChance >= 0.5
+    return true if data.weather.forecastDaily.days.first.restOfDayForecast.precipitationChance >= 0.5
     return ["Dust", "ScatteredThunderstorms", "Smoke", "HeavyRain", "Rain", "Showers", "HeavySnow",
       "MixedRainAndSleet", "MixedRainAndSnow", "MixedRainfall", "MixedSnowAndSleet",
       "ScatteredShowers", "ScatteredSnowShowers", "Sleet", "Snow", "SnowShowers",
@@ -212,12 +216,13 @@ module WeatherHelpers
     weather += " and a #{aqi_quality(data.purple_air.aqi.value)} <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.purple_air.aqi.value.round}" if data&.purple_air&.aqi&.value.present?
 
     if data.weather.forecastDaily.present?
-      weather += ". #{today_or_tonight(data.weather.currentWeather.daylight)}'s forecast is #{format_condition(data.weather.forecastDaily.days.first.restOfDayForecast.conditionCode).downcase},"
-      weather += " with a high of #{format_temperature(data.weather.forecastDaily.days.first.temperatureMax)}"
-      weather += data.weather.forecastDaily.days.first.precipitationChance == 0 || data.weather.forecastDaily.days.first.restOfDayForecast.precipitationType.downcase == 'clear' ? " and " : ", "
-      weather += " a low of #{format_temperature(data.weather.forecastDaily.days.first.temperatureMin)}"
-      weather += ", and a #{number_to_percentage(data.weather.forecastDaily.days.first.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation(data.weather.forecastDaily.days.first.restOfDayForecast.precipitationType)}" if data.weather.forecastDaily.days.first.restOfDayForecast.precipitationChance > 0 && data.weather.forecastDaily.days.first.restOfDayForecast.precipitationType.downcase != 'clear'
-      weather += ", with #{format_precipitation(data.weather.forecastDaily.days.first.restOfDayForecast.snowfallAmount)} of snow expected" if data.weather.forecastDaily.days.first.restOfDayForecast.snowfallAmount > 0
+      day = data.weather.forecastDaily.days.first
+      weather += ". #{today_or_tonight}'s forecast is #{format_condition(day.restOfDayForecast.conditionCode)&.downcase},"
+      weather += " with a high of #{format_temperature(day.temperatureMax)}"
+      weather += day.precipitationChance == 0 || day.restOfDayForecast.precipitationType.downcase == 'clear' ? " and " : ", "
+      weather += " a low of #{format_temperature(day.temperatureMin)}"
+      weather += ", and a #{number_to_percentage(day.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation(day.restOfDayForecast.precipitationType)}" if day.restOfDayForecast.precipitationChance > 0 && day.restOfDayForecast.precipitationType.downcase != 'clear'
+      weather += ", with #{format_precipitation(day.restOfDayForecast.snowfallAmount)} of snow expected" if day.restOfDayForecast.snowfallAmount > 0
       weather += "."
     end
 
