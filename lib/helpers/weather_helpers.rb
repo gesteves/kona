@@ -10,7 +10,7 @@ module WeatherHelpers
       :description => "Clear", :icon_day => "sun", :icon_night => "moon"
     },
     "Cloudy" => {
-      :description => "Cloudy", :icon => "cloud"
+      :description => "Cloudy", :icon => "clouds"
     },
     "Dust" => {
       :description => "Dust", :icon => "sun-dust"
@@ -198,9 +198,14 @@ module WeatherHelpers
     end
   end
 
+  def is_hot?
+    data.weather.currentWeather.temperature >= 32 || data.weather.currentWeather.temperatureApparent >= 32
+  end
+
   def forecast
     weather = ""
     weather += "**It's race day!** " if is_race_day?
+    weather += "Man, it's a hot one! " if !is_race_day? && is_hot?
     weather += "I'm currently in **#{format_location}**, where the weather is"
     weather += " #{format_condition(data.weather.currentWeather.conditionCode).downcase}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
     weather += " (which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)})" if data.weather.currentWeather.temperature.round != data.weather.currentWeather.temperatureApparent.round
