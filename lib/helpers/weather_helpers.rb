@@ -198,13 +198,13 @@ module WeatherHelpers
     weather += "**It's race day!** " if is_race_day?
     weather += "Man, it's a hot one! " if !is_race_day? && is_hot?
     weather += "I'm currently in **#{format_location}**, where the weather is"
-    weather += " #{format_condition(data.weather.currentWeather.conditionCode).downcase}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
+    weather += " #{format_condition(data.weather.currentWeather.conditionCode).downcase} with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
     weather += " (which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)})" if data.weather.currentWeather.temperature.round != data.weather.currentWeather.temperatureApparent.round
     weather += " and a #{aqi_quality} <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.purple_air.aqi.value.round}" if data&.purple_air&.aqi&.value.present?
 
     if data.weather.forecastDaily.present?
       day = data.weather.forecastDaily.days.first
-      weather += ". #{today_or_tonight}'s forecast is #{format_condition(day.restOfDayForecast.conditionCode)&.downcase},"
+      weather += ". #{today_or_tonight}'s forecast is #{format_condition(day.restOfDayForecast.conditionCode)&.downcase}"
       weather += " with a high of #{format_temperature(day.temperatureMax)}"
       weather += day.precipitationChance == 0 || day.restOfDayForecast.precipitationType.downcase == 'clear' ? " and " : ", "
       weather += " a low of #{format_temperature(day.temperatureMin)}"
