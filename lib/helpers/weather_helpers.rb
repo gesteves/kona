@@ -59,18 +59,16 @@ module WeatherHelpers
 
   def aqi_quality
     case data.purple_air.aqi.value
-    when 0..25
-      "_great_"
-    when 25..50
-      "good"
+    when 0..50
+      "a good"
     when 50..100
-      "moderate"
-    when 100..150
-      "bad"
-    when 150..200
-      "_terrible_"
+      "a moderate"
+    when 100..200
+      "an unhealthy"
+    when 200..300
+      "a _very_ unhealthy"
     else
-      "**horrible**"
+      "a **hazardous**"
     end
   end
 
@@ -93,7 +91,7 @@ module WeatherHelpers
       weather += " with a high of #{format_temperature(day.temperatureMax)}"
       weather += day.precipitationChance == 0 || day.restOfDayForecast.precipitationType.downcase == 'clear' ? " and " : ", "
       weather += " a low of #{format_temperature(day.temperatureMin)}"
-      weather += ", and a #{number_to_percentage(day.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation(day.restOfDayForecast.precipitationType)}" if day.restOfDayForecast.precipitationChance > 0 && day.restOfDayForecast.precipitationType.downcase != 'clear'
+      weather += ", and #{number_to_percentage(day.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation(day.restOfDayForecast.precipitationType)}" if day.restOfDayForecast.precipitationChance > 0 && day.restOfDayForecast.precipitationType.downcase != 'clear'
       weather += ", with #{format_precipitation(day.restOfDayForecast.snowfallAmount)} of snow expected" if day.restOfDayForecast.snowfallAmount > 0
       weather += "."
     end
