@@ -200,7 +200,7 @@ module WeatherHelpers
 
   def forecast
     weather = ""
-    weather += "It's race day! " if is_race_day?
+    weather += "**It's race day!** " if is_race_day?
     weather += "I'm currently in **#{format_location}**, where the weather is"
     weather += " #{format_condition(data.weather.currentWeather.conditionCode).downcase}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
     weather += " (which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)})" if data.weather.currentWeather.temperature.round != data.weather.currentWeather.temperatureApparent.round
