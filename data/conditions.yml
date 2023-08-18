@@ -1,0 +1,179 @@
+Clear:
+  description: Clear
+  icon_day: sun
+  icon_night: moon
+  current: the sky is clear
+  forecast: clear sky
+Cloudy:
+  description: Cloudy
+  icon: clouds
+  current: it's cloudy
+  forecast: cloudy sky
+Dust:
+  description: Dust
+  icon: sun-dust
+  current: it's dusty
+Fog:
+  description: Fog
+  icon: cloud-fog
+  current: it's foggy
+Haze:
+  description: Haze
+  icon: sun-haze
+  current: it's hazy
+MostlyClear:
+  description: Mostly Clear
+  icon_day: sun-cloud
+  icon_night: moon-cloud
+  current: it's mostly clear
+  forecast: mostly clear sky
+MostlyCloudy:
+  description: Mostly Cloudy
+  icon_day: clouds-sun
+  icon_night: clouds-sun
+  current: it's mostly cloudy
+  forecast: mostly cloudy sky
+PartlyCloudy:
+  description: Partly Cloudy
+  icon_day: clouds-sun
+  icon_night: clouds-sun
+  current: it's partly cloudy
+  forecast: partly cloudy sky
+ScatteredThunderstorms:
+  description: Scattered Thunderstorms
+  icon: cloud-bolt
+  current: there are scattered thunderstorms
+Smoke:
+  description: Smoke
+  icon: smoke
+  current: it's smoky
+Breezy:
+  description: Breezy
+  icon: wind
+  current: it's breezy
+  forecast: a breeze
+Windy:
+  description: Windy
+  icon: wind
+  current: it's windy
+  forecast: wind
+Drizzle:
+  description: Drizzle
+  icon: cloud-drizzle
+  current: it's drizzling
+  forecast: a drizzle
+HeavyRain:
+  description: Heavy Rain
+  icon: cloud-showers-heavy
+  current: it's raining heavily
+Rain:
+  description: Rain
+  icon: cloud-rain
+  current: it's raining
+Showers:
+  description: Showers
+  icon: cloud-showers
+  current: there are showers
+Flurries:
+  description: Flurries
+  icon: cloud-snow
+  current: there are flurries
+HeavySnow:
+  description: Heavy Snow
+  icon: cloud-snow
+  current: it's snowing heavily
+MixedRainAndSleet:
+  description: Mixed Rain and Sleet
+  icon: cloud-hail-mixed
+  current: it's raining and sleeting
+MixedRainAndSnow:
+  description: Mixed Rain and Snow
+  icon: cloud-hail-mixed
+  current: it's raining and snowing
+MixedRainfall:
+  description: Mixed Rainfall
+  icon: cloud-hail-mixed
+  current: there's mixed rain
+MixedSnowAndSleet:
+  description: Mixed Snow and Sleet
+  icon: cloud-hail-mixed
+  current: it's snowing and sleeting
+ScatteredShowers:
+  description: Scattered Showers
+  icon: cloud-showers
+  current: there are scattered showers
+ScatteredSnowShowers:
+  description: Scattered Snow Showers
+  icon: cloud-snow
+  current: there are scattered snow showers
+Sleet:
+  description: Sleet
+  icon: cloud-snow
+  current: it's sleeting
+Snow:
+  description: Snow
+  icon: cloud-snow
+  current: it's snowing
+SnowShowers:
+  description: Snow Showers
+  icon: cloud-hail-mixed
+  current: there are snow showers
+Blizzard:
+  description: Blizzard
+  icon: snow-blowing
+  current: there's a blizzard
+  forecast: a blizzard
+BlowingSnow:
+  description: Blowing Snow
+  icon: snow-blowing
+  current: there's blowing snow
+FreezingDrizzle:
+  description: Freezing Drizzle
+  icon: cloud-hail-mixed
+  current: there's a freezing drizzle
+  forecast: a freezing drizzle
+FreezingRain:
+  description: Freezing Rain
+  icon: cloud-hail-mixed
+  current: there's freezing rain
+Frigid:
+  description: Frigid
+  icon: temperature-snow
+  current: it's frigid
+  forecast: frigid temperatures
+Hail:
+  description: Hail
+  icon: cloud-hail
+  current: it's hailing
+Hot:
+  description: Hot
+  icon: temperature-sun
+  current: it's hot
+  forecast: high temperatures
+Hurricane:
+  description: Hurricane
+  icon: hurricane
+  current: there's a hurricane
+  forecast: a hurricane
+IsolatedThunderstorms:
+  description: Isolated Thunderstorms
+  icon: cloud-bolt
+  current: there are isolated thunderstorms
+SevereThunderstorm:
+  description: Severe Thunderstorms
+  icon: cloud-bolt
+  current: there's a severe thunderstorm
+Thunderstorms:
+  description: Thunderstorms
+  icon: cloud-bolt
+  current: there's a thunderstorm
+Tornado:
+  description: Tornado
+  icon: tornado
+  current: there's a tornado
+  forecast: a tornado
+TropicalStorm:
+  description: Tropical Storm
+  icon: hurricane
+  current: there's a tropical storm
+  forecast: a tropical storm

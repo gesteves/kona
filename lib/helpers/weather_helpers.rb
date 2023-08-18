@@ -5,129 +5,6 @@ module WeatherHelpers
     thousand: 'm'
   }
 
-  CONDITIONS = {
-    "Clear" => {
-      :description => "Clear", :icon_day => "sun", :icon_night => "moon"
-    },
-    "Cloudy" => {
-      :description => "Cloudy", :icon => "clouds"
-    },
-    "Dust" => {
-      :description => "Dust", :icon => "sun-dust"
-    },
-    "Fog" => {
-      :description => "Fog", :icon => "cloud-fog"
-    },
-    "Haze" => {
-      :description => "Haze", :icon => "sun-haze"
-    },
-    "MostlyClear" => {
-      :description => "Mostly Clear", :icon_day => "sun-cloud", :icon_night => "moon-cloud"
-    },
-    "MostlyCloudy" => {
-      :description => "Mostly Cloudy", :icon_day => "clouds-sun", :icon_night => "clouds-sun"
-    },
-    "PartlyCloudy" => {
-      :description => "Partly Cloudy", :icon_day => "clouds-sun", :icon_night => "clouds-sun"
-    },
-    "ScatteredThunderstorms" => {
-      :description => "Scattered Thunderstorms", :icon => "cloud-bolt"
-    },
-    "Smoke" => {
-      :description => "Smoke", :icon => "smoke"
-    },
-    "Breezy" => {
-      :description => "Breezy", :icon => "wind"
-    },
-    "Windy" => {
-      :description => "Windy", :icon => "wind"
-    },
-    "Drizzle" => {
-      :description => "Drizzle", :icon => "cloud-drizzle"
-    },
-    "HeavyRain" => {
-      :description => "Heavy Rain", :icon => "cloud-showers-heavy"
-    },
-    "Rain" => {
-      :description => "Rain", :icon => "cloud-rain"
-    },
-    "Showers" => {
-      :description => "Showers", :icon => "cloud-showers"
-    },
-    "Flurries" => {
-      :description => "Flurries", :icon => "cloud-snow"
-    },
-    "HeavySnow" => {
-      :description => "Heavy Snow", :icon => "cloud-snow"
-    },
-    "MixedRainAndSleet" => {
-      :description => "Mixed Rain and Sleet", :icon => "cloud-hail-mixed"
-    },
-    "MixedRainAndSnow" => {
-      :description => "Mixed Rain and Snow", :icon => "cloud-hail-mixed"
-    },
-    "MixedRainfall" => {
-      :description => "Mixed Rainfall", :icon => "cloud-hail-mixed"
-    },
-    "MixedSnowAndSleet" => {
-      :description => "Mixed Snow and Sleet", :icon => "cloud-hail-mixed"
-    },
-    "ScatteredShowers" => {
-      :description => "Scattered Showers", :icon => "cloud-showers"
-    },
-    "ScatteredSnowShowers" => {
-      :description => "Scattered Snow Showers", :icon => "cloud-snow"
-    },
-    "Sleet" => {
-      :description => "Sleet", :icon => "cloud-snow"
-    },
-    "Snow" => {
-      :description => "Snow", :icon => "cloud-snow"
-    },
-    "SnowShowers" => {
-      :description => "Snow Showers", :icon => "cloud-hail-mixed"
-    },
-    "Blizzard" => {
-      :description => "Blizzard", :icon => "snow-blowing"
-    },
-    "BlowingSnow" => {
-      :description => "Blowing Snow", :icon => "snow-blowing"
-    },
-    "FreezingDrizzle" => {
-      :description => "Freezing Drizzle", :icon => "cloud-hail-mixed"
-    },
-    "FreezingRain" => {
-      :description => "Freezing Rain", :icon => "cloud-hail-mixed"
-    },
-    "Frigid" => {
-      :description => "Frigid", :icon => "temperature-snow"
-    },
-    "Hail" => {
-      :description => "Hail", :icon => "cloud-hail"
-    },
-    "Hot" => {
-      :description => "Hot", :icon => "temperature-sun"
-    },
-    "Hurricane" => {
-      :description => "Hurricane", :icon => "hurricane"
-    },
-    "IsolatedThunderstorms" => {
-      :description => "Isolated Thunderstorms", :icon => "cloud-bolt"
-    },
-    "SevereThunderstorm" => {
-      :description => "Severe Thunderstorm", :icon => "cloud-bolt"
-    },
-    "Thunderstorms" => {
-      :description => "Thunderstorms", :icon => "cloud-bolt"
-    },
-    "Tornado" => {
-      :description => "Tornado", :icon => "tornado"
-    },
-    "TropicalStorm" => {
-      :description => "Tropical Storm", :icon => "hurricane"
-    }
-  }
-
   def format_temperature(temp)
     "#{number_to_human(temp, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')}ºC"
   end
@@ -145,7 +22,15 @@ module WeatherHelpers
   end
 
   def format_condition(condition_code)
-    CONDITIONS.dig(condition_code, :description) || condition_code.underscore.gsub('_', ' ')
+    data.conditions.dig(condition_code, :description) || condition_code.underscore.gsub('_', ' ')
+  end
+
+  def format_current_condition(condition_code)
+    data.conditions.dig(condition_code, :current) || format_condition(condition_code)
+  end
+
+  def format_forecasted_condition(condition_code)
+    data.conditions.dig(condition_code, :forecast) || format_condition(condition_code)
   end
 
   def format_precipitation(type)
@@ -197,14 +82,14 @@ module WeatherHelpers
     weather = ""
     weather += "**It's race day!** " if is_race_day?
     weather += "Man, it's a hot one! " if !is_race_day? && is_hot?
-    weather += "I'm currently in **#{format_location}**, where the weather is"
-    weather += " #{format_condition(data.weather.currentWeather.conditionCode).downcase} with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
+    weather += "I'm currently in **#{format_location}**, where"
+    weather += " #{format_current_condition(data.weather.currentWeather.conditionCode).downcase}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
     weather += " (which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)})" if data.weather.currentWeather.temperature.round != data.weather.currentWeather.temperatureApparent.round
     weather += " and a #{aqi_quality} <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.purple_air.aqi.value.round}" if data&.purple_air&.aqi&.value.present?
 
     if data.weather.forecastDaily.present?
       day = data.weather.forecastDaily.days.first
-      weather += ". #{today_or_tonight}'s forecast is #{format_condition(day.restOfDayForecast.conditionCode)&.downcase}"
+      weather += ". #{today_or_tonight}'s forecast calls for #{format_forecasted_condition(day.restOfDayForecast.conditionCode).downcase},"
       weather += " with a high of #{format_temperature(day.temperatureMax)}"
       weather += day.precipitationChance == 0 || day.restOfDayForecast.precipitationType.downcase == 'clear' ? " and " : ", "
       weather += " a low of #{format_temperature(day.temperatureMin)}"
@@ -222,7 +107,7 @@ module WeatherHelpers
   end
 
   def weather_icon
-    condition = CONDITIONS[data.weather.currentWeather.conditionCode]
+    condition = data.conditions[data.weather.currentWeather.conditionCode]
     return 'cloud-question' if condition.blank?
     if data.weather.currentWeather.daylight
       condition[:icon_day] || condition[:icon]
