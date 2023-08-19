@@ -19,8 +19,10 @@ class PurpleAir
   def save_data
     sensor = nearest_sensor
     return if sensor.blank?
-    sensor[:aqi] = formatted_aqi(nearest_sensor[:'pm2.5_atm'])
-    sensor
+    raw_pm25 = nearest_sensor[:'pm2.5_atm']
+    humidity = nearest_sensor[:humidity]
+    pm25 = humidity.present? ? apply_epa_correction(raw_pm25, humidity.to_f) : raw_pm25
+    sensor[:aqi] = formatted_aqi(pm25)
     File.open('data/purple_air.json', 'w') { |f| f << sensor.to_json }
   end
 
@@ -42,7 +44,7 @@ class PurpleAir
   def api_query_params
     {
       location_type: 0,
-      fields: 'name,pm2.5_atm,latitude,longitude',
+      fields: 'name,pm2.5_atm,latitude,longitude,humidity',
       nwlat: @latitude + 0.1,
       selat: @latitude - 0.1,
       nwlng: @longitude - 0.1,
@@ -65,6 +67,25 @@ class PurpleAir
 
     # Combine the fields with the corresponding data for the nearest sensor
     fields.zip(nearest_sensor_data).to_h
+  end
+
+  def apply_epa_correction(pm25, humidity)
+    case pm25
+    when 0...30
+      0.524 * pm25 - 0.0862 * humidity + 5.75
+    when 30...50
+      ((0.786 * (pm25 / 20 - 3 / 2) + 0.524 * (1 - (pm25 / 20 - 3 / 2))) * pm25) - 0.0862 * humidity + 5.75
+    when 50...210
+      0.786 * pm25 - 0.0862 * humidity + 5.75
+    when 210...260
+      ((0.69 * (pm25 / 50 - 21 / 5) + 0.786 * (1 - (pm25 / 50 - 21 / 5))) * pm25) -
+        0.0862 * humidity * (1 - (pm25 / 50 - 21 / 5)) +
+        2.966 * (pm25 / 50 - 21 / 5) +
+        5.75 * (1 - (pm25 / 50 - 21 / 5)) +
+        8.84 * (10**(-4)) * pm25**2 * (pm25 / 50 - 21 / 5)
+    else
+      2.966 + 0.69 * pm25 + 8.841 * (10**(-4)) * pm25**2
+    end
   end
 
   def formatted_aqi(pm25)
