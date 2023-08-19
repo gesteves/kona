@@ -5,8 +5,4 @@
 build/
 .env
 data/*.json
-source/images/photographs/
-source/images/avatar/
-source/images/books/
-source/images/beers/
-source/images/albums/
+node_modules
