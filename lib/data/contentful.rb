@@ -198,7 +198,7 @@ class Contentful
   end
 
   def location
-    @site[:location]
+    @site.dig(:author, :location) || {}
   end
 
   private
