@@ -5,7 +5,7 @@ module DistanceHelpers
     thousand: 'kilometers'
   }
 
-  def formatted_distance(meters)
+  def format_distance(meters)
     precision = if meters < 10000
       2
     elsif meters < 1000000
@@ -16,11 +16,11 @@ module DistanceHelpers
     number_to_human(meters, units: DISTANCE_UNITS, precision: precision, strip_insignificant_zeros: true, significant: false, delimiter: ',')
   end
 
-  def formatted_distance_number(meters)
-    formatted_distance(meters).split(/\s+/).first
+  def format_distance_number(meters)
+    format_distance(meters).split(/\s+/).first
   end
 
-  def formatted_distance_unit(meters)
-    formatted_distance(meters).split(/\s+/).last
+  def format_distance_unit(meters)
+    format_distance(meters).split(/\s+/).last
   end
 end
