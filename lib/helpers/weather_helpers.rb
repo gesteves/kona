@@ -10,9 +10,10 @@ module WeatherHelpers
   end
 
   def daylight?
+    forecast = Time.parse(data.weather.currentWeather.metadata.readTime)
     sunrise = Time.parse(data.weather.forecastDaily.days.first.sunrise)
     sunset = Time.parse(data.weather.forecastDaily.days.first.sunset)
-    Time.now > (sunrise - 1.hour) && forecast < (sunset - 1.hour)
+    forecast > (sunrise - 1.hour) && forecast < (sunset - 1.hour)
   rescue
     true
   end
