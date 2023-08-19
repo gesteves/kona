@@ -61,7 +61,14 @@ class GoogleMaps
 
     return JSON.parse(data) if data.present?
 
-    response = HTTParty.get("#{GOOGLE_MAPS_API_URL}/geocode/json?latlng=#{@latitude},#{@longitude}&key=#{GOOGLE_MAPS_API_KEY}")
+    query = {
+      latlng: "#{@latitude},#{@longitude}",
+      key: GOOGLE_MAPS_API_KEY,
+      language: "en",
+      result_type: "political"
+    }
+
+    response = HTTParty.get("#{GOOGLE_MAPS_API_URL}/geocode/json", query: query)
     return unless response.success?
 
     @redis.setex(cache_key, 1.day, response.body)
