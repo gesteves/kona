@@ -33,8 +33,18 @@ namespace :import do
 
   desc 'Imports location & weather data'
   task :weather => [:dotenv, :set_up_directories] do
-    latitude = contentful.location[:lat]
-    longitude = contentful.location[:lon]
+    puts 'Getting most recent check-in from Swarm'
+    swarm = Swarm.new
+    checkin = swarm.recent_checkin_location
+
+    if checkin[:latitude].nil? || checkin[:longitude].nil?
+      puts "No recent Swarm check-ins found, using site location as a fallback"
+      latitude = contentful.location[:lat]
+      longitude = contentful.location[:lon]
+    else
+      latitude = checkin[:latitude]
+      longitude = checkin[:longitude]
+    end
 
     puts 'Importing geocoded location data from Google Maps'
     maps = GoogleMaps.new(latitude, longitude)
