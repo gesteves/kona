@@ -99,16 +99,12 @@
 .home__block {
   display: grid;
   grid-column: 1 / -1;
-  grid-gap: var(--row-gap) var(--column-gap);
+  grid-gap: var(--column-gap);
   grid-template-columns: repeat(12, 1fr);
 }
 
 .home__block-icon {
-  grid-column: span 3;
-
-  @media (min-width: #{$bp-small}) {
-    grid-column: span 2;
-  }
+  grid-column: span 2;
 
   @media (min-width: #{$bp-medium}) {
     align-self: center;
