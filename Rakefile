@@ -38,7 +38,7 @@ namespace :import do
     checkin = swarm.recent_checkin_location
 
     if checkin[:latitude].nil? || checkin[:longitude].nil?
-      puts "No recent Swarm check-ins found, using site location as a fallback"
+      puts "No recent Swarm check-ins found, using Contentful location as a fallback"
       latitude = contentful.location[:lat]
       longitude = contentful.location[:lon]
     else
