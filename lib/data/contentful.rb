@@ -73,18 +73,6 @@ class Contentful
           }
         }
       }
-      author: authorCollection(limit: 1, order: [sys_firstPublishedAt_ASC]) {
-        items {
-          name
-          email
-          profilePicture {
-            width
-            height
-            url
-            description
-          }
-        }
-      }
       site: siteCollection(limit: 1, order: [sys_firstPublishedAt_ASC]) {
         items {
           title
@@ -101,6 +89,10 @@ class Contentful
               height
               url
               description
+            }
+            location {
+              lat
+              lon
             }
           }
           navLinksCollection {
@@ -135,10 +127,6 @@ class Contentful
             height
             url
             description
-          }
-          location {
-            lat
-            lon
           }
           sys {
             publishedAt
@@ -189,7 +177,6 @@ class Contentful
   def initialize
     @articles = []
     @assets = []
-    @author = []
     @events = []
     @pages = []
     @redirects = []
@@ -204,7 +191,6 @@ class Contentful
     File.open('data/blog.json', 'w') { |f| f << @blog.to_json }
     File.open('data/tags.json', 'w') { |f| f << @tags.to_json }
     File.open('data/pages.json', 'w') { |f| f << @pages.to_json }
-    File.open('data/author.json', 'w') { |f| f << @author.to_json }
     File.open('data/site.json', 'w') { |f| f << @site.to_json }
     File.open('data/redirects.json', 'w') { |f| f << @redirects.to_json }
     File.open('data/events.json', 'w') { |f| f << @events.to_json }
@@ -258,7 +244,6 @@ class Contentful
 
       @articles  += response.data.articles.items
       @assets    += response.data.assets.items
-      @author    += response.data.author.items
       @events    += response.data.events.items
       @pages     += response.data.pages.items
       @redirects += response.data.redirects.items
@@ -272,7 +257,6 @@ class Contentful
     @assets = @assets.compact.map(&:to_h).map(&:with_indifferent_access)
     @redirects = @redirects.compact.map(&:to_h).map(&:with_indifferent_access)
     @events = @events.compact.map(&:to_h).map(&:with_indifferent_access)
-    @author = @author.compact.map(&:to_h).map(&:with_indifferent_access).first
     @site = @site.compact.map(&:to_h).map(&:with_indifferent_access).first
   end
 
