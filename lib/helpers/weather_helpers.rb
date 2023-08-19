@@ -13,7 +13,7 @@ module WeatherHelpers
     now = Time.now
     sunrise = Time.parse(data.weather.forecastDaily.days.first.sunrise)
     sunset = Time.parse(data.weather.forecastDaily.days.first.sunset)
-    now > (sunrise - 1.hour) && now < (sunset - 1.hour)
+    now > (sunrise - 2.hour) && now < (sunset - 2.hour)
   rescue
     true
   end
