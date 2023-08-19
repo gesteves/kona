@@ -1,5 +1,5 @@
 <div class="stats__stat">
   <span class="stats__meta"><%= activity %></span>
-  <span class="stats__number"><%= formatted_distance_number(distance) %></span>
-  <span class="stats__meta"><%= formatted_distance_unit(distance) %> <%= "😬" if distance == 0 %></span>
+  <span class="stats__number"><%= format_distance_number(distance) %></span>
+  <span class="stats__meta"><%= format_distance_unit(distance) %> <%= "😬" if distance == 0 %></span>
 </div>
