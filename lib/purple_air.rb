@@ -29,7 +29,7 @@ class PurpleAir
   private
 
   def find_sensors
-    cache_key = "purple_air:sensors:#{@latitude}:#{@longitude}"
+    cache_key = "purple_air:sensors:#{api_query_params.values.map(&:to_s).join(':')}"
     data = @redis.get(cache_key)
 
     return JSON.parse(data) if data.present?
