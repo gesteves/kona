@@ -46,7 +46,10 @@ namespace :import do
       longitude = checkin[:longitude]
     end
 
-    next if latitude.nil? || longitude.nil?
+    if latitude.nil? || longitude.nil?
+      puts "No location available, skipping weather data"
+      next
+    end
 
     puts 'Importing geocoded location data from Google Maps'
     maps = GoogleMaps.new(latitude, longitude)
