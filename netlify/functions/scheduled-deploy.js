@@ -8,7 +8,7 @@ const handler = schedule('0 * * * *', async () => {
   const currentHourMDT = (new Date().getUTCHours() - 6 + 24) % 24;
 
   // Check if current MDT hour is between 8 AM and 8 PM
-  if (currentHourMDT >= 8 && currentHourMDT <= 20) && (BUILD_HOOK)) {
+  if ((currentHourMDT >= 8 && currentHourMDT <= 20) && (BUILD_HOOK)) {
     await fetch(BUILD_HOOK, {
       method: 'POST'
     }).then(response => {
