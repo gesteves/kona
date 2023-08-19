@@ -53,7 +53,7 @@
         <h2>© <%= data.articles.reject(&:draft).map { |a| DateTime.parse(a.published_at) }.min.strftime('%Y') %>–<%= Time.now.strftime('%Y') %></h2>
         <p><%= data.site.copyright %></p>
         <hr>
-        <p>Weather data from <span class="no-wrap"><span class="icon"><%= partial "partials/icons/apple.svg" %></span> Weather</span></p>
+        <p>Weather data from <span class="no-wrap"><span class="icon"><%= partial "icons/apple.svg" %></span> Weather</span></p>
       </section>
   </div>
 </footer>
