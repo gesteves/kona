@@ -1,11 +1,10 @@
 require 'dotenv/tasks'
 require 'rake/clean'
 require 'yaml'
-require_relative 'lib/contentful'
-require_relative 'lib/google_maps'
-require_relative 'lib/purple_air'
-require_relative 'lib/strava'
-require_relative 'lib/weather_kit'
+
+Dir["lib/data/*.rb"].each do |file|
+  require_relative file
+end
 
 CLOBBER.include %w{
   data/*.json
