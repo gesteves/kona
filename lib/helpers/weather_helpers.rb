@@ -10,7 +10,12 @@ module WeatherHelpers
   end
 
   def daylight?
-    data.weather.currentWeather.daylight.presence
+    forecast = Time.parse(data.weather.currentWeather.metadata.readTime)
+    sunrise = Time.parse(data.weather.forecastDaily.days.first.sunrise)
+    sunset = Time.parse(data.weather.forecastDaily.days.first.sunset)
+    forecast >= (sunrise - 1.hours) && forecast < (sunset - 1.hour)
+  rescue
+    true
   end
 
   def today_or_tonight
@@ -96,7 +101,7 @@ module WeatherHelpers
       weather += "."
     end
 
-    if data.weather.currentWeather.daylight && !is_race_day?
+    if daylight? && !is_race_day?
       weather += " It's a good day to train "
       weather += train_indoors? ? "indoors!" : "outside!"
     end
