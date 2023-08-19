@@ -12,9 +12,15 @@ class Strava
       username: ENV['REDIS_USERNAME'],
       password: ENV['REDIS_PASSWORD']
     )
+    @athlete_id = ENV['STRAVA_ATHLETE_ID']
   end
 
   def stats
+    cache_key = "strava:stats:#{@athlete_id}"
+    data = @redis.get(cache_key)
+
+    return JSON.parse(data) if data.present?
+
     access_token = get_access_token
     return if access_token.blank?
 
@@ -23,7 +29,7 @@ class Strava
       "Content-Type" => "application/json"
     }
 
-    response = HTTParty.get("#{STRAVA_API_URL}/athletes/#{ENV['STRAVA_ATHLETE_ID']}/stats", headers: headers)
+    response = HTTParty.get("#{STRAVA_API_URL}/athletes/#{@athlete_id}/stats", headers: headers)
     return unless response.success?
 
     stats = JSON.parse(response.body)
@@ -32,6 +38,8 @@ class Strava
     stats.each_key do |k|
       stats[k]['activities'] = stats[k].delete('count') if stats[k].is_a?(Hash) && stats[k]['count'].present?
     end
+
+    @redis.setex(cache_key, 1.hour, stats.to_json)
 
     stats
   end

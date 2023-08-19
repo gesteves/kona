@@ -40,7 +40,7 @@ class WeatherKit
     response = HTTParty.get("#{WEATHERKIT_API_URL}/weather/en/#{@latitude}/#{@longitude}", query: query, headers: headers)
     return unless response.success?
 
-    @redis.setex(cache_key, 5.minutes, response.body)
+    @redis.setex(cache_key, 1.hour, response.body)
     JSON.parse(response.body)
   end
 
@@ -88,7 +88,7 @@ class WeatherKit
     claims = {
       iss: team_id,
       iat: current_time,
-      exp: current_time + 60,
+      exp: 1.minute.from_now.to_i,
       sub: service_id
     }
 

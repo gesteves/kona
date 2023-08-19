@@ -64,7 +64,7 @@ class GoogleMaps
     response = HTTParty.get("#{GOOGLE_MAPS_API_URL}/geocode/json?latlng=#{@latitude},#{@longitude}&key=#{GOOGLE_MAPS_API_KEY}")
     return unless response.success?
 
-    @redis.setex(cache_key, 1.year, response.body)
+    @redis.setex(cache_key, 1.day, response.body)
     JSON.parse(response.body)
   end
 
