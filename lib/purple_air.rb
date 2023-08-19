@@ -44,7 +44,7 @@ class PurpleAir
   def api_query_params
     {
       location_type: 0,
-      fields: 'name,pm2.5_atm,latitude,longitude,humidity',
+      fields: 'pm2.5_atm,latitude,longitude,humidity',
       nwlat: @latitude + 0.1,
       selat: @latitude - 0.1,
       nwlng: @longitude - 0.1,
