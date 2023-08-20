@@ -60,8 +60,8 @@ Windy:
 Drizzle:
   description: Drizzle
   icon: cloud-drizzle
-  current: it's drizzling
-  forecast: a drizzle
+  current: it's raining lightly
+  forecast: light rain
 HeavyRain:
   description: Heavy Rain
   icon: cloud-showers-heavy
