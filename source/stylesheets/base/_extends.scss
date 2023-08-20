@@ -140,6 +140,8 @@
   }
 
   abbr {
+    font-variant-caps: all-small-caps;
+    font-variant-numeric: oldstyle-nums;
     text-decoration: none;
   }
 
@@ -299,8 +301,8 @@
 .extend-lead-in {
   & > p:first-of-type::first-line {
     font-style: normal;
-    font-variant: small-caps;
-    text-transform: lowercase;
+    font-variant-caps: all-small-caps;
+    font-variant-numeric: oldstyle-nums;
   }
 }
 
