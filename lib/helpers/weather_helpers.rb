@@ -51,16 +51,12 @@ module WeatherHelpers
 
   def train_indoors?
     return true if data.purple_air&.aqi&.value&.to_i > 75
+    return !data.conditions.dig(data.weather.currentWeather.conditionCode, :safe)
+    return !data.conditions.dig(data.weather.forecastDaily.days.first.conditionCode, :safe)
     return true if data.weather.forecastDaily.days.first.temperatureMax >= 32
     return true if data.weather.forecastDaily.days.first.temperatureMin <= -12
     return true if data.weather.forecastDaily.days.first.restOfDayForecast.precipitationChance >= 0.5
     return true if data.weather.forecastDaily.days.first.restOfDayForecast.snowfallAmount > 0
-    return (["Dust", "ScatteredThunderstorms", "Smoke", "Drizzle" "HeavyRain", "Rain", "Showers", "HeavySnow",
-      "MixedRainAndSleet", "MixedRainAndSnow", "MixedRainfall", "MixedSnowAndSleet",
-      "ScatteredShowers", "ScatteredSnowShowers", "Sleet", "Snow", "SnowShowers",
-      "Blizzard", "BlowingSnow", "FreezingDrizzle", "FreezingRain", "Frigid",
-      "Hail", "Hot", "Hurricane", "IsolatedThunderstorms", "SevereThunderstorm",
-      "Thunderstorm", "Tornado", "TropicalStorm"] & [data.weather.currentWeather.conditionCode, data.weather.forecastDaily.days.first.conditionCode].uniq).present?
   end
 
   def aqi_quality

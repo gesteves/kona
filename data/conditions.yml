@@ -4,176 +4,216 @@ Clear:
   icon_night: moon
   current: the sky is clear
   forecast: clear sky
+  safe: true
 Cloudy:
   description: Cloudy
   icon: clouds
   current: it's cloudy
   forecast: cloudy sky
+  safe: true
 Dust:
   description: Dust
   icon: sun-dust
   current: it's dusty
+  safe: false
 Fog:
   description: Fog
   icon: cloud-fog
   current: it's foggy
+  safe: true
 Haze:
   description: Haze
   icon: sun-haze
   current: it's hazy
+  safe: true
 MostlyClear:
   description: Mostly Clear
   icon_day: sun-cloud
   icon_night: moon-cloud
   current: it's mostly clear
   forecast: mostly clear sky
+  safe: true
 MostlyCloudy:
   description: Mostly Cloudy
   icon_day: clouds-sun
   icon_night: clouds-sun
   current: it's mostly cloudy
   forecast: mostly cloudy sky
+  safe: true
 PartlyCloudy:
   description: Partly Cloudy
   icon_day: clouds-sun
   icon_night: clouds-sun
   current: it's partly cloudy
   forecast: partly cloudy sky
+  safe: true
 ScatteredThunderstorms:
   description: Scattered Thunderstorms
   icon: cloud-bolt
   current: there are scattered thunderstorms
+  safe: false
 Smoke:
   description: Smoke
   icon: smoke
   current: it's smoky
+  safe: false
 Breezy:
   description: Breezy
   icon: wind
   current: it's breezy
   forecast: a breeze
+  safe: true
 Windy:
   description: Windy
   icon: wind
   current: it's windy
   forecast: wind
+  safe: false
 Drizzle:
   description: Drizzle
   icon: cloud-drizzle
   current: it's raining lightly
   forecast: light rain
+  safe: false
 HeavyRain:
   description: Heavy Rain
   icon: cloud-showers-heavy
   current: it's raining heavily
+  safe: false
 Rain:
   description: Rain
   icon: cloud-rain
   current: it's raining
+  safe: false
 Showers:
   description: Showers
   icon: cloud-showers
   current: there are showers
+  safe: false
 Flurries:
   description: Flurries
   icon: cloud-snow
   current: there are flurries
+  safe: false
 HeavySnow:
   description: Heavy Snow
   icon: cloud-snow
   current: it's snowing heavily
+  safe: false
 MixedRainAndSleet:
   description: Mixed Rain and Sleet
   icon: cloud-hail-mixed
   current: it's raining and sleeting
+  safe: false
 MixedRainAndSnow:
   description: Mixed Rain and Snow
   icon: cloud-hail-mixed
   current: it's raining and snowing
+  safe: false
 MixedRainfall:
   description: Mixed Rainfall
   icon: cloud-hail-mixed
   current: there's mixed rain
+  safe: false
 MixedSnowAndSleet:
   description: Mixed Snow and Sleet
   icon: cloud-hail-mixed
   current: it's snowing and sleeting
+  safe: false
 ScatteredShowers:
   description: Scattered Showers
   icon: cloud-showers
   current: there are scattered showers
+  safe: false
 ScatteredSnowShowers:
   description: Scattered Snow Showers
   icon: cloud-snow
   current: there are scattered snow showers
+  safe: false
 Sleet:
   description: Sleet
   icon: cloud-snow
   current: it's sleeting
+  safe: false
 Snow:
   description: Snow
   icon: cloud-snow
   current: it's snowing
+  safe: false
 SnowShowers:
   description: Snow Showers
   icon: cloud-hail-mixed
   current: there are snow showers
+  safe: false
 Blizzard:
   description: Blizzard
   icon: snow-blowing
   current: there's a blizzard
   forecast: a blizzard
+  safe: false
 BlowingSnow:
   description: Blowing Snow
   icon: snow-blowing
   current: there's blowing snow
+  safe: false
 FreezingDrizzle:
   description: Freezing Drizzle
   icon: cloud-hail-mixed
   current: there's a freezing drizzle
   forecast: a freezing drizzle
+  safe: false
 FreezingRain:
   description: Freezing Rain
   icon: cloud-hail-mixed
   current: there's freezing rain
+  safe: false
 Frigid:
   description: Frigid
   icon: temperature-snow
   current: it's frigid
   forecast: frigid temperatures
+  safe: false
 Hail:
   description: Hail
   icon: cloud-hail
   current: it's hailing
+  safe: false
 Hot:
   description: Hot
   icon: temperature-sun
   current: it's hot
   forecast: high temperatures
+  safe: false
 Hurricane:
   description: Hurricane
   icon: hurricane
   current: there's a hurricane
   forecast: a hurricane
+  safe: false
 IsolatedThunderstorms:
   description: Isolated Thunderstorms
   icon: cloud-bolt
   current: there are isolated thunderstorms
+  safe: false
 SevereThunderstorm:
   description: Severe Thunderstorms
   icon: cloud-bolt
   current: there's a severe thunderstorm
+  safe: false
 Thunderstorms:
   description: Thunderstorms
   icon: cloud-bolt
   current: there's a thunderstorm
+  safe: false
 Tornado:
   description: Tornado
   icon: tornado
   current: there's a tornado
   forecast: a tornado
+  safe: false
 TropicalStorm:
   description: Tropical Storm
   icon: hurricane
   current: there's a tropical storm
   forecast: a tropical storm
+  safe: false
