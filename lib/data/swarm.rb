@@ -40,7 +40,7 @@ class Swarm
     response = HTTParty.get("#{FOURSQUARE_API_URL}/users/self/checkins", query: query)
     return unless response.success?
 
-    @redis.setex(cache_key, 1.hour, response.body)
+    @redis.setex(cache_key, 5.minutes, response.body)
     JSON.parse(response.body)
   end
 end
