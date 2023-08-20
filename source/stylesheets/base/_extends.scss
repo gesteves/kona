@@ -139,7 +139,8 @@
     font-style: italic;
   }
 
-  abbr {
+  abbr,
+  acronym {
     font-variant-caps: all-small-caps;
     font-variant-numeric: oldstyle-nums;
     text-decoration: none;
