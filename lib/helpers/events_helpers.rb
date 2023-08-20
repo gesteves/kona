@@ -6,6 +6,6 @@ module EventsHelpers
   end
 
   def is_race_day?
-    data.events.any? { |e| is_today? e.date }
+    data.events.any? { |e| is_today?(e.date) && !e.canceled }
   end
 end

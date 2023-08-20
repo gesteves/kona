@@ -147,6 +147,7 @@ class Contentful
           location
           url
           date
+          canceled
           sys {
             id
           }
