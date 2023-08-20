@@ -146,6 +146,22 @@
     text-decoration: none;
   }
 
+
+sub,
+sup {
+  font-size: 75%;
+  line-height: 0;
+  position: relative;
+}
+
+sup {
+  top: -0.5rem;
+}
+
+sub {
+  bottom: -0.25rem;
+}
+
   small {
     color: var(--color-text-secondary);
     font-size: var(--font-x-small);
