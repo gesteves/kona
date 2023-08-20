@@ -9,7 +9,7 @@ module WeatherHelpers
     "#{number_to_human(temp, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')}ºC"
   end
 
-  def daylight?
+  def is_daytime?
     now = Time.now
     sunrise = Time.parse(data.weather.forecastDaily.days.first.sunrise)
     sunset = Time.parse(data.weather.forecastDaily.days.first.sunset)
@@ -19,7 +19,7 @@ module WeatherHelpers
   end
 
   def today_or_tonight
-    daylight? ? "Today" : "Tonight"
+    is_daytime? ? "Today" : "Tonight"
   end
 
   def format_precipitation(amount)
@@ -98,9 +98,13 @@ module WeatherHelpers
       weather += "."
     end
 
-    if daylight? && !is_race_day?
-      weather += " It's a good day to train "
-      weather += train_indoors? ? "indoors!" : "outside!"
+    if is_daytime?
+      if is_rest_day?
+        weather += " It's a good day to rest!"
+      elsif !is_race_day?
+        weather += " It's a good day to train "
+        weather += train_indoors? ? "indoors!" : "outside!"
+      end
     end
 
     markdown_to_html(weather)

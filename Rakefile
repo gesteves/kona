@@ -31,6 +31,12 @@ namespace :import do
     Strava.new.save_data
   end
 
+  desc 'Imports content from TrainerRoad'
+  task :trainerroad => [:dotenv, :set_up_directories] do
+    puts 'Importing today’s workouts from TrainerRoad'
+    TrainerRoad.new.save_data
+  end
+
   desc 'Imports location & weather data'
   task :weather => [:dotenv, :set_up_directories] do
     puts 'Getting most recent check-in from Swarm'
@@ -71,6 +77,7 @@ task :import => %w{
   clobber
   import:contentful
   import:strava
+  import:trainerroad
   import:weather
 }
 
