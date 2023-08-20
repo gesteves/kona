@@ -55,12 +55,12 @@ module WeatherHelpers
     return true if data.weather.forecastDaily.days.first.temperatureMin <= -12
     return true if data.weather.forecastDaily.days.first.restOfDayForecast.precipitationChance >= 0.5
     return true if data.weather.forecastDaily.days.first.restOfDayForecast.snowfallAmount > 0
-    return ["Dust", "ScatteredThunderstorms", "Smoke", "HeavyRain", "Rain", "Showers", "HeavySnow",
+    return (["Dust", "ScatteredThunderstorms", "Smoke", "Drizzle" "HeavyRain", "Rain", "Showers", "HeavySnow",
       "MixedRainAndSleet", "MixedRainAndSnow", "MixedRainfall", "MixedSnowAndSleet",
       "ScatteredShowers", "ScatteredSnowShowers", "Sleet", "Snow", "SnowShowers",
       "Blizzard", "BlowingSnow", "FreezingDrizzle", "FreezingRain", "Frigid",
       "Hail", "Hot", "Hurricane", "IsolatedThunderstorms", "SevereThunderstorm",
-      "Thunderstorm", "Tornado", "TropicalStorm"].include?(data.weather.forecastDaily.days.first.conditionCode)
+      "Thunderstorm", "Tornado", "TropicalStorm"] & [data.weather.currentWeather.conditionCode, data.weather.forecastDaily.days.first.conditionCode].uniq).present?
   end
 
   def aqi_quality
