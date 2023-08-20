@@ -22,7 +22,7 @@ module WeatherHelpers
     is_daytime? ? "Today" : "Tonight"
   end
 
-  def format_precipitation(amount)
+  def format_precipitation_amount(amount)
     number_to_human(amount, units: PRECIPITATION_UNITS, precision: 2, strip_insignificant_zeros: true, significant: false, delimiter: ',')
   end
 
@@ -38,7 +38,7 @@ module WeatherHelpers
     data.conditions.dig(condition_code, :forecast) || format_condition(condition_code)
   end
 
-  def format_precipitation(type)
+  def format_precipitation_type(type)
     case type.downcase
     when 'clear'
       'precipitation'
@@ -97,8 +97,8 @@ module WeatherHelpers
       weather += " with a high of #{format_temperature(day.temperatureMax)}"
       weather += day.precipitationChance == 0 || day.restOfDayForecast.precipitationType.downcase == 'clear' ? " and " : ", "
       weather += " a low of #{format_temperature(day.temperatureMin)}"
-      weather += ", and #{number_to_percentage(day.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation(day.restOfDayForecast.precipitationType)}" if day.restOfDayForecast.precipitationChance > 0 && day.restOfDayForecast.precipitationType.downcase != 'clear'
-      weather += ", with #{format_precipitation(day.restOfDayForecast.snowfallAmount)} of snow expected" if day.restOfDayForecast.snowfallAmount > 0
+      weather += ", and #{number_to_percentage(day.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(day.restOfDayForecast.precipitationType)}" if day.restOfDayForecast.precipitationChance > 0 && day.restOfDayForecast.precipitationType.downcase != 'clear'
+      weather += ", with #{format_precipitation_amount(day.restOfDayForecast.snowfallAmount)} of snow expected" if day.restOfDayForecast.snowfallAmount > 0
       weather += "."
     end
 
