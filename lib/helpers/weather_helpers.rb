@@ -59,6 +59,10 @@ module WeatherHelpers
     return true if data.weather.forecastDaily.days.first.restOfDayForecast.snowfallAmount > 0
   end
 
+  def is_good_weather?
+    !is_bad_weather?
+  end
+
   def aqi_quality
     case data.purple_air.aqi.value
     when 0..50
@@ -80,7 +84,7 @@ module WeatherHelpers
 
   def forecast
     weather = ""
-    weather += "**It's race day!** " if is_race_day?
+    weather += "It's race day! " if is_race_day?
     weather += "Man, it's a hot one! " if !is_race_day? && is_hot?
     weather += "I'm currently in **#{format_location}**, where"
     weather += " #{format_current_condition(data.weather.currentWeather.conditionCode).downcase}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
@@ -98,13 +102,19 @@ module WeatherHelpers
       weather += "."
     end
 
-    if is_daytime? && !is_race_day?
-      if is_bad_weather? && is_rest_day?
-        weather += " It's a good day to rest!"
-      elsif is_bad_weather?
-        weather += " It's a good day for indoor training!"
-      else
-        weather += " It's a good day to be outside!"
+    if is_daytime?
+      weather += if is_race_day? && is_good_weather?
+        " Great weather for racing!"
+      elsif is_race_day? && is_bad_weather?
+        " Tough weather for racing!"
+      elsif is_good_weather? && is_workout_scheduled?
+        " It's a good day to train outside!"
+      elsif is_good_weather? && !is_workout_scheduled?
+        " It's a good day to play outside!"
+      elsif is_bad_weather? && is_workout_scheduled?
+        " It's a good day to train indoors!"
+      elsif is_bad_weather? && !is_workout_scheduled?
+        " It's a good day to rest!"
       end
     end
 

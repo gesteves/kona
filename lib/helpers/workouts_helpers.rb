@@ -1,5 +1,5 @@
 module WorkoutsHelpers
-  def is_rest_day?
-    data.trainerroad.workouts.blank?
+  def is_workout_scheduled?
+    data.trainerroad.workouts.present?
   end
 end
