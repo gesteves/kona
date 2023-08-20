@@ -104,7 +104,7 @@ module WeatherHelpers
 
     if is_daytime?
       weather += if is_race_day? && is_good_weather?
-        " Great weather for racing!"
+        " Good weather for racing!"
       elsif is_race_day? && is_bad_weather?
         " Tough weather for racing!"
       elsif is_good_weather? && is_workout_scheduled?
