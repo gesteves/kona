@@ -31,7 +31,7 @@ module WeatherHelpers
   end
 
   def format_current_condition(condition_code)
-    data.conditions.dig(condition_code, :current) || format_condition(condition_code)
+    data.conditions.dig(condition_code, :currently) || format_condition(condition_code)
   end
 
   def format_forecasted_condition(condition_code)
