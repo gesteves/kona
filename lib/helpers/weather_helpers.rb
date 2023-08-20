@@ -49,7 +49,7 @@ module WeatherHelpers
     end
   end
 
-  def train_indoors?
+  def is_bad_weather?
     return true if data.purple_air&.aqi&.value&.to_i > 75
     return !data.conditions.dig(data.weather.currentWeather.conditionCode, :safe)
     return !data.conditions.dig(data.weather.forecastDaily.days.first.conditionCode, :safe)
@@ -98,12 +98,13 @@ module WeatherHelpers
       weather += "."
     end
 
-    if is_daytime?
-      if is_rest_day?
+    if is_daytime? && !is_race_day?
+      if is_bad_weather? && is_rest_day?
         weather += " It's a good day to rest!"
-      elsif !is_race_day?
-        weather += " It's a good day to train "
-        weather += train_indoors? ? "indoors!" : "outside!"
+      elsif is_bad_weather?
+        weather += " It's a good day for indoor training!"
+      else
+        weather += " It's a good day to be outside!"
       end
     end
 
