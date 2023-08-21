@@ -142,7 +142,7 @@ module WeatherHelpers
       if is_good_weather?
         activities << "It's a good day to go for a bike ride!" if is_bike_scheduled?
         activities << "It's a good day to go for a run!" if is_run_scheduled?
-        activities << "It's a good day to go swim in the lake!" if is_swim_scheduled?
+        activities << "It's a good day to go for a swim!" if is_swim_scheduled?
         activities << "It's a good day to spend time outside!" if !is_workout_scheduled?
       else
         activities << "It's a good day to ride indoors!" if is_bike_scheduled?
