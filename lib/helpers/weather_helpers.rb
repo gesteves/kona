@@ -58,7 +58,7 @@ module WeatherHelpers
     snowfall = data.weather&.forecastDaily&.days&.first&.snowfallAmount&.to_f
 
     return true if aqi > 75
-    return true if current_temperature <= -12 || current_temperature >= 32)
+    return true if current_temperature <= -12 || current_temperature >= 32
     return true if low_temperature <= -12 || high_temperature >= 32
     return true if data.weather.forecastDaily.days.first.temperatureMin <= -12
     return true if precipitation_chance >= 0.5
