@@ -25,10 +25,10 @@ class TrainerRoad
 
     calendars = Icalendar::Calendar.parse(response.body)
     calendar = calendars.first
-    today = Date.today
+    today = Time.current.in_time_zone('Mountain Time (US & Canada)').to_date
 
     todays_events = calendar.events.select do |event|
-      event.dtstart.to_date == today
+      event.dtstart.to_datetime.in_time_zone('Mountain Time (US & Canada)').to_date == today
     end
 
     workouts = todays_events.map do |event|
