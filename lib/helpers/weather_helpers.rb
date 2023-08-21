@@ -98,7 +98,7 @@ module WeatherHelpers
     weather += " (which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)})" if data.weather.currentWeather.temperature.round != data.weather.currentWeather.temperatureApparent.round
     weather += "."
 
-    weather += " The air quality is #{aqi_quality}, with an <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.purple_air.aqi.value.round}." if data&.purple_air&.aqi&.value.present?
+    weather += " The <abbr title=\"Air Quality Index\">AQI</abbr> is #{aqi_quality}, at #{data.purple_air.aqi.value.round}." if data&.purple_air&.aqi&.value.present?
 
     if data.weather.forecastDaily.present?
       day = data.weather.forecastDaily.days.first
