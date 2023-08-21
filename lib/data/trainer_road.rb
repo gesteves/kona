@@ -5,7 +5,7 @@ require 'icalendar'
 class TrainerRoad
   CALENDAR_URL = ENV['TRAINERROAD_CALENDAR_URL']
 
-  def initialize(timezone = "-0600")
+  def initialize(timezone = "America/Denver")
     @timezone = timezone
     @redis = Redis.new(
       host: ENV['REDIS_HOST'] || 'localhost',
@@ -18,7 +18,7 @@ class TrainerRoad
   def workouts
     return if CALENDAR_URL.blank?
 
-    cache_key = "trainerroad:workouts:#{CALENDAR_URL.parameterize}"
+    cache_key = "trainerroad:workouts:#{@timezone}:#{CALENDAR_URL.parameterize}"
     data = @redis.get(cache_key)
 
     return JSON.parse(data) if data.present?

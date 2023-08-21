@@ -36,7 +36,8 @@ class GoogleMaps
   def time_zone
     data = time_zone_data
     return if data.blank?
-    formatted_time_zone = format_time_zone_offset(data['rawOffset'])
+    data[:formattedOffset] = format_time_zone_offset(data['rawOffset'])
+    data
   end
 
   def country_code
