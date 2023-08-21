@@ -107,7 +107,7 @@ module WeatherHelpers
     current << "#{format_current_condition(data.weather.currentWeather.conditionCode).downcase}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
     current << "(which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)})" if data.weather.currentWeather.temperature.round != data.weather.currentWeather.temperatureApparent.round
     current << "."
-    current.join(' ').gsub(',.', '.').gsub(/\s+([,.])/, '\1')
+    current.join(' ').gsub(/,\s*\./, '.').gsub(/\s+([,.])/, '\1')
   end
 
   def current_aqi
