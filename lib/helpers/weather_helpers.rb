@@ -52,10 +52,10 @@ module WeatherHelpers
   def is_bad_weather?
     aqi = data.purple_air&.aqi&.value&.to_f
     current_temperature = (data.weather&.currentWeather&.temperatureApparent || data.weather&.currentWeather&.temperature)&.to_f
-    high_temperature = data.weather&.forecastDaily&.days&.first&.temperatureMax&.to_f
-    low_temperature = data.weather&.forecastDaily&.days&.first&.temperatureMin&.to_f
-    precipitation_chance = data.weather&.forecastDaily&.days&.first&.precipitationChance&.to_f
-    snowfall = data.weather&.forecastDaily&.days&.first&.snowfallAmount&.to_f
+    high_temperature = data.weather&.forecastDaily&.days&.first&.restOfDayForecast&.temperatureMax&.to_f
+    low_temperature = data.weather&.forecastDaily&.days&.first&.restOfDayForecast&.temperatureMin&.to_f
+    precipitation_chance = data.weather&.forecastDaily&.days&.first&.restOfDayForecast&.precipitationChance&.to_f
+    snowfall = data.weather&.forecastDaily&.days&.first&.restOfDayForecast&.snowfallAmount&.to_f
 
     return true if aqi > 75
     return true if current_temperature <= -12 || current_temperature >= 32
