@@ -89,45 +89,69 @@ module WeatherHelpers
     data.weather.currentWeather.temperature >= 32 || data.weather.currentWeather.temperatureApparent >= 32
   end
 
+  def weather_summary
+    summary = []
+    summary << current_weather
+    summary << current_aqi
+    summary << forecast
+    summary << activities
+    markdown_to_html(summary.join(' '))
+  end
+
+  def current_weather
+    return if data.weather.currentWeather.blank?
+    current = []
+    current << "It's race day!" if is_race_day?
+    current << "Man, it's a hot one!" if !is_race_day? && is_hot?
+    current << "I'm currently in **#{format_location}**, where"
+    current << "#{format_current_condition(data.weather.currentWeather.conditionCode).downcase}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
+    current << "(which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)})" if data.weather.currentWeather.temperature.round != data.weather.currentWeather.temperatureApparent.round
+    current << "."
+    current.join(' ').gsub(',.', '.').gsub(/\s+([,.])/, '\1')
+  end
+
+  def current_aqi
+    return if data.purple_air.aqi.value.blank?
+    "The <abbr title=\"Air Quality Index\">AQI</abbr> is #{aqi_quality}, at #{data.purple_air.aqi.value.round}."
+  end
+
   def forecast
-    weather = ""
-    weather += "It's race day! " if is_race_day?
-    weather += "Man, it's a hot one! " if !is_race_day? && is_hot?
-    weather += "I'm currently in **#{format_location}**, where"
-    weather += " #{format_current_condition(data.weather.currentWeather.conditionCode).downcase}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
-    weather += " (which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)})" if data.weather.currentWeather.temperature.round != data.weather.currentWeather.temperatureApparent.round
-    weather += "."
+    return if data.weather.forecastDaily.blank?
+    day = data.weather.forecastDaily.days.first
+    forecast = []
+    forecast << "#{today_or_tonight}'s forecast calls for #{format_forecasted_condition(day.restOfDayForecast.conditionCode).downcase},"
+    forecast << "with a high of #{format_temperature(day.temperatureMax)}"
+    forecast << day.precipitationChance == 0 || day.restOfDayForecast.precipitationType.downcase == 'clear' ? "and" : ","
+    forecast << "a low of #{format_temperature(day.temperatureMin)},"
+    forecast << "and a #{number_to_percentage(day.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(day.restOfDayForecast.precipitationType)}," if day.restOfDayForecast.precipitationChance > 0 && day.restOfDayForecast.precipitationType.downcase != 'clear'
+    forecast << "with #{format_precipitation_amount(day.restOfDayForecast.snowfallAmount)} of snow expected" if day.restOfDayForecast.snowfallAmount > 0
+    forecast << "."
 
-    weather += " The <abbr title=\"Air Quality Index\">AQI</abbr> is #{aqi_quality}, at #{data.purple_air.aqi.value.round}." if data&.purple_air&.aqi&.value.present?
+    forecast.join(' ').gsub(',.', '.').gsub(/\s+([,.])/, '\1')
+  end
 
-    if data.weather.forecastDaily.present?
-      day = data.weather.forecastDaily.days.first
-      weather += " #{today_or_tonight}'s forecast calls for #{format_forecasted_condition(day.restOfDayForecast.conditionCode).downcase},"
-      weather += " with a high of #{format_temperature(day.temperatureMax)}"
-      weather += day.precipitationChance == 0 || day.restOfDayForecast.precipitationType.downcase == 'clear' ? " and " : ", "
-      weather += " a low of #{format_temperature(day.temperatureMin)}"
-      weather += ", and #{number_to_percentage(day.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(day.restOfDayForecast.precipitationType)}" if day.restOfDayForecast.precipitationChance > 0 && day.restOfDayForecast.precipitationType.downcase != 'clear'
-      weather += ", with #{format_precipitation_amount(day.restOfDayForecast.snowfallAmount)} of snow expected" if day.restOfDayForecast.snowfallAmount > 0
-      weather += "."
-    end
-
-    if is_daytime?
-      weather += if is_race_day? && is_good_weather?
-        " Good weather for racing!"
-      elsif is_race_day? && is_bad_weather?
-        " Tough weather for racing!"
-      elsif is_good_weather? && is_workout_scheduled?
-        " It's a good day to train outside!"
-      elsif is_good_weather? && !is_workout_scheduled?
-        " It's a good day to play outside!"
-      elsif is_bad_weather? && is_workout_scheduled?
-        " It's a good day to train indoors!"
-      elsif is_bad_weather? && !is_workout_scheduled?
-        " It's a good day to rest!"
+  def activities
+    activities = []
+    if is_race_day?
+      if is_good_weather?
+        activities << "Good weather for racing!"
+      else
+        activities << "Tough weather for racing!"
+      else
+    else
+      if is_good_weather?
+        activities << "It's a good day to go for a bike ride!" if is_bike_scheduled?
+        activities << "It's a good day to go for a run!" if is_run_scheduled?
+        activities << "It's a good day to go swim in the lake!" if is_swim_scheduled?
+        activities << "It's a good day to spend time outside!" if !is_workout_scheduled?
+      else
+        activities << "It's a good day to ride indoors!" if is_bike_scheduled?
+        activities << "It's a good day to hit the treadmill!" if is_run_scheduled?
+        activities << "It's a good day to hit the pool!" if is_swim_scheduled?
+        activities << "It's a good day to rest!" if !is_workout_scheduled?
       end
     end
-
-    markdown_to_html(weather)
+    is_daytime? ? activities.sample : ''
   end
 
   def weather_icon
