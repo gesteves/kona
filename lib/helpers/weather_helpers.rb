@@ -51,12 +51,12 @@ module WeatherHelpers
 
   def is_bad_weather?
     return true if data.purple_air&.aqi&.value&.to_i > 75
-    return !data.conditions.dig(data.weather.currentWeather.conditionCode, :safe)
-    return !data.conditions.dig(data.weather.forecastDaily.days.first.conditionCode, :safe)
     return true if data.weather.forecastDaily.days.first.temperatureMax >= 32
     return true if data.weather.forecastDaily.days.first.temperatureMin <= -12
     return true if data.weather.forecastDaily.days.first.restOfDayForecast.precipitationChance >= 0.5
     return true if data.weather.forecastDaily.days.first.restOfDayForecast.snowfallAmount > 0
+    return !data.conditions.dig(data.weather.currentWeather.conditionCode, :safe)
+    return !data.conditions.dig(data.weather.forecastDaily.days.first.conditionCode, :safe)
   end
 
   def is_good_weather?
