@@ -5,7 +5,8 @@ require 'icalendar'
 class TrainerRoad
   CALENDAR_URL = ENV['TRAINERROAD_CALENDAR_URL']
 
-  def initialize
+  def initialize(timezone = "-0600")
+    @timezone = timezone
     @redis = Redis.new(
       host: ENV['REDIS_HOST'] || 'localhost',
       port: ENV['REDIS_PORT'] || 6379,
@@ -15,6 +16,8 @@ class TrainerRoad
   end
 
   def workouts
+    return if CALENDAR_URL.blank?
+
     cache_key = "trainerroad:workouts:#{CALENDAR_URL.parameterize}"
     data = @redis.get(cache_key)
 
@@ -25,10 +28,10 @@ class TrainerRoad
 
     calendars = Icalendar::Calendar.parse(response.body)
     calendar = calendars.first
-    today = Time.current.in_time_zone('Mountain Time (US & Canada)').to_date
+    today = Time.current.in_time_zone(@timezone).to_date
 
     todays_events = calendar.events.select do |event|
-      event.dtstart.to_datetime.in_time_zone('Mountain Time (US & Canada)').to_date == today
+      event.dtstart.to_datetime.in_time_zone(@timezone).to_date == today
     end
 
     workouts = todays_events.map do |event|
