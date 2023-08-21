@@ -137,7 +137,7 @@ module WeatherHelpers
         activities << "Good weather for racing!"
       else
         activities << "Tough weather for racing!"
-      else
+      end
     else
       if is_good_weather?
         activities << "It's a good day to go for a bike ride!" if is_bike_scheduled?
