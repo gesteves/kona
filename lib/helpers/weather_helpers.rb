@@ -73,15 +73,15 @@ module WeatherHelpers
   def aqi_quality
     case data.purple_air.aqi.value
     when 0..50
-      "a good"
+      "good"
     when 50..100
-      "a moderate"
+      "moderate"
     when 100..200
-      "an unhealthy"
+      "unhealthy"
     when 200..300
-      "a _very_ unhealthy"
+      "_very_ unhealthy"
     else
-      "a **hazardous**"
+      "**hazardous**"
     end
   end
 
@@ -96,11 +96,13 @@ module WeatherHelpers
     weather += "I'm currently in **#{format_location}**, where"
     weather += " #{format_current_condition(data.weather.currentWeather.conditionCode).downcase}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
     weather += " (which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)})" if data.weather.currentWeather.temperature.round != data.weather.currentWeather.temperatureApparent.round
-    weather += " and #{aqi_quality} <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.purple_air.aqi.value.round}" if data&.purple_air&.aqi&.value.present?
+    weather += "."
+
+    weather += " The air quality is #{aqi_quality}, with an <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.purple_air.aqi.value.round}." if data&.purple_air&.aqi&.value.present?
 
     if data.weather.forecastDaily.present?
       day = data.weather.forecastDaily.days.first
-      weather += ". #{today_or_tonight}'s forecast calls for #{format_forecasted_condition(day.restOfDayForecast.conditionCode).downcase},"
+      weather += " #{today_or_tonight}'s forecast calls for #{format_forecasted_condition(day.restOfDayForecast.conditionCode).downcase},"
       weather += " with a high of #{format_temperature(day.temperatureMax)}"
       weather += day.precipitationChance == 0 || day.restOfDayForecast.precipitationType.downcase == 'clear' ? " and " : ", "
       weather += " a low of #{format_temperature(day.temperatureMin)}"
