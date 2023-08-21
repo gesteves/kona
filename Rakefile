@@ -10,54 +10,40 @@ CLOBBER.include %w{
   data/*.json
 }
 
-namespace :import do
-  directory 'data'
-
-  task :set_up_directories => %w{
-    data
-  }
-
+desc 'Imports all content for the site'
+task :import => [:dotenv, :clobber] do
+  puts 'Setting up data directory'
+  directory = 'data'
+  mkdir_p(directory) unless File.directory?(directory)
+  
   contentful = Contentful.new
 
-  desc 'Imports content from Contentful'
-  task :contentful => [:dotenv, :set_up_directories] do
-    puts 'Importing site content from Contentful'
-    contentful.save_data
+  puts 'Importing site content from Contentful'
+  contentful.save_data
+
+  puts 'Importing activity stats from Strava'
+  Strava.new.save_data
+
+  # Imports location & weather data
+  puts 'Getting most recent check-in from Swarm'
+  swarm = Swarm.new
+  checkin = swarm.recent_checkin_location
+
+  if checkin[:latitude].nil? || checkin[:longitude].nil?
+    puts "No recent Swarm check-ins found, using Contentful location as a fallback"
+    latitude = contentful.location[:lat]
+    longitude = contentful.location[:lon]
+  else
+    latitude = checkin[:latitude]
+    longitude = checkin[:longitude]
   end
 
-  desc 'Imports content from Strava'
-  task :strava => [:dotenv, :set_up_directories] do
-    puts 'Importing activity stats from Strava'
-    Strava.new.save_data
-  end
+  time_zone = nil
 
-  desc 'Imports content from TrainerRoad'
-  task :trainerroad => [:dotenv, :set_up_directories] do
-    puts 'Importing today’s workouts from TrainerRoad'
-    TrainerRoad.new.save_data
-  end
-
-  desc 'Imports location & weather data'
-  task :weather => [:dotenv, :set_up_directories] do
-    puts 'Getting most recent check-in from Swarm'
-    swarm = Swarm.new
-    checkin = swarm.recent_checkin_location
-
-    if checkin[:latitude].nil? || checkin[:longitude].nil?
-      puts "No recent Swarm check-ins found, using Contentful location as a fallback"
-      latitude = contentful.location[:lat]
-      longitude = contentful.location[:lon]
-    else
-      latitude = checkin[:latitude]
-      longitude = checkin[:longitude]
-    end
-
-    if latitude.nil? || longitude.nil?
-      puts "No location available, skipping weather data"
-      next
-    end
-
-    puts 'Importing geocoded location data from Google Maps'
+  if latitude.nil? || longitude.nil?
+    puts "No location available, skipping weather and AQI data"
+  else
+    puts 'Reverse geocoding location in Google Maps'
     maps = GoogleMaps.new(latitude, longitude)
     maps.save_data
     country = maps.country_code
@@ -71,15 +57,11 @@ namespace :import do
     PurpleAir.new(latitude, longitude).save_data
   end
 
-end
+  puts 'Importing today’s workouts from TrainerRoad'
+  TrainerRoad.new(time_zone).save_data
 
-task :import => %w{
-  clobber
-  import:contentful
-  import:strava
-  import:trainerroad
-  import:weather
-}
+  puts 'All import tasks completed'
+end
 
 desc 'Import content and build the site'
 task :build => [:dotenv, :import] do
