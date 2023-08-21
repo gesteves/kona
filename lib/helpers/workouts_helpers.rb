@@ -11,7 +11,7 @@ module WorkoutsHelpers
     data.trainerroad.workouts.any? { |w| w.discipline == 'Run' }
   end
 
-  def is_swim_workout_scheduled?
+  def is_swim_scheduled?
     data.trainerroad.workouts.any? { |w| w.discipline == 'Swim' }
   end
 end
