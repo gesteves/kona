@@ -50,11 +50,19 @@ module WeatherHelpers
   end
 
   def is_bad_weather?
-    return true if data.purple_air&.aqi&.value&.to_i > 75
-    return true if data.weather.forecastDaily.days.first.temperatureMax >= 32
+    aqi = data.purple_air&.aqi&.value&.to_f
+    current_temperature = (data.weather&.currentWeather&.temperatureApparent || data.weather&.currentWeather&.temperature)&.to_f
+    high_temperature = data.weather&.forecastDaily&.days&.first&.temperatureMax&.to_f
+    low_temperature = data.weather&.forecastDaily&.days&.first&.temperatureMin&.to_f
+    precipitation_chance = data.weather&.forecastDaily&.days&.first&.precipitationChance&.to_f
+    snowfall = data.weather&.forecastDaily&.days&.first&.snowfallAmount&.to_f
+
+    return true if aqi > 75
+    return true if current_temperature <= -12 || current_temperature >= 32)
+    return true if low_temperature <= -12 || high_temperature >= 32
     return true if data.weather.forecastDaily.days.first.temperatureMin <= -12
-    return true if data.weather.forecastDaily.days.first.restOfDayForecast.precipitationChance >= 0.5
-    return true if data.weather.forecastDaily.days.first.restOfDayForecast.snowfallAmount > 0
+    return true if precipitation_chance >= 0.5
+    return true if snowfall > 0
     return !data.conditions.dig(data.weather.currentWeather.conditionCode, :safe)
     return !data.conditions.dig(data.weather.forecastDaily.days.first.conditionCode, :safe)
   end
