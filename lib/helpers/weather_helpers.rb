@@ -70,21 +70,6 @@ module WeatherHelpers
     !is_bad_weather?
   end
 
-  def aqi_quality
-    case data.purple_air.aqi.value
-    when 0..50
-      "good"
-    when 50..100
-      "moderate"
-    when 100..200
-      "unhealthy"
-    when 200..300
-      "_very_ unhealthy"
-    else
-      "**hazardous**"
-    end
-  end
-
   def is_hot?
     data.weather.currentWeather.temperature >= 32 || data.weather.currentWeather.temperatureApparent >= 32
   end
@@ -112,7 +97,7 @@ module WeatherHelpers
 
   def current_aqi
     return if data.purple_air.aqi.value.blank?
-    "The <abbr title=\"Air Quality Index\">AQI</abbr> is #{aqi_quality}, at #{data.purple_air.aqi.value.round}."
+    "The <abbr title=\"Air Quality Index\">AQI</abbr> is #{data.purple_air.aqi.label.downcase}, at #{data.purple_air.aqi.value.round}."
   end
 
   def forecast
