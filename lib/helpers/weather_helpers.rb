@@ -90,7 +90,7 @@ module WeatherHelpers
     current << "Man, it's a hot one!" if !is_race_day? && is_hot?
     current << "I'm currently in **#{format_location}**, where"
     current << "#{format_current_condition(data.weather.currentWeather.conditionCode).downcase}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
-    current << "(which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)})" if data.weather.currentWeather.temperature.round != data.weather.currentWeather.temperatureApparent.round
+    current << ", which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)}" if data.weather.currentWeather.temperature.round != data.weather.currentWeather.temperatureApparent.round
     current << "."
     current.join(' ').gsub(/,\s*\./, '.').gsub(/\s+([,.])/, '\1')
   end
