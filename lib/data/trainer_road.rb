@@ -35,10 +35,10 @@ class TrainerRoad
     end
 
     workouts = todays_events.map do |event|
-      workout = parse_summary(event.summary)
-      workout[:discipline] = determine_discipline(workout[:name])
-      workout
+      parse_workout(event.summary)
     end
+
+    workouts.compact!
 
     @redis.setex(cache_key, 1.hour, workouts.to_json)
 
@@ -54,19 +54,15 @@ class TrainerRoad
 
   private
 
-  def parse_summary(summary)
+  def parse_workout(summary)
     match_data = /(\d+:\d+) - (.+)/.match(summary)
+    return nil if match_data.blank?
 
-    if match_data
-      {
-        duration: match_data[1],
-        name: match_data[2]
-      }
-    else
-      {
-        name: summary
-      }
-    end
+    {
+      duration: match_data[1],
+      name: match_data[2],
+      discipline: determine_discipline(match_data[2])
+    }
   end
 
   def determine_discipline(name)
