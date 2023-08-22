@@ -57,13 +57,19 @@ class TrainerRoad
   def parse_summary(summary)
     match_data = /(\d+:\d+) - (.+)/.match(summary)
 
-    {
-      duration: match_data[1],
-      name: match_data[2]
-    }
+    if match_data
+      {
+        duration: match_data[1],
+        name: match_data[2]
+      }
+    else
+      {
+        name: summary
+      }
   end
 
   def determine_discipline(name)
+    return if name.blank?
     return "Run" if name.include?("Run")
     return "Swim" if name.include?("Swim")
     "Bike"
