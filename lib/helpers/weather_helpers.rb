@@ -49,6 +49,10 @@ module WeatherHelpers
     end
   end
 
+  def format_air_quality(label)
+    label.gsub('very', '_very_').gsub('hazardous', '**hazardous**')
+  end
+
   def is_bad_weather?
     aqi = data.purple_air.aqi.value
     current_temperature = (data.weather.currentWeather.temperatureApparent || data.weather.currentWeather.temperature)
@@ -97,7 +101,7 @@ module WeatherHelpers
 
   def current_aqi
     return if data.purple_air.aqi.value.blank?
-    "The <abbr title=\"Air Quality Index\">AQI</abbr> is #{data.purple_air.aqi.label.downcase}, at #{data.purple_air.aqi.value.round}."
+    "The air quality is #{format_air_quality(data.purple_air.aqi.label.downcase)}, with an <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.purple_air.aqi.value.round}."
   end
 
   def forecast
