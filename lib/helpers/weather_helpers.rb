@@ -105,10 +105,8 @@ module WeatherHelpers
     day = data.weather.forecastDaily.days.first
     forecast = []
     forecast << "#{today_or_tonight}'s forecast calls for #{format_forecasted_condition(day.restOfDayForecast.conditionCode).downcase},"
-    forecast << "with a high of #{format_temperature(day.temperatureMax)}"
-    forecast << (day.precipitationChance == 0 || day.restOfDayForecast.precipitationType.downcase == 'clear' ? "and" : ",")
-    forecast << "a low of #{format_temperature(day.temperatureMin)},"
-    forecast << "and a #{number_to_percentage(day.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(day.restOfDayForecast.precipitationType)}," if day.restOfDayForecast.precipitationChance > 0 && day.restOfDayForecast.precipitationType.downcase != 'clear'
+    forecast << "with a high of #{format_temperature(day.temperatureMax)} a low of #{format_temperature(day.temperatureMin)}."
+    forecast << "There's a #{number_to_percentage(day.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(day.restOfDayForecast.precipitationType)}," if day.restOfDayForecast.precipitationChance > 0 && day.restOfDayForecast.precipitationType.downcase != 'clear'
     forecast << "with #{format_precipitation_amount(day.restOfDayForecast.snowfallAmount)} of snow expected" if day.restOfDayForecast.snowfallAmount > 0
     forecast << "."
 
@@ -125,9 +123,9 @@ module WeatherHelpers
       end
     else
       if is_good_weather?
-        activities << "It's a good day to go for a bike ride!" if is_bike_scheduled?
+        activities << "It's a good day for a bike ride!" if is_bike_scheduled?
         activities << "It's a good day to go for a run!" if is_run_scheduled?
-        activities << "It's a good day to go for a swim!" if is_swim_scheduled?
+        activities << "It's a good day to go swimming!" if is_swim_scheduled?
         activities << "It's a good day to spend time outside!" if !is_workout_scheduled?
       else
         activities << "It's a good day to ride indoors!" if is_bike_scheduled?
