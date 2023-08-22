@@ -106,7 +106,7 @@ module WeatherHelpers
     forecast = []
     forecast << "#{today_or_tonight}'s forecast calls for #{format_forecasted_condition(day.restOfDayForecast.conditionCode).downcase},"
     forecast << "with a high of #{format_temperature(day.temperatureMax)} a low of #{format_temperature(day.temperatureMin)}."
-    forecast << "There's a #{number_to_percentage(day.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(day.restOfDayForecast.precipitationType)} later #{today_or_tonight}," if day.restOfDayForecast.precipitationChance > 0 && day.restOfDayForecast.precipitationType.downcase != 'clear'
+    forecast << "There's a #{number_to_percentage(day.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(day.restOfDayForecast.precipitationType)} later #{today_or_tonight}.downcase," if day.restOfDayForecast.precipitationChance > 0 && day.restOfDayForecast.precipitationType.downcase != 'clear'
     forecast << "with #{format_precipitation_amount(day.restOfDayForecast.snowfallAmount)} of snow expected" if day.restOfDayForecast.snowfallAmount > 0
     forecast << "."
 
