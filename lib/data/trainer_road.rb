@@ -66,6 +66,7 @@ class TrainerRoad
       {
         name: summary
       }
+    end
   end
 
   def determine_discipline(name)
