@@ -80,6 +80,7 @@ module WeatherHelpers
 
   def weather_summary
     summary = []
+    summary << intro
     summary << current_weather
     summary << current_aqi
     summary << forecast
@@ -87,11 +88,15 @@ module WeatherHelpers
     markdown_to_html(summary.join(' '))
   end
 
+  def intro
+    return unless is_daytime?
+    return "It's race day!" if is_race_day?
+    return "Man, it's a hot one!" if !is_race_day? && is_hot?
+  end
+
   def current_weather
     return if data.weather.currentWeather.blank?
     current = []
-    current << "It's race day!" if is_race_day?
-    current << "Man, it's a hot one!" if !is_race_day? && is_hot?
     current << "I'm currently in **#{format_location}**, where"
     current << "#{format_current_condition(data.weather.currentWeather.conditionCode).downcase}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
     current << ", which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)}" if data.weather.currentWeather.temperature.round != data.weather.currentWeather.temperatureApparent.round
