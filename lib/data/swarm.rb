@@ -16,8 +16,10 @@ class Swarm
   end
 
   def recent_checkin_location
+    latest = Time.now.beginning_of_day
+    earliest = latest - 2.days
     data = get_checkins
-    checkin = data.dig('response', 'checkins', 'items')&.find { |c| c['createdAt'] >= 3.days.ago.to_i && c['createdAt'] < Time.now.beginning_of_day.to_i }
+    checkin = data.dig('response', 'checkins', 'items')&.find { |c| c['createdAt'] >= earliest.to_i && c['createdAt'] < latest.to_i }
     latitude = checkin&.dig('venue', 'location', 'lat')
     longitude = checkin&.dig('venue', 'location', 'lng')
     { latitude: latitude, longitude: longitude }.compact
