@@ -38,14 +38,14 @@ MostlyCloudy:
   description: Mostly Cloudy
   forecast: mostly cloudy sky
   icon_day: clouds-sun
-  icon_night: clouds-sun
+  icon_night: clouds-moon
   safe: true
 PartlyCloudy:
   currently: it's partly cloudy
   description: Partly Cloudy
   forecast: partly cloudy sky
   icon_day: clouds-sun
-  icon_night: clouds-sun
+  icon_night: clouds-moon
   safe: true
 ScatteredThunderstorms:
   currently: there are scattered thunderstorms
