@@ -4,6 +4,7 @@ require 'icalendar'
 
 class TrainerRoad
   CALENDAR_URL = ENV['TRAINERROAD_CALENDAR_URL']
+  DISCIPLINE_ORDER = { "Swim" => 1, "Bike" => 2, "Run" => 3 }
 
   def initialize(timezone = "America/Denver")
     @timezone = timezone
@@ -38,7 +39,7 @@ class TrainerRoad
       parse_workout(event.summary)
     end
 
-    workouts.compact!
+    workouts.compact!.sort_by! { |w| DISCIPLINE_ORDER[w[:discipline]] }
 
     @redis.setex(cache_key, 1.hour, workouts.to_json)
 
