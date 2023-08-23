@@ -81,7 +81,7 @@ Breezy:
   labels:
     current: it's breezy
     forecast: is breezy
-  icon: wind
+  icon: wind-warning
 
 Windy:
   is_good_weather: false
@@ -263,7 +263,7 @@ SevereThunderstorm:
   labels:
     current: there's a severe thunderstorm
     forecast: calls for severe thunderstorms
-  icon: cloud-bolt
+  icon: bolt-lightning
 
 Thunderstorms:
   is_good_weather: false
