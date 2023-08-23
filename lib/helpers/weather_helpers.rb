@@ -155,12 +155,12 @@ module WeatherHelpers
 
     workouts = data.trainerroad.workouts.uniq(&:discipline).map { |w| "a #{w.description}"}
 
-    activities << "My training plan calls for"
+    activities << "My training plan has"
     activities << (workouts.size <= 2 ? workouts.join(' and ') : [workouts[0..-2].join(', '), workouts[-1]].join(' and '))
     activities << if is_good_weather?
-      "—it's a good day to train outside!"
+      "scheduled for today—it's a good day to train outside!"
     else
-      "—it's a good day to train indoors!"
+      "scheduled for today—it's a good day to train indoors!"
     end
 
     activities.join(' ')
