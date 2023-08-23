@@ -1,18 +1,16 @@
 module WeatherHelpers
-  PRECIPITATION_UNITS = {
+  PRECIPITATION_METRIC_UNITS = {
     unit: 'mm',
     ten: 'cm',
     thousand: 'm'
   }
 
-  def format_temperature(temp)
-    celsius = "#{number_to_human(temp, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')}ºC"
-    fahrenheit = "#{number_to_human(celsius_to_fahrenheit(temp), precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')}ºF"
-    "<data title=\"#{fahrenheit}\">#{celsius}</data>"
-  end
+  PRECIPITATION_IMPERIAL_UNITS = {
+    unit: 'in'
+  }
 
-  def celsius_to_fahrenheit(temp)
-    temp * 9.0 / 5.0 + 32
+  def mm_to_in(mm)
+    mm / 25.4
   end
 
   def is_daytime?
@@ -28,16 +26,28 @@ module WeatherHelpers
     is_daytime? ? "Today" : "Tonight"
   end
 
-  def format_precipitation_amount(amount)
-    number_to_human(amount, units: PRECIPITATION_UNITS, precision: 2, strip_insignificant_zeros: true, significant: false, delimiter: ',')
-  end
-
   def format_current_condition(condition_code)
     data.conditions.dig(condition_code, :labels, :current) || "it's #{condition_code.underscore.gsub('_', ' ')}"
   end
 
   def format_forecasted_condition(condition_code)
     data.conditions.dig(condition_code, :labels, :forecast) || "calls for #{condition_code.underscore.gsub('_', ' ')}"
+  end
+
+  def format_temperature(temp)
+    celsius = "#{number_to_human(temp, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')}ºC"
+    fahrenheit = "#{number_to_human(celsius_to_fahrenheit(temp), precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')}ºF"
+    "<data title=\"#{fahrenheit}\">#{celsius}</data>"
+  end
+
+  def celsius_to_fahrenheit(celsius)
+    (celsius * (9.0 / 5.0)) + 32
+  end
+
+  def format_precipitation_amount(mm)
+    metric = number_to_human(mm, units: PRECIPITATION_METRIC_UNITS, precision: (mm > 1000 ? 1 : 0), strip_insignificant_zeros: true, significant: false, delimiter: ',')
+    imperial = number_to_human(mm_to_in(mm), units: PRECIPITATION_IMPERIAL_UNITS, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')
+    "<data title=\"#{imperial}\">#{metric}</data>"
   end
 
   def format_precipitation_type(type)
