@@ -4,216 +4,216 @@ Clear:
   forecast: clear sky
   icon_day: sun
   icon_night: moon
-  safe: true
+  is_good_weather: true
 Cloudy:
   currently: it's cloudy
   description: Cloudy
   forecast: cloudy sky
   icon: clouds
-  safe: true
+  is_good_weather: true
 Dust:
   currently: it's dusty
   description: Dust
   icon: sun-dust
-  safe: false
+  is_good_weather: false
 Fog:
   currently: it's foggy
   description: Fog
   icon: cloud-fog
-  safe: true
+  is_good_weather: true
 Haze:
   currently: it's hazy
   description: Haze
   icon: sun-haze
-  safe: true
+  is_good_weather: true
 MostlyClear:
   currently: it's mostly clear
   description: Mostly Clear
   forecast: mostly clear sky
   icon_day: sun-cloud
   icon_night: moon-cloud
-  safe: true
+  is_good_weather: true
 MostlyCloudy:
   currently: it's mostly cloudy
   description: Mostly Cloudy
   forecast: mostly cloudy sky
   icon_day: clouds-sun
   icon_night: clouds-moon
-  safe: true
+  is_good_weather: true
 PartlyCloudy:
   currently: it's partly cloudy
   description: Partly Cloudy
   forecast: partly cloudy sky
   icon_day: clouds-sun
   icon_night: clouds-moon
-  safe: true
+  is_good_weather: true
 ScatteredThunderstorms:
   currently: there are scattered thunderstorms
   description: Scattered Thunderstorms
   icon: cloud-bolt
-  safe: false
+  is_good_weather: false
 Smoke:
   currently: it's smoky
   description: Smoke
   icon: smoke
-  safe: false
+  is_good_weather: false
 Breezy:
   currently: it's breezy
   description: Breezy
   forecast: a breeze
   icon: wind
-  safe: true
+  is_good_weather: true
 Windy:
   currently: it's windy
   description: Windy
   forecast: wind
   icon: wind
-  safe: false
+  is_good_weather: false
 Drizzle:
   currently: it's raining lightly
   description: Drizzle
   forecast: light rain
   icon: cloud-drizzle
-  safe: false
+  is_good_weather: false
 HeavyRain:
   currently: it's raining heavily
   description: Heavy Rain
   icon: cloud-showers-heavy
-  safe: false
+  is_good_weather: false
 Rain:
   currently: it's raining
   description: Rain
   icon: cloud-rain
-  safe: false
+  is_good_weather: false
 Showers:
   currently: there are showers
   description: Showers
   icon: cloud-showers
-  safe: false
+  is_good_weather: false
 Flurries:
   currently: there are flurries
   description: Flurries
   icon: cloud-snow
-  safe: false
+  is_good_weather: false
 HeavySnow:
   currently: it's snowing heavily
   description: Heavy Snow
   icon: cloud-snow
-  safe: false
+  is_good_weather: false
 MixedRainAndSleet:
   currently: it's raining and sleeting
   description: Mixed Rain and Sleet
   icon: cloud-hail-mixed
-  safe: false
+  is_good_weather: false
 MixedRainAndSnow:
   currently: it's raining and snowing
   description: Mixed Rain and Snow
   icon: cloud-hail-mixed
-  safe: false
+  is_good_weather: false
 MixedRainfall:
   currently: there's mixed rain
   description: Mixed Rainfall
   icon: cloud-hail-mixed
-  safe: false
+  is_good_weather: false
 MixedSnowAndSleet:
   currently: it's snowing and sleeting
   description: Mixed Snow and Sleet
   icon: cloud-hail-mixed
-  safe: false
+  is_good_weather: false
 ScatteredShowers:
   currently: there are scattered showers
   description: Scattered Showers
   icon: cloud-showers
-  safe: false
+  is_good_weather: false
 ScatteredSnowShowers:
   currently: there are scattered snow showers
   description: Scattered Snow Showers
   icon: cloud-snow
-  safe: false
+  is_good_weather: false
 Sleet:
   currently: it's sleeting
   description: Sleet
   icon: cloud-snow
-  safe: false
+  is_good_weather: false
 Snow:
   currently: it's snowing
   description: Snow
   icon: cloud-snow
-  safe: false
+  is_good_weather: false
 SnowShowers:
   currently: there are snow showers
   description: Snow Showers
   icon: cloud-hail-mixed
-  safe: false
+  is_good_weather: false
 Blizzard:
   currently: there's a blizzard
   description: Blizzard
   forecast: a blizzard
   icon: snow-blowing
-  safe: false
+  is_good_weather: false
 BlowingSnow:
   currently: there's blowing snow
   description: Blowing Snow
   icon: snow-blowing
-  safe: false
+  is_good_weather: false
 FreezingDrizzle:
   currently: there's a freezing drizzle
   description: Freezing Drizzle
   forecast: a freezing drizzle
   icon: cloud-hail-mixed
-  safe: false
+  is_good_weather: false
 FreezingRain:
   currently: there's freezing rain
   description: Freezing Rain
   icon: cloud-hail-mixed
-  safe: false
+  is_good_weather: false
 Frigid:
   currently: it's frigid
   description: Frigid
   forecast: frigid temperatures
   icon: temperature-snow
-  safe: false
+  is_good_weather: false
 Hail:
   currently: it's hailing
   description: Hail
   icon: cloud-hail
-  safe: false
+  is_good_weather: false
 Hot:
   currently: it's hot
   description: Hot
   forecast: high temperatures
   icon: temperature-sun
-  safe: false
+  is_good_weather: false
 Hurricane:
   currently: there's a hurricane
   description: Hurricane
   forecast: a hurricane
   icon: hurricane
-  safe: false
+  is_good_weather: false
 IsolatedThunderstorms:
   currently: there are isolated thunderstorms
   description: Isolated Thunderstorms
   icon: cloud-bolt
-  safe: false
+  is_good_weather: false
 SevereThunderstorm:
   currently: there's a severe thunderstorm
   description: Severe Thunderstorms
   icon: cloud-bolt
-  safe: false
+  is_good_weather: false
 Thunderstorms:
   currently: there's a thunderstorm
   description: Thunderstorms
   icon: cloud-bolt
-  safe: false
+  is_good_weather: false
 Tornado:
   currently: there's a tornado
   description: Tornado
   forecast: a tornado
   icon: tornado
-  safe: false
+  is_good_weather: false
 TropicalStorm:
   currently: there's a tropical storm
   description: Tropical Storm
   forecast: a tropical storm
   icon: hurricane
-  safe: false
+  is_good_weather: false

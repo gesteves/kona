@@ -72,8 +72,8 @@ module WeatherHelpers
     return true if low_temperature <= -12 || high_temperature >= 32
     return true if precipitation_chance >= 0.5
     return true if snowfall > 0
-    return !data.conditions.dig(data.weather.currentWeather.conditionCode, :safe)
-    return !data.conditions.dig(data.weather.forecastDaily.days.first.conditionCode, :safe)
+    return !data.conditions.dig(data.weather.currentWeather.conditionCode, :is_good_weather)
+    return !data.conditions.dig(data.weather.forecastDaily.days.first.conditionCode, :is_good_weather)
   end
 
   def is_good_weather?
