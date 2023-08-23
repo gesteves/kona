@@ -76,10 +76,10 @@ class TrainerRoad
   def human_readable_description(duration, discipline)
     hours, minutes = duration.split(":").map(&:to_i)
 
-    if hours == 0
-      description_duration = "#{minutes}-minute"
-    elsif hours == 1 && minutes == 0
-      description_duration = "1-hour"
+    total_minutes = (hours * 60) + minutes
+
+    if total_minutes <= 90
+      description_duration = "#{total_minutes}-minute"
     else
       description_duration = duration
     end
@@ -88,6 +88,7 @@ class TrainerRoad
 
     "#{description_duration} #{suffix}"
   end
+
 
 
   def determine_discipline(name)
