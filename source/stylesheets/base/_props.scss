@@ -74,9 +74,45 @@
   --color-text:                       var(--color-jet);
 
   // Gradients
-  --gradient-footer-background:       linear-gradient(180deg, var(--color-alice-blue), var(--color-alice-blue-darker));
-  --gradient-heading:                 linear-gradient(180deg, var(--color-prussian-blue), var(--color-oxford-blue));
-  --gradient-link:                    linear-gradient(180deg, var(--color-red-cmyk), var(--color-firebrick));
+  --gradient-footer-background:       linear-gradient(
+                                        180deg,
+                                        hsl(210deg 70% 96%) 0%,
+                                        hsl(210deg 70% 96%) 21%,
+                                        hsl(209deg 70% 95%) 30%,
+                                        hsl(209deg 71% 95%) 39%,
+                                        hsl(209deg 71% 94%) 46%,
+                                        hsl(208deg 71% 94%) 54%,
+                                        hsl(208deg 71% 93%) 61%,
+                                        hsl(208deg 71% 93%) 69%,
+                                        hsl(207deg 71% 92%) 79%,
+                                        hsl(207deg 71% 92%) 100%
+                                      ); // https://www.joshwcomeau.com/gradient-generator?colors=eef5fc|dcecf9&angle=180&colorMode=hcl&precision=8&easingCurve=0.333|1|0.666|0
+  --gradient-heading:                 linear-gradient(
+                                        180deg,
+                                        hsl(208deg 71% 20%) 0%,
+                                        hsl(208deg 71% 19%) 21%,
+                                        hsl(208deg 71% 18%) 30%,
+                                        hsl(208deg 71% 17%) 39%,
+                                        hsl(208deg 71% 16%) 46%,
+                                        hsl(208deg 71% 15%) 54%,
+                                        hsl(208deg 71% 15%) 61%,
+                                        hsl(208deg 71% 14%) 69%,
+                                        hsl(208deg 71% 13%) 79%,
+                                        hsl(208deg 70% 12%) 100%
+                                      ); // https://www.joshwcomeau.com/gradient-generator?colors=0f3557|092034&angle=180&colorMode=hcl&precision=8&easingCurve=0.333|1|0.666|0
+  --gradient-link:                    linear-gradient(
+                                        180deg,
+                                        hsl(350deg 98% 48%) 0%,
+                                        hsl(350deg 98% 47%) 21%,
+                                        hsl(350deg 98% 46%) 30%,
+                                        hsl(350deg 98% 44%) 39%,
+                                        hsl(350deg 98% 43%) 46%,
+                                        hsl(350deg 98% 42%) 54%,
+                                        hsl(350deg 98% 41%) 61%,
+                                        hsl(350deg 98% 40%) 69%,
+                                        hsl(350deg 98% 39%) 79%,
+                                        hsl(350deg 98% 38%) 100%
+                                      ); // https://www.joshwcomeau.com/gradient-generator?colors=f2022a|bf0222&angle=180&colorMode=hcl&precision=8&easingCurve=0.333|1|0.666|0
 
   // Font sizes
   --font-x-large: clamp(36px, 10vw, 72px);
@@ -143,8 +179,32 @@
     --color-text-tertiary:              var(--color-sonic-silver);
     --color-text:                       var(--color-platinum);
 
-    --gradient-footer-background:       linear-gradient(180deg, var(--color-rich-black), var(--color-rich-black-darker));
-    --gradient-heading:                 linear-gradient(180deg, var(--color-alice-blue), var(--color-columbia-blue));
+    --gradient-footer-background:       linear-gradient(
+                                          180deg,
+                                          hsl(209deg 71% 8%) 0%,
+                                          hsl(208deg 71% 8%) 21%,
+                                          hsl(208deg 71% 7%) 30%,
+                                          hsl(207deg 71% 7%) 39%,
+                                          hsl(206deg 71% 6%) 46%,
+                                          hsl(206deg 72% 6%) 54%,
+                                          hsl(206deg 73% 5%) 61%,
+                                          hsl(205deg 73% 5%) 69%,
+                                          hsl(205deg 72% 4%) 79%,
+                                          hsl(206deg 70% 4%) 100%
+                                        ); // https://www.joshwcomeau.com/gradient-generator?colors=061523|030b11&angle=180&colorMode=hcl&precision=8&easingCurve=0.333|1|0.666|0
+    --gradient-heading:                 linear-gradient(
+                                          180deg,
+                                          hsl(210deg 70% 96%) 0%,
+                                          hsl(210deg 70% 95%) 21%,
+                                          hsl(210deg 70% 94%) 30%,
+                                          hsl(209deg 70% 93%) 39%,
+                                          hsl(209deg 70% 93%) 46%,
+                                          hsl(209deg 70% 92%) 54%,
+                                          hsl(209deg 70% 91%) 61%,
+                                          hsl(208deg 70% 90%) 69%,
+                                          hsl(208deg 70% 89%) 79%,
+                                          hsl(208deg 70% 88%) 100%
+                                        ); // https://www.joshwcomeau.com/gradient-generator?colors=eef5fc|cbe2f6&angle=180&colorMode=hcl&precision=8&easingCurve=0.333|1|0.666|0
   }
 
   @media (prefers-reduced-motion) {
