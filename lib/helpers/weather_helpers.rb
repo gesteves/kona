@@ -92,7 +92,21 @@ module WeatherHelpers
     summary << current_aqi
     summary << forecast
     summary << activities
-    markdown_to_html(summary.join(' ').gsub(/,\s*\./, '.').gsub(/\s+([,.])/, '\1').gsub(/\.+/, '.'))
+    markdown_to_html(clean_up_punctuation(summary.join(' ')))
+  end
+
+  def clean_up_punctuation(s)
+    # Remove whitespace before any commas or periods
+    s.gsub!(/\s+([,.])/, '\1')
+
+    # Replace multiple commas or periods with a single one
+    s.gsub!(/,+/ , ',')
+    s.gsub!(/\.\.+/ , '.')
+
+    # Replace a comma and a period next to each other with a period
+    s.gsub!(/,\.|\.,/ , '.')
+
+    s
   end
 
   def intro
