@@ -50,7 +50,7 @@ task :import => [:dotenv, :clobber] do
     time_zone = maps.time_zone
 
     puts 'Importing weather data from WeatherKit'
-    weather = WeatherKit.new(latitude, longitude, time_zone[:formattedOffset], country)
+    weather = WeatherKit.new(latitude, longitude, time_zone[:timeZoneId], country)
     weather.save_data
 
     puts 'Importing air quality data from PurpleAir'
