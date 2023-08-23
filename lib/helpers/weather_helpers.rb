@@ -96,7 +96,7 @@ module WeatherHelpers
     current << "#{format_current_condition(data.weather.currentWeather.conditionCode).downcase}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
     current << ", which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)}" if data.weather.currentWeather.temperature.round != data.weather.currentWeather.temperatureApparent.round
     current << "."
-    current.join(' ').gsub(/,\s*\./, '.').gsub(/\s+([,.])/, '\1')
+    current.join(' ').gsub(/,\s*\./, '.').gsub(/\s+([,.])/, '\1').gsub(/\.+/, '.')
   end
 
   def current_aqi
@@ -114,7 +114,7 @@ module WeatherHelpers
     forecast << "with #{format_precipitation_amount(day.restOfDayForecast.snowfallAmount)} of snow expected" if day.restOfDayForecast.snowfallAmount > 0
     forecast << "."
 
-    forecast.join(' ').gsub(/,\s*\./, '.').gsub(/\s+([,.])/, '\1')
+    forecast.join(' ').gsub(/,\s*\./, '.').gsub(/\s+([,.])/, '\1').gsub(/\.+/, '.')
   end
 
   def activities
