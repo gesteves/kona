@@ -171,9 +171,9 @@ module WeatherHelpers
     condition = data.conditions[data.weather.currentWeather.conditionCode]
     return 'cloud-question' if condition.blank?
     if is_daytime?
-      condition[:icon_day] || condition[:icon]
+      condition[:icon][:day] || condition[:icon]
     else
-      condition[:icon_night] || condition[:icon]
+      condition[:icon][:night] || condition[:icon]
     end
   end
 end

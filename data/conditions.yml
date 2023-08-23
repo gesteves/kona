@@ -2,9 +2,10 @@ Clear:
   currently: it's clear
   description: Clear
   forecast: clear sky
-  icon_day: sun
-  icon_night: moon
   is_good_weather: true
+  icon:
+    day: sun
+    night: moon
 Cloudy:
   currently: it's cloudy
   description: Cloudy
@@ -30,23 +31,26 @@ MostlyClear:
   currently: it's mostly clear
   description: Mostly Clear
   forecast: mostly clear sky
-  icon_day: sun-cloud
-  icon_night: moon-cloud
   is_good_weather: true
+  icon:
+    day: sun-cloud
+    night: moon-cloud
 MostlyCloudy:
   currently: it's mostly cloudy
   description: Mostly Cloudy
   forecast: mostly cloudy sky
-  icon_day: clouds-sun
-  icon_night: clouds-moon
   is_good_weather: true
+  icon:
+    day: clouds-sun
+    night: clouds-moon
 PartlyCloudy:
   currently: it's partly cloudy
   description: Partly Cloudy
   forecast: partly cloudy sky
-  icon_day: clouds-sun
-  icon_night: clouds-moon
   is_good_weather: true
+  icon:
+    day: clouds-sun
+    night: clouds-moon
 ScatteredThunderstorms:
   currently: there are scattered thunderstorms
   description: Scattered Thunderstorms
