@@ -141,7 +141,6 @@ module WeatherHelpers
 
   def activities
     return unless is_daytime?
-    activities = []
 
     if is_race_day? && is_good_weather?
       return "Good weather for racing!"
@@ -155,7 +154,7 @@ module WeatherHelpers
 
     workouts = data.trainerroad.workouts.uniq(&:discipline).map { |w| w.description =~ /^(8|11|18|[aeiou])/i ? "an #{w.description}" : "a #{w.description}"}
 
-    activities << "My training plan has"
+    activities = ["My training plan has"]
     activities << (workouts.size <= 2 ? workouts.join(' and ') : [workouts[0..-2].join(', '), workouts[-1]].join(' and '))
     activities << if is_good_weather?
       "scheduled for today—it's a good day to train outside!"
