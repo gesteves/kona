@@ -88,7 +88,7 @@ module WeatherHelpers
     summary << current_aqi
     summary << forecast
     summary << activities
-    markdown_to_html(clean_up_punctuation(summary.join(' ')))
+    markdown_to_html(remove_widows(clean_up_punctuation(summary.join(' '))))
   end
 
   def clean_up_punctuation(s)
@@ -130,7 +130,7 @@ module WeatherHelpers
     return if data.weather&.forecastDaily&.days&.first.blank?
     day = data.weather.forecastDaily.days.first
     forecast = []
-    forecast << "The forecast for #{today_or_tonight.downcase} #{format_forecasted_condition(day.restOfDayForecast.conditionCode).downcase},"
+    forecast << "#{today_or_tonight}'s forecast #{format_forecasted_condition(day.restOfDayForecast.conditionCode).downcase},"
     forecast << "with a high of #{format_temperature(day.temperatureMax)} and a low of #{format_temperature(day.temperatureMin)}."
     forecast << "There's a #{number_to_percentage(day.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(day.restOfDayForecast.precipitationType)} later #{today_or_tonight.downcase}," if day.restOfDayForecast.precipitationChance > 0 && day.restOfDayForecast.precipitationType.downcase != 'clear'
     forecast << "with #{format_precipitation_amount(day.restOfDayForecast.snowfallAmount)} of snow expected" if day.restOfDayForecast.snowfallAmount > 0
@@ -148,14 +148,14 @@ module WeatherHelpers
     elsif is_race_day? && is_bad_weather?
       return "Tough weather for racing!"
     elsif !is_workout_scheduled? && is_good_weather?
-      return "It's a good day to be outside!"
+      return "I don't have any workouts scheduled for today, but it's a good day to be outside!"
     elsif !is_workout_scheduled? && is_bad_weather?
-      return "It's a good day to rest!"
+      return "I don't have any workouts scheduled for today so it's a good day to rest!"
     end
 
     workouts = data.trainerroad.workouts.uniq(&:discipline).map { |w| "a #{w.description}"}
 
-    activities << "Today's plan calls for"
+    activities << "My training plan calls for"
     activities << (workouts.size <= 2 ? workouts.join(' and ') : [workouts[0..-2].join(', '), workouts[-1]].join(' and '))
     activities << if is_good_weather?
       "—it's a good day to train outside!"
