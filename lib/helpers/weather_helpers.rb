@@ -153,7 +153,7 @@ module WeatherHelpers
       return "I don't have any workouts scheduled for today so it's a good day to rest!"
     end
 
-    workouts = data.trainerroad.workouts.uniq(&:discipline).map { |w| "a #{w.description}"}
+    workouts = data.trainerroad.workouts.uniq(&:discipline).map { |w| w.description =~ /^(8|11|18|[aeiou])/i ? "an #{w.description}" : "a #{w.description}"}
 
     activities << "My training plan has"
     activities << (workouts.size <= 2 ? workouts.join(' and ') : [workouts[0..-2].join(', '), workouts[-1]].join(' and '))
