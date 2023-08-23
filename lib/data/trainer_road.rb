@@ -58,12 +58,36 @@ class TrainerRoad
     match_data = /(\d+:\d+) - (.+)/.match(summary)
     return nil if match_data.blank?
 
+    duration = match_data[1]
+    name = match_data[2]
+    discipline = determine_discipline(name)
+
+    description = human_readable_description(duration, discipline)
+
     {
-      duration: match_data[1],
-      name: match_data[2],
-      discipline: determine_discipline(match_data[2])
+      duration: duration,
+      name: name,
+      discipline: discipline,
+      description: description
     }
   end
+
+  def human_readable_description(duration, discipline)
+    hours, minutes = duration.split(":").map(&:to_i)
+
+    if hours == 0
+      description_duration = "#{minutes}-minute"
+    elsif hours == 1 && minutes == 0
+      description_duration = "1-hour"
+    else
+      description_duration = duration
+    end
+
+    suffix = discipline == "Bike" ? "ride" : discipline.downcase
+
+    "#{description_duration} #{suffix}"
+  end
+
 
   def determine_discipline(name)
     return if name.blank?

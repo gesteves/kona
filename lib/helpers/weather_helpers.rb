@@ -93,7 +93,7 @@ module WeatherHelpers
 
   def clean_up_punctuation(s)
     # Remove whitespace before any commas or periods
-    s.gsub!(/\s+([,.])/, '\1')
+    s.gsub!(/\s+([,.—])/, '\1')
 
     # Replace multiple commas or periods with a single one
     s.gsub!(/,+/ , ',')
@@ -130,7 +130,7 @@ module WeatherHelpers
     return if data.weather&.forecastDaily&.days&.first.blank?
     day = data.weather.forecastDaily.days.first
     forecast = []
-    forecast << "#{today_or_tonight}'s forecast #{format_forecasted_condition(day.restOfDayForecast.conditionCode).downcase},"
+    forecast << "The forecast for #{today_or_tonight.downcase} #{format_forecasted_condition(day.restOfDayForecast.conditionCode).downcase},"
     forecast << "with a high of #{format_temperature(day.temperatureMax)} and a low of #{format_temperature(day.temperatureMin)}."
     forecast << "There's a #{number_to_percentage(day.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(day.restOfDayForecast.precipitationType)} later #{today_or_tonight.downcase}," if day.restOfDayForecast.precipitationChance > 0 && day.restOfDayForecast.precipitationType.downcase != 'clear'
     forecast << "with #{format_precipitation_amount(day.restOfDayForecast.snowfallAmount)} of snow expected" if day.restOfDayForecast.snowfallAmount > 0
@@ -140,27 +140,30 @@ module WeatherHelpers
   end
 
   def activities
+    return unless is_daytime?
     activities = []
-    if is_race_day?
-      if is_good_weather?
-        activities << "Good weather for racing!"
-      else
-        activities << "Tough weather for racing!"
-      end
-    else
-      if is_good_weather?
-        activities << "It's a good day for a bike ride!" if is_bike_scheduled?
-        activities << "It's a good day to go for a run!" if is_run_scheduled?
-        activities << "It's a good day to go swimming!" if is_swim_scheduled?
-        activities << "It's a good day to spend time outside!" if !is_workout_scheduled?
-      else
-        activities << "It's a good day to ride indoors!" if is_bike_scheduled?
-        activities << "It's a good day to hit the treadmill!" if is_run_scheduled?
-        activities << "It's a good day to hit the pool!" if is_swim_scheduled?
-        activities << "It's a good day to rest!" if !is_workout_scheduled?
-      end
+
+    if is_race_day? && is_good_weather?
+      return "Good weather for racing!"
+    elsif is_race_day? && is_bad_weather?
+      return "Tough weather for racing!"
+    elsif !is_workout_scheduled? && is_good_weather?
+      return "It's a good day to be outside!"
+    elsif !is_workout_scheduled? && is_bad_weather?
+      return "It's a good day to rest!"
     end
-    is_daytime? ? activities.sample : ''
+
+    workouts = data.trainerroad.workouts.uniq(&:discipline).map { |w| "a #{w.description}"}
+
+    activities << "Today's plan calls for"
+    activities << (workouts.size <= 2 ? workouts.join(' and ') : [workouts[0..-2].join(', '), workouts[-1]].join(' and '))
+    activities << if is_good_weather?
+      "—it's a good day to train outside!"
+    else
+      "—it's a good day to train indoors!"
+    end
+
+    activities.join(' ')
   end
 
   def weather_icon
