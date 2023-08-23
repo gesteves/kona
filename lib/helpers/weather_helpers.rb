@@ -79,6 +79,7 @@ module WeatherHelpers
   end
 
   def weather_summary
+    return if current_weather.blank? && forecast.blank?
     summary = []
     summary << intro
     summary << current_weather
@@ -95,7 +96,7 @@ module WeatherHelpers
   end
 
   def current_weather
-    return if data.weather.currentWeather.blank?
+    return if data.weather&.currentWeather.blank?
     current = []
     current << "I'm currently in **#{format_location}**, where"
     current << "#{format_current_condition(data.weather.currentWeather.conditionCode).downcase}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
@@ -105,12 +106,12 @@ module WeatherHelpers
   end
 
   def current_aqi
-    return if data.purple_air.aqi.value.blank?
+    return if data.purple_air&.aqi&.value.blank?
     "The air quality is #{format_air_quality(data.purple_air.aqi.label.downcase)}, with an <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.purple_air.aqi.value.round}."
   end
 
   def forecast
-    return if data.weather.forecastDaily.blank?
+    return if data.weather&.forecastDaily&.days&.first.blank?
     day = data.weather.forecastDaily.days.first
     forecast = []
     forecast << "#{today_or_tonight}'s forecast calls for #{format_forecasted_condition(day.restOfDayForecast.conditionCode).downcase},"
