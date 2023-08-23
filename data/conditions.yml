@@ -1,223 +1,288 @@
 Clear:
-  currently: it's clear
-  description: Clear
-  forecast: clear sky
   is_good_weather: true
+  labels:
+    current: it's clear
+    forecast: is clear
   icon:
     day: sun
     night: moon
+
 Cloudy:
-  currently: it's cloudy
-  description: Cloudy
-  forecast: cloudy sky
+  is_good_weather: true
+  labels:
+    current: it's cloudy
+    forecast: is cloudy
   icon: clouds
-  is_good_weather: true
+
 Dust:
-  currently: it's dusty
-  description: Dust
-  icon: sun-dust
   is_good_weather: false
+  labels:
+    current: there's dust in the air
+    forecast: calls for dusty conditions
+  icon: sun-dust
+
 Fog:
-  currently: it's foggy
-  description: Fog
+  is_good_weather: false
+  labels:
+    current: it's foggy
+    forecast: is foggy
   icon: cloud-fog
-  is_good_weather: true
+
 Haze:
-  currently: it's hazy
-  description: Haze
+  is_good_weather: false
+  labels:
+    current: it's hazy
+    forecast: is hazy
   icon: sun-haze
-  is_good_weather: true
+
 MostlyClear:
-  currently: it's mostly clear
-  description: Mostly Clear
-  forecast: mostly clear sky
   is_good_weather: true
+  labels:
+    current: it's mostly clear
+    forecast: is mostly clear
   icon:
     day: sun-cloud
     night: moon-cloud
+
 MostlyCloudy:
-  currently: it's mostly cloudy
-  description: Mostly Cloudy
-  forecast: mostly cloudy sky
   is_good_weather: true
+  labels:
+    current: it's mostly cloudy
+    forecast: is mostly cloudy
   icon:
     day: clouds-sun
     night: clouds-moon
+
 PartlyCloudy:
-  currently: it's partly cloudy
-  description: Partly Cloudy
-  forecast: partly cloudy sky
   is_good_weather: true
+  labels:
+    current: it's partly cloudy
+    forecast: is partly cloudy
   icon:
     day: clouds-sun
     night: clouds-moon
+
 ScatteredThunderstorms:
-  currently: there are scattered thunderstorms
-  description: Scattered Thunderstorms
-  icon: cloud-bolt
   is_good_weather: false
+  labels:
+    current: there are scattered thunderstorms
+    forecast: calls for scattered thunderstorms
+  icon: cloud-bolt
+
 Smoke:
-  currently: it's smoky
-  description: Smoke
+  is_good_weather: false
+  labels:
+    current: it's smoky
+    forecast: calls for smoky conditions
   icon: smoke
-  is_good_weather: false
+
 Breezy:
-  currently: it's breezy
-  description: Breezy
-  forecast: a breeze
-  icon: wind
   is_good_weather: true
-Windy:
-  currently: it's windy
-  description: Windy
-  forecast: wind
+  labels:
+    current: it's breezy
+    forecast: is breezy
   icon: wind
+
+Windy:
   is_good_weather: false
+  labels:
+    current: it's windy
+    forecast: calls for windy conditions
+  icon: wind
+
 Drizzle:
-  currently: it's raining lightly
-  description: Drizzle
-  forecast: light rain
+  is_good_weather: false
+  labels:
+    current: it's raining lightly
+    forecast: calls for light rain
   icon: cloud-drizzle
-  is_good_weather: false
+
 HeavyRain:
-  currently: it's raining heavily
-  description: Heavy Rain
+  is_good_weather: false
+  labels:
+    current: it's raining heavily
+    forecast: calls for heavy rain
   icon: cloud-showers-heavy
-  is_good_weather: false
+
 Rain:
-  currently: it's raining
-  description: Rain
+  is_good_weather: false
+  labels:
+    current: it's raining
+    forecast: calls for rain
   icon: cloud-rain
-  is_good_weather: false
+
 Showers:
-  currently: there are showers
-  description: Showers
-  icon: cloud-showers
   is_good_weather: false
+  labels:
+    current: there are showers
+    forecast: calls for showers
+  icon: cloud-showers
+
 Flurries:
-  currently: there are flurries
-  description: Flurries
-  icon: cloud-snow
   is_good_weather: false
+  labels:
+    current: there are flurries
+    forecast: calls for flurries
+  icon: cloud-snow
+
 HeavySnow:
-  currently: it's snowing heavily
-  description: Heavy Snow
-  icon: cloud-snow
   is_good_weather: false
+  labels:
+    current: it's snowing heavily
+    forecast: calls for heavy snow
+  icon: cloud-snow
+
 MixedRainAndSleet:
-  currently: it's raining and sleeting
-  description: Mixed Rain and Sleet
-  icon: cloud-hail-mixed
   is_good_weather: false
+  labels:
+    current: there's a mix of rain and sleet
+    forecast: calls for mixed rain and sleet
+  icon: cloud-hail-mixed
+
 MixedRainAndSnow:
-  currently: it's raining and snowing
-  description: Mixed Rain and Snow
-  icon: cloud-hail-mixed
   is_good_weather: false
+  labels:
+    current: there's a mix of rain and snow
+    forecast: calls for mixed rain and snow
+  icon: cloud-hail-mixed
+
 MixedRainfall:
-  currently: there's mixed rain
-  description: Mixed Rainfall
-  icon: cloud-hail-mixed
   is_good_weather: false
+  labels:
+    current: mixed rainfall is expected
+    forecast: calls for mixed rainfall
+  icon: cloud-hail-mixed
+
 MixedSnowAndSleet:
-  currently: it's snowing and sleeting
-  description: Mixed Snow and Sleet
-  icon: cloud-hail-mixed
   is_good_weather: false
+  labels:
+    current: there's a mix of snow and sleet
+    forecast: calls for mixed snow and sleet
+  icon: cloud-hail-mixed
+
 ScatteredShowers:
-  currently: there are scattered showers
-  description: Scattered Showers
+  is_good_weather: false
+  labels:
+    current: there are scattered showers
+    forecast: calls for scattered showers
   icon: cloud-showers
-  is_good_weather: false
+
 ScatteredSnowShowers:
-  currently: there are scattered snow showers
-  description: Scattered Snow Showers
-  icon: cloud-snow
   is_good_weather: false
+  labels:
+    current: there are scattered snow showers
+    forecast: calls for scattered snow showers
+  icon: cloud-snow
+
 Sleet:
-  currently: it's sleeting
-  description: Sleet
-  icon: cloud-snow
   is_good_weather: false
+  labels:
+    current: it's sleeting
+    forecast: calls for sleet
+  icon: cloud-snow
+
 Snow:
-  currently: it's snowing
-  description: Snow
+  is_good_weather: false
+  labels:
+    current: it's snowing
+    forecast: calls for snow
   icon: cloud-snow
-  is_good_weather: false
+
 SnowShowers:
-  currently: there are snow showers
-  description: Snow Showers
-  icon: cloud-hail-mixed
   is_good_weather: false
+  labels:
+    current: there are snow showers
+    forecast: calls for snow showers
+  icon: cloud-hail-mixed
+
 Blizzard:
-  currently: there's a blizzard
-  description: Blizzard
-  forecast: a blizzard
-  icon: snow-blowing
   is_good_weather: false
+  labels:
+    current: there's a blizzard
+    forecast: calls for blizzard conditions
+  icon: snow-blowing
+
 BlowingSnow:
-  currently: there's blowing snow
-  description: Blowing Snow
+  is_good_weather: false
+  labels:
+    current: there's blowing snow
+    forecast: calls for blowing snow
   icon: snow-blowing
-  is_good_weather: false
+
 FreezingDrizzle:
-  currently: there's a freezing drizzle
-  description: Freezing Drizzle
-  forecast: a freezing drizzle
-  icon: cloud-hail-mixed
   is_good_weather: false
+  labels:
+    current: there's a freezing drizzle
+    forecast: calls for freezing drizzle
+  icon: cloud-hail-mixed
+
 FreezingRain:
-  currently: there's freezing rain
-  description: Freezing Rain
+  is_good_weather: false
+  labels:
+    current: there's freezing rain
+    forecast: calls for freezing rain
   icon: cloud-hail-mixed
-  is_good_weather: false
+
 Frigid:
-  currently: it's frigid
-  description: Frigid
-  forecast: frigid temperatures
+  is_good_weather: false
+  labels:
+    current: it's frigid outside
+    forecast: is extremely cold
   icon: temperature-snow
-  is_good_weather: false
+
 Hail:
-  currently: it's hailing
-  description: Hail
+  is_good_weather: false
+  labels:
+    current: it's hailing
+    forecast: calls for hail
   icon: cloud-hail
-  is_good_weather: false
+
 Hot:
-  currently: it's hot
-  description: Hot
-  forecast: high temperatures
+  is_good_weather: true
+  labels:
+    current: it's hot
+    forecast: is hot
   icon: temperature-sun
-  is_good_weather: false
+
 Hurricane:
-  currently: there's a hurricane
-  description: Hurricane
-  forecast: a hurricane
-  icon: hurricane
   is_good_weather: false
+  labels:
+    current: there's a hurricane
+    forecast: calls for hurricane conditions
+  icon: hurricane
+
 IsolatedThunderstorms:
-  currently: there are isolated thunderstorms
-  description: Isolated Thunderstorms
-  icon: cloud-bolt
   is_good_weather: false
+  labels:
+    current: there are isolated thunderstorms
+    forecast: calls for isolated thunderstorms
+  icon: cloud-bolt
+
 SevereThunderstorm:
-  currently: there's a severe thunderstorm
-  description: Severe Thunderstorms
-  icon: cloud-bolt
   is_good_weather: false
+  labels:
+    current: there's a severe thunderstorm
+    forecast: calls for severe thunderstorms
+  icon: cloud-bolt
+
 Thunderstorms:
-  currently: there's a thunderstorm
-  description: Thunderstorms
+  is_good_weather: false
+  labels:
+    current: there are thunderstorms
+    forecast: calls for thunderstorms
   icon: cloud-bolt
-  is_good_weather: false
+
 Tornado:
-  currently: there's a tornado
-  description: Tornado
-  forecast: a tornado
+  is_good_weather: false
+  labels:
+    current: there's a tornado
+    forecast: calls for tornado conditions
   icon: tornado
-  is_good_weather: false
+
 TropicalStorm:
-  currently: there's a tropical storm
-  description: Tropical Storm
-  forecast: a tropical storm
-  icon: hurricane
   is_good_weather: false
+  labels:
+    current: there's a tropical storm
+    forecast: calls for a tropical storm
+  icon: hurricane
+

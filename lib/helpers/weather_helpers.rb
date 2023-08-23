@@ -32,16 +32,12 @@ module WeatherHelpers
     number_to_human(amount, units: PRECIPITATION_UNITS, precision: 2, strip_insignificant_zeros: true, significant: false, delimiter: ',')
   end
 
-  def format_condition(condition_code)
-    data.conditions.dig(condition_code, :description) || condition_code.underscore.gsub('_', ' ')
-  end
-
   def format_current_condition(condition_code)
-    data.conditions.dig(condition_code, :currently) || format_condition(condition_code)
+    data.conditions.dig(condition_code, :labels, :current) || "it's #{condition_code.underscore.gsub('_', ' ')}"
   end
 
   def format_forecasted_condition(condition_code)
-    data.conditions.dig(condition_code, :forecast) || format_condition(condition_code)
+    data.conditions.dig(condition_code, :labels, :forecast) || "calls for #{condition_code.underscore.gsub('_', ' ')}"
   end
 
   def format_precipitation_type(type)
@@ -134,7 +130,7 @@ module WeatherHelpers
     return if data.weather&.forecastDaily&.days&.first.blank?
     day = data.weather.forecastDaily.days.first
     forecast = []
-    forecast << "#{today_or_tonight}'s forecast calls for #{format_forecasted_condition(day.restOfDayForecast.conditionCode).downcase},"
+    forecast << "#{today_or_tonight}'s forecast #{format_forecasted_condition(day.restOfDayForecast.conditionCode).downcase},"
     forecast << "with a high of #{format_temperature(day.temperatureMax)} and a low of #{format_temperature(day.temperatureMin)}."
     forecast << "There's a #{number_to_percentage(day.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(day.restOfDayForecast.precipitationType)} later #{today_or_tonight.downcase}," if day.restOfDayForecast.precipitationChance > 0 && day.restOfDayForecast.precipitationType.downcase != 'clear'
     forecast << "with #{format_precipitation_amount(day.restOfDayForecast.snowfallAmount)} of snow expected" if day.restOfDayForecast.snowfallAmount > 0
