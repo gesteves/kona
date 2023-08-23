@@ -20,7 +20,7 @@ class WeatherKit
   end
 
   def weather
-    cache_key = "weatherkit:weather:#{@latitude}:#{@longitude}"
+    cache_key = "weatherkit:weather:#{@latitude}:#{@longitude}:#{@country}:#{@time_zone}"
     data = @redis.get(cache_key)
 
     return JSON.parse(data) if data.present?
