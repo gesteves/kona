@@ -98,7 +98,7 @@ module WeatherHelpers
     summary << current_aqi
     summary << forecast
     summary << activities
-    markdown_to_html(remove_widows(clean_up_punctuation(summary.join(' '))))
+    markdown_to_html(clean_up_punctuation(summary.join(' ')))
   end
 
   def clean_up_punctuation(s)
