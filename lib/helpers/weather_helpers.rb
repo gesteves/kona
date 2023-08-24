@@ -13,6 +13,11 @@ module WeatherHelpers
     mm / 25.4
   end
 
+  def todays_forecast
+    now = Time.now
+    data.weather.forecastDaily.days.find { |d| Time.parse(d.forecastStart) <= now && Time.parse(d.forecastEnd) >= now }
+  end
+
   def is_daytime?
     now = Time.now
     sunrise = Time.parse(todays_forecast.sunrise)
@@ -22,13 +27,10 @@ module WeatherHelpers
     true
   end
 
-  def todays_forecast
-    now = Time.now
-    data.weather.forecastDaily.days.find { |d| Time.parse(d.forecastStart) <= now && Time.parse(d.forecastEnd) >= now }
-  end
-
   def today_or_tonight
-    is_daytime? ? "Today" : "Tonight"
+    now = Time.now
+    sunset = Time.parse(todays_forecast.sunset)
+    now < sunset ? "Today" : "Tonight"
   end
 
   def format_current_condition(condition_code)
