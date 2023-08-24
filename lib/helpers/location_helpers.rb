@@ -24,7 +24,7 @@ module LocationHelpers
         return [city || county, state].compact.join(", ")
       end
     else
-      if city&.downcase =~ /#{country&.downcase}/
+      if city == 'Ciudad de México'
         return city
       else
         return [city || state, country].compact.join(", ")
