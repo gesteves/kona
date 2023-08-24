@@ -37,6 +37,16 @@ module WeatherHelpers
     is_evening? ? "Tonight" : "Today"
   end
 
+  def rest_of_day_high_temperature
+    now = Time.now
+    data.weather&.forecastHourly&.hours&.select { |h| Time.parse(h.forecastStart) >= now && Time.parse(h.forecastStart) <= Time.parse(todays_forecast.forecastEnd) }&.map(&:temperature)&.max || todays_forecast.temperatureMax
+  end
+
+  def rest_of_day_low_temperature
+    now = Time.now
+    data.weather&.forecastHourly&.hours&.select { |h| Time.parse(h.forecastStart) >= now && Time.parse(h.forecastStart) <= Time.parse(todays_forecast.forecastEnd) }&.map(&:temperature)&.min || todays_forecast.temperatureMin
+  end
+
   def format_current_condition(condition_code)
     data.conditions.dig(condition_code, :labels, :current) || "it's #{condition_code.underscore.gsub('_', ' ')}"
   end
@@ -148,12 +158,11 @@ module WeatherHelpers
 
   def forecast
     return if todays_forecast.blank?
-    day = todays_forecast
     forecast = []
-    forecast << "#{today_or_tonight}'s forecast #{format_forecasted_condition(day.restOfDayForecast.conditionCode).downcase},"
-    forecast << "with a high of #{format_temperature(day.temperatureMax)} and a low of #{format_temperature(day.temperatureMin)}."
-    forecast << "There's a #{number_to_percentage(day.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(day.restOfDayForecast.precipitationType)} later #{today_or_tonight.downcase}," if day.restOfDayForecast.precipitationChance > 0 && day.restOfDayForecast.precipitationType.downcase != 'clear'
-    forecast << "with #{format_precipitation_amount(day.restOfDayForecast.snowfallAmount)} of snow expected" if day.restOfDayForecast.snowfallAmount > 0
+    forecast << "#{today_or_tonight}'s forecast #{format_forecasted_condition(todays_forecast.restOfDayForecast.conditionCode).downcase},"
+    forecast << "with a high of #{format_temperature(rest_of_day_high_temperature)} and a low of #{format_temperature(rest_of_day_low_temperature)}."
+    forecast << "There's a #{number_to_percentage(todays_forecast.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(todays_forecast.restOfDayForecast.precipitationType)} later #{today_or_tonight.downcase}," if todays_forecast.restOfDayForecast.precipitationChance > 0 && todays_forecast.restOfDayForecast.precipitationType.downcase != 'clear'
+    forecast << "with #{format_precipitation_amount(todays_forecast.restOfDayForecast.snowfallAmount)} of snow expected" if todays_forecast.restOfDayForecast.snowfallAmount > 0
     forecast << "."
 
     forecast.join(' ')
