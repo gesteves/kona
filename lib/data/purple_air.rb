@@ -113,10 +113,11 @@ class PurpleAir
     { value: aqi, label: label }.compact
   end
 
-  def calculate_aqi(cp, ih, il, bph, bpl)
-    a = (ih - il)
-    b = (bph - bpl)
-    c = (cp - bpl)
-    (a / b) * c + il
+  def calculate_aqi(pm25, aqi_high, aqi_low, pm25_high, pm25_low)
+    aqi_range = aqi_high - aqi_low
+    pm25_range = pm25_high - pm25_low
+    difference_from_low_breakpoint = pm25 - pm25_low
+    (aqi_range / pm25_range) * difference_from_low_breakpoint + aqi_low
   end
+
 end
