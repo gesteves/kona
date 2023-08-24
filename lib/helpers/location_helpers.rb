@@ -5,11 +5,13 @@ module LocationHelpers
     # Extract city, state, and country names from the components
     city = components.find { |component| component['types'].include?('locality') }&.long_name
     state = components.find { |component| component['types'].include?('administrative_area_level_1') }&.long_name
+    county = components.find { |component| component['types'].include?('administrative_area_level_2') }&.long_name
     country = components.find { |component| component['types'].include?('country') }&.long_name
 
     # Replace single quotes with curly single quotes, so places like "Coeur d’Alene" look right
     city&.gsub!("'", "’")
     state&.gsub!("'", "’")
+    county&.gsub!("'", "’")
     country&.gsub!("'", "’")
 
     case country
@@ -19,13 +21,13 @@ module LocationHelpers
       elsif state == 'District of Columbia'
         return 'Washington, DC'
       else
-        return [city, state].compact.join(", ")
+        return [city || county, state].compact.join(", ")
       end
     else
       if city.downcase =~ /#{country.downcase}/
         return city
       else
-        return [city, country].compact.join(", ")
+        return [city || state, country].compact.join(", ")
       end
     end
   end
