@@ -18,14 +18,14 @@ module LocationHelpers
         return 'New York City'
       elsif state == 'District of Columbia'
         return 'Washington, DC'
-      els
-        return [city, state].join(", ")
+      else
+        return [city, state].compact.join(", ")
       end
     else
       if city.downcase =~ /#{country.downcase}/
         return city
       else
-        return [city, country].join(", ")
+        return [city, country].compact.join(", ")
       end
     end
   end
