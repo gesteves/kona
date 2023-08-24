@@ -27,10 +27,14 @@ module WeatherHelpers
     true
   end
 
-  def today_or_tonight
+  def is_evening?
     now = Time.now
     sunset = Time.parse(todays_forecast.sunset)
-    now < sunset ? "Today" : "Tonight"
+    now > sunset
+  end
+
+  def today_or_tonight
+    is_evening? ? "Tonight" : "Today"
   end
 
   def format_current_condition(condition_code)
@@ -123,8 +127,7 @@ module WeatherHelpers
   end
 
   def intro
-    return unless is_daytime?
-    return "It's race day!" if is_race_day?
+    return "It's race day!" if is_race_day? && !is_evening?
     return "Man, it's a hot one!" if !is_race_day? && is_hot?
   end
 
@@ -157,7 +160,7 @@ module WeatherHelpers
   end
 
   def activities
-    return unless is_daytime?
+    return if is_evening?
 
     if is_race_day? && is_good_weather?
       return "Good weather for racing!"
