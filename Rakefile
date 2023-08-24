@@ -28,6 +28,7 @@ task :import => [:dotenv, :clobber] do
   puts 'Getting most recent check-in from Swarm'
   swarm = Swarm.new
   checkin = swarm.recent_checkin_location
+  time_zone = nil
 
   if checkin[:latitude].nil? || checkin[:longitude].nil?
     puts "No recent Swarm check-ins found, using Contentful location as a fallback"
@@ -37,8 +38,6 @@ task :import => [:dotenv, :clobber] do
     latitude = checkin[:latitude]
     longitude = checkin[:longitude]
   end
-
-  time_zone = 'America/Denver'
 
   if latitude.nil? || longitude.nil?
     puts "No location available, skipping weather and AQI data"
@@ -58,7 +57,7 @@ task :import => [:dotenv, :clobber] do
   end
 
   puts 'Importing today’s workouts from TrainerRoad'
-  TrainerRoad.new(time_zone[:timeZoneId]).save_data
+  TrainerRoad.new(time_zone.dig(:timeZoneId)).save_data
 
   puts 'All import tasks completed'
 end
