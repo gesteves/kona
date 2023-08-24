@@ -166,16 +166,16 @@ module WeatherHelpers
       return "Good weather for racing!"
     elsif is_race_day? && is_bad_weather?
       return "Tough weather for racing!"
-    elsif !is_workout_scheduled? && is_good_weather?
+    elsif no_workout_scheduled? && is_good_weather?
       return "I don't have any workouts scheduled for today, but it's a good day to be outside."
-    elsif !is_workout_scheduled? && is_bad_weather?
+    elsif no_workout_scheduled? && is_bad_weather?
       return "I don't have any workouts scheduled for today so it's a good day to rest."
     end
 
-    workouts = data.trainerroad.workouts.map { |w| w.description =~ /^(8|11|18|80)-/i ? "an #{w.description}" : "a #{w.description}"}
+    workouts = data.trainerroad.workouts.map { |w| workout_with_article(w) }
 
     activities = ["My training plan has"]
-    activities << (workouts.size <= 2 ? workouts.join(' and ') : [workouts[0..-2].join(', '), workouts[-1]].join(' and '))
+    activities << comma_join_with_and(workouts)
     activities << if is_good_weather?
       "scheduled for today—and it's a good day to train outside."
     else
@@ -189,11 +189,6 @@ module WeatherHelpers
     condition = data.conditions[data.weather.currentWeather.conditionCode]
     return 'cloud-question' if condition.blank?
     return condition[:icon] if condition[:icon].is_a?(String)
-
-    if is_daytime?
-      condition[:icon][:day]
-    else
-      condition[:icon][:night]
-    end
+    is_daytime? ? condition[:icon][:day] : condition[:icon][:night]
   end
 end

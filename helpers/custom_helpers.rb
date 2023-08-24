@@ -86,6 +86,10 @@ module CustomHelpers
     words.append(last_words).join(' ')
   end
 
+  def comma_join_with_and(items)
+    items.size <= 2 ? items.join(' and ') : [items[0..-2].join(', '), items[-1]].join(' and ')
+  end
+
   def source_tag(url, options = {})
     srcset_opts = { fm: options[:format] }.compact
     options[:srcset] = srcset(url: url, widths: options[:widths], square: options[:square], options: srcset_opts)
