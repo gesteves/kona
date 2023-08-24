@@ -49,8 +49,7 @@ class GoogleMaps
     query = {
       latlng: "#{@latitude},#{@longitude}",
       key: GOOGLE_MAPS_API_KEY,
-      language: "en",
-      result_type: "political"
+      language: "en"
     }
 
     response = HTTParty.get("#{GOOGLE_MAPS_API_URL}/geocode/json", query: query)
