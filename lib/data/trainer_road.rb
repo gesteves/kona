@@ -39,7 +39,7 @@ class TrainerRoad
       parse_workout(event.summary)
     end
 
-    workouts.compact!.sort_by! { |w| DISCIPLINE_ORDER[w[:discipline]] }
+    workouts = workouts.compact.sort_by { |w| DISCIPLINE_ORDER[w[:discipline]] }
 
     @redis.setex(cache_key, 1.hour, workouts.to_json)
 
