@@ -44,6 +44,26 @@
   }
 }
 
+.entry__highlight--live::before {
+  animation: 1s blink ease infinite;
+  background: currentColor;
+  border-radius: 100%;
+  content: ' ';
+  display: inline-block;
+  height: 0.5rem;
+  margin-right: 0.25rem;
+  width: 0.5rem;
+}
+
+@keyframes blink {
+  from, to {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 .entry__body {
   @extend .extend-body-styles;
   
