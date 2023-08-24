@@ -16,14 +16,17 @@ class PurpleAir
     )
   end
 
-  def save_data
+  def aqi
     sensor = nearest_sensor
     return if sensor.blank?
     raw_pm25 = nearest_sensor[:'pm2.5_atm']
     humidity = nearest_sensor[:humidity]
     pm25 = humidity.present? ? apply_epa_correction(raw_pm25, humidity.to_f) : raw_pm25
-    sensor[:aqi] = formatted_aqi(pm25)
-    File.open('data/purple_air.json', 'w') { |f| f << sensor.to_json }
+    sensor[:aqi] = format_aqi(pm25)
+  end
+
+  def save_data
+    File.open('data/purple_air.json', 'w') { |f| f << aqi.to_json }
   end
 
   private
@@ -88,7 +91,7 @@ class PurpleAir
     end
   end
 
-  def formatted_aqi(pm25)
+  def format_aqi(pm25)
     return {} if pm25.blank?
 
     aqi, label = case pm25

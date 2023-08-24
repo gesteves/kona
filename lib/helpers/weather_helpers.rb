@@ -77,7 +77,7 @@ module WeatherHelpers
   end
 
   def is_bad_weather?
-    aqi = data.purple_air.aqi.value
+    aqi = data&.purple_air&.aqi&.value.to_i
     current_temperature = (data.weather.currentWeather.temperatureApparent || data.weather.currentWeather.temperature)
     high_temperature = todays_forecast.temperatureMax
     low_temperature = todays_forecast.temperatureMin
@@ -143,7 +143,7 @@ module WeatherHelpers
 
   def current_aqi
     return if data.purple_air&.aqi&.value.blank?
-    "The air quality is #{format_air_quality(data.purple_air.aqi.label.downcase)}, with an <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.purple_air.aqi.value.round}."
+    "The air quality is #{format_air_quality(data&.purple_air&.aqi&.label.downcase)}, with an <abbr title=\"Air Quality Index\">AQI</abbr> of #{data&.purple_air&.aqi&.value.round}."
   end
 
   def forecast
