@@ -23,6 +23,7 @@ class PurpleAir
     humidity = nearest_sensor[:humidity]
     pm25 = humidity.present? ? apply_epa_correction(raw_pm25, humidity.to_f) : raw_pm25
     sensor[:aqi] = format_aqi(pm25)
+    sensor
   end
 
   def save_data
