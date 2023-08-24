@@ -15,7 +15,7 @@ module WeatherHelpers
 
   def todays_forecast
     now = Time.now
-    data.weather.forecastDaily.days.find { |d| Time.parse(d.forecastStart) <= now && Time.parse(d.forecastEnd) >= now }
+    data.weather&.forecastDaily&.days&.find { |d| Time.parse(d.forecastStart) <= now && Time.parse(d.forecastEnd) >= now }
   end
 
   def is_daytime?
@@ -144,7 +144,7 @@ module WeatherHelpers
   end
 
   def forecast
-    return if data.weather&.forecastDaily&.days&.first.blank?
+    return if todays_forecast.blank?
     day = todays_forecast
     forecast = []
     forecast << "#{today_or_tonight}'s forecast #{format_forecasted_condition(day.restOfDayForecast.conditionCode).downcase},"
