@@ -167,9 +167,9 @@ module WeatherHelpers
     elsif is_race_day? && is_bad_weather?
       return "Tough weather for racing!"
     elsif !is_workout_scheduled? && is_good_weather?
-      return "I don't have any workouts scheduled for today, but it's a good day to be outside!"
+      return "I don't have any workouts scheduled for today, but it's a good day to be outside."
     elsif !is_workout_scheduled? && is_bad_weather?
-      return "I don't have any workouts scheduled for today so it's a good day to rest!"
+      return "I don't have any workouts scheduled for today so it's a good day to rest."
     end
 
     workouts = data.trainerroad.workouts.map { |w| w.description =~ /^(8|11|18|80)-/i ? "an #{w.description}" : "a #{w.description}"}
@@ -177,9 +177,9 @@ module WeatherHelpers
     activities = ["My training plan has"]
     activities << (workouts.size <= 2 ? workouts.join(' and ') : [workouts[0..-2].join(', '), workouts[-1]].join(' and '))
     activities << if is_good_weather?
-      "scheduled for today—it's a good day to train outside!"
+      "scheduled for today—and it's a good day to train outside."
     else
-      "scheduled for today—it's a good day to train indoors!"
+      "scheduled for today—so it's a good day to train indoors."
     end
 
     activities.join(' ')
