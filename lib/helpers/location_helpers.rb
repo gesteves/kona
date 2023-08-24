@@ -20,6 +20,8 @@ module LocationHelpers
         return 'New York City'
       elsif state == 'District of Columbia'
         return 'Washington, DC'
+      elsif county == 'Teton County' && state == 'Wyoming'
+        return "Jackson Hole, Wyoming"
       else
         return [city || county, state].compact.join(", ")
       end
