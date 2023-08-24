@@ -15,11 +15,16 @@ module WeatherHelpers
 
   def is_daytime?
     now = Time.now
-    sunrise = Time.parse(data.weather.forecastDaily.days.first.sunrise)
-    sunset = Time.parse(data.weather.forecastDaily.days.first.sunset)
-    now > (sunrise - 1.hour) && now < (sunset - 1.hour)
+    sunrise = Time.parse(todays_forecast.sunrise)
+    sunset = Time.parse(todays_forecast.sunset)
+    now > sunrise && now < sunset
   rescue
     true
+  end
+
+  def todays_forecast
+    now = Time.now
+    data.weather.forecastDaily.days.find { |d| Time.parse(d.forecastStart) <= now && Time.parse(d.forecastEnd) >= now }
   end
 
   def today_or_tonight
@@ -68,10 +73,10 @@ module WeatherHelpers
   def is_bad_weather?
     aqi = data.purple_air.aqi.value
     current_temperature = (data.weather.currentWeather.temperatureApparent || data.weather.currentWeather.temperature)
-    high_temperature = data.weather.forecastDaily.days.first.temperatureMax
-    low_temperature = data.weather.forecastDaily.days.first.temperatureMin
-    precipitation_chance = data.weather.forecastDaily.days.first.restOfDayForecast.precipitationChance
-    snowfall = data.weather.forecastDaily.days.first.restOfDayForecast.snowfallAmount
+    high_temperature = todays_forecast.temperatureMax
+    low_temperature = todays_forecast.temperatureMin
+    precipitation_chance = todays_forecast.restOfDayForecast.precipitationChance
+    snowfall = todays_forecast.restOfDayForecast.snowfallAmount
 
     return true if aqi > 75
     return true if current_temperature <= -12 || current_temperature >= 32
@@ -79,7 +84,7 @@ module WeatherHelpers
     return true if precipitation_chance >= 0.5
     return true if snowfall > 0
     return !data.conditions.dig(data.weather.currentWeather.conditionCode, :is_good_weather)
-    return !data.conditions.dig(data.weather.forecastDaily.days.first.conditionCode, :is_good_weather)
+    return !data.conditions.dig(todays_forecast.conditionCode, :is_good_weather)
   end
 
   def is_good_weather?
@@ -138,7 +143,7 @@ module WeatherHelpers
 
   def forecast
     return if data.weather&.forecastDaily&.days&.first.blank?
-    day = data.weather.forecastDaily.days.first
+    day = todays_forecast
     forecast = []
     forecast << "#{today_or_tonight}'s forecast #{format_forecasted_condition(day.restOfDayForecast.conditionCode).downcase},"
     forecast << "with a high of #{format_temperature(day.temperatureMax)} and a low of #{format_temperature(day.temperatureMin)}."
