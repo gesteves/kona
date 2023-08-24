@@ -42,7 +42,7 @@ task :import => [:dotenv, :clobber] do
   if latitude.nil? || longitude.nil?
     puts "No location available, skipping weather and AQI data"
   else
-    puts 'Reverse geocoding location in Google Maps'
+    puts 'Geocoding location in Google Maps'
     maps = GoogleMaps.new(latitude, longitude)
     maps.save_data
     country = maps.country_code
