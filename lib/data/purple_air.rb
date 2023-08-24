@@ -64,10 +64,12 @@ class PurpleAir
     lat_index = fields.index(:latitude)
     lon_index = fields.index(:longitude)
 
-    nearest_sensor_data = sensors['data'].min_by do |sensor|
+    nearest_sensor_data = sensors['data'].reject { |sensor| sensor[lat_index].blank? || sensor[lon_index].blank? }.min_by do |sensor|
       lat, lon = sensor[lat_index], sensor[lon_index]
       Math.sqrt((lat - @latitude)**2 + (lon - @longitude)**2)
     end
+
+    return if nearest_sensor_data.blank?
 
     # Combine the fields with the corresponding data for the nearest sensor
     fields.zip(nearest_sensor_data).to_h
