@@ -161,8 +161,12 @@ module WeatherHelpers
     forecast = []
     forecast << "#{today_or_tonight}'s forecast #{format_forecasted_condition(todays_forecast.restOfDayForecast.conditionCode).downcase},"
     forecast << "with a high of #{format_temperature(rest_of_day_high_temperature)} and a low of #{format_temperature(rest_of_day_low_temperature)}."
-    forecast << "There's a #{number_to_percentage(todays_forecast.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(todays_forecast.restOfDayForecast.precipitationType)} later #{today_or_tonight.downcase}," if todays_forecast.restOfDayForecast.precipitationChance > 0 && todays_forecast.restOfDayForecast.precipitationType.downcase != 'clear'
-    forecast << "with #{format_precipitation_amount(todays_forecast.restOfDayForecast.snowfallAmount)} of snow expected" if todays_forecast.restOfDayForecast.snowfallAmount > 0
+
+    if todays_forecast.restOfDayForecast.precipitationChance > 0 && todays_forecast.restOfDayForecast.precipitationType.downcase != 'clear'
+      forecast << "There's a #{number_to_percentage(todays_forecast.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(todays_forecast.restOfDayForecast.precipitationType)} later #{today_or_tonight.downcase},"
+      forecast << "with #{format_precipitation_amount(todays_forecast.restOfDayForecast.snowfallAmount)} expected" if todays_forecast.restOfDayForecast.precipitationType.downcase == 'snow' && todays_forecast.restOfDayForecast.snowfallAmount > 0
+    end
+
     forecast << "."
 
     forecast.join(' ')
