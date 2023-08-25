@@ -37,16 +37,6 @@ module WeatherHelpers
     is_evening? ? "Tonight" : "Today"
   end
 
-  def rest_of_day_high_temperature
-    now = Time.now
-    data.weather&.forecastHourly&.hours&.select { |h| Time.parse(h.forecastStart) >= now && Time.parse(h.forecastStart) <= Time.parse(todays_forecast.forecastEnd) }&.map(&:temperature)&.max || todays_forecast.temperatureMax
-  end
-
-  def rest_of_day_low_temperature
-    now = Time.now
-    data.weather&.forecastHourly&.hours&.select { |h| Time.parse(h.forecastStart) >= now && Time.parse(h.forecastStart) <= Time.parse(todays_forecast.forecastEnd) }&.map(&:temperature)&.min || todays_forecast.temperatureMin
-  end
-
   def format_current_condition(condition_code)
     data.conditions.dig(condition_code, :labels, :current) || "it's #{condition_code.underscore.gsub('_', ' ')}"
   end
@@ -160,7 +150,7 @@ module WeatherHelpers
     return if todays_forecast.blank?
     forecast = []
     forecast << "#{today_or_tonight}'s forecast #{format_forecasted_condition(todays_forecast.restOfDayForecast.conditionCode).downcase},"
-    forecast << "with a high of #{format_temperature(rest_of_day_high_temperature)} and a low of #{format_temperature(rest_of_day_low_temperature)}."
+    forecast << "with a high of #{format_temperature(todays_forecast.temperatureMax)} and a low of #{format_temperature(todays_forecast.temperatureMin)}."
 
     if todays_forecast.restOfDayForecast.precipitationChance > 0 && todays_forecast.restOfDayForecast.precipitationType.downcase != 'clear'
       forecast << "There's a #{number_to_percentage(todays_forecast.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(todays_forecast.restOfDayForecast.precipitationType)} later #{today_or_tonight.downcase},"
