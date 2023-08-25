@@ -47,6 +47,7 @@ task :import => [:dotenv, :clobber] do
     maps.save_data
     country = maps.country_code
     time_zone = maps.time_zone
+    puts 'Importing weather data from WeatherKit'
     weather = WeatherKit.new(latitude, longitude, time_zone['timeZoneId'], country)
     weather.save_data
 
