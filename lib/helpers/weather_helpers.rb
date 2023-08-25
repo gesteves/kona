@@ -55,7 +55,8 @@ module WeatherHelpers
 
   def format_precipitation_amount(mm)
     metric = number_to_human(mm, units: PRECIPITATION_METRIC_UNITS, precision: (mm > 1000 ? 1 : 0), strip_insignificant_zeros: true, significant: false, delimiter: ',')
-    imperial = number_to_human(mm_to_in(mm), units: { unit: mm_to_in(mm).round == 1 ? "inch" : "inches" }, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')
+    imperial = number_to_human(mm_to_in(mm), precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')
+    imperial += (imperial == "1" ? " inch" : " inches")
     content_tag :span, 'data-controller': 'units', 'data-units-imperial-value': imperial, 'data-units-metric-value': metric do
       metric
     end
