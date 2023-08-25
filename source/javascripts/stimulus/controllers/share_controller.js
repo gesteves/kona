@@ -18,7 +18,7 @@ export default class extends Controller {
     const ogTitle = document.querySelector('meta[property="og:title"]')?.content || document.title;
     const url = this.getCanonicalOrFallbackUrl();
     const modifiedUrl = new URL(url);
-    modifiedUrl.searchParams.append('ref', 'Share button');
+    modifiedUrl.searchParams.append('ref', 'Share%20button');
 
     navigator.share({
       title: ogTitle,
