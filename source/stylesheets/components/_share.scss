@@ -1,15 +1,34 @@
 .share {
-  -webkit-overflow-scrolling: touch;
-  display: flex;
-  flex-flow: row nowrap;
   grid-column: 1 / -1;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  white-space: nowrap;
 
   @media (min-width: #{$bp-medium}) {
     grid-column: 3 / -3;
   }
+}
+
+.share__heading {
+  color: var(--color-text-secondary);
+  font-family: var(--ibm-plex-mono);
+  font-size: var(--font-x-small);
+  line-height: var(--line-height-x-small);
+  text-transform: uppercase;
+  font-weight: normal;
+  text-align: center;
+  margin: 0 0 1rem 0;
+}
+
+.share__buttons {
+  display: flex;
+  flex-flow: row nowrap;
+  justify-content: center;
+}
+
+.share__buttons--scrolling {
+  -webkit-overflow-scrolling: touch;
+  justify-content: start;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  white-space: nowrap;
 }
 
 .share__button {
