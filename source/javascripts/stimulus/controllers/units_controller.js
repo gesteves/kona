@@ -10,7 +10,6 @@ export default class extends Controller {
   isImperialLocale() {
     const imperialLocales = ['en-US'];
     const userLocale = navigator.language;
-    console.log(imperialLocales.includes(userLocale))
     return imperialLocales.includes(userLocale);
   }
 
