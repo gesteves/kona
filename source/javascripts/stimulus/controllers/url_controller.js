@@ -1,15 +1,10 @@
+import { trackPageView } from '../lib/analytics';
 import { Controller } from "stimulus";
 
 export default class extends Controller {
   connect() {
-    this.trackPageView();
+    trackPageView();
     this.cleanUpUrl();
-  }
-
-  trackPageView() {
-    if (typeof plausible !== 'undefined') {
-      plausible('pageview');
-    }
   }
 
   cleanUpUrl() {
