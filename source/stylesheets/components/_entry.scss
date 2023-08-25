@@ -53,6 +53,10 @@
   height: 0.5rem;
   margin-right: 0.25rem;
   width: 0.5rem;
+
+  @media (prefers-reduced-motion) {
+    display: none;
+  }
 }
 
 @keyframes blink {
