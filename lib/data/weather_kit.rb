@@ -20,7 +20,7 @@ class WeatherKit
   end
 
   def weather
-    cache_key = "weatherkit:weather:#{@latitude}:#{@longitude}:#{@country}:#{@time_zone}"
+    cache_key = "weatherkit:weather:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
     data = @redis.get(cache_key)
 
     return JSON.parse(data) if data.present?
@@ -51,7 +51,7 @@ class WeatherKit
   private
 
   def availability
-    cache_key = "weatherkit:availability:#{@latitude}:#{@longitude}:#{@country}:#{@time_zone}"
+    cache_key = "weatherkit:availability:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
     data = @redis.get(cache_key)
 
     return JSON.parse(data) if data.present?
