@@ -1,9 +1,11 @@
 import { Controller } from "stimulus";
 
 export default class extends Controller {
+  static classes = ["hidden"]
+
   connect() {
     if (navigator.share) {
-      this.element.classList.remove('--is-hidden');
+      this.element.classList.remove(this.hiddenClass);
     }
   }
 
