@@ -33,8 +33,9 @@ class WeatherKit
     }
 
     query = {
-      timezone: @time_zone,
-      dataSets: datasets&.join(',')
+      countryCode: @country,
+      dataSets: datasets&.join(','),
+      timezone: @time_zone
     }
 
     response = HTTParty.get("#{WEATHERKIT_API_URL}/weather/en/#{@latitude}/#{@longitude}", query: query, headers: headers)
