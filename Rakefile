@@ -47,9 +47,7 @@ task :import => [:dotenv, :clobber] do
     maps.save_data
     country = maps.country_code
     time_zone = maps.time_zone
-
-    puts 'Importing weather data from WeatherKit'
-    weather = WeatherKit.new(latitude, longitude, time_zone[:timeZoneId], country)
+    weather = WeatherKit.new(latitude, longitude, time_zone['timeZoneId'], country)
     weather.save_data
 
     puts 'Importing air quality data from PurpleAir'
@@ -57,7 +55,7 @@ task :import => [:dotenv, :clobber] do
   end
 
   puts 'Importing today’s workouts from TrainerRoad'
-  TrainerRoad.new(time_zone.dig(:timeZoneId)).save_data
+  TrainerRoad.new(time_zone.dig('timeZoneId')).save_data
 
   puts 'All import tasks completed'
 end

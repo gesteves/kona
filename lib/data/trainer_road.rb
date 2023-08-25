@@ -32,7 +32,7 @@ class TrainerRoad
     today = Time.current.in_time_zone(@timezone).to_date
 
     todays_events = calendar.events.select do |event|
-      event.dtstart.to_datetime.in_time_zone(@timezone).to_date == today
+      event.dtstart.to_datetime.to_date == today
     end
 
     workouts = todays_events.map do |event|
