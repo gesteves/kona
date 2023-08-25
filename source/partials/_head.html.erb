@@ -12,6 +12,7 @@
     <link rel="apple-touch-icon" href="<%= site_icon(w: 180) %>">
     <link rel="manifest" href="/manifest.json">
   <% end %>
+  <%= javascript_include_tag 'site' %>
   <%= stylesheet_link_tag 'site' %>
   <%= yield_content :assets %>
 </head>

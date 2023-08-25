@@ -17,6 +17,7 @@ end
 activate :asset_hash
 activate :directory_indexes
 
+ignore "/javascripts/stimulus/*"
 ignore "/article.html"
 ignore "/short.html"
 ignore "/page.html"
@@ -53,7 +54,6 @@ configure :production do
   config[:context]             = ENV['CONTEXT']
   config[:netlify]             = ENV['NETLIFY']
   activate :minify_css
-  activate :minify_javascript
   activate :minify_html
 
   page "/404.html", directory_index: false

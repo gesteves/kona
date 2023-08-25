@@ -23,4 +23,16 @@ module DistanceHelpers
   def format_distance_unit(meters)
     format_distance(meters).split(/\s+/).last
   end
+
+  def meters_to_miles(meters)
+    miles = meters * 0.000621371
+    precision = if miles < 10
+      2
+    elsif miles < 1000
+      1
+    else
+      0
+    end
+    number_to_human(miles, precision: precision, strip_insignificant_zeros: true, significant: false, delimiter: ',')
+  end
 end
