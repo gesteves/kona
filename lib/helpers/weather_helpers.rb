@@ -25,12 +25,21 @@ module WeatherHelpers
 
   def is_evening?
     now = Time.now
-    sunset = Time.parse(todays_forecast.sunset)
-    now > sunset
+    sunset = Time.parse(todays_forecast.sunset).beginning_of_hour
+    now >= sunset
   end
 
-  def today_or_tonight
-    is_evening? ? "Tonight" : "Today"
+  def current_day_period
+    now = Time.now
+    sunset = Time.parse(todays_forecast.sunset).beginning_of_hour
+    noon = Time.parse(todays_forecast.solarNoon).beginning_of_hour
+    if now >= sunset
+      "Tonight"
+    elsif now >= noon
+      "This afternoon"
+    else
+      "Today"
+    end
   end
 
   def format_current_condition(condition_code)
@@ -150,11 +159,11 @@ module WeatherHelpers
   def forecast
     return if todays_forecast.blank?
     forecast = []
-    forecast << "#{today_or_tonight}'s forecast #{format_forecasted_condition(todays_forecast.restOfDayForecast.conditionCode).downcase},"
+    forecast << "#{current_day_period}'s forecast #{format_forecasted_condition(todays_forecast.restOfDayForecast.conditionCode).downcase},"
     forecast << "with a high of #{format_temperature(todays_forecast.temperatureMax)} and a low of #{format_temperature(todays_forecast.temperatureMin)}."
 
     if todays_forecast.restOfDayForecast.precipitationChance > 0 && todays_forecast.restOfDayForecast.precipitationType.downcase != 'clear'
-      forecast << "There's a #{number_to_percentage(todays_forecast.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(todays_forecast.restOfDayForecast.precipitationType)} later #{today_or_tonight.downcase},"
+      forecast << "There's a #{number_to_percentage(todays_forecast.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(todays_forecast.restOfDayForecast.precipitationType)} later #{current_day_period.downcase},"
       forecast << "with #{format_precipitation_amount(todays_forecast.restOfDayForecast.snowfallAmount)} expected" if todays_forecast.restOfDayForecast.precipitationType.downcase == 'snow' && todays_forecast.restOfDayForecast.snowfallAmount > 0
     end
 
