@@ -10,10 +10,6 @@
         <%= partial "icons/brands/facebook-f.svg" %>
       </a>
 
-      <button class="share__button" data-controller="share" data-share-text-value="<%= "#{og_title(article)} #{full_url(article.path, { ref: 'Mastodon' })}" %>" data-action="click->share#shareOnMastodon">
-        <%= partial "icons/brands/mastodon.svg" %>
-      </button>
-
       <a class="share__button" href="https://reddit.com/submit?title=<%= ERB::Util.url_encode og_title(article) %>&url=<%= ERB::Util.url_encode full_url(article.path, { ref: 'Reddit' }) %>" rel="noopener nofollow" target="_blank">
         <%= partial "icons/brands/reddit-alien.svg" %>
       </a>

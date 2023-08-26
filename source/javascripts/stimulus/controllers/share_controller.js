@@ -44,35 +44,4 @@ export default class extends Controller {
 
     window.open(linkURL, 'share', `width=${width},height=${height},scrollbars=yes`);
   }
-
-  shareOnMastodon(event) {
-    event.preventDefault();
-  
-    const rawDomain = prompt("What’s your Mastodon instance?", "mastodon.social");
-  
-    if (!rawDomain) {
-      return;
-    }
-  
-    const domain = this.extractDomain(rawDomain);
-    
-    if (!domain) {
-      alert("That doesn’t look quite right, please try again.");
-      return;
-    }
-  
-    const mastodonShareUrl = `https://${domain}/share?text=${encodeURIComponent(this.getShareText())}`;
-
-    window.location.href = mastodonShareUrl;
-  }
-  
-  extractDomain(rawInput) {
-    try {
-      const input = rawInput.startsWith('http') ? rawInput : `https://${rawInput}`;
-      const url = new URL(input);
-      return url.hostname;
-    } catch (error) {
-      return null;
-    }
-  }
 }
