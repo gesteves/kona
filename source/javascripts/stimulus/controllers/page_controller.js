@@ -9,7 +9,7 @@ export default class extends Controller {
     }
   }
 
-  handleTurboLoad() {
+  handlePageLoad() {
     trackPageView();
     this.cleanUpUrl();
   }
