@@ -60,16 +60,13 @@ export default class extends Controller {
     const domain = this.extractDomain(rawDomain);
     
     if (!domain) {
-      alert("That doesn’t look like a valid domain, please try again.");
+      alert("That doesn’t look quite right, please try again.");
       return;
     }
   
     const mastodonShareUrl = `https://${domain}/share?text=${encodeURIComponent(textToShare)}`;
 
-    const width = this.popupWidthValue || 400;
-    const height = this.popupHeightValue || 300;
-
-    window.open(mastodonShareUrl, 'share', `width=${width},height=${height},scrollbars=yes`);
+    window.location.href = mastodonShareUrl;
   }
   
   extractDomain(rawInput) {
