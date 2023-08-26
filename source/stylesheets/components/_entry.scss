@@ -54,7 +54,7 @@
   margin-right: 0.25rem;
   width: 0.5rem;
 
-  @media (prefers-reduced-motion) {
+  @media (prefers-reduced-motion: reduce) {
     display: none;
   }
 }
