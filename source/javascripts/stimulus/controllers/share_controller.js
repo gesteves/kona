@@ -41,6 +41,44 @@ export default class extends Controller {
     const width = this.popupWidthValue || 400;
     const height = this.popupHeightValue || 300;
 
-    window.open(linkURL, 'popupWindow', `width=${width},height=${height},scrollbars=yes`);
+    window.open(linkURL, 'share', `width=${width},height=${height},scrollbars=yes`);
+  }
+
+  shareOnMastodon(event) {
+    event.preventDefault();
+
+    const ogTitle = document.querySelector('meta[property="og:title"]')?.content || document.title;
+    const url = this.getCanonicalOrFallbackUrl();
+    const textToShare = `${ogTitle} ${url}`;
+  
+    const rawDomain = prompt("What’s your Mastodon instance?", "mastodon.social");
+  
+    if (!rawDomain) {
+      return;
+    }
+  
+    const domain = this.extractDomain(rawDomain);
+    
+    if (!domain) {
+      alert("That doesn’t look like a valid domain, please try again.");
+      return;
+    }
+  
+    const mastodonShareUrl = `https://${domain}/share?text=${encodeURIComponent(textToShare)}`;
+
+    const width = this.popupWidthValue || 400;
+    const height = this.popupHeightValue || 300;
+
+    window.open(mastodonShareUrl, 'share', `width=${width},height=${height},scrollbars=yes`);
+  }
+  
+  extractDomain(rawInput) {
+    try {
+      const input = rawInput.startsWith('http') ? rawInput : `https://${rawInput}`;
+      const url = new URL(input);
+      return url.hostname;
+    } catch (error) {
+      return null;
+    }
   }
 }
