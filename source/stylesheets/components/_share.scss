@@ -19,16 +19,8 @@
 
 .share__buttons {
   display: flex;
-  flex-flow: row nowrap;
+  flex-flow: row wrap;
   justify-content: center;
-}
-
-.share__buttons--scrolling {
-  -webkit-overflow-scrolling: touch;
-  justify-content: start;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  white-space: nowrap;
 }
 
 .share__button {
@@ -44,7 +36,7 @@
   font-weight: 300;
   justify-content: center;
   line-height: var(--line-height-x-small);
-  margin: 0 0.5rem 0 0;
+  margin: 0 0.25rem 0.5rem 0;
   padding: 1rem;
   scroll-snap-align: start;
 
@@ -72,9 +64,5 @@
 
   &.--is-hidden {
     display: none;
-  }
-
-  &:last-child {
-    margin-right: 0;
   }
 }
