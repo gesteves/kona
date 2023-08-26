@@ -1,7 +1,7 @@
 {
   "scripts": {
-    "build": "webpack",
-    "watch": "webpack --watch"
+    "build": "webpack --mode=production",
+    "watch": "webpack --mode=development --watch"
   },
   "dependencies": {
     "@babel/core": "^7.22.11",
