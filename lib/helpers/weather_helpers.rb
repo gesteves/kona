@@ -16,9 +16,9 @@ module WeatherHelpers
 
   def is_daytime?
     now = Time.now
-    sunrise = Time.parse(todays_forecast.sunrise)
-    sunset = Time.parse(todays_forecast.sunset)
-    now > sunrise && now < sunset
+    sunrise = Time.parse(todays_forecast.sunrise).beginning_of_hour
+    sunset = Time.parse(todays_forecast.sunset).beginning_of_hour
+    now >= sunrise && now <= sunset
   rescue
     true
   end
