@@ -5,7 +5,9 @@ export default class extends Controller {
   static values = {
     popupWidth: Number,
     popupHeight: Number,
-    isNative: Boolean
+    isNative: Boolean,
+    text: String,
+    url: String
   };
 
   connect() {
@@ -14,21 +16,20 @@ export default class extends Controller {
     }
   }
 
-  getCanonicalOrFallbackUrl() {
-    const canonicalLink = document.querySelector('link[rel="canonical"]');
-    return canonicalLink ? canonicalLink.href : window.location.href;
+  getShareUrl() {
+    return this.urlValue || document.querySelector('link[rel="canonical"]')?.href || window.location.href
+  }
+
+  getShareText() {
+    return this.textValue || document.querySelector('meta[property="og:title"]')?.content || document.title;
   }
 
   openShareSheet(event) {
     event.preventDefault();
-    const ogTitle = document.querySelector('meta[property="og:title"]')?.content || document.title;
-    const url = this.getCanonicalOrFallbackUrl();
-    const modifiedUrl = new URL(url);
-    modifiedUrl.searchParams.append('ref', 'Share%20button');
 
     navigator.share({
-      title: ogTitle,
-      url: modifiedUrl.toString()
+      title: this.getShareText(),
+      url: this.getShareUrl()
     }).catch(() => {
       // Handle potential error silently
     });
@@ -46,10 +47,6 @@ export default class extends Controller {
 
   shareOnMastodon(event) {
     event.preventDefault();
-
-    const ogTitle = document.querySelector('meta[property="og:title"]')?.content || document.title;
-    const url = this.getCanonicalOrFallbackUrl();
-    const textToShare = `${ogTitle} ${url}`;
   
     const rawDomain = prompt("What’s your Mastodon instance?", "mastodon.social");
   
@@ -64,7 +61,7 @@ export default class extends Controller {
       return;
     }
   
-    const mastodonShareUrl = `https://${domain}/share?text=${encodeURIComponent(textToShare)}`;
+    const mastodonShareUrl = `https://${domain}/share?text=${encodeURIComponent(this.getShareText())}`;
 
     window.location.href = mastodonShareUrl;
   }
