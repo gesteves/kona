@@ -2,15 +2,15 @@
   <h3 class="share__heading">Share This Article</h3>
 
   <div class="share__buttons">
-      <button class="share__button --is-hidden" data-controller="share" data-action="share#share" data-share-hidden-class="--is-hidden">
+      <button class="share__button --is-hidden" data-controller="share" data-share-is-native-value="true" data-action="click->share#openShareSheet" data-share-hidden-class="--is-hidden">
         <%= partial "icons/solid/arrow-up-from-bracket.svg" %>
       </button>
 
-      <a class="share__button" href="https://www.facebook.com/sharer/sharer.php?u=<%= ERB::Util.url_encode full_url(article.path, { ref: 'Facebook' }) %>" rel="noopener nofollow" target="_blank">
+      <a class="share__button" data-controller="share" data-action="click->share#openPopup" href="https://www.facebook.com/sharer/sharer.php?u=<%= ERB::Util.url_encode full_url(article.path, { ref: 'Facebook' }) %>" rel="noopener nofollow" target="_blank">
         <%= partial "icons/brands/facebook-f.svg" %>
       </a>
 
-      <a class="share__button" href="https://linkedin.com/shareArticle?title=<%= ERB::Util.url_encode og_title(article) %>&url=<%= ERB::Util.url_encode full_url(article.path, { ref: 'LinkedIn' }) %>" rel="noopener nofollow" target="_blank">
+      <a class="share__button" data-controller="share" data-action="click->share#openPopup" href="https://linkedin.com/shareArticle?title=<%= ERB::Util.url_encode og_title(article) %>&url=<%= ERB::Util.url_encode full_url(article.path, { ref: 'LinkedIn' }) %>" rel="noopener nofollow" target="_blank">
         <%= partial "icons/brands/linkedin-in.svg" %>
       </a>
 
