@@ -1,4 +1,4 @@
-<div class="home__block" data-controller="live-update" data-live-update-url-value="<%= url_for('/xhr/weather.html') %>" data-live-update-polling-frequency-value="<%= ENV['XHR_POLLING_FREQUENCY'] %>">
-  <div class="home__block-icon" aria-hidden="true"><%= partial "icons/thin/#{weather_icon}.svg" %></div>
-  <div class="home__block-text"><%= weather_summary %></div>
+<div class="weather" data-controller="live-update" data-live-update-url-value="<%= url_for('/xhr/weather.html') %>" data-live-update-polling-frequency-value="<%= ENV['XHR_POLLING_FREQUENCY'] %>">
+  <div class="weather__icon" aria-hidden="true"><%= partial "icons/thin/#{weather_icon}.svg" %></div>
+  <div class="weather__text"><%= weather_summary %></div>
 </div>

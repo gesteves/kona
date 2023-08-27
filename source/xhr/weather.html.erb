@@ -1,4 +1,6 @@
 ---
 layout: false
 ---
-<%= partial 'partials/weather' %>
+<% if data.weather.currentWeather.present? && data.weather.forecastDaily.present? %>
+  <%= partial 'partials/weather' %>
+<% end %>

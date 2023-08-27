@@ -1,0 +1,42 @@
+.weather {
+  border-top: 2px solid var(--color-border);
+  display: grid;
+  grid-column: 1 / -1;
+  grid-gap: var(--column-gap);
+  grid-template-columns: repeat(12, 1fr);
+  padding: var(--padding) 0 0 0;
+}
+
+.weather__icon {
+  grid-column: span 2;
+
+  @media (min-width: #{$bp-medium}) {
+    align-self: center;
+  }
+
+  @media (min-width: 1024px) {
+    grid-column: span 1;
+  }
+
+  g,
+  path {
+    fill: var(--color-heading);
+  }
+}
+
+.weather__text {
+  @extend .extend-body-styles;
+  grid-column: span 12;
+
+  @media (min-width: #{$bp-small}) {
+    grid-column: span 10;
+  }
+
+  @media (min-width: 1024px) {
+    grid-column: span 11;
+  }
+
+  p {
+    margin: 0;
+  }
+}
