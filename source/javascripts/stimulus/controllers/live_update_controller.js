@@ -9,7 +9,9 @@ export default class extends Controller {
   connect() {
     if (this.hasUrlValue && this.hasPollingFrequencyValue && (this.pollingFrequencyValue >= 60)) {
       this.interval = setInterval(() => {
-        this.fetchAndUpdateContent();
+        if (document.visibilityState === "visible") {
+          this.fetchAndUpdateContent();
+        }
       }, this.pollingFrequencyValue * 1000);
     }
   }
