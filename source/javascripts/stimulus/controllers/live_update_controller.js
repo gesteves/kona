@@ -7,7 +7,7 @@ export default class extends Controller {
   };
 
   connect() {
-    if (this.pollingFrequencyValue > 0) {
+    if (this.hasPollingFrequencyValue && (this.pollingFrequencyValue > 0)) {
       this.interval = setInterval(() => {
         this.fetchAndUpdateContent();
       }, this.pollingFrequencyValue * 1000);
@@ -19,7 +19,7 @@ export default class extends Controller {
   }
 
   async fetchAndUpdateContent() {
-    if (this.urlValue) {
+    if (this.hasUrlValue) {
       try {
         let response = await fetch(this.urlValue);
         let data = await response.text();
