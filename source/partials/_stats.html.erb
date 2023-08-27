@@ -1,4 +1,4 @@
-<section class="stats" data-controller="live-update" data-live-update-url-value="<%= url_for('/xhr/stats.html') %>" data-live-update-polling-frequency-value="<%= ENV['XHR_POLLING_FREQUENCY'] %>">
+<section class="stats" data-controller="live-update" data-live-update-url-value="<%= url_for('/xhr/stats.html') %>" data-action="visibilitychange@document->live-update#handleVisibilityChange">
   <%= partial 'partials/stats/total',    locals: { timeframe: 'In the past month', activities: stats.recent_swim_totals.activities + stats.recent_ride_totals.activities + stats.recent_run_totals.activities } %>
   <%= partial 'partials/stats/activity', locals: { activity: 'Swimming', distance: stats.recent_swim_totals.distance } %>
   <%= partial 'partials/stats/activity', locals: { activity: 'Cycling', distance: stats.recent_ride_totals.distance } %>
