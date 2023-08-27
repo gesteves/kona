@@ -39,7 +39,7 @@ class Strava
       stats[k]['activities'] = stats[k].delete('count') if stats[k].is_a?(Hash) && stats[k]['count'].present?
     end
 
-    @redis.setex(cache_key, 1.hour, stats.to_json)
+    @redis.setex(cache_key, 5.minutes, stats.to_json)
 
     stats
   end
