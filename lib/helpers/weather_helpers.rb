@@ -14,19 +14,23 @@ module WeatherHelpers
     data.weather.forecastDaily.days.find { |d| Time.parse(d.forecastStart) <= now && Time.parse(d.forecastEnd) >= now }
   end
 
+  def sunrise
+    Time.parse(todays_forecast.sunrise)
+  end
+
+  def sunset
+    Time.parse(todays_forecast.sunset)
+  end
+
   def is_daytime?
     now = Time.now
-    sunrise = Time.parse(todays_forecast.sunrise).beginning_of_hour
-    sunset = Time.parse(todays_forecast.sunset).beginning_of_hour
     now >= sunrise && now <= sunset
   rescue
     true
   end
 
   def is_evening?
-    now = Time.now
-    sunset = Time.parse(todays_forecast.sunset).beginning_of_hour
-    now >= sunset
+    Time.now >= sunset
   end
 
   def today_or_tonight
