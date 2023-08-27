@@ -25,8 +25,8 @@ module WeatherHelpers
 
   def is_evening?
     now = Time.now
-    sunset = Time.parse(todays_forecast.sunset)
-    now > sunset
+    sunset = Time.parse(todays_forecast.sunset).beginning_of_hour
+    now >= sunset
   end
 
   def today_or_tonight
@@ -164,7 +164,7 @@ module WeatherHelpers
   end
 
   def activities
-    return if is_evening?
+    return unless is_daytime?
 
     if is_race_day? && is_good_weather?
       return "Good weather for racing!"
