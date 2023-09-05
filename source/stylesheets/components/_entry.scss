@@ -145,8 +145,11 @@
 
 .entry__table {
   overflow-x: scroll;
-  margin: 2rem 0;
-  width: 100%;
+  margin: 2rem calc(var(--content-padding) * -1);
+
+  @media (min-width: #{$bp-medium}) {
+    margin: 2rem 0;
+  }
 
   table {
     border-collapse: collapse;
