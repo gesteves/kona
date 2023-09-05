@@ -15,11 +15,11 @@ module WeatherHelpers
   end
 
   def sunrise
-    Time.parse(todays_forecast.sunrise)
+    Time.parse(todays_forecast.sunrise).in_time_zone(data.time_zone.timeZoneId)
   end
 
   def sunset
-    Time.parse(todays_forecast.sunset)
+    Time.parse(todays_forecast.sunset).in_time_zone(data.time_zone.timeZoneId)
   end
 
   def is_daytime?
@@ -38,7 +38,7 @@ module WeatherHelpers
   end
 
   def format_current_condition(condition_code)
-    data.conditions.dig(condition_code, :labels, :current) || "it's #{condition_code.underscore.gsub('_', ' ')}"
+    data.conditions.dig(condition_code, :labels, :current) || "It's #{condition_code.underscore.gsub('_', ' ')}"
   end
 
   def format_forecasted_condition(condition_code)
@@ -48,7 +48,7 @@ module WeatherHelpers
   def format_temperature(temp)
     celsius = "#{number_to_human(temp, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')}ºC"
     fahrenheit = "#{number_to_human(celsius_to_fahrenheit(temp), precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')}ºF"
-    content_tag :span, 'data-controller': 'units', 'data-units-imperial-value': fahrenheit, 'data-units-metric-value': celsius, title: "#{celsius} | #{fahrenheit}" do
+    content_tag :data, 'data-controller': 'units', 'data-units-imperial-value': fahrenheit, 'data-units-metric-value': celsius, title: "#{celsius} | #{fahrenheit}" do
       celsius
     end
   end
@@ -61,7 +61,7 @@ module WeatherHelpers
     metric = number_to_human(mm, units: PRECIPITATION_METRIC_UNITS, precision: (mm > 1000 ? 1 : 0), strip_insignificant_zeros: true, significant: false, delimiter: ',')
     imperial = number_to_human(mm_to_in(mm), precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')
     imperial += (imperial == "1" ? " inch" : " inches")
-    content_tag :span, 'data-controller': 'units', 'data-units-imperial-value': imperial, 'data-units-metric-value': metric, title: "#{metric} | #{imperial}" do
+    content_tag :data, 'data-controller': 'units', 'data-units-imperial-value': imperial, 'data-units-metric-value': metric, title: "#{metric} | #{imperial}" do
       metric
     end
   end
@@ -110,25 +110,14 @@ module WeatherHelpers
     return if current_weather.blank? && forecast.blank?
     summary = []
     summary << intro
+    summary << current_location
     summary << current_weather
     summary << current_aqi
     summary << forecast
+    summary << precipitation
+    summary << sunrise_or_sunset
     summary << activities
-    markdown_to_html(clean_up_punctuation(summary.join(' ')))
-  end
-
-  def clean_up_punctuation(s)
-    # Remove whitespace before any commas or periods
-    s.gsub!(/\s+([,.—])/, '\1')
-
-    # Replace multiple commas or periods with a single one
-    s.gsub!(/,+/ , ',')
-    s.gsub!(/\.\.+/ , '.')
-
-    # Replace a comma and a period next to each other with a period
-    s.gsub!(/,\.|\.,/ , '.')
-
-    s
+    markdown_to_html(summary.reject(&:blank?).map { |t| "<span>#{t}</span>" }.join(' '))
   end
 
   def intro
@@ -136,35 +125,44 @@ module WeatherHelpers
     return "Man, it's a hot one!" if !is_race_day? && is_hot?
   end
 
+  def current_location
+    "I'm currently in **#{format_location}**"
+  end
+
   def current_weather
     return if data.weather.currentWeather.blank?
-    current = []
-    current << "I'm currently in **#{format_location}**, where"
-    current << "#{format_current_condition(data.weather.currentWeather.conditionCode).downcase}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
-    current << ", which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)}" if data.weather.currentWeather.temperature.round != data.weather.currentWeather.temperatureApparent.round
-    current << "."
-    current.join(' ')
+    text = []
+    text << "#{format_current_condition(data.weather.currentWeather.conditionCode)}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
+    text << ", which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)}" if data.weather.currentWeather.temperature.round != data.weather.currentWeather.temperatureApparent.round
+    text.join
   end
 
   def current_aqi
     return if data.purple_air&.aqi&.value.blank?
-    "The air quality is #{format_air_quality(data.purple_air&.aqi&.label.downcase)}, with an <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.purple_air&.aqi&.value.round}."
+    "The air quality is #{format_air_quality(data.purple_air&.aqi&.label.downcase)}, with an <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.purple_air&.aqi&.value.round}"
   end
 
   def forecast
     return if todays_forecast.blank?
-    forecast = []
-    forecast << "#{today_or_tonight}'s forecast #{format_forecasted_condition(todays_forecast.restOfDayForecast.conditionCode).downcase},"
-    forecast << "with a high of #{format_temperature(todays_forecast.temperatureMax)} and a low of #{format_temperature(todays_forecast.temperatureMin)}."
+    text = []
+    text << "#{today_or_tonight}'s forecast #{format_forecasted_condition(todays_forecast.restOfDayForecast.conditionCode).downcase},"
+    text << "with a high of #{format_temperature(todays_forecast.temperatureMax)} and a low of #{format_temperature(todays_forecast.temperatureMin)}"
+    text.join(' ')
+  end
 
-    if todays_forecast.restOfDayForecast.precipitationChance > 0 && todays_forecast.restOfDayForecast.precipitationType.downcase != 'clear'
-      forecast << "There's a #{number_to_percentage(todays_forecast.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(todays_forecast.restOfDayForecast.precipitationType)} later #{today_or_tonight.downcase},"
-      forecast << "with #{format_precipitation_amount(todays_forecast.restOfDayForecast.snowfallAmount)} expected" if todays_forecast.restOfDayForecast.precipitationType.downcase == 'snow' && todays_forecast.restOfDayForecast.snowfallAmount > 0
-    end
+  def precipitation
+    return if todays_forecast.restOfDayForecast.precipitationChance == 0 || todays_forecast.restOfDayForecast.precipitationType.downcase == 'clear'
+    text = []
+    text << "There's a #{number_to_percentage(todays_forecast.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(todays_forecast.restOfDayForecast.precipitationType)} later #{today_or_tonight.downcase},"
+    text << "with #{format_precipitation_amount(todays_forecast.restOfDayForecast.snowfallAmount)} expected" if todays_forecast.restOfDayForecast.precipitationType.downcase == 'snow' && todays_forecast.restOfDayForecast.snowfallAmount > 0
+    text.join(' ')
+  end
 
-    forecast << "."
-
-    forecast.join(' ')
+  def sunrise_or_sunset
+    return if todays_forecast.blank?
+    now = Time.now
+    return "Sunrise will be at #{sunrise.strftime('%I:%M %p').gsub(/(am|pm)/i, "<abbr>\\1</abbr>")}" if now <= sunrise
+    return "Sunset will be at #{sunset.strftime('%I:%M %p').gsub(/(am|pm)/i, "<abbr>\\1</abbr>")}" if now >= sunrise && now <= sunset
   end
 
   def activities
@@ -175,22 +173,14 @@ module WeatherHelpers
     elsif is_race_day? && is_bad_weather?
       return "Tough weather for racing!"
     elsif no_workout_scheduled? && is_good_weather?
-      return "I don't have any workouts scheduled for today, but it's a good day to be outside."
+      return "It's a good day to be outside!"
     elsif no_workout_scheduled? && is_bad_weather?
-      return "I don't have any workouts scheduled for today so it's a good day to rest."
+      return "It's a good day to rest!"
+    elsif is_good_weather?
+      return "It's a good day to train outside!"
+    elsif is_bad_weather?
+      return "It's a good day to train indoors!"
     end
-
-    workouts = data.trainerroad.workouts.map { |w| workout_with_article(w) }
-
-    activities = ["My training plan has"]
-    activities << comma_join_with_and(workouts)
-    activities << if is_good_weather?
-      "scheduled for today—and it's a good day to train outside."
-    else
-      "scheduled for today—so it's a good day to train indoors."
-    end
-
-    activities.join(' ')
   end
 
   def weather_icon

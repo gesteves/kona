@@ -39,4 +39,13 @@
   p {
     margin: 0;
   }
+
+  span::after {
+    color: var(--color-text-tertiary);
+    content: ' · ';
+  }
+
+  span:last-of-type::after {
+    content: '';
+  }
 }

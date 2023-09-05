@@ -32,10 +32,8 @@ class GoogleMaps
   end
 
   def save_data
-    data = geocode
-    return if data.blank?
-
-    File.open('data/location.json', 'w') { |f| f << data.to_json }
+    File.open('data/location.json', 'w') { |f| f << geocode.to_json }
+    File.open('data/time_zone.json', 'w') { |f| f << time_zone.to_json }
   end
 
   private
