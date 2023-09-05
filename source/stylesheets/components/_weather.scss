@@ -42,7 +42,7 @@
 
   span::after {
     color: var(--color-text-tertiary);
-    content: ' · ';
+    content: ' / ';
   }
 
   span:last-of-type::after {
