@@ -14,8 +14,17 @@ module WeatherHelpers
     data.weather.forecastDaily.days.find { |d| Time.parse(d.forecastStart) <= now && Time.parse(d.forecastEnd) >= now }
   end
 
+  def tomorrows_forecast
+    now = Time.now
+    data.weather.forecastDaily.days.find { |d| Time.parse(d.forecastStart) > now }
+  end
+
   def sunrise
     Time.parse(todays_forecast.sunrise).in_time_zone(data.time_zone.timeZoneId)
+  end
+
+  def tomorrows_sunrise
+    Time.parse(tomorrows_forecast.sunrise).in_time_zone(data.time_zone.timeZoneId)
   end
 
   def sunset
@@ -159,10 +168,10 @@ module WeatherHelpers
   end
 
   def sunrise_or_sunset
-    return if todays_forecast.blank?
     now = Time.now
     return "Sunrise will be at #{sunrise.strftime('%I:%M %p').gsub(/(am|pm)/i, "<abbr>\\1</abbr>")}" if now <= sunrise
-    return "Sunset will be at #{sunset.strftime('%I:%M %p').gsub(/(am|pm)/i, "<abbr>\\1</abbr>")}" if now >= sunrise && now <= sunset
+    return "Sunset will be at #{sunset.strftime('%I:%M %p').gsub(/(am|pm)/i, "<abbr>\\1</abbr>")}" if now >= sunrise && now < sunset
+    return "Sunrise will be at #{tomorrows_sunrise.strftime('%I:%M %p').gsub(/(am|pm)/i, "<abbr>\\1</abbr>")}" if now >= sunset
   end
 
   def activities
