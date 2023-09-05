@@ -118,8 +118,9 @@ module WeatherHelpers
   def weather_summary
     return if current_weather.blank? && forecast.blank?
     summary = []
-    summary << intro
+    summary << race_day
     summary << current_location
+    summary << smooth
     summary << current_weather
     summary << current_aqi
     summary << forecast
@@ -129,13 +130,16 @@ module WeatherHelpers
     markdown_to_html(summary.reject(&:blank?).map { |t| "<span>#{t}</span>" }.join(' '))
   end
 
-  def intro
-    return "**It's race day!**" if is_race_day? && !is_evening?
-    return "Man, it's a hot one!" if !is_race_day? && is_hot?
+  def race_day
+    "**It's race day!**" if is_race_day? && !is_evening?
   end
 
   def current_location
     "I'm currently in **#{format_location}**"
+  end
+
+  def smooth
+    "Man, it's a hot one!" if !is_race_day? && is_hot?
   end
 
   def current_weather
