@@ -18,7 +18,6 @@ class Swarm
 
   def recent_checkin_location
     current_time = Time.now.in_time_zone(@time_zone)
-    puts current_time
     latest = current_time.beginning_of_day
     earliest = latest - 2.days
     data = get_checkins
