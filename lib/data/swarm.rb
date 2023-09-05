@@ -13,11 +13,13 @@ class Swarm
       username: ENV['REDIS_USERNAME'],
       password: ENV['REDIS_PASSWORD']
     )
+    @time_zone = ENV['DEFAULT_TIMEZONE'] || 'America/Denver'
   end
 
   def recent_checkin_location
-    current_time_mountain = Time.now.in_time_zone('Mountain Time (US & Canada)')
-    latest = current_time_mountain.beginning_of_day
+    current_time = Time.now.in_time_zone(@time_zone)
+    puts current_time
+    latest = current_time.beginning_of_day
     earliest = latest - 2.days
     data = get_checkins
     checkin = data.dig('response', 'checkins', 'items')&.find { |c| c['createdAt'] >= earliest.to_i && c['createdAt'] < latest.to_i }

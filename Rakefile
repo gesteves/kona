@@ -26,9 +26,9 @@ task :import => [:dotenv, :clobber] do
 
   # Imports location & weather data
   puts 'Getting most recent check-in from Swarm'
+  time_zone = ENV['DEFAULT_TIMEZONE']
   swarm = Swarm.new
   checkin = swarm.recent_checkin_location
-  time_zone = nil
 
   if checkin[:latitude].nil? || checkin[:longitude].nil?
     puts "No recent Swarm check-ins found, using Contentful location as a fallback"
@@ -46,9 +46,9 @@ task :import => [:dotenv, :clobber] do
     maps = GoogleMaps.new(latitude, longitude)
     maps.save_data
     country = maps.country_code
-    time_zone = maps.time_zone
+    time_zone = maps.time_zone['timeZoneId']
     puts 'Importing weather data from WeatherKit'
-    weather = WeatherKit.new(latitude, longitude, time_zone['timeZoneId'], country)
+    weather = WeatherKit.new(latitude, longitude, time_zone, country)
     weather.save_data
 
     puts 'Importing air quality data from PurpleAir'
@@ -56,7 +56,7 @@ task :import => [:dotenv, :clobber] do
   end
 
   puts 'Importing today’s workouts from TrainerRoad'
-  TrainerRoad.new(time_zone.dig('timeZoneId')).save_data
+  TrainerRoad.new(time_zone).save_data
 
   puts 'All import tasks completed'
 end
