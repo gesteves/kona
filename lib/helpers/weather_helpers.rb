@@ -15,11 +15,11 @@ module WeatherHelpers
   end
 
   def sunrise
-    Time.parse(todays_forecast.sunrise).in_time_zone(data.time_zone.timeZoneId)
+    Time.parse(todays_forecast.sunrise).in_time_zone(data.time_zone.formattedOffset)
   end
 
   def sunset
-    Time.parse(todays_forecast.sunset).in_time_zone(data.time_zone.timeZoneId)
+    Time.parse(todays_forecast.sunset).in_time_zone(data.time_zone.formattedOffset)
   end
 
   def is_daytime?
