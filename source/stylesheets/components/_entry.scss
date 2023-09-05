@@ -144,12 +144,17 @@
 }
 
 .entry__table {
-  border-collapse: collapse;
-  font-family: var(--ibm-plex-mono);
-  font-size: var(--font-x-small);
-  line-height: var(--line-height-x-small);
+  overflow-x: scroll;
   margin: 2rem 0;
   width: 100%;
+
+  table {
+    border-collapse: collapse;
+    font-family: var(--ibm-plex-mono);
+    font-size: var(--font-x-small);
+    line-height: var(--line-height-x-small);
+    width: 100%;
+  }
 
   thead tr {
     background-color: var(--color-table-header-background);
@@ -162,6 +167,7 @@
   th,
   td {
     padding: 1rem 1rem;
+    white-space: nowrap;
   }
 
   tbody tr {
@@ -177,56 +183,7 @@
     }
   }
 
-  @media (max-width: #{$bp-medium}) {  
-    border-bottom: 2px solid var(--color-table-last-cell-border);
-    border-top: 2px solid var(--color-table-last-cell-border);
-
-    thead {
-      height: 1px;
-      overflow: hidden;
-      position: absolute;
-      white-space: nowrap;
-      width: 1px;
-    }
-
-    tbody {
-      tr {
-        border: none;
-        display: block;
-
-        &:last-of-type {
-          &, td:last-of-type {
-            border: none;
-          }
-        }
-      }
-      
-      td {
-        border-bottom: 1px solid var(--color-table-cell-border);
-        display: block;
-        text-align: right;
-
-        &:nth-of-type(odd) {
-          background-color: var(--color-background);
-        }
-
-        &:nth-of-type(even) {
-          background-color: var(--color-table-even-cell-background);
-        }
-
-        &:last-of-type {
-          border-bottom: 2px solid var(--color-table-last-cell-border);
-        }
-      }
-      
-      td::before {
-        content: attr(data-label);
-        float: left;
-        font-weight: bold;
-        text-transform: uppercase;
-      }
-    }
-  }
+  
 }
 
 .entry--article .entry__body {

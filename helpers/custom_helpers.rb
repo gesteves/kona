@@ -251,15 +251,7 @@ module CustomHelpers
   def responsivize_tables(html)
     return if html.blank?
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
-      doc.css('table').each do |table|
-        table['class'] = 'entry__table'
-        labels = table.css('thead th').to_a.map(&:inner_html)
-        table.css('tbody tr').each do |row|
-          row.css('td').each_with_index do |td, i|
-            td['data-label'] = labels[i]
-          end
-        end
-      end
+      doc.css('table').each { |table| table.wrap("<div class=\"entry__table\"></div>") }
     doc.to_html
   end
 
