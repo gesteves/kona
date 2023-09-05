@@ -121,7 +121,7 @@ module WeatherHelpers
   end
 
   def intro
-    return "It's race day!" if is_race_day? && !is_evening?
+    return "**It's race day!**" if is_race_day? && !is_evening?
     return "Man, it's a hot one!" if !is_race_day? && is_hot?
   end
 
@@ -133,8 +133,8 @@ module WeatherHelpers
     return if data.weather.currentWeather.blank?
     text = []
     text << "#{format_current_condition(data.weather.currentWeather.conditionCode)}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
-    text << ", which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)}" if data.weather.currentWeather.temperature.round != data.weather.currentWeather.temperatureApparent.round
-    text.join
+    text << "which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)}" if data.weather.currentWeather.temperature.round != data.weather.currentWeather.temperatureApparent.round
+    text.join(', ')
   end
 
   def current_aqi
@@ -145,17 +145,17 @@ module WeatherHelpers
   def forecast
     return if todays_forecast.blank?
     text = []
-    text << "#{today_or_tonight}'s forecast #{format_forecasted_condition(todays_forecast.restOfDayForecast.conditionCode).downcase},"
+    text << "#{today_or_tonight}'s forecast #{format_forecasted_condition(todays_forecast.restOfDayForecast.conditionCode).downcase}"
     text << "with a high of #{format_temperature(todays_forecast.temperatureMax)} and a low of #{format_temperature(todays_forecast.temperatureMin)}"
-    text.join(' ')
+    text.join(', ')
   end
 
   def precipitation
     return if todays_forecast.restOfDayForecast.precipitationChance == 0 || todays_forecast.restOfDayForecast.precipitationType.downcase == 'clear'
     text = []
-    text << "There's a #{number_to_percentage(todays_forecast.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(todays_forecast.restOfDayForecast.precipitationType)} later #{today_or_tonight.downcase},"
+    text << "There's a #{number_to_percentage(todays_forecast.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(todays_forecast.restOfDayForecast.precipitationType)} later #{today_or_tonight.downcase}"
     text << "with #{format_precipitation_amount(todays_forecast.restOfDayForecast.snowfallAmount)} expected" if todays_forecast.restOfDayForecast.precipitationType.downcase == 'snow' && todays_forecast.restOfDayForecast.snowfallAmount > 0
-    text.join(' ')
+    text.join(', ')
   end
 
   def sunrise_or_sunset
