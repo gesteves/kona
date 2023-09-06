@@ -42,7 +42,8 @@
 
   span::after {
     color: var(--color-text-tertiary);
-    content: ' / ';
+    content: '\00a0·';
+    margin: 0 0.5rem;
   }
 
   span:last-of-type::after {
