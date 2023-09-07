@@ -21,7 +21,7 @@
 
   span::after {
     color: var(--color-text-tertiary);
-    content: ' / ';
+    content: '\00a0•';
   }
 
   span:last-of-type::after {
