@@ -159,8 +159,8 @@ module WeatherHelpers
     return if todays_forecast.blank?
     text = []
     text << "#{today_or_tonight}'s forecast #{format_forecasted_condition(todays_forecast.restOfDayForecast.conditionCode).downcase}"
-    text << "with a high of #{format_temperature(todays_forecast.temperatureMax)} and a low of #{format_temperature(todays_forecast.temperatureMin)}" if is_daytime?
-    text << "with a low of #{format_temperature(todays_forecast.temperatureMin)}" if !is_daytime?
+    text << "with a high of #{format_temperature(todays_forecast.temperatureMax)} and a low of #{format_temperature(todays_forecast.temperatureMin)}" unless is_evening?
+    text << "with a low of #{format_temperature(todays_forecast.temperatureMin)}" if is_evening?
     text.join(', ')
   end
 
