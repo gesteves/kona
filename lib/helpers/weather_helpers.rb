@@ -177,9 +177,9 @@ module WeatherHelpers
 
   def sunrise_or_sunset
     now = Time.now
-    return "Sunrise will be at #{sunrise.strftime('%l:%M %p').gsub(/(am|pm)/i, "<abbr>\\1</abbr>")}" if now <= sunrise
-    return "Sunset will be at #{sunset.strftime('%l:%M %p').gsub(/(am|pm)/i, "<abbr>\\1</abbr>")}" if now >= sunrise && now < sunset
-    return "Sunrise will be at #{tomorrows_sunrise.strftime('%l:%M %p').gsub(/(am|pm)/i, "<abbr>\\1</abbr>")}" if now >= sunset
+    return "Sunrise will be at #{sunrise.strftime('%l:%M\00a0%p').gsub(/(am|pm)/i, "<abbr>\\1</abbr>")}" if now <= sunrise
+    return "Sunset will be at #{sunset.strftime('%l:%M\00a0%p').gsub(/(am|pm)/i, "<abbr>\\1</abbr>")}" if now >= sunrise && now < sunset
+    return "Sunrise will be at #{tomorrows_sunrise.strftime('%l:%M\00a0%p').gsub(/(am|pm)/i, "<abbr>\\1</abbr>")}" if now >= sunset
   end
 
   def activities
