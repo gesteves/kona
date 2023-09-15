@@ -37,7 +37,7 @@ module WeatherHelpers
   end
 
   def is_evening?
-    Time.now >= sunset
+    Time.now >= sunset.beginning_of_hour
   end
 
   def today_or_tonight
