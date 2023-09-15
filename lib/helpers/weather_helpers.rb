@@ -177,9 +177,9 @@ module WeatherHelpers
 
   def sunrise_or_sunset
     now = Time.now
-    return "Sunrise will be at #{format_time(sunrise)}" if now <= sunrise
-    return "Sunset will be at #{format_time(sunset)}" if now >= sunrise && now < sunset
-    return "Sunrise will be at #{format_time(tomorrows_sunrise)}" if now >= sunset
+    return "Sunrise will be at #{format_time(sunrise)}" if now <= sunrise.beginning_of_hour
+    return "Sunset will be at #{format_time(sunset)}" if now >= sunrise.beginning_of_hour && now < sunset.beginning_of_hour
+    return "Sunrise will be at #{format_time(tomorrows_sunrise)}" if now >= sunset.beginning_of_hour
   end
 
   def format_time(time)
