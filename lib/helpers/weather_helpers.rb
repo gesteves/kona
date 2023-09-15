@@ -34,8 +34,6 @@ module WeatherHelpers
   def is_daytime?
     now = Time.now
     now >= sunrise.beginning_of_hour && now <= sunset.beginning_of_hour
-  rescue
-    true
   end
 
   def is_evening?
