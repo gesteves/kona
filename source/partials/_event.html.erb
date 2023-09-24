@@ -4,7 +4,7 @@
       <% if event.canceled %>
         <span class="entry__highlight">Canceled</span>
       <% elsif is_today?(event.date) %>
-        <span class="entry__highlight entry__highlight--live">Today</span>
+        <span class="entry__highlight <%= "entry__highlight--live" if is_daytime? %>">Today</span>
       <% else %>
         <span><%= Time.parse(event.date).strftime('%B %-e, %Y') %></span>
       <% end %>
