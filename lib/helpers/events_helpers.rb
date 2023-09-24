@@ -1,8 +1,8 @@
 module EventsHelpers
   def is_today?(date)
-    event_date = Time.rfc3339(date)
+    event_date = Time.rfc3339(date).in_time_zone(data.time_zone.timeZoneId)
     today = Time.current.in_time_zone(data.time_zone.timeZoneId)
-    event_date.beginning_of_day == today.beginning_of_day
+    event_date.to_date == today.to_date
   end
 
   def is_race_day?
