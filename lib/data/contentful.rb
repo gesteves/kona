@@ -235,7 +235,7 @@ class Contentful
     fetch = true
 
     while fetch
-      response = Client.query(QUERIES::Content, variables: { skip: skip, limit: limit, today: Time.now.beginning_of_day.strftime("%F") })
+      response = Client.query(QUERIES::Content, variables: { skip: skip, limit: limit, today: Time.current.in_time_zone(ENV['DEFAULT_TIMEZONE']).beginning_of_day.strftime("%F") })
       loops += 1
       skip = loops * limit
 
