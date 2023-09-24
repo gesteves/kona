@@ -16,7 +16,7 @@ class Contentful
   Client = GraphQL::Client.new(schema: Schema, execute: HTTP)
 
   QUERIES = Client.parse <<-'GRAPHQL'
-    query Content($skip: Int, $limit: Int, $today: DateTime) {
+    query Content($skip: Int, $limit: Int) {
       articles: articleCollection(skip: $skip, limit: $limit, preview: true) {
         items {
           title
@@ -140,7 +140,7 @@ class Contentful
           status
         }
       }
-      events: eventCollection(skip: $skip, limit: $limit, where: { date_gte: $today }, order: [date_ASC]) {
+      events: eventCollection(skip: $skip, limit: $limit, order: [date_ASC]) {
         items {
           title
           description
@@ -235,7 +235,7 @@ class Contentful
     fetch = true
 
     while fetch
-      response = Client.query(QUERIES::Content, variables: { skip: skip, limit: limit, today: Time.current.in_time_zone(ENV['DEFAULT_TIMEZONE']).beginning_of_day.strftime("%F") })
+      response = Client.query(QUERIES::Content, variables: { skip: skip, limit: limit })
       loops += 1
       skip = loops * limit
 
