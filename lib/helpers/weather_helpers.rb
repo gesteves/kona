@@ -113,6 +113,14 @@ module WeatherHelpers
     data.weather.currentWeather.temperature >= 32 || data.weather.currentWeather.temperatureApparent >= 32
   end
 
+  def hide_apparent_temperature?
+    celsius_temp = data.weather.currentWeather.temperature.round
+    celsius_apparent = data.weather.currentWeather.temperatureApparent.round
+    fahrenheit_temp = celsius_to_fahrenheit(data.weather.currentWeather.temperature).round
+    fahrenheit_apparent = celsius_to_fahrenheit(data.weather.currentWeather.temperatureApparent).round
+    celsius_temp == celsius_apparent || fahrenheit_temp == fahrenheit_apparent
+  end
+
   def weather_summary
     return if current_weather.blank? && forecast.blank?
     summary = []
@@ -144,7 +152,7 @@ module WeatherHelpers
     return if data.weather.currentWeather.blank?
     text = []
     text << "#{format_current_condition(data.weather.currentWeather.conditionCode)}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
-    text << "which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)}" if data.weather.currentWeather.temperature.round != data.weather.currentWeather.temperatureApparent.round
+    text << "which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)}" unless hide_apparent_temperature?
     text.join(', ')
   end
 
