@@ -75,8 +75,8 @@ module WeatherHelpers
     imperial = if inches < 1
       "less than an inch"
     else
-      in = number_to_human(inches, precision: (inches < 1 ? 1 : 0 ), strip_insignificant_zeros: true, significant: false, delimiter: ',')
-      in == "1" ? "#{in} inch" : "#{in} inches"
+      human_inches = number_to_human(inches, precision: (inches < 1 ? 1 : 0 ), strip_insignificant_zeros: true, significant: false, delimiter: ',')
+      human_inches == "1" ? "#{human_inches} inch" : "#{human_inches} inches"
     end
 
     content_tag :data, 'data-controller': 'units', 'data-units-imperial-value': imperial, 'data-units-metric-value': metric, title: "#{metric} | #{imperial}" do
