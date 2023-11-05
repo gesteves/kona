@@ -186,8 +186,10 @@ module WeatherHelpers
 
   def precipitation
     return if todays_forecast.restOfDayForecast.precipitationChance == 0 || todays_forecast.restOfDayForecast.precipitationType.downcase == 'clear'
+    percentage_string = number_to_percentage(todays_forecast.restOfDayForecast.precipitationChance * 100, precision: 0)
+    article = ["8", "11", "18"].any? { |prefix| percentage_string.start_with?(prefix) } ? "an" : "a"
     text = []
-    text << "There's a #{number_to_percentage(todays_forecast.restOfDayForecast.precipitationChance * 100, precision: 0)} chance of #{format_precipitation_type(todays_forecast.restOfDayForecast.precipitationType)} later #{today_or_tonight.downcase}"
+    text << "There's #{article} #{percentage_string} chance of #{format_precipitation_type(todays_forecast.restOfDayForecast.precipitationType)} later #{today_or_tonight.downcase}"
     text << "with #{format_precipitation_amount(todays_forecast.restOfDayForecast.snowfallAmount)} expected" if todays_forecast.restOfDayForecast.precipitationType.downcase == 'snow' && todays_forecast.restOfDayForecast.snowfallAmount > 0
     text.join(', ')
   end
