@@ -45,3 +45,23 @@
   line-height: var(--line-height-x-small);
   text-transform: uppercase;
 }
+
+.stats__branding {
+  display: flex;
+  flex-flow: row nowrap;
+  grid-column: span 12;
+  justify-content: space-between;
+
+  svg {
+    width: 120px;
+  }
+
+  a {
+    text-transform: none;
+
+    &:hover,
+    &:active {
+      color: var(--color-link);
+    }
+  }
+}
