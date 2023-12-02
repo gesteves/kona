@@ -1,5 +1,6 @@
 <div class="stats__stat">
-  <span class="stats__meta"><%= "Activity".pluralize(activities) %></span>
+  <span class="stats__meta"><%= "Activity".pluralize(activities) %> <%= timeframe %></span>
   <span class="stats__number"><%= number_to_delimited(activities) %></span>
-  <span class="stats__meta"><%= timeframe %></span>
+  <% strava = data.site.socialsCollection.items.compact.find { |i| i.title == "Strava" } %>
+  <span class="stats__meta"><%= link_to "View on Strava", strava.destination, rel: "me noopener", target: "_blank" %></span>
 </div>

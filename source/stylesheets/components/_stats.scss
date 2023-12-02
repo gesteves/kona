@@ -44,24 +44,30 @@
   font-size: var(--font-x-small);
   line-height: var(--line-height-x-small);
   text-transform: uppercase;
+  white-space: nowrap;
+
+  a {
+    &:link,
+    &:visited {
+      color: currentColor;
+      text-decoration-color: var(--color-text-tertiary);
+    }
+
+    &:hover,
+    &:active {
+      color: var(--color-link);
+      text-decoration-color: currentColor;
+    }
+  }
 }
 
 .stats__branding {
   display: flex;
   flex-flow: row nowrap;
   grid-column: span 12;
-  justify-content: space-between;
+  justify-content: flex-end;
 
   svg {
     width: 120px;
-  }
-
-  a {
-    text-transform: none;
-
-    &:hover,
-    &:active {
-      color: var(--color-link);
-    }
   }
 }
