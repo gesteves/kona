@@ -1,5 +1,5 @@
 <div class="stats__stat">
-  <span class="stats__meta"><%= activity %> <%= %w{ 🥴 🙃 😑 🥲 😬 }.sample if distance == 0 %></span>
+  <span class="stats__meta"><%= activity %> <%= %w{ 🥴 🙃 🥲 😬 }.sample if distance == 0 %></span>
   <span class="stats__number" data-controller="units" data-units-imperial-value="<%= format_distance_number(distance, units: 'imperial') %>" data-units-metric-value="<%= format_distance_number(distance) %>" title="<%= "#{format_distance(distance)} | #{format_distance(distance, units: 'imperial')}" %>"><%= format_distance_number(distance) %></span>
   <span class="stats__meta"   data-controller="units" data-units-imperial-value="<%= format_distance_unit(distance, units: 'imperial') %>"   data-units-metric-value="<%= format_distance_unit(distance) %>"><%= format_distance_unit(distance) %></span>
 </div>
