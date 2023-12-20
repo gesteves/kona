@@ -18,19 +18,20 @@ module DistanceHelpers
       number_to_human(meters, units: DISTANCE_UNITS, precision: precision, strip_insignificant_zeros: true, significant: false, delimiter: ',')
     when 'imperial'
       miles = meters_to_miles(meters)
-      precision = if miles > 1 && miles < 10
-        2
-      elsif miles < 1000
-        1
-      else
-        0
-      end
-      if miles < 1
-        distance = meters_to_yards(meters)
+      yards = meters_to_yards(meters)
+      if yards < 1000
+        distance = yards
         units = { unit: "yards" }
       else
         distance = miles
         units = { unit: "miles" }
+      end
+      precision = if distance < 10
+        2
+      elsif distance < 1000
+        1
+      else
+        0
       end
       number_to_human(distance, units: units, precision: precision, strip_insignificant_zeros: true, significant: false, delimiter: ',')
     end
