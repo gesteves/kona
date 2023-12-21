@@ -41,7 +41,7 @@ module DistanceHelpers
     kilometers = meters / 1000.0
 
     if meters < 1000
-      [meters, { unit: 'meter'.pluralize(meter) }]
+      [meters, { unit: 'meter'.pluralize(meters) }]
     else
       [kilometers, { unit: 'kilometer'.pluralize(kilometers) }]
     end
