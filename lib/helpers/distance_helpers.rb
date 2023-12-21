@@ -27,15 +27,17 @@ module DistanceHelpers
   end
 
   def determine_precision(distance)
-    case distance
-    when 0...10
+    significant_digits = distance.to_i.digits.count
+    case significant_digits
+    when 1, 2
       2
-    when 10...1000
+    when 3
       1
     else
       0
     end
   end
+  
 
   def metric_conversion(meters)
     kilometers = meters / 1000.0
