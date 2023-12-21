@@ -16,11 +16,11 @@ module DistanceHelpers
   end
 
   def distance_value(meters, units: 'si')
-    format_distance(meters, units: units).split(/\s+/).first
+    distance(meters, units: units).split(/\s+/).first
   end
 
   def distance_unit(meters, units: 'si')
-    format_distance(meters, units: units).split(/\s+/).last
+    distance(meters, units: units).split(/\s+/).last
   end
 
   private
