@@ -33,6 +33,4 @@ module LocationHelpers
       end
     end
   end
-
-
 end
