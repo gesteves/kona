@@ -45,10 +45,10 @@ module DistanceHelpers
     miles = meters_to_miles(meters)
     yards = meters_to_yards(meters)
 
-    if yards < 1000
-      [yards, { unit: 'yards' }]
+    if yards < 1760
+      [yards, { unit: 'yard'.pluralize(yards) }]
     else
-      [miles, { unit: 'miles' }]
+      [miles, { unit: 'mile'.pluralize(miles) }]
     end
   end
 
