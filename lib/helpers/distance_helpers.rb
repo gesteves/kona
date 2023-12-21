@@ -1,14 +1,10 @@
 module DistanceHelpers
 
-  DISTANCE_UNITS = {
-    unit: 'meters',
-    thousand: 'kilometers'
-  }
-
   def distance(meters, units: 'si')
     case units
     when 'si', 'metric'
-      formatted_distance(meters, DISTANCE_UNITS, determine_precision(meters))
+      metric_distance, metric_units = metric_conversion(meters)
+      formatted_distance(metric_distance, metric_units, determine_precision(metric_distance))
     when 'imperial'
       imperial_distance, imperial_units = imperial_conversion(meters)
       formatted_distance(imperial_distance, imperial_units, determine_precision(imperial_distance))
@@ -32,12 +28,22 @@ module DistanceHelpers
 
   def determine_precision(distance)
     case distance
-    when 0...10000
+    when 0...10
       2
-    when 10000...1000000
+    when 10...1000
       1
     else
       0
+    end
+  end
+
+  def metric_conversion(meters)
+    kilometers = meters / 1000.0
+
+    if meters < 1000
+      [meters, { unit: 'meter'.pluralize(meter) }]
+    else
+      [kilometers, { unit: 'kilometer'.pluralize(kilometers) }]
     end
   end
 
