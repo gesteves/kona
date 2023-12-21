@@ -5,48 +5,55 @@ module DistanceHelpers
     thousand: 'kilometers'
   }
 
-  def format_distance(meters, units: 'si')
+  def distance(meters, units: 'si')
     case units
     when 'si', 'metric'
-      precision = if meters < 10000
-        2
-      elsif meters < 1000000
-        1
-      else
-        0
-      end
-      number_to_human(meters, units: DISTANCE_UNITS, precision: precision, strip_insignificant_zeros: true, significant: false, delimiter: ',')
+      formatted_distance(meters, DISTANCE_UNITS, determine_precision(meters))
     when 'imperial'
-      miles = meters_to_miles(meters)
-      yards = meters_to_yards(meters)
-      if yards < 1000
-        distance = yards
-        units = { unit: "yards" }
-      else
-        distance = miles
-        units = { unit: "miles" }
-      end
-      precision = if distance < 10
-        2
-      elsif distance < 1000
-        1
-      else
-        0
-      end
-      number_to_human(distance, units: units, precision: precision, strip_insignificant_zeros: true, significant: false, delimiter: ',')
+      imperial_distance, imperial_units = imperial_conversion(meters)
+      formatted_distance(imperial_distance, imperial_units, determine_precision(imperial_distance))
     end
   end
 
-  def format_distance_number(meters, units: 'si')
+  def distance_value(meters, units: 'si')
     format_distance(meters, units: units).split(/\s+/).first
   end
 
-  def format_distance_unit(meters, units: 'si')
+  def distance_unit(meters, units: 'si')
     format_distance(meters, units: units).split(/\s+/).last
   end
 
+  private
+
+  def formatted_distance(distance, units, precision)
+    number_to_human(distance, units: units, precision: precision,
+                    strip_insignificant_zeros: true, significant: false, delimiter: ',')
+  end
+
+  def determine_precision(distance)
+    case distance
+    when 0...10000
+      2
+    when 10000...1000000
+      1
+    else
+      0
+    end
+  end
+
+  def imperial_conversion(meters)
+    miles = meters_to_miles(meters)
+    yards = meters_to_yards(meters)
+
+    if yards < 1000
+      [yards, { unit: 'yards' }]
+    else
+      [miles, { unit: 'miles' }]
+    end
+  end
+
   def meters_to_miles(meters)
-    miles = meters * 0.000621371
+    meters * 0.000621371
   end
 
   def meters_to_yards(meters)
