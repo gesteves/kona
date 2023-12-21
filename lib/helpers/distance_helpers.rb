@@ -42,7 +42,7 @@ module DistanceHelpers
   def metric_conversion(meters)
     kilometers = meters / 1000.0
 
-    if meters < 1000
+    if kilometers < 1
       [meters, { unit: 'meter'.pluralize(meters) }]
     else
       [kilometers, { unit: 'kilometer'.pluralize(kilometers) }]
@@ -53,7 +53,7 @@ module DistanceHelpers
     miles = meters_to_miles(meters)
     yards = meters_to_yards(meters)
 
-    if yards < 1760
+    if miles < 1
       [yards, { unit: 'yard'.pluralize(yards) }]
     else
       [miles, { unit: 'mile'.pluralize(miles) }]
