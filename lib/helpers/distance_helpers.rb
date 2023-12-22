@@ -26,7 +26,7 @@ module DistanceHelpers
                     strip_insignificant_zeros: true, significant: false, delimiter: ',')
   end
 
-  def determine_precision(number, max_digits: 4, max_decimals: 2)
+  def determine_precision(number, max_digits: 4, max_decimals: 1)
     significant_digits = number.to_i.digits.count
     precision = max_digits - significant_digits
     precision.clamp(0, max_decimals)
