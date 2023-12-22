@@ -26,18 +26,12 @@ module DistanceHelpers
                     strip_insignificant_zeros: true, significant: false, delimiter: ',')
   end
 
-  def determine_precision(distance)
-    significant_digits = distance.to_i.digits.count
-    case significant_digits
-    when 1, 2
-      2
-    when 3
-      1
-    else
-      0
-    end
+  def determine_precision(number, max_digits: 4, max_decimals: 2)
+    significant_digits = number.to_i.digits.count
+    precision = max_digits - significant_digits
+    precision.clamp(0, max_decimals)
   end
-  
+
 
   def metric_conversion(meters)
     kilometers = meters / 1000.0
