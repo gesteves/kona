@@ -2,7 +2,7 @@
   <% if content.title.present? && content.title != "Blog" %>
     <header class="blog__header">
       <h2 id="hed">
-        <%= content.title %>
+        <%= remove_widows(content.title) %>
       </h2>
     </header>
   <% end %>
