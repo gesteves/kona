@@ -34,7 +34,7 @@ module LocationHelpers
     end
   end
 
-  def home?
+  def in_jackson_hole?
     format_location == "Jackson Hole, Wyoming"
   end
 end

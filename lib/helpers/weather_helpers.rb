@@ -248,6 +248,6 @@ module WeatherHelpers
   end
 
   def is_indoor_season?
-    home? && (Time.now.month <= 3 || Time.now.month >= 11)
+    in_jackson_hole? && (Time.now.month <= 3 || Time.now.month >= 11)
   end
 end
