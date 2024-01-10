@@ -3,7 +3,7 @@ module WorkoutsHelpers
     data.trainerroad.workouts.present?
   end
 
-  def no_workout_scheduled?
+  def is_rest_day?
     !is_workout_scheduled?
   end
 

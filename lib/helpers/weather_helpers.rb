@@ -246,8 +246,4 @@ module WeatherHelpers
     return condition[:icon] if condition[:icon].is_a?(String)
     is_daytime? ? condition[:icon][:day] : condition[:icon][:night]
   end
-
-  def is_indoor_season?
-    in_jackson_hole? && (Time.now.month <= 3 || Time.now.month >= 11)
-  end
 end
