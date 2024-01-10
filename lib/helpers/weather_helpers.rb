@@ -209,18 +209,34 @@ module WeatherHelpers
   def activities
     return unless is_daytime?
 
-    if is_race_day? && is_good_weather?
-      return "Good weather for racing!"
-    elsif is_race_day? && is_bad_weather?
-      return "Tough weather for racing!"
-    elsif no_workout_scheduled? && is_good_weather?
+    if is_race_day?
+      if is_good_weather?
+        return "Good weather for racing!"
+      else
+        return "Tough weather for racing!"
+      end
+    end
+
+    if is_indoor_season?
+      if is_workout_scheduled?
+        return "It's a good day to train indoors!"
+      else
+        return "It's a good day to rest!"
+      end
+    end
+    
+    if is_workout_scheduled?
+      if is_good_weather?
+        return "It's a good day to train outside!"
+      else
+        return "It's a good day to train indoors!"
+      end
+    end
+
+    if is_good_weather?
       return "It's a good day to be outside!"
-    elsif no_workout_scheduled? && is_bad_weather?
+    else
       return "It's a good day to rest!"
-    elsif is_good_weather?
-      return "It's a good day to train outside!"
-    elsif is_bad_weather?
-      return "It's a good day to train indoors!"
     end
   end
 
@@ -229,5 +245,9 @@ module WeatherHelpers
     return 'cloud-question' if condition.blank?
     return condition[:icon] if condition[:icon].is_a?(String)
     is_daytime? ? condition[:icon][:day] : condition[:icon][:night]
+  end
+
+  def is_indoor_season?
+    home? && (Time.now.month <= 3 || Time.now.month >= 11)
   end
 end

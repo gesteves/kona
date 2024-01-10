@@ -33,4 +33,8 @@ module LocationHelpers
       end
     end
   end
+
+  def home?
+    format_location == "Jackson Hole, Wyoming"
+  end
 end
