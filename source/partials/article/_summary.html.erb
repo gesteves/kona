@@ -4,7 +4,7 @@
       <span><%= link_to DateTime.parse(article.published_at).strftime('%A, %B %-e, %Y'), article.path %></span>
     </p>
     <h4 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">
-      <%= link_to smartypants(article.title), article.path %>
+      <%= link_to smartypants(remove_widows(article.title)), article.path %>
     </h4>
   </header>
   <div class="entry__body">
