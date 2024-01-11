@@ -27,7 +27,7 @@ module LocationHelpers
       end
     else
       if city == 'Ciudad de México'
-        return city
+        return "Mexico City"
       else
         return [city || state, country].compact.join(", ")
       end
