@@ -326,7 +326,7 @@ class Contentful
       tag = tag.dup
       tag[:items] = @articles.select { |a| !a[:draft] && a.dig(:contentfulMetadata, :tags).include?(tag) }
       tag[:path] = "/tagged/#{tag[:id]}/index.html"
-      tag[:template] = "/blog.html"
+      tag[:template] = "/articles.html"
       tag[:title] = tag[:name]
       tag[:indexInSearchEngines] = true
       tag
@@ -342,7 +342,7 @@ class Contentful
         current_page: index + 1,
         previous_page: index == 0 ? nil : index,
         next_page: index == sliced.size - 1 ? nil : index + 2,
-        template: "/blog.html",
+        template: "/articles.html",
         title: "Blog",
         items: page,
         indexInSearchEngines: true

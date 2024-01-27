@@ -22,7 +22,7 @@ ignore "/article.html"
 ignore "/short.html"
 ignore "/page.html"
 ignore "/home.html"
-ignore "/blog.html"
+ignore "/articles.html"
 
 @app.data.articles.each do |article|
   proxy article.path, article.template, locals: { content: article }, ignore: true
