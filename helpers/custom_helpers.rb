@@ -405,6 +405,8 @@ module CustomHelpers
   end
 
   def blurhash_data_uri(asset_id, width: 32)
+    return unless ENV['ENABLE_BLURHASH'].present?
+
     original_width, original_height = get_asset_dimensions(asset_id)
     return unless original_width && original_height
 
