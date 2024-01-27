@@ -5,7 +5,7 @@
         <% data.srcsets.avatar.formats.each do |format| %>
           <%= source_tag(data.site.author.profilePicture.url, sizes: data.srcsets.avatar.sizes.join(', '), type: "image/#{format}", format: format, widths: data.srcsets.avatar.widths.sort) %>
         <% end %>
-        <img src="<%= data.site.author.profilePicture.url %>" alt="<%= data.site.author.profilePicture.description %>" width="<%= data.site.author.profilePicture.width %>" height="<%= data.site.author.profilePicture.height %>" loading="lazy" decoding="async">
+        <img src="<%= netlify_image_url(data.site.author.profilePicture.url) %>" alt="<%= data.site.author.profilePicture.description %>" width="<%= data.site.author.profilePicture.width %>" height="<%= data.site.author.profilePicture.height %>" loading="lazy" decoding="async">
       </picture>
     </section>
 

@@ -15,3 +15,6 @@ status = 200
 
 [functions]
   node_bundler = "esbuild"
+
+[images]
+  remote_images = ["https://images.ctfassets.net/.*"]

@@ -90,25 +90,6 @@ module CustomHelpers
     items.size <= 2 ? items.join(' and ') : [items[0..-2].join(', '), items[-1]].join(' and ')
   end
 
-  def source_tag(url, options = {})
-    srcset_opts = { fm: options[:format] }.compact
-    options[:srcset] = srcset(url: url, widths: options[:widths], square: options[:square], options: srcset_opts)
-    options.delete(:widths)
-    options.delete(:format)
-    tag :source, options
-  end
-
-  def srcset(url:, widths:, square: false, options: {})
-    url = URI.parse(url)
-    srcset = widths.map do |w|
-      query = options.merge!({ w: w })
-      query.merge!({ h: w, fit: "fill", f: "faces"}) if square
-      url.query = URI.encode_www_form(query)
-      "#{url.to_s} #{w}w"
-    end
-    srcset.join(', ')
-  end
-
   def pagination_path(page:)
     if page == 1
       "/blog/index.html"
@@ -134,6 +115,32 @@ module CustomHelpers
 
   def get_asset_id(url)
     url.split('/')[4]
+  end
+
+  def netlify_image_url(original_url, params = {})
+    netlify_base_url = '/.netlify/images'
+    original_url = "https://#{original_url}" unless original_url.start_with?('http://', 'https://')
+    query_params = URI.encode_www_form(params)
+    "#{netlify_base_url}?url=#{URI.encode_www_form_component(original_url)}&#{query_params}"
+  end
+
+
+  def srcset(url:, widths:, square: false, options: {})
+    srcset = widths.map do |w|
+      query = options.merge({ w: w })
+      query.merge!({ h: w }) if square
+      netlify_image_url(url, query) + " #{w}w"
+    end
+    srcset.join(', ')
+  end
+
+
+  def source_tag(url, options = {})
+    srcset_opts = { fm: options[:format] }.compact
+    options[:srcset] = srcset(url: url, widths: options[:widths], square: options[:square], options: srcset_opts)
+    options.delete(:widths)
+    options.delete(:format)
+    tag :source, options
   end
 
   def responsivize_images(html, widths: [100, 200, 300], sizes: '100vw', formats: ['avif', 'webp', 'jpg'], lazy: true, square: false)
@@ -181,19 +188,17 @@ module CustomHelpers
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
     doc.css('img').each do |img|
       asset_id = get_asset_id(img['src'])
-      asset_width, asset_height = get_asset_dimensions(asset_id)
+      asset_width, _ = get_asset_dimensions(asset_id)
       content_type = get_asset_content_type(asset_id)
 
-      # Skip to the next image if it's a gif.
       next if content_type == 'image/gif'
 
-      width = [width, asset_width].compact.min
-      url = URI.parse(img['src'])
-      url.query = URI.encode_www_form({ w: width })
-      img['src'] = url.to_s
+      resize_width = [width, asset_width].compact.min
+      img['src'] = netlify_image_url(img['src'], { w: resize_width })
     end
     doc.to_html
   end
+
 
   def set_alt_text(html)
     return if html.blank?
@@ -333,9 +338,8 @@ module CustomHelpers
   end
 
   def site_icon(w:)
-    url = URI.parse(data.site.logo.url)
-    url.query = URI.encode_www_form(w: w)
-    url.to_s
+    original_url = data.site.logo.url
+    netlify_image_url(original_url, { w: w })
   rescue
     nil
   end
@@ -348,10 +352,8 @@ module CustomHelpers
     ].flatten.max
   end
 
-  def open_graph_image_url(url)
-    url = URI.parse(url)
-    query = { w: 1200, h: 630, fit: 'fill', f: 'faces' }
-    url.query = URI.encode_www_form(query)
-    url.to_s
+  def open_graph_image_url(original_url)
+    params = { w: 1200, h: 630, fit: 'fill' }
+    netlify_image_url(original_url, params)
   end
 end
