@@ -16,7 +16,7 @@
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="<%= content.openGraphImage.description %>">
 <% elsif data.site.openGraphImage.present? %>
-  <meta property="og:image" content="<%= netlify_image_url(data.site.openGraphImage.url) %>">
+  <meta property="og:image" content="<%= cdn_image_url(data.site.openGraphImage.url) %>">
   <meta property="og:image:width" content="<%= data.site.openGraphImage.width %>">
   <meta property="og:image:height" content="<%= data.site.openGraphImage.height %>">
   <meta property="og:image:alt" content="<%= data.site.openGraphImage.description %>">

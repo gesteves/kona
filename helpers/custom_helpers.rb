@@ -127,23 +127,30 @@ module CustomHelpers
     asset&.url
   end
 
-  def netlify_image_url(original_url, params = {}, config = {})
-    base_path = '/.netlify/images'
-    netlify_base_url = ENV['CONTEXT'] == 'dev' ? "http://localhost:8888#{base_path}" : "#{ENV['URL']}#{base_path}"
-    original_url = "https:#{original_url}" if original_url.start_with?('//')
+  def cdn_image_url(original_url, params = {})
+    if ENV['NETLIFY'] == 'true'
+      base_path = '/.netlify/images'
+      netlify_base_url = ENV['CONTEXT'] == 'dev' ? "http://localhost:8888#{base_path}" : "#{ENV['URL']}#{base_path}"
+      original_url = "https:#{original_url}" if original_url.start_with?('//')
 
-    query_params = URI.encode_www_form(params)
-    url_with_params = "#{netlify_base_url}?url=#{URI.encode_www_form_component(original_url)}"
-    url_with_params += "&#{query_params}" unless query_params.empty?
+      query_params = URI.encode_www_form(params)
+      url_with_params = "#{netlify_base_url}?url=#{URI.encode_www_form_component(original_url)}"
+      url_with_params += "&#{query_params}" unless query_params.empty?
+    else
+      query_params = URI.encode_www_form(params)
+      url_with_params = original_url
+      url_with_params += "?#{query_params}" unless query_params.empty? || original_url.include?('?')
+    end
 
     url_with_params
   end
+
 
   def srcset(url:, widths:, square: false, options: {})
     srcset = widths.map do |w|
       query = options.merge({ w: w })
       query.merge!({ h: w }) if square
-      netlify_image_url(url, query) + " #{w}w"
+      cdn_image_url(url, query) + " #{w}w"
     end
     srcset.join(', ')
   end
@@ -223,7 +230,7 @@ module CustomHelpers
         img['height'] = square ? width : height
       end
 
-      img['src'] = netlify_image_url(original_url)
+      img['src'] = cdn_image_url(original_url)
 
       # Skip to the next image if it's a gif.
       next if content_type == 'image/gif'
@@ -269,12 +276,12 @@ module CustomHelpers
       asset_width, _ = get_asset_dimensions(asset_id)
       content_type = get_asset_content_type(asset_id)
 
-      img['src'] = netlify_image_url(img['src'])
+      img['src'] = cdn_image_url(img['src'])
       img['data-asset-id'] = asset_id
       next if content_type == 'image/gif'
 
       resize_width = [width, asset_width].compact.min
-      img['src'] = netlify_image_url(original_url, { w: resize_width })
+      img['src'] = cdn_image_url(original_url, { w: resize_width })
     end
     doc.to_html
   end
@@ -426,7 +433,7 @@ module CustomHelpers
 
   def site_icon(w:)
     original_url = data.site.logo.url
-    netlify_image_url(original_url, { w: w })
+    cdn_image_url(original_url, { w: w })
   rescue
     nil
   end
@@ -441,7 +448,7 @@ module CustomHelpers
 
   def open_graph_image_url(original_url)
     params = { w: 1200, h: 630, fit: 'fill' }
-    netlify_image_url(original_url, params)
+    cdn_image_url(original_url, params)
   end
 
   def blurhash_data_uri(asset_id, width: 32)
@@ -467,7 +474,7 @@ module CustomHelpers
 
   def get_blurhash(asset_id, width, height)
     url = get_asset_url(asset_id)
-    blurhash_url = netlify_image_url(url, { fm: 'blurhash', w: width, h: height })
+    blurhash_url = cdn_image_url(url, { fm: 'blurhash', w: width, h: height })
     response = HTTParty.get(blurhash_url)
     response.ok? ? response.body : nil
   rescue
