@@ -119,7 +119,7 @@ module CustomHelpers
 
   def netlify_image_url(original_url, params = {})
     netlify_base_url = '/.netlify/images'
-    original_url = "https://#{original_url}" unless original_url.start_with?('http://', 'https://')
+    original_url = "https:#{original_url}" unless original_url.start_with?('http:', 'https:')
     query_params = URI.encode_www_form(params)
     "#{netlify_base_url}?url=#{URI.encode_www_form_component(original_url)}&#{query_params}"
   end
