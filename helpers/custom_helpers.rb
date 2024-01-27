@@ -180,14 +180,29 @@ module CustomHelpers
     "--placeholder:url('data:image/svg+xml;charset=utf-8,#{URI.encode_www_form_component(svg.gsub(/\s+/, ' '))}');"
   end
 
-
-  def responsivize_images(html, widths: [100, 200, 300], sizes: '100vw', formats: ['avif', 'webp', 'jpg'], lazy: true, square: false)
+  def add_image_data_attributes(html)
     return if html.blank?
 
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
     doc.css('img').each do |img|
       original_url = img['src']
       asset_id = get_asset_id(original_url)
+      img['data-asset-id'] = asset_id
+      img['data-original-url'] = original_url
+    end
+    doc.to_html
+  end
+
+  def responsivize_images(html, widths: [100, 200, 300], sizes: '100vw', formats: ['avif', 'webp', 'jpg'], lazy: true, square: false)
+    return if html.blank?
+
+    doc = Nokogiri::HTML::DocumentFragment.parse(html)
+    doc.css('img').each do |img|
+      original_url = img['data-original-url']
+      asset_id = img['data-asset-id']
+
+      next if asset_id.blank? || original_url.blank?
+
       width, height = get_asset_dimensions(asset_id)
       content_type = get_asset_content_type(asset_id)
 
@@ -207,11 +222,6 @@ module CustomHelpers
       end
 
       img['src'] = netlify_image_url(original_url)
-      img['data-asset-id'] = asset_id
-
-      placeholder_style = css_placeholder_background(asset_id)
-      img['style'] = placeholder_style unless placeholder_style.blank?
-      img['class'] = [img['class'], 'placeholder'].compact.join(' ')
 
       # Skip to the next image if it's a gif.
       next if content_type == 'image/gif'
@@ -228,13 +238,32 @@ module CustomHelpers
     doc.to_html
   end
 
+  def add_image_placeholders(html)
+    return if html.blank?
+
+    doc = Nokogiri::HTML::DocumentFragment.parse(html)
+    doc.css('img').each do |img|
+      asset_id = img['data-asset-id']
+
+      next if asset_id.blank?
+
+      placeholder_style = css_placeholder_background(asset_id)
+      img['style'] = placeholder_style unless placeholder_style.blank?
+      img['class'] = [img['class'], 'placeholder'].compact.join(' ')
+    end
+    doc.to_html
+  end
+
   def resize_images(html, width: 1000)
     return if html.blank?
 
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
     doc.css('img').each do |img|
-      original_url = img['src']
-      asset_id = get_asset_id(original_url)
+      original_url = img['data-original-url']
+      asset_id = img['data-asset-id']
+
+      next if asset_id.blank? || original_url.blank?
+
       asset_width, _ = get_asset_dimensions(asset_id)
       content_type = get_asset_content_type(asset_id)
 
@@ -248,13 +277,15 @@ module CustomHelpers
     doc.to_html
   end
 
-
   def set_alt_text(html)
     return if html.blank?
 
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
     doc.css('img').each do |img|
-      asset_id = img['data-asset-id'] || get_asset_id(img['src'])
+      asset_id = img['data-asset-id']
+
+      next if asset_id.blank?
+
       alt_text = get_asset_description(asset_id)
       img['alt'] = alt_text if alt_text.present?
     end
@@ -311,8 +342,10 @@ module CustomHelpers
 
   def render_body(text)
     html = markdown_to_html(text)
+    html = add_image_data_attributes(html)
     html = add_figure_elements(html, base_class: 'entry')
     html = responsivize_images(html, widths: data.srcsets.entry.widths, sizes: data.srcsets.entry.sizes.join(', '), formats: data.srcsets.entry.formats)
+    html = add_image_placeholders(html)
     html = set_alt_text(html)
     html = mark_affiliate_links(html)
     html = responsivize_tables(html)
@@ -321,6 +354,7 @@ module CustomHelpers
 
   def render_feed_body(text)
     html = markdown_to_html(text)
+    html = add_image_data_attributes(html)
     html = add_figure_elements(html)
     html = resize_images(html, width: data.srcsets.entry.widths.max)
     html = set_alt_text(html)
@@ -330,8 +364,10 @@ module CustomHelpers
 
   def render_home_body(text)
     html = markdown_to_html(text)
+    html = add_image_data_attributes(html)
     html = add_figure_elements(html, base_class: 'home')
     html = responsivize_images(html, widths: data.srcsets.home.widths, sizes: data.srcsets.home.sizes.join(', '), formats: data.srcsets.entry.formats, lazy: false, square: true)
+    html = add_image_placeholders(html)
     html = set_alt_text(html)
     html
   end
