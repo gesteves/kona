@@ -167,6 +167,8 @@ module CustomHelpers
         img['height'] = square ? width : height
       end
 
+      img['src'] = netlify_image_url(img['src'])
+
       # Skip to the next image if it's a gif.
       next if content_type == 'image/gif'
 
