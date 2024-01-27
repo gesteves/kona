@@ -1,6 +1,10 @@
 require 'redcarpet'
 require 'nokogiri'
 require 'active_support/all'
+require 'mini_magick'
+require 'httparty'
+require 'base64'
+require 'blurhash'
 
 module CustomHelpers
   include ActiveSupport::NumberHelper
@@ -98,6 +102,10 @@ module CustomHelpers
     end
   end
 
+  def get_asset_id(url)
+    url.split('/')[4]
+  end
+
   def get_asset_dimensions(asset_id)
     asset = data.assets.find { |a| a.sys.id == asset_id }
     return asset&.width, asset&.height
@@ -113,8 +121,9 @@ module CustomHelpers
     asset&.contentType
   end
 
-  def get_asset_id(url)
-    url.split('/')[4]
+  def get_asset_url(asset_id)
+    asset = data.assets.find { |a| a.sys.id == asset_id }
+    asset&.url
   end
 
   def netlify_image_url(original_url, params = {})
@@ -138,7 +147,6 @@ module CustomHelpers
     srcset.join(', ')
   end
 
-
   def source_tag(url, options = {})
     srcset_opts = { fm: options[:format] }.compact
     options[:srcset] = srcset(url: url, widths: options[:widths], square: options[:square], options: srcset_opts)
@@ -146,6 +154,32 @@ module CustomHelpers
     options.delete(:format)
     tag :source, options
   end
+
+  def blurhash_svg(asset_id)
+    data_uri = blurhash_data_uri(asset_id)
+    return if data_uri.blank?
+
+    width, height = get_asset_dimensions(asset_id)
+
+    # Construct the SVG string using Ruby string interpolation
+    "<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' viewBox='0 0 #{width} #{height}'>
+      <filter id='blur' filterUnits='userSpaceOnUse' color-interpolation-filters='sRGB'>
+        <feGaussianBlur stdDeviation='100' edgeMode='duplicate' />
+        <feComponentTransfer>
+          <feFuncA type='discrete' tableValues='1 1' />
+        </feComponentTransfer>
+      </filter>
+      <image filter='url(#blur)' xlink:href='#{data_uri}' x='0' y='0' height='100%' width='100%'/>
+    </svg>"
+  end
+
+  def css_placeholder_background(asset_id)
+    svg = blurhash_svg(asset_id)
+    return if svg.blank?
+
+    "--placeholder:url('data:image/svg+xml;charset=utf-8,#{URI.encode_www_form_component(svg.gsub(/\s+/, ' '))}');"
+  end
+
 
   def responsivize_images(html, widths: [100, 200, 300], sizes: '100vw', formats: ['avif', 'webp', 'jpg'], lazy: true, square: false)
     return if html.blank?
@@ -173,6 +207,10 @@ module CustomHelpers
 
       img['src'] = netlify_image_url(img['src'])
       img['data-asset-id'] = asset_id
+
+      placeholder_style = css_placeholder_background(asset_id)
+      img['style'] = placeholder_style unless placeholder_style.blank?
+      img['class'] = [img['class'], 'placeholder'].compact.join(' ')
 
       # Skip to the next image if it's a gif.
       next if content_type == 'image/gif'
@@ -364,5 +402,31 @@ module CustomHelpers
   def open_graph_image_url(original_url)
     params = { w: 1200, h: 630, fit: 'fill' }
     netlify_image_url(original_url, params)
+  end
+
+  def blurhash_data_uri(asset_id, width: 32)
+    original_width, original_height = get_asset_dimensions(asset_id)
+    return unless original_width && original_height
+
+    height = ((original_height.to_f / original_width.to_f) * width).round
+    blurhash_string = blurhash_string(asset_id, width, height)
+    return unless Blurhash.valid_blurhash?(blurhash_string)
+
+    pixels = Blurhash.decode(width, height, blurhash_string)
+    depth = 8
+    dimensions = [width, height]
+    map = 'rgba'
+    image = MiniMagick::Image.get_image_from_pixels(pixels, dimensions, map, depth, 'jpg')
+    "data:image/jpeg;base64,#{Base64.strict_encode64(image.to_blob)}"
+  rescue
+    nil
+  end
+
+  def blurhash_string(asset_id, width, height)
+    return "eXLNf5of~pt64:X:R-NHt7xZ~qbcRkt8s.?wozt7kCWUo~R*R+jZof" unless config[:context] == 'production'
+    url = get_asset_url(asset_id)
+    blurhash_url = netlify_image_url(url, { fm: 'blurhash', w: width, h: height })
+    response = HTTParty.get(blurhash_url)
+    response.ok? ? response.body : nil
   end
 end

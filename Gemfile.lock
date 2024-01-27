@@ -1,3 +1,10 @@
+GIT
+  remote: https://github.com/gesteves/blurhash
+  revision: 2d0433937d5dc4a376ff3f58d03014da79762b4f
+  branch: master
+  specs:
+    blurhash (0.1.7)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -94,6 +101,7 @@ GEM
     middleman-minify-html (3.4.1)
       htmlcompressor (~> 0.2.0)
       middleman-core (>= 3.2)
+    mini_magick (4.12.0)
     mini_mime (1.1.5)
     minitest (5.21.2)
     multi_xml (0.6.0)
@@ -146,6 +154,7 @@ PLATFORMS
 
 DEPENDENCIES
   activesupport
+  blurhash!
   dotenv
   graphql-client
   httparty
@@ -155,6 +164,7 @@ DEPENDENCIES
   middleman-autoprefixer (~> 3.0)
   middleman-dotenv
   middleman-minify-html
+  mini_magick
   nokogiri
   public_suffix
   rake
