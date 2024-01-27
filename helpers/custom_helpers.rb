@@ -128,7 +128,7 @@ module CustomHelpers
 
   def netlify_image_url(original_url, params = {}, config = {})
     base_path = '/.netlify/images'
-    netlify_base_url = ENV['CONTEXT'] == 'dev' ? "http://localhost:8888#{base_path}" : base_path
+    netlify_base_url = ENV['CONTEXT'] == 'dev' ? "http://localhost:8888#{base_path}" : "#{ENV['URL']}#{base_path}"
     original_url = "https:#{original_url}" if original_url.start_with?('//')
 
     query_params = URI.encode_www_form(params)
