@@ -1,11 +1,11 @@
-const currentContext = window.currentContext || 'development';
+const currentContext = window.currentContext || 'dev';
 
 export function isProduction() {
   return currentContext === 'production';
 }
 
 export function isDevelopment() {
-  return currentContext === 'development';
+  return currentContext === 'dev';
 }
 
 export function isDeployPreview() {
