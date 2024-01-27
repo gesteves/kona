@@ -72,6 +72,8 @@ module ImageHelpers
     nil
   end
 
+  # Embed the Blurhash image in an SVG with a blur filter
+  # https://css-tricks.com/the-blur-up-technique-for-loading-background-images/#recreating-the-blur-filter-with-svg
   def blurhash_svg_data_uri(asset_id)
     svg = blurhash_svg(asset_id)
     return if svg.blank?
@@ -86,7 +88,6 @@ module ImageHelpers
 
     width, height = get_asset_dimensions(asset_id)
 
-    # Construct the SVG string using Ruby string interpolation
     "<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' viewBox='0 0 #{width} #{height}'>
       <filter id='blur' filterUnits='userSpaceOnUse' color-interpolation-filters='sRGB'>
         <feGaussianBlur stdDeviation='100' edgeMode='duplicate' />
