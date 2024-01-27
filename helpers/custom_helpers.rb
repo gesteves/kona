@@ -128,8 +128,8 @@ module CustomHelpers
   end
 
   def cdn_image_url(original_url, params = {})
-    # Sometimes contentful returns an asset with downloads.ctfassets.net for some reason,
-    # which aren't served from their CDN.
+    # For some reason sometimes contentful returns an asset served from downloads.ctfassets.net,
+    # which aren't served from their CDN, and break image processing.
     original_url.sub!('downloads.ctfassets.net', 'images.ctfassets.net')
 
     if ENV['NETLIFY'] == 'true'
