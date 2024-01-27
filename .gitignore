@@ -7,3 +7,6 @@ build/
 data/*.json
 node_modules
 source/javascripts/site.js
+
+# Local Netlify folder
+.netlify
