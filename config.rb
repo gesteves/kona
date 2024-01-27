@@ -17,12 +17,12 @@ end
 activate :asset_hash
 activate :directory_indexes
 
-ignore "/javascripts/stimulus/*"
 ignore "/article.html"
-ignore "/short.html"
-ignore "/page.html"
-ignore "/home.html"
 ignore "/articles.html"
+ignore "/home.html"
+ignore "/javascripts/stimulus/*"
+ignore "/page.html"
+ignore "/short.html"
 
 @app.data.articles.each do |article|
   proxy article.path, article.template, locals: { content: article }, ignore: true
