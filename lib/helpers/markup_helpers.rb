@@ -1,6 +1,9 @@
 require 'nokogiri'
 
 module MarkupHelpers
+  # Renders the body text with various transformations for HTML output.
+  # @param text [String] The markdown text to render.
+  # @return [String] The HTML-rendered text with added attributes and transformations.
   def render_body(text)
     html = markdown_to_html(text)
     html = add_image_data_attributes(html)
@@ -13,6 +16,9 @@ module MarkupHelpers
     html
   end
 
+  # Renders the body text for a feed with various transformations for HTML output.
+  # @param text [String] The markdown text to render.
+  # @return [String] The HTML-rendered text with added attributes and transformations.
   def render_feed_body(text)
     html = markdown_to_html(text)
     html = add_image_data_attributes(html)
@@ -23,6 +29,9 @@ module MarkupHelpers
     html
   end
 
+  # Renders the body text for the home page with various transformations for HTML output.
+  # @param text [String] The markdown text to render.
+  # @return [String] The HTML-rendered text with added attributes and transformations.
   def render_home_body(text)
     html = markdown_to_html(text)
     html = add_image_data_attributes(html)
@@ -33,14 +42,9 @@ module MarkupHelpers
     html
   end
 
-  def source_tag(url, options = {})
-    srcset_opts = { fm: options[:format] }.compact
-    options[:srcset] = srcset(url: url, widths: options[:widths], square: options[:square], options: srcset_opts)
-    options.delete(:widths)
-    options.delete(:format)
-    tag :source, options
-  end
-
+  # Adds data attributes to image elements in HTML to store asset information.
+  # @param html [String] The HTML content with image elements.
+  # @return [String] The HTML content with added data attributes.
   def add_image_data_attributes(html)
     return if html.blank?
 
@@ -54,6 +58,10 @@ module MarkupHelpers
     doc.to_html
   end
 
+  # Adds figure elements around image elements in HTML with optional base class.
+  # @param html [String] The HTML content with image elements.
+  # @param base_class [String] (Optional) The base class to add to the figure element.
+  # @return [String] The HTML content with added figure elements.
   def add_figure_elements(html, base_class: nil)
     return if html.blank?
 
@@ -88,6 +96,9 @@ module MarkupHelpers
     doc.to_html
   end
 
+  # Sets the caption and credit within HTML content.
+  # @param html [String] The HTML content with caption and credit separated by ' | '.
+  # @return [String, nil] The HTML content with caption and credit formatted with <cite>, or nil if blank.
   def set_caption_credit(html)
     return if html.blank?
     parts = html.split(' | ')
@@ -95,6 +106,14 @@ module MarkupHelpers
     "#{parts.first} <cite>#{parts.last}</cite>"
   end
 
+  # Makes images responsive within HTML by adding source elements for various formats and sizes.
+  # @param html [String] The HTML content with image elements.
+  # @param widths [Array<Integer>] The widths for which to generate responsive images.
+  # @param sizes [String] The sizes attribute value for the image element.
+  # @param formats [Array<String>] The image formats to include (e.g., 'avif', 'webp', 'jpg').
+  # @param lazy [Boolean] Whether to enable lazy loading for images.
+  # @param square [Boolean] Whether to maintain a square aspect ratio for images.
+  # @return [String] The HTML content with added source elements for responsive images.
   def responsivize_images(html, widths: [100, 200, 300], sizes: '100vw', formats: ['avif', 'webp', 'jpg'], lazy: true, square: false)
     return if html.blank?
 
@@ -140,6 +159,22 @@ module MarkupHelpers
     doc.to_html
   end
 
+  # Generates a <source> HTML tag with optional srcset attribute.
+  # @param url [String] The URL of the image.
+  # @param options [Hash] (Optional) Additional options for the <source> tag.
+  # @return [String] The HTML <source> tag with optional srcset attribute.
+  def source_tag(url, options = {})
+    srcset_opts = { fm: options[:format] }.compact
+    options[:srcset] = srcset(url: url, widths: options[:widths], square: options[:square], options: srcset_opts)
+    options.delete(:widths)
+    options.delete(:format)
+    tag :source, options
+  end
+
+  # Resizes images within HTML to a specified width.
+  # @param html [String] The HTML content with image elements.
+  # @param width [Integer] The maximum width for resized images.
+  # @return [String] The HTML content with images resized to the specified width.
   def resize_images(html, width: 1000)
     return if html.blank?
 
@@ -163,6 +198,9 @@ module MarkupHelpers
     doc.to_html
   end
 
+  # Adds image placeholders to images in HTML content.
+  # @param html [String] The HTML content with image elements.
+  # @return [String] The HTML content with image placeholders added as CSS background.
   def add_image_placeholders(html)
     return if html.blank?
 
@@ -179,6 +217,9 @@ module MarkupHelpers
     doc.to_html
   end
 
+  # Sets alt text for images in HTML content based on asset descriptions.
+  # @param html [String] The HTML content with image elements.
+  # @return [String] The HTML content with alt text set for images.
   def set_alt_text(html)
     return if html.blank?
 
@@ -194,6 +235,9 @@ module MarkupHelpers
     doc.to_html
   end
 
+  # Wraps HTML tables in responsive div containers.
+  # @param html [String] The HTML content with table elements.
+  # @return [String] The HTML content with tables wrapped in responsive div containers.
   def responsivize_tables(html)
     return if html.blank?
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
@@ -201,6 +245,9 @@ module MarkupHelpers
     doc.to_html
   end
 
+  # Marks affiliate links in HTML content with 'rel="sponsored nofollow"'.
+  # @param html [String] The HTML content containing hyperlinks.
+  # @return [String] The HTML content with affiliate links marked as 'rel="sponsored nofollow"'.
   def mark_affiliate_links(html)
     return if html.blank?
 

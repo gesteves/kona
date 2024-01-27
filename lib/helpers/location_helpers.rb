@@ -1,4 +1,6 @@
 module LocationHelpers
+  # Formats location information based on address components.
+  # @return [String] The formatted location string.
   def format_location
     components = data.location.results.first.address_components
 
@@ -34,10 +36,15 @@ module LocationHelpers
     end
   end
 
+  # Checks if the formatted location is "Jackson Hole, Wyoming."
+  # @return [Boolean] True if the location matches, false otherwise.
   def in_jackson_hole?
     format_location == "Jackson Hole, Wyoming"
   end
 
+  # Checks if it's the indoor season in Jackson Hole, Wyoming.
+  # Indoor season is considered from November to March.
+  # @return [Boolean] True if it's indoor season, false otherwise.
   def is_indoor_season?
     in_jackson_hole? && (Time.now.month <= 3 || Time.now.month >= 11)
   end
