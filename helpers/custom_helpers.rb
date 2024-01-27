@@ -149,7 +149,7 @@ module CustomHelpers
   def srcset(url:, widths:, square: false, options: {})
     srcset = widths.map do |w|
       query = options.merge({ w: w })
-      query.merge!({ h: w }) if square
+      query.merge!({ h: w, fit: 'cover' }) if square
       cdn_image_url(url, query) + " #{w}w"
     end
     srcset.join(', ')
@@ -447,7 +447,7 @@ module CustomHelpers
   end
 
   def open_graph_image_url(original_url)
-    params = { w: 1200, h: 630, fit: 'fill' }
+    params = { w: 1200, h: 630, fit: 'cover' }
     cdn_image_url(original_url, params)
   end
 
