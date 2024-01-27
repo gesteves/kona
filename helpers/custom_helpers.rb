@@ -122,8 +122,12 @@ module CustomHelpers
     original_url = "https:#{original_url}" if original_url.start_with?('//')
 
     query_params = URI.encode_www_form(params)
-    "#{netlify_base_url}?url=#{URI.encode_www_form_component(original_url)}&#{query_params}"
+    url_with_params = "#{netlify_base_url}?url=#{URI.encode_www_form_component(original_url)}"
+    url_with_params += "&#{query_params}" unless query_params.empty?
+
+    url_with_params
   end
+
 
   def srcset(url:, widths:, square: false, options: {})
     srcset = widths.map do |w|
