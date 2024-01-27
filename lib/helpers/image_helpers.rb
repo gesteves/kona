@@ -72,9 +72,17 @@ module ImageHelpers
     nil
   end
 
+  def blurhash_svg_data_uri(asset_id)
+    svg = blurhash_svg(asset_id)
+    return if svg.blank?
+
+    encoded_svg = ERB::Util.url_encode(svg.gsub(/\s+/, ' '))
+    "data:image/svg+xml;charset=utf-8,#{encoded_svg}"
+  end
+
   def blurhash_svg(asset_id)
-    data_uri = blurhash_data_uri(asset_id)
-    return if data_uri.blank?
+    jpeg_data_uri = blurhash_jpeg_data_uri(asset_id)
+    return if jpeg_data_uri.blank?
 
     width, height = get_asset_dimensions(asset_id)
 
@@ -86,11 +94,11 @@ module ImageHelpers
           <feFuncA type='discrete' tableValues='1 1' />
         </feComponentTransfer>
       </filter>
-      <image filter='url(#blur)' xlink:href='#{data_uri}' x='0' y='0' height='100%' width='100%'/>
+      <image filter='url(#blur)' xlink:href='#{jpeg_data_uri}' x='0' y='0' height='100%' width='100%'/>
     </svg>"
   end
 
-  def blurhash_data_uri(asset_id, width: 32)
+  def blurhash_jpeg_data_uri(asset_id, width: 32)
     return unless ENV['ENABLE_BLURHASH'].present?
 
     original_width, original_height = get_asset_dimensions(asset_id)
