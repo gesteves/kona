@@ -186,7 +186,8 @@ module CustomHelpers
 
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
     doc.css('img').each do |img|
-      asset_id = get_asset_id(img['src'])
+      original_url = img['src']
+      asset_id = get_asset_id(original_url)
       width, height = get_asset_dimensions(asset_id)
       content_type = get_asset_content_type(asset_id)
 
@@ -205,7 +206,7 @@ module CustomHelpers
         img['height'] = square ? width : height
       end
 
-      img['src'] = netlify_image_url(img['src'])
+      img['src'] = netlify_image_url(original_url)
       img['data-asset-id'] = asset_id
 
       placeholder_style = css_placeholder_background(asset_id)
@@ -221,7 +222,7 @@ module CustomHelpers
       # Add a source element for each image format,
       # as a sibling of the img element in the picture tag.
       formats.each do |format|
-        img.add_previous_sibling(source_tag(img['src'], sizes: sizes, type: "image/#{format}", format: format, widths: img_widths, square: square))
+        img.add_previous_sibling(source_tag(original_url, sizes: sizes, type: "image/#{format}", format: format, widths: img_widths, square: square))
       end
     end
     doc.to_html
@@ -232,7 +233,8 @@ module CustomHelpers
 
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
     doc.css('img').each do |img|
-      asset_id = get_asset_id(img['src'])
+      original_url = img['src']
+      asset_id = get_asset_id(original_url)
       asset_width, _ = get_asset_dimensions(asset_id)
       content_type = get_asset_content_type(asset_id)
 
@@ -241,7 +243,7 @@ module CustomHelpers
       next if content_type == 'image/gif'
 
       resize_width = [width, asset_width].compact.min
-      img['src'] = netlify_image_url(img['src'], { w: resize_width })
+      img['src'] = netlify_image_url(original_url, { w: resize_width })
     end
     doc.to_html
   end
