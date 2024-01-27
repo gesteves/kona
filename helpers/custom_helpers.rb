@@ -168,6 +168,7 @@ module CustomHelpers
       end
 
       img['src'] = netlify_image_url(img['src'])
+      img['data-asset-id'] = asset_id
 
       # Skip to the next image if it's a gif.
       next if content_type == 'image/gif'
@@ -193,6 +194,8 @@ module CustomHelpers
       asset_width, _ = get_asset_dimensions(asset_id)
       content_type = get_asset_content_type(asset_id)
 
+      img['src'] = netlify_image_url(img['src'])
+      img['data-asset-id'] = asset_id
       next if content_type == 'image/gif'
 
       resize_width = [width, asset_width].compact.min
@@ -207,7 +210,7 @@ module CustomHelpers
 
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
     doc.css('img').each do |img|
-      asset_id = get_asset_id(img['src'])
+      asset_id = img['data-asset-id'] || get_asset_id(img['src'])
       alt_text = get_asset_description(asset_id)
       img['alt'] = alt_text if alt_text.present?
     end
