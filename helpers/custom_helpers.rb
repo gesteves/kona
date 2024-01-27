@@ -5,6 +5,7 @@ require 'mini_magick'
 require 'httparty'
 require 'base64'
 require 'blurhash'
+require 'cgi'
 
 module CustomHelpers
   include ActiveSupport::NumberHelper
@@ -177,7 +178,9 @@ module CustomHelpers
     svg = blurhash_svg(asset_id)
     return if svg.blank?
 
-    "--placeholder:url('data:image/svg+xml;charset=utf-8,#{URI.encode_www_form_component(svg.gsub(/\s+/, ' '))}');"
+    # Escape the SVG and replace '+' with '%20' for spaces
+    encoded_svg = CGI.escape(svg).gsub('+', '%20')
+    "--placeholder:url('data:image/svg+xml;charset=utf-8,#{encoded_svg}');"
   end
 
   def add_image_data_attributes(html)
