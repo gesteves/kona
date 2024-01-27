@@ -418,15 +418,18 @@ module CustomHelpers
     map = 'rgba'
     image = MiniMagick::Image.get_image_from_pixels(pixels, dimensions, map, depth, 'jpg')
     "data:image/jpeg;base64,#{Base64.strict_encode64(image.to_blob)}"
-  rescue
+  rescue => e
+    STDERR.puts "Blurhash data URI generation error: #{e.message}"
     nil
   end
 
   def blurhash_string(asset_id, width, height)
-    return "eXLNf5of~pt64:X:R-NHt7xZ~qbcRkt8s.?wozt7kCWUo~R*R+jZof" unless config[:context] == 'production'
     url = get_asset_url(asset_id)
     blurhash_url = netlify_image_url(url, { fm: 'blurhash', w: width, h: height })
     response = HTTParty.get(blurhash_url)
     response.ok? ? response.body : nil
+  rescue => e
+    STDERR.puts "Blurhash generation error: #{e.message}"
+    nil
   end
 end
