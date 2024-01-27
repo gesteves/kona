@@ -128,6 +128,10 @@ module CustomHelpers
   end
 
   def cdn_image_url(original_url, params = {})
+    # Sometimes contentful returns an asset with downloads.ctfassets.net for some reason,
+    # which aren't served from their CDN.
+    original_url.sub!('downloads.ctfassets.net', 'images.ctfassets.net')
+
     if ENV['NETLIFY'] == 'true'
       base_path = '/.netlify/images'
       netlify_base_url = ENV['CONTEXT'] == 'dev' ? "http://localhost:8888#{base_path}" : "#{ENV['URL']}#{base_path}"
@@ -144,7 +148,6 @@ module CustomHelpers
 
     url_with_params
   end
-
 
   def srcset(url:, widths:, square: false, options: {})
     srcset = widths.map do |w|
