@@ -1,5 +1,8 @@
 /* global plausible */
 
+/**
+ * Sets up the Plausible analytics queue if it doesn't already exist.
+ */
 function setupPlausibleQueue() {
   window.plausible = window.plausible || function() {
     (window.plausible.q = window.plausible.q || []).push(arguments);

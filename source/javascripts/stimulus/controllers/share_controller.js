@@ -16,14 +16,32 @@ export default class extends Controller {
     }
   }
 
+  /**
+   * Gets the URL to share. It returns the URL from the Stimulus controller's `urlValue` if available,
+   * otherwise, it checks for the canonical URL in the document or uses the current window location URL.
+   *
+   * @returns {string} The URL to share.
+   */
   getShareUrl() {
     return this.urlValue || document.querySelector('link[rel="canonical"]')?.href || window.location.href
   }
 
+  /**
+   * Gets the text to share. It returns the text from the Stimulus controller's `textValue` if available,
+   * otherwise, it checks for the Open Graph title in the document's meta tags or uses the document title.
+   *
+   * @returns {string} The text to share.
+   */
   getShareText() {
     return this.textValue || document.querySelector('meta[property="og:title"]')?.content || document.title;
   }
 
+  /**
+   * Opens the native share sheet to share the current page's title and URL. It uses the `navigator.share` API
+   * and handles any potential errors silently.
+   *
+   * @param {Event} event - The event that triggered the share action (e.g., a click event).
+   */
   openShareSheet(event) {
     event.preventDefault();
 
@@ -35,6 +53,11 @@ export default class extends Controller {
     });
   }
 
+  /**
+   * Opens a popup window for sharing the linked URL.
+   *
+   * @param {Event} event - The event that triggered the popup window (e.g., a click event).
+   */
   openPopup(event) {
     event.preventDefault();
     const linkURL = this.element.href;
