@@ -10,10 +10,10 @@ module CustomHelpers
   include ActiveSupport::NumberHelper
 
   def full_url(resource, params = {})
-    base_url = if config[:netlify] && config[:context] == 'production'
-      config[:url]
-    elsif config[:netlify] && config[:context] != 'production'
-      config[:deploy_url]
+    base_url = if ENV['NETLIFY'] && ENV['CONTEXT'] == 'production'
+      ENV['URL']
+    elsif ENV['NETLIFY'] && ENV['CONTEXT'] != 'production'
+      ENV['DEPLOY_URL']
     else
       'http://localhost:4567'
     end
@@ -126,8 +126,9 @@ module CustomHelpers
     asset&.url
   end
 
-  def netlify_image_url(original_url, params = {})
-    netlify_base_url = '/.netlify/images'
+  def netlify_image_url(original_url, params = {}, config = {})
+    base_path = '/.netlify/images'
+    netlify_base_url = ENV['CONTEXT'] == 'dev' ? "http://localhost:8888#{base_path}" : base_path
     original_url = "https:#{original_url}" if original_url.start_with?('//')
 
     query_params = URI.encode_www_form(params)
@@ -136,7 +137,6 @@ module CustomHelpers
 
     url_with_params
   end
-
 
   def srcset(url:, widths:, square: false, options: {})
     srcset = widths.map do |w|
@@ -409,27 +409,25 @@ module CustomHelpers
     return unless original_width && original_height
 
     height = ((original_height.to_f / original_width.to_f) * width).round
-    blurhash_string = blurhash_string(asset_id, width, height)
-    return unless Blurhash.valid_blurhash?(blurhash_string)
+    blurhash = get_blurhash(asset_id, width, height)
+    return unless Blurhash.valid_blurhash?(blurhash)
 
-    pixels = Blurhash.decode(width, height, blurhash_string)
+    pixels = Blurhash.decode(width, height, blurhash)
     depth = 8
     dimensions = [width, height]
     map = 'rgba'
     image = MiniMagick::Image.get_image_from_pixels(pixels, dimensions, map, depth, 'jpg')
     "data:image/jpeg;base64,#{Base64.strict_encode64(image.to_blob)}"
-  rescue => e
-    STDERR.puts "Blurhash data URI generation error: #{e.message}"
+  rescue
     nil
   end
 
-  def blurhash_string(asset_id, width, height)
+  def get_blurhash(asset_id, width, height)
     url = get_asset_url(asset_id)
     blurhash_url = netlify_image_url(url, { fm: 'blurhash', w: width, h: height })
     response = HTTParty.get(blurhash_url)
     response.ok? ? response.body : nil
-  rescue => e
-    STDERR.puts "Blurhash generation error: #{e.message}"
+  rescue
     nil
   end
 end

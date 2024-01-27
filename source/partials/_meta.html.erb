@@ -11,6 +11,6 @@
 <% end %>
 <meta name="viewport" content="width=device-width,minimum-scale=1">
 <meta name="theme-color" content="#BF0222">
-<% if config[:context] != 'production' || (defined?(content) && hide_from_search_engines?(content)) %>
+<% if ENV['CONTEXT'] != 'production' || (defined?(content) && hide_from_search_engines?(content)) %>
   <meta name="robots" content="noindex">
 <% end %>

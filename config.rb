@@ -49,10 +49,6 @@ configure :development do
 end
 
 configure :production do
-  config[:url]                 = ENV['URL']
-  config[:deploy_url]          = ENV['DEPLOY_URL']
-  config[:context]             = ENV['CONTEXT']
-  config[:netlify]             = ENV['NETLIFY']
   activate :minify_css
   activate :minify_html
 
