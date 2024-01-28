@@ -196,7 +196,7 @@ module WeatherHelpers
     markdown_to_html(summary.reject(&:blank?).map { |t| "<span>#{remove_widows(t)}</span>" }.join(' '))
   end
 
-  # Indicates if it's race day and not evening.
+  # Indicates if it's race day.
   # @return [String, nil] A Markdown-formatted message indicating race day, or `nil` if it's not race day or it's evening.
   def race_day
     "**It's race day!**" if is_race_day? && !is_evening?
