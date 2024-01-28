@@ -116,6 +116,9 @@ module WeatherHelpers
     end
   end
 
+  # Formats a precipitation type for display.
+  # @param [String] type - The precipitation type (e.g., 'clear', 'mixed').
+  # @return [String] A formatted string representing the precipitation type.
   def format_precipitation_type(type)
     case type.downcase
     when 'clear'
@@ -127,9 +130,9 @@ module WeatherHelpers
     end
   end
 
-  # Formats a precipitation type for display.
-  # @param [String] type - The precipitation type (e.g., 'clear', 'mixed').
-  # @return [String] A formatted string representing the precipitation type.
+  # Adds formatting to add emphasis to bad AQI values.
+  # @param [String] The AQI description.
+  # @return [String] A formatted string representing the AQI.
   def format_air_quality(label)
     label.gsub('very', '_very_').gsub('hazardous', '**hazardous**')
   end

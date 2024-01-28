@@ -42,7 +42,7 @@ module MarkupHelpers
     html
   end
 
-  # Adds data attributes to image elements in HTML to store asset information.
+  # Adds data attributes to image elements in HTML to store asset information for later use.
   # @param html [String] The HTML content with image elements.
   # @return [String] The HTML content with added data attributes.
   def add_image_data_attributes(html)

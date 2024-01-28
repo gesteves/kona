@@ -45,6 +45,7 @@ module ImageHelpers
   end
 
   # Generates a CDN image URL with optional query parameters.
+  # Uses Netlify's Image CDN or Contentful's, as needed.
   # @param original_url [String] The original URL of the image.
   # @param params [Hash] (Optional) Query parameters to be appended to the URL.
   # @return [String] The CDN image URL with optional query parameters.
@@ -59,15 +60,17 @@ module ImageHelpers
       original_url = "https:#{original_url}" if original_url.start_with?('//')
 
       query_params = URI.encode_www_form(params)
-      url_with_params = "#{netlify_base_url}?url=#{URI.encode_www_form_component(original_url)}"
-      url_with_params += "&#{query_params}" unless query_params.empty?
-    else
+      image_url = "#{netlify_base_url}?url=#{URI.encode_www_form_component(original_url)}"
+      image_url += "&#{query_params}" unless query_params.empty?
+    elsif original_url.matches?('images.ctfassets.net')
       query_params = URI.encode_www_form(params)
-      url_with_params = original_url
-      url_with_params += "?#{query_params}" unless query_params.empty? || original_url.include?('?')
+      image_url = original_url
+      image_url += "?#{query_params}" unless query_params.empty? || original_url.include?('?')
+    else
+      image_url = original_url
     end
 
-    url_with_params
+    image_url
   end
 
   # Generates a responsive srcset for an image URL with specified widths and optional parameters.
@@ -85,9 +88,9 @@ module ImageHelpers
     srcset.join(', ')
   end
 
-  # Generates a CDN URL for an Open Graph image with specified dimensions.
+  # Generates a CDN URL for an Open Graph image based on Facebook's size guidelines.
   # @param original_url [String] The original URL of the image.
-  # @return [String] The CDN URL for the Open Graph image with specified dimensions.
+  # @return [String] The CDN URL for the Open Graph image.
   def open_graph_image_url(original_url)
     params = { w: 1200, h: 630, fit: 'cover' }
     cdn_image_url(original_url, params)
@@ -103,7 +106,7 @@ module ImageHelpers
     nil
   end
 
-  # Generates a data URI containing SVG data for Blurhash based on an asset ID.
+  # Generates a data URI containing an SVG embedded with the Blurhash for an asset ID.
   # https://css-tricks.com/the-blur-up-technique-for-loading-background-images/#recreating-the-blur-filter-with-svg
   # @param asset_id [String] The ID of the asset used for generating Blurhash SVG.
   # @return [String, nil] The data URI with SVG data for Blurhash, or nil if not found or blank.
@@ -115,7 +118,7 @@ module ImageHelpers
     "data:image/svg+xml;charset=utf-8,#{encoded_svg}"
   end
 
-  # Generates an SVG with Blurhash effect based on an asset ID.
+  # Generates an SVG embedded with the Blurhash for an asset ID.
   # @param asset_id [String] The ID of the asset used for generating Blurhash SVG.
   # @return [String, nil] The SVG with Blurhash effect, or nil if not found or blank.
   def blurhash_svg(asset_id)
@@ -135,7 +138,7 @@ module ImageHelpers
     </svg>"
   end
 
-  # Generates a data URI containing JPEG image data with Blurhash effect based on an asset ID.
+  # Generates a data URI containing JPEG image data for the Blurhash for an an asset ID.
   # @param asset_id [String] The ID of the asset used for generating Blurhash JPEG data URI.
   # @param width [Integer] (Optional) The desired width of the JPEG image. Default is 32.
   # @return [String, nil] The data URI with JPEG image data and Blurhash effect, or nil if not generated or valid.
