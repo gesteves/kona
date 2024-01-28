@@ -6,23 +6,23 @@
         <%= partial "icons/solid/arrow-up-from-bracket.svg" %>
       </button>
 
-      <a aria-label="Share by email " class="share__button" href="mailto:?subject=<%= ERB::Util.url_encode og_title(article) %>&body=<%= ERB::Util.url_encode full_url(article.path, { ref: 'Email' }) %>">
+      <a aria-label="Share by email " class="share__button" href="<%= mail_share_url(article) %>">
         <%= partial "icons/solid/envelope.svg" %>
       </a>
 
-      <a aria-label="Share by text message" class="share__button" href="sms:?&body=<%= ERB::Util.url_encode("#{og_title(article)} #{full_url(article.path, { ref: 'Text Message' })}") %>">
+      <a aria-label="Share by text message" class="share__button" href="<%= sms_share_url(article) %>">
         <%= partial "icons/solid/comment.svg" %>
       </a>
 
-      <a aria-label="Share on Facebook" class="share__button" data-controller="share" data-action="click->share#openPopup" href="https://www.facebook.com/sharer/sharer.php?u=<%= ERB::Util.url_encode full_url(article.path, { ref: 'Facebook' }) %>" rel="noopener nofollow" target="_blank">
+      <a aria-label="Share on Facebook" class="share__button" data-controller="share" data-action="click->share#openPopup" href="<%= facebook_share_url(article) %>" rel="noopener nofollow" target="_blank">
         <%= partial "icons/brands/facebook-f.svg" %>
       </a>
 
-      <a aria-label="Share on Reddit" class="share__button" href="https://reddit.com/submit?title=<%= ERB::Util.url_encode og_title(article) %>&url=<%= ERB::Util.url_encode full_url(article.path, { ref: 'Reddit' }) %>" rel="noopener nofollow" target="_blank">
+      <a aria-label="Share on Reddit" class="share__button" href="<%= reddit_share_url(article) %>" rel="noopener nofollow" target="_blank">
         <%= partial "icons/brands/reddit-alien.svg" %>
       </a>
 
-      <a aria-label="Share on Threads" class="share__button" href="https://www.threads.net/intent/post?text=<%= ERB::Util.url_encode("#{og_title(article)} #{full_url(article.path, { ref: 'Threads' })}") %>" rel="noopener nofollow" target="_blank">
+      <a aria-label="Share on Threads" class="share__button" href="<%= threads_share_url(article) %>" rel="noopener nofollow" target="_blank">
         <%= partial "icons/brands/threads.svg" %>
       </a>
   </div>
