@@ -27,6 +27,7 @@ class WeatherKit
   end
 
   # Fetches the current weather data for the specified location.
+  # @see https://developer.apple.com/documentation/weatherkitrestapi/get_api_v1_weather_language_latitude_longitude
   # @return [Hash, nil] The current weather data, or nil if fetching fails.
   def weather
     cache_key = "weatherkit:weather:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
@@ -62,6 +63,7 @@ class WeatherKit
   private
 
   # Checks the availability of weather data for the specified location.
+  # @see https://developer.apple.com/documentation/weatherkitrestapi/get_api_v1_availability_latitude_longitude
   # @return [Array, nil] The available weather data sets, or nil if unavailable.
   def availability
     cache_key = "weatherkit:availability:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
@@ -85,6 +87,7 @@ class WeatherKit
   end
 
   # Generates an authentication token for the WeatherKit API.
+  # @see https://developer.apple.com/documentation/weatherkitrestapi/request_authentication_for_weatherkit_rest_api
   # @return [String] The generated JWT authentication token.
   def token
     key_id = ENV['WEATHERKIT_KEY_ID']

@@ -48,7 +48,8 @@ class GoogleMaps
 
   private
 
-  # Fetches geocoding data for the specified coordinates.
+  # Reverse-geocodes the given coordinates into a human-readable address.
+  # @see https://developers.google.com/maps/documentation/geocoding/requests-reverse-geocoding
   # @return [Hash, nil] The geocoding data, or nil if fetching fails.
   def geocode
     cache_key = "google_maps:geocoded:#{@latitude}:#{@longitude}"
@@ -70,6 +71,7 @@ class GoogleMaps
   end
 
   # Fetches time zone data for the specified coordinates.
+  # @see https://developers.google.com/maps/documentation/timezone/requests-timezone
   # @return [Hash, nil] The time zone data, or nil if fetching fails.
   def time_zone_data
     cache_key = "google_maps:time_zone:#{@latitude}:#{@longitude}"

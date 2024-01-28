@@ -19,6 +19,7 @@ class Strava
   end
 
   # Fetches the current stats of the athlete from Strava.
+  # @see https://developers.strava.com/docs/reference/#api-Athletes-getStats
   # @return [Hash, nil] The athlete's statistics, or nil if fetching fails.
   def stats
     cache_key = "strava:stats:#{@athlete_id}"

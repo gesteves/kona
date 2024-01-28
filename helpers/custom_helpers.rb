@@ -3,7 +3,7 @@ require 'active_support/all'
 module CustomHelpers
   include ActiveSupport::NumberHelper
 
-  # Constructs the full URL for a given resource, considering the environment and additional parameters.
+  # Constructs the full URL for a given Middleman resource, depending on the environment.
   # @param resource [Object] The resource for which the URL is being generated.
   # @param params [Hash] (Optional) Additional query parameters to be included in the URL.
   # @return [String] The fully constructed URL as a string.
@@ -22,6 +22,7 @@ module CustomHelpers
   end
 
   # Determines if the site is currently running on Netlify, based on the presence of a CONTEXT env var.
+  # @see https://docs.netlify.com/configure-builds/environment-variables/#build-metadata
   # @return [Boolean] True if the site is on Netlify.
   def is_netlify?
     ENV['CONTEXT'].present?

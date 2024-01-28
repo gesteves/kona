@@ -41,6 +41,7 @@ class PurpleAir
   private
 
   # Finds sensors within a defined proximity.
+  # @see https://api.purpleair.com/#api-sensors-get-sensors-data
   # @return [Hash, nil] The sensor data, or nil if fetching fails.
   def find_sensors
     cache_key = "purple_air:sensors:#{api_query_params.values.map(&:to_s).join(':')}"

@@ -35,6 +35,7 @@ class Swarm
   private
 
   # Retrieves check-in data from Foursquare or the cache.
+  # @see https://location.foursquare.com/developer/reference/get-user-checkins
   # @return [Hash, nil] The check-in data or nil if the request fails.
   def get_checkins
     v = '20230818'
