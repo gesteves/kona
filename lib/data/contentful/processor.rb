@@ -1,14 +1,24 @@
+require 'redis'
+
 # This class is responsible for fetching content
 # from Contentful through a GraphQL query and massages
 # it in various ways so it can be rendered
 # by Middleman.
 class ContentfulProcessor
   attr_reader :content
+  CACHE_KEY = "contentful:content:v1"
+  CACHE_EXPIRATION = 300
 
   # Initializes the processor.
   # @param client [GraphQL::Client] The GraphQL client used for querying Contentful.
   def initialize(client)
     @client = client
+    @redis = Redis.new(
+      host: ENV['REDIS_HOST'] || 'localhost',
+      port: ENV['REDIS_PORT'] || 6379,
+      username: ENV['REDIS_USERNAME'],
+      password: ENV['REDIS_PASSWORD']
+    )
     @content = {
       articles: [],
       assets: [],
@@ -24,12 +34,18 @@ class ContentfulProcessor
   # Generates content from Contentful.
   # It fetches all content in a single query and processes each content type.
   def generate_content!
-    fetch_all_content
-    process_site
-    process_articles
-    process_pages
-    generate_blog
-    generate_tags
+    cached_content = @redis.get(CACHE_KEY)
+    if cached_content
+      @content = JSON.parse(cached_content, symbolize_names: true)
+    else
+      fetch_all_content
+      process_site
+      process_articles
+      process_pages
+      generate_blog
+      generate_tags
+      cache_content
+    end
   end
 
   private
@@ -213,5 +229,9 @@ class ContentfulProcessor
       }
     end
     @content[:blog] = blog
+  end
+
+  def cache_content
+    @redis.setex(CACHE_KEY, CACHE_EXPIRATION, @content.to_json)
   end
 end
