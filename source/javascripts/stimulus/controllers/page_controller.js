@@ -11,7 +11,6 @@ export default class extends Controller {
    * This method is called automatically by Stimulus.
    */
   load() {
-    // Only track page views in a production environment
     if (isProduction()) {
       trackPageView();
     }
