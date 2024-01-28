@@ -55,12 +55,11 @@ module ImageHelpers
     original_url.sub!('downloads.ctfassets.net', 'images.ctfassets.net')
 
     if is_netlify?
-      base_path = '/.netlify/images'
-      netlify_base_url = is_dev? ? "#{ENV['DEPLOY_URL']}#{base_path}" : "#{ENV['URL']}#{base_path}"
+      base_url = "#{ENV['URL']}/.netlify/images"
       original_url = "https:#{original_url}" if original_url.start_with?('//')
 
       query_params = URI.encode_www_form(params)
-      image_url = "#{netlify_base_url}?url=#{URI.encode_www_form_component(original_url)}"
+      image_url = "#{base_url}?url=#{URI.encode_www_form_component(original_url)}"
       image_url += "&#{query_params}" unless query_params.empty?
     elsif original_url.match?('images.ctfassets.net')
       query_params = URI.encode_www_form(params)
