@@ -2,9 +2,12 @@ require 'httparty'
 require 'redis'
 require 'active_support/all'
 
+# The Strava class interfaces with the Strava API to fetch and save athlete statistics.
 class Strava
   STRAVA_API_URL = 'https://www.strava.com/api/v3'
 
+  # Initializes the Strava class with necessary settings and athlete information.
+  # @return [Strava] The instance of the Strava class.
   def initialize
     @redis = Redis.new(
       host: ENV['REDIS_HOST'] || 'localhost',
@@ -15,6 +18,8 @@ class Strava
     @athlete_id = ENV['STRAVA_ATHLETE_ID']
   end
 
+  # Fetches the current stats of the athlete from Strava.
+  # @return [Hash, nil] The athlete's statistics, or nil if fetching fails.
   def stats
     cache_key = "strava:stats:#{@athlete_id}"
     data = @redis.get(cache_key)
@@ -44,6 +49,7 @@ class Strava
     stats
   end
 
+  # Saves the current athlete stats to a JSON file.
   def save_data
     data = {
       stats: stats
@@ -53,6 +59,8 @@ class Strava
 
   private
 
+  # Retrieves the Strava access token, refreshing it if necessary.
+  # @return [String, nil] The access token, or nil if unavailable.
   def get_access_token
     access_token = @redis.get('strava:access_token')
     return access_token if access_token.present?
@@ -63,6 +71,9 @@ class Strava
     refresh_access_token(refresh_token)
   end
 
+  # Refreshes the Strava access token using the refresh token.
+  # @param refresh_token [String] The refresh token.
+  # @return [String] The new access token.
   def refresh_access_token(refresh_token)
     client_id = ENV['STRAVA_CLIENT_ID']
     client_secret = ENV['STRAVA_CLIENT_SECRET']

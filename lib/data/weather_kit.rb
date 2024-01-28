@@ -3,9 +3,16 @@ require 'httparty'
 require 'redis'
 require 'active_support/all'
 
+# The WeatherKit class interfaces with Apple's WeatherKit API to fetch weather data.
 class WeatherKit
   WEATHERKIT_API_URL = 'https://weatherkit.apple.com/api/v1/'
 
+  # Initializes the WeatherKit class with location and time zone information.
+  # @param latitude [Float] The latitude for the weather data.
+  # @param longitude [Float] The longitude for the weather data.
+  # @param time_zone [String] The time zone for the weather data.
+  # @param country [String] The country for the weather data.
+  # @return [WeatherKit] The instance of the WeatherKit class.
   def initialize(latitude, longitude, time_zone, country)
     @redis = Redis.new(
       host: ENV['REDIS_HOST'] || 'localhost',
@@ -19,6 +26,8 @@ class WeatherKit
     @country = country
   end
 
+  # Fetches the current weather data for the specified location.
+  # @return [Hash, nil] The current weather data, or nil if fetching fails.
   def weather
     cache_key = "weatherkit:weather:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
     data = @redis.get(cache_key)
@@ -45,12 +54,15 @@ class WeatherKit
     JSON.parse(response.body)
   end
 
+  # Saves the current weather data to a JSON file.
   def save_data
     File.open('data/weather.json','w'){ |f| f << weather.to_json }
   end
 
   private
 
+  # Checks the availability of weather data for the specified location.
+  # @return [Array, nil] The available weather data sets, or nil if unavailable.
   def availability
     cache_key = "weatherkit:availability:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
     data = @redis.get(cache_key)
@@ -72,6 +84,8 @@ class WeatherKit
     JSON.parse(response.body)
   end
 
+  # Generates an authentication token for the WeatherKit API.
+  # @return [String] The generated JWT authentication token.
   def token
     key_id = ENV['WEATHERKIT_KEY_ID']
     team_id = ENV['WEATHERKIT_TEAM_ID']
@@ -97,5 +111,4 @@ class WeatherKit
 
     JWT.encode(claims, private_key, 'ES256', header)
   end
-
 end

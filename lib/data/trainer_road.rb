@@ -2,10 +2,14 @@ require 'httparty'
 require 'active_support/all'
 require 'icalendar'
 
+# The TrainerRoad class interfaces with a TrainerRoad calendar to fetch workout details.
 class TrainerRoad
   CALENDAR_URL = ENV['TRAINERROAD_CALENDAR_URL']
   DISCIPLINE_ORDER = { "Swim" => 1, "Bike" => 2, "Run" => 3 }
 
+  # Initializes the TrainerRoad class with a specified timezone.
+  # @param timezone [String] The timezone for the workout times.
+  # @return [TrainerRoad] The instance of the TrainerRoad class.
   def initialize(timezone = "America/Denver")
     @timezone = timezone
     @redis = Redis.new(
@@ -16,6 +20,8 @@ class TrainerRoad
     )
   end
 
+  # Fetches the workouts for the current day from the TrainerRoad calendar.
+  # @return [Array<Hash>, nil] An array of today's workouts, or nil if no data is available.
   def workouts
     return if CALENDAR_URL.blank?
 
@@ -46,6 +52,7 @@ class TrainerRoad
     workouts
   end
 
+  # Saves the current day's workouts to a JSON file.
   def save_data
     data = {
       workouts: workouts
@@ -55,6 +62,9 @@ class TrainerRoad
 
   private
 
+  # Parses the workout summary to extract workout details.
+  # @param summary [String] The summary of the workout event.
+  # @return [Hash, nil] The parsed workout details or nil if parsing fails.
   def parse_workout(summary)
     match_data = /(\d+:\d+) - (.+)/.match(summary)
     return nil if match_data.blank?
@@ -73,6 +83,10 @@ class TrainerRoad
     }
   end
 
+  # Converts workout duration and discipline into a human-readable format.
+  # @param duration [String] The duration of the workout.
+  # @param discipline [String] The discipline of the workout (e.g., Bike, Run, Swim).
+  # @return [String] A human-readable description of the workout.
   def human_readable_description(duration, discipline)
     hours, minutes = duration.split(":").map(&:to_i)
 
@@ -89,8 +103,9 @@ class TrainerRoad
     "#{description_duration} #{suffix}"
   end
 
-
-
+  # Determines the discipline of the workout based on its name.
+  # @param name [String] The name of the workout.
+  # @return [String] The determined discipline ('Bike', 'Run', or 'Swim').
   def determine_discipline(name)
     return if name.blank?
     return "Run" if name.include?("Run")

@@ -2,10 +2,15 @@ require 'httparty'
 require 'redis'
 require 'active_support/all'
 
+# The GoogleMaps class interfaces with the Google Maps API to fetch geocoding and timezone data.
 class GoogleMaps
   GOOGLE_MAPS_API_URL = 'https://maps.googleapis.com/maps/api'
   GOOGLE_MAPS_API_KEY = ENV['GOOGLE_MAPS_API_KEY']
 
+  # Initializes the GoogleMaps class with geographical coordinates.
+  # @param latitude [Float] The latitude for the location.
+  # @param longitude [Float] The longitude for the location.
+  # @return [GoogleMaps] The instance of the GoogleMaps class.
   def initialize(latitude, longitude)
     @redis = Redis.new(
       host: ENV['REDIS_HOST'] || 'localhost',
@@ -17,6 +22,8 @@ class GoogleMaps
     @longitude = longitude
   end
 
+  # Fetches and formats the time zone data for the specified coordinates.
+  # @return [Hash, nil] The time zone data, or nil if fetching fails.
   def time_zone
     data = time_zone_data
     return if data.blank?
@@ -24,6 +31,8 @@ class GoogleMaps
     data
   end
 
+  # Retrieves the country code for the specified coordinates using geocoding.
+  # @return [String, nil] The country code, or nil if fetching fails.
   def country_code
     data = geocode
     return if data.blank?
@@ -31,6 +40,7 @@ class GoogleMaps
     data['results'][0]['address_components'].find { |component| component['types'].include?('country') }['short_name']
   end
 
+  # Saves the geocode and time zone data to JSON files.
   def save_data
     File.open('data/location.json', 'w') { |f| f << geocode.to_json }
     File.open('data/time_zone.json', 'w') { |f| f << time_zone.to_json }
@@ -38,6 +48,8 @@ class GoogleMaps
 
   private
 
+  # Fetches geocoding data for the specified coordinates.
+  # @return [Hash, nil] The geocoding data, or nil if fetching fails.
   def geocode
     cache_key = "google_maps:geocoded:#{@latitude}:#{@longitude}"
     data = @redis.get(cache_key)
@@ -57,6 +69,8 @@ class GoogleMaps
     JSON.parse(response.body)
   end
 
+  # Fetches time zone data for the specified coordinates.
+  # @return [Hash, nil] The time zone data, or nil if fetching fails.
   def time_zone_data
     cache_key = "google_maps:time_zone:#{@latitude}:#{@longitude}"
     data = @redis.get(cache_key)
@@ -71,6 +85,9 @@ class GoogleMaps
     JSON.parse(response.body)
   end
 
+  # Formats a time zone offset from seconds to a string format.
+  # @param offset_in_seconds [Integer] The time zone offset in seconds.
+  # @return [String] The formatted time zone offset.
   def format_time_zone_offset(offset_in_seconds)
     offset_minutes = offset_in_seconds.abs / 60
     hours = offset_minutes / 60

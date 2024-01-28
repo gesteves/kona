@@ -2,9 +2,14 @@ require 'httparty'
 require 'redis'
 require 'active_support/all'
 
+# The PurpleAir class interfaces with the PurpleAir API to fetch air quality data.
 class PurpleAir
   PURPLE_AIR_API_URL = 'https://api.purpleair.com/v1/sensors'
 
+  # Initializes the PurpleAir class with geographical coordinates.
+  # @param latitude [Float] The latitude for the air quality data.
+  # @param longitude [Float] The longitude for the air quality data.
+  # @return [PurpleAir] The instance of the PurpleAir class.
   def initialize(latitude, longitude)
     @latitude = latitude
     @longitude = longitude
@@ -16,22 +21,27 @@ class PurpleAir
     )
   end
 
+  # Fetches the Air Quality Index (AQI) based on the nearest sensor data.
+  # @return [Hash, nil] The AQI and related data, or nil if fetching fails.
   def aqi
     sensor = nearest_sensor
     return if sensor.blank?
-    raw_pm25 = nearest_sensor[:'pm2.5_atm']
-    humidity = nearest_sensor[:humidity]
+    raw_pm25 = sensor[:'pm2.5_atm']
+    humidity = sensor[:humidity]
     pm25 = humidity.present? ? apply_epa_correction(raw_pm25, humidity.to_f) : raw_pm25
     sensor[:aqi] = format_aqi(pm25)
     sensor
   end
 
+  # Saves the AQI data to a JSON file.
   def save_data
     File.open('data/purple_air.json', 'w') { |f| f << aqi.to_json }
   end
 
   private
 
+  # Finds sensors within a defined proximity.
+  # @return [Hash, nil] The sensor data, or nil if fetching fails.
   def find_sensors
     cache_key = "purple_air:sensors:#{api_query_params.values.map(&:to_s).join(':')}"
     data = @redis.get(cache_key)
@@ -45,6 +55,8 @@ class PurpleAir
     JSON.parse(response.body)
   end
 
+  # Constructs query parameters for the API request.
+  # @return [Hash] The API query parameters.
   def api_query_params
     {
       location_type: 0,
@@ -56,6 +68,8 @@ class PurpleAir
     }
   end
 
+  # Identifies the nearest air quality sensor based on the current location.
+  # @return [Hash, nil] The nearest sensor data, or nil if none are close enough.
   def nearest_sensor
     sensors = find_sensors
     return if sensors['data'].blank?
@@ -75,6 +89,12 @@ class PurpleAir
     fields.zip(nearest_sensor_data).to_h
   end
 
+  # Applies EPA correction to raw PM2.5 data based on humidity.
+  # @see https://community.purpleair.com/t/is-there-a-field-that-returns-data-with-us-epa-pm2-5-conversion-formula-applied/4593
+  # @see https://cfpub.epa.gov/si/si_public_record_report.cfm?dirEntryId=353088&Lab=CEMM
+  # @param pm25 [Float] The raw PM2.5 measurement.
+  # @param humidity [Float] The humidity measurement.
+  # @return [Float] The corrected PM2.5 value.
   def apply_epa_correction(pm25, humidity)
     case pm25
     when 0...30
@@ -94,6 +114,9 @@ class PurpleAir
     end
   end
 
+  # Formats the PM2.5 value into an Air Quality Index (AQI).
+  # @param pm25 [Float] The PM2.5 value to be converted.
+  # @return [Hash] The formatted AQI value and label.
   def format_aqi(pm25)
     return {} if pm25.blank?
 
@@ -119,6 +142,13 @@ class PurpleAir
     { value: aqi, label: label }.compact
   end
 
+  # Calculates the AQI based on PM2.5 value and breakpoints.
+  # @param pm25 [Float] The PM2.5 value.
+  # @param aqi_high [Integer] The high end of the AQI range.
+  # @param aqi_low [Integer] The low end of the AQI range.
+  # @param pm25_high [Float] The high PM2.5 breakpoint.
+  # @param pm25_low [Float] The low PM2.5 breakpoint.
+  # @return [Float] The calculated AQI value.
   def calculate_aqi(pm25, aqi_high, aqi_low, pm25_high, pm25_low)
     aqi_range = aqi_high - aqi_low
     pm25_range = pm25_high - pm25_low
