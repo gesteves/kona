@@ -34,9 +34,9 @@ class ContentfulProcessor
   # Generates content from Contentful.
   # It fetches all content in a single query and processes each content type.
   def generate_content!
-    cached_content = @redis.get(CACHE_KEY)
-    if cached_content
-      @content = JSON.parse(cached_content, symbolize_names: true)
+    content = @redis.get(CACHE_KEY)
+    if content
+      @content = JSON.parse(content, symbolize_names: true)
     else
       fetch_all_content
       process_site
