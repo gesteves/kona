@@ -3,6 +3,12 @@ import { schedule } from '@netlify/functions'
 
 const BUILD_HOOK = process.env.BUILD_HOOK_URL
 
+/**
+ * Scheduled function to trigger a Netlify build using a build webhook.
+ * It runs every hour at the beginning of the hour.
+ * 
+ * @returns {Object} Response object with status code.
+ */
 const handler = schedule('0 * * * *', async () => {
 
   if (BUILD_HOOK) {
