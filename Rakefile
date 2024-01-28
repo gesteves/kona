@@ -19,7 +19,8 @@ task :import => [:dotenv, :clobber] do
   setup_data_directory
   import_contentful
   import_strava
-  import_location_and_weather_data
+  import_location
+  import_weather_and_air_quality_data
   import_trainer_road
   puts 'All import tasks completed'
 end
@@ -54,7 +55,7 @@ def import_strava
   safely_perform { Strava.new.save_data }
 end
 
-def import_location_and_weather_data
+def import_location
   puts 'Getting most recent check-in from Swarm'
   swarm = Swarm.new
   @contentful ||= Contentful.new
@@ -66,7 +67,6 @@ def import_location_and_weather_data
   safely_perform {
     @maps ||= GoogleMaps.new(latitude, longitude)
     @maps.save_data
-    import_weather_and_air_quality_data(latitude, longitude)
   }
 end
 
@@ -85,23 +85,21 @@ def fetch_location(contentful, swarm)
 end
 
 # Imports weather and air quality data
-def import_weather_and_air_quality_data(latitude, longitude)
-  @maps ||= GoogleMaps.new(latitude, longitude)
-  country = @maps.country_code
-  time_zone = @maps.time_zone['timeZoneId']
+def import_weather_and_air_quality_data
+  return if @maps.nil?
 
   puts 'Importing weather data from WeatherKit'
-  weather = WeatherKit.new(latitude, longitude, time_zone, country)
+  weather = WeatherKit.new(@maps.latitude, @maps.longitude, @maps.time_zone['timeZoneId'], @maps.country_code)
   weather.save_data
 
   puts 'Importing air quality data from PurpleAir'
-  PurpleAir.new(latitude, longitude).save_data
+  PurpleAir.new(@maps.latitude, @maps.longitude).save_data
 end
 
 # Imports today's workouts from TrainerRoad
 def import_trainer_road
   puts 'Importing today’s workouts from TrainerRoad'
-  time_zone = if @maps && @maps.time_zone && @maps.time_zone['timeZoneId']
+  time_zone = if !@maps.nil?
                 @maps.time_zone['timeZoneId']
               else
                 ENV['DEFAULT_TIMEZONE'] || 'UTC'
