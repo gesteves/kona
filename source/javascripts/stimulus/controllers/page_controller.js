@@ -7,8 +7,9 @@ import { Controller } from "@hotwired/stimulus";
  */
 export default class extends Controller {
   /**
-   * Tracks a page view when the page loads in production.
-   * This method is called automatically by Stimulus.
+   * Tracks a page view when the page loads in production (to prevent bogus page views on dev & branch previews).
+   * This is called on every `turbo:load` event.
+   * @see https://turbo.hotwired.dev/reference/events
    */
   load() {
     if (isProduction()) {
