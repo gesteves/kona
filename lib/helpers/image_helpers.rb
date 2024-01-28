@@ -107,7 +107,7 @@ module ImageHelpers
   end
 
   # Generates a data URI containing an SVG embedded with the Blurhash for an asset ID.
-  # https://css-tricks.com/the-blur-up-technique-for-loading-background-images/#recreating-the-blur-filter-with-svg
+  # @see https://css-tricks.com/the-blur-up-technique-for-loading-background-images/#recreating-the-blur-filter-with-svg
   # @param asset_id [String] The ID of the asset used for generating Blurhash SVG.
   # @return [String, nil] The data URI with SVG data for Blurhash, or nil if not found or blank.
   def blurhash_svg_data_uri(asset_id)
@@ -163,12 +163,14 @@ module ImageHelpers
     nil
   end
 
-  # Generates a Blurhash for an asset based on its ID, width, and height.
+  # Generates a Blurhash for an asset based on its ID, width, and height
+  # (only if using Netlify's image CDN).
   # @param asset_id [String] The ID of the asset used for generating Blurhash.
   # @param width [Integer] The width of the Blurhash image.
   # @param height [Integer] The height of the Blurhash image.
   # @return [String, nil] The generated Blurhash, or nil if not generated or retrieved.
   def generate_blurhash(asset_id, width, height)
+    return unless ENV['NETLIFY'] == 'true'
     url = get_asset_url(asset_id)
     blurhash_url = cdn_image_url(url, { fm: 'blurhash', w: width, h: height })
     response = HTTParty.get(blurhash_url)
