@@ -98,11 +98,7 @@ end
 # Imports today's workouts from TrainerRoad
 def import_trainer_road
   puts 'Importing today’s workouts from TrainerRoad'
-  time_zone = if !@geocoded.nil?
-                @geocoded.time_zone['timeZoneId']
-              else
-                ENV['DEFAULT_TIMEZONE'] || 'UTC'
-              end
+  time_zone = @geocoded.nil? ? "UTC" : @geocoded.time_zone['timeZoneId']
   safely_perform { TrainerRoad.new(time_zone).save_data }
 end
 
