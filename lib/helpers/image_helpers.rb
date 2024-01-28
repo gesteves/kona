@@ -163,7 +163,7 @@ module ImageHelpers
 
   # Generates a Blurhash for an asset based on its ID, width, and height
   # (only if using Netlify's image CDN).
-  # @param asset_id [String] The ID of the asset used for generating Blurhash.
+  # @param asset_id [String] The ID of the asset used for generating the Blurhash.
   # @param width [Integer] The width of the Blurhash image.
   # @param height [Integer] The height of the Blurhash image.
   # @return [String, nil] The generated Blurhash, or nil if not generated or retrieved.
@@ -171,9 +171,16 @@ module ImageHelpers
     return unless is_netlify?
     url = get_asset_url(asset_id)
     blurhash_url = cdn_image_url(url, { fm: 'blurhash', w: width, h: height })
-    response = HTTParty.get(blurhash_url)
-    response.ok? ? response.body : nil
-  rescue
-    nil
+
+    begin
+      response = HTTParty.get(blurhash_url)
+      if response.ok? && response.headers['Content-Type'].include?('text/plain')
+        response.body
+      else
+        nil
+      end
+    rescue
+      nil
+    end
   end
 end
