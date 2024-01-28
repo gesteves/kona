@@ -77,8 +77,6 @@ class Contentful
       @pages     += response.data.pages.items
       @redirects += response.data.redirects.items
       @site      += response.data.site.items
-
-      sleep 0.02
     end
 
     @articles = @articles.compact.map(&:to_h).map(&:with_indifferent_access)
