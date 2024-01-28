@@ -46,6 +46,8 @@ module ImageHelpers
 
   # Generates a CDN image URL with optional query parameters.
   # Uses Netlify's Image CDN or Contentful's, as needed.
+  # @see https://docs.netlify.com/image-cdn/overview/
+  # @see https://www.contentful.com/developers/docs/references/images-api/
   # @param original_url [String] The original URL of the image.
   # @param params [Hash] (Optional) Query parameters to be appended to the URL.
   # @return [String] The CDN image URL with optional query parameters.
@@ -163,6 +165,7 @@ module ImageHelpers
 
   # Generates a Blurhash for an asset based on its ID, width, and height
   # (only if using Netlify's image CDN).
+  # @see https://blurha.sh/
   # @param asset_id [String] The ID of the asset used for generating the Blurhash.
   # @param width [Integer] The width of the Blurhash image.
   # @param height [Integer] The height of the Blurhash image.
