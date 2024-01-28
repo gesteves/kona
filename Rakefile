@@ -11,6 +11,8 @@ BUILD_DIRECTORY = 'build'
 # Remove all existing data files from previous imports.
 CLOBBER.include %w{ data/*.json }
 
+@contentful = nil
+
 desc 'Imports all content for the site'
 task :import => [:dotenv, :clobber] do
   setup_data_directory
@@ -35,32 +37,28 @@ end
 
 # Methods for tasks
 
-# Sets up the data directory where the JSON files will get saved.
 def setup_data_directory
   puts 'Setting up data directory'
   FileUtils.mkdir_p(DATA_DIRECTORY)
 end
 
-# Imports content from Contentful
 def import_contentful
   puts 'Importing site content from Contentful'
-  safely_perform { Contentful.new.save_data }
+  @contentful ||= Contentful.new
+  safely_perform { @contentful.save_data }
 end
 
-# Imports activity stats from Strava
 def import_strava
   puts 'Importing activity stats from Strava'
   safely_perform { Strava.new.save_data }
 end
 
-# Imports location and weather data
 def import_location_and_weather_data
   puts 'Getting most recent check-in from Swarm'
   swarm = Swarm.new
-  contentful = Contentful.new
-  latitude, longitude = fetch_location(contentful, swarm)
+  @contentful ||= Contentful.new
+  latitude, longitude = fetch_location(@contentful, swarm)
 
-  # If we don't have a location, then we can't get weather or AQI data.
   return if latitude.nil? || longitude.nil?
 
   puts 'Geocoding location in Google Maps'
