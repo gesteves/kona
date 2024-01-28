@@ -20,7 +20,7 @@ module ImageHelpers
     return asset&.width, asset&.height
   end
 
-  # Retrieves the description of an asset by its ID.
+  # Retrieves the description (aka alt text) of an asset by its ID.
   # @param asset_id [String] The ID of the asset for which to retrieve the description.
   # @return [String, nil] The description of the asset, or nil if the asset is not found or has no description.
   def get_asset_description(asset_id)
@@ -54,15 +54,15 @@ module ImageHelpers
     # which aren't served from their CDN, and break image processing.
     original_url.sub!('downloads.ctfassets.net', 'images.ctfassets.net')
 
-    if ENV['NETLIFY'] == 'true'
+    if is_netlify?
       base_path = '/.netlify/images'
-      netlify_base_url = ENV['CONTEXT'] == 'dev' ? "http://localhost:8888#{base_path}" : "#{ENV['URL']}#{base_path}"
+      netlify_base_url = is_dev? ? "#{ENV['DEPLOY_URL']}#{base_path}" : "#{ENV['URL']}#{base_path}"
       original_url = "https:#{original_url}" if original_url.start_with?('//')
 
       query_params = URI.encode_www_form(params)
       image_url = "#{netlify_base_url}?url=#{URI.encode_www_form_component(original_url)}"
       image_url += "&#{query_params}" unless query_params.empty?
-    elsif original_url.matches?('images.ctfassets.net')
+    elsif original_url.match?('images.ctfassets.net')
       query_params = URI.encode_www_form(params)
       image_url = original_url
       image_url += "?#{query_params}" unless query_params.empty? || original_url.include?('?')
@@ -170,7 +170,7 @@ module ImageHelpers
   # @param height [Integer] The height of the Blurhash image.
   # @return [String, nil] The generated Blurhash, or nil if not generated or retrieved.
   def generate_blurhash(asset_id, width, height)
-    return unless ENV['NETLIFY'] == 'true'
+    return unless is_netlify?
     url = get_asset_url(asset_id)
     blurhash_url = cdn_image_url(url, { fm: 'blurhash', w: width, h: height })
     response = HTTParty.get(blurhash_url)
