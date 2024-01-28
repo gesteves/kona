@@ -157,8 +157,7 @@ module ImageHelpers
     map = 'rgba'
     image = MiniMagick::Image.get_image_from_pixels(pixels, dimensions, map, depth, 'jpg')
     "data:image/jpeg;base64,#{Base64.strict_encode64(image.to_blob)}"
-  rescue => e
-    STDERR.puts "Blurhash data URI generation error: #{e.message}"
+  rescue
     nil
   end
 
