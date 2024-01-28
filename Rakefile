@@ -12,7 +12,7 @@ BUILD_DIRECTORY = 'build'
 CLOBBER.include %w{ data/*.json }
 
 @contentful = nil
-@maps = nil
+@geocoded = nil
 
 desc 'Imports all content for the site'
 task :import => [:dotenv, :clobber] do
@@ -65,8 +65,8 @@ def import_location
 
   puts 'Geocoding location in Google Maps'
   safely_perform {
-    @maps ||= GoogleMaps.new(latitude, longitude)
-    @maps.save_data
+    @geocoded = GoogleMaps.new(latitude, longitude)
+    @geocoded.save_data
   }
 end
 
@@ -86,21 +86,20 @@ end
 
 # Imports weather and air quality data
 def import_weather_and_air_quality_data
-  return if @maps.nil?
+  return if @geocoded.nil?
 
   puts 'Importing weather data from WeatherKit'
-  weather = WeatherKit.new(@maps.latitude, @maps.longitude, @maps.time_zone['timeZoneId'], @maps.country_code)
-  weather.save_data
+  WeatherKit.new(@geocoded.latitude, @geocoded.longitude, @geocoded.time_zone['timeZoneId'], @geocoded.country_code).save_data
 
   puts 'Importing air quality data from PurpleAir'
-  PurpleAir.new(@maps.latitude, @maps.longitude).save_data
+  PurpleAir.new(@geocoded.latitude, @geocoded.longitude).save_data
 end
 
 # Imports today's workouts from TrainerRoad
 def import_trainer_road
   puts 'Importing today’s workouts from TrainerRoad'
-  time_zone = if !@maps.nil?
-                @maps.time_zone['timeZoneId']
+  time_zone = if !@geocoded.nil?
+                @geocoded.time_zone['timeZoneId']
               else
                 ENV['DEFAULT_TIMEZONE'] || 'UTC'
               end
