@@ -1,5 +1,8 @@
 import { Controller } from "@hotwired/stimulus";
 
+/**
+ * Controller for managing social sharing functionality.
+ */
 export default class extends Controller {
   static classes = ["hidden"];
   static values = {
@@ -10,6 +13,10 @@ export default class extends Controller {
     url: String
   };
 
+  /**
+   * If the native share API is available and the `isNativeValue` is true,
+   * the element's hidden class is removed.
+   */
   connect() {
     if (navigator.share && this.isNativeValue) {
       this.element.classList.remove(this.hiddenClass);
@@ -17,9 +24,8 @@ export default class extends Controller {
   }
 
   /**
-   * Gets the URL to share. It returns the URL from the Stimulus controller's `urlValue` if available,
+   * Gets the URL to share. It returns the URL from the `urlValue` if available,
    * otherwise, it checks for the canonical URL in the document or uses the current window location URL.
-   *
    * @returns {string} The URL to share.
    */
   getShareUrl() {
@@ -27,9 +33,8 @@ export default class extends Controller {
   }
 
   /**
-   * Gets the text to share. It returns the text from the Stimulus controller's `textValue` if available,
+   * Gets the text to share. It returns the text from the `textValue` if available,
    * otherwise, it checks for the Open Graph title in the document's meta tags or uses the document title.
-   *
    * @returns {string} The text to share.
    */
   getShareText() {
@@ -39,7 +44,6 @@ export default class extends Controller {
   /**
    * Opens the native share sheet to share the current page's title and URL. It uses the `navigator.share` API
    * and handles any potential errors silently.
-   *
    * @param {Event} event - The event that triggered the share action (e.g., a click event).
    */
   openShareSheet(event) {
@@ -55,7 +59,6 @@ export default class extends Controller {
 
   /**
    * Opens a popup window for sharing the linked URL.
-   *
    * @param {Event} event - The event that triggered the popup window (e.g., a click event).
    */
   openPopup(event) {

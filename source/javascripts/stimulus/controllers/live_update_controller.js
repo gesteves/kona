@@ -1,5 +1,8 @@
 import { Controller } from "@hotwired/stimulus";
 
+/**
+ * Controller class for managing dynamic content updates.
+ */
 export default class extends Controller {
   static values = {
     url: String
@@ -15,9 +18,9 @@ export default class extends Controller {
   }
 
   /**
-   * Fetches data from a URL and updates the content of the element.
+   * Fetches data from a specified URL and updates the content of the associated element.
    * @async
-   * @returns {Promise<void>} A promise that resolves when the content is updated.
+   * @returns {Promise<void>} A promise that resolves when the content is updated, or if an error occurs.
    */
   async fetchAndUpdateContent() {
     if (this.hasUrlValue) {

@@ -22,6 +22,8 @@ export function trackPageView() {
 /**
  * Product-agnostic function to make an event tracking call.
  * Currently supports Plausible.
+ * @param {string} event - The event name to be tracked.
+ * @param {Object} props - Additional properties to send with the event.
  */
 export function trackEvent(event, props = {}) {
   setupPlausibleQueue();
@@ -29,7 +31,9 @@ export function trackEvent(event, props = {}) {
 }
 
 /**
- * Removes specific UTM params and other query parameters from the page URL.
+ * Removes specific UTM parameters and other query parameters from the page URL.
+ * This function modifies the current URL by removing marketing and tracking parameters,
+ * then updates the browser's history state to reflect the clean URL.
  */
 export function cleanUpUrl() {
   const currentUrl = new URL(window.location.href);
