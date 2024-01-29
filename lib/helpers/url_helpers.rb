@@ -29,7 +29,8 @@ module UrlHelpers
   # Extracts and returns the domain from the application's root URL.
   # @return [String] The domain of the application's root URL.
   def site_domain
-    PublicSuffix.domain(root_url)
+    uri = URI.parse(root_url)
+    domain = PublicSuffix.domain(uri.host)
   end
 
 end
