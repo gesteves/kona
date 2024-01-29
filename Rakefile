@@ -59,7 +59,7 @@ def import_location
 
   return if latitude.nil? || longitude.nil?
 
-  puts 'Geocoding location in Google Maps'
+  puts '  Geocoding location in Google Maps'
   safely_perform {
     @geocoded = GoogleMaps.new(latitude, longitude)
     @geocoded.save_data
@@ -74,7 +74,7 @@ end
 def fetch_location(contentful, swarm)
   checkin = swarm.recent_checkin_location
   if checkin[:latitude].nil? || checkin[:longitude].nil?
-    puts 'No recent Swarm check-ins; using default location from Contentful'
+    puts '  No recent Swarm check-ins; using default location from Contentful'
     return [contentful.location[:lat], contentful.location[:lon]]
   end
   [checkin[:latitude], checkin[:longitude]]
