@@ -17,7 +17,7 @@ status = 200
   node_bundler = "esbuild"
 
 [images]
-  remote_images = ["https://images.ctfassets.net/.*"]
+  remote_images = ["https://images.ctfassets.net/.*", "https://downloads.ctfassets.net/.*"]
 
 [dev]
   autoLaunch = false
