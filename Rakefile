@@ -103,6 +103,9 @@ end
 # Builds the entire site
 # @param verbose [Boolean] Whether to build the site with verbose output
 def build_site(verbose: false)
+  # Use NETLIFY_BUILD_DEBUG env var to override the verbose flag if set to "true"
+  verbose = true if ENV['NETLIFY_BUILD_DEBUG'] == 'true'
+
   sh 'npm run build'
   middleman_command = verbose ? 'middleman build --verbose' : 'middleman build'
   sh middleman_command
