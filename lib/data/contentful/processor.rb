@@ -217,11 +217,15 @@ class ContentfulProcessor
     blog = []
     sliced = @content[:articles].reject { |a| a[:draft] }.each_slice(entries_per_page)
     sliced.each_with_index do |page, index|
+      current_page = index + 1
+      previous_page = index == 0 ? nil : index
+      next_page = index == sliced.size - 1 ? nil : index + 2
       blog << {
-        current_page: index + 1,
-        previous_page: index == 0 ? nil : index,
-        next_page: index == sliced.size - 1 ? nil : index + 2,
+        current_page: current_page,
+        previous_page: previous_page,
+        next_page: next_page,
         template: "/articles.html",
+        path: current_page == 1 ? "/blog/index.html" : "/blog/page/#{current_page}/index.html",
         title: "Blog",
         items: page,
         indexInSearchEngines: true

@@ -37,11 +37,7 @@ end
 end
 
 @app.data.blog.each do |page|
-  if page.current_page == 1
-    proxy "/blog/index.html", page.template, locals: { content: page }, ignore: true
-  else
-    proxy "/blog/page/#{page.current_page}/index.html", page.template, locals: { content: page }, ignore: true
-  end
+  proxy page.path, page.template, locals: { content: page }, ignore: true
 end
 
 configure :development do
