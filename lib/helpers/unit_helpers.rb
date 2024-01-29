@@ -1,5 +1,7 @@
-module DistanceHelpers
+require 'active_support/all'
 
+module UnitHelpers
+  include ActiveSupport::NumberHelper
   # Converts a distance in meters to either metric or imperial units.
   # @param meters [Numeric] The distance in meters to be converted.
   # @param units [String] (Optional) The unit system for conversion: 'si', 'metric', or 'imperial'. Default is 'si'.
@@ -100,5 +102,12 @@ module DistanceHelpers
   # @return [Numeric] The equivalent length in inches.
   def millimeters_to_inches(millimeters)
     millimeters / 25.4
+  end
+
+  # Converts a temperature value from Celsius to Fahrenheit.
+  # @param [Float] celsius - The temperature value in Celsius.
+  # @return [Float] The equivalent temperature value in Fahrenheit.
+  def celsius_to_fahrenheit(celsius)
+    (celsius * (9.0 / 5.0)) + 32
   end
 end

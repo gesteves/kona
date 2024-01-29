@@ -1,4 +1,7 @@
+require 'active_support/all'
+
 module WeatherHelpers
+  include ActiveSupport::NumberHelper
   PRECIPITATION_METRIC_UNITS = {
     unit: 'mm',
     ten: 'cm',
@@ -84,13 +87,6 @@ module WeatherHelpers
     content_tag :data, 'data-controller': 'units', 'data-units-imperial-value': fahrenheit, 'data-units-metric-value': celsius, title: "#{celsius} | #{fahrenheit}" do
       celsius
     end
-  end
-
-  # Converts a temperature value from Celsius to Fahrenheit.
-  # @param [Float] celsius - The temperature value in Celsius.
-  # @return [Float] The equivalent temperature value in Fahrenheit.
-  def celsius_to_fahrenheit(celsius)
-    (celsius * (9.0 / 5.0)) + 32
   end
 
   # Formats a precipitation amount from millimeters (mm) to both metric and imperial units.
