@@ -192,11 +192,11 @@ class ContentfulProcessor
   end
 
   # Generates a collection of unique tags from articles.
-  # Each tag includes a paginated list of associated articles, path, and other metadata.
-  # @return [Array<Hash>] A sorted array of unique tags.
+  # Each tag includes a paginated collection of articles with that tag, and other metadata.
+  # @return [Array<Hash>] A collection of tag pages.
   def generate_tags
     entries_per_page = @content[:site][:entriesPerPage]
-    tags = @content[:articles].map { |a| a.dig(:contentfulMetadata, :tags) }.flatten.uniq
+    tags = @content[:articles].reject { |a| a[:draft] }.map { |a| a.dig(:contentfulMetadata, :tags) }.flatten.uniq
     paginated_tags = tags.map do |tag|
       tag = tag.dup
       tagged_articles = @content[:articles].select { |a| !a[:draft] && a.dig(:contentfulMetadata, :tags).include?(tag) }
@@ -218,12 +218,11 @@ class ContentfulProcessor
       end
       { tag: tag, pages: paginated_tag_pages }
     end
-    paginated_tags.select { |t| t[:pages].any? { |p| p[:items].present? } }.sort_by { |t| t[:tag][:id] }
     @content[:tags] = paginated_tags
   end
 
   # Generates a paginated collection of blog entries.
-  # Each page includes articles for that page, navigation details, and template information.
+  # Each page includes articles for that page, and other metadata.
   # @return [Array<Hash>] A collection of blog pages.
   def generate_blog
     entries_per_page = @content[:site][:entriesPerPage]
