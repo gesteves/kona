@@ -9,6 +9,7 @@ module MarkupHelpers
     html = add_image_data_attributes(html)
     html = add_figure_elements(html, base_class: 'entry')
     html = responsivize_images(html, widths: data.srcsets.entry.widths, sizes: data.srcsets.entry.sizes.join(', '), formats: data.srcsets.entry.formats)
+    html = resize_images(html, width: data.srcsets.entry.widths.max)
     html = add_image_placeholders(html)
     html = set_alt_text(html)
     html = mark_affiliate_links(html)
@@ -37,6 +38,7 @@ module MarkupHelpers
     html = add_image_data_attributes(html)
     html = add_figure_elements(html, base_class: 'home')
     html = responsivize_images(html, widths: data.srcsets.home.widths, sizes: data.srcsets.home.sizes.join(', '), formats: data.srcsets.entry.formats, lazy: false, square: true)
+    html = resize_images(html)
     html = add_image_placeholders(html)
     html = set_alt_text(html)
     html
