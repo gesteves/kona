@@ -17,12 +17,12 @@ CLOBBER.include %w{ data/*.json }
 desc 'Imports all content for the site'
 task :import => [:dotenv, :clobber] do
   setup_data_directory
-  import_contentful
-  import_strava
-  import_location
-  import_weather_and_air_quality_data
-  import_trainer_road
-  puts 'All import tasks completed'
+  measure_and_output(:import_contentful, "Importing site content from Contentful")
+  measure_and_output(:import_strava, "Importing activity stats from Strava")
+  measure_and_output(:import_location, "Importing location data from Swarm")
+  measure_and_output(:import_weather, "Importing weather data from WeatherKit")
+  measure_and_output(:import_aqi, "Importing air quality data from PurpleAir")
+  measure_and_output(:import_trainer_road, "Importing today’s workouts from TrainerRoad")
 end
 
 desc 'Import content and build the site'
@@ -40,23 +40,19 @@ end
 # Methods for tasks
 
 def setup_data_directory
-  puts 'Setting up data directory'
   FileUtils.mkdir_p(DATA_DIRECTORY)
 end
 
 def import_contentful
-  puts 'Importing site content from Contentful'
   @contentful ||= Contentful.new
   safely_perform { @contentful.save_data }
 end
 
 def import_strava
-  puts 'Importing activity stats from Strava'
   safely_perform { Strava.new.save_data }
 end
 
 def import_location
-  puts 'Getting most recent check-in from Swarm'
   swarm = Swarm.new
   @contentful ||= Contentful.new
   latitude, longitude = fetch_location(@contentful, swarm)
@@ -78,26 +74,28 @@ end
 def fetch_location(contentful, swarm)
   checkin = swarm.recent_checkin_location
   if checkin[:latitude].nil? || checkin[:longitude].nil?
-    puts "No recent Swarm check-ins found, using Contentful location as a fallback"
+    puts 'No recent Swarm check-ins; using default location from Contentful'
     return [contentful.location[:lat], contentful.location[:lon]]
   end
   [checkin[:latitude], checkin[:longitude]]
 end
 
-# Imports weather and air quality data
-def import_weather_and_air_quality_data
+# Imports weather data
+def import_weather
   return if @geocoded.nil?
 
-  puts 'Importing weather data from WeatherKit'
   WeatherKit.new(@geocoded.latitude, @geocoded.longitude, @geocoded.time_zone['timeZoneId'], @geocoded.country_code).save_data
+end
 
-  puts 'Importing air quality data from PurpleAir'
+# Imports air quality data
+def import_aqi
+  return if @geocoded.nil?
+
   PurpleAir.new(@geocoded.latitude, @geocoded.longitude).save_data
 end
 
 # Imports today's workouts from TrainerRoad
 def import_trainer_road
-  puts 'Importing today’s workouts from TrainerRoad'
   time_zone = @geocoded.nil? ? "UTC" : @geocoded.time_zone['timeZoneId']
   safely_perform { TrainerRoad.new(time_zone).save_data }
 end
@@ -105,7 +103,6 @@ end
 # Builds the entire site
 # @param verbose [Boolean] Whether to build the site with verbose output
 def build_site(verbose: false)
-  puts 'Building the site'
   sh 'npm run build'
   middleman_command = verbose ? 'middleman build --verbose' : 'middleman build'
   sh middleman_command
@@ -118,4 +115,15 @@ def safely_perform
   yield
 rescue => e
   puts "Error occurred: #{e.message}"
+end
+
+# Measures the execution time of a specified method and outputs the result.
+# @param method [Symbol] The method to be executed and measured.
+# @param description [String] A description of the task being measured.
+def measure_and_output(method, description)
+  puts description
+  start_time = Time.now
+  send(method)
+  duration = Time.now - start_time
+  puts "  Completed in #{duration.round(2)} seconds"
 end
