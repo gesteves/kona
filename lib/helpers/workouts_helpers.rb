@@ -29,13 +29,6 @@ module WorkoutsHelpers
     data.trainerroad.workouts.any? { |w| w.discipline == 'Swim' }
   end
 
-  # Determines the appropriate indefinite article ('a' or 'an') to use with a workout description.
-  # @param workout [Object] The workout object with a description.
-  # @return [String] The workout description prefixed with the appropriate indefinite article.
-  def workout_with_article(workout)
-    workout.description =~ /^(8|11|18|80)-/i ? "an #{workout.description}" : "a #{workout.description}"
-  end
-
   # Formats and combines activity totals for swimming, cycling, and running.
   # @param swims [Integer] The number of swimming activities.
   # @param rides [Integer] The number of cycling activities.
