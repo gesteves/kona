@@ -53,7 +53,6 @@ class ContentfulProcessor
   # Fetches all content with a paginated GraphQL query.
   # Continues fetching until all content items have been retrieved.
   def fetch_all_content
-    puts 'Fetching Contentful data from the API'
     skip = 0
     limit = 1000
     fetch = true
