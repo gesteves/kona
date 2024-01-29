@@ -33,7 +33,9 @@ end
 end
 
 @app.data.tags.each do |tag|
-  proxy tag.path, tag.template, locals: { content: tag }, ignore: true
+  tag.pages.each do |page|
+    proxy page.path, page.template, locals: { content: page }, ignore: true
+  end
 end
 
 @app.data.blog.each do |page|

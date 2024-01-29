@@ -192,21 +192,34 @@ class ContentfulProcessor
   end
 
   # Generates a collection of unique tags from articles.
-  # Each tag includes a list of associated articles, path, and other metadata.
+  # Each tag includes a paginated list of associated articles, path, and other metadata.
   # @return [Array<Hash>] A sorted array of unique tags.
   def generate_tags
+    entries_per_page = @content[:site][:entriesPerPage]
     tags = @content[:articles].map { |a| a.dig(:contentfulMetadata, :tags) }.flatten.uniq
-    tags.map! do |tag|
+    paginated_tags = tags.map do |tag|
       tag = tag.dup
-      tag[:items] = @content[:articles].select { |a| !a[:draft] && a.dig(:contentfulMetadata, :tags).include?(tag) }
-      tag[:path] = "/tagged/#{tag[:id]}/index.html"
-      tag[:template] = "/articles.html"
-      tag[:title] = tag[:name]
-      tag[:indexInSearchEngines] = true
-      tag
+      tagged_articles = @content[:articles].select { |a| !a[:draft] && a.dig(:contentfulMetadata, :tags).include?(tag) }
+      sliced = tagged_articles.each_slice(entries_per_page)
+      paginated_tag_pages = sliced.map.with_index do |page, index|
+        current_page = index + 1
+        previous_page = index.zero? ? nil : index
+        next_page = index == sliced.size - 1 ? nil : index + 2
+        {
+          current_page: current_page,
+          previous_page: previous_page,
+          next_page: next_page,
+          template: "/articles.html",
+          path: current_page == 1 ? "/tagged/#{tag[:id]}/index.html" : "/tagged/#{tag[:id]}/page/#{current_page}/index.html",
+          title: tag[:name],
+          items: page,
+          indexInSearchEngines: true
+        }
+      end
+      { tag: tag, pages: paginated_tag_pages }
     end
-    tags.select { |t| t[:items].present? }.sort { |a, b| a[:id] <=> b[:id] }
-    @content[:tags] = tags
+    paginated_tags.select { |t| t[:pages].any? { |p| p[:items].present? } }.sort_by { |t| t[:tag][:id] }
+    @content[:tags] = paginated_tags
   end
 
   # Generates a paginated collection of blog entries.
