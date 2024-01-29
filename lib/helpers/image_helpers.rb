@@ -52,18 +52,13 @@ module ImageHelpers
   # @param params [Hash] (Optional) Query parameters to be appended to the URL.
   # @return [String] The CDN image URL with optional query parameters.
   def cdn_image_url(original_url, params = {})
-    # For some reason sometimes contentful returns an asset served from downloads.ctfassets.net,
-    # which aren't served from their CDN, and break image processing.
-    original_url.sub!('downloads.ctfassets.net', 'images.ctfassets.net')
-
     if is_netlify?
       base_url = "#{ENV['URL']}/.netlify/images"
       original_url = "https:#{original_url}" if original_url.start_with?('//')
-
       query_params = URI.encode_www_form(params)
       image_url = "#{base_url}?url=#{URI.encode_www_form_component(original_url)}"
       image_url += "&#{query_params}" unless query_params.empty?
-    elsif original_url.match?('images.ctfassets.net')
+    elsif original_url.match?('ctfassets.net')
       query_params = URI.encode_www_form(params)
       image_url = original_url
       image_url += "?#{query_params}" unless query_params.empty? || original_url.include?('?')
