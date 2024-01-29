@@ -8,17 +8,24 @@ module CustomHelpers
   # @param params [Hash] (Optional) Additional query parameters to be included in the URL.
   # @return [String] The fully constructed URL as a string.
   def full_url(resource, params = {})
-    base_url = if is_production?
+    url = URI.parse(root_url)
+    url.path = url_for(resource)
+    url.query = URI.encode_www_form(params) if params.present?
+    url.to_s
+  end
+
+  def root_url
+    if is_production?
       ENV['URL']
     elsif is_netlify?
       ENV['DEPLOY_URL']
     else
       'http://localhost:4567'
     end
-    url = URI.parse(base_url)
-    url.path = url_for(resource)
-    url.query = URI.encode_www_form(params) if params.present?
-    url.to_s
+  end
+
+  def site_domain
+    PublicSuffix.domain(root_url)
   end
 
   # Determines if the site is currently running on Netlify, based on the presence of a CONTEXT env var.
