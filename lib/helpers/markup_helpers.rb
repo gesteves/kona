@@ -6,6 +6,7 @@ module MarkupHelpers
   # @return [String] The HTML-rendered text with added attributes and transformations.
   def render_body(text)
     html = markdown_to_html(text)
+    html = add_unit_data_attributes(html)
     html = add_image_data_attributes(html)
     html = add_figure_elements(html, base_class: 'entry')
     html = responsivize_images(html, widths: data.srcsets.entry.widths, sizes: data.srcsets.entry.sizes.join(', '), formats: data.srcsets.entry.formats)
@@ -43,6 +44,28 @@ module MarkupHelpers
     html = set_alt_text(html)
     html
   end
+
+  # Adds data attributes for the units-controller.js Stimulus controller,
+  # to simplify entering unit conversion data in Contentful.
+  # @param html [String] A string containing the HTML to be processed.
+  # @return [String] The modified HTML with updated data attributes.
+  # @example
+  #   original_html = '<span data-imperial="6.21 mi">10 km</span>'
+  #   modified_html = add_unit_data_attributes(original_html)
+  #   # => '<span data-units-imperial-value="6.21 mi" data-units-metric-value="10 km" data-controller="units">10 km</span>'
+  def add_unit_data_attributes(html)
+    return if html.blank?
+
+    doc = Nokogiri::HTML::DocumentFragment.parse(html)
+    doc.css('[data-imperial]').each do |element|
+      element['data-units-imperial-value'] = element['data-imperial']
+      element['data-units-metric-value'] = element.text
+      element.remove_attribute('data-imperial')
+      element['data-controller'] = 'units'
+    end
+    doc.to_html
+  end
+
 
   # Adds data attributes to image elements in HTML to store asset information for later use.
   # @param html [String] The HTML content with image elements.
