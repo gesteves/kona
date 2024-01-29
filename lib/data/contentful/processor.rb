@@ -214,13 +214,12 @@ class ContentfulProcessor
   # @return [Array<Hash>] A collection of blog pages.
   def generate_blog
     entries_per_page = @content[:site][:entriesPerPage]
-    blog = []
-    sliced = @content[:articles].reject { |a| a[:draft] }.each_slice(entries_per_page)
-    sliced.each_with_index do |page, index|
+    sliced_articles = @content[:articles].reject { |a| a[:draft] }.each_slice(entries_per_page)
+    blog_pages = sliced_articles.map.with_index do |page, index|
       current_page = index + 1
-      previous_page = index == 0 ? nil : index
-      next_page = index == sliced.size - 1 ? nil : index + 2
-      blog << {
+      previous_page = index.zero? ? nil : index
+      next_page = index == sliced_articles.size - 1 ? nil : index + 2
+      {
         current_page: current_page,
         previous_page: previous_page,
         next_page: next_page,
@@ -231,7 +230,7 @@ class ContentfulProcessor
         indexInSearchEngines: true
       }
     end
-    @content[:blog] = blog
+    @content[:blog] = blog_pages
   end
 
   def cache_content
