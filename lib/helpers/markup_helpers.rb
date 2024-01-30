@@ -1,7 +1,8 @@
 require 'nokogiri'
 
 # This module manipulates Markdown content in various ways that are
-# hard or impossible to do in the story editor in Contenful.
+# hard or impossible to do in the story editor in Contentful,
+# e.g. making images and tables responsive, etc.
 module MarkupHelpers
   # Renders the body text for an entry with various transformations of the HTML output.
   # @param text [String] The Markdown text to render.
