@@ -9,6 +9,7 @@ module MarkupHelpers
   # @return [String] The rendered HTML with added attributes and transformations.
   def render_body(text)
     html = markdown_to_html(text)
+    html = open_external_links_in_new_tabs(text)
     html = add_unit_data_attributes(html)
     html = add_image_data_attributes(html)
     html = add_figure_elements(html, base_class: 'entry')
@@ -284,6 +285,27 @@ module MarkupHelpers
       if is_affiliate_link?(a['href'])
         a['rel'] = "sponsored nofollow"
       end
+    end
+    doc.to_html
+  end
+
+  # Opens external links in new tabs.
+  # @param html [String] The HTML string to be processed.
+  # @return [String] The modified HTML with updated link attributes.
+  def open_external_links_in_new_tabs(html)
+    return html if html.blank?
+
+    current_host = URI.parse(root_url).host
+    doc = Nokogiri::HTML::DocumentFragment.parse(html)
+    doc.css('a').each do |link|
+      href = link['href']
+      next unless href&.start_with?('http://', 'https://')
+
+      link_host = URI.parse(href).host
+      next unless link_host != current_host
+
+      link['rel'] = 'noopener'
+      link['target'] = '_blank'
     end
     doc.to_html
   end
