@@ -1,9 +1,11 @@
 require 'nokogiri'
 
+# This module manipulates Markdown content in various ways that are
+# hard or impossible to do in the story editor in Contenful.
 module MarkupHelpers
-  # Renders the body text with various transformations for HTML output.
-  # @param text [String] The markdown text to render.
-  # @return [String] The HTML-rendered text with added attributes and transformations.
+  # Renders the body text for an entry with various transformations of the HTML output.
+  # @param text [String] The Markdown text to render.
+  # @return [String] The rendered HTML with added attributes and transformations.
   def render_body(text)
     html = markdown_to_html(text)
     html = add_unit_data_attributes(html)
@@ -18,9 +20,9 @@ module MarkupHelpers
     html
   end
 
-  # Renders the body text for a feed with various transformations for HTML output.
-  # @param text [String] The markdown text to render.
-  # @return [String] The HTML-rendered text with added attributes and transformations.
+  # Renders the body text for the Atom feed with various transformations of the HTML output.
+  # @param text [String] The Markdown text to render.
+  # @return [String] The rendered HTML with added attributes and transformations.
   def render_feed_body(text)
     html = markdown_to_html(text)
     html = add_image_data_attributes(html)
@@ -31,9 +33,9 @@ module MarkupHelpers
     html
   end
 
-  # Renders the body text for the home page with various transformations for HTML output.
-  # @param text [String] The markdown text to render.
-  # @return [String] The HTML-rendered text with added attributes and transformations.
+  # Renders the body text for the home page with various transformations of the HTML output.
+  # @param text [String] The Markdown text to render.
+  # @return [String] The rendered HTML with added attributes and transformations.
   def render_home_body(text)
     html = markdown_to_html(text)
     html = add_image_data_attributes(html)
@@ -66,7 +68,6 @@ module MarkupHelpers
     doc.to_html
   end
 
-
   # Adds data attributes to image elements in HTML to store asset information for later use.
   # @param html [String] The HTML content with image elements.
   # @return [String] The HTML content with added data attributes.
@@ -83,7 +84,7 @@ module MarkupHelpers
     doc.to_html
   end
 
-  # Adds figure elements around image elements in HTML with optional base class.
+  # Adds figure elements around image elements in HTML with an optional CSS class.
   # @param html [String] The HTML content with image elements.
   # @param base_class [String] (Optional) The base class to add to the figure element.
   # @return [String] The HTML content with added figure elements.
@@ -121,7 +122,7 @@ module MarkupHelpers
     doc.to_html
   end
 
-  # Sets the caption and credit within HTML content.
+  # Formats the figcaption of a figure element, wrapping the credit in a <cite> element
   # @param html [String] The HTML content with caption and credit separated by ' | '.
   # @return [String, nil] The HTML content with caption and credit formatted with <cite>, or nil if blank.
   def set_caption_credit(html)
@@ -131,14 +132,15 @@ module MarkupHelpers
     "#{parts.first} <cite>#{parts.last}</cite>"
   end
 
-  # Makes images responsive within HTML by adding source elements for various formats and sizes.
+  # Makes images responsive within HTML by wrapping image elements in a picture element
+  # using source elements with srcsets/sizes in various formats.
   # @param html [String] The HTML content with image elements.
   # @param widths [Array<Integer>] The widths for which to generate responsive images.
   # @param sizes [String] The sizes attribute value for the image element.
   # @param formats [Array<String>] The image formats to include (e.g., 'avif', 'webp', 'jpg').
   # @param lazy [Boolean] Whether to enable lazy loading for images.
-  # @param square [Boolean] Whether to maintain a square aspect ratio for images.
-  # @return [String] The HTML content with added source elements for responsive images.
+  # @param square [Boolean] Whether to crop images square.
+  # @return [String] The HTML content with responsive picture elements.
   def responsivize_images(html, widths: [100, 200, 300], sizes: '100vw', formats: ['avif', 'webp', 'jpg'], lazy: true, square: false)
     return if html.blank?
 
@@ -184,10 +186,10 @@ module MarkupHelpers
     doc.to_html
   end
 
-  # Generates a <source> HTML tag with optional srcset attribute.
+  # Generates a <source> HTML tag with a srcset.
   # @param url [String] The URL of the image.
   # @param options [Hash] (Optional) Additional options for the <source> tag.
-  # @return [String] The HTML <source> tag with optional srcset attribute.
+  # @return [String] The HTML <source> tag.
   def source_tag(url, options = {})
     srcset_opts = { fm: options[:format] }.compact
     options[:srcset] = srcset(url: url, widths: options[:widths], square: options[:square], options: srcset_opts)
@@ -242,7 +244,7 @@ module MarkupHelpers
     doc.to_html
   end
 
-  # Sets alt text for images in HTML content based on asset descriptions.
+  # Sets alt text for images in HTML content to the assets' descriptions.
   # @param html [String] The HTML content with image elements.
   # @return [String] The HTML content with alt text set for images.
   def set_alt_text(html)
