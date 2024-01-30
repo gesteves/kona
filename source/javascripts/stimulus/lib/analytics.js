@@ -41,19 +41,26 @@ export function cleanUpUrl() {
 
   // List of query parameters to remove
   const paramsToRemove = [
-      'ref',
-      'source',
-      'utm_source',
-      'utm_medium',
-      'utm_campaign',
-      'utm_content',
-      'utm_term'
+    'ref',
+    'source',
+    'utm_source',
+    'utm_medium',
+    'utm_campaign',
+    'utm_content',
+    'utm_term'
   ];
 
+  let paramRemoved = false;
+
   paramsToRemove.forEach(param => {
+    if (params.has(param)) {
       params.delete(param);
+      paramRemoved = true;
+    }
   });
 
-  const cleanURL = window.location.origin + window.location.pathname + (params.toString() ? '?' + params.toString() : '');
-  window.history.replaceState({}, document.title, cleanURL);
+  if (paramRemoved) {
+    const cleanURL = window.location.origin + window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+    window.history.replaceState({}, document.title, cleanURL);
+  }
 }
