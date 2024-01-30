@@ -263,10 +263,10 @@ module MarkupHelpers
   # Wraps HTML tables in responsive div containers.
   # @param html [String] The HTML content with table elements.
   # @return [String] The HTML content with tables wrapped in responsive div containers.
-  def responsivize_tables(html)
+  def responsivize_tables(html, css_class: "entry__table")
     return if html.blank?
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
-      doc.css('table').each { |table| table.wrap("<div class=\"entry__table\"></div>") }
+      doc.css('table').each { |table| table.wrap("<div class=\"#{css_class}\"></div>") }
     doc.to_html
   end
 
