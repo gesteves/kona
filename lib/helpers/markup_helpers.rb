@@ -9,7 +9,7 @@ module MarkupHelpers
   # @return [String] The rendered HTML with added attributes and transformations.
   def render_body(text)
     html = markdown_to_html(text)
-    html = open_external_links_in_new_tabs(text)
+    html = open_external_links_in_new_tabs(html)
     html = add_unit_data_attributes(html)
     html = add_image_data_attributes(html)
     html = add_figure_elements(html, base_class: 'entry')
