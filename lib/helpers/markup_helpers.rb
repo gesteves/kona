@@ -274,16 +274,17 @@ module MarkupHelpers
     doc.to_html
   end
 
-  # Marks affiliate links in HTML content with 'rel="sponsored nofollow"'.
+  # Marks affiliate links in HTML content as sponsored, and makes them open in a new tab.
   # @param html [String] The HTML content containing hyperlinks.
-  # @return [String] The HTML content with affiliate links marked as 'rel="sponsored nofollow"'.
+  # @return [String] The HTML content with affiliate links marked as sponsored.
   def mark_affiliate_links(html)
     return if html.blank?
 
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
     doc.css('a').each do |a|
       if is_affiliate_link?(a['href'])
-        a['rel'] = "sponsored nofollow"
+        a['rel'] = "sponsored nofollow noopener"
+        link['target'] = '_blank'
       end
     end
     doc.to_html
