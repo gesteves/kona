@@ -45,4 +45,10 @@ module WorkoutsHelpers
     activities.join(separator)
   end
 
+  # Checks if it's indoor training season in Jackson Hole.
+  # Indoor season is from November through March.
+  # @return [Boolean] True if it's indoor season, false otherwise.
+  def is_indoor_season?
+    in_jackson_hole? && (Time.now.month <= 3 || Time.now.month >= 11)
+  end
 end

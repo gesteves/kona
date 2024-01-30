@@ -42,11 +42,4 @@ module LocationHelpers
   def in_jackson_hole?
     format_location == "Jackson Hole, Wyoming"
   end
-
-  # Checks if it's the indoor season in Jackson Hole.
-  # Indoor season is from November to March.
-  # @return [Boolean] True if it's indoor season, false otherwise.
-  def is_indoor_season?
-    in_jackson_hole? && (Time.now.month <= 3 || Time.now.month >= 11)
-  end
 end
