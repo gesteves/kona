@@ -40,14 +40,14 @@ module WeatherHelpers
     Time.parse(todays_forecast.sunset).in_time_zone(data.time_zone.timeZoneId)
   end
 
-  # Checks if it is currently daytime based on sunrise and sunset times.
+  # Checks if it is currently daytime (i.e. between sunrise and sunset).
   # @return [Boolean] true if it is daytime, false otherwise.
   def is_daytime?
     now = Time.now
     now >= sunrise.beginning_of_hour && now <= sunset.beginning_of_hour
   end
 
-  # Checks if it is currently evening based on the sunset time.
+  # Checks if it is currently evening (i.e. after sunset).
   # @return [Boolean] true if it is evening, false otherwise.
   def is_evening?
     Time.now >= sunset.beginning_of_hour
@@ -63,7 +63,6 @@ module WeatherHelpers
   # Formats the current weather condition based on its condition code.
   # @param [String] condition_code - The condition code representing the current weather.
   # @return [String] The formatted current weather condition description.
-  #   If a specific description is available, it's used; otherwise, a generic description is generated.
   def format_current_condition(condition_code)
     data.conditions.dig(condition_code, :labels, :current) || "It's #{condition_code.underscore.gsub('_', ' ')}"
   end
@@ -71,7 +70,6 @@ module WeatherHelpers
   # Formats the forecasted weather condition based on its condition code.
   # @param [String] condition_code - The condition code representing the forecasted weather.
   # @return [String] The formatted forecasted weather condition description.
-  #   If a specific description is available, it's used; otherwise, a generic description is generated.
   def format_forecasted_condition(condition_code)
     data.conditions.dig(condition_code, :labels, :forecast) || "calls for #{condition_code.underscore.gsub('_', ' ')}"
   end
@@ -79,8 +77,6 @@ module WeatherHelpers
   # Formats a temperature value in Celsius to both Celsius and Fahrenheit.
   # @param [Float] temp - The temperature value in Celsius.
   # @return [String] A formatted temperature value with units in both Celsius and Fahrenheit.
-  #   The result is wrapped in a data tag with controllers for unit conversion.
-  #   The title attribute contains both Celsius and Fahrenheit values.
   def format_temperature(temp)
     celsius = "#{number_to_human(temp, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')}ºC"
     fahrenheit = "#{number_to_human(celsius_to_fahrenheit(temp), precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')}ºF"
@@ -133,7 +129,7 @@ module WeatherHelpers
     label.gsub('very', '_very_').gsub('hazardous', '**hazardous**')
   end
 
-  # Determines if the current weather conditions are considered bad.
+  # Determines if the current weather conditions are considered "bad".
   # @return [Boolean] `true` if the weather conditions are bad, `false` otherwise.
   def is_bad_weather?
     aqi = data&.purple_air&.aqi&.value.to_i
@@ -153,7 +149,7 @@ module WeatherHelpers
     return !data.conditions.dig(todays_forecast.conditionCode, :is_good_weather)
   end
 
-  # Determines if the current weather conditions are considered good.
+  # Determines if the current weather conditions are considered "good".
   # @return [Boolean] `true` if the weather conditions are good, `false` otherwise.
   def is_good_weather?
     !is_bad_weather?
@@ -192,25 +188,25 @@ module WeatherHelpers
     markdown_to_html(summary.reject(&:blank?).map { |t| "<span>#{remove_widows(t)}</span>" }.join(' '))
   end
 
-  # Indicates if it's race day.
+  # Generates a race-day preamble.
   # @return [String, nil] A Markdown-formatted message indicating race day, or `nil` if it's not race day or it's evening.
   def race_day
     "**It's race day!**" if is_race_day? && !is_evening?
   end
 
-  # Provides information about the current location.
-  # @return [String] A Markdown-formatted string indicating the current location.
+  # Formats my current location.
+  # @return [String] A Markdown-formatted string indicating my current location.
   def current_location
     "I'm currently in **#{format_location}**"
   end
 
   # Determines if it's a hot one.
-  # @return [String, nil] A comment about the weather conditions or nil if conditions don't match.
+  # @return [String, nil] The first lyric from the Grammy-award winning 1999 hit SMOOTH by Santana featuring Rob Thomas of Matchbox Twenty off the multi-platinum album Supernatural.
   def smooth
     "Man, it's a hot one!" if !is_race_day? && is_hot?
   end
 
-  # Provides information about the current weather conditions.
+  # Provides a summary of current weather conditions.
   # @return [String, nil] A string describing the current weather conditions or nil if no data is available.
   def current_weather
     return if data.weather.currentWeather.blank?
@@ -220,7 +216,7 @@ module WeatherHelpers
     text.join(', ')
   end
 
-  # Provides information about the current Air Quality Index (AQI).
+  # Provides a summary of the current Air Quality Index (AQI).
   # @return [String, nil] A string describing the current AQI or nil if no data is available.
   def current_aqi
     return if data.purple_air&.aqi&.value.blank?
@@ -241,7 +237,7 @@ module WeatherHelpers
     text.join(', ')
   end
 
-  # Provides information about precipitation for today or tonight.
+  # Provides a summary of precipitation for today or tonight.
   # @return [String, nil] A string describing the precipitation details for today or tonight, or nil if no data is available.
   def precipitation
     return if todays_forecast.restOfDayForecast.precipitationChance == 0 || todays_forecast.restOfDayForecast.precipitationType.downcase == 'clear'
