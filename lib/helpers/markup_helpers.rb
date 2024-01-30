@@ -302,7 +302,7 @@ module MarkupHelpers
       next unless href&.start_with?('http://', 'https://')
 
       link_host = URI.parse(href).host
-      next unless link_host != current_host
+      next if link_host.blank? || link_host == current_host
 
       link['rel'] = 'noopener'
       link['target'] = '_blank'
