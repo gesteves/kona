@@ -185,7 +185,7 @@ module WeatherHelpers
     summary << precipitation
     summary << sunrise_or_sunset
     summary << activities
-    markdown_to_html(summary.reject(&:blank?).map { |t| "<span>#{remove_widows(t)}</span>" }.join(' '))
+    markdown_to_html(summary.reject(&:blank?).map { |t| "<span>#{t}</span>" }.join(' '))
   end
 
   # Generates a race-day preamble.

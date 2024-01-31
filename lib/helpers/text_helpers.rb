@@ -1,35 +1,13 @@
-require 'nokogiri'
-
 module TextHelpers
   # Replaces the space between the last two words of a text with a non-breaking space to prevent widow words.
   # @param text [String] The text in which to prevent widows.
   # @return [String, nil] The text with a non-breaking space between the last two words, or nil if the text is blank.
   def remove_widows(text)
     return if text.blank?
-
-    # Parse the string as HTML fragment
-    doc = Nokogiri::HTML.fragment(text)
-    text_nodes = doc.search('.//text()')
-
-    if text_nodes.empty?
-      # Handle plain text
-      words = text.split(/\s+/)
-      insert_nbsp_between_last_two_words(words)
-    else
-      # Handle HTML
-      last_text_node = text_nodes.last
-      words = last_text_node.content.split(/\s+/)
-      last_text_node.content = insert_nbsp_between_last_two_words(words)
-    end
-
-    doc.to_html
-  end
-
-  def insert_nbsp_between_last_two_words(words)
-    return words.join(' ') if words.size <= 1
-
-    words[-2] += '&nbsp;' + words.pop
-    words.join(' ')
+    words = text.split(/\s+/)
+    return text if words.size == 1
+    last_words = words.pop(2).join('&nbsp;')
+    words.append(last_words).join(' ')
   end
 
   # Joins an array of items into a string, using commas and 'and' appropriately.
