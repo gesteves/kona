@@ -4,10 +4,19 @@ module TextHelpers
   # @return [String, nil] The text with a non-breaking space between the last two words, or nil if the text is blank.
   def remove_widows(text)
     return if text.blank?
-    words = text.split(/\s+/)
-    return text if words.size == 1
-    last_words = words.pop(2).join('&nbsp;')
-    words.append(last_words).join(' ')
+
+    doc = Nokogiri::HTML.fragment(text)
+    last_text_node = doc.search('.//text()').last
+
+    return text if last_text_node.blank?
+
+    words = last_text_node.content.split(/\s+/)
+    if words.size > 1
+      words[-2] += '&nbsp;' + words.pop
+      last_text_node.content = words.join(' ')
+    end
+
+    doc.to_html
   end
 
   # Joins an array of items into a string, using commas and 'and' appropriately.
