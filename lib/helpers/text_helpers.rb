@@ -7,18 +7,29 @@ module TextHelpers
   def remove_widows(text)
     return if text.blank?
 
+    # Parse the string as HTML fragment
     doc = Nokogiri::HTML.fragment(text)
-    last_text_node = doc.search('.//text()').last
+    text_nodes = doc.search('.//text()')
 
-    return text if last_text_node.nil?
-
-    words = last_text_node.content.split(/\s+/)
-    if words.size > 1
-      words[-2] += '&nbsp;' + words.pop
-      last_text_node.content = words.join(' ')
+    if text_nodes.empty?
+      # Handle plain text
+      words = text.split(/\s+/)
+      insert_nbsp_between_last_two_words(words)
+    else
+      # Handle HTML
+      last_text_node = text_nodes.last
+      words = last_text_node.content.split(/\s+/)
+      last_text_node.content = insert_nbsp_between_last_two_words(words)
     end
 
     doc.to_html
+  end
+
+  def insert_nbsp_between_last_two_words(words)
+    return words.join(' ') if words.size <= 1
+
+    words[-2] += '&nbsp;' + words.pop
+    words.join(' ')
   end
 
   # Joins an array of items into a string, using commas and 'and' appropriately.
