@@ -1,3 +1,5 @@
+require 'nokogiri'
+
 module TextHelpers
   # Replaces the space between the last two words of a text with a non-breaking space to prevent widow words.
   # @param text [String] The text in which to prevent widows.
@@ -8,7 +10,7 @@ module TextHelpers
     doc = Nokogiri::HTML.fragment(text)
     last_text_node = doc.search('.//text()').last
 
-    return text if last_text_node.blank?
+    return text if last_text_node.nil?
 
     words = last_text_node.content.split(/\s+/)
     if words.size > 1
