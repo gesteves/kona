@@ -261,7 +261,7 @@ module WeatherHelpers
   # @param time [Time] The `Time` object to be formatted.
   # @return [String] The formatted time string with AM or PM abbreviation.
   def format_time(time)
-    time.strftime('%l:%M %p').gsub(/(am|pm)/i, "<abbr>\\1</abbr>")
+    remove_widows(time.strftime('%l:%M %p')).gsub(/(am|pm)/i, "<abbr>\\1</abbr>")
   end
 
   # Generates a recommendation for activities based on current conditions and schedules.
