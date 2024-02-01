@@ -145,7 +145,7 @@ module ImageHelpers
     return unless original_width && original_height
 
     height = ((original_height.to_f / original_width.to_f) * width).round
-    blurhash = generate_blurhash(asset_id, width, height)
+    blurhash = blurhash_string(asset_id, width, height)
     return unless Blurhash.valid_blurhash?(blurhash)
 
     pixels = Blurhash.decode(width, height, blurhash)
@@ -158,14 +158,28 @@ module ImageHelpers
     nil
   end
 
-  # Generates a Blurhash for an asset based on its ID, width, and height
-  # (only if using Netlify's image CDN).
+  # Determines the method to fetch or encode a Blurhash for an asset.
+  # If on Netlify, it fetches the Blurhash; otherwise, it encodes it locally.
+  # @param asset_id [String] The ID of the asset.
+  # @param width [Integer] The width for the Blurhash image.
+  # @param height [Integer] The height for the Blurhash image.
+  # @return [String, nil] The Blurhash string or nil if unable to fetch or encode.
+  def blurhash_string(asset_id, width, height)
+    if is_netlify?
+      fetch_blurhash(asset_id, width, height)
+    else
+      encode_blurhash(asset_id, width, height)
+    end
+  end
+
+  # Fetches a Blurhash for an asset based on its ID, width, and height
+  # from Netlify's image CDN.
   # @see https://blurha.sh/
   # @param asset_id [String] The ID of the asset used for generating the Blurhash.
   # @param width [Integer] The width of the Blurhash image.
   # @param height [Integer] The height of the Blurhash image.
   # @return [String, nil] The generated Blurhash, or nil if not generated or retrieved.
-  def generate_blurhash(asset_id, width, height)
+  def fetch_blurhash(asset_id, width, height)
     return unless is_netlify?
     url = get_asset_url(asset_id)
     blurhash_url = cdn_image_url(url, { fm: 'blurhash', w: width, h: height })
@@ -180,5 +194,18 @@ module ImageHelpers
     rescue
       nil
     end
+  end
+
+  # Encodes a Blurhash for an asset locally.
+  # @param asset_id [String] The ID of the asset.
+  # @param width [Integer] The intended width for the Blurhash.
+  # @param height [Integer] The intended height for the Blurhash.
+  # @return [String, nil] The encoded Blurhash string or nil if encoding fails.
+  def encode_blurhash(asset_id, width, height)
+    url = get_asset_url(asset_id)
+    image = MiniMagick::Image.open(cdn_image_url(url, { w: width, h: height }))
+    Blurhash.encode(image.width, image.height, image.get_pixels.flatten)
+  rescue
+    nil
   end
 end
