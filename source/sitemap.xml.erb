@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc><%= full_url('index.html') %></loc>
-    <lastmod><%= site_updated_at.strftime('%Y-%m-%d') %></lastmod>
-  </url>
-  <% data.pages.reject { |a| a.draft || !a.indexInSearchEngines || a.isHomePage }.each do |page| %>
+  <% data.pages.reject { |a| a.draft || !a.indexInSearchEngines }.each do |page| %>
     <url>
       <loc><%= full_url(page.path) %></loc>
-      <lastmod><%= DateTime.parse(page.updated_at).strftime('%Y-%m-%d') %></lastmod>
+      <% if page.isHomePage %>
+        <lastmod><%= site_updated_at.strftime('%Y-%m-%d') %></lastmod>
+      <% else %>
+        <lastmod><%= DateTime.parse(page.updated_at).strftime('%Y-%m-%d') %></lastmod>
+      <% end %>
     </url>
   <% end %>
   <% data.articles.reject { |a| a.draft || !a.indexInSearchEngines }.each do |article| %>

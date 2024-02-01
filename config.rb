@@ -24,22 +24,30 @@ ignore "/javascripts/stimulus/*"
 ignore "/page.html"
 ignore "/short.html"
 
-@app.data.articles.each do |article|
-  proxy article.path, article.template, locals: { content: article }, ignore: true
+if defined?(@app.data.articles)
+  @app.data.articles.each do |article|
+    proxy article.path, article.template, locals: { content: article }, ignore: true
+  end
 end
 
-@app.data.pages.each do |page|
-  proxy page.path, page.template, locals: { content: page }, ignore: true
-end
-
-@app.data.tags.each do |tag|
-  tag.pages.each do |page|
+if defined?(@app.data.pages)
+  @app.data.pages.each do |page|
     proxy page.path, page.template, locals: { content: page }, ignore: true
   end
 end
 
-@app.data.blog.each do |page|
-  proxy page.path, page.template, locals: { content: page }, ignore: true
+if defined?(@app.data.tags)
+  @app.data.tags.each do |tag|
+    tag.pages.each do |page|
+      proxy page.path, page.template, locals: { content: page }, ignore: true
+    end
+  end
+end
+
+if defined?(@app.data.blog)
+  @app.data.blog.each do |page|
+    proxy page.path, page.template, locals: { content: page }, ignore: true
+  end
 end
 
 configure :development do
