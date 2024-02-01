@@ -25,14 +25,21 @@ task :import => [:dotenv, :clobber] do
   measure_and_output(:import_trainer_road, "Importing today’s workouts from TrainerRoad")
 end
 
+desc 'Run the test suite'
+task :test do
+  puts 'Running tests...'
+  result = system('bundle exec rspec')
+  raise 'Tests failed!' unless result
+end
+
 desc 'Import content and build the site'
-task :build => [:dotenv, :import] do
+task :build => [:dotenv, :test, :import] do
   build_site
 end
 
 namespace :build do
   desc 'Import content and build the site with verbose output'
-  task :verbose => [:dotenv, :import] do
+  task :verbose => [:dotenv, :test, :import] do
     build_site(verbose: true)
   end
 end
