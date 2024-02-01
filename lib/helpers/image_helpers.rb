@@ -188,7 +188,7 @@ module ImageHelpers
       if response.ok? && response.headers['Content-Type'].include?('text/plain')
         response.body
       else
-        nil
+        encode_blurhash(asset_id, width, height)
       end
     rescue
       nil
