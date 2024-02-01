@@ -180,7 +180,6 @@ module ImageHelpers
   # @param height [Integer] The height of the Blurhash image.
   # @return [String, nil] The generated Blurhash, or nil if not generated or retrieved.
   def fetch_blurhash(asset_id, width, height)
-    return unless is_netlify?
     url = get_asset_url(asset_id)
     blurhash_url = cdn_image_url(url, { fm: 'blurhash', w: width, h: height })
 
