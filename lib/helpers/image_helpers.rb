@@ -160,6 +160,7 @@ module ImageHelpers
 
   # Determines the method to fetch or encode a Blurhash for an asset.
   # If on Netlify, it fetches the Blurhash; otherwise, it encodes it locally.
+  # @see https://blurha.sh/
   # @param asset_id [String] The ID of the asset.
   # @param width [Integer] The width for the Blurhash image.
   # @param height [Integer] The height for the Blurhash image.
@@ -174,7 +175,6 @@ module ImageHelpers
 
   # Fetches a Blurhash for an asset based on its ID, width, and height
   # from Netlify's image CDN.
-  # @see https://blurha.sh/
   # @param asset_id [String] The ID of the asset used for generating the Blurhash.
   # @param width [Integer] The width of the Blurhash image.
   # @param height [Integer] The height of the Blurhash image.
