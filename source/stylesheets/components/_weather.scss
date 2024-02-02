@@ -40,12 +40,12 @@
     margin: 0;
   }
 
-  span::after {
+  & > span::after {
     color: var(--color-text-tertiary);
     content: '\00a0·';
   }
 
-  span:last-of-type::after {
+  & > span:last-of-type::after {
     content: '';
   }
 }

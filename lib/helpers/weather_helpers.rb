@@ -80,7 +80,7 @@ module WeatherHelpers
   def format_temperature(temp)
     celsius = "#{number_to_human(temp, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')}ºC"
     fahrenheit = "#{number_to_human(celsius_to_fahrenheit(temp), precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')}ºF"
-    content_tag :data, 'data-controller': 'units', 'data-units-imperial-value': fahrenheit, 'data-units-metric-value': celsius do
+    content_tag :span, 'data-controller': 'units', 'data-units-imperial-value': fahrenheit, 'data-units-metric-value': celsius do
       celsius
     end
   end
@@ -105,7 +105,7 @@ module WeatherHelpers
       "about #{amount}"
     end
 
-    content_tag :data, 'data-controller': 'units', 'data-units-imperial-value': imperial, 'data-units-metric-value': metric do
+    content_tag :span, 'data-controller': 'units', 'data-units-imperial-value': imperial, 'data-units-metric-value': metric do
       metric
     end
   end
