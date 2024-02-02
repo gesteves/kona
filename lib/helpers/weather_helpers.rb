@@ -92,7 +92,8 @@ module WeatherHelpers
     metric = if mm < 10
       "less than a centimeter"
     else
-      number_to_human(mm, units: PRECIPITATION_METRIC_UNITS, precision: (mm > 1000 ? 1 : 0), strip_insignificant_zeros: true, significant: false, delimiter: ',')
+      amount = number_to_human(mm, units: PRECIPITATION_METRIC_UNITS, precision: (mm > 1000 ? 1 : 0), strip_insignificant_zeros: true, significant: false, delimiter: ',')
+      "about #{amount}"
     end
 
     inches = millimeters_to_inches(mm)
@@ -100,7 +101,8 @@ module WeatherHelpers
       "less than an inch"
     else
       human_inches = number_to_human(inches, precision: (inches < 1 ? 1 : 0 ), strip_insignificant_zeros: true, significant: false, delimiter: ',')
-      human_inches == "1" ? "#{human_inches} inch" : "#{human_inches} inches"
+      amount = human_inches == "1" ? "#{human_inches} inch" : "#{human_inches} inches"
+      "about #{amount}"
     end
 
     content_tag :data, 'data-controller': 'units', 'data-units-imperial-value': imperial, 'data-units-metric-value': metric do
