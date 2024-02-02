@@ -184,7 +184,7 @@ module WeatherHelpers
     summary << forecast
     summary << precipitation
     summary << sunrise_or_sunset
-    summary << activities
+    summary << remove_widows(activities)
     markdown_to_html(summary.reject(&:blank?).map { |t| "<span>#{t}</span>" }.join(' '))
   end
 
