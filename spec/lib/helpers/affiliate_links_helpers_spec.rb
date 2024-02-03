@@ -1,7 +1,6 @@
 require 'spec_helper'
 
 RSpec.describe AffiliateLinksHelpers do
-
   describe '#has_affiliate_links?' do
     let(:content_with_affiliate) { double('Content', intro: 'Check out this product', body: '<a href="https://www.amazon.com/example?tag=affiliate-20">Product Link</a>') }
     let(:content_without_affiliate) { double('Content', intro: 'Just some intro', body: '<a href="https://example.com">Normal Link</a>') }
