@@ -23,6 +23,7 @@ ignore "/home.html"
 ignore "/javascripts/stimulus/*"
 ignore "/page.html"
 ignore "/short.html"
+ignore "/icons/*"
 
 @app.data.articles.each do |article|
   proxy article.path, article.template, locals: { content: article }, ignore: true
