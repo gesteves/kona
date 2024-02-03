@@ -3,9 +3,9 @@ require 'sanitize'
 module SiteHelpers
   # Generates an Atom-compliant tag URI from a URL and date.
   # @param url [String] The URL to be converted.
-  # @param date [Date, Time] (Optional) The date for the tag.
+  # @param date [Date, Time] The date for the tag.
   # @return [String] The Atom tag URI.
-  def atom_tag(url, date = nil)
+  def atom_tag(url, date)
     tag = url.gsub(/^http(s)?:\/\//, '').gsub('#', '/').split('/')
     tag[0] = "tag:#{tag[0]},#{date.strftime('%Y-%m-%d')}:"
     tag.join('/')
