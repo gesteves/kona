@@ -1,8 +1,8 @@
 <meta charset="utf-8">
 <% if defined?(content) %>
-  <title><%= title_tag(content) %></title>
+  <%= title_tag(content) %>
 <% elsif current_page.data.title.present? %>
-  <title><%= title_tag(current_page.data.title) %></title>
+  <%= title_tag(current_page.data.title) %>
 <% end %>
 <% if defined?(content) %>
   <meta name="description" content="<%= content_summary(content) %>">

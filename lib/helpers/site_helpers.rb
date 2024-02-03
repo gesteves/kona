@@ -11,41 +11,35 @@ module SiteHelpers
     tag.join('/')
   end
 
-  # Determines the page title based on the content provided.
-  # @param content [Hash, String] The content from which to derive the page title.
-  #                               Can be a Hash (typically with title and page information) or a String.
-  # @return [String, Array<String>, nil] The page title, which could be a String, an Array of Strings,
-  #                                      or nil if the title is not determined.
-  def page_title(content)
-    if content.is_a? Hash
-      if content&.current_page.to_i > 1
-        [content.title, "Page #{content.current_page}"]
-      elsif content.title.present? && content.isHomePage.blank?
-        content.title
-      end
-    elsif content.is_a? String
-      content
+  # Generates a formatted page title based on the provided content.
+  # @param content [Hash, String] The content to generate the title from.
+  #   If a Hash, expects :title and :current_page keys for pagination.
+  #   If a String, uses directly as the title content.
+  # @param include_site_name [Boolean] Whether to append the site's title to the generated title.
+  # @param separator [String] The separator used between title segments.
+  # @return [String] The sanitized and formatted page title.
+  def page_title(content, include_site_name: false, separator: ' · ')
+    title = []
+    if content.is_a?(Hash) && !content.isHomePage
+      title << content.title
+      title << "Page #{content.current_page}" if content&.current_page.to_i > 1
+    elsif content.is_a?(String)
+      title << content
     else
-      data.site.metaTitle
+      title << data.site.metaTitle
     end
+    title << data.site.metaTitle if include_site_name
+
+    Sanitize.fragment(title.reject(&:blank?).uniq.join(separator)).strip
   end
 
-  # Constructs a title tag using the page title and site metadata.
-  # @param content [Hash, String] The content used to determine the page title.
-  # @param separator [String] (Optional) The separator to use between the page title and site meta title.
-  # @return [String] The formatted title tag, HTML tags stripped and
-  def title_tag(content, separator: ' · ')
-    title = page_title(content)
-    Sanitize.fragment(smartypants([title, data.site.metaTitle].flatten.reject(&:blank?).uniq.join(separator))).strip
-  end
-
-  # Generates an Open Graph (OG) title for a webpage using the page title.
-  # @param content [Hash, String] The content used to determine the page title.
-  # @param separator [String] (Optional) The separator to use in the title.
-  # @return [String] The formatted OG title, with HTML tags stripped and typographic adjustments applied.
-  def og_title(content, separator: ' · ')
-    title = page_title(content)
-    Sanitize.fragment(smartypants([title].flatten.reject(&:blank?).uniq.join(separator))).strip
+  # Wraps the generated page title within a title HTML tag.
+  # @param content [Hash, String] The content to generate the title from.
+  # @return [String] An HTML title tag with the generated page title.
+  def title_tag(content)
+    content_tag :title do
+      page_title(content, include_site_name: true)
+    end
   end
 
   # Retrieves a summary of the content, falling back to the site's meta description if not present.
