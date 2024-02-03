@@ -1,3 +1,5 @@
+require 'sanitize'
+
 module SiteHelpers
   # Generates an Atom-compliant tag URI from a URL and date.
   # @param url [String] The URL to be converted.
@@ -34,7 +36,7 @@ module SiteHelpers
   # @return [String] The formatted title tag, HTML tags stripped and
   def title_tag(content, separator: ' · ')
     title = page_title(content)
-    strip_tags(smartypants([title, data.site.metaTitle].flatten.reject(&:blank?).uniq.join(separator)))
+    Sanitize.fragment(smartypants([title, data.site.metaTitle].flatten.reject(&:blank?).uniq.join(separator))).strip
   end
 
   # Generates an Open Graph (OG) title for a webpage using the page title.
@@ -43,7 +45,7 @@ module SiteHelpers
   # @return [String] The formatted OG title, with HTML tags stripped and typographic adjustments applied.
   def og_title(content, separator: ' · ')
     title = page_title(content)
-    strip_tags(smartypants([title].flatten.reject(&:blank?).uniq.join(separator)))
+    Sanitize.fragment(smartypants([title].flatten.reject(&:blank?).uniq.join(separator))).strip
   end
 
   # Retrieves a summary of the content, falling back to the site's meta description if not present.
