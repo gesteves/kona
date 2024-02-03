@@ -20,6 +20,15 @@ RSpec.describe MarkdownHelpers do
     end
   end
 
+  describe '#markdown_to_text' do
+    let(:markdown) { '**bold** and _italic_' }
+
+    it 'converts markdown to plain text, stripping HTML tags' do
+      text = markdown_to_text(markdown)
+      expect(text).to eq('bold and italic')
+    end
+  end
+
   describe '#smartypants' do
     let(:text) { "Quotes 'single quotes' and \"double quotes\"" }
 

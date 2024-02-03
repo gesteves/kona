@@ -1,4 +1,5 @@
 require 'redcarpet'
+require 'sanitize'
 
 module MarkdownHelpers
   # Converts Markdown text to HTML, with additional formatting and SmartyPants rendering.
@@ -15,7 +16,7 @@ module MarkdownHelpers
   # @param text [String] The Markdown text to be converted.
   # @return [String] The plain text representation of the Markdown text.
   def markdown_to_text(text)
-    strip_tags(markdown_to_html(text))
+    Sanitize.fragment(markdown_to_html(text)).strip
   end
 
   # Applies SmartyPants rendering to the provided text for typographic improvements.
