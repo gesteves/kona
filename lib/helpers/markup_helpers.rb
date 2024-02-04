@@ -298,15 +298,15 @@ module MarkupHelpers
 
     current_host = URI.parse(root_url).host
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
-    doc.css('a').each do |link|
-      href = link['href']
+    doc.css('a').each do |a|
+      href = a['href']
       next unless href&.start_with?('http://', 'https://')
 
       link_host = URI.parse(href).host
       next if link_host.blank? || link_host == current_host
 
-      link['rel'] = 'noopener'
-      link['target'] = '_blank'
+      a['rel'] = 'noopener'
+      a['target'] = '_blank'
     end
     doc.to_html
   end
