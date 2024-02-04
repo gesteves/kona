@@ -284,7 +284,7 @@ module MarkupHelpers
     doc.css('a').each do |a|
       if is_affiliate_link?(a['href'])
         a['rel'] = "sponsored nofollow noopener"
-        link['target'] = '_blank'
+        a['target'] = '_blank'
       end
     end
     doc.to_html
