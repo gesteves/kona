@@ -16,4 +16,18 @@
       <lastmod><%= DateTime.parse(article.updated_at).strftime('%Y-%m-%d') %></lastmod>
     </url>
   <% end %>
+  <% data.tags.each do |tag| %>
+    <% tag.pages.each do |page| %>
+      <url>
+        <loc><%= full_url(page.path) %></loc>
+        <lastmod><%= page.items.reject { |a| a.draft || !a.indexInSearchEngines }.map { |a| DateTime.parse(a.updated_at) }.max.strftime('%Y-%m-%d') %></lastmod>
+      </url>
+    <% end %>
+  <% end %>
+  <% data.blog.each do |page| %>
+    <url>
+      <loc><%= full_url(page.path) %></loc>
+      <lastmod><%= page.items.reject { |a| a.draft || !a.indexInSearchEngines }.map { |a| DateTime.parse(a.updated_at) }.max.strftime('%Y-%m-%d') %></lastmod>
+    </url>
+  <% end %>
 </urlset>
