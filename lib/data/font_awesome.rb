@@ -32,8 +32,9 @@ class FontAwesome
       styles.each do |style, icons|
         icon_data[family][style] = icons.map do |icon_id|
           svg = fetch_icon(version, family, style, icon_id)
+          next if svg.blank?
           { 'id' => icon_id, 'svg' => svg }
-        end
+        end.compact
       end
     end
 
@@ -56,6 +57,8 @@ class FontAwesome
     return svg if svg.present?
 
     response = @client.query(FontAwesomeClient::QUERIES::Icons, variables: { version: version, query: icon_id, first: 1 })
+    return if response.data.search.empty?
+
     icon = response.data.search.map(&:to_h).map(&:with_indifferent_access).first
 
     svg = icon[:svgs].find { |svg| svg[:familyStyle][:family] == family && svg[:familyStyle][:style] == style }[:html]
