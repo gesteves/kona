@@ -2,7 +2,7 @@ require 'yaml'
 require 'json'
 require 'redis'
 require 'active_support/all'
-require_relative 'font_awesome/client'
+require_relative 'graphql/font_awesome'
 
 # The FontAwesome class is responsible for fetching icon SVGs from the Font Awesome GraphQL API,
 # caching them in Redis, and saving the data to a JSON file.
