@@ -3,27 +3,27 @@
 
   <div class="share__buttons">
       <button aria-label="Open sharing options" class="share__button --is-hidden" data-controller="share" data-share-text-value="<%= page_title(article) %>" data-share-url-value="<%= full_url(article.path, { ref: 'Share Button' }) %>" data-share-is-native-value="true" data-action="click->share#openShareSheet" data-share-hidden-class="--is-hidden">
-        <%= partial "icons/solid/arrow-up-from-bracket.svg" %>
+        <%= icon_svg("classic", "solid", "arrow-up-from-bracket") %>
       </button>
 
       <a aria-label="Share by email " class="share__button" href="<%= mail_share_url(article) %>">
-        <%= partial "icons/solid/envelope.svg" %>
+        <%= icon_svg("classic", "solid", "envelope") %>
       </a>
 
       <a aria-label="Share by text message" class="share__button" href="<%= sms_share_url(article) %>">
-        <%= partial "icons/solid/comment.svg" %>
+        <%= icon_svg("classic", "solid", "comment") %>
       </a>
 
       <a aria-label="Share on Facebook" class="share__button" data-controller="share" data-action="click->share#openPopup" href="<%= facebook_share_url(article) %>" rel="noopener nofollow" target="_blank">
-        <%= partial "icons/brands/facebook-f.svg" %>
+        <%= icon_svg("classic", "brands", "facebook-f") %>
       </a>
 
       <a aria-label="Share on Reddit" class="share__button" href="<%= reddit_share_url(article) %>" rel="noopener nofollow" target="_blank">
-        <%= partial "icons/brands/reddit-alien.svg" %>
+        <%= icon_svg("classic", "brands", "reddit-alien") %>
       </a>
 
       <a aria-label="Share on Threads" class="share__button" href="<%= threads_share_url(article) %>" rel="noopener nofollow" target="_blank">
-        <%= partial "icons/brands/threads.svg" %>
+        <%= icon_svg("classic", "brands", "threads") %>
       </a>
   </div>
 </div>

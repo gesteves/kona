@@ -1,0 +1,44 @@
+version: "6.5.1"
+icons:
+  classic:
+    brands:
+      - facebook-f
+      - reddit-alien
+      - threads
+    solid:
+      - arrow-up-from-bracket
+      - comment
+      - envelope
+    thin:
+      - bolt-lightning
+      - cloud-bolt
+      - cloud-drizzle
+      - cloud-fog
+      - cloud-hail-mixed
+      - cloud-hail
+      - cloud-question
+      - cloud-rain
+      - cloud-showers-heavy
+      - cloud-showers
+      - cloud-snow
+      - cloud-sun-rain
+      - cloud
+      - clouds-moon
+      - clouds-sun
+      - clouds
+      - hurricane
+      - moon-cloud
+      - moon
+      - smoke
+      - snow-blowing
+      - snowflake-droplets
+      - sun-cloud
+      - sun-dust
+      - sun-haze
+      - sun
+      - temperature-snow
+      - temperature-sun
+      - tornado
+      - wind-warning
+      - wind
+

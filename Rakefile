@@ -18,6 +18,7 @@ desc 'Imports all content for the site'
 task :import => [:dotenv, :clobber] do
   setup_data_directory
   measure_and_output(:import_contentful, "Importing site content from Contentful")
+  measure_and_output(:import_font_awesome, "Importing icons from Font Awesome")
   measure_and_output(:import_strava, "Importing activity stats from Strava")
   measure_and_output(:import_location, "Importing location data from Swarm")
   measure_and_output(:import_weather, "Importing weather data from WeatherKit")
@@ -53,6 +54,11 @@ end
 def import_contentful
   @contentful ||= Contentful.new
   safely_perform { @contentful.save_data }
+end
+
+def import_font_awesome
+  @font_awesome ||= FontAwesome.new
+  safely_perform { @font_awesome.save_data }
 end
 
 def import_strava
