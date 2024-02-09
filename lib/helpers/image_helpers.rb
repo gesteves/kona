@@ -139,8 +139,6 @@ module ImageHelpers
   # @param width [Integer] (Optional) The desired width of the JPEG image. Default is 32.
   # @return [String, nil] The data URI with JPEG image data and Blurhash effect, or nil if not generated or valid.
   def blurhash_jpeg_data_uri(asset_id, width: 32)
-    return unless ENV['ENABLE_BLURHASH'].present?
-
     original_width, original_height = get_asset_dimensions(asset_id)
     return unless original_width && original_height
 
