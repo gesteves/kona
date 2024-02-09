@@ -2,8 +2,6 @@ require 'spec_helper'
 require 'yaml'
 
 describe 'Condition Icons' do
-  condition_codes = YAML.load_file('data/conditions.yml')
-
   let(:weather_conditions) { YAML.load_file('data/conditions.yml') }
   let(:icons) { YAML.load_file('data/font_awesome.yml') }
 
