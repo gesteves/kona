@@ -131,7 +131,7 @@ module WeatherHelpers
     label.gsub('very', '_very_').gsub('hazardous', '**hazardous**')
   end
 
-  # Determines if the current weather conditions are considered "bad".
+  # Determines if the current weather conditions are considered "bad" for working out outdoors.
   # @return [Boolean] `true` if the weather conditions are bad, `false` otherwise.
   def is_bad_weather?
     aqi = data&.purple_air&.aqi&.value.to_i
@@ -141,17 +141,23 @@ module WeatherHelpers
     precipitation_chance = todays_forecast.restOfDayForecast.precipitationChance
     snowfall = todays_forecast.restOfDayForecast.snowfallAmount
 
+    # Air quality is moderate or worse
     return true if aqi > 75
+    # Current temp is too cold or too hot
     return true if current_temperature <= -12 || current_temperature >= 32
+    # Forecasted low temp is too cold
     return true if low_temperature <= -12
+    # Forecasted high temp is too cold or too hot
     return true if high_temperature <= 0 || high_temperature >= 32
+    # It's likely to rain
     return true if precipitation_chance >= 0.5
+    # There's gonna be accumulating snow
     return true if snowfall > 0
-    return data.conditions.dig(data.weather.currentWeather.conditionCode, :adverse_weather)
-    return data.conditions.dig(todays_forecast.conditionCode, :adverse_weather)
+    # The current or forecasted conditions are adverse weather
+    data.conditions.dig(data.weather.currentWeather.conditionCode, :adverse_weather) || data.conditions.dig(todays_forecast.conditionCode, :adverse_weather)
   end
 
-  # Determines if the current weather conditions are considered "good".
+  # Determines if the current weather conditions are considered "good" for working out outdoors..
   # @return [Boolean] `true` if the weather conditions are good, `false` otherwise.
   def is_good_weather?
     !is_bad_weather?
