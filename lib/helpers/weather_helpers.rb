@@ -191,8 +191,8 @@ module WeatherHelpers
     return if currently.blank? && forecast.blank?
     summary = []
     summary << race_day
-    summary << current_location
     summary << smooth
+    summary << current_location
     summary << currently
     summary << current_aqi
     summary << forecast
@@ -217,7 +217,7 @@ module WeatherHelpers
   end
 
   # Determines if it's a hot one.
-  # @return [String, nil] The first lyric from the Grammy-award winning 1999 hit SMOOTH by Santana featuring Rob Thomas of Matchbox Twenty off the multi-platinum album Supernatural.
+  # @return [String, nil] The opening words of the Grammy-award winning 1999 hit SMOOTH by Santana featuring Rob Thomas of Matchbox Twenty off the multi-platinum album Supernatural.
   def smooth
     "Man, it's a hot one!" if !is_race_day? && is_hot?
   end
