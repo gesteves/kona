@@ -33,8 +33,6 @@ module UnitHelpers
     distance(meters, units: units).split(/\s+/).last
   end
 
-  private
-
   # Formats a distance number with specified units and precision.
   # @param distance [Numeric] The distance to be formatted.
   # @param units [String] The unit of measurement for the distance.
