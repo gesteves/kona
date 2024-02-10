@@ -3,7 +3,7 @@ module EventsHelpers
   # @param event [Event] The event to check.
   # @return [Boolean] Returns true if the given event is today; false otherwise.
   def is_today?(event)
-    event_date = Time.parse(event.date).in_time_zone(data.time_zone.timeZoneId) # Correction: Use `date` parameter
+    event_date = Time.parse(event.date).in_time_zone(data.time_zone.timeZoneId)
     today = Time.current.in_time_zone(data.time_zone.timeZoneId)
     event_date.to_date == today.to_date
   end
