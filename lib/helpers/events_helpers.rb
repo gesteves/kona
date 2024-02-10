@@ -19,4 +19,11 @@ module EventsHelpers
   def is_race_day?
     todays_race.present?
   end
+
+  # Prepends "the" to non-Ironman events.
+  # @param title [String] The title of the event.
+  # @return [String] The modified title with an article if applicable.
+  def event_name_with_optional_article(title)
+    title.start_with?(/ironman/i) ? title : "the #{title}"
+  end
 end

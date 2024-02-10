@@ -198,8 +198,8 @@ module WeatherHelpers
     summary << forecast
     summary << precipitation
     summary << sunrise_or_sunset
-    summary << remove_widows(activities)
-    markdown_to_html(summary.reject(&:blank?).map { |t| "<span>#{t}</span>" }.join(' '))
+    summary << activities
+    open_external_links_in_new_tabs(markdown_to_html(summary.reject(&:blank?).map { |t| "<span>#{t}</span>" }.join(' ')))
   end
 
   # Generates a race-day preamble.
@@ -211,7 +211,9 @@ module WeatherHelpers
   # Formats my current location.
   # @return [String] A Markdown-formatted string indicating my current location.
   def current_location
-    "I'm currently in **#{format_location}**"
+    location = "I'm currently in **#{format_location}**"
+    location += " for **#{event_name_with_optional_article(todays_race.title)}**" if is_race_day? && !is_evening?
+    location
   end
 
   # Determines if it's a hot one.
