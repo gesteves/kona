@@ -149,6 +149,7 @@ module ContentfulClient
           description
           location
           url
+          trackingUrl
           date
           canceled
           sys {
