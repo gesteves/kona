@@ -8,3 +8,4 @@
 <%= redirect.from %> <%= redirect.to %> <%= redirect.status %><%= "!" if redirect.from.match? /^https?:\/\// %>
 <% end %>
 /tracker/ <%= todays_race&.trackingUrl || root_url %> 302
+/live/ <%= todays_race&.trackingUrl || root_url %> 302
