@@ -8,6 +8,12 @@ module WeatherHelpers
     thousand: 'm'
   }
 
+  # Retrieves the current weather conditions.
+  # @return [Hash, nil] The current weather conditions data, or nil if not found.
+  def current_weather
+    data.weather.currentWeather
+  end
+
   # Retrieves the forecast for the current day.
   # @return [Hash, nil] The forecast data for today, or nil if not found.
   def todays_forecast
@@ -135,7 +141,7 @@ module WeatherHelpers
   # @return [Boolean] `true` if the weather conditions are bad, `false` otherwise.
   def is_bad_weather?
     aqi = data&.purple_air&.aqi&.value.to_i
-    current_temperature = (data.weather.currentWeather.temperatureApparent || data.weather.currentWeather.temperature)
+    current_temperature = (current_weather.temperatureApparent || current_weather.temperature)
     high_temperature = todays_forecast.temperatureMax
     low_temperature = todays_forecast.temperatureMin
     precipitation_chance = todays_forecast.restOfDayForecast.precipitationChance
@@ -154,7 +160,7 @@ module WeatherHelpers
     # There's gonna be accumulating snow
     return true if snowfall > 0
     # The current or forecasted conditions are adverse weather
-    data.conditions.dig(data.weather.currentWeather.conditionCode, :adverse_weather) || data.conditions.dig(todays_forecast.conditionCode, :adverse_weather)
+    data.conditions.dig(current_weather.conditionCode, :adverse_weather) || data.conditions.dig(todays_forecast.conditionCode, :adverse_weather)
   end
 
   # Determines if the current weather conditions are considered "good" for working out outdoors..
@@ -166,28 +172,28 @@ module WeatherHelpers
   # Determines if the current temperature is hot.
   # @return [Boolean] `true` if the temperature is hot (32°C or higher), `false` otherwise.
   def is_hot?
-    data.weather.currentWeather.temperature >= 32 || data.weather.currentWeather.temperatureApparent >= 32
+    current_weather.temperature >= 32 || current_weather.temperatureApparent >= 32
   end
 
   # Determines if the apparent temperature should be hidden.
   # @return [Boolean] `true` if the apparent temperature should be hidden, `false` otherwise.
   def hide_apparent_temperature?
-    celsius_temp = data.weather.currentWeather.temperature.round
-    celsius_apparent = data.weather.currentWeather.temperatureApparent.round
-    fahrenheit_temp = celsius_to_fahrenheit(data.weather.currentWeather.temperature).round
-    fahrenheit_apparent = celsius_to_fahrenheit(data.weather.currentWeather.temperatureApparent).round
+    celsius_temp = current_weather.temperature.round
+    celsius_apparent = current_weather.temperatureApparent.round
+    fahrenheit_temp = celsius_to_fahrenheit(current_weather.temperature).round
+    fahrenheit_apparent = celsius_to_fahrenheit(current_weather.temperatureApparent).round
     celsius_temp == celsius_apparent || fahrenheit_temp == fahrenheit_apparent
   end
 
   # Generates a summary of weather-related information.
   # @return [String] An HTML-formatted summary of weather-related information.
   def weather_summary
-    return if current_weather.blank? && forecast.blank?
+    return if currently.blank? && forecast.blank?
     summary = []
     summary << race_day
     summary << current_location
     summary << smooth
-    summary << current_weather
+    summary << currently
     summary << current_aqi
     summary << forecast
     summary << precipitation
@@ -216,11 +222,11 @@ module WeatherHelpers
 
   # Provides a summary of current weather conditions.
   # @return [String, nil] A string describing the current weather conditions or nil if no data is available.
-  def current_weather
-    return if data.weather.currentWeather.blank?
+  def currently
+    return if current_weather.blank?
     text = []
-    text << "#{format_current_condition(data.weather.currentWeather.conditionCode).capitalize}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
-    text << "which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)}" unless hide_apparent_temperature?
+    text << "#{format_current_condition(current_weather.conditionCode).capitalize}, with a temperature of #{format_temperature(current_weather.temperature)}"
+    text << "which feels like #{format_temperature(current_weather.temperatureApparent)}" unless hide_apparent_temperature?
     text.join(', ')
   end
 
@@ -311,7 +317,7 @@ module WeatherHelpers
   # Determines the weather icon to display based on current weather conditions.
   # @return [String] The name of the weather icon to display.
   def weather_icon
-    condition = data.conditions[data.weather.currentWeather.conditionCode]
+    condition = data.conditions[current_weather.conditionCode]
     return 'cloud-question' if condition.blank?
     return condition[:icon] if condition[:icon].is_a?(String)
     is_daytime? ? condition[:icon][:day] : condition[:icon][:night]
