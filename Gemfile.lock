@@ -33,11 +33,10 @@ GEM
     fast_blank (1.0.1)
     fastimage (2.2.7)
     ffi (1.16.3)
-    graphql (2.2.6)
-      racc (~> 1.4)
-    graphql-client (0.19.0)
+    graphql (2.2.8)
+    graphql-client (0.20.0)
       activesupport (>= 3.0)
-      graphql
+      graphql (>= 1.13.0)
     haml (6.2.3)
       temple (>= 0.8.2)
       thor
@@ -105,7 +104,7 @@ GEM
       middleman-core (>= 3.2)
     mini_magick (4.12.0)
     mini_mime (1.1.5)
-    minitest (5.21.2)
+    minitest (5.22.2)
     multi_xml (0.6.0)
     nokogiri (1.16.0-arm64-darwin)
       racc (~> 1.4)
