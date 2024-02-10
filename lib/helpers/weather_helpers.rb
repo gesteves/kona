@@ -199,7 +199,7 @@ module WeatherHelpers
     summary << precipitation
     summary << sunrise_or_sunset
     summary << activities
-    open_external_links_in_new_tabs(markdown_to_html(summary.reject(&:blank?).map { |t| "<span>#{t}</span>" }.join(' ')))
+    markdown_to_html(summary.reject(&:blank?).map { |t| "<span>#{t}</span>" }.join(' '))
   end
 
   # Generates a race-day preamble.
