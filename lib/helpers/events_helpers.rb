@@ -14,6 +14,12 @@ module EventsHelpers
     data.events.find { |e| is_today?(e.date) && !e.canceled }
   end
 
+  # Returns a collection of upcoming race events.
+  # @return [Array<Event>] An array of event objects that are upcoming and not canceled.
+  def upcoming_races
+    data.events.select { |e| Time.parse(e.date).in_time_zone(data.time_zone.timeZoneId).beginning_of_day >= Time.current.in_time_zone(data.time_zone.timeZoneId).beginning_of_day }.reject(&:canceled)
+  end
+
   # Determines if today is a race day.
   # @return [Boolean] True if there is a race event today that is not canceled; false otherwise.
   def is_race_day?

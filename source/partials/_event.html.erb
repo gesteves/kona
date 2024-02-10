@@ -1,10 +1,8 @@
 <article class="entry entry--summary" aria-labelledby="hed-<%= event.sys.id.parameterize %>">
   <header class="entry__header">
     <p class="entry__meta entry__meta--truncated">
-      <% if event.canceled %>
-        <span class="entry__highlight">Canceled</span>
-      <% elsif is_today?(event.date) %>
-        <span class="entry__highlight <%= "entry__highlight--live" if is_daytime? %>">Today</span>
+      <% if is_today?(event.date) %>
+        <span class="entry__highlight">Today</span>
       <% else %>
         <span><%= Time.parse(event.date).strftime('%B %-e, %Y') %></span>
       <% end %>
