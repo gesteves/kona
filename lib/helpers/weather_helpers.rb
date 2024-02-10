@@ -64,14 +64,14 @@ module WeatherHelpers
   # @param [String] condition_code - The condition code representing the current weather.
   # @return [String] The formatted current weather condition description.
   def format_current_condition(condition_code)
-    data.conditions.dig(condition_code, :labels, :current) || "It's #{condition_code.underscore.gsub('_', ' ')}"
+    data.conditions.dig(condition_code, :phrases, :currently) || "it's #{condition_code.underscore.gsub('_', ' ')}"
   end
 
   # Formats the forecasted weather condition based on its condition code.
   # @param [String] condition_code - The condition code representing the forecasted weather.
   # @return [String] The formatted forecasted weather condition description.
   def format_forecasted_condition(condition_code)
-    data.conditions.dig(condition_code, :labels, :forecast) || "calls for #{condition_code.underscore.gsub('_', ' ')}"
+    data.conditions.dig(condition_code, :phrases, :forecast) || "calls for #{condition_code.underscore.gsub('_', ' ')}"
   end
 
   # Formats a temperature value in Celsius to both Celsius and Fahrenheit.
@@ -147,8 +147,8 @@ module WeatherHelpers
     return true if high_temperature <= 0 || high_temperature >= 32
     return true if precipitation_chance >= 0.5
     return true if snowfall > 0
-    return !data.conditions.dig(data.weather.currentWeather.conditionCode, :is_good_weather)
-    return !data.conditions.dig(todays_forecast.conditionCode, :is_good_weather)
+    return data.conditions.dig(data.weather.currentWeather.conditionCode, :adverse_weather)
+    return data.conditions.dig(todays_forecast.conditionCode, :adverse_weather)
   end
 
   # Determines if the current weather conditions are considered "good".
@@ -213,7 +213,7 @@ module WeatherHelpers
   def current_weather
     return if data.weather.currentWeather.blank?
     text = []
-    text << "#{format_current_condition(data.weather.currentWeather.conditionCode)}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
+    text << "#{format_current_condition(data.weather.currentWeather.conditionCode).capitalize}, with a temperature of #{format_temperature(data.weather.currentWeather.temperature)}"
     text << "which feels like #{format_temperature(data.weather.currentWeather.temperatureApparent)}" unless hide_apparent_temperature?
     text.join(', ')
   end
