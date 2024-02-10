@@ -2,6 +2,5 @@
   <% activities = swims + rides + runs %>
   <span class="stats__meta"><%= "Activity".pluralize(activities) %></span>
   <span class="stats__number"><%= number_to_delimited(activities) %></span>
-  <% strava = data.site.socialsCollection.items.compact.find { |i| i.title == "Strava" } %>
   <span class="stats__meta"><%= timeframe %></span>
 </div>
