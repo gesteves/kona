@@ -17,6 +17,6 @@
     <%= partial 'partials/weather' %>
   <% end %>
   <% if data.events.present? %>
-    <%= partial 'partials/collection', locals: { title: "Upcoming Races", items: data.events.select { |e| Time.parse(e.date).beginning_of_day >= Time.current.in_time_zone(data.time_zone.timeZoneId).beginning_of_day }, variant: "thirds" } %>
+    <%= partial 'partials/collection', locals: { title: "Upcoming Races", items: data.events.select { |e| Time.parse(e.date).in_time_zone(data.time_zone.timeZoneId).beginning_of_day >= Time.current.in_time_zone(data.time_zone.timeZoneId).beginning_of_day }, variant: "thirds" } %>
   <% end %>
 </div>
