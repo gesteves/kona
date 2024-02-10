@@ -143,7 +143,7 @@ module ContentfulClient
           status
         }
       }
-      events: eventCollection(skip: $skip, limit: $limit, order: [date_ASC]) {
+      events: eventCollection(skip: $skip, limit: $limit, order: [date_ASC], where: { canceled: false }) {
         items {
           title
           description
@@ -151,15 +151,8 @@ module ContentfulClient
           url
           trackingUrl
           date
-          canceled
           sys {
             id
-          }
-          contentfulMetadata {
-            tags {
-              id
-              name
-            }
           }
         }
       }
