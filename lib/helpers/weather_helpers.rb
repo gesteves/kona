@@ -211,9 +211,7 @@ module WeatherHelpers
   # Formats my current location.
   # @return [String] A Markdown-formatted string indicating my current location.
   def current_location
-    location = "I'm currently in **#{format_location}**"
-    location += " for **#{event_name_with_optional_article(todays_race.title)}**" if is_race_day? && !is_evening?
-    location
+    "I'm currently in **#{format_location}**"
   end
 
   # Determines if it's a hot one.

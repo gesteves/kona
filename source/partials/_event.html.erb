@@ -1,8 +1,15 @@
 <article class="entry entry--summary" aria-labelledby="hed-<%= event.sys.id.parameterize %>">
   <header class="entry__header">
     <p class="entry__meta entry__meta--truncated">
-      <% if is_today?(event.date) %>
-        <span class="entry__highlight">Today</span>
+      <% if is_today?(event) %>
+        <% link_label = is_daytime? ? "Live results" : "Results" %>
+        <% highlight_class = "entry__highlight" + (is_daytime? ? " entry__highlight--live" : "") %>
+        <% if event.trackingUrl.present? %>
+          <span class="<%= highlight_class %>"><%= link_to link_label, event.trackingUrl, rel: "noopener", target: "_blank" %></span>
+          <span>Today</span>
+        <% else %>
+          <span class="<%= highlight_class %>">Today</span>
+        <% end %>
       <% else %>
         <span><%= Time.parse(event.date).strftime('%B %-e, %Y') %></span>
       <% end %>
