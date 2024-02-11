@@ -32,7 +32,7 @@
   width: 1px;
 }
 
-@media (inverted-colors) {
+@media screen and (inverted-colors) {
   img {
     filter: invert(1);
   }
@@ -43,4 +43,11 @@
     text-shadow: none !important;
   }
   // scss-lint:enable ImportantRule
+}
+
+@media screen and (prefers-reduced-motion) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0s;
+  }
 }
