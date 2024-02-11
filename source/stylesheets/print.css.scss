@@ -1,0 +1,18 @@
+#header,
+#nav,
+#share,
+#you-may-also-like,
+#footer {
+  display: none;
+}
+
+.entry__body a {
+  &::after {
+    color: var(--color-text-secondary);
+    content: " (" attr(href) ")";
+    font-family: var(--ibm-plex-mono);
+    font-size: var(--font-x-small);
+    vertical-align: middle;
+    
+  }
+}
