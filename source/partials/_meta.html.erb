@@ -10,9 +10,10 @@
   <meta name="description" content="<%= current_page.data.summary %>">
 <% end %>
 <meta name="viewport" content="width=device-width,minimum-scale=1">
+<meta name="view-transition" content="same-origin">
 <meta name="theme-color" content="#BF0222">
 <% if !is_production? || (defined?(content) && hide_from_search_engines?(content)) %>
   <meta name="robots" content="noindex">
+<% else %>
+  <meta name="bingbot" content="noarchive">
 <% end %>
-<meta name="bingbot" content="noarchive">
-<meta name="view-transition" content="same-origin">
