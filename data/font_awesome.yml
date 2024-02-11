@@ -11,34 +11,34 @@ icons:
       - envelope
     thin:
       - bolt-lightning
+      - cloud
       - cloud-bolt
       - cloud-drizzle
       - cloud-fog
-      - cloud-hail-mixed
       - cloud-hail
+      - cloud-hail-mixed
       - cloud-question
       - cloud-rain
-      - cloud-showers-heavy
       - cloud-showers
+      - cloud-showers-heavy
       - cloud-snow
       - cloud-sun-rain
-      - cloud
+      - clouds
       - clouds-moon
       - clouds-sun
-      - clouds
       - hurricane
-      - moon-cloud
       - moon
+      - moon-cloud
       - smoke
       - snow-blowing
       - snowflake-droplets
+      - sun
       - sun-cloud
       - sun-dust
       - sun-haze
-      - sun
       - temperature-snow
       - temperature-sun
       - tornado
-      - wind-warning
       - wind
+      - wind-warning
 
