@@ -29,8 +29,7 @@ end
 desc 'Run the test suite'
 task :test do
   puts 'Running tests...'
-  result = system('bundle exec rspec')
-  raise 'Tests failed!' unless result
+  sh 'bundle exec rspec'
 end
 
 desc 'Import content and build the site'
