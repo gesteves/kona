@@ -43,3 +43,10 @@ h6 {
   background-color: var(--color-accent);
   height: 2px;
 }
+
+@media screen and (prefers-reduced-motion) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0s;
+  }
+}
