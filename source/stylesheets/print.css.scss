@@ -6,6 +6,10 @@
   display: none;
 }
 
+.entry__figure {
+  break-inside: avoid;
+}
+
 .entry__body a {
   &::after {
     color: var(--color-text-secondary);
