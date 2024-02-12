@@ -6,8 +6,17 @@
   display: none;
 }
 
+body,
+.content,
+.content__main {
+  display: block;
+}
+
+
 .entry__figure {
   break-inside: avoid;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 .entry__body a {
