@@ -19,7 +19,8 @@ class Swarm
     @time_zone = ENV['DEFAULT_TIMEZONE'] || 'America/Denver'
   end
 
-  # Fetches the location of the most recent check-in within the last two days.
+  # Fetches the location of the most recent check-in within the last two days, not including today,
+  # e.g. "where was I at the end of yesterday or the day before".
   # @return [Hash] The latitude and longitude of the recent check-in.
   def recent_checkin_location
     current_time = Time.now.in_time_zone(@time_zone)

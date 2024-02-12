@@ -51,7 +51,7 @@ class Contentful
 
   def generate_content!
     content = @redis.get(CACHE_KEY)
-    if content
+    if content.present?
       @content = JSON.parse(content, symbolize_names: true)
     else
       fetch_all_content
