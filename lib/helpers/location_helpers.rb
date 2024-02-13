@@ -30,7 +30,11 @@ module LocationHelpers
         return [city || county, region].compact.join(", ")
       end
     else
-      return [city || region, country].compact.join(", ")
+      if city == 'Ciudad de México'
+        return 'Mexico City'
+      else
+        return [city || region, country].compact.join(", ")
+      end
     end
   end
 
