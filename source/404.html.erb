@@ -14,6 +14,6 @@ body: I'm sorry, but the page you were looking for can't be found.
     </div>
   </section>
   <% if data.articles.reject { |a| a.draft }.present? %>
-    <%= partial 'partials/collection', locals: { title: "Recent Articles", items: data.articles.reject { |a| a.draft }.slice(0, 4), variant: "centered" } %>
+    <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent_articles(count: 4), variant: "centered" } %>
   <% end %>
 </div>
