@@ -33,7 +33,6 @@ GEM
     fast_blank (1.0.1)
     fastimage (2.2.7)
     ffi (1.16.3)
-    foreman (0.87.2)
     graphql (2.2.8)
     graphql-client (0.20.0)
       activesupport (>= 3.0)
@@ -174,7 +173,6 @@ DEPENDENCIES
   activesupport
   blurhash!
   dotenv
-  foreman
   graphql-client
   httparty
   icalendar
