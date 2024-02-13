@@ -19,28 +19,24 @@ module LocationHelpers
     country&.gsub!("'", "’")
 
     case country
-    when 'United States', 'United Kingdom'
+    when 'United States', 'United Kingdom', 'Canada'
       if city == 'New York' && region == 'New York'
         return 'New York City'
       elsif region == 'District of Columbia'
         return 'Washington, DC'
       elsif county == 'Teton County' && region == 'Wyoming'
-        return "Jackson Hole, Wyoming"
+        return 'Jackson Hole, Wyoming'
       else
         return [city || county, region].compact.join(", ")
       end
     else
-      if city == 'Ciudad de México'
-        return "Mexico City"
-      else
-        return [city || region, country].compact.join(", ")
-      end
+      return [city || region, country].compact.join(", ")
     end
   end
 
   # Checks if the location is, well, Jackson Hole.
   # @return [Boolean] True if the location matches, false otherwise.
   def in_jackson_hole?
-    format_location == "Jackson Hole, Wyoming"
+    format_location == 'Jackson Hole, Wyoming'
   end
 end
