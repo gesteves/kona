@@ -20,8 +20,12 @@ status = 200
   remote_images = ["https://images.ctfassets.net/.*", "https://downloads.ctfassets.net/.*"]
 
 [dev]
-  command = "bundle exec foreman start -f Procfile.dev"
-  targetPort = 4567
   autoLaunch = false 
+  command = "bundle exec foreman start -f Procfile.dev"
   framework = "#custom"
+  targetPort = 4567
+
+[build]
+  command = "bundle exec rake build"
+  publish = "build/"
 
