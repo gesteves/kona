@@ -20,7 +20,6 @@ status = 200
   remote_images = ["https://images.ctfassets.net/.*", "https://downloads.ctfassets.net/.*"]
 
 [dev]
-  autoLaunch = false 
   command = "bundle exec foreman start -f Procfile.dev"
   framework = "#custom"
   targetPort = 4567
