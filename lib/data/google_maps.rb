@@ -62,6 +62,7 @@ class GoogleMaps
     cached_location = @redis.get(cache_key)
     params = parse_incoming_hook_body
     if params[:latitude].present? && params[:longitude].present?
+      puts params.to_s
       current_location = "#{params[:latitude]},#{params[:longitude]}"
       @redis.set(cache_key, current_location)
       current_location
