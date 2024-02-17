@@ -64,7 +64,7 @@ class GoogleMaps
     if params[:latitude].present? && params[:longitude].present?
       puts params.to_s
       current_location = "#{params[:latitude]},#{params[:longitude]}"
-      @redis.set(cache_key, current_location)
+      @redis.setex(cache_key, 2.days, current_location)
       current_location
     elsif cached_location.present?
       cached_location
