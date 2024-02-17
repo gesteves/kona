@@ -1,5 +1,6 @@
 require 'httparty'
 require 'redis'
+require 'cgi'
 require 'active_support/all'
 
 # The GoogleMaps class interfaces with the Google Maps API to fetch geocoding and timezone data.
@@ -19,6 +20,8 @@ class GoogleMaps
     )
     location = get_current_location
     @latitude, @longitude = location.split(',').map(&:to_f) if location.present?
+    puts @latitude
+    puts @longitude
   end
 
   # Fetches and formats the time zone data for the specified coordinates.
@@ -47,34 +50,42 @@ class GoogleMaps
 
   private
 
-  # Gets the current location, from:
+  # Retrieves the current location from either the INCOMING_HOOK_BODY environment variable,
+  # a Redis cache, or the LOCATION environment variable, in that order of priority.
   #
-  # 1. redis, if it's been cached previously
-  # 2. the `INCOMING_HOOK_BODY` env var, which comes from a build webhook, or
-  # 3. a default `LOCATION` env var.
-  # @return [String, nil] the current location as a string in "latitude, longitude" format
+  # The method ensures that the most up-to-date and valid location is used, preferring
+  # real-time data from the INCOMING_HOOK_BODY, then cached data, and finally a preset
+  # environment variable if no other source is available.
+  #
+  # @return [String, nil] The current location as a "latitude,longitude" string if available;
+  #         otherwise, returns nil if no valid location data can be found or parsed.
   def get_current_location
     cache_key = 'google_maps:location'
-    location = @redis.get(cache_key)
-    return location if location.present?
-
-    location = ENV['INCOMING_HOOK_BODY']&.strip
-    puts location
-
-    if valid_location_format?(location)
-      @redis.set(cache_key, location)
-      location
+    cached_location = @redis.get(cache_key)
+    params = parse_incoming_hook_body
+    if params[:latitude].present? && params[:longitude].present?
+      current_location = "#{params[:latitude]},#{params[:longitude]}"
+      @redis.set(cache_key, current_location)
+      current_location
+    elsif cached_location.present?
+      cached_location
     else
-      ENV['LOCATION'] if valid_location_format?(ENV['LOCATION'])
+      ENV['LOCATION']
     end
   end
 
-  # Validates the format of a location string.
-  # A valid location is a latitude and longitude separated by a comma.
-  # @param location [String] The location string to validate.
-  # @return [Boolean] true if the location string is valid.
-  def valid_location_format?(location)
-    location.present? && location.match?(/^\-?\d+(\.\d+)?,\s*\-?\d+(\.\d+)?$/)
+  # Parses the INCOMING_HOOK_BODY environment variable for latitude and longitude values.
+  #
+  # @return [Hash] A hash containing :latitude and :longitude keys with their respective
+  #         values if parsing is successful; an empty hash is returned if parsing fails
+  #         or if the necessary values are not present.
+  def parse_incoming_hook_body
+    params = CGI.parse(ENV['INCOMING_HOOK_BODY'])
+    latitude = params['latitude']&.first
+    longitude = params['longitude']&.first
+    { latitude: latitude, longitude: longitude }.compact
+  rescue
+    {}
   end
 
   # Reverse-geocodes the given coordinates into a human-readable address.
