@@ -1,6 +1,5 @@
 require 'httparty'
 require 'redis'
-require 'cgi'
 require 'active_support/all'
 
 # The GoogleMaps class interfaces with the Google Maps API to fetch geocoding and timezone data.
@@ -60,9 +59,10 @@ class GoogleMaps
   def get_current_location
     cache_key = 'google_maps:location:current'
     cached_location = @redis.get(cache_key)
-    params = parse_incoming_hook_body
-    if params[:latitude].present? && params[:longitude].present?
-      current_location = "#{params[:latitude]},#{params[:longitude]}"
+    incoming_hook_body = parse_incoming_hook_body
+    if incoming_hook_body[:latitude].present? && incoming_hook_body[:longitude].present?
+      current_location = "#{incoming_hook_body[:latitude]},#{incoming_hook_body[:longitude]}"
+      puts current_location
       @redis.setex(cache_key, 2.days, current_location)
       current_location
     elsif cached_location.present?
@@ -78,11 +78,7 @@ class GoogleMaps
   #         values if parsing is successful; an empty hash is returned if parsing fails
   #         or if the necessary values are not present.
   def parse_incoming_hook_body
-    puts ENV['INCOMING_HOOK_BODY']
-    params = CGI.parse(ENV['INCOMING_HOOK_BODY'])
-    latitude = params['latitude']&.first
-    longitude = params['longitude']&.first
-    { latitude: latitude, longitude: longitude }.compact
+    JSON.parse(ENV['INCOMING_HOOK_BODY'], symbolize_names: true)
   rescue
     {}
   end
