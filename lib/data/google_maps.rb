@@ -59,6 +59,7 @@ class GoogleMaps
     return location if location.present?
 
     location = ENV['INCOMING_HOOK_BODY']&.strip
+    puts location
 
     if valid_location_format?(location)
       @redis.set(cache_key, location)
