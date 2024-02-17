@@ -78,6 +78,7 @@ class GoogleMaps
   #         values if parsing is successful; an empty hash is returned if parsing fails
   #         or if the necessary values are not present.
   def parse_incoming_hook_body
+    puts ENV['INCOMING_HOOK_BODY']
     params = CGI.parse(ENV['INCOMING_HOOK_BODY'])
     latitude = params['latitude']&.first
     longitude = params['longitude']&.first
