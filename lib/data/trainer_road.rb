@@ -42,7 +42,7 @@ class TrainerRoad
     end
 
     workouts = todays_events.map do |event|
-      parse_workout(event.summary)
+      parse_workout(event)
     end
 
     workouts = workouts.compact.sort_by { |w| DISCIPLINE_ORDER[w[:discipline]] }
@@ -62,32 +62,36 @@ class TrainerRoad
 
   private
 
-  # Parses the workout summary to extract workout details.
-  # @param summary [String] The summary of the workout event.
-  # @return [Hash, nil] The parsed workout details or nil if parsing fails.
-  def parse_workout(summary)
-    match_data = /(\d+:\d+) - (.+)/.match(summary)
+  # Parses a workout event to extract relevant details.
+  # @param event [Icalendar::Event] The calendar event representing a workout.
+  # @return [Hash, nil] A hash with the workout's details, including :duration, :name,
+  #         :discipline, :summary, and :description. Returns nil if the event summary
+  #         does not match the expected format or if critical information is missing.
+  def parse_workout(event)
+    match_data = /(\d+:\d+) - (.+)/.match(event.summary)
     return nil if match_data.blank?
 
     duration = match_data[1]
     name = match_data[2]
     discipline = determine_discipline(name)
 
-    description = human_readable_description(duration, discipline)
+    summary = human_readable_summary(duration, discipline)
+    description = event.description.sub(/.*?Description: /, '')
 
     {
       duration: duration,
       name: name,
       discipline: discipline,
+      summary: summary,
       description: description
     }
   end
 
-  # Converts workout duration and discipline into a human-readable format.
+  # Converts workout duration and discipline into a human-readable summary.
   # @param duration [String] The duration of the workout.
   # @param discipline [String] The discipline of the workout (e.g., Bike, Run, Swim).
-  # @return [String] A human-readable description of the workout.
-  def human_readable_description(duration, discipline)
+  # @return [String] A human-readable summary of the workout.
+  def human_readable_summary(duration, discipline)
     hours, minutes = duration.split(":").map(&:to_i)
 
     total_minutes = (hours * 60) + minutes
