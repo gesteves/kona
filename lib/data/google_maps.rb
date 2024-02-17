@@ -9,18 +9,16 @@ class GoogleMaps
   GOOGLE_MAPS_API_KEY = ENV['GOOGLE_MAPS_API_KEY']
 
   # Initializes the GoogleMaps class with geographical coordinates.
-  # @param latitude [Float] The latitude for the location.
-  # @param longitude [Float] The longitude for the location.
   # @return [GoogleMaps] The instance of the GoogleMaps class.
-  def initialize(latitude, longitude)
+  def initialize
     @redis = Redis.new(
       host: ENV['REDIS_HOST'] || 'localhost',
       port: ENV['REDIS_PORT'] || 6379,
       username: ENV['REDIS_USERNAME'],
       password: ENV['REDIS_PASSWORD']
     )
-    @latitude = latitude
-    @longitude = longitude
+    location = get_current_location
+    @latitude, @longitude = location.split(',').map(&:to_f) if location.present?
   end
 
   # Fetches and formats the time zone data for the specified coordinates.
@@ -49,10 +47,40 @@ class GoogleMaps
 
   private
 
+  # Gets the current location, from:
+  #
+  # 1. redis, if it's been cached previously
+  # 2. the `INCOMING_HOOK_BODY` env var, which comes from a build webhook, or
+  # 3. a default `LOCATION` env var.
+  # @return [String, nil] the current location as a string in "latitude, longitude" format
+  def get_current_location
+    cache_key = 'google_maps:location'
+    location = @redis.get(cache_key)
+    return location if location.present?
+
+    location = ENV['INCOMING_HOOK_BODY']&.strip
+
+    if valid_location_format?(location)
+      @redis.set(cache_key, location)
+      location
+    else
+      ENV['LOCATION'] if valid_location_format?(ENV['LOCATION'])
+    end
+  end
+
+  # Validates the format of a location string.
+  # A valid location is a latitude and longitude separated by a comma.
+  # @param location [String] The location string to validate.
+  # @return [Boolean] true if the location string is valid.
+  def valid_location_format?(location)
+    location.present? && location.match?(/^\-?\d+(\.\d+)?,\s*\-?\d+(\.\d+)?$/)
+  end
+
   # Reverse-geocodes the given coordinates into a human-readable address.
   # @see https://developers.google.com/maps/documentation/geocoding/requests-reverse-geocoding
   # @return [Hash, nil] The geocoding data, or nil if fetching fails.
   def geocode
+    return if @latitude.blank? || @longitude.blank?
     cache_key = "google_maps:geocoded:#{@latitude}:#{@longitude}"
     data = @redis.get(cache_key)
 
@@ -75,6 +103,7 @@ class GoogleMaps
   # @see https://developers.google.com/maps/documentation/timezone/requests-timezone
   # @return [Hash, nil] The time zone data, or nil if fetching fails.
   def time_zone_data
+    return if @latitude.blank? || @longitude.blank?
     cache_key = "google_maps:time_zone:#{@latitude}:#{@longitude}"
     data = @redis.get(cache_key)
 

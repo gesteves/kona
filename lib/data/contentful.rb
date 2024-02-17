@@ -34,10 +34,6 @@ class Contentful
     end
   end
 
-  def location
-    @content[:site].dig(:author, :location) || {}
-  end
-
   private
 
   def save_to_file(type, data)

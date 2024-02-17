@@ -93,10 +93,6 @@ module ContentfulClient
               url
               description
             }
-            location {
-              lat
-              lon
-            }
           }
           navLinksCollection {
             items {
