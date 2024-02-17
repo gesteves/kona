@@ -59,10 +59,9 @@ class GoogleMaps
   def get_current_location
     cache_key = 'google_maps:location:current'
     cached_location = @redis.get(cache_key)
-    incoming_hook_body = parse_incoming_hook_body
-    if incoming_hook_body[:latitude].present? && incoming_hook_body[:longitude].present?
-      current_location = "#{incoming_hook_body[:latitude]},#{incoming_hook_body[:longitude]}"
-      puts current_location
+    payload = parse_incoming_hook_body
+    if payload[:latitude].present? && payload[:longitude].present?
+      current_location = "#{payload[:latitude]},#{payload[:longitude]}"
       @redis.setex(cache_key, 2.days, current_location)
       current_location
     elsif cached_location.present?
