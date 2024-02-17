@@ -20,8 +20,6 @@ class GoogleMaps
     )
     location = get_current_location
     @latitude, @longitude = location.split(',').map(&:to_f) if location.present?
-    puts @latitude
-    puts @longitude
   end
 
   # Fetches and formats the time zone data for the specified coordinates.
