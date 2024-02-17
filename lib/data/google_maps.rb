@@ -58,7 +58,7 @@ class GoogleMaps
   # @return [String, nil] The current location as a "latitude,longitude" string if available;
   #         otherwise, returns nil if no valid location data can be found or parsed.
   def get_current_location
-    cache_key = 'google_maps:location'
+    cache_key = 'google_maps:location:current'
     cached_location = @redis.get(cache_key)
     params = parse_incoming_hook_body
     if params[:latitude].present? && params[:longitude].present?
