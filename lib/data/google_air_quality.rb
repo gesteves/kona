@@ -4,6 +4,7 @@ require 'active_support/all'
 
 # The GoogleAirQuality class interfaces with the Google Air Quality API to fetch the AQI for a location.
 class GoogleAirQuality
+  attr_reader :aqi
   GOOGLE_AQI_API_URL = 'https://airquality.googleapis.com/v1'
 
   # Initializes the GoogleAirQuality class with geographical coordinates.
@@ -23,12 +24,21 @@ class GoogleAirQuality
     @longitude = longitude
     @country_code = country_code
     @aqi_code = aqi_code
+    @aqi = set_aqi
   end
 
-  # Retrieves the air quality data for the specified coordinates.
+  # Saves the AQI data to a JSON file.
+  def save_data
+    return if @aqi.blank?
+    File.open('data/air_quality.json', 'w') { |f| f << @aqi.to_json }
+  end
+
+  private
+
+  # Sets the air quality data for the specified coordinates.
   # @return [Hash, nil] The AQI data, or nil if fetching fails.
-  def aqi
-    data = current_conditions
+  def set_aqi
+    data = lookup_current_conditions
     return if data.blank?
 
     result = data['indexes']&.find { |i| i['code'] == @aqi_code }
@@ -43,17 +53,10 @@ class GoogleAirQuality
     }
   end
 
-  # Saves the AQI data to a JSON file.
-  def save_data
-    File.open('data/air_quality.json', 'w') { |f| f << aqi.to_json }
-  end
-
-  private
-
-  # Returns the AQI data for the given coordinates.
+  # gets the AQI data for the given coordinates from the API.
   # @see https://developers.google.com/maps/documentation/air-quality/reference/rest/v1/currentConditions/lookup#http-request
   # @return [Hash, nil] AQI data, or nil if fetching fails.
-  def current_conditions
+  def lookup_current_conditions
     return if @latitude.blank? || @longitude.blank?
     cache_key = "google:aqi:#{@latitude}:#{@longitude}:#{@country_code}:#{@aqi_code}"
     data = @redis.get(cache_key)

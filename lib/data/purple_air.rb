@@ -4,6 +4,7 @@ require 'active_support/all'
 
 # The PurpleAir class interfaces with the PurpleAir API to fetch air quality data.
 class PurpleAir
+  attr_reader :aqi
   PURPLE_AIR_API_URL = 'https://api.purpleair.com/v1/sensors'
 
   # Initializes the PurpleAir class with geographical coordinates.
@@ -19,11 +20,20 @@ class PurpleAir
       username: ENV['REDIS_USERNAME'],
       password: ENV['REDIS_PASSWORD']
     )
+    @aqi = set_aqi
   end
 
-  # Fetches the Air Quality Index (AQI) based on the nearest sensor data.
+  # Saves the AQI data to a JSON file.
+  def save_data
+    return if @aqi.blank?
+    File.open('data/air_quality.json', 'w') { |f| f << @aqi.to_json }
+  end
+
+  private
+
+  # Sets the Air Quality Index (AQI) based on the nearest sensor data.
   # @return [Hash, nil] The AQI and related data, or nil if fetching fails.
-  def aqi
+  def set_aqi
     sensor = nearest_sensor
     return if sensor.blank?
     raw_pm25 = sensor['pm2.5_atm']
@@ -31,13 +41,6 @@ class PurpleAir
     pm25 = humidity.present? ? apply_epa_correction(raw_pm25, humidity.to_f) : raw_pm25
     format_aqi(pm25)
   end
-
-  # Saves the AQI data to a JSON file.
-  def save_data
-    File.open('data/air_quality.json', 'w') { |f| f << aqi.to_json }
-  end
-
-  private
 
   # Finds sensors within a defined proximity.
   # @see https://api.purpleair.com/#api-sensors-get-sensors-data
