@@ -33,7 +33,7 @@ class Location
       current_location = "#{payload[:latitude]},#{payload[:longitude]}"
       @redis.setex(cache_key, 2.days, current_location)
       current_location
-    elsif cached_location.present? && ENV['CONTEXT'] != 'dev'
+    elsif cached_location.present? && ENV['USE_DEFAULT_LOCATION'].blank?
       cached_location
     else
       ENV['LOCATION']
