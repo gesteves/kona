@@ -145,11 +145,13 @@ module WeatherHelpers
     data.pollen&.map { |p| p&.indexInfo&.value }&.compact&.max&.to_i
   end
 
+  # Returns the pollen level's description.
+  # @return [String, nil] Description of the highest pollen level or nil.
   def pollen_level
-    level = data.pollen&.select { |p| p&.indexInfo&.value&.present? }&.sort_by { |p| p.indexInfo.value }&.reverse&.first
-    return if level.blank?
+    highest_level = data.pollen&.filter { |p| p&.indexInfo&.value.to_i > 0 }&.max_by { |p| p.indexInfo.value }
+    return if highest_level.blank?
 
-    "Pollen levels are #{level.indexInfo.category.downcase}"
+    "Pollen levels are #{highest_level.indexInfo.category.downcase}"
   end
 
   # Determines if the current weather conditions are considered "bad" for working out outdoors.
