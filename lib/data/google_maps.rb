@@ -43,6 +43,7 @@ class GoogleMaps
   def save_data
     File.open('data/location.json', 'w') { |f| f << geocode.to_json }
     File.open('data/time_zone.json', 'w') { |f| f << time_zone.to_json }
+    File.open('data/elevation.json', 'w') { |f| f << elevation.to_json }
   end
 
   private
@@ -102,6 +103,28 @@ class GoogleMaps
     return unless response.success?
 
     @redis.setex(cache_key, 1.day, response.body)
+    JSON.parse(response.body)
+  end
+
+  # Returns the elevation for the given coordinates.
+  # @see https://developers.google.com/maps/documentation/elevation/requests-elevation#ElevationRequests
+  # @return [Hash, nil] The elevation data, or nil if fetching fails.
+  def elevation
+    return if @latitude.blank? || @longitude.blank?
+    cache_key = "google_maps:elevation:#{@latitude}:#{@longitude}"
+    data = @redis.get(cache_key)
+
+    return JSON.parse(data) if data.present?
+
+    query = {
+      locations: "#{@latitude},#{@longitude}",
+      key: GOOGLE_API_KEY
+    }
+
+    response = HTTParty.get("#{GOOGLE_MAPS_API_URL}/elevation/json", query: query)
+    return unless response.success?
+
+    @redis.setex(cache_key, 1.minute, response.body)
     JSON.parse(response.body)
   end
 

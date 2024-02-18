@@ -95,6 +95,13 @@ module UnitHelpers
     meters * 1.09361
   end
 
+  # Converts a distance from meters to feet.
+  # @param meters [Numeric] The distance in meters to be converted.
+  # @return [Numeric] The distance in feet.
+  def meters_to_feet(meters)
+    meters * 3.28084
+  end
+
   # Converts millimeters to inches.
   # @param millimeters [Numeric] The length in millimeters.
   # @return [Numeric] The equivalent length in inches.

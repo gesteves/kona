@@ -1,3 +1,4 @@
+require 'active_support/all'
 module LocationHelpers
   # Formats location information based on address components from the Google Maps API.
   # Handles special formatting for some specific locations.
@@ -35,6 +36,18 @@ module LocationHelpers
       else
         return [city || region, country].compact.join(", ")
       end
+    end
+  end
+
+  # Returns the elevation for the current location formatted in meters and feet.
+  # @return [String] A formatted elevation value with units in both meters and feet.
+  def format_elevation
+    elevation = data.elevation&.results&.first&.elevation
+    return if elevation.blank?
+    meters = "#{number_to_rounded(elevation, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')} m"
+    feet = "#{number_to_rounded(meters_to_feet(elevation), precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')} feet"
+    content_tag :span, 'data-controller': 'units', 'data-units-imperial-value': feet, 'data-units-metric-value': meters do
+      meters
     end
   end
 

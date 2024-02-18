@@ -193,6 +193,7 @@ module WeatherHelpers
     summary << race_day
     summary << smooth
     summary << current_location
+    summary << elevation
     summary << currently
     summary << current_aqi
     summary << forecast
@@ -212,6 +213,11 @@ module WeatherHelpers
   # @return [String] A Markdown-formatted string indicating my current location.
   def current_location
     "I'm currently in **#{format_location}**"
+  end
+
+  def elevation
+    return if format_elevation.blank?
+    "The elevation is #{format_elevation}"
   end
 
   # Determines if it's a hot one.
