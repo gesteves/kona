@@ -27,6 +27,13 @@ class GoogleMaps
     @elevation = get_elevation
   end
 
+  # Returns a timezone ID of the form "America/Denver".
+  # @return [String, nil] the timezone ID.
+  def time_zone_id
+    return if @time_zone.blank?
+    @time_zone['timeZoneId']
+  end
+
   # Saves the geocode and time zone data to JSON files.
   def save_data
     File.open('data/location.json', 'w') { |f| f << @geocoded.to_json }

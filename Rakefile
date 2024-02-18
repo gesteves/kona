@@ -74,7 +74,7 @@ end
 def import_weather
   safely_perform {
     @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
-    WeatherKit.new(@google_maps.latitude, @google_maps.longitude, @google_maps.time_zone['timeZoneId'], @google_maps.country_code).save_data
+    WeatherKit.new(@google_maps.latitude, @google_maps.longitude, @google_maps.time_zone_id, @google_maps.country_code).save_data
   }
 end
 
@@ -99,8 +99,7 @@ end
 def import_trainer_road
   safely_perform {
     @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
-    time_zone = @google_maps.time_zone['timeZoneId']
-    TrainerRoad.new(time_zone).save_data 
+    TrainerRoad.new(@google_maps.time_zone_id).save_data 
   }
 end
 
