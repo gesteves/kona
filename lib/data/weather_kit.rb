@@ -5,6 +5,7 @@ require 'active_support/all'
 
 # The WeatherKit class interfaces with Apple's WeatherKit API to fetch weather data.
 class WeatherKit
+  attr_reader :weather
   WEATHERKIT_API_URL = 'https://weatherkit.apple.com/api/v1/'
 
   # Initializes the WeatherKit class with location and time zone information.
@@ -24,12 +25,20 @@ class WeatherKit
     @longitude = longitude
     @time_zone = time_zone
     @country = country
+    @weather = get_weather
   end
 
-  # Fetches the current weather data for the specified location.
+  # Saves the current weather data to a JSON file.
+  def save_data
+    File.open('data/weather.json','w'){ |f| f << @weather.to_json }
+  end
+
+  private
+
+  # Gets the current weather data for the specified location.
   # @see https://developer.apple.com/documentation/weatherkitrestapi/get_api_v1_weather_language_latitude_longitude
   # @return [Hash, nil] The current weather data, or nil if fetching fails.
-  def weather
+  def get_weather
     cache_key = "weatherkit:weather:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
     data = @redis.get(cache_key)
 
@@ -54,13 +63,6 @@ class WeatherKit
     @redis.setex(cache_key, 5.minutes, response.body)
     JSON.parse(response.body)
   end
-
-  # Saves the current weather data to a JSON file.
-  def save_data
-    File.open('data/weather.json','w'){ |f| f << weather.to_json }
-  end
-
-  private
 
   # Checks the availability of weather data for the specified location.
   # @see https://developer.apple.com/documentation/weatherkitrestapi/get_api_v1_availability_latitude_longitude
