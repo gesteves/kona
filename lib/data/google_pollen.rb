@@ -2,14 +2,14 @@ require 'httparty'
 require 'redis'
 require 'active_support/all'
 
-# The Pollen class interfaces with the Google Pollen API to fetch pollen data for a location.
-class Pollen
+# The GooglePollen class interfaces with the Google Pollen API to fetch pollen data for a location.
+class GooglePollen
   GOOGLE_POLLEN_API_URL = 'https://pollen.googleapis.com/v1'
 
-  # Initializes the Pollen class with geographical coordinates.
+  # Initializes the GooglePollen class with geographical coordinates.
   # @param latitude [Float] The latitude for the location.
   # @param longitude [Float] The longitude for the location.
-  # @return [GoogleMaps] The instance of the Pollen class.
+  # @return [GooglePollen] The instance of the GooglePollen class.
   def initialize(latitude, longitude)
     @redis = Redis.new(
       host: ENV['REDIS_HOST'] || 'localhost',

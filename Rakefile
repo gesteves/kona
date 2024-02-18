@@ -90,7 +90,7 @@ end
 def import_pollen
   safely_perform {
     @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
-    Pollen.new(@google_maps.latitude, @google_maps.longitude).save_data 
+    GooglePollen.new(@google_maps.latitude, @google_maps.longitude).save_data 
   }
 end
 
