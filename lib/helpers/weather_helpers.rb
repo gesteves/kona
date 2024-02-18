@@ -141,7 +141,7 @@ module WeatherHelpers
   # @see https://developers.google.com/maps/documentation/pollen/reference/rest/v1/forecast/lookup#indexinfo
   # @return [Integer] The pollen index, where 0 is "none", and 5 is "very high"
   def pollen_value
-    return if data.pollen.blank?
+    return 0 if data.pollen.blank?
     data.pollen&.map { |p| p&.indexInfo&.value }&.compact&.max&.to_i
   end
 
