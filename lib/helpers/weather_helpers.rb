@@ -151,7 +151,7 @@ module WeatherHelpers
     highest_level = data.pollen&.filter { |p| p&.indexInfo&.value.to_i > 0 }&.max_by { |p| p.indexInfo.value }
     return if highest_level.blank?
 
-    "Pollen levels are #{highest_level.indexInfo.category.downcase.gsub('very', '_very_')}"
+    "Pollen levels are #{highest_level.indexInfo.category.downcase}"
   end
 
   # Determines if the current weather conditions are considered "bad" for working out outdoors.
