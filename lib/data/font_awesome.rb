@@ -51,7 +51,7 @@ class FontAwesome
   # @param icon_id [String] The unique identifier for the icon.
   # @return [String] The SVG content for the specified icon.
   def fetch_icon(version, family, style, icon_id)
-    cache_key = "font-awesome:v1:icon:#{version}:#{family}:#{style}:#{icon_id}"
+    cache_key = "font-awesome:icon:#{version}:#{family}:#{style}:#{icon_id}"
     svg = @redis.get(cache_key)
 
     return svg if svg.present?
