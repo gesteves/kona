@@ -154,8 +154,8 @@ module WeatherHelpers
   # Returns the pollen level's description.
   # @return [String, nil] Description of the highest pollen level or nil.
   def current_pollen
-    return unless pollen_index >= 4
-    "Pollen levels are #{highest_level.indexInfo.category.downcase.gsub('very', '_very_')}"
+    return if pollen_index.zero?
+    "Pollen levels are #{highest_level.indexInfo.category.downcase}"
   end
 
   # Determines if the current weather conditions are considered "bad" for working out outdoors.
