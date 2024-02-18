@@ -6,7 +6,7 @@ require 'active_support/all'
 class GoogleMaps
   attr_reader :latitude, :longitude
   GOOGLE_MAPS_API_URL = 'https://maps.googleapis.com/maps/api'
-  GOOGLE_MAPS_API_KEY = ENV['GOOGLE_MAPS_API_KEY']
+  GOOGLE_API_KEY = ENV['GOOGLE_API_KEY']
 
   # Initializes the GoogleMaps class with geographical coordinates.
   # @return [GoogleMaps] The instance of the GoogleMaps class.
@@ -94,7 +94,7 @@ class GoogleMaps
 
     query = {
       latlng: "#{@latitude},#{@longitude}",
-      key: GOOGLE_MAPS_API_KEY,
+      key: GOOGLE_API_KEY,
       language: "en"
     }
 
@@ -115,8 +115,13 @@ class GoogleMaps
 
     return JSON.parse(data) if data.present?
 
-    timestamp = Time.now.to_i
-    response = HTTParty.get("#{GOOGLE_MAPS_API_URL}/timezone/json?location=#{@latitude},#{@longitude}&timestamp=#{timestamp}&key=#{GOOGLE_MAPS_API_KEY}")
+    query = {
+      location: "#{@latitude},#{@longitude}",
+      key: GOOGLE_API_KEY,
+      timestamp: Time.now.to_i
+    }
+
+    response = HTTParty.get("#{GOOGLE_MAPS_API_URL}/timezone/json", query: query)
     return unless response.success?
 
     @redis.setex(cache_key, 1.day, response.body)
