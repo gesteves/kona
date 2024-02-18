@@ -124,7 +124,7 @@ class GoogleMaps
     response = HTTParty.get("#{GOOGLE_MAPS_API_URL}/elevation/json", query: query)
     return unless response.success?
 
-    @redis.setex(cache_key, 1.minute, response.body)
+    @redis.setex(cache_key, 1.day, response.body)
     JSON.parse(response.body)
   end
 
