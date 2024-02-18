@@ -42,7 +42,7 @@ class Pollen
   # @return [Hash, nil] The pollen data, or nil if fetching fails.
   def pollen_forecast
     return if @latitude.blank? || @longitude.blank?
-    cache_key = "google_maps:pollen:#{@latitude}:#{@longitude}"
+    cache_key = "google:pollen:#{@latitude}:#{@longitude}"
     data = @redis.get(cache_key)
 
     return JSON.parse(data) if data.present?
