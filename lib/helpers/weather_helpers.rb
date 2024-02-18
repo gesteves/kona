@@ -142,7 +142,7 @@ module WeatherHelpers
   # @return [Integer] The pollen index, where 0 is "none", and 5 is "very high"
   def pollen_value
     return 0 if data.pollen.blank?
-    data.pollen&.map { |p| p&.indexInfo&.value }&.compact&.max&.to_i
+    data.pollen&.map { |p| p&.indexInfo&.value.to_i }&.max
   end
 
   # Returns the pollen level's description.
