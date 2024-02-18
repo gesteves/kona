@@ -161,7 +161,7 @@ module WeatherHelpers
   # Determines if the current weather conditions are considered "bad" for working out outdoors.
   # @return [Boolean] `true` if the weather conditions are bad, `false` otherwise.
   def is_bad_weather?
-    aqi = data&.air_quality&.aqi&.to_i
+    aqi = data&.air_quality&.aqi.to_i
     current_temperature = (current_weather.temperatureApparent || current_weather.temperature)
     high_temperature = todays_forecast.temperatureMax
     low_temperature = todays_forecast.temperatureMin
