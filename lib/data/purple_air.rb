@@ -25,8 +25,7 @@ class PurpleAir
 
   # Saves the AQI data to a JSON file.
   def save_data
-    return if @aqi.blank?
-    File.open('data/air_quality.json', 'w') { |f| f << @aqi.to_json }
+    File.open('data/air_quality.json', 'w') { |f| f << @aqi.to_json } if @aqi.present?
   end
 
   private

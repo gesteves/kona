@@ -29,9 +29,9 @@ class GoogleMaps
 
   # Saves the geocode and time zone data to JSON files.
   def save_data
-    File.open('data/location.json', 'w') { |f| f << @geocoded.to_json } if @geocoded.present?
-    File.open('data/time_zone.json', 'w') { |f| f << @time_zone.to_json } if @time_zone.present?
-    File.open('data/elevation.json', 'w') { |f| f << @elevation.to_json } if @elevation.present?
+    File.open('data/location.json', 'w') { |f| f << @geocoded.to_json }
+    File.open('data/time_zone.json', 'w') { |f| f << @time_zone.to_json }
+    File.open('data/elevation.json', 'w') { |f| f << @elevation.to_json }
   end
 
   private
