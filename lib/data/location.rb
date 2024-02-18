@@ -18,15 +18,13 @@ class Location
   end
 
   private
-  # Retrieves the current location from either the INCOMING_HOOK_BODY environment variable,
-  # a Redis cache, or the LOCATION environment variable, in that order of priority.
-  #
-  # The method ensures that the most up-to-date and valid location is used, preferring
-  # real-time data from the INCOMING_HOOK_BODY, then cached data, and finally a preset
-  # environment variable if no other source is available.
-  #
-  # @return [String, nil] The current location as a "latitude,longitude" string if available;
-  #         otherwise, returns nil if no valid location data can be found or parsed.
+  # Retrieves the location to use for the various condition data (weather, pollen, air quality, etc.)
+  # The location can come from a few places:
+  # 1. As coordinates in the payload of a Netlify build hook sent from my phone
+  #    at regular intervals, which get cached for a couple days.
+  # 2. From that cache, if it's still there.
+  # 3. From an environment variable, which stores a default location.
+  # @return [String, nil] The current location as a "latitude,longitude" string if available.
   def get_current_location
     cache_key = 'location:current'
     cached_location = @redis.get(cache_key)
@@ -44,9 +42,8 @@ class Location
 
   # Parses the INCOMING_HOOK_BODY environment variable for latitude and longitude values.
   #
-  # @return [Hash] A hash containing :latitude and :longitude keys with their respective
-  #         values if parsing is successful; an empty hash is returned if parsing fails
-  #         or if the necessary values are not present.
+  # @return [Hash] A hash, which should contain the :latitude and :longitude keys with their respective
+  #         values; otherwise returns an empty hash.
   def parse_incoming_hook_body
     JSON.parse(ENV['INCOMING_HOOK_BODY'], symbolize_names: true)
   rescue
