@@ -30,7 +30,7 @@ class GooglePollen
     data['dailyInfo'][0]['pollenTypeInfo']
   end
 
-  # Saves the pollen data to JSON files.
+  # Saves the pollen data to a JSON file.
   def save_data
     File.open('data/pollen.json', 'w') { |f| f << pollen.to_json }
   end
