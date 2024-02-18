@@ -9,9 +9,10 @@ class GoogleAirQuality
   # Initializes the GoogleAirQuality class with geographical coordinates.
   # @param latitude [Float] The latitude for the location.
   # @param longitude [Float] The longitude for the location.
-  # @param longitude [String] The country code for the location (optional, defaults to US).
+  # @param country_code [String] The country code for the location.
+  # @param aqi_code [String] The code for the AQI to use (optional, defaults to EPA NowCast).
   # @return [GoogleAirQuality] The instance of the GoogleAirQuality class.
-  def initialize(latitude, longitude, country_code = 'US')
+  def initialize(latitude, longitude, country_code, aqi_code = 'usa_epa_nowcast')
     @redis = Redis.new(
       host: ENV['REDIS_HOST'] || 'localhost',
       port: ENV['REDIS_PORT'] || 6379,
@@ -21,15 +22,16 @@ class GoogleAirQuality
     @latitude = latitude
     @longitude = longitude
     @country_code = country_code
+    @aqi_code = aqi_code
   end
 
   # Retrieves the air quality data for the specified coordinates.
   # @return [Hash, nil] The AQI data, or nil if fetching fails.
   def aqi
     data = current_conditions
-    return if data.blank? || data['indexes'].blank?
-
-    result = data['indexes'][0]
+    return if data.blank?
+    result = data['indexes']&.find { |i| i['code'] == @aqi_code }
+    return if result.blank?
 
     {
       aqi: result['aqi'],
@@ -50,7 +52,7 @@ class GoogleAirQuality
   # @return [Hash, nil] AQI data, or nil if fetching fails.
   def current_conditions
     return if @latitude.blank? || @longitude.blank?
-    cache_key = "google:aqi:#{@latitude}:#{@longitude}"
+    cache_key = "google:aqi:#{@latitude}:#{@longitude}:#{@country_code}:#{@aqi_code}"
     data = @redis.get(cache_key)
 
     return JSON.parse(data) if data.present?
@@ -67,7 +69,7 @@ class GoogleAirQuality
       languageCode: 'en',
       universalAqi: false,
       extraComputations: ['LOCAL_AQI'],
-      customLocalAqis: [{ regionCode: @country_code, aqi: 'usa_epa_nowcast' }]
+      customLocalAqis: [{ regionCode: @country_code, aqi: @aqi_code }]
     }
 
     headers = {
