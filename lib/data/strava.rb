@@ -4,6 +4,7 @@ require 'active_support/all'
 
 # The Strava class interfaces with the Strava API to fetch and save athlete statistics.
 class Strava
+  attr_reader :stats
   STRAVA_API_URL = 'https://www.strava.com/api/v3'
 
   # Initializes the Strava class with necessary settings and athlete information.
@@ -16,12 +17,24 @@ class Strava
       password: ENV['REDIS_PASSWORD']
     )
     @athlete_id = ENV['STRAVA_ATHLETE_ID']
+    @stats = get_stats
   end
 
-  # Fetches the current stats of the athlete from Strava.
+  # Saves the data to a JSON file.
+  def save_data
+    data = {
+      stats: @stats
+    }.compact
+
+    File.open('data/strava.json', 'w') { |f| f << data.to_json }
+  end
+
+  private
+
+  # Gets the current stats of the athlete from the Strava API.
   # @see https://developers.strava.com/docs/reference/#api-Athletes-getStats
   # @return [Hash, nil] The athlete's statistics, or nil if fetching fails.
-  def stats
+  def get_stats
     cache_key = "strava:stats:#{@athlete_id}"
     data = @redis.get(cache_key)
 
@@ -49,16 +62,6 @@ class Strava
 
     stats
   end
-
-  # Saves the current athlete stats to a JSON file.
-  def save_data
-    data = {
-      stats: stats
-    }
-    File.open('data/strava.json', 'w') { |f| f << data.to_json }
-  end
-
-  private
 
   # Retrieves the Strava access token, refreshing it if necessary.
   # @return [String, nil] The access token, or nil if unavailable.
