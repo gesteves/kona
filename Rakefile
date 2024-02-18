@@ -12,6 +12,7 @@ BUILD_DIRECTORY = 'build'
 CLOBBER.include %w{ data/*.json }
 
 @google_maps = nil
+@location = Location.new
 
 desc 'Imports all content for the site'
 task :import => [:dotenv, :clobber] do
@@ -63,7 +64,7 @@ end
 
 def import_location
   safely_perform {
-    @google_maps ||= GoogleMaps.new
+    @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
     @google_maps.save_data
   }
 end
@@ -71,7 +72,7 @@ end
 # Imports weather data
 def import_weather
   safely_perform {
-    @google_maps ||= GoogleMaps.new
+    @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
     WeatherKit.new(@google_maps.latitude, @google_maps.longitude, @google_maps.time_zone['timeZoneId'], @google_maps.country_code).save_data
   }
 end
@@ -79,7 +80,7 @@ end
 # Imports air quality data
 def import_aqi
   safely_perform {
-    @google_maps ||= GoogleMaps.new
+    @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
     PurpleAir.new(@google_maps.latitude, @google_maps.longitude).save_data 
   }
 end
@@ -87,7 +88,7 @@ end
 # Imports today's workouts from TrainerRoad
 def import_trainer_road
   safely_perform {
-    @google_maps ||= GoogleMaps.new
+    @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
     time_zone = @google_maps.time_zone['timeZoneId']
     TrainerRoad.new(time_zone).save_data 
   }

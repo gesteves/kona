@@ -9,16 +9,18 @@ class GoogleMaps
   GOOGLE_API_KEY = ENV['GOOGLE_API_KEY']
 
   # Initializes the GoogleMaps class with geographical coordinates.
+  # @param latitude [Float] The latitude for the location.
+  # @param longitude [Float] The longitude for the location.
   # @return [GoogleMaps] The instance of the GoogleMaps class.
-  def initialize
+  def initialize(latitude, longitude)
     @redis = Redis.new(
       host: ENV['REDIS_HOST'] || 'localhost',
       port: ENV['REDIS_PORT'] || 6379,
       username: ENV['REDIS_USERNAME'],
       password: ENV['REDIS_PASSWORD']
     )
-    location = get_current_location
-    @latitude, @longitude = location.split(',').map(&:to_f) if location.present?
+    @latitude = latitude
+    @longitude = longitude
   end
 
   # Fetches and formats the time zone data for the specified coordinates.
@@ -39,6 +41,15 @@ class GoogleMaps
     data['results'][0]['address_components'].find { |component| component['types'].include?('country') }['short_name']
   end
 
+  # Retrieves the elevation for the specified coordinates.
+  # @return [Hash, nil] The elevation data, or nil if fetching fails.
+  def elevation
+    data = elevation_data
+    return if data.blank?
+
+    data['results'][0]
+  end
+
   # Saves the geocode and time zone data to JSON files.
   def save_data
     File.open('data/location.json', 'w') { |f| f << geocode.to_json }
@@ -47,41 +58,6 @@ class GoogleMaps
   end
 
   private
-
-  # Retrieves the current location from either the INCOMING_HOOK_BODY environment variable,
-  # a Redis cache, or the LOCATION environment variable, in that order of priority.
-  #
-  # The method ensures that the most up-to-date and valid location is used, preferring
-  # real-time data from the INCOMING_HOOK_BODY, then cached data, and finally a preset
-  # environment variable if no other source is available.
-  #
-  # @return [String, nil] The current location as a "latitude,longitude" string if available;
-  #         otherwise, returns nil if no valid location data can be found or parsed.
-  def get_current_location
-    cache_key = 'google_maps:location:current'
-    cached_location = @redis.get(cache_key)
-    payload = parse_incoming_hook_body
-    if payload[:latitude].present? && payload[:longitude].present?
-      current_location = "#{payload[:latitude]},#{payload[:longitude]}"
-      @redis.setex(cache_key, 2.days, current_location)
-      current_location
-    elsif cached_location.present?
-      cached_location
-    else
-      ENV['LOCATION']
-    end
-  end
-
-  # Parses the INCOMING_HOOK_BODY environment variable for latitude and longitude values.
-  #
-  # @return [Hash] A hash containing :latitude and :longitude keys with their respective
-  #         values if parsing is successful; an empty hash is returned if parsing fails
-  #         or if the necessary values are not present.
-  def parse_incoming_hook_body
-    JSON.parse(ENV['INCOMING_HOOK_BODY'], symbolize_names: true)
-  rescue
-    {}
-  end
 
   # Reverse-geocodes the given coordinates into a human-readable address.
   # @see https://developers.google.com/maps/documentation/geocoding/requests-reverse-geocoding
@@ -109,7 +85,7 @@ class GoogleMaps
   # Returns the elevation for the given coordinates.
   # @see https://developers.google.com/maps/documentation/elevation/requests-elevation#ElevationRequests
   # @return [Hash, nil] The elevation data, or nil if fetching fails.
-  def elevation
+  def elevation_data
     return if @latitude.blank? || @longitude.blank?
     cache_key = "google_maps:elevation:#{@latitude}:#{@longitude}"
     data = @redis.get(cache_key)

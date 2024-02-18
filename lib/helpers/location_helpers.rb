@@ -42,8 +42,9 @@ module LocationHelpers
   # Returns the elevation for the current location formatted in meters and feet.
   # @return [String] A formatted elevation value with units in both meters and feet.
   def format_elevation
-    elevation = data.elevation&.results&.first&.elevation
+    elevation = data.elevation.elevation
     return if elevation.blank?
+
     meters = "#{number_to_rounded(elevation, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')} m"
     feet = "#{number_to_rounded(meters_to_feet(elevation), precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')} feet"
     content_tag :span, 'data-controller': 'units', 'data-units-imperial-value': feet, 'data-units-metric-value': meters do
