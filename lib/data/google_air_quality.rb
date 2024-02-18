@@ -30,14 +30,17 @@ class GoogleAirQuality
   def aqi
     data = current_conditions
     return if data.blank?
+
     result = data['indexes']&.find { |i| i['code'] == @aqi_code }
+    # Fall back to "Universal AQI"
+    result ||= data['indexes']&.find { |i| i['code'] == 'uaqi' }
+
     return if result.blank?
 
     {
       aqi: result['aqi'],
       category: result['category'].gsub(/\s?air quality\s?/i, '')
     }
-
   end
 
   # Saves the AQI data to a JSON file.
@@ -67,7 +70,6 @@ class GoogleAirQuality
         longitude: @longitude
       },
       languageCode: 'en',
-      universalAqi: false,
       extraComputations: ['LOCAL_AQI'],
       customLocalAqis: [{ regionCode: @country_code, aqi: @aqi_code }]
     }
