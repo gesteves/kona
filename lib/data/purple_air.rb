@@ -74,11 +74,12 @@ class PurpleAir
     sensors = find_sensors
     return if sensors['data'].blank?
 
-    fields = sensors['fields'].map(&:to_sym)
-    lat_index = fields.index(:latitude)
-    lon_index = fields.index(:longitude)
+    fields = sensors['fields']
+    lat_index = fields.index('latitude')
+    lon_index = fields.index('longitude')
+    pm25_index = fields.index('pm2.5_atm')
 
-    nearest_sensor_data = sensors['data'].reject { |sensor| sensor[lat_index].blank? || sensor[lon_index].blank? }.min_by do |sensor|
+    nearest_sensor_data = sensors['data'].reject { |sensor| sensor[lat_index].blank? || sensor[lon_index].blank? || sensor[pm25_index].blank? || sensor[pm25_index] == 0 }.min_by do |sensor|
       lat, lon = sensor[lat_index], sensor[lon_index]
       Math.sqrt((lat - @latitude)**2 + (lon - @longitude)**2)
     end
