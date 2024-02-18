@@ -137,6 +137,21 @@ module WeatherHelpers
     label.gsub('very', '_very_').gsub('hazardous', '**hazardous**')
   end
 
+  # Returns the pollen index, from 0 to 5
+  # @see https://developers.google.com/maps/documentation/pollen/reference/rest/v1/forecast/lookup#indexinfo
+  # @return [Integer] The pollen index, where 0 is "none", and 5 is "very high"
+  def pollen_value
+    return if data.pollen.blank?
+    data.pollen&.map { |p| p&.indexInfo&.value }&.compact&.max&.to_i
+  end
+
+  def pollen_level
+    level = data.pollen&.select { |p| p&.indexInfo&.value&.present? }&.sort_by { |p| p.indexInfo.value }&.reverse&.first
+    return if level.blank?
+
+    "Pollen levels are #{level.indexInfo.category.downcase}"
+  end
+
   # Determines if the current weather conditions are considered "bad" for working out outdoors.
   # @return [Boolean] `true` if the weather conditions are bad, `false` otherwise.
   def is_bad_weather?
@@ -159,6 +174,8 @@ module WeatherHelpers
     return true if precipitation_chance >= 0.5
     # There's gonna be accumulating snow
     return true if snowfall > 0
+    # Pollen is high or more
+    return true if pollen_value >= 4
     # The current or forecasted conditions are adverse weather
     data.conditions.dig(current_weather.conditionCode, :adverse_weather) || data.conditions.dig(todays_forecast.conditionCode, :adverse_weather)
   end
@@ -196,6 +213,7 @@ module WeatherHelpers
     summary << elevation
     summary << currently
     summary << current_aqi
+    summary << pollen_level
     summary << forecast
     summary << precipitation
     summary << sunrise_or_sunset

@@ -23,6 +23,7 @@ task :import => [:dotenv, :clobber] do
   measure_and_output(:import_location, "Importing location data from Google Maps")
   measure_and_output(:import_weather, "Importing weather data from WeatherKit")
   measure_and_output(:import_aqi, "Importing air quality data from PurpleAir")
+  measure_and_output(:import_pollen, "Importing pollen data from Google")
   measure_and_output(:import_trainer_road, "Importing today’s workouts from TrainerRoad")
 end
 
@@ -82,6 +83,14 @@ def import_aqi
   safely_perform {
     @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
     PurpleAir.new(@google_maps.latitude, @google_maps.longitude).save_data 
+  }
+end
+
+# Imports pollen data
+def import_pollen
+  safely_perform {
+    @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
+    Pollen.new(@google_maps.latitude, @google_maps.longitude).save_data 
   }
 end
 
