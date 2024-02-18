@@ -17,14 +17,14 @@ CLOBBER.include %w{ data/*.json }
 desc 'Imports all content for the site'
 task :import => [:dotenv, :clobber] do
   setup_data_directory
-  measure_and_output(:import_contentful, "Importing site content from Contentful")
-  measure_and_output(:import_font_awesome, "Importing icons from Font Awesome")
-  measure_and_output(:import_strava, "Importing activity stats from Strava")
-  measure_and_output(:import_location, "Importing location data from Google Maps")
-  measure_and_output(:import_weather, "Importing weather data from WeatherKit")
-  measure_and_output(:import_aqi, "Importing air quality data from PurpleAir")
-  measure_and_output(:import_pollen, "Importing pollen data from Google")
-  measure_and_output(:import_trainer_road, "Importing today’s workouts from TrainerRoad")
+  measure_and_output(:import_contentful, "Importing site content")
+  measure_and_output(:import_font_awesome, "Importing icons")
+  measure_and_output(:import_strava, "Importing activity stats")
+  measure_and_output(:import_location, "Importing location data")
+  measure_and_output(:import_weather, "Importing weather data")
+  measure_and_output(:import_aqi, "Importing air quality data")
+  measure_and_output(:import_pollen, "Importing pollen data")
+  measure_and_output(:import_trainer_road, "Importing today’s workouts")
 end
 
 desc 'Run the test suite'
@@ -82,7 +82,12 @@ end
 def import_aqi
   safely_perform {
     @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
-    PurpleAir.new(@google_maps.latitude, @google_maps.longitude).save_data 
+    purple_air = PurpleAir.new(@google_maps.latitude, @google_maps.longitude)
+    if purple_air.aqi.present?
+      purple_air.save_data
+    else
+      GoogleAirQuality.new(@google_maps.latitude, @google_maps.longitude, @google_maps.country_code).save_data
+    end
   }
 end
 

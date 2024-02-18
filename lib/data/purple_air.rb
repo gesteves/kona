@@ -29,13 +29,12 @@ class PurpleAir
     raw_pm25 = sensor[:'pm2.5_atm']
     humidity = sensor[:humidity]
     pm25 = humidity.present? ? apply_epa_correction(raw_pm25, humidity.to_f) : raw_pm25
-    sensor[:aqi] = format_aqi(pm25)
-    sensor
+    format_aqi(pm25)
   end
 
   # Saves the AQI data to a JSON file.
   def save_data
-    File.open('data/purple_air.json', 'w') { |f| f << aqi.to_json }
+    File.open('data/air_quality.json', 'w') { |f| f << aqi.to_json }
   end
 
   private
@@ -117,21 +116,21 @@ class PurpleAir
 
   # Formats the PM2.5 value into an Air Quality Index (AQI).
   # @param pm25 [Float] The PM2.5 value to be converted.
-  # @return [Hash] The formatted AQI value and label.
+  # @return [Hash] The formatted AQI value and category.
   def format_aqi(pm25)
     return {} if pm25.blank?
 
-    aqi, label = case pm25
+    aqi, category = case pm25
                  when 0..12.0
                    [calculate_aqi(pm25, 50, 0, 12.0, 0), 'Good']
                  when 12.1..35.4
                    [calculate_aqi(pm25, 100, 51, 35.4, 12.1), 'Moderate']
                  when 35.5..55.4
-                   [calculate_aqi(pm25, 150, 101, 55.4, 35.5), 'Unhealthy for Sensitive Groups']
+                   [calculate_aqi(pm25, 150, 101, 55.4, 35.5), 'Unhealthy for sensitive groups']
                  when 55.5..150.4
                    [calculate_aqi(pm25, 200, 151, 150.4, 55.5), 'Unhealthy']
                  when 150.5..250.4
-                   [calculate_aqi(pm25, 300, 201, 250.4, 150.5), 'Very Unhealthy']
+                   [calculate_aqi(pm25, 300, 201, 250.4, 150.5), 'Very unhealthy']
                  when 250.5..350.4
                    [calculate_aqi(pm25, 400, 301, 350.4, 250.5), 'Hazardous']
                  when 350.5..500.4
@@ -140,7 +139,7 @@ class PurpleAir
                    [nil, nil]
                  end
 
-    { value: aqi, label: label }.compact
+    { aqi: aqi, category: category }.compact
   end
 
   # Calculates the AQI based on PM2.5 value and breakpoints.

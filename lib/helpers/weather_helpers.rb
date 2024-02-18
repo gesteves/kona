@@ -157,7 +157,7 @@ module WeatherHelpers
   # Determines if the current weather conditions are considered "bad" for working out outdoors.
   # @return [Boolean] `true` if the weather conditions are bad, `false` otherwise.
   def is_bad_weather?
-    aqi = data&.purple_air&.aqi&.value.to_i
+    aqi = data&.air_quality&.aqi&.to_i
     current_temperature = (current_weather.temperatureApparent || current_weather.temperature)
     high_temperature = todays_forecast.temperatureMax
     low_temperature = todays_forecast.temperatureMin
@@ -259,8 +259,8 @@ module WeatherHelpers
   # Provides a summary of the current Air Quality Index (AQI).
   # @return [String, nil] A string describing the current AQI or nil if no data is available.
   def current_aqi
-    return if data.purple_air&.aqi&.value.blank?
-    "The air quality is #{format_air_quality(data.purple_air&.aqi&.label.downcase)}, with an <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.purple_air&.aqi&.value.round}"
+    return if data&.air_quality&.aqi.blank?
+    "The air quality is #{format_air_quality(data.air_quality&.category&.downcase)}, with an <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.air_quality&.aqi&.round}"
   end
 
   # Provides the weather forecast for today or tonight.
