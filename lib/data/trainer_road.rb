@@ -47,7 +47,7 @@ class TrainerRoad
 
     workouts = workouts.compact.sort_by { |w| DISCIPLINE_ORDER[w[:discipline]] }
 
-    @redis.setex(cache_key, 1.hour, workouts.to_json)
+    @redis.setex(cache_key, 5.minutes, workouts.to_json)
 
     workouts
   end

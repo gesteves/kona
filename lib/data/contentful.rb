@@ -4,7 +4,6 @@ require_relative 'graphql/contentful'
 
 class Contentful
   CACHE_KEY = "contentful:content:v1"
-  CACHE_EXPIRATION = 300
 
   def initialize
     @client = ContentfulClient::Client
@@ -249,6 +248,6 @@ class Contentful
   end
 
   def cache_content
-    @redis.setex(CACHE_KEY, CACHE_EXPIRATION, @content.to_json)
+    @redis.setex(CACHE_KEY, 5.minutes, @content.to_json)
   end
 end
