@@ -137,21 +137,25 @@ module WeatherHelpers
     label.gsub('very', '_very_').gsub('hazardous', '**hazardous**')
   end
 
-  # Returns the pollen index, from 0 to 5
+  # Returns a hash with the highest pollen level.
+  # @see https://developers.google.com/maps/documentation/pollen/reference/rest/v1/forecast/lookup#indexinfo
+  # @return [Hash, nil]
+  def highest_pollen_level
+    data.pollen&.filter { |p| p&.indexInfo&.value.to_i > 0 }&.max_by { |p| p.indexInfo.value }
+  end
+
+  # Returns the pollen index, from 0 to 5.
   # @see https://developers.google.com/maps/documentation/pollen/reference/rest/v1/forecast/lookup#indexinfo
   # @return [Integer] The pollen index, where 0 is "none", and 5 is "very high"
-  def pollen_value
-    return 0 if data.pollen.blank?
-    data.pollen&.map { |p| p&.indexInfo&.value.to_i }&.max
+  def pollen_index
+    highest_pollen_level&.indexInfo&.value.to_i
   end
 
   # Returns the pollen level's description.
   # @return [String, nil] Description of the highest pollen level or nil.
-  def pollen_level
-    highest_level = data.pollen&.filter { |p| p&.indexInfo&.value.to_i > 0 }&.max_by { |p| p.indexInfo.value }
-    return if highest_level.blank?
-
-    "Pollen levels are #{highest_level.indexInfo.category.downcase}"
+  def current_pollen
+    return unless pollen_index >= 4
+    "Pollen levels are #{highest_level.indexInfo.category.downcase.gsub('very', '_very_')}"
   end
 
   # Determines if the current weather conditions are considered "bad" for working out outdoors.
@@ -176,8 +180,8 @@ module WeatherHelpers
     return true if precipitation_chance >= 0.5
     # There's gonna be accumulating snow
     return true if snowfall > 0
-    # Pollen is high or more
-    return true if pollen_value >= 4
+    # Pollen is high or very high
+    return true if pollen_index >= 4
     # The current or forecasted conditions are adverse weather
     data.conditions.dig(current_weather.conditionCode, :adverse_weather) || data.conditions.dig(todays_forecast.conditionCode, :adverse_weather)
   end
@@ -215,7 +219,7 @@ module WeatherHelpers
     summary << elevation
     summary << currently
     summary << current_aqi
-    summary << pollen_level
+    summary << current_pollen
     summary << forecast
     summary << precipitation
     summary << sunrise_or_sunset
