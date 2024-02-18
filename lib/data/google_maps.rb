@@ -4,7 +4,7 @@ require 'active_support/all'
 
 # The GoogleMaps class interfaces with the Google Maps API to fetch geocoding and timezone data.
 class GoogleMaps
-  attr_reader :latitude, :longitude
+  attr_reader :latitude, :longitude, :time_zone, :country_code, :elevation, :geocoded
   GOOGLE_MAPS_API_URL = 'https://maps.googleapis.com/maps/api'
   GOOGLE_API_KEY = ENV['GOOGLE_API_KEY']
 
@@ -21,48 +21,34 @@ class GoogleMaps
     )
     @latitude = latitude
     @longitude = longitude
+    @geocoded = reverse_geocode
+    @time_zone = get_time_zone
+    @country_code = get_country_code
+    @elevation = get_elevation
   end
 
-  # Fetches and formats the time zone data for the specified coordinates.
-  # @return [Hash, nil] The time zone data, or nil if fetching fails.
-  def time_zone
-    data = time_zone_data
-    return if data.blank?
-    data[:formattedOffset] = format_time_zone_offset(data['rawOffset'])
-    data
+  # Saves the geocode and time zone data to JSON files.
+  def save_data
+    File.open('data/location.json', 'w') { |f| f << @geocoded.to_json } if @geocoded.present?
+    File.open('data/time_zone.json', 'w') { |f| f << @time_zone.to_json } if @time_zone.present?
+    File.open('data/elevation.json', 'w') { |f| f << @elevation.to_json } if @elevation.present?
   end
 
-  # Retrieves the country code for the specified coordinates using geocoding.
+  private
+
+  # Gets the country code for the specified coordinates using geocoding.
   # @return [String, nil] The country code, or nil if fetching fails.
-  def country_code
-    data = geocode
+  def get_country_code
+    data = @geocoded || reverse_geocode
     return if data.blank?
 
     data['results'][0]['address_components'].find { |component| component['types'].include?('country') }['short_name']
   end
 
-  # Retrieves the elevation for the specified coordinates.
-  # @return [Hash, nil] The elevation data, or nil if fetching fails.
-  def elevation
-    data = elevation_data
-    return if data.blank?
-
-    data['results'][0]
-  end
-
-  # Saves the geocode and time zone data to JSON files.
-  def save_data
-    File.open('data/location.json', 'w') { |f| f << geocode.to_json }
-    File.open('data/time_zone.json', 'w') { |f| f << time_zone.to_json }
-    File.open('data/elevation.json', 'w') { |f| f << elevation.to_json }
-  end
-
-  private
-
   # Reverse-geocodes the given coordinates into a human-readable address.
   # @see https://developers.google.com/maps/documentation/geocoding/requests-reverse-geocoding
   # @return [Hash, nil] The geocoding data, or nil if fetching fails.
-  def geocode
+  def reverse_geocode
     return if @latitude.blank? || @longitude.blank?
     cache_key = "google_maps:geocoded:#{@latitude}:#{@longitude}"
     data = @redis.get(cache_key)
@@ -82,10 +68,10 @@ class GoogleMaps
     JSON.parse(response.body)
   end
 
-  # Returns the elevation for the given coordinates.
+  # Gets the elevation for the coordinates from the API.
   # @see https://developers.google.com/maps/documentation/elevation/requests-elevation#ElevationRequests
   # @return [Hash, nil] The elevation data, or nil if fetching fails.
-  def elevation_data
+  def get_elevation
     return if @latitude.blank? || @longitude.blank?
     cache_key = "google_maps:elevation:#{@latitude}:#{@longitude}"
     data = @redis.get(cache_key)
@@ -100,14 +86,16 @@ class GoogleMaps
     response = HTTParty.get("#{GOOGLE_MAPS_API_URL}/elevation/json", query: query)
     return unless response.success?
 
-    @redis.setex(cache_key, 1.day, response.body)
-    JSON.parse(response.body)
+    data = JSON.parse(response.body)
+    data['results'][0]
+    @redis.setex(cache_key, 1.day, data.to_json)
+    data
   end
 
-  # Fetches time zone data for the specified coordinates.
+  # Gets time zone data for the coordinates from the API.
   # @see https://developers.google.com/maps/documentation/timezone/requests-timezone
   # @return [Hash, nil] The time zone data, or nil if fetching fails.
-  def time_zone_data
+  def get_time_zone
     return if @latitude.blank? || @longitude.blank?
     cache_key = "google_maps:time_zone:#{@latitude}:#{@longitude}"
     data = @redis.get(cache_key)
@@ -123,8 +111,10 @@ class GoogleMaps
     response = HTTParty.get("#{GOOGLE_MAPS_API_URL}/timezone/json", query: query)
     return unless response.success?
 
-    @redis.setex(cache_key, 1.day, response.body)
-    JSON.parse(response.body)
+    data = JSON.parse(response.body)
+    data[:formattedOffset] = format_time_zone_offset(data['rawOffset'])
+    @redis.setex(cache_key, 1.day, data.to_json)
+    data
   end
 
   # Formats a time zone offset from seconds to a string format.
