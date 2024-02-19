@@ -10,16 +10,16 @@
   <meta property="og:description" content="<%= current_page.data.summary %>">
 <% end %>
 
-<% if defined?(content) && content.openGraphImage.present? %>
-  <meta property="og:image" content="<%= open_graph_image_url(content.openGraphImage.url) %>">
+<% if defined?(content) && content.open_graph_image.present? %>
+  <meta property="og:image" content="<%= open_graph_image_url(content.open_graph_image.url) %>">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="<%= content.openGraphImage.description %>">
-<% elsif data.site.openGraphImage.present? %>
-  <meta property="og:image" content="<%= cdn_image_url(data.site.openGraphImage.url) %>">
-  <meta property="og:image:width" content="<%= data.site.openGraphImage.width %>">
-  <meta property="og:image:height" content="<%= data.site.openGraphImage.height %>">
-  <meta property="og:image:alt" content="<%= data.site.openGraphImage.description %>">
+  <meta property="og:image:alt" content="<%= content.open_graph_image.description %>">
+<% elsif data.site.open_graph_image.present? %>
+  <meta property="og:image" content="<%= cdn_image_url(data.site.open_graph_image.url) %>">
+  <meta property="og:image:width" content="<%= data.site.open_graph_image.width %>">
+  <meta property="og:image:height" content="<%= data.site.open_graph_image.height %>">
+  <meta property="og:image:alt" content="<%= data.site.open_graph_image.description %>">
 <% end %>
 
 <meta property="og:url" content="<%= full_url(current_page.url) %>">

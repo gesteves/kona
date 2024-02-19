@@ -2,8 +2,8 @@
   <header class="entry__header">
     <p class="entry__meta entry__meta--truncated">
       <% if is_today?(event) %>
-        <% if is_daytime? && event.trackingUrl.present? %>
-          <span class="entry__highlight entry__highlight--live"><%= link_to "Live results", event.trackingUrl, rel: "noopener", target: "_blank" %></span>
+        <% if is_daytime? && event.tracking_url.present? %>
+          <span class="entry__highlight entry__highlight--live"><%= link_to "Live results", event.tracking_url, rel: "noopener", target: "_blank" %></span>
           <span>Today</span>
         <% elsif is_daytime? %>
           <span class="entry__highlight entry__highlight--live">Today</span>

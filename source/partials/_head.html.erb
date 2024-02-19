@@ -1,8 +1,8 @@
 <head>
   <%= partial 'partials/meta' %>
   <%= partial 'partials/open_graph' %>
-  <% if defined?(content) && content.canonicalUrl.present? %>
-    <link rel="canonical" href="<%= content.canonicalUrl %>">
+  <% if defined?(content) && content.canonical_url.present? %>
+    <link rel="canonical" href="<%= content.canonical_url %>">
   <% else %>
     <link rel="canonical" href="<%= full_url(current_page.url) %>">
   <% end %>

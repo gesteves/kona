@@ -50,6 +50,7 @@ class Contentful
       @content = JSON.parse(content, symbolize_names: true)
     else
       fetch_all_content
+      transform_keys
       process_site
       process_articles
       process_pages
@@ -76,12 +77,17 @@ class Contentful
   # Processes and stores the fetched data from each API call.
   # @param response [GraphQL::Client::Response] The response from the GraphQL query.
   def process_fetched_data(response)
-    @content[:articles] += response.data.articles.items.compact.map(&:to_h).map(&:with_indifferent_access)
-    @content[:pages] += response.data.pages.items.compact.map(&:to_h).map(&:with_indifferent_access)
-    @content[:assets] += response.data.assets.items.compact.map(&:to_h).map(&:with_indifferent_access)
-    @content[:redirects] += response.data.redirects.items.compact.map(&:to_h).map(&:with_indifferent_access)
-    @content[:events] += response.data.events.items.compact.map(&:to_h).map(&:with_indifferent_access)
-    @content[:site] += response.data.site.items.compact.map(&:to_h).map(&:with_indifferent_access)
+    @content[:articles] += response.data.articles.items.compact.map(&:to_h)
+    @content[:pages] += response.data.pages.items.compact.map(&:to_h)
+    @content[:assets] += response.data.assets.items.compact.map(&:to_h)
+    @content[:redirects] += response.data.redirects.items.compact.map(&:to_h)
+    @content[:events] += response.data.events.items.compact.map(&:to_h)
+    @content[:site] += response.data.site.items.compact.map(&:to_h)
+  end
+
+  # Deep transform keys from camelCase to snake_case symbols
+  def transform_keys
+    @content = @content.deep_transform_keys { |key| key.to_s.underscore.to_sym }
   end
 
   # Ensures there's only one `site` stored (that should be the case, but just in case).
@@ -135,9 +141,9 @@ class Contentful
   # @param item [Hash] The content item to be processed.
   # @return [Hash] The item with the draft status set.
   def set_draft_status(item)
-    draft = item.dig(:sys, :publishedVersion).blank?
+    draft = item.dig(:sys, :published_version).blank?
     item[:draft] = draft
-    item[:indexInSearchEngines] = false if draft
+    item[:index_in_search_engines] = false if draft
     item
   end
 
@@ -145,8 +151,8 @@ class Contentful
   # @param item [Hash] The content item to be processed.
   # @return [Hash] The item with timestamps set.
   def set_timestamps(item)
-    item[:published_at] = item.dig(:published) || item.dig(:sys, :firstPublishedAt) || Time.now.to_s
-    item[:updated_at] = item.dig(:sys, :publishedAt) || Time.now.to_s
+    item[:published_at] = item.dig(:published) || item.dig(:sys, :first_published_at) || Time.now.to_s
+    item[:updated_at] = item.dig(:sys, :published_at) || Time.now.to_s
     item
   end
 
@@ -169,7 +175,7 @@ class Contentful
   def set_page_path(item)
     item[:path] = if item[:draft]
       "/id/#{item.dig(:sys, :id)}/index.html"
-    elsif item[:isHomePage]
+    elsif item[:is_home_page]
       "/index.html"
     else
       "/#{item[:slug]}/index.html"
@@ -185,7 +191,7 @@ class Contentful
       "/article.html"
     elsif item[:entry_type] == 'Short'
       "/short.html"
-    elsif item[:entry_type] == 'Page' && item[:isHomePage]
+    elsif item[:entry_type] == 'Page' && item[:is_home_page]
       "/home.html"
     else
       "/page.html"
@@ -197,11 +203,11 @@ class Contentful
   # Each tag includes a paginated collection of articles with that tag, and other metadata.
   # @return [Array<Hash>] A collection of tag pages.
   def generate_tags
-    entries_per_page = @content[:site][:entriesPerPage]
-    tags = @content[:articles].reject { |a| a[:draft] }.map { |a| a.dig(:contentfulMetadata, :tags) }.flatten.uniq
+    entries_per_page = @content[:site][:entries_per_page]
+    tags = @content[:articles].reject { |a| a[:draft] }.map { |a| a.dig(:contentful_metadata, :tags) }.flatten.uniq
     paginated_tags = tags.map do |tag|
       tag = tag.dup
-      tagged_articles = @content[:articles].select { |a| !a[:draft] && a.dig(:contentfulMetadata, :tags).include?(tag) }
+      tagged_articles = @content[:articles].select { |a| !a[:draft] && a.dig(:contentful_metadata, :tags).include?(tag) }
       sliced = tagged_articles.each_slice(entries_per_page)
       paginated_tag_pages = sliced.map.with_index do |page, index|
         current_page = index + 1
@@ -215,7 +221,7 @@ class Contentful
           path: current_page == 1 ? "/tagged/#{tag[:id]}/index.html" : "/tagged/#{tag[:id]}/page/#{current_page}/index.html",
           title: tag[:name],
           items: page,
-          indexInSearchEngines: true
+          index_in_search_engines: true
         }
       end
       { tag: tag, pages: paginated_tag_pages }
@@ -227,7 +233,7 @@ class Contentful
   # Each page includes articles for that page, and other metadata.
   # @return [Array<Hash>] A collection of blog pages.
   def generate_blog
-    entries_per_page = @content[:site][:entriesPerPage]
+    entries_per_page = @content[:site][:entries_per_page]
     sliced_articles = @content[:articles].reject { |a| a[:draft] }.each_slice(entries_per_page)
     blog_pages = sliced_articles.map.with_index do |page, index|
       current_page = index + 1
@@ -241,7 +247,7 @@ class Contentful
         path: current_page == 1 ? "/blog/index.html" : "/blog/page/#{current_page}/index.html",
         title: "Blog",
         items: page,
-        indexInSearchEngines: true
+        index_in_search_engines: true
       }
     end
     @content[:blog] = blog_pages

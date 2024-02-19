@@ -3,9 +3,9 @@
     <section class="footer__avatar">
       <picture>
         <% data.srcsets.avatar.formats.each do |format| %>
-          <%= source_tag(data.site.author.profilePicture.url, sizes: data.srcsets.avatar.sizes.join(', '), type: "image/#{format}", format: format, widths: data.srcsets.avatar.widths.sort) %>
+          <%= source_tag(data.site.author.profile_picture.url, sizes: data.srcsets.avatar.sizes.join(', '), type: "image/#{format}", format: format, widths: data.srcsets.avatar.widths.sort) %>
         <% end %>
-        <img src="<%= cdn_image_url(data.site.author.profilePicture.url) %>" alt="<%= data.site.author.profilePicture.description %>" width="<%= data.site.author.profilePicture.width %>" height="<%= data.site.author.profilePicture.height %>" loading="lazy" decoding="async">
+        <img src="<%= cdn_image_url(data.site.author.profile_picture.url) %>" alt="<%= data.site.author.profile_picture.description %>" width="<%= data.site.author.profile_picture.width %>" height="<%= data.site.author.profile_picture.height %>" loading="lazy" decoding="async">
       </picture>
     </section>
 
@@ -13,14 +13,14 @@
       <%= render_body(data.site.blurb) %>
     </section>
 
-      <% menu_items = data.site.footerLinksCollection.items.compact  %>
+      <% menu_items = data.site.footer_links_collection.items.compact  %>
       <% if menu_items.present? %>
         <section class="footer__section">
           <h2>Links</h2>
           <ul>
             <% menu_items.each do |i| %>
               <li>
-                <% if i.openInNewTab %>
+                <% if i.open_in_new_tab %>
                   <%= link_to i.title, i.destination, rel: "noopener", target: "_blank" %>
                 <% else %>
                   <%= link_to i.title, i.destination %>
@@ -31,14 +31,14 @@
         </section>
       <% end %>
 
-      <% socials = data.site.socialsCollection.items.compact %>
+      <% socials = data.site.socials_collection.items.compact %>
       <% if socials.present? %>
         <section class="footer__section">
           <h2>Elsewhere</h2>
           <ul>
             <% socials.each do |i| %>
               <li>
-                <% if i.openInNewTab %>
+                <% if i.open_in_new_tab %>
                   <%= link_to i.title, i.destination, rel: "me noopener", target: "_blank" %>
                 <% else %>
                   <%= link_to i.title, i.destination, rel: "me noopener" %>

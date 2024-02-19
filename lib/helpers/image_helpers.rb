@@ -33,7 +33,7 @@ module ImageHelpers
   # @return [String, nil] The content type of the asset, or nil if the asset is not found.
   def get_asset_content_type(asset_id)
     asset = data.assets.find { |a| a.sys.id == asset_id }
-    asset&.contentType
+    asset&.content_type
   end
 
   # Retrieves the URL of an asset by its ID.

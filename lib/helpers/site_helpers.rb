@@ -20,15 +20,15 @@ module SiteHelpers
   # @return [String] The sanitized and formatted page title.
   def page_title(content, include_site_name: false, separator: ' · ')
     title = []
-    if content.is_a?(Hash) && !content.isHomePage
+    if content.is_a?(Hash) && !content.is_home_page
       title << content.title
       title << "Page #{content.current_page}" if content&.current_page.to_i > 1
     elsif content.is_a?(String)
       title << content
     else
-      title << data.site.metaTitle
+      title << data.site.meta_title
     end
-    title << data.site.metaTitle if include_site_name
+    title << data.site.meta_title if include_site_name
 
     Sanitize.fragment(title.reject(&:blank?).uniq.join(separator)).strip
   end
@@ -49,7 +49,7 @@ module SiteHelpers
     if content.summary.present?
       content.summary
     else
-      data.site.metaDescription
+      data.site.meta_description
     end
   end
 
@@ -58,7 +58,7 @@ module SiteHelpers
   # @return [Boolean] Returns true if the content should not be indexed in search engines.
   def hide_from_search_engines?(content)
     return true if content.draft
-    !content.indexInSearchEngines
+    !content.index_in_search_engines
   end
 
   # Generates the path for a specific page in a paginated series.
@@ -77,12 +77,12 @@ module SiteHelpers
   # @param count [Integer] (Optional) The number of related articles to return. Default is 4.
   # @return [Array<Object>] An array of articles related to the given article, up to the specified count.
   def related_articles(article, count: 4)
-    tags = article.contentfulMetadata.tags.map(&:id)
+    tags = article.contentful_metadata.tags.map(&:id)
     data.articles
       .reject { |a| a.path == article.path } # Reject the article itself
       .reject { |a| a.draft } # Reject drafts
       .reject { |a| a.entry_type == 'Short' } # Reject short posts
-      .sort { |a,b| (b.contentfulMetadata.tags.map(&:id) & tags).size <=> (a.contentfulMetadata.tags.map(&:id) & tags).size } # Fake relevancy sorting by sorting by number of common tags
+      .sort { |a,b| (b.contentful_metadata.tags.map(&:id) & tags).size <=> (a.contentful_metadata.tags.map(&:id) & tags).size } # Fake relevancy sorting by sorting by number of common tags
       .slice(0, count) # Slice the specified number of articles
   end
 
@@ -104,9 +104,9 @@ module SiteHelpers
   # @return [DateTime] The latest date and time at which either a page, an article, or the site was updated.
   def site_updated_at
     [
-      data.pages.reject { |p| p.draft || !p.indexInSearchEngines }.map { |p| DateTime.parse(p.sys.publishedAt) },
-      data.articles.reject { |a| a.draft || !a.indexInSearchEngines }.map { |a| DateTime.parse(a.sys.publishedAt) },
-      DateTime.parse(data.site.sys.publishedAt)
+      data.pages.reject { |p| p.draft || !p.index_in_search_engines }.map { |p| DateTime.parse(p.sys.published_at) },
+      data.articles.reject { |a| a.draft || !a.index_in_search_engines }.map { |a| DateTime.parse(a.sys.published_at) },
+      DateTime.parse(data.site.sys.published_at)
     ].flatten.max
   end
 end

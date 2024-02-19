@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <% data.pages.reject { |a| a.draft || !a.indexInSearchEngines }.each do |page| %>
+  <% data.pages.reject { |a| a.draft || !a.index_in_search_engines }.each do |page| %>
     <url>
       <loc><%= full_url(page.path) %></loc>
-      <% if page.isHomePage %>
+      <% if page.is_home_page %>
         <lastmod><%= site_updated_at.strftime('%Y-%m-%d') %></lastmod>
       <% else %>
         <lastmod><%= DateTime.parse(page.updated_at).strftime('%Y-%m-%d') %></lastmod>
       <% end %>
     </url>
   <% end %>
-  <% data.articles.reject { |a| a.draft || !a.indexInSearchEngines }.each do |article| %>
+  <% data.articles.reject { |a| a.draft || !a.index_in_search_engines }.each do |article| %>
     <url>
       <loc><%= full_url(article.path) %></loc>
       <lastmod><%= DateTime.parse(article.updated_at).strftime('%Y-%m-%d') %></lastmod>
@@ -20,14 +20,14 @@
     <% tag.pages.each do |page| %>
       <url>
         <loc><%= full_url(page.path) %></loc>
-        <lastmod><%= page.items.reject { |a| a.draft || !a.indexInSearchEngines }.map { |a| DateTime.parse(a.updated_at) }.max.strftime('%Y-%m-%d') %></lastmod>
+        <lastmod><%= page.items.reject { |a| a.draft || !a.index_in_search_engines }.map { |a| DateTime.parse(a.updated_at) }.max.strftime('%Y-%m-%d') %></lastmod>
       </url>
     <% end %>
   <% end %>
   <% data.blog.each do |page| %>
     <url>
       <loc><%= full_url(page.path) %></loc>
-      <lastmod><%= page.items.reject { |a| a.draft || !a.indexInSearchEngines }.map { |a| DateTime.parse(a.updated_at) }.max.strftime('%Y-%m-%d') %></lastmod>
+      <lastmod><%= page.items.reject { |a| a.draft || !a.index_in_search_engines }.map { |a| DateTime.parse(a.updated_at) }.max.strftime('%Y-%m-%d') %></lastmod>
     </url>
   <% end %>
 </urlset>
