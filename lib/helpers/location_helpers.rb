@@ -52,12 +52,9 @@ module LocationHelpers
   def format_elevation
     elevation = data.location.elevation
     return if elevation.blank?
-
     meters = "#{number_to_rounded(elevation, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')} m"
     feet = "#{number_to_rounded(meters_to_feet(elevation), precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')} feet"
-    content_tag :span, 'data-controller': 'units', 'data-units-imperial-value': feet, 'data-units-metric-value': meters do
-      meters
-    end
+    units_tag(meters, feet)
   end
 
   # Checks if the location is, well, Jackson Hole.

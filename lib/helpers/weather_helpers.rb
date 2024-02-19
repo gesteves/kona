@@ -86,9 +86,7 @@ module WeatherHelpers
   def format_temperature(temp)
     celsius = "#{number_to_human(temp, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')}ºC"
     fahrenheit = "#{number_to_human(celsius_to_fahrenheit(temp), precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')}ºF"
-    content_tag :span, 'data-controller': 'units', 'data-units-imperial-value': fahrenheit, 'data-units-metric-value': celsius do
-      celsius
-    end
+    units_tag(celsius, fahrenheit)
   end
 
   # Formats a precipitation amount from millimeters (mm) to both metric and imperial units.
@@ -111,9 +109,7 @@ module WeatherHelpers
       "about #{amount}"
     end
 
-    content_tag :span, 'data-controller': 'units', 'data-units-imperial-value': imperial, 'data-units-metric-value': metric do
-      metric
-    end
+    units_tag(metric, imperial)
   end
 
   # Formats a precipitation type for display.
