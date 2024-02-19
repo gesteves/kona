@@ -167,11 +167,11 @@ module WeatherHelpers
     # Air quality is moderate or worse
     return true if aqi > 75
     # Current temp is too cold or too hot
-    return true if current_temperature <= -12 || current_temperature >= 32
+    return true if current_temperature <= -12 || current_temperature >= 35
     # Forecasted low temp is too cold
     return true if low_temperature <= -12
     # Forecasted high temp is too cold or too hot
-    return true if high_temperature <= 0 || high_temperature >= 32
+    return true if high_temperature <= 0 || high_temperature >= 35
     # It's likely to rain
     return true if precipitation_chance >= 0.5
     # There's gonna be accumulating snow
@@ -191,7 +191,7 @@ module WeatherHelpers
   # Determines if the current temperature is hot.
   # @return [Boolean] `true` if the temperature is hot (32°C or higher), `false` otherwise.
   def is_hot?
-    current_weather.temperature >= 32 || current_weather.temperature_apparent >= 32
+    current_weather.temperature >= 30 || current_weather.temperature_apparent >= 30
   end
 
   # Determines if the apparent temperature should be hidden.
@@ -326,7 +326,9 @@ module WeatherHelpers
     end
 
     if is_workout_scheduled?
-      if is_good_weather?
+      if is_good_weather? && is_hot?
+        return "It's a good day for some heat training!"
+      elsif is_good_weather?
         return "It's a good day to train outside!"
       else
         return "It's a good day to train indoors!"
