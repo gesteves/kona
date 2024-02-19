@@ -41,7 +41,7 @@ class GoogleMaps
 
   # Saves the geocode and time zone data to JSON files.
   def save_data
-    File.open('data/location.json', 'w') { |f| f << @location.to_json }
+    File.open('data/location.json', 'w') { |f| f << @location.deep_transform_keys { |key| key.to_s.underscore }.to_json }
   end
 
   private
