@@ -49,7 +49,7 @@ class GoogleAirQuality
   # @see https://developers.google.com/maps/documentation/air-quality/reference/rest/v1/currentConditions/lookup#http-request
   # @return [Hash, nil] AQI data, or nil if fetching fails.
   def lookup_current_conditions
-    return if @latitude.blank? || @longitude.blank?
+    return if @latitude.blank? || @longitude.blank? || @country_code.blank?
     cache_key = "google:aqi:#{@latitude}:#{@longitude}:#{@country_code}:#{@aqi_code}"
     data = $redis.get(cache_key)
 

@@ -23,7 +23,7 @@ class WeatherKit
 
   # Saves the current weather data to a JSON file.
   def save_data
-    File.open('data/weather.json','w'){ |f| f << @weather.deep_transform_keys { |key| key.to_s.underscore }.to_json }
+    File.open('data/weather.json','w'){ |f| f << @weather&.deep_transform_keys { |key| key.to_s.underscore }.to_json }
   end
 
   private
@@ -32,6 +32,7 @@ class WeatherKit
   # @see https://developer.apple.com/documentation/weatherkitrestapi/get_api_v1_weather_language_latitude_longitude
   # @return [Hash, nil] The current weather data, or nil if fetching fails.
   def get_weather
+    return if @latitude.blank? || @longitude.blank? || @time_zone.blank? || @country.blank?
     cache_key = "weatherkit:weather:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
     data = $redis.get(cache_key)
 

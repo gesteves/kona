@@ -24,18 +24,18 @@ class GoogleMaps
   # Returns a timezone ID of the form "America/Denver".
   # @return [String, nil] the timezone ID.
   def time_zone_id
-    @location[:time_zone][:timeZoneId]
+    @location&.dig(:time_zone, :timeZoneId)
   end
 
   # Returns the country code for the specified coordinates.
   # @return [String, nil] The country code, or nil if fetching fails.
   def country_code
-    @location[:geocoded][:address_components].find { |component| component[:types].include?('country') }[:short_name]
+    @location&.dig(:geocoded, :address_components)&.find { |component| component[:types].include?('country') }&.dig(:short_name)
   end
 
   # Saves the geocode and time zone data to JSON files.
   def save_data
-    File.open('data/location.json', 'w') { |f| f << @location.deep_transform_keys { |key| key.to_s.underscore }.to_json }
+    File.open('data/location.json', 'w') { |f| f << @location&.deep_transform_keys { |key| key.to_s.underscore }.to_json }
   end
 
   private
@@ -108,6 +108,8 @@ class GoogleMaps
     return unless response.success?
 
     data = JSON.parse(response.body, symbolize_names: true)
+    return if data[:status] == 'ZERO_RESULTS'
+
     data[:formattedOffset] = format_time_zone_offset(data[:rawOffset])
     $redis.setex(cache_key, 1.day, data.to_json)
     data
@@ -117,6 +119,7 @@ class GoogleMaps
   # @param offset_in_seconds [Integer] The time zone offset in seconds.
   # @return [String] The formatted time zone offset.
   def format_time_zone_offset(offset_in_seconds)
+    return if offset_in_seconds.blank?
     offset_minutes = offset_in_seconds.abs / 60
     hours = offset_minutes / 60
     minutes = offset_minutes % 60
