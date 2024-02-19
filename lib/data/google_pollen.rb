@@ -52,7 +52,7 @@ class GooglePollen
     response = HTTParty.get("#{GOOGLE_POLLEN_API_URL}/forecast:lookup", query: query)
     return unless response.success?
 
-    data = JSON.parse(response.body)['dailyInfo'][0]['pollenTypeInfo']
+    data = JSON.parse(response.body)['dailyInfo'][0]
     @redis.setex(cache_key, 1.hour, data.to_json)
     data
   end

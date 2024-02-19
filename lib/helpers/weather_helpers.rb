@@ -141,7 +141,7 @@ module WeatherHelpers
   # @see https://developers.google.com/maps/documentation/pollen/reference/rest/v1/forecast/lookup#indexinfo
   # @return [Hash, nil]
   def highest_pollen_level
-    data.pollen&.filter { |p| p&.index_info&.value.to_i > 0 }&.max_by { |p| p.index_info.value }
+    data.pollen&.pollen_type_info&.filter { |p| p&.index_info&.value.to_i > 0 }&.max_by { |p| p.index_info.value }
   end
 
   # Returns the pollen index, from 0 to 5.
