@@ -13,29 +13,37 @@ module LocationHelpers
     county = components.find { |component| component['types'].include?('administrative_area_level_2') }&.long_name
     country = components.find { |component| component['types'].include?('country') }&.long_name
 
-    # Replace single quotes with curly single quotes, so places like "Coeur d’Alene" look right
+    # Replace single quotes with curly single quotes, so places like "Coeur d’Alene" look right.
+    # (For whatever reason, SmartyPants can't handle this).
     city&.gsub!("'", "’")
     region&.gsub!("'", "’")
     county&.gsub!("'", "’")
     country&.gsub!("'", "’")
 
+    # No need to be more specific than this when I'm home 😬
+    return 'Jackson Hole, Wyoming' if county == 'Teton County' && region == 'Wyoming'
+    # "New York, New York" is kinda redundant, so...
+    return 'New York City' if city == 'New York' && region == 'New York'
+    # DC is the only case where I want the state abbreviation.
+    return 'Washington, DC' if region == 'District of Columbia'
+    # Not sure how to get Google Maps to return translated names.
+    return 'Mexico City' if city == 'Ciudad de México'
+
     case country
-    when 'United States', 'United Kingdom', 'Canada'
-      if city == 'New York' && region == 'New York'
-        return 'New York City'
-      elsif region == 'District of Columbia'
-        return 'Washington, DC'
-      elsif county == 'Teton County' && region == 'Wyoming'
-        return 'Jackson Hole, Wyoming'
-      else
-        return [city || county, region].compact.join(", ")
-      end
+    when 'United States'
+      # The US gets city (or county) and state, e.g.
+      # - San Francisco, California
+      # - Fairfax County, Virginia
+      return [city || county, region].compact.join(", ")
+    when 'United Kingdom', 'Canada'
+      # The UK and Canada get city and province/region, e.g.
+      # - Edinburgh, Scotland
+      # - Vancouver, British Columbia
+      return [city, region].compact.join(", ")
     else
-      if city == 'Ciudad de México'
-        return 'Mexico City'
-      else
-        return [city || region, country].compact.join(", ")
-      end
+      # Every other country gets city and country, e.g.
+      # - Caracas, Venezuela
+      return [city, country].compact.join(", ")
     end
   end
 
