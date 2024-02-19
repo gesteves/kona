@@ -189,7 +189,7 @@ module WeatherHelpers
   end
 
   # Determines if the current temperature is hot.
-  # @return [Boolean] `true` if the temperature is hot (32°C or higher), `false` otherwise.
+  # @return [Boolean] `true` if the temperature is hot, `false` otherwise.
   def is_hot?
     current_weather.temperature >= 30 || current_weather.temperature_apparent >= 30
   end
