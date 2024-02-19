@@ -58,6 +58,7 @@ class GoogleMaps
 
     query = {
       latlng: "#{@latitude},#{@longitude}",
+      result_type: 'political',
       key: GOOGLE_API_KEY,
       language: "en"
     }
