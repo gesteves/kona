@@ -57,4 +57,10 @@ module LocationHelpers
   def in_jackson_hole?
     format_location == 'Jackson Hole, Wyoming'
   end
+
+  # Returns the time zone ID for the current location.
+  # @return [String] A time zone ID, of rhte
+  def location_time_zone_id
+    data&.location&.time_zone&.time_zone_id || ENV['DEFAULT_TIMEZONE'] || 'America/Denver'
+  end
 end
