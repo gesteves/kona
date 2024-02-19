@@ -312,6 +312,9 @@ module MarkupHelpers
   end
 
   # Renders a tag with the data-* attributes to attach the unit conversion Stimulus controller.
+  # @param metric [String] The text with metric units.
+  # @param imperial [String] The text with imperial units.
+  # @param tag [Symbol] The HTML to use. Optional, defaults to a <span>.
   # @return [String] An HTML tag.
   def units_tag(metric, imperial, tag = :span)
     content_tag tag.to_sym, 'data-controller': 'units', 'data-units-imperial-value': imperial, 'data-units-metric-value': metric do
