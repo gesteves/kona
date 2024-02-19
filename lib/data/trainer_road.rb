@@ -12,12 +12,6 @@ class TrainerRoad
   # @return [TrainerRoad] The instance of the TrainerRoad class.
   def initialize(timezone = "America/Denver")
     @timezone = timezone
-    @redis = Redis.new(
-      host: ENV['REDIS_HOST'] || 'localhost',
-      port: ENV['REDIS_PORT'] || 6379,
-      username: ENV['REDIS_USERNAME'],
-      password: ENV['REDIS_PASSWORD']
-    )
   end
 
   # Fetches the workouts for the current day from the TrainerRoad calendar.
@@ -26,7 +20,7 @@ class TrainerRoad
     return if CALENDAR_URL.blank?
 
     cache_key = "trainerroad:workouts:#{@timezone}:#{CALENDAR_URL.parameterize}"
-    data = @redis.get(cache_key)
+    data = $redis.get(cache_key)
 
     return JSON.parse(data) if data.present?
 
@@ -47,7 +41,7 @@ class TrainerRoad
 
     workouts = workouts.compact.sort_by { |w| DISCIPLINE_ORDER[w[:discipline]] }
 
-    @redis.setex(cache_key, 5.minutes, workouts.to_json)
+    $redis.setex(cache_key, 5.minutes, workouts.to_json)
 
     workouts
   end

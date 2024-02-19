@@ -13,12 +13,6 @@ class GoogleMaps
   # @param longitude [Float] The longitude for the location.
   # @return [GoogleMaps] The instance of the GoogleMaps class.
   def initialize(latitude, longitude)
-    @redis = Redis.new(
-      host: ENV['REDIS_HOST'] || 'localhost',
-      port: ENV['REDIS_PORT'] || 6379,
-      username: ENV['REDIS_USERNAME'],
-      password: ENV['REDIS_PASSWORD']
-    )
     @latitude = latitude
     @longitude = longitude
     @location = {}
@@ -52,7 +46,7 @@ class GoogleMaps
   def reverse_geocode
     return if @latitude.blank? || @longitude.blank?
     cache_key = "google_maps:geocoded:#{@latitude}:#{@longitude}"
-    data = @redis.get(cache_key)
+    data = $redis.get(cache_key)
 
     return JSON.parse(data, symbolize_names: true) if data.present?
 
@@ -67,7 +61,7 @@ class GoogleMaps
     return unless response.success?
 
     data = JSON.parse(response.body, symbolize_names: true)[:results][0]
-    @redis.setex(cache_key, 1.day, data.to_json)
+    $redis.setex(cache_key, 1.day, data.to_json)
     data
   end
 
@@ -77,7 +71,7 @@ class GoogleMaps
   def get_elevation
     return if @latitude.blank? || @longitude.blank?
     cache_key = "google_maps:elevation:#{@latitude}:#{@longitude}"
-    data = @redis.get(cache_key)
+    data = $redis.get(cache_key)
 
     return JSON.parse(data, symbolize_names: true) if data.present?
 
@@ -90,7 +84,7 @@ class GoogleMaps
     return unless response.success?
 
     data = JSON.parse(response.body, symbolize_names: true)[:results][0]
-    @redis.setex(cache_key, 1.day, data.to_json)
+    $redis.setex(cache_key, 1.day, data.to_json)
     data
   end
 
@@ -100,7 +94,7 @@ class GoogleMaps
   def get_time_zone
     return if @latitude.blank? || @longitude.blank?
     cache_key = "google_maps:time_zone:#{@latitude}:#{@longitude}"
-    data = @redis.get(cache_key)
+    data = $redis.get(cache_key)
 
     return JSON.parse(data, symbolize_names: true) if data.present?
 
@@ -115,7 +109,7 @@ class GoogleMaps
 
     data = JSON.parse(response.body, symbolize_names: true)
     data[:formattedOffset] = format_time_zone_offset(data[:rawOffset])
-    @redis.setex(cache_key, 1.day, data.to_json)
+    $redis.setex(cache_key, 1.day, data.to_json)
     data
   end
 

@@ -7,12 +7,6 @@ class Contentful
 
   def initialize
     @client = ContentfulClient::Client
-    @redis = Redis.new(
-      host: ENV['REDIS_HOST'] || 'localhost',
-      port: ENV['REDIS_PORT'] || 6379,
-      username: ENV['REDIS_USERNAME'],
-      password: ENV['REDIS_PASSWORD']
-    )
     @content = {
       articles: [],
       assets: [],
@@ -45,7 +39,7 @@ class Contentful
   end
 
   def generate_content!
-    content = @redis.get(CACHE_KEY)
+    content = $redis.get(CACHE_KEY)
     if content.present?
       @content = JSON.parse(content, symbolize_names: true)
     else
@@ -254,6 +248,6 @@ class Contentful
   end
 
   def cache_content
-    @redis.setex(CACHE_KEY, 5.minutes, @content.to_json)
+    $redis.setex(CACHE_KEY, 5.minutes, @content.to_json)
   end
 end

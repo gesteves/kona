@@ -13,12 +13,6 @@ class PurpleAir
   def initialize(latitude, longitude)
     @latitude = latitude
     @longitude = longitude
-    @redis = Redis.new(
-      host: ENV['REDIS_HOST'] || 'localhost',
-      port: ENV['REDIS_PORT'] || 6379,
-      username: ENV['REDIS_USERNAME'],
-      password: ENV['REDIS_PASSWORD']
-    )
     @aqi = set_aqi
   end
 
@@ -45,14 +39,14 @@ class PurpleAir
   # @return [Hash, nil] The sensor data, or nil if fetching fails.
   def find_sensors
     cache_key = "purple_air:sensors:#{api_query_params.values.map(&:to_s).join(':')}"
-    data = @redis.get(cache_key)
+    data = $redis.get(cache_key)
 
     return JSON.parse(data) if data.present?
 
     response = HTTParty.get(PURPLE_AIR_API_URL, query: api_query_params, headers: { 'X-API-Key' => ENV['PURPLEAIR_API_KEY'] })
     return unless response.success?
 
-    @redis.setex(cache_key, 1.hour, response.body)
+    $redis.setex(cache_key, 1.hour, response.body)
     JSON.parse(response.body)
   end
 

@@ -7,12 +7,6 @@ class Location
 
   # Initializes the Location instance by fetching the current location from available sources.
   def initialize
-    @redis = Redis.new(
-      host: ENV['REDIS_HOST'] || 'localhost',
-      port: ENV['REDIS_PORT'] || 6379,
-      username: ENV['REDIS_USERNAME'],
-      password: ENV['REDIS_PASSWORD']
-    )
     location = get_current_location
     @latitude, @longitude = location.split(',').map(&:to_f) if location.present?
   end
@@ -27,11 +21,11 @@ class Location
   # @return [String, nil] The current location as a "latitude,longitude" string if available.
   def get_current_location
     cache_key = 'location:current'
-    cached_location = @redis.get(cache_key)
+    cached_location = $redis.get(cache_key)
     payload = parse_incoming_hook_body
     if payload[:latitude].present? && payload[:longitude].present?
       current_location = "#{payload[:latitude]},#{payload[:longitude]}"
-      @redis.setex(cache_key, 2.days, current_location)
+      $redis.setex(cache_key, 2.days, current_location)
       current_location
     elsif cached_location.present? && ENV['USE_DEFAULT_LOCATION'].blank?
       cached_location

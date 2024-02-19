@@ -14,12 +14,6 @@ class WeatherKit
   # @param country [String] The country for the weather data.
   # @return [WeatherKit] The instance of the WeatherKit class.
   def initialize(latitude, longitude, time_zone, country)
-    @redis = Redis.new(
-      host: ENV['REDIS_HOST'] || 'localhost',
-      port: ENV['REDIS_PORT'] || 6379,
-      username: ENV['REDIS_USERNAME'],
-      password: ENV['REDIS_PASSWORD']
-    )
     @latitude = latitude
     @longitude = longitude
     @time_zone = time_zone
@@ -39,7 +33,7 @@ class WeatherKit
   # @return [Hash, nil] The current weather data, or nil if fetching fails.
   def get_weather
     cache_key = "weatherkit:weather:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
-    data = @redis.get(cache_key)
+    data = $redis.get(cache_key)
 
     return JSON.parse(data) if data.present?
 
@@ -59,7 +53,7 @@ class WeatherKit
     response = HTTParty.get("#{WEATHERKIT_API_URL}/weather/en/#{@latitude}/#{@longitude}", query: query, headers: headers)
     return unless response.success?
 
-    @redis.setex(cache_key, 5.minutes, response.body)
+    $redis.setex(cache_key, 5.minutes, response.body)
     JSON.parse(response.body)
   end
 
@@ -68,7 +62,7 @@ class WeatherKit
   # @return [Array, nil] The available weather data sets, or nil if unavailable.
   def availability
     cache_key = "weatherkit:availability:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
-    data = @redis.get(cache_key)
+    data = $redis.get(cache_key)
 
     return JSON.parse(data) if data.present?
 
@@ -83,7 +77,7 @@ class WeatherKit
     response = HTTParty.get("#{WEATHERKIT_API_URL}/availability/#{@latitude}/#{@longitude}", query: query, headers: headers)
     return unless response.success?
 
-    @redis.setex(cache_key, 1.day, response.body)
+    $redis.setex(cache_key, 1.day, response.body)
     JSON.parse(response.body)
   end
 

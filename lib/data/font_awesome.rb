@@ -11,12 +11,6 @@ class FontAwesome
   # and Redis connection.
   def initialize
     @client = FontAwesomeClient::Client
-    @redis = Redis.new(
-      host: ENV['REDIS_HOST'] || 'localhost',
-      port: ENV['REDIS_PORT'] || 6379,
-      username: ENV['REDIS_USERNAME'],
-      password: ENV['REDIS_PASSWORD']
-    )
   end
 
   # Reads icon data from a YAML file, fetches each icon's SVG from the Font Awesome GraphQL API,
@@ -52,7 +46,7 @@ class FontAwesome
   # @return [String] The SVG content for the specified icon.
   def fetch_icon(version, family, style, icon_id)
     cache_key = "font-awesome:icon:#{version}:#{family}:#{style}:#{icon_id}"
-    svg = @redis.get(cache_key)
+    svg = FontAwesomeClient::REDIS.get(cache_key)
 
     return svg if svg.present?
 
@@ -63,7 +57,7 @@ class FontAwesome
 
     svg = icon[:svgs].find { |svg| svg[:familyStyle][:family] == family && svg[:familyStyle][:style] == style }[:html]
 
-    @redis.setex(cache_key, 1.year, svg)
+    FontAwesomeClient::REDIS.setex(cache_key, 1.year, svg)
 
     svg
   end

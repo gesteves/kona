@@ -13,12 +13,6 @@ class GoogleAirQuality
   # @param aqi_code [String] The code for the AQI to use (optional, defaults to EPA NowCast).
   # @return [GoogleAirQuality] The instance of the GoogleAirQuality class.
   def initialize(latitude, longitude, country_code, aqi_code = 'usa_epa_nowcast')
-    @redis = Redis.new(
-      host: ENV['REDIS_HOST'] || 'localhost',
-      port: ENV['REDIS_PORT'] || 6379,
-      username: ENV['REDIS_USERNAME'],
-      password: ENV['REDIS_PASSWORD']
-    )
     @latitude = latitude
     @longitude = longitude
     @country_code = country_code
@@ -57,7 +51,7 @@ class GoogleAirQuality
   def lookup_current_conditions
     return if @latitude.blank? || @longitude.blank?
     cache_key = "google:aqi:#{@latitude}:#{@longitude}:#{@country_code}:#{@aqi_code}"
-    data = @redis.get(cache_key)
+    data = $redis.get(cache_key)
 
     return JSON.parse(data) if data.present?
 
@@ -82,7 +76,7 @@ class GoogleAirQuality
     response = HTTParty.post("#{GOOGLE_AQI_API_URL}/currentConditions:lookup", query: query, body: body.to_json, headers: headers)
     return unless response.success?
 
-    @redis.setex(cache_key, 1.hour, response.body)
+    $redis.setex(cache_key, 1.hour, response.body)
     JSON.parse(response.body)
   end
 end

@@ -11,12 +11,6 @@ class GooglePollen
   # @param longitude [Float] The longitude for the location.
   # @return [GooglePollen] The instance of the GooglePollen class.
   def initialize(latitude, longitude)
-    @redis = Redis.new(
-      host: ENV['REDIS_HOST'] || 'localhost',
-      port: ENV['REDIS_PORT'] || 6379,
-      username: ENV['REDIS_USERNAME'],
-      password: ENV['REDIS_PASSWORD']
-    )
     @latitude = latitude
     @longitude = longitude
     @pollen = get_pollen_forecast
@@ -35,7 +29,7 @@ class GooglePollen
   def get_pollen_forecast
     return if @latitude.blank? || @longitude.blank?
     cache_key = "google:pollen:#{@latitude}:#{@longitude}"
-    data = @redis.get(cache_key)
+    data = $redis.get(cache_key)
 
     return JSON.parse(data) if data.present?
 
@@ -52,7 +46,7 @@ class GooglePollen
     return unless response.success?
 
     data = JSON.parse(response.body)['dailyInfo'][0]
-    @redis.setex(cache_key, 1.hour, data.to_json)
+    $redis.setex(cache_key, 1.hour, data.to_json)
     data
   end
 end

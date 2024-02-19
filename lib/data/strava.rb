@@ -9,12 +9,6 @@ class Strava
   # Initializes the Strava class with necessary settings and athlete information.
   # @return [Strava] The instance of the Strava class.
   def initialize
-    @redis = Redis.new(
-      host: ENV['REDIS_HOST'] || 'localhost',
-      port: ENV['REDIS_PORT'] || 6379,
-      username: ENV['REDIS_USERNAME'],
-      password: ENV['REDIS_PASSWORD']
-    )
     @athlete_id = ENV['STRAVA_ATHLETE_ID']
     @stats = get_stats
   end
@@ -35,7 +29,7 @@ class Strava
   # @return [Hash, nil] The athlete's statistics, or nil if fetching fails.
   def get_stats
     cache_key = "strava:stats:#{@athlete_id}"
-    data = @redis.get(cache_key)
+    data = $redis.get(cache_key)
 
     return JSON.parse(data) if data.present?
 
@@ -57,7 +51,7 @@ class Strava
       stats[k]['activities'] = stats[k].delete('count') if stats[k].is_a?(Hash) && stats[k]['count'].present?
     end
 
-    @redis.setex(cache_key, 5.minutes, stats.to_json)
+    $redis.setex(cache_key, 5.minutes, stats.to_json)
 
     stats
   end
@@ -65,10 +59,10 @@ class Strava
   # Retrieves the Strava access token, refreshing it if necessary.
   # @return [String, nil] The access token, or nil if unavailable.
   def get_access_token
-    access_token = @redis.get('strava:access_token')
+    access_token = $redis.get('strava:access_token')
     return access_token if access_token.present?
 
-    refresh_token = @redis.get('strava:refresh_token') || ENV['STRAVA_REFRESH_TOKEN']
+    refresh_token = $redis.get('strava:refresh_token') || ENV['STRAVA_REFRESH_TOKEN']
     return if refresh_token.blank?
 
     refresh_access_token(refresh_token)
@@ -95,11 +89,11 @@ class Strava
 
     if access_token.present?
       expiration = expires_at - Time.now.to_i
-      @redis.setex('strava:access_token', expiration, access_token)
+      $redis.setex('strava:access_token', expiration, access_token)
     end
 
     if new_refresh_token.present?
-      @redis.set('strava:refresh_token', new_refresh_token)
+      $redis.set('strava:refresh_token', new_refresh_token)
     end
 
     access_token
