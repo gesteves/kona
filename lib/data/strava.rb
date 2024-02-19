@@ -4,7 +4,6 @@ require 'active_support/all'
 
 # The Strava class interfaces with the Strava API to fetch and save athlete statistics.
 class Strava
-  attr_reader :stats
   STRAVA_API_URL = 'https://www.strava.com/api/v3'
 
   # Initializes the Strava class with necessary settings and athlete information.

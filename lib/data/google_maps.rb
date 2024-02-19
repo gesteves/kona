@@ -4,7 +4,7 @@ require 'active_support/all'
 
 # The GoogleMaps class interfaces with the Google Maps API to fetch geocoding and timezone data.
 class GoogleMaps
-  attr_reader :latitude, :longitude, :time_zone
+  attr_reader :latitude, :longitude
   GOOGLE_MAPS_API_URL = 'https://maps.googleapis.com/maps/api'
   GOOGLE_API_KEY = ENV['GOOGLE_API_KEY']
 

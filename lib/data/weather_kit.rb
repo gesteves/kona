@@ -5,7 +5,6 @@ require 'active_support/all'
 
 # The WeatherKit class interfaces with Apple's WeatherKit API to fetch weather data.
 class WeatherKit
-  attr_reader :weather
   WEATHERKIT_API_URL = 'https://weatherkit.apple.com/api/v1/'
 
   # Initializes the WeatherKit class with location and time zone information.

@@ -4,7 +4,6 @@ require 'active_support/all'
 
 # The PurpleAir class interfaces with the PurpleAir API to fetch air quality data.
 class PurpleAir
-  attr_reader :aqi
   PURPLE_AIR_API_URL = 'https://api.purpleair.com/v1/sensors'
 
   # Initializes the PurpleAir class with geographical coordinates.
