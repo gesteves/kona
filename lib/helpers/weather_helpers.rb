@@ -11,21 +11,21 @@ module WeatherHelpers
   # Retrieves the current weather conditions.
   # @return [Hash, nil] The current weather conditions data, or nil if not found.
   def current_weather
-    data.weather.currentWeather
+    data.weather.current_weather
   end
 
   # Retrieves the forecast for the current day.
   # @return [Hash, nil] The forecast data for today, or nil if not found.
   def todays_forecast
     now = Time.now
-    data.weather.forecastDaily.days.find { |d| Time.parse(d.forecastStart) <= now && Time.parse(d.forecastEnd) >= now }
+    data.weather.forecast_daily.days.find { |d| Time.parse(d.forecast_start) <= now && Time.parse(d.forecast_end) >= now }
   end
 
   # Retrieves the forecast for tomorrow.
   # @return [Hash, nil] The forecast data for tomorrow, or nil if not found.
   def tomorrows_forecast
     now = Time.now
-    data.weather.forecastDaily.days.find { |d| Time.parse(d.forecastStart) > now }
+    data.weather.forecast_daily.days.find { |d| Time.parse(d.forecast_start) > now }
   end
 
   # Retrieves the time of sunrise for today.
@@ -162,11 +162,11 @@ module WeatherHelpers
   # @return [Boolean] `true` if the weather conditions are bad, `false` otherwise.
   def is_bad_weather?
     aqi = data&.air_quality&.aqi.to_i
-    current_temperature = (current_weather.temperatureApparent || current_weather.temperature)
-    high_temperature = todays_forecast.temperatureMax
-    low_temperature = todays_forecast.temperatureMin
-    precipitation_chance = todays_forecast.restOfDayForecast.precipitationChance
-    snowfall = todays_forecast.restOfDayForecast.snowfallAmount
+    current_temperature = (current_weather.temperature_apparent || current_weather.temperature)
+    high_temperature = todays_forecast.temperature_max
+    low_temperature = todays_forecast.temperature_min
+    precipitation_chance = todays_forecast.rest_of_day_forecast.precipitation_chance
+    snowfall = todays_forecast.rest_of_day_forecast.snowfall_amount
 
     # Air quality is moderate or worse
     return true if aqi > 75
@@ -183,7 +183,7 @@ module WeatherHelpers
     # Pollen is high or very high
     return true if pollen_index >= 4
     # The current or forecasted conditions are adverse weather
-    data.conditions.dig(current_weather.conditionCode, :adverse_weather) || data.conditions.dig(todays_forecast.conditionCode, :adverse_weather)
+    data.conditions.dig(current_weather.condition_code, :adverse_weather) || data.conditions.dig(todays_forecast.condition_code, :adverse_weather)
   end
 
   # Determines if the current weather conditions are considered "good" for working out outdoors..
@@ -195,16 +195,16 @@ module WeatherHelpers
   # Determines if the current temperature is hot.
   # @return [Boolean] `true` if the temperature is hot (32°C or higher), `false` otherwise.
   def is_hot?
-    current_weather.temperature >= 32 || current_weather.temperatureApparent >= 32
+    current_weather.temperature >= 32 || current_weather.temperature_apparent >= 32
   end
 
   # Determines if the apparent temperature should be hidden.
   # @return [Boolean] `true` if the apparent temperature should be hidden, `false` otherwise.
   def hide_apparent_temperature?
     celsius_temp = current_weather.temperature.round
-    celsius_apparent = current_weather.temperatureApparent.round
+    celsius_apparent = current_weather.temperature_apparent.round
     fahrenheit_temp = celsius_to_fahrenheit(current_weather.temperature).round
-    fahrenheit_apparent = celsius_to_fahrenheit(current_weather.temperatureApparent).round
+    fahrenheit_apparent = celsius_to_fahrenheit(current_weather.temperature_apparent).round
     celsius_temp == celsius_apparent || fahrenheit_temp == fahrenheit_apparent
   end
 
@@ -255,8 +255,8 @@ module WeatherHelpers
   def currently
     return if current_weather.blank?
     text = []
-    text << "#{format_current_condition(current_weather.conditionCode).capitalize}, with a temperature of #{format_temperature(current_weather.temperature)}"
-    text << "which feels like #{format_temperature(current_weather.temperatureApparent)}" unless hide_apparent_temperature?
+    text << "#{format_current_condition(current_weather.condition_code).capitalize}, with a temperature of #{format_temperature(current_weather.temperature)}"
+    text << "which feels like #{format_temperature(current_weather.temperature_apparent)}" unless hide_apparent_temperature?
     text.join(', ')
   end
 
@@ -272,11 +272,11 @@ module WeatherHelpers
   def forecast
     return if todays_forecast.blank?
     text = []
-    text << "#{today_or_tonight}'s forecast #{format_forecasted_condition(todays_forecast.restOfDayForecast.conditionCode).downcase}"
+    text << "#{today_or_tonight}'s forecast #{format_forecasted_condition(todays_forecast.rest_of_day_forecast.condition_code).downcase}"
     if is_evening?
-      text << "with a low of #{format_temperature(todays_forecast.temperatureMin)}"
+      text << "with a low of #{format_temperature(todays_forecast.temperature_min)}"
     else
-      text << "with a high of #{format_temperature(todays_forecast.temperatureMax)} and a low of #{format_temperature(todays_forecast.temperatureMin)}"
+      text << "with a high of #{format_temperature(todays_forecast.temperature_max)} and a low of #{format_temperature(todays_forecast.temperature_min)}"
     end
     text.join(', ')
   end
@@ -284,11 +284,11 @@ module WeatherHelpers
   # Provides a summary of precipitation for today or tonight.
   # @return [String, nil] A string describing the precipitation details for today or tonight, or nil if no data is available.
   def precipitation
-    return if todays_forecast.restOfDayForecast.precipitationChance == 0 || todays_forecast.restOfDayForecast.precipitationType.downcase == 'clear'
-    percentage_string = number_to_percentage(todays_forecast.restOfDayForecast.precipitationChance * 100, precision: 0)
+    return if todays_forecast.rest_of_day_forecast.precipitation_chance == 0 || todays_forecast.rest_of_day_forecast.precipitation_type.downcase == 'clear'
+    percentage_string = number_to_percentage(todays_forecast.rest_of_day_forecast.precipitation_chance * 100, precision: 0)
     text = []
-    text << "There's #{with_indefinite_article(percentage_string)} chance of #{format_precipitation_type(todays_forecast.restOfDayForecast.precipitationType)} later #{today_or_tonight.downcase}"
-    text << "with #{format_precipitation_amount(todays_forecast.restOfDayForecast.snowfallAmount)} expected" if todays_forecast.restOfDayForecast.precipitationType.downcase == 'snow' && todays_forecast.restOfDayForecast.snowfallAmount > 0
+    text << "There's #{with_indefinite_article(percentage_string)} chance of #{format_precipitation_type(todays_forecast.rest_of_day_forecast.precipitation_type)} later #{today_or_tonight.downcase}"
+    text << "with #{format_precipitation_amount(todays_forecast.rest_of_day_forecast.snowfall_amount)} expected" if todays_forecast.rest_of_day_forecast.precipitation_type.downcase == 'snow' && todays_forecast.rest_of_day_forecast.snowfall_amount > 0
     text.join(', ')
   end
 
@@ -347,7 +347,7 @@ module WeatherHelpers
   # Determines the weather icon to display based on current weather conditions.
   # @return [String] The name of the weather icon to display.
   def weather_icon
-    condition = data.conditions[current_weather.conditionCode]
+    condition = data.conditions[current_weather.condition_code]
     return 'cloud-question' if condition.blank?
     return condition[:icon] if condition[:icon].is_a?(String)
     is_daytime? ? condition[:icon][:day] : condition[:icon][:night]

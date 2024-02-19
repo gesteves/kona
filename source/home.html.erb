@@ -13,7 +13,7 @@
   <% if data.articles.reject { |a| a.draft }.present? %>
     <%= partial 'partials/collection', locals: { title: "Recent Articles", items: data.articles.reject { |a| a.draft }.slice(0, 4), variant: "halves" } %>
   <% end %>
-  <% if data.weather.currentWeather.present? && data.weather.forecastDaily.present? %>
+  <% if weather_summary.present? %>
     <%= partial 'partials/weather' %>
   <% end %>
   <% if data.events.present? %>
