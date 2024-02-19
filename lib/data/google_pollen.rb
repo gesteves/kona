@@ -25,7 +25,7 @@ class GooglePollen
 
   # Saves the pollen data to a JSON file.
   def save_data
-    File.open('data/pollen.json', 'w') { |f| f << @pollen.to_json }
+    File.open('data/pollen.json', 'w') { |f| f << @pollen.deep_transform_keys { |key| key.to_s.underscore }.to_json }
   end
 
   private
