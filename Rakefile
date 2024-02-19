@@ -52,6 +52,21 @@ namespace :build do
   end
 end
 
+namespace :redis do
+  desc 'Empties the Redis instance after confirmation'
+  task :clear do
+    puts 'WARNING: You are about to completely empty the Redis instance. This action is irreversible!'
+    print 'Type "execute" to proceed: '
+    confirmation = STDIN.gets.strip
+    if confirmation.downcase == 'execute'
+      $redis.flushdb
+      puts 'Redis instance has been emptied.'
+    else
+      puts 'Redis empty action cancelled.'
+    end
+  end
+end
+
 # Methods for tasks
 
 def setup_data_directory
@@ -77,7 +92,6 @@ def import_location
   }
 end
 
-# Imports weather data
 def import_weather
   safely_perform {
     @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
@@ -85,7 +99,6 @@ def import_weather
   }
 end
 
-# Imports air quality data
 def import_aqi
   safely_perform {
     @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
@@ -94,7 +107,6 @@ def import_aqi
   }
 end
 
-# Imports pollen data
 def import_pollen
   safely_perform {
     @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
@@ -102,7 +114,6 @@ def import_pollen
   }
 end
 
-# Imports today's workouts from TrainerRoad
 def import_trainer_road
   safely_perform {
     @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
