@@ -5,7 +5,7 @@ module LocationHelpers
   # @see https://developers.google.com/maps/documentation/geocoding/requests-geocoding#GeocodingResponses
   # @return [String] The formatted location string.
   def format_location
-    components = data.location.results.first.address_components
+    components = data.location.address_components
 
     # Extract city, state/region, and country names from the components
     city = components.find { |component| component['types'].include?('locality') }&.long_name

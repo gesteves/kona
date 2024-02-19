@@ -48,8 +48,7 @@ class GoogleMaps
   def get_country_code
     data = @geocoded || reverse_geocode
     return if data.blank?
-
-    data['results'][0]['address_components'].find { |component| component['types'].include?('country') }['short_name']
+    data['address_components'].find { |component| component['types'].include?('country') }['short_name']
   end
 
   # Reverse-geocodes the given coordinates into a human-readable address.
@@ -71,8 +70,9 @@ class GoogleMaps
     response = HTTParty.get("#{GOOGLE_MAPS_API_URL}/geocode/json", query: query)
     return unless response.success?
 
-    @redis.setex(cache_key, 1.day, response.body)
-    JSON.parse(response.body)
+    data = JSON.parse(response.body)['results'][0]
+    @redis.setex(cache_key, 1.day, data.to_json)
+    data
   end
 
   # Gets the elevation for the coordinates from the API.
