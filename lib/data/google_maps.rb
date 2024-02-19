@@ -4,7 +4,7 @@ require 'active_support/all'
 
 # The GoogleMaps class interfaces with the Google Maps API to fetch geocoding and timezone data.
 class GoogleMaps
-  attr_reader :latitude, :longitude, :time_zone, :country_code, :elevation, :geocoded
+  attr_reader :latitude, :longitude, :time_zone
   GOOGLE_MAPS_API_URL = 'https://maps.googleapis.com/maps/api'
   GOOGLE_API_KEY = ENV['GOOGLE_API_KEY']
 
@@ -21,35 +21,30 @@ class GoogleMaps
     )
     @latitude = latitude
     @longitude = longitude
-    @geocoded = reverse_geocode
-    @time_zone = get_time_zone
-    @country_code = get_country_code
-    @elevation = get_elevation
+    @location = {}
+    @location[:geocoded] = reverse_geocode
+    @location[:time_zone] = get_time_zone
+    @location[:elevation] = get_elevation[:elevation]
   end
 
   # Returns a timezone ID of the form "America/Denver".
   # @return [String, nil] the timezone ID.
   def time_zone_id
-    return if @time_zone.blank?
-    @time_zone['timeZoneId']
+    @location[:time_zone][:timeZoneId]
+  end
+
+  # Returns the country code for the specified coordinates.
+  # @return [String, nil] The country code, or nil if fetching fails.
+  def country_code
+    @location[:geocoded][:address_components].find { |component| component[:types].include?('country') }[:short_name]
   end
 
   # Saves the geocode and time zone data to JSON files.
   def save_data
-    File.open('data/location.json', 'w') { |f| f << @geocoded.to_json }
-    File.open('data/time_zone.json', 'w') { |f| f << @time_zone.to_json }
-    File.open('data/elevation.json', 'w') { |f| f << @elevation.to_json }
+    File.open('data/location.json', 'w') { |f| f << @location.to_json }
   end
 
   private
-
-  # Gets the country code for the specified coordinates using geocoding.
-  # @return [String, nil] The country code, or nil if fetching fails.
-  def get_country_code
-    data = @geocoded || reverse_geocode
-    return if data.blank?
-    data['address_components'].find { |component| component['types'].include?('country') }['short_name']
-  end
 
   # Reverse-geocodes the given coordinates into a human-readable address.
   # @see https://developers.google.com/maps/documentation/geocoding/requests-reverse-geocoding
@@ -59,7 +54,7 @@ class GoogleMaps
     cache_key = "google_maps:geocoded:#{@latitude}:#{@longitude}"
     data = @redis.get(cache_key)
 
-    return JSON.parse(data) if data.present?
+    return JSON.parse(data, symbolize_names: true) if data.present?
 
     query = {
       latlng: "#{@latitude},#{@longitude}",
@@ -70,7 +65,7 @@ class GoogleMaps
     response = HTTParty.get("#{GOOGLE_MAPS_API_URL}/geocode/json", query: query)
     return unless response.success?
 
-    data = JSON.parse(response.body)['results'][0]
+    data = JSON.parse(response.body, symbolize_names: true)[:results][0]
     @redis.setex(cache_key, 1.day, data.to_json)
     data
   end
@@ -83,7 +78,7 @@ class GoogleMaps
     cache_key = "google_maps:elevation:#{@latitude}:#{@longitude}"
     data = @redis.get(cache_key)
 
-    return JSON.parse(data) if data.present?
+    return JSON.parse(data, symbolize_names: true) if data.present?
 
     query = {
       locations: "#{@latitude},#{@longitude}",
@@ -93,7 +88,7 @@ class GoogleMaps
     response = HTTParty.get("#{GOOGLE_MAPS_API_URL}/elevation/json", query: query)
     return unless response.success?
 
-    data = JSON.parse(response.body)['results'][0]
+    data = JSON.parse(response.body, symbolize_names: true)[:results][0]
     @redis.setex(cache_key, 1.day, data.to_json)
     data
   end
@@ -106,7 +101,7 @@ class GoogleMaps
     cache_key = "google_maps:time_zone:#{@latitude}:#{@longitude}"
     data = @redis.get(cache_key)
 
-    return JSON.parse(data) if data.present?
+    return JSON.parse(data, symbolize_names: true) if data.present?
 
     query = {
       location: "#{@latitude},#{@longitude}",
@@ -117,8 +112,8 @@ class GoogleMaps
     response = HTTParty.get("#{GOOGLE_MAPS_API_URL}/timezone/json", query: query)
     return unless response.success?
 
-    data = JSON.parse(response.body)
-    data[:formattedOffset] = format_time_zone_offset(data['rawOffset'])
+    data = JSON.parse(response.body, symbolize_names: true)
+    data[:formattedOffset] = format_time_zone_offset(data[:rawOffset])
     @redis.setex(cache_key, 1.day, data.to_json)
     data
   end

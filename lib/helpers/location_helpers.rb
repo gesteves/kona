@@ -5,7 +5,7 @@ module LocationHelpers
   # @see https://developers.google.com/maps/documentation/geocoding/requests-geocoding#GeocodingResponses
   # @return [String] The formatted location string.
   def format_location
-    components = data.location.address_components
+    components = data.location.geocoded.address_components
 
     # Extract city, state/region, and country names from the components
     city = components.find { |component| component['types'].include?('locality') }&.long_name
@@ -42,7 +42,7 @@ module LocationHelpers
   # Returns the elevation for the current location formatted in meters and feet.
   # @return [String] A formatted elevation value with units in both meters and feet.
   def format_elevation
-    elevation = data.elevation.elevation
+    elevation = data.location.elevation
     return if elevation.blank?
 
     meters = "#{number_to_rounded(elevation, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')} m"
