@@ -31,19 +31,19 @@ module WeatherHelpers
   # Retrieves the time of sunrise for today.
   # @return [Time, nil] The time of sunrise today, or nil if not found.
   def sunrise
-    Time.parse(todays_forecast.sunrise).in_time_zone(location_time_zone_id)
+    Time.parse(todays_forecast.sunrise).in_time_zone(location_time_zone)
   end
 
   # Retrieves the time of sunrise for tomorrow.
   # @return [Time, nil] The time of sunrise tomorrow, or nil if not found.
   def tomorrows_sunrise
-    Time.parse(tomorrows_forecast.sunrise).in_time_zone(location_time_zone_id)
+    Time.parse(tomorrows_forecast.sunrise).in_time_zone(location_time_zone)
   end
 
   # Retrieves the time of sunset for today.
   # @return [Time, nil] The time of sunset today, or nil if not found.
   def sunset
-    Time.parse(todays_forecast.sunset).in_time_zone(location_time_zone_id)
+    Time.parse(todays_forecast.sunset).in_time_zone(location_time_zone)
   end
 
   # Checks if it is currently daytime (i.e. between sunrise and sunset).
