@@ -31,7 +31,7 @@ class GooglePollen
     cache_key = "google:pollen:#{@latitude}:#{@longitude}"
     data = $redis.get(cache_key)
 
-    return JSON.parse(data) if data.present?
+    return JSON.parse(data, symbolize_names: true) if data.present?
 
     query = {
       'location.latitude': @latitude,
@@ -45,7 +45,7 @@ class GooglePollen
     response = HTTParty.get("#{GOOGLE_POLLEN_API_URL}/forecast:lookup", query: query)
     return unless response.success?
 
-    data = JSON.parse(response.body)['dailyInfo'][0]
+    data = JSON.parse(response.body, symbolize_names: true).dig(:dailyInfo, 0)
     $redis.setex(cache_key, 1.hour, data.to_json)
     data
   end

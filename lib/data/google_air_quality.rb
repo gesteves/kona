@@ -33,15 +33,15 @@ class GoogleAirQuality
     data = lookup_current_conditions
     return if data.blank?
 
-    result = data['indexes']&.find { |i| i['code'] == @aqi_code }
+    result = data[:indexes]&.find { |i| i[:code] == @aqi_code }
     # Fall back to "Universal AQI"
-    result ||= data['indexes']&.find { |i| i['code'] == 'uaqi' }
+    result ||= data[:indexes]&.find { |i| i[:code] == 'uaqi' }
 
     return if result.blank?
 
     {
-      aqi: result['aqi'],
-      category: result['category'].gsub(/\s?air quality\s?/i, '')
+      aqi: result[:aqi],
+      category: result[:category].gsub(/\s?air quality\s?/i, '')
     }
   end
 
@@ -53,7 +53,7 @@ class GoogleAirQuality
     cache_key = "google:aqi:#{@latitude}:#{@longitude}:#{@country_code}:#{@aqi_code}"
     data = $redis.get(cache_key)
 
-    return JSON.parse(data) if data.present?
+    return JSON.parse(data, symbolize_names: true) if data.present?
 
     query = {
       key: ENV['GOOGLE_API_KEY']
@@ -77,6 +77,6 @@ class GoogleAirQuality
     return unless response.success?
 
     $redis.setex(cache_key, 1.hour, response.body)
-    JSON.parse(response.body)
+    JSON.parse(response.body, symbolize_names: true)
   end
 end

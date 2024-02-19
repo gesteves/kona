@@ -60,7 +60,7 @@ class GoogleMaps
     response = HTTParty.get("#{GOOGLE_MAPS_API_URL}/geocode/json", query: query)
     return unless response.success?
 
-    data = JSON.parse(response.body, symbolize_names: true)[:results][0]
+    data = JSON.parse(response.body, symbolize_names: true)&.dig(:results, 0)
     $redis.setex(cache_key, 1.day, data.to_json)
     data
   end
@@ -83,7 +83,7 @@ class GoogleMaps
     response = HTTParty.get("#{GOOGLE_MAPS_API_URL}/elevation/json", query: query)
     return unless response.success?
 
-    data = JSON.parse(response.body, symbolize_names: true)[:results][0]
+    data = JSON.parse(response.body, symbolize_names: true)&.dig(:results, 0)
     $redis.setex(cache_key, 1.day, data.to_json)
     data
   end
@@ -110,21 +110,7 @@ class GoogleMaps
     data = JSON.parse(response.body, symbolize_names: true)
     return if data[:status] == 'ZERO_RESULTS'
 
-    data[:formattedOffset] = format_time_zone_offset(data[:rawOffset])
     $redis.setex(cache_key, 1.day, data.to_json)
     data
-  end
-
-  # Formats a time zone offset from seconds to a string format.
-  # @param offset_in_seconds [Integer] The time zone offset in seconds.
-  # @return [String] The formatted time zone offset.
-  def format_time_zone_offset(offset_in_seconds)
-    return if offset_in_seconds.blank?
-    offset_minutes = offset_in_seconds.abs / 60
-    hours = offset_minutes / 60
-    minutes = offset_minutes % 60
-    sign = offset_in_seconds < 0 ? "-" : "+"
-
-    "#{sign}#{hours.to_s.rjust(2, '0')}#{minutes.to_s.rjust(2, '0')}"
   end
 end
