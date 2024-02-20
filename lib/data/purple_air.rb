@@ -27,13 +27,13 @@ class PurpleAir
   # @return [Hash, nil] The AQI and related data, or nil if fetching fails.
   def set_aqi
     return if @latitude.blank? || @longitude.blank?
+
     sensor = nearest_sensor
     return if sensor.blank?
-    raw_pm25 = sensor['pm2.5']
-    humidity = sensor['humidity']
-    pm25 = humidity.present? ? apply_epa_correction(raw_pm25, humidity.to_f) : raw_pm25
-    data = format_aqi(pm25)
-    return if data[:aqi].zero?
+
+    corrected_pm25 = apply_epa_correction(sensor['pm2.5'], sensor['humidity'])
+    data = format_aqi(corrected_pm25)
+    return if data.dig(:aqi).blank? || data.dig(:aqi).zero?
     data
   end
 
@@ -95,6 +95,9 @@ class PurpleAir
   # @param humidity [Float] The humidity measurement.
   # @return [Float] The corrected PM2.5 value.
   def apply_epa_correction(pm25, humidity)
+    return if pm25.blank?
+    return pm25 if humidity.blank?
+
     case pm25
     when 0...30
       0.524 * pm25 - 0.0862 * humidity + 5.75
@@ -117,7 +120,7 @@ class PurpleAir
   # @param pm25 [Float] The PM2.5 value to be converted.
   # @return [Hash] The formatted AQI value and category.
   def format_aqi(pm25)
-    return {} if pm25.blank?
+    return if pm25.blank?
 
     aqi, category = case pm25
                  when 0..12.0
