@@ -7,19 +7,18 @@ class Location
 
   # Initializes the Location instance by fetching the current location from available sources.
   def initialize
-    location = get_current_location
-    @latitude, @longitude = location&.split(',')&.map(&:to_f)
+    @latitude, @longitude = set_location&.split(',')&.map(&:to_f)
   end
 
   private
-  # Retrieves the location to use for the various condition data (weather, pollen, air quality, etc.)
+  # Sets the location to use for the various condition data (weather, pollen, air quality, etc.)
   # The location can come from a few places:
   # 1. As coordinates in the payload of a Netlify build hook sent from my phone
   #    at regular intervals, which get cached for a couple days.
   # 2. From that cache, if it's still there.
   # 3. From an environment variable, which stores a default location.
-  # @return [String, nil] The current location as a "latitude,longitude" string if available.
-  def get_current_location
+  # @return [String, nil] The current location as a "latitude,longitude" string, if available.
+  def set_location
     cache_key = 'location:current'
     cached_location = $redis.get(cache_key)
     latitude, longitude = parse_incoming_hook_body
