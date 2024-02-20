@@ -29,7 +29,7 @@ class PurpleAir
     return if @latitude.blank? || @longitude.blank?
     sensor = nearest_sensor
     return if sensor.blank?
-    raw_pm25 = sensor['pm2.5_atm']
+    raw_pm25 = sensor['pm2.5']
     humidity = sensor['humidity']
     pm25 = humidity.present? ? apply_epa_correction(raw_pm25, humidity.to_f) : raw_pm25
     format_aqi(pm25)
@@ -56,7 +56,7 @@ class PurpleAir
   def api_query_params
     {
       location_type: 0,
-      fields: 'pm2.5_atm,latitude,longitude,humidity',
+      fields: 'pm2.5,latitude,longitude,humidity',
       nwlat: @latitude + 0.1,
       selat: @latitude - 0.1,
       nwlng: @longitude - 0.1,
@@ -73,7 +73,7 @@ class PurpleAir
     fields = sensors['fields']
     lat_index = fields.index('latitude')
     lon_index = fields.index('longitude')
-    pm25_index = fields.index('pm2.5_atm')
+    pm25_index = fields.index('pm2.5')
 
     nearest_sensor_data = sensors['data'].reject { |sensor| sensor[lat_index].blank? || sensor[lon_index].blank? || sensor[pm25_index].blank? || sensor[pm25_index].zero? }.min_by do |sensor|
       lat, lon = sensor[lat_index], sensor[lon_index]
