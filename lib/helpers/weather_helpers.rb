@@ -136,7 +136,7 @@ module WeatherHelpers
   # Returns a hash with the highest pollen level.
   # @see https://developers.google.com/maps/documentation/pollen/reference/rest/v1/forecast/lookup#indexinfo
   # @return [Hash, nil]
-  def highest_pollen_level
+  def pollen_level
     data.pollen&.pollen_type_info&.filter { |p| p&.index_info&.value.to_i > 0 }&.max_by { |p| p.index_info.value }
   end
 
@@ -144,14 +144,14 @@ module WeatherHelpers
   # @see https://developers.google.com/maps/documentation/pollen/reference/rest/v1/forecast/lookup#indexinfo
   # @return [Integer] The pollen index, where 0 is "none", and 5 is "very high"
   def pollen_index
-    highest_pollen_level&.index_info&.value.to_i
+    pollen_level&.index_info&.value.to_i
   end
 
   # Returns the pollen level's description.
   # @return [String, nil] Description of the highest pollen level or nil.
-  def current_pollen
+  def format_pollen_level
     return if pollen_index.zero?
-    "Pollen levels are #{highest_level.index_info.category.downcase}"
+    "Pollen levels are #{pollen_level.index_info.category.downcase}"
   end
 
   # Determines if the current weather conditions are considered "bad" for working out outdoors.
@@ -215,7 +215,7 @@ module WeatherHelpers
     summary << elevation
     summary << currently
     summary << current_aqi
-    summary << current_pollen
+    summary << format_pollen_level
     summary << forecast
     summary << precipitation
     summary << sunrise_or_sunset
