@@ -36,8 +36,7 @@ class Location
 
   # Parses the INCOMING_HOOK_BODY environment variable for latitude and longitude values.
   # @see https://docs.netlify.com/configure-builds/build-hooks/#payload
-  # @return [Hash] A hash, which should contain the :latitude and :longitude keys with their respective
-  #         values; otherwise returns an empty hash.
+  # @return [Array, nil] An array of the `latitude` and `longitude` in the build hook payload, or nil.
   def parse_incoming_hook_body
     payload = JSON.parse(ENV['INCOMING_HOOK_BODY'], symbolize_names: true)
     return payload[:latitude], payload[:longitude]
