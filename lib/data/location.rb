@@ -8,7 +8,7 @@ class Location
   # Initializes the Location instance by fetching the current location from available sources.
   def initialize
     location = get_current_location
-    @latitude, @longitude = location.split(',').map(&:to_f) if location.present?
+    @latitude, @longitude = location&.split(',')&.map(&:to_f)
   end
 
   private

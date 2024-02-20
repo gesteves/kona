@@ -26,6 +26,7 @@ class PurpleAir
   # Sets the Air Quality Index (AQI) based on the nearest sensor data.
   # @return [Hash, nil] The AQI and related data, or nil if fetching fails.
   def set_aqi
+    return if @latitude.blank? || @longitude.blank?
     sensor = nearest_sensor
     return if sensor.blank?
     raw_pm25 = sensor['pm2.5_atm']
