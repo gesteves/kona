@@ -22,9 +22,9 @@ class Location
   def get_current_location
     cache_key = 'location:current'
     cached_location = $redis.get(cache_key)
-    payload = parse_incoming_hook_body
-    if payload[:latitude].present? && payload[:longitude].present?
-      current_location = "#{payload[:latitude]},#{payload[:longitude]}"
+    latitude, longitude = parse_incoming_hook_body
+    if latitude.present? && longitude.present?
+      current_location = "#{latitude},#{longitude}"
       $redis.setex(cache_key, 2.days, current_location)
       current_location
     elsif cached_location.present? && ENV['USE_DEFAULT_LOCATION'].blank?
@@ -39,8 +39,9 @@ class Location
   # @return [Hash] A hash, which should contain the :latitude and :longitude keys with their respective
   #         values; otherwise returns an empty hash.
   def parse_incoming_hook_body
-    JSON.parse(ENV['INCOMING_HOOK_BODY'], symbolize_names: true)
+    payload = JSON.parse(ENV['INCOMING_HOOK_BODY'], symbolize_names: true)
+    return payload[:latitude], payload[:longitude]
   rescue
-    {}
+    nil
   end
 end
