@@ -32,7 +32,9 @@ class PurpleAir
     raw_pm25 = sensor['pm2.5']
     humidity = sensor['humidity']
     pm25 = humidity.present? ? apply_epa_correction(raw_pm25, humidity.to_f) : raw_pm25
-    format_aqi(pm25)
+    data = format_aqi(pm25)
+    return if data[:aqi].zero?
+    data
   end
 
   # Finds sensors within a defined proximity.
@@ -75,7 +77,7 @@ class PurpleAir
     lon_index = fields.index('longitude')
     pm25_index = fields.index('pm2.5')
 
-    nearest_sensor_data = sensors['data'].reject { |sensor| sensor[lat_index].blank? || sensor[lon_index].blank? || sensor[pm25_index].blank? || sensor[pm25_index].zero? }.min_by do |sensor|
+    nearest_sensor_data = sensors['data'].reject { |sensor| sensor[lat_index].blank? || sensor[lon_index].blank? }.min_by do |sensor|
       lat, lon = sensor[lat_index], sensor[lon_index]
       Math.sqrt((lat - @latitude)**2 + (lon - @longitude)**2)
     end
