@@ -49,7 +49,7 @@ class Contentful
     if content.present?
       @content = JSON.parse(content, symbolize_names: true)
     else
-      fetch_all_content
+      get_contentful_data
       process_site
       process_articles
       process_pages
@@ -60,7 +60,7 @@ class Contentful
   end
 
   # Fetches all content from Contentful's GraphQL API.
-  def fetch_all_content
+  def get_contentful_data
     skip = 0
     limit = 100
     loop do
@@ -69,7 +69,7 @@ class Contentful
       raise if response.data.blank?
       # Convert the data in the response to a hash, and transform the keys from CamelCase to Ruby-style camel_case :symbols.
       data = response.data.to_h.deep_transform_keys { |key| key.to_s.underscore.to_sym }
-      # Break the loop when the API stops returning items for any of the content types.
+      # Break the loop when the API stops returning items for all of the content types.
       break if data.keys.all? { |k| data.dig(k, :items).empty? }
       # Add them to the @content instance variable.
       [:articles, :pages, :assets, :redirects, :events, :site].each { |c| @content[c] += data.dig(c, :items).compact }
@@ -77,7 +77,7 @@ class Contentful
     end
   end
 
-  # Ensures there's only one `site` stored (that should be the case, but just in case).
+  # Grabs the first site in the array.
   def process_site
     @content[:site] = @content[:site].first
   end
