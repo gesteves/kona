@@ -3,7 +3,7 @@ require 'redis'
 require_relative 'graphql/contentful'
 
 class Contentful
-  CACHE_KEY = "contentful:content:v1"
+  CACHE_KEY = "contentful:content"
 
   def initialize
     @client = ContentfulClient::Client
@@ -21,6 +21,7 @@ class Contentful
     generate_content!
   end
 
+  # Saves all the content to JSON files.
   def save_data
     @content.each do |type, data|
       save_to_file(type, data)
@@ -29,6 +30,9 @@ class Contentful
 
   private
 
+  # Writes the given data to a JSON file, named after the type of content.
+  # @param type [Symbol] The type of content being saved (e.g., :articles, :pages).
+  # @param data [Array<Hash>, Hash] The data to be saved into a file.
   def save_to_file(type, data)
     file_path = "data/#{type}.json"
     File.open(file_path, 'w') do |file|
@@ -38,6 +42,8 @@ class Contentful
     puts "Failed to save #{type}: #{e.message}"
   end
 
+  # Generates the content  by fetching from Contentful and processing it.
+  # Caches the newly fetched and processed content.
   def generate_content!
     content = $redis.get(CACHE_KEY)
     if content.present?
@@ -54,6 +60,7 @@ class Contentful
     end
   end
 
+  # Fetches all content from Contentful's GraphQL API.
   def fetch_all_content
     skip = 0
     limit = 100
@@ -79,7 +86,7 @@ class Contentful
     @content[:site] += response.data.site.items.compact.map(&:to_h)
   end
 
-  # Deep transform keys from camelCase to snake_case symbols
+  # Deep transform hash keys from the camelCase strings in the GraphQL response to Ruby-style snake_case symbols.
   def transform_keys
     @content = @content.deep_transform_keys { |key| key.to_s.underscore.to_sym }
   end
