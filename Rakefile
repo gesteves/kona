@@ -102,8 +102,12 @@ end
 def import_aqi
   safely_perform {
     @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
-    GoogleAirQuality.new(@google_maps.latitude, @google_maps.longitude, @google_maps.country_code).save_data
-    PurpleAir.new(@google_maps.latitude, @google_maps.longitude).save_data
+    purple_air = PurpleAir.new(@google_maps.latitude, @google_maps.longitude)
+    if purple_air.aqi.present?
+      purple_air.save_data
+    else
+      GoogleAirQuality.new(@google_maps.latitude, @google_maps.longitude, @google_maps.country_code).save_data
+    end
   }
 end
 
