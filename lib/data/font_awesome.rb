@@ -68,7 +68,7 @@ class FontAwesome
       icon_data[family] ||= {}
       icon_data[family][style] ||= []
 
-      svg = fetch_from_api(version, family, style, icon_id, cache_key) if svg.blank?
+      svg = fetch_from_api(version, family, style, icon_id) if svg.blank?
 
       icon_data[family][style] << { id: icon_id, svg: svg } if svg.present?
     end
@@ -80,26 +80,16 @@ class FontAwesome
   # @param family [String] The icon family.
   # @param style [String] The icon style.
   # @param icon_id [String] The unique identifier for the icon.
-  # @param cache_key [String] The Redis cache key for the icon.
   # @return [String, nil] The SVG content for the icon, or nil if not found.
-  def fetch_from_api(version, family, style, icon_id, cache_key)
-    svg = fetch_icon_from_api(version, family, style, icon_id)
-    $redis.setex(cache_key, 1.year, svg) if svg.present?
-    svg
-  end
-
-  # Fetches an icon's SVG from the Font Awesome GraphQL API.
-  # @param version [String] The version of the icon set.
-  # @param family [String] The icon family.
-  # @param style [String] The icon style.
-  # @param icon_id [String] The unique identifier for the icon.
-  # @return [String, nil] The SVG content for the specified icon, or nil if not found.
-  def fetch_icon_from_api(version, family, style, icon_id)
+  def fetch_from_api(version, family, style, icon_id)
     response = @client.query(FontAwesomeClient::QUERIES::Icons, variables: { version: version, query: icon_id, first: 1 })
     return if response.data.search.empty?
 
     icon = response.data.search.map(&:to_h).map(&:with_indifferent_access).first
-    icon[:svgs].find { |s| s[:familyStyle][:family] == family && s[:familyStyle][:style] == style }&.dig(:html)
+    svg = icon[:svgs].find { |s| s[:familyStyle][:family] == family && s[:familyStyle][:style] == style }&.dig(:html)
+    
+    $redis.setex(cache_key_for(version, family, style, icon_id), 1.year, svg) if svg.present?
+    svg
   end
 
   # Constructs a Redis cache key for an icon.
