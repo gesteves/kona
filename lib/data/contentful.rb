@@ -50,7 +50,6 @@ class Contentful
       @content = JSON.parse(content, symbolize_names: true)
     else
       fetch_all_content
-      transform_keys
       process_site
       process_articles
       process_pages
@@ -65,30 +64,17 @@ class Contentful
     skip = 0
     limit = 100
     loop do
+      # Fetch the data from the API.
       response = @client.query(ContentfulClient::QUERIES::Content, variables: { skip: skip, limit: limit })
-      break if response.data.articles.items.empty? && response.data.pages.items.empty? &&
-               response.data.assets.items.empty? && response.data.redirects.items.empty? &&
-               response.data.events.items.empty?
-
-      process_fetched_data(response)
+      raise if response.data.blank?
+      # Convert the data in the response to a hash, and transform the keys from CamelCase to Ruby-style camel_case :symbols.
+      data = response.data.to_h.deep_transform_keys { |key| key.to_s.underscore.to_sym }
+      # Break the loop when the API stops returning items for any of the content types.
+      break if data.keys.all? { |k| data.dig(k, :items).empty? }
+      # Add them to the @content instance variable.
+      [:articles, :pages, :assets, :redirects, :events, :site].each { |c| @content[c] += data.dig(c, :items).compact }
       skip += limit
     end
-  end
-
-  # Processes and stores the fetched data from each API call.
-  # @param response [GraphQL::Client::Response] The response from the GraphQL query.
-  def process_fetched_data(response)
-    @content[:articles] += response.data.articles.items.compact.map(&:to_h)
-    @content[:pages] += response.data.pages.items.compact.map(&:to_h)
-    @content[:assets] += response.data.assets.items.compact.map(&:to_h)
-    @content[:redirects] += response.data.redirects.items.compact.map(&:to_h)
-    @content[:events] += response.data.events.items.compact.map(&:to_h)
-    @content[:site] += response.data.site.items.compact.map(&:to_h)
-  end
-
-  # Deep transform hash keys from the camelCase strings in the GraphQL response to Ruby-style snake_case symbols.
-  def transform_keys
-    @content = @content.deep_transform_keys { |key| key.to_s.underscore.to_sym }
   end
 
   # Ensures there's only one `site` stored (that should be the case, but just in case).
@@ -255,6 +241,6 @@ class Contentful
   end
 
   def cache_content
-    $redis.setex(CACHE_KEY, 5.minutes, @content.to_json)
+    $redis.setex(CACHE_KEY, 1.minute, @content.to_json)
   end
 end

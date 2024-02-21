@@ -76,7 +76,7 @@ module ContentfulClient
           }
         }
       }
-      site: siteCollection(limit: 1, order: [sys_firstPublishedAt_ASC]) {
+      site: siteCollection(skip: $skip, limit: 1, order: [sys_firstPublishedAt_ASC]) {
         items {
           title
           metaTitle
