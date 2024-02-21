@@ -88,7 +88,7 @@ class FontAwesome
     icon = response.data.search.map(&:to_h).map(&:with_indifferent_access).first
     svg = icon[:svgs].find { |s| s[:familyStyle][:family] == family && s[:familyStyle][:style] == style }&.dig(:html)
     
-    $redis.setex(cache_key_for(version, family, style, icon_id), 1.year, svg) if svg.present?
+    $redis.set(cache_key_for(version, family, style, icon_id), svg) if svg.present?
     svg
   end
 

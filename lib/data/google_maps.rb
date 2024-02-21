@@ -61,7 +61,7 @@ class GoogleMaps
     return unless response.success?
 
     data = JSON.parse(response.body, symbolize_names: true)&.dig(:results, 0)
-    $redis.setex(cache_key, 1.day, data.to_json) if data.present?
+    $redis.set(cache_key, data.to_json) if data.present?
     data
   end
 
