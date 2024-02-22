@@ -41,22 +41,8 @@ class PurpleAir
   # @see https://api.purpleair.com/#api-sensors-get-sensors-data
   # @return [Hash, nil] The sensor data, or nil if fetching fails.
   def find_sensors
-    cache_key = "purple_air:sensors:#{api_query_params.values.map(&:to_s).join(':')}"
-    data = $redis.get(cache_key)
-
-    return JSON.parse(data) if data.present?
-
-    response = HTTParty.get(PURPLE_AIR_API_URL, query: api_query_params, headers: { 'X-API-Key' => ENV['PURPLEAIR_API_KEY'] })
-    return unless response.success?
-
-    $redis.setex(cache_key, 1.hour, response.body)
-    JSON.parse(response.body)
-  end
-
-  # Constructs query parameters for the API request.
-  # @return [Hash] The API query parameters.
-  def api_query_params
-    {
+    # Get indoor sensors within a bounding box roughly 22x22 km in size
+    query = {
       location_type: 0,
       fields: 'pm2.5,latitude,longitude,humidity',
       nwlat: @latitude + 0.1,
@@ -64,6 +50,17 @@ class PurpleAir
       nwlng: @longitude - 0.1,
       selng: @longitude + 0.1
     }
+
+    cache_key = "purple_air:sensors:#{query.values.map(&:to_s).join(':')}"
+    data = $redis.get(cache_key)
+
+    return JSON.parse(data) if data.present?
+
+    response = HTTParty.get(PURPLE_AIR_API_URL, query: query, headers: { 'X-API-Key' => ENV['PURPLEAIR_API_KEY'] })
+    return unless response.success?
+
+    $redis.setex(cache_key, 1.hour, response.body)
+    JSON.parse(response.body)
   end
 
   # Identifies the nearest air quality sensor based on the current location.
