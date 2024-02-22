@@ -4,33 +4,31 @@ require 'active_support/all'
 # Represents a geographic location with latitude and longitude attributes.
 class Location
   attr_reader :latitude, :longitude
+  LOCATION_CACHE_KEY = 'location:current'
 
   # Initializes the Location instance by fetching the current location from available sources.
   def initialize
-    @latitude, @longitude = split_into_coordinates(set_location)
+    @latitude, @longitude = split_into_coordinates(current_location)
   end
 
   private
-  # Sets the location to use for the various condition data (weather, pollen, air quality, etc.)
+  # Chooses the location to use for the various condition data (weather, pollen, air quality, etc.)
   # The location can come from a few places:
   # 1. From an environment variable, if present and valid.
   # 2. As coordinates in the payload of a Netlify build hook sent from my phone
   #    at regular intervals, which gets cached in redis.
   # 3. From that cache, if it's still there.
   # @return [String, nil] The current location as a "latitude,longitude" string, if available.
-  def set_location
+  def current_location
     return ENV['LOCATION'] if split_into_coordinates(ENV['LOCATION']).present?
-
-    cache_key = 'location:current'
-    cached_location = $redis.get(cache_key)
 
     latitude, longitude = parse_incoming_hook_body
     if valid_coordinates?(latitude, longitude) 
-      current_location = "#{latitude},#{longitude}"
-      $redis.set(cache_key, current_location)
-      current_location
+      location = "#{latitude},#{longitude}"
+      $redis.set(LOCATION_CACHE_KEY, location)
+      location
     else
-      cached_location
+      $redis.get(LOCATION_CACHE_KEY)
     end
   end
 
