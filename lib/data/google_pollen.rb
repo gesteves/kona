@@ -1,5 +1,4 @@
 require 'httparty'
-require 'redis'
 require 'active_support/all'
 
 # The GooglePollen class interfaces with the Google Pollen API to fetch pollen data for a location.

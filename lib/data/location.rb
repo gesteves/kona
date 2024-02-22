@@ -1,4 +1,3 @@
-require 'redis'
 require 'active_support/all'
 
 # Represents a geographic location with latitude and longitude attributes.

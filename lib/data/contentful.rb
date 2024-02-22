@@ -1,5 +1,4 @@
 require 'active_support/all'
-require 'redis'
 require_relative 'graphql/contentful'
 
 class Contentful

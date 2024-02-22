@@ -1,5 +1,4 @@
 require 'httparty'
-require 'redis'
 require 'active_support/all'
 
 # The Strava class interfaces with the Strava API to fetch and save athlete statistics.

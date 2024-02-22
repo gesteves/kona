@@ -1,5 +1,4 @@
 require 'httparty'
-require 'redis'
 require 'active_support/all'
 
 # The PurpleAir class interfaces with the PurpleAir API to fetch air quality data.

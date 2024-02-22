@@ -1,6 +1,5 @@
 require 'yaml'
 require 'json'
-require 'redis'
 require 'active_support/all'
 require_relative 'graphql/font_awesome'
 

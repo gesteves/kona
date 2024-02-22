@@ -1,6 +1,6 @@
 require 'dotenv/tasks'
 require 'rake/clean'
-require 'yaml'
+require 'redis'
 
 # Require all Ruby files in the lib/data directory
 Dir["lib/data/*.rb"].each { |file| require_relative file }

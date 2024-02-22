@@ -1,5 +1,4 @@
 require 'httparty'
-require 'redis'
 require 'active_support/all'
 
 # The GoogleAirQuality class interfaces with the Google Air Quality API to fetch the AQI for a location.

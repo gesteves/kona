@@ -1,6 +1,5 @@
 require 'jwt'
 require 'httparty'
-require 'redis'
 require 'active_support/all'
 
 # The WeatherKit class interfaces with Apple's WeatherKit API to fetch weather data.

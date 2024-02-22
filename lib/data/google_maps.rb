@@ -1,5 +1,4 @@
 require 'httparty'
-require 'redis'
 require 'active_support/all'
 
 # The GoogleMaps class interfaces with the Google Maps API to fetch geocoding and timezone data.
