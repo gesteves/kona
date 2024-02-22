@@ -41,14 +41,14 @@ class PurpleAir
   # @see https://api.purpleair.com/#api-sensors-get-sensors-data
   # @return [Hash, nil] The sensor data, or nil if fetching fails.
   def find_sensors
-    # Get indoor sensors within a bounding box roughly 22x22 km in size
+    # Get indoor sensors within a roughly 11x11 km bounding box
     query = {
       location_type: 0,
       fields: 'pm2.5,latitude,longitude,humidity',
-      nwlat: @latitude + 0.1,
-      selat: @latitude - 0.1,
-      nwlng: @longitude - 0.1,
-      selng: @longitude + 0.1
+      nwlat: @latitude + 0.05,
+      selat: @latitude - 0.05,
+      nwlng: @longitude - 0.05,
+      selng: @longitude + 0.05
     }
 
     cache_key = "purple_air:sensors:#{query.values.map(&:to_s).join(':')}"
