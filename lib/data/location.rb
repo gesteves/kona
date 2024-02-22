@@ -7,30 +7,51 @@ class Location
 
   # Initializes the Location instance by fetching the current location from available sources.
   def initialize
-    @latitude, @longitude = set_location&.split(',')&.map(&:to_f)
+    @latitude, @longitude = split_into_coordinates(set_location)
   end
 
   private
   # Sets the location to use for the various condition data (weather, pollen, air quality, etc.)
   # The location can come from a few places:
-  # 1. As coordinates in the payload of a Netlify build hook sent from my phone
-  #    at regular intervals, which get cached for a couple days.
-  # 2. From that cache, if it's still there.
-  # 3. From an environment variable, which stores a default location.
+  # 1. From an environment variable, if present and valid.
+  # 2. As coordinates in the payload of a Netlify build hook sent from my phone
+  #    at regular intervals, which gets cached in redis.
+  # 3. From that cache, if it's still there.
   # @return [String, nil] The current location as a "latitude,longitude" string, if available.
   def set_location
+    return ENV['LOCATION'] if split_into_coordinates(ENV['LOCATION']).present?
+
     cache_key = 'location:current'
     cached_location = $redis.get(cache_key)
+
     latitude, longitude = parse_incoming_hook_body
-    if latitude.present? && longitude.present?
+    if valid_coordinates?(latitude, longitude) 
       current_location = "#{latitude},#{longitude}"
-      $redis.setex(cache_key, 2.days, current_location)
+      $redis.set(cache_key, current_location)
       current_location
-    elsif cached_location.present? && ENV['USE_DEFAULT_LOCATION'].blank?
-      cached_location
     else
-      ENV['LOCATION']
+      cached_location
     end
+  end
+
+  # Validates the latitude and longitude values.
+  # @param latitude [Float] Latitude value to be validated.
+  # @param longitude [Float] Longitude value to be validated.
+  # @return [Boolean] True if the coordinates are valid, otherwise false.
+  def valid_coordinates?(latitude, longitude)
+    return false if latitude.blank? || longitude.blank?
+    return false if latitude < -90 || latitude > 90
+    return false if longitude < -180 || longitude > 180
+    true
+  end
+
+  # Splits a location string into latitude and longitude coordinates.
+  # @param location [String] The location string in the format "latitude,longitude".
+  # @return [Array<Float>, nil] An array containing the latitude and longitude as floats, or nil if invalid.
+  def split_into_coordinates(location)
+    latitude, longitude = location&.split(',')&.map(&:to_f)
+    return if !valid_coordinates?(latitude, longitude)
+    return latitude, longitude
   end
 
   # Parses the INCOMING_HOOK_BODY environment variable for latitude and longitude values.
