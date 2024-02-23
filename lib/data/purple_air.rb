@@ -187,12 +187,13 @@ class PurpleAir
   # @param distance_km [Float] The half-width and half-height of the bounding box in kilometers.
   # @return [Hash] A hash with keys :nwlat, :selat, :nwlng, :selng representing the coordinates of the bounding box.
   def calculate_bounding_box(latitude, longitude, distance_km)
+    # 1º of latitude is 111 km: https://en.wikipedia.org/wiki/Decimal_degrees#Precision
     latitude_delta = distance_km / 111.0
     longitude_delta = distance_km / (111.0 * Math.cos(latitude * Math::PI / 180))
   
-    # Cap latitude adjustments to avoid exceeding poles
-    nwlat = [[latitude + latitude_delta, 90].min, -90].max
-    selat = [[latitude - latitude_delta, 90].min, -90].max
+    # Clamp latitude adjustments to avoid exceeding poles
+    nwlat = (latitude + latitude_delta).clamp(-90, 90)
+    selat = (latitude - latitude_delta).clamp(-90, 90)
   
     # Calculate longitude, adjusting for wraparound
     nwlng = longitude - longitude_delta
