@@ -37,19 +37,14 @@ class PurpleAir
     data
   end
 
-  # Finds sensors within a defined proximity.
+
+  # Finds sensors within a specified distance from a given latitude and longitude.
   # @see https://api.purpleair.com/#api-sensors-get-sensors-data
-  # @return [Hash, nil] The sensor data, or nil if fetching fails.
-  def find_sensors
-    # Get indoor sensors within a roughly 11x11 km bounding box
-    query = {
-      location_type: 0,
-      fields: 'pm2.5,latitude,longitude,humidity',
-      nwlat: @latitude + 0.05,
-      selat: @latitude - 0.05,
-      nwlng: @longitude - 0.05,
-      selng: @longitude + 0.05
-    }
+  # @param distance_km [Float] The distance from the center point to the edge of the bounding box in kilometers. Defaults to 1 km.
+  # @return [Array, nil] A parsed JSON array of sensor data if the query is successful and data is found; nil otherwise.
+  def find_sensors(distance_km = 1)
+    bounding_box = calculate_bounding_box(@latitude, @longitude, distance_km)
+    query = bounding_box.merge(location_type: 0, fields: 'pm2.5,latitude,longitude,humidity')
 
     cache_key = "purple_air:sensors:#{query.values.map(&:to_s).join(':')}"
     data = $redis.get(cache_key)
@@ -183,5 +178,30 @@ class PurpleAir
     c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   
     earth_radius_km * c
+  end
+
+  # Returns the northwest (NW) and southeast (SE) corners of a bounding box
+  # centered around the given latitude and longitude, expanded by the specified distance in kilometers.
+  # @param latitude [Float] The latitude of the center point in degrees.
+  # @param longitude [Float] The longitude of the center point in degrees.
+  # @param distance_km [Float] The half-width and half-height of the bounding box in kilometers.
+  # @return [Hash] A hash with keys :nwlat, :selat, :nwlng, :selng representing the coordinates of the bounding box.
+  def calculate_bounding_box(latitude, longitude, distance_km)
+    latitude_delta = distance_km / 111.0
+    longitude_delta = distance_km / (111.0 * Math.cos(latitude * Math::PI / 180))
+  
+    # Cap latitude adjustments to avoid exceeding poles
+    nwlat = [[latitude + latitude_delta, 90].min, -90].max
+    selat = [[latitude - latitude_delta, 90].min, -90].max
+  
+    # Calculate longitude, adjusting for wraparound
+    nwlng = longitude - longitude_delta
+    selng = longitude + longitude_delta
+  
+    # Adjust for longitude wraparound
+    nwlng += 360 if nwlng < -180
+    selng -= 360 if selng > 180
+    
+    { nwlat: nwlat, selat: selat, nwlng: nwlng, selng: selng }
   end
 end
