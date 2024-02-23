@@ -9,10 +9,10 @@ module UnitHelpers
   def distance(meters, units: 'si')
     case units
     when 'si', 'metric'
-      metric_distance, metric_units = metric_conversion(meters)
+      metric_distance, metric_units = meters_to_metric_units(meters)
       formatted_distance(metric_distance, metric_units, determine_precision(metric_distance))
     when 'imperial'
-      imperial_distance, imperial_units = imperial_conversion(meters)
+      imperial_distance, imperial_units = meters_to_imperial_units(meters)
       formatted_distance(imperial_distance, imperial_units, determine_precision(imperial_distance))
     end
   end
@@ -57,7 +57,7 @@ module UnitHelpers
   # Converts a distance from meters to kilometers or meters based on the distance magnitude.
   # @param meters [Numeric] The distance in meters to be converted.
   # @return [Array] An array containing the converted distance and its unit (either meters or kilometers).
-  def metric_conversion(meters)
+  def meters_to_metric_units(meters)
     kilometers = meters / 1000.0
 
     if kilometers < 1
@@ -70,7 +70,7 @@ module UnitHelpers
   # Converts a distance from meters to miles or yards based on the distance magnitude.
   # @param meters [Numeric] The distance in meters to be converted.
   # @return [Array] An array containing the converted distance and its unit (either miles or yards).
-  def imperial_conversion(meters)
+  def meters_to_imperial_units(meters)
     miles = meters_to_miles(meters)
     yards = meters_to_yards(meters)
 
