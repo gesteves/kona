@@ -75,8 +75,8 @@ class PurpleAir
     pm25_index = fields.index('pm2.5')
 
     nearest_sensor_data = sensors['data'].reject { |sensor| sensor[lat_index].blank? || sensor[lon_index].blank? }.min_by do |sensor|
-      lat, lon = sensor[lat_index], sensor[lon_index]
-      Math.sqrt((lat - @latitude)**2 + (lon - @longitude)**2)
+      sensor_latitude, sensor_longitude = sensor[lat_index], sensor[lon_index]
+      haversine_distance(@latitude, @longitude, sensor_latitude, sensor_longitude)
     end
 
     return if nearest_sensor_data.blank?
@@ -155,4 +155,33 @@ class PurpleAir
     (aqi_range / pm25_range) * difference_from_low_breakpoint + aqi_low
   end
 
+  # Calculates the great-circle distance between two points on the Earth.
+  # @param lat1 [Float] Latitude of the first point in degrees.
+  # @param lon1 [Float] Longitude of the first point in degrees.
+  # @param lat2 [Float] Latitude of the second point in degrees.
+  # @param lon2 [Float] Longitude of the second point in degrees.
+  # @see https://en.wikipedia.org/wiki/Haversine_formula
+  # @return [Float] The distance between the two points in kilometers.
+  def haversine_distance(lat1, lon1, lat2, lon2)
+    # Arithmetic mean radius of the Earth: https://en.wikipedia.org/wiki/Earth_radius#Arithmetic_mean_radius
+    earth_radius_km = 6371.0
+  
+    # Convert latitude and longitude from degrees to radians
+    lat1 = lat1 * Math::PI / 180
+    lat2 = lat2 * Math::PI / 180
+    lon1 = lon1 * Math::PI / 180
+    lon2 = lon2 * Math::PI / 180
+  
+    # Calculate differences
+    delta_lat = lat2 - lat1
+    delta_lon = lon2 - lon1
+  
+    # Implement Haversine formula
+    a = Math.sin(delta_lat / 2) ** 2 +
+        Math.cos(lat1) * Math.cos(lat2) *
+        Math.sin(delta_lon / 2) ** 2
+    c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  
+    earth_radius_km * c
+  end
 end
