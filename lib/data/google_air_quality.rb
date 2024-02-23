@@ -44,7 +44,7 @@ class GoogleAirQuality
     }
   end
 
-  # gets the AQI data for the given coordinates from the API.
+  # Gets the AQI data for the given coordinates from the API.
   # @see https://developers.google.com/maps/documentation/air-quality/reference/rest/v1/currentConditions/lookup#http-request
   # @return [Hash, nil] AQI data, or nil if fetching fails.
   def lookup_current_conditions
