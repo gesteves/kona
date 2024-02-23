@@ -96,11 +96,9 @@ class WeatherKit
       id: "#{team_id}.#{service_id}"
     }
 
-    current_time = Time.now.to_i
-
     claims = {
       iss: team_id,
-      iat: current_time,
+      iat: Time.now.to_i,
       exp: 1.minute.from_now.to_i,
       sub: service_id
     }
