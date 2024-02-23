@@ -37,7 +37,6 @@ class PurpleAir
     data
   end
 
-
   # Finds sensors within a specified distance from a given latitude and longitude.
   # @see https://api.purpleair.com/#api-sensors-get-sensors-data
   # @param distance_km [Float] The distance from the center point to the edge of the bounding box in kilometers. Defaults to 1 km.
