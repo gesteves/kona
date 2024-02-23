@@ -62,10 +62,10 @@ module MarkupHelpers
 
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
     doc.css('[data-imperial]').each do |element|
-      element['data-units-imperial-value'] = element['data-imperial']
-      element['data-units-metric-value'] = element.text
-      element.remove_attribute('data-imperial')
-      element['data-controller'] = 'units'
+      imperial_value = element['data-imperial']
+      metric_value = element.text
+      new_element = units_tag(metric_value, imperial_value, element.name.to_sym)
+      element.replace(Nokogiri::HTML::DocumentFragment.parse(new_element_html))
     end
     doc.to_html
   end
