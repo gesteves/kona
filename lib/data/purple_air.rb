@@ -13,7 +13,7 @@ class PurpleAir
   def initialize(latitude, longitude)
     @latitude = latitude
     @longitude = longitude
-    @aqi = set_aqi
+    @aqi = get_aqi
   end
 
   # Saves the AQI data to a JSON file.
@@ -23,9 +23,9 @@ class PurpleAir
 
   private
 
-  # Sets the Air Quality Index (AQI) based on the nearest sensor data.
+  # Gets the Air Quality Index (AQI) based on the nearest sensor data.
   # @return [Hash, nil] The AQI and related data, or nil if fetching fails.
-  def set_aqi
+  def get_aqi
     return if @latitude.blank? || @longitude.blank?
 
     sensor = nearest_sensor

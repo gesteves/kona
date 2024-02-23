@@ -16,7 +16,7 @@ class GoogleAirQuality
     @longitude = longitude
     @country_code = country_code
     @aqi_code = aqi_code
-    @aqi = set_aqi
+    @aqi = get_aqi
   end
 
   # Saves the AQI data to a JSON file.
@@ -26,9 +26,9 @@ class GoogleAirQuality
 
   private
 
-  # Sets the air quality data for the specified coordinates.
+  # Gets the air quality data for the specified coordinates.
   # @return [Hash, nil] The AQI data, or nil if fetching fails.
-  def set_aqi
+  def get_aqi
     data = lookup_current_conditions
     return if data.blank?
 
