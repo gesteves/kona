@@ -43,8 +43,8 @@ class FontAwesome
     icons.each do |family, styles|
       styles.each do |style, icons|
         icons.each do |icon_id|
-          cache_key = cache_key_for(version, family, style, icon_id)
-          metadata[cache_key] = [family, style, icon_id]
+          key = cache_key_for(version, family, style, icon_id)
+          metadata[key] = [family, style, icon_id]
         end
       end
     end
@@ -59,8 +59,8 @@ class FontAwesome
   def generate_icon_data(svgs_from_cache, icon_metadata, version)
     icon_data = {}
     svgs_from_cache.each_with_index do |svg, index|
-      cache_key = icon_metadata.keys[index]
-      family, style, icon_id = icon_metadata[cache_key]
+      key = icon_metadata.keys[index]
+      family, style, icon_id = icon_metadata[key]
 
       icon_data[family] ||= {}
       icon_data[family][style] ||= []
