@@ -11,7 +11,7 @@ class FontAwesome
   # @return [FontAwesome] instance of the FontAwesome class.
   def initialize
     @client = FontAwesomeClient::Client
-    @icons = generate_icon_data
+    @icons = get_icons
   end
 
   # Saves the fetched icon data to a JSON file.
@@ -24,45 +24,43 @@ class FontAwesome
   # Gathers icons data from a YAML file and fetches their SVGs from the Font Awesome GraphQL API
   # or the Redis cache, updating the cache with any missing SVGs.
   # @return [Hash] The complete icons data including families, styles, and SVG content.
-  def generate_icon_data
+  def get_icons
     data = YAML.load_file('data/font_awesome.yml')
     version = data['version']
-    cache_keys, icon_mappings = prepare_cache_keys_and_mappings(data['icons'], version)
+    icon_metadata = get_icon_metadata(data['icons'], version)
 
+    cache_keys = icon_metadata.keys
     svgs_from_cache = $redis.mget(*cache_keys)
-    fetch_missing_icons(svgs_from_cache, icon_mappings, version)
+    generate_icon_data(svgs_from_cache, icon_metadata, version)
   end
 
-  # Prepares the cache keys for Redis and maps those keys to their corresponding icon details.
-  #
-  # @param icons [Hash] The icons data from YAML file.
+  # Returns a hash mapping cache keys to icon metadata
+  # @param icons [Hash] The icon data from the YAML file.
   # @param version [String] The version of the icons set.
-  # @return [Array] Two-element array containing cache keys and icon mappings.
-  def prepare_cache_keys_and_mappings(icons, version)
-    cache_keys = []
-    icon_mappings = {}
+  # @return [Hash] A hash mapping cache keys to icon metadata.
+  def get_icon_metadata(icons, version)
+    metadata = {}
     icons.each do |family, styles|
       styles.each do |style, icons|
         icons.each do |icon_id|
           cache_key = cache_key_for(version, family, style, icon_id)
-          cache_keys << cache_key
-          icon_mappings[cache_key] = [family, style, icon_id]
+          metadata[cache_key] = [family, style, icon_id]
         end
       end
     end
-    [cache_keys, icon_mappings]
+    metadata
   end
 
-  # Fetches missing SVGs from the API, updates the Redis cache, and constructs the icons data structure.
-  # @param svgs_from_cache [Array] SVGs fetched from Redis cache.
-  # @param icon_mappings [Hash] Mappings from cache keys to icon details.
+  # Constructs the icons data structure, fetching missing SVGs from the API as needed.
+  # @param svgs_from_cache [Array] SVGs fetched from Redis cache; uncached icons are nil.
+  # @param icon_metadata [Hash] Hash mapping cache keys to icon details.
   # @param version [String] The version of the icons set.
   # @return [Hash] The complete icons data including SVGs.
-  def fetch_missing_icons(svgs_from_cache, icon_mappings, version)
+  def generate_icon_data(svgs_from_cache, icon_metadata, version)
     icon_data = {}
     svgs_from_cache.each_with_index do |svg, index|
-      cache_key = icon_mappings.keys[index]
-      family, style, icon_id = icon_mappings[cache_key]
+      cache_key = icon_metadata.keys[index]
+      family, style, icon_id = icon_metadata[cache_key]
 
       icon_data[family] ||= {}
       icon_data[family][style] ||= []
@@ -86,7 +84,7 @@ class FontAwesome
 
     icon = response.data.search.map(&:to_h).map(&:with_indifferent_access).first
     svg = icon[:svgs].find { |s| s[:familyStyle][:family] == family && s[:familyStyle][:style] == style }&.dig(:html)
-    
+
     $redis.set(cache_key_for(version, family, style, icon_id), svg) if svg.present?
     svg
   end
