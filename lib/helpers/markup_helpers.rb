@@ -65,7 +65,7 @@ module MarkupHelpers
       imperial_value = element['data-imperial']
       metric_value = element.text
       new_element = units_tag(metric_value, imperial_value, element.name.to_sym)
-      element.replace(Nokogiri::HTML::DocumentFragment.parse(new_element_html))
+      element.replace(Nokogiri::HTML::DocumentFragment.parse(new_element))
     end
     doc.to_html
   end

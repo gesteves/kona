@@ -1,6 +1,10 @@
 require 'spec_helper'
+require 'padrino-helpers'
 
 RSpec.describe MarkupHelpers do
+  include Padrino::Helpers
+  include Padrino::Helpers::TagHelpers
+
   let(:affiliate_link) { 'https://www.amazon.com/abc123?tag=example-20' }
   let(:non_affiliate_link) { 'https://www.amazon.com/abc123' }
   let(:external_link) { 'https://www.example.com/whatever' }
@@ -18,7 +22,7 @@ RSpec.describe MarkupHelpers do
 
       it 'adds the correct data attributes' do
         transformed_html = add_unit_data_attributes(html)
-        expect(transformed_html).to eq('<span data-units-imperial-value="6.21 mi" data-units-metric-value="10 km" data-controller="units">10 km</span>')
+        expect(transformed_html).to eq('<span data-controller="units" data-units-imperial-value="6.21 mi" data-units-metric-value="10 km">10 km</span>')
       end
     end
 
