@@ -28,7 +28,7 @@ class PurpleAir
   def get_aqi
     return if @latitude.blank? || @longitude.blank?
 
-    sensor = nearest_sensor
+    sensor = nearest_sensor_within_distance
     return if sensor.blank?
 
     corrected_pm25 = apply_epa_correction(sensor['pm2.5'], sensor['humidity'])
@@ -37,11 +37,29 @@ class PurpleAir
     data
   end
 
-  # Finds sensors within a specified distance from a given latitude and longitude.
-  # @see https://api.purpleair.com/#api-sensors-get-sensors-data
+  # Finds the nearest outdoor air quality sensor within a specified distance from the current location.
   # @param distance_km [Float] The distance from the center point to the edge of the bounding box in kilometers. Defaults to 1 km.
+  # @return [Hash, nil] The nearest sensor data, or nil if none are close enough.
+  def nearest_sensor_within_distance(distance_km = 1)
+    sensors = find_sensors_within_distance(distance_km)
+    return if sensors['data'].blank?
+
+    fields = sensors['fields']
+    lat_index = fields.index('latitude')
+    lon_index = fields.index('longitude')
+    pm25_index = fields.index('pm2.5')
+
+    nearest_sensor_data = sensors['data'].min_by { |sensor| haversine_distance(@latitude, @longitude, sensor[lat_index], sensor[lon_index]) }
+
+    # Combine the fields with the corresponding data for the nearest sensor
+    fields.zip(nearest_sensor_data).to_h
+  end
+
+  # Finds all outdoor air quality sensors within a specified distance from the current location.
+  # @see https://api.purpleair.com/#api-sensors-get-sensors-data
+  # @param distance_km [Float] The distance from the center point to the edge of the bounding box in kilometers.
   # @return [Array, nil] A parsed JSON array of sensor data if the query is successful and data is found; nil otherwise.
-  def find_sensors(distance_km = 1)
+  def find_sensors_within_distance(distance_km)
     bounding_box = calculate_bounding_box(@latitude, @longitude, distance_km)
     query = bounding_box.merge(location_type: 0, fields: 'pm2.5,latitude,longitude,humidity')
 
@@ -55,28 +73,6 @@ class PurpleAir
 
     $redis.setex(cache_key, 1.hour, response.body)
     JSON.parse(response.body)
-  end
-
-  # Identifies the nearest air quality sensor based on the current location.
-  # @return [Hash, nil] The nearest sensor data, or nil if none are close enough.
-  def nearest_sensor
-    sensors = find_sensors
-    return if sensors['data'].blank?
-
-    fields = sensors['fields']
-    lat_index = fields.index('latitude')
-    lon_index = fields.index('longitude')
-    pm25_index = fields.index('pm2.5')
-
-    nearest_sensor_data = sensors['data'].reject { |sensor| sensor[lat_index].blank? || sensor[lon_index].blank? }.min_by do |sensor|
-      sensor_latitude, sensor_longitude = sensor[lat_index], sensor[lon_index]
-      haversine_distance(@latitude, @longitude, sensor_latitude, sensor_longitude)
-    end
-
-    return if nearest_sensor_data.blank?
-
-    # Combine the fields with the corresponding data for the nearest sensor
-    fields.zip(nearest_sensor_data).to_h
   end
 
   # Applies EPA correction to raw PM2.5 data based on humidity.
@@ -159,23 +155,23 @@ class PurpleAir
   def haversine_distance(lat1, lon1, lat2, lon2)
     # Arithmetic mean radius of the Earth: https://en.wikipedia.org/wiki/Earth_radius#Arithmetic_mean_radius
     earth_radius_km = 6371.0
-  
+
     # Convert latitude and longitude from degrees to radians
     lat1 = lat1 * Math::PI / 180
     lat2 = lat2 * Math::PI / 180
     lon1 = lon1 * Math::PI / 180
     lon2 = lon2 * Math::PI / 180
-  
+
     # Calculate differences
     delta_lat = lat2 - lat1
     delta_lon = lon2 - lon1
-  
+
     # Implement Haversine formula
     a = Math.sin(delta_lat / 2) ** 2 +
         Math.cos(lat1) * Math.cos(lat2) *
         Math.sin(delta_lon / 2) ** 2
     c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  
+
     earth_radius_km * c
   end
 
@@ -189,19 +185,19 @@ class PurpleAir
     # 1º of latitude is 111 km: https://en.wikipedia.org/wiki/Decimal_degrees#Precision
     latitude_delta = distance_km / 111.0
     longitude_delta = distance_km / (111.0 * Math.cos(latitude * Math::PI / 180))
-  
+
     # Clamp latitude adjustments to avoid exceeding poles
     nwlat = (latitude + latitude_delta).clamp(-90, 90)
     selat = (latitude - latitude_delta).clamp(-90, 90)
-  
+
     # Calculate longitude, adjusting for wraparound
     nwlng = longitude - longitude_delta
     selng = longitude + longitude_delta
-  
+
     # Adjust for longitude wraparound
     nwlng += 360 if nwlng < -180
     selng -= 360 if selng > 180
-    
+
     { nwlat: nwlat, selat: selat, nwlng: nwlng, selng: selng }
   end
 end
