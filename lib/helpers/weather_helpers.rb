@@ -342,6 +342,13 @@ module WeatherHelpers
     end
   end
 
+  # Checks if it's indoor training season in Jackson Hole.
+  # Indoor season is from November through March.
+  # @return [Boolean] True if it's indoor season, false otherwise.
+  def is_indoor_season?
+    in_jackson_hole? && (Time.now.month <= 3 || Time.now.month >= 11)
+  end
+
   # Determines the weather icon to display based on current weather conditions.
   # @return [String] The name of the weather icon to display.
   def weather_icon
