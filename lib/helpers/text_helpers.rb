@@ -23,5 +23,4 @@ module TextHelpers
   def with_indefinite_article(word)
     word =~ /^(8|11|18|a|e|i|o|u)/i ? "an #{word}" : "a #{word}"
   end
-  
 end

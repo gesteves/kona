@@ -32,5 +32,4 @@ module UrlHelpers
     uri = URI.parse(root_url)
     domain = PublicSuffix.domain(uri.host)
   end
-
 end

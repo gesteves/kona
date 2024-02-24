@@ -48,5 +48,4 @@ module ShareHelpers
     encoded_text = ERB::Util.url_encode(text)
     "https://www.threads.net/intent/post?text=#{encoded_text}"
   end
-
 end
