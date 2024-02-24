@@ -253,8 +253,9 @@ module WeatherHelpers
     return if current_weather.blank?
     text = []
     text << "#{format_current_condition(current_weather.condition_code).capitalize}, with a temperature of #{format_temperature(current_weather.temperature)}"
-    text << "which feels like #{format_temperature(current_weather.temperature_apparent)}" unless hide_apparent_temperature?
-    text.join(', ')
+    text << ", which feels like #{format_temperature(current_weather.temperature_apparent)}" unless hide_apparent_temperature?
+    text << " and #{number_to_percentage(current_weather.humidity * 100, precision: 0)} humidity" unless current_weather.humidity.blank? || current_weather.humidity.zero?
+    text.join
   end
 
   # Provides a summary of the current Air Quality Index (AQI).
