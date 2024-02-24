@@ -61,17 +61,6 @@ module SiteHelpers
     !content.index_in_search_engines
   end
 
-  # Generates the path for a specific page in a paginated series.
-  # @param page [Integer] The page number for which to generate the path.
-  # @return [String] The path for the given page in the pagination.
-  def pagination_path(page:)
-    if page == 1
-      "/blog/index.html"
-    else
-      "/blog/page/#{page}/index.html"
-    end
-  end
-
   # Selects a specified number of articles related to a given article based on shared tags.
   # @param article [Object] The reference article for finding related articles.
   # @param count [Integer] (Optional) The number of related articles to return. Default is 4.

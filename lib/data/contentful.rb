@@ -199,12 +199,28 @@ class Contentful
         current_page = index + 1
         previous_page = index.zero? ? nil : index
         next_page = index == sliced.size - 1 ? nil : index + 2
+        path = current_page == 1 ? "/tagged/#{tag[:id]}/index.html" : "/tagged/#{tag[:id]}/page/#{current_page}/index.html"
+        previous_page_path = if previous_page.blank?
+          nil
+        elsif previous_page == 1
+          "/tagged/#{tag[:id]}/index.html"
+        else
+          "/tagged/#{tag[:id]}/page/#{previous_page}/index.html"
+        end
+        next_page_path = if next_page.blank?
+          nil
+        else
+          "/tagged/#{tag[:id]}/page/#{next_page}/index.html"
+        end
+
         {
           current_page: current_page,
           previous_page: previous_page,
           next_page: next_page,
           template: "/articles.html",
-          path: current_page == 1 ? "/tagged/#{tag[:id]}/index.html" : "/tagged/#{tag[:id]}/page/#{current_page}/index.html",
+          path: path,
+          previous_page_path: previous_page_path,
+          next_page_path: next_page_path,
           title: tag[:name],
           items: page,
           index_in_search_engines: true
@@ -225,12 +241,27 @@ class Contentful
       current_page = index + 1
       previous_page = index.zero? ? nil : index
       next_page = index == sliced_articles.size - 1 ? nil : index + 2
+      path = current_page == 1 ? "/blog/index.html" : "/blog/page/#{current_page}/index.html"
+      previous_page_path = if previous_page.blank?
+        nil
+      elsif previous_page == 1
+        "/blog/index.html"
+      else
+        "/blog/page/#{previous_page}/index.html"
+      end
+      next_page_path = if next_page.blank?
+        nil
+      else
+        "/blog/page/#{next_page}/index.html"
+      end
       {
         current_page: current_page,
         previous_page: previous_page,
         next_page: next_page,
         template: "/articles.html",
-        path: current_page == 1 ? "/blog/index.html" : "/blog/page/#{current_page}/index.html",
+        path: path,
+        previous_page_path: previous_page_path,
+        next_page_path: next_page_path,
         title: "Blog",
         items: page,
         index_in_search_engines: true
