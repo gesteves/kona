@@ -83,21 +83,21 @@ module SiteHelpers
       .reject { |a| a.draft } # Reject drafts
       .reject { |a| a.entry_type == 'Short' } # Reject short posts
       .sort { |a,b| (b.contentful_metadata.tags.map(&:id) & tags).size <=> (a.contentful_metadata.tags.map(&:id) & tags).size } # Fake relevancy sorting by sorting by number of common tags
-      .slice(0, count) # Slice the specified number of articles
+      .take(count) # Take the specified number of articles
   end
 
   # Retrieves a specified number of random articles, excluding drafts and short entries.
   # @param count [Integer] (Optional) The number of random articles to return. Default is 5.
   # @return [Array<Object>] An array of randomly selected articles, up to the specified count.
   def random_articles(count: 5)
-    data.articles.reject { |a| a.draft || a.entry_type == 'Short' }.shuffle.slice(0, count)
+    data.articles.reject { |a| a.draft || a.entry_type == 'Short' }.shuffle.take(count)
   end
 
   # Retrieves a specified number of the most recent articles, excluding drafts and short entries.
   # @param count [Integer] (Optional) The number of recent articles to return. Default is 5.
   # @return [Array<Object>] An array of the most recent articles, up to the specified count.
   def recent_articles(count: 5)
-    data.articles.reject { |a| a.draft || a.entry_type == 'Short' }.slice(0, count)
+    data.articles.reject { |a| a.draft || a.entry_type == 'Short' }.take(count)
   end
 
   # Attempts to determine the time the website was most recently updated.
@@ -108,5 +108,11 @@ module SiteHelpers
       data.articles.reject { |a| a.draft || !a.index_in_search_engines }.map { |a| DateTime.parse(a.sys.published_at) },
       DateTime.parse(data.site.sys.published_at)
     ].flatten.max
+  end
+
+  # Returns a range of years, from the year the earliest article was published to the current year.
+  # @return [String] A range of years, like 2006-2024.
+  def copyright_years
+    "#{data.articles.reject(&:draft).map { |a| DateTime.parse(a.published_at) }.min.strftime('%Y')}–#{Time.current.in_time_zone(location_time_zone).strftime('%Y')}"
   end
 end

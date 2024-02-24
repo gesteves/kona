@@ -50,7 +50,7 @@
       <% end %>
 
       <section class="footer__section">
-        <h2>© <%= data.articles.reject(&:draft).map { |a| DateTime.parse(a.published_at) }.min.strftime('%Y') %>–<%= Time.now.strftime('%Y') %></h2>
+        <h2>© <%= copyright_years %></h2>
         <p><%= data.site.copyright %></p>
       </section>
   </div>
