@@ -145,7 +145,7 @@ module WeatherHelpers
   # @return [String] The pollen index category.
   def pollen_index_category
     return "None" if pollen_index_value.zero?
-    data.pollen.pollen_type_info.find { |p| p.index_info.value.to_i == pollen_index_value }.index_info.category
+    data.pollen.pollen_type_info&.find { |p| p&.index_info&.value.to_i == pollen_index_value }&.index_info.category
   end
 
   # Returns the pollen level's description as a sentence.
