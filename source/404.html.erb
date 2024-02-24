@@ -13,7 +13,8 @@ body: I'm sorry, but the page you were looking for can't be found.
       <%= smartypants(markdown_to_html(current_page.data.body)) %>
     </div>
   </section>
-  <% if data.articles.reject { |a| a.draft }.present? %>
-    <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent_articles(count: 4), variant: "centered" } %>
+  <% recent_articles = recent_articles(count: 4) %>
+  <% if recent_articles.present? %>
+    <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent_articles, variant: "centered" } %>
   <% end %>
 </div>
