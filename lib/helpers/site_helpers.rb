@@ -30,7 +30,7 @@ module SiteHelpers
     end
     title << data.site.meta_title if include_site_name
 
-    Sanitize.fragment(title.reject(&:blank?).uniq.join(separator)).strip
+    sanitize(title.reject(&:blank?).uniq.join(separator))
   end
 
   # Wraps the generated page title within a title HTML tag.
@@ -46,11 +46,12 @@ module SiteHelpers
   # @param content [Object] The content object which may contain a summary.
   # @return [String] The content summary or the site's meta description.
   def content_summary(content)
-    if content.summary.present?
+    summary = if content.summary.present?
       content.summary
     else
       data.site.meta_description
     end
+    sanitize(summary)
   end
 
   # Determines whether the content should be hidden from search engines.
