@@ -53,7 +53,8 @@ module LocationHelpers
     elevation = data.location.elevation
     return if elevation.blank?
     meters = "#{number_to_rounded(elevation, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')} m"
-    feet = "#{number_to_rounded(meters_to_feet(elevation), precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')} feet"
+    feet = number_to_rounded(meters_to_feet(elevation), precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')
+    feet = feet == "1" ? "#{feet} foot" : "#{feet} feet"
     units_tag(meters, feet)
   end
 
