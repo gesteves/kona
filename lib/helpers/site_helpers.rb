@@ -62,6 +62,13 @@ module SiteHelpers
     !content.index_in_search_engines
   end
 
+  # Returns the canonical URL for the current content object or the current page.
+  # @return [String] A canonical URL.
+  def canonical_url
+    return content.canonical_url if defined?(content) && content&.canonical_url.present?
+    full_url(current_page.url)
+  end
+
   # Selects a specified number of articles related to a given article based on shared tags.
   # @param article [Object] The reference article for finding related articles.
   # @param count [Integer] (Optional) The number of related articles to return. Default is 4.
