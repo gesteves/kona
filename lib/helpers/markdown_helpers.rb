@@ -12,13 +12,6 @@ module MarkdownHelpers
     Redcarpet::Render::SmartyPants.render(markdown.render(text))
   end
 
-  # Converts Markdown text to plain text by first converting to HTML and then stripping HTML tags.
-  # @param text [String] The Markdown text to be converted.
-  # @return [String] The plain text representation of the Markdown text.
-  def markdown_to_text(text)
-    Sanitize.fragment(markdown_to_html(text)).strip
-  end
-
   # Applies SmartyPants rendering to the provided text for typographic improvements.
   # @param text [String] The text to be processed with SmartyPants rendering.
   # @return [String] The text after SmartyPants rendering, or an empty string if the original text is blank.

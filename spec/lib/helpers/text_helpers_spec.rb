@@ -27,4 +27,13 @@ RSpec.describe TextHelpers do
       expect(with_indefinite_article("80-minute workout")).to eq("an 80-minute workout")
     end
   end
+
+  describe '#sanitize' do
+    let(:markdown) { '**bold** and _italic_ with a <span>span</span> for good measure' }
+
+    it 'returns plain text, stripping HTML tags and Markdown syntax' do
+      text = sanitize(markdown)
+      expect(text).to eq('bold and italic with a span for good measure')
+    end
+  end
 end

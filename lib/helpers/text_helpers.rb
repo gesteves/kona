@@ -23,4 +23,11 @@ module TextHelpers
   def with_indefinite_article(word)
     word =~ /^(8|11|18|a|e|i|o|u)/i ? "an #{word}" : "a #{word}"
   end
+
+  # Removes markup and Markdown syntax from a string by first converting Markdown to HTML and then stripping HTML tags.
+  # @param text [String] The text to be sanitized.
+  # @return [String] The plain text with tags or Markdown syntax removed.
+  def sanitize(text)
+    Sanitize.fragment(markdown_to_html(text)).strip
+  end
 end
