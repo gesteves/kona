@@ -54,9 +54,10 @@ module SiteHelpers
   end
 
   # Determines whether the content should be hidden from search engines.
-  # @param content [Object] The content object to evaluate.
-  # @return [Boolean] Returns true if the content should not be indexed in search engines.
-  def hide_from_search_engines?(content)
+  # @return [Boolean] Returns true if the page should be hidden from search engines.
+  def hide_from_search_engines?
+    return true unless is_production?
+    return false unless defined?(content)
     return true if content.draft
     !content.index_in_search_engines
   end

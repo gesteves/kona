@@ -12,7 +12,7 @@
 <meta name="viewport" content="width=device-width,minimum-scale=1">
 <meta name="view-transition" content="same-origin">
 <meta name="theme-color" content="#BF0222">
-<% if !is_production? || (defined?(content) && hide_from_search_engines?(content)) %>
+<% if hide_from_search_engines? %>
   <meta name="robots" content="noindex">
 <% else %>
   <meta name="bingbot" content="noarchive">
