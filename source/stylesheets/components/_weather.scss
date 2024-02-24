@@ -10,10 +10,6 @@
 .weather__icon {
   grid-column: span 2;
 
-  @media (min-width: #{$bp-medium}) {
-    align-self: center;
-  }
-
   @media (min-width: 1024px) {
     grid-column: span 1;
   }
