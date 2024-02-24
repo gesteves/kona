@@ -133,25 +133,26 @@ module WeatherHelpers
     label.gsub('very', '_very_').gsub('hazardous', '**hazardous**')
   end
 
-  # Returns a hash with the highest pollen level.
-  # @see https://developers.google.com/maps/documentation/pollen/reference/rest/v1/forecast/lookup#indexinfo
-  # @return [Hash, nil]
-  def pollen_level
-    data.pollen&.pollen_type_info&.filter { |p| p&.index_info&.value.to_i > 0 }&.max_by { |p| p.index_info.value }
-  end
-
-  # Returns the pollen index, from 0 to 5.
+  # Returns the pollen index value, from 0 to 5.
   # @see https://developers.google.com/maps/documentation/pollen/reference/rest/v1/forecast/lookup#indexinfo
   # @return [Integer] The pollen index, where 0 is "none", and 5 is "very high"
-  def pollen_index
-    pollen_level&.index_info&.value.to_i
+  def pollen_index_value
+    data.pollen&.pollen_type_info&.select { |p| p&.index_info&.value.to_i > 0 }&.map { |p| p.index_info.value }&.max.to_i
   end
 
-  # Returns the pollen level's description.
+  # Returns the pollen index category, from "none" to "very high".
+  # @see https://developers.google.com/maps/documentation/pollen/reference/rest/v1/forecast/lookup#indexinfo
+  # @return [String] The pollen index category.
+  def pollen_index_category
+    return "None" if pollen_index_value.zero?
+    data.pollen.pollen_type_info.find { |p| p.index_info.value.to_i == pollen_index_value }.index_info.category
+  end
+
+  # Returns the pollen level's description as a sentence.
   # @return [String, nil] Description of the highest pollen level or nil.
   def format_pollen_level
-    return if pollen_index.zero?
-    "Pollen levels are #{pollen_level.index_info.category.downcase}"
+    return if pollen_index_value.zero?
+    "Pollen levels are #{pollen_index_category.downcase}"
   end
 
   # Determines if the current weather conditions are considered "bad" for working out outdoors.
@@ -177,7 +178,7 @@ module WeatherHelpers
     # There's gonna be accumulating snow
     return true if snowfall > 0
     # Pollen is high or very high
-    return true if pollen_index >= 4
+    return true if pollen_index_value >= 4
     # The current or forecasted conditions are adverse weather
     data.conditions.dig(current_weather.condition_code, :adverse_weather) || data.conditions.dig(todays_forecast.condition_code, :adverse_weather)
   end
