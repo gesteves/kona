@@ -53,14 +53,8 @@ class WeatherKit
     response = HTTParty.get("#{WEATHERKIT_API_URL}/weather/en/#{@latitude}/#{@longitude}", query: query, headers: headers)
     return unless response.success?
 
-    data = JSON.parse(response.body, symbolize_names: true)
-    expire_in = begin
-      Time.parse(data.dig(:currentWeather, :metadata, :expireTime)).to_i - Time.now.to_i
-    rescue
-      5.minutes
-    end
-    $redis.setex(cache_key, expire_in, response.body)
-    data
+    $redis.setex(cache_key, 5.minutes, response.body)
+    JSON.parse(response.body, symbolize_names: true)
   end
 
   # Checks the availability of weather data for the specified location.

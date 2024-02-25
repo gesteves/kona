@@ -14,7 +14,7 @@
   <% if recent_articles.present? %>
     <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent_articles, variant: "halves" } %>
   <% end %>
-  <% if weather_data_is_current? %>
+  <% if weather_summary.present? %>
     <%= partial 'partials/weather' %>
   <% end %>
   <% if data.events.present? %>
