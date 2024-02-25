@@ -52,8 +52,8 @@ module FontAwesomeClient
   Client = GraphQL::Client.new(schema: Schema, execute: HTTP)
 
   QUERIES = Client.parse <<-'GRAPHQL'
-    query Icons ($version: String!, $query: String!, $first: Int) {
-      search(version: $version, query: $query, first: $first) {
+    query Icons ($version: String!, $query: String!) {
+      search(version: $version, query: $query) {
         id
         svgs {
           familyStyle {

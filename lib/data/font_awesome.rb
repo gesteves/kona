@@ -77,14 +77,15 @@ class FontAwesome
   # @param family [String] The icon family.
   # @param style [String] The icon style.
   # @param icon_id [String] The unique identifier for the icon.
+  # @see https://fontawesome.com/docs/apis/graphql/get-started
   # @return [String, nil] The SVG content for the icon, or nil if not found.
   def fetch_from_api(version, family, style, icon_id)
-    response = @client.query(FontAwesomeClient::QUERIES::Icons, variables: { version: version, query: icon_id, first: 1 })
+    response = @client.query(FontAwesomeClient::QUERIES::Icons, variables: { version: version, query: icon_id })
     return if response.data.search.empty?
 
-    icon = response.data.search.map(&:to_h).map(&:with_indifferent_access).first
-    svg = icon[:svgs].find { |s| s[:familyStyle][:family] == family && s[:familyStyle][:style] == style }&.dig(:html)
-
+    results = response.data.search.map(&:to_h)
+    icon = results.find { |i| i['id'] == icon_id }
+    svg = icon.dig('svgs')&.find { |s| s.dig('familyStyle', 'family') == family && s.dig('familyStyle', 'style') == style }&.dig('html')
     $redis.set(cache_key_for(version, family, style, icon_id), svg) if svg.present?
     svg
   end
