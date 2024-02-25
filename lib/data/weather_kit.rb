@@ -35,7 +35,7 @@ class WeatherKit
     cache_key = "weatherkit:weather:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
     data = $redis.get(cache_key)
 
-    return JSON.parse(data) if data.present?
+    return JSON.parse(data, symbolize_names: true) if data.present?
 
     datasets = availability
     return if datasets.blank?
@@ -53,8 +53,14 @@ class WeatherKit
     response = HTTParty.get("#{WEATHERKIT_API_URL}/weather/en/#{@latitude}/#{@longitude}", query: query, headers: headers)
     return unless response.success?
 
-    $redis.setex(cache_key, 5.minutes, response.body)
-    JSON.parse(response.body)
+    data = JSON.parse(response.body, symbolize_names: true)
+    expire_in = begin
+      Time.parse(data.dig(:currentWeather, :metadata, :expireTime)).to_i - Time.now.to_i
+    rescue
+      5.minutes
+    end
+    $redis.setex(cache_key, expire_in, response.body)
+    data
   end
 
   # Checks the availability of weather data for the specified location.
@@ -64,7 +70,7 @@ class WeatherKit
     cache_key = "weatherkit:availability:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
     data = $redis.get(cache_key)
 
-    return JSON.parse(data) if data.present?
+    return JSON.parse(data, symbolize_names: true) if data.present?
 
     headers = {
       "Authorization" => "Bearer #{token}"
@@ -78,7 +84,7 @@ class WeatherKit
     return unless response.success?
 
     $redis.setex(cache_key, 1.day, response.body)
-    JSON.parse(response.body)
+    JSON.parse(response.body, symbolize_names: true)
   end
 
   # Generates an authentication token for the WeatherKit API.
