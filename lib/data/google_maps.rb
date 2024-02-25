@@ -109,7 +109,7 @@ class GoogleMaps
     data = JSON.parse(response.body, symbolize_names: true)
     return if data[:status] == 'ZERO_RESULTS'
 
-    $redis.setex(cache_key, 1.day, data.to_json)
+    $redis.setex(cache_key, 1.hour, data.to_json)
     data
   end
 end
