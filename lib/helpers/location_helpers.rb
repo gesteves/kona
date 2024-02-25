@@ -8,10 +8,10 @@ module LocationHelpers
     components = data.location.geocoded.address_components
 
     # Extract city, state/region, and country names from the components
-    city = components.find { |component| component['types'].include?('locality') }&.long_name
-    region = components.find { |component| component['types'].include?('administrative_area_level_1') }&.long_name
-    county = components.find { |component| component['types'].include?('administrative_area_level_2') }&.long_name
-    country = components.find { |component| component['types'].include?('country') }&.long_name
+    city = components.find { |component| component.types.include?('locality') }&.long_name || components.find { |component| component.types.include?('sublocality') }&.long_name
+    region = components.find { |component| component.types.include?('administrative_area_level_1') }&.long_name
+    county = components.find { |component| component.types.include?('administrative_area_level_2') }&.long_name
+    country = components.find { |component| component.types.include?('country') }&.long_name
 
     # Replace single quotes with curly single quotes, so places like "Coeur d’Alene" look right.
     # (For whatever reason, SmartyPants can't handle this).
