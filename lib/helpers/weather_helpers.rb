@@ -8,11 +8,12 @@ module WeatherHelpers
     thousand: 'm'
   }
 
-  # Validates that the available weather data is still valid and not stale.
+  # Validates that the available weather data is still current and not stale.
   # @return [Boolean] True if the weather data is still current.
   def weather_data_is_current?
-    return false if current_weather.blank? || todays_forecast.blank?
-    Time.parse(current_weather.as_of) <= 1.hour.from_now
+    Time.parse(current_weather&.metadata&.expire_time) >= Time.now
+  rescue
+    false
   end
 
   # Retrieves the current weather conditions.
