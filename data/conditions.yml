@@ -24,7 +24,7 @@ Breezy:
   phrases:
     currently: it's breezy
     forecast: is breezy
-  icon: wind-warning
+  icon: wind
 
 Clear:
   adverse_weather: false
@@ -33,7 +33,7 @@ Clear:
     forecast: is clear
   icon:
     day: sun
-    night: moon
+    night: moon-stars
 
 Cloudy:
   adverse_weather: false
@@ -82,7 +82,7 @@ FreezingRain:
   phrases:
     currently: there's freezing rain
     forecast: calls for freezing rain
-  icon: cloud-hail-mixed
+  icon: cloud-sleet
 
 Frigid:
   adverse_weather: true
@@ -103,7 +103,7 @@ Haze:
   phrases:
     currently: it's hazy
     forecast: is hazy
-  icon: sun-haze
+  icon: cloud-fog
 
 HeavyRain:
   adverse_weather: true
@@ -117,7 +117,7 @@ HeavySnow:
   phrases:
     currently: it's snowing heavily
     forecast: calls for heavy snow
-  icon: cloud-snow
+  icon: snowflakes
 
 IsolatedThunderstorms:
   adverse_weather: true
@@ -131,21 +131,21 @@ MixedRainAndSleet:
   phrases:
     currently: there's a mix of rain and sleet
     forecast: calls for mixed rain and sleet
-  icon: cloud-hail-mixed
+  icon: cloud-sleet
 
 MixedRainAndSnow:
   adverse_weather: true
   phrases:
     currently: there's a mix of rain and snow
     forecast: calls for mixed rain and snow
-  icon: cloud-hail-mixed
+  icon: cloud-sleet
 
 MixedRainfall:
   adverse_weather: true
   phrases:
     currently: there's mixed rainfall
     forecast: calls for mixed rainfall
-  icon: cloud-hail-mixed
+  icon: cloud-sleet
 
 MixedSnowAndSleet:
   adverse_weather: true
@@ -221,14 +221,14 @@ Smoke:
   phrases:
     currently: it's smoky
     forecast: calls for smoky conditions
-  icon: smoke
+  icon: fire-smoke
 
 Snow:
   adverse_weather: true
   phrases:
     currently: it's snowing
     forecast: calls for snow
-  icon: cloud-snow
+  icon: snowflake
 
 SnowShowers:
   adverse_weather: true
