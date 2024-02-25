@@ -7,6 +7,8 @@ require 'redis'
 module FontAwesomeClient
   Dotenv.load
 
+  FONT_AWESOME_API_URL = "https://api.fontawesome.com"
+
   REDIS = Redis.new(
     host: ENV['REDIS_HOST'] || 'localhost',
     port: ENV['REDIS_PORT'] || 6379,
@@ -18,28 +20,26 @@ module FontAwesomeClient
     access_token = REDIS.get("font_awesome:access_token")
     return access_token if access_token.present?
 
-    response = HTTParty.post(
-      "https://api.fontawesome.com/token",
-      headers: { "Authorization" => "Bearer #{api_token}", "Content-Type" => "application/json" }
-    )
-    if response.code == 200
-      access_token = response.parsed_response["access_token"]
-      expires_in = response.parsed_response["expires_in"]
+    headers = {
+      "Authorization" => "Bearer #{api_token}",
+      "Content-Type" => "application/json"
+    }
 
-      REDIS.setex("font_awesome:access_token", expires_in, access_token)
+    response = HTTParty.post("#{FONT_AWESOME_API_URL}/token", headers: headers)
+    return unless response.success?
 
-      access_token
-    else
-      puts "Error fetching the access token: #{response.body}"
-      nil
-    end
+    data = JSON.parse(response.body, symbolize_names: true)
+    access_token = data[:access_token]
+    expires_in = data[:expires_in]
+    REDIS.setex("font_awesome:access_token", expires_in, access_token)
+    access_token
   rescue StandardError => e
     puts "Error fetching the access token: #{e}"
     nil
   end
 
   # Creates the HTTP client for GraphQL
-  HTTP = GraphQL::Client::HTTP.new("https://api.fontawesome.com") do
+  HTTP = GraphQL::Client::HTTP.new(FONT_AWESOME_API_URL) do
     def headers(context)
       { "Authorization": "Bearer #{FontAwesomeClient.get_access_token(ENV['FONT_AWESOME_API_TOKEN'])}" }
     end
