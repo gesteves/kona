@@ -17,7 +17,7 @@ class GoogleMaps
     @location = {}
     @location[:geocoded] = reverse_geocode
     @location[:time_zone] = get_time_zone
-    @location[:elevation] = get_elevation[:elevation]
+    @location[:elevation] = get_elevation&.dig(:elevation)
   end
 
   # Returns a timezone ID of the form "America/Denver".
