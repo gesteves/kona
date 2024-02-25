@@ -58,10 +58,10 @@ class Strava
   # Retrieves the Strava access token, refreshing it if necessary.
   # @return [String, nil] The access token, or nil if unavailable.
   def get_access_token
-    access_token = $redis.get('strava:access_token')
+    access_token = $redis.get("strava:access_token:#{@athlete_id}")
     return access_token if access_token.present?
 
-    refresh_token = $redis.get('strava:refresh_token') || ENV['STRAVA_REFRESH_TOKEN']
+    refresh_token = $redis.get("strava:refresh_token:#{@athlete_id}") || ENV['STRAVA_REFRESH_TOKEN']
     return if refresh_token.blank?
 
     refresh_access_token(refresh_token)
@@ -88,11 +88,11 @@ class Strava
 
     if access_token.present?
       expiration = expires_at - Time.now.to_i
-      $redis.setex('strava:access_token', expiration, access_token)
+      $redis.setex("strava:access_token:#{@athlete_id}", expiration, access_token)
     end
 
     if new_refresh_token.present?
-      $redis.set('strava:refresh_token', new_refresh_token)
+      $redis.set("strava:refresh_token:#{@athlete_id}", new_refresh_token)
     end
 
     access_token

@@ -2,7 +2,7 @@ require 'active_support/all'
 require_relative 'graphql/contentful'
 
 class Contentful
-  CACHE_KEY = "contentful:content"
+  CACHE_KEY = "contentful:content:#{ENV['CONTENTFUL_SPACE']}"
 
   def initialize
     @client = ContentfulClient::Client

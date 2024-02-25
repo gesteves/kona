@@ -44,7 +44,7 @@ class GoogleMaps
   # @return [Hash, nil] The geocoding data, or nil if fetching fails.
   def reverse_geocode
     return if @latitude.blank? || @longitude.blank?
-    cache_key = "google_maps:geocoded:#{@latitude}:#{@longitude}"
+    cache_key = "google:maps:geocoded:#{@latitude}:#{@longitude}"
     data = $redis.get(cache_key)
 
     return JSON.parse(data, symbolize_names: true) if data.present?
@@ -69,7 +69,7 @@ class GoogleMaps
   # @return [Hash, nil] The elevation data, or nil if fetching fails.
   def get_elevation
     return if @latitude.blank? || @longitude.blank?
-    cache_key = "google_maps:elevation:#{@latitude}:#{@longitude}"
+    cache_key = "google:maps:elevation:#{@latitude}:#{@longitude}"
     data = $redis.get(cache_key)
 
     return JSON.parse(data, symbolize_names: true) if data.present?
@@ -92,7 +92,7 @@ class GoogleMaps
   # @return [Hash, nil] The time zone data, or nil if fetching fails.
   def get_time_zone
     return if @latitude.blank? || @longitude.blank?
-    cache_key = "google_maps:time_zone:#{@latitude}:#{@longitude}"
+    cache_key = "google:maps:time_zone:#{@latitude}:#{@longitude}"
     data = $redis.get(cache_key)
 
     return JSON.parse(data, symbolize_names: true) if data.present?
