@@ -2,6 +2,6 @@
 layout: false
 ---
 
-<% if weather_summary.present? %>
+<% if weather_data_is_current? %>
   <%= partial 'partials/weather' %>
 <% end %>
