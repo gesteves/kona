@@ -69,4 +69,10 @@ module LocationHelpers
   def location_time_zone
     data&.location&.time_zone&.time_zone_id || ENV['DEFAULT_TIMEZONE'] || 'America/Denver'
   end
+
+  # Returns the current time in the current location's time zone
+  # @return [DateTime] The current time in the local time zone
+  def current_time
+    Time.current.in_time_zone(location_time_zone)
+  end
 end

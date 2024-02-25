@@ -111,6 +111,6 @@ module SiteHelpers
   # Returns a range of years, from the year the earliest article was published to the current year.
   # @return [String] A range of years, like 2006-2024.
   def copyright_years
-    "#{data.articles.reject(&:draft).map { |a| DateTime.parse(a.published_at) }.min.strftime('%Y')}–#{Time.current.in_time_zone(location_time_zone).strftime('%Y')}"
+    "#{data.articles.reject(&:draft).map { |a| DateTime.parse(a.published_at) }.min.strftime('%Y')}–#{current_time.strftime('%Y')}"
   end
 end

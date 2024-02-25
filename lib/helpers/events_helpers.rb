@@ -4,8 +4,7 @@ module EventsHelpers
   # @return [Boolean] Returns true if the given event is today; false otherwise.
   def is_today?(event)
     event_date = Time.parse(event.date).in_time_zone(location_time_zone)
-    today = Time.current.in_time_zone(location_time_zone)
-    event_date.to_date == today.to_date
+    event_date.to_date == current_time.to_date
   end
 
   # Finds today's race event, if any.
@@ -17,7 +16,7 @@ module EventsHelpers
   # Returns a collection of upcoming race events.
   # @return [Array<Event>] An array of event objects that are today or in the future.
   def upcoming_races
-    data.events.select { |e| Time.parse(e.date).in_time_zone(location_time_zone).beginning_of_day >= Time.current.in_time_zone(location_time_zone).beginning_of_day }
+    data.events.select { |e| Time.parse(e.date).in_time_zone(location_time_zone).beginning_of_day >= current_time.beginning_of_day }
   end
 
   # Determines if today is a race day.
