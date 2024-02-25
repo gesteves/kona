@@ -11,7 +11,7 @@ BUILD_DIRECTORY = 'build'
 # Remove all existing data files from previous imports.
 CLOBBER.include %w{ data/*.json }
 
-$redis = Redis.new(
+$redis ||= Redis.new(
   host: ENV['REDIS_HOST'] || 'localhost',
   port: ENV['REDIS_PORT'] || 6379,
   username: ENV['REDIS_USERNAME'],
