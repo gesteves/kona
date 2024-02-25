@@ -77,7 +77,7 @@ class WeatherKit
     response = HTTParty.get("#{WEATHERKIT_API_URL}/availability/#{@latitude}/#{@longitude}", query: query, headers: headers)
     return unless response.success?
 
-    $redis.setex(cache_key, 1.day, response.body)
+    $redis.setex(cache_key, 5.minutes, response.body)
     JSON.parse(response.body, symbolize_names: true)
   end
 
