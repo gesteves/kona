@@ -27,6 +27,7 @@ module ContentfulClient
           intro
           body
           author {
+            slug
             name
           }
           summary
@@ -86,6 +87,7 @@ module ContentfulClient
           email
           entriesPerPage
           author {
+            slug
             name
             profilePicture {
               width
