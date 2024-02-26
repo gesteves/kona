@@ -2,8 +2,6 @@ require 'active_support/all'
 require_relative 'graphql/contentful'
 
 class Contentful
-  CACHE_KEY = "contentful:content:#{ENV['CONTENTFUL_SPACE']}"
-
   def initialize
     @client = ContentfulClient::Client
     @content = {
@@ -41,21 +39,14 @@ class Contentful
     puts "Failed to save #{type}: #{e.message}"
   end
 
-  # Generates the content  by fetching from Contentful and processing it.
-  # Caches the newly fetched and processed content.
+  # Generates the content by fetching from Contentful and processing it.
   def generate_content!
-    content = $redis.get(CACHE_KEY)
-    if content.present?
-      @content = JSON.parse(content, symbolize_names: true)
-    else
-      get_contentful_data
-      process_site
-      process_articles
-      process_pages
-      generate_blog
-      generate_tags
-      cache_content
-    end
+    get_contentful_data
+    process_site
+    process_articles
+    process_pages
+    generate_blog
+    generate_tags
   end
 
   # Fetches all content from Contentful's GraphQL API.
@@ -66,7 +57,7 @@ class Contentful
       # Fetch the data from the API.
       response = @client.query(ContentfulClient::QUERIES::Content, variables: { skip: skip, limit: limit })
       raise if response.data.blank?
-      # Convert the data in the response to a hash, and transform the keys from CamelCase to Ruby-style camel_case :symbols.
+      # Convert the data in the response to a hash, and transform the keys from camelCase to Ruby-style camel_case :symbols.
       data = response.data.to_h.deep_transform_keys { |key| key.to_s.underscore.to_sym }
       # Break the loop when the API stops returning items for all of the content types.
       break if data.keys.all? { |k| data.dig(k, :items).empty? }
@@ -268,9 +259,5 @@ class Contentful
       }
     end
     @content[:blog] = blog_pages
-  end
-
-  def cache_content
-    $redis.setex(CACHE_KEY, 5.minutes, @content.to_json)
   end
 end
