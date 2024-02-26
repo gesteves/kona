@@ -321,14 +321,4 @@ module MarkupHelpers
       metric
     end
   end
-
-  # Returns the src attribute of the first <img> tag in the given HTML markup.
-  # @param html [String] The HTML content to search through.
-  # @return [String, nil] The src attribute of the first image, or nil if no image is found.
-  def first_image_url(html)
-    return if html.blank?
-    doc = Nokogiri::HTML(html)
-    img = doc.at_css('img')
-    img.present? ? img['src'] : nil
-  end
 end

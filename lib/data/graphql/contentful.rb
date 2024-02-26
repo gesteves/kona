@@ -34,7 +34,7 @@ module ContentfulClient
           published
           indexInSearchEngines
           canonicalUrl
-          openGraphImage {
+          coverImage {
             width
             height
             url
@@ -63,7 +63,7 @@ module ContentfulClient
           indexInSearchEngines
           canonicalUrl
           isHomePage
-          openGraphImage {
+          coverImage {
             width
             height
             url
@@ -123,7 +123,7 @@ module ContentfulClient
             url
             contentType
           }
-          openGraphImage {
+          coverImage {
             width
             height
             url

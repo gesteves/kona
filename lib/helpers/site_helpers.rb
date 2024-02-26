@@ -127,12 +127,11 @@ module SiteHelpers
       "dateModified": DateTime.parse(content.sys.published_at).iso8601,
       "author": { "@type": "Person", "name": content.author.name, "url": full_url("/author/#{content.author.slug}") }
     }
-    image_url = content&.open_graph_image&.url || first_image_url(markdown_to_html(content.body))
-    if image_url.present?
+    if content&.cover_image&.url.present?
       schema["image"] = ["1000x1000", "1600x900", "1600x1200"].map do |s|
         w, h = s.split('x')
         params = { w: w, h: h, fit: 'cover' }
-        cdn_image_url(image_url, params)
+        cdn_image_url(content.cover_image.url, params)
       end
     end
     schema.to_json
