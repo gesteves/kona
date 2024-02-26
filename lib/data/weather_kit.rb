@@ -106,5 +106,7 @@ class WeatherKit
     private_key = OpenSSL::PKey::EC.new(private_key_content)
 
     JWT.encode(claims, private_key, 'ES256', header)
+  rescue
+    nil
   end
 end
