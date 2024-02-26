@@ -113,4 +113,28 @@ module SiteHelpers
   def copyright_years
     "#{data.articles.reject(&:draft).map { |a| DateTime.parse(a.published_at) }.min.strftime('%Y')}–#{current_time.strftime('%Y')}"
   end
+
+  # Generates a JSON-LD schema string for an article, based on the provided content.
+  # @param content [Object] An object containing the article's data.
+  # @see https://developers.google.com/search/docs/appearance/structured-data/article
+  # @return [String] A JSON-LD formatted string representing the article's schema.
+  def article_schema(content)
+    schema = {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": sanitize(content.title),
+      "datePublished": DateTime.parse(content.published_at).iso8601,
+      "dateModified": DateTime.parse(content.sys.published_at).iso8601,
+      "author": { name: content.author.name }
+    }
+    image_url = content&.open_graph_image&.url || first_image_url(markdown_to_html(content.body))
+    if image_url.present?
+      schema["image"] = ["1000x1000", "1600x900", "1600x1200"].map do |s|
+        w, h = s.split('x')
+        params = { w: w, h: h, fit: 'cover' }
+        cdn_image_url(image_url, params)
+      end
+    end
+    schema.to_json
+  end
 end

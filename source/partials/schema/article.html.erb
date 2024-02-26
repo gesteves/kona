@@ -1,0 +1,3 @@
+<% if defined?(content) && content.entry_type == 'Article' %>
+<script type="application/ld+json"><%= article_schema(content) %></script>
+<% end %>
