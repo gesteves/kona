@@ -24,7 +24,6 @@ $redis ||= Redis.new(
 desc 'Imports all content for the site'
 task :import => [:dotenv, :clobber] do
   setup_data_directory
-  puts ENV['INCOMING_HOOK_BODY']
   measure_and_output(:import_contentful, "Importing site content")
   measure_and_output(:import_font_awesome, "Importing icons")
   measure_and_output(:import_strava, "Importing activity stats")
