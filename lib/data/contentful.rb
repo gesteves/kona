@@ -271,6 +271,6 @@ class Contentful
   end
 
   def cache_content
-    $redis.setex(CACHE_KEY, 1.minute, @content.to_json)
+    $redis.setex(CACHE_KEY, 5.minutes, @content.to_json)
   end
 end
