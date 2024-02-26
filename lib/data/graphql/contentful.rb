@@ -18,7 +18,35 @@ module ContentfulClient
   # Create the GraphQL client
   Client = GraphQL::Client.new(schema: Schema, execute: HTTP)
 
+  # Modified query using fragments
   QUERIES = Client.parse <<-'GRAPHQL'
+    fragment SysFields on Sys {
+      id
+      firstPublishedAt
+      publishedAt
+      publishedVersion
+    }
+
+    fragment ImageFields on Asset {
+      width
+      height
+      url
+      description
+      title
+      contentType
+    }
+
+    fragment AuthorFields on Author {
+      slug
+      name
+    }
+
+    fragment ShortcutFields on Shortcut {
+      title
+      destination
+      openInNewTab
+    }
+
     query Content ($skip: Int, $limit: Int) {
       articles: articleCollection(skip: $skip, limit: $limit, preview: true) {
         items {
@@ -27,24 +55,17 @@ module ContentfulClient
           intro
           body
           author {
-            slug
-            name
+            ...AuthorFields
           }
           summary
           published
           indexInSearchEngines
           canonicalUrl
           coverImage {
-            width
-            height
-            url
-            description
+            ...ImageFields
           }
           sys {
-            id
-            firstPublishedAt
-            publishedAt
-            publishedVersion
+            ...SysFields
           }
           contentfulMetadata {
             tags {
@@ -64,16 +85,10 @@ module ContentfulClient
           canonicalUrl
           isHomePage
           coverImage {
-            width
-            height
-            url
-            description
+            ...ImageFields
           }
           sys {
-            id
-            firstPublishedAt
-            publishedAt
-            publishedVersion
+            ...SysFields
           }
         }
       }
@@ -87,50 +102,34 @@ module ContentfulClient
           email
           entriesPerPage
           author {
-            slug
-            name
+            ...AuthorFields
             profilePicture {
-              width
-              height
-              url
-              description
+              ...ImageFields
             }
           }
           navLinksCollection {
             items {
-              title
-              destination
-              openInNewTab
+              ...ShortcutFields
             }
           }
           footerLinksCollection {
             items {
-              title
-              destination
-              openInNewTab
+              ...ShortcutFields
             }
           }
           socialsCollection {
             items {
-              title
-              destination
-              openInNewTab
+              ...ShortcutFields
             }
           }
           logo {
-            width
-            height
-            url
-            contentType
+            ...ImageFields
           }
           coverImage {
-            width
-            height
-            url
-            description
+            ...ImageFields
           }
           sys {
-            publishedAt
+            ...SysFields
           }
         }
       }
@@ -139,6 +138,9 @@ module ContentfulClient
           from
           to
           status
+          sys {
+            ...SysFields
+          }
         }
       }
       events: eventCollection(skip: $skip, limit: $limit, order: [date_ASC], where: { canceled: false }) {
@@ -150,21 +152,16 @@ module ContentfulClient
           trackingUrl
           date
           sys {
-            id
+            ...SysFields
           }
         }
       }
       assets: assetCollection(skip: $skip, limit: $limit, preview: true, order: [sys_firstPublishedAt_DESC]) {
         items {
+          ...ImageFields
           sys {
-            id
+            ...SysFields
           }
-          url
-          width
-          height
-          description
-          title
-          contentType
         }
       }
     }
