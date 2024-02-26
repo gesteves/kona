@@ -15,11 +15,6 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="<%= content.open_graph_image.description %>">
-<% elsif defined(content) && first_image_url(markdown_to_html(content.body)).present? %>
-  <meta property="og:image" content="<%= first_image_url(markdown_to_html(content.body)) %>">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="<%= get_asset_description(get_asset_id(first_image_url(markdown_to_html(content.body)))) %>">
 <% elsif data.site.open_graph_image.present? %>
   <meta property="og:image" content="<%= cdn_image_url(data.site.open_graph_image.url) %>">
   <meta property="og:image:width" content="<%= data.site.open_graph_image.width %>">
