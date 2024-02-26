@@ -42,8 +42,3 @@ h6 {
 .turbo-progress-bar {
   visibility: hidden;
 }
-
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: var(--transition-duration);
-}
