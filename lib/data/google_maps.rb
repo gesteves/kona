@@ -107,7 +107,7 @@ class GoogleMaps
     return unless response.success?
 
     data = JSON.parse(response.body, symbolize_names: true)
-    return if data[:status] == 'ZERO_RESULTS'
+    return unless data[:status] == 'OK'
 
     $redis.setex(cache_key, 1.hour, data.to_json)
     data
