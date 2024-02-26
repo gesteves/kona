@@ -1,6 +1,7 @@
 <head>
   <%= partial 'partials/meta' %>
   <%= partial 'partials/open_graph' %>
+  <%= partial 'partials/schema/article' if defined?(content) && content.entry_type == 'Article' %>
   <link rel="canonical" href="<%= canonical_url %>">
   <link rel="alternate" type="application/atom+xml" href="<%= full_url("/feed.xml") %>" />
   <link rel="icon" href="/favicon.ico" sizes="32x32">
@@ -12,6 +13,5 @@
   <%= stylesheet_link_tag 'site', 'data-turbo-track': 'reload' %>
   <%= stylesheet_link_tag 'print', media: 'print', 'data-turbo-track': 'reload' %>
   <%= yield_content :assets %>
-  <%= partial 'partials/schema/article' %>
   <%= partial 'partials/analytics' %>
 </head>
