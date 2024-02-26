@@ -18,7 +18,6 @@ module ContentfulClient
   # Create the GraphQL client
   Client = GraphQL::Client.new(schema: Schema, execute: HTTP)
 
-  # Modified query using fragments
   QUERIES = Client.parse <<-'GRAPHQL'
     fragment SysFields on Sys {
       id
