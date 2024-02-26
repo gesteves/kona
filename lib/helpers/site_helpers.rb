@@ -125,7 +125,7 @@ module SiteHelpers
       "headline": sanitize(content.title),
       "datePublished": DateTime.parse(content.published_at).iso8601,
       "dateModified": DateTime.parse(content.sys.published_at).iso8601,
-      "author": { name: content.author.name }
+      "author": { "@type": "Person", "name": content.author.name, "url": full_url("/about.html") }
     }
     image_url = content&.open_graph_image&.url || first_image_url(markdown_to_html(content.body))
     if image_url.present?
