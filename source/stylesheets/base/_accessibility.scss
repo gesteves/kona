@@ -46,8 +46,7 @@
 }
 
 @media screen and (prefers-reduced-motion) {
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
-    animation-duration: 0s;
+  :root {
+    --transition-duration: 0s;
   }
 }

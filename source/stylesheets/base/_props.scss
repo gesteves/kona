@@ -217,8 +217,4 @@
                                           hsl(208deg 70% 88%) 100%
                                         ); // https://www.joshwcomeau.com/gradient-generator?colors=eef5fc|cbe2f6&angle=180&colorMode=hcl&precision=8&easingCurve=0.333|1|0.666|0
   }
-
-  @media (prefers-reduced-motion) {
-    --transition-duration: 0;
-  }
 }
