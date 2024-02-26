@@ -11,19 +11,11 @@ BUILD_DIRECTORY = 'build'
 # Remove all existing data files from previous imports.
 CLOBBER.include %w{ data/*.json }
 
-$redis ||= Redis.new(
-  host: ENV['REDIS_HOST'] || 'localhost',
-  port: ENV['REDIS_PORT'] || 6379,
-  username: ENV['REDIS_USERNAME'],
-  password: ENV['REDIS_PASSWORD']
-)
-
-@google_maps = nil
-@location = Location.new
-
 desc 'Imports all content for the site'
 task :import => [:dotenv, :clobber] do
   setup_data_directory
+  initialize_redis
+  initialize_location
   measure_and_output(:import_contentful, "Importing site content")
   measure_and_output(:import_font_awesome, "Importing icons")
   measure_and_output(:import_strava, "Importing activity stats")
@@ -71,6 +63,19 @@ end
 
 def setup_data_directory
   FileUtils.mkdir_p(DATA_DIRECTORY)
+end
+
+def initialize_redis
+  $redis ||= Redis.new(
+    host: ENV['REDIS_HOST'] || 'localhost',
+    port: ENV['REDIS_PORT'] || 6379,
+    username: ENV['REDIS_USERNAME'],
+    password: ENV['REDIS_PASSWORD']
+  )
+end
+
+def initialize_location
+  @location ||= Location.new
 end
 
 def import_contentful
