@@ -64,9 +64,9 @@ This requires Google Maps and WeatherKit to be set up to work.
 
 #### Location
 
-To set the location used for the weather conditions and forecast on the home page, add it as a comma-separated pair of latitude/longitude coordinates to the `LOCATION` environment variable, like `"19.639133263373843, -155.9967081931534"`. You can also pass them as JSON in the body of a [Netlify build hook](https://docs.netlify.com/configure-builds/build-hooks/) to update them (and the website) automatically.
+To set the location used for the weather conditions and forecast on the home page, add it as a comma-separated pair of latitude/longitude coordinates to the `LOCATION` environment variable, like `"19.639133263373843, -155.9967081931534"`. You can also leave this blank, and pass the coordinates as JSON in the body of a [Netlify build hook](https://docs.netlify.com/configure-builds/build-hooks/) to update them (and the website) automatically (but note that if set, the environment variable takes precedence).
 
-For example, making the following request...
+For example, if the `LOCATION` environment variable is not set, making the following HTTP POST request...
 
 ```
 curl -X POST <NETLIFY_BUILD_HOOK_URL> -H "Content-Type: application/json" -d '{ "latitude": 19.639133263373843, "longitude": -155.9967081931534 }'
