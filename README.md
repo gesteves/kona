@@ -1,18 +1,18 @@
 # Kona
 
-This is a very simple blog system written in [Middleman](https://middlemanapp.com/), powered by [Contentful](https://www.contentful.com/), and hosted on [Netlify](https://www.netlify.com/). Check it out at *[Given to Tri](https://www.giventotri.com/)*.
+This is a very fast and streamlined blogging system written in [Middleman](https://middlemanapp.com/), powered by [Contentful](https://www.contentful.com/), and hosted on [Netlify](https://www.netlify.com/). Check it out at *[Given to Tri](https://www.giventotri.com/)*.
 
 [![Netlify Status](https://api.netlify.com/api/v1/badges/f87f4e00-a5a5-436d-b6df-a3628c3fb919/deploy-status)](https://app.netlify.com/sites/giventotri/deploys)
 
 ## Setup
 
-Kona leverages Middleman's [data files](https://middlemanapp.com/advanced/data-files/) by making API calls to various services, manipulating the responses as needed, and dropping the data in the `data/` folder as JSON files, which makes them available as data in the app's templates and helper methods. To do this, you'll need to set up these services and add the necessary credentials as environment variables. Check out the `.env.example` file in the repo to see the credentials you'll need.
+Kona leverages Middleman's [data files](https://middlemanapp.com/advanced/data-files/) by making API calls to various services, manipulating the responses as needed, and dropping the data in the `data/` folder as JSON files, which makes them available as data in the app's templates and helper methods. To do this, you'll need to set up these services and add the necessary credentials as environment variables. Check out the `.env.example` file in the repo to see the credentials you'll need. You'll want to add them to an `.env` file and to the site's environment variables in Netlify.
 
 ### Required services
 
 #### Netlify
 
-Kona can technically be hosted basically anywhere because it's just a static site generator, but it works much better on Netlify since it's set up to use Netlify features such as [Build Hooks](https://docs.netlify.com/configure-builds/build-hooks/) and [Image CDN](https://docs.netlify.com/image-cdn/overview/).
+Kona can technically be hosted basically anywhere because it's just a static site generator, but it works much better on Netlify since it's set up to use Netlify features such as [build hooks](https://docs.netlify.com/configure-builds/build-hooks/), [functions](https://docs.netlify.com/functions/overview/) and [Image CDN](https://docs.netlify.com/image-cdn/overview/).
 
 #### Contentful
 
@@ -58,7 +58,7 @@ This requires Google Maps to be set up to work.
 
 #### Purple Air
 
-Kona uses [Purple Air](https://www2.purpleair.com/) to show hyperlocal air quality data on the weather section on the home page. You can get one at https://develop.purpleair.com and add it to the `PURPLEAIR_API_KEY` environment variable.
+Kona uses [Purple Air](https://www2.purpleair.com/) to show hyperlocal air quality data on the weather section on the home page. You can get an API key at https://develop.purpleair.com and add it to the `PURPLEAIR_API_KEY` environment variable.
 
 This requires Google Maps and WeatherKit to be set up to work.
 
@@ -76,11 +76,11 @@ curl -X POST <NETLIFY_BUILD_HOOK_URL> -H "Content-Type: application/json" -d '{ 
 
 #### TrainerRoad
 
-This doesn't do much, it's simply used to check if a workout is scheduled for today. You can grab the calendar URL from https://www.trainerroad.com/app/profile/calendar-sync and add it to the environment variable.
+This doesn't do much, it's simply used to check if a workout is scheduled for today and adjust some messaging on the home page accordingly. You can grab the calendar URL from https://www.trainerroad.com/app/profile/calendar-sync and add it to the environment variable.
 
 #### Netlify build hook
 
-To keep the weather information on the front page current, you can use a [Netlify build hook](https://docs.netlify.com/configure-builds/build-hooks/) to rebuild the site hourly. To set this up, create a build hook in the site's build configuration and add it to the `BUILD_HOOK_URL` environment variable.
+To keep the information on the home page current, you can use a [Netlify build hook](https://docs.netlify.com/configure-builds/build-hooks/) to rebuild the site hourly. To set this up, create a build hook in the site's build configuration and add it to the `BUILD_HOOK_URL` environment variable.
 
 ### Running the site locally
 
