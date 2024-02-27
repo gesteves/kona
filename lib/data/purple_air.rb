@@ -26,7 +26,7 @@ class PurpleAir
   # Gets the Air Quality Index (AQI) based on the nearest sensor data.
   # @return [Hash, nil] The AQI and related data, or nil if fetching fails.
   def get_aqi
-    return if @latitude.blank? || @longitude.blank? || ENV['PURPLEAIR_API_KEY']
+    return if @latitude.blank? || @longitude.blank? || ENV['PURPLEAIR_API_KEY'].blank?
 
     sensor = nearest_sensor_within_distance
     return if sensor.blank?
