@@ -6,13 +6,17 @@ This is a very simple blog system written in [Middleman](https://middlemanapp.co
 
 ## Setup
 
-Kona leverages Middleman's [data files](https://middlemanapp.com/advanced/data-files/) functionality by making API calls to various services, manipulating the responses as needed, and dropping the data in the `data/` folder as JSON files, which makes them available as data in the app's templates and helper methods. To do this, you'll need to set up these services and add the necessary credentials as environment variables. Check out the `.env.example` file in the repo to see the credentials you'll need.
+Kona leverages Middleman's [data files](https://middlemanapp.com/advanced/data-files/) by making API calls to various services, manipulating the responses as needed, and dropping the data in the `data/` folder as JSON files, which makes them available as data in the app's templates and helper methods. To do this, you'll need to set up these services and add the necessary credentials as environment variables. Check out the `.env.example` file in the repo to see the credentials you'll need.
 
 ### Required services
 
+#### Netlify
+
+Kona can technically be hosted basically anywhere because it's just a static site generator, but it works much better on Netlify since it's set up to use Netlify features such as [Build Hooks](https://docs.netlify.com/configure-builds/build-hooks/) and [Image CDN](https://docs.netlify.com/image-cdn/overview/).
+
 #### Contentful
 
-[Contentful](https://www.contentful.com/) is used to author most of the site's content, including the blog articles. Unfortunately, there's no quick way to set this up, but you'll want a content model like this:
+[Contentful](https://www.contentful.com/) is the CMS used to author most of the site's content, including the blog articles. Unfortunately, there's no quick way to set this up, but you'll want a content model like this:
 
 ![cf-Given to Tri-master-2024-02-26_14-27-43](https://github.com/gesteves/kona/assets/6379/02191523-7786-4b36-860e-a00671938e1e)
 
@@ -20,13 +24,15 @@ Then head over to Settings > API Keys in Contentful, create a new API key, copy 
 
 #### Font Awesome
 
-Kona uses Font Awesome for the various icons on the site. Rather than store the SVGs themselves in the repo, it pulls them from the API at build time. You'll need a Font Awesome Pro account, and an API token with a "Pro icons and metadata" scope, which you can set up at https://fontawesome.com/account/general. Add it to the `FONT_AWESOME_API_TOKEN` environment variable.
+Kona uses Font Awesome for the various icons on the site. Rather than store the SVGs themselves in the repo, it pulls them from the API at build time. You'll need a Font Awesome Pro account, and an API token with a "Pro icons and metadata" read scope, which you can set up at https://fontawesome.com/account/general. Add it to the `FONT_AWESOME_API_TOKEN` environment variable.
 
 #### Redis
 
 Kona uses redis to cache some of the API responses from various services, which makes deploys a little speedier. You can set up a free instance at https://redis.com and add the credentials to the appropriate environment variables.
 
 ### Optional services
+
+The services below aren't required to run Kona, but they provide additional data, mainly the various stats on the home page.
 
 #### Strava
 
@@ -38,9 +44,9 @@ Kona uses Google Maps to geocode the location shown on the home page, and fetch 
 
 * Geocoding API
 * Time Zone API
+* Maps Elevation API
 * Air Quality API
 * Pollen API
-* Maps Elevation API
 
 Then, add the API key to the `GOOGLE_API_KEY` environment variable.
 
@@ -90,5 +96,5 @@ Steps:
 2. Install dependencies with `bundle install` and `npm install`
 4. Build the site with `netlify build`, which will run the data import tasks
 5. Run the local server with `netlify dev`
-6. Optionally, if you're going to make changes to the JavaScript files, run `npm run watch` in another terminal tab
+6. Optionally, if you're going to make changes to the JS files, run `npm run watch` in another terminal tab
 7. If you want to reload the data without rebuilding the site, run `bundle exec rake import`
