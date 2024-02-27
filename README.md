@@ -6,7 +6,7 @@ This is a very simple blog system written in [Middleman](https://middlemanapp.co
 
 ## Setup
 
-Kona leverages Middleman's [data files](https://middlemanapp.com/advanced/data-files/) functionality by making API calls to various services, manipulating the responses as needed, and dropping the data in the `data/` folder as JSON files, which makes them available as data in the app's templated and helper methods. To do this, you'll need to set up these services and add the necessary credentials as environment variables. Check out the `.env.example` file in the repo to see the credentials you'll need.
+Kona leverages Middleman's [data files](https://middlemanapp.com/advanced/data-files/) functionality by making API calls to various services, manipulating the responses as needed, and dropping the data in the `data/` folder as JSON files, which makes them available as data in the app's templates and helper methods. To do this, you'll need to set up these services and add the necessary credentials as environment variables. Check out the `.env.example` file in the repo to see the credentials you'll need.
 
 ### Required services
 
@@ -58,7 +58,7 @@ This requires Google Maps and WeatherKit to be set up to work.
 
 #### Location
 
-To set the location used for the weather conditions and forecast on the home page, add it as a pair of coordinates to the `LOCATION` environment variable, like "19.639133263373843, -155.9967081931534". You can also pass them as JSON in the body of a [Netlify build hook](https://docs.netlify.com/configure-builds/build-hooks/) to update them (and the website) automatically.
+To set the location used for the weather conditions and forecast on the home page, add it as a pair of coordinates to the `LOCATION` environment variable, like `"19.639133263373843, -155.9967081931534"`. You can also pass them as JSON in the body of a [Netlify build hook](https://docs.netlify.com/configure-builds/build-hooks/) to update them (and the website) automatically.
 
 For example, making the following request...
 
