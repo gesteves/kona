@@ -6,11 +6,11 @@
         <%= icon_svg("classic", "solid", "arrow-up-from-bracket") %>
       </button>
 
-      <a aria-label="Share by email" title="Share by email" class="share__button" href="<%= mail_share_url(article) %>">
+      <a aria-label="Share by email" title="Share by email" class="share__button" href="<%= mail_share_url(article) %>" rel="noopener nofollow">
         <%= icon_svg("classic", "solid", "envelope") %>
       </a>
 
-      <a aria-label="Share by text message" title="Share by text message" class="share__button" href="<%= sms_share_url(article) %>">
+      <a aria-label="Share by text message" title="Share by text message" class="share__button" href="<%= sms_share_url(article) %>" rel="noopener nofollow">
         <%= icon_svg("classic", "solid", "comment") %>
       </a>
 
