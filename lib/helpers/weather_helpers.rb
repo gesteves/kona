@@ -8,6 +8,18 @@ module WeatherHelpers
     thousand: 'm'
   }
 
+  # Returns if the current weather data is still current.
+  # @return [Boolean] True if the weather data is still current.
+  def weather_data_is_current?
+    current_weather.present? && todays_forecast.present?
+  end
+
+  # Returns if the current weather data is stale/out of date.
+  # @return [Boolean] True if the weather data is stale.
+  def weather_data_is_stale?
+    !weather_data_is_current?
+  end
+
   # Retrieves the current weather conditions.
   # @return [Hash, nil] The current weather conditions data, or nil if not found.
   def current_weather
@@ -18,7 +30,7 @@ module WeatherHelpers
   # @return [Hash, nil] The forecast data for today, or nil if not found.
   def todays_forecast
     now = Time.now
-    data.weather.forecast_daily&.days&.find { |d| Time.parse(d.forecast_start) <= now && Time.parse(d.forecast_end) >= now }
+    data.weather.forecast_daily&.days&.find { |d| d.rest_of_day_forecast.present? && Time.parse(d.forecast_start) <= now && Time.parse(d.forecast_end) >= now }
   end
 
   # Retrieves the forecast for tomorrow.
@@ -208,7 +220,7 @@ module WeatherHelpers
   # Generates a summary of weather-related information.
   # @return [String] An HTML-formatted summary of weather-related information.
   def weather_summary
-    return if currently.blank? && forecast.blank?
+    return if weather_data_is_stale?
     summary = []
     summary << race_day
     summary << smooth
