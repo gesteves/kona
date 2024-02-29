@@ -46,6 +46,7 @@ GEM
       concurrent-ruby (~> 1.0)
     hashie (3.6.0)
     htmlcompressor (0.2.0)
+    htmlentities (4.3.4)
     httparty (0.21.0)
       mini_mime (>= 1.0.0)
       multi_xml (>= 0.5.2)
@@ -176,6 +177,7 @@ DEPENDENCIES
   blurhash!
   dotenv
   graphql-client
+  htmlentities
   httparty
   icalendar
   jwt

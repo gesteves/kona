@@ -27,7 +27,9 @@ module TextHelpers
   # Removes markup and Markdown syntax from a string by first converting Markdown to HTML and then stripping HTML tags.
   # @param text [String] The text to be sanitized.
   # @return [String] The plain text with tags or Markdown syntax removed.
-  def sanitize(text)
-    Sanitize.fragment(markdown_to_html(text)).strip
+  def sanitize(text, ignore_html_entities: false)
+    text = Sanitize.fragment(markdown_to_html(text)).strip
+    text = HTMLEntities.new.decode(text) if ignore_html_entities
+    text
   end
 end
