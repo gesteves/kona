@@ -24,12 +24,13 @@ module TextHelpers
     word =~ /^(8|11|18|a|e|i|o|u)/i ? "an #{word}" : "a #{word}"
   end
 
-  # Removes markup and Markdown syntax from a string by first converting Markdown to HTML and then stripping HTML tags.
+  # Sanitizes a given text by removing any HTML tags, and optionally decoding HTML entities.
   # @param text [String] The text to be sanitized.
-  # @return [String] The plain text with tags or Markdown syntax removed.
-  def sanitize(text, ignore_html_entities: false)
+  # @param decode_html_entities [Boolean] Whether to decode HTML entities in the sanitized text, for example `&amp;` back to `&`. Defaults to false.
+  # @return [String] The sanitized text, with HTML tags removed and optionally HTML entities decoded.
+  def sanitize(text, decode_html_entities: false)
     text = Sanitize.fragment(markdown_to_html(text)).strip
-    text = HTMLEntities.new.decode(text) if ignore_html_entities
+    text = HTMLEntities.new.decode(text) if decode_html_entities
     text
   end
 end
