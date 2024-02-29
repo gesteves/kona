@@ -14,6 +14,10 @@
         <%= icon_svg("classic", "solid", "comment") %>
       </a>
 
+      <a aria-label="Share on Bluesky" class="share__button" href="<%= bluesky_share_url(article) %>" rel="noopener nofollow" target="_blank">
+        <%= icon_svg("classic", "solid", "square") %>
+      </a>
+
       <a aria-label="Share on Facebook" class="share__button" data-controller="share" data-action="click->share#openPopup" href="<%= facebook_share_url(article) %>" rel="noopener nofollow" target="_blank">
         <%= icon_svg("classic", "brands", "facebook-f") %>
       </a>

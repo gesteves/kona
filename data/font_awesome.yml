@@ -9,6 +9,7 @@ icons:
       - arrow-up-from-bracket
       - comment
       - envelope
+      - square
     thin:
       - bolt-lightning
       - cloud-bolt
