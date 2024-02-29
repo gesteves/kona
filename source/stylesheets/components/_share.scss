@@ -2,20 +2,29 @@
   grid-column: 1 / -1;
   position: relative;
 
-  &::before {
-    background: linear-gradient(to right, rgba(0, 0, 0, 0), var(--color-background));
+  &::before,
+  &::after {
     bottom: 0;
     content: "";
     pointer-events: none;
     position: absolute;
-    right: -1px;
     top: 0;
-    width: 100px;
+    width: var(--padding);
     z-index: 1;
 
-    @media (min-width: 600px) {
+    @media (min-width: #{$bp-social}) {
       display: none;
     }
+  }
+
+  &::before {
+    background: linear-gradient(to left, rgba(0, 0, 0, 0), var(--color-background));
+    left: calc(var(--padding) * -1);
+  }
+
+  &::after {
+    background: linear-gradient(to right, rgba(0, 0, 0, 0), var(--color-background));
+    right: calc(var(--padding) * -1);
   }
 
   @media (min-width: #{$bp-medium}) {
@@ -33,7 +42,7 @@
   text-align: left;
   margin: 0;
 
-  @media (min-width: 600px) {
+  @media (min-width: #{$bp-social}) {
     text-align: center;
   }
 }
@@ -42,21 +51,25 @@
   display: flex;
   flex-flow: row nowrap;
   justify-content: flex-start;
-  margin-bottom: -1rem;
+  margin: 0 calc(var(--padding) * -1) -1rem calc(var(--padding) * -1);
   overflow-x: auto;
   padding: 1rem 0;
+  scroll-padding-left: var(--padding);
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
 
+  &::before,
   &::after {
     content: "";
-    flex: 0 0 var(--padding);
+    flex: 0 0 50px;
   }
 
-  @media (min-width: 600px) {
+  @media (min-width: #{$bp-social}) {
     justify-content: center;
+    margin: 0 0 -1rem 0;
     overflow-x: visible;
 
+    &::before,
     &::after {
       display: none;
     }
