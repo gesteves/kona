@@ -1,5 +1,21 @@
 .share {
   grid-column: 1 / -1;
+  position: relative;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 100px;
+    pointer-events: none;
+    background: linear-gradient(to right, rgba(0, 0, 0, 0), var(--color-background));
+
+    @media (min-width: 600px) {
+      display: none;
+    }
+  }
 
   @media (min-width: #{$bp-medium}) {
     grid-column: 3 / -3;
@@ -13,14 +29,35 @@
   line-height: var(--line-height-x-small);
   text-transform: uppercase;
   font-weight: normal;
-  text-align: center;
+  text-align: left;
   margin: 0 0 1rem 0;
+
+  @media (min-width: 600px) {
+    text-align: center;
+  }
 }
 
 .share__buttons {
   display: flex;
-  flex-flow: row wrap;
-  justify-content: center;
+  flex-flow: row nowrap;
+  justify-content: flex-start;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+
+  &::after {
+    content: "";
+    flex: 0 0 var(--padding);
+  }
+
+  @media (min-width: 600px) {
+    justify-content: center;
+    overflow-x: visible;
+
+    &::after {
+      display: none;
+    }
+  }
 }
 
 .share__button {
@@ -31,6 +68,7 @@
   color: var(--color-share-button-text);
   display: flex;
   flex-flow: row nowrap;
+  flex: 0 0 auto;
   font-family: var(--lato);
   font-size: var(--font-x-small);
   font-weight: 300;
