@@ -51,12 +51,21 @@ module ShareHelpers
 
   # Generates a URL for sharing an article on Bluesky.
   # @param article [Article] The article to be shared.
-  # @return [String] The Threads share URL.
+  # @return [String] The Bluesky share URL.
   def bluesky_share_url(article)
     title = sanitize(article.title)
     url = full_url(article.path, { ref: 'Bluesky' })
     text = "#{title} #{url}"
     encoded_text = ERB::Util.url_encode(text)
     "https://bsky.app/intent/compose?text=#{encoded_text}"
+  end
+
+  # Generates a URL for saving an article on Pocket.
+  # @param article [Article] The article to be shared.
+  # @return [String] The Pocket save URL.
+  def pocket_save_url(article)
+    url = full_url(article.path, { ref: 'Pocket' })
+    url = ERB::Util.url_encode(url)
+    "https://getpocket.com/save?url=#{url}"
   end
 end
