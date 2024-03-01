@@ -44,6 +44,9 @@ class WeatherKit
       "Authorization" => "Bearer #{token}"
     }
 
+    # The documentation lists `countryCode` as a required parameter,
+    # but it's actually `country`, as per this thread: https://developer.apple.com/forums/thread/723800
+    # Omitting `country` prevents weather alerts from being returned.
     query = {
       country: @country,
       dataSets: datasets&.join(','),
