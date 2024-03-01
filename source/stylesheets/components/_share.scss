@@ -29,7 +29,7 @@
   margin: 0 calc(var(--padding) * -1) -1rem calc(var(--padding) * -1);
   overflow-x: auto;
   padding: 1rem 0;
-  scroll-padding-left: calc(var(--padding) + 0.25rem);
+  scroll-padding-left: var(--padding);
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
 
