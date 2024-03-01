@@ -2,31 +2,6 @@
   grid-column: 1 / -1;
   position: relative;
 
-  &::before,
-  &::after {
-    bottom: 0;
-    content: "";
-    pointer-events: none;
-    position: absolute;
-    top: 0;
-    width: var(--padding);
-    z-index: 1;
-
-    @media (min-width: #{$bp-social}) {
-      display: none;
-    }
-  }
-
-  &::before {
-    background: linear-gradient(to left, rgba(0, 0, 0, 0), var(--color-background));
-    left: calc(var(--padding) * -1);
-  }
-
-  &::after {
-    background: linear-gradient(to right, rgba(0, 0, 0, 0), var(--color-background));
-    right: calc(var(--padding) * -1);
-  }
-
   @media (min-width: #{$bp-medium}) {
     grid-column: 3 / -3;
   }
