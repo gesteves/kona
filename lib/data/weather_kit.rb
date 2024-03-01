@@ -45,7 +45,7 @@ class WeatherKit
     }
 
     query = {
-      countryCode: @country,
+      country: @country,
       dataSets: datasets&.join(','),
       timezone: @time_zone
     }
