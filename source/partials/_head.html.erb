@@ -3,7 +3,7 @@
   <%= partial 'partials/open_graph' %>
   <%= partial 'partials/schema/article', locals: { article: content } if defined?(content) && content.entry_type == 'Article' %>
   <link rel="canonical" href="<%= canonical_url %>">
-  <link rel="alternate" type="application/atom+xml" href="<%= full_url("/feed.xml") %>" />
+  <link rel="alternate" type="application/atom+xml" title="<%= sanitize(data.site.meta_title) %>" href="<%= full_url("/feed.xml") %>" />
   <link rel="icon" href="/favicon.ico" sizes="32x32">
   <% if data.site.logo.present? %>
     <link rel="apple-touch-icon" href="<%= site_icon_url(w: 180) %>">
