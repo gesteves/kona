@@ -146,6 +146,8 @@ module SiteHelpers
   # Returns the subtitle for the RSS feed, based off the site's meta title.
   # @return [String] The subtitle for the feed.
   def feed_subtitle
-    data.site.meta_title.split(':').last.strip
+    subtitle = data.site.meta_title.split(':').last.strip
+    return if subtitle == feed_title
+    subtitle
   end
 end
