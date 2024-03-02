@@ -1,3 +1,5 @@
+require 'htmlentities'
+
 module TextHelpers
   # Replaces the space between the last two words of a text with a non-breaking space to prevent widow words.
   # @param text [String] The text in which to prevent widows.
@@ -26,11 +28,11 @@ module TextHelpers
 
   # Sanitizes a given text by removing any HTML tags, and optionally decoding HTML entities.
   # @param text [String] The text to be sanitized.
-  # @param decode_html_entities [Boolean] Whether to decode HTML entities in the sanitized text, for example `&amp;` back to `&`. Defaults to false.
+  # @param escape_html_entities [Boolean] Whether to escape HTML entities in the sanitized text, for example `&` to `&amp;`. Defaults to false.
   # @return [String] The sanitized text, with HTML tags removed and optionally HTML entities decoded.
-  def sanitize(text, decode_html_entities: false)
+  def sanitize(text, escape_html_entities: false)
     text = Sanitize.fragment(markdown_to_html(text)).strip
-    text = HTMLEntities.new.decode(text) if decode_html_entities
+    text = HTMLEntities.new.decode(text) unless escape_html_entities
     text
   end
 end

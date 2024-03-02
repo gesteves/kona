@@ -29,11 +29,16 @@ RSpec.describe TextHelpers do
   end
 
   describe '#sanitize' do
-    let(:markdown) { '**bold** and _italic_ with a <span>span</span> for good measure' }
+    let(:markdown) { '**bold** & _italic_ with a <span>span</span> for good measure' }
 
     it 'returns plain text, stripping HTML tags and Markdown syntax' do
       text = sanitize(markdown)
-      expect(text).to eq('bold and italic with a span for good measure')
+      expect(text).to eq('bold & italic with a span for good measure')
+    end
+
+    it 'returns plain text, stripping HTML tags and Markdown syntax, and escaping HTML entities' do
+      text = sanitize(markdown, escape_html_entities: true)
+      expect(text).to eq('bold &amp; italic with a span for good measure')
     end
   end
 end

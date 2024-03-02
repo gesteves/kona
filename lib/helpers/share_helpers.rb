@@ -5,7 +5,7 @@ module ShareHelpers
   # @param article [Article] The article to be shared.
   # @return [String] The mailto URL.
   def mail_share_url(article)
-    subject = ERB::Util.url_encode(sanitize(article.title, decode_html_entities: true))
+    subject = ERB::Util.url_encode(sanitize(article.title))
     body = ERB::Util.url_encode(full_url(article.path, { ref: 'Email' }))
     "mailto:?subject=#{subject}&body=#{body}"
   end
@@ -14,7 +14,7 @@ module ShareHelpers
   # @param article [Article] The article to be shared.
   # @return [String] The SMS URL.
   def sms_share_url(article)
-    title = sanitize(article.title, decode_html_entities: true)
+    title = sanitize(article.title)
     url = full_url(article.path, { ref: 'Text Message' })
     text = "#{title} #{url}"
     body = ERB::Util.url_encode(text)
@@ -33,7 +33,7 @@ module ShareHelpers
   # @param article [Article] The article to be shared.
   # @return [String] The Reddit share URL.
   def reddit_share_url(article)
-    title = ERB::Util.url_encode(sanitize(article.title, decode_html_entities: true))
+    title = ERB::Util.url_encode(sanitize(article.title))
     url = ERB::Util.url_encode(full_url(article.path, { ref: 'Reddit' }))
     "https://reddit.com/submit?title=#{title}&url=#{url}"
   end
@@ -42,7 +42,7 @@ module ShareHelpers
   # @param article [Article] The article to be shared.
   # @return [String] The Threads share URL.
   def threads_share_url(article)
-    title = sanitize(article.title, decode_html_entities: true)
+    title = sanitize(article.title)
     url = full_url(article.path, { ref: 'Threads' })
     text = "#{title} #{url}"
     encoded_text = ERB::Util.url_encode(text)
@@ -53,7 +53,7 @@ module ShareHelpers
   # @param article [Article] The article to be shared.
   # @return [String] The Bluesky share URL.
   def bluesky_share_url(article)
-    title = sanitize(article.title, decode_html_entities: true)
+    title = sanitize(article.title)
     url = full_url(article.path, { ref: 'Bluesky' })
     text = "#{title} #{url}"
     encoded_text = ERB::Util.url_encode(text)
