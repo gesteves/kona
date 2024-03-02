@@ -136,4 +136,16 @@ module SiteHelpers
     end
     schema.to_json
   end
+
+  # Returns the title for the RSS feed, based off the site's meta title.
+  # @return [String] The title for the feed.
+  def feed_title
+    data.site.meta_title.split(':').first.strip
+  end
+
+  # Returns the subtitle for the RSS feed, based off the site's meta title.
+  # @return [String] The subtitle for the feed.
+  def feed_subtitle
+    data.site.meta_title.split(':').last.strip
+  end
 end

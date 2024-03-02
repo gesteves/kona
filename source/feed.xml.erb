@@ -3,7 +3,8 @@
   <% articles = recent_articles(count: 100) %>
   <% updated = articles.map { |e| DateTime.parse(e.updated_at) }.max %>
   <id><%= atom_tag(full_url("/index.html"), articles.map { |e| DateTime.parse(e.published_at) }.min) %></id>
-  <title type="text"><%=h data.site.title %></title>
+  <title><%=h feed_title %></title>
+  <% if feed_subtitle.present? %><subtitle><%=h feed_subtitle %></subtitle><% end %>
   <updated><%= updated.rfc3339 %></updated>
   <link rel="alternate" type="text/html" href="<%= full_url("/index.html", { ref: 'Feed' }) %>"/>
   <link rel="self" type="application/atom+xml" href="<%= full_url("/feed.xml") %>"/>
