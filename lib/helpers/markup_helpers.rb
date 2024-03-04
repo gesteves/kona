@@ -317,8 +317,6 @@ module MarkupHelpers
   # @param tag [Symbol] The HTML to use. Optional, defaults to a <span>.
   # @return [String] An HTML tag.
   def units_tag(metric, imperial, tag = :span)
-    metric = remove_widows(metric)
-    imperial = remove_widows(imperial)
     content_tag tag.to_sym, 'data-controller': 'units', 'data-units-imperial-value': imperial, 'data-units-metric-value': metric do
       metric
     end
