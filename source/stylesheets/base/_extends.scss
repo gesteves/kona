@@ -251,7 +251,8 @@
 
   a {
     text-decoration: underline;
-    text-decoration-thickness: 2px;
+    text-decoration-thickness: 1px;
+    text-decoration-thickness: clamp(1px, 10%, 2px);
   }
 
   a:link,
