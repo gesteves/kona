@@ -259,14 +259,13 @@
   a:link,
   a:visited {
     color: currentColor;
-    text-decoration-color: currentColor;
-    
+    text-decoration-color: var(--color-link);
   }
 
   a:hover,
   a:active {
     color: var(--color-link-hover);
-    text-decoration-color: var(--color-link);
+    text-decoration-color: currentColor;
   }
 
   & > *:last-child {
