@@ -9,14 +9,20 @@
   line-height: var(--line-height-x-small);
   text-transform: uppercase;
 
+  a {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.1rem;
+  }
+
   a:link, a:visited {
     color: var(--color-text-secondary);
-    text-decoration: none;
+    text-decoration-color: var(--color-text-tertiary);
   }
 
   a:hover, a:active {
     color: var(--color-link-hover);
-    text-decoration: none;
+    text-decoration-color: currentColor;
   }
 
   span::after {
@@ -199,8 +205,6 @@
       border-bottom: 2px solid var(--color-table-last-cell-border);
     }
   }
-
-  
 }
 
 .entry--article .entry__body {
