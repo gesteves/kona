@@ -5,7 +5,7 @@
           <span class="entry__highlight">Draft</span>
         <% end %>
         <% unless article.entry_type == 'Page' %>
-          <span><%= link_to DateTime.parse(article.published_at).strftime('%A, %B %-e, %Y'), article.path %></span>
+          <span><%= DateTime.parse(article.published_at).strftime('%A, %B %-e, %Y') %></span>
           <% if article.contentful_metadata.tags.present? %>
             <span><%= article.contentful_metadata.tags.sort { |a, b| a.name <=> b.name }.map { |tag| link_to tag.name, "/tagged/#{tag.id}/index.html" }.join(', ') %></span>
           <% end %>
