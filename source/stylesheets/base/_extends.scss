@@ -151,20 +151,20 @@
   }
 
 
-sub,
-sup {
-  font-size: 50%;
-  line-height: 0;
-  position: relative;
-}
+  sub,
+  sup {
+    font-size: 50%;
+    line-height: 0;
+    position: relative;
+  }
 
-sup {
-  top: -0.5rem;
-}
+  sup {
+    top: -0.5rem;
+  }
 
-sub {
-  bottom: -0.25rem;
-}
+  sub {
+    bottom: -0.25rem;
+  }
 
   small {
     color: var(--color-text-secondary);
