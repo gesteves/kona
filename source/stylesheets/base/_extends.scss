@@ -249,17 +249,22 @@
     width: 100%;
   }
 
+  a {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+  }
+
   a:link,
   a:visited {
-    color: var(--color-link);
-    text-decoration: none;
+    color: currentColor;
+    text-decoration-color: currentColor;
+    
   }
 
   a:hover,
   a:active {
     color: var(--color-link-hover);
-    text-decoration: underline;
-    text-decoration-thickness: 2px;
+    text-decoration-color: var(--color-link);
   }
 
   & > *:last-child {
