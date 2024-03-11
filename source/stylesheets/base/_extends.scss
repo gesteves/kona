@@ -268,6 +268,10 @@
     text-decoration-color: currentColor;
   }
 
+  a:focus {
+    text-decoration: none;
+  }
+
   & > *:last-child {
     margin-bottom: 0;
   }

@@ -25,6 +25,10 @@
     text-decoration-color: currentColor;
   }
 
+  a:focus {
+    text-decoration: none;
+  }
+
   span::after {
     color: var(--color-text-tertiary);
     content: '\00a0•';
@@ -56,6 +60,10 @@
     &:active {
       color: currentColor;
       text-decoration: underline;
+    }
+
+    &:focus {
+      text-decoration: none;
     }
   }
 
