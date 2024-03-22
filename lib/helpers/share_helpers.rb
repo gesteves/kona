@@ -6,7 +6,7 @@ module ShareHelpers
   # @return [String] The mailto URL.
   def mail_share_url(article)
     subject = ERB::Util.url_encode(sanitize(article.title))
-    body = ERB::Util.url_encode(full_url(article.path, { ref: 'Email' }))
+    body = ERB::Util.url_encode(full_url(article.path))
     "mailto:?subject=#{subject}&body=#{body}"
   end
 
@@ -15,7 +15,7 @@ module ShareHelpers
   # @return [String] The SMS URL.
   def sms_share_url(article)
     title = sanitize(article.title)
-    url = full_url(article.path, { ref: 'Text Message' })
+    url = full_url(article.path)
     text = "#{title} #{url}"
     body = ERB::Util.url_encode(text)
     "sms:?&body=#{body}"
@@ -25,7 +25,7 @@ module ShareHelpers
   # @param article [Article] The article to be shared.
   # @return [String] The Facebook share URL.
   def facebook_share_url(article)
-    url = ERB::Util.url_encode(full_url(article.path, { ref: 'Facebook' }))
+    url = ERB::Util.url_encode(full_url(article.path))
     "https://www.facebook.com/sharer/sharer.php?u=#{url}"
   end
 
@@ -34,7 +34,7 @@ module ShareHelpers
   # @return [String] The Reddit share URL.
   def reddit_share_url(article)
     title = ERB::Util.url_encode(sanitize(article.title))
-    url = ERB::Util.url_encode(full_url(article.path, { ref: 'Reddit' }))
+    url = ERB::Util.url_encode(full_url(article.path))
     "https://reddit.com/submit?title=#{title}&url=#{url}"
   end
 
@@ -43,7 +43,7 @@ module ShareHelpers
   # @return [String] The Threads share URL.
   def threads_share_url(article)
     title = sanitize(article.title)
-    url = full_url(article.path, { ref: 'Threads' })
+    url = full_url(article.path)
     text = "#{title} #{url}"
     encoded_text = ERB::Util.url_encode(text)
     "https://www.threads.net/intent/post?text=#{encoded_text}"
@@ -54,7 +54,7 @@ module ShareHelpers
   # @return [String] The Bluesky share URL.
   def bluesky_share_url(article)
     title = sanitize(article.title)
-    url = full_url(article.path, { ref: 'Bluesky' })
+    url = full_url(article.path)
     text = "#{title} #{url}"
     encoded_text = ERB::Util.url_encode(text)
     "https://bsky.app/intent/compose?text=#{encoded_text}"
@@ -64,7 +64,7 @@ module ShareHelpers
   # @param article [Article] The article to be shared.
   # @return [String] The Pocket save URL.
   def pocket_save_url(article)
-    url = full_url(article.path, { ref: 'Pocket' })
+    url = full_url(article.path)
     url = ERB::Util.url_encode(url)
     "https://getpocket.com/save?url=#{url}"
   end
