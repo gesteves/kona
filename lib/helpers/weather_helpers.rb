@@ -220,7 +220,6 @@ module WeatherHelpers
   # Generates a summary of weather-related information.
   # @return [String] An HTML-formatted summary of weather-related information.
   def weather_summary
-    return if weather_data_is_stale?
     summary = []
     summary << race_day
     summary << smooth
