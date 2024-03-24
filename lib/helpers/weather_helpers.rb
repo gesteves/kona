@@ -267,7 +267,6 @@ module WeatherHelpers
   # Provides a summary of current weather conditions.
   # @return [String, nil] A string describing the current weather conditions or nil if no data is available.
   def currently
-    return if current_weather.blank?
     text = []
     text << "#{format_current_condition(current_weather.condition_code).capitalize}, with a temperature of #{format_temperature(current_weather.temperature)}"
     text << "which feels like #{format_temperature(current_weather.temperature_apparent)}" unless hide_apparent_temperature?
@@ -286,7 +285,6 @@ module WeatherHelpers
   # Provides the weather forecast for today or tonight.
   # @return [String, nil] A string describing the weather forecast for today or tonight, or nil if no data is available.
   def forecast
-    return if todays_forecast.blank?
     text = []
     text << "#{today_or_tonight}'s forecast #{format_forecasted_condition(rest_of_day_forecast.condition_code).downcase}"
     text << "with a high of #{format_temperature(todays_forecast.temperature_max)} and a low of #{format_temperature(todays_forecast.temperature_min)}"
