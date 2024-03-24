@@ -287,7 +287,11 @@ module WeatherHelpers
   def forecast
     text = []
     text << "#{today_or_tonight}'s forecast #{format_forecasted_condition(rest_of_day_forecast.condition_code).downcase}"
-    text << "with a high of #{format_temperature(todays_forecast.temperature_max)} and a low of #{format_temperature(todays_forecast.temperature_min)}"
+    if is_evening?
+      text << "with a low of #{format_temperature(todays_forecast.temperature_min)}"
+    else
+      text << "with a high of #{format_temperature(todays_forecast.temperature_max)} and a low of #{format_temperature(todays_forecast.temperature_min)}"
+    end
     text.join(', ')
   end
 
