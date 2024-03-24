@@ -33,6 +33,12 @@ module WeatherHelpers
     data.weather.forecast_daily&.days&.find { |d| d.rest_of_day_forecast.present? && Time.parse(d.forecast_start) <= now && Time.parse(d.forecast_end) >= now }
   end
 
+  # Returns the forecast for the rest of the day if it's daytime, or the overnight forecast after sunset.
+  # @return [Hash] The forecast data for the rest of the day or night.
+  def rest_of_day_forecast
+    is_evening? ? todays_forecast.overnight_forecast : todays_forecast.rest_of_day_forecast
+  end
+
   # Retrieves the forecast for tomorrow.
   # @return [Hash, nil] The forecast data for tomorrow, or nil if not found.
   def tomorrows_forecast
@@ -174,8 +180,8 @@ module WeatherHelpers
     current_temperature = (current_weather.temperature_apparent || current_weather.temperature)
     high_temperature = todays_forecast.temperature_max
     low_temperature = todays_forecast.temperature_min
-    precipitation_chance = todays_forecast.rest_of_day_forecast.precipitation_chance
-    snowfall = todays_forecast.rest_of_day_forecast.snowfall_amount
+    precipitation_chance = rest_of_day_forecast.precipitation_chance
+    snowfall = rest_of_day_forecast.snowfall_amount
 
     # Air quality is moderate or worse
     return true if aqi > 75
@@ -282,23 +288,19 @@ module WeatherHelpers
   def forecast
     return if todays_forecast.blank?
     text = []
-    text << "#{today_or_tonight}'s forecast #{format_forecasted_condition(todays_forecast.rest_of_day_forecast.condition_code).downcase}"
-    if is_evening?
-      text << "with a low of #{format_temperature(todays_forecast.temperature_min)}"
-    else
-      text << "with a high of #{format_temperature(todays_forecast.temperature_max)} and a low of #{format_temperature(todays_forecast.temperature_min)}"
-    end
+    text << "#{today_or_tonight}'s forecast #{format_forecasted_condition(rest_of_day_forecast.condition_code).downcase}"
+    text << "with a high of #{format_temperature(todays_forecast.temperature_max)} and a low of #{format_temperature(todays_forecast.temperature_min)}"
     text.join(', ')
   end
 
   # Provides a summary of precipitation for today or tonight.
   # @return [String, nil] A string describing the precipitation details for today or tonight, or nil if no data is available.
   def precipitation
-    return if todays_forecast.rest_of_day_forecast.precipitation_chance == 0 || todays_forecast.rest_of_day_forecast.precipitation_type.downcase == 'clear'
-    percentage_string = number_to_percentage(todays_forecast.rest_of_day_forecast.precipitation_chance * 100, precision: 0)
+    return if rest_of_day_forecast.precipitation_chance == 0 || rest_of_day_forecast.precipitation_type.downcase == 'clear'
+    percentage_string = number_to_percentage(rest_of_day_forecast.precipitation_chance * 100, precision: 0)
     text = []
-    text << "There's #{with_indefinite_article(percentage_string)} chance of #{format_precipitation_type(todays_forecast.rest_of_day_forecast.precipitation_type)} later #{today_or_tonight.downcase}"
-    text << "with #{format_precipitation_amount(todays_forecast.rest_of_day_forecast.snowfall_amount)} expected" if todays_forecast.rest_of_day_forecast.precipitation_type.downcase == 'snow' && todays_forecast.rest_of_day_forecast.snowfall_amount > 0
+    text << "There's #{with_indefinite_article(percentage_string)} chance of #{format_precipitation_type(rest_of_day_forecast.precipitation_type)} later #{today_or_tonight.downcase}"
+    text << "with #{format_precipitation_amount(rest_of_day_forecast.snowfall_amount)} expected" if rest_of_day_forecast.precipitation_type.downcase == 'snow' && rest_of_day_forecast.snowfall_amount > 0
     text.join(', ')
   end
 
