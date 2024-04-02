@@ -1,7 +1,8 @@
-version: "6.5.1"
+version: "6.5.2"
 icons:
   classic:
     brands:
+      - bluesky
       - facebook-f
       - get-pocket
       - reddit-alien
