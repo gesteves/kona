@@ -78,6 +78,10 @@ curl -X POST <NETLIFY_BUILD_HOOK_URL> -H "Content-Type: application/json" -d '{ 
 
 This doesn't do much, it's simply used to check if a workout is scheduled for today and adjust some messaging on the home page accordingly. You can grab the calendar URL from https://www.trainerroad.com/app/profile/calendar-sync and add it to the environment variable.
 
+#### Dark Visitors
+
+This imports updated robots.txt directives from [Dark Visitors](https://darkvisitors.com/) to prevent data scrapers from scraping the site's content to train LLMs. To set it up, set up an acccount there to grab an access token, and add it to the environment variable.
+
 #### Netlify build hook
 
 To keep the information on the home page current, you can use a [Netlify build hook](https://docs.netlify.com/configure-builds/build-hooks/) to rebuild the site hourly. To set this up, create a build hook in the site's build configuration and add it to the `BUILD_HOOK_URL` environment variable.
