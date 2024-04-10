@@ -14,7 +14,7 @@ class DarkVisitors
   # Saves the fetched robots.txt data into a JSON file.
   def save_data
     json_data = { robots_txt: @data }
-    File.open('data/dark_visitors.json', 'w') { |f| f << data.to_json }
+    File.open('data/dark_visitors.json', 'w') { |f| f << json_data.to_json }
   end
 
   private
@@ -23,7 +23,7 @@ class DarkVisitors
   # @return [String] The robots.txt data as a string.
   def fetch_robots_txt
     return if ENV['DARK_VISITORS_ACCESS_TOKEN'].blank?
-    
+
     cache_key = "darkvisitors:robots_txt"
     data = $redis.get(cache_key)
 
