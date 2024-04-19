@@ -119,6 +119,7 @@ module SiteHelpers
   # @see https://developers.google.com/search/docs/appearance/structured-data/article
   # @return [String] A JSON-LD formatted string representing the article's schema.
   def article_schema(content)
+    return if content.draft
     schema = {
       "@context": "https://schema.org",
       "@type": "Article",
