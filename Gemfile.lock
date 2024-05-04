@@ -19,6 +19,7 @@ GEM
       execjs (~> 2)
     backports (3.24.1)
     base64 (0.2.0)
+    bigdecimal (3.1.7)
     coffee-script (2.4.1)
       coffee-script-source
       execjs
@@ -27,6 +28,7 @@ GEM
     connection_pool (2.4.1)
     contracts (0.16.1)
     crass (1.0.6)
+    csv (3.3.0)
     diff-lcs (1.5.1)
     dotenv (3.1.0)
     erubis (2.7.0)
@@ -48,7 +50,8 @@ GEM
     hashie (3.6.0)
     htmlcompressor (0.2.0)
     htmlentities (4.3.4)
-    httparty (0.21.0)
+    httparty (0.22.0)
+      csv
       mini_mime (>= 1.0.0)
       multi_xml (>= 0.5.2)
     i18n (1.6.0)
@@ -109,7 +112,8 @@ GEM
     mini_magick (4.12.0)
     mini_mime (1.1.5)
     minitest (5.22.3)
-    multi_xml (0.6.0)
+    multi_xml (0.7.1)
+      bigdecimal (~> 3.1)
     nokogiri (1.16.4-arm64-darwin)
       racc (~> 1.4)
     nokogiri (1.16.4-x86_64-darwin)
