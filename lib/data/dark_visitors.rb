@@ -24,7 +24,12 @@ class DarkVisitors
   def fetch_robots_txt
     return if ENV['DARK_VISITORS_ACCESS_TOKEN'].blank?
 
-    cache_key = "darkvisitors:robots_txt"
+    body = {
+      agent_types: ["AI Data Scraper", "Undocumented AI Agent"],
+      disallow: "/"
+    }
+
+    cache_key = "darkvisitors:robots_txt:agent_types:#{body[:agent_types].map(&:parameterize).join(':')}:disallow:#{body[:disallow].paramaterize}"
     data = $redis.get(cache_key)
 
     return data if data.present?
@@ -32,11 +37,6 @@ class DarkVisitors
     headers = {
       "Authorization" => "Bearer #{@access_token}",
       "Content-Type" => "application/json"
-    }
-
-    body = {
-      agent_types: ["AI Data Scraper"],
-      disallow: "/"
     }
 
     response = HTTParty.post("#{DARK_VISITORS_API_URL}/robots-txts", headers: headers, body: body.to_json)
