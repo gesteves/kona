@@ -29,7 +29,7 @@ class DarkVisitors
       disallow: "/"
     }
 
-    cache_key = "darkvisitors:robots_txt:agent_types:#{body[:agent_types].map(&:parameterize).join(':')}:disallow:#{body[:disallow].paramaterize}"
+    cache_key = "darkvisitors:robots_txt:agent_types:#{body[:agent_types].map(&:parameterize).join(':')}:disallow:#{body[:disallow].parameterize}"
     data = $redis.get(cache_key)
 
     return data if data.present?
