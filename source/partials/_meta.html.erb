@@ -5,9 +5,9 @@
   <%= title_tag(current_page.data.title) %>
 <% end %>
 <% if defined?(content) %>
-  <meta name="description" content="<%= content_summary(content) %>">
+  <meta name="description" content="<%= h content_summary(content) %>">
 <% elsif current_page.data.summary.present? %>
-  <meta name="description" content="<%= current_page.data.summary %>">
+  <meta name="description" content="<%= h current_page.data.summary %>">
 <% end %>
 <meta name="viewport" content="width=device-width,minimum-scale=1">
 <meta name="view-transition" content="same-origin">
