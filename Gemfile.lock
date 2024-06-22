@@ -59,7 +59,7 @@ GEM
     icalendar (2.10.1)
       ice_cube (~> 0.16)
     ice_cube (0.16.4)
-    jwt (2.8.1)
+    jwt (2.8.2)
       base64
     kramdown (2.4.0)
       rexml
