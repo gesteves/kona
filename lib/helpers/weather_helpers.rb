@@ -144,6 +144,32 @@ module WeatherHelpers
     end
   end
 
+  # Converts a wind direction in degrees to a cardinal direction.
+  # @param [Integer] degrees - The wind direction in degrees.
+  # @return [String] The cardinal direction corresponding to the wind direction.
+  def wind_direction(degrees)
+    case degrees
+    when 0..22.5, 337.5..360
+      "North"
+    when 22.5..67.5
+      "Northeast"
+    when 67.5..112.5
+      "East"
+    when 112.5..157.5
+      "Southeast"
+    when 157.5..202.5
+      "South"
+    when 202.5..247.5
+      "Southwest"
+    when 247.5..292.5
+      "West"
+    when 292.5..337.5
+      "Northwest"
+    else
+      nil
+    end
+  end
+
   # Adds formatting to add emphasis to bad AQI values.
   # @param [String] The AQI description.
   # @return [String] A formatted string representing the AQI.
@@ -232,6 +258,7 @@ module WeatherHelpers
     summary << current_location
     summary << elevation
     summary << currently
+    summary << wind
     summary << current_aqi
     summary << format_pollen_level
     summary << forecast
@@ -273,6 +300,25 @@ module WeatherHelpers
     text << "and #{number_to_percentage(current_weather.humidity * 100, precision: 0)} humidity" unless current_weather.humidity.blank? || current_weather.humidity.zero?
     separator = hide_apparent_temperature? ? " " : ", "
     text.join(separator)
+  end
+
+  # Provides a summary of the current wind conditions.
+  # @return [String] A string describing the current wind conditions.
+  def wind
+    return if wind_direction(current_weather.wind_direction).blank?
+
+    metric = "#{current_weather.wind_speed.round} km/h"
+    imperial = "#{kilometers_to_miles(current_weather.wind_speed).round} mph"
+    text = []
+    text << "Winds are #{units_tag(metric, imperial)} from the #{wind_direction(current_weather.wind_direction).downcase}"
+
+    if current_weather.wind_gust.present? && current_weather.wind_gust >= current_weather.wind_speed + 5
+      metric = "#{current_weather.wind_gust.round} km/h"
+      imperial = "#{kilometers_to_miles(current_weather.wind_gust).round} mph"
+      text << "with gusts up to #{units_tag(metric, imperial)}"
+    end
+
+    text.join(', ')
   end
 
   # Provides a summary of the current Air Quality Index (AQI).

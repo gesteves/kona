@@ -88,6 +88,13 @@ module UnitHelpers
     meters * 0.000621371
   end
 
+  # Converts a distance from kilometers to miles.
+  # @param meters [Float] The distance in kilometers to be converted.
+  # @return [Float] The distance in miles.
+  def kilometers_to_miles(km)
+    km * 0.621371
+  end
+
   # Converts a distance from meters to yards.
   # @param meters [Float] The distance in meters to be converted.
   # @return [Float] The distance in yards.
