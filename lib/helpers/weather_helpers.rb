@@ -304,7 +304,6 @@ module WeatherHelpers
     summary << current_location
     summary << elevation
     summary << currently
-    summary << wind
     summary << current_aqi
     summary << format_pollen_level
     summary << forecast
@@ -343,9 +342,9 @@ module WeatherHelpers
     text = []
     text << "#{format_current_condition(current_weather.condition_code).capitalize}, with a temperature of #{format_temperature(current_weather.temperature)}"
     text << "which feels like #{format_temperature(current_weather.temperature_apparent)}" unless hide_apparent_temperature?
-    text << "and #{number_to_percentage(current_weather.humidity * 100, precision: 0)} humidity" unless current_weather.humidity.blank? || current_weather.humidity.zero?
-    separator = hide_apparent_temperature? ? " " : ", "
-    text.join(separator)
+    text << "#{number_to_percentage(current_weather.humidity * 100, precision: 0)} humidity" unless current_weather.humidity.blank? || current_weather.humidity.zero?
+    text << wind
+    comma_join_with_and(text)
   end
 
   # Provides a summary of the current wind conditions.
@@ -360,12 +359,12 @@ module WeatherHelpers
     gusts_imperial = kilometers_to_miles(current_weather&.wind_gust.to_f).round
     gusts_knots = kph_to_knots(current_weather&.wind_gust.to_f)
 
-    return if direction.blank? || beaufort_number(wind_speed_knots).zero?
+    return if direction.blank?
 
     metric = "#{wind_speed_metric} km/h"
     imperial = "#{wind_speed_imperial} mph"
     text = []
-    text << "#{beaufort_description(wind_speed_knots)}, #{units_tag(metric, imperial)} from the #{direction.downcase}"
+    text << "#{beaufort_description(wind_speed_knots).downcase} of #{units_tag(metric, imperial)} from the #{direction.downcase}"
 
     if gusts_knots >= 16 && gusts_knots >= wind_speed_knots + 10
       metric = "#{gusts_metric} km/h"

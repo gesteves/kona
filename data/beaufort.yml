@@ -1,39 +1,39 @@
 0:
   name: Calm
-  description: "Winds are calm"
+  description: "No wind"
 1:
   name: Light air
-  description: "There's light air"
+  description: "Light air"
 2:
   name: Light breeze
-  description: "There's a light breeze"
+  description: "A light breeze"
 3:
   name: Gentle breeze
-  description: "There's a gentle breeze"
+  description: "A gentle breeze"
 4:
   name: Moderate breeze
-  description: "There's a moderate breeze"
+  description: "A moderate breeze"
 5:
   name: Fresh breeze
-  description: "There's a fresh breeze"
+  description: "A fresh breeze"
 6:
   name: Strong breeze
-  description: "There's a strong breeze"
+  description: "A strong breeze"
 7:
   name: High winds
-  description: "There are high winds"
+  description: "High winds"
 8:
   name: Gale
-  description: "There's a gale"
+  description: "A gale"
 9:
   name: Strong gale
-  description: "There's a strong gale"
+  description: "A strong gale"
 10:
   name: Storm
-  description: "There's a storm"
+  description: "Storm winds"
 11:
   name: Violent storm
-  description: "There's a violent storm"
+  description: "Violent storm winds"
 12:
   name: Hurricane-force
-  description: "There are hurricane-force winds"
+  description: "Hurricane-force winds"

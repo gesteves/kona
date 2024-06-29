@@ -15,7 +15,8 @@ RSpec.describe TextHelpers do
 
   describe "#comma_join_with_and" do
     it "joins an array with commas and 'and'" do
-      expect(comma_join_with_and(['apple', 'banana', 'cherry'])).to eq("apple, banana and cherry")
+      expect(comma_join_with_and(['apple', 'banana', 'cherry'], false)).to eq("apple, banana and cherry")
+      expect(comma_join_with_and(['apple', 'banana', 'cherry'], true)).to eq("apple, banana, and cherry")
     end
   end
 

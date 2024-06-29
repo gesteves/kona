@@ -14,9 +14,11 @@ module TextHelpers
 
   # Joins an array of items into a string, using commas and 'and' appropriately.
   # @param items [Array<String>] The array of items to be joined into a string.
+  # @param oxford [Boolean] (Optional) Whether to use the Oxford comma before the last item. Default is true.
   # @return [String] A string with the items joined by commas, and 'and' before the last item.
-  def comma_join_with_and(items)
-    items.size <= 2 ? items.join(' and ') : [items[0..-2].join(', '), items[-1]].join(' and ')
+  def comma_join_with_and(items, oxford = true)
+    last_separator = oxford ? ', and ' : ' and '
+    items.size <= 2 ? items.join(last_separator) : [items[0..-2].join(', '), items[-1]].join(last_separator)
   end
 
   # Determines the appropriate indefinite article ('a' or 'an') to use with a word.
