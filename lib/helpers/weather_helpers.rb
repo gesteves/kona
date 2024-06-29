@@ -174,34 +174,8 @@ module WeatherHelpers
   # @param [Float] The wind speed in knots
   # @return [Integer] The Beaufort scale number (0-12)
   def beaufort_number(knots)
-    case knots.round
-    when 0..1
-      0
-    when 2..3
-      1
-    when 4..6
-      2
-    when 7..10
-      3
-    when 11..16
-      4
-    when 17..21
-      5
-    when 22..27
-      6
-    when 28..33
-      7
-    when 34..40
-      8
-    when 41..47
-      9
-    when 48..55
-      10
-    when 56..63
-      11
-    else
-      12
-    end
+    beaufort = (knots / 1.625) ** (2.0 / 3.0)
+    beaufort.round.clamp(0, 12)
   end
 
   # Method to get Beaufort scale description from YAML file based on the wind speed.
