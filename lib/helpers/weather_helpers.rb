@@ -316,7 +316,7 @@ module WeatherHelpers
     if current_weather.wind_gust.present? && current_weather.wind_gust >= current_weather.wind_speed + 5
       metric = "#{current_weather.wind_gust.round} km/h"
       imperial = "#{kilometers_to_miles(current_weather.wind_gust).round} mph"
-      text << "with gusts up to #{units_tag(metric, imperial)}"
+      text << "with #{units_tag(metric, imperial)} gusts"
     end
 
     text.join(', ')
