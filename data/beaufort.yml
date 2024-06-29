@@ -5,7 +5,7 @@
 1:
   adverse_weather: false
   name: Light air
-  description: "Winds are light"
+  description: "There's light air"
 2:
   adverse_weather: false
   name: Light breeze
@@ -49,4 +49,4 @@
 12:
   adverse_weather: true
   name: Hurricane-force
-  description: "There's hurricane-force winds"
+  description: "There are hurricane-force winds"

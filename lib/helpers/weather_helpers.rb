@@ -173,7 +173,7 @@ module WeatherHelpers
   # Method to convert wind speed in knots to Beaufort scale number (0-12)
   # @param [Float] The wind speed in knots
   # @return [Integer] The Beaufort scale number (0-12)
-  def knots_to_beaufort_number(knots)
+  def beaufort_number(knots)
     case knots
     when 0..1
       0
@@ -208,10 +208,9 @@ module WeatherHelpers
   # @param [Float] The wind speed in knots
   # @return [String] The Beaufort scale description
   def beaufort_description(knots)
-    beaufort_number = knots_to_beaufort_number(knots)
-    descriptions = YAML.load_file('beaufort_descriptions.yml')
+    beaufort_number = beaufort_number(knots)
 
-    descriptions[beaufort_number]['description']
+    data.beaufort[beaufort_number]['description']
   end
 
   # Adds formatting to add emphasis to bad AQI values.
