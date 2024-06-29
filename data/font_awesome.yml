@@ -11,6 +11,7 @@ icons:
       - arrow-up-from-bracket
       - comment
       - envelope
+      - link-simple
     thin:
       - bolt-lightning
       - cloud-bolt

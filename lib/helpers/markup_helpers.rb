@@ -19,6 +19,7 @@ module MarkupHelpers
     html = set_alt_text(html)
     html = mark_affiliate_links(html)
     html = responsivize_tables(html)
+    html = add_heading_permalinks(html)
     html
   end
 
@@ -271,6 +272,18 @@ module MarkupHelpers
     return if html.blank?
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
       doc.css('table').each { |table| table.wrap("<div class=\"#{css_class}\"></div>") }
+    doc.to_html
+  end
+
+  def add_heading_permalinks(html)
+    return if html.blank?
+    doc = Nokogiri::HTML::DocumentFragment.parse(html)
+    doc.css('h2, h3, h4, h5, h6').each do |heading|
+      heading_id = heading['id']
+      next if heading_id.blank?
+      permalink = "<a href=\"##{heading_id}\" class=\"entry__heading-permalink\" aria-label=\"Permalink to “#{heading.text}”\">#{icon_svg("classic", "solid", "link-simple")}</a>"
+      heading.children.before(Nokogiri::HTML::DocumentFragment.parse(permalink))
+    end
     doc.to_html
   end
 
