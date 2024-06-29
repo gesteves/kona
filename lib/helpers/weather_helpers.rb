@@ -318,7 +318,7 @@ module WeatherHelpers
     text << "which feels like #{format_temperature(current_weather.temperature_apparent)}" unless hide_apparent_temperature?
     text << "#{number_to_percentage(current_weather.humidity * 100, precision: 0)} humidity" unless current_weather.humidity.blank? || current_weather.humidity.zero?
     text << wind
-    comma_join_with_and(text)
+    comma_join_with_and(text.compact)
   end
 
   # Provides a summary of the current wind conditions.
