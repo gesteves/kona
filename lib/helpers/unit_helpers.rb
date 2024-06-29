@@ -95,6 +95,13 @@ module UnitHelpers
     km * 0.621371
   end
 
+  # Converts a speed from kilometers per hour to knots.
+  # @param kph [Float] The speed in kilometers per hour to be converted.
+  # @return [Float] The speed in knots.
+  def kph_to_knots(kph)
+    kph * 0.539957
+  end
+
   # Converts a distance from meters to yards.
   # @param meters [Float] The distance in meters to be converted.
   # @return [Float] The distance in yards.

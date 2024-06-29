@@ -305,17 +305,26 @@ module WeatherHelpers
   # Provides a summary of the current wind conditions.
   # @return [String] A string describing the current wind conditions.
   def wind
-    return if wind_direction(current_weather.wind_direction).blank?
-    return if current_weather.wind_speed.round == 0 || kilometers_to_miles(current_weather.wind_speed).round == 0
+    direction = wind_direction(current_weather.wind_direction)
+    wind_speed_metric = current_weather.wind_speed.round
+    wind_speed_imperial = kilometers_to_miles(current_weather.wind_speed).round
+    wind_speed_knots = kph_to_knots(current_weather.wind_speed).round
 
-    metric = "#{current_weather.wind_speed.round} km/h"
-    imperial = "#{kilometers_to_miles(current_weather.wind_speed).round} mph"
+    gusts_metric = current_weather&.wind_gust.to_f.round
+    gusts_imperial = kilometers_to_miles(current_weather&.wind_gust.to_f).round
+    gusts_knots = kph_to_knots(current_weather&.wind_gust.to_f).round
+
+    return if direction.blank?
+    return if wind_speed_metric == 0 || wind_speed_imperial == 0
+
+    metric = "#{wind_speed_metric} km/h"
+    imperial = "#{wind_speed_imperial} mph"
     text = []
-    text << "Winds are #{units_tag(metric, imperial)} from the #{wind_direction(current_weather.wind_direction).downcase}"
+    text << "Winds are #{units_tag(metric, imperial)} from the #{direction.downcase}"
 
-    if current_weather.wind_gust.present? && current_weather.wind_gust >= current_weather.wind_speed + 5
-      metric = "#{current_weather.wind_gust.round} km/h"
-      imperial = "#{kilometers_to_miles(current_weather.wind_gust).round} mph"
+    if gusts_knots >= 16 && gusts_knots >= wind_speed_knots + 10
+      metric = "#{gusts_metric} km/h"
+      imperial = "#{gusts_imperial} mph"
       text << "with #{units_tag(metric, imperial)} gusts"
     end
 
