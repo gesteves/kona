@@ -306,6 +306,7 @@ module WeatherHelpers
   # @return [String] A string describing the current wind conditions.
   def wind
     return if wind_direction(current_weather.wind_direction).blank?
+    return if current_weather.wind_speed.round == 0 || kilometers_to_miles(current_weather.wind_speed).round == 0
 
     metric = "#{current_weather.wind_speed.round} km/h"
     imperial = "#{kilometers_to_miles(current_weather.wind_speed).round} mph"
