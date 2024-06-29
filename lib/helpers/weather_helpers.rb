@@ -174,7 +174,7 @@ module WeatherHelpers
   # @param [Float] The wind speed in knots
   # @return [Integer] The Beaufort scale number (0-12)
   def beaufort_number(knots)
-    case knots
+    case knots.round
     when 0..1
       0
     when 2..3
