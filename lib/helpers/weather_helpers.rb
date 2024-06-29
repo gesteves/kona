@@ -366,7 +366,7 @@ module WeatherHelpers
     text = []
     text << "#{beaufort_description(wind_speed_knots).downcase} of #{units_tag(metric, imperial)} from the #{direction.downcase}"
 
-    if gusts_knots >= 16 && gusts_knots >= wind_speed_knots + 10
+    if gusts_knots >= 16 && gusts_knots >= wind_speed_knots + 9
       metric = "#{gusts_metric} km/h"
       imperial = "#{gusts_imperial} mph"
       text << "with #{units_tag(metric, imperial)} gusts"
