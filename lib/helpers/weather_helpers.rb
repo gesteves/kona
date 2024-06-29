@@ -369,7 +369,7 @@ module WeatherHelpers
     if gusts_knots >= 16 && gusts_knots >= wind_speed_knots + 9
       metric = "#{gusts_metric} km/h"
       imperial = "#{gusts_imperial} mph"
-      text << "with #{units_tag(metric, imperial)} gusts"
+      text << ", with #{units_tag(metric, imperial)} gusts"
     end
 
     text.join(' ')
