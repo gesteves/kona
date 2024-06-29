@@ -1,52 +1,39 @@
 0:
-  adverse_weather: false
   name: Calm
   description: "Winds are calm"
 1:
-  adverse_weather: false
   name: Light air
   description: "There's light air"
 2:
-  adverse_weather: false
   name: Light breeze
   description: "There's a light breeze"
 3:
-  adverse_weather: false
   name: Gentle breeze
   description: "There's a gentle breeze"
 4:
-  adverse_weather: false
   name: Moderate breeze
   description: "There's a moderate breeze"
 5:
-  adverse_weather: true
   name: Fresh breeze
   description: "There's a fresh breeze"
 6:
-  adverse_weather: true
   name: Strong breeze
   description: "There's a strong breeze"
 7:
-  adverse_weather: true
   name: High winds
   description: "There are high winds"
 8:
-  adverse_weather: true
   name: Gale
   description: "There's a gale"
 9:
-  adverse_weather: true
   name: Strong gale
   description: "There's a strong gale"
 10:
-  adverse_weather: true
   name: Storm
   description: "There's a storm"
 11:
-  adverse_weather: true
   name: Violent storm
   description: "There's a violent storm"
 12:
-  adverse_weather: true
   name: Hurricane-force
   description: "There are hurricane-force winds"

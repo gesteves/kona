@@ -251,6 +251,7 @@ module WeatherHelpers
     low_temperature = todays_forecast.temperature_min
     precipitation_chance = rest_of_day_forecast.precipitation_chance
     snowfall = rest_of_day_forecast.snowfall_amount
+    beaufort_number = beaufort_number(kph_to_knots(current_weather.wind_speed))
 
     # Air quality is moderate or worse
     return true if aqi > 75
@@ -262,6 +263,8 @@ module WeatherHelpers
     return true if high_temperature <= 0 || high_temperature >= 35
     # It's likely to rain
     return true if precipitation_chance >= 0.5
+    # Too windy
+    return true if beaufort_number >= 5
     # There's gonna be accumulating snow
     return true if snowfall > 0
     # Pollen is high or very high
@@ -351,11 +354,11 @@ module WeatherHelpers
     direction = wind_direction(current_weather.wind_direction)
     wind_speed_metric = current_weather.wind_speed.round
     wind_speed_imperial = kilometers_to_miles(current_weather.wind_speed).round
-    wind_speed_knots = kph_to_knots(current_weather.wind_speed).round
+    wind_speed_knots = kph_to_knots(current_weather.wind_speed)
 
     gusts_metric = current_weather&.wind_gust.to_f.round
     gusts_imperial = kilometers_to_miles(current_weather&.wind_gust.to_f).round
-    gusts_knots = kph_to_knots(current_weather&.wind_gust.to_f).round
+    gusts_knots = kph_to_knots(current_weather&.wind_gust.to_f)
 
     return if direction.blank? || beaufort_number(wind_speed_knots).zero?
 
