@@ -170,6 +170,50 @@ module WeatherHelpers
     end
   end
 
+  # Method to convert wind speed in knots to Beaufort scale number (0-12)
+  # @param [Float] The wind speed in knots
+  # @return [Integer] The Beaufort scale number (0-12)
+  def knots_to_beaufort_number(knots)
+    case knots
+    when 0..1
+      0
+    when 2..3
+      1
+    when 4..6
+      2
+    when 7..10
+      3
+    when 11..16
+      4
+    when 17..21
+      5
+    when 22..27
+      6
+    when 28..33
+      7
+    when 34..40
+      8
+    when 41..47
+      9
+    when 48..55
+      10
+    when 56..63
+      11
+    else
+      12
+    end
+  end
+
+  # Method to get Beaufort scale description from YAML file based on the wind speed.
+  # @param [Float] The wind speed in knots
+  # @return [String] The Beaufort scale description
+  def beaufort_description(knots)
+    beaufort_number = knots_to_beaufort_number(knots)
+    descriptions = YAML.load_file('beaufort_descriptions.yml')
+
+    descriptions[beaufort_number]['description']
+  end
+
   # Adds formatting to add emphasis to bad AQI values.
   # @param [String] The AQI description.
   # @return [String] A formatted string representing the AQI.
@@ -314,13 +358,12 @@ module WeatherHelpers
     gusts_imperial = kilometers_to_miles(current_weather&.wind_gust.to_f).round
     gusts_knots = kph_to_knots(current_weather&.wind_gust.to_f).round
 
-    return if direction.blank?
-    return if wind_speed_metric == 0 || wind_speed_imperial == 0
+    return if direction.blank? || beaufort_number(wind_speed_knots).zero?
 
     metric = "#{wind_speed_metric} km/h"
     imperial = "#{wind_speed_imperial} mph"
     text = []
-    text << "Winds are #{units_tag(metric, imperial)} from the #{direction.downcase}"
+    text << "#{beaufort_description(wind_speed_knots)}, #{units_tag(metric, imperial)} from the #{direction.downcase}"
 
     if gusts_knots >= 16 && gusts_knots >= wind_speed_knots + 10
       metric = "#{gusts_metric} km/h"
