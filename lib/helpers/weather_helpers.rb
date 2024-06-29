@@ -319,7 +319,7 @@ module WeatherHelpers
       text << "with #{units_tag(metric, imperial)} gusts"
     end
 
-    text.join(', ')
+    text.join(' ')
   end
 
   # Provides a summary of the current Air Quality Index (AQI).
