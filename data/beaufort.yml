@@ -3,7 +3,7 @@
   description: "No wind"
 1:
   name: Light air
-  description: "A barely noticeable breeze"
+  description: "A very light breeze"
 2:
   name: Light breeze
   description: "A light breeze"
