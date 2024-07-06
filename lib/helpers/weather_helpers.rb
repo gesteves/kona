@@ -241,8 +241,6 @@ module WeatherHelpers
     return true if beaufort_number >= 5
     # There's gonna be accumulating snow
     return true if snowfall > 0
-    # Pollen is high or very high
-    return true if pollen_index_value >= 4
     # The current or forecasted conditions are adverse weather
     data.conditions.dig(current_weather.condition_code, :adverse_weather) || data.conditions.dig(todays_forecast.condition_code, :adverse_weather)
   end
