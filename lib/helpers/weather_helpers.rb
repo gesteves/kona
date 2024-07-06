@@ -185,7 +185,7 @@ module WeatherHelpers
     beaufort_number = beaufort_number(knots)
 
     content_tag :span, title: "Beaufort scale #{beaufort_number}" do
-      data.beaufort[beaufort_number]['description']
+      data.beaufort[beaufort_number]['description'].downcase
     end
   end
 
@@ -334,12 +334,12 @@ module WeatherHelpers
     gusts_knots = kph_to_knots(current_weather&.wind_gust.to_f)
 
     return if direction.blank?
-    return beaufort_description(wind_speed_knots).downcase if beaufort_number(wind_speed_knots).zero?
+    return beaufort_description(wind_speed_knots) if beaufort_number(wind_speed_knots).zero?
 
     metric = "#{wind_speed_metric} km/h"
     imperial = "#{wind_speed_imperial} mph"
     text = []
-    text << "#{beaufort_description(wind_speed_knots).downcase} of #{units_tag(metric, imperial)} from the #{direction.downcase}"
+    text << "#{beaufort_description(wind_speed_knots)} of #{units_tag(metric, imperial)} from the #{direction.downcase}"
 
     if gusts_knots >= 16 && gusts_knots >= wind_speed_knots + 9
       metric = "#{gusts_metric} km/h"
