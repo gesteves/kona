@@ -22,7 +22,7 @@ RSpec.describe MarkupHelpers do
 
       it 'adds the correct data attributes' do
         transformed_html = add_unit_data_attributes(html)
-        expect(transformed_html).to eq('<span data-controller="units" data-units-imperial-value="6.21 mi" data-units-metric-value="10 km">10 km</span>')
+        expect(transformed_html).to eq('<span data-controller="units" data-units-imperial-value="6.21 mi" data-units-metric-value="10 km" title="10 km | 6.21 mi">10 km</span>')
       end
     end
 
