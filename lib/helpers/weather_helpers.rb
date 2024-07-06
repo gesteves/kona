@@ -238,7 +238,7 @@ module WeatherHelpers
     # It's likely to rain
     return true if precipitation_chance >= 0.5
     # Too windy
-    return true if beaufort_number >= 5
+    return true if beaufort_number >= 4
     # There's gonna be accumulating snow
     return true if snowfall > 0
     # The current or forecasted conditions are adverse weather
