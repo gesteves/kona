@@ -184,7 +184,9 @@ module WeatherHelpers
   def beaufort_description(knots)
     beaufort_number = beaufort_number(knots)
 
-    data.beaufort[beaufort_number]['description']
+    content_tag :span, title: "Beaufort scale #{beaufort_number}" do
+      data.beaufort[beaufort_number]['description']
+    end
   end
 
   # Adds formatting to add emphasis to bad AQI values.
