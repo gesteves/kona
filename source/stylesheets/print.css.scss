@@ -25,9 +25,16 @@ body,
 }
 
 .entry__body a {
+  text-decoration: none;
+
+  &:link,
+  &:visited {
+    color: var(--color-link);
+  }
+
   &::after {
     color: var(--color-text-secondary);
-    content: " (" attr(href) ")";
+    content: "(" attr(href) ")";
     font-family: var(--ibm-plex-mono);
     font-size: var(--font-x-small);
     vertical-align: middle;
