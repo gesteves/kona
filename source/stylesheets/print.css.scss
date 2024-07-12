@@ -40,3 +40,15 @@ body,
     vertical-align: middle;
   }
 }
+
+.entry__meta a {
+  text-decoration: none;
+}
+
+img {
+  height: auto;
+  margin: 0 auto;
+  max-height: 90vh;
+  page-break-inside: avoid;
+  width: auto
+}
