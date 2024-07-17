@@ -61,7 +61,7 @@ module MarkupHelpers
       first_p = doc.children.first
       first_p.inner_html = "<b>#{title}.</b> #{first_p.inner_html}"
     else
-      new_p = Nokogiri::HTML::DocumentFragment.parse("<p><b>#{title}</b></p>").children.first
+      new_p = Nokogiri::HTML::DocumentFragment.parse("<p><b>#{title}.</b></p>").children.first
       doc.children.first.add_previous_sibling(new_p)
     end
   
