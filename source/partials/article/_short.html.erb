@@ -5,6 +5,6 @@
     </p>
   </header>
   <div class="entry__body">
-    <%= render_body(article.intro) %>
+    <%= prepend_title(smartypants(article.title), render_body(article.intro)) %>
   </div>
 </article>
