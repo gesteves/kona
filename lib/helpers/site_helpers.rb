@@ -100,6 +100,13 @@ module SiteHelpers
     data.articles.reject { |a| a.draft || a.entry_type == 'Short' }.take(count)
   end
 
+  # Retrieves a specified number of the most recent articles for the RSS feed, excluding drafts.
+  # @param count [Integer] (Optional) The number of recent articles to return. Default is 100.
+  # @return [Array<Object>] An array of the most recent articles, up to the specified count.
+  def feed_articles(count: 100)
+    data.articles.reject { |a| a.draft }.take(count)
+  end
+
   # Attempts to determine the time the website was most recently updated.
   # @return [DateTime] The latest date and time at which either a page, an article, or the site was updated.
   def site_updated_at

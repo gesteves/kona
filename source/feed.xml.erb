@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
-  <% articles = recent_articles(count: 100) %>
+  <% articles = feed_articles %>
   <% updated = articles.map { |e| DateTime.parse(e.updated_at) }.max %>
   <id><%= atom_tag(full_url("/index.html"), articles.map { |e| DateTime.parse(e.published_at) }.min) %></id>
   <title><%=h feed_title %></title>
