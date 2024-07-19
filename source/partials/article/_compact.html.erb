@@ -1,7 +1,7 @@
 <article class="entry entry--compact" id="entry-<%= article.sys.id.parameterize %>" aria-labelledby="hed-<%= article.sys.id.parameterize %>">
   <header class="entry__header">
     <p class="entry__meta">
-      <span><%= DateTime.parse(article.published_at).strftime('%A, %B %-e, %Y') %></span>
+      <span><%= link_to DateTime.parse(article.published_at).strftime('%A, %B %-e, %Y'), article.path %></span>
       <% if article.contentful_metadata.tags.present? %>
         <span><%= article.contentful_metadata.tags.sort { |a, b| a.name <=> b.name }.map { |t| link_to t.name, "/tagged/#{t.id}/index.html" }.join(', ') %></span>
       <% end %>
