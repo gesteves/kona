@@ -48,6 +48,8 @@ module SiteHelpers
   def content_summary(content)
     summary = if content.summary.present?
       content.summary
+    elsif content.entry_type == 'Short'
+      content.intro
     elsif content.intro.present?
       content.intro&.truncate(200)
     else
