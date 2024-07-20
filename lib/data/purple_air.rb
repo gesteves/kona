@@ -104,26 +104,27 @@ class PurpleAir
   end
 
   # Formats the PM2.5 value into an Air Quality Index (AQI).
+  # @see https://www.epa.gov/system/files/documents/2024-02/pm-naaqs-air-quality-index-fact-sheet.pdf
   # @param pm25 [Float] The PM2.5 value to be converted.
   # @return [Hash] The formatted AQI value and category.
   def format_aqi(pm25)
     return if pm25.blank?
 
     aqi, category = case pm25
-                 when 0..12.0
-                   [calculate_aqi(pm25, 50, 0, 12.0, 0), 'Good']
-                 when 12.1..35.4
-                   [calculate_aqi(pm25, 100, 51, 35.4, 12.1), 'Moderate']
+                 when 0..9.0
+                   [calculate_aqi(pm25, 50, 0, 9.0, 0), 'Good']
+                 when 9.1..35.4
+                   [calculate_aqi(pm25, 100, 51, 35.4, 9.1), 'Moderate']
                  when 35.5..55.4
                    [calculate_aqi(pm25, 150, 101, 55.4, 35.5), 'Unhealthy for sensitive groups']
-                 when 55.5..150.4
-                   [calculate_aqi(pm25, 200, 151, 150.4, 55.5), 'Unhealthy']
-                 when 150.5..250.4
-                   [calculate_aqi(pm25, 300, 201, 250.4, 150.5), 'Very unhealthy']
-                 when 250.5..350.4
-                   [calculate_aqi(pm25, 400, 301, 350.4, 250.5), 'Hazardous']
-                 when 350.5..500.4
-                   [calculate_aqi(pm25, 500, 401, 500.4, 350.5), 'Hazardous']
+                 when 55.5..125.4
+                   [calculate_aqi(pm25, 200, 151, 125.4, 55.5), 'Unhealthy']
+                 when 125.5..225.4
+                   [calculate_aqi(pm25, 300, 201, 225.4, 125.5), 'Very unhealthy']
+                 when 225.5..500.0
+                   [calculate_aqi(pm25, 500, 301, 500.0, 225.5), 'Hazardous']
+                 when 500.1..1000.0
+                    [calculate_aqi(pm25, 1000, 501, 1000.0, 500.1), 'Hazardous']
                  else
                    [nil, nil]
                  end
@@ -132,6 +133,7 @@ class PurpleAir
   end
 
   # Calculates the AQI based on PM2.5 value and breakpoints.
+  # @see https://www.airnow.gov/sites/default/files/2020-05/aqi-technical-assistance-document-sept2018.pdf
   # @param pm25 [Float] The PM2.5 value.
   # @param aqi_high [Integer] The high end of the AQI range.
   # @param aqi_low [Integer] The low end of the AQI range.
