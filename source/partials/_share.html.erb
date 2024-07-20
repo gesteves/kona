@@ -1,5 +1,5 @@
 <div class="share" id="social-sharing">
-  <h3 class="share__heading">Share This Article</h3>
+  <h3 class="share__heading">Share This <%= article.entry_type == 'Short' ? 'Post' : content.entry_type %></h3>
 
   <div class="share__buttons">
       <button aria-label="Open sharing options" title="Open sharing options" class="share__button --is-hidden" data-controller="share" data-share-text-value="<%= sanitize(article.title) %>" data-share-url-value="<%= full_url(article.path) %>" data-share-is-native-value="true" data-action="click->share#openShareSheet" data-share-hidden-class="--is-hidden">
