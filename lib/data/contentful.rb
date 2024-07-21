@@ -186,6 +186,7 @@ class Contentful
       tag = tag.dup
       tagged_articles = @content[:articles].select { |a| !a[:draft] && a.dig(:contentful_metadata, :tags).include?(tag) }
       sliced = tagged_articles.each_slice(entries_per_page)
+      summary = "Browse all #{tagged_articles.any? { |a| a[:entry_type] == 'Short'} ? 'articles and posts' : 'articles' } tagged ”#{tag[:name]}”."
       paginated_tag_pages = sliced.map.with_index do |page, index|
         current_page = index + 1
         previous_page = index.zero? ? nil : index
@@ -213,7 +214,7 @@ class Contentful
           previous_page_path: previous_page_path,
           next_page_path: next_page_path,
           title: tag[:name],
-          summary: "Articles tagged ”#{tag[:name]}”",
+          summary: summary,
           items: page,
           index_in_search_engines: true
         }
