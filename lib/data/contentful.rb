@@ -213,6 +213,7 @@ class Contentful
           previous_page_path: previous_page_path,
           next_page_path: next_page_path,
           title: tag[:name],
+          summary: "Articles tagged ”#{tag[:name]}”",
           items: page,
           index_in_search_engines: true
         }
