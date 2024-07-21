@@ -124,9 +124,6 @@ module ContentfulClient
           logo {
             ...ImageFields
           }
-          coverImage {
-            ...ImageFields
-          }
           sys {
             ...SysFields
           }
