@@ -16,8 +16,8 @@
     </h2>
   </header>
   <div class="entry__body">
-    <%= render_body(article.intro, image_variant: :outdent) %>
-    <%= render_body(article.body, image_variant: :outdent) %>
+    <%= render_body(article.intro, image_variant: :full) %>
+    <%= render_body(article.body, image_variant: :full) %>
     <%= partial 'partials/disclosure', locals: { entry: article } %>
   </div>
 </article>

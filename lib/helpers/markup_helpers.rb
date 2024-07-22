@@ -6,15 +6,10 @@ require 'nokogiri'
 module MarkupHelpers
   # Renders the body text for an entry with various transformations of the HTML output.
   # @param text [String] The Markdown text to render.
-  # @param image_variant [Symbol] The responsive images config to us
+  # @param image_variant [Symbol] The responsive images config to use.
   # @return [String] The rendered HTML with added attributes and transformations.
   def render_body(text, image_variant: :entry)
-    srcset = if image_variant == :outdent
-      data.srcsets.outdent
-    elsif image_variant == :outdent
-      data.srcsets.entry
-    end
-
+    srcset = data.srcsets[image_variant]
     html = markdown_to_html(text)
     html = open_external_links_in_new_tabs(html)
     html = add_unit_data_attributes(html)
@@ -63,7 +58,7 @@ module MarkupHelpers
   # @return [String] The body of the entry with the entry at the beginning.
   def prepend_title(title, html)
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
-  
+
     if doc.children.first.name == 'p'
       first_p = doc.children.first
       first_p.inner_html = "<b>#{title}.</b> #{first_p.inner_html}"
@@ -71,7 +66,7 @@ module MarkupHelpers
       new_p = Nokogiri::HTML::DocumentFragment.parse("<p><b>#{title}.</b></p>").children.first
       doc.children.first.add_previous_sibling(new_p)
     end
-  
+
     doc.to_html
   end
 

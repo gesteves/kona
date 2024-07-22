@@ -15,7 +15,7 @@ entry:
     - avif
     - webp
     - jpg
-outdent:
+full:
   sizes:
     - "(min-width: 1280px) 1008px"
     - "(min-width: 768px) calc((((100vw - 4rem - (11 * 2rem))/12) * 10) + (9 * 2rem))"
