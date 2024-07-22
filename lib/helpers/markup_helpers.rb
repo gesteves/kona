@@ -6,15 +6,22 @@ require 'nokogiri'
 module MarkupHelpers
   # Renders the body text for an entry with various transformations of the HTML output.
   # @param text [String] The Markdown text to render.
+  # @param image_variant [Symbol] The responsive images config to us
   # @return [String] The rendered HTML with added attributes and transformations.
-  def render_body(text)
+  def render_body(text, image_variant: :entry)
+    srcset = if image_variant == :outdent
+      data.srcsets.outdent
+    elsif image_variant == :outdent
+      data.srcsets.entry
+    end
+
     html = markdown_to_html(text)
     html = open_external_links_in_new_tabs(html)
     html = add_unit_data_attributes(html)
     html = add_image_data_attributes(html)
     html = add_figure_elements(html, base_class: 'entry')
-    html = responsivize_images(html, widths: data.srcsets.entry.widths, sizes: data.srcsets.entry.sizes.join(', '), formats: data.srcsets.entry.formats)
-    html = resize_images(html, width: data.srcsets.entry.widths.max)
+    html = responsivize_images(html, widths: srcset.widths, sizes: srcset.sizes.join(', '), formats: srcset.formats)
+    html = resize_images(html, width: srcset.widths.max)
     html = add_image_placeholders(html)
     html = set_alt_text(html)
     html = mark_affiliate_links(html)

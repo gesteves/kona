@@ -1,5 +1,22 @@
 entry:
   sizes:
+    - "(min-width: 1280px) 800px"
+    - "(min-width: 768px) calc((((100vw - 4rem - (11 * 2rem))/12) * 8) + (7 * 2rem))"
+    - "calc(100vw - 4rem)"
+  widths:
+    - 800
+    - 1600
+    - 1098
+    - 987
+    - 1092
+    - 978
+    - 622
+  formats:
+    - avif
+    - webp
+    - jpg
+outdent:
+  sizes:
     - "(min-width: 1280px) 1008px"
     - "(min-width: 768px) calc((((100vw - 4rem - (11 * 2rem))/12) * 10) + (9 * 2rem))"
     - "100vw"
