@@ -34,13 +34,13 @@ task :test do
 end
 
 desc 'Import content and build the site'
-task :build => [:dotenv, :test, :import] do
+task :build => [:dotenv, :import] do
   build_site
 end
 
 namespace :build do
   desc 'Import content and build the site with verbose output'
-  task :verbose => [:dotenv, :test, :import] do
+  task :verbose => [:dotenv, :import] do
     build_site(verbose: true)
   end
 end
