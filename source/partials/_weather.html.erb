@@ -5,7 +5,7 @@
     <% if weather_alerts.present? %>
       <div class="weather__alerts">
         <% weather_alerts.each do |alert| %>
-          <a href="<%= alert.details_url %>" class="weather__alert", target="_blank">
+          <a href="<%= alert.details_url %>" class="weather__alert" target="_blank">
             <%= icon_svg "classic", "regular", "triangle-exclamation" %>
             <%= alert.description %>
           </a>
