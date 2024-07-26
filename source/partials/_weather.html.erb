@@ -1,4 +1,16 @@
 <div class="weather" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= url_for('/xhr/weather.html') %>" data-action="visibilitychange@document->live-update#handleVisibilityChange">
   <div class="weather__icon" aria-hidden="true"><%= icon_svg("classic", "thin", weather_icon) %></div>
-  <div class="weather__text"><%= weather_summary %></div>
+  <div class="weather__text">
+    <%= weather_summary %>
+    <% if weather_alerts.present? %>
+      <div class="weather__alerts">
+        <% weather_alerts.each do |alert| %>
+          <a href="<%= alert.details_url %>" class="weather__alert", target="_blank">
+            <%= icon_svg "classic", "regular", "triangle-exclamation" %>
+            <%= alert.description %>
+          </a>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
 </div>

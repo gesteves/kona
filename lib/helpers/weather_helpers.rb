@@ -450,4 +450,9 @@ module WeatherHelpers
     return condition[:icon] if condition[:icon].is_a?(String)
     is_daytime? ? condition[:icon][:day] : condition[:icon][:night]
   end
+
+  def weather_alerts
+    return if data.weather&.weather_alerts&.alerts.blank?
+    data.weather.weather_alerts.alerts
+  end
 end
