@@ -18,6 +18,7 @@ activate :asset_hash
 activate :directory_indexes
 
 ignore "/article.html"
+ignore "/article.json"
 ignore "/articles.html"
 ignore "/home.html"
 ignore "/javascripts/stimulus/*"
@@ -26,6 +27,7 @@ ignore "/short.html"
 
 @app.data.articles.each do |article|
   proxy article.path, article.template, locals: { content: article }, ignore: true
+  proxy article.path.gsub('/index.html', '.json'), "/article.json", locals: { content: article }, ignore: true
 end
 
 @app.data.pages.each do |page|
