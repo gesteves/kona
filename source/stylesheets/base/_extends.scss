@@ -55,6 +55,8 @@
   h4,
   h5,
   h6 {
+    align-items: center;
+    display: flex;
     font-family: var(--ibm-plex-sans-condensed);
     font-size: var(--font-medium);
     line-height: var(--line-height-medium);
