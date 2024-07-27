@@ -50,7 +50,7 @@
 .weather__alerts {
   .weather__alert {
     align-items: center;
-    color: var(--color-text-tertiary);
+    color: var(--color-text-secondary);
     display: inline-flex;
     font-family: var(--ibm-plex-mono);
     font-size: var(--font-x-small);
@@ -59,7 +59,7 @@
     text-transform: uppercase;
   
     &:link, &:visited {
-      color: var(--color-text-tertiary);
+      color: var(--color-text-secondary);
       text-decoration: none;
     }
   
