@@ -1,10 +1,5 @@
 [[redirects]]
 from = "/js/script.js"
-to = "https://plausible.io/js/script.js"
-status = 200
-
-[[redirects]]
-from = "/js/script.manual.js"
 to = "https://plausible.io/js/script.manual.js"
 status = 200
 
