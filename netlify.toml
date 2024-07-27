@@ -23,3 +23,7 @@ status = 200
   command = "bundle exec rake build"
   publish = "build/"
 
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Referrer-Policy = "no-referrer-when-downgrade"
