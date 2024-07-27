@@ -70,7 +70,7 @@ class PurpleAir
     response = HTTParty.get(PURPLE_AIR_API_URL, query: query, headers: { 'X-API-Key' => ENV['PURPLEAIR_API_KEY'] })
     return unless response.success?
 
-    $redis.setex(cache_key, 1.hour, response.body)
+    $redis.setex(cache_key, 5.minutes, response.body)
     JSON.parse(response.body)
   end
 
