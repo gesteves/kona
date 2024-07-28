@@ -2,7 +2,7 @@
   <div class="weather__icon" aria-hidden="true"><%= icon_svg("classic", "thin", weather_icon) %></div>
   <div class="weather__text">
     <%= weather_summary %>
-    <% weather_alerts.each do |alert| %>
+    <% weather_alerts&.each do |alert| %>
       <a href="<%= alert.details_url %>" class="weather__alert" target="_blank">
         <%= icon_svg "classic", "solid", "triangle-exclamation" %>
         <%= alert.description %>
