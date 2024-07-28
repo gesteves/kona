@@ -61,11 +61,19 @@
     &:link, &:visited {
       color: var(--color-text-secondary);
       text-decoration: none;
+      g,
+      path {
+        fill: var(--color-text-tertiary);
+      }
     }
   
     &:hover, &:active {
       color: var(--color-link-hover);
       text-decoration: none;
+      g,
+      path {
+        fill: var(--color-link-hover);
+      }
     }
   
     &:focus {
@@ -81,11 +89,6 @@
       margin-right: 0.25rem;
       vertical-align: middle;
       width: 1rem;
-  
-      g,
-      path {
-        fill: currentColor;
-      }
     }
   }
 }

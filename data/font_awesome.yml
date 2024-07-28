@@ -12,7 +12,6 @@ icons:
       - comment
       - envelope
       - link-simple
-    regular:
       - triangle-exclamation
     thin:
       - bolt-lightning
