@@ -452,7 +452,7 @@ module WeatherHelpers
   end
 
   def weather_alerts
-    return if data.weather&.weather_alerts&.alerts.blank?
+    return [] if data.weather&.weather_alerts&.alerts.blank?
     data.weather.weather_alerts.alerts
   end
 end
