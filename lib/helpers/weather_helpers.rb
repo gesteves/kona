@@ -448,10 +448,16 @@ module WeatherHelpers
     is_daytime? ? condition[:icon][:day] : condition[:icon][:night]
   end
 
+  # Returns an array of the weather alerts, sorted by precedence.
+  #
+  # @return [Array] An array of alert objects, sorted by precedence from lowest to highest.
+  #                 Returns an empty array if there are no alerts.
   def weather_alerts
     return [] if data.weather&.weather_alerts&.alerts.blank?
-    alerts = data.weather.weather_alerts.alerts
-
-    alerts.group_by { |alert| alert.token }.map { |token, grouped_alerts| grouped_alerts.min_by { |alert| alert.precedence } }
+    # Dedup alerts by precedence
+    alerts = data.weather.weather_alerts.alerts.group_by { |alert| alert.token }
+                                    .map { |token, grouped_alerts| grouped_alerts.min_by { |alert| alert.precedence } }
+    # Sort the remaining alerts by precedence
+    alerts.sort_by { |alert| alert.precedence }
   end
 end
