@@ -450,6 +450,8 @@ module WeatherHelpers
 
   def weather_alerts
     return [] if data.weather&.weather_alerts&.alerts.blank?
-    data.weather.weather_alerts.alerts
+    alerts = data.weather.weather_alerts.alerts
+
+    alerts.group_by { |alert| alert.token }.map { |token, grouped_alerts| grouped_alerts.min_by { |alert| alert.precedence } }
   end
 end
