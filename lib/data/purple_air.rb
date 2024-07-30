@@ -122,10 +122,8 @@ class PurpleAir
                    [calculate_aqi(pm25, 300, 201, 225.4, 125.5), 'Very unhealthy']
                  when 225.5..500.0
                    [calculate_aqi(pm25, 500, 301, 500.0, 225.5), 'Hazardous']
-                 when 500.1..1000.0
-                    [calculate_aqi(pm25, 1000, 501, 1000.0, 500.1), 'Hazardous']
                  else
-                   [nil, nil]
+                   [501, 'Hazardous']
                  end
 
     { aqi: aqi, category: category }.compact

@@ -189,13 +189,6 @@ module WeatherHelpers
     end
   end
 
-  # Adds formatting to add emphasis to bad AQI values.
-  # @param [String] The AQI description.
-  # @return [String] A formatted string representing the AQI.
-  def format_air_quality(label)
-    label.gsub('very', '_very_').gsub('hazardous', '**hazardous**')
-  end
-
   # Returns the pollen index value, from 0 to 5.
   # @see https://developers.google.com/maps/documentation/pollen/reference/rest/v1/forecast/lookup#indexinfo
   # @return [Integer] The pollen index, where 0 is "none", and 5 is "very high"
@@ -354,7 +347,11 @@ module WeatherHelpers
   # @return [String, nil] A string describing the current AQI or nil if no data is available.
   def current_aqi
     return if data&.air_quality&.aqi.blank?
-    "The air quality is #{format_air_quality(data.air_quality&.category&.downcase)}, with an <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.air_quality&.aqi&.round}"
+    if data.air_quality.aqi.round > 500
+      "The air quality is so hazardous it's beyond the <abbr title=\"Air Quality Index\">AQI</abbr>"
+    else
+      "The air quality is #{data.air_quality&.category&.downcase}, with an <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.air_quality.aqi.round}"
+    end
   end
 
   # Provides the weather forecast for today or tonight.
