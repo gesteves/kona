@@ -350,7 +350,7 @@ module WeatherHelpers
     if data.air_quality.aqi.round > 500
       "The air quality is so hazardous it's beyond the <abbr title=\"Air Quality Index\">AQI</abbr>"
     else
-      "The air quality is #{data.air_quality&.category&.downcase}, with an <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.air_quality.aqi.round}"
+      "The air quality is #{data.air_quality.category.downcase}, with an <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.air_quality.aqi.round}"
     end
   end
 
