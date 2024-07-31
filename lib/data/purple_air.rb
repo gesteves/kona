@@ -60,7 +60,7 @@ class PurpleAir
   # @return [Array, nil] A parsed JSON array of sensor data if the query is successful and data is found; nil otherwise.
   def find_sensors_within_distance(distance_km)
     bounding_box = calculate_bounding_box(@latitude, @longitude, distance_km)
-    query = bounding_box.merge(location_type: 0, fields: 'pm2.5,latitude,longitude,humidity')
+    query = bounding_box.merge(location_type: 0, fields: 'pm2.5_atm,latitude,longitude,humidity')
 
     cache_key = "purple_air:sensors:#{query.values.map(&:to_s).join(':')}"
     data = $redis.get(cache_key)
