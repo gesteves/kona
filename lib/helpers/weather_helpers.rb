@@ -454,7 +454,7 @@ module WeatherHelpers
   #                 Returns an empty array if there are no alerts.
   def weather_alerts
     return [] if data.weather&.weather_alerts&.alerts.blank?
-    # Dedup alerts by precedence
+    # Dedup alerts by token and precedence
     alerts = data.weather.weather_alerts.alerts.group_by { |alert| alert.token }
                                     .map { |token, grouped_alerts| grouped_alerts.min_by { |alert| alert.precedence } }
     # Sort the remaining alerts by precedence
