@@ -31,7 +31,7 @@ class PurpleAir
     sensor = nearest_sensor_within_distance
     return if sensor.blank?
 
-    corrected_pm25 = apply_epa_correction(sensor['pm2.5_atm'], sensor['humidity'])
+    corrected_pm25 = apply_epa_correction(sensor['pm2.5_cf_1'], sensor['humidity'])
     data = format_aqi(corrected_pm25)
     return if data.dig(:aqi).blank? || data.dig(:aqi).zero?
     data
@@ -60,7 +60,7 @@ class PurpleAir
   # @return [Array, nil] A parsed JSON array of sensor data if the query is successful and data is found; nil otherwise.
   def find_sensors_within_distance(distance_km)
     bounding_box = calculate_bounding_box(@latitude, @longitude, distance_km)
-    query = bounding_box.merge(location_type: 0, fields: 'pm2.5_atm,latitude,longitude,humidity')
+    query = bounding_box.merge(location_type: 0, fields: 'pm2.5_cf_1,latitude,longitude,humidity')
 
     cache_key = "purple_air:sensors:#{query.values.map(&:to_s).join(':')}"
     data = $redis.get(cache_key)
@@ -83,24 +83,13 @@ class PurpleAir
   def apply_epa_correction(pm25, humidity)
     return if pm25.blank?
     return pm25 if humidity.blank?
-
-    case pm25
-    when 0...30
-      0.524 * pm25 - 0.0862 * humidity + 5.75
-    when 30...50
-      ((0.786 * (pm25 / 20 - 3 / 2) + 0.524 * (1 - (pm25 / 20 - 3 / 2))) * pm25) - 0.0862 * humidity + 5.75
-    when 50...210
-      0.786 * pm25 - 0.0862 * humidity + 5.75
-    when 210...260
-      ((0.69 * (pm25 / 50 - 21 / 5) + 0.786 * (1 - (pm25 / 50 - 21 / 5))) * pm25) -
-        0.0862 * humidity * (1 - (pm25 / 50 - 21 / 5)) +
-        2.966 * (pm25 / 50 - 21 / 5) +
-        5.75 * (1 - (pm25 / 50 - 21 / 5)) +
-        8.84 * (10**(-4)) * pm25**2 * (pm25 / 50 - 21 / 5)
+  
+    if pm25 <= 343
+      0.52 * pm25 - 0.086 * humidity + 5.75
     else
-      2.966 + 0.69 * pm25 + 8.841 * (10**(-4)) * pm25**2
+      0.46 * pm25 + 3.93 * (10**-4) * pm25**2 + 2.97
     end
-  end
+  end  
 
   # Formats the PM2.5 value into an Air Quality Index (AQI).
   # @see https://www.epa.gov/system/files/documents/2024-02/pm-naaqs-air-quality-index-fact-sheet.pdf
