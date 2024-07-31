@@ -31,7 +31,7 @@ class PurpleAir
     sensor = nearest_sensor_within_distance
     return if sensor.blank?
 
-    corrected_pm25 = apply_epa_correction(sensor['pm2.5'], sensor['humidity'])
+    corrected_pm25 = apply_epa_correction(sensor['pm2.5_atm'], sensor['humidity'])
     data = format_aqi(corrected_pm25)
     return if data.dig(:aqi).blank? || data.dig(:aqi).zero?
     data
