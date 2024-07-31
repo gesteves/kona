@@ -9,7 +9,7 @@ const BUILD_HOOK = process.env.BUILD_HOOK_URL
  * 
  * @returns {Object} Response object with status code.
  */
-const handler = schedule('59 * * * *', async () => {
+const handler = schedule('0 * * * *', async () => {
 
   if (BUILD_HOOK) {
     await fetch(BUILD_HOOK, {
