@@ -138,10 +138,7 @@ class PurpleAir
   # @param aqi_high [Integer] The high end of the AQI range.
   # @return [Float] The calculated AQI value.
   def calculate_aqi(pm25, pm25_low, pm25_high, aqi_low, aqi_high)
-    aqi_range = aqi_high - aqi_low
-    pm25_range = pm25_high - pm25_low
-    difference_from_low_breakpoint = pm25 - pm25_low
-    (aqi_range / pm25_range) * difference_from_low_breakpoint + aqi_low
+    (((aqi_high - aqi_low)/(pm25_high - pm25_low)) * (pm25 - pm25_low)) - aqi_low
   end
 
   # Calculates the great-circle distance between two points on the Earth.
