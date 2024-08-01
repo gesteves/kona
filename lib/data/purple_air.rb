@@ -108,7 +108,7 @@ class PurpleAir
   # @return [Hash] The formatted AQI value and category.
   def format_aqi(pm25)
     return if pm25.blank?
-
+    pm25 = pm25.round(1)
     aqi, category = case pm25
                     when 0..9.0
                       [calculate_aqi(pm25, 0, 9.0, 0, 50), 'Good']
