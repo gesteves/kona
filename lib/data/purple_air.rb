@@ -120,10 +120,8 @@ class PurpleAir
                       [calculate_aqi(pm25, 55.5, 125.4, 151, 200), 'Unhealthy']
                     when 125.5..225.4
                       [calculate_aqi(pm25, 125.5, 225.4, 201, 300), 'Very unhealthy']
-                    when 225.5..500.0
-                      [calculate_aqi(pm25, 225.5, 500.0, 301, 500), 'Hazardous']
                     else
-                      [501, 'Hazardous']
+                      [calculate_aqi(pm25, 225.5, 500.0, 301, 500), 'Hazardous']
                     end
 
     { aqi: aqi, category: category }.compact
@@ -138,7 +136,11 @@ class PurpleAir
   # @param aqi_high [Integer] The high end of the AQI range.
   # @return [Float] The calculated AQI value.
   def calculate_aqi(pm25, pm25_low, pm25_high, aqi_low, aqi_high)
-    ((((aqi_high - aqi_low)/(pm25_high - pm25_low)) * (pm25 - pm25_low)) + aqi_low).round
+    if pm25 > 500
+      (((aqi_high - aqi_low) / (pm25_high - pm25_low)) * (pm25 - pm25_high) + aqi_high).round
+    else
+      ((((aqi_high - aqi_low) / (pm25_high - pm25_low)) * (pm25 - pm25_low)) + aqi_low).round
+    end
   end
 
   # Calculates the great-circle distance between two points on the Earth.
