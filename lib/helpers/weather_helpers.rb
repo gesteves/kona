@@ -347,10 +347,10 @@ module WeatherHelpers
   # @return [String, nil] A string describing the current AQI or nil if no data is available.
   def current_aqi
     return if data&.air_quality&.aqi.blank?
-    if data.air_quality.aqi.round > 500
+    if data.air_quality.aqi > 500
       "The air quality is so hazardous it's beyond the <abbr title=\"Air Quality Index\">AQI</abbr>"
     else
-      "The air quality is #{data.air_quality.category.downcase}, with an <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.air_quality.aqi.round}"
+      "The air quality is #{data.air_quality.category.downcase}, with an <abbr title=\"Air Quality Index\">AQI</abbr> of #{data.air_quality.aqi}"
     end
   end
 
