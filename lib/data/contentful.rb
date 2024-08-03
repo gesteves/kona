@@ -69,11 +69,9 @@ class Contentful
         raise "Error fetching #{key}: #{response.errors.messages['data'].join(' - ')}" if response.errors.present?
 
         data = response.data.to_h.deep_transform_keys { |k| k.to_s.underscore.to_sym }
-        break if data.dig(key, :items).empty?
-
         items = data.dig(key, :items).compact
-
         @content[key] += items
+
         break if items.size < limit || limit == 1
 
         skip += limit
