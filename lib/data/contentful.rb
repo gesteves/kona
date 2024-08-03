@@ -10,7 +10,7 @@ class Contentful
       events: [],
       pages: [],
       redirects: [],
-      site: [],
+      sites: [],
       blog: [],
       tags: []
     }
@@ -52,24 +52,40 @@ class Contentful
   # Fetches all content from Contentful's GraphQL API.
   def get_contentful_data
     skip = 0
-    limit = 100
-    loop do
-      # Fetch the data from the API.
-      response = @client.query(ContentfulClient::QUERIES::Content, variables: { skip: skip, limit: limit })
-      raise if response.data.blank?
-      # Convert the data in the response to a hash, and transform the keys from camelCase to Ruby-style camel_case :symbols.
-      data = response.data.to_h.deep_transform_keys { |key| key.to_s.underscore.to_sym }
-      # Break the loop when the API stops returning items for all of the content types.
-      break if data.keys.all? { |k| data.dig(k, :items).empty? }
-      # Add them to the @content instance variable.
-      [:articles, :pages, :assets, :redirects, :events, :site].each { |c| @content[c] += data.dig(c, :items).compact }
-      skip += limit
+
+    queries = {
+      articles: ContentfulClient::QUERIES::Articles,
+      pages: ContentfulClient::QUERIES::Pages,
+      assets: ContentfulClient::QUERIES::Assets,
+      redirects: ContentfulClient::QUERIES::Redirects,
+      events: ContentfulClient::QUERIES::Events,
+      sites: ContentfulClient::QUERIES::Sites
+    }
+
+    queries.each do |key, query|
+      limit = key == :sites ? 1 : 100
+      loop do
+        response = @client.query(query, variables: { skip: skip, limit: limit })
+        raise "Error fetching #{key}: #{response.errors.messages['data'].join(' - ')}" if response.errors.present?
+
+        data = response.data.to_h.deep_transform_keys { |k| k.to_s.underscore.to_sym }
+        break if data.dig(key, :items).empty?
+
+        items = data.dig(key, :items).compact
+
+        @content[key] += items
+        break if items.size < limit || limit == 1
+
+        skip += limit
+      end
+      skip = 0
     end
   end
 
   # Grabs the first site in the array.
   def process_site
-    @content[:site] = @content[:site].first
+    @content[:site] = @content[:sites].first
+    @content.delete(:sites)
   end
 
   # Processes articles from the fetched content.

@@ -46,7 +46,7 @@ module ContentfulClient
       openInNewTab
     }
 
-    query Content ($skip: Int, $limit: Int) {
+    query Articles($skip: Int, $limit: Int) {
       articles: articleCollection(skip: $skip, limit: $limit, preview: true) {
         items {
           title
@@ -74,7 +74,10 @@ module ContentfulClient
           }
         }
       }
-      pages: pageCollection(skip: $skip, limit: $limit, preview: true, order: [title_ASC]) {
+    }
+
+    query Pages($skip: Int, $limit: Int) {
+      pages: pageCollection(skip: $skip, limit: $limit, preview: true) {
         items {
           title
           slug
@@ -91,7 +94,10 @@ module ContentfulClient
           }
         }
       }
-      site: siteCollection(skip: $skip, limit: 1, order: [sys_firstPublishedAt_ASC]) {
+    }
+
+    query Sites($skip: Int, $limit: Int) {
+      sites: siteCollection(skip: $skip, limit: $limit, order: [sys_firstPublishedAt_ASC]) {
         items {
           title
           metaTitle
@@ -129,6 +135,9 @@ module ContentfulClient
           }
         }
       }
+    }
+
+    query Redirects($skip: Int, $limit: Int) {
       redirects: redirectCollection(skip: $skip, limit: $limit, order: [sys_publishedAt_DESC]) {
         items {
           from
@@ -139,7 +148,10 @@ module ContentfulClient
           }
         }
       }
-      events: eventCollection(skip: $skip, limit: $limit, order: [date_ASC], where: { canceled: false }) {
+    }
+
+    query Events($skip: Int, $limit: Int) {
+      events: eventCollection(skip: $skip, limit: $limit, where: { canceled: false }) {
         items {
           title
           description
@@ -152,7 +164,10 @@ module ContentfulClient
           }
         }
       }
-      assets: assetCollection(skip: $skip, limit: $limit, preview: true, order: [sys_firstPublishedAt_DESC]) {
+    }
+
+    query Assets($skip: Int, $limit: Int) {
+      assets: assetCollection(skip: $skip, limit: $limit, preview: true) {
         items {
           ...ImageFields
           sys {
