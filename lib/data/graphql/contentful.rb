@@ -96,8 +96,8 @@ module ContentfulClient
       }
     }
 
-    query Sites($skip: Int, $limit: Int) {
-      sites: siteCollection(skip: $skip, limit: $limit, order: [sys_firstPublishedAt_ASC]) {
+    query Sites {
+      sites: siteCollection(limit: 1, order: [sys_firstPublishedAt_ASC]) {
         items {
           title
           metaTitle

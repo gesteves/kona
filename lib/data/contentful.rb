@@ -52,7 +52,7 @@ class Contentful
   # Fetches all content from Contentful's GraphQL API.
   def get_contentful_data
     skip = 0
-
+    limit = 100
     queries = {
       articles: ContentfulClient::QUERIES::Articles,
       pages: ContentfulClient::QUERIES::Pages,
@@ -63,7 +63,6 @@ class Contentful
     }
 
     queries.each do |key, query|
-      limit = key == :sites ? 1 : 100
       loop do
         response = @client.query(query, variables: { skip: skip, limit: limit })
         raise "Error fetching #{key}: #{response.errors.messages['data'].join(' - ')}" if response.errors.present?
@@ -72,7 +71,7 @@ class Contentful
         items = data.dig(key, :items).compact
         @content[key] += items
 
-        break if items.size < limit || limit == 1
+        break if items.size < limit
 
         skip += limit
       end
