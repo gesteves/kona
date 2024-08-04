@@ -97,7 +97,7 @@ module ContentfulClient
     }
 
     query Sites {
-      sites: siteCollection(limit: 1, order: [sys_firstPublishedAt_ASC]) {
+      sites: siteCollection(limit: 1, order: [sys_publishedAt_DESC]) {
         items {
           title
           metaTitle
