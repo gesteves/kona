@@ -58,17 +58,23 @@ module MarkupHelpers
   # @return [String] The body of the entry with the entry at the beginning.
   def prepend_title(title, html)
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
-
+  
+    if title.match?(/(\.$|\.\"$|\.”$)/)
+      formatted_title = "<b>#{title}</b>"
+    else
+      formatted_title = "<b>#{title}.</b>"
+    end
+  
     if doc.children.first.name == 'p'
       first_p = doc.children.first
-      first_p.inner_html = "<b>#{title}.</b> #{first_p.inner_html}"
+      first_p.inner_html = "#{formatted_title} #{first_p.inner_html}"
     else
-      new_p = Nokogiri::HTML::DocumentFragment.parse("<p><b>#{title}.</b></p>").children.first
+      new_p = Nokogiri::HTML::DocumentFragment.parse("<p>#{formatted_title}</p>").children.first
       doc.children.first.add_previous_sibling(new_p)
     end
-
+  
     doc.to_html
-  end
+  end  
 
   # Adds data attributes for the units-controller.js Stimulus controller,
   # to simplify entering unit conversion data in Contentful.
