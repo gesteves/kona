@@ -23,6 +23,8 @@ entry:
     - 986
     - 1006
     - 1258
+    - 1128
+    - 1014
   formats:
     - avif
     - webp
@@ -52,6 +54,8 @@ full:
     - 1125
     - 640
     - 320
+    - 1320
+    - 1206
   formats:
     - avif
     - webp
