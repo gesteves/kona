@@ -122,7 +122,7 @@ module MarkupHelpers
 
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
 
-    doc.css('img, iframe, video').each do |element|
+    doc.css('img').each do |element|
       parent = element.parent
       element = element.remove
       caption = set_caption_credit(parent.inner_html)
