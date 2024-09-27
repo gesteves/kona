@@ -113,41 +113,41 @@ module MarkupHelpers
     doc.to_html
   end
 
-  # Adds figure elements around image elements in HTML with an optional CSS class.
-  # @param html [String] The HTML content with image elements.
+  # Adds figure elements around media in HTML with an optional CSS class.
+  # @param html [String] The HTML content with media elements.
   # @param base_class [String] (Optional) The base class to add to the figure element.
   # @return [String] The HTML content with added figure elements.
   def add_figure_elements(html, base_class: nil)
     return if html.blank?
 
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
-    doc.css('img').each do |img|
-      # Get the parent of the image
-      parent = img.parent
-      # Remove the image
-      img = img.remove
-      # The caption is whatever is left in the parent, so store it...
+
+    doc.css('img, iframe, video').each do |element|
+      parent = element.parent
+      element = element.remove
       caption = set_caption_credit(parent.inner_html)
-      # ...then put the image back
-      parent.prepend_child(img)
+      parent.prepend_child(element)
 
-      # Get the corresponding image asset
-      asset_id = get_asset_id(img['src'])
-      content_type = get_asset_content_type(asset_id)
+      if element.name == 'img'
+        asset_id = get_asset_id(element['src'])
+        content_type = get_asset_content_type(asset_id)
+      else
+        content_type = element.name
+      end
 
-      # Wrap the whole thing in a figure element,
-      # with the caption in a figcaption, if present,
-      # then replace the original paragraph with it.
       figure = if base_class.present?
-        figure_class = "#{base_class}__figure #{base_class}__figure--#{content_type.split('/').last}"
+        figure_class = "#{base_class}__figure #{base_class}__figure--#{content_type}"
         "<figure class=\"#{figure_class}\"></figure>"
       else
         "<figure></figure>"
       end
-      img.wrap(figure)
-      img.add_next_sibling("<figcaption>#{caption}</figcaption>") if caption.present?
-      parent.replace(img.parent)
+
+      element.wrap(figure)
+
+      element.add_next_sibling("<figcaption>#{caption}</figcaption>") if caption.present?
+      parent.replace(element.parent)
     end
+
     doc.to_html
   end
 
