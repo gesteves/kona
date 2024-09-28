@@ -14,7 +14,7 @@ module MarkupHelpers
     html = open_external_links_in_new_tabs(html)
     html = add_unit_data_attributes(html)
     html = add_image_data_attributes(html)
-    html = add_figure_elements(html, base_class: 'entry')
+    html = add_figure_elements_to_images(html, base_class: 'entry')
     html = responsivize_images(html, widths: srcset.widths, sizes: srcset.sizes.join(', '), formats: srcset.formats)
     html = resize_images(html, width: srcset.widths.max)
     html = add_image_placeholders(html)
@@ -31,7 +31,7 @@ module MarkupHelpers
   def render_feed_body(text)
     html = markdown_to_html(text)
     html = add_image_data_attributes(html)
-    html = add_figure_elements(html)
+    html = add_figure_elements_to_images(html)
     html = resize_images(html, width: data.srcsets.entry.widths.max)
     html = set_alt_text(html)
     html = mark_affiliate_links(html)
@@ -44,7 +44,7 @@ module MarkupHelpers
   def render_home_body(text)
     html = markdown_to_html(text)
     html = add_image_data_attributes(html)
-    html = add_figure_elements(html, base_class: 'home')
+    html = add_figure_elements_to_images(html, base_class: 'home')
     html = responsivize_images(html, widths: data.srcsets.home.widths, sizes: data.srcsets.home.sizes.join(', '), formats: data.srcsets.entry.formats, lazy: false, square: true)
     html = resize_images(html)
     html = add_image_placeholders(html)
@@ -58,13 +58,13 @@ module MarkupHelpers
   # @return [String] The body of the entry with the entry at the beginning.
   def prepend_title(title, html)
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
-  
+
     if title.match?(/(\.$|\.\"$|\.”$)/)
       formatted_title = "<b>#{title}</b>"
     else
       formatted_title = "<b>#{title}.</b>"
     end
-  
+
     if doc.children.first.name == 'p'
       first_p = doc.children.first
       first_p.inner_html = "#{formatted_title} #{first_p.inner_html}"
@@ -72,9 +72,9 @@ module MarkupHelpers
       new_p = Nokogiri::HTML::DocumentFragment.parse("<p>#{formatted_title}</p>").children.first
       doc.children.first.add_previous_sibling(new_p)
     end
-  
+
     doc.to_html
-  end  
+  end
 
   # Adds data attributes for the units-controller.js Stimulus controller,
   # to simplify entering unit conversion data in Contentful.
@@ -113,41 +113,41 @@ module MarkupHelpers
     doc.to_html
   end
 
-  # Adds figure elements around media in HTML with an optional CSS class.
-  # @param html [String] The HTML content with media elements.
+  # Adds figure elements around image elements in HTML with an optional CSS class.
+  # @param html [String] The HTML content with image elements.
   # @param base_class [String] (Optional) The base class to add to the figure element.
   # @return [String] The HTML content with added figure elements.
-  def add_figure_elements(html, base_class: nil)
+  def add_figure_elements_to_images(html, base_class: nil)
     return if html.blank?
 
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
-
-    doc.css('img').each do |element|
-      parent = element.parent
-      element = element.remove
+    doc.css('img').each do |img|
+      # Get the parent of the image
+      parent = img.parent
+      # Remove the image
+      img = img.remove
+      # The caption is whatever is left in the parent, so store it...
       caption = set_caption_credit(parent.inner_html)
-      parent.prepend_child(element)
+      # ...then put the image back
+      parent.prepend_child(img)
 
-      if element.name == 'img'
-        asset_id = get_asset_id(element['src'])
-        content_type = get_asset_content_type(asset_id)
-      else
-        content_type = element.name
-      end
+      # Get the corresponding image asset
+      asset_id = get_asset_id(img['src'])
+      content_type = get_asset_content_type(asset_id)
 
+      # Wrap the whole thing in a figure element,
+      # with the caption in a figcaption, if present,
+      # then replace the original paragraph with it.
       figure = if base_class.present?
-        figure_class = "#{base_class}__figure #{base_class}__figure--#{content_type}"
+        figure_class = "#{base_class}__figure #{base_class}__figure--#{content_type.split('/').last}"
         "<figure class=\"#{figure_class}\"></figure>"
       else
         "<figure></figure>"
       end
-
-      element.wrap(figure)
-
-      element.add_next_sibling("<figcaption>#{caption}</figcaption>") if caption.present?
-      parent.replace(element.parent)
+      img.wrap(figure)
+      img.add_next_sibling("<figcaption>#{caption}</figcaption>") if caption.present?
+      parent.replace(img.parent)
     end
-
     doc.to_html
   end
 
