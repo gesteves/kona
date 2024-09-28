@@ -69,9 +69,21 @@ module ShareHelpers
     "https://getpocket.com/save?url=#{url}"
   end
 
+  # Generates a URL for flipping an article on Flipboard.
+  # @param article [Article] The article to be shared.
+  # @return [String] The Flipboard save URL.
   def flipboard_share_url(article)
     title = ERB::Util.url_encode(sanitize(article.title))
     url = ERB::Util.url_encode(full_url(article.path))
     "https://share.flipboard.com/bookmarklet/popout?v=2&title=#{title}&url=#{url}"
+  end
+
+  # Generates a URL for sharing an article on Mastodon.
+  # @param article [Article] The article to be shared.
+  # @return [String] The MastodonShare share URL.
+  def mastodonshare_url(article)
+    title = ERB::Util.url_encode(sanitize(article.title))
+    url = ERB::Util.url_encode(full_url(article.path))
+    "https://mastodonshare.com/?text=#{title}&url=#{url}"
   end
 end

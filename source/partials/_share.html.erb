@@ -26,6 +26,10 @@
         <%= icon_svg("classic", "brands", "flipboard") %>
       </a>
 
+      <a aria-label="Share on Mastodon" title="Share on Mastodon" class="share__button" href="<%= mastodonshare_url(article) %>" rel="noopener nofollow" target="_blank">
+        <%= icon_svg("classic", "brands", "mastodon") %>
+      </a>
+
       <a aria-label="Save to Pocket" title="Save to Pocket" class="share__button" href="<%= pocket_save_url(article) %>" rel="noopener nofollow" target="_blank">
         <%= icon_svg("classic", "brands", "get-pocket") %>
       </a>
