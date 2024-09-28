@@ -17,6 +17,7 @@ module MarkupHelpers
     html = add_figure_elements_to_images(html, base_class: 'entry')
     html = add_figure_elements_to_iframes(html, base_class: 'entry')
     html = add_figure_elements_to_embeds(html, base_class: 'entry')
+    html = set_caption_credit(html)
     html = responsivize_images(html, widths: srcset.widths, sizes: srcset.sizes.join(', '), formats: srcset.formats)
     html = resize_images(html, width: srcset.widths.max)
     html = add_image_placeholders(html)
@@ -36,6 +37,7 @@ module MarkupHelpers
     html = add_figure_elements_to_images(html)
     html = add_figure_elements_to_iframes(html)
     html = add_figure_elements_to_embeds(html)
+    html = set_caption_credit(html)
     html = resize_images(html, width: data.srcsets.entry.widths.max)
     html = set_alt_text(html)
     html = mark_affiliate_links(html)
@@ -49,6 +51,7 @@ module MarkupHelpers
     html = markdown_to_html(text)
     html = add_image_data_attributes(html)
     html = add_figure_elements_to_images(html, base_class: 'home')
+    html = set_caption_credit(html)
     html = responsivize_images(html, widths: data.srcsets.home.widths, sizes: data.srcsets.home.sizes.join(', '), formats: data.srcsets.entry.formats, lazy: false, square: true)
     html = resize_images(html)
     html = add_image_placeholders(html)
@@ -131,7 +134,7 @@ module MarkupHelpers
       # Remove the image
       img = img.remove
       # The caption is whatever is left in the parent, so store it...
-      caption = set_caption_credit(parent.inner_html)
+      caption = parent.inner_html
       # ...then put the image back
       parent.prepend_child(img)
 
@@ -221,14 +224,25 @@ module MarkupHelpers
   end
 
 
-  # Formats the figcaption of a figure element, wrapping the credit in a <cite> element
-  # @param html [String] The HTML content with caption and credit separated by ' | '.
-  # @return [String, nil] The HTML content with caption and credit formatted with <cite>, or nil if blank.
+  # Formats the figcaption of figure elements, wrapping the credit in a <cite> element
+  # @param html [String] The HTML content with figcaptions.
+  # @return [String, nil] The HTML content with caption and credit formatted with <cite>.
   def set_caption_credit(html)
-    return if html.blank?
-    parts = html.split(' | ')
-    return html if parts.size == 1
-    "#{parts.first} <cite>#{parts.last}</cite>"
+    # Parse the HTML with Nokogiri
+    doc = Nokogiri::HTML.fragment(html)
+
+    # Loop over every figcaption element
+    doc.css('figcaption').each do |figcaption|
+      # Split the text content by ' | '
+      parts = figcaption.inner_html.split(' | ')
+
+      # If there are two parts, format with <cite>
+      if parts.size > 1
+        figcaption.inner_html = "#{parts.first} <cite>#{parts.last}</cite>"
+      end
+    end
+
+    doc.to_html
   end
 
   # Makes images responsive within HTML by wrapping image elements in a picture element
