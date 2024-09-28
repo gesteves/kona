@@ -68,4 +68,10 @@ module ShareHelpers
     url = ERB::Util.url_encode(url)
     "https://getpocket.com/save?url=#{url}"
   end
+
+  def flipboard_share_url(article)
+    title = ERB::Util.url_encode(sanitize(article.title))
+    url = ERB::Util.url_encode(full_url(article.path))
+    "https://share.flipboard.com/bookmarklet/popout?v=2&title=#{title}&url=#{url}"
+  end
 end
