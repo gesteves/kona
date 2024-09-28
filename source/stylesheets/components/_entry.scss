@@ -262,7 +262,9 @@
     }
   }
 
-  .entry__figure--gif {
+  .entry__figure--gif,
+  .entry__figure--embed,
+  .entry__figure--iframe {
     margin: 1.5rem 0;
   
     figcaption {

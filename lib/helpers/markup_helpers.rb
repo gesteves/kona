@@ -15,6 +15,8 @@ module MarkupHelpers
     html = add_unit_data_attributes(html)
     html = add_image_data_attributes(html)
     html = add_figure_elements_to_images(html, base_class: 'entry')
+    html = add_figure_elements_to_iframes(html, base_class: 'entry')
+    html = add_figure_elements_to_embeds(html, base_class: 'entry')
     html = responsivize_images(html, widths: srcset.widths, sizes: srcset.sizes.join(', '), formats: srcset.formats)
     html = resize_images(html, width: srcset.widths.max)
     html = add_image_placeholders(html)
@@ -32,6 +34,8 @@ module MarkupHelpers
     html = markdown_to_html(text)
     html = add_image_data_attributes(html)
     html = add_figure_elements_to_images(html)
+    html = add_figure_elements_to_iframes(html)
+    html = add_figure_elements_to_embeds(html)
     html = resize_images(html, width: data.srcsets.entry.widths.max)
     html = set_alt_text(html)
     html = mark_affiliate_links(html)
@@ -150,6 +154,72 @@ module MarkupHelpers
     end
     doc.to_html
   end
+
+  # Adds figure elements around iframes in HTML with an optional CSS class.
+  # @param html [String] The HTML content with iframes.
+  # @param base_class [String] (Optional) The base class to add to the figure element.
+  # @return [String] The HTML content with added figure elements.
+  def add_figure_elements_to_iframes(html, base_class: nil)
+    # Parse the HTML with Nokogiri
+    doc = Nokogiri::HTML.fragment(html)
+
+    # Loop over every iframe element
+    doc.css('iframe').each do |iframe|
+      parent = iframe.parent
+
+      # If the iframe's immediate parent is not a figure tag
+      if parent.name != 'figure'
+        # Create a new figure element and wrap the iframe
+        figure = Nokogiri::XML::Node.new('figure', doc)
+        iframe.replace(figure)
+        figure.add_child(iframe)
+        # Update the parent to reference the newly created figure
+        parent = figure
+      end
+
+      parent['class'] = "#{base_class}__figure #{base_class}__figure--iframe" if base_class.present?
+    end
+
+    doc.to_html
+  end
+
+  # Adds figure elements around social media embeds in HTML with an optional CSS class.
+  # @param html [String] The HTML content with social media embeds.
+  # @param base_class [String] (Optional) The base class to add to the figure element.
+  # @return [String] The HTML content with added figure elements.
+  def add_figure_elements_to_embeds(html, base_class: nil)
+    # Parse the HTML with Nokogiri
+    doc = Nokogiri::HTML.fragment(html)
+
+    # Loop over every blockquote element immediately followed by a script tag
+    # (Bluesky, Instagram, and Threads embeds are blockquotes followed by scripts.)
+    doc.css('blockquote + script').each do |script|
+      blockquote = script.previous_element
+
+      # Ensure the previous element is actually a blockquote
+      next unless blockquote.name == 'blockquote'
+
+      parent = blockquote.parent
+
+      # If the blockquote's immediate parent is not a figure tag
+      if parent.name != 'figure'
+        # Create a new figure element and wrap the blockquote and script
+        figure = Nokogiri::XML::Node.new('figure', doc)
+        blockquote.replace(figure)
+        figure.add_child(blockquote)
+        figure.add_child(script)
+
+        # Update the parent to reference the newly created figure
+        parent = figure
+      end
+
+      # Set classes if base_class is provided
+      parent['class'] = "#{base_class}__figure #{base_class}__figure--embed" if base_class.present?
+    end
+
+    doc.to_html
+  end
+
 
   # Formats the figcaption of a figure element, wrapping the credit in a <cite> element
   # @param html [String] The HTML content with caption and credit separated by ' | '.
