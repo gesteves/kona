@@ -60,7 +60,7 @@ GEM
       ice_cube (~> 0.16)
       ostruct
     ice_cube (0.17.0)
-    jwt (2.9.0)
+    jwt (2.9.1)
       base64
     kramdown (2.4.0)
       rexml
