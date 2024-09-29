@@ -59,31 +59,4 @@ module ShareHelpers
     encoded_text = ERB::Util.url_encode(text)
     "https://bsky.app/intent/compose?text=#{encoded_text}"
   end
-
-  # Generates a URL for saving an article on Pocket.
-  # @param article [Article] The article to be shared.
-  # @return [String] The Pocket save URL.
-  def pocket_save_url(article)
-    url = full_url(article.path)
-    url = ERB::Util.url_encode(url)
-    "https://getpocket.com/save?url=#{url}"
-  end
-
-  # Generates a URL for flipping an article on Flipboard.
-  # @param article [Article] The article to be shared.
-  # @return [String] The Flipboard save URL.
-  def flipboard_share_url(article)
-    title = ERB::Util.url_encode(sanitize(article.title))
-    url = ERB::Util.url_encode(full_url(article.path))
-    "https://share.flipboard.com/bookmarklet/popout?v=2&title=#{title}&url=#{url}"
-  end
-
-  # Generates a URL for sharing an article on Mastodon.
-  # @param article [Article] The article to be shared.
-  # @return [String] The MastodonShare share URL.
-  def mastodonshare_url(article)
-    title = ERB::Util.url_encode(sanitize(article.title))
-    url = ERB::Util.url_encode(full_url(article.path))
-    "https://mastodonshare.com/?text=#{title}&url=#{url}"
-  end
 end
