@@ -28,10 +28,13 @@ class WeatherKit
   private
 
   # Gets the current weather data for the specified location.
+  # Retries up to three times with an exponential backoff if fetching fails.
   # @see https://developer.apple.com/documentation/weatherkitrestapi/get_api_v1_weather_language_latitude_longitude
   # @return [Hash, nil] The current weather data, or nil if fetching fails.
   def get_weather
     return if @latitude.blank? || @longitude.blank? || @time_zone.blank? || @country.blank?
+
+    retries ||= 0
     cache_key = "weatherkit:weather:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
     data = $redis.get(cache_key)
 
@@ -44,9 +47,6 @@ class WeatherKit
       "Authorization" => "Bearer #{token}"
     }
 
-    # The documentation lists `countryCode` as a required parameter,
-    # but it's actually `country`, as per this thread: https://developer.apple.com/forums/thread/723800
-    # Omitting `country` prevents weather alerts from being returned.
     query = {
       country: @country,
       dataSets: datasets&.join(','),
@@ -54,17 +54,26 @@ class WeatherKit
     }
 
     response = HTTParty.get("#{WEATHERKIT_API_URL}/weather/en/#{@latitude}/#{@longitude}", query: query, headers: headers)
-    puts "[WeatherKit] Weather response: #{response.code} - #{response.body}" unless response.success?
-    return unless response.success?
+    raise "Failed to fetch weather data: #{response.code}" unless response.success?
 
     $redis.setex(cache_key, 5.minutes, response.body)
     JSON.parse(response.body, symbolize_names: true)
+
+  rescue StandardError
+    retries += 1
+    if retries <= 3
+      sleep(2**retries)
+      retry
+    end
+    nil
   end
 
   # Checks the availability of weather data for the specified location.
+  # Retries up to three times with an exponential backoff if fetching fails.
   # @see https://developer.apple.com/documentation/weatherkitrestapi/get_api_v1_availability_latitude_longitude
   # @return [Array, nil] The available weather data sets, or nil if unavailable.
   def availability
+    retries ||= 0
     cache_key = "weatherkit:availability:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
     data = $redis.get(cache_key)
 
@@ -79,11 +88,18 @@ class WeatherKit
     }
 
     response = HTTParty.get("#{WEATHERKIT_API_URL}/availability/#{@latitude}/#{@longitude}", query: query, headers: headers)
-    puts "[WeatherKit] Availability response: #{response.code} - #{response.body}" unless response.success?
-    return unless response.success?
+    raise "Failed to fetch availability data: #{response.code}" unless response.success?
 
     $redis.setex(cache_key, 5.minutes, response.body)
     JSON.parse(response.body, symbolize_names: true)
+
+  rescue StandardError
+    retries += 1
+    if retries <= 3
+      sleep(2**retries)
+      retry
+    end
+    nil
   end
 
   # Generates an authentication token for the WeatherKit API.
