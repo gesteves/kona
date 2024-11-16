@@ -36,9 +36,11 @@ GEM
     fast_blank (1.0.1)
     fastimage (2.2.7)
     ffi (1.16.3)
-    graphql (2.3.5)
+    fiber-storage (1.0.0)
+    graphql (2.4.3)
       base64
-    graphql-client (0.23.0)
+      fiber-storage
+    graphql-client (0.24.0)
       activesupport (>= 3.0)
       graphql (>= 1.13.0)
     haml (6.2.3)
