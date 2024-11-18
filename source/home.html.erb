@@ -7,8 +7,8 @@
       <%= render_home_body(content.body) %>
     </div>
   </section>
-  <% if data.strava.stats.present? %>
-    <%= partial 'partials/stats', locals: { stats: data.strava.stats } %>
+  <% if data.intervals.present? %>
+    <%= partial 'partials/stats', locals: { stats: data.intervals } %>
   <% end %>
   <% recent_articles = recent_articles(count: 4) %>
   <% if recent_articles.present? %>

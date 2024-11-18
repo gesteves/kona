@@ -1,6 +1,5 @@
 <div class="stats__stat">
-  <% activities = swims + rides + runs %>
-  <span class="stats__meta"><%= "Activity".pluralize(activities) %></span>
-  <span class="stats__number"><%= number_to_delimited(activities) %></span>
+  <span class="stats__meta"><%= "Activity".pluralize(total) %></span>
+  <span class="stats__number"><%= number_to_delimited(total) %></span>
   <span class="stats__meta"><%= timeframe %></span>
 </div>

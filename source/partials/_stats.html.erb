@@ -1,6 +1,6 @@
 <section class="stats" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= url_for('/xhr/stats.html') %>" data-action="visibilitychange@document->live-update#handleVisibilityChange">
-  <%= partial 'partials/stats/total',    locals: { timeframe: 'in the past month', swims: stats.recent_swim_totals.activities, rides: stats.recent_ride_totals.activities, runs: stats.recent_run_totals.activities } %>
-  <%= partial 'partials/stats/activity', locals: { activity: 'Swimming', distance: stats.recent_swim_totals.distance } %>
-  <%= partial 'partials/stats/activity', locals: { activity: 'Cycling', distance: stats.recent_ride_totals.distance } %>
-  <%= partial 'partials/stats/activity', locals: { activity: 'Running', distance: stats.recent_run_totals.distance } %>
+  <%= partial 'partials/stats/total',    locals: { timeframe: 'in the past month', total: stats.total_activities } %>
+  <%= partial 'partials/stats/activity', locals: { activity: 'Swimming', distance: stats.swim_distance } %>
+  <%= partial 'partials/stats/activity', locals: { activity: 'Cycling', distance: stats.bike_distance } %>
+  <%= partial 'partials/stats/activity', locals: { activity: 'Running', distance: stats.run_distance } %>
 </section>

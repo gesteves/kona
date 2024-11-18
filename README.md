@@ -34,9 +34,9 @@ Kona uses redis to cache some of the API responses from various services, which 
 
 The services below aren't required to run Kona, but they provide additional data, mainly the various stats on the home page.
 
-#### Strava
+#### Intervals.icu
 
-Kona uses Strava to show the activity stats on the home page. You'll need to set up a new application at https://www.strava.com/settings/api and add the Client ID, Client Secret and Refresh Token from that page to the corresponding environment variables. You'll also need your Athlete ID, which is in the URL of your Strava profile page.
+Kona uses Intervals.ixu to show the activity stats on the home page. You'll need to set up an account at https://intervals.icu and add the Athlete ID and API key from the settings page to the corresponding environment variables.
 
 #### Google Maps
 

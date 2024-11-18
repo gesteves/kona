@@ -18,7 +18,7 @@ task :import => [:dotenv, :clobber] do
   initialize_location
   measure_and_output(:import_contentful, "Importing site content")
   measure_and_output(:import_font_awesome, "Importing icons")
-  measure_and_output(:import_strava, "Importing activity stats")
+  measure_and_output(:import_intervals, "Importing activity stats")
   measure_and_output(:import_location, "Importing location data")
   measure_and_output(:import_weather, "Importing weather data")
   measure_and_output(:import_aqi, "Importing air quality data")
@@ -87,8 +87,8 @@ def import_font_awesome
   safely_perform { FontAwesome.new.save_data }
 end
 
-def import_strava
-  safely_perform { Strava.new.save_data }
+def import_intervals
+  safely_perform { Intervals.new.save_data }
 end
 
 def import_location
