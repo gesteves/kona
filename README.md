@@ -36,7 +36,7 @@ The services below aren't required to run Kona, but they provide additional data
 
 #### Intervals.icu
 
-Kona uses Intervals.ixu to show the activity stats on the home page. You'll need to set up an account at https://intervals.icu and add the Athlete ID and API key from the settings page to the corresponding environment variables.
+Kona uses Intervals.icu to show the activity stats on the home page. You'll need to set up an account at https://intervals.icu and add the Athlete ID and API key from the settings page to the corresponding environment variables.
 
 #### Google Maps
 
