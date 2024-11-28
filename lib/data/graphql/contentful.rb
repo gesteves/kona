@@ -38,6 +38,7 @@ module ContentfulClient
     fragment AuthorFields on Author {
       slug
       name
+      blueskyUrl
     }
 
     fragment ShortcutFields on Shortcut {
@@ -60,6 +61,7 @@ module ContentfulClient
           published
           indexInSearchEngines
           canonicalUrl
+          blueskyCommentsUrl
           coverImage {
             ...ImageFields
           }
