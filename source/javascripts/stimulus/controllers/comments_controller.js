@@ -69,10 +69,14 @@ export default class extends Controller {
    * @param {Array} replies - Array of top-level replies.
    */
   updateComments(replies) {
-    const sortedReplies = this.sortReplies(replies, this.sortValue);
-
+    // Filter out posts with text that is only the 📌 emoji
+    const filteredReplies = replies.filter((reply) => reply.post.record.text.trim() !== "📌");
+  
+    // Sort the remaining replies
+    const sortedReplies = this.sortReplies(filteredReplies, this.sortValue);
+  
     const container = this.element;
-
+  
     sortedReplies.forEach((reply) => {
       this.renderPost(reply, container);
     });
@@ -143,6 +147,11 @@ export default class extends Controller {
       isAuthor: author.did === this.authorDidValue,
     };
 
+    // Skip rendering posts with text that is just 📌
+    if (post.post.record.text.trim() === "📌") {
+      return;
+    }
+
     // Render the compiled template with data
     const rendered = compiledTemplate(data);
 
@@ -155,9 +164,10 @@ export default class extends Controller {
       container.appendChild(tempContainer.firstChild);
     }
 
-    // Render replies recursively with incremented depth, sorted chronologically
+    // Render replies recursively with incremented depth, filtering out 📌 posts
     if (post.replies && post.replies.length > 0) {
-      const sortedReplies = this.sortReplies(post.replies, 'oldest');
+      const filteredReplies = post.replies.filter((reply) => reply.post.record.text.trim() !== "📌");
+      const sortedReplies = this.sortReplies(filteredReplies, "oldest");
       sortedReplies.forEach((reply) => {
         this.renderPost(reply, container, depth + 1);
       });
