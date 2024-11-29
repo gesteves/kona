@@ -13,6 +13,9 @@ icons:
       - link-simple
     regular:
       - triangle-exclamation
+      - heart
+      - comment
+      - retweet
     thin:
       - bolt-lightning
       - cloud-bolt

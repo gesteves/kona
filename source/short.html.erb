@@ -1,3 +1,4 @@
 <%= partial 'partials/article/short', locals: { article: content } %>
 <%= partial 'partials/share', locals: { article: content } %>
 <%= partial 'partials/related', locals: { article: content } %>
+<%= partial 'partials/comments', locals: { article: content } if content.bluesky_comments_at_uri.present? %>

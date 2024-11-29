@@ -1,0 +1,38 @@
+<div
+  class="comments"
+  id="comments"
+  data-controller="comments"
+  data-comments-author-did-value="<%= article.author.bluesky_did %>"
+  data-comments-url-value="<%= article.bluesky_comments_url %>"
+  data-comments-at-uri-value="<%= article.bluesky_comments_at_uri %>"
+  data-comments-depth-value="6"
+  data-comments-parent-height-value="1000"
+>
+  <h3 class="comments__heading">Comments</h3>
+  <script data-comments-target="commentTemplate" type="text/x-handlebars-template">
+    <div class="comments__comment comments__comment--depth-{{depth}}">
+      {{#if avatar}}
+      <a href="{{postLink}}" class="comments__avatar-link" target="_blank" rel="noreferrer noopener nofollow">
+        <img class="comments__avatar" src="{{avatar}}" alt="{{displayName}}’s avatar">
+      </a>
+      {{/if}}
+      <div class="comments__content">
+        <div class="comments__header">
+          <a href="{{authorProfileLink}}" target="_blank" rel="noreferrer noopener nofollow">
+            <span class="comments__author-name">{{displayName}}</span> @{{handle}}
+          </a>
+          <a class="comments__timestamp" href="{{postLink}}" target="_blank" rel="noreferrer noopener nofollow" title="{{timestamp}}">{{relativeTimestamp}}</a>
+        </div>
+        <p class="comments__text">{{text}}</p>
+        <div class="comments__meta">
+          <span class="comments__meta-item"><%= icon_svg "classic", "regular", "comment" %> {{replyCount}}</span>
+          <span class="comments__meta-item"><%= icon_svg "classic", "regular", "retweet" %> {{repostCount}}</span>
+          <span class="comments__meta-item"><%= icon_svg "classic", "regular", "heart" %> {{likeCount}}</span>
+        </div>
+        {{#if seeMoreComments}}
+        <a href="{{postLink}}" class="comments__see-more" target="_blank" rel="noreferrer noopener nofollow">Continue this thread on Bluesky</a>
+        {{/if}}
+      </div>
+    </div>
+  </script>
+</div>
