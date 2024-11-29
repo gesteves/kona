@@ -1,7 +1,17 @@
 .comments {
+  @extend .extend-body-styles;
   grid-column: 1 / -1;
   position: relative;
   overflow-x: scroll;
+
+  p {
+    font-size: var(--font-small);
+    margin: 0 0 1rem 0;
+  }
+
+  .is-hidden {
+    display: none;
+  }
 
   @media (min-width: #{$bp-medium}) {
     grid-column: 3 / -3;
@@ -15,6 +25,31 @@
     margin-bottom: 1.5rem;
   }
 
+  &__spinner {
+    margin: 1rem 0;
+  
+    svg {
+      width: var(--font-medium);
+      height: var(--font-medium);
+      animation: spin 1s linear infinite; // Add animation here
+  
+      g,
+      path {
+        fill: var(--color-text-primary);
+      }
+    }
+  }
+  
+  // Define the spin animation
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }  
+
   &__comment {
     display: flex;
     align-items: flex-start;
@@ -24,7 +59,7 @@
     min-width: 320px;
 
     &:first-of-type {
-      border-top: none;
+      border-top: 2px solid var(--color-border);
     }
 
     @for $depth from 0 through 6 {
@@ -99,14 +134,6 @@
     }
   }
 
-  &__text {
-    font-family: var(--lato);
-    font-size: var(--font-small);
-    font-weight: 300;
-    line-height: var(--line-height-medium);
-    margin: 0 0 1rem 0;
-  }
-
   &__meta {
     color: var(--color-text-secondary);
     font-family: var(--ibm-plex-mono);
@@ -135,7 +162,6 @@
   }
 
   &__see-more {
-    color: var(--color-text-secondary);
     display: inline-block;
     font-family: var(--ibm-plex-mono);
     font-size: var(--font-x-small);

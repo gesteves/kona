@@ -3,7 +3,7 @@ import { formatDistanceToNow } from "date-fns";
 import Handlebars from "handlebars";
 
 export default class extends Controller {
-  static targets = ['commentTemplate'];
+  static targets = ['commentTemplate', 'spinner', 'prompt', 'firstComment', 'error'];
   static values = {
     atUri: String,
     url: String,
@@ -41,12 +41,16 @@ export default class extends Controller {
       );
 
       if (thread.replies && thread.replies.length > 0) {
+        this.promptTarget.classList.remove("is-hidden");
         this.updateComments(thread.replies);
       } else {
-        console.log("No comments found.");
+        this.firstCommentTarget.classList.remove("is-hidden");
       }
     } catch (err) {
       console.error("Error fetching comments:", err);
+      this.errorTarget.classList.remove("is-hidden");
+    } finally {
+      this.spinnerTarget.remove();
     }
   }
 
