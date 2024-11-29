@@ -17,12 +17,16 @@ export default class extends Controller {
     this.observeVisibility();
   }
 
+  /**
+   * Sets up an IntersectionObserver to fetch comments when the element is visible.
+   */
   observeVisibility() {
     this.intersectionObserver = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             this.fetchComments();
+            // Disconnect the observer after the element is visible so we don't fetch comments multiple times.
             this.intersectionObserver.disconnect();
           }
         });
@@ -33,6 +37,11 @@ export default class extends Controller {
     this.intersectionObserver.observe(this.element);
   }
 
+  /**
+   * Fetches the thread data from the API and updates comments.
+   * Handles cases where there are no replies or fetch errors.
+   * @async
+   */
   async fetchComments() {
     try {
       const thread = await this.getPostThread(
@@ -55,6 +64,10 @@ export default class extends Controller {
     }
   }
 
+  /**
+   * Updates the comment section with sorted replies.
+   * @param {Array} replies - Array of top-level replies.
+   */
   updateComments(replies) {
     const sortedReplies = this.sortReplies(replies, this.sortValue);
 
@@ -65,6 +78,12 @@ export default class extends Controller {
     });
   }
 
+  /**
+   * Sorts replies based on the specified sorting criteria.
+   * @param {Array} replies - Array of replies to sort.
+   * @param {String} sortValue - Sorting criteria ("oldest", "newest", "likes").
+   * @returns {Array} - Sorted replies array.
+   */
   sortReplies(replies, sortValue) {
     switch (sortValue) {
       case "newest":
@@ -83,6 +102,12 @@ export default class extends Controller {
     }
   }
 
+  /**
+   * Renders a single post and its replies recursively.
+   * @param {Object} post - The post object to render.
+   * @param {HTMLElement} container - The container to append the rendered post to.
+   * @param {Number} depth - The depth of the post in the thread.
+   */
   renderPost(post, container, depth = 0) {
     const template = this.commentTemplateTarget.innerHTML;
 
@@ -130,7 +155,7 @@ export default class extends Controller {
       container.appendChild(tempContainer.firstChild);
     }
 
-    // Render replies recursively with incremented depth
+    // Render replies recursively with incremented depth, sorted chronologically
     if (post.replies && post.replies.length > 0) {
       const sortedReplies = this.sortReplies(post.replies, 'oldest');
       sortedReplies.forEach((reply) => {
@@ -139,6 +164,15 @@ export default class extends Controller {
     }
   }
 
+  /**
+   * Fetches the thread data from the Bluesky API.
+   * @async
+   * @param {String} uri - The URI of the thread to fetch.
+   * @param {Number} depth - The maximum depth to fetch.
+   * @param {Number} parentHeight - The parent height for pagination.
+   * @returns {Object} - The fetched thread data.
+   * @throws Will throw an error if the API call fails.
+   */
   async getPostThread(uri, depth, parentHeight) {
     const params = new URLSearchParams({ uri });
 
@@ -170,6 +204,9 @@ export default class extends Controller {
     return data.thread;
   }
 
+  /**
+   * Disconnects the intersection observer when the controller is disconnected.
+   */
   disconnect() {
     if (this.intersectionObserver) {
       this.intersectionObserver.disconnect();
