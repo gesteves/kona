@@ -1,8 +1,8 @@
 .comments {
   @extend .extend-body-styles;
   grid-column: 1 / -1;
-  position: relative;
   overflow-x: scroll;
+  position: relative;
 
   p {
     font-size: var(--font-small);
@@ -29,9 +29,9 @@
     margin: 1rem 0;
   
     svg {
-      width: var(--font-medium);
+      animation: spin 1s linear infinite;
       height: var(--font-medium);
-      animation: spin 1s linear infinite; // Add animation here
+      width: var(--font-medium);
   
       g,
       path {
@@ -51,12 +51,12 @@
   }  
 
   &__comment {
-    display: flex;
     align-items: flex-start;
     border-top: 1px solid var(--color-border);
-    padding-top: 1rem;
+    display: flex;
     margin-top: 1rem;
     min-width: 320px;
+    padding-top: 1rem;
 
     &:first-of-type {
       border-top: 2px solid var(--color-border);
@@ -70,27 +70,27 @@
   }
 
   &__avatar-link {
-    margin-right: 1rem;
     flex-shrink: 0;
+    margin-right: 1rem;
   }
 
   &__avatar {
-    width: 40px;
-    height: 40px;
     border-radius: 50%;
+    height: 40px;
     object-fit: cover;
+    width: 40px;
   }
 
   &__content {
     display: flex;
-    flex-grow: 1;
     flex-flow: column nowrap;
+    flex-grow: 1;
   }
 
   &__header {
+    align-items: center;
     color: var(--color-text-secondary);
     display: inline-flex;
-    align-items: center;
     font-family: var(--ibm-plex-mono);
     font-size: var(--font-x-small);
     line-height: var(--line-height-medium);
@@ -123,9 +123,9 @@
     }
 
     svg {
-      width: 1rem;
       height: 1rem;
       margin-right: .25rem;
+      width: 1rem;
 
       g,
       path {
@@ -136,23 +136,23 @@
 
   &__meta {
     color: var(--color-text-secondary);
-    font-family: var(--ibm-plex-mono);
-    font-size: var(--font-x-small);
     display: flex;
     flex-flow: row nowrap;
+    font-family: var(--ibm-plex-mono);
+    font-size: var(--font-x-small);
     justify-content: flex-start;
 
     &-item {
+      align-items: center;
       display: flex;
       flex-flow: row nowrap;
-      align-items: center;
       margin-right: 1rem;
     }
 
     svg {
-      width: 1rem;
       height: 1rem;
       margin-right: 0.25rem;
+      width: 1rem;
 
       g,
       path {
@@ -162,13 +162,13 @@
   }
 
   &__see-more {
+    border-top: 1px solid var(--color-border);
     display: inline-block;
     font-family: var(--ibm-plex-mono);
     font-size: var(--font-x-small);
     line-height: var(--line-height-x-small);
-    text-transform: uppercase;
     margin-top: 1rem;
-    border-top: 1px solid var(--color-border);
+    text-transform: uppercase;
   
     &:link,
     &:visited {
