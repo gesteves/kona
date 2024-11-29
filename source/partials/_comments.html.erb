@@ -10,7 +10,7 @@
 >
   <h3 class="comments__heading">Comments</h3>
   <script data-comments-target="commentTemplate" type="text/x-handlebars-template">
-    <div class="comments__comment comments__comment--depth-{{depth}}">
+    <article class="comments__comment comments__comment--depth-{{depth}}">
       {{#if avatar}}
       <a href="{{postLink}}" class="comments__avatar-link" target="_blank" rel="noreferrer noopener nofollow">
         <img class="comments__avatar" src="{{avatar}}" alt="{{displayName}}’s avatar">
@@ -25,14 +25,14 @@
         </div>
         <p class="comments__text">{{text}}</p>
         <div class="comments__meta">
-          <span class="comments__meta-item"><%= icon_svg "classic", "regular", "comment" %> {{replyCount}}</span>
-          <span class="comments__meta-item"><%= icon_svg "classic", "regular", "retweet" %> {{repostCount}}</span>
-          <span class="comments__meta-item"><%= icon_svg "classic", "regular", "heart" %> {{likeCount}}</span>
+          <span class="comments__meta-item" aria-label="{{replyCount}} replies"><%= icon_svg "classic", "regular", "comment" %> {{replyCount}}</span>
+          <span class="comments__meta-item" aria-label="{{repostCount}} reposts"><%= icon_svg "classic", "regular", "retweet" %> {{repostCount}}</span>
+          <span class="comments__meta-item" aria-label="{{likeCount}} likes"><%= icon_svg "classic", "regular", "heart" %> {{likeCount}}</span>
         </div>
         {{#if seeMoreComments}}
         <a href="{{postLink}}" class="comments__see-more" target="_blank" rel="noreferrer noopener nofollow">Continue this thread on Bluesky</a>
         {{/if}}
       </div>
-    </div>
+    </article>
   </script>
 </div>
