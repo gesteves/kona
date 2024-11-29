@@ -10,6 +10,7 @@ export default class extends Controller {
     authorDid: String,
     depth: Number,
     parentHeight: Number,
+    sort: String, // New value for sorting ("oldest", "newest", "likes")
   };
 
   connect() {
@@ -55,19 +56,39 @@ export default class extends Controller {
   }
 
   updateComments(replies) {
+    const sortedReplies = this.sortReplies(replies, this.sortValue);
+
     const container = this.element;
 
-    replies.forEach((reply) => {
+    sortedReplies.forEach((reply) => {
       this.renderPost(reply, container);
     });
   }
 
+  sortReplies(replies, sortValue) {
+    switch (sortValue) {
+      case "newest":
+        return replies.sort((a, b) => 
+          new Date(b.post.record.createdAt) - new Date(a.post.record.createdAt)
+        );
+      case "likes":
+        return replies.sort((a, b) => 
+          (b.post.likeCount ?? 0) - (a.post.likeCount ?? 0)
+        );
+      case "oldest":
+      default:
+        return replies.sort((a, b) => 
+          new Date(a.post.record.createdAt) - new Date(b.post.record.createdAt)
+        );
+    }
+  }
+
   renderPost(post, container, depth = 0) {
     const template = this.commentTemplateTarget.innerHTML;
-  
+
     // Compile the Handlebars template
     const compiledTemplate = Handlebars.compile(template);
-  
+
     // Prepare the data object for the template
     const author = post.post.author;
     const createdAt = new Date(post.post.record.createdAt);
@@ -96,10 +117,10 @@ export default class extends Controller {
       depth: depth,
       isAuthor: author.did === this.authorDidValue,
     };
-  
+
     // Render the compiled template with data
     const rendered = compiledTemplate(data);
-  
+
     // Convert the rendered HTML string to actual DOM nodes
     const tempContainer = document.createElement("div");
     tempContainer.innerHTML = rendered;
@@ -108,14 +129,15 @@ export default class extends Controller {
     while (tempContainer.firstChild) {
       container.appendChild(tempContainer.firstChild);
     }
-  
+
     // Render replies recursively with incremented depth
     if (post.replies && post.replies.length > 0) {
-      post.replies.forEach((reply) => {
+      const sortedReplies = this.sortReplies(post.replies, 'oldest');
+      sortedReplies.forEach((reply) => {
         this.renderPost(reply, container, depth + 1);
       });
     }
-  }   
+  }
 
   async getPostThread(uri, depth, parentHeight) {
     const params = new URLSearchParams({ uri });
