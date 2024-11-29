@@ -14,6 +14,8 @@ class Bluesky
   # @return [String] the at-uri for the post.
   # @raise [ArgumentError] if the post URL is invalid.
   def self.post_url_to_at_uri(post_url)
+    return if post_url.blank?
+
     cache_key = "bluesky:posts:at-uri:#{post_url.parameterize}"
     at_uri = $redis.get(cache_key)
 
@@ -51,6 +53,8 @@ class Bluesky
   # @param handle [String] the handle to resolve.
   # @return [String, nil] the DID if resolved successfully, or nil if the handle cannot be resolved.
   def self.resolve_handle(handle)
+    return if handle.blank?
+
     cache_key = "bluesky:dids:#{handle.parameterize}"
     did = $redis.get(cache_key)
 
