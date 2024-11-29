@@ -11,6 +11,8 @@ icons:
       - comment
       - envelope
       - link-simple
+      - badge-check
+      - circle-notch
     regular:
       - triangle-exclamation
       - heart

@@ -9,6 +9,7 @@
   data-comments-parent-height-value="1000"
 >
   <h3 class="comments__heading">Comments</h3>
+  <p>Loading comments…</p>
   <script data-comments-target="commentTemplate" type="text/x-handlebars-template">
     <article class="comments__comment comments__comment--depth-{{depth}}">
       {{#if avatar}}
@@ -18,8 +19,12 @@
       {{/if}}
       <div class="comments__content">
         <div class="comments__header">
+          {{#if isAuthor}}
+            <%= icon_svg "classic", "solid", "badge-check" %>
+          {{/if}}
           <a href="{{authorProfileLink}}" target="_blank" rel="noreferrer noopener nofollow">
-            <span class="comments__author-name">{{displayName}}</span> @{{handle}}
+            <span class="comments__author-name">{{displayName}}</span>
+            @{{handle}}
           </a>
           <a class="comments__timestamp" href="{{postLink}}" target="_blank" rel="noreferrer noopener nofollow" title="{{timestamp}}">{{relativeTimestamp}}</a>
         </div>

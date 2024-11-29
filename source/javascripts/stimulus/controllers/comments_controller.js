@@ -90,6 +90,7 @@ export default class extends Controller {
       postLink: `https://bsky.app/profile/${author.did}/post/${post.post.uri.split("/").pop()}`,
       seeMoreComments: (!post.replies || post.replies.length === 0) && post.post.replyCount > 0,
       depth: depth,
+      isAuthor: author.did === this.authorDidValue,
     };
   
     // Render the compiled template with data

@@ -54,7 +54,8 @@
 
   &__header {
     color: var(--color-text-secondary);
-    display: block;
+    display: inline-flex;
+    align-items: center;
     font-family: var(--ibm-plex-mono);
     font-size: var(--font-x-small);
     line-height: var(--line-height-medium);
@@ -65,8 +66,9 @@
 
     .comments__timestamp::before {
       color: var(--color-text-tertiary);
-      content: ' • ';
+      content: '•';
       font-weight: normal;
+      padding: 0 .25rem;
     }
 
     a {
@@ -83,6 +85,17 @@
   
     a:focus {
       text-decoration: none;
+    }
+
+    svg {
+      width: 1rem;
+      height: 1rem;
+      margin-right: .25rem;
+
+      g,
+      path {
+        fill: var(--color-accent);
+      }
     }
   }
 
