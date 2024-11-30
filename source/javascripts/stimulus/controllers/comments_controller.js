@@ -31,8 +31,7 @@ export default class extends Controller {
             this.intersectionObserver.disconnect();
           }
         });
-      },
-      { threshold: 0.1 }
+      }
     );
 
     this.intersectionObserver.observe(this.element);
