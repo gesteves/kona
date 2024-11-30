@@ -8,14 +8,23 @@
   data-comments-depth-value="<%= ENV.fetch('BLUESKY_COMMENTS_DEPTH', 6) %>"
   data-comments-parent-height-value="<%= ENV.fetch('BLUESKY_COMMENTS_HEIGHT', 1000) %>"
   data-comments-sort-value="<%= ENV.fetch('BLUESKY_COMMENTS_SORT', 'likes').strip.downcase %>"
+  data-comments-prompt-value="<%= article.comments_prompt %>"
 >
-  <h3 class="comments__heading">Comments</h3>
+  <h3 class="comments__heading" data-comments-target="heading">Comments</h3>
+
   <div class="comments__spinner" data-comments-target="spinner">
     <%= icon_svg "classic", "solid", "circle-notch" %>
   </div>
-  <p class="is-hidden" data-comments-target="prompt"><a href="<%= article.bluesky_comments_url %>" rel="noreferrer noopener nofollow">Reply on Bluesky</a> to join the conversation.</p>
-  <p class="is-hidden" data-comments-target="firstComment">No comments yet! <a href="<%= article.bluesky_comments_url %>" rel="noreferrer noopener nofollow">Reply on Bluesky</a> to start the conversation.</p>
-  <p class="is-hidden" data-comments-target="error">Oops, comments failed to load. Please reload the page to try again.</p>
+
+  <script data-comments-target="introTemplate" type="text/x-handlebars-template">
+    <p>
+      {{#if error}}
+        {{{error}}}
+      {{else}}
+        {{{prompt}}} <a href="{{postUrl}}" target="_blank" rel="noreferrer noopener nofollow">Reply on Bluesky</a> to {{verb}} the conversation.
+      {{/if}}
+    </p>
+  </script>
 
   <script data-comments-target="commentTemplate" type="text/x-handlebars-template">
     <article class="comments__comment comments__comment--depth-{{depth}}">

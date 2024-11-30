@@ -62,6 +62,7 @@ module ContentfulClient
           indexInSearchEngines
           canonicalUrl
           blueskyCommentsUrl
+          commentsPrompt
           coverImage {
             ...ImageFields
           }

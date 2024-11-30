@@ -3,14 +3,15 @@ import { formatDistanceToNow } from "date-fns";
 import Handlebars from "handlebars";
 
 export default class extends Controller {
-  static targets = ['commentTemplate', 'spinner', 'prompt', 'firstComment', 'error'];
+  static targets = ['commentTemplate', 'spinner', 'introTemplate', 'heading'];
   static values = {
     atUri: String,
     url: String,
     authorDid: String,
     depth: Number,
     parentHeight: Number,
-    sort: String, // Accepts "oldest", "newest", or "likes"
+    sort: String,
+    prompt: String,
   };
 
   connect() {
@@ -43,6 +44,10 @@ export default class extends Controller {
    * @async
    */
   async fetchComments() {
+    let renderedContent;
+    const template = this.introTemplateTarget.innerHTML;
+    const compiledTemplate = Handlebars.compile(template);
+
     try {
       const thread = await this.getPostThread(
         this.atUriValue,
@@ -51,18 +56,53 @@ export default class extends Controller {
       );
 
       if (thread.replies && thread.replies.length > 0) {
-        this.promptTarget.classList.remove("is-hidden");
+        renderedContent = compiledTemplate({
+          prompt: this.promptValue,
+          postUrl: this.urlValue,
+          verb: "join",
+        });
+        
         this.updateComments(thread.replies);
       } else {
-        this.firstCommentTarget.classList.remove("is-hidden");
+        renderedContent = compiledTemplate({
+          prompt: this.promptValue,
+          postUrl: this.urlValue,
+          verb: "start",
+        });
       }
     } catch (err) {
       console.error("Error fetching comments:", err);
-      this.errorTarget.classList.remove("is-hidden");
+
+      renderedContent = compiledTemplate({
+        error: "Oops! Comments failed to load, reload the page to try again.",
+      });
     } finally {
       this.spinnerTarget.remove();
+      this.insertAfterHeading(renderedContent);
     }
   }
+
+  /**
+   * Inserts the rendered content after the headingTarget.
+   * @param {string} content - The HTML content to insert.
+   */
+  insertAfterHeading(content) {
+    const tempContainer = document.createElement("div");
+    tempContainer.innerHTML = content;
+
+    while (tempContainer.firstChild) {
+      const child = tempContainer.firstChild;
+
+      // Ensure the child is a valid element before inserting
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        this.headingTarget.insertAdjacentElement("afterend", child);
+      } else {
+        // Remove invalid nodes like text or comments
+        tempContainer.removeChild(child);
+      }
+    }
+  }
+
 
   /**
    * Updates the comment section with sorted replies.
