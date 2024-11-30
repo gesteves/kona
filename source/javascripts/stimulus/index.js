@@ -9,3 +9,7 @@ Stimulus.load(definitionsFromContext(context))
 Handlebars.registerHelper("pluralize", function (count, singular, plural) {
   return count === 1 ? singular : plural;
 });
+Handlebars.registerHelper("formatNumber", function (number) {
+  if (number == null) return 0; // Default to 0 if number is null or undefined
+  return new Intl.NumberFormat("en-US").format(number);
+});
