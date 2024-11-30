@@ -46,9 +46,9 @@
         </div>
         <p class="comments__text">{{text}}</p>
         <div class="comments__meta">
-          <span class="comments__meta-item" aria-label="{{likeCount}} likes"><%= icon_svg "classic", "regular", "heart" %> {{likeCount}}</span>
-          <span class="comments__meta-item" aria-label="{{repostCount}} reposts"><%= icon_svg "classic", "regular", "retweet" %> {{repostCount}}</span>
-          <span class="comments__meta-item" aria-label="Reply"><a href="{{postLink}}" target="_blank" rel="noreferrer noopener nofollow"><%= icon_svg "classic", "regular", "comment" %> Reply</a></span>
+          <span class="comments__meta-item" title="{{likeCount}} {{pluralize likeCount "like" "likes"}}"><%= icon_svg "classic", "regular", "heart" %> {{likeCount}}</span>
+          <span class="comments__meta-item" title="{{repostCount}} {{pluralize repostCount "repost" "reposts"}}"><%= icon_svg "classic", "regular", "retweet" %> {{repostCount}}</span>
+          <span class="comments__meta-item"><a href="{{postLink}}" target="_blank" rel="noreferrer noopener nofollow"><%= icon_svg "classic", "regular", "comment" %> Reply</a></span>
           {{#if seeMoreComments}}
             <span class="comments__meta-item comments__meta-item--more"><a href="{{postLink}}" target="_blank" rel="noreferrer noopener nofollow">Read {{replyCount}} more {{pluralize replyCount "reply" "replies"}} on Bluesky <%= icon_svg "classic", "regular", "arrow-right" %></a></span>
           {{/if}}
