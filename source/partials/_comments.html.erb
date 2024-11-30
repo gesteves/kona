@@ -23,7 +23,7 @@
       {{#if error}}
         {{{error}}}
       {{else}}
-        {{{prompt}}} <a href="{{postUrl}}" target="_blank" rel="noreferrer noopener nofollow">Reply on Bluesky</a> to {{verb}} the conversation.
+        {{{prompt}}} <a href="{{postUrl}}" target="_blank" rel="noopener me">Reply on Bluesky</a> to {{verb}} the conversation.
       {{/if}}
     </p>
   </script>
@@ -31,13 +31,13 @@
   <script data-comments-target="commentTemplate" type="text/x-handlebars-template">
     <article class="comments__comment comments__comment--depth-{{depth}}">
       {{#if avatar}}
-      <a href="{{authorProfileLink}}" class="comments__avatar-link" target="_blank" rel="noreferrer noopener nofollow">
+      <a href="{{authorProfileLink}}" class="comments__avatar-link" target="_blank" rel="noopener {{#if isAuthor}}me{{else}}nofollow{{/if}}">
         <img class="comments__avatar" src="{{avatar}}" alt="{{displayName}}’s avatar">
       </a>
       {{/if}}
       <div class="comments__content">
         <div class="comments__header">
-          <a class="comments__author-link" href="{{authorProfileLink}}" target="_blank" rel="noreferrer noopener nofollow">
+          <a class="comments__author-link" href="{{authorProfileLink}}" target="_blank" rel="noopener {{#if isAuthor}}me{{else}}nofollow{{/if}}">
             <span class="comments__author-name">
               {{displayName}}
               {{#if isAuthor}}
@@ -46,15 +46,15 @@
             </span>
             @{{handle}}
           </a>
-          <a class="comments__timestamp" href="{{postLink}}" target="_blank" rel="noreferrer noopener nofollow" title="{{timestamp}}">{{relativeTimestamp}}</a>
+          <a class="comments__timestamp" href="{{postLink}}" target="_blank" rel="noopener {{#if isAuthor}}me{{else}}nofollow{{/if}}" title="{{timestamp}}">{{relativeTimestamp}}</a>
         </div>
         <p class="comments__text">{{text}}</p>
         <div class="comments__meta">
           <span class="comments__meta-item" title="{{likeCount}} {{pluralize likeCount "like" "likes"}}"><%= icon_svg "classic", "regular", "heart" %> {{likeCount}}</span>
           <span class="comments__meta-item" title="{{repostCount}} {{pluralize repostCount "repost" "reposts"}}"><%= icon_svg "classic", "regular", "retweet" %> {{repostCount}}</span>
-          <span class="comments__meta-item"><a href="{{postLink}}" target="_blank" rel="noreferrer noopener nofollow"><%= icon_svg "classic", "regular", "comment" %> Reply</a></span>
+          <span class="comments__meta-item"><a href="{{postLink}}" target="_blank" rel="noopener {{#if isAuthor}}me{{else}}nofollow{{/if}}"><%= icon_svg "classic", "regular", "comment" %> Reply</a></span>
           {{#if seeMoreComments}}
-            <span class="comments__meta-item comments__meta-item--more"><a href="{{postLink}}" target="_blank" rel="noreferrer noopener nofollow">Read {{replyCount}} more {{pluralize replyCount "reply" "replies"}} on Bluesky <%= icon_svg "classic", "regular", "arrow-right" %></a></span>
+            <span class="comments__meta-item comments__meta-item--more"><a href="{{postLink}}" target="_blank" rel="noopener {{#if isAuthor}}me{{else}}nofollow{{/if}}">Read {{replyCount}} more {{pluralize replyCount "reply" "replies"}} on Bluesky <%= icon_svg "classic", "regular", "arrow-right" %></a></span>
           {{/if}}
         </div>
       </div>
