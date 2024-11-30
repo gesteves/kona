@@ -115,7 +115,7 @@
     font-size: var(--font-x-small);
     line-height: var(--line-height-medium);
 
-    @media (min-width: #{$bp-small}) {
+    @media (min-width: #{$bp-medium}) {
       align-items: center;
       flex-flow: row wrap;
     }
@@ -124,7 +124,7 @@
       display: inline-flex;
       flex-flow: column;
 
-      @media (min-width: #{$bp-small}) {
+      @media (min-width: #{$bp-medium}) {
         align-items: center;
         flex-flow: row wrap;
       }
@@ -139,7 +139,7 @@
     }
 
     .comments__timestamp::before {
-      @media (min-width: #{$bp-small}) {
+      @media (min-width: #{$bp-medium}) {
         color: var(--color-text-tertiary);
         content: '•';
         font-weight: normal;
