@@ -16,10 +16,6 @@ export default class extends Controller {
 
   connect() {
     this.observeVisibility();
-
-    Handlebars.registerHelper("pluralize", function (count, singular, plural) {
-      return count === 1 ? singular : plural;
-    });
   }
 
   /**
