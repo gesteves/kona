@@ -25,12 +25,14 @@
   }
 
   &__spinner {
+    display: flex;
+    justify-content: center;
     margin: 1rem 0;
   
     svg {
       animation: spin 1s linear infinite;
-      height: var(--font-medium);
-      width: var(--font-medium);
+      height: 40px;
+      width: 40px;
   
       g,
       path {
