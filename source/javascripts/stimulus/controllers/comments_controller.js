@@ -3,7 +3,7 @@ import { formatDistanceToNow } from "date-fns";
 import Handlebars from "handlebars";
 
 export default class extends Controller {
-  static targets = ['commentTemplate', 'spinner', 'introTemplate', 'heading'];
+  static targets = ['commentTemplate', 'spinner', 'introTemplate', 'heading', 'container'];
   static values = {
     atUri: String,
     url: String,
@@ -114,10 +114,8 @@ export default class extends Controller {
     // Sort the remaining replies
     const sortedReplies = this.sortReplies(filteredReplies, this.sortValue);
   
-    const container = this.element;
-  
     sortedReplies.forEach((reply) => {
-      this.renderPost(reply, container);
+      this.renderPost(reply);
     });
   }
 
@@ -148,10 +146,9 @@ export default class extends Controller {
   /**
    * Renders a single post and its replies recursively.
    * @param {Object} post - The post object to render.
-   * @param {HTMLElement} container - The container to append the rendered post to.
    * @param {Number} depth - The depth of the post in the thread.
    */
-  renderPost(post, container, depth = 0) {
+  renderPost(post, depth = 0) {
     const template = this.commentTemplateTarget.innerHTML;
 
     // Compile the Handlebars template
@@ -200,7 +197,7 @@ export default class extends Controller {
 
     // Append each child of the temporary container to the actual container
     while (tempContainer.firstChild) {
-      container.appendChild(tempContainer.firstChild);
+      this.containerTarget.appendChild(tempContainer.firstChild);
     }
 
     // Render replies recursively with incremented depth, filtering out 📌 posts
@@ -208,7 +205,7 @@ export default class extends Controller {
       const filteredReplies = post.replies.filter((reply) => reply.post.record.text.trim() !== "📌");
       const sortedReplies = this.sortReplies(filteredReplies, "oldest");
       sortedReplies.forEach((reply) => {
-        this.renderPost(reply, container, depth + 1);
+        this.renderPost(reply, depth + 1);
       });
     }
   }

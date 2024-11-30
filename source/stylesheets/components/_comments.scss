@@ -1,7 +1,6 @@
 .comments {
   @extend .extend-body-styles;
   grid-column: 1 / -1;
-  overflow-x: scroll;
   position: relative;
 
   p {
@@ -48,7 +47,18 @@
     to {
       transform: rotate(360deg);
     }
-  }  
+  }
+  
+  &__container {
+    border-top: 2px solid var(--color-border);
+    margin-top: 1.5rem;
+    overflow-x: scroll;
+    padding-top: 1.5rem;
+
+    &:empty {
+      display: none;
+    }
+  }
 
   &__comment {
     align-items: flex-start;
@@ -59,7 +69,9 @@
     padding-top: 1rem;
 
     &:first-of-type {
-      border-top: 2px solid var(--color-border);
+      border-top: none;
+      margin-top: 0;
+      padding-top: 0;
     }
 
     @for $depth from 0 through 6 {
