@@ -10,7 +10,7 @@ export default class extends Controller {
     authorDid: String,
     depth: Number,
     parentHeight: Number,
-    sort: String, // New value for sorting ("oldest", "newest", "likes")
+    sort: String, // Accepts "oldest", "newest", or "likes"
   };
 
   connect() {
