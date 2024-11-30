@@ -111,15 +111,14 @@
 
   &__header {
     color: var(--color-text-secondary);
-    display: inline-flex;
+    display: flex;
     flex-flow: column;
     font-family: var(--ibm-plex-mono);
     font-size: var(--font-x-small);
     line-height: var(--line-height-medium);
 
     @media (min-width: #{$bp-medium}) {
-      align-items: center;
-      flex-flow: row wrap;
+      display: block;
     }
 
     .comments__author-link {
@@ -140,12 +139,12 @@
       margin-right: 0.25rem;
     }
 
-    .comments__timestamp::before {
+    .comments__separator {
+      color: var(--color-text-tertiary);
+      display: none;
+
       @media (min-width: #{$bp-medium}) {
-        color: var(--color-text-tertiary);
-        content: '•';
-        font-weight: normal;
-        padding: 0 .25rem;
+        display: inline;
       }
     }
 
