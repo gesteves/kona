@@ -175,8 +175,8 @@ export default class extends Controller {
         hour: "numeric",
         minute: "numeric",
         hour12: true,
-      }).format(createdAt), // Fully formatted timestamp
-      relativeTimestamp: formatDistanceToNow(createdAt, { addSuffix: true }), // Relative time
+      }).format(createdAt),
+      relativeTimestamp: formatDistanceToNow(createdAt, { addSuffix: true }),
       text: post.post.record.text,
       replyCount: post.post.replyCount ?? 0,
       repostCount: post.post.repostCount ?? 0,
