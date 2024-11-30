@@ -8,10 +8,10 @@
   data-comments-depth-value="<%= ENV.fetch('BLUESKY_COMMENTS_DEPTH', 6) %>"
   data-comments-parent-height-value="<%= ENV.fetch('BLUESKY_COMMENTS_HEIGHT', 1000) %>"
   data-comments-sort-value="<%= ENV.fetch('BLUESKY_COMMENTS_SORT', 'likes').strip.downcase %>"
-  data-comments-prompt-value="<%= article.comments_prompt %>"
+  data-comments-prompt-value="<%= smartypants article.comments_prompt %>"
 >
   <h3 class="comments__heading" data-comments-target="heading">Comments</h3>
-
+  <div class="comments__intro" data-comments-target="intro"></div>
   <div class="comments__spinner" data-comments-target="spinner">
     <%= icon_svg "classic", "solid", "circle-notch" %>
   </div>

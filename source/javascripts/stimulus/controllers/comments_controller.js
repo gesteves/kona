@@ -3,7 +3,7 @@ import { formatDistanceToNow } from "date-fns";
 import Handlebars from "handlebars";
 
 export default class extends Controller {
-  static targets = ['commentTemplate', 'spinner', 'introTemplate', 'heading', 'container'];
+  static targets = ['commentTemplate', 'introTemplate', 'heading', 'intro', 'spinner', 'container'];
   static values = {
     atUri: String,
     url: String,
@@ -16,6 +16,7 @@ export default class extends Controller {
 
   connect() {
     this.observeVisibility();
+    this.renderIntro(this.promptValue, this.urlValue, "join");
   }
 
   /**
@@ -38,70 +39,60 @@ export default class extends Controller {
   }
 
   /**
+   * Renders am intro template and replaces the contents of the introTarget with the rendered content.
+   * @param {string} prompt - The prompt message to display.
+   * @param {string} url - The URL for the "Reply on Bluesky" link.
+   * @param {string} verb - The verb to use in the prompt (e.g., "start", "join").
+   */
+  renderIntro(prompt, url, verb) {
+    const template = this.introTemplateTarget.innerHTML;
+    const compiledTemplate = Handlebars.compile(template);
+    const renderedContent = compiledTemplate({
+      prompt: prompt,
+      postUrl: url,
+      verb: verb,
+    });
+
+    this.introTarget.innerHTML = renderedContent;
+  }
+
+  /**
+   * Renders an error template and replaces the contents of the introTarget with the rendered content.
+   * @param {string} error - The error message to display.
+   */
+  renderError(error) {
+    const template = this.introTemplateTarget.innerHTML;
+    const compiledTemplate = Handlebars.compile(template);
+    const renderedContent = compiledTemplate({ error: error });
+
+    this.introTarget.innerHTML = renderedContent;
+  }
+
+  /**
    * Fetches the thread data from the API and updates comments.
    * Handles cases where there are no replies or fetch errors.
    * @async
    */
   async fetchComments() {
-    let renderedContent;
-    const template = this.introTemplateTarget.innerHTML;
-    const compiledTemplate = Handlebars.compile(template);
-
     try {
       const thread = await this.getPostThread(
         this.atUriValue,
         this.depthValue,
-        this.parentHeightValue
+        this.parentHeightValue,
       );
 
       if (thread.replies && thread.replies.length > 0) {
-        renderedContent = compiledTemplate({
-          prompt: this.promptValue,
-          postUrl: this.urlValue,
-          verb: "join",
-        });
-        
         this.updateComments(thread.replies);
       } else {
-        renderedContent = compiledTemplate({
-          prompt: this.promptValue,
-          postUrl: this.urlValue,
-          verb: "start",
-        });
+        this.renderIntro(this.promptValue, this.urlValue, "start");
       }
     } catch (err) {
       console.error("Error fetching comments:", err);
-
-      renderedContent = compiledTemplate({
-        error: "Oops! Comments failed to load, reload the page to try again.",
-      });
+      this.renderError("Oops! Comments failed to load, reload the page to try again.");
     } finally {
       this.spinnerTarget.remove();
-      this.insertAfterHeading(renderedContent);
     }
   }
-
-  /**
-   * Inserts the rendered content after the headingTarget.
-   * @param {string} content - The HTML content to insert.
-   */
-  insertAfterHeading(content) {
-    const tempContainer = document.createElement("div");
-    tempContainer.innerHTML = content;
-
-    while (tempContainer.firstChild) {
-      const child = tempContainer.firstChild;
-
-      // Ensure the child is a valid element before inserting
-      if (child.nodeType === Node.ELEMENT_NODE) {
-        this.headingTarget.insertAdjacentElement("afterend", child);
-      } else {
-        // Remove invalid nodes like text or comments
-        tempContainer.removeChild(child);
-      }
-    }
-  }
-
 
   /**
    * Updates the comment section with sorted replies.
