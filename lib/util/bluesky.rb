@@ -176,12 +176,13 @@ class Bluesky
     image_url = html.css("meta[property='og:image']")&.first&.[]("content")
     published_time = html.css("meta[property='article:published_time']")&.first&.[]("content")
 
-    # Parse the published_time if present; fallback to the current time
-    created_at = if published_time.present?
-                   DateTime.parse(published_time).iso8601 rescue Time.now.iso8601
-                 else
-                   Time.now.iso8601
-                 end
+    # If published_time is missing or within the last day, use the current time.
+    created_at = begin
+      published_time = DateTime.parse(published_time)
+      published_time < 1.day.ago ? published_time : Time.now
+    rescue
+      Time.now
+    end
 
     # Return nil if title, description, and image are all missing
     return if title.blank? && description.blank? && image_url.blank?
@@ -206,7 +207,7 @@ class Bluesky
     {
       text: "",
       langs: ["en-US"],
-      createdAt: created_at,
+      createdAt: created_at.iso8601,
       embed: embed
     }
   rescue StandardError => e
