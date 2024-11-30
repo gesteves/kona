@@ -4,7 +4,7 @@
   data-controller="comments"
   data-comments-author-did-value="<%= article.author.bluesky_did %>"
   data-comments-url-value="<%= article.bluesky_comments_url %>"
-  data-comments-at-uri-value="<%= article.bluesky_comments_at_uri %>"
+  data-comments-at-uri-value="<%= ENV['BLUESKY_COMMENTS_DEBUG_URI'] || article.bluesky_comments_at_uri %>"
   data-comments-depth-value="<%= ENV.fetch('BLUESKY_COMMENTS_DEPTH', 6) %>"
   data-comments-parent-height-value="<%= ENV.fetch('BLUESKY_COMMENTS_HEIGHT', 1000) %>"
   data-comments-sort-value="<%= ENV.fetch('BLUESKY_COMMENTS_SORT', 'likes').strip.downcase %>"
