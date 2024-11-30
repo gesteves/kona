@@ -1,6 +1,6 @@
 require 'active_support/all'
 require_relative 'graphql/contentful'
-require_relative 'bluesky'
+require_relative '../util/bluesky'
 
 class Contentful
   def initialize
