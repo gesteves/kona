@@ -1,12 +1,45 @@
 require 'httparty'
 require 'active_support/all'
+require 'nokogiri'
 
 class Bluesky
   BASE_URL = "https://bsky.social".freeze
 
   # Initializes a new instance of the Bluesky class.
-  def initialize
+  #
+  # @param base_url [String] the base URL of the Bluesky API.
+  # @param email [String] the email for the Bluesky account.
+  # @param password [String] the single-app password for the Bluesky account.
+  def initialize(email:, password:)
+    session = create_session(email: email, password: password)
+    @did = session["did"]
+    @access_token = session["accessJwt"]
   end
+
+  def post_article(url)
+    # Construct the embed object, if provided
+    record_data = construct_record(url)
+    return if record_data.blank?
+
+    record = {
+      repo: @did,
+      collection: "app.bsky.feed.post",
+      record: record_data
+    }
+
+    response = create_record(record)
+    uri = response["uri"]
+
+    if uri.start_with?("at://")
+      components = uri.split("/")
+      handle = components[2]
+      post_id = components[-1]
+      "https://bsky.app/profile/#{handle}/post/#{post_id}"
+    else
+      uri
+    end
+  end
+
 
   # Converts a Bluesky post URL into an at-uri.
   #
@@ -66,5 +99,119 @@ class Bluesky
     did = JSON.parse(response.body)["did"]
     $redis.setex(cache_key, 1.day, did)
     did
+  end
+
+  private
+
+  # Creates a new session with the Bluesky API and caches the DID and access token.
+  #
+  # @param email [String] the email for the Bluesky account.
+  # @param password [String] the single-app password for the Bluesky account.
+  # @return [Hash] the response from the session creation request.
+  # @raise [RuntimeError] if the session creation request fails.
+  def create_session(email:, password:)
+    body = {
+      identifier: email,
+      password: password
+    }
+
+    response = HTTParty.post("#{BASE_URL}/xrpc/com.atproto.server.createSession", body: body.to_json, headers: { "Content-Type" => "application/json" })
+    if response.success?
+      JSON.parse(response.body)
+    else
+      raise "Unable to create a new session."
+    end
+  end
+
+  # Uploads a photo to the Bluesky API and returns the response blob.
+  #
+  # @param url [String] the URL of the photo to upload.
+  # @return [Hash] the parsed response body from the photo upload request.
+  # @raise [RuntimeError] if the photo upload request fails.
+  def upload_photo(url)
+    image_data = HTTParty.get(url).body
+
+    headers = {
+      "Authorization" => "Bearer #{@access_token}",
+      "Content-Type" => "image/jpeg"
+    }
+
+    response = HTTParty.post("#{BASE_URL}/xrpc/com.atproto.repo.uploadBlob", body: image_data, headers: headers)
+
+    if response.success?
+      JSON.parse(response.body)
+    else
+      raise "Failed to upload photo: #{response.body}"
+    end
+  end
+
+  # Creates a record in the Bluesky API for the specified collection.
+  # @param record [Hash] the record data to send to the API.
+  # @return [Hash] the parsed response body if successful.
+  # @raise [RuntimeError] if the post request fails.
+  def create_record(record)
+    headers = {
+      "Authorization" => "Bearer #{@access_token}",
+      "Content-Type" => "application/json"
+    }
+
+    response = HTTParty.post("#{BASE_URL}/xrpc/com.atproto.repo.createRecord",
+                             body: record.to_json,
+                             headers: headers)
+
+    if response.success?
+      JSON.parse(response.body)
+    else
+      raise "Failed to create #{record[:collection]} record: #{response.body}"
+    end
+  end
+
+  def construct_record(url)
+    # Open the URL and parse the HTML using Nokogiri
+    html = Nokogiri::HTML(HTTParty.get(url).body)
+
+    # Extract OpenGraph metadata
+    title = html.css("meta[property='og:title']")&.first&.[]("content")
+    description = html.css("meta[property='og:description']")&.first&.[]("content")
+    image_url = html.css("meta[property='og:image']")&.first&.[]("content")
+    published_time = html.css("meta[property='article:published_time']")&.first&.[]("content")
+
+    # Parse the published_time if present; fallback to the current time
+    created_at = if published_time.present?
+                   DateTime.parse(published_time).iso8601 rescue Time.now.iso8601
+                 else
+                   Time.now.iso8601
+                 end
+
+    # Return nil if title, description, and image are all missing
+    return if title.blank? && description.blank? && image_url.blank?
+
+    # Prepare the embed object
+    embed = {
+      "$type" => "app.bsky.embed.external",
+      "external" => {
+        "uri" => url,
+        "title" => title.presence,
+        "description" => description.presence
+      }.compact
+    }
+
+    # Add the thumbnail blob if an image URL is present
+    if image_url.present?
+      blob = upload_photo(image_url)["blob"]
+      embed["external"]["thumb"] = blob if blob.present?
+    end
+
+    # Construct and return the record object
+    {
+      text: "",
+      langs: ["en-US"],
+      createdAt: created_at,
+      embed: embed
+    }
+  rescue StandardError => e
+    # Log the error and return nil to skip posting
+    puts "Error constructing record: #{e.message}"
+    nil
   end
 end
