@@ -2,6 +2,7 @@ require 'httparty'
 require 'active_support/all'
 require 'nokogiri'
 require 'redcarpet'
+require 'htmlentities'
 
 class Bluesky
   BASE_URL = "https://bsky.social".freeze
@@ -214,6 +215,6 @@ class Bluesky
   # @return [String] The processed text, or an empty string if the input is blank.
   def smartypants(text)
     return "" if text.blank?
-    Redcarpet::Render::SmartyPants.render(text)
+    HTMLEntities.new.decode(Redcarpet::Render::SmartyPants.render(text))
   end
 end
