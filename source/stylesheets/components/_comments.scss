@@ -91,6 +91,7 @@
     align-items: center;
     color: var(--color-text-secondary);
     display: inline-flex;
+    flex-flow: row wrap;
     font-family: var(--ibm-plex-mono);
     font-size: var(--font-x-small);
     line-height: var(--line-height-medium);
