@@ -162,7 +162,7 @@ export default class extends Controller {
       avatar: author.avatar || null,
       displayName: author.displayName || author.handle,
       handle: author.handle,
-      authorProfileLink: `https://bsky.app/profile/${author.did}`,
+      authorProfileLink: `https://bsky.app/profile/${author.handle}`,
       timestamp: new Intl.DateTimeFormat("en-US", {
         weekday: "long",
         year: "numeric",
@@ -177,7 +177,7 @@ export default class extends Controller {
       replyCount: post.post.replyCount ?? 0,
       repostCount: post.post.repostCount ?? 0,
       likeCount: post.post.likeCount ?? 0,
-      postLink: `https://bsky.app/profile/${author.did}/post/${post.post.uri.split("/").pop()}`,
+      postLink: `https://bsky.app/profile/${author.handle}/post/${post.post.uri.split("/").pop()}`,
       seeMoreComments: (!post.replies || post.replies.length === 0) && post.post.replyCount > 0,
       depth: depth,
       isAuthor: author.did === this.authorDidValue,
