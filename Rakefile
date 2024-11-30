@@ -64,6 +64,8 @@ namespace :bluesky do
   desc 'Posts an article to Bluesky with the given URL, backdated to the time it was published.'
   task :post_article => :dotenv do
     url = ENV['URL']
+    text = ENV['TEXT']
+
     if url.blank?
       puts "Error: You must provide a URL using the URL environment variable."
       exit(1)
@@ -82,7 +84,7 @@ namespace :bluesky do
     bluesky = Bluesky.new(email: email, password: password)
 
     # Call post_article and output the result
-    post_url = bluesky.post_article(url)
+    post_url = bluesky.post_article(url: url, text: text)
     if post_url
       puts post_url
     else
