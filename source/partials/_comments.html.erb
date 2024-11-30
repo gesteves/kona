@@ -29,17 +29,19 @@
   <script data-comments-target="commentTemplate" type="text/x-handlebars-template">
     <article class="comments__comment comments__comment--depth-{{depth}}">
       {{#if avatar}}
-      <a href="{{postLink}}" class="comments__avatar-link" target="_blank" rel="noreferrer noopener nofollow">
+      <a href="{{authorProfileLink}}" class="comments__avatar-link" target="_blank" rel="noreferrer noopener nofollow">
         <img class="comments__avatar" src="{{avatar}}" alt="{{displayName}}’s avatar">
       </a>
       {{/if}}
       <div class="comments__content">
         <div class="comments__header">
-          {{#if isAuthor}}
-            <%= icon_svg "classic", "solid", "badge-check" %>
-          {{/if}}
-          <a href="{{authorProfileLink}}" target="_blank" rel="noreferrer noopener nofollow">
-            <span class="comments__author-name">{{displayName}}</span>
+          <a class="comments__author-link" href="{{authorProfileLink}}" target="_blank" rel="noreferrer noopener nofollow">
+            <span class="comments__author-name">
+              {{displayName}}
+              {{#if isAuthor}}
+                <%= icon_svg "classic", "solid", "shield-check" %>
+              {{/if}}
+            </span>
             @{{handle}}
           </a>
           <a class="comments__timestamp" href="{{postLink}}" target="_blank" rel="noreferrer noopener nofollow" title="{{timestamp}}">{{relativeTimestamp}}</a>
