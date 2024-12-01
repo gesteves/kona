@@ -18,7 +18,6 @@ icons:
       - heart
       - comment
       - retweet
-      - arrow-right
     thin:
       - bolt-lightning
       - cloud-bolt
