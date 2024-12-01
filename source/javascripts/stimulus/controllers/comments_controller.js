@@ -79,6 +79,8 @@ export default class extends Controller {
 
   /**
    * Sorts replies based on the specified sorting criteria.
+   * When sorted by likes, author's posts appear at the top (chronologically),
+   * followed by other posts sorted by likes.
    * @param {Array} replies - Array of replies to sort.
    * @param {String} sortValue - Sorting criteria ("oldest", "newest", "likes").
    * @returns {Array} - Sorted replies array.
@@ -89,10 +91,28 @@ export default class extends Controller {
         return replies.sort((a, b) => 
           new Date(b.post.record.createdAt) - new Date(a.post.record.createdAt)
         );
+
       case "likes":
-        return replies.sort((a, b) => 
-          (b.post.likeCount ?? 0) - (a.post.likeCount ?? 0)
-        );
+        return replies.sort((a, b) => {
+          // Separate author's posts
+          const aIsAuthor = this.isAuthor(a.post);
+          const bIsAuthor = this.isAuthor(b.post);
+
+          if (aIsAuthor && bIsAuthor) {
+            // Both are author's posts, sort chronologically
+            return new Date(a.post.record.createdAt) - new Date(b.post.record.createdAt);
+          } else if (aIsAuthor) {
+            // Author's post comes first
+            return -1;
+          } else if (bIsAuthor) {
+            // Author's post comes first
+            return 1;
+          }
+
+          // Sort remaining posts by likes
+          return (b.post.likeCount ?? 0) - (a.post.likeCount ?? 0);
+        });
+
       case "oldest":
       default:
         return replies.sort((a, b) => 
@@ -103,7 +123,7 @@ export default class extends Controller {
 
   /**
    * Renders a single post and its replies recursively.
-   * @param {Object} post - The post object to render.
+   * @param {Object} reply - The post object to render.
    * @param {Number} depth - The depth of the post in the thread.
    */
   renderPost(post, depth = 0) {
@@ -139,7 +159,7 @@ export default class extends Controller {
       postLink: `https://bsky.app/profile/${author.handle}/post/${post.post.uri.split("/").pop()}`,
       seeMoreComments: (!post.replies || post.replies.length === 0) && post.post.replyCount > 0,
       depth: depth,
-      isAuthor: author.did === this.authorDidValue,
+      isAuthor: this.isAuthor(post.post),
     };
 
     // Skip rendering posts with text that is just 📌
@@ -201,6 +221,15 @@ export default class extends Controller {
     }
 
     return html;
+  }
+
+  /**
+   * Checks if a post was authored by the current user.
+   * @param {Object} post - The post object to check.
+   * @returns {Boolean} - True if the post was authored by the current user
+  */
+  isAuthor(post) {
+    return post.author.did === this.authorDidValue;
   }
 
   /**
