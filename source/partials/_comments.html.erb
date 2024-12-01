@@ -55,7 +55,7 @@
           <span class="comments__meta-item" title="{{formatNumber repostCount}} {{pluralize repostCount "repost" "reposts"}}"><%= icon_svg "classic", "regular", "retweet" %> {{formatNumber repostCount}}</span>
           <span class="comments__meta-item"><a href="{{postLink}}" target="_blank" rel="noopener {{#if isAuthor}}me{{else}}nofollow{{/if}}"><%= icon_svg "classic", "regular", "comment" %> Reply</a></span>
           {{#if seeMoreComments}}
-            <span class="comments__meta-item comments__meta-item--more"><a href="{{postLink}}" target="_blank" rel="noopener {{#if isAuthor}}me{{else}}nofollow{{/if}}">Read {{formatNumber replyCount}} more {{pluralize replyCount "reply" "replies"}} on Bluesky</a></span>
+            <span class="comments__meta-item comments__meta-item--more"><a href="{{postLink}}" target="_blank" rel="noopener {{#if isAuthor}}me{{else}}nofollow{{/if}}">Continue thread on Bluesky</a></span>
           {{/if}}
         </div>
       </div>
