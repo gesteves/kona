@@ -230,7 +230,7 @@ export default class extends Controller {
 
   /**
    * Checks if a DID belongs to the author of the article.
-   * @param {Object} did - The DID to check.
+   * @param {String} did - The DID to check.
    * @returns {Boolean} - True if the DID belongs to the author, false otherwise.
   */
   isAuthor(did) {
