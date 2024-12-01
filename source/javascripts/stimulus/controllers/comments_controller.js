@@ -49,7 +49,6 @@ export default class extends Controller {
         this.depthValue,
         this.parentHeightValue,
       );
-      raise
       if (thread.replies && thread.replies.length > 0) {
         this.updateComments(thread.replies);
       }
