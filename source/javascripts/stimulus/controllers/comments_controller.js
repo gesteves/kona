@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus";
 import { formatDistanceToNow } from "date-fns";
+import { RichText } from '@atproto/api';
 import Handlebars from "handlebars";
 
 export default class extends Controller {
@@ -131,6 +132,7 @@ export default class extends Controller {
       }).format(createdAt),
       relativeTimestamp: formatDistanceToNow(createdAt, { addSuffix: true }),
       text: post.post.record.text,
+      richText: this.renderPostTextToHtml(post.post),
       replyCount: post.post.replyCount ?? 0,
       repostCount: post.post.repostCount ?? 0,
       likeCount: post.post.likeCount ?? 0,
@@ -165,6 +167,40 @@ export default class extends Controller {
         this.renderPost(reply, depth + 1);
       });
     }
+  }
+
+  /**
+   * Converts a post's text and facets into an HTML string.
+   * @param {Object} post - The post object containing text and facets.
+   * @returns {String} - The HTML representation of the post's text.
+   */
+  renderPostTextToHtml(post) {
+    const { text, facets } = post.record;
+
+    const isAuthor = post.author.did === this.authorDidValue;
+    const rel = isAuthor ? "noopener" : "nofollow noopener ugc";
+
+    // Create a RichText instance with the post's text and facets
+    const richText = new RichText({
+      text,
+      facets,
+    });
+
+    // Generate HTML from segments
+    let html = '';
+    for (const segment of richText.segments()) {
+      if (segment.isLink()) {
+        html += `<a href="${segment.link?.uri}" rel="${rel}" target="_blank">${segment.text}</a>`;
+      } else if (segment.isMention()) {
+        html += `<a href="https://bsky.app/profile/${segment.mention?.did}" rel="${rel}" target="_blank">${segment.text}</a>`;
+      } else if (segment.isTag()) {
+        html += `<a href="https://bsky.app/hashtag/${segment.tag?.tag}" rel="${rel}" target="_blank">${segment.text}</a>`;
+      } else {
+        html += segment.text;
+      }
+    }
+
+    return html;
   }
 
   /**
