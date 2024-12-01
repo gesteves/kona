@@ -40,8 +40,7 @@ export default class extends Controller {
   }
 
   /**
-   * Fetches the thread data from the API and updates comments.
-   * Filters out hidden replies and sorts the rest.
+   * Fetches the thread data from the API and kicks off processing them.
    * @async
    */
   async fetchComments() {
@@ -52,7 +51,7 @@ export default class extends Controller {
         this.parentHeightValue,
       );
 
-      // Store hidden replies in the class property
+      // Store hidden replies for later.
       this.hiddenReplies = data.threadgate?.record.hiddenReplies || [];
 
       if (data.thread.replies && data.thread.replies.length > 0) {
@@ -135,22 +134,12 @@ export default class extends Controller {
   }
 
   /**
-   * Renders a single post and its replies recursively.
-   * Filters out hidden replies and renders the rest.
+   * Renders a single Bluesky post and its replies recursively.
    * @param {Object} post - The post object to render.
    * @param {Number} depth - The depth of the post in the thread.
    */
   renderPost(post, depth = 0) {
-    // Skip rendering posts that are in the hidden replies list
-    if (this.hiddenReplies.includes(post.post.uri)) {
-      return;
-    }
-
-    // Skip rendering posts with text that is just 📌
-    if (post.post.record.text.trim() === "📌") {
-      return;
-    }
-
+    // Get the Handlebars template from the target element
     const template = this.commentTemplateTarget.innerHTML;
 
     // Compile the Handlebars template
@@ -164,7 +153,7 @@ export default class extends Controller {
       avatar: author.avatar || null,
       displayName: author.displayName || author.handle,
       handle: author.handle,
-      authorProfileLink: `https://bsky.app/profile/${author.handle}`,
+      authorProfileUrl: `https://bsky.app/profile/${author.handle}`,
       timestamp: new Intl.DateTimeFormat("en-US", {
         weekday: "long",
         year: "numeric",
@@ -176,11 +165,11 @@ export default class extends Controller {
       }).format(createdAt),
       relativeTimestamp: formatDistanceToNow(createdAt, { addSuffix: true }),
       text: post.post.record.text,
-      richText: this.renderPostTextToHtml(post.post),
+      htmlText: this.renderPostTextToHtml(post.post),
       replyCount: post.post.replyCount ?? 0,
       repostCount: post.post.repostCount ?? 0,
       likeCount: post.post.likeCount ?? 0,
-      postLink: `https://bsky.app/profile/${author.handle}/post/${post.post.uri.split("/").pop()}`,
+      postUrl: `https://bsky.app/profile/${author.handle}/post/${post.post.uri.split("/").pop()}`,
       seeMoreComments: (!post.replies || post.replies.length === 0) && post.post.replyCount > 0 && depth == this.depthValue - 1,
       depth: depth,
       isAuthor: this.isAuthor(author.did),
@@ -198,7 +187,7 @@ export default class extends Controller {
       this.containerTarget.appendChild(tempContainer.firstChild);
     }
 
-    // Render replies recursively with incremented depth
+    // Render replies recursively with incremented depth for indentation
     if (post.replies && post.replies.length > 0) {
       this.processReplies(post.replies, depth + 1, this.sortValue);
     }
@@ -212,6 +201,7 @@ export default class extends Controller {
   renderPostTextToHtml(post) {
     const { text, facets } = post.record;
 
+    // Trust my own posts. Don't trust others' posts.
     const isAuthor = this.isAuthor(post.author.did);
     const rel = isAuthor ? "noopener" : "nofollow noopener ugc";
 
