@@ -45,13 +45,15 @@ export default class extends Controller {
    */
   async fetchComments() {
     try {
-      const thread = await this.getPostThread(
+      const data = await this.getPostThread(
         this.atUriValue,
         this.depthValue,
         this.parentHeightValue,
       );
-      if (thread.replies && thread.replies.length > 0) {
-        this.updateComments(thread.replies);
+
+      if (data.thread.replies && data.thread.replies.length > 0) {
+        const hiddenReplies = data.threadgate?.record.hiddenReplies || [];
+        this.updateComments(data.thread.replies, hiddenReplies);
       }
     } catch (err) {
       console.error("Error fetching comments:", err);
@@ -63,17 +65,23 @@ export default class extends Controller {
 
   /**
    * Updates the comment section with sorted replies.
+   * Filters out hidden replies and sorts the rest.
    * @param {Array} replies - Array of top-level replies.
+   * @param {Array} hiddenReplies - Array of hidden reply URIs.
    */
-  updateComments(replies) {
-    // Filter out posts with text that is only the 📌 emoji
-    const filteredReplies = replies.filter((reply) => reply.post.record.text.trim() !== "📌");
-  
+  updateComments(replies, hiddenReplies) {
+    // Filter out posts with text that is only the 📌 emoji or are in the hidden replies list
+    const filteredReplies = replies.filter(
+      (reply) =>
+        reply.post.record.text.trim() !== "📌" &&
+        !hiddenReplies.includes(reply.post.uri)
+    );
+
     // Sort the remaining replies
     const sortedReplies = this.sortReplies(filteredReplies, this.sortValue);
-  
+
     sortedReplies.forEach((reply) => {
-      this.renderPost(reply);
+      this.renderPost(reply, 0, hiddenReplies);
     });
   }
 
@@ -123,10 +131,17 @@ export default class extends Controller {
 
   /**
    * Renders a single post and its replies recursively.
-   * @param {Object} reply - The post object to render.
+   * Filters out hidden replies and renders the rest.
+   * @param {Object} post - The post object to render.
    * @param {Number} depth - The depth of the post in the thread.
+   * @param {Array} hiddenReplies - Array of hidden reply URIs.
    */
-  renderPost(post, depth = 0) {
+  renderPost(post, depth = 0, hiddenReplies = []) {
+    // Skip rendering posts that are in the hidden replies list
+    if (hiddenReplies.includes(post.post.uri)) {
+      return;
+    }
+
     const template = this.commentTemplateTarget.innerHTML;
 
     // Compile the Handlebars template
@@ -179,12 +194,16 @@ export default class extends Controller {
       this.containerTarget.appendChild(tempContainer.firstChild);
     }
 
-    // Render replies recursively with incremented depth, filtering out 📌 posts
+    // Render replies recursively with incremented depth, filtering out hidden replies
     if (post.replies && post.replies.length > 0) {
-      const filteredReplies = post.replies.filter((reply) => reply.post.record.text.trim() !== "📌");
+      const filteredReplies = post.replies.filter(
+        (reply) =>
+          reply.post.record.text.trim() !== "📌" &&
+          !hiddenReplies.includes(reply.post.uri)
+      );
       const sortedReplies = this.sortReplies(filteredReplies, "oldest");
       sortedReplies.forEach((reply) => {
-        this.renderPost(reply, depth + 1);
+        this.renderPost(reply, depth + 1, hiddenReplies);
       });
     }
   }
@@ -269,7 +288,7 @@ export default class extends Controller {
     }
 
     const data = await res.json();
-    return data.thread;
+    return data;
   }
 
   /**
