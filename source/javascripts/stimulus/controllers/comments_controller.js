@@ -110,7 +110,7 @@ export default class extends Controller {
           // Separate author's posts
           const aIsAuthor = this.isAuthor(a.post.author.did);
           const bIsAuthor = this.isAuthor(b.post.author.did);
-          
+
           if (aIsAuthor && bIsAuthor) {
             // Both are author's posts, sort chronologically
             return new Date(a.post.record.createdAt) - new Date(b.post.record.createdAt);
@@ -181,7 +181,7 @@ export default class extends Controller {
       repostCount: post.post.repostCount ?? 0,
       likeCount: post.post.likeCount ?? 0,
       postLink: `https://bsky.app/profile/${author.handle}/post/${post.post.uri.split("/").pop()}`,
-      seeMoreComments: (!post.replies || post.replies.length === 0) && post.post.replyCount > 0,
+      seeMoreComments: (!post.replies || post.replies.length === 0) && post.post.replyCount > 0 && depth == this.depthValue - 1,
       depth: depth,
       isAuthor: this.isAuthor(author.did),
     };
