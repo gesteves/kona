@@ -8,25 +8,16 @@
   data-comments-depth-value="<%= ENV.fetch('BLUESKY_COMMENTS_DEPTH', 6) %>"
   data-comments-parent-height-value="<%= ENV.fetch('BLUESKY_COMMENTS_HEIGHT', 1000) %>"
   data-comments-sort-value="<%= ENV.fetch('BLUESKY_COMMENTS_SORT', 'likes').strip.downcase %>"
-  data-comments-prompt-value="<%= smartypants article.comments_prompt %>"
 >
   <h3 class="comments__heading" data-comments-target="heading">Comments</h3>
-  <div class="comments__intro" data-comments-target="intro"></div>
+  <div class="comments__intro" data-comments-target="intro">
+    <p><%= smartypants article.comments_prompt %> <a href="<%= article.bluesky_comments_url %>" target="_blank" rel="noopener me">Discuss this <%= article.entry_type == 'Short' ? 'post' : content.entry_type.downcase %> on Bluesky</a>.</p>
+  </div>
   <div class="comments__spinner" data-comments-target="spinner">
     <%= icon_svg "classic", "solid", "circle-notch" %>
   </div>
 
   <div class="comments__container" data-comments-target="container"></div>
-
-  <script data-comments-target="introTemplate" type="text/x-handlebars-template">
-    <p>
-      {{#if error}}
-        {{{error}}}
-      {{else}}
-        {{{prompt}}} <a href="{{postUrl}}" target="_blank" rel="noopener me">Reply on Bluesky</a> to {{verb}} the conversation.
-      {{/if}}
-    </p>
-  </script>
 
   <script data-comments-target="commentTemplate" type="text/x-handlebars-template">
     <article class="comments__comment comments__comment--depth-{{depth}}">

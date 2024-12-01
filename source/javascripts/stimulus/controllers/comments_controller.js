@@ -3,7 +3,7 @@ import { formatDistanceToNow } from "date-fns";
 import Handlebars from "handlebars";
 
 export default class extends Controller {
-  static targets = ['commentTemplate', 'introTemplate', 'heading', 'intro', 'spinner', 'container'];
+  static targets = ['commentTemplate', 'heading', 'intro', 'spinner', 'container'];
   static values = {
     atUri: String,
     url: String,
@@ -16,7 +16,6 @@ export default class extends Controller {
 
   connect() {
     this.observeVisibility();
-    this.renderIntro(this.promptValue, this.urlValue, "join");
   }
 
   /**
@@ -39,36 +38,6 @@ export default class extends Controller {
   }
 
   /**
-   * Renders am intro template and replaces the contents of the introTarget with the rendered content.
-   * @param {string} prompt - The prompt message to display.
-   * @param {string} url - The URL for the "Reply on Bluesky" link.
-   * @param {string} verb - The verb to use in the prompt (e.g., "start", "join").
-   */
-  renderIntro(prompt, url, verb) {
-    const template = this.introTemplateTarget.innerHTML;
-    const compiledTemplate = Handlebars.compile(template);
-    const renderedContent = compiledTemplate({
-      prompt: prompt,
-      postUrl: url,
-      verb: verb,
-    });
-
-    this.introTarget.innerHTML = renderedContent;
-  }
-
-  /**
-   * Renders an error template and replaces the contents of the introTarget with the rendered content.
-   * @param {string} error - The error message to display.
-   */
-  renderError(error) {
-    const template = this.introTemplateTarget.innerHTML;
-    const compiledTemplate = Handlebars.compile(template);
-    const renderedContent = compiledTemplate({ error: error });
-
-    this.introTarget.innerHTML = renderedContent;
-  }
-
-  /**
    * Fetches the thread data from the API and updates comments.
    * Handles cases where there are no replies or fetch errors.
    * @async
@@ -80,15 +49,13 @@ export default class extends Controller {
         this.depthValue,
         this.parentHeightValue,
       );
-
+      raise
       if (thread.replies && thread.replies.length > 0) {
         this.updateComments(thread.replies);
-      } else {
-        this.renderIntro(this.promptValue, this.urlValue, "start");
       }
     } catch (err) {
       console.error("Error fetching comments:", err);
-      this.renderError("Oops! Comments failed to load, reload the page to try again.");
+      this.containerTarget.innerHTML = '<p>Oops! Something went wrong loading the comments, please refresh the page to try again.</p>';
     } finally {
       this.spinnerTarget.remove();
     }
