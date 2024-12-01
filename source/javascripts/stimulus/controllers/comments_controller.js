@@ -50,10 +50,10 @@ export default class extends Controller {
         this.depthValue,
         this.parentHeightValue,
       );
-
+  
       if (data.thread.replies && data.thread.replies.length > 0) {
         const hiddenReplies = data.threadgate?.record.hiddenReplies || [];
-        this.updateComments(data.thread.replies, hiddenReplies);
+        this.renderReplies(data.thread.replies, 0, hiddenReplies, this.sortValue);
       }
     } catch (err) {
       console.error("Error fetching comments:", err);
@@ -64,12 +64,14 @@ export default class extends Controller {
   }
 
   /**
-   * Updates the comment section with sorted replies.
-   * Filters out hidden replies and sorts the rest.
-   * @param {Array} replies - Array of top-level replies.
+   * Renders a list of replies recursively.
+   * Handles filtering, sorting, and rendering of replies at any depth.
+   * @param {Array} replies - Array of replies to render.
+   * @param {Number} depth - The depth of the current replies.
    * @param {Array} hiddenReplies - Array of hidden reply URIs.
+   * @param {String} sortValue - Sorting criteria ("oldest", "newest", "likes").
    */
-  updateComments(replies, hiddenReplies) {
+  renderReplies(replies, depth = 0, hiddenReplies = [], sortValue = "oldest") {
     // Filter out posts with text that is only the 📌 emoji or are in the hidden replies list
     const filteredReplies = replies.filter(
       (reply) =>
@@ -78,10 +80,11 @@ export default class extends Controller {
     );
 
     // Sort the remaining replies
-    const sortedReplies = this.sortReplies(filteredReplies, this.sortValue);
+    const sortedReplies = this.sortReplies(filteredReplies, sortValue);
 
+    // Render each reply and recursively render their replies
     sortedReplies.forEach((reply) => {
-      this.renderPost(reply, 0, hiddenReplies);
+      this.renderPost(reply, depth, hiddenReplies);
     });
   }
 
@@ -177,11 +180,6 @@ export default class extends Controller {
       isAuthor: this.isAuthor(post.post),
     };
 
-    // Skip rendering posts with text that is just 📌
-    if (post.post.record.text.trim() === "📌") {
-      return;
-    }
-
     // Render the compiled template with data
     const rendered = compiledTemplate(data);
 
@@ -194,17 +192,9 @@ export default class extends Controller {
       this.containerTarget.appendChild(tempContainer.firstChild);
     }
 
-    // Render replies recursively with incremented depth, filtering out hidden replies
+    // Recursively render replies
     if (post.replies && post.replies.length > 0) {
-      const filteredReplies = post.replies.filter(
-        (reply) =>
-          reply.post.record.text.trim() !== "📌" &&
-          !hiddenReplies.includes(reply.post.uri)
-      );
-      const sortedReplies = this.sortReplies(filteredReplies, this.sortValue);
-      sortedReplies.forEach((reply) => {
-        this.renderPost(reply, depth + 1, hiddenReplies);
-      });
+      this.renderReplies(post.replies, depth + 1, hiddenReplies, "oldest");
     }
   }
 
