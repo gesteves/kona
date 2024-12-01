@@ -201,7 +201,7 @@ export default class extends Controller {
           reply.post.record.text.trim() !== "📌" &&
           !hiddenReplies.includes(reply.post.uri)
       );
-      const sortedReplies = this.sortReplies(filteredReplies, "oldest");
+      const sortedReplies = this.sortReplies(filteredReplies, this.sortValue);
       sortedReplies.forEach((reply) => {
         this.renderPost(reply, depth + 1, hiddenReplies);
       });
