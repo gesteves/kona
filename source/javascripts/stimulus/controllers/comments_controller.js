@@ -108,9 +108,9 @@ export default class extends Controller {
       case "likes":
         return replies.sort((a, b) => {
           // Separate author's posts
-          const aIsAuthor = this.isAuthor(a.post);
-          const bIsAuthor = this.isAuthor(b.post);
-
+          const aIsAuthor = this.isAuthor(a.post.author.did);
+          const bIsAuthor = this.isAuthor(b.post.author.did);
+          
           if (aIsAuthor && bIsAuthor) {
             // Both are author's posts, sort chronologically
             return new Date(a.post.record.createdAt) - new Date(b.post.record.createdAt);
@@ -183,7 +183,7 @@ export default class extends Controller {
       postLink: `https://bsky.app/profile/${author.handle}/post/${post.post.uri.split("/").pop()}`,
       seeMoreComments: (!post.replies || post.replies.length === 0) && post.post.replyCount > 0,
       depth: depth,
-      isAuthor: this.isAuthor(post.post),
+      isAuthor: this.isAuthor(author.did),
     };
 
     // Render the compiled template with data
@@ -212,7 +212,7 @@ export default class extends Controller {
   renderPostTextToHtml(post) {
     const { text, facets } = post.record;
 
-    const isAuthor = post.author.did === this.authorDidValue;
+    const isAuthor = this.isAuthor(post.author.did);
     const rel = isAuthor ? "noopener" : "nofollow noopener ugc";
 
     // Create a RichText instance with the post's text and facets
@@ -239,12 +239,12 @@ export default class extends Controller {
   }
 
   /**
-   * Checks if a post was authored by the current user.
-   * @param {Object} post - The post object to check.
-   * @returns {Boolean} - True if the post was authored by the current user
+   * Checks if a DID belongs to the author of the article.
+   * @param {Object} did - The DID to check.
+   * @returns {Boolean} - True if the DID belongs to the author, false otherwise.
   */
-  isAuthor(post) {
-    return post.author.did === this.authorDidValue;
+  isAuthor(did) {
+    return did === this.authorDidValue;
   }
 
   /**
