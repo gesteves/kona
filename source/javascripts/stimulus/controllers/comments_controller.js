@@ -17,6 +17,7 @@ export default class extends Controller {
 
   connect() {
     this.observeVisibility();
+    this.hiddenReplies = [];
   }
 
   /**
@@ -40,7 +41,7 @@ export default class extends Controller {
 
   /**
    * Fetches the thread data from the API and updates comments.
-   * Handles cases where there are no replies or fetch errors.
+   * Filters out hidden replies and sorts the rest.
    * @async
    */
   async fetchComments() {
@@ -50,10 +51,12 @@ export default class extends Controller {
         this.depthValue,
         this.parentHeightValue,
       );
-  
+
+      // Store hidden replies in the class property
+      this.hiddenReplies = data.threadgate?.record.hiddenReplies || [];
+
       if (data.thread.replies && data.thread.replies.length > 0) {
-        const hiddenReplies = data.threadgate?.record.hiddenReplies || [];
-        this.renderReplies(data.thread.replies, 0, hiddenReplies, this.sortValue);
+        this.processReplies(data.thread.replies, 0, this.sortValue);
       }
     } catch (err) {
       console.error("Error fetching comments:", err);
@@ -64,19 +67,18 @@ export default class extends Controller {
   }
 
   /**
-   * Renders a list of replies recursively.
+   * Processes a list of replies recursively.
    * Handles filtering, sorting, and rendering of replies at any depth.
    * @param {Array} replies - Array of replies to render.
    * @param {Number} depth - The depth of the current replies.
-   * @param {Array} hiddenReplies - Array of hidden reply URIs.
    * @param {String} sortValue - Sorting criteria ("oldest", "newest", "likes").
    */
-  renderReplies(replies, depth = 0, hiddenReplies = [], sortValue = "oldest") {
+  processReplies(replies, depth = 0, sortValue = "oldest") {
     // Filter out posts with text that is only the 📌 emoji or are in the hidden replies list
     const filteredReplies = replies.filter(
       (reply) =>
         reply.post.record.text.trim() !== "📌" &&
-        !hiddenReplies.includes(reply.post.uri)
+        !this.hiddenReplies.includes(reply.post.uri)
     );
 
     // Sort the remaining replies
@@ -84,7 +86,7 @@ export default class extends Controller {
 
     // Render each reply and recursively render their replies
     sortedReplies.forEach((reply) => {
-      this.renderPost(reply, depth, hiddenReplies);
+      this.renderPost(reply, depth);
     });
   }
 
@@ -137,11 +139,15 @@ export default class extends Controller {
    * Filters out hidden replies and renders the rest.
    * @param {Object} post - The post object to render.
    * @param {Number} depth - The depth of the post in the thread.
-   * @param {Array} hiddenReplies - Array of hidden reply URIs.
    */
-  renderPost(post, depth = 0, hiddenReplies = []) {
+  renderPost(post, depth = 0) {
     // Skip rendering posts that are in the hidden replies list
-    if (hiddenReplies.includes(post.post.uri)) {
+    if (this.hiddenReplies.includes(post.post.uri)) {
+      return;
+    }
+
+    // Skip rendering posts with text that is just 📌
+    if (post.post.record.text.trim() === "📌") {
       return;
     }
 
@@ -192,9 +198,9 @@ export default class extends Controller {
       this.containerTarget.appendChild(tempContainer.firstChild);
     }
 
-    // Recursively render replies
+    // Render replies recursively with incremented depth
     if (post.replies && post.replies.length > 0) {
-      this.renderReplies(post.replies, depth + 1, hiddenReplies, "oldest");
+      this.processReplies(post.replies, depth + 1, this.sortValue);
     }
   }
 
