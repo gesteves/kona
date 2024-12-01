@@ -12,6 +12,7 @@ icons:
       - envelope
       - link-simple
       - shield-check
+      - badge-check
       - circle-notch
     regular:
       - triangle-exclamation
