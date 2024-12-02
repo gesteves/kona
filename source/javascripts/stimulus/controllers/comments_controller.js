@@ -343,6 +343,8 @@ export default class extends Controller {
       params.append("parentHeight", constrainedParentHeight.toString());
     }
 
+    // Public endpoint, does not require authentication
+    // See: https://docs.bsky.app/docs/api/app-bsky-feed-get-post-thread
     const res = await fetch(
       `https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?${params.toString()}`,
       {
