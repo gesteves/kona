@@ -15,7 +15,7 @@ export default class extends Controller {
 
   connect() {
     this.hiddenReplies = [];
-    this.atUri = this.parsePostUrlToAtUri(this.urlValue);
+    this.atUri = this.convertPostUrlToAtUri(this.urlValue);
     if (this.atUri) {
       this.resolveAuthorDid()
         .then(() => {
@@ -43,7 +43,7 @@ export default class extends Controller {
    * @param {String} postUrl - The Bluesky post URL.
    * @returns {String|null} - The at-uri if valid, otherwise null.
    */
-  parsePostUrlToAtUri(postUrl) {
+  convertPostUrlToAtUri(postUrl) {
     if (!postUrl) return null;
 
     try {
