@@ -113,8 +113,6 @@ module ImageHelpers
     logo_url = data&.site&.open_graph_image_logo&.url
     query_params[:logo] = ERB::Util.url_encode(logo_url) if logo_url.present?
 
-    puts query_params
-
     "#{base_url}/og?#{query_params.to_query}"
   end
 
