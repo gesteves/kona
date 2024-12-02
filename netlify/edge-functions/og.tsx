@@ -55,7 +55,7 @@ export default async function handler(req: Request, context: Context) {
               style={{
                 position: "absolute",
                 top: "20px",
-                right: "20px",
+                left: "20px",
               }}
             />
           )}
