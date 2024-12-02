@@ -23,9 +23,10 @@ export default class extends Controller {
         })
         .catch((error) => {
           console.error("Failed to resolve author DID:", error);
-          this.element.remove();
+          this.renderError();
         });
     } else {
+      // The post for comments isn't valid; so render nothing.
       this.element.remove();
     }
   }
@@ -141,10 +142,18 @@ export default class extends Controller {
       }
     } catch (err) {
       console.error("Error fetching comments:", err);
-      this.containerTarget.innerHTML = '<p>Oops! Something went wrong loading the comments, please refresh the page to try again.</p>';
+      this.renderError();
     } finally {
       this.spinnerTarget.remove();
     }
+  }
+
+  /**
+   * Renders a paragraph with an error message in the container for the comments.
+   * @param {String} message - The error message to render.
+   */
+  renderError(message = "Oops! Something went wrong, please refresh the page to try again.") {
+    this.containerTarget.innerHTML = `<p>${message}</p>`;
   }
 
   /**
