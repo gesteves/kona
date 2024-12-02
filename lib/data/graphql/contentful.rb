@@ -132,7 +132,7 @@ module ContentfulClient
           logo {
             ...ImageFields
           }
-          openGraphImageLogo {
+          coverImage {
             ...ImageFields
           }
           sys {
