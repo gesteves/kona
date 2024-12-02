@@ -60,39 +60,6 @@ namespace :redis do
   end
 end
 
-namespace :bluesky do
-  desc 'Posts an article to Bluesky with the given URL, backdated to the time it was published.'
-  task :post_article => :dotenv do
-    url = ENV['URL']
-    text = ENV['TEXT']
-
-    if url.blank?
-      puts "Error: You must provide a URL using the URL environment variable."
-      exit(1)
-    end
-
-    # Fetch credentials from environment variables
-    email = ENV['BLUESKY_EMAIL']
-    password = ENV['BLUESKY_PASSWORD']
-
-    if email.blank? || password.blank?
-      puts "Error: BLUESKY_EMAIL and BLUESKY_PASSWORD environment variables must be set."
-      exit(1)
-    end
-
-    # Initialize Bluesky instance
-    bluesky = Bluesky.new(email: email, password: password)
-
-    # Call post_article and output the result
-    post_url = bluesky.post_article(url: url, text: text)
-    if post_url
-      puts post_url
-    else
-      puts "Error: Failed to post the article."
-    end
-  end
-end
-
 # Methods for tasks
 
 def setup_data_directory

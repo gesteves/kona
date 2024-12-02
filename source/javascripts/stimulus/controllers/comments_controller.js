@@ -1,14 +1,12 @@
 import { Controller } from "@hotwired/stimulus";
 import { formatDistanceToNow } from "date-fns";
-import { RichText } from '@atproto/api';
+import { RichText, AtpAgent } from '@atproto/api';
 import Handlebars from "handlebars";
 
 export default class extends Controller {
   static targets = ['commentTemplate', 'heading', 'intro', 'spinner', 'container'];
   static values = {
-    atUri: String,
     url: String,
-    authorDid: String,
     depth: Number,
     parentHeight: Number,
     sort: String,
@@ -16,8 +14,92 @@ export default class extends Controller {
   };
 
   connect() {
-    this.observeVisibility();
     this.hiddenReplies = [];
+    this.atUri = this.parsePostUrlToAtUri(this.urlValue);
+    if (this.atUri) {
+      this.resolveAuthorDid()
+        .then(() => {
+          this.observeVisibility();
+        })
+        .catch((error) => {
+          console.error("Failed to resolve author DID:", error);
+          this.element.remove();
+        });
+    } else {
+      this.element.remove();
+    }
+  }
+
+  /**
+   * Resolves the DID of the author from the at-uri and stores it.
+   * @async
+   */
+  async resolveAuthorDid() {
+    this.authorDid = await this.extractDidFromAtUri(this.atUri);
+  }
+
+  /**
+   * Parses a Bluesky post URL and converts it into an at-uri.
+   * @param {String} postUrl - The Bluesky post URL.
+   * @returns {String|null} - The at-uri if valid, otherwise null.
+   */
+  parsePostUrlToAtUri(postUrl) {
+    if (!postUrl) return null;
+
+    try {
+      const url = new URL(postUrl);
+
+      if (url.host !== 'bsky.app' || !url.pathname.startsWith('/profile/')) {
+        return null;
+      }
+
+      const pathParts = url.pathname.split('/');
+      const didOrHandle = pathParts[2];
+      const postId = pathParts[4];
+
+      if (!didOrHandle || !postId) {
+        return null;
+      }
+
+      return `at://${didOrHandle}/app.bsky.feed.post/${postId}`
+    } catch (error) {
+      console.error("Error parsing post URL:", postUrl, error);
+      return null;
+    }
+  }
+
+  /**
+   * Extracts the DID from an at-uri.
+   * @param {String} atUri - The at-uri to process.
+   * @returns {Promise<String|null>} - The extracted DID. Resolves to null if invalid.
+   */
+  async extractDidFromAtUri(atUri) {
+    if (!atUri) return null;
+
+    try {
+      const parts = atUri.split('/');
+      const didOrHandle = parts[2]; // The third part of the path should contain the DID or handle.
+      if (didOrHandle.startsWith('did:plc:')) {
+        return didOrHandle; // Return the DID directly if present.
+      } else {
+        return await this.resolveHandle(didOrHandle); // Otherwise, resolve the handle to a DID.
+      }
+    } catch (error) {
+      console.error("Error extracting DID from at-uri:", atUri, error);
+      return null;
+    }
+  }
+
+  /**
+   * Resolves a handle to a DID using the ATP agent.
+   * @async
+   * @param {String} handle - The handle to resolve. 
+   * @returns {Promise<String|null>} - The resolved DID. Resolves to null if the handle is invalid.
+   */
+  async resolveHandle(handle) {
+    const agent = new AtpAgent({ service: 'https://bsky.social' });
+    const data = await agent.resolveHandle({ handle: handle });
+    return data.data.did;
   }
 
   /**
@@ -46,7 +128,7 @@ export default class extends Controller {
   async fetchComments() {
     try {
       const data = await this.getPostThread(
-        this.atUriValue,
+        this.atUri,
         this.depthValue,
         this.parentHeightValue,
       );
@@ -234,7 +316,7 @@ export default class extends Controller {
    * @returns {Boolean} - True if the DID belongs to the author, false otherwise.
   */
   isAuthor(did) {
-    return did === this.authorDidValue;
+    return did === this.authorDid;
   }
 
   /**

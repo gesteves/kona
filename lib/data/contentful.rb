@@ -1,6 +1,5 @@
 require 'active_support/all'
 require_relative 'graphql/contentful'
-require_relative '../util/bluesky'
 
 class Contentful
   def initialize
@@ -93,8 +92,6 @@ class Contentful
       set_draft_status(item)
       set_timestamps(item)
       set_article_path(item)
-      set_bluesky_comments_at_uri(item)
-      set_bluesky_author_did(item)
       set_template(item)
     end
 
@@ -189,22 +186,6 @@ class Contentful
     else
       "/page.html"
     end
-    item
-  end
-
-  # Sets the Bluesky AT-URI of the Bluesky post used for comments.
-  # @param item [Hash] The content item to be processed.
-  # @return [Hash] The item with the AT-URI set.
-  def set_bluesky_comments_at_uri(item)
-    item[:bluesky_comments_at_uri] = Bluesky.post_url_to_at_uri(item[:bluesky_comments_url])
-    item
-  end
-
-  # Sets the Bluesky DID of the author of a content item.
-  # @param item [Hash] The content item to be processed.
-  # @return [Hash] The item with the author's DID set.
-  def set_bluesky_author_did(item)
-    item[:author][:bluesky_did] = Bluesky.resolve_handle(item[:author][:bluesky_url]&.split('/')&.last)
     item
   end
 

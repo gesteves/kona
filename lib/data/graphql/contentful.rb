@@ -38,7 +38,6 @@ module ContentfulClient
     fragment AuthorFields on Author {
       slug
       name
-      blueskyUrl
     }
 
     fragment ShortcutFields on Shortcut {
