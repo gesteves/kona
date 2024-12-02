@@ -132,6 +132,9 @@ module ContentfulClient
           logo {
             ...ImageFields
           }
+          openGraphImageLogo {
+            ...ImageFields
+          }
           sys {
             ...SysFields
           }

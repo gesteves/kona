@@ -92,6 +92,32 @@ module ImageHelpers
     cdn_image_url(original_url, params)
   end
 
+  # Generates an Open Graph image with some arbitrary text.
+  # @param text [String] The text to be displayed on the Open Graph image.
+  # @return [String, nil] The URL for the Open Graph image with the specified text, or nil if not generated.
+  def generate_open_graph_image_url(text)
+    base_url = if is_production?
+                ENV['URL']
+              elsif is_netlify?
+                ENV['DEPLOY_URL']
+              else
+                nil
+              end
+
+    return if base_url.blank?
+
+    query_params = {
+      text: ERB::Util.url_encode(sanitize(text))
+    }
+
+    logo_url = data&.site&.open_graph_image_logo&.url
+    query_params[:logo] = ERB::Util.url_encode(logo_url) if logo_url.present?
+
+    puts query_params
+
+    "#{base_url}/og?#{query_params.to_query}"
+  end
+
   # Generates a CDN URL for the site icon with the specified width.
   # @param w [Integer] The desired width of the site icon.
   # @return [String, nil] The CDN URL for the site icon with the specified width, or nil if not found.

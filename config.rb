@@ -14,7 +14,7 @@ activate :dotenv
 activate :autoprefixer do |config|
   config.browsers = ['last 1 version', 'last 3 safari versions', 'last 3 ios versions']
 end
-activate :asset_hash
+activate :asset_hash, ignore: [/\.ttf$/]
 activate :directory_indexes
 
 ignore "/article.html"
