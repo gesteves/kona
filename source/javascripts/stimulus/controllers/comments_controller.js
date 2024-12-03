@@ -70,6 +70,38 @@ export default class extends Controller {
   }
 
   /**
+   * Converts an at-uri into a Bluesky post URL, using a handle if provided.
+   * @param {String} atUri - The at-uri to convert.
+   * @param {String} [handle] - Optional handle to use instead of the DID.
+   * @returns {String|null} - The Bluesky post URL if valid, otherwise null.
+   */
+  convertAtUriToPostUrl(atUri, handle = null) {
+    if (!atUri) return null;
+
+    try {
+      const parts = atUri.split('/');
+      if (parts.length < 5 || parts[0] !== 'at:' || parts[3] !== 'app.bsky.feed.post') {
+        return null;
+      }
+
+      const didOrHandle = parts[2]; // Extract the DID or handle from the at-uri
+      const postId = parts[4]; // Extract the post ID
+
+      if (!didOrHandle || !postId) {
+        return null;
+      }
+
+      // Use the provided handle if available, otherwise default to the DID or handle from the at-uri
+      const profileIdentifier = handle || didOrHandle;
+
+      return `https://bsky.app/profile/${profileIdentifier}/post/${postId}`;
+    } catch (error) {
+      console.error("Error converting at-uri to post URL:", atUri, error);
+      return null;
+    }
+  }
+
+  /**
    * Extracts the DID from an at-uri.
    * @param {String} atUri - The at-uri to process.
    * @returns {Promise<String|null>} - The extracted DID. Resolves to null if invalid.
@@ -241,29 +273,20 @@ export default class extends Controller {
     const createdAt = new Date(post.post.record.createdAt);
 
     const data = {
+      authorProfileUrl: `https://bsky.app/profile/${author.handle}`,
       avatar: author.avatar || null,
+      depth: depth,
       displayName: author.displayName || author.handle,
       handle: author.handle,
-      authorProfileUrl: `https://bsky.app/profile/${author.handle}`,
-      timestamp: new Intl.DateTimeFormat("en-US", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "numeric",
-        minute: "numeric",
-        hour12: true,
-      }).format(createdAt),
+      text: this.renderPostTextToHtml(post.post),
+      isAuthor: this.isAuthor(author.did),
+      likeCount: post.post.likeCount ?? 0,
+      postUrl: this.convertAtUriToPostUrl(post.post.uri, author.handle),
       relativeTimestamp: formatDistanceToNow(createdAt, { addSuffix: true }),
-      text: post.post.record.text,
-      htmlText: this.renderPostTextToHtml(post.post),
       replyCount: post.post.replyCount ?? 0,
       repostCount: post.post.repostCount ?? 0,
-      likeCount: post.post.likeCount ?? 0,
-      postUrl: `https://bsky.app/profile/${author.handle}/post/${post.post.uri.split("/").pop()}`,
       seeMoreComments: (!post.replies || post.replies.length === 0) && post.post.replyCount > 0 && depth == this.depthValue - 1,
-      depth: depth,
-      isAuthor: this.isAuthor(author.did),
+      timestamp: this.formatTimestamp(createdAt),
     };
 
     // Render the compiled template with data
@@ -282,6 +305,23 @@ export default class extends Controller {
     if (post.replies && post.replies.length > 0) {
       this.processReplies(post.replies, depth + 1, this.sortValue);
     }
+  }
+
+  /**
+   * Formats a timestamp as "Tuesday, December 3, 2024 at 7:44 AM"
+   * @param {Date} date - The date to format
+   * @returns {String} - The formatted date
+   */
+  formatTimestamp(date) {
+    return new Intl.DateTimeFormat("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+      hour12: true,
+    }).format(date);
   }
 
   /**
