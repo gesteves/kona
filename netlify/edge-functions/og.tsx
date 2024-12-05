@@ -8,7 +8,13 @@ export default async function handler(req: Request, context: Context) {
   const targetUrl = searchParams.get("url");
 
   if (!targetUrl) {
-    return new Response("Bad Request", { status: 400 });
+    return new Response("Bad Request", {
+      status: 400,
+      headers: {
+        "cache-control": "public, max-age=300",
+        "Netlify-Vary": "query=url",
+      },
+    });
   }
 
   try {
@@ -16,7 +22,13 @@ export default async function handler(req: Request, context: Context) {
     const target = new URL(targetUrl);
     const siteBaseUrl = new URL(context.site.url);
     if (target.origin !== siteBaseUrl.origin) {
-      return new Response("Forbidden", { status: 403 });
+      return new Response("Forbidden", {
+        status: 403,
+        headers: {
+          "cache-control": "public, max-age=300",
+          "Netlify-Vary": "query=url",
+        },
+      });
     }
 
     // Fetch the target page
@@ -42,11 +54,10 @@ export default async function handler(req: Request, context: Context) {
 
     // Fetch the config file
     const configResponse = await fetch(new URL("/og/config.json", context.site.url).href);
-    const config = await configResponse.json();
-
     if (!configResponse.ok) {
       throw new Error(`Failed to fetch config file: ${configResponse.statusText}`);
     }
+    const config = await configResponse.json();
 
     const logoUrl = config.logoUrl;
     const fontsConfig = config.fonts || [];
@@ -118,13 +129,24 @@ export default async function handler(req: Request, context: Context) {
         width: 1200,
         height: 630,
         fonts: fonts.length > 0 ? fonts : undefined,
+        headers: {
+          "content-type": "image/png",
+          "cache-control": "public, max-age=31536000, no-transform, immutable",
+          "Netlify-Vary": "query=url",
+        },
       }
     );
 
     return imageResponse;
   } catch (error) {
     console.error("Error generating the image:", error);
-    return new Response("Internal Server Error", { status: 500 });
+    return new Response("Internal Server Error", {
+      status: 500,
+      headers: {
+        "cache-control": "public, max-age=5",
+        "Netlify-Vary": "query=url",
+      },
+    });
   }
 }
 
