@@ -8,8 +8,9 @@ export default async function handler(req: Request, context: Context) {
   const targetUrl = searchParams.get("url");
 
   if (!targetUrl) {
-    return new Response("Bad Request", {
-      status: 400,
+    console.error("Missing URL parameter.");
+    return new Response("Not Found", {
+      status: 404,
       headers: {
         "cache-control": "public, max-age=300",
         "Netlify-Vary": "query=url",
@@ -22,8 +23,9 @@ export default async function handler(req: Request, context: Context) {
     const target = new URL(targetUrl);
     const siteBaseUrl = new URL(context.site.url);
     if (target.origin !== siteBaseUrl.origin) {
-      return new Response("Forbidden", {
-        status: 403,
+      console.error("Invalid URL parameter:", targetUrl);
+      return new Response("Not Found", {
+        status: 404,
         headers: {
           "cache-control": "public, max-age=300",
           "Netlify-Vary": "query=url",
@@ -34,7 +36,14 @@ export default async function handler(req: Request, context: Context) {
     // Fetch the target page
     const pageResponse = await fetch(targetUrl);
     if (!pageResponse.ok) {
-      throw new Error(`Failed to fetch target URL: ${pageResponse.statusText}`);
+      console.error("Failed to fetch target URL", targetUrl, pageResponse.status);
+      return new Response("Not Found", {
+        status: 404,
+        headers: {
+          "cache-control": "public, max-age=300",
+          "Netlify-Vary": "query=url",
+        },
+      });
     }
 
     const pageHtml = await pageResponse.text();
@@ -143,7 +152,7 @@ export default async function handler(req: Request, context: Context) {
     return new Response("Internal Server Error", {
       status: 500,
       headers: {
-        "cache-control": "public, max-age=5",
+        "cache-control": "public, max-age=300",
         "Netlify-Vary": "query=url",
       },
     });
