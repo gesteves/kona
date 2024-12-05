@@ -15,6 +15,10 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="<%= h content.cover_image.description %>">
+<% elsif defined?(content) %>
+  <meta property="og:image" content="<%= generate_open_graph_image_url(full_url(current_page.url)) %>">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
 <% elsif data.site.cover_image.present? %>
   <meta property="og:image" content="<%= open_graph_image_url(data.site.cover_image.url) %>">
   <meta property="og:image:width" content="1200">

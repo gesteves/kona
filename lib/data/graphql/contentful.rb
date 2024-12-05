@@ -135,6 +135,9 @@ module ContentfulClient
           coverImage {
             ...ImageFields
           }
+          smallLogo {
+            ...ImageFields
+          }
           sys {
             ...SysFields
           }

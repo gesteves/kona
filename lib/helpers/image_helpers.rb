@@ -92,6 +92,13 @@ module ImageHelpers
     cdn_image_url(original_url, params)
   end
 
+  # Automatically generates an Open Graph image for the given URL
+  # @param url [String] The URL to generate the Open Graph image for.
+  # @return [String] The URL of the generated Open Graph image.
+  def generate_open_graph_image_url(url)
+    "#{root_url}/og?url=#{url}"
+  end
+
   # Generates a CDN URL for the site icon with the specified width.
   # @param w [Integer] The desired width of the site icon.
   # @return [String, nil] The CDN URL for the site icon with the specified width, or nil if not found.

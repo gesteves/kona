@@ -1,0 +1,13 @@
+<%=
+  {
+    logoUrl: data.site.small_logo&.url,
+    fonts: [
+      {
+        name: "IBM Plex Sans Condensed",
+        url: full_url("fonts/IBMPlexSansCondensed-Bold.ttf"),
+        weight: 700,
+        style: "normal"
+      }
+    ]
+  }.compact.to_json
+%>
