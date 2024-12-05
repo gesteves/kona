@@ -99,7 +99,6 @@ export default async function handler(req: Request, context: Context) {
             flexFlow: "column",
             height: "630px",
             justifyContent: "center",
-            padding: "40px",
             position: "relative",
             width: "1200px",
           }}
@@ -123,8 +122,8 @@ export default async function handler(req: Request, context: Context) {
                 color: "transparent",
                 fontFamily: "IBM Plex Sans Condensed",
                 fontSize: "72px",
-                margin: "1rem 0",
-                padding: "1rem 0",
+                margin: "1rem",
+                padding: "1rem",
                 position: "relative",
                 textAlign: "center",
                 textWrap: "balance",
