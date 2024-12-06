@@ -7,6 +7,9 @@ export default async function handler(req: Request, context: Context) {
   const { searchParams } = new URL(req.url);
   const targetUrl = searchParams.get("url");
 
+  const userAgent = req.headers.get("User-Agent");
+  console.info("User-Agent:", userAgent);
+
   if (!targetUrl) {
     console.error("Missing URL parameter.");
     return new Response("Not Found", {
