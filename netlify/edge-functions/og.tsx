@@ -1,8 +1,9 @@
 import React from "https://esm.sh/react@18.2.0";
-import { ImageResponse } from "https://deno.land/x/og_edge/mod.js";
-import { DOMParser } from "https://deno.land/x/deno_dom/deno-dom-wasm.js";
+import { ImageResponse } from "https://deno.land/x/og_edge/mod.ts";
+import { DOMParser } from "https://deno.land/x/deno_dom/deno-dom-wasm.ts";
+import type { Context } from "@netlify/edge-functions";
 
-export default async function handler(req, context) {
+export default async function handler(req: Request, context: Context) {
   const { searchParams } = new URL(req.url);
   const targetUrl = searchParams.get("url");
 
@@ -55,10 +56,10 @@ export default async function handler(req, context) {
 
     // Get title from the og:title tag or <title> tag
     const ogTitleElement = document.querySelector('meta[property="og:title"]');
-    const ogTitle = ogTitleElement ? ogTitleElement.getAttribute("content") : null;
+    const ogTitle = ogTitleElement?.getAttribute("content");
 
     const titleTag = document.querySelector("title");
-    const title = ogTitle || (titleTag ? titleTag.textContent : null);
+    const title = ogTitle || titleTag?.textContent || null;
 
     // Fetch the config file
     const configResponse = await fetch(new URL("/og/config.json", context.site.url).href);
@@ -72,7 +73,7 @@ export default async function handler(req, context) {
 
     // Fetch font data for all fonts
     const fonts = await Promise.all(
-      fontsConfig.map(async (fontConfig) => {
+      fontsConfig.map(async (fontConfig: { name: string; url: string; weight?: number; style: string }) => {
         const fontResponse = await fetch(fontConfig.url);
         if (!fontResponse.ok) {
           throw new Error(`Failed to fetch font: ${fontConfig.url}`);
@@ -82,17 +83,16 @@ export default async function handler(req, context) {
           name: fontConfig.name,
           data: fontData,
           weight: fontConfig.weight || 400,
-          style: fontConfig.style,
+          style: fontConfig.style as "normal" | "italic",
         };
       })
     );
 
     // Generate the Open Graph image
     const imageResponse = new ImageResponse(
-      React.createElement(
-        "div",
-        {
-          style: {
+      (
+        <div
+          style={{
             alignItems: "center",
             backgroundColor: "#FFF",
             display: "flex",
@@ -101,18 +101,21 @@ export default async function handler(req, context) {
             justifyContent: "center",
             position: "relative",
             width: "1200px",
-          },
-        },
-        logoUrl &&
-          React.createElement("img", {
-            src: logoUrl,
-            style: { margin: "1rem 0", width: "200px" },
-          }),
-        title &&
-          React.createElement(
-            "h1",
-            {
-              style: {
+          }}
+        >
+          {logoUrl && (
+            <img
+              src={logoUrl}
+              style={{
+                margin: "1rem 0",
+                width: "200px",
+              }}
+            />
+          )}
+
+          {title && (
+            <h1
+              style={{
                 background: "linear-gradient(180deg, #0F3557 0%, #030B11 100%)",
                 backgroundClip: "text",
                 borderTop: "1px solid #EBEBEB",
@@ -124,10 +127,12 @@ export default async function handler(req, context) {
                 position: "relative",
                 textAlign: "center",
                 textWrap: "balance",
-              },
-            },
-            title
-          )
+              }}
+            >
+              {title}
+            </h1>
+          )}
+        </div>
       ),
       {
         width: 1200,
