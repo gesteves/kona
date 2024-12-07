@@ -27,7 +27,9 @@ export default class extends Controller {
   }
 
   /**
-   * Handle successful copy event.
+   * Handles successful copy event.
+   * Show the check icon and hide the link icon.
+   * Revert back after a few seconds.
    */
   successfulCopy() {
     // Hide the link icon and show the circle-check icon
@@ -42,9 +44,10 @@ export default class extends Controller {
   }
 
   /**
-   * Handle unsuccessful copy event.
+   * Show the link in an alert if copying fails.
    */
   unsuccessfulCopy() {
-    console.error('Failed to copy link.');
+    const href = this.buttonTarget.getAttribute('href');
+    alert(href);
   }
 }
