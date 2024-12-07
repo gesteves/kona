@@ -155,27 +155,34 @@ module ImageHelpers
   # @return [String, nil] The data URI with JPEG image data and Blurhash effect, or nil if not generated or valid.
   def blurhash_jpeg_data_uri(asset_id, width: 32)
     content_type = get_asset_content_type(asset_id)
+    # Blurhashes for GIFs are not supported; return.
     return if content_type == 'image/gif'
 
     original_width, original_height = get_asset_dimensions(asset_id)
     published_version = get_asset_published_version(asset_id)
-    return unless original_width && original_height
+    return unless original_width && original_height && published_version
 
+    # Attempt to fetch from cache—generating these things is sorta expensive
     cache_key = "blurhash:jpeg:#{asset_id}:#{published_version}:#{width}"
     jpeg = redis.get(cache_key)
-    puts "Cache hit: #{cache_key}" if jpeg.present?
     return jpeg if jpeg.present?
+
+    # Attempt to fetch the Blurhash string
     height = ((original_height.to_f / original_width.to_f) * width).round
     blurhash = blurhash_string(asset_id, width, height)
     return unless Blurhash.valid_blurhash?(blurhash)
 
+    # Generate the JPEG image from the Blurhash string
     pixels = Blurhash.decode(width, height, blurhash)
     depth = 8
     dimensions = [width, height]
     map = 'rgba'
     image = MiniMagick::Image.get_image_from_pixels(pixels, dimensions, map, depth, 'jpg')
+
+    # Encode the JPEG image as a data URI
     jpeg = "data:image/jpeg;base64,#{Base64.strict_encode64(image.to_blob)}"
 
+    # Cache that shit for later.
     redis.set(cache_key, jpeg)
     jpeg
   rescue
@@ -190,14 +197,17 @@ module ImageHelpers
   # @param height [Integer] The height of the Blurhash image.
   # @return [String, nil] The generated Blurhash, or nil if not generated or retrieved.
   def blurhash_string(asset_id, width, height)
+    # Encode the Blurhash manually if we're not on Netlify
     return encode_blurhash(asset_id, width, height) unless is_netlify?
 
+    # Attempt to fetch the Blurhash from Netlify's Image CDN
     url = get_asset_url(asset_id)
     blurhash_url = cdn_image_url(url, { fm: 'blurhash', w: width, h: height })
     response = HTTParty.get(blurhash_url)
     if response.ok? && response.headers['Content-Type'].include?('text/plain') && Blurhash.valid_blurhash?(response.body)
       response.body
     else
+      # Fall back to encoding the Blurhash manually.
       encode_blurhash(asset_id, width, height)
     end
   rescue
