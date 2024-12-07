@@ -80,10 +80,12 @@
     border: 1px solid var(--color-share-button-border-hover);
     color: var(--color-share-button-text-hover);
   }
-  
+
+  .span,
   svg {
-    width: 1rem;
+    display: block;
     height: 1rem;
+    width: 1rem;
 
     g,
     path {
@@ -98,4 +100,8 @@
   &.--is-hidden {
     display: none;
   }
+}
+
+.share__hidden {
+  display: none;
 }
