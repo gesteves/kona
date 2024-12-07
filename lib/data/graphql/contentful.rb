@@ -38,6 +38,8 @@ module ContentfulClient
     fragment AuthorFields on Author {
       slug
       name
+      bluesky
+      mastodon
     }
 
     fragment ShortcutFields on Shortcut {
