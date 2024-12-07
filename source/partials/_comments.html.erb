@@ -2,6 +2,7 @@
   class="comments"
   id="comments"
   data-controller="comments"
+  data-comments-author-handle-value="<%= article&.author&.bluesky&.gsub(/^@/, '') %>"
   data-comments-url-value="<%= ENV['BLUESKY_COMMENTS_DEBUG_URL'] || article.bluesky_comments_url %>"
   data-comments-depth-value="<%= ENV.fetch('BLUESKY_COMMENTS_DEPTH', 6) %>"
   data-comments-parent-height-value="<%= ENV.fetch('BLUESKY_COMMENTS_HEIGHT', 1000) %>"

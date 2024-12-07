@@ -11,6 +11,7 @@ export default class extends Controller {
     parentHeight: Number,
     sort: String,
     prompt: String,
+    authorHandle: String,
   };
 
   connect() {
@@ -32,11 +33,15 @@ export default class extends Controller {
   }
 
   /**
-   * Resolves the DID of the author from the at-uri and stores it.
+   * Resolves the DID of the author from the author's handle or the thread's at-uri and stores it.
    * @async
    */
   async resolveAuthorDid() {
-    this.authorDid = await this.extractDidFromAtUri(this.atUri);
+    if (this.authorHandleValue) {
+      this.authorDid = await this.resolveHandle(this.authorHandleValue);
+    } else {
+      this.authorDid = await this.extractDidFromAtUri(this.atUri);
+    }
   }
 
   /**
