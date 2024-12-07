@@ -1,6 +1,6 @@
 <head>
   <%= partial 'partials/meta' %>
-  <%= partial 'partials/open_graph' %>
+  <%= partial 'partials/open_graph_and_social' %>
   <%= partial 'partials/schema/article', locals: { article: content } if defined?(content) && content.entry_type == 'Article' && !content.draft %>
   <link rel="canonical" href="<%= canonical_url %>">
   <link rel="alternate" type="application/atom+xml" title="<%= sanitize(data.site.meta_title) %>" href="<%= full_url("/feed.xml") %>" />
