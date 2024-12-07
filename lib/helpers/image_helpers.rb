@@ -44,6 +44,14 @@ module ImageHelpers
     asset&.url
   end
 
+  # Retrieves the published version of an asset by its ID.
+  # @param asset_id [String] The ID of the asset for which to retrieve the published version.
+  # @return [Integer, nil] The published version of the asset, or nil if the asset is not found.
+  def get_asset_published_version(asset_id)
+    asset = data.assets.find { |a| a.sys.id == asset_id }
+    asset&.sys&.published_version
+  end
+
   # Generates a CDN image URL with optional query parameters.
   # Uses Netlify's Image CDN or Contentful's, as needed.
   # @see https://docs.netlify.com/image-cdn/overview/
@@ -147,7 +155,12 @@ module ImageHelpers
   # @return [String, nil] The data URI with JPEG image data and Blurhash effect, or nil if not generated or valid.
   def blurhash_jpeg_data_uri(asset_id, width: 32)
     original_width, original_height = get_asset_dimensions(asset_id)
+    published_version = get_asset_published_version(asset_id)
     return unless original_width && original_height
+
+    cache_key = "blurhash:jpeg:#{asset_id}:#{published_version}:#{width}"
+    jpeg = redis.get(cache_key)
+    return jpeg if jpeg.present?
 
     height = ((original_height.to_f / original_width.to_f) * width).round
     blurhash = blurhash_string(asset_id, width, height)
@@ -158,7 +171,10 @@ module ImageHelpers
     dimensions = [width, height]
     map = 'rgba'
     image = MiniMagick::Image.get_image_from_pixels(pixels, dimensions, map, depth, 'jpg')
-    "data:image/jpeg;base64,#{Base64.strict_encode64(image.to_blob)}"
+    jpeg = "data:image/jpeg;base64,#{Base64.strict_encode64(image.to_blob)}"
+
+    redis.set(cache_key, jpeg)
+    jpeg
   rescue
     nil
   end
@@ -173,7 +189,6 @@ module ImageHelpers
   def blurhash_string(asset_id, width, height)
     url = get_asset_url(asset_id)
     blurhash_url = cdn_image_url(url, { fm: 'blurhash', w: width, h: height })
-
     begin
       response = HTTParty.get(blurhash_url)
       if response.ok? && response.headers['Content-Type'].include?('text/plain') && Blurhash.valid_blurhash?(response.body)
