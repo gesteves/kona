@@ -163,6 +163,7 @@ module ImageHelpers
 
     cache_key = "blurhash:jpeg:#{asset_id}:#{published_version}:#{width}"
     jpeg = redis.get(cache_key)
+    puts "Cache hit: #{cache_key}" if jpeg.present?
     return jpeg if jpeg.present?
     height = ((original_height.to_f / original_width.to_f) * width).round
     blurhash = blurhash_string(asset_id, width, height)
