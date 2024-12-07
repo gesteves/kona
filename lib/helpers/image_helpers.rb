@@ -96,7 +96,7 @@ module ImageHelpers
   # @param url [String] The URL to generate the Open Graph image for.
   # @return [String] The URL of the generated Open Graph image.
   def generate_open_graph_image_url(url)
-    "#{root_url}/og?url=#{url}"
+    "#{root_url}/og?url=#{ERB::Util.url_encode(url)}"
   end
 
   # Generates a CDN URL for the site icon with the specified width.
