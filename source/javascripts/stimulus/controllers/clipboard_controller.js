@@ -45,6 +45,6 @@ export default class extends Controller {
    * Handle unsuccessful copy event.
    */
   unsuccessfulCopy() {
-    console.error('Failed to copy link. Please try again.');
+    console.error('Failed to copy link.');
   }
 }
