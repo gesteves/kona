@@ -10,13 +10,6 @@
       </main>
     </div>
     <%= partial 'partials/footer' %>
-
-    <div id="notifications" class="notifications" data-notifications-target="container" data-action="transitionend->notifications#toggle" data-turbo-permanent>
-      <script data-notifications-target="template" type="text/x-handlebars-template">
-        <div class="notification is-{{status}} is-transparent" data-notifications-target="notification" data-action="click->notifications#close">
-          {{{ message }}}
-        </div>
-      </script>
-    </div>
+    <%= partial 'partials/notifications' %>
   </body>
 </html>
