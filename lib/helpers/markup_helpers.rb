@@ -391,7 +391,16 @@ module MarkupHelpers
     doc.css('h3').each do |heading|
       heading_id = heading['id']
       next if heading_id.blank?
-      permalink = "<a href=\"##{heading_id}\" class=\"entry__heading-permalink\" aria-label=\"Permalink to “#{heading.text}”\">#{icon_svg("classic", "solid", "link-simple")}</a>"
+      permalink = <<~HTML
+        <a href="##{heading_id}" class="entry__heading-permalink" aria-label="Permalink to “#{heading.text}”" data-controller="clipboard" data-clipboard-target="button" data-clipboard-hidden-class="entry__heading-permalink-icon--hidden" data-action="click->clipboard#preventDefault">
+          <span data-clipboard-target="link" class="entry__heading-permalink-icon">
+            #{icon_svg("classic", "solid", "link-simple")}
+          </span>
+          <span data-clipboard-target="check" class="entry__heading-permalink-icon entry__heading-permalink-icon--hidden">
+            #{icon_svg("classic", "solid", "check")}
+          </span>
+        </a>
+      HTML
       heading.children.before(Nokogiri::HTML::DocumentFragment.parse(permalink))
     end
     doc.to_html

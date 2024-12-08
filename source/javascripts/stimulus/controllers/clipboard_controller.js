@@ -7,7 +7,7 @@ export default class extends Controller {
 
   connect() {
     this.clipboard = new ClipboardJS(this.buttonTarget, {
-      text: () => this.buttonTarget.getAttribute('href')
+      text: () => this.getPermalink()
     });
 
     this.clipboard.on('success', () => this.successfulCopy());
@@ -24,6 +24,19 @@ export default class extends Controller {
    */
   preventDefault (event) {
     event.preventDefault();
+  }
+
+  /**
+   * Get the permalink from the button's href attribute.
+   * @return {String} Permalink URL.
+   */
+  getPermalink() {
+    const href = this.buttonTarget.getAttribute('href');
+    if (href.startsWith('#')) {
+      return window.location.origin + window.location.pathname + href;
+    } else {
+      return href;
+    }
   }
 
   /**

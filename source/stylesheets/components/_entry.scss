@@ -274,13 +274,16 @@
 }
 
 .entry__heading-permalink {
-  display: inline-block;
+  align-items: center;
+  display: inline-flex;
+  justify-items: center;
   margin-left: -1.5rem;
   margin-right: 0.5rem;
-  width: 1rem;
 
   svg {
     display: block;
+    height: 1rem;
+    width: 1rem;
   }
 
   &:link,
@@ -297,5 +300,19 @@
     path {
       fill: var(--color-link-hover);
     }
+  }
+
+  &--hidden {
+    display: none;
+  }
+}
+
+.entry__heading-permalink-icon {
+  display: block;
+  height: 1rem;
+  width: 1rem;
+
+  &--hidden {
+    display: none;
   }
 }
