@@ -16,6 +16,24 @@
     line-height: var(--line-height-x-small);
   }
 
+  p {
+    a {
+      text-decoration: underline;
+      text-decoration-thickness: 2px;
+      text-underline-position: under;
+    }
+
+    a:link, a:visited {
+      color: var(--color-text);
+      text-decoration-color: var(--color-link);
+    }
+  
+    a:hover, a:active {
+      color: var(--color-link-hover);
+      text-decoration-color: currentColor;
+    }
+  }
+
   i,
   em,
   cite {
@@ -190,16 +208,4 @@
 
 .footer__colophon {
   grid-column: 1 / -1;
-
-  a:link, a:visited {
-    color: var(--color-text);
-    text-decoration: none;
-  }
-
-  a:hover, a:active {
-    color: var(--color-link-hover);
-    text-decoration: underline;
-    text-decoration-thickness: 2px;
-    text-underline-position: under;
-  }
 }
