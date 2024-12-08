@@ -4,8 +4,6 @@
       <%= partial 'partials/logo.svg.erb' %>
     </a>
 
-    <p class="footer__blurb"><%= smartypants(data.site.blurb) %></p>
-
     <% socials = data.site.socials_collection.items.compact %>
     <% if socials.present? %>
       <ul class="footer__socials">
@@ -16,6 +14,8 @@
     <% end %>
 
     <hr class="footer__line">
+
+    <p class="footer__blurb"><%= smartypants(data.site.blurb) %></p>
 
     <% menu_items = data.site.footer_links_collection.items.compact %>
     <% if menu_items.present? %>
