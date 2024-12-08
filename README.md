@@ -12,7 +12,7 @@ Kona leverages Middleman's [data files](https://middlemanapp.com/advanced/data-f
 
 #### Netlify
 
-Kona can technically be hosted basically anywhere because it's just a static site generator, but it works much better on Netlify since it's set up to use Netlify features such as [build hooks](https://docs.netlify.com/configure-builds/build-hooks/), [functions](https://docs.netlify.com/functions/overview/) and [Image CDN](https://docs.netlify.com/image-cdn/overview/).
+Kona can technically be hosted basically anywhere because it's just a static site, but it works much better on Netlify since it's set up to use Netlify features such as [build hooks](https://docs.netlify.com/configure-builds/build-hooks/), [functions](https://docs.netlify.com/functions/overview/) and [Image CDN](https://docs.netlify.com/image-cdn/overview/).
 
 #### Contentful
 
