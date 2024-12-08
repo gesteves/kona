@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { sendNotification } from '../lib/utils';
 import ClipboardJS from 'clipboard';
 
 export default class extends Controller {
@@ -53,6 +54,8 @@ export default class extends Controller {
     // Hide the link icon and show the circle-check icon
     this.linkTarget.classList.add(this.hiddenClass);
     this.checkTarget.classList.remove(this.hiddenClass);
+
+    sendNotification('Link copied to clipboard');
 
     // Revert back after 5 seconds
     setTimeout(() => {

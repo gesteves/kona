@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en" data-controller="page" data-action="turbo:load->page#load">
   <%= partial 'partials/head' %>
-  <body>
+  <body data-controller="notifications" data-action="notify->notifications#add" data-notifications-transparent-class="is-transparent" data-notifications-closed-class="is-closed">
     <%= partial 'partials/skip' %>
     <div class="content">
       <%= partial 'partials/header' %>
@@ -10,5 +10,13 @@
       </main>
     </div>
     <%= partial 'partials/footer' %>
+
+    <div id="notifications" class="notifications" data-notifications-target="container" data-action="transitionend->notifications#toggle" data-turbo-permanent>
+      <script data-notifications-target="template" type="text/x-handlebars-template">
+        <div class="notification is-{{status}} is-transparent" data-notifications-target="notification" data-action="click->notifications#close">
+          {{{ message }}}
+        </div>
+      </script>
+    </div>
   </body>
 </html>
