@@ -28,12 +28,15 @@ export default class extends Controller {
 
   /**
    * Get the permalink from the button's href attribute.
+   * Handles both relative and absolute URLs, as well as anchor links.
    * @return {String} Permalink URL.
    */
   getPermalink() {
     const href = this.buttonTarget.getAttribute('href');
     if (href.startsWith('#')) {
       return window.location.origin + window.location.pathname + href;
+    } else if (href.startsWith('/')) {
+      return window.location.origin + href;
     } else {
       return href;
     }
