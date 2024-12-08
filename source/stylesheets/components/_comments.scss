@@ -1,6 +1,8 @@
 .comments {
   @extend .extend-body-styles;
+  border-top: 2px solid var(--color-border);
   grid-column: 1 / -1;
+  padding: var(--padding) 0 0 0;
   position: relative;
 
   p {
@@ -16,12 +18,12 @@
     grid-column: 3 / -3;
   }
 
-  &__heading {
+  .comments__heading {
     font-family: var(--ibm-plex-sans-condensed);
     font-size: var(--font-medium);
     font-weight: 700;
     line-height: var(--line-height-medium);
-    margin-bottom: 1.5rem;
+    margin: 0 0 1.5rem 0;
   }
 
   &__spinner {
