@@ -88,7 +88,7 @@ To keep the information on the home page current, you can use a [Netlify build h
 
 #### Bluesky
 
-Kona uses Bluesky as a comments system. There's no much to it, just turn them on by setting the `BLUESKY_COMMENTS_ENABLED` environment variable to `true`, and paste the public URL of a Bluesky post in the corresponding field in an article. Replies to that post on Bluesky will appear as comments in the article. If you're the author of the Bluesky post, you can use Bluesky's moderation tools to moderate the comments in the article. For example, if you use the "hide reply for everyone" option in Bluesky or block the author there, it'll be reflected in the comments thread in the article.
+Kona uses [Bluesky](https://bsky.social) as a comments system. There's no much to it, just turn them on by setting the `BLUESKY_COMMENTS_ENABLED` environment variable to `true`, and paste the public URL of a Bluesky post in the corresponding field in an article. Replies to that post on Bluesky will appear as comments in the article. If you're the author of the Bluesky post, you can use Bluesky's moderation tools to moderate the comments in the article. For example, if you use the "hide reply for everyone" option in Bluesky or block the author there, it'll be reflected in the comments thread in the article.
 
 (For now, posting and replying to comments has to be done in Bluesky. Posting from Kona directly is on my to-do list.)
 
