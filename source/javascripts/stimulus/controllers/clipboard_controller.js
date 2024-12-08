@@ -5,6 +5,9 @@ import ClipboardJS from 'clipboard';
 export default class extends Controller {
   static classes = ['hidden']
   static targets = ['button', 'link', 'check'];
+  static values = {
+    successMessage: { type: String, default: "The link has been copied to your clipboard!" }
+  }
 
   connect() {
     this.clipboard = new ClipboardJS(this.buttonTarget, {
@@ -51,7 +54,7 @@ export default class extends Controller {
    * Revert back after a few seconds.
    */
   successfulCopy() {
-    if (this.linkTarget && this.checkTarget) {
+    if (this.hasLinkTarget && this.hasCheckTarget) {
       // Hide the link icon and show the circle-check icon
       this.linkTarget.classList.add(this.hiddenClass);
       this.checkTarget.classList.remove(this.hiddenClass);
@@ -62,7 +65,7 @@ export default class extends Controller {
       }, 2000);
     }
 
-    sendNotification('Link copied to clipboard');
+    sendNotification(this.successMessageValue);
   }
 
   /**
