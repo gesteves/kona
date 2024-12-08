@@ -168,7 +168,7 @@ module SiteHelpers
   # @param destination [String] The URL to the social media profile.
   # @param css_class [String] The CSS class to apply to the link.
   # @param open_in_new_tab [Boolean] Whether to open the link in a new tab.
-  def social_media_link(title:, destination:, css_class:, open_in_new_tab: true)
+  def social_media_link(title:, destination:, css_class: nil, open_in_new_tab: true)
     icon = if title.downcase == 'feed'
       icon_svg("classic", "solid", "rss")
     elsif title.downcase == 'reddit'
@@ -190,7 +190,7 @@ module SiteHelpers
     end
     options["rel"] = open_in_new_tab ? "me noopener" : "me"
     options["target"] = "_blank" if open_in_new_tab
-    options["class"] = css_class
+    options["class"] = css_class if css_class.present?
     options["href"] = destination
 
     content_tag :a, options do
