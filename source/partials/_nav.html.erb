@@ -4,7 +4,7 @@
     <% items.each do |i| %>
       <li class="nav__item">
         <% if i.destination.end_with?('.xml') %>
-          <%= link_to i.title, i.destination, "data-controller": "clipboard", "data-action": "click->clipboard#preventDefault", "data-clipboard-success-message-value": "The link to the feed has been copied to your clipboard!" %>
+          <%= link_to i.title, i.destination, "data-controller": "clipboard", "data-action": "click->clipboard#preventDefault", "data-clipboard-success-message-value": "The link has been copied to your clipboard!" %>
         <% elsif i.open_in_new_tab %>
           <%= link_to i.title, i.destination, rel: "noopener", target: "_blank" %>
         <% else %>
