@@ -41,7 +41,15 @@
 .footer__logo-link {
   align-items: center;
   display: flex;
-  grid-column: span 2;
+  grid-column: span 6;
+
+  @media (min-width: #{$bp-small}) {
+    grid-column: span 4;
+  }
+
+  @media (min-width: #{$bp-medium}) {
+    grid-column: span 2;
+  }
 
   &:link,
   &:visited {
@@ -79,8 +87,6 @@
   flex-flow: row wrap;
   grid-column: span 12;
   justify-content: flex-start;
-
-
 
   @media (min-width: #{$bp-medium}) {
     grid-column: 3 / -1;
