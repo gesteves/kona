@@ -75,6 +75,7 @@
 
 .footer__blurb {
   grid-column: span 12;
+  text-wrap: balance;
 
   @media (min-width: #{$bp-medium}) {
     grid-column: 1 / 8;
