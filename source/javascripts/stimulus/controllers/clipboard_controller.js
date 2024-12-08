@@ -51,17 +51,18 @@ export default class extends Controller {
    * Revert back after a few seconds.
    */
   successfulCopy() {
-    // Hide the link icon and show the circle-check icon
-    this.linkTarget.classList.add(this.hiddenClass);
-    this.checkTarget.classList.remove(this.hiddenClass);
+    if (this.linkTarget && this.checkTarget) {
+      // Hide the link icon and show the circle-check icon
+      this.linkTarget.classList.add(this.hiddenClass);
+      this.checkTarget.classList.remove(this.hiddenClass);
+      // Revert back after 5 seconds
+      setTimeout(() => {
+        this.linkTarget.classList.remove(this.hiddenClass);
+        this.checkTarget.classList.add(this.hiddenClass);
+      }, 2000);
+    }
 
     sendNotification('Link copied to clipboard');
-
-    // Revert back after 5 seconds
-    setTimeout(() => {
-      this.linkTarget.classList.remove(this.hiddenClass);
-      this.checkTarget.classList.add(this.hiddenClass);
-    }, 2000);
   }
 
   /**
