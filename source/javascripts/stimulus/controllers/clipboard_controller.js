@@ -35,6 +35,8 @@ export default class extends Controller {
     const href = this.buttonTarget.getAttribute('href');
     if (href.startsWith('#')) {
       return window.location.origin + window.location.pathname + href;
+    } else if (href.startsWith('//')) {
+      return href;
     } else if (href.startsWith('/')) {
       return window.location.origin + href;
     } else {
