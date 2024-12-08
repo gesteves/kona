@@ -4,13 +4,13 @@ import ClipboardJS from 'clipboard';
 
 export default class extends Controller {
   static classes = ['hidden']
-  static targets = ['button', 'link', 'check'];
+  static targets = ['link', 'check'];
   static values = {
     successMessage: { type: String, default: "The link has been copied to your clipboard!" }
   }
 
   connect() {
-    this.clipboard = new ClipboardJS(this.buttonTarget, {
+    this.clipboard = new ClipboardJS(this.element, {
       text: () => this.getPermalink()
     });
 
@@ -36,7 +36,7 @@ export default class extends Controller {
    * @return {String} Permalink URL.
    */
   getPermalink() {
-    const href = this.buttonTarget.getAttribute('href');
+    const href = this.element.getAttribute('href');
     if (href.startsWith('#')) {
       return window.location.origin + window.location.pathname + href;
     } else if (href.startsWith('//')) {
@@ -72,7 +72,7 @@ export default class extends Controller {
    * Show the link in an alert if copying fails.
    */
   unsuccessfulCopy() {
-    const href = this.buttonTarget.getAttribute('href');
+    const href = this.element.getAttribute('href');
     alert(href);
   }
 }
