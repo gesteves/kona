@@ -4,23 +4,27 @@ icons:
     brands:
       - bluesky
       - facebook-f
+      - instagram
+      - mastodon
       - reddit-alien
+      - strava
       - threads
     solid:
       - arrow-up-from-bracket
+      - badge-check
+      - check
+      - circle-notch
       - comment
       - envelope
-      - link-simple
-      - shield-check
-      - badge-check
-      - circle-notch
       - link
-      - check
+      - link-simple
+      - rss
+      - shield-check
     regular:
-      - triangle-exclamation
-      - heart
       - comment
+      - heart
       - retweet
+      - triangle-exclamation
     thin:
       - bolt-lightning
       - cloud-bolt
