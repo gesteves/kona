@@ -162,4 +162,39 @@ module SiteHelpers
     return if subtitle == feed_title
     subtitle
   end
+
+  # Returns the markup for a social media link.
+  # @param title [String] The title of the social media platform.
+  # @param destination [String] The URL to the social media profile.
+  # @param css_class [String] The CSS class to apply to the link.
+  # @param open_in_new_tab [Boolean] Whether to open the link in a new tab.
+  def social_media_link(title:, destination:, css_class:, open_in_new_tab: true)
+    icon = if title.downcase == 'feed'
+      icon_svg("classic", "solid", "rss")
+    elsif title.downcase == 'reddit'
+      icon_svg("classic", "brands", "reddit-alien")
+    else
+      icon_svg("classic", "brands", title.downcase)
+    end
+    options = if title.downcase == 'feed'
+      {
+        "title": "Subscribe to the feed",
+        "data-controller": "clipboard",
+        "data-action": "click->clipboard#preventDefault",
+        "data-clipboard-success-message-value": "The link to the feed has been copied to your clipboard!"
+      }
+    else
+      {
+        "title": "Follow on #{title}"
+      }
+    end
+    options["rel"] = open_in_new_tab ? "me noopener" : "me"
+    options["target"] = "_blank" if open_in_new_tab
+    options["class"] = css_class
+    options["href"] = destination
+
+    content_tag :a, options do
+      icon || ""
+    end
+  end
 end

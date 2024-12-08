@@ -1,59 +1,38 @@
 <footer class="footer" id="footer">
   <div class="footer__wrapper">
-    <section class="footer__avatar">
-      <picture>
-        <% data.srcsets.avatar.formats.each do |format| %>
-          <%= source_tag(data.site.author.profile_picture.url, sizes: data.srcsets.avatar.sizes.join(', '), type: "image/#{format}", format: format, widths: data.srcsets.avatar.widths.sort) %>
+    <a href="/" class="footer__logo-link" aria-label="<%= data.site.title %>">
+      <%= partial 'partials/logo.svg.erb' %>
+    </a>
+
+    <p class="footer__blurb"><%= smartypants(data.site.blurb) %></p>
+
+    <% socials = data.site.socials_collection.items.compact %>
+    <% if socials.present? %>
+      <ul class="footer__socials">
+        <% socials.each do |i| %>
+          <li class="footer__social-item"><%= social_media_link(title: i.title, destination: i.destination, css_class: "share__button", open_in_new_tab: i.open_in_new_tab) %></li>
         <% end %>
-        <img src="<%= cdn_image_url(data.site.author.profile_picture.url) %>" alt="<%= data.site.author.profile_picture.description %>" width="<%= data.site.author.profile_picture.width %>" height="<%= data.site.author.profile_picture.height %>" loading="lazy" decoding="async">
-      </picture>
-    </section>
+      </ul>
+    <% end %>
 
-    <section class="footer__blurb">
-      <%= render_body(data.site.blurb) %>
-    </section>
+    <hr class="footer__line">
 
-      <% menu_items = data.site.footer_links_collection.items.compact  %>
-      <% if menu_items.present? %>
-        <section class="footer__section">
-          <h2>Links</h2>
-          <ul>
-            <% menu_items.each do |i| %>
-              <li>
-                <% if i.destination.end_with?('.xml') %>
-                  <%= link_to i.title, i.destination, "data-controller": "clipboard", "data-action": "click->clipboard#preventDefault", "data-clipboard-success-message-value": "The link to the feed has been copied to your clipboard!" %>
-                <% elsif i.open_in_new_tab %>
-                  <%= link_to i.title, i.destination, rel: "noopener", target: "_blank" %>
-                <% else %>
-                  <%= link_to i.title, i.destination %>
-                <% end %>
-              </li>
+    <% menu_items = data.site.footer_links_collection.items.compact %>
+    <% if menu_items.present? %>
+      <ul class="footer__menu">
+        <% menu_items.each do |i| %>
+          <li class="footer__menu-item">
+            <% if i.open_in_new_tab %>
+              <%= link_to i.title, i.destination, rel: "noopener", target: "_blank" %>
+            <% else %>
+              <%= link_to i.title, i.destination %>
             <% end %>
-          </ul>
-        </section>
-      <% end %>
-
-      <% socials = data.site.socials_collection.items.compact %>
-      <% if socials.present? %>
-        <section class="footer__section">
-          <h2>Elsewhere</h2>
-          <ul>
-            <% socials.each do |i| %>
-              <li>
-                <% if i.open_in_new_tab %>
-                  <%= link_to i.title, i.destination, rel: "me noopener", target: "_blank" %>
-                <% else %>
-                  <%= link_to i.title, i.destination, rel: "me noopener" %>
-                <% end %>
-              </li>
-            <% end %>
-          </ul>
-        </section>
-      <% end %>
-
-      <section class="footer__section">
-        <h2>© <%= copyright_years %></h2>
-        <p><%= data.site.copyright %></p>
-      </section>
+          </li>
+        <% end %>
+        <li class="footer__menu-item"><a href="#top" data-controller="back-to-top" data-action="click->back-to-top#go">Back to top</a></li>
+      </ul>
+    <% end %>
+      
+    <p class="footer__copyright"><b>© <%= copyright_years %></b> <%= data.site.copyright %>. All rights reserved.</p>
   </div>
 </footer>

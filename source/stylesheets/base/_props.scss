@@ -44,7 +44,7 @@
   --color-background:                     white;
   --color-blockquote-border:              var(--color-platinum);
   --color-blockquote-text:                var(--color-text-secondary);
-  --color-border-footer:                  var(--color-oxford-blue);
+  --color-border-footer:                  var(--color-columbia-blue-darker);
   --color-border:                         var(--color-platinum);
   --color-button-background:              var(--color-firebrick);
   --color-button-border:                  var(--color-madder);
@@ -67,7 +67,7 @@
   --color-selection-text:                 var(--color-oxford-blue);
   --color-share-button-background-active: var(--color-madder);
   --color-share-button-background-hover:  var(--color-firebrick);
-  --color-share-button-background:        var(--color-background);
+  --color-share-button-background:        transparent;
   --color-share-button-border-hover:      var(--color-firebrick);
   --color-share-button-border:            var(--color-silver-chalice);
   --color-share-button-text-hover:        var(--color-platinum);
@@ -170,7 +170,7 @@
     --color-aside-text:                 var(--color-alice-blue);
     --color-background:                 black;
     --color-blockquote-border:          var(--color-sonic-silver);
-    --color-border-footer:              var(--color-alice-blue);
+    --color-border-footer:              var(--color-prussian-blue);
     --color-border:                     var(--color-oxford-blue);
     --color-code-background:            var(--color-eerie-black);
     --color-code-border:                var(--color-jet);

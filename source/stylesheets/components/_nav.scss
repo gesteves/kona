@@ -13,14 +13,13 @@
 }
 
 .nav__item {
-  display: block;
+  align-items: center;
+  display: flex;
+  flex-flow: nowrap;
   font-family: var(--ibm-plex-mono);
   font-size: var(--font-small);
   line-height: var(--line-height-small);
   text-transform: uppercase;
-  display: flex;
-  flex-flow: nowrap;
-  align-items: center;
 
   @media (min-width: #{$bp-medium}) {
     font-size: var(--font-x-small);
