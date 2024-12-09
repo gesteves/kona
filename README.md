@@ -80,7 +80,7 @@ This doesn't do much, it's simply used to check if a workout is scheduled for to
 
 #### Dark Visitors
 
-This imports updated robots.txt directives from [Dark Visitors](https://darkvisitors.com/) to prevent data scrapers from scraping the site's content to train LLMs. To set it up, set up an acccount there to grab an access token, and add it to the environment variable.
+This imports updated robots.txt directives from [Dark Visitors](https://darkvisitors.com/) to prevent data scrapers from scraping the site's content to train LLMs. To set it up, set up an account there to grab an access token, and add it to the environment variable.
 
 #### Netlify build hook
 
