@@ -14,41 +14,14 @@
   line-height: var(--line-height-x-small);
   text-transform: uppercase;
   font-weight: normal;
-  text-align: left;
-  margin: 0;
-
-  @media (min-width: #{$bp-social}) {
-    text-align: center;
-  }
+  text-align: center;
+  margin: 0 0 1rem 0;
 }
 
 .share__buttons {
   display: flex;
   flex-flow: row nowrap;
-  justify-content: flex-start;
-  margin: 0 calc(var(--padding) * -1) -1rem calc(var(--padding) * -1);
-  overflow-x: auto;
-  padding: 1rem 0;
-  scroll-padding-left: var(--padding);
-  scroll-snap-type: x proximity;
-  -webkit-overflow-scrolling: touch;
-
-  &::before,
-  &::after {
-    content: "";
-    flex: 0 0 50px;
-  }
-
-  @media (min-width: #{$bp-social}) {
-    justify-content: center;
-    margin: 0 0 -1rem 0;
-    overflow-x: visible;
-
-    &::before,
-    &::after {
-      display: none;
-    }
-  }
+  justify-content: center;
 }
 
 .share__button {
@@ -66,8 +39,12 @@
   justify-content: center;
   line-height: var(--line-height-x-small);
   margin: 0 0.25rem 0 0;
-  padding: 1rem;
+  padding: 0.5rem;
   scroll-snap-align: start;
+
+  @media (min-width: #{$bp-medium}) {
+    padding: 1rem;
+  }
 
   &:hover {
     background: var(--color-share-button-background-hover);
