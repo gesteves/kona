@@ -200,6 +200,8 @@ module SiteHelpers
     end
   end
 
+  # Formats the text at the very bottom of the footer.
+  # @return [String] A string of HTML.
   def footer_text
     text = ["© #{copyright_years} #{data.site.copyright}."]
     text << ["Powered by <a href=\"https://github.com/gesteves/kona\" target=\"_blank\" rel=\"noopener\">Kona</a>."]
