@@ -171,8 +171,6 @@ module SiteHelpers
   def social_media_link(title:, destination:, css_class: nil, open_in_new_tab: true)
     icon = if title.downcase == 'feed'
       icon_svg("classic", "solid", "rss")
-    elsif title.downcase == 'reddit'
-      icon_svg("classic", "brands", "reddit-alien")
     else
       icon_svg("classic", "brands", title.downcase)
     end
