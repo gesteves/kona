@@ -290,7 +290,7 @@ export default class extends Controller {
       repostCount: post.post.repostCount ?? 0,
       seeMoreComments: (!post.replies || post.replies.length === 0) && post.post.replyCount > 0 && depth == this.depthValue - 1,
       formattedDate: this.formatDate(createdAt),
-      timestamp: Math.floor(createdAt.getTime() / 1000),
+      timestamp: createdAt.toISOString(),
     };
 
     // Render the compiled template with data

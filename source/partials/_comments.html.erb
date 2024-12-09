@@ -37,7 +37,7 @@
             @{{handle}}
           </a>
           <span class="comments__separator">•</span>
-          <a class="comments__timestamp" href="{{postUrl}}" target="_blank" rel="noopener {{#if isAuthor}}me{{else}}nofollow{{/if}}" title="{{formattedDate}}">{{formattedDate}}</a>
+          <a class="comments__timestamp" href="{{postUrl}}" target="_blank" rel="noopener {{#if isAuthor}}me{{else}}nofollow{{/if}}" title="{{formattedDate}}" data-controller="relative-date" data-relative-date-datetime-value="{{timestamp}}">{{formattedDate}}</a>
         </div>
         <div class="comments__text"><p>{{{text}}}<p></div>
         <div class="comments__meta">
