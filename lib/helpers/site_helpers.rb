@@ -168,6 +168,7 @@ module SiteHelpers
   # @param destination [String] The URL to the social media profile.
   # @param css_class [String] The CSS class to apply to the link.
   # @param open_in_new_tab [Boolean] Whether to open the link in a new tab.
+  # @return [String] An anchor element with an SVG icon.
   def social_media_link(title:, destination:, css_class: nil, open_in_new_tab: true)
     icon = if title.downcase == 'feed'
       icon_svg("classic", "solid", "rss")
