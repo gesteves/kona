@@ -174,6 +174,9 @@ module SiteHelpers
     else
       icon_svg("classic", "brands", title.downcase)
     end
+
+    icon = icon_svg("classic", "solid", "link") if icon.blank?
+
     options = if title.downcase == 'feed'
       {
         "title": "Subscribe to the feed",
@@ -192,7 +195,7 @@ module SiteHelpers
     options["href"] = destination
 
     content_tag :a, options do
-      icon || ""
+      icon
     end
   end
 end
