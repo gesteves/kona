@@ -17,6 +17,8 @@
   }
 
   p {
+    text-wrap: balance;
+    
     a {
       text-decoration: underline;
     }
@@ -93,9 +95,8 @@
   }
 }
 
-.footer__blurb {
+.footer__section {
   grid-column: span 12;
-  text-wrap: balance;
 }
 
 .footer__socials {
@@ -202,8 +203,4 @@
     color: var(--color-link-hover);
     text-decoration: none;
   }
-}
-
-.footer__colophon {
-  grid-column: 1 / -1;
 }

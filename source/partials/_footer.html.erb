@@ -15,7 +15,7 @@
 
     <hr class="footer__line">
 
-    <p class="footer__blurb"><%= smartypants(data.site.blurb) %></p>
+    <section class="footer__section"><%= markdown_to_html(data.site.blurb) %></section>
 
     <% menu_items = data.site.footer_links_collection.items.compact %>
     <% if menu_items.present? %>
@@ -33,6 +33,6 @@
       </ul>
     <% end %>
 
-    <p class="footer__colophon">© <%= copyright_years %> <%= smartypants(data.site.copyright) %>. Powered by <a href="https://github.com/gesteves/kona" target="_blank" rel="noopener">Kona</a>.</p>
+    <section class="footer__section"><%= markdown_to_html("© #{copyright_years} #{data.site.copyright}") %></section>
   </div>
 </footer>
