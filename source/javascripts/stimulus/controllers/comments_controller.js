@@ -1,5 +1,4 @@
 import { Controller } from "@hotwired/stimulus";
-import { formatDistanceToNow } from "date-fns";
 import { RichText, AtpAgent } from '@atproto/api';
 import Handlebars from "handlebars";
 
@@ -287,11 +286,11 @@ export default class extends Controller {
       isAuthor: this.isAuthor(author.did),
       likeCount: post.post.likeCount ?? 0,
       postUrl: this.convertAtUriToPostUrl(post.post.uri, author.handle),
-      relativeTimestamp: formatDistanceToNow(createdAt, { addSuffix: true }),
       replyCount: post.post.replyCount ?? 0,
       repostCount: post.post.repostCount ?? 0,
       seeMoreComments: (!post.replies || post.replies.length === 0) && post.post.replyCount > 0 && depth == this.depthValue - 1,
-      timestamp: this.formatTimestamp(createdAt),
+      formattedDate: this.formatDate(createdAt),
+      timestamp: Math.floor(createdAt.getTime() / 1000),
     };
 
     // Render the compiled template with data
@@ -313,11 +312,11 @@ export default class extends Controller {
   }
 
   /**
-   * Formats a timestamp as "Tuesday, December 3, 2024 at 7:44 AM"
+   * Formats a date as "Tuesday, December 3, 2024 at 7:44 AM"
    * @param {Date} date - The date to format
    * @returns {String} - The formatted date
    */
-  formatTimestamp(date) {
+  formatDate(date) {
     return new Intl.DateTimeFormat("en-US", {
       weekday: "long",
       year: "numeric",
