@@ -199,4 +199,11 @@ module SiteHelpers
       icon
     end
   end
+
+  def footer_text
+    text = ["© #{copyright_years} #{data.site.copyright}"]
+    text << ["Powered by <a href=\"https://github.com/gesteves/kona\" target=\"_blank\" rel=\"noopener\">Kona</a>"]
+    text << ["Updated <span data-controller=\"relative-date\" data-relative-date-datetime-value=\"#{Time.now.iso8601}\">at #{Time.now.strftime('%l:%M %p')}</span>"]
+    markdown_to_html(text.join(' • '))
+  end
 end
