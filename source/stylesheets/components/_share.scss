@@ -20,7 +20,7 @@
 
 .share__buttons {
   display: flex;
-  flex-flow: row nowrap;
+  flex-flow: row wrap;
   justify-content: center;
 }
 
@@ -32,15 +32,9 @@
   color: var(--color-share-button-text);
   display: flex;
   flex-flow: row nowrap;
-  flex: 0 0 auto;
-  font-family: var(--lato);
-  font-size: var(--font-x-small);
-  font-weight: 300;
   justify-content: center;
-  line-height: var(--line-height-x-small);
   margin: 0 0.25rem 0 0;
   padding: 0.5rem;
-  scroll-snap-align: start;
 
   @media (min-width: #{$bp-medium}) {
     padding: 1rem;
