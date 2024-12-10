@@ -207,7 +207,14 @@ module SiteHelpers
     markdown_to_html(text)
   end
 
+  # Returns the publicly-visible name for an entry type
+  # @return [String] The name of the entry type
   def entry_type(content)
-    content.entry_type == 'Short' ? 'Post' : content.entry_type
+    case content.entry_type
+    when 'Short'
+      'Post'
+    else
+      content.entry_type
+    end
   end
 end
