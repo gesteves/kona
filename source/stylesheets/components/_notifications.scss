@@ -12,8 +12,8 @@
 
   .notification {
     border-radius: 5px;
-    background-color: transparentize(black, 0.35);
-    color: var(--color-alice-blue);
+    background-color: transparentize(whote, 0.25);
+    color: black;
     cursor: pointer;
     font-family: var(--lato);
     font-size: var(--font-small);
@@ -27,19 +27,19 @@
 
     &.is-success {
       // Forest green
-      background-color: transparentize(#008F3E, 0.35);
+      background-color: transparentize(#008F3E, 0.25);
       color: white;
     }
 
     &.is-warning {
       // Sunglow
-      background-color: transparentize(#F9CB40, 0.35);
+      background-color: transparentize(#F9CB40, 0.25);
       color: var(--color-rich-black-darker);
     }
 
     &.is-danger {
       // Red CMYK
-      background-color: transparentize(#F2022A, 0.35);
+      background-color: transparentize(#F2022A, 0.25);
       color: white;
     }
 
