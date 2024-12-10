@@ -23,7 +23,7 @@
     max-width: calc(100% - (2 * var(--content-padding)));
     padding: 1rem;
     text-align: center;
-    transition: opacity ease-in 250ms;
+    transition: opacity ease-in var(--transition-duration);
 
     &.is-success {
       // Forest green
