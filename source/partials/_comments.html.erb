@@ -10,7 +10,7 @@
 >
   <h3 class="comments__heading" data-comments-target="heading">Comments</h3>
   <div class="comments__intro" data-comments-target="intro">
-    <p><%= smartypants article.comments_prompt %> <a href="<%= article.bluesky_comments_url %>" target="_blank" rel="noopener me">Discuss this <%= article.entry_type == 'Short' ? 'post' : content.entry_type.downcase %> on Bluesky</a>.</p>
+    <p><%= smartypants article.comments_prompt %> <a href="<%= article.bluesky_comments_url %>" target="_blank" rel="noopener me">Discuss this <%= entry_type(article).downcase %> on Bluesky</a>.</p>
   </div>
   <div class="comments__spinner" data-comments-target="spinner">
     <%= icon_svg "classic", "solid", "circle-notch" %>

@@ -206,4 +206,8 @@ module SiteHelpers
     text = "© #{copyright_years} #{data.site.copyright}"
     markdown_to_html(text)
   end
+
+  def entry_type(content)
+    content.entry_type == 'Short' ? 'Post' : content.entry_type
+  end
 end
