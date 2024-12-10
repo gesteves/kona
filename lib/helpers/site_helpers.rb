@@ -183,7 +183,7 @@ module SiteHelpers
         "title": "Subscribe to the feed",
         "data-controller": "clipboard",
         "data-action": "click->clipboard#preventDefault",
-        "data-clipboard-success-message-value": "The link to the feed has been copied to your clipboard!"
+        "data-clipboard-success-message-value": "The link to the feed has been copied to your clipboard."
       }
     else
       {

@@ -6,7 +6,7 @@ export default class extends Controller {
   static classes = ['hidden']
   static targets = ['link', 'check'];
   static values = {
-    successMessage: { type: String, default: "The link has been copied to your clipboard!" }
+    successMessage: { type: String, default: "The link has been copied to your clipboard." }
   }
 
   connect() {
