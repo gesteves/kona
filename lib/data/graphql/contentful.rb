@@ -61,6 +61,7 @@ module ContentfulClient
           summary
           published
           indexInSearchEngines
+          showAffiliateLinksDisclosure
           canonicalUrl
           blueskyCommentsUrl
           commentsPrompt

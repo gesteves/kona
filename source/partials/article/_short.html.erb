@@ -9,5 +9,6 @@
   </header>
   <div class="entry__body">
     <%= prepend_title(smartypants(article.title), render_body(article.intro)) %>
+    <%= partial 'partials/disclosure', locals: { entry: article } %>
   </div>
 </article>

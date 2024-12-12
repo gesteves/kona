@@ -1,4 +1,4 @@
-<% if has_affiliate_links?(entry) %>
+<% if entry.show_affiliate_links_disclosure || has_affiliate_links?(entry) %>
 <aside>
   <%= markdown_to_html(remove_widows("Please note that this article contains affiliate links. As an Amazon Associate, I earn from qualifying purchases made through the Amazon links on this page.")) %>
 </aside>
