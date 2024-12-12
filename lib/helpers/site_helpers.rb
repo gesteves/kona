@@ -217,4 +217,29 @@ module SiteHelpers
       content.entry_type
     end
   end
+
+  # Determines if the article was published today the current timezone.
+  # @param article [Object] The article.
+  # @return [Boolean] If the article was published today.
+  def published_today?(article)
+    article_date = Time.parse(article.published_at).in_time_zone(location_time_zone)
+    article_date.to_date == current_time.to_date
+  end
+
+  # Returns a permalink anchor tag for the article, with the date it was published.
+  # If the article was published today, includes attributes to render the date as a relative timestamp.
+  # @param article [Object] The article.
+  # @return [String] An <a> tag linking to the article, with a relative or absolute date as the text.
+  def article_permalink_timestamp(article)
+    options = {
+      href: article.path
+    }
+    if published_today?(article)
+      options["data-controller"] = "relative-date"
+      options["data-relative-date-datetime-value"] = DateTime.parse(article.published_at).iso8601
+    end
+    content_tag :a, options do
+      DateTime.parse(article.published_at).strftime('%A, %B %-e, %Y')
+    end
+  end
 end
