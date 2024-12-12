@@ -18,7 +18,7 @@ Kona can technically be hosted basically anywhere because it's just a static sit
 
 [Contentful](https://www.contentful.com/) is the CMS used to author most of the site's content, including the blog articles. Unfortunately, there's no quick way to set this up, but you'll want a content model like this:
 
-![cf-Given to Tri-master-2024-12-08_15-41-26](https://github.com/user-attachments/assets/21048e6f-2839-409e-99bb-5cf23df5e07c)
+![Given to Tri Visual Modeler Dec 12 2024](https://github.com/user-attachments/assets/d17c2451-134a-472e-88bd-012e04a3d136)
 
 Then head over to Settings > API Keys in Contentful, create a new API key, copy the Space ID and Content Preview API access token, and add them to the `CONTENTFUL_SPACE` and `CONTENTFUL_TOKEN` environment variables. You'll also probably want to install the Netlify app within Contentful, which will rebuild the site whenever new content is published or updated in Contentful.
 
