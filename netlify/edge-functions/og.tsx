@@ -146,7 +146,7 @@ export default async function handler(req: Request, context: Context) {
       }
     );
 
-    console.info("Generated Open Graph image for URL:", targetUrl);
+    console.info(targetUrl, req.headers.get("User-Agent"));
     return imageResponse;
   } catch (error) {
     console.error("Error generating the image:", error);
