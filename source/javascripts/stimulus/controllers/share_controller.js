@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { trackEvent } from '../lib/analytics';
 
 /**
  * Controller for managing social sharing functionality.
@@ -48,6 +49,7 @@ export default class extends Controller {
    */
   openShareSheet(event) {
     event.preventDefault();
+    trackEvent('Open Share', { url: this.getShareUrl() });
 
     navigator.share({
       title: this.getShareText(),
