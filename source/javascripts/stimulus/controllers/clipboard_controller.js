@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus";
 import { sendNotification } from '../lib/utils';
+import { trackEvent } from '../lib/analytics';
 import ClipboardJS from 'clipboard';
 
 export default class extends Controller {
@@ -66,6 +67,7 @@ export default class extends Controller {
     }
 
     sendNotification(this.successMessageValue);
+    trackEvent("Copy to Clipboard", { href: this.getPermalink() });
   }
 
   /**
