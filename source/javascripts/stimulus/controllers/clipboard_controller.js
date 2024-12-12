@@ -67,7 +67,7 @@ export default class extends Controller {
     }
 
     sendNotification(this.successMessageValue);
-    trackEvent("Copy to Clipboard", { href: this.getPermalink() });
+    trackEvent("Copy to Clipboard", { url: this.getPermalink() });
   }
 
   /**
