@@ -16,7 +16,7 @@ module ShareHelpers
   def sms_share_url(article)
     title = sanitize(article.title)
     url = full_url(article.path)
-    text = "#{title} #{url}"
+    text = "#{title}\n\n#{url}"
     body = ERB::Util.url_encode(text)
     "sms:?&body=#{body}"
   end
