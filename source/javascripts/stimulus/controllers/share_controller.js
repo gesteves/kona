@@ -49,7 +49,7 @@ export default class extends Controller {
    */
   openShareSheet(event) {
     event.preventDefault();
-    trackEvent('Open Share', { url: this.getShareUrl() });
+    trackEvent('Share', { url: this.getShareUrl() });
 
     navigator.share({
       title: this.getShareText(),
