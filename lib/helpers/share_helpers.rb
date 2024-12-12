@@ -44,7 +44,7 @@ module ShareHelpers
   def threads_share_url(article)
     title = sanitize(article.title)
     url = full_url(article.path)
-    text = "#{title} #{url}"
+    text = "#{title}\n\n#{url}"
     encoded_text = ERB::Util.url_encode(text)
     "https://www.threads.net/intent/post?text=#{encoded_text}"
   end
@@ -55,7 +55,7 @@ module ShareHelpers
   def bluesky_share_url(article)
     title = sanitize(article.title)
     url = full_url(article.path)
-    text = "#{title} #{url}"
+    text = "#{title}\n\n#{url}"
     encoded_text = ERB::Util.url_encode(text)
     "https://bsky.app/intent/compose?text=#{encoded_text}"
   end
