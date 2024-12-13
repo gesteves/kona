@@ -211,6 +211,7 @@ module SiteHelpers
   # @param entry [Object] The entry to check.
   # @return [String] The name of the entry type
   def entry_type(entry)
+    return if entry.entry_type.blank?
     case entry.entry_type
     when 'Short'
       'Post'
