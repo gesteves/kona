@@ -3,12 +3,11 @@
  * @param {string} message The text for the notification
  * @param {string} status The type of notification
  */
-export function sendNotification (message, status = 'success', icon = 'circle-check') {
+export function sendNotification (message, status = 'success') {
   const event = new CustomEvent('notify', {
     detail: {
       message: message,
-      status: status,
-      icon: icon
+      status: status
     }
   });
   document.body.dispatchEvent(event);
