@@ -25,15 +25,17 @@ module ContentHelpers
   # @param article [Object] The article.
   # @return [String] An <a> tag linking to the article, with a relative or absolute date as the text.
   def article_permalink_timestamp(article)
+    formatted = DateTime.parse(article.published_at).strftime('%A, %B %-e, %Y')
     options = {
       href: article.path
     }
     if published_today?(article) || article.draft
       options["data-controller"] = "relative-date"
       options["data-relative-date-datetime-value"] = DateTime.parse(article.published_at).iso8601
+      options["title"] = formatted
     end
     content_tag :a, options do
-      DateTime.parse(article.published_at).strftime('%A, %B %-e, %Y')
+      formatted
     end
   end
 
