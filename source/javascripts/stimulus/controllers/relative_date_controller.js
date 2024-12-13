@@ -34,7 +34,7 @@ export default class extends Controller {
 
     // Determine the update interval
     let nextUpdate;
-    if (differenceInSeconds < 60) {
+    if ((differenceInSeconds < 60) && this.includeSecondsValue) {
       nextUpdate = 1000; // Update every 1 second
     } else if (differenceInSeconds < 3600) {
       nextUpdate = 60000; // Update every 1 minute
