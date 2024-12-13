@@ -7,9 +7,9 @@ export default class extends Controller {
   static targets = ['commentTemplate', 'heading', 'intro', 'spinner', 'container'];
   static values = {
     url: String,
-    depth: Number,
-    parentHeight: Number,
-    sort: String,
+    depth: { type: Number, default: 6 },
+    parentHeight: { type: Number, default: 1000 },
+    sort: { type: String, default: "likes" },
     prompt: String,
     authorHandle: String,
   };
