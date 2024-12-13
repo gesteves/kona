@@ -37,16 +37,21 @@ export default class extends Controller {
       return;
     }
 
-    // Determine the update interval
+    // Determine the update interval.
+    // This roughly matches the formatting used by formatDistanceToNow: https://date-fns.org/v4.1.0/docs/formatDistanceToNow
     let nextUpdate;
     if ((differenceInSeconds < minutesToSeconds(1)) && this.includeSecondsValue) {
-      nextUpdate = secondsToMilliseconds(1); // Update every second
+      // If the date is less than a minute ago, update every second.
+      nextUpdate = secondsToMilliseconds(1);
     } else if (differenceInSeconds < minutesToSeconds(45)) {
-      nextUpdate = minutesToMilliseconds(1); // Update every minute
+      // If the date is less than 45 minutes ago, update every minute.
+      nextUpdate = minutesToMilliseconds(1);
     } else if (differenceInSeconds < hoursToSeconds(24)) {
-      nextUpdate = hoursToMilliseconds(1); // Update every hour
+      // If the date is less than a day ago, update every hour.
+      nextUpdate = hoursToMilliseconds(1);
     } else {
-      return; // Stop updating after 1 day
+      // Stop updating after 1 day
+      return;
     }
 
     this.timer = setTimeout(() => this.updateRelativeTime(), nextUpdate);
