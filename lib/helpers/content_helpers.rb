@@ -28,7 +28,7 @@ module ContentHelpers
     options = {
       href: article.path
     }
-    if published_today?(article)
+    if published_today?(article) || article.draft
       options["data-controller"] = "relative-date"
       options["data-relative-date-datetime-value"] = DateTime.parse(article.published_at).iso8601
     end
