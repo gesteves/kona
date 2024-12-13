@@ -1,11 +1,12 @@
 import { Controller } from "@hotwired/stimulus";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, minutesToSeconds, hoursToSeconds, hoursToMilliseconds, minutesToMilliseconds, secondsToMilliseconds } from "date-fns";
 
 export default class extends Controller {
   static values = {
     datetime: String,
     addSuffix: { type: Boolean, default: true },
     includeSeconds: { type: Boolean, default: true },
+    liveUpdating: { type: Boolean, default: true }
   };
 
   connect() {
@@ -32,14 +33,18 @@ export default class extends Controller {
 
     this.element.textContent = relativeDate;
 
+    if (!this.liveUpdatingValue) {
+      return;
+    }
+
     // Determine the update interval
     let nextUpdate;
-    if ((differenceInSeconds < 60) && this.includeSecondsValue) {
-      nextUpdate = 1000; // Update every 1 second
-    } else if (differenceInSeconds < 3600) {
-      nextUpdate = 60000; // Update every 1 minute
-    } else if (differenceInSeconds < 86400) {
-      nextUpdate = 3600000; // Update every 1 hour
+    if ((differenceInSeconds < minutesToSeconds(1)) && this.includeSecondsValue) {
+      nextUpdate = secondsToMilliseconds(1); // Update every second
+    } else if (differenceInSeconds < minutesToSeconds(45)) {
+      nextUpdate = minutesToMilliseconds(1); // Update every minute
+    } else if (differenceInSeconds < hoursToSeconds(24)) {
+      nextUpdate = hoursToMilliseconds(1); // Update every hour
     } else {
       return; // Stop updating after 1 day
     }
