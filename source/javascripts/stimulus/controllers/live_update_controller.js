@@ -8,6 +8,14 @@ export default class extends Controller {
     url: String
   };
 
+  connect() {
+    document.addEventListener("visibilitychange", this.handleVisibilityChange.bind(this));
+  }
+
+  disconnect() {
+    document.removeEventListener("visibilitychange", this.handleVisibilityChange.bind(this));
+  }
+
   /**
    * Updates content when the page becomes visible.
    */
