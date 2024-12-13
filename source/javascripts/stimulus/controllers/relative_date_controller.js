@@ -24,7 +24,7 @@ export default class extends Controller {
   updateRelativeTime() {
     const now = new Date();
     const timestamp = new Date(this.datetimeValue);
-    const differenceInSeconds = Math.floor((now - timestamp) / 1000);
+    const differenceInSeconds = Math.abs(Math.floor((now - timestamp) / 1000));
 
     const relativeDate = formatDistanceToNow(timestamp, {
       addSuffix: this.addSuffixValue,
