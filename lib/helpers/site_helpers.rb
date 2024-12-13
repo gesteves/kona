@@ -208,13 +208,14 @@ module SiteHelpers
   end
 
   # Returns the publicly-visible name for an entry type
+  # @param entry [Object] The entry to check.
   # @return [String] The name of the entry type
-  def entry_type(content)
-    case content.entry_type
+  def entry_type(entry)
+    case entry.entry_type
     when 'Short'
       'Post'
     else
-      content.entry_type
+      entry.entry_type
     end
   end
 
