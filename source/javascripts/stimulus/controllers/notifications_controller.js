@@ -29,7 +29,7 @@ export default class extends Controller {
       message: message,
       status: status,
       showSuccessIcon: this.showSuccessIcon(status),
-      showWarningIcon: !this.showWarningIcon(status),
+      showWarningIcon: !this.showSuccessIcon(status),
     });
 
     if (this.hasNotificationTarget) {
