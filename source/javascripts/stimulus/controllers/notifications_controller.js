@@ -25,8 +25,12 @@ export default class extends Controller {
     // Compile the Handlebars template
     const compiledTemplate = Handlebars.compile(template);
     // Render the compiled template with data
-    const rendered = compiledTemplate({ message: message, status: status });
-    
+    const rendered = compiledTemplate({
+      message: message,
+      status: status,
+      showSuccessIcon: this.showSuccessIcon(status),
+      showWarningIcon: !this.showWarningIcon(status),
+    });
 
     if (this.hasNotificationTarget) {
       this.closeAll();
@@ -35,6 +39,15 @@ export default class extends Controller {
       this.prependToContainer(rendered);
       this.toggle();
     }
+  }
+
+  /**
+   * Checks if we should show the success icon.
+   * @param {String} icon The icon name.
+   * @returns {Boolean} True if we should show the success icon.
+   */
+  showSuccessIcon(status) {
+    return status === 'success';
   }
 
   /**

@@ -13,6 +13,7 @@ icons:
       - arrow-up-from-bracket
       - badge-check
       - check
+      - circle-check
       - circle-notch
       - comment
       - envelope
@@ -20,6 +21,7 @@ icons:
       - link-simple
       - rss
       - shield-check
+      - triangle-exclamation
     regular:
       - comment
       - heart

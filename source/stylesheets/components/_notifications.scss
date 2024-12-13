@@ -11,10 +11,12 @@
   z-index: 100;
 
   .notification {
+    align-items: center;
     border-radius: 5px;
     background-color: transparentize(white, 0.25);
     color: black;
     cursor: pointer;
+    display: flex;
     font-family: var(--lato);
     font-size: var(--font-small);
     font-weight: 300;
@@ -45,6 +47,18 @@
 
     &.is-transparent {
       opacity: 0;
+    }
+
+    svg {
+      display: inline-block;
+      height: 1rem;
+      margin-right: 0.25rem;
+      width: 1rem;
+
+      g,
+      path {
+        fill: currentColor;
+      }
     }
   }
 

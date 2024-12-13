@@ -1,6 +1,12 @@
 <div id="notifications" class="notifications" data-notifications-target="container" data-action="transitionend->notifications#toggle" data-turbo-permanent>
   <script data-notifications-target="template" type="text/x-handlebars-template">
     <div class="notification is-{{status}} is-transparent" data-notifications-target="notification" data-action="click->notifications#close">
+      {{#if showSuccessIcon}}
+        <%= icon_svg('classic', 'solid', 'circle-check') %>
+      {{/if}}
+      {{#if showWarningIcon}}
+        <%= icon_svg('classic', 'solid', 'exclamation-triangle') %>
+      {{/if}}
       {{{ message }}}
     </div>
   </script>
