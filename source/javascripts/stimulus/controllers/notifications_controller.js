@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { prependToElement } from '../lib/utils';
 import Handlebars from "handlebars";
 
 /**
@@ -34,9 +35,9 @@ export default class extends Controller {
 
     if (this.hasNotificationTarget) {
       this.closeAll();
-      this.prependToContainer(rendered);
+      prependToElement(rendered, this.containerTarget);
     } else {
-      this.prependToContainer(rendered);
+      prependToElement(rendered, this.containerTarget);
       this.toggle();
     }
   }
@@ -48,19 +49,6 @@ export default class extends Controller {
    */
   showSuccessIcon(status) {
     return status === 'success';
-  }
-
-  /**
-   * Adds the rendered HTML to the container
-   * @param {String} html Rendered HTML string.
-   */
-  prependToContainer(html) {
-    // Convert the rendered HTML string to actual DOM nodes
-    const tempContainer = document.createElement("div");
-    tempContainer.innerHTML = html;
-    while (tempContainer.firstChild) {
-      this.containerTarget.prepend(tempContainer.firstChild);
-    }
   }
 
   /**

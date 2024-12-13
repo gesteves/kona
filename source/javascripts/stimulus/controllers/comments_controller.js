@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus";
 import { RichText, AtpAgent } from '@atproto/api';
+import { appendToElement } from '../lib/utils';
 import Handlebars from "handlebars";
 
 export default class extends Controller {
@@ -296,14 +297,7 @@ export default class extends Controller {
     // Render the compiled template with data
     const rendered = compiledTemplate(data);
 
-    // Convert the rendered HTML string to actual DOM nodes
-    const tempContainer = document.createElement("div");
-    tempContainer.innerHTML = rendered;
-
-    // Append each child of the temporary container to the actual container
-    while (tempContainer.firstChild) {
-      this.containerTarget.appendChild(tempContainer.firstChild);
-    }
+    appendToElement(rendered, this.containerTarget);
 
     // Render replies recursively with incremented depth for indentation
     if (post.replies && post.replies.length > 0) {
