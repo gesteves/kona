@@ -21,6 +21,9 @@ export default class extends Controller {
     }
   }
 
+  /**
+   * Replaces the element's text content with a relative time string.
+   */
   updateRelativeTime() {
     const now = new Date();
     const timestamp = new Date(this.datetimeValue);
