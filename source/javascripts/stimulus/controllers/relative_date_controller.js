@@ -5,20 +5,45 @@ export default class extends Controller {
   static values = {
     datetime: String,
     addSuffix: { type: Boolean, default: true },
-    includeSeconds: { type: Boolean, default: true }
+    includeSeconds: { type: Boolean, default: true },
   };
 
-  /** 
-   * Replaces an absolute timestamp with a relative one.
-   */
   connect() {
     if (this.hasDatetimeValue) {
-      const relativeDate = formatDistanceToNow(new Date(this.datetimeValue), {
-        addSuffix: this.addSuffixValue,
-        includeSeconds: this.includeSecondsValue,
-      });
-
-      this.element.textContent = relativeDate;
+      this.updateRelativeTime();
     }
+  }
+
+  disconnect() {
+    if (this.timer) {
+      clearTimeout(this.timer);
+    }
+  }
+
+  updateRelativeTime() {
+    const now = new Date();
+    const timestamp = new Date(this.datetimeValue);
+    const differenceInSeconds = Math.floor((now - timestamp) / 1000);
+
+    const relativeDate = formatDistanceToNow(timestamp, {
+      addSuffix: this.addSuffixValue,
+      includeSeconds: this.includeSecondsValue,
+    });
+
+    this.element.textContent = relativeDate;
+
+    // Determine the update interval
+    let nextUpdate;
+    if (differenceInSeconds < 60) {
+      nextUpdate = 1000; // Update every 1 second
+    } else if (differenceInSeconds < 3600) {
+      nextUpdate = 60000; // Update every 1 minute
+    } else if (differenceInSeconds < 86400) {
+      nextUpdate = 3600000; // Update every 1 hour
+    } else {
+      return; // Stop updating after 1 day
+    }
+
+    this.timer = setTimeout(() => this.updateRelativeTime(), nextUpdate);
   }
 }
