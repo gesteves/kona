@@ -24,6 +24,7 @@
       <content type="html">
         <%=h render_feed_body(entry.intro) %>
         <%=h render_feed_body(entry.body) %>
+        <%=h partial 'partials/disclosure', locals: { entry: entry } %>
       </content>
       <% if entry.contentful_metadata.tags.present? %>
         <% entry.contentful_metadata.tags.sort { |a, b| a.name <=> b.name }.each do |tag| %>

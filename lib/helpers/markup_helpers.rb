@@ -414,7 +414,7 @@ module MarkupHelpers
 
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
     doc.css('a').each do |a|
-      if is_affiliate_link?(a['href'])
+      if is_amazon_associates_link?(a['href'])
         a['rel'] = "sponsored nofollow noopener"
         a['target'] = '_blank'
       end

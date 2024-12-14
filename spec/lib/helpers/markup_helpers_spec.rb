@@ -11,8 +11,8 @@ RSpec.describe MarkupHelpers do
   let(:internal_link) { 'https://www.giventotri.com/whatever' }
 
   before do
-    allow(self).to receive(:is_affiliate_link?).with(affiliate_link).and_return(true)
-    allow(self).to receive(:is_affiliate_link?).with(non_affiliate_link).and_return(false)
+    allow(self).to receive(:is_amazon_associates_link?).with(affiliate_link).and_return(true)
+    allow(self).to receive(:is_amazon_associates_link?).with(non_affiliate_link).and_return(false)
     allow(self).to receive(:root_url).and_return('https://www.giventotri.com')
   end
 
