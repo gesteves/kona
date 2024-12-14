@@ -102,6 +102,6 @@ module ContentHelpers
     body << smartypants(sanitize(entry.summary.presence || entry.title.presence))
     body << full_url(entry.path)
     body << entry.contentful_metadata.tags.sort { |a, b| a.name <=> b.name }.map { |t| camelcase_hashtag(t.name) }.join(' ')
-    body.reject(&:blank?).join("<br><br>")
+    body.reject(&:blank?).join("\n\n")
   end
 end
