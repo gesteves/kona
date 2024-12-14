@@ -73,7 +73,6 @@ export default class extends Controller {
   /**
    * Removes all notifications that have been marked as closed from the DOM,
    * and displays any pending transparent notifications.
-   * @param {Event} event Click event.
    */
   toggle () {
     this.notificationTargets
