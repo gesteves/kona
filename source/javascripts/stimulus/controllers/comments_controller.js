@@ -374,6 +374,7 @@ export default class extends Controller {
    * @param {Number} parentHeight - The parent height for pagination.
    * @returns {Object} - The fetched thread data.
    * @throws Will throw an error if the API call fails.
+   * @see https://docs.bsky.app/docs/api/app-bsky-feed-get-post-thread
    */
   async getPostThread(uri, depth, parentHeight) {
     const params = new URLSearchParams({ uri });
@@ -391,7 +392,6 @@ export default class extends Controller {
     }
 
     // Public endpoint, does not require authentication
-    // See: https://docs.bsky.app/docs/api/app-bsky-feed-get-post-thread
     const res = await fetch(
       `https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?${params.toString()}`,
       {
