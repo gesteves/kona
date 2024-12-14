@@ -33,6 +33,7 @@ module TextHelpers
   # @param escape_html_entities [Boolean] Whether to escape HTML entities in the sanitized text, for example `&` to `&amp;`. Defaults to false.
   # @return [String] The sanitized text, with HTML tags removed and optionally HTML entities decoded.
   def sanitize(text, escape_html_entities: false)
+    return if text.blank?
     text = Sanitize.fragment(markdown_to_html(text)).strip
     text = HTMLEntities.new.decode(text) unless escape_html_entities
     text

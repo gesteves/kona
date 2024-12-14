@@ -85,4 +85,23 @@ module ContentHelpers
     end
     schema.to_json
   end
+
+  # Turns a tag into a camelcased hashtag, e.g. #my-tag => #MyTag
+  # @param tag [String] The tag to convert.
+  # @return [String] The camelcased hashtag.
+  def camelcase_hashtag(tag)
+    return if tag.blank?
+    "##{tag.parameterize.split('-').map(&:capitalize).join}"
+  end
+
+  # Generates a Mastodon post for a given entry.
+  # @param entry [Object] The entry to generate a Mastodon post for.
+  # @return [String] The Mastodon post content.
+  def mastodon_post(entry)
+    body = []
+    body << smartypants(sanitize(entry.summary.presence || entry.title.presence))
+    body << full_url(entry.path)
+    body << entry.contentful_metadata.tags.sort { |a, b| a.name <=> b.name }.map { |t| camelcase_hashtag(t.name) }.join(' ')
+    body.reject(&:blank?).join("\n\n")
+  end
 end
