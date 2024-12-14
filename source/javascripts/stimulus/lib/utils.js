@@ -38,3 +38,16 @@ export function appendToElement(html, element) {
     element.appendChild(tempContainer.firstChild);
   }
 }
+
+/**
+ * Replace the given element with the given HTML
+ * @param {String} html An HTML string.
+ * @param {Element} element The element to replace.
+ */
+export function replaceElement(html, element) {
+  const tempContainer = document.createElement("div");
+  tempContainer.innerHTML = html;
+  while (tempContainer.firstChild) {
+    element.replaceWith(tempContainer.firstChild);
+  }
+}
