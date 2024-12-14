@@ -1,4 +1,5 @@
-<div id="notifications" class="notifications" data-notifications-target="container" data-action="transitionend->notifications#toggle" data-turbo-permanent>
+<div id="notifications" data-controller="notifications" data-action="notify@document->notifications#add transitionend->notifications#toggle" data-notifications-transparent-class="is-transparent" data-notifications-closed-class="is-closed" data-turbo-permanent>
+  <div class="notifications" data-notifications-target="container"></div>
   <script data-notifications-target="template" type="text/x-handlebars-template">
     <div class="notification is-{{status}} is-transparent" data-notifications-target="notification" data-action="click->notifications#close">
       {{#if showSuccessIcon}}

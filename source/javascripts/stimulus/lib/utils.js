@@ -10,7 +10,7 @@ export function sendNotification (message, status = 'success') {
       status: status
     }
   });
-  document.body.dispatchEvent(event);
+  document.dispatchEvent(event);
 }
 
 /**
