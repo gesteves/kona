@@ -127,8 +127,8 @@ module ContentHelpers
   # @param b [Object] The second article to compare.
   # @return [Integer] -1, 0, or 1, depending on the comparison result.
   def compare_by_trending_score(a, b)
-    score_b = calculate_trending_score(b)
-    score_a = calculate_trending_score(a)
+    score_b = trending_score(b)
+    score_a = trending_score(a)
 
     if score_b != score_a
       score_b <=> score_a
@@ -143,7 +143,7 @@ module ContentHelpers
   #
   # @param article [Object] The article for which to calculate the trending score.
   # @return [Float] The growth rate of the article's traffic. Returns 0 if there is no past traffic data.
-  def calculate_trending_score(article)
+  def trending_score(article)
     avg_pageviews_last_week = article.metrics[:"7d"].pageviews / 7.0
     return 0 if avg_pageviews_last_week.zero?
 
