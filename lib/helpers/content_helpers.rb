@@ -136,8 +136,12 @@ module ContentHelpers
   # @return [String] The formatted reading time.
   def reading_time(article)
     minutes = article.reading_time_minutes.to_i
-    return "Est. reading time one minute" if minutes == 0
-    "Est. reading time #{distance_of_time_in_words(Time.now, Time.now + minutes.minutes)}"
+    formatted_time = if minutes <= 1
+      "one minute"
+    else
+      distance_of_time_in_words(Time.now, Time.now + minutes.minutes)
+    end
+    "Est. reading time #{formatted_time}"
   end
 
   # Formats the number of views for an article.
