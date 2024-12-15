@@ -52,7 +52,7 @@ module ContentHelpers
 
   # Finds articles most related to a given article.
   # @param article [Object] The reference article for finding related articles.
-  # @param count [Integer] (Optional) The number of related articles to return. Default is 4.
+  # @param count [Integer] (Optional) The number of articles to return.
   # @return [Array<Object>] A list of articles sorted by relevance.
   def related_articles(article, count: 4)
     data.articles
@@ -63,8 +63,8 @@ module ContentHelpers
       .take(count)
   end
 
-  # Returns the most viewed articles based on Plausible analytics data.
-  # @param count [Integer] (Optional) The number of popular articles to return. Default is 4.
+  # Returns the most viewed articles based on analytics data.
+  # @param count [Integer] (Optional) The number of articles to return.
   # @param exclude [Object] (Optional) An article to exclude from the results.
   # @return [Array<Object>] An array of the most viewed articles, up to the specified count.
   def most_viewed_articles(count: 4, exclude: nil)
@@ -77,9 +77,9 @@ module ContentHelpers
   end
 
   # Returns the most trending articles on the site based on a "trending score".
-  # @param count [Integer] (Optional) The number of trending articles to return. Default is 4.
+  # @param count [Integer] (Optional) The number of articles to return.
   # @param exclude [Object] (Optional) An article to exclude from the results.
-  # @return [Array<Object>] An array of the most trending articles, up to the specified count.
+  # @return [Array<Object>] An array of the trending articles, up to the specified count.
   def trending_articles(count: 4, exclude: nil)
     data.articles
       .reject { |a| a.path == exclude&.path }
@@ -92,7 +92,7 @@ module ContentHelpers
   # Compares two articles based on 1d, 7d, and all-time pageviews, in that order.
   # That is, the article with the most pageviews in the past day is considered first.
   # If the day's pageviews are equal, the pageviews for the past week is used as a tie breaker.
-  # If they're still tied, then all-time pageviews are used as a tie breaker.
+  # If they're still tied, then all-time pageviews are used as a final tie breaker.
   # @param a [Object] The first article to compare.
   # @param b [Object] The second article to compare.
   # @return [Integer] -1, 0, or 1, depending on the comparison.
@@ -138,15 +138,14 @@ module ContentHelpers
     avg_pageviews_last_week = article.metrics[:"7d"].pageviews / 7.0
     return 0 if avg_pageviews_last_week.zero?
 
-    growth_rate = (article.metrics[:"1d"].pageviews - avg_pageviews_last_week) / avg_pageviews_last_week
-    growth_rate
+    (article.metrics[:"1d"].pageviews - avg_pageviews_last_week) / avg_pageviews_last_week
   end
 
   # Calculates an overall score of how related two articles are.
   # The score considers:
   # - Shared tags (more tags in common means they're more related)
-  # - Title similarity
-  # - Recency (more recent articles are more related)
+  # - Title similarity (more similar titles are weighed more heavily)
+  # - Recency (more recent articles are weighed more heavily)
   #
   # @param article [Object] The reference article.
   # @param candidate [Object] The article to evaluate for relatedness.
@@ -160,7 +159,6 @@ module ContentHelpers
     recency = recency_score(candidate)
     title_similarity = Text::WhiteSimilarity.new.similarity(sanitize(article.title), sanitize(candidate.title))
 
-    # Composite relevance score
     (shared_tags * tags_weight) + (recency * recency_weight) + (title_similarity * title_weight)
   end
 
@@ -170,7 +168,7 @@ module ContentHelpers
   # @return [Float] A score between 0 and 1 based on how recently the article was published.
   def recency_score(article)
     days_old = ((Time.now - DateTime.parse(article.published_at)) / 1.day).to_i
-    Math.exp((ENV.fetch('RECENCY_DECAY_RATE', 0.1).to_f * -1) * days_old)
+    Math.exp((ENV.fetch('RECENCY_SCORE_DECAY_RATE', 0.1).to_f * -1) * days_old)
   end
 
   # Generates a JSON-LD schema string for an article, based on the provided content.
@@ -197,7 +195,7 @@ module ContentHelpers
     schema.to_json
   end
 
-  # Turns a tag into a camelcased hashtag, e.g. #my-tag => #MyTag
+  # Turns a tag into a camelcased hashtag, e.g. "My Tag" => "#MyTag"
   # @param tag [String] The tag to convert.
   # @return [String] The camelcased hashtag.
   def camelcase_hashtag(tag)
@@ -218,9 +216,9 @@ module ContentHelpers
 
   # Formats the reading time for an article.
   # @param article [Object] The article to calculate the reading time for.
-  # @param wpm [Integer] (Optional) The words per minute to use for the calculation. Default is 200.
   # @return [String] The formatted reading time.
-  def reading_time(article, wpm: 200)
+  def reading_time(article)
+    wpm = ENV.fetch('READING_TIME_WPM', 200).to_i
     plain_text = sanitize([article.intro, article.body].reject(&:blank?).join("\n\n"), escape_html_entities: true)
     word_count = plain_text.split(/\s+/).size
     minutes = (word_count / wpm.to_f).ceil
@@ -232,8 +230,8 @@ module ContentHelpers
     "Est. reading time #{formatted_time}"
   end
 
-  # Formats the number of views for an article.
-  # @param article [Object] The article to calculate the views for.
+  # Formats the number of pageviews for an article.
+  # @param article [Object] The article to show the pageviews for.
   # @return [String] The formatted number of views.
   def article_views(article)
     return if article&.metrics&.all&.pageviews.blank?
