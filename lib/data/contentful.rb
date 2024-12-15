@@ -1,8 +1,13 @@
 require 'active_support/all'
 require_relative 'graphql/contentful'
 require_relative 'plausible'
+require_relative '../helpers/markdown_helpers'
+require_relative '../helpers/text_helpers'
 
 class Contentful
+  include MarkdownHelpers
+  include TextHelpers
+
   def initialize
     @client = ContentfulClient::Client
     @content = {
@@ -95,6 +100,7 @@ class Contentful
       set_timestamps(item)
       set_article_path(item)
       set_template(item)
+      set_reading_time(item)
     end
 
     @content[:articles].sort! { |a, b| DateTime.parse(b[:published_at]) <=> DateTime.parse(a[:published_at]) }
@@ -188,6 +194,17 @@ class Contentful
     else
       "/page.html"
     end
+    item
+  end
+
+  # Calculates the reading time for an article based on its word count.
+  # @param item [Hash] The article to be processed.
+  # @param wpm [Integer] (Optional) The average words per minute for reading. Default is 200.
+  # @return [Hash] The article with the reading time set.
+  def set_reading_time(item, wpm: 200)
+    plain_text = sanitize([item[:intro], item[:body]].reject(&:blank?).join("\n\n"), escape_html_entities: true)
+    word_count = plain_text.split(/\s+/).size
+    item[:reading_time_minutes] = (word_count / wpm.to_f).ceil
     item
   end
 
