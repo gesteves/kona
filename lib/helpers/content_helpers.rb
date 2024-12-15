@@ -14,7 +14,7 @@ module ContentHelpers
     end
   end
 
-  # Determines if the article was published today the current timezone.
+  # Determines if the article was published today in the current timezone.
   # @param article [Object] The article.
   # @return [Boolean] If the article was published today.
   def published_today?(article)
