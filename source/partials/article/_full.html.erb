@@ -17,13 +17,9 @@
     <% unless article.entry_type == 'Page' %>
       <p class="entry__meta">
         <span><%= reading_time(article) %></span>
-        <span>
-          <% if article.metrics.all.pageviews.to_i == 0 %>
-            Never read
-          <% else %>
-            Viewed <%= "#{number_to_delimited(article.metrics.all.pageviews)} #{'time'.pluralize(article.metrics.all.pageviews)}" %>
-          <% end %>
-        </span>
+        <% if article_views(article).present? %>
+          <span><%= article_views(article) %></span>
+        <% end %>
       </p>
     <% end %>
   </header>
