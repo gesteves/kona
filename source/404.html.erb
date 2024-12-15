@@ -13,7 +13,7 @@ body: I'm sorry, but the page you were looking for can't be found.
       <%= smartypants(markdown_to_html(current_page.data.body)) %>
     </div>
   </section>
-  <% most_read = trending_articles %>
+  <% most_read = most_viewed_articles %>
   <% if most_read.present? %>
     <%= partial 'partials/collection', locals: { title: "Most Read Articles", items: most_read, variant: "centered" } %>
   <% end %>

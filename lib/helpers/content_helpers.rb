@@ -58,15 +58,26 @@ module ContentHelpers
       .reject { |a| a.path == article.path } # Reject the article itself
       .reject { |a| a.draft } # Reject drafts
       .reject { |a| a.entry_type == 'Short' } # Reject short posts
-      .sort { |a,b| (b.contentful_metadata.tags.map(&:id) & tags).size <=> (a.contentful_metadata.tags.map(&:id) & tags).size } # Fake relevancy sorting by sorting by number of common tags
-      .take(count) # Take the specified number of articles
+      .sort do |a, b|
+        shared_tags_a = (a.contentful_metadata.tags.map(&:id) & tags).size
+        shared_tags_b = (b.contentful_metadata.tags.map(&:id) & tags).size
+
+        # Sort articles by the number of tags they have in common,
+        # then by trending score if the number of shared tags is equal.
+        if shared_tags_b != shared_tags_a
+          shared_tags_b <=> shared_tags_a
+        else
+          compare_by_trending_score(a, b)
+        end
+      end
+      .take(count)
   end
 
-  # Returns the most popular articles based on Plausible analytics data.
+  # Returns the most viewed articles based on Plausible analytics data.
   # @param count [Integer] (Optional) The number of popular articles to return. Default is 4.
   # @param exclude [Object] (Optional) An article to exclude from the results.
   # @return [Array<Object>] An array of the most popular articles, up to the specified count.
-  def most_read_articles(count: 4, exclude: nil)
+  def most_viewed_articles(count: 4, exclude: nil)
     data.articles
       .reject { |a| a.path == exclude&.path }
       .reject { |a| a.draft }
@@ -75,17 +86,78 @@ module ContentHelpers
       .take(count)
   end
 
-  # Returns the most read articles in the past day.
-  # @param count [Integer] (Optional) The number of popular articles to return. Default is 4.
+  # Returns the most trending articles on the site based on recent traffic surges.
+  # Articles are ranked by their "trending score," which measures the rate of change
+  # in traffic (1-day pageviews compared to the average of the past 7 days).
+  # Ties are broken using 1-day, 7-day, and all-time pageviews, in that order.
+  #
+  # @param count [Integer] (Optional) The number of trending articles to return. Default is 4.
   # @param exclude [Object] (Optional) An article to exclude from the results.
-  # @return [Array<Object>] An array of the most popular articles, up to the specified count.
+  # @return [Array<Object>] An array of the most trending articles, up to the specified count.
   def trending_articles(count: 4, exclude: nil)
     data.articles
       .reject { |a| a.path == exclude&.path }
       .reject { |a| a.draft }
       .reject { |a| a.entry_type == 'Short' }
-      .sort { |a, b| b.metrics[:"1d"].pageviews <=> a.metrics[:"1d"].pageviews }
+      .sort { |a, b| compare_by_trending_score(a, b) }
       .take(count)
+  end
+
+  # Compares two articles based on 1d, 7d, and all-time pageviews, in that order.
+  # That is, the article with the most pageviews in the past day is considered first.
+  # If the day's pageviews are equal, the article with the most recent week's pageviews is considered first.
+  # If they're still tied, then the article with the most all-time pageviews is considered first.
+  # @param a [Object] The first article to compare.
+  # @param b [Object] The second article to compare.
+  # @return [Integer] -1, 0, or 1, depending on the comparison.
+  def compare_by_pageviews(a, b)
+    day_pageviews_b = b.metrics[:"1d"].pageviews
+    day_pageviews_a = a.metrics[:"1d"].pageviews
+
+    if day_pageviews_b != day_pageviews_a
+      day_pageviews_b <=> day_pageviews_a
+    else
+      week_pageviews_b = b.metrics[:"7d"].pageviews
+      week_pageviews_a = a.metrics[:"7d"].pageviews
+
+      if week_pageviews_b != week_pageviews_a
+        week_pageviews_b <=> week_pageviews_a
+      else
+        b.metrics.all.pageviews <=> a.metrics.all.pageviews
+      end
+    end
+  end
+
+  # Compares two articles based on their trending scores and, if tied, their pageview metrics.
+  # Trending score is determined by the rate of change in traffic (1-day vs. 7-day average).
+  # Pageview metrics are used as a tie-breaker (1-day, 7-day, and all-time, in that order).
+  #
+  # @param a [Object] The first article to compare.
+  # @param b [Object] The second article to compare.
+  # @return [Integer] -1, 0, or 1, depending on the comparison result.
+  def compare_by_trending_score(a, b)
+    score_b = calculate_trending_score(b)
+    score_a = calculate_trending_score(a)
+
+    if score_b != score_a
+      score_b <=> score_a
+    else
+      compare_by_pageviews(a, b) # Fall back to pageviews if scores are tied
+    end
+  end
+
+  # Calculates a "trending score" for an article based on the rate of change in traffic.
+  # The score is determined by comparing the 1-day pageviews against the average pageviews
+  # over the past week.
+  #
+  # @param article [Object] The article for which to calculate the trending score.
+  # @return [Float] The growth rate of the article's traffic. Returns 0 if there is no past traffic data.
+  def calculate_trending_score(article)
+    avg_pageviews_last_week = article.metrics[:"7d"].pageviews / 7.0
+    return 0 if avg_pageviews_last_week.zero?
+
+    growth_rate = (article.metrics[:"1d"].pageviews - avg_pageviews_last_week) / avg_pageviews_last_week
+    growth_rate
   end
 
   # Generates a JSON-LD schema string for an article, based on the provided content.
