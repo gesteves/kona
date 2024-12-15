@@ -16,6 +16,12 @@ class Plausible
   def query(metrics: [], date_range: "all", dimensions: ["event:page"], filters: nil, order_by: nil, offset: 0, limit: 10000)
     return if @access_token.blank? || @site_id.blank?
 
+    if date_range == "1d"
+      now = Time.now.beginning_of_hour
+      yesterday = now - 1.day
+      date_range = [yesterday.iso8601, now.iso8601]
+    end
+
     body = {
       site_id: @site_id,
       metrics: metrics,
