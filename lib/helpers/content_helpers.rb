@@ -62,6 +62,23 @@ module ContentHelpers
       .take(count) # Take the specified number of articles
   end
 
+  # Returns the most popular articles based on Plausible analytics data.
+  # @param count [Integer] (Optional) The number of popular articles to return. Default is 4.
+  # @return [Array<Object>] An array of the most popular articles, up to the specified count.
+  def most_read_articles(article, count: 4)
+    # Extract paths from articles and plausible most_popular
+    article_paths = data.articles
+      .reject { |a| a.path == article.path }
+      .reject { |a| a.draft }
+      .reject { |a| a.entry_type == 'Short' }
+      .index_by { |a| a.path.sub(/\/index\.html$/, '/') }
+
+    data.plausible.pageviews
+      .map { |path| article_paths[path] }
+      .compact
+      .take(count)
+  end
+
   # Generates a JSON-LD schema string for an article, based on the provided content.
   # @param content [Object] An object containing the article's data.
   # @see https://developers.google.com/search/docs/appearance/structured-data/article

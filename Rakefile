@@ -17,6 +17,7 @@ task :import => [:dotenv, :clobber] do
   initialize_redis
   initialize_location
   measure_and_output(:import_contentful, "Importing site content")
+  measure_and_output(:import_plausible, "Importing analytics data")
   measure_and_output(:import_font_awesome, "Importing icons")
   measure_and_output(:import_intervals, "Importing activity stats")
   measure_and_output(:import_location, "Importing location data")
@@ -25,7 +26,6 @@ task :import => [:dotenv, :clobber] do
   measure_and_output(:import_pollen, "Importing pollen data")
   measure_and_output(:import_trainer_road, "Importing today’s workouts")
   measure_and_output(:import_dark_visitors, "Importing robots.txt directives")
-  measure_and_output(:import_plausible, "Importing Plausible analytics data")
 end
 
 desc 'Run the test suite'

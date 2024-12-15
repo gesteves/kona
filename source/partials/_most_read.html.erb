@@ -1,0 +1,4 @@
+<% most_read = most_read_articles(article) %>
+<% if most_read.present? %>
+  <%= partial 'partials/collection', locals: { title: "Most Read", items: most_read, variant: "centered" } %>
+<% end %>

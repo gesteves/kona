@@ -1,4 +1,4 @@
 <%= partial 'partials/article/short', locals: { article: content } %>
 <%= partial 'partials/share', locals: { article: content } %>
-<%= partial 'partials/related', locals: { article: content } %>
+<%= partial 'partials/most_read', locals: { article: content } %>
 <%= partial 'partials/comments', locals: { article: content } if content.bluesky_comments_url.present? && ENV['BLUESKY_COMMENTS_ENABLED'].present? %>
