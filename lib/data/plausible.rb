@@ -54,8 +54,7 @@ class Plausible
     response = HTTParty.post(PLAUSIBLE_API_URL, headers: headers, body: body.to_json)
     return unless response.success?
 
-    data = JSON.parse(response.body, symbolize_names: true)
     $redis.setex(cache_key, 1.hour, response.body)
-    data
+    JSON.parse(response.body, symbolize_names: true)
   end
 end
