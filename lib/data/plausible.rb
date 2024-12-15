@@ -17,9 +17,9 @@ class Plausible
     return if @access_token.blank? || @site_id.blank?
 
     if date_range == "1d"
-      now = Time.now.beginning_of_hour
-      yesterday = now - 1.day
-      date_range = [yesterday.iso8601, now.iso8601]
+      today = Time.now.beginning_of_hour
+      yesterday = today - 1.day
+      date_range = [yesterday.iso8601, today.iso8601]
     end
 
     body = {
