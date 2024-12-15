@@ -15,6 +15,6 @@ body: I'm sorry, but the page you were looking for can't be found.
   </section>
   <% most_read = most_viewed_articles %>
   <% if most_read.present? %>
-    <%= partial 'partials/collection', locals: { title: "Most Read Articles", items: most_read, variant: "centered" } %>
+    <%= partial 'partials/collection', locals: { title: "You May Also Like", items: most_read, variant: "centered" } %>
   <% end %>
 </div>
