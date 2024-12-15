@@ -59,7 +59,7 @@ module ContentHelpers
       .reject { |a| a.path == article.path } # Exclude the current article
       .reject { |a| a.draft } # Exclude drafts
       .reject { |a| a.entry_type == 'Short' } # Exclude short posts
-      .sort_by { |a| -relatedness_score(article, a) } # Sort by relatedness score descending
+      .sort_by { |a| -relatedness_score(article, a) } # Sort by relatedness score, in descending order
       .take(count)
   end
 
