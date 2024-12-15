@@ -25,6 +25,7 @@ task :import => [:dotenv, :clobber] do
   measure_and_output(:import_pollen, "Importing pollen data")
   measure_and_output(:import_trainer_road, "Importing today’s workouts")
   measure_and_output(:import_dark_visitors, "Importing robots.txt directives")
+  measure_and_output(:import_plausible, "Importing Plausible analytics data")
 end
 
 desc 'Run the test suite'
@@ -134,6 +135,12 @@ end
 def import_dark_visitors
   safely_perform {
     DarkVisitors.new.save_data 
+  }
+end
+
+def import_plausible
+  safely_perform {
+    Plausible.new.save_data
   }
 end
 
