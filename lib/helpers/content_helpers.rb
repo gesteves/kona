@@ -50,8 +50,7 @@ module ContentHelpers
     !content.index_in_search_engines
   end
 
-  # Finds articles most related to a given article based on shared tags, recency, title similarity, and pageviews.
-  #
+  # Finds articles most related to a given article.
   # @param article [Object] The reference article for finding related articles.
   # @param count [Integer] (Optional) The number of related articles to return. Default is 4.
   # @return [Array<Object>] A list of articles sorted by relevance.
@@ -67,7 +66,7 @@ module ContentHelpers
   # Returns the most viewed articles based on Plausible analytics data.
   # @param count [Integer] (Optional) The number of popular articles to return. Default is 4.
   # @param exclude [Object] (Optional) An article to exclude from the results.
-  # @return [Array<Object>] An array of the most popular articles, up to the specified count.
+  # @return [Array<Object>] An array of the most viewed articles, up to the specified count.
   def most_viewed_articles(count: 4, exclude: nil)
     data.articles
       .reject { |a| a.path == exclude&.path }
@@ -77,11 +76,7 @@ module ContentHelpers
       .take(count)
   end
 
-  # Returns the most trending articles on the site based on recent traffic surges.
-  # Articles are ranked by their "trending score," which measures the rate of change
-  # in traffic (1-day pageviews compared to the average of the past 7 days).
-  # Ties are broken using 1-day, 7-day, and all-time pageviews, in that order.
-  #
+  # Returns the most trending articles on the site based on a "trending score".
   # @param count [Integer] (Optional) The number of trending articles to return. Default is 4.
   # @param exclude [Object] (Optional) An article to exclude from the results.
   # @return [Array<Object>] An array of the most trending articles, up to the specified count.
@@ -96,8 +91,8 @@ module ContentHelpers
 
   # Compares two articles based on 1d, 7d, and all-time pageviews, in that order.
   # That is, the article with the most pageviews in the past day is considered first.
-  # If the day's pageviews are equal, the article with the most recent week's pageviews is considered first.
-  # If they're still tied, then the article with the most all-time pageviews is considered first.
+  # If the day's pageviews are equal, the pageviews for the past week is used as a tie breaker.
+  # If they're still tied, then all-time pageviews are used as a tie breaker.
   # @param a [Object] The first article to compare.
   # @param b [Object] The second article to compare.
   # @return [Integer] -1, 0, or 1, depending on the comparison.
@@ -120,9 +115,6 @@ module ContentHelpers
   end
 
   # Compares two articles based on their trending scores and, if tied, their pageview metrics.
-  # Trending score is determined by the rate of change in traffic (1-day vs. 7-day average).
-  # Pageview metrics are used as a tie-breaker (1-day, 7-day, and all-time, in that order).
-  #
   # @param a [Object] The first article to compare.
   # @param b [Object] The second article to compare.
   # @return [Integer] -1, 0, or 1, depending on the comparison result.
@@ -140,7 +132,6 @@ module ContentHelpers
   # Calculates a "trending score" for an article based on the rate of change in traffic.
   # The score is determined by comparing the 1-day pageviews against the average pageviews
   # over the past week.
-  #
   # @param article [Object] The article for which to calculate the trending score.
   # @return [Float] The growth rate of the article's traffic. Returns 0 if there is no past traffic data.
   def trending_score(article)
@@ -151,11 +142,11 @@ module ContentHelpers
     growth_rate
   end
 
-  # Calculates the overall relatedness score between two articles.
+  # Calculates an overall score of how related two articles are.
   # The score considers:
-  # - Shared tags
-  # - Recency (time decay based on publication date)
+  # - Shared tags (more tags in common means they're more related)
   # - Title similarity
+  # - Recency (more recent articles are more related)
   #
   # @param article [Object] The reference article.
   # @param candidate [Object] The article to evaluate for relatedness.
@@ -175,12 +166,11 @@ module ContentHelpers
 
   # Calculates a recency score for an article based on its age.
   # The score decays exponentially as the article gets older.
-  #
   # @param article [Object] The article to evaluate.
   # @return [Float] A score between 0 and 1 based on how recently the article was published.
   def recency_score(article)
     days_old = ((Time.now - DateTime.parse(article.published_at)) / 1.day).to_i
-    Math.exp(-0.1 * days_old) # Adjust decay rate for faster/slower recency decay
+    Math.exp((ENV.fetch('RECENCY_DECAY_RATE', 0.1).to_f * -1) * days_old)
   end
 
   # Generates a JSON-LD schema string for an article, based on the provided content.
