@@ -1,5 +1,6 @@
 require 'active_support/all'
 require_relative 'graphql/contentful'
+require_relative 'plausible'
 
 class Contentful
   def initialize
@@ -45,6 +46,7 @@ class Contentful
     process_site
     process_articles
     process_pages
+    process_analytics
     generate_blog
     generate_tags
   end
@@ -274,5 +276,28 @@ class Contentful
       }
     end
     @content[:blog] = blog_pages
+  end
+
+  # Fetches traffic data from Plausible for articles,
+  # and stores it in each article.
+  def process_analytics
+    # Define the metrics to query
+    metrics = ["pageviews", "visits", "visitors"]
+    analytics = Plausible.new.query(metrics: metrics, date_range: "all", filters: [["matches", "event:page", ["^/20\\d{2}/"]]])
+
+    # Create a lookup hash for quick access to analytics data by path
+    analytics_data = (analytics.dig(:results) || []).each_with_object({}) do |result, hash|
+      path = result[:dimensions].first.sub(/\/index\.html$/, '/') # Normalize the path
+      hash[path] = metrics.zip(result[:metrics]).to_h # Create a hash of metric names and values
+    end
+
+    # Add analytics data to each article under :metrics[:all], defaulting metrics to 0
+    @content[:articles].each do |article|
+      normalized_path = article[:path].sub(/\/index\.html$/, '/') # Normalize the article path
+      article[:metrics] ||= {} # Initialize the metrics key if it doesn't exist
+      article[:metrics][:all] = metrics.each_with_object({}) do |metric, hash|
+        hash[metric] = analytics_data.dig(normalized_path, metric) || 0 # Default to 0 if missing
+      end
+    end
   end
 end

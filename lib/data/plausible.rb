@@ -9,42 +9,33 @@ class Plausible
   def initialize
     @access_token = ENV['PLAUSIBLE_API_KEY']
     @site_id = ENV['PLAUSIBLE_SITE_ID']
-    @data = fetch_analytics_data
   end
-
-  # Saves the fetched data into a JSON file.
-  def save_data
-    metrics = @data[:query][:metrics]
-    results = @data[:results]
-
-    # Build the JSON data with keys for each metric, sorting paths by the corresponding metric values
-    json_data = metrics.each_with_object({}) do |metric, output|
-      metric_index = metrics.index(metric)
-      output[metric] = results
-        .sort_by { |result| -result[:metrics][metric_index] }
-        .map { |result| result[:dimensions].first }
-    end
-
-    File.open('data/plausible.json', 'w') { |f| f << json_data.to_json }
-  end
-
-  private
 
   # Fetches the analytics data from the Plausible API and returns the results.
   # @return [Hash] A hash representing the API response.
-  def fetch_analytics_data
+  def query(metrics: [], date_range: "all", dimensions: ["event:page"], filters: nil, order_by: nil, offset: 0, limit: 10000)
     return if @access_token.blank? || @site_id.blank?
 
     body = {
       site_id: @site_id,
-      metrics: ["pageviews", "visits"],
-      dimensions: ["event:page"],
-      filters: [["matches", "event:page", ["^/20\\d{2}/"]]],
-      order_by: [["pageviews", "desc"]],
-      pagination: { offset: 0, limit: 1000 }
-    }
+      metrics: metrics,
+      date_range: date_range,
+      dimensions: dimensions,
+      filters: filters,
+      order_by: order_by,
+      pagination: { offset: offset, limit: limit }
+    }.compact
 
-    cache_key = "plausible:#{body.to_s.parameterize}"
+    cache_key = "plausible:query:"
+    cache_key += body.map do |key, value|
+      if value.is_a?(Hash)
+        value.map { |sub_key, sub_value| "#{key}.#{sub_key}:#{sub_value.to_s.parameterize}" }.join(':')
+      elsif value.is_a?(Array)
+        "#{key}:#{value.map(&:to_s).map(&:parameterize).join('-')}"
+      else
+        "#{key}:#{value.to_s.parameterize}"
+      end
+    end.join(':')
     data = $redis.get(cache_key)
 
     return JSON.parse(data, symbolize_names: true) if data.present?
@@ -53,11 +44,6 @@ class Plausible
       "Authorization" => "Bearer #{@access_token}",
       "Content-Type" => "application/json"
     }
-
-    body[:date_range] = [
-      1.day.ago.iso8601,
-      Time.current.iso8601
-    ]
 
     response = HTTParty.post(PLAUSIBLE_API_URL, headers: headers, body: body.to_json)
     return unless response.success?

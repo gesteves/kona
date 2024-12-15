@@ -67,15 +67,11 @@ module ContentHelpers
   # @param exclude [Object] (Optional) An article to exclude from the results.
   # @return [Array<Object>] An array of the most popular articles, up to the specified count.
   def most_read_articles(count: 4, exclude: nil)
-    article_paths = data.articles
+    data.articles
       .reject { |a| a.path == exclude&.path }
       .reject { |a| a.draft }
       .reject { |a| a.entry_type == 'Short' }
-      .index_by { |a| a.path.sub(/\/index\.html$/, '/') }
-
-    data.plausible.pageviews
-      .map { |path| article_paths[path] }
-      .compact
+      .sort { |a, b| b.metrics.all.pageviews <=> a.metrics.all.pageviews }
       .take(count)
   end
 

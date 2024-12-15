@@ -17,7 +17,6 @@ task :import => [:dotenv, :clobber] do
   initialize_redis
   initialize_location
   measure_and_output(:import_contentful, "Importing site content")
-  measure_and_output(:import_plausible, "Importing analytics data")
   measure_and_output(:import_font_awesome, "Importing icons")
   measure_and_output(:import_intervals, "Importing activity stats")
   measure_and_output(:import_location, "Importing location data")
@@ -135,12 +134,6 @@ end
 def import_dark_visitors
   safely_perform {
     DarkVisitors.new.save_data 
-  }
-end
-
-def import_plausible
-  safely_perform {
-    Plausible.new.save_data
   }
 end
 
