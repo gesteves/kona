@@ -75,6 +75,19 @@ module ContentHelpers
       .take(count)
   end
 
+  # Returns the most read articles in the past day.
+  # @param count [Integer] (Optional) The number of popular articles to return. Default is 4.
+  # @param exclude [Object] (Optional) An article to exclude from the results.
+  # @return [Array<Object>] An array of the most popular articles, up to the specified count.
+  def trending_articles(count: 4, exclude: nil)
+    data.articles
+      .reject { |a| a.path == exclude&.path }
+      .reject { |a| a.draft }
+      .reject { |a| a.entry_type == 'Short' }
+      .sort { |a, b| b.metrics[:"1d"].pageviews <=> a.metrics[:"1d"].pageviews }
+      .take(count)
+  end
+
   # Generates a JSON-LD schema string for an article, based on the provided content.
   # @param content [Object] An object containing the article's data.
   # @see https://developers.google.com/search/docs/appearance/structured-data/article
