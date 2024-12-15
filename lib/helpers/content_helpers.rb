@@ -205,9 +205,12 @@ module ContentHelpers
 
   # Formats the reading time for an article.
   # @param article [Object] The article to calculate the reading time for.
+  # @param wpm [Integer] (Optional) The words per minute to use for the calculation. Default is 200.
   # @return [String] The formatted reading time.
-  def reading_time(article)
-    minutes = article.reading_time_minutes.to_i
+  def reading_time(article, wpm: 200)
+    plain_text = sanitize([article.intro, article.body].reject(&:blank?).join("\n\n"), escape_html_entities: true)
+    word_count = plain_text.split(/\s+/).size
+    minutes = (word_count / wpm.to_f).ceil
     formatted_time = if minutes <= 1
       "one minute"
     else
