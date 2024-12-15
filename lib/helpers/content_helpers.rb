@@ -136,8 +136,8 @@ module ContentHelpers
   # @return [String] The formatted reading time.
   def reading_time(article)
     minutes = article.reading_time_minutes.to_i
-    return "Less than a minute read" if minutes == 0
-    "#{distance_of_time_in_words(Time.now, Time.now + minutes.minutes).gsub('minutes', 'minute')} read"
+    return "Est. reading time one minute" if minutes == 0
+    "Est. reading time #{distance_of_time_in_words(Time.now, Time.now + minutes.minutes)}"
   end
 
   # Formats the number of views for an article.
@@ -147,6 +147,6 @@ module ContentHelpers
     return if article&.metrics&.all&.pageviews.blank?
     views = [1, article.metrics.all.pageviews].max
     times = views == 1 ? 'once' : "#{number_to_delimited(views)} times"
-    "Viewed #{times}"
+    "Read #{times}"
   end
 end
