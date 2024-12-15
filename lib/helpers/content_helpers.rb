@@ -117,4 +117,14 @@ module ContentHelpers
     body << entry.contentful_metadata.tags.sort { |a, b| a.name <=> b.name }.map { |t| camelcase_hashtag(t.name) }.join(' ')
     body.reject(&:blank?).join("\n\n")
   end
+
+  # Formats the reading time for an article.
+  # @param article [Object] The article to calculate the reading time for.
+  # @return [String] The formatted reading time.
+  def reading_time(article)
+    minutes = article.reading_time_minutes.to_i
+    return "Less than a minute read" if minutes == 0
+
+    "#{distance_of_time_in_words(Time.now, Time.now + minutes.minutes).gsub('minutes', 'minute')} read"
+  end
 end

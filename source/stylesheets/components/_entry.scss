@@ -226,7 +226,12 @@
 
   .entry__hed {
     @extend .extend-heading-gradient;
-    margin-top: 1rem;
+  }
+}
+
+.entry--full.entry--page {
+  .entry__hed {
+    margin-bottom: -1rem;
   }
 }
 

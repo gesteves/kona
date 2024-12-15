@@ -14,6 +14,18 @@
     <h2 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">
       <%= smartypants(remove_widows(article.title)) %>
     </h2>
+    <% unless article.entry_type == 'Page' %>
+      <p class="entry__meta">
+        <span><%= reading_time(article) %></span>
+        <span>
+          <% if article.metrics.all.pageviews.to_i == 0 %>
+            Never read
+          <% else %>
+            Viewed <%= "#{number_to_delimited(article.metrics.all.pageviews)} #{'time'.pluralize(article.metrics.all.pageviews)}" %>
+          <% end %>
+        </span>
+      </p>
+    <% end %>
   </header>
   <div class="entry__body">
     <%= render_body(article.intro, image_variant: :full) %>
