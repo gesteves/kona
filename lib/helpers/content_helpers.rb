@@ -147,6 +147,6 @@ module ContentHelpers
     return if article&.metrics&.all&.pageviews.blank?
     views = [1, article.metrics.all.pageviews].max
     times = views == 1 ? 'once' : "#{number_to_delimited(views)} times"
-    "Read #{times}"
+    "Viewed #{times}"
   end
 end
