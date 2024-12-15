@@ -64,11 +64,11 @@ module ContentHelpers
 
   # Returns the most popular articles based on Plausible analytics data.
   # @param count [Integer] (Optional) The number of popular articles to return. Default is 4.
+  # @param exclude [Object] (Optional) An article to exclude from the results.
   # @return [Array<Object>] An array of the most popular articles, up to the specified count.
-  def most_read_articles(article, count: 4)
-    # Extract paths from articles and plausible most_popular
+  def most_read_articles(count: 4, exclude: nil)
     article_paths = data.articles
-      .reject { |a| a.path == article.path }
+      .reject { |a| a.path == exclude&.path }
       .reject { |a| a.draft }
       .reject { |a| a.entry_type == 'Short' }
       .index_by { |a| a.path.sub(/\/index\.html$/, '/') }
