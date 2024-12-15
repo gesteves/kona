@@ -1,4 +1,0 @@
-<% most_read = trending_articles(exclude: article) %>
-<% if most_read.present? %>
-  <%= partial 'partials/collection', locals: { title: "You May Also Like", items: most_read, variant: "centered" } %>
-<% end %>
