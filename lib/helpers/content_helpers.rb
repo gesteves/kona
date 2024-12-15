@@ -1,3 +1,5 @@
+require 'text'
+
 module ContentHelpers
   # Returns the publicly-visible name for an entry type
   # @param entry [Object] The entry to check.
@@ -48,28 +50,17 @@ module ContentHelpers
     !content.index_in_search_engines
   end
 
-  # Selects a specified number of articles related to a given article based on shared tags.
+  # Finds articles most related to a given article based on shared tags, recency, title similarity, and pageviews.
+  #
   # @param article [Object] The reference article for finding related articles.
   # @param count [Integer] (Optional) The number of related articles to return. Default is 4.
-  # @return [Array<Object>] An array of articles related to the given article, up to the specified count.
+  # @return [Array<Object>] A list of articles sorted by relevance.
   def related_articles(article, count: 4)
-    tags = article.contentful_metadata.tags.map(&:id)
     data.articles
-      .reject { |a| a.path == article.path } # Reject the article itself
-      .reject { |a| a.draft } # Reject drafts
-      .reject { |a| a.entry_type == 'Short' } # Reject short posts
-      .sort do |a, b|
-        shared_tags_a = (a.contentful_metadata.tags.map(&:id) & tags).size
-        shared_tags_b = (b.contentful_metadata.tags.map(&:id) & tags).size
-
-        # Sort articles by the number of tags they have in common,
-        # then by trending score if the number of shared tags is equal.
-        if shared_tags_b != shared_tags_a
-          shared_tags_b <=> shared_tags_a
-        else
-          compare_by_trending_score(a, b)
-        end
-      end
+      .reject { |a| a.path == article.path } # Exclude the current article
+      .reject { |a| a.draft } # Exclude drafts
+      .reject { |a| a.entry_type == 'Short' } # Exclude short posts
+      .sort_by { |a| -relatedness_score(article, a) } # Sort by relatedness score descending
       .take(count)
   end
 
@@ -158,6 +149,38 @@ module ContentHelpers
 
     growth_rate = (article.metrics[:"1d"].pageviews - avg_pageviews_last_week) / avg_pageviews_last_week
     growth_rate
+  end
+
+  # Calculates the overall relatedness score between two articles.
+  # The score considers:
+  # - Shared tags
+  # - Recency (time decay based on publication date)
+  # - Title similarity
+  #
+  # @param article [Object] The reference article.
+  # @param candidate [Object] The article to evaluate for relatedness.
+  # @return [Float] The relatedness score for the candidate article.
+  def relatedness_score(article, candidate)
+    tags_weight = ENV.fetch('RELATEDNESS_TAGS_WEIGHT', 1).to_i
+    recency_weight = ENV.fetch('RELATEDNESS_RECENCY_WEIGHT', 1).to_i
+    title_weight = ENV.fetch('RELATEDNESS_TITLE_WEIGHT', 1).to_i
+
+    shared_tags = (candidate.contentful_metadata.tags.map(&:id) & article.contentful_metadata.tags.map(&:id)).size
+    recency = recency_score(candidate)
+    title_similarity = Text::WhiteSimilarity.new.similarity(sanitize(article.title), sanitize(candidate.title))
+
+    # Composite relevance score
+    (shared_tags * tags_weight) + (recency * recency_weight) + (title_similarity * title_weight)
+  end
+
+  # Calculates a recency score for an article based on its age.
+  # The score decays exponentially as the article gets older.
+  #
+  # @param article [Object] The article to evaluate.
+  # @return [Float] A score between 0 and 1 based on how recently the article was published.
+  def recency_score(article)
+    days_old = ((Time.now - DateTime.parse(article.published_at)) / 1.day).to_i
+    Math.exp(-0.1 * days_old) # Adjust decay rate for faster/slower recency decay
   end
 
   # Generates a JSON-LD schema string for an article, based on the provided content.
