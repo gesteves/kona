@@ -223,11 +223,10 @@ module ContentHelpers
     word_count = plain_text.split(/\s+/).size
     minutes = (word_count / wpm.to_f).ceil
     formatted_time = if minutes <= 1
-      "one minute"
+      "One-minute read"
     else
-      distance_of_time_in_words(Time.now, Time.now + minutes.minutes)
+      "#{minute}-minute read"
     end
-    "Est. reading time #{formatted_time}"
   end
 
   # Formats the number of pageviews for an article.
