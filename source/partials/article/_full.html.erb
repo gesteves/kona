@@ -18,7 +18,7 @@
       <p class="entry__meta">
         <span aria-label="Estimated reading time: <%= reading_time(article) %>">Est. reading time <%= reading_time(article) %></span>
         <% if article_views(article).present? %>
-          <span>Viewed <%= article_views(article) %></span>
+          <span><%= article_views(article) %></span>
         <% end %>
       </p>
     <% end %>
