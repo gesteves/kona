@@ -56,9 +56,9 @@ module ContentHelpers
   # @return [Array<Object>] A list of articles sorted by relevance.
   def related_articles(article, count: 4)
     data.articles
-      .reject { |a| a.path == article.path } # Exclude the current article
-      .reject { |a| a.draft } # Exclude drafts
-      .reject { |a| a.entry_type == 'Short' } # Exclude short posts
+      .reject { |a| a.path == article.path }          # Exclude the current article
+      .reject { |a| a.draft }                         # Exclude drafts
+      .reject { |a| a.entry_type == 'Short' }         # Exclude short posts
       .sort_by { |a| -relatedness_score(article, a) } # Sort by relatedness score, in descending order
       .take(count)
   end
@@ -82,10 +82,10 @@ module ContentHelpers
   # @return [Array<Object>] An array of the trending articles, up to the specified count.
   def trending_articles(count: 4, exclude: nil)
     data.articles
-      .reject { |a| a.path == exclude&.path }
-      .reject { |a| a.draft }
-      .reject { |a| a.entry_type == 'Short' }
-      .sort_by { |a| -trending_score(a) }
+      .reject { |a| a.path == exclude&.path } # Exclude the current article, if applicable
+      .reject { |a| a.draft }                 # Exclude drafts
+      .reject { |a| a.entry_type == 'Short' } # Exclude short posts
+      .sort_by { |a| -trending_score(a) }     # Sort by trending score, in descending order
       .take(count)
   end
 
