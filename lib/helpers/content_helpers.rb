@@ -85,48 +85,8 @@ module ContentHelpers
       .reject { |a| a.path == exclude&.path }
       .reject { |a| a.draft }
       .reject { |a| a.entry_type == 'Short' }
-      .sort { |a, b| compare_by_trending_score(a, b) }
+      .sort_by { |a| -trending_score(a) }
       .take(count)
-  end
-
-  # Compares two articles based on 1d, 7d, and all-time pageviews, in that order.
-  # That is, the article with the most pageviews in the past day is considered first.
-  # If the day's pageviews are equal, the pageviews for the past week is used as a tie breaker.
-  # If they're still tied, then all-time pageviews are used as a final tie breaker.
-  # @param a [Object] The first article to compare.
-  # @param b [Object] The second article to compare.
-  # @return [Integer] -1, 0, or 1, depending on the comparison.
-  def compare_by_pageviews(a, b)
-    day_pageviews_b = b.metrics[:"1d"].pageviews
-    day_pageviews_a = a.metrics[:"1d"].pageviews
-
-    if day_pageviews_b != day_pageviews_a
-      day_pageviews_b <=> day_pageviews_a
-    else
-      week_pageviews_b = b.metrics[:"7d"].pageviews
-      week_pageviews_a = a.metrics[:"7d"].pageviews
-
-      if week_pageviews_b != week_pageviews_a
-        week_pageviews_b <=> week_pageviews_a
-      else
-        b.metrics.all.pageviews <=> a.metrics.all.pageviews
-      end
-    end
-  end
-
-  # Compares two articles based on their trending scores and, if tied, their pageview metrics.
-  # @param a [Object] The first article to compare.
-  # @param b [Object] The second article to compare.
-  # @return [Integer] -1, 0, or 1, depending on the comparison result.
-  def compare_by_trending_score(a, b)
-    score_b = trending_score(b)
-    score_a = trending_score(a)
-
-    if score_b != score_a
-      score_b <=> score_a
-    else
-      compare_by_pageviews(a, b) # Fall back to pageviews if scores are tied
-    end
   end
 
   # Calculates a "trending score" for an article based on the rate of change in traffic.
