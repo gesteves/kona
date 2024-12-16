@@ -33,6 +33,30 @@ icons:
       - stopwatch
       - tag
       - tags
+      - clock-one
+      - clock-one-thirty
+      - clock-two
+      - clock-two-thirty
+      - clock-three
+      - clock-three-thirty
+      - clock-four
+      - clock-four-thirty
+      - clock-five
+      - clock-five-thirty
+      - clock-six
+      - clock-six-thirty
+      - clock-seven
+      - clock-seven-thirty
+      - clock-eight
+      - clock-eight-thirty
+      - clock-nine
+      - clock-nine-thirty
+      - clock-ten
+      - clock-ten-thirty
+      - clock-eleven
+      - clock-eleven-thirty
+      - clock-twelve
+      - clock-twelve-thirty
     thin:
       - bolt-lightning
       - cloud-bolt
