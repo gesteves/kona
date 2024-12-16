@@ -5,9 +5,16 @@
           <span class="entry__highlight">Draft</span>
         <% end %>
         <% unless article.entry_type == 'Page' %>
-          <span><%= article_permalink_timestamp(article) %></span>
+          <span><%= icon_svg("classic", "light", "calendar") %> <%= article_permalink_timestamp(article) %></span>
           <% if article.contentful_metadata.tags.present? %>
-            <span><%= article.contentful_metadata.tags.sort { |a, b| a.name <=> b.name }.map { |tag| link_to tag.name, "/tagged/#{tag.id}/index.html" }.join(', ') %></span>
+            <span>
+              <% if article.contentful_metadata.tags.size == 1 %>
+                <%= icon_svg("classic", "light", "tag") %>
+              <% else %>
+                <%= icon_svg("classic", "light", "tags") %>
+              <% end %>
+              <%= article.contentful_metadata.tags.sort { |a, b| a.name <=> b.name }.map { |tag| link_to tag.name, "/tagged/#{tag.id}/index.html" }.join(', ') %>
+            </span>
           <% end %>
         <% end %>
       </p>
@@ -16,10 +23,8 @@
     </h2>
     <% unless article.entry_type == 'Page' %>
       <p class="entry__meta">
-        <span aria-label="Estimated reading time: <%= reading_time(article) %>">Est. reading time <%= reading_time(article) %></span>
-        <% if article_views(article).present? %>
-          <span><%= article_views(article) %></span>
-        <% end %>
+        <span><%= icon_svg("classic", "light", "stopwatch") %> <%= reading_time(article) %></span>
+        <span><%= icon_svg("classic", "light", "eye") %> <%= article_views(article) %></span>
       </p>
     <% end %>
   </header>

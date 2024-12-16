@@ -27,6 +27,12 @@ icons:
       - heart
       - retweet
       - triangle-exclamation
+    light:
+      - calendar
+      - eye
+      - stopwatch
+      - tag
+      - tags
     thin:
       - bolt-lightning
       - cloud-bolt

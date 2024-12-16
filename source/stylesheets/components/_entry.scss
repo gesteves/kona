@@ -25,13 +25,24 @@
     text-decoration: none;
   }
 
-  span::after {
-    color: var(--color-text-tertiary);
-    content: '\00a0•';
+  span {
+    margin-right: 1rem;
   }
 
-  span:last-of-type::after {
-    content: '';
+  span:last-of-type {
+    margin-right: 0;
+  }
+
+  svg {
+    display: inline-block;
+    height: 1rem;
+    vertical-align: text-bottom;
+    width: 1rem;
+
+    g,
+    path {
+      fill: var(--color-text-tertiary);
+    }
   }
 }
 
