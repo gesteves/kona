@@ -22,12 +22,11 @@ icons:
       - rss
       - shield-check
       - triangle-exclamation
-    regular:
+    light:
       - comment
       - heart
       - retweet
       - triangle-exclamation
-    light:
       - calendar
       - eye
       - stopwatch
