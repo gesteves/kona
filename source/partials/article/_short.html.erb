@@ -1,18 +1,6 @@
 <article class="entry entry--compact" id="entry-<%= article.sys.id.parameterize %>">
   <header class="entry__header">
-    <p class="entry__meta">
-      <span><%= icon_svg("classic", "light", "calendar") %> <%= article_permalink_timestamp(article) %></span>
-      <% if article.contentful_metadata.tags.present? %>
-        <span>
-          <% if article.contentful_metadata.tags.size == 1 %>
-            <%= icon_svg("classic", "light", "tag") %>
-          <% else %>
-            <%= icon_svg("classic", "light", "tags") %>
-          <% end %>
-          <%= article.contentful_metadata.tags.sort { |a, b| a.name <=> b.name }.map { |tag| link_to tag.name, "/tagged/#{tag.id}/index.html" }.join(', ') %>
-        </span>
-      <% end %>
-    </p>
+    <%= partial 'partials/article/meta_top', locals: { article: article } %>
   </header>
   <div class="entry__body">
     <%= prepend_title(smartypants(article.title), render_body(article.intro)) %>
