@@ -128,7 +128,7 @@ module ContentHelpers
   # @return [Float] A score between 0 and 1 based on how recently the article was published.
   def recency_score(article)
     days_old = ((Time.now - DateTime.parse(article.published_at)) / 1.day).to_i
-    Math.exp((ENV.fetch('RECENCY_SCORE_DECAY_RATE', 0.1).to_f * -1) * days_old)
+    Math.exp((ENV.fetch('RECENCY_SCORE_DECAY_RATE', 0.1).to_f.abs * -1) * days_old)
   end
 
   # Generates a JSON-LD schema string for an article, based on the provided content.
