@@ -222,11 +222,8 @@ module ContentHelpers
     plain_text = sanitize([article.intro, article.body].reject(&:blank?).join("\n\n"), escape_html_entities: true)
     word_count = plain_text.split(/\s+/).size
     minutes = (word_count / wpm.to_f).ceil
-    formatted_time = if minutes <= 1
-      "One-minute read"
-    else
-      "#{minute}-minute read"
-    end
+    minutes = "One" if minutes <= 1
+    "#{minutes}-minute read"
   end
 
   # Formats the number of pageviews for an article.
