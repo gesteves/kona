@@ -108,7 +108,11 @@ module ContentHelpers
   # @return [Float] The trending score, between 0 and 1.
   def trending_score(article)
     # Calculate max growth rates among all articles
-    max_growth_rate = data.articles.map { |a| pageview_growth_rate(a) }.max
+    max_growth_rate = data.articles
+      .reject { |a| a.draft }                 # Exclude drafts
+      .reject { |a| a.entry_type == 'Short' } # Exclude short posts
+      .map { |a| pageview_growth_rate(a) }
+      .max
 
     # Avoid division by zero
     return 0 if max_growth_rate.zero?
