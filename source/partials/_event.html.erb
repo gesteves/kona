@@ -13,7 +13,7 @@
       <% else %>
         <span><%= icon_svg("classic", "light", "calendar") %> <%= DateTime.parse(event.date).strftime('%B %-e, %Y') %></span>
       <% end %>
-      <span><%= icon_svg("classic", "light", "location-dot") %><%= event.location %></span>
+      <span><%= icon_svg("classic", "light", "location-dot") %> <%= event.location %></span>
     </p>
     <h4 class="entry__hed" id="hed-<%= event.sys.id.parameterize %>">
       <%= link_to smartypants(remove_widows(event.title)), event.url, rel: "noopener", target: "_blank" %>
