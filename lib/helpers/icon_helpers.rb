@@ -1,5 +1,4 @@
 require 'humanize'
-require_relative '../data/font_awesome'
 
 module IconHelpers
   # Returns the SVG for a specified icon.
@@ -8,7 +7,7 @@ module IconHelpers
   # @param icon_id [String] The unique identifier for the icon.
   # @return [String] The SVG content for the icon.
   def icon_svg(family, style, icon_id)
-    FontAwesome.new.get_icon(family, style, icon_id)
+    data.icons.dig(family, style)&.find { |i| i.id == icon_id }&.svg
   end
 
   # Returns the SVG for the clock icon closest to the given time.
