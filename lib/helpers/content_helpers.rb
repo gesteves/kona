@@ -50,7 +50,7 @@ module ContentHelpers
     !content.index_in_search_engines
   end
 
-  # Finds articles most related to a given article.
+  # Returns the articles most relevant to the given article.
   # @param article [Object] The reference article for finding related articles.
   # @param count [Integer] (Optional) The number of articles to return.
   # @return [Array<Object>] A list of articles sorted by relevance.
@@ -76,7 +76,7 @@ module ContentHelpers
       .take(count)
   end
 
-  # Returns the most trending articles on the site based on a "trending score".
+  # Returns the articles that are "trending", i.e. getting a surge of traffic.
   # @param count [Integer] (Optional) The number of articles to return.
   # @param exclude [Object] (Optional) An article to exclude from the results.
   # @return [Array<Object>] An array of the trending articles, up to the specified count.
@@ -89,9 +89,8 @@ module ContentHelpers
       .take(count)
   end
 
-  # Calculates the pageview growth rate for an article.
-  # The growth rate is based on the increase from the 7-day average pageviews to the past 1-day pageviews.
-  #
+  # Calculates the growth rate for an article, comparing the pageviews in the past day
+  # to the average pageviews in the past week.
   # @param article [Object] The article for which to calculate the growth rate.
   # @return [Float] The growth rate. Returns 0 if there are no past pageviews.
   def pageview_growth_rate(article)
@@ -101,9 +100,10 @@ module ContentHelpers
     (article.metrics[:"1d"].pageviews - avg_pageviews_last_week) / avg_pageviews_last_week
   end
 
-  # Calculates the trending score for a single article.
-  # The score is normalized to be between 0 and 1, with the top growth rate across all articles receiving a score of 1.
-  #
+  # Normalizes the growth rate of an article to a "trending" score between 0 and 1.
+  # e.g. the article with the highest growth rate in the past day is the most "trending" one,
+  # with a score of 1.
+  # (idk, just making things up.)
   # @param article [Object] The article for which to calculate the trending score.
   # @return [Float] The trending score, between 0 and 1.
   def trending_score(article)
@@ -120,9 +120,8 @@ module ContentHelpers
 
   # Calculates an overall similarity score between two articles.
   # The score is normalized to be between 0 and 1 and considers:
-  # - Shared tags (proportional to total tags in the reference article)
-  # - Title similarity (normalized similarity score using Text::WhiteSimilarity)
-  #
+  # - Proportion of shared tags (articles with lots of tags in common are probably similar)
+  # - Similarity of the titles (articles with similar titles are probably similar)
   # @param article [Object] The reference article.
   # @param candidate [Object] The article to evaluate for similarity.
   # @return [Float] The similarity score between 0 and 1.
@@ -142,9 +141,8 @@ module ContentHelpers
     (tags_score * tags_weight) + (title_score * title_weight)
   end
 
-  # Calculates a relevance score by combining similarity_score, recency_score, and trending_score.
-  # Each score is normalized to be between 0 and 1, and weights can be configured via ENV variables.
-  #
+  # Calculates a relevance score by adding up similarity_score, recency_score, and trending_score.
+  # Assumes that articles that are similar, recent, and trending are relevant to the given article.
   # @param article [Object] The reference article.
   # @param candidate [Object] The article to evaluate for relevance.
   # @return [Float] The relevance score between 0 and 1.
