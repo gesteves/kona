@@ -91,6 +91,7 @@ module ContentfulClient
           indexInSearchEngines
           canonicalUrl
           isHomePage
+          showRecommendations
           coverImage {
             ...ImageFields
           }

@@ -1,2 +1,4 @@
 <%= partial 'partials/article/page', locals: { article: content } %>
-<%= partial 'partials/trending' %>
+<% if content.show_recommendations %>
+  <%= partial 'partials/trending' %>
+<% end %>
