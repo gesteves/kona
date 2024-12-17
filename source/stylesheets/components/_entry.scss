@@ -4,6 +4,8 @@
 
 .entry__meta {
   color: var(--color-text-secondary);
+  display: flex;
+  flex-flow: column;
   font-family: var(--ibm-plex-mono);
   font-size: var(--font-x-small);
   line-height: var(--line-height-x-small);
@@ -25,14 +27,6 @@
     text-decoration: none;
   }
 
-  span {
-    margin-right: 1rem;
-  }
-
-  span:last-of-type {
-    margin-right: 0;
-  }
-
   svg {
     display: inline-block;
     height: 1rem;
@@ -42,6 +36,18 @@
     g,
     path {
       fill: var(--color-text-tertiary);
+    }
+  }
+
+  @media (min-width: 500px) {
+    display: block;
+    
+    span {
+      margin-right: 1rem;
+    }
+  
+    span:last-of-type {
+      margin-right: 0;
     }
   }
 }
