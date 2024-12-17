@@ -15,6 +15,7 @@ icons:
       - check
       - circle-check
       - circle-notch
+      - circle-small
       - comment
       - envelope
       - link
@@ -30,12 +31,12 @@ icons:
       - comment
       - eye
       - heart
+      - location-dot
       - retweet
       - stopwatch
       - tag
       - tags
       - triangle-exclamation
-      - location-dot
       - clock-one
       - clock-one-thirty
       - clock-two
