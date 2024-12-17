@@ -361,6 +361,8 @@
 .extend-heading-gradient {
   color: var(--color-heading);
   font-weight: 700;
+  margin-bottom: -1rem;
+  padding-bottom: 1rem;
 
   @media screen {
     @supports (background-clip: text) or (-webkit-background-clip: text) {
@@ -368,8 +370,6 @@
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
-      margin-bottom: -1rem;
-      padding-bottom: 1rem;
     }
   }
 }
