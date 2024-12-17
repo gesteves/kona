@@ -39,11 +39,11 @@
     }
   }
 
-  @media (min-width: 500px) {
+  @media (min-width: #{$bp-medium}) {
     display: block;
-    
+
     span {
-      margin-right: 1rem;
+      margin-right: 0.5rem;
     }
   
     span:last-of-type {
