@@ -238,14 +238,14 @@
     border-bottom: 1px solid var(--color-border);
     margin-bottom: var(--padding);
     padding-bottom: var(--padding);
+    
+    @media (min-width: #{$bp-medium}) {
+      text-align: center;
+    }
   }
 
   .entry__hed {
     @extend .extend-heading-gradient;
-  }
-
-  @media (min-width: #{$bp-medium}) {
-    text-align: center;
   }
 }
 
