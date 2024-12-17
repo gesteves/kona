@@ -160,6 +160,15 @@ module ContentHelpers
     (similarity * similarity_weight) + (recency * recency_weight) + (trending * trending_weight)
   end
 
+  # Calculates a recency score for an article based on its age.
+  # The score decays exponentially as the article gets older.
+  # @param article [Object] The article to evaluate.
+  # @return [Float] A score between 0 and 1 based on how recently the article was published.
+  def recency_score(article)
+    days_old = ((Time.now - DateTime.parse(article.published_at)) / 1.day).to_i
+    Math.exp((ENV.fetch('RECENCY_SCORE_DECAY_RATE', 0.1).to_f.abs * -1) * days_old)
+  end
+
   # Generates a JSON-LD schema string for an article, based on the provided content.
   # @param content [Object] An object containing the article's data.
   # @see https://developers.google.com/search/docs/appearance/structured-data/article
