@@ -1,7 +1,14 @@
 <article class="entry entry--summary" id="entry-<%= article.sys.id.parameterize %>" aria-labelledby="hed-<%= article.sys.id.parameterize %>">
   <header class="entry__header">
     <p class="entry__meta">
-      <span><%= article_permalink_timestamp(article) %></span>
+      <span>
+        <% if published_today?(article) || article.draft %>
+          <%= clock_icon_svg(DateTime.parse(article.published_at)) %>
+        <% else %>
+          <%= icon_svg("classic", "light", "calendar") %>
+        <% end %>
+        <%= article_permalink_timestamp(article) %>
+      </span>
     </p>
     <h4 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">
       <%= link_to smartypants(remove_widows(article.title)), article.path %>
