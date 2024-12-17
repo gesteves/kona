@@ -17,7 +17,6 @@ task :import => [:dotenv, :clobber] do
   initialize_redis
   initialize_location
   measure_and_output(:import_contentful, "Importing site content")
-  measure_and_output(:import_font_awesome, "Importing icons")
   measure_and_output(:import_intervals, "Importing activity stats")
   measure_and_output(:import_location, "Importing location data")
   measure_and_output(:import_weather, "Importing weather data")
@@ -81,10 +80,6 @@ end
 
 def import_contentful
   safely_perform { Contentful.new.save_data }
-end
-
-def import_font_awesome
-  safely_perform { FontAwesome.new.save_data }
 end
 
 def import_intervals
