@@ -16,7 +16,11 @@
       <span><%= icon_svg("classic", "light", "location-dot") %> <%= event.location %></span>
     </p>
     <h4 class="entry__hed" id="hed-<%= event.sys.id.parameterize %>">
-      <%= link_to smartypants(remove_widows(event.title)), event.url, rel: "noopener", target: "_blank" %>
+      <% if event.url.present? %>
+        <%= link_to smartypants(remove_widows(event.title)), event.url, rel: "noopener", target: "_blank" %>
+      <% else %>
+        <%= smartypants(remove_widows(event.title)) %>
+      <% end %>
     </h4>
   </header>
   <% if event.description.present? %>
