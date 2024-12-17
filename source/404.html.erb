@@ -14,7 +14,7 @@ body: I'm sorry, but the page you were looking for can't be found.
     </div>
   </section>
   <% trending = trending_articles %>
-  <% if most_read.present? %>
+  <% if trending.present? %>
     <%= partial 'partials/collection', locals: { title: "Trending Articles", items: trending, variant: "centered" } %>
   <% end %>
 </div>
