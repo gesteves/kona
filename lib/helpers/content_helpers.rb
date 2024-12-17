@@ -191,7 +191,13 @@ module ContentHelpers
   def article_views(article)
     return if article&.metrics&.all&.pageviews.blank?
     views = [1, article.metrics.all.pageviews].max
-    times = views == 1 ? 'once' : "#{number_to_delimited(views)} times"
+    times = if views == 1
+      "once"
+    elsif views == 69
+      "69 times (nice)"
+    else
+      "#{number_to_delimited(views)} times"
+    end
     "Viewed #{times}"
   end
 end
