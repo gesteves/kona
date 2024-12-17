@@ -92,18 +92,11 @@
   }
 }
 
-.entry__highlight--live::before {
+.entry__highlight--live svg {
   animation: 1s blink ease infinite;
-  background: currentColor;
-  border-radius: 100%;
-  content: ' ';
-  display: inline-block;
-  height: 0.5rem;
-  margin-right: 0.25rem;
-  width: 0.5rem;
 
   @media (prefers-reduced-motion: reduce) {
-    display: none;
+    animation: none;
   }
 }
 
