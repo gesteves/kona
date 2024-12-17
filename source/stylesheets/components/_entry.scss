@@ -83,6 +83,13 @@
   &::after {
     font-weight: normal;
   }
+
+  svg {
+    g,
+    path {
+      fill: var(--color-firebrick);
+    }
+  }
 }
 
 .entry__highlight--live::before {

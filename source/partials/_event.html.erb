@@ -6,9 +6,9 @@
           <span class="entry__highlight entry__highlight--live"><%= link_to "Live results", event.tracking_url, rel: "noopener", target: "_blank" %></span>
           <span><%= icon_svg("classic", "light", "calendar") %> Today</span>
         <% elsif is_daytime? %>
-          <span class="entry__highlight entry__highlight--live">Today</span>
+          <span class="entry__highlight"><%= icon_svg("classic", "regular", "calendar-check") %> Today</span>
         <% else %>
-          <span><%= icon_svg("classic", "light", "calendar") %> Today</span>
+          <span><%= icon_svg("classic", "light", "calendar-check") %> Today</span>
         <% end %>
       <% else %>
         <span><%= icon_svg("classic", "light", "calendar") %> <%= DateTime.parse(event.date).strftime('%B %-e, %Y') %></span>

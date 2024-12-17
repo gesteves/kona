@@ -22,16 +22,19 @@ icons:
       - rss
       - shield-check
       - triangle-exclamation
+    regular:
+      - calendar-check
     light:
+      - calendar
+      - calendar-check
       - comment
+      - eye
       - heart
       - retweet
-      - triangle-exclamation
-      - calendar
-      - eye
       - stopwatch
       - tag
       - tags
+      - triangle-exclamation
       - location-dot
       - clock-one
       - clock-one-thirty
