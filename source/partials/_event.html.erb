@@ -4,16 +4,16 @@
       <% if is_today?(event) %>
         <% if is_daytime? && event.tracking_url.present? %>
           <span class="entry__highlight entry__highlight--live"><%= link_to "Live results", event.tracking_url, rel: "noopener", target: "_blank" %></span>
-          <span>Today</span>
+          <span><%= icon_svg("classic", "light", "calendar") %> Today</span>
         <% elsif is_daytime? %>
           <span class="entry__highlight entry__highlight--live">Today</span>
         <% else %>
-          <span>Today</span>
+          <span><%= icon_svg("classic", "light", "calendar") %> Today</span>
         <% end %>
       <% else %>
-        <span><%= Time.parse(event.date).strftime('%B %-e, %Y') %></span>
+        <span><%= icon_svg("classic", "light", "calendar") %> <%= DateTime.parse(event.date).strftime('%B %-e, %Y') %></span>
       <% end %>
-      <span><%= event.location %></span>
+      <span><%= icon_svg("classic", "light", "location-dot") %><%= event.location %></span>
     </p>
     <h4 class="entry__hed" id="hed-<%= event.sys.id.parameterize %>">
       <%= link_to smartypants(remove_widows(event.title)), event.url, rel: "noopener", target: "_blank" %>
