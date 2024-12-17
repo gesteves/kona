@@ -59,7 +59,7 @@ module ContentHelpers
       .reject { |a| a.path == article.path }          # Exclude the current article
       .reject { |a| a.draft }                         # Exclude drafts
       .reject { |a| a.entry_type == 'Short' }         # Exclude short posts
-      .sort_by { |a| -relatedness_score(article, a) } # Sort by relatedness score, in descending order
+      .sort_by { |a| -relevance_score(article, a) }   # Sort by relevance score, in descending order
       .take(count)
   end
 
@@ -89,46 +89,75 @@ module ContentHelpers
       .take(count)
   end
 
-  # Calculates a "trending score" for an article based on the rate of change in traffic.
-  # The score is determined by comparing the 1-day pageviews against the average pageviews
-  # over the past week.
-  # @param article [Object] The article for which to calculate the trending score.
-  # @return [Float] The growth rate of the article's traffic. Returns 0 if there is no past traffic data.
-  def trending_score(article)
+  # Calculates the pageview growth rate for an article.
+  # The growth rate is based on the increase from the 7-day average pageviews to the past 1-day pageviews.
+  #
+  # @param article [Object] The article for which to calculate the growth rate.
+  # @return [Float] The growth rate. Returns 0 if there are no past pageviews.
+  def pageview_growth_rate(article)
     avg_pageviews_last_week = article.metrics[:"7d"].pageviews / 7.0
     return 0 if avg_pageviews_last_week.zero?
 
     (article.metrics[:"1d"].pageviews - avg_pageviews_last_week) / avg_pageviews_last_week
   end
 
-  # Calculates an overall score of how related two articles are.
-  # The score considers:
-  # - Shared tags (more tags in common means they're more related)
-  # - Title similarity (more similar titles are weighed more heavily)
-  # - Recency (more recent articles are weighed more heavily)
+  # Calculates the trending score for a single article.
+  # The score is normalized to be between 0 and 1, with the top growth rate across all articles receiving a score of 1.
   #
-  # @param article [Object] The reference article.
-  # @param candidate [Object] The article to evaluate for relatedness.
-  # @return [Float] The relatedness score for the candidate article.
-  def relatedness_score(article, candidate)
-    tags_weight = ENV.fetch('RELATEDNESS_TAGS_WEIGHT', 1).to_i
-    recency_weight = ENV.fetch('RELATEDNESS_RECENCY_WEIGHT', 1).to_i
-    title_weight = ENV.fetch('RELATEDNESS_TITLE_WEIGHT', 1).to_i
+  # @param article [Object] The article for which to calculate the trending score.
+  # @return [Float] The trending score, between 0 and 1.
+  def trending_score(article)
+    # Calculate max growth rates among all articles
+    max_growth_rate = data.articles.map { |a| pageview_growth_rate(a) }.max
 
-    shared_tags = (candidate.contentful_metadata.tags.map(&:id) & article.contentful_metadata.tags.map(&:id)).size
-    recency = recency_score(candidate)
-    title_similarity = Text::WhiteSimilarity.new.similarity(sanitize(article.title), sanitize(candidate.title))
+    # Avoid division by zero
+    return 0 if max_growth_rate.zero?
 
-    (shared_tags * tags_weight) + (recency * recency_weight) + (title_similarity * title_weight)
+    # Normalize the article's growth rate
+    article_growth_rate = pageview_growth_rate(article)
+    article_growth_rate / max_growth_rate
   end
 
-  # Calculates a recency score for an article based on its age.
-  # The score decays exponentially as the article gets older.
-  # @param article [Object] The article to evaluate.
-  # @return [Float] A score between 0 and 1 based on how recently the article was published.
-  def recency_score(article)
-    days_old = ((Time.now - DateTime.parse(article.published_at)) / 1.day).to_i
-    Math.exp((ENV.fetch('RECENCY_SCORE_DECAY_RATE', 0.1).to_f.abs * -1) * days_old)
+  # Calculates an overall similarity score between two articles.
+  # The score is normalized to be between 0 and 1 and considers:
+  # - Shared tags (proportional to total tags in the reference article)
+  # - Title similarity (normalized similarity score using Text::WhiteSimilarity)
+  #
+  # @param article [Object] The reference article.
+  # @param candidate [Object] The article to evaluate for similarity.
+  # @return [Float] The similarity score between 0 and 1.
+  def similarity_score(article, candidate)
+    tags_weight = ENV.fetch('SIMILARITY_TAGS_WEIGHT', 1).to_f
+    title_weight = ENV.fetch('SIMILARITY_TITLE_WEIGHT', 1).to_f
+
+    # Tags score is the percentage of tags in common
+    total_tags = article.contentful_metadata.tags.map(&:id).size.to_f
+    shared_tags = (candidate.contentful_metadata.tags.map(&:id) & article.contentful_metadata.tags.map(&:id)).size
+    tags_score = total_tags.zero? ? 0 : (shared_tags / total_tags)
+
+    # Title score uses Text::WhiteSimilarity to score how similar their titles are
+    white = Text::WhiteSimilarity.new
+    title_score = white.similarity(sanitize(article.title), sanitize(candidate.title))
+
+    (tags_score * tags_weight) + (title_score * title_weight)
+  end
+
+  # Calculates a relevance score by combining similarity_score, recency_score, and trending_score.
+  # Each score is normalized to be between 0 and 1, and weights can be configured via ENV variables.
+  #
+  # @param article [Object] The reference article.
+  # @param candidate [Object] The article to evaluate for relevance.
+  # @return [Float] The relevance score between 0 and 1.
+  def relevance_score(article, candidate)
+    similarity_weight = ENV.fetch('RELEVANCE_SIMILARITY_WEIGHT', 1).to_f
+    recency_weight = ENV.fetch('RELEVANCE_RECENCY_WEIGHT', 1).to_f
+    trending_weight = ENV.fetch('RELEVANCE_TRENDING_WEIGHT', 1).to_f
+
+    similarity = similarity_score(article, candidate)
+    recency = recency_score(candidate)
+    trending = trending_score(candidate)
+
+    (similarity * similarity_weight) + (recency * recency_weight) + (trending * trending_weight)
   end
 
   # Generates a JSON-LD schema string for an article, based on the provided content.
