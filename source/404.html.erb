@@ -13,8 +13,7 @@ body: I'm sorry, but the page you were looking for can't be found.
       <%= smartypants(markdown_to_html(current_page.data.body)) %>
     </div>
   </section>
-  <% trending = trending_articles %>
-  <% if trending.present? %>
-    <%= partial 'partials/collection', locals: { title: "Trending Articles", items: trending, variant: "centered" } %>
+  <% if trending_articles.present? %>
+    <%= partial 'partials/collection', locals: { title: "Trending Articles", items: trending_articles, variant: "centered" } %>
   <% end %>
 </div>
