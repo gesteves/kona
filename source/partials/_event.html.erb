@@ -1,9 +1,7 @@
 <article class="entry entry--summary" id="event-<%= event.sys.id.parameterize %>" aria-labelledby="hed-<%= event.sys.id.parameterize %>">
   <header class="entry__header">
     <p class="entry__meta entry__meta--truncated">
-      <% if is_trackable?(event) %>
-        <span class="entry__highlight entry__highlight--live"><%= icon_svg("classic", "solid", "circle-small") %> <%= link_to "Live results", event.tracking_url, rel: "noopener", target: "_blank" %></span>
-      <% end %>
+      <%= event_tracking_tag(event) %>
       <%= event_timestamp_tag(event) %>
       <span><%= icon_svg("classic", "light", "location-dot") %> <%= event.location %></span>
     </p>

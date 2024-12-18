@@ -89,6 +89,21 @@ module EventsHelpers
     end
   end
 
+  # Generates an HTML span tag with the event's tracking link.
+  # @param event [Object] The event object to render.
+  # @return [String] An HTML-safe string with the event's tracking link.
+  def event_tracking_tag(event)
+    return "" unless is_trackable?(event)
+    tags = []
+    tags << icon_svg("classic", "solid", "circle-small")
+    tags << content_tag :a, { href: event.tracking_url, rel: "nooopener", target: "_blank" } do
+      "Live results"
+    end
+    content_tag :span, { class: "entry__highlight entry__highlight--live" } do
+      tags.join(" ")
+    end
+  end
+
   # Generates an HTML span tag with the event's icon and timestamp.
   # @param event [Object] The event object to render.
   # @return [String] An HTML-safe string with the event's icon and formatted timestamp.
