@@ -33,11 +33,25 @@ module EventsHelpers
     event.status.include?("Registered")
   end
 
+  # Determines if I'm not starting this event.
+  # @param event [Object] The event object to check.
+  # @return [Boolean] True if the event's status includes "DNS" (Did Not Start), otherwise false.
+  def is_dns?(event)
+    event.status.include?("DNS")
+  end
+
+  # Determines if the event has been canceled.
+  # @param event [Object] The event object to check.
+  # @return [Boolean] True if the event's status includes "Canceled"), otherwise false.
+  def is_canceled?(event)
+    event.status.include?("Canceled")
+  end
+
   # Determines if I'm not attending the event, either because it's been canceled or I'm a DNS.
   # @param event [Object] The event object to check.
   # @return [Boolean] True if the event's status includes "Canceled" or "DNS" (Did Not Start), otherwise false.
   def is_canceled?(event)
-    (event.status & ["Canceled", "DNS"]).present?
+    is_dns?(event) || is_canceled?(event)
   end
 
   # Determines if the event status is tentative, i.e. I'm considering it but haven't registered yet.
@@ -89,15 +103,6 @@ module EventsHelpers
   def event_timestamp_tag(event)
     options = {}
     options[:class] = "entry__highlight" if is_in_progress?(event) && !is_trackable?(event)
-    options[:title] = if is_today?(event)
-      "It’s today!"
-    elsif is_confirmed?(event)
-      "Registered"
-    elsif is_canceled?(event)
-      event.status.join(", ")
-    elsif is_tentative?(event)
-      "Tentative"
-    end
     content_tag :span, options do
       "#{event_icon_svg(event)} #{event_timestamp(event)}"
     end
