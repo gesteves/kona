@@ -94,13 +94,13 @@ module EventsHelpers
   # @return [String] An HTML-safe string with the event's tracking link.
   def event_tracking_tag(event)
     return "" unless is_trackable?(event)
+    
     tags = []
     tags << icon_svg("classic", "solid", "circle-small")
-    tags << content_tag :a, { href: event.tracking_url, rel: "nooopener", target: "_blank" } do
-      "Live results"
-    end
-    content_tag :span, { class: "entry__highlight entry__highlight--live" } do
-      tags.join(" ")
+    tags << content_tag(:a, "Live results", href: event.tracking_url, rel: "noopener", target: "_blank")
+  
+    content_tag :span, class: "entry__highlight entry__highlight--live" do
+      tags.join(" ").html_safe
     end
   end
 
