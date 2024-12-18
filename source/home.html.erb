@@ -7,12 +7,14 @@
       <%= render_home_body(content.body) %>
     </div>
   </section>
+  <% if recent_articles.present? %>
+    <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent_articles, variant: "halves" } %>
+  <% end %>
   <% if data.intervals.present? %>
     <%= partial 'partials/stats', locals: { stats: data.intervals } %>
   <% end %>
-  <% recent_articles = recent_articles(count: 4) %>
-  <% if recent_articles.present? %>
-    <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent_articles, variant: "halves" } %>
+  <% if trending_articles.present? %>
+    <%= partial 'partials/collection', locals: { title: "Trending Articles", items: trending_articles, variant: "halves" } %>
   <% end %>
   <% if weather_data_is_current? %>
     <%= partial 'partials/weather' %>

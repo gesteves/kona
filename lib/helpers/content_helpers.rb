@@ -50,6 +50,32 @@ module ContentHelpers
     !content.index_in_search_engines
   end
 
+  # Returns the canonical URL for the current content object or the current page.
+  # @return [String] A canonical URL.
+  def canonical_url
+    return content.canonical_url if defined?(content) && content&.canonical_url.present?
+    full_url(current_page.url)
+  end
+
+  # Retrieves a specified number of the most recent articles, excluding drafts and short entries.
+  # @param count [Integer] (Optional) The number of recent articles to return.
+  # @param exclude [Object] (Optional) An article to exclude from the results.
+  # @return [Array<Object>] An array of the most recent articles, up to the specified count.
+  def recent_articles(count: 4, exclude: nil)
+    data.articles
+      .reject { |a| a.path == exclude&.path } # Exclude the given article, if applicable
+      .reject { |a| a.draft }                 # Exclude drafts
+      .reject { |a| a.entry_type == 'Short' } # Exclude short posts
+      .take(count)
+  end
+
+  # Retrieves a specified number of the most recent articles for the RSS feed, excluding drafts.
+  # @param count [Integer] (Optional) The number of recent articles to return. Default is 100.
+  # @return [Array<Object>] An array of the most recent articles, up to the specified count.
+  def feed_articles(count: 100)
+    data.articles.reject { |a| a.draft }.take(count)
+  end
+
   # Returns the articles most relevant to the given article.
   # @param article [Object] The reference article for finding related articles.
   # @param count [Integer] (Optional) The number of articles to return.
@@ -69,10 +95,10 @@ module ContentHelpers
   # @return [Array<Object>] An array of the most viewed articles, up to the specified count.
   def most_viewed_articles(count: 4, exclude: nil)
     data.articles
-      .reject { |a| a.path == exclude&.path }
-      .reject { |a| a.draft }
-      .reject { |a| a.entry_type == 'Short' }
-      .sort { |a, b| b.metrics.all.pageviews <=> a.metrics.all.pageviews }
+      .reject { |a| a.path == exclude&.path } # Exclude the given article, if applicable
+      .reject { |a| a.draft }                 # Exclude drafts
+      .reject { |a| a.entry_type == 'Short' } # Exclude short posts
+      .sort { |a, b| b.metrics.all.pageviews <=> a.metrics.all.pageviews } # Sort by all-time pageviews in descending order
       .take(count)
   end
 
@@ -82,7 +108,7 @@ module ContentHelpers
   # @return [Array<Object>] An array of the trending articles, up to the specified count.
   def trending_articles(count: 4, exclude: nil)
     data.articles
-      .reject { |a| a.path == exclude&.path } # Exclude the current article, if applicable
+      .reject { |a| a.path == exclude&.path } # Exclude the given article, if applicable
       .reject { |a| a.draft }                 # Exclude drafts
       .reject { |a| a.entry_type == 'Short' } # Exclude short posts
       .sort_by { |a| -trending_score(a) }     # Sort by trending score, in descending order
