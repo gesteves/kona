@@ -57,7 +57,7 @@ module EventsHelpers
   # @param event [Object] The event object to check.
   # @return [Boolean] True if the event occurs today, is during daytime, and is confirmed.
   def is_in_progress?(event)
-    is_daytime? && is_today?(event)
+    is_daytime? && is_today?(event) && is_confirmed?(event)
   end
 
   # Determines if the event is happening and there's a live tracking link.
