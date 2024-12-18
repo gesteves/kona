@@ -95,6 +95,7 @@ module EventsHelpers
   def event_timestamp_tag(event)
     options = {}
     options[:class] = "entry__highlight" if is_in_progress?(event) && !is_trackable?(event)
+    options[:title] = entry.status.join(", ").presence || "Tentative"
     content_tag :span, options do
       "#{event_icon_svg(event)} #{event_timestamp(event)}"
     end
