@@ -4,11 +4,11 @@
       <% if is_today?(event) %>
         <% if is_daytime? && event.tracking_url.present? %>
           <span class="entry__highlight entry__highlight--live"><%= icon_svg("classic", "solid", "circle-small") %> <%= link_to "Live results", event.tracking_url, rel: "noopener", target: "_blank" %></span>
-          <span><%= icon_svg("classic", "light", "calendar-check") %> Today</span>
+          <span><%= icon_svg("classic", "light", "calendar-star") %> Today</span>
         <% elsif is_daytime? %>
-          <span class="entry__highlight"><%= icon_svg("classic", "regular", "calendar-check") %> Today</span>
+          <span class="entry__highlight"><%= icon_svg("classic", "regular", "calendar-star") %> Today</span>
         <% else %>
-          <span><%= icon_svg("classic", "light", "calendar-check") %> Today</span>
+          <span><%= icon_svg("classic", "light", "calendar-star") %> Today</span>
         <% end %>
       <% else %>
         <span><%= icon_svg("classic", "light", "calendar") %> <%= DateTime.parse(event.date).strftime('%B %-e, %Y') %></span>

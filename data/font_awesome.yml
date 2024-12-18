@@ -24,10 +24,12 @@ icons:
       - shield-check
       - triangle-exclamation
     regular:
-      - calendar-check
+      - calendar-star
     light:
       - calendar
       - calendar-check
+      - calendar-star
+      - calendar-xmark
       - comment
       - eye
       - heart
