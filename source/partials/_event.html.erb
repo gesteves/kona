@@ -1,18 +1,10 @@
 <article class="entry entry--summary" id="event-<%= event.sys.id.parameterize %>" aria-labelledby="hed-<%= event.sys.id.parameterize %>">
   <header class="entry__header">
     <p class="entry__meta entry__meta--truncated">
-      <% if is_today?(event) %>
-        <% if is_daytime? && event.tracking_url.present? %>
-          <span class="entry__highlight entry__highlight--live"><%= icon_svg("classic", "solid", "circle-small") %> <%= link_to "Live results", event.tracking_url, rel: "noopener", target: "_blank" %></span>
-          <span><%= icon_svg("classic", "light", "calendar-star") %> Today</span>
-        <% elsif is_daytime? %>
-          <span class="entry__highlight"><%= icon_svg("classic", "regular", "calendar-star") %> Today</span>
-        <% else %>
-          <span><%= icon_svg("classic", "light", "calendar-star") %> Today</span>
-        <% end %>
-      <% else %>
-        <span><%= icon_svg("classic", "light", "calendar") %> <%= DateTime.parse(event.date).strftime('%B %-e, %Y') %></span>
+      <% if is_trackable?(event) %>
+        <span class="entry__highlight entry__highlight--live"><%= icon_svg("classic", "solid", "circle-small") %> <%= link_to "Live results", event.tracking_url, rel: "noopener", target: "_blank" %></span>
       <% end %>
+      <% event_timestamp_tag(event) %>
       <span><%= icon_svg("classic", "light", "location-dot") %> <%= event.location %></span>
     </p>
     <h4 class="entry__hed" id="hed-<%= event.sys.id.parameterize %>">

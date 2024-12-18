@@ -24,4 +24,72 @@ module EventsHelpers
   def is_race_day?
     todays_race.present?
   end
+
+  # Determines if I'm registered for the event.
+  # @param event [Object] The event object to check.
+  # @return [Boolean] True if the event's status includes "Registered", otherwise false.
+  def is_confirmed?(event)
+    event.status.include?("Registered")
+  end
+
+  # Determines if I'm not attending the event, either because it's been canceled or I'm a DNS.
+  # @param event [Object] The event object to check.
+  # @return [Boolean] True if the event's status includes "Canceled" or "DNS" (Did Not Start), otherwise false.
+  def is_canceled?(event)
+    (event.status & ["Canceled", "DNS"]).present?
+  end
+
+  # Determines if the event status is tentative, i.e. I'm considering it but haven't registered yet.
+  # @param event [Object] The event object to check.
+  # @return [Boolean] True if the event status is empty or includes "Tentative", otherwise false.
+  def is_tentative?(event)
+    event.status.empty? || event.status.include?("Tentative")
+  end
+
+  # Determines if the event is currently in progress.
+  # @param event [Object] The event object to check.
+  # @return [Boolean] True if the event occurs today, is during daytime, and is confirmed.
+  def is_in_progress?(event)
+    is_daytime? && is_today?(event) && is_confirmed?(event)
+  end
+
+  # Determines if the event is happening and there's a live tracking link.
+  # @param event [Object] The event object to check.
+  # @return [Boolean] True if the event is in progress and has a tracking URL, otherwise false.
+  def is_trackable?(event)
+    is_in_progress?(event) && event.tracking_url.present?
+  end
+
+  # Retrieves the appropriate event icon SVG based on the event status.
+  # @param event [Object] The event object to evaluate.
+  # @return [String] The HTML-safe SVG icon representing the event's current status.
+  def event_icon_svg(event)
+    return icon_svg("classic", "light",   "calendar-xmark") if is_canceled?(event)
+    return icon_svg("classic", "light",   "calendar-check") if is_confirmed?(event)
+    return icon_svg("classic", "light",   "calendar-star")  if is_trackable?(event)
+    return icon_svg("classic", "regular", "calendar-star")  if is_in_progress?(event)
+    icon_svg("classic", "light", "calendar")
+  end
+
+  # Formats the event timestamp.
+  # @param event [Object] The event object containing the date.
+  # @return [String] "Today" if the event is today, otherwise a formatted date string (e.g., "January 1, 2024").
+  def event_timestamp(event)
+    if is_today?(event)
+      "Today"
+    else
+      DateTime.parse(event.date).strftime('%B %-e, %Y')
+    end
+  end
+
+  # Generates an HTML span tag with the event's icon and timestamp.
+  # @param event [Object] The event object to render.
+  # @return [String] An HTML-safe string with the event's icon and formatted timestamp.
+  def event_timestamp_tag(event)
+    options = {}
+    options[:class] = "entry__highlight" if is_in_progress?(event) && !is_trackable?(event)
+    content_tag :span, options do
+      "#{event_icon_svg(event)} #{event_timestamp(event)}"
+    end
+  end
 end
