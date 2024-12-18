@@ -4,7 +4,7 @@
       <% if is_trackable?(event) %>
         <span class="entry__highlight entry__highlight--live"><%= icon_svg("classic", "solid", "circle-small") %> <%= link_to "Live results", event.tracking_url, rel: "noopener", target: "_blank" %></span>
       <% end %>
-      <% event_timestamp_tag(event) %>
+      <%= event_timestamp_tag(event) %>
       <span><%= icon_svg("classic", "light", "location-dot") %> <%= event.location %></span>
     </p>
     <h4 class="entry__hed" id="hed-<%= event.sys.id.parameterize %>">
