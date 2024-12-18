@@ -3,6 +3,7 @@ module EventsHelpers
   # @param event [Event] The event to check.
   # @return [Boolean] Returns true if the given event is today; false otherwise.
   def is_today?(event)
+    return false unless is_confirmed?(event)
     event_date = Time.parse(event.date).in_time_zone(location_time_zone)
     event_date.to_date == current_time.to_date
   end
@@ -50,7 +51,7 @@ module EventsHelpers
   # @param event [Object] The event object to check.
   # @return [Boolean] True if the event occurs today, is during daytime, and is confirmed.
   def is_in_progress?(event)
-    is_daytime? && is_today?(event) && is_confirmed?(event)
+    is_daytime? && is_today?(event)
   end
 
   # Determines if the event is happening and there's a live tracking link.
@@ -88,6 +89,15 @@ module EventsHelpers
   def event_timestamp_tag(event)
     options = {}
     options[:class] = "entry__highlight" if is_in_progress?(event) && !is_trackable?(event)
+    options[:title] = if is_today?(event)
+      "It’s today!"
+    elsif is_confirmed?(event)
+      "Registered"
+    elsif is_canceled?(event)
+      event.status.join(", ")
+    elsif is_tentative?(event)
+      "Tentative"
+    end
     content_tag :span, options do
       "#{event_icon_svg(event)} #{event_timestamp(event)}"
     end
