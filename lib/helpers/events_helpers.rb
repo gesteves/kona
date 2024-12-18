@@ -10,7 +10,7 @@ module EventsHelpers
   # Finds today's race event, if any.
   # @return [Event, nil] The race event for today if one exists, nil otherwise.
   def todays_race
-    data.events.find { |e| is_today?(e) && is_confirmed?(event) }
+    data.events.find { |e| is_today?(e) && is_confirmed?(e) }
   end
 
   # Returns a collection of upcoming race events.
@@ -72,9 +72,9 @@ module EventsHelpers
   # @return [String] The HTML-safe SVG icon representing the event's current status.
   def event_icon_svg(event)
     return icon_svg("classic", "light",   "calendar-xmark") if is_canceled?(event) || is_dns?(event)
-    return icon_svg("classic", "light",   "calendar-check") if is_confirmed?(event)
     return icon_svg("classic", "light",   "calendar-star")  if is_trackable?(event)
     return icon_svg("classic", "regular", "calendar-star")  if is_in_progress?(event)
+    return icon_svg("classic", "light",   "calendar-check") if is_confirmed?(event)
     icon_svg("classic", "light", "calendar")
   end
 
