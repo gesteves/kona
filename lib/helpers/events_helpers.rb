@@ -46,13 +46,6 @@ module EventsHelpers
     event.status.include?("Canceled")
   end
 
-  # Determines if I'm not attending the event, either because it's been canceled or I'm a DNS.
-  # @param event [Object] The event object to check.
-  # @return [Boolean] True if the event's status includes "Canceled" or "DNS" (Did Not Start), otherwise false.
-  def is_canceled?(event)
-    is_dns?(event) || is_canceled?(event)
-  end
-
   # Determines if the event status is tentative, i.e. I'm considering it but haven't registered yet.
   # @param event [Object] The event object to check.
   # @return [Boolean] True if the event status is empty or includes "Tentative", otherwise false.
@@ -78,7 +71,7 @@ module EventsHelpers
   # @param event [Object] The event object to evaluate.
   # @return [String] The HTML-safe SVG icon representing the event's current status.
   def event_icon_svg(event)
-    return icon_svg("classic", "light",   "calendar-xmark") if is_canceled?(event)
+    return icon_svg("classic", "light",   "calendar-xmark") if is_canceled?(event) || is_dns?(event)
     return icon_svg("classic", "light",   "calendar-check") if is_confirmed?(event)
     return icon_svg("classic", "light",   "calendar-star")  if is_trackable?(event)
     return icon_svg("classic", "regular", "calendar-star")  if is_in_progress?(event)
