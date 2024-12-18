@@ -3,7 +3,6 @@ module EventsHelpers
   # @param event [Event] The event to check.
   # @return [Boolean] Returns true if the given event is today; false otherwise.
   def is_today?(event)
-    return false unless is_confirmed?(event)
     event_date = Time.parse(event.date).in_time_zone(location_time_zone)
     event_date.to_date == current_time.to_date
   end
@@ -11,7 +10,7 @@ module EventsHelpers
   # Finds today's race event, if any.
   # @return [Event, nil] The race event for today if one exists, nil otherwise.
   def todays_race
-    data.events.find { |e| is_today?(e) }
+    data.events.find { |e| is_today?(e) && is_confirmed?(event) }
   end
 
   # Returns a collection of upcoming race events.
