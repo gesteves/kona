@@ -163,7 +163,7 @@ module ContentfulClient
     }
 
     query Events($skip: Int, $limit: Int) {
-      events: eventCollection(skip: $skip, limit: $limit, where: { canceled: false }) {
+      events: eventCollection(skip: $skip, limit: $limit) {
         items {
           title
           description
@@ -171,6 +171,7 @@ module ContentfulClient
           url
           trackingUrl
           date
+          status
           sys {
             ...SysFields
           }
