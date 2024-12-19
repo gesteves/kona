@@ -18,7 +18,7 @@ Kona can technically be hosted basically anywhere because it's just a static sit
 
 [Contentful](https://www.contentful.com/) is the CMS used to author most of the site's content, including the blog articles. Unfortunately, there's no quick way to set this up, but you'll want a content model like this:
 
-![Given to Tri Visual Modeler Dec 12 2024](https://github.com/user-attachments/assets/d17c2451-134a-472e-88bd-012e04a3d136)
+![Given to Tri Visual Modeler Dec 19 2024](https://github.com/user-attachments/assets/4ca20411-3fd4-4b5f-b86b-8e1f42425763)
 
 Then head over to Settings > API Keys in Contentful, create a new API key, copy the Space ID and Content Preview API access token, and add them to the `CONTENTFUL_SPACE` and `CONTENTFUL_TOKEN` environment variables. You'll also probably want to install the Netlify app within Contentful, which will rebuild the site whenever new content is published or updated in Contentful.
 
@@ -91,6 +91,10 @@ To keep the information on the home page current, you can use a [Netlify build h
 Kona uses [Bluesky](https://bsky.social) as a comments system. There's no much to it, just turn them on by setting the `BLUESKY_COMMENTS_ENABLED` environment variable to `true`, and paste the public URL of a Bluesky post in the corresponding field in an article. Replies to that post on Bluesky will appear as comments in the article. If you're the author of the Bluesky post, you can use Bluesky's moderation tools to moderate the comments in the article. For example, if you use the "hide reply for everyone" option in Bluesky or block the author there, it'll be reflected in the comments thread in the article.
 
 (For now, posting and replying to comments has to be done in Bluesky. Posting from Kona directly is on my to-do list.)
+
+#### Plausible
+
+Kona uses [Plausible](https://plausible.io/) for traffic analytics, and uses the traffic data to show trending or most-read articles on the home page. To set this up, you'll need to create an API key at https://plausible.io/settings and set up your site ID and API key in the `PLAUSIBLE_SITE_ID` and `PLAUSIBLE_API_KEY` environment variables, respectively.
 
 ### Running the site locally
 
