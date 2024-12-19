@@ -1,6 +1,6 @@
 <article class="entry entry--compact" id="entry-<%= article.sys.id.parameterize %>">
   <header class="entry__header">
-    <%= partial 'partials/article/meta_top', locals: { article: article } %>
+    <%= partial 'partials/article/meta', locals: { article: article } %>
   </header>
   <div class="entry__body">
     <%= prepend_title(smartypants(article.title), render_body(article.intro)) %>

@@ -1,6 +1,6 @@
 <article class="entry entry--full entry--article" id="entry-<%= article.sys.id.parameterize %>" aria-labelledby="hed-<%= article.sys.id.parameterize %>">
   <header class="entry__header">
-    <%= partial 'partials/article/meta_top', locals: { article: article } %>
+    <%= partial 'partials/article/meta', locals: { article: article } %>
     <h2 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">
       <%= smartypants(remove_widows(article.title)) %>
     </h2>
