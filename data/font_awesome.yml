@@ -25,6 +25,7 @@ icons:
       - triangle-exclamation
     regular:
       - calendar-star
+      - typewriter
     light:
       - calendar
       - calendar-check

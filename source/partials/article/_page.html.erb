@@ -2,7 +2,7 @@
   <header class="entry__header">
       <p class="entry__meta">
         <% if article.draft %>
-          <span class="entry__highlight">Draft</span>
+          <span class="entry__highlight"><%= icon_svg("classic", "regular", "typewriter") %> Draft</span>
         <% end %>
       </p>
     <h2 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">

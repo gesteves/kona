@@ -1,6 +1,6 @@
 <p class="entry__meta">
   <% if article.draft %>
-    <span class="entry__highlight">Draft</span>
+    <span class="entry__highlight"><%= icon_svg("classic", "regular", "typewriter") %> Draft</span>
   <% end %>
   <span>
     <% if published_today?(article) || article.draft %>
