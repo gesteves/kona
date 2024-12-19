@@ -255,8 +255,7 @@ module ContentHelpers
   # @param article [Object] The article to show the pageviews for.
   # @return [String] The formatted number of views.
   def article_views(article)
-    return if article&.metrics&.all&.pageviews.blank?
-    views = [1, article.metrics.all.pageviews].max
+    views = article&.metrics&.all&.pageviews.to_i + 1
     times = case views
     when 1
       "once"
