@@ -267,4 +267,9 @@ module ContentHelpers
     end
     "Viewed #{times}"
   end
+
+  def plausible_url(article, period: "all")
+    return unless ENV['PLAUSIBLE_SITE_ID'].present?
+    "https://plausible.io/#{ENV['PLAUSIBLE_SITE_ID']}?period=#{period}&filters=((is,page,(#{article.path.gsub(/\/index.html$/, '/')})))"
+  end
 end
