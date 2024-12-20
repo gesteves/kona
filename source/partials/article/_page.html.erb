@@ -6,7 +6,7 @@
         <% end %>
       </p>
     <h2 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">
-      <%= smartypants(remove_widows(article.title)) %>
+      <%= smartypants(article.title) %>
     </h2>
   </header>
   <div class="entry__body">

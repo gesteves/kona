@@ -1,7 +1,7 @@
 <div class="home" aria-labelledby="hed">
   <section class="home__intro">
     <h2 class="home__headline" id="hed">
-      <%= smartypants(remove_widows(content.title)) %>
+      <%= smartypants(content.title) %>
     </h2>
     <div class="home__body">
       <%= render_home_body(content.body) %>

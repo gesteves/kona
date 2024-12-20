@@ -7,9 +7,9 @@
     </p>
     <h4 class="entry__hed" id="hed-<%= event.sys.id.parameterize %>">
       <% if event.url.present? %>
-        <%= link_to smartypants(remove_widows(event.title)), event.url, rel: "noopener", target: "_blank" %>
+        <%= link_to smartypants(event.title), event.url, rel: "noopener", target: "_blank" %>
       <% else %>
-        <%= smartypants(remove_widows(event.title)) %>
+        <%= smartypants(event.title) %>
       <% end %>
     </h4>
   </header>

@@ -1,6 +1,6 @@
 <section class="collection <%= "collection--#{variant}" if defined?(variant) %>" <% if title.present? %>id="<%= title.parameterize %>"<% end %>>
   <% if title.present? %>
-    <h3 class="collection__heading"><%= smartypants(remove_widows(title)) %></h3>
+    <h3 class="collection__heading"><%= smartypants(title) %></h3>
   <% end %>
   <ol class="collection__list">
     <% items.each do |item| %>
