@@ -1,6 +1,6 @@
 require 'text'
 
-module ContentHelpers
+module ArticleHelpers
   # Returns the publicly-visible name for an entry type
   # @param entry [Object] The entry to check.
   # @return [String] The name of the entry type
