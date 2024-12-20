@@ -26,6 +26,8 @@
   font-size: var(--font-x-large);
   font-weight: 700;
   line-height: var(--line-height-x-large);
+  margin: 0;
+  padding: 0;
 
   @media (min-width: #{$bp-medium}) {
     font-size: var(--font-large);
@@ -35,6 +37,10 @@
   @media (min-width: #{$bp-large}) {
     font-size: var(--font-x-large);
     line-height: var(--line-height-x-large);
+  }
+
+  @supports (text-box-edge: cap) and (text-box-trim: trim-both) {
+    padding: 1rem 0;
   }
 }
 
