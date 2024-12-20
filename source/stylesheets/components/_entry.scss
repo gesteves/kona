@@ -55,8 +55,9 @@
 }
 
 .entry__meta--truncated {
-  overflow: hidden;
+  overflow-x: hidden;
   text-overflow: ellipsis;
+  text-box-trim: trim-end;
   white-space: nowrap;
 }
 
