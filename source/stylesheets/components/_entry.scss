@@ -253,7 +253,23 @@
 
 .entry--full.entry--article {
   .entry__hed {
-    margin-bottom: 1rem;
+    @supports (text-box-edge: cap) and (text-box-trim: trim-both) {
+      margin: 0;
+
+      @media (min-width: #{$bp-medium}) {
+        margin: 1rem;
+      }
+    }
+
+    @supports not ((text-box-edge: cap) or (text-box-trim: trim-both)) {
+      margin: 0;
+      padding: 1rem 0;
+
+      @media (min-width: #{$bp-medium}) {
+        margin-top: 0;
+        padding-top: 0;
+      }
+    }
   }
 }
 
