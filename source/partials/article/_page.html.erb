@@ -1,10 +1,8 @@
 <article class="entry entry--full entry--page" id="entry-<%= article.sys.id.parameterize %>" aria-labelledby="hed-<%= article.sys.id.parameterize %>">
-  <header class="entry__header">
-      <p class="entry__meta">
-        <% if article.draft %>
-          <span class="entry__highlight"><%= icon_svg("classic", "regular", "typewriter") %> Draft</span>
-        <% end %>
-      </p>
+  <header class="entry__header">      
+    <% if article.draft %>
+      <p class="entry__meta"><span class="entry__highlight"><%= icon_svg("classic", "regular", "typewriter") %> Draft</span></p>
+    <% end %>
     <h2 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">
       <%= smartypants(article.title) %>
     </h2>
