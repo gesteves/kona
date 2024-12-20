@@ -11,13 +11,30 @@
 .blog__header {
   @extend .extend-entry-header;
   border-bottom: 1px solid var(--color-border);
-  margin-bottom: var(--row-gap);
-  padding-bottom: var(--row-gap);
+  margin-bottom: var(--padding);
+  padding-bottom: var(--padding);
 
-  text-align: center;
+  @media (min-width: #{$bp-medium}) {
+    text-align: center;
+  }
 
-  h2 {
-    margin: 0;
+  .blog__hed {
+    @extend .extend-heading-gradient;
+  
+    @supports (text-box-edge: cap) and (text-box-trim: trim-both) {
+      @media (min-width: #{$bp-medium}) {
+        margin: 1rem;
+      }
+    }
+  
+    @supports not ((text-box-edge: cap) or (text-box-trim: trim-both)) {
+      margin: 0;
+      padding: 1rem 0;
+  
+      @media (min-width: #{$bp-medium}) {
+        padding-top: 0;
+      }
+    }
   }
 }
 

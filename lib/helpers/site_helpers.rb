@@ -131,4 +131,13 @@ module SiteHelpers
     text = "© #{copyright_years} #{data.site.copyright}"
     markdown_to_html(text)
   end
+
+  # Returns the number of entries tagged with a specific tag.
+  # @param tag_name [String] The name of the tag to count entries for.
+  # @return [Integer] The number of entries tagged with the specified tag.
+  def tag_entry_count(tag_name)
+    tag = data.tags.find { |t| t&.tag&.name == tag_name }
+    return 0 if tag.blank?
+    tag.pages.map { |t| t.items }.flatten.uniq.size
+  end
 end
