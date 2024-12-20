@@ -18,6 +18,7 @@
   font-size: var(--font-x-large);
   grid-column: 1 / -1;
   line-height: var(--line-height-x-large);
+  margin: 0 0 -1rem 0;
 
   @media (min-width: #{$bp-medium}) {
     grid-column: 2 / -2;
