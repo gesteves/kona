@@ -248,7 +248,7 @@ module ArticleHelpers
     plain_text = sanitize([article.intro, article.body].reject(&:blank?).join("\n\n"), escape_html_entities: true)
     word_count = plain_text.split(/\s+/).size
     minutes = (word_count / wpm.to_f).ceil
-    "#{minutes}-minute read"
+    "A #{minutes}-minute read"
   end
 
   # Formats the number of pageviews for an article.
