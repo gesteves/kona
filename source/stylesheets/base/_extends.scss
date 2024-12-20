@@ -371,6 +371,13 @@
       background-clip: text;
       color: transparent;
     }
+
+    @supports (text-box-edge: cap) and (text-box-trim: trim-both) {
+      margin: 1rem 0 1rem 0;
+      padding: 1rem 0 1rem 0;
+      text-box-edge: cap alphabetic;
+      text-box-trim: trim-both;
+    }
   }
 }
 

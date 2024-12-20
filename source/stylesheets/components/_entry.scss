@@ -9,6 +9,8 @@
   font-family: var(--ibm-plex-mono);
   font-size: var(--font-x-small);
   line-height: var(--line-height-x-small);
+  text-box-edge: text;
+  text-box-trim: trim-both;
   text-transform: uppercase;
 
   a {
