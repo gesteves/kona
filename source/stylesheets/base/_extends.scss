@@ -418,14 +418,9 @@
 
   svg {
     display: inline-block;
-    height: .8rem;
+    height: var(--light-icon-size);
     vertical-align: text-bottom;
-    width: .8rem;
-
-    @media (min-width: #{$bp-medium}) {
-      height: 1rem;
-      width: 1rem;
-    }
+    width: var(--light-icon-size);
 
     g,
     path {

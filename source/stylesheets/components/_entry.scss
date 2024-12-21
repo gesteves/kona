@@ -31,9 +31,9 @@
 
   svg {
     display: inline-block;
-    height: 1rem;
+    height: var(--light-icon-size);
     vertical-align: text-bottom;
-    width: 1rem;
+    width: var(--light-icon-size);
 
     g,
     path {

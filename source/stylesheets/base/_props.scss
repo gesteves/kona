@@ -145,6 +145,7 @@
   --transition-duration: 250ms;
   --picture-outdent:     var(--content-padding);
   --avatar-size:         48px;
+  --light-icon-size:     0.8rem;
 
   @media (min-width: #{$bp-medium}) {
     --column-gap:          2rem;
@@ -157,6 +158,7 @@
     --padding:             4rem;
     --picture-outdent:     calc((100vw - (var(--content-padding) * 2) - (11 * var(--column-gap)))/12 + var(--column-gap));
     --row-gap:             4rem;
+    --light-icon-size:     1rem;
   }
 
   @media (min-width: #{$bp-large}) {
