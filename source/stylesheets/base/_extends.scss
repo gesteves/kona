@@ -403,7 +403,7 @@
   text-transform: uppercase;
 
   &:link,
-  &:active {
+  &:visited {
     color: var(--color-button-text);
     text-decoration: none;
   }
@@ -418,9 +418,14 @@
 
   svg {
     display: inline-block;
-    height: 1rem;
+    height: .8rem;
     vertical-align: text-bottom;
-    width: 1rem;
+    width: .8rem;
+
+    @media (min-width: #{$bp-medium}) {
+      height: 1rem;
+      width: 1rem;
+    }
 
     g,
     path {
