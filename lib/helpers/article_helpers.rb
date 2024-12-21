@@ -234,9 +234,15 @@ module ArticleHelpers
   # @return [String] The Mastodon post content.
   def mastodon_post(entry)
     body = []
-    body << smartypants(sanitize(entry.summary.presence || entry.title.presence))
-    body << full_url(entry.path)
-    body << entry.contentful_metadata.tags.sort { |a, b| a.name <=> b.name }.map { |t| camelcase_hashtag(t.name) }.join(' ')
+    url = full_url(entry.path)
+    tags = entry.contentful_metadata.tags.sort { |a, b| a.name <=> b.name }.map { |t| camelcase_hashtag(t.name) }.join(' ')
+    if entry.summary.present?
+      body << smartypants(sanitize(entry.summary))
+      body << url
+    else
+      body << "#{smartypants(sanitize(entry.title))}: #{url}"
+    end
+    body << tags
     body.reject(&:blank?).join("\n\n")
   end
 
