@@ -116,32 +116,7 @@
   @extend .extend-body-styles;
   
   .entry__read-more {
-    color: var(--color-text-secondary);
-    display: inline-block;
-    font-family: var(--ibm-plex-mono);
-    font-size: var(--font-x-small);
-    line-height: var(--line-height-x-small);
-    text-transform: uppercase;
-  
-    &:link,
-    &:visited {
-      color: var(--color-text-secondary);
-      text-decoration: none;
-    }
-  
-    &:hover,
-    &:active {
-      color: var(--color-link-hover);
-      text-decoration: none;
-    }
-
-    &::after {
-      color: currentColor;
-      content: "»";
-      left: 0.5rem;
-      position: relative;
-      top: -0.06rem;
-    }
+    @extend .extend-primary-button;
   }
 }
 

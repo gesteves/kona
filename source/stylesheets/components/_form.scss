@@ -36,29 +36,8 @@
   }
   
   button[type=submit] {
+    @extend .extend-primary-button;
+    @extend .extend-pushable-button;
     align-self: flex-start;
-    background-color: var(--color-button-background);
-    border-radius: 2px;
-    border: none;
-    box-shadow: 0 2px 0 var(--color-button-border);
-    color: var(--color-button-text);
-    font-family: var(--ibm-plex-mono);
-    font-size: var(--font-x-small);
-    font-style: normal;
-    font-weight: 300;
-    line-height: var(--line-height-x-small);
-    padding: 0 2rem;
-    text-shadow: 0 -1px 0 var(--color-button-border);
-    text-transform: uppercase;
-  
-    &:hover {
-      background-color: var(--color-button-hover);
-      cursor: pointer;
-    }
-  
-    &:active {
-      box-shadow: none;
-      transform: translateY(2px);
-    }
   }
 }

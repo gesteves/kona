@@ -27,6 +27,7 @@ icons:
       - calendar-star
       - typewriter
     light:
+      - arrow-right
       - calendar
       - calendar-check
       - calendar-star

@@ -385,3 +385,55 @@
 .extend-box-shadow {
   box-shadow: 0 1px 1px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.05), 0 4px 8px rgba(0,0,0,0.05), 0 8px 16px rgba(0,0,0,0.05), 0 16px 32px rgba(0,0,0,0.05);
 }
+
+.extend-primary-button {
+  background-color: var(--color-button-background);
+  border-radius: 2px;
+  border: none;
+  color: var(--color-button-text);
+  display: inline-block;
+  font-family: var(--ibm-plex-mono);
+  font-size: var(--font-x-small);
+  font-style: normal;
+  font-weight: 300;
+  line-height: var(--line-height-x-small);
+  padding: 0 1rem;
+  text-decoration: none;
+  text-shadow: 0 -1px 0 var(--color-button-border);
+  text-transform: uppercase;
+
+  &:link,
+  &:active {
+    color: var(--color-button-text);
+    text-decoration: none;
+  }
+
+  &:hover,
+  &:active {
+    background-color: var(--color-button-hover);
+    color: var(--color-button-text);
+    cursor: pointer;
+    text-decoration: none;
+  }
+
+  svg {
+    display: inline-block;
+    height: 1rem;
+    vertical-align: text-bottom;
+    width: 1rem;
+
+    g,
+    path {
+      fill: currentColor;
+    }
+  }
+}
+
+.extend-pushable-button {
+  box-shadow: 0 2px 0 var(--color-button-border);
+
+  &:active {
+    box-shadow: none;
+    transform: translateY(2px);
+  }
+}

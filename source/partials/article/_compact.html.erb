@@ -7,6 +7,6 @@
   </header>
   <div class="entry__body">
     <%= render_body(article.intro) %>
-    <%= link_to "Continue reading", article.path, class: "entry__read-more" %>
+    <%= link_to "Continue reading #{icon_svg("classic", "light", "arrow-right")}", article.path, class: "entry__read-more" %>
   </div>
 </article>
