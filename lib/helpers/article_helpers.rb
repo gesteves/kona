@@ -276,8 +276,11 @@ module ArticleHelpers
     "Viewed #{times}"
   end
 
-  def plausible_url(article, period: "all")
+  def plausible_url(article)
     return unless ENV['PLAUSIBLE_SITE_ID'].present?
-    "https://plausible.io/#{ENV['PLAUSIBLE_SITE_ID']}?period=#{period}&filters=((is,page,(#{article.path.gsub(/\/index.html$/, '/')})))"
+    path = article.path.gsub(/\/index.html$/, '/')
+    from = DateTime.parse(article.published_at).strftime('%Y-%m-%d')
+    to = current_time.strftime('%Y-%m-%d')
+    "https://plausible.io/#{ENV['PLAUSIBLE_SITE_ID']}?period=custom&filters=((is,page,(#{path})))&from=#{from}&to=#{to}"
   end
 end
