@@ -67,6 +67,7 @@ module ImageHelpers
       image_url = "#{base_url}?url=#{URI.encode_www_form_component(original_url)}"
       image_url += "&#{query_params}" unless query_params.empty?
     elsif original_url.match?('ctfassets.net')
+      params[:fit] = "fill" if params[:fit] == "cover"
       query_params = URI.encode_www_form(params)
       image_url = original_url
       image_url += "?#{query_params}" unless query_params.empty? || original_url.include?('?')
