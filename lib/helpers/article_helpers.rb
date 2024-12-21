@@ -279,7 +279,7 @@ module ArticleHelpers
   def plausible_url(article)
     return unless ENV['PLAUSIBLE_SITE_ID'].present?
     path = article.path.gsub(/\/index.html$/, '/')
-    from = DateTime.parse(article.published_at).strftime('%Y-%m-%d')
+    from = DateTime.parse(article.published_at).in_time_zone(location_time_zone).strftime('%Y-%m-%d')
     to = current_time.strftime('%Y-%m-%d')
     "https://plausible.io/#{ENV['PLAUSIBLE_SITE_ID']}?period=custom&filters=((is,page,(#{path})))&from=#{from}&to=#{to}"
   end
