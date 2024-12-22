@@ -1,6 +1,6 @@
 <article class="entry entry--summary" id="event-<%= event.sys.id.parameterize %>" aria-labelledby="hed-<%= event.sys.id.parameterize %>">
   <header class="entry__header">
-    <p class="entry__meta entry__meta--truncated">
+    <p class="entry__meta">
       <%= event_tracking_tag(event) %>
       <%= event_timestamp_tag(event) %>
       <span><%= icon_svg("classic", "light", "location-dot") %> <%= event.location %></span>

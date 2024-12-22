@@ -42,7 +42,7 @@
   }
 
   @media (min-width: #{$bp-medium}) {
-    display: block;
+    flex-flow: row wrap;
 
     span {
       margin-right: 0.5rem;
@@ -52,13 +52,6 @@
       margin-right: 0;
     }
   }
-}
-
-.entry__meta--truncated {
-  overflow-x: hidden;
-  text-overflow: ellipsis;
-  text-box-trim: trim-end;
-  white-space: nowrap;
 }
 
 .entry__highlight {
@@ -219,6 +212,10 @@
 
     @media (min-width: #{$bp-medium}) {
       text-align: center;
+
+      .entry__meta {
+        justify-content: center;
+      }
     }
   }
 
