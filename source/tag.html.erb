@@ -1,4 +1,21 @@
 <div class="blog">
+  <header class="blog__header">
+    <p class="entry__meta"><span>All Content Tagged</span></p>
+    <h2 id="hed" class="blog__hed">
+      <%= smartypants(content.title) %>
+    </h2>
+    <p class="entry__meta">
+      <span>
+        <% tag_entry_count = tag_entry_count(content.title) %>
+        <% if tag_entry_count == 1 %>
+          Only one entry
+        <% else %>
+          <%= "#{tag_entry_count.humanize} #{'entry'.pluralize(tag_entry_count)} in total" %>
+        <% end %>
+      </span>
+    </p>
+  </header>
+
   <% if content.items.present? %>
     <ol class="blog__list">
       <% content.items.each do |item| %>

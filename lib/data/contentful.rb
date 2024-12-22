@@ -224,7 +224,7 @@ class Contentful
           current_page: current_page,
           previous_page: previous_page,
           next_page: next_page,
-          template: "/articles.html",
+          template: "/tag.html",
           path: path,
           previous_page_path: previous_page_path,
           next_page_path: next_page_path,
