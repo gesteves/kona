@@ -16,6 +16,10 @@
 
   @media (min-width: #{$bp-medium}) {
     text-align: center;
+
+    .entry__meta {
+      justify-content: center;
+    }
   }
 
   .blog__hed {
