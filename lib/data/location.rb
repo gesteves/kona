@@ -8,6 +8,7 @@ class Location
   # Initializes the Location instance by fetching the current location from available sources.
   def initialize
     @latitude, @longitude = split_into_coordinates(current_location)
+    puts "Initializing location: #{@latitude}, #{@longitude}"
   end
 
   private
@@ -22,7 +23,7 @@ class Location
     return ENV['LOCATION'] if split_into_coordinates(ENV['LOCATION']).present?
 
     latitude, longitude = parse_incoming_hook_body
-    if valid_coordinates?(latitude, longitude) 
+    if valid_coordinates?(latitude, longitude)
       location = "#{latitude},#{longitude}"
       $redis.set(LOCATION_CACHE_KEY, location)
       location
