@@ -65,7 +65,7 @@ module LocationHelpers
   end
 
   # Returns the time zone ID for the current location.
-  # @return [String] A time zone ID, of rhte
+  # @return [String] The time zone ID for the current location.
   def location_time_zone
     data&.location&.time_zone&.time_zone_id || 'America/Denver'
   end
