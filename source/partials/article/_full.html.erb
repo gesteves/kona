@@ -7,7 +7,7 @@
     <p class="entry__meta">
       <span><%= icon_svg("classic", "light", "stopwatch") %> <%= reading_time(article) %></span>
       <% if plausible_url(article).present? %>
-        <span><%= icon_svg("classic", "light", "eye") %> <%= link_to article_views(article), plausible_url(article), rel: "noopener nofollow", target: "_blank" %></span>
+        <span><%= icon_svg("classic", "light", "eye") %> <%= link_to article_views(article), plausible_url(article), rel: "noopener noreferrer nofollow", target: "_blank" %></span>
       <% end %>
     </p>
   </header>
