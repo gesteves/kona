@@ -8,7 +8,6 @@ class Location
   # Initializes the Location instance by fetching the current location from available sources.
   def initialize
     @latitude, @longitude = split_into_coordinates(current_location)
-    puts "Initializing location: #{@latitude}, #{@longitude}"
   end
 
   private
