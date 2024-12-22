@@ -55,7 +55,6 @@ class Location
   # @see https://docs.netlify.com/configure-builds/build-hooks/#payload
   # @return [Array, nil] An array of the `latitude` and `longitude` in the build hook payload, or nil.
   def parse_incoming_hook_body
-    puts "Received incoming hook body: #{ENV['INCOMING_HOOK_BODY']}"
     payload = JSON.parse(ENV['INCOMING_HOOK_BODY'], symbolize_names: true)
     return payload[:latitude], payload[:longitude]
   rescue
