@@ -68,13 +68,21 @@ module WeatherHelpers
   # @return [Boolean] true if it is daytime, false otherwise.
   def is_daytime?
     now = Time.now
-    now >= sunrise.beginning_of_hour && now <= sunset.beginning_of_hour
+    if data.weather.present?
+      now >= sunrise.beginning_of_hour && now <= sunset.beginning_of_hour
+    else
+      now.hour >= 6 && now.hour < 18
+    end
   end
 
   # Checks if it is currently evening (i.e. after sunset).
   # @return [Boolean] true if it is evening, false otherwise.
   def is_evening?
-    Time.now >= sunset.beginning_of_hour
+    if data.weather.present?
+      Time.now >= sunset.beginning_of_hour
+    else
+      Time.now.hour >= 18
+    end
   end
 
   # Determines whether to refer to the current time as "Today" or "Tonight"
