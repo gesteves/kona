@@ -27,7 +27,7 @@ module LocationHelpers
     # DC is the only case where I want the state abbreviation.
     return 'Washington, DC' if region == 'District of Columbia'
     # Not sure how to get Google Maps to return translated names.
-    return 'Mexico City' if city == 'Ciudad de México'
+    return 'Mexico City, Mexico' if city == 'Ciudad de México'
 
     case country
     when 'United States'
