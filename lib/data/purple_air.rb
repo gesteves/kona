@@ -48,8 +48,9 @@ class PurpleAir
     lat_index = fields.index('latitude')
     lon_index = fields.index('longitude')
     pm25_index = fields.index('pm2.5_atm')
+    confidence_index = fields.index('confidence')
 
-    valid_sensors = sensors['data'].reject { |sensor| sensor[pm25_index].zero? }
+    valid_sensors = sensors['data'].reject { |sensor| sensor[pm25_index].zero? || sensor[confidence_index] < 50 }
     return if valid_sensors.blank?
 
     nearest_sensor_data = valid_sensors.min_by { |sensor| haversine_distance(@latitude, @longitude, sensor[lat_index], sensor[lon_index]) }
@@ -64,7 +65,7 @@ class PurpleAir
   # @return [Array, nil] A parsed JSON array of sensor data if the query is successful and data is found; nil otherwise.
   def find_sensors_within_distance(distance_km)
     bounding_box = calculate_bounding_box(@latitude, @longitude, distance_km)
-    query = bounding_box.merge(location_type: 0, max_age: 1.hour, fields: 'pm2.5_atm,latitude,longitude,humidity')
+    query = bounding_box.merge(location_type: 0, max_age: 1.hour, fields: 'pm2.5_atm,latitude,longitude,humidity,confidence')
 
     cache_key = "purple_air:sensors:#{query.values.map(&:to_s).join(':')}"
     data = $redis.get(cache_key)
