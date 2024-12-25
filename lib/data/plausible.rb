@@ -32,16 +32,7 @@ class Plausible
       pagination: { offset: offset, limit: limit }
     }.compact
 
-    cache_key = "plausible:query:"
-    cache_key += body.map do |key, value|
-      if value.is_a?(Hash)
-        value.map { |sub_key, sub_value| "#{key}.#{sub_key}:#{sub_value.to_s.parameterize}" }.join(':')
-      elsif value.is_a?(Array)
-        "#{key}:#{value.map(&:to_s).map(&:parameterize).join('-')}"
-      else
-        "#{key}:#{value.to_s.parameterize}"
-      end
-    end.join(':')
+    cache_key = generate_cache_key(body)
     data = $redis.get(cache_key)
 
     return JSON.parse(data, symbolize_names: true) if data.present?
@@ -56,5 +47,22 @@ class Plausible
 
     $redis.setex(cache_key, 1.hour, response.body)
     JSON.parse(response.body, symbolize_names: true)
+  end
+
+  private
+
+  # Generates a cache key for Redis based on the query parameters.
+  # @param body [Hash] The request body containing query parameters.
+  # @return [String] A parameterized string suitable for use as a Redis cache key.
+  def generate_cache_key(body)
+    "plausible:query:" + body.map do |key, value|
+      if value.is_a?(Hash)
+        value.map { |sub_key, sub_value| "#{key}.#{sub_key}:#{sub_value.to_s.parameterize}" }.join(':')
+      elsif value.is_a?(Array)
+        "#{key}:#{value.map(&:to_s).map(&:parameterize).join('-')}"
+      else
+        "#{key}:#{value.to_s.parameterize}"
+      end
+    end.join(':')
   end
 end
