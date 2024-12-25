@@ -47,8 +47,12 @@ class PurpleAir
     fields = sensors['fields']
     lat_index = fields.index('latitude')
     lon_index = fields.index('longitude')
+    pm25_index = fields.index('pm2.5_atm')
 
-    nearest_sensor_data = sensors['data'].min_by { |sensor| haversine_distance(@latitude, @longitude, sensor[lat_index], sensor[lon_index]) }
+    valid_sensors = sensors['data'].reject { |sensor| sensor[pm25_index].zero? }
+    return if valid_sensors.blank?
+
+    nearest_sensor_data = valid_sensors.min_by { |sensor| haversine_distance(@latitude, @longitude, sensor[lat_index], sensor[lon_index]) }
 
     # Combine the fields with the corresponding data for the nearest sensor
     fields.zip(nearest_sensor_data).to_h
