@@ -40,7 +40,7 @@ class GoogleAirQuality
 
     {
       aqi: result[:aqi],
-      category: result[:category].gsub(/\s?air quality\s?/i, '')
+      category: result[:category].gsub(/\s?air quality\s?/i, ' ').strip
     }
   end
 
