@@ -230,8 +230,8 @@ module WeatherHelpers
     snowfall = rest_of_day_forecast.snowfall_amount
     beaufort_number = beaufort_number(kph_to_knots(current_weather.wind_speed))
 
-    # Air quality is moderate or worse
-    return true if aqi > 75
+    # Air quality is worse than moderate
+    return true if aqi > 100
     # Current temp is too cold or too hot
     return true if current_temperature <= -12 || current_temperature >= 35
     # Forecasted low temp is too cold
