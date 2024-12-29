@@ -13,11 +13,7 @@
   <% if data.intervals.present? %>
     <%= partial 'partials/stats', locals: { stats: data.intervals } %>
   <% end %>
-  <% if trending_articles == recent_articles %>
-    <%= partial 'partials/collection', locals: { title: "Most Read Articles", items: most_viewed_articles, variant: "halves" } %>
-  <% else %>
-    <%= partial 'partials/collection', locals: { title: "Trending Articles", items: trending_articles, variant: "halves" } %>
-  <% end %>
+  <%= partial 'partials/collection', locals: { title: "Trending Articles", items: (trending_articles(count: 8) - recent_articles).take(4), variant: "halves" } %>
   <% if weather_data_is_current? %>
     <%= partial 'partials/weather' %>
   <% end %>
