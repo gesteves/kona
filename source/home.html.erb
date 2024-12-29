@@ -13,7 +13,7 @@
   <% if data.intervals.present? %>
     <%= partial 'partials/stats', locals: { stats: data.intervals } %>
   <% end %>
-  <% if trending_articles == recent_articles %>
+  <% if (trending_articles & recent_articles).present? %>
     <%= partial 'partials/collection', locals: { title: "Most Read Articles", items: most_viewed_articles, variant: "halves" } %>
   <% else %>
     <%= partial 'partials/collection', locals: { title: "Trending Articles", items: trending_articles, variant: "halves" } %>
