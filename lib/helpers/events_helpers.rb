@@ -73,7 +73,8 @@ module EventsHelpers
   def event_icon_svg(event)
     return icon_svg("classic", "light",   "calendar-xmark") if is_canceled?(event) || is_dns?(event)
     return icon_svg("classic", "light",   "calendar-star")  if is_trackable?(event)
-    return icon_svg("classic", "regular", "calendar-star")  if is_today?(event) && is_confirmed?(event)
+    return icon_svg("classic", "regular", "calendar-star")  if is_in_progress?(event)
+    return icon_svg("classic", "light",   "calendar-star")  if is_today?(event) && is_confirmed?(event)
     return icon_svg("classic", "light",   "calendar-check") if is_confirmed?(event)
     icon_svg("classic", "light", "calendar")
   end
