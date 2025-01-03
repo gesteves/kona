@@ -50,7 +50,7 @@ class PurpleAir
     pm25_index = fields.index('pm2.5_atm')
     confidence_index = fields.index('confidence')
 
-    valid_sensors = sensors['data'].reject { |sensor| sensor[pm25_index].zero? || sensor[confidence_index] < 50 }
+    valid_sensors = sensors['data'].reject { |sensor| sensor[confidence_index] < 50 }
     return if valid_sensors.blank?
 
     nearest_sensor_data = valid_sensors.min_by { |sensor| haversine_distance(@latitude, @longitude, sensor[lat_index], sensor[lon_index]) }
