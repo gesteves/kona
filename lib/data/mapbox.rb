@@ -40,6 +40,7 @@ class Mapbox
     @max_height = [options[:max_height].to_i, MAX_HEIGHT].min
     @min_size = options[:min_size].to_i
     @padding = validate_padding(options[:padding])
+    @tileset_id = options[:tileset_id]
   end
 
   # Generates a static map image from a GPX file, and saves it to the data/mapbox/images folder.
@@ -57,9 +58,8 @@ class Mapbox
     height = (WIDTH / aspect_ratio).clamp(MIN_HEIGHT, @max_height).round
 
     image_url = mapbox_image_url(bounding_box, coordinates, WIDTH, height)
-    puts "  Downloading image: #{image_url}"
     download_image(image_url, output_file_path)
-    puts "  ✅ Image saved to #{image_file_name}\n\n"
+    puts "✅ Image saved to #{image_file_name}\n\n"
   end
 
   private
@@ -135,10 +135,17 @@ class Mapbox
     end_marker = marker_config(:end_marker, coordinates.last)
 
     username, style = MAPBOX_STYLE_URL.split('/')[3..4]
-
     bbox = "%5B#{bounding_box[:min_lon]},#{bounding_box[:min_lat]},#{bounding_box[:max_lon]},#{bounding_box[:max_lat]}%5D"
+    layer = generate_layer
 
-    "https://api.mapbox.com/styles/v1/#{username}/#{style}/static/#{start_marker},#{end_marker}/#{bbox}/#{width}x#{height}@2x?padding=#{@padding}&access_token=#{MAPBOX_ACCESS_TOKEN}"
+    base_params = {
+      padding: @padding,
+      access_token: MAPBOX_ACCESS_TOKEN
+    }.compact
+
+    url = "https://api.mapbox.com/styles/v1/#{username}/#{style}/static/#{start_marker},#{end_marker}/#{bbox}/#{width}x#{height}@2x?#{base_params.to_query}"
+    url += "&addlayer=#{layer.to_json}" if layer.present?
+    url
   end
 
   # Generates the marker configuration for a Mapbox static map image
@@ -187,6 +194,28 @@ class Mapbox
     else
       padding.to_i
     end
+  end
+
+  # Generates a layer for a Mapbox static map image
+  # @return [Hash] The layer configuration
+  def generate_layer
+    return if @tileset_id.blank?
+    {
+      "id": @tileset_id,
+      "type": "line",
+      "source": {
+        "type": "vector",
+        "url": "mapbox://#{@tileset_id}"
+      },
+      "source-layer": "tracks",
+      "paint": {
+        "line-color": "%23BF0222",
+        "line-width": 4,
+        "line-opacity": 0.75,
+        "line-cap": "round",
+        "line-join": "round"
+      }
+    }
   end
 end
 
