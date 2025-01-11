@@ -5,6 +5,7 @@ require 'active_support/all'
 
 class Mapbox
   attr_reader :activity_name
+  attr_reader :activity_type
   attr_writer :tileset_id
 
   GPX_FOLDER = File.expand_path('../../../data/mapbox/gpx', __FILE__)
@@ -51,15 +52,16 @@ class Mapbox
   # and then uses the Mapbox Static API to generate a static map image, but it doesn't add the GPX file to the map.
   # Before running this task, the GPX file must be uploaded to Mapbox and added to the map in Mapbox Studio first.
   def generate_map_image
-    puts "Generating map for #{@activity_name}"
+    puts "🔄 Generating map for #{@activity_name} – #{@activity_type}"
     bounding_box = calculate_bounding_box(@coordinates)
 
-    image_file_name = @activity_name.parameterize + '.png'
+    image_file_name = "#{@activity_name} #{@activity_type}".parameterize + '.png'
     output_file_path = File.join(IMAGES_FOLDER, image_file_name)
 
     aspect_ratio = calculate_aspect_ratio(bounding_box)
     height = (WIDTH / aspect_ratio).clamp(MIN_HEIGHT, @max_height).round
 
+    puts "💾 Saving image…"
     image_url = mapbox_image_url(bounding_box, @coordinates, WIDTH, height)
     download_image(image_url, output_file_path)
     puts "✅ Image saved to #{image_file_name}\n\n"
@@ -70,7 +72,7 @@ class Mapbox
   def extract_data_from_gpx
     doc = Nokogiri::XML(File.open(@gpx_file_path))
     @activity_name = doc.at_xpath('//xmlns:trk/xmlns:name')&.text || File.basename(@gpx_file_path)
-    @activity_type = doc.at_xpath('//xmlns:trk/xmlns:type')&.text || 'Other'
+    @activity_type = doc.at_xpath('//xmlns:trk/xmlns:type')&.text&.titleize || 'Other'
 
     @coordinates = doc.xpath('//xmlns:trkpt').map do |trkpt|
       [trkpt['lon'].to_f, trkpt['lat'].to_f]
@@ -143,6 +145,7 @@ class Mapbox
 
     url = "https://api.mapbox.com/styles/v1/#{username}/#{style}/static/#{start_marker},#{end_marker}/#{bbox}/#{width}x#{height}@2x?#{base_params.to_query}"
     url += "&addlayer=#{layer.to_json}" if layer.present?
+    url += "&before_layer=road-label" if layer.present?
     url
   end
 
@@ -164,7 +167,7 @@ class Mapbox
     return ACTIVITY_ICONS[:finish] if marker_type == :end_marker
 
     return ACTIVITY_ICONS[:swimming] if @activity_type =~ /swimming/i
-    return ACTIVITY_ICONS[:cycling]  if @activity_type =~ /cycling/i
+    return ACTIVITY_ICONS[:cycling]  if @activity_type =~ /cycling|biking/i
     return ACTIVITY_ICONS[:running]  if @activity_type =~ /running/i
 
     ACTIVITY_ICONS[:start]
