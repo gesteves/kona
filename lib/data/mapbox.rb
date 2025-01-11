@@ -4,8 +4,6 @@ require 'fileutils'
 require 'active_support/all'
 
 class Mapbox
-  attr_reader :activity_name
-  attr_reader :activity_type
   attr_writer :tileset_id
 
   GPX_FOLDER = File.expand_path('../../../data/mapbox/gpx', __FILE__)
@@ -52,10 +50,10 @@ class Mapbox
   # and then uses the Mapbox Static API to generate a static map image, but it doesn't add the GPX file to the map.
   # Before running this task, the GPX file must be uploaded to Mapbox and added to the map in Mapbox Studio first.
   def generate_map_image
-    puts "🔄 Generating map for #{@activity_name} – #{@activity_type}"
+    puts "🔄 Generating map for #{activity_title}"
     bounding_box = calculate_bounding_box(@coordinates)
 
-    image_file_name = "#{@activity_name} #{@activity_type}".parameterize + '.png'
+    image_file_name = activity_title.parameterize + '.png'
     output_file_path = File.join(IMAGES_FOLDER, image_file_name)
 
     aspect_ratio = calculate_aspect_ratio(bounding_box)
@@ -65,6 +63,11 @@ class Mapbox
     image_url = mapbox_image_url(bounding_box, @coordinates, WIDTH, height)
     download_image(image_url, output_file_path)
     puts "✅ Image saved to #{image_file_name}\n\n"
+  end
+
+  def activity_title
+    return @activity_name if @activity_name.downcase.include?(@activity_type.downcase)
+    "#{@activity_name} – #{@activity_type}"
   end
 
   private

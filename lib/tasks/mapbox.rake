@@ -8,10 +8,10 @@ namespace :mapbox do
       
       tileset_id = global_tileset_id
       if tileset_id.nil?
-        print "Enter the Mapbox tileset ID for #{mapbox.activity_name} – #{mapbox.activity_type}, or press Enter to skip: "
+        print "Enter the Mapbox tileset ID for #{mapbox.activity_title}, or press Enter to skip: "
         tileset_id = STDIN.gets.chomp
         if tileset_id.empty?
-          puts "⏭️  Skipping #{mapbox.activity_name}.\n\n"
+          puts "⏭️  Skipping #{mapbox.activity_title}.\n\n"
           next
         end
       end
@@ -20,7 +20,7 @@ namespace :mapbox do
       begin
         mapbox.generate_map_image
       rescue => e
-        puts "❎ Error generating map for #{mapbox.activity_name}: #{e.message}"
+        puts "❎ Error generating map for #{mapbox.activity_title}: #{e.message}"
         next
       end   
     end
