@@ -4,6 +4,9 @@ require 'fileutils'
 require 'active_support/all'
 
 class Mapbox
+  attr_reader :activity_name
+  attr_writer :tileset_id
+
   GPX_FOLDER = File.expand_path('../../../data/mapbox/gpx', __FILE__)
   IMAGES_FOLDER = File.expand_path('../../../data/mapbox/images', __FILE__)
 
@@ -41,44 +44,39 @@ class Mapbox
     @min_size = options[:min_size].to_i
     @padding = validate_padding(options[:padding])
     @tileset_id = options[:tileset_id]
+    extract_data_from_gpx
   end
 
   # Generates a static map image from a GPX file, and saves it to the data/mapbox/images folder.
   # and then uses the Mapbox Static API to generate a static map image, but it doesn't add the GPX file to the map.
   # Before running this task, the GPX file must be uploaded to Mapbox and added to the map in Mapbox Studio first.
   def generate_map_image
-    puts "Generating map for #{File.basename(@gpx_file_path)}"
-    coordinates = extract_coordinates_from_gpx(@gpx_file_path)
-    bounding_box = calculate_bounding_box(coordinates)
+    puts "Generating map for #{@activity_name}"
+    bounding_box = calculate_bounding_box(@coordinates)
 
-    image_file_name = File.basename(@gpx_file_path, '.gpx') + '.png'
+    image_file_name = @activity_name.parameterize + '.png'
     output_file_path = File.join(IMAGES_FOLDER, image_file_name)
 
     aspect_ratio = calculate_aspect_ratio(bounding_box)
     height = (WIDTH / aspect_ratio).clamp(MIN_HEIGHT, @max_height).round
 
-    image_url = mapbox_image_url(bounding_box, coordinates, WIDTH, height)
+    image_url = mapbox_image_url(bounding_box, @coordinates, WIDTH, height)
     download_image(image_url, output_file_path)
     puts "✅ Image saved to #{image_file_name}\n\n"
   end
 
   private
 
-  # Extracts the coordinates from a GPX file
-  # @param gpx_file_path [String] The path to the GPX file
-  # @return [Array<Array<Float>>] The coordinates of the track points
-  def extract_coordinates_from_gpx(gpx_file_path)
-    file = File.open(gpx_file_path)
-    doc = Nokogiri::XML(file)
-    file.close
+  def extract_data_from_gpx
+    doc = Nokogiri::XML(File.open(@gpx_file_path))
+    @activity_name = doc.at_xpath('//xmlns:trk/xmlns:name')&.text || File.basename(@gpx_file_path)
+    @activity_type = doc.at_xpath('//xmlns:trk/xmlns:type')&.text || 'Other'
 
-    coordinates = doc.xpath('//xmlns:trkpt').map do |trkpt|
+    @coordinates = doc.xpath('//xmlns:trkpt').map do |trkpt|
       [trkpt['lon'].to_f, trkpt['lat'].to_f]
     end
 
-    raise 'No track points found in GPX file' if coordinates.empty?
-
-    coordinates
+    raise 'No track points found in GPX file' if @coordinates.empty?
   end
 
   # Calculates the bounding box for a set of coordinates
@@ -165,10 +163,9 @@ class Mapbox
   def select_icon(marker_type)
     return ACTIVITY_ICONS[:finish] if marker_type == :end_marker
 
-    filename = File.basename(@gpx_file_path).downcase
-    return ACTIVITY_ICONS[:swimming] if filename =~ /swim/i
-    return ACTIVITY_ICONS[:cycling]  if filename =~ /bike|cycling/i
-    return ACTIVITY_ICONS[:running]  if filename =~ /run|marathon|5k|10k|12k/i
+    return ACTIVITY_ICONS[:swimming] if @activity_type =~ /swimming/i
+    return ACTIVITY_ICONS[:cycling]  if @activity_type =~ /cycling/i
+    return ACTIVITY_ICONS[:running]  if @activity_type =~ /running/i
 
     ACTIVITY_ICONS[:start]
   end
