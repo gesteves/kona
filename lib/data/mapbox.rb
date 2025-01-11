@@ -157,12 +157,11 @@ class Mapbox
   # @return [String] The icon name
   def select_icon(marker_type)
     return ACTIVITY_ICONS[:finish] if marker_type == :end_marker
-    return ACTIVITY_ICONS[:start] if marker_type == :start_marker
 
     filename = File.basename(@gpx_file_path).downcase
-    return ACTIVITY_ICONS[:swimming] if filename.include?('swim')
-    return ACTIVITY_ICONS[:cycling] if filename.include?('bike') || filename.include?('cycling')
-    return ACTIVITY_ICONS[:running] if filename.include?('run') || filename.include?('marathon') || filename.include?('5k') || filename.include?('10k') || filename.include?('12k')
+    return ACTIVITY_ICONS[:swimming] if filename =~ /swim/i
+    return ACTIVITY_ICONS[:cycling]  if filename =~ /bike|cycling/i
+    return ACTIVITY_ICONS[:running]  if filename =~ /run|marathon|5k|10k|12k/i
 
     ACTIVITY_ICONS[:start]
   end
