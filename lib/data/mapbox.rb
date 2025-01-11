@@ -28,7 +28,7 @@ class Mapbox
     gpx_file_path,
     max_height: 1280,
     min_size_km: 0,
-    padding: 40
+    padding: 50
   )
     @gpx_file_path = gpx_file_path
     @max_height = [max_height, MAX_HEIGHT].min

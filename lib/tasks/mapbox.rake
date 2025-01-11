@@ -8,7 +8,7 @@ namespace :mapbox do
           gpx_file,
           max_height: ENV['MAX_HEIGHT']&.to_i || 1280,
           min_size_km: ENV['MIN_SIZE_KM']&.to_f || 0,
-          padding: ENV['PADDING']&.to_i || 40
+          padding: ENV['PADDING']&.to_i || 50
         )
         mapbox.generate_map_image
       else
