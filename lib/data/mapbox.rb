@@ -156,8 +156,7 @@ class Mapbox
     }.compact
 
     url = "https://api.mapbox.com/styles/v1/#{username}/#{style}/static/#{start_marker},#{end_marker}/#{bbox}/#{width}x#{height}@2x?#{base_params.to_query}"
-    url += "&addlayer=#{layer.to_json}" if layer.present?
-    url += "&before_layer=road-label" if layer.present?
+    url += "&addlayer=#{layer.to_json}&before_layer=road-label" if layer.present?
     url
   end
 
