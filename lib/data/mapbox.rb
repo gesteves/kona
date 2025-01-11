@@ -16,7 +16,7 @@ class Mapbox
     running: 'pitch',
     cycling: 'bicycle-share',
     swimming: 'swimming',
-    start: 'embassy',
+    start: 'rocket',
     finish: 'racetrack'
   }
 
