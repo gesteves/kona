@@ -143,7 +143,7 @@ class Mapbox
     color = marker_type == :start_marker ? START_MARKER_COLOR : END_MARKER_COLOR
     icon = select_icon(marker_type)
 
-    "pin-s-#{icon}+#{color}(#{coordinate[0]},#{coordinate[1]})"
+    "pin-l-#{icon}+#{color}(#{coordinate[0]},#{coordinate[1]})"
   end
 
   # Selects the icon for a marker based on the marker type and the GPX file name
