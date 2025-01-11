@@ -40,7 +40,7 @@ class Mapbox
     )
     @gpx_file_path = gpx_file_path
     @max_height = [options[:max_height].to_i, MAX_HEIGHT].min
-    @min_size = options[:min_size].to_i
+    @min_size = options[:min_size].to_f
     @padding = validate_padding(options[:padding])
     @tileset_id = options[:tileset_id]
     extract_data_from_gpx
