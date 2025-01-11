@@ -1,6 +1,7 @@
 require 'httparty'
 require 'nokogiri'
 require 'fileutils'
+require 'active_support/all'
 
 class Mapbox
   GPX_FOLDER = File.expand_path('../../../data/mapbox/gpx', __FILE__)
@@ -23,17 +24,22 @@ class Mapbox
   WIDTH = 1280
   MAX_HEIGHT = 1280
   MIN_HEIGHT = 800
+  PADDING = 50
+  MIN_SIZE = 0
 
   def initialize(
     gpx_file_path,
-    max_height: 1280,
-    min_size_km: 0,
-    padding: 50
+    options = {}
   )
+    options.reverse_merge!(
+      max_height: MAX_HEIGHT,
+      min_size: MIN_SIZE,
+      padding: PADDING
+    )
     @gpx_file_path = gpx_file_path
-    @max_height = [max_height, MAX_HEIGHT].min
-    @min_size_km = min_size_km
-    @padding = padding
+    @max_height = [options[:max_height].to_i, MAX_HEIGHT].min
+    @min_size = options[:min_size].to_i
+    @padding = validate_padding(options[:padding])
   end
 
   # Generates a static map image from a GPX file, and saves it to the data/mapbox/images folder.
@@ -86,7 +92,7 @@ class Mapbox
     # Calculate the minimum size in degrees
     # At the equator, 1 degree is 111.32 km, therefore 1 km is 0.009 degrees.
     # This is used to ensure the map is zoomed out enough to show the surroundings if the track is too short.
-    min_size = @min_size_km * 0.009 # Convert km to degrees
+    min_size = @min_size * 0.009 # Convert km to degrees
 
     if (max_lon - min_lon) < min_size
       center_lon = (min_lon + max_lon) / 2
@@ -172,4 +178,16 @@ class Mapbox
     FileUtils.mkdir_p(File.dirname(output_file_path))
     File.open(output_file_path, 'wb') { |f| f.write(response.body) }
   end
+
+  # Validates the padding value
+  # @param padding [String, Integer] The padding value
+  # @return [Integer] The padding value
+  def validate_padding(padding)
+    if padding.is_a?(String) && padding =~ /,/
+      padding
+    else
+      padding.to_i
+    end
+  end
 end
+

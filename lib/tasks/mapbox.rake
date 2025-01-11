@@ -4,11 +4,14 @@ namespace :mapbox do
     Dir.glob(File.join(Mapbox::GPX_FOLDER, '*.gpx')).each do |gpx_file|
       print "❓ Did you add #{File.basename(gpx_file)} to the map in Mapbox Studio and publish it? [y/N]: "
       if STDIN.gets.chomp.downcase == 'y'
+        options = {
+          max_height: ENV['MAX_HEIGHT'],
+          min_size: ENV['MIN_SIZE'],
+          padding: ENV['PADDING']
+        }.compact
         mapbox = Mapbox.new(
           gpx_file,
-          max_height: ENV['MAX_HEIGHT']&.to_i || 1280,
-          min_size_km: ENV['MIN_SIZE_KM']&.to_f || 0,
-          padding: ENV['PADDING']&.to_i || 50
+          options
         )
         mapbox.generate_map_image
       else
