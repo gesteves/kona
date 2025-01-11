@@ -53,7 +53,6 @@ class Mapbox
     puts "🔄 Generating map for #{activity_title}"
     bounding_box = calculate_bounding_box(@coordinates)
 
-    image_file_name = activity_title.parameterize + '.png'
     output_file_path = File.join(IMAGES_FOLDER, image_file_name)
 
     aspect_ratio = calculate_aspect_ratio(bounding_box)
@@ -66,16 +65,26 @@ class Mapbox
   end
 
   def activity_title
-    return @activity_name if @activity_name.downcase.include?(@activity_type.downcase)
-    "#{@activity_name} – #{@activity_type}"
+    return @activity_name if @activity_name =~ /swim|run|bike|biking|cycling|marathon|10k|5k|12k/i
+    "#{@activity_name} - #{@activity_type}"
   end
 
   private
+
+  def image_file_name
+    base = "#{@activity_start.strftime('%Y-%m-%d')} #{activity_title}"
+    base.parameterize + '.png'
+  end
 
   def extract_data_from_gpx
     doc = Nokogiri::XML(File.open(@gpx_file_path))
     @activity_name = doc.at_xpath('//xmlns:trk/xmlns:name')&.text || File.basename(@gpx_file_path)
     @activity_type = doc.at_xpath('//xmlns:trk/xmlns:type')&.text&.titleize || 'Other'
+    @activity_start = begin
+      DateTime.parse(doc.at_xpath('//xmlns:trkpt[1]/xmlns:time')&.text)
+    rescue
+      Time.now
+    end
 
     @coordinates = doc.xpath('//xmlns:trkpt').map do |trkpt|
       [trkpt['lon'].to_f, trkpt['lat'].to_f]
