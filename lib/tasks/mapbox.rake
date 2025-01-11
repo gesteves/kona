@@ -1,27 +1,22 @@
 namespace :mapbox do
   desc 'Generate static map images from GPX files in the data/mapbox/gpx folder'
   task generate_images: :environment do
-    tileset_id = ENV['TILESET_ID']
-    if tileset_id.nil?
-      print "Please enter the Mapbox tileset ID: "
-      tileset_id = STDIN.gets.chomp
-    end
-
-    if tileset_id.empty?
-      raise "❎ TILESET_ID is required."
-    end
+    global_tileset_id = ENV['TILESET_ID']
 
     Dir.glob(File.join(Mapbox::GPX_FOLDER, '*.gpx')).each do |gpx_file|
-      options = {
-        max_height: ENV['MAX_HEIGHT'],
-        min_size: ENV['MIN_SIZE'],
-        padding: ENV['PADDING'],
-        tileset_id: tileset_id
-      }.compact
-      mapbox = Mapbox.new(
-        gpx_file,
-        options
-      )
+      mapbox = Mapbox.new(gpx_file, { max_height: ENV['MAX_HEIGHT'], min_size: ENV['MIN_SIZE'], padding: ENV['PADDING'] }.compact)
+      
+      tileset_id = global_tileset_id
+      if tileset_id.nil?
+        print "Enter the Mapbox tileset ID for #{mapbox.activity_name}, or press Enter to skip: "
+        tileset_id = STDIN.gets.chomp
+        if tileset_id.empty?
+          puts "⏭️  Skipping #{mapbox.activity_name}."
+          next
+        end
+      end
+
+      mapbox.tileset_id = tileset_id
       mapbox.generate_map_image
     end
   end
