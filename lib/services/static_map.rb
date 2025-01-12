@@ -64,17 +64,18 @@ class StaticMap
   # Returns a title for the activity based on the GPX file name and activity type.
   # @return [String] The title for the activity
   def activity_title
-    return @activity_name if @activity_name =~ /swim|run|bike|biking|cycling|marathon|10k|5k|12k/i
-    "#{@activity_name} - #{@activity_type}"
+    year = @activity_start&.strftime('%Y')
+    title = year.present? ? "#{year} #{@activity_name.gsub(/#{year}/, '')}" : @activity_name
+    return title if title =~ /swim|run|bike|biking|cycling|marathon|10k|5k|12k/i
+    "#{title} - #{@activity_type}"
   end
 
   private
 
-  # Returns the file name for the map image based on the activity name and date.
+  # Returns the file name for the map image based on the activity title
   # @return [String] The file name for the map image
   def image_file_name
-    base = "#{@activity_start&.strftime('%Y-%m-%d')} #{activity_title}".strip
-    base.parameterize + '.png'
+    activity_title.parameterize + '.png'
   end
 
   # Extracts data from a GPX file and saves it in instance variables.
