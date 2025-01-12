@@ -48,7 +48,7 @@ class StaticMap
   # Generates a map as a static image and saves it to the data/mapbox/images folder.
   # It uses the Mapbox Static API to generate the map image based on the bounding box of the GPX file, but it doesn't add the GPX file itself to the map.
   # Before running this task, the GPX file must be uploaded to Mapbox as a tileset.
-  def generate_map_image
+  def generate_map_image!
     puts "🔄 Generating map for #{activity_title}"
     output_file_path = File.join(IMAGES_FOLDER, image_file_name)
     image_url = mapbox_image_url
