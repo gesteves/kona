@@ -72,7 +72,7 @@ class Mapbox
   private
 
   def image_file_name
-    base = "#{@activity_start.strftime('%Y-%m-%d')} #{activity_title}"
+    base = "#{@activity_start&.strftime('%Y-%m-%d')} #{activity_title}".strip
     base.parameterize + '.png'
   end
 
@@ -83,7 +83,7 @@ class Mapbox
     @activity_start = begin
       DateTime.parse(doc.at_xpath('//xmlns:trkpt[1]/xmlns:time')&.text)
     rescue
-      Time.now
+      nil
     end
 
     @coordinates = doc.xpath('//xmlns:trkpt').map do |trkpt|
