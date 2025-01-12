@@ -34,7 +34,8 @@ class StaticMap
   def initialize(gpx_file_path, options = {})
     options.reverse_merge!(
       max_height: MAX_HEIGHT,
-      min_size: MIN_SIZE
+      min_size: MIN_SIZE,
+      padding: PADDING
     )
 
     @tileset_id = options[:tileset_id]
