@@ -27,7 +27,7 @@ class Mapbox
   MAX_HEIGHT = 1280
   MIN_HEIGHT = 800
   PADDING = 50
-  MIN_SIZE = 0
+  MIN_SIZE = 1
 
   def initialize(
     gpx_file_path,
@@ -93,29 +93,53 @@ class Mapbox
     raise 'No track points found in GPX file' if @coordinates.empty?
   end
 
-  # Calculates the bounding box for a set of coordinates
+  # Calculates the bounding box for a set of coordinates, taking latitude into account
   # @param coordinates [Array<Array<Float>>] The coordinates of the track points
   # @return [Hash] The bounding box with min_lon, max_lon, min_lat, and max_lat
   def calculate_bounding_box(coordinates)
+    # Separate the longitudes and latitudes from the coordinates
     lons, lats = coordinates.transpose
     min_lon, max_lon = lons.min, lons.max
     min_lat, max_lat = lats.min, lats.max
 
-    # Calculate the minimum size in degrees
-    # At the equator, 1 degree is 111.32 km, therefore 1 km is 0.009 degrees.
-    # This is used to ensure the map is zoomed out enough to show the surroundings if the track is too short.
-    min_size = @min_size * 0.009 # Convert km to degrees
+    # Calculate the average latitude (center of the bounding box in terms of latitude)
+    center_lat = (min_lat + max_lat) / 2
 
-    if (max_lon - min_lon) < min_size
+    # Convert the center latitude to radians for trigonometric calculations
+    # We use radians because trigonometric functions in Ruby (like Math.cos) expect radians.
+    center_lat_in_radians = center_lat * Math::PI / 180
+
+    # The cosine of the latitude adjusts the length of one degree of longitude.
+    # At the equator (latitude 0°), cos(0) = 1, so 1° of longitude is approximately 111.32 km.
+    # As you move toward the poles, cos(latitude) decreases, making longitude degrees shorter.
+    cos_lat = Math.cos(center_lat_in_radians)
+
+    # Calculate the minimum size of the bounding box in degrees of latitude.
+    # 1° of latitude ≈ 111.32 km everywhere on Earth.
+    min_size_lat = @min_size / 111.32
+
+    # Calculate the minimum size of the bounding box in degrees of longitude at the given latitude.
+    # 1° of longitude ≈ 111.32 km * cos(latitude).
+    min_size_lon = @min_size / (111.32 * cos_lat)
+
+    # Ensure the longitude span is at least the minimum size
+    if (max_lon - min_lon) < min_size_lon
+      # Calculate the center of the current longitude span
       center_lon = (min_lon + max_lon) / 2
-      min_lon = center_lon - (min_size / 2)
-      max_lon = center_lon + (min_size / 2)
+
+      # Adjust the min and max longitude so the total span is equal to min_size_lon
+      min_lon = center_lon - (min_size_lon / 2)
+      max_lon = center_lon + (min_size_lon / 2)
     end
 
-    if (max_lat - min_lat) < min_size
+    # Ensure the latitude span is at least the minimum size
+    if (max_lat - min_lat) < min_size_lat
+      # Calculate the center of the current latitude span
       center_lat = (min_lat + max_lat) / 2
-      min_lat = center_lat - (min_size / 2)
-      max_lat = center_lat + (min_size / 2)
+
+      # Adjust the min and max latitude so the total span is equal to min_size_lat
+      min_lat = center_lat - (min_size_lat / 2)
+      max_lat = center_lat + (min_size_lat / 2)
     end
 
     {
@@ -126,13 +150,19 @@ class Mapbox
     }
   end
 
-  # Calculates the aspect ratio of the bounding box
+  # Calculates the aspect ratio of the bounding box based on physical distances in kilometers
   # @param bounding_box [Hash] The bounding box with min_lon, max_lon, min_lat, and max_lat
-  # @return [Float] The aspect ratio
+  # @return [Float] The aspect ratio (width in km / height in km)
   def calculate_aspect_ratio(bounding_box)
-    lon_diff = bounding_box[:max_lon] - bounding_box[:min_lon]
-    lat_diff = bounding_box[:max_lat] - bounding_box[:min_lat]
-    lon_diff / lat_diff
+    center_lat = (bounding_box[:min_lat] + bounding_box[:max_lat]) / 2
+    cos_lat = Math.cos(center_lat * Math::PI / 180) # Cosine of latitude for longitude adjustment
+
+    # Convert the differences in longitude and latitude to kilometers
+    width_km = (bounding_box[:max_lon] - bounding_box[:min_lon]) * 111.32 * cos_lat
+    height_km = (bounding_box[:max_lat] - bounding_box[:min_lat]) * 111.32
+
+    # Calculate the aspect ratio as width in km divided by height in km
+    width_km / height_km
   end
 
   # Generates the URL for a static map image from Mapbox
