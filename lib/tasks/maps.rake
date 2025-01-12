@@ -1,4 +1,4 @@
-require_relative '../services/static_map'
+require_relative '../utils/static_map'
 namespace :maps do
   desc 'Generate static map images from GPX files in the data/maps/gpx folder'
   task generate: :environment do
