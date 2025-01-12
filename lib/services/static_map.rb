@@ -65,7 +65,7 @@ class StaticMap
   # @return [String] The title for the activity
   def activity_title
     year = @activity_start&.strftime('%Y')
-    title = year.present? ? "#{year} #{@activity_name.gsub(/#{year}/, '')}" : @activity_name
+    title = year.present? ? "#{year} #{@activity_name.gsub(/#{year}/, '').strip}" : @activity_name
     return title if title =~ /swim|run|bike|biking|cycling|marathon|10k|5k|12k/i
     "#{title} - #{@activity_type}"
   end
