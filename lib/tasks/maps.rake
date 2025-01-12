@@ -15,7 +15,7 @@ namespace :maps do
       end
 
       begin
-        map.generate_map_image!
+        map.generate_image!
       rescue => e
         puts "❎ Error generating map for #{map.activity_title}: #{e.message}"
         next
