@@ -10,7 +10,7 @@ class StaticMap
   IMAGES_FOLDER = File.expand_path('../../../data/maps/images', __FILE__)
 
   MAPBOX_ACCESS_TOKEN = ENV['MAPBOX_ACCESS_TOKEN'] || raise('Mapbox access token is missing!')
-  MAPBOX_STYLE_URL = ENV['MAPBOX_STYLE_URL'] || raise('Map style URL is missing!')
+  MAPBOX_STYLE_URL = ENV['MAPBOX_STYLE_URL'] || "mapbox://styles/mapbox/outdoors-v12"
 
   # Maki icons
   # @see https://labs.mapbox.com/maki-icons/
