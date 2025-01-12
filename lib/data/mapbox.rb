@@ -200,10 +200,20 @@ class Mapbox
   # @param padding [String, Integer] The padding value
   # @return [Integer] The padding value
   def validate_padding(padding)
-    if padding.is_a?(String) && padding =~ /,/
-      padding
+    # Convert input to string and split by commas
+    values = padding.to_s.split(',').map(&:to_i)
+
+    case values.length
+    when 1  # Single value: apply to all sides
+      values[0]
+    when 2  # Two values: top/bottom, left/right
+      "#{values[0]},#{values[1]},#{values[0]},#{values[1]}"
+    when 3  # Three values: top, left/right, bottom
+      "#{values[0]},#{values[1]},#{values[2]},#{values[1]}"
+    when 4  # Four values: top, right, bottom, left
+      values.join(',')
     else
-      padding.to_i
+      PADDING  # Default padding if invalid input
     end
   end
 
