@@ -4,7 +4,7 @@ require 'fileutils'
 require 'active_support/all'
 
 class StaticMap
-  attr_writer :tileset_id
+  attr_accessor :tileset_id
 
   GPX_FOLDER = File.expand_path('../../../data/maps/gpx', __FILE__)
   IMAGES_FOLDER = File.expand_path('../../../data/maps/images', __FILE__)
