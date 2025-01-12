@@ -12,6 +12,8 @@ class StaticMap
   MAPBOX_ACCESS_TOKEN = ENV['MAPBOX_ACCESS_TOKEN'] || raise('Mapbox access token is missing!')
   MAPBOX_STYLE_URL = ENV['MAPBOX_STYLE_URL'] || raise('Map style URL is missing!')
 
+  # Maki icons
+  # @see https://labs.mapbox.com/maki-icons/
   ACTIVITY_ICONS = {
     running: 'pitch',
     cycling: 'bicycle-share',
