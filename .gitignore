@@ -5,7 +5,7 @@
 build/
 .env
 data/*.json
-data/mapbox
+data/maps
 node_modules
 source/javascripts/site.js*
 

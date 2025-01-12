@@ -3,13 +3,13 @@ require 'nokogiri'
 require 'fileutils'
 require 'active_support/all'
 
-class Mapbox
+class StaticMap
   attr_writer :tileset_id
 
-  GPX_FOLDER = File.expand_path('../../../data/mapbox/gpx', __FILE__)
-  IMAGES_FOLDER = File.expand_path('../../../data/mapbox/images', __FILE__)
+  GPX_FOLDER = File.expand_path('../../../data/maps/gpx', __FILE__)
+  IMAGES_FOLDER = File.expand_path('../../../data/maps/images', __FILE__)
 
-  MAPBOX_ACCESS_TOKEN = ENV['MAPBOX_ACCESS_TOKEN'] || raise('Mapbox API key is missing!')
+  MAPBOX_ACCESS_TOKEN = ENV['MAPBOX_ACCESS_TOKEN'] || raise('Mapbox access token is missing!')
   MAPBOX_STYLE_URL = ENV['MAPBOX_STYLE_URL'] || raise('Map style URL is missing!')
 
   ACTIVITY_ICONS = {
@@ -20,8 +20,8 @@ class Mapbox
     finish: 'racetrack'
   }
 
-  START_MARKER_COLOR = '18A644'
-  END_MARKER_COLOR = 'F90F1A'
+  START_MARKER_COLOR = '18A644' # Green
+  END_MARKER_COLOR = 'F90F1A' # Red
 
   WIDTH = 1280
   MAX_HEIGHT = 1280
@@ -29,41 +29,37 @@ class Mapbox
   PADDING = 50
   MIN_SIZE = 1
 
-  def initialize(
-    gpx_file_path,
-    options = {}
-  )
+  def initialize(gpx_file_path, options = {})
     options.reverse_merge!(
       max_height: MAX_HEIGHT,
-      min_size: MIN_SIZE,
-      padding: PADDING
+      min_size: MIN_SIZE
     )
-    @gpx_file_path = gpx_file_path
-    @max_height = [options[:max_height].to_i, MAX_HEIGHT].min
+
+    @tileset_id = options[:tileset_id]
     @min_size = options[:min_size].to_f
     @padding = validate_padding(options[:padding])
-    @tileset_id = options[:tileset_id]
-    extract_data_from_gpx
+    extract_data_from_gpx(gpx_file_path)
+    @bounding_box = calculate_bounding_box(@coordinates)
+    @bounding_box_aspect_ratio = bounding_box_aspect_ratio(@bounding_box)
+    @width = WIDTH
+    @height = (@width / @bounding_box_aspect_ratio).clamp(MIN_HEIGHT, [options[:max_height].to_i, MAX_HEIGHT].min).round
   end
 
-  # Generates a static map image from a GPX file, and saves it to the data/mapbox/images folder.
-  # and then uses the Mapbox Static API to generate a static map image, but it doesn't add the GPX file to the map.
-  # Before running this task, the GPX file must be uploaded to Mapbox and added to the map in Mapbox Studio first.
+  # Generates a map as a static image and saves it to the data/mapbox/images folder.
+  # It uses the Mapbox Static API to generate the map image based on the bounding box of the GPX file, but it doesn't add the GPX file itself to the map.
+  # Before running this task, the GPX file must be uploaded to Mapbox as a tileset.
   def generate_map_image
     puts "🔄 Generating map for #{activity_title}"
-    bounding_box = calculate_bounding_box(@coordinates)
-
     output_file_path = File.join(IMAGES_FOLDER, image_file_name)
-
-    aspect_ratio = calculate_aspect_ratio(bounding_box)
-    height = (WIDTH / aspect_ratio).clamp(MIN_HEIGHT, @max_height).round
+    image_url = mapbox_image_url
 
     puts "💾 Saving image…"
-    image_url = mapbox_image_url(bounding_box, @coordinates, WIDTH, height)
     download_image(image_url, output_file_path)
     puts "✅ Image saved to #{image_file_name}\n\n"
   end
 
+  # Returns a title for the activity based on the GPX file name and activity type.
+  # @return [String] The title for the activity
   def activity_title
     return @activity_name if @activity_name =~ /swim|run|bike|biking|cycling|marathon|10k|5k|12k/i
     "#{@activity_name} - #{@activity_type}"
@@ -71,14 +67,18 @@ class Mapbox
 
   private
 
+  # Returns the file name for the map image based on the activity name and date.
+  # @return [String] The file name for the map image
   def image_file_name
     base = "#{@activity_start&.strftime('%Y-%m-%d')} #{activity_title}".strip
     base.parameterize + '.png'
   end
 
-  def extract_data_from_gpx
-    doc = Nokogiri::XML(File.open(@gpx_file_path))
-    @activity_name = doc.at_xpath('//xmlns:trk/xmlns:name')&.text || File.basename(@gpx_file_path)
+  # Extracts data from a GPX file and saves it in instance variables.
+  # @param gpx_file_path [String] The path to the GPX file
+  def extract_data_from_gpx(gpx_file_path)
+    doc = Nokogiri::XML(File.open(gpx_file_path))
+    @activity_name = doc.at_xpath('//xmlns:trk/xmlns:name')&.text || File.basename(gpx_file_path)
     @activity_type = doc.at_xpath('//xmlns:trk/xmlns:type')&.text&.titleize || 'Other'
     @activity_start = begin
       DateTime.parse(doc.at_xpath('//xmlns:trkpt[1]/xmlns:time')&.text)
@@ -93,7 +93,7 @@ class Mapbox
     raise 'No track points found in GPX file' if @coordinates.empty?
   end
 
-  # Calculates the bounding box for a set of coordinates, taking latitude into account
+  # Calculates the bounding box for a set of coordinates, taking latitude into account.
   # @param coordinates [Array<Array<Float>>] The coordinates of the track points
   # @return [Hash] The bounding box with min_lon, max_lon, min_lat, and max_lat
   def calculate_bounding_box(coordinates)
@@ -150,10 +150,10 @@ class Mapbox
     }
   end
 
-  # Calculates the aspect ratio of the bounding box based on physical distances in kilometers
+  # Calculates the aspect ratio of the bounding box based on physical distances in kilometers.
   # @param bounding_box [Hash] The bounding box with min_lon, max_lon, min_lat, and max_lat
   # @return [Float] The aspect ratio (width in km / height in km)
-  def calculate_aspect_ratio(bounding_box)
+  def bounding_box_aspect_ratio(bounding_box)
     center_lat = (bounding_box[:min_lat] + bounding_box[:max_lat]) / 2
     cos_lat = Math.cos(center_lat * Math::PI / 180) # Cosine of latitude for longitude adjustment
 
@@ -165,19 +165,15 @@ class Mapbox
     width_km / height_km
   end
 
-  # Generates the URL for a static map image from Mapbox
-  # @param bounding_box [Hash] The bounding box with min_lon, max_lon, min_lat, and max_lat
-  # @param coordinates [Array<Array<Float>>] The coordinates of the track points
-  # @param width [Integer] The width of the image
-  # @param height [Integer] The height of the image
+  # Generates the URL for a static map image from Mapbox.
   # @return [String] The URL for the static map image
   # @see https://docs.mapbox.com/api/maps/static-images/
-  def mapbox_image_url(bounding_box, coordinates, width, height)
-    start_marker = marker_config(:start_marker, coordinates.first)
-    end_marker = marker_config(:end_marker, coordinates.last)
+  def mapbox_image_url
+    start_marker = marker_config(:start_marker, @coordinates.first)
+    end_marker = marker_config(:end_marker, @coordinates.last)
 
     username, style = MAPBOX_STYLE_URL.split('/')[3..4]
-    bbox = "%5B#{bounding_box[:min_lon]},#{bounding_box[:min_lat]},#{bounding_box[:max_lon]},#{bounding_box[:max_lat]}%5D"
+    bbox = "%5B#{@bounding_box[:min_lon]},#{@bounding_box[:min_lat]},#{@bounding_box[:max_lon]},#{@bounding_box[:max_lat]}%5D"
     layer = generate_layer
 
     base_params = {
@@ -185,12 +181,12 @@ class Mapbox
       access_token: MAPBOX_ACCESS_TOKEN
     }.compact
 
-    url = "https://api.mapbox.com/styles/v1/#{username}/#{style}/static/#{end_marker},#{start_marker}/#{bbox}/#{width}x#{height}@2x?#{base_params.to_query}"
+    url = "https://api.mapbox.com/styles/v1/#{username}/#{style}/static/#{end_marker},#{start_marker}/#{bbox}/#{@width}x#{@height}@2x?#{base_params.to_query}"
     url += "&addlayer=#{layer.to_json}&before_layer=road-label" if layer.present?
     url
   end
 
-  # Generates the marker configuration for a Mapbox static map image
+  # Generates the marker configuration for a Mapbox static map image.
   # @param marker_type [Symbol] The type of marker (:start_marker or :end_marker)
   # @param coordinate [Array<Float>] The coordinate of the marker
   # @return [String] The marker configuration
@@ -201,7 +197,7 @@ class Mapbox
     "pin-l-#{icon}+#{color}(#{coordinate[0]},#{coordinate[1]})"
   end
 
-  # Selects the icon for a marker based on the marker type and the GPX file name
+  # Selects the icon for a marker based on the marker type and the activity type.
   # @param marker_type [Symbol] The type of marker (:start_marker or :end_marker)
   # @return [String] The icon name
   def select_icon(marker_type)
@@ -214,7 +210,7 @@ class Mapbox
     ACTIVITY_ICONS[:start]
   end
 
-  # Downloads an image from a URL and saves it to a file
+  # Downloads an image from a URL and saves it to a file.
   # @param image_url [String] The URL of the image to download
   # @param output_file_path [String] The path to save the image
   def download_image(image_url, output_file_path)
@@ -226,7 +222,7 @@ class Mapbox
     File.open(output_file_path, 'wb') { |f| f.write(response.body) }
   end
 
-  # Validates the padding value
+  # Validates the padding value.
   # @param padding [String, Integer] The padding value
   # @return [Integer] The padding value
   def validate_padding(padding)
@@ -247,7 +243,7 @@ class Mapbox
     end
   end
 
-  # Generates a layer for a Mapbox static map image
+  # Generates a layer for a Mapbox tileset, which should be the GPX file uploaded to Mapbox.
   # @return [Hash] The layer configuration
   def generate_layer
     return if @tileset_id.blank?
