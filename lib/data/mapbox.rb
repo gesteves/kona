@@ -185,7 +185,7 @@ class Mapbox
       access_token: MAPBOX_ACCESS_TOKEN
     }.compact
 
-    url = "https://api.mapbox.com/styles/v1/#{username}/#{style}/static/#{start_marker},#{end_marker}/#{bbox}/#{width}x#{height}@2x?#{base_params.to_query}"
+    url = "https://api.mapbox.com/styles/v1/#{username}/#{style}/static/#{end_marker},#{start_marker}/#{bbox}/#{width}x#{height}@2x?#{base_params.to_query}"
     url += "&addlayer=#{layer.to_json}&before_layer=road-label" if layer.present?
     url
   end
