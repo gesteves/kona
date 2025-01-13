@@ -35,12 +35,14 @@ class StaticMap
     options.reverse_merge!(
       max_height: MAX_HEIGHT,
       min_size: MIN_SIZE,
-      padding: PADDING
+      padding: PADDING,
+      reverse_markers: false
     )
 
     @tileset_id = options[:tileset_id]
     @min_size = options[:min_size].to_f
     @padding = validate_padding(options[:padding])
+    @reverse_markers = options[:reverse_markers]
     extract_data_from_gpx(gpx_file_path)
     @bounding_box = calculate_bounding_box(@coordinates)
     @bounding_box_aspect_ratio = bounding_box_aspect_ratio(@bounding_box)
@@ -173,10 +175,9 @@ class StaticMap
   # @return [String] The URL for the static map image
   # @see https://docs.mapbox.com/api/maps/static-images/
   def mapbox_image_url
-    start_marker = marker_config(:start_marker, @coordinates.first)
-    end_marker = marker_config(:end_marker, @coordinates.last)
-
     username, style = MAPBOX_STYLE_URL.split('/')[3..4]
+    markers = [marker_config(:end_marker, @coordinates.last), marker_config(:start_marker, @coordinates.first)]
+    markers.reverse! if @reverse_markers
     bbox = "%5B#{@bounding_box[:min_lon]},#{@bounding_box[:min_lat]},#{@bounding_box[:max_lon]},#{@bounding_box[:max_lat]}%5D"
     layer = generate_layer
 
@@ -185,7 +186,7 @@ class StaticMap
       access_token: MAPBOX_ACCESS_TOKEN
     }.compact
 
-    url = "https://api.mapbox.com/styles/v1/#{username}/#{style}/static/#{end_marker},#{start_marker}/#{bbox}/#{@width}x#{@height}@2x?#{base_params.to_query}"
+    url = "https://api.mapbox.com/styles/v1/#{username}/#{style}/static/#{markers.join(',')}/#{bbox}/#{@width}x#{@height}@2x?#{base_params.to_query}"
     url += "&addlayer=#{layer.to_json}&before_layer=road-label" if layer.present?
     url
   end
