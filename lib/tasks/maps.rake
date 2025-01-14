@@ -10,7 +10,7 @@ namespace :maps do
     gpx_files = Dir.glob(File.join(StaticMap::GPX_FOLDER, '*.gpx'))
     
     if gpx_files.empty?
-      puts "❗️ No GPX files found in #{StaticMap::GPX_FOLDER}"
+      puts "⚠️ No GPX files found in #{StaticMap::GPX_FOLDER}"
       next
     end
 
