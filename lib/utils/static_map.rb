@@ -19,7 +19,8 @@ class StaticMap
     cycling: 'bicycle-share',
     swimming: 'swimming',
     start: 'rocket',
-    finish: 'racetrack'
+    finish: 'racetrack',
+    dnf: 'danger'
   }
 
   START_MARKER_COLOR = '18A644' # Green
@@ -36,13 +37,15 @@ class StaticMap
       max_height: MAX_HEIGHT,
       min_size: MIN_SIZE,
       padding: PADDING,
-      reverse_markers: false
+      reverse_markers: false,
+      dnf: false
     )
 
     @tileset_id = options[:tileset_id]
     @min_size = options[:min_size].to_f
     @padding = validate_padding(options[:padding])
     @reverse_markers = options[:reverse_markers]
+    @dnf = options[:dnf]
     extract_data_from_gpx(gpx_file_path)
     @bounding_box = calculate_bounding_box(@coordinates)
     @bounding_box_aspect_ratio = bounding_box_aspect_ratio(@bounding_box)
@@ -51,8 +54,9 @@ class StaticMap
   end
 
   # Generates a map as a static image and saves it to the data/mapbox/images folder.
-  # It uses the Mapbox Static API to generate the map image based on the bounding box of the GPX file, but it doesn't add the GPX file itself to the map.
-  # Before running this task, the GPX file must be uploaded to Mapbox as a tileset.
+  # It uses the Mapbox Static API to generate the map image based on the bounding box of the GPX file,
+  # but it doesn't add the GPX file itself to the map.
+  # Before running this task, the GPX file must be uploaded to Mapbox Studio as a tileset.
   def generate_image!
     puts "🔄 Generating map for #{activity_title}"
     output_file_path = File.join(IMAGES_FOLDER, image_file_name)
@@ -206,7 +210,8 @@ class StaticMap
   # @param marker_type [Symbol] The type of marker (:start_marker or :end_marker)
   # @return [String] The icon name
   def select_icon(marker_type)
-    return ACTIVITY_ICONS[:finish] if marker_type == :end_marker
+    return ACTIVITY_ICONS[:dnf]      if @dnf && marker_type == :end_marker
+    return ACTIVITY_ICONS[:finish]   if marker_type == :end_marker
 
     return ACTIVITY_ICONS[:swimming] if @activity_type =~ /swimming/i
     return ACTIVITY_ICONS[:cycling]  if @activity_type =~ /cycling|biking/i
