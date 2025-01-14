@@ -2,7 +2,14 @@ require_relative '../utils/static_map'
 namespace :maps do
   desc 'Generate static map images from GPX files in the data/maps/gpx folder'
   task generate: :environment do
-    Dir.glob(File.join(StaticMap::GPX_FOLDER, '*.gpx')).each do |gpx_file|
+    gpx_files = Dir.glob(File.join(StaticMap::GPX_FOLDER, '*.gpx'))
+    
+    if gpx_files.empty?
+      puts "❗️ No GPX files found in #{StaticMap::GPX_FOLDER}"
+      next
+    end
+
+    gpx_files.each do |gpx_file|
       options = {
         reverse_markers: ENV['REVERSE_MARKERS'].present?,
         padding: ENV['PADDING'],
@@ -29,6 +36,6 @@ namespace :maps do
         next
       end   
     end
-    puts "✅ All maps generated!"
+    puts "✅ Map generation complete!"
   end
 end
