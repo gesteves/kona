@@ -20,7 +20,7 @@ class StaticMap
     swimming: 'swimming',
     start: 'rocket',
     finish: 'racetrack',
-    dnf: 'danger'
+    dnf: 'embassy'
   }
 
   START_MARKER_COLOR = '18A644' # Green
