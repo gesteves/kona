@@ -1,6 +1,11 @@
 require_relative '../utils/static_map'
 namespace :maps do
-  desc 'Generate static map images from GPX files in the data/maps/gpx folder'
+  # Loops through the GPX files stored in the StaticMap::GPX_FOLDER folder (data/maps/gpx),
+  # generates a map for each as a static PNG image, and saves it to the StaticMap::IMAGES_FOLDER folder (data/mapbox/images).
+  # It uses the Mapbox Static API to generate the map image based on the bounding box of the GPX file,
+  # but the GPX files must be uploaded manually to Mapbox Studio as tilesets first.
+  # @todo Automate uploading the GPX files to Mapbox.
+  desc 'Generate static map images from GPX files'
   task generate: :environment do
     gpx_files = Dir.glob(File.join(StaticMap::GPX_FOLDER, '*.gpx'))
     

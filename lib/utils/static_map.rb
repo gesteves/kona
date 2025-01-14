@@ -53,10 +53,7 @@ class StaticMap
     @height = (@width / @bounding_box_aspect_ratio).clamp(MIN_HEIGHT, [options[:max_height].to_i, MAX_HEIGHT].min).round
   end
 
-  # Generates a map as a static image and saves it to the data/mapbox/images folder.
-  # It uses the Mapbox Static API to generate the map image based on the bounding box of the GPX file,
-  # but it doesn't add the GPX file itself to the map.
-  # Before running this task, the GPX file must be uploaded to Mapbox Studio as a tileset.
+  # Generates a map as a static image and saves it to the IMAGES_FOLDER folder.
   def generate_image!
     puts "🔄 Generating map for #{activity_title}"
     output_file_path = File.join(IMAGES_FOLDER, image_file_name)
