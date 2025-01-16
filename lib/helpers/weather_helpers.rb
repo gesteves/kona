@@ -334,8 +334,7 @@ module WeatherHelpers
     gusts_imperial = kilometers_to_miles(current_weather&.wind_gust.to_f).round
     gusts_knots = kph_to_knots(current_weather&.wind_gust.to_f)
 
-    return if direction.blank?
-    return beaufort_description(wind_speed_knots) if beaufort_number(wind_speed_knots).zero?
+    return if direction.blank? || beaufort_number(wind_speed_knots).zero?
 
     metric = "#{wind_speed_metric} km/h"
     imperial = "#{wind_speed_imperial} mph"
