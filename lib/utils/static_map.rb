@@ -35,6 +35,7 @@ class StaticMap
   def initialize(gpx_file_path, options = {})
     options.reverse_merge!(
       max_height: MAX_HEIGHT,
+      min_height: MIN_HEIGHT,
       min_size: MIN_SIZE,
       padding: PADDING,
       reverse_markers: false,
@@ -50,7 +51,9 @@ class StaticMap
     @bounding_box = calculate_bounding_box(@coordinates)
     @bounding_box_aspect_ratio = bounding_box_aspect_ratio(@bounding_box)
     @width = WIDTH
-    @height = (@width / @bounding_box_aspect_ratio).clamp(MIN_HEIGHT, [options[:max_height].to_i, MAX_HEIGHT].min).round
+    min_height = options[:min_height].to_i.clamp(MIN_HEIGHT, MAX_HEIGHT)
+    max_height = options[:max_height].to_i.clamp(MIN_HEIGHT, MAX_HEIGHT)
+    @height = (@width / @bounding_box_aspect_ratio).clamp(min_height, max_height).round
   end
 
   # Generates a map as a static image and saves it to the IMAGES_FOLDER folder.

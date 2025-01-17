@@ -19,6 +19,7 @@ namespace :maps do
         reverse_markers: ENV['REVERSE_MARKERS'].present?,
         padding: ENV['PADDING'],
         max_height: ENV['MAX_HEIGHT'],
+        min_height: ENV['MIN_HEIGHT'],
         min_size: ENV['MIN_SIZE'],
         tileset_id: ENV['TILESET_ID'],
         dnf: ENV['DNF'].present?
