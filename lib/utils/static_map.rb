@@ -225,7 +225,7 @@ class StaticMap
   def download_image(image_url, output_file_path)
     response = HTTParty.get(image_url)
 
-    raise "Failed to download image (HTTP #{response.code}): #{response.body}" unless response.success?
+    raise JSON.parse(response.body, symbolize_names: true)[:message] unless response.success?
 
     FileUtils.mkdir_p(File.dirname(output_file_path))
     File.open(output_file_path, 'wb') { |f| f.write(response.body) }
