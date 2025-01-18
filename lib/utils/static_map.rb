@@ -282,7 +282,7 @@ class StaticMap
       },
       "source-layer": "tracks",
       "paint": {
-        "line-color": "%23#{TRACK_COLOR}",
+        "line-color": URI.encode_www_form_component("##{TRACK_COLOR}"),
         "line-width": TRACK_WIDTH,
         "line-opacity": TRACK_OPACITY,
         "line-cap": "round",
