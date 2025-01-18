@@ -26,6 +26,10 @@ class StaticMap
   START_MARKER_COLOR = '18A644' # Green
   END_MARKER_COLOR = 'F90F1A' # Red
 
+  TRACK_COLOR = 'BF0222' # Red
+  TRACK_OPACITY = 0.75
+  TRACK_WIDTH = 4
+
   WIDTH = 1280
   MAX_HEIGHT = 1280
   MIN_HEIGHT = 800
@@ -278,9 +282,9 @@ class StaticMap
       },
       "source-layer": "tracks",
       "paint": {
-        "line-color": "%23BF0222",
-        "line-width": 4,
-        "line-opacity": 0.75,
+        "line-color": "%23#{TRACK_COLOR}",
+        "line-width": TRACK_WIDTH,
+        "line-opacity": TRACK_OPACITY,
         "line-cap": "round",
         "line-join": "round"
       }
