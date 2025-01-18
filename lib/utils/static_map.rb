@@ -48,7 +48,7 @@ class StaticMap
     extract_data_from_gpx(gpx_file_path)
     @bounding_box = calculate_bounding_box(@coordinates)
     @width = WIDTH
-    @height = if options[:height].to_i > 0
+    @height = if options[:height].to_i > top_and_bottom_padding(@padding)
       [options[:height].to_i, MAX_HEIGHT].min
     else
       (@width / bounding_box_aspect_ratio(@bounding_box)).clamp(MIN_HEIGHT, MAX_HEIGHT)
@@ -249,6 +249,19 @@ class StaticMap
       values.join(',')
     else
       PADDING  # Default padding if empty input
+    end
+  end
+
+  # Calculates the sum of the top and bottom padding.
+  # @param padding [String, Integer] The padding value
+  # @return [Integer] The total padding
+  def top_and_bottom_padding(padding)
+    if padding.is_a?(Integer)
+      padding * 2  # Single value: double it for top and bottom
+    else
+      # String with 4 values: sum first (top) and third (bottom) values
+      values = padding.to_s.split(',').map(&:to_i)
+      values[0] + values[2]
     end
   end
 
