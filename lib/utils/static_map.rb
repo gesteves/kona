@@ -34,18 +34,18 @@ class StaticMap
   MAX_HEIGHT = 1280
   MIN_HEIGHT = 800
   PADDING = 50
-  MIN_SIZE = 1
+  MIN_KM = 1  # Minimum width and height of the map's viewable area in kilometers
 
   def initialize(gpx_file_path, options = {})
     options.reverse_merge!(
-      min_size: MIN_SIZE,
+      min_km: MIN_KM,
       padding: PADDING,
       reverse_markers: false,
       dnf: false
     )
 
     @tileset_id = options[:tileset_id]
-    @min_size = options[:min_size].to_f
+    @min_km = options[:min_km].to_f
     @padding = validate_padding(options[:padding])
     @reverse_markers = options[:reverse_markers]
     @dnf = options[:dnf]
@@ -127,32 +127,32 @@ class StaticMap
     # As you move toward the poles, cos(latitude) decreases, making longitude degrees shorter.
     cos_lat = Math.cos(center_lat_in_radians)
 
-    # Calculate the minimum size of the bounding box in degrees of latitude.
+    # Calculate the minimum viewable size of the bounding box in degrees of latitude.
     # 1° of latitude ≈ 111.32 km everywhere on Earth.
-    min_size_lat = @min_size / 111.32
+    min_viewable_lat = @min_km / 111.32
 
-    # Calculate the minimum size of the bounding box in degrees of longitude at the given latitude.
+    # Calculate the minimum viewable size of the bounding box in degrees of longitude at the given latitude.
     # 1° of longitude ≈ 111.32 km * cos(latitude).
-    min_size_lon = @min_size / (111.32 * cos_lat)
+    min_viewable_lon = @min_km / (111.32 * cos_lat)
 
     # Ensure the longitude span is at least the minimum size
-    if (max_lon - min_lon) < min_size_lon
+    if (max_lon - min_lon) < min_viewable_lon
       # Calculate the center of the current longitude span
       center_lon = (min_lon + max_lon) / 2
 
-      # Adjust the min and max longitude so the total span is equal to min_size_lon
-      min_lon = center_lon - (min_size_lon / 2)
-      max_lon = center_lon + (min_size_lon / 2)
+      # Adjust the min and max longitude so the total span is equal to min_viewable_lon
+      min_lon = center_lon - (min_viewable_lon / 2)
+      max_lon = center_lon + (min_viewable_lon / 2)
     end
 
     # Ensure the latitude span is at least the minimum size
-    if (max_lat - min_lat) < min_size_lat
+    if (max_lat - min_lat) < min_viewable_lat
       # Calculate the center of the current latitude span
       center_lat = (min_lat + max_lat) / 2
 
-      # Adjust the min and max latitude so the total span is equal to min_size_lat
-      min_lat = center_lat - (min_size_lat / 2)
-      max_lat = center_lat + (min_size_lat / 2)
+      # Adjust the min and max latitude so the total span is equal to min_viewable_lat
+      min_lat = center_lat - (min_viewable_lat / 2)
+      max_lat = center_lat + (min_viewable_lat / 2)
     end
 
     {
@@ -195,6 +195,7 @@ class StaticMap
 
     url = "https://api.mapbox.com/styles/v1/#{username}/#{style}/static/#{markers.join(',')}/#{bbox}/#{@width}x#{@height}@2x?#{base_params.to_query}"
     url += "&addlayer=#{layer.to_json}&before_layer=road-label" if layer.present?
+    puts url
     url
   end
 

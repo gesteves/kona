@@ -19,7 +19,7 @@ namespace :maps do
         reverse_markers: ENV['REVERSE_MARKERS'].present?,
         padding: ENV['PADDING'],
         height: ENV['HEIGHT'],
-        min_size: ENV['MIN_SIZE'],
+        min_km: ENV['MIN_KM'],
         tileset_id: ENV['TILESET_ID'],
         dnf: ENV['DNF'].present?
       }.compact
