@@ -261,15 +261,13 @@ module ArticleHelpers
   # @param article [Object] The article to show the pageviews for.
   # @return [String] The formatted number of views.
   def article_views(article)
-    # Add one because if someone is seeing this number, by definition it has gone up by one.
-    views = article&.metrics&.all&.pageviews.to_i + 1
+    views = article&.metrics&.all&.pageviews.to_i
+    return "Never viewed" if views.zero?
     times = case views
     when 1
       "once"
     when 2
       "twice"
-    when 69
-      "69 times (nice)"
     else
       "#{number_to_delimited(views)} times"
     end
