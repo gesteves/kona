@@ -195,7 +195,6 @@ class StaticMap
 
     url = "https://api.mapbox.com/styles/v1/#{username}/#{style}/static/#{markers.join(',')}/#{bbox}/#{@width}x#{@height}@2x?#{base_params.to_query}"
     url += "&addlayer=#{layer.to_json}&before_layer=road-label" if layer.present?
-    puts url
     url
   end
 
