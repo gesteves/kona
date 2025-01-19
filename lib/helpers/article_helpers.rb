@@ -114,6 +114,14 @@ module ArticleHelpers
       .take(count)
   end
 
+  # Returns the trending articles, excluding the recent articles.
+  # @param count [Integer] (Optional) The number of articles to return.
+  # @param exclude [Object] (Optional) An article to exclude from the results.
+  # @return [Array<Object>] An array of the trending articles, excluding the recent articles, up to the specified count.
+  def non_recent_trending_articles(count: 4, exclude: nil)
+    trending_articles(count: count * 2, exclude: exclude) - recent_articles(count: count, exclude: exclude).take(count)
+  end
+
   # Calculates the growth rate for an article, comparing the pageviews in the past day
   # to the average pageviews in the past week.
   # @param article [Object] The article for which to calculate the growth rate.
