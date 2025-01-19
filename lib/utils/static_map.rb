@@ -53,9 +53,9 @@ class StaticMap
     @bounding_box = calculate_bounding_box(@coordinates)
     @width = WIDTH
     @height = if options[:height].to_i > top_and_bottom_padding(@padding)
-      [options[:height].to_i, MAX_HEIGHT].min.round
+      [options[:height].to_i, MAX_HEIGHT].min
     else
-      (@width / bounding_box_aspect_ratio(@bounding_box)).clamp(MIN_HEIGHT, MAX_HEIGHT).round
+      (@width / bounding_box_aspect_ratio(@bounding_box)).ceil.clamp(MIN_HEIGHT, MAX_HEIGHT)
     end
   end
 
