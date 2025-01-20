@@ -110,7 +110,7 @@ module ArticleHelpers
       .reject { |a| a.path == exclude&.path } # Exclude the given article, if applicable
       .reject { |a| a.draft }                 # Exclude drafts
       .reject { |a| a.entry_type == 'Short' } # Exclude short posts
-      .sort_by { |a| [-absolute_trending_score(a), -a.metrics[:"1d"].pageviews, -a.metrics[:"7d"].pageviews, -a.metrics[:"30d"].pageviews, -a.metrics.all.pageviews] } # Sort by trending score, then use pageviews as tiebreakers
+      .sort_by { |a| [-absolute_trending_score(a), -average_weekly_views(a), -average_monthly_views(a), -average_all_time_views(a)] } # Sort by trending score, then use average weekly, monthly, and all-time pageviews as tiebreakers
       .take(count)
   end
 
@@ -123,6 +123,27 @@ module ArticleHelpers
     articles.take(count)
   end
 
+  # Returns the average weekly pageviews for an article.
+  # @param article [Object] The article to calculate the average weekly pageviews for.
+  # @return [Float] The average weekly pageviews.
+  def average_weekly_views(article)
+    article.metrics[:"7d"].pageviews.to_f / 7
+  end
+
+  # Returns the average monthly pageviews for an article.
+  # @param article [Object] The article to calculate the average monthly pageviews for.
+  # @return [Float] The average monthly pageviews.
+  def average_monthly_views(article)
+    article.metrics[:"30d"].pageviews.to_f / 30
+  end
+
+  # Returns the average all-time pageviews for an article.
+  # @param article [Object] The article to calculate the average all-time pageviews for.
+  # @return [Float] The average all-time pageviews.
+  def average_all_time_views(article)
+    article.metrics.all.pageviews.to_f / days_since_published(article)
+  end
+
   # Calculates an absolute trending score for an article based on its pageviews.
   # @param article [Object] The article for which to calculate the trending score.
   # @return [Float] The absolute trending score.
@@ -131,8 +152,8 @@ module ArticleHelpers
     absolute_weight = ENV.fetch('TRENDING_SCORE_ABSOLUTE_WEIGHT', 1).to_f
 
     daily_views = article.metrics.day.pageviews.to_f
-    weekly_avg = article.metrics[:"7d"].pageviews.to_f / 7
-    all_time_avg = article.metrics.all.pageviews.to_f / days_since_published(article)
+    weekly_avg = average_weekly_views(article)
+    all_time_avg = average_all_time_views(article)
 
     # Return 0 if there's no recent activity
     return 0 if daily_views.zero? || weekly_avg.zero? || all_time_avg.zero?
