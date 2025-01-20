@@ -131,27 +131,32 @@ module ArticleHelpers
     absolute_weight = ENV.fetch('TRENDING_SCORE_ABSOLUTE_WEIGHT', 1).to_f
 
     daily_views = article.metrics.day.pageviews.to_f
-    weekly_views = article.metrics[:"7d"].pageviews.to_f
-    weekly_avg = weekly_views / 7.0
+    weekly_avg = article.metrics[:"7d"].pageviews.to_f / 7
     all_time_avg = article.metrics.all.pageviews.to_f / days_since_published(article)
 
     # Return 0 if there's no recent activity
-    return 0 if daily_views.zero?
+    return 0 if daily_views.zero? || weekly_avg.zero? || all_time_avg.zero?
 
-    # Calculate relative increase from baseline
+    # We use the higher of weekly average and all-time average as our baseline
+    # because we want to detect spikes relative to the article's "normal" traffic.
+    # If an article consistently gets high traffic (high all-time avg) or has been
+    # getting increased attention lately (high weekly avg), we need a higher
+    # baseline to determine if today's traffic represents an unusual spike.
     baseline = [weekly_avg, all_time_avg].max
-    relative_score = if baseline.zero?
-      1  # If no historical data, any views today are significant
-    else
-      daily_views / baseline
-    end
 
-    # Calculate absolute score based on daily views relative to historical average
-    absolute_score = if all_time_avg.zero?
-      1  # If no history, any views today are significant
-    else
-      daily_views / all_time_avg
-    end
+    # We calculate two scores:
+    # 1. Relative score (daily_views / baseline): Measures if today's traffic is unusually high
+    #    compared to the article's normal traffic. This helps identify sudden spikes in interest,
+    #    even for articles that typically get low traffic.
+    # 2. Absolute score (daily_views / all_time_avg): Measures raw traffic volume relative to
+    #    the article's history. This helps ensure articles with significant absolute traffic
+    #    still rank highly, even if the spike isn't as dramatic percentage-wise.
+    #
+    # These scores are then weighted and combined. The relative score helps surface articles
+    # having unusual spikes, while the absolute score ensures articles with high raw traffic
+    # aren't completely overshadowed by low-traffic articles having small but dramatic spikes.
+    relative_score = daily_views / baseline
+    absolute_score = daily_views / all_time_avg
 
     (relative_score * relative_weight) + (absolute_score * absolute_weight)
   end
