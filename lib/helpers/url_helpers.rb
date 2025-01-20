@@ -30,6 +30,6 @@ module UrlHelpers
   # @return [String] The domain of the application's root URL.
   def site_domain
     uri = URI.parse(root_url)
-    domain = PublicSuffix.domain(uri.host)
+    PublicSuffix.domain(uri.host)
   end
 end
