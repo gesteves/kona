@@ -133,7 +133,7 @@ module ArticleHelpers
     return 0 if weekly_avg.zero?
 
     ratio = daily_views / weekly_avg
-    ratio / (ratio + 1)
+    (ratio / (ratio + 1)).round(5)
   end
 
   # Calculates an overall similarity score between two articles.
