@@ -1,4 +1,4 @@
-<article class="entry entry--compact" id="entry-<%= article.sys.id.parameterize %>" aria-labelledby="hed-<%= article.sys.id.parameterize %>" data-one-day-pageviews="<%= article.metrics[:"1d"].pageviews %>" data-seven-day-pageviews="<%= article.metrics[:"7d"].pageviews %>" data-pageviews-growth-rate="<%= pageview_growth_rate(article) %>" data-trending-score="<%= trending_score(article) %>" data-recency-score="<%= recency_score(article) %>">
+<article class="entry entry--compact" id="entry-<%= article.sys.id.parameterize %>" aria-labelledby="hed-<%= article.sys.id.parameterize %>" data-one-day-pageviews="<%= article.metrics[:"1d"].pageviews %>" data-seven-day-pageviews="<%= article.metrics[:"7d"].pageviews %>" data-trending-score="<%= trending_score(article) %>" data-recency-score="<%= recency_score(article) %>">
   <header class="entry__header">
     <%= partial 'partials/article/meta', locals: { article: article } %>
     <h2 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">

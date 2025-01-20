@@ -123,39 +123,50 @@ module ArticleHelpers
     articles.take(count)
   end
 
-  # Calculates the growth rate for an article, comparing the pageviews in the past day
-  # to the average pageviews in the past week.
-  # @param article [Object] The article for which to calculate the growth rate.
-  # @return [Float] The growth rate. Returns 0 if there are no past pageviews.
-  def pageview_growth_rate(article)
-    avg_pageviews_last_week = article.metrics[:"7d"].pageviews / 7.0
-    return 0 if avg_pageviews_last_week.zero?
-
-    ((article.metrics[:"1d"].pageviews - avg_pageviews_last_week) / avg_pageviews_last_week).round(5)
-  end
-
   # Normalizes the growth rate of an article to a "trending" score between 0 and 1.
-  # e.g. the article with the highest growth rate in the past day is the most "trending" one,
-  # with a score of 1.
-  # (idk, just making things up.)
   # @param article [Object] The article for which to calculate the trending score.
   # @return [Float] The trending score, between 0 and 1.
   def trending_score(article)
-    # Calculate min and max growth rates among all articles
-    growth_rates = data.articles
-      .reject { |a| a.draft }                 # Exclude drafts
-      .reject { |a| a.entry_type == 'Short' } # Exclude short posts
-      .map { |a| pageview_growth_rate(a) }
+    daily_views = article.metrics[:"1d"].pageviews
+    weekly_avg = article.metrics[:"7d"].pageviews / 7.0
+    all_time_views = article.metrics.all.pageviews.to_f
+    days_since_publish = ((Time.now - DateTime.parse(article.published_at)) / 1.day).to_i
 
-    min_growth_rate = growth_rates.min
-    max_growth_rate = growth_rates.max
+    # Calculate historical daily average (excluding recent week to detect spikes)
+    historical_daily_avg = if days_since_publish > 7
+      (all_time_views - article.metrics[:"7d"].pageviews) / (days_since_publish - 7).to_f
+    else
+      weekly_avg
+    end
 
-    # Avoid division by zero
-    return 0 if max_growth_rate == min_growth_rate
+    # Combine absolute views, recent growth, and historical context
+    absolute_weight = 0.6
+    growth_weight = 0.2
+    historical_weight = 0.2
 
-    # Normalize the article's growth rate to [0,1] range
-    article_growth_rate = pageview_growth_rate(article)
-    ((article_growth_rate - min_growth_rate) / (max_growth_rate - min_growth_rate)).round(5)
+    # Normalize daily views against all articles
+    max_daily_views = data.articles
+      .reject { |a| a.draft }
+      .reject { |a| a.entry_type == 'Short' }
+      .map { |a| a.metrics[:"1d"].pageviews }
+      .max.to_f
+
+    absolute_score = daily_views / max_daily_views
+
+    # Calculate growth vs last week
+    growth = weekly_avg.zero? ? 0 : (daily_views - weekly_avg) / weekly_avg
+    growth_score = growth / (growth.abs + 1)  # Normalize to -1 to 1 range
+    growth_score = (growth_score + 1) / 2     # Shift to 0 to 1 range
+
+    # Calculate how much current traffic exceeds historical average
+    historical_growth = historical_daily_avg.zero? ? 0 : (daily_views - historical_daily_avg) / historical_daily_avg
+    historical_score = historical_growth / (historical_growth.abs + 1)  # Normalize to -1 to 1 range
+    historical_score = (historical_score + 1) / 2                       # Shift to 0 to 1 range
+
+    # Combine scores
+    (absolute_score * absolute_weight +
+     growth_score * growth_weight +
+     historical_score * historical_weight).round(5)
   end
 
   # Calculates an overall similarity score between two articles.
