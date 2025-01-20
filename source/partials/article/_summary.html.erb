@@ -1,4 +1,4 @@
-<article class="entry entry--summary" id="entry-<%= article.sys.id.parameterize %>" aria-labelledby="hed-<%= article.sys.id.parameterize %>" data-trending-score="<%= trending_score(article).round(5) %>" data-recency-score="<%= recency_score(article).round(5) %>">
+<article class="entry entry--summary" id="entry-<%= article.sys.id.parameterize %>" aria-labelledby="hed-<%= article.sys.id.parameterize %>" data-trending-score="<%= absolute_trending_score(article).round(5) %>" data-recency-score="<%= recency_score(article).round(5) %>">
   <header class="entry__header">
     <p class="entry__meta">
       <span>

@@ -110,7 +110,7 @@ module ArticleHelpers
       .reject { |a| a.path == exclude&.path } # Exclude the given article, if applicable
       .reject { |a| a.draft }                 # Exclude drafts
       .reject { |a| a.entry_type == 'Short' } # Exclude short posts
-      .sort_by { |a| -trending_score(a) }     # Sort by trending score, in descending order
+      .sort_by { |a| -absolute_trending_score(a) }     # Sort by trending score, in descending order
       .take(count)
   end
 
