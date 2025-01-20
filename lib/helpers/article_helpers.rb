@@ -141,19 +141,21 @@ module ArticleHelpers
   # @param article [Object] The article for which to calculate the trending score.
   # @return [Float] The trending score, between 0 and 1.
   def trending_score(article)
-    # Calculate max growth rates among all articles
-    max_growth_rate = data.articles
+    # Calculate min and max growth rates among all articles
+    growth_rates = data.articles
       .reject { |a| a.draft }                 # Exclude drafts
       .reject { |a| a.entry_type == 'Short' } # Exclude short posts
       .map { |a| pageview_growth_rate(a) }
-      .max
+
+    min_growth_rate = growth_rates.min
+    max_growth_rate = growth_rates.max
 
     # Avoid division by zero
-    return 0 if max_growth_rate.zero?
+    return 0 if max_growth_rate == min_growth_rate
 
-    # Normalize the article's growth rate
+    # Normalize the article's growth rate to [0,1] range
     article_growth_rate = pageview_growth_rate(article)
-    article_growth_rate / max_growth_rate
+    (article_growth_rate - min_growth_rate) / (max_growth_rate - min_growth_rate)
   end
 
   # Calculates an overall similarity score between two articles.
