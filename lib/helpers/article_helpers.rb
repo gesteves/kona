@@ -123,50 +123,17 @@ module ArticleHelpers
     articles.take(count)
   end
 
-  # Normalizes the growth rate of an article to a "trending" score between 0 and 1.
+  # Calculates a trending score for an article based on its pageviews today vs the average pageviews in the past week.
   # @param article [Object] The article for which to calculate the trending score.
   # @return [Float] The trending score, between 0 and 1.
   def trending_score(article)
     daily_views = article.metrics[:"1d"].pageviews
     weekly_avg = article.metrics[:"7d"].pageviews / 7.0
-    all_time_views = article.metrics.all.pageviews.to_f
-    days_since_publish = ((Time.now - DateTime.parse(article.published_at)) / 1.day).to_i
 
-    # Calculate historical daily average (excluding recent week to detect spikes)
-    historical_daily_avg = if days_since_publish > 7
-      (all_time_views - article.metrics[:"7d"].pageviews) / (days_since_publish - 7).to_f
-    else
-      weekly_avg
-    end
+    return 0 if weekly_avg.zero?
 
-    # Combine absolute views, recent growth, and historical context
-    absolute_weight = 0.6
-    growth_weight = 0.2
-    historical_weight = 0.2
-
-    # Normalize daily views against all articles
-    max_daily_views = data.articles
-      .reject { |a| a.draft }
-      .reject { |a| a.entry_type == 'Short' }
-      .map { |a| a.metrics[:"1d"].pageviews }
-      .max.to_f
-
-    absolute_score = daily_views / max_daily_views
-
-    # Calculate growth vs last week
-    growth = weekly_avg.zero? ? 0 : (daily_views - weekly_avg) / weekly_avg
-    growth_score = growth / (growth.abs + 1)  # Normalize to -1 to 1 range
-    growth_score = (growth_score + 1) / 2     # Shift to 0 to 1 range
-
-    # Calculate how much current traffic exceeds historical average
-    historical_growth = historical_daily_avg.zero? ? 0 : (daily_views - historical_daily_avg) / historical_daily_avg
-    historical_score = historical_growth / (historical_growth.abs + 1)  # Normalize to -1 to 1 range
-    historical_score = (historical_score + 1) / 2                       # Shift to 0 to 1 range
-
-    # Combine scores
-    (absolute_score * absolute_weight +
-     growth_score * growth_weight +
-     historical_score * historical_weight).round(5)
+    ratio = daily_views / weekly_avg
+    ratio / (ratio + 1)
   end
 
   # Calculates an overall similarity score between two articles.
