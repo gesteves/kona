@@ -125,7 +125,7 @@ module ArticleHelpers
 
   # Calculates a trending score for an article based on its pageviews.
   # @param article [Object] The article for which to calculate the trending score.
-  # @return [Float] The trending score, between 0 and 1.
+  # @return [Float] The trending score.
   def trending_score(article)
     relative_weight = ENV.fetch('TRENDING_SCORE_RELATIVE_WEIGHT', 1).to_f
     absolute_weight = ENV.fetch('TRENDING_SCORE_ABSOLUTE_WEIGHT', 1).to_f
@@ -141,23 +141,19 @@ module ArticleHelpers
     # Calculate relative increase from baseline
     baseline = [weekly_avg, all_time_avg].max
     relative_score = if baseline.zero?
-      daily_views > 0 ? 1 : 0  # If no historical data, any views today are significant
+      1  # If no historical data, any views today are significant
     else
-      ratio = daily_views / baseline
-      ratio / (ratio + 1)  # Normalize to 0-1 range
+      daily_views / baseline
     end
 
     # Calculate absolute score based on daily views relative to historical average
     absolute_score = if all_time_avg.zero?
-      daily_views > 0 ? 1 : 0  # If no history, any views today are significant
+      1  # If no history, any views today are significant
     else
-      ratio = daily_views / all_time_avg
-      ratio / (ratio + 1)  # Normalizes to 0-1 range
+      daily_views / all_time_avg
     end
 
-    # Combine scores with weights and normalize to 0-1 range
-    total_weight = relative_weight + absolute_weight
-    combined_score = ((relative_score * relative_weight) + (absolute_score * absolute_weight)) / total_weight
+    combined_score = (relative_score * relative_weight) + (absolute_score * absolute_weight)
     combined_score.round(5)
   end
 
@@ -167,7 +163,7 @@ module ArticleHelpers
   # - Similarity of the titles (articles with similar titles are probably similar)
   # @param article [Object] The reference article.
   # @param candidate [Object] The article to evaluate for similarity.
-  # @return [Float] The similarity score between 0 and 1.
+  # @return [Float] The similarity score.
   def similarity_score(article, candidate)
     tags_weight = ENV.fetch('SIMILARITY_SCORE_TAGS_WEIGHT', 1).to_f
     title_weight = ENV.fetch('SIMILARITY_SCORE_TITLE_WEIGHT', 1).to_f
@@ -181,7 +177,8 @@ module ArticleHelpers
     white = Text::WhiteSimilarity.new
     title_score = white.similarity(sanitize(article.title), sanitize(candidate.title))
 
-    ((tags_score * tags_weight) + (title_score * title_weight)).round(5)
+    combined_score = (tags_score * tags_weight) + (title_score * title_weight)
+    combined_score.round(5)
   end
 
   # Calculates a relevance score by adding up similarity_score, recency_score, and trending_score.
