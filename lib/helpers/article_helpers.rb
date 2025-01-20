@@ -123,10 +123,10 @@ module ArticleHelpers
     articles.take(count)
   end
 
-  # Calculates a trending score for an article based on its pageviews.
+  # Calculates an absolute trending score for an article based on its pageviews.
   # @param article [Object] The article for which to calculate the trending score.
-  # @return [Float] The trending score.
-  def trending_score(article)
+  # @return [Float] The absolute trending score.
+  def absolute_trending_score(article)
     relative_weight = ENV.fetch('TRENDING_SCORE_RELATIVE_WEIGHT', 1).to_f
     absolute_weight = ENV.fetch('TRENDING_SCORE_ABSOLUTE_WEIGHT', 1).to_f
 
@@ -155,6 +155,23 @@ module ArticleHelpers
 
     combined_score = (relative_score * relative_weight) + (absolute_score * absolute_weight)
     combined_score.round(5)
+  end
+
+  # Returns a normalized trending score between 0 and 1.
+  # The article with the highest absolute trending score gets a 1,
+  # and all other articles are scaled proportionally.
+  # @param article [Object] The article for which to calculate the trending score.
+  # @return [Float] The normalized trending score between 0 and 1.
+  def trending_score(article)
+    scores = data.articles
+      .reject { |a| a.draft }                 # Exclude drafts
+      .reject { |a| a.entry_type == 'Short' } # Exclude short posts
+      .map { |a| absolute_trending_score(a) }
+
+    max_score = scores.max
+    return 0 if max_score.zero?
+
+    (absolute_trending_score(article) / max_score).round(5)
   end
 
   # Calculates an overall similarity score between two articles.
