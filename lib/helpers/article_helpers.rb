@@ -127,6 +127,9 @@ module ArticleHelpers
   # @param article [Object] The article for which to calculate the trending score.
   # @return [Float] The trending score, between 0 and 1.
   def trending_score(article)
+    relative_weight = ENV.fetch('TRENDING_SCORE_RELATIVE_WEIGHT', 1).to_f
+    absolute_weight = ENV.fetch('TRENDING_SCORE_ABSOLUTE_WEIGHT', 1).to_f
+
     daily_views = article.metrics[:"1d"].pageviews
     weekly_views = article.metrics[:"7d"].pageviews
     weekly_avg = weekly_views / 7.0
@@ -153,7 +156,7 @@ module ArticleHelpers
     end
 
     # Combine scores with weights
-    combined_score = (relative_score * 0.7) + (absolute_score * 0.3)
+    combined_score = (relative_score * relative_weight) + (absolute_score * absolute_weight)
     combined_score.round(5)
   end
 
@@ -165,8 +168,8 @@ module ArticleHelpers
   # @param candidate [Object] The article to evaluate for similarity.
   # @return [Float] The similarity score between 0 and 1.
   def similarity_score(article, candidate)
-    tags_weight = ENV.fetch('SIMILARITY_TAGS_WEIGHT', 1).to_f
-    title_weight = ENV.fetch('SIMILARITY_TITLE_WEIGHT', 1).to_f
+    tags_weight = ENV.fetch('SIMILARITY_SCORE_TAGS_WEIGHT', 1).to_f
+    title_weight = ENV.fetch('SIMILARITY_SCORE_TITLE_WEIGHT', 1).to_f
 
     # Tags score is the percentage of tags in common
     total_tags = article.contentful_metadata.tags.map(&:id).size.to_f
@@ -186,9 +189,9 @@ module ArticleHelpers
   # @param candidate [Object] The article to evaluate for relevance.
   # @return [Float] The relevance score between 0 and 1.
   def relevance_score(article, candidate)
-    similarity_weight = ENV.fetch('RELEVANCE_SIMILARITY_WEIGHT', 1).to_f
-    recency_weight = ENV.fetch('RELEVANCE_RECENCY_WEIGHT', 1).to_f
-    trending_weight = ENV.fetch('RELEVANCE_TRENDING_WEIGHT', 1).to_f
+    similarity_weight = ENV.fetch('RELEVANCE_SCORE_SIMILARITY_WEIGHT', 1).to_f
+    recency_weight = ENV.fetch('RELEVANCE_SCORE_RECENCY_WEIGHT', 1).to_f
+    trending_weight = ENV.fetch('RELEVANCE_SCORE_TRENDING_WEIGHT', 1).to_f
 
     similarity = similarity_score(article, candidate)
     recency = recency_score(candidate)
