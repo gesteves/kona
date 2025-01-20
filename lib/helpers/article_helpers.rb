@@ -123,17 +123,38 @@ module ArticleHelpers
     articles.take(count)
   end
 
-  # Calculates a trending score for an article based on its pageviews today vs the average pageviews in the past week.
+  # Calculates a trending score for an article based on its pageviews.
   # @param article [Object] The article for which to calculate the trending score.
   # @return [Float] The trending score, between 0 and 1.
   def trending_score(article)
     daily_views = article.metrics[:"1d"].pageviews
-    weekly_avg = article.metrics[:"7d"].pageviews / 7.0
+    weekly_views = article.metrics[:"7d"].pageviews
+    weekly_avg = weekly_views / 7.0
+    all_time_avg = article.metrics.all.pageviews / days_since_published(article)
 
-    return 0 if weekly_avg.zero?
+    # Return 0 if there's no recent activity
+    return 0 if daily_views.zero?
 
-    ratio = daily_views / weekly_avg
-    (ratio / (ratio + 1)).round(5)
+    # Calculate relative increase from baseline
+    baseline = [weekly_avg, all_time_avg].max
+    relative_score = if baseline.zero?
+      daily_views > 0 ? 1 : 0  # If no historical data, any views today are significant
+    else
+      ratio = daily_views / baseline
+      ratio / (ratio + 1)  # Normalize to 0-1 range
+    end
+
+    # Calculate absolute score based on daily views relative to historical average
+    absolute_score = if all_time_avg.zero?
+      daily_views > 0 ? 1 : 0  # If no history, any views today are significant
+    else
+      ratio = daily_views / all_time_avg
+      ratio / (ratio + 1)  # Normalizes to 0-1 range
+    end
+
+    # Combine scores with weights
+    combined_score = (relative_score * 0.7) + (absolute_score * 0.3)
+    combined_score.round(5)
   end
 
   # Calculates an overall similarity score between two articles.
@@ -181,8 +202,7 @@ module ArticleHelpers
   # @param article [Object] The article to evaluate.
   # @return [Float] A score between 0 and 1 based on how recently the article was published.
   def recency_score(article)
-    days_old = ((Time.now - DateTime.parse(article.published_at)) / 1.day).to_i
-    Math.exp((ENV.fetch('RECENCY_SCORE_DECAY_RATE', 0.1).to_f.abs * -1) * days_old).round(5)
+    Math.exp((ENV.fetch('RECENCY_SCORE_DECAY_RATE', 0.1).to_f.abs * -1) * days_since_published(article)).round(5)
   end
 
   # Generates a JSON-LD schema string for an article, based on the provided content.
@@ -269,5 +289,12 @@ module ArticleHelpers
     from = DateTime.parse(article.published_at).in_time_zone(location_time_zone).strftime('%Y-%m-%d')
     to = current_time.strftime('%Y-%m-%d')
     "https://plausible.io/#{ENV['PLAUSIBLE_SITE_ID']}?period=custom&filters=((is,page,(#{path})))&from=#{from}&to=#{to}"
+  end
+
+  # Calculates the number of days since an article was published.
+  # @param article [Object] The article to calculate the days since published for.
+  # @return [Integer] The number of days since the article was published.
+  def days_since_published(article)
+    ((Time.now - DateTime.parse(article.published_at)) / 1.day).ceil
   end
 end
