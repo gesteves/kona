@@ -110,7 +110,7 @@ module ArticleHelpers
       .reject { |a| a.path == exclude&.path } # Exclude the given article, if applicable
       .reject { |a| a.draft }                 # Exclude drafts
       .reject { |a| a.entry_type == 'Short' } # Exclude short posts
-      .sort_by { |a| [-absolute_trending_score(a), -article.metrics[:"7d"].pageviews] } # Sort by trending score, then by 7-day pageviews
+      .sort_by { |a| [-absolute_trending_score(a), -article.metrics[:"7d"].pageviews, -article.metrics[:"30d"].pageviews, -article.metrics.all.pageviews] } # Sort by trending score, then use pageviews as tiebreakers
       .take(count)
   end
 
