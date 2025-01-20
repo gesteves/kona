@@ -131,7 +131,7 @@ module ArticleHelpers
     avg_pageviews_last_week = article.metrics[:"7d"].pageviews / 7.0
     return 0 if avg_pageviews_last_week.zero?
 
-    (article.metrics[:"1d"].pageviews - avg_pageviews_last_week) / avg_pageviews_last_week
+    ((article.metrics[:"1d"].pageviews - avg_pageviews_last_week) / avg_pageviews_last_week).round(5)
   end
 
   # Normalizes the growth rate of an article to a "trending" score between 0 and 1.
@@ -155,7 +155,7 @@ module ArticleHelpers
 
     # Normalize the article's growth rate to [0,1] range
     article_growth_rate = pageview_growth_rate(article)
-    (article_growth_rate - min_growth_rate) / (max_growth_rate - min_growth_rate)
+    ((article_growth_rate - min_growth_rate) / (max_growth_rate - min_growth_rate)).round(5)
   end
 
   # Calculates an overall similarity score between two articles.
@@ -178,7 +178,7 @@ module ArticleHelpers
     white = Text::WhiteSimilarity.new
     title_score = white.similarity(sanitize(article.title), sanitize(candidate.title))
 
-    (tags_score * tags_weight) + (title_score * title_weight)
+    ((tags_score * tags_weight) + (title_score * title_weight)).round(5)
   end
 
   # Calculates a relevance score by adding up similarity_score, recency_score, and trending_score.
@@ -195,7 +195,7 @@ module ArticleHelpers
     recency = recency_score(candidate)
     trending = trending_score(candidate)
 
-    (similarity * similarity_weight) + (recency * recency_weight) + (trending * trending_weight)
+    ((similarity * similarity_weight) + (recency * recency_weight) + (trending * trending_weight)).round(5)
   end
 
   # Calculates a recency score for an article based on its age.
@@ -204,7 +204,7 @@ module ArticleHelpers
   # @return [Float] A score between 0 and 1 based on how recently the article was published.
   def recency_score(article)
     days_old = ((Time.now - DateTime.parse(article.published_at)) / 1.day).to_i
-    Math.exp((ENV.fetch('RECENCY_SCORE_DECAY_RATE', 0.1).to_f.abs * -1) * days_old)
+    Math.exp((ENV.fetch('RECENCY_SCORE_DECAY_RATE', 0.1).to_f.abs * -1) * days_old).round(5)
   end
 
   # Generates a JSON-LD schema string for an article, based on the provided content.
