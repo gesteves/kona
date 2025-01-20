@@ -155,8 +155,9 @@ module ArticleHelpers
       ratio / (ratio + 1)  # Normalizes to 0-1 range
     end
 
-    # Combine scores with weights
-    combined_score = (relative_score * relative_weight) + (absolute_score * absolute_weight)
+    # Combine scores with weights and normalize to 0-1 range
+    total_weight = relative_weight + absolute_weight
+    combined_score = ((relative_score * relative_weight) + (absolute_score * absolute_weight)) / total_weight
     combined_score.round(5)
   end
 
