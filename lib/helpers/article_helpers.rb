@@ -157,7 +157,6 @@ module ArticleHelpers
     # aren't completely overshadowed by low-traffic articles having small but dramatic spikes.
     relative_score = daily_views / baseline
     absolute_score = daily_views / all_time_avg
-
     (relative_score * relative_weight) + (absolute_score * absolute_weight)
   end
 
