@@ -153,8 +153,7 @@ module ArticleHelpers
       daily_views / all_time_avg
     end
 
-    combined_score = (relative_score * relative_weight) + (absolute_score * absolute_weight)
-    combined_score.round(5)
+    (relative_score * relative_weight) + (absolute_score * absolute_weight)
   end
 
   # Returns a normalized trending score between 0 and 1.
@@ -171,7 +170,7 @@ module ArticleHelpers
     max_score = scores.max
     return 0 if max_score.zero?
 
-    (absolute_trending_score(article) / max_score).round(5)
+    (absolute_trending_score(article) / max_score)
   end
 
   # Calculates an overall similarity score between two articles.
@@ -194,8 +193,7 @@ module ArticleHelpers
     white = Text::WhiteSimilarity.new
     title_score = white.similarity(sanitize(article.title), sanitize(candidate.title))
 
-    combined_score = (tags_score * tags_weight) + (title_score * title_weight)
-    combined_score.round(5)
+    (tags_score * tags_weight) + (title_score * title_weight)
   end
 
   # Calculates a relevance score by adding up similarity_score, recency_score, and trending_score.
@@ -212,7 +210,7 @@ module ArticleHelpers
     recency = recency_score(candidate)
     trending = trending_score(candidate)
 
-    ((similarity * similarity_weight) + (recency * recency_weight) + (trending * trending_weight)).round(5)
+    ((similarity * similarity_weight) + (recency * recency_weight) + (trending * trending_weight))
   end
 
   # Calculates a recency score for an article based on its age.
@@ -220,7 +218,7 @@ module ArticleHelpers
   # @param article [Object] The article to evaluate.
   # @return [Float] A score between 0 and 1 based on how recently the article was published.
   def recency_score(article)
-    Math.exp((ENV.fetch('RECENCY_SCORE_DECAY_RATE', 0.1).to_f.abs * -1) * days_since_published(article)).round(5)
+    Math.exp((ENV.fetch('RECENCY_SCORE_DECAY_RATE', 0.1).to_f.abs * -1) * days_since_published(article))
   end
 
   # Generates a JSON-LD schema string for an article, based on the provided content.
