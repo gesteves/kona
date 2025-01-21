@@ -8,7 +8,6 @@ icons:
       - mastodon
       - reddit
       - strava
-      - threads
     solid:
       - arrow-up-from-bracket
       - badge-check

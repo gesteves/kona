@@ -38,17 +38,6 @@ module ShareHelpers
     "https://reddit.com/submit?title=#{title}&url=#{url}"
   end
 
-  # Generates a URL for sharing an article on Threads.
-  # @param article [Article] The article to be shared.
-  # @return [String] The Threads share URL.
-  def threads_share_url(article)
-    title = sanitize(article.title)
-    url = full_url(article.path)
-    text = "#{title}\n\n#{url}"
-    encoded_text = ERB::Util.url_encode(text)
-    "https://www.threads.net/intent/post?text=#{encoded_text}"
-  end
-
   # Generates a URL for sharing an article on Bluesky.
   # @param article [Article] The article to be shared.
   # @return [String] The Bluesky share URL.
