@@ -151,7 +151,7 @@ module ArticleHelpers
     relative_weight = ENV.fetch('TRENDING_SCORE_RELATIVE_WEIGHT', 1).to_f
     absolute_weight = ENV.fetch('TRENDING_SCORE_ABSOLUTE_WEIGHT', 1).to_f
 
-    daily_views = article.metrics.day.pageviews.to_f
+    daily_views = article.metrics[:"1d"].pageviews.to_f
     weekly_avg = average_weekly_views(article)
     all_time_avg = average_all_time_views(article)
 

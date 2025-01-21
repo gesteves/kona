@@ -285,7 +285,7 @@ class Contentful
     metrics = ["pageviews", "visits", "visitors"]
 
     # Define the date ranges to process
-    date_ranges = ["all", "30d", "7d", "day"]
+    date_ranges = ["all", "30d", "7d", "1d"]
 
     # Initialize a hash to store analytics data for each date range
     analytics_by_range = {}
