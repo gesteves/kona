@@ -110,7 +110,7 @@ module ArticleHelpers
       .reject { |a| a.path == exclude&.path } # Exclude the given article, if applicable
       .reject { |a| a.draft }                 # Exclude drafts
       .reject { |a| a.entry_type == 'Short' } # Exclude short posts
-      .sort_by { |a| [-absolute_trending_score(a), -average_weekly_views(a), -average_monthly_views(a), -average_all_time_views(a)] } # Sort by trending score, then use average weekly, monthly, and all-time pageviews as tiebreakers
+      .sort_by { |a| [-absolute_trending_score(a), -average_daily_views_past_week(a), -average_daily_views_past_month(a), -average_daily_views_all_time(a)] } # Sort by trending score, then use average weekly, monthly, and all-time pageviews as tiebreakers
       .take(count)
   end
 
@@ -123,24 +123,24 @@ module ArticleHelpers
     articles.take(count)
   end
 
-  # Returns the average weekly pageviews for an article.
-  # @param article [Object] The article to calculate the average weekly pageviews for.
-  # @return [Float] The average weekly pageviews.
-  def average_weekly_views(article)
+  # Returns the average daily pageviews for the past week for an article.
+  # @param article [Object] The article to calculate the average daily pageviews for.
+  # @return [Float] The average pageviews.
+  def average_daily_views_past_week(article)
     article.metrics[:"7d"].pageviews.to_f / 7
   end
 
-  # Returns the average monthly pageviews for an article.
-  # @param article [Object] The article to calculate the average monthly pageviews for.
-  # @return [Float] The average monthly pageviews.
-  def average_monthly_views(article)
+  # Returns the average daily pageviews for the past month for an article.
+  # @param article [Object] The article to calculate the average daily pageviews for.
+  # @return [Float] The average pageviews.
+  def average_daily_views_past_month(article)
     article.metrics[:"30d"].pageviews.to_f / 30
   end
 
-  # Returns the average all-time pageviews for an article.
-  # @param article [Object] The article to calculate the average all-time pageviews for.
-  # @return [Float] The average all-time pageviews.
-  def average_all_time_views(article)
+  # Returns the average daily pageviews for an article since it was published.
+  # @param article [Object] The article to calculate the average daily pageviews for.
+  # @return [Float] The average pageviews.
+  def average_daily_views_all_time(article)
     article.metrics.all.pageviews.to_f / days_since_published(article)
   end
 
@@ -152,18 +152,18 @@ module ArticleHelpers
     absolute_weight = ENV.fetch('TRENDING_SCORE_ABSOLUTE_WEIGHT', 1).to_f
 
     daily_views = article.metrics[:"1d"].pageviews.to_f
-    weekly_avg = average_weekly_views(article)
-    all_time_avg = average_all_time_views(article)
+    week_avg = average_daily_views_past_week(article)
+    all_time_avg = average_daily_views_all_time(article)
 
     # Return 0 if there's no recent activity
-    return 0 if daily_views.zero? || weekly_avg.zero? || all_time_avg.zero?
+    return 0 if daily_views.zero? || week_avg.zero? || all_time_avg.zero?
 
     # We use the higher of weekly average and all-time average as our baseline
     # because we want to detect spikes relative to the article's "normal" traffic.
     # If an article consistently gets high traffic (high all-time avg) or has been
     # getting increased attention lately (high weekly avg), we need a higher
     # baseline to determine if today's traffic represents an unusual spike.
-    baseline = [weekly_avg, all_time_avg].max
+    baseline = [week_avg, all_time_avg].max
 
     # We calculate two scores:
     # 1. Relative score (daily_views / baseline): Measures if today's traffic is unusually high
