@@ -12,6 +12,7 @@ module MarkupHelpers
     srcset = data.srcsets[image_variant]
     html = markdown_to_html(text)
     html = open_external_links_in_new_tabs(html)
+    html = copy_feed_links(html)
     html = add_unit_data_attributes(html)
     html = add_image_data_attributes(html)
     html = add_figure_elements_to_images(html, base_class: 'entry')
@@ -453,4 +454,24 @@ module MarkupHelpers
       metric
     end
   end
+
+  # Adds markup to support copying feed links to the clipboard
+  # @param html [String] The HTML string to be processed.
+  # @return [String] The modified HTML with updated link attributes.
+  def copy_feed_links(html)
+    return html if html.blank?
+  
+    doc = Nokogiri::HTML::DocumentFragment.parse(html)
+  
+    doc.css('a').each do |link|
+      href = link['href']
+      next unless href&.end_with?('/feed.xml')
+  
+      link['data-controller'] = 'clipboard'
+      link['data-clipboard-success-message-value'] = 'The link to the feed has been copied to your clipboard.'
+      link['data-action'] = 'click->clipboard#preventDefault'
+    end
+  
+    doc.to_html
+  end  
 end
