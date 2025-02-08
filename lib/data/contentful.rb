@@ -1,4 +1,5 @@
 require 'active_support/all'
+require 'public_suffix'
 require_relative 'graphql/contentful'
 require_relative 'plausible'
 
@@ -47,6 +48,7 @@ class Contentful
     process_articles
     process_pages
     process_analytics
+    process_assets
     generate_blog
     generate_tags
   end
@@ -111,6 +113,13 @@ class Contentful
     end
 
     @content[:pages].sort! { |a, b| DateTime.parse(b[:published_at]) <=> DateTime.parse(a[:published_at]) }
+  end
+
+  # Processes assets from the fetched content.
+  def process_assets
+    @content[:assets].map! do |item|
+      rewrite_image_urls(item)
+    end
   end
 
   # Sets the entry type for a content item based on its attributes.
@@ -313,4 +322,23 @@ class Contentful
       end
     end
   end
+
+  # Rewrites Contentful image URLs to CloudFront URLs.
+  # @param item [Hash] The asset to be processed.
+  # @return [Hash] The asset with the image URLs rewritten.
+  def rewrite_image_urls(item)
+    return item if ENV['CLOUDFRONT_DOMAIN'].blank?
+    uri = URI.parse(item[:url])
+    domain = PublicSuffix.domain(uri.host)
+
+    if domain == 'ctfassets.net'
+      uri.host = ENV['CLOUDFRONT_DOMAIN']
+      item[:url] = uri.to_s
+    end
+    item
+  rescue => e
+    puts "Error rewriting image URL: #{e.message}"
+    item
+  end
 end
+

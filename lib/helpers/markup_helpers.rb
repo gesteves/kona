@@ -14,7 +14,6 @@ module MarkupHelpers
     html = open_external_links_in_new_tabs(html)
     html = copy_feed_links(html)
     html = add_unit_data_attributes(html)
-    html = rewrite_image_urls(html)
     html = add_image_data_attributes(html)
     html = add_figure_elements_to_images(html, base_class: 'entry')
     html = add_figure_elements_to_iframes(html, base_class: 'entry')
@@ -35,7 +34,6 @@ module MarkupHelpers
   # @return [String] The rendered HTML with added attributes and transformations.
   def render_feed_body(text)
     html = markdown_to_html(text)
-    html = rewrite_image_urls(html)
     html = add_image_data_attributes(html)
     html = add_figure_elements_to_images(html)
     html = add_figure_elements_to_iframes(html)
@@ -52,7 +50,6 @@ module MarkupHelpers
   # @return [String] The rendered HTML with added attributes and transformations.
   def render_home_body(text)
     html = markdown_to_html(text)
-    html = rewrite_image_urls(html)
     html = add_image_data_attributes(html)
     html = add_figure_elements_to_images(html, base_class: 'home')
     html = set_caption_credit(html)
@@ -121,32 +118,6 @@ module MarkupHelpers
       img['data-asset-id'] = asset_id
       img['data-original-url'] = original_url
     end
-    doc.to_html
-  end
-
-  # Rewrites Contentful image URLs to CloudFront URLs.
-  # @param html [String] The HTML content with image elements.
-  # @return [String] The HTML content with image URLs rewritten.
-  def rewrite_image_urls(html)
-    return if html.blank?
-    return html unless is_netlify? && ENV['CLOUDFRONT_DOMAIN'].present?
-
-    doc = Nokogiri::HTML::DocumentFragment.parse(html)
-    cloudfront_domain = ENV['CLOUDFRONT_DOMAIN']
-
-    doc.css('img').each do |img|
-      src = img['src']
-      next unless src
-
-      uri = URI.parse(src) rescue next
-      domain = PublicSuffix.domain(uri.host) rescue next
-
-      if domain == 'ctfassets.net'
-        uri.host = cloudfront_domain
-        img['src'] = uri.to_s
-      end
-    end
-
     doc.to_html
   end
 
