@@ -329,10 +329,14 @@ class Contentful
   def rewrite_image_urls(item)
     return item if ENV['CLOUDFRONT_DOMAIN'].blank?
     uri = URI.parse(item[:url])
+    version = item.dig(:sys, :published_version)
     domain = PublicSuffix.domain(uri.host)
 
     if domain == 'ctfassets.net'
       uri.host = ENV['CLOUDFRONT_DOMAIN']
+      if version.present?
+        uri.query = uri.query.to_s.empty? ? "v=#{version}" : "#{uri.query}&v=#{version}"
+      end
       item[:url] = uri.to_s
     end
     item
