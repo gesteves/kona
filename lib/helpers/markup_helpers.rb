@@ -329,7 +329,7 @@ module MarkupHelpers
       asset_width, _ = get_asset_dimensions(asset_id)
       content_type = get_asset_content_type(asset_id)
 
-      img['src'] = cdn_image_url(img['src'])
+      img['src'] = cdn_image_url(original_url)
       img['data-asset-id'] = asset_id
       next if content_type == 'image/gif'
 

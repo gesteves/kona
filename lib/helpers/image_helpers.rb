@@ -61,7 +61,8 @@ module ImageHelpers
   # @return [String] The CDN image URL with optional query parameters.
   def cdn_image_url(original_url, params = {})
     asset_id = get_asset_id(original_url)
-    original_url = get_asset_url(asset_id) if asset_id.present?
+    asset_url = get_asset_url(asset_id)
+    original_url = asset_url if asset_url.present?
     if is_netlify?
       base_url = "#{ENV['URL']}/.netlify/images"
       original_url = "https:#{original_url}" if original_url.start_with?('//')
