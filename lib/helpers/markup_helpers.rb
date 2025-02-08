@@ -116,7 +116,7 @@ module MarkupHelpers
       original_url = img['src']
       asset_id = get_asset_id(original_url)
       img['data-asset-id'] = asset_id
-      img['data-original-url'] = original_url
+      img['data-original-url'] = get_asset_url(asset_id)
     end
     doc.to_html
   end
