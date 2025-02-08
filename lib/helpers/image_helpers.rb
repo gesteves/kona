@@ -63,7 +63,14 @@ module ImageHelpers
     asset_id = get_asset_id(original_url)
     asset_url = get_asset_url(asset_id)
     original_url = asset_url if asset_url.present?
-    if is_netlify?
+    if is_netlify? && original_url.match?('/.netlify/images')
+      uri = URI.parse(original_url)
+      existing_params = URI.decode_www_form(uri.query || "").to_h
+      merged_params = existing_params.merge(params)
+      query_params = URI.encode_www_form(merged_params)
+      uri.query = query_params
+      image_url = uri.to_s
+    elsif is_netlify?
       base_url = "#{ENV['URL']}/.netlify/images"
       original_url = "https:#{original_url}" if original_url.start_with?('//')
       query_params = URI.encode_www_form(params)
