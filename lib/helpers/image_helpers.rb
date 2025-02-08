@@ -68,9 +68,12 @@ module ImageHelpers
       image_url += "&#{query_params}" unless query_params.empty?
     else
       params[:fit] = "fill" if params[:fit] == "cover"
-      query_params = URI.encode_www_form(params)
-      image_url = original_url
-      image_url += "?#{query_params}" unless query_params.empty? || original_url.include?('?')
+      uri = URI.parse(original_url)
+      existing_params = URI.decode_www_form(uri.query || "").to_h
+      merged_params = existing_params.merge(params)
+      query_params = URI.encode_www_form(merged_params)
+      uri.query = query_params
+      image_url = uri.to_s
     end
 
     image_url
