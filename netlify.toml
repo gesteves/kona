@@ -12,7 +12,7 @@ status = 200
   node_bundler = "esbuild"
 
 [images]
-  remote_images = ["https://images.ctfassets.net/.*", "https://downloads.ctfassets.net/.*"]
+  remote_images = ["https://images.ctfassets.net/.*", "https://downloads.ctfassets.net/.*", "https://d26f6hvebqpvgh.cloudfront.net/.*"]
 
 [build]
   command = "bundle exec rake build"
