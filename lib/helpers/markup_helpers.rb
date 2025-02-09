@@ -26,6 +26,7 @@ module MarkupHelpers
     html = mark_affiliate_links(html)
     html = responsivize_tables(html)
     html = add_heading_permalinks(html)
+    html = lazy_load_iframes(html)
     html
   end
 
@@ -472,6 +473,18 @@ module MarkupHelpers
       link['data-action'] = 'click->clipboard#preventDefault'
     end
 
+    doc.to_html
+  end
+
+  # Adds lazy loading to iframes in HTML content.
+  # @param html [String] The HTML content with iframe elements.
+  # @return [String] The HTML content with lazy-loaded iframes.
+  def lazy_load_iframes(html)
+    return html if html.blank?
+    doc = Nokogiri::HTML::DocumentFragment.parse(html)
+    doc.css('iframe').each do |iframe|
+      iframe['loading'] = 'lazy'
+    end
     doc.to_html
   end
 end
