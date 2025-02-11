@@ -59,14 +59,20 @@
     align-items: center;
     display: flex;
     font-family: var(--ibm-plex-sans-condensed);
-    font-size: var(--font-medium);
-    line-height: var(--line-height-medium);
-    margin: 1.5rem 0;
   }
 
   h3 {
     font-size: var(--font-semi-large);
     line-height: var(--line-height-semi-large);
+    margin: 1.125rem 0;
+  }
+
+  h4,
+  h5,
+  h6 {
+    font-size: var(--font-medium);
+    line-height: var(--line-height-medium);
+    margin: 1.5rem 0;
   }
 
   p,
