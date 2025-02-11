@@ -390,7 +390,7 @@ module MarkupHelpers
   def add_heading_permalinks(html)
     return if html.blank?
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
-    doc.css('h3').each do |heading|
+    doc.css('h3, h4').each do |heading|
       heading_id = heading['id']
       next if heading_id.blank?
       permalink = <<~HTML
