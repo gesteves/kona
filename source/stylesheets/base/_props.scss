@@ -124,6 +124,7 @@
   // Font sizes
   --font-x-large: clamp(36px, 10vw, 72px);
   --font-large:   clamp(24px, 10vw, 48px);
+  --font-medium-large: 22px
   --font-medium:  16px;
   --font-small:   12px;
   --font-x-small: 10px;
@@ -132,6 +133,7 @@
   // Line height
   --line-height-x-large: 1;
   --line-height-large:   1;
+  --line-height-medium-large: 1.125;
   --line-height-medium:  1.5;
   --line-height-small:   2;
   --line-height-x-small: 2.4;
@@ -151,6 +153,7 @@
     --column-gap:          2rem;
     --font-x-large:        clamp(36px, 10vw, 108px);
     --font-large:          clamp(36px, 6vw, 72px);
+    --font-medium-large:   32px;
     --font-medium:         24px;
     --font-small:          18px;
     --font-x-small:        12px;
