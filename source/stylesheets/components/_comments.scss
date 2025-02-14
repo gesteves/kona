@@ -20,10 +20,10 @@
 
   .comments__heading {
     font-family: var(--ibm-plex-sans-condensed);
-    font-size: var(--font-medium);
+    font-size: var(--font-semi-large);
     font-weight: 700;
-    line-height: var(--line-height-medium);
-    margin: 0 0 1.5rem 0;
+    line-height: var(--line-height-semi-large);
+    margin-bottom: 1.125rem;
   }
 
   &__spinner {
