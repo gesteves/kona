@@ -284,14 +284,14 @@ module ArticleHelpers
   def social_media_post(entry, include_tags: true)
     body = []
     url = full_url(entry.path)
-    body = if entry.social_media_summary.present?
+    summary = if entry.social_media_summary.present?
       entry.social_media_summary
     elsif entry.summary.present?
       entry.summary
     else
       entry.title
     end
-    body << smartypants(sanitize(body))
+    body << smartypants(sanitize(summary))
     body << url
     body << entry.contentful_metadata.tags.sort { |a, b| a.name <=> b.name }.map { |t| camelcase_hashtag(t.name) }.join(' ') if include_tags
     body.reject(&:blank?).join("\n\n")
