@@ -278,20 +278,22 @@ module ArticleHelpers
     "##{tag.parameterize.split('-').map(&:capitalize).join}"
   end
 
-  # Generates a Mastodon post for a given entry.
-  # @param entry [Object] The entry to generate a Mastodon post for.
-  # @return [String] The Mastodon post content.
-  def mastodon_post(entry)
+  # Generates a social media post for a given entry.
+  # @param entry [Object] The entry to generate a social media post for.
+  # @return [String] The social media post content.
+  def social_media_post(entry, include_tags: true)
     body = []
     url = full_url(entry.path)
-    tags = entry.contentful_metadata.tags.sort { |a, b| a.name <=> b.name }.map { |t| camelcase_hashtag(t.name) }.join(' ')
-    if entry.summary.present?
-      body << smartypants(sanitize(entry.summary))
-      body << url
+    body = if entry.social_media_summary.present?
+      entry.social_media_summary
+    elsif entry.summary.present?
+      entry.summary
     else
-      body << "#{smartypants(sanitize(entry.title))}: #{url}"
+      entry.title
     end
-    body << tags
+    body << smartypants(sanitize(body))
+    body << url
+    body << entry.contentful_metadata.tags.sort { |a, b| a.name <=> b.name }.map { |t| camelcase_hashtag(t.name) }.join(' ') if include_tags
     body.reject(&:blank?).join("\n\n")
   end
 

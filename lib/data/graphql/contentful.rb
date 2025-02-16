@@ -59,6 +59,7 @@ module ContentfulClient
             ...AuthorFields
           }
           summary
+          socialMediaSummary
           published
           indexInSearchEngines
           showAffiliateLinksDisclosure
