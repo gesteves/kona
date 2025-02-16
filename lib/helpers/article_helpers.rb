@@ -281,7 +281,7 @@ module ArticleHelpers
   # Generates a social media post for a given entry.
   # @param entry [Object] The entry to generate a social media post for.
   # @return [String] The social media post content.
-  def social_media_post(entry, include_tags: true)
+  def social_media_post(entry, include_url: true, include_tags: true)
     body = []
     url = full_url(entry.path)
     summary = if entry.social_media_summary.present?
@@ -292,7 +292,7 @@ module ArticleHelpers
       entry.title
     end
     body << smartypants(sanitize(summary))
-    body << url
+    body << url if include_url
     body << entry.contentful_metadata.tags.sort { |a, b| a.name <=> b.name }.map { |t| camelcase_hashtag(t.name) }.join(' ') if include_tags
     body.reject(&:blank?).join("\n\n")
   end
