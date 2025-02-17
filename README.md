@@ -110,5 +110,5 @@ Steps:
 2. Install dependencies with `bundle install` and `npm install`
 4. Build the site with `netlify build`, which will run the data import tasks
 5. Run the local server with `netlify dev`
-6. Optionally, if you're going to make changes to the JS files, run `npm run watch` in another terminal tab
+6. In another terminal tab, run `npm run watch`
 7. If you want to reload the data without rebuilding the site, run `bundle exec rake import`
