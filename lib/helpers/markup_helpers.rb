@@ -68,7 +68,7 @@ module MarkupHelpers
   def prepend_title(title, html)
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
 
-    if title.match?(/(\.$|\.\"$|\.”$)/)
+    if title.match?(/(\.$|\.\"$|\.”$|\?$)/)
       formatted_title = "<b>#{title}</b>"
     else
       formatted_title = "<b>#{title}.</b>"
