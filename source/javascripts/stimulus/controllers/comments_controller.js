@@ -18,14 +18,7 @@ export default class extends Controller {
     this.hiddenReplies = [];
     this.atUri = this.convertPostUrlToAtUri(this.urlValue);
     if (this.atUri) {
-      this.resolveAuthorDid()
-        .then(() => {
-          this.observeVisibility();
-        })
-        .catch((error) => {
-          console.error("Failed to resolve author DID:", error);
-          this.renderError();
-        });
+      this.observeVisibility();
     } else {
       // The post for comments isn't valid; so render nothing.
       this.element.remove();
@@ -148,7 +141,14 @@ export default class extends Controller {
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            this.fetchComments();
+            this.resolveAuthorDid()
+              .then(() => {
+                this.fetchComments();
+              })
+              .catch((error) => {
+                console.error("Failed to resolve author DID:", error);
+                this.renderError();
+              });
             // Disconnect the observer after the element is visible so we don't fetch comments multiple times.
             this.intersectionObserver.disconnect();
           }
