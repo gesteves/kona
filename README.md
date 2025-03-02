@@ -96,9 +96,9 @@ Kona uses [Bluesky](https://bsky.social) as a comments system. There's no much t
 
 Kona uses [Plausible](https://plausible.io/) for traffic analytics, and uses the traffic data to show trending or most-read articles on the home page. To set this up, you'll need to create an API key at https://plausible.io/settings and set up your site ID and API key in the `PLAUSIBLE_SITE_ID` and `PLAUSIBLE_API_KEY` environment variables, respectively.
 
-#### Cloudfront
+#### CloudFront
 
-Contentful's free tier has a pretty low monthly bandwidth quota for images. You can serve the assets from Cloudfront instead, just enter the Cloudfront distribution's domain in the `CLOUDFRONT_DOMAIN` environment variable. Make sure to set up the distribution to use Contentful's assets endpoint as the origin.
+Contentful's free tier has a pretty low monthly bandwidth quota for images. To serve the assets from CloudFront instead, set up a distribution to use Contentful's assets endpoint (`images.ctfassets.net`) as the origin with a suitably long TTL, and enter the CloudFront distribution's domain in the `CLOUDFRONT_DOMAIN` environment variable.
 
 ### Running the site locally
 
