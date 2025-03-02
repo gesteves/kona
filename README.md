@@ -98,7 +98,7 @@ Kona uses [Plausible](https://plausible.io/) for traffic analytics, and uses the
 
 #### CloudFront
 
-Contentful's free tier has a pretty low monthly bandwidth quota for images. To serve the assets from CloudFront instead, set up a distribution to use Contentful's assets endpoint (`images.ctfassets.net`) as the origin with a suitably long TTL, and enter the CloudFront distribution's domain in the `CLOUDFRONT_DOMAIN` environment variable.
+Contentful's free tier has a pretty low monthly bandwidth quota for images. To serve them from CloudFront instead, set up a distribution to use Contentful's assets endpoint (`images.ctfassets.net`) as the origin with a suitably long TTL, and enter the CloudFront distribution's domain in the `CLOUDFRONT_DOMAIN` environment variable.
 
 ### Running the site locally
 
