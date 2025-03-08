@@ -26,9 +26,5 @@ gem 'rspec'
 gem 'htmlentities'
 gem 'text'
 gem 'humanize'
-# Deprecation warning in Ruby 3.4
-gem 'mutex_m'
-# Deprecation warning in Ruby 3.5
-gem 'logger'
 gem 'benchmark'
 gem 'rdoc'

@@ -133,7 +133,6 @@ GEM
     minitest (5.25.4)
     multi_xml (0.7.1)
       bigdecimal (~> 3.1)
-    mutex_m (0.3.0)
     nokogiri (1.18.3-arm64-darwin)
       racc (~> 1.4)
     nokogiri (1.18.3-x86_64-darwin)
@@ -221,13 +220,11 @@ DEPENDENCIES
   humanize
   icalendar
   jwt
-  logger
   middleman (~> 4.6)
   middleman-autoprefixer (~> 3.0)
   middleman-dotenv
   middleman-minify-html
   mini_magick
-  mutex_m
   nokogiri
   public_suffix
   rake
