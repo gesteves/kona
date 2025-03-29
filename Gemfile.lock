@@ -36,7 +36,7 @@ GEM
     connection_pool (2.5.0)
     contracts (0.17.2)
     crass (1.0.6)
-    csv (3.3.0)
+    csv (3.3.3)
     diff-lcs (1.5.1)
     dotenv (3.1.7)
     drb (2.2.1)
@@ -63,7 +63,7 @@ GEM
     hashie (5.0.0)
     htmlcompressor (0.2.0)
     htmlentities (4.3.4)
-    httparty (0.22.0)
+    httparty (0.23.1)
       csv
       mini_mime (>= 1.0.0)
       multi_xml (>= 0.5.2)
