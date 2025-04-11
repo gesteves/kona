@@ -52,7 +52,7 @@ class Intervals
     swim_distance = activities.select { |a| ['Swim', 'OpenWaterSwim'].include?(a['type'] }.sum { |a| a['distance'] || 0 }
     bike_distance = activities.select { |a| ['Ride', 'VirtualRide'].include?(a['type']) }.sum { |a| a['distance'] || 0 }
     run_distance = activities.select { |a| ['Run', 'VirtualRun'].include?(a['type']) }.sum { |a| a['distance'] || 0 }
-    total_activities = activities.count { |a| ['Swim', 'Ride', 'VirtualRide', 'Run', 'VirtualRun'].include?(a['type']) }
+    total_activities = activities.count { |a| ['Swim', 'OpenWaterSwim', 'Ride', 'VirtualRide', 'Run', 'VirtualRun'].include?(a['type']) }
 
     {
       swim_distance: swim_distance,
