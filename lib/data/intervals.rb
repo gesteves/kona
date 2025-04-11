@@ -49,7 +49,7 @@ class Intervals
   # @param activities [Array<Hash>] List of activities.
   # @return [Hash] Summarized activity statistics.
   def summarize_activities(activities)
-    swim_distance = activities.select { |a| a['type'] == 'Swim' }.sum { |a| a['distance'] || 0 }
+    swim_distance = activities.select { |a| ['Swim', 'OpenWaterSwim'].include?(a['type'] }.sum { |a| a['distance'] || 0 }
     bike_distance = activities.select { |a| ['Ride', 'VirtualRide'].include?(a['type']) }.sum { |a| a['distance'] || 0 }
     run_distance = activities.select { |a| ['Run', 'VirtualRun'].include?(a['type']) }.sum { |a| a['distance'] || 0 }
     total_activities = activities.count { |a| ['Swim', 'Ride', 'VirtualRide', 'Run', 'VirtualRun'].include?(a['type']) }
