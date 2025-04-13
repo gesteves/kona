@@ -69,27 +69,16 @@ class Runna
     # Parse first line of the description
     description_lines = event.description.lines.map(&:strip).reject(&:blank?)
     header_line = description_lines.first
-    type_of_run, distance, duration_range = header_line.split("•").map(&:strip)
+    type_of_run, distance_text, _ = header_line.split("•").map(&:strip)
 
-    # Duration: take upper bound (e.g., "50m - 1h0m" → "1:00")
-    if duration_range.include?("-")
-      max_part = duration_range.split(/[-–]/).last.strip
-    else
-      max_part = duration_range
-    end
-
-    hours = max_part[/(\d+)h/, 1]&.to_i || 0
-    minutes = max_part[/(\d+)m/, 1]&.to_i || 0
-    duration = format("%d:%02d", hours, minutes)
-
-    # Summary: "#{distance} #{type_of_run.downcase}"
-    summary = "#{distance} #{type_of_run.downcase}"
-
-    # Description: everything between first and last line
+    # Convert distance to meters
+    distance_km = distance_text[/\d+(\.\d+)?/].to_f
+    distance = (distance_km * 1000).to_i
+    summary = "#{distance_text} #{type_of_run.downcase}"
     description = description_lines[1...-1].join("\n")
 
     {
-      duration: duration,
+      distance: distance,
       name: name,
       discipline: "Run",
       summary: summary,
