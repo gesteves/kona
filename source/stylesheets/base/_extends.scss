@@ -220,6 +220,13 @@
       }
     }
 
+    ul,
+    ol {
+      color: var(--color-text-secondary);
+      font-style: italic;
+      margin-left: 1.5rem;
+    }
+
     i,
     em,
     cite {
