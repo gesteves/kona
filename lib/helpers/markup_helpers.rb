@@ -230,17 +230,39 @@ module MarkupHelpers
   # @param html [String] The HTML content with figcaptions.
   # @return [String, nil] The HTML content with caption and credit formatted with <cite>.
   def set_caption_credit(html)
-    # Parse the HTML with Nokogiri
     doc = Nokogiri::HTML.fragment(html)
 
-    # Loop over every figcaption element
     doc.css('figcaption').each do |figcaption|
-      # Split the text content by ' | '
-      parts = figcaption.inner_html.split(' | ')
+      children = figcaption.children
+      found_separator = false
+      caption_nodes = []
+      credit_nodes = []
 
-      # If there are two parts, format with <cite>
-      if parts.size > 1
-        figcaption.inner_html = "#{parts.first} <cite>#{parts.last}</cite>"
+      children.each do |child|
+        if found_separator
+          credit_nodes << child
+          next
+        end
+
+        if child.text.include?(' | ')
+          # Split the text node at the separator
+          before, after = child.text.split(' | ', 2)
+          caption_nodes << Nokogiri::XML::Text.new(before, doc)
+          credit_nodes << Nokogiri::XML::Text.new(after, doc)
+          found_separator = true
+        else
+          caption_nodes << child
+        end
+      end
+
+      # Only modify if separator was found
+      if found_separator
+        figcaption.children.remove
+        caption_nodes.each { |node| figcaption.add_child(node) }
+        cite = Nokogiri::XML::Node.new('cite', doc)
+        credit_nodes.each { |node| cite.add_child(node) }
+        figcaption.add_child(Nokogiri::XML::Text.new(' ', doc)) unless credit_nodes.empty?
+        figcaption.add_child(cite)
       end
     end
 

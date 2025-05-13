@@ -81,4 +81,57 @@ RSpec.describe MarkupHelpers do
       expect(transformed_html).to eq(html_without_external_link)
     end
   end
+
+  describe '#set_caption_credit' do
+    context 'when given a figcaption with a separator' do
+      it 'wraps the credit in a cite tag' do
+        html = '<figcaption>This is a caption | Photo by Pepe</figcaption>'
+        transformed_html = set_caption_credit(html)
+        expect(transformed_html).to eq('<figcaption>This is a caption <cite>Photo by Pepe</cite></figcaption>')
+      end
+
+      it 'preserves HTML tags in the caption' do
+        html = '<figcaption>This is <a href="http://example.com">a link</a> | Photo by Pepe</figcaption>'
+        transformed_html = set_caption_credit(html)
+        expect(transformed_html).to eq('<figcaption>This is <a href="http://example.com">a link</a> <cite>Photo by Pepe</cite></figcaption>')
+      end
+
+      it 'preserves HTML tags in the credit' do
+        html = '<figcaption>This is a caption | Photo by <a href="http://example.com">Pepe</a></figcaption>'
+        transformed_html = set_caption_credit(html)
+        expect(transformed_html).to eq('<figcaption>This is a caption <cite>Photo by <a href="http://example.com">Pepe</a></cite></figcaption>')
+      end
+
+      it 'ignores | characters in HTML attributes' do
+        html = '<figcaption>This is <a href="http://example.com" title="example | page">a link</a> | Photo by Pepe</figcaption>'
+        transformed_html = set_caption_credit(html)
+        expect(transformed_html).to eq('<figcaption>This is <a href="http://example.com" title="example | page">a link</a> <cite>Photo by Pepe</cite></figcaption>')
+      end
+    end
+
+    context 'when given a figcaption without a separator' do
+      it 'leaves the content unchanged' do
+        html = '<figcaption>This is a caption without a credit</figcaption>'
+        transformed_html = set_caption_credit(html)
+        expect(transformed_html).to eq(html)
+      end
+
+      it 'leaves the content unchanged even with | in attributes' do
+        html = '<figcaption>This is <a href="http://example.com" title="example | page">a link</a></figcaption>'
+        transformed_html = set_caption_credit(html)
+        expect(transformed_html).to eq(html)
+      end
+    end
+
+    context 'when given multiple figcaptions' do
+      it 'processes each figcaption independently' do
+        html = '<div><figcaption>First caption | First credit</figcaption><figcaption>Second caption | Second credit</figcaption></div>'
+        transformed_html = set_caption_credit(html)
+        expect(transformed_html).to include(
+          '<figcaption>First caption <cite>First credit</cite></figcaption>',
+          '<figcaption>Second caption <cite>Second credit</cite></figcaption>'
+        )
+      end
+    end
+  end
 end
