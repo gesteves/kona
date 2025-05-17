@@ -26,6 +26,7 @@ export default class extends Controller {
    * Closes the navigation menu.
    */
   closeNav() {
+    console.log("closing the nav")
     document.body.classList.remove(this.openClass);
     this.updateButtonAttributes();
   }
