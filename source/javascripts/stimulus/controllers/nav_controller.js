@@ -5,6 +5,7 @@ import { Controller } from "@hotwired/stimulus";
  */
 export default class extends Controller {
   static classes = ["open"];
+  static targets = ["button"];
 
   /**
    * Toggles the navigation menu.
@@ -13,5 +14,6 @@ export default class extends Controller {
   toggleNav(event) {
     event.preventDefault();
     document.body.classList.toggle(this.openClass);
+    this.buttonTarget.setAttribute("aria-expanded", document.body.classList.contains(this.openClass));
   }
 }
