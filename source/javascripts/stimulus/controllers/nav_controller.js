@@ -24,9 +24,8 @@ export default class extends Controller {
 
   /**
    * Closes the navigation menu.
-   * @param {Event} event The event that triggered the close.
    */
-  closeNav(event) {
+  closeNav() {
     document.body.classList.remove(this.openClass);
     this.updateButtonAttributes();
   }
