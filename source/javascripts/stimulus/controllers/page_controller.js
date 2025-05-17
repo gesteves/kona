@@ -13,4 +13,13 @@ export default class extends Controller {
   load() {
     trackPageView();
   }
+
+  /**
+   * Closes the navigation menu when a link is clicked.
+   * This is called on every `turbo:click` event.
+   * @see https://turbo.hotwired.dev/reference/events
+   */
+  click() {
+    document.body.className = '';
+  }
 }
