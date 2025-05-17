@@ -15,5 +15,6 @@ export default class extends Controller {
     event.preventDefault();
     document.body.classList.toggle(this.openClass);
     this.buttonTarget.setAttribute("aria-expanded", document.body.classList.contains(this.openClass));
+    this.buttonTarget.setAttribute("aria-label", document.body.classList.contains(this.openClass) ? "Close menu" : "Open menu");
   }
 }
