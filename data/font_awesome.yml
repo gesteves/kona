@@ -64,6 +64,8 @@ icons:
       - clock-eleven-thirty
       - clock-twelve
       - clock-twelve-thirty
+      - bars
+      - xmark
     thin:
       - bolt-lightning
       - cloud-bolt

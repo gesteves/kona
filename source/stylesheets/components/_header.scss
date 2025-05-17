@@ -1,23 +1,17 @@
 .header {
+  display: flex;
+  flex-flow: row nowrap;
+  justify-content: space-between;
   align-items: center;
-  box-sizing: border-box;
-  display: grid;
   grid-column: 1 / -1;
-  grid-gap: var(--row-gap) var(--column-gap);
-  grid-template-areas:
-    ".   .   logo logo logo logo logo logo logo logo .   ."
-    "nav nav nav  nav  nav  nav  nav  nav  nav  nav  nav nav";
-  grid-template-columns: repeat(12, 1fr);
-  width: 100%;
 
-  @media (min-width: #{$bp-small}) {
-    grid-template-areas:
-      ".   .   .    logo logo logo logo logo logo .    .   ."
-      "nav nav nav  nav  nav  nav  nav  nav  nav  nav  nav nav";
-  }
-
-  @media (min-width: #{$bp-medium}) {
+  @media (min-width: #{$bp-nav}) {
+    align-items: center;
+    box-sizing: border-box;
+    display: grid;
+    grid-gap: var(--row-gap) var(--column-gap);
     grid-template-areas: "logo logo logo nav nav nav nav nav nav nav nav nav";
+    grid-template-columns: repeat(12, 1fr);
   }
 }
 
@@ -25,6 +19,7 @@
   display: block;
   grid-area: logo;
   text-decoration: none;
+  width: 180px;
 
   &:link,
   &:visited {
@@ -47,8 +42,7 @@
     transition: fill var(--transition-duration);
   }
 
-  @media (min-width: #{$bp-medium}) {
-    margin-bottom: 0;
-    max-width: none;
+  @media (min-width: #{$bp-nav}) {
+    width: auto;
   }
 }

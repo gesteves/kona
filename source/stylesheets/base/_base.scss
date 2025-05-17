@@ -12,6 +12,10 @@ body {
   justify-content: space-between;
   min-height: 100vh;
   min-height: 100dvh;
+
+  &.has-nav-open {
+    position: fixed;
+  }
 }
 
 img {

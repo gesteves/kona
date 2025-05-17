@@ -13,7 +13,6 @@
   grid-column: 1 / -1;
   grid-gap: var(--row-gap) var(--column-gap);
   grid-template-columns: repeat(12, 1fr);
-  padding: var(--padding) 0;
   width: 100%;
 }
 

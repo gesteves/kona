@@ -1,5 +1,5 @@
 <% if items.present? %>
-  <nav class="nav" id="nav">
+  <nav class="nav" id="nav" data-controller="nav" data-nav-open-class="has-nav-open">
     <ol class="nav__list">
     <% items.each do |i| %>
       <li class="nav__item">
@@ -13,5 +13,13 @@
       </li>
     <% end %>
     </ol>
+    <button id="nav-button" aria-expanded="false" aria-label="Open menu" aria-controls="nav-menu" class="nav__hamburger" data-action="click->nav#toggleNav">
+      <span class="nav__hamburger-closed">
+        <%= icon_svg "classic", "light", "bars" %>
+      </span>
+      <span class="nav__hamburger-open">
+        <%= icon_svg "classic", "light", "xmark" %>
+      </span>
+    </button>
   </nav>
 <% end %>
