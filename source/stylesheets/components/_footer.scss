@@ -5,6 +5,7 @@
   box-sizing: border-box;
   display: flex;
   flex-flow: column;
+  margin-top: var(--row-gap);
   width: 100%;
 
   p,
