@@ -19,10 +19,14 @@ export default class extends Controller {
   }
 
   /**
-   * Before rendering a Turbo page, remove the open class from the new body.
+   * When Turbo loads a page from its cache, sometimes it renders it with the nav open,
+   * since it was cached that way.
+   * So, before rendering a Turbo page, remove the open class from the new body.
    * @param {Event} event  The turbo:before-render event that contains the new body.
    */
   closeNavInNewBody(event) {
+    event.preventDefault();
     event.detail.newBody.classList.remove(this.openClass);
+    event.detail.resume();
   }
 }
