@@ -15,11 +15,10 @@ export default class extends Controller {
   }
 
   /**
-   * Closes the navigation menu when a link is clicked.
-   * This is called on every `turbo:click` event.
+   * Resets the body state before the page is cached.
    * @see https://turbo.hotwired.dev/reference/events
    */
-  click() {
+  resetBody() {
     document.body.className = '';
   }
 }
