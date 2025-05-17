@@ -13,12 +13,4 @@ export default class extends Controller {
   load() {
     trackPageView();
   }
-
-  /**
-   * Resets the body state before the page is cached.
-   * @see https://turbo.hotwired.dev/reference/events
-   */
-  resetBody() {
-    document.body.className = '';
-  }
 }
