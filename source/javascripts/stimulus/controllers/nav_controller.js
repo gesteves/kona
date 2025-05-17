@@ -17,17 +17,20 @@ export default class extends Controller {
     this.updateButtonAttributes();
   }
 
-  updateButtonAttributes() {
-    this.buttonTarget.setAttribute("aria-expanded", document.body.classList.contains(this.openClass));
-    this.buttonTarget.setAttribute("aria-label", document.body.classList.contains(this.openClass) ? "Close menu" : "Open menu");
-  }
-
   /**
    * Closes the navigation menu.
    */
   closeNav() {
-    console.log("closing the nav")
     document.body.classList.remove(this.openClass);
     this.updateButtonAttributes();
   }
+
+  /**
+   * Updates the button's ARIA attributes to match the nav's state.
+   */
+  updateButtonAttributes() {
+    this.buttonTarget.setAttribute("aria-expanded", document.body.classList.contains(this.openClass));
+    this.buttonTarget.setAttribute("aria-label", document.body.classList.contains(this.openClass) ? "Close menu" : "Open menu");
+  }
+  
 }
