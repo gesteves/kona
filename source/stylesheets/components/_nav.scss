@@ -10,15 +10,18 @@
   background-color: var(--color-header-background);
   bottom: 0;
   box-sizing: border-box;
-  display: none;
+  display: flex;
   flex-flow: column;
   height: 100vh;
   height: 100dvh;
   left: 0;
+  opacity: 0;
   padding: calc(var(--content-padding) * 3) var(--content-padding);
   position: absolute;
   right: 0;
   top: 0;
+  transition: opacity var(--transition-duration) ease-in-out, visibility var(--transition-duration) ease-in-out;
+  visibility: hidden;
   width: 100vw;
   z-index: 2;
 
@@ -28,18 +31,20 @@
   }
 
   .has-nav-open & {
-    display: flex;
+    opacity: 1;
+    visibility: visible;
   }
 
   @media (min-width: #{$bp-nav}) {
     backdrop-filter: none;
     background: none;
-    display: flex;
     flex-flow: row nowrap;
     height: auto;
     justify-content: flex-end;
     padding: 0;
+    opacity: 1;
     position: relative;
+    visibility: visible;
     width: auto;
   }
 }
