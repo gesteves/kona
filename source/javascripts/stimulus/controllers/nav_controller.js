@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { trackEvent } from '../lib/analytics';
 
 /**
  * Controller for toggling the navigation menu.
@@ -15,6 +16,7 @@ export default class extends Controller {
     event.preventDefault();
     document.body.classList.toggle(this.openClass);
     this.updateButtonAttributes();
+    trackEvent("Nav", { state: this.isNavOpen() ? "Open" : "Closed" });
   }
 
   /**
@@ -29,8 +31,15 @@ export default class extends Controller {
    * Updates the button's ARIA attributes to match the nav's state.
    */
   updateButtonAttributes() {
-    this.buttonTarget.setAttribute("aria-expanded", document.body.classList.contains(this.openClass));
-    this.buttonTarget.setAttribute("aria-label", document.body.classList.contains(this.openClass) ? "Close menu" : "Open menu");
+    this.buttonTarget.setAttribute("aria-expanded", this.isNavOpen());
+    this.buttonTarget.setAttribute("aria-label", this.isNavOpen() ? "Close menu" : "Open menu");
   }
-  
+
+  /**
+   * Checks if the navigation menu is open.
+   * @returns {Boolean} True if the navigation menu is open, false otherwise.
+   */
+  isNavOpen() {
+    return document.body.classList.contains(this.openClass);
+  }
 }
