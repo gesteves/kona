@@ -211,7 +211,7 @@ class Contentful
       tag = tag.dup
       tagged_articles = @content[:articles].select { |a| !a[:draft] && a.dig(:contentful_metadata, :tags).include?(tag) }
       sliced = tagged_articles.each_slice(entries_per_page)
-      summary = "Browse #{tagged_articles.size.humanize} #{'article'.pluralize(tagged_articles.size)} tagged ”#{tag[:name]}”."
+      summary = "Browse #{tagged_articles.size.humanize} #{'entry'.pluralize(tagged_articles.size)} tagged ”#{tag[:name]}”."
       paginated_tag_pages = sliced.map.with_index do |page, index|
         current_page = index + 1
         previous_page = index.zero? ? nil : index
