@@ -48,4 +48,15 @@ module ShareHelpers
     encoded_text = ERB::Util.url_encode(text)
     "https://bsky.app/intent/compose?text=#{encoded_text}"
   end
+
+  # Generates a URL for sharing an article on Threads.
+  # @param article [Article] The article to be shared.
+  # @return [String] The Threads share URL.
+  def threads_share_url(article)
+    title = sanitize(article.title)
+    url = full_url(article.path)
+    encoded_text = ERB::Util.url_encode(title)
+    encoded_url = ERB::Util.url_encode(url)
+    "https://www.threads.com/intent/post?text=#{encoded_text}&url=#{encoded_url}"
+  end
 end
