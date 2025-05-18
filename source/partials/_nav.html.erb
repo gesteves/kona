@@ -14,10 +14,10 @@
     <% end %>
     </ol>
     <button id="nav-button" aria-expanded="false" aria-label="Open menu" aria-controls="nav-menu" class="nav__hamburger" data-nav-target="button" data-action="click->nav#toggleNav">
-      <span class="nav__hamburger-closed">
+      <span class="nav__hamburger-closed" aria-hidden="true">
         <%= icon_svg "classic", "light", "bars" %>
       </span>
-      <span class="nav__hamburger-open">
+      <span class="nav__hamburger-open" aria-hidden="true">
         <%= icon_svg "classic", "light", "xmark" %>
       </span>
     </button>
