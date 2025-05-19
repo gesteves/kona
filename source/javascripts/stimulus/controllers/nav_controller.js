@@ -7,6 +7,10 @@ import { trackEvent } from '../lib/analytics';
 export default class extends Controller {
   static classes = ["open"];
   static targets = ["button"];
+  static values = {
+    ariaOpenLabel: String,
+    ariaCloseLabel: String,
+  };
 
   /**
    * Toggles the navigation menu.
@@ -32,7 +36,7 @@ export default class extends Controller {
    */
   updateButtonAttributes() {
     this.buttonTarget.setAttribute("aria-expanded", this.isNavOpen());
-    this.buttonTarget.setAttribute("aria-label", this.isNavOpen() ? "Close menu" : "Open menu");
+    this.buttonTarget.setAttribute("aria-label", this.isNavOpen() ? this.ariaCloseLabelValue : this.ariaOpenLabelValue);
   }
 
   /**
