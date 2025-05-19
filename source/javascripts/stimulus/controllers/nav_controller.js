@@ -8,8 +8,8 @@ export default class extends Controller {
   static classes = ["open"];
   static targets = ["button"];
   static values = {
-    ariaOpenLabel: String,
-    ariaCloseLabel: String,
+    openAriaLabel: { type: String, default: "Open menu" },
+    closeAriaLabel: { type: String, default: "Close menu" },
   };
 
   /**
@@ -36,7 +36,7 @@ export default class extends Controller {
    */
   updateButtonAttributes() {
     this.buttonTarget.setAttribute("aria-expanded", this.isNavOpen());
-    this.buttonTarget.setAttribute("aria-label", this.isNavOpen() ? this.ariaCloseLabelValue : this.ariaOpenLabelValue);
+    this.buttonTarget.setAttribute("aria-label", this.isNavOpen() ? this.closeAriaLabelValue : this.openAriaLabelValue);
   }
 
   /**

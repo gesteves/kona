@@ -1,5 +1,5 @@
 <% if items.present? %>
-  <nav class="nav" id="nav" data-controller="nav" data-nav-open-class="has-nav-open" data-action="turbo:before-cache@document->nav#closeNav" data-nav-aria-open-label-value="Open menu" data-nav-aria-close-label-value="Close menu">
+  <nav class="nav" id="nav" data-controller="nav" data-nav-open-class="has-nav-open" data-action="turbo:before-cache@document->nav#closeNav">
     <ol class="nav__list">
     <% items.each do |i| %>
       <li class="nav__item">
