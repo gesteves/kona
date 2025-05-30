@@ -60,29 +60,10 @@ class Runna
   # @return [Hash, nil] A hash with the workout's details.
   def parse_workout(event)
     return nil if event.summary.blank? || event.description.blank?
-
-    # Remove emoji and extract just the name before the "•"
-    raw_name = event.summary.strip
-    name_part = raw_name.sub(/^(\p{Emoji_Presentation}|\p{So})\s*/, '') # remove emoji
-    name = name_part.split("•").first.strip
-
-    # Parse first line of the description
-    description_lines = event.description.lines.map(&:strip).reject(&:blank?)
-    header_line = description_lines.first
-    type_of_run, distance_text, _ = header_line.split("•").map(&:strip)
-
-    # Convert distance to meters
-    distance_km = distance_text[/\d+(\.\d+)?/].to_f
-    distance = (distance_km * 1000).to_i
-    summary = "#{distance_text} #{type_of_run.downcase}"
-    description = description_lines[1...-1].join("\n")
-
     {
-      distance: distance,
-      name: name,
       discipline: "Run",
-      summary: summary,
-      description: description
+      summary: event.summary,
+      description: event.description
     }
   end
 
