@@ -43,4 +43,56 @@ namespace :maps do
     end
     puts "✅ Map generation complete!"
   end
+
+  desc 'Show help information for map generation tasks'
+  task help: :environment do
+    puts <<~HELP
+      Map Generation Help
+      ==================
+
+      This rake task generates static map images from GPX files using Mapbox's Static API.
+
+      Prerequisites:
+      -------------
+      1. A Mapbox account and access token (set MAPBOX_ACCESS_TOKEN environment variable)
+      2. GPX files uploaded to Mapbox Studio as tilesets
+      3. GPX files placed in #{StaticMap::GPX_FOLDER}
+
+      Usage:
+      ------
+      rake maps:generate [options]
+
+      Options:
+      --------
+      TILESET_ID=<id>     Mapbox tileset ID for the GPX file. If not provided, you'll be prompted for each file.
+      REVERSE_MARKERS     Reverse the start/end markers (default: false)
+      PADDING=<value>     Padding around the map in pixels. Can be:
+                          - Single value (e.g., 50) for all sides
+                          - Two values (e.g., 50,100) for top/bottom, left/right
+                          - Three values (e.g., 50,100,75) for top, left/right, bottom
+                          - Four values (e.g., 50,100,75,25) for top, right, bottom, left
+                          Default: 50
+      HEIGHT=<value>      Custom height for the map in pixels (default: calculated based on aspect ratio)
+      MIN_KM=<value>      Minimum width and height of the map's viewable area in kilometers (default: 1)
+      DNF                 Mark the activity as Did Not Finish (changes end marker icon)
+
+      Example:
+      --------
+      rake maps:generate TILESET_ID=your-tileset-id PADDING=100 MIN_KM=2
+
+      Output:
+      -------
+      Generated maps are saved to: #{StaticMap::IMAGES_FOLDER}
+      File names are based on the activity title from the GPX file
+
+      Notes:
+      ------
+      - The map style can be customized by setting MAPBOX_STYLE_URL environment variable
+        (default: mapbox://styles/mapbox/outdoors-v12)
+      - Track color is set to ##{StaticMap::TRACK_COLOR} with #{StaticMap::TRACK_OPACITY * 100}% opacity
+      - Start marker is green (#{StaticMap::START_MARKER_COLOR}), end marker is red (#{StaticMap::END_MARKER_COLOR})
+      - Map width is fixed at #{StaticMap::WIDTH}px, height is calculated based on the track's aspect ratio
+        (minimum: #{StaticMap::MIN_HEIGHT}px, maximum: #{StaticMap::MAX_HEIGHT}px)
+    HELP
+  end
 end
