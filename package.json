@@ -4,7 +4,7 @@
     "watch": "webpack --mode=development --watch"
   },
   "dependencies": {
-    "@atproto/api": "^0.15.16",
+    "@atproto/api": "^0.15.19",
     "@babel/core": "^7.27.7",
     "@babel/preset-env": "^7.27.2",
     "@hotwired/stimulus": "^3.2.2",
