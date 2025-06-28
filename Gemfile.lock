@@ -71,7 +71,7 @@ GEM
     humanize (3.1.0)
     i18n (1.14.7)
       concurrent-ruby (~> 1.0)
-    icalendar (2.11.1)
+    icalendar (2.11.2)
       base64
       ice_cube (~> 0.16)
       logger
@@ -141,7 +141,7 @@ GEM
       racc (~> 1.4)
     nokogiri (1.18.8-x86_64-linux-gnu)
       racc (~> 1.4)
-    ostruct (0.6.1)
+    ostruct (0.6.2)
     padrino-helpers (0.15.3)
       i18n (>= 0.6.7, < 2)
       padrino-support (= 0.15.3)
