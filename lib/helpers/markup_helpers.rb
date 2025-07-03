@@ -412,6 +412,8 @@ module MarkupHelpers
       blurhash_svg_data_uri = blurhash_svg_data_uri(asset_id)
       img['style'] = "--placeholder:url('#{blurhash_svg_data_uri}');" unless blurhash_svg_data_uri.blank?
       img['class'] = [img['class'], 'placeholder'].compact.join(' ')
+      img['data-controller'] = 'image-placeholder'
+      img['data-action'] = 'load->image-placeholder#removePlaceholder error->image-placeholder#removePlaceholder'
     end
     doc.to_html
   end
