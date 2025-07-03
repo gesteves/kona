@@ -8,7 +8,9 @@ export default class extends Controller {
     }
   }
 
-  // Action method to be called via data-action attributes
+  /**
+   * Removes the placeholder background whe the image loads.
+   */
   removePlaceholder() {
     this.element.classList.remove('placeholder')
   }
