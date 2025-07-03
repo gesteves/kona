@@ -19,6 +19,7 @@ module MarkupHelpers
     html = add_figure_elements_to_iframes(html, base_class: 'entry')
     html = add_figure_elements_to_embeds(html, base_class: 'entry')
     html = set_caption_credit(html)
+    html = wrap_figcaption_emoji(html)
     html = responsivize_images(html, widths: srcset.widths, sizes: srcset.sizes.join(', '), formats: srcset.formats)
     html = resize_images(html, width: srcset.widths.max)
     html = add_image_placeholders(html)
@@ -263,6 +264,40 @@ module MarkupHelpers
         credit_nodes.each { |node| cite.add_child(node) }
         figcaption.add_child(Nokogiri::XML::Text.new(' ', doc)) unless credit_nodes.empty?
         figcaption.add_child(cite)
+      end
+    end
+
+    doc.to_html
+  end
+
+  # Wraps emoji characters in figcaption elements with <i> tags
+  # @param html [String] The HTML content with figcaptions.
+  # @return [String] The HTML content with emojis wrapped in <i> tags.
+  def wrap_figcaption_emoji(html)
+    return html if html.blank?
+
+    doc = Nokogiri::HTML.fragment(html)
+
+    doc.css('figcaption').each do |figcaption|
+      # Process each text node in the figcaption
+      figcaption.xpath('.//text()').each do |text_node|
+        text_content = text_node.content
+        next if text_content.empty?
+
+        # Match emoji characters using Unicode ranges
+        # This covers most common emoji ranges including:
+        # - Emoticons, Dingbats, Transport symbols, etc.
+        # - Includes variation selectors and skin tone modifiers
+        emoji_regex = /([\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E6}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F900}-\u{1F9FF}]|[\u{1F018}-\u{1F270}])[\u{FE00}-\u{FE0F}\u{1F3FB}-\u{1F3FF}]?/
+
+        if text_content.match?(emoji_regex)
+          # Split the text and wrap emojis in <i> tags
+          new_content = text_content.gsub(emoji_regex) { |emoji| "<i>#{emoji}</i>" }
+          
+          # Create a new HTML fragment and replace the text node
+          new_fragment = Nokogiri::HTML::DocumentFragment.parse(new_content)
+          text_node.replace(new_fragment)
+        end
       end
     end
 
