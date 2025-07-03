@@ -311,12 +311,19 @@ module MarkupHelpers
       # Skip to the next image if it's a gif.
       next if content_type == 'image/gif'
 
+      # PNG images should remain as PNGs, not be converted to other formats
+      image_formats = if content_type == 'image/png'
+        ['png']
+      else
+        formats
+      end
+
       # Then wrap it in a picture element.
       img.wrap('<picture></picture>')
 
       # Add a source element for each image format,
       # as a sibling of the img element in the picture tag.
-      formats.each do |format|
+      image_formats.each do |format|
         img.add_previous_sibling(source_tag(original_url, sizes: sizes, type: "image/#{format}", format: format, widths: img_widths, square: square))
       end
     end

@@ -29,6 +29,7 @@ entry:
     - avif
     - webp
     - jpg
+    - png
 full:
   sizes:
     - "(min-width: 1280px) 1008px"
@@ -60,6 +61,7 @@ full:
     - avif
     - webp
     - jpg
+    - png
 avatar:
   sizes:
     - "(min-width: 1280px) 72px"
@@ -76,6 +78,7 @@ avatar:
     - avif
     - webp
     - jpg
+    - png
 home:
   sizes:
     - "(min-width: 1280px) 488px"
@@ -98,3 +101,4 @@ home:
     - avif
     - webp
     - jpg
+    - png
