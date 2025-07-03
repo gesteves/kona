@@ -135,35 +135,35 @@ RSpec.describe MarkupHelpers do
     end
   end
 
-  describe '#wrap_figcaption_emojis' do
+  describe '#wrap_figcaption_emoji' do
     context 'when given a figcaption with emojis' do
       it 'wraps single emoji in <i> tags' do
         html = '<figcaption>Amazing sunset 📸</figcaption>'
-        transformed_html = wrap_figcaption_emojis(html)
+        transformed_html = wrap_figcaption_emoji(html)
         expect(transformed_html).to eq('<figcaption>Amazing sunset <i>📸</i></figcaption>')
       end
 
       it 'wraps multiple emojis in separate <i> tags' do
         html = '<figcaption>Great shot 📷 with perfect lighting ✨</figcaption>'
-        transformed_html = wrap_figcaption_emojis(html)
+        transformed_html = wrap_figcaption_emoji(html)
         expect(transformed_html).to eq('<figcaption>Great shot <i>📷</i> with perfect lighting <i>✨</i></figcaption>')
       end
 
       it 'wraps emojis while preserving other HTML tags' do
         html = '<figcaption>Amazing <a href="http://example.com">photo</a> 🎨 | Photo by <cite>Artist</cite> 📸</figcaption>'
-        transformed_html = wrap_figcaption_emojis(html)
+        transformed_html = wrap_figcaption_emoji(html)
         expect(transformed_html).to eq('<figcaption>Amazing <a href="http://example.com">photo</a> <i>🎨</i> | Photo by <cite>Artist</cite> <i>📸</i></figcaption>')
       end
 
       it 'handles consecutive emojis' do
         html = '<figcaption>Fantastic view 🌟✨🎯</figcaption>'
-        transformed_html = wrap_figcaption_emojis(html)
+        transformed_html = wrap_figcaption_emoji(html)
         expect(transformed_html).to eq('<figcaption>Fantastic view <i>🌟</i><i>✨</i><i>🎯</i></figcaption>')
       end
 
       it 'works with different emoji categories including variation selectors' do
         html = '<figcaption>Perfect day 😎☀️🌈</figcaption>'
-        transformed_html = wrap_figcaption_emojis(html)
+        transformed_html = wrap_figcaption_emoji(html)
         expect(transformed_html).to eq('<figcaption>Perfect day <i>😎</i><i>☀️</i><i>🌈</i></figcaption>')
       end
     end
@@ -171,13 +171,13 @@ RSpec.describe MarkupHelpers do
     context 'when given a figcaption without emojis' do
       it 'leaves the content unchanged' do
         html = '<figcaption>This is a regular caption</figcaption>'
-        transformed_html = wrap_figcaption_emojis(html)
+        transformed_html = wrap_figcaption_emoji(html)
         expect(transformed_html).to eq(html)
       end
 
       it 'preserves HTML tags without emojis' do
         html = '<figcaption>Regular <a href="http://example.com">caption</a> with <strong>formatting</strong></figcaption>'
-        transformed_html = wrap_figcaption_emojis(html)
+        transformed_html = wrap_figcaption_emoji(html)
         expect(transformed_html).to eq(html)
       end
     end
@@ -185,7 +185,7 @@ RSpec.describe MarkupHelpers do
     context 'when given multiple figcaptions' do
       it 'processes each figcaption independently' do
         html = '<div><figcaption>First caption 📸</figcaption><figcaption>Second caption ✨</figcaption></div>'
-        transformed_html = wrap_figcaption_emojis(html)
+        transformed_html = wrap_figcaption_emoji(html)
         expect(transformed_html).to include(
           '<figcaption>First caption <i>📸</i></figcaption>',
           '<figcaption>Second caption <i>✨</i></figcaption>'
@@ -195,8 +195,8 @@ RSpec.describe MarkupHelpers do
 
     context 'when html is blank' do
       it 'returns the html unchanged' do
-        expect(wrap_figcaption_emojis('')).to eq('')
-        expect(wrap_figcaption_emojis(nil)).to be_nil
+        expect(wrap_figcaption_emoji('')).to eq('')
+        expect(wrap_figcaption_emoji(nil)).to be_nil
       end
     end
   end

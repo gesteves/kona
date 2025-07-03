@@ -19,7 +19,7 @@ module MarkupHelpers
     html = add_figure_elements_to_iframes(html, base_class: 'entry')
     html = add_figure_elements_to_embeds(html, base_class: 'entry')
     html = set_caption_credit(html)
-    html = wrap_figcaption_emojis(html)
+    html = wrap_figcaption_emoji(html)
     html = responsivize_images(html, widths: srcset.widths, sizes: srcset.sizes.join(', '), formats: srcset.formats)
     html = resize_images(html, width: srcset.widths.max)
     html = add_image_placeholders(html)
@@ -41,7 +41,6 @@ module MarkupHelpers
     html = add_figure_elements_to_iframes(html)
     html = add_figure_elements_to_embeds(html)
     html = set_caption_credit(html)
-    html = wrap_figcaption_emojis(html)
     html = resize_images(html, width: data.srcsets.entry.widths.max)
     html = set_alt_text(html)
     html = mark_affiliate_links(html)
@@ -56,7 +55,6 @@ module MarkupHelpers
     html = add_image_data_attributes(html)
     html = add_figure_elements_to_images(html, base_class: 'home')
     html = set_caption_credit(html)
-    html = wrap_figcaption_emojis(html)
     html = responsivize_images(html, widths: data.srcsets.home.widths, sizes: data.srcsets.home.sizes.join(', '), formats: data.srcsets.entry.formats, lazy: false, square: true)
     html = resize_images(html)
     html = add_image_placeholders(html)
@@ -275,7 +273,7 @@ module MarkupHelpers
   # Wraps emoji characters in figcaption elements with <i> tags
   # @param html [String] The HTML content with figcaptions.
   # @return [String] The HTML content with emojis wrapped in <i> tags.
-  def wrap_figcaption_emojis(html)
+  def wrap_figcaption_emoji(html)
     return html if html.blank?
 
     doc = Nokogiri::HTML.fragment(html)
