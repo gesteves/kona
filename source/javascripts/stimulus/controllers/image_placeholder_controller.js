@@ -9,7 +9,7 @@ export default class extends Controller {
   }
 
   /**
-   * Removes the placeholder background whe the image loads.
+   * Removes the placeholder background when the image loads.
    */
   removePlaceholder() {
     this.element.classList.remove('placeholder')

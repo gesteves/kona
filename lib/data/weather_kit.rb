@@ -1,6 +1,8 @@
 require 'jwt'
 require 'httparty'
 require 'active_support/all'
+require 'openssl'
+require 'base64'
 
 # The WeatherKit class interfaces with Apple's WeatherKit API to fetch weather data.
 class WeatherKit
