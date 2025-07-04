@@ -351,19 +351,11 @@ module ArticleHelpers
   # @param count [Integer] (Optional) The number of race reports to return.
   # @return [Array<Object>] A list of race reports from the same event, sorted by publication date in reverse chronological order.
   def related_race_reports(article, count: 5)
-    # Find the corresponding event by matching race reports
-    event = data.events.find do |e|
-      e.race_reports_collection.items.any? { |report| report.slug == article.slug }
-    end
+    return [] unless article.event&.sys&.id
 
-    return [] unless event
-
-    # Get all race report slugs from the event
-    race_report_slugs = event.race_reports_collection.items.map(&:slug)
-
-    # Find all articles that match these slugs, excluding the current article
+    # Find all articles that are linked to the same event
     race_reports = data.articles
-      .select { |a| race_report_slugs.include?(a.slug) }
+      .select { |a| a.event&.sys&.id == article.event.sys.id }
       .reject { |a| a.slug == article.slug }
       .reject { |a| a.draft }
       .sort_by { |a| -DateTime.parse(a.published_at).to_i }
