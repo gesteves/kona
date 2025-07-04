@@ -155,16 +155,22 @@ RSpec.describe MarkupHelpers do
         expect(transformed_html).to eq('<figcaption>Amazing <a href="http://example.com">photo</a> <span class="emoji">🎨</span> | Photo by <cite>Artist</cite> <span class="emoji">📸</span></figcaption>')
       end
 
-      it 'handles consecutive emojis' do
+      it 'handles consecutive emojis in a single span' do
         html = '<figcaption>Fantastic view 🌟✨🎯</figcaption>'
         transformed_html = wrap_figcaption_emoji(html)
-        expect(transformed_html).to eq('<figcaption>Fantastic view <span class="emoji">🌟</span><span class="emoji">✨</span><span class="emoji">🎯</span></figcaption>')
+        expect(transformed_html).to eq('<figcaption>Fantastic view <span class="emoji">🌟✨🎯</span></figcaption>')
       end
 
       it 'works with different emoji categories including variation selectors' do
         html = '<figcaption>Perfect day 😎☀️🌈</figcaption>'
         transformed_html = wrap_figcaption_emoji(html)
-        expect(transformed_html).to eq('<figcaption>Perfect day <span class="emoji">😎</span><span class="emoji">☀️</span><span class="emoji">🌈</span></figcaption>')
+        expect(transformed_html).to eq('<figcaption>Perfect day <span class="emoji">😎☀️🌈</span></figcaption>')
+      end
+
+      it 'handles emoji separated by spaces in a single span' do
+        html = '<figcaption>Great shot 📷 ✨ 🎯</figcaption>'
+        transformed_html = wrap_figcaption_emoji(html)
+        expect(transformed_html).to eq('<figcaption>Great shot <span class="emoji">📷 ✨ 🎯</span></figcaption>')
       end
     end
 
