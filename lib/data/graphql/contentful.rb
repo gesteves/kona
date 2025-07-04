@@ -173,6 +173,13 @@ module ContentfulClient
           trackingUrl
           date
           status
+          raceReportsCollection {
+            items {
+              slug
+              title
+              summary
+            }
+          }
           sys {
             ...SysFields
           }

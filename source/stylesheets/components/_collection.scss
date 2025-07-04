@@ -57,3 +57,19 @@
     grid-column: span 3;
   }
 }
+
+.collection--full-width {
+  grid-column: 1 / -1;
+
+  @media (min-width: #{$bp-medium}) {
+    grid-column: 3 / -3;
+  }
+
+  .collection__list {
+    grid-template-columns: repeat(8, 1fr);
+  }
+
+  .collection__item {
+    grid-column: 1 / -1;
+  }
+}

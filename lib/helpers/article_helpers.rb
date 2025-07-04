@@ -80,11 +80,15 @@ module ArticleHelpers
   # @param count [Integer] (Optional) The number of articles to return.
   # @return [Array<Object>] A list of articles sorted by relevance.
   def related_articles(article, count: 4)
+    # Get race reports that will be shown in the race reports section
+    race_report_slugs = related_race_reports(article).map(&:slug)
+
     data.articles
-      .reject { |a| a.path == article.path }          # Exclude the current article
-      .reject { |a| a.draft }                         # Exclude drafts
-      .reject { |a| a.entry_type == 'Short' }         # Exclude short posts
-      .sort_by { |a| -relevance_score(article, a) }   # Sort by relevance score, in descending order
+      .reject { |a| a.path == article.path }             # Exclude the current article
+      .reject { |a| a.draft }                            # Exclude drafts
+      .reject { |a| a.entry_type == 'Short' }            # Exclude short posts
+      .reject { |a| race_report_slugs.include?(a.slug) } # Exclude race reports shown in race reports section
+      .sort_by { |a| -relevance_score(article, a) }      # Sort by relevance score, in descending order
       .take(count)
   end
 
@@ -340,5 +344,31 @@ module ArticleHelpers
   # @return [Integer] The number of days since the article was published.
   def days_since_published(article)
     ((Time.now - DateTime.parse(article.published_at)) / 1.day).ceil
+  end
+
+  # Finds related race reports from the same event as the current article.
+  # @param article [Object] The current article to find race reports for.
+  # @param count [Integer] (Optional) The number of race reports to return.
+  # @return [Array<Object>] A list of race reports from the same event, sorted by publication date in reverse chronological order.
+  def related_race_reports(article, count: 5)
+    # Find the corresponding event by matching race reports
+    event = data.events.find do |e|
+      e.race_reports_collection.items.any? { |report| report.slug == article.slug }
+    end
+
+    return [] unless event
+
+    # Get all race report slugs from the event
+    race_report_slugs = event.race_reports_collection.items.map(&:slug)
+
+    # Find all articles that match these slugs, excluding the current article
+    race_reports = data.articles
+      .select { |a| race_report_slugs.include?(a.slug) }
+      .reject { |a| a.slug == article.slug }
+      .reject { |a| a.draft }
+      .sort_by { |a| -DateTime.parse(a.published_at).to_i }
+      .take(count)
+
+    race_reports
   end
 end
