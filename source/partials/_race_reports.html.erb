@@ -1,4 +1,4 @@
 <% race_reports = related_race_reports(article) %>
 <% if race_reports.present? %>
-  <%= partial 'partials/collection', locals: { title: "More From This Race", items: race_reports, variant: "centered" } %>
+  <%= partial 'partials/collection', locals: { title: "More Reports From This Race", items: race_reports, variant: "full-width" } %>
 <% end %>
