@@ -177,7 +177,7 @@ module ContentfulClient
           url
           trackingUrl
           date
-          status
+          going
           sys {
             ...SysFields
           }
