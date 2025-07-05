@@ -358,6 +358,7 @@ module ArticleHelpers
       .select { |a| a.event&.sys&.id == article.event.sys.id }
       .reject { |a| a.slug == article.slug }
       .reject { |a| a.draft }
+      .reject { |a| a.entry_type == 'Short' }
       .sort_by { |a| -DateTime.parse(a.published_at).to_i }
       .take(count)
 
