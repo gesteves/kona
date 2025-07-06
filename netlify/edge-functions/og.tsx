@@ -1,6 +1,6 @@
 import React from "https://esm.sh/react@18.2.0";
 import { ImageResponse } from "https://deno.land/x/og_edge/mod.ts";
-import { DOMParser } from "https://deno.land/x/deno_dom/deno-dom-wasm.ts";
+import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.49/deno-dom-wasm.ts";
 import type { Context } from "@netlify/edge-functions";
 
 export default async function handler(req: Request, context: Context) {
