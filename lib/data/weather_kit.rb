@@ -55,7 +55,7 @@ class WeatherKit
       timezone: @time_zone
     }
 
-    response = HTTParty.get("#{WEATHERKIT_API_URL}/weather/en/#{@latitude}/#{@longitude}", query: query, headers: headers)
+    response = HTTParty.get("#{WEATHERKIT_API_URL}weather/en/#{@latitude}/#{@longitude}", query: query, headers: headers)
     raise "Failed to fetch weather data: #{response.code}" unless response.success?
 
     $redis.setex(cache_key, 5.minutes, response.body)
@@ -89,7 +89,7 @@ class WeatherKit
       country: @country
     }
 
-    response = HTTParty.get("#{WEATHERKIT_API_URL}/availability/#{@latitude}/#{@longitude}", query: query, headers: headers)
+    response = HTTParty.get("#{WEATHERKIT_API_URL}availability/#{@latitude}/#{@longitude}", query: query, headers: headers)
     raise "Failed to fetch availability data: #{response.code}" unless response.success?
 
     $redis.setex(cache_key, 5.minutes, response.body)
