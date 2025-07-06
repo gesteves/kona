@@ -11,3 +11,5 @@ source/javascripts/site.js*
 
 # Local Netlify folder
 .netlify
+tmp/
+prompts/
