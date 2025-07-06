@@ -3,6 +3,9 @@ require 'public_suffix'
 require 'humanize'
 require_relative 'graphql/contentful'
 require_relative 'plausible'
+require_relative 'google_maps'
+require_relative 'weather_kit'
+require_relative 'google_air_quality'
 
 class Contentful
   def initialize
@@ -50,6 +53,7 @@ class Contentful
     process_pages
     process_analytics
     process_assets
+    process_events
     generate_blog
     generate_tags
   end
@@ -344,6 +348,92 @@ class Contentful
   rescue => e
     puts "Error rewriting image URL: #{e.message}"
     item
+  end
+
+  # Processes events and adds weather forecasts for upcoming races within the next 10 days.
+  def process_events
+    @content[:events].map! do |event|
+      process_event_weather(event)
+      event
+    end
+  end
+
+  # Processes weather data for a single event
+  def process_event_weather(event)
+    return unless event[:coordinates]&.dig(:lat) && event[:coordinates]&.dig(:lon)
+
+    lat = event[:coordinates][:lat]
+    lon = event[:coordinates][:lon]
+    event_date = Date.parse(event[:date])
+    days_until_event = (event_date - Date.current).to_i
+
+
+    return unless days_until_event.between?(0, 10)
+
+    # Get location data from Google Maps
+    maps = GoogleMaps.new(lat, lon)
+    time_zone = maps.time_zone_id
+    country_code = maps.country_code
+    elevation = maps.instance_variable_get(:@location)&.dig(:elevation)
+
+    return unless time_zone.present? && country_code.present?
+
+    # Add time zone and elevation to base event
+    event[:time_zone] = time_zone
+    event[:elevation] = elevation
+
+    # Get weather forecast
+    add_weather_forecast(event, lat, lon, time_zone, country_code, event_date)
+
+    # Get AQI data for events in the next 4 days
+    add_aqi_data(event, lat, lon, country_code, days_until_event) if days_until_event <= 4
+  end
+
+  # Adds weather forecast data to an event
+  def add_weather_forecast(event, lat, lon, time_zone, country_code, event_date)
+    weather_kit = WeatherKit.new(lat, lon, time_zone, country_code)
+    weather_data = weather_kit.instance_variable_get(:@weather)
+
+    return unless weather_data.present?
+
+    # Use camelCase keys as returned by the API
+    daily_forecast = weather_data.dig(:forecastDaily, :days)
+
+    # Match based on the date portion only, ignoring time
+    event_forecast = daily_forecast&.find do |day|
+      forecast_date = Date.parse(day[:forecastStart]) rescue nil
+      forecast_date == event_date
+    end
+
+    return unless event_forecast.present?
+
+    daytime_forecast = event_forecast[:daytimeForecast]
+    event[:weather] = {
+      cloud_cover: daytime_forecast[:cloudCover],
+      humidity: daytime_forecast[:humidity],
+      precipitation_chance: daytime_forecast[:precipitationChance],
+      precipitation_type: daytime_forecast[:precipitationType],
+      temperature_max: daytime_forecast[:temperatureMax],
+      temperature_min: daytime_forecast[:temperatureMin],
+      wind_direction: daytime_forecast[:windDirection],
+      wind_speed: daytime_forecast[:windSpeed],
+      wind_speed_max: daytime_forecast[:windSpeedMax],
+      wind_gust_speed_max: daytime_forecast[:windGustSpeedMax],
+      condition_code: daytime_forecast[:conditionCode],
+      sunrise: event_forecast[:sunrise]
+    }
+  end
+
+  # Adds AQI data to an event
+  def add_aqi_data(event, lat, lon, country_code, days_until_event)
+    aqi_service = GoogleAirQuality.new(lat, lon, country_code)
+    aqi_data = aqi_service.instance_variable_get(:@aqi)
+
+    return unless aqi_data.present?
+
+    event[:weather] ||= {}
+    event[:weather][:aqi] = aqi_data[:aqi]
+    event[:weather][:aqi_condition] = aqi_data[:category]
   end
 end
 
