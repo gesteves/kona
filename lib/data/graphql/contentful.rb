@@ -172,10 +172,6 @@ module ContentfulClient
           title
           description
           location
-          coordinates {
-            lat
-            lon
-          }
           url
           trackingUrl
           date
