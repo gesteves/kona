@@ -420,7 +420,8 @@ class Contentful
       wind_speed_max: daytime_forecast[:windSpeedMax],
       wind_gust_speed_max: daytime_forecast[:windGustSpeedMax],
       condition_code: daytime_forecast[:conditionCode],
-      sunrise: event_forecast[:sunrise]
+      sunrise: event_forecast[:sunrise],
+      sunset: event_forecast[:sunset]
     }
   end
 
