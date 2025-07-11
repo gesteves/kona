@@ -45,11 +45,11 @@
     flex-flow: row wrap;
 
     span {
-      margin-right: 0.5rem;
+      margin-inline-end: 0.5rem;
     }
   
     span:last-of-type {
-      margin-right: 0;
+      margin-inline-end: 0;
     }
   }
 }
@@ -301,8 +301,8 @@
   align-items: center;
   display: inline-flex;
   justify-items: center;
-  margin-left: -1.5rem;
-  margin-right: 0.5rem;
+  margin-inline-start: -1.5rem;
+  margin-inline-end: 0.5rem;
 
   svg {
     display: block;
