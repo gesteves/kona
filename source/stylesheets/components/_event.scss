@@ -3,7 +3,7 @@
   color: var(--color-text-secondary);
   display: flex;
   flex-flow: column;
-  gap: 0 0.5rem;
+  gap: 0 1rem;
   font-family: var(--ibm-plex-mono);
   font-size: var(--font-x-small);
   line-height: var(--line-height-x-small);
@@ -26,6 +26,12 @@
   @include bp-medium {
     flex-flow: row wrap;
   }
+}
+
+.event__weather-stat-group {
+  display: flex;
+  flex-flow: row nowrap;
+  gap: 0 1rem;
 }
 
 .event__weather-heading {
