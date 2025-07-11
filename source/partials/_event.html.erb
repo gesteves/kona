@@ -1,4 +1,4 @@
-<article class="entry entry--summary" id="event-<%= event.sys.id.parameterize %>" aria-labelledby="hed-<%= event.sys.id.parameterize %>">
+<article class="entry entry--summary event" id="event-<%= event.sys.id.parameterize %>" aria-labelledby="hed-<%= event.sys.id.parameterize %>">
   <header class="entry__header">
     <p class="entry__meta">
       <%= event_tracking_tag(event) %>
@@ -13,9 +13,14 @@
       <% end %>
     </h4>
   </header>
-  <% if event.description.present? %>
-    <div class="entry__body">
-      <%= render_body(event.description) %>
-    </div>
-  <% end %>
+  <div class="event__body <%= "event__body--has-weather" if has_weather_data?(event) %>">
+    <% if event.description.present? %>
+      <div class="entry__body event__description">
+        <%= render_body(event.description) %>
+      </div>
+    <% end %>
+    <% if has_weather_data?(event) %>
+      <%= partial 'partials/event_weather', locals: { event: event } %>
+    <% end %>
+  </div>
 </article>

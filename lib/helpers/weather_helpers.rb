@@ -106,6 +106,13 @@ module WeatherHelpers
     data.conditions.dig(condition_code, :phrases, :forecast) || "calls for #{condition_code.underscore.gsub('_', ' ')}"
   end
 
+  # Formats the weather condition based on its condition code.
+  # @param [String] condition_code - The condition code representing the weather.
+  # @return [String] The formatted weather condition description.
+  def format_condition(condition_code)
+    data.conditions.dig(condition_code, :phrases, :simplified) || condition_code.underscore.gsub('_', ' ')
+  end
+
   # Formats a temperature value in Celsius to both Celsius and Fahrenheit.
   # @param [Float] temp - The temperature value in Celsius.
   # @return [String] A formatted temperature value with units in both Celsius and Fahrenheit.
@@ -447,9 +454,10 @@ module WeatherHelpers
   end
 
   # Determines the weather icon to display based on current weather conditions.
+  # @param condition_code [String] The condition code to use for the icon.
   # @return [String] The name of the weather icon to display.
-  def weather_icon
-    condition = data.conditions[current_weather.condition_code]
+  def weather_icon(condition_code = current_weather.condition_code)
+    condition = data.conditions[condition_code]
     return 'cloud-question' if condition.blank?
     return condition[:icon] if condition[:icon].is_a?(String)
     is_daytime? ? condition[:icon][:day] : condition[:icon][:night]

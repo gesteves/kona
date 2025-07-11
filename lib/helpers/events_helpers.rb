@@ -35,6 +35,13 @@ module EventsHelpers
     event_date.to_date >= current_time.to_date && event_date.to_date <= 10.days.from_now.to_date
   end
 
+  # Determines if the event has a weather forecast for the event date.
+  # @param event [Event] The event to check.
+  # @return [Boolean] True if the event has weather data; false otherwise.
+  def has_weather_data?(event)
+    event.weather.present?
+  end
+
   # Determines if the event is currently in progress.
   # @param event [Object] The event object to check.
   # @return [Boolean] True if the event occurs today, is during daytime, and is confirmed.

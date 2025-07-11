@@ -1,0 +1,25 @@
+.event__body {
+  display: grid;
+  grid-gap: var(--row-gap) var(--column-gap);
+  grid-template-columns: repeat(12, 1fr);
+}
+
+.event__description {
+  grid-column: 1 / -1;
+}
+
+.event__weather {
+  grid-column: 1 / -1;
+}
+
+.event__body--has-weather {
+  @media (min-width: #{$bp-medium}) {
+    .event__description {
+      grid-column: span 8;
+    }
+
+    .event__weather {
+      grid-column: span 4;
+    }
+  }
+}
