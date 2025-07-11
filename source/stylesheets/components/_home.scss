@@ -2,14 +2,14 @@
   display: grid;
   grid-column: 1 / -1;
   grid-gap: var(--row-gap) var(--column-gap);
-  grid-template-columns: repeat(12, 1fr);
+  grid-template-columns: subgrid;
 }
 
 .home__intro {
   display: grid;
   grid-column: 1 / -1;
   grid-gap: 0 var(--column-gap);
-  grid-template-columns: repeat(12, 1fr);
+  grid-template-columns: subgrid;
 }
 
 .home__headline {

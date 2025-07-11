@@ -11,7 +11,7 @@
     display: grid;
     grid-gap: var(--row-gap) var(--column-gap);
     grid-template-areas: "logo logo logo nav nav nav nav nav nav nav nav nav";
-    grid-template-columns: repeat(12, 1fr);
+    grid-template-columns: subgrid;
   }
 }
 
