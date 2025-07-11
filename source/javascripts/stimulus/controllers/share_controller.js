@@ -11,7 +11,8 @@ export default class extends Controller {
     popupHeight: Number,
     isNative: Boolean,
     text: String,
-    url: String
+    url: String,
+    via: String
   };
 
   /**
@@ -49,7 +50,7 @@ export default class extends Controller {
    */
   openShareSheet(event) {
     event.preventDefault();
-    trackEvent('Share', { url: this.getShareUrl() });
+    trackEvent('Share', { url: this.getShareUrl(), via: 'Native' });
 
     navigator.share({
       title: this.getShareText(),
@@ -67,9 +68,19 @@ export default class extends Controller {
     event.preventDefault();
     const linkURL = this.element.href;
     
+    trackEvent('Share', { url: this.getShareUrl(), via: this.viaValue });
+    
     const width = this.popupWidthValue || 400;
     const height = this.popupHeightValue || 300;
 
     window.open(linkURL, 'share', `width=${width},height=${height},scrollbars=yes`);
+  }
+
+  /**
+   * Tracks share events for regular links.
+   * @param {Event} event - The event that triggered the share action.
+   */
+  trackShare(event) {
+    trackEvent('Share', { url: this.getShareUrl(), via: this.viaValue });
   }
 }
