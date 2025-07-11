@@ -369,7 +369,6 @@ class Contentful
     event_date = Date.parse(event[:date])
     days_until_event = (event_date - Date.current).to_i
 
-
     return unless days_until_event.between?(0, 10)
 
     # Get location data from Google Maps
