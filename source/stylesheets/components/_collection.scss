@@ -73,3 +73,7 @@
     grid-column: 1 / -1;
   }
 }
+
+.collection--has-featured .collection__item:first-child {
+  grid-column: 1 / -1;
+}
