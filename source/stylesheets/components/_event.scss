@@ -22,10 +22,12 @@
       fill: var(--color-text-tertiary);
     }
   }
+}
 
-  @include bp-medium {
-    flex-flow: row wrap;
-  }
+.event__weather-stats {
+  display: flex;
+  flex-flow: row wrap;
+  gap: 0 1rem;
 }
 
 .event__weather-stat-group {
