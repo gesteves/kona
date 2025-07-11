@@ -1,25 +1,42 @@
-@import 'vendors/reset';
-@import 'fonts/lato';
-@import 'fonts/ibm-plex-mono';
-@import 'fonts/ibm-plex-sans-condensed';
+@layer reset, fonts, base, components, utilities;
+
 @import 'base/variables';
 @import 'base/mixins';
-@import 'base/props';
-@import 'base/base';
-@import 'base/extends';
-@import 'base/accessibility';
-@import 'components/blog';
-@import 'components/collection';
-@import 'components/content';
-@import 'components/entry';
-@import 'components/footer';
-@import 'components/form';
-@import 'components/header';
-@import 'components/home';
-@import 'components/nav';
-@import 'components/notifications';
-@import 'components/pagination';
-@import 'components/placeholder';
-@import 'components/stats';
-@import 'components/share';
-@import 'components/weather';
+
+@layer reset {
+  @import 'vendors/reset';
+}
+
+@layer fonts {
+  @import 'fonts/lato';
+  @import 'fonts/ibm-plex-mono';
+  @import 'fonts/ibm-plex-sans-condensed';
+}
+
+@layer base {
+  @import 'base/props';
+  @import 'base/base';
+  @import 'base/extends';
+}
+
+@layer components {
+  @import 'components/blog';
+  @import 'components/collection';
+  @import 'components/content';
+  @import 'components/entry';
+  @import 'components/footer';
+  @import 'components/form';
+  @import 'components/header';
+  @import 'components/home';
+  @import 'components/nav';
+  @import 'components/notifications';
+  @import 'components/pagination';
+  @import 'components/placeholder';
+  @import 'components/stats';
+  @import 'components/share';
+  @import 'components/weather';
+}
+
+@layer utilities {
+  @import 'base/accessibility';
+}
