@@ -10,13 +10,15 @@ module EventsHelpers
   # Finds today's race event, if any.
   # @return [Event, nil] The race event for today if one exists, nil otherwise.
   def todays_race
-    data.events.find { |e| is_today?(e) && is_going?(e) }
+    data.events.find { |e| is_today?(e) && e.going }
   end
 
   # Returns a collection of upcoming race events.
+  # Returns four events if the next one is in the next 10 days, otherwise returns three events.
   # @return [Array<Event>] An array of event objects that are today or in the future.
   def upcoming_races
-    data.events.sort_by { |e| Time.parse(e.date) }.select { |e| Time.parse(e.date).in_time_zone(location_time_zone).beginning_of_day >= current_time.beginning_of_day && e.going }.take(3)
+    upcoming = data.events.sort_by { |e| Time.parse(e.date) }.select { |e| Time.parse(e.date).in_time_zone(location_time_zone).beginning_of_day >= current_time.beginning_of_day && e.going }
+    upcoming.take(is_close?(upcoming.first) ? 4 : 3)
   end
 
   # Determines if today is a race day.
@@ -25,19 +27,26 @@ module EventsHelpers
     todays_race.present?
   end
 
-  # Determines if I'm going to the event.
-  # @param event [Object] The event object to check.
-  # @return [Boolean] True if the event's going field is true, otherwise false.
-  def is_going?(event)
-    event.going == true
+  # Determines if the event is happening in the next 10 days.
+  # @param event [Event] The event to check.
+  # @return [Boolean] True if the event is happening in the next 10 days; false otherwise.
+  def is_close?(event)
+    event_date = Time.parse(event.date).in_time_zone(location_time_zone)
+    event_date.to_date >= current_time.to_date && event_date.to_date <= 10.days.from_now.to_date
   end
 
+  # Determines if the event has a weather forecast for the event date.
+  # @param event [Event] The event to check.
+  # @return [Boolean] True if the event has weather data; false otherwise.
+  def has_weather_data?(event)
+    event.weather.present?
+  end
 
   # Determines if the event is currently in progress.
   # @param event [Object] The event object to check.
   # @return [Boolean] True if the event occurs today, is during daytime, and is confirmed.
   def is_in_progress?(event)
-    is_daytime? && is_today?(event) && is_going?(event)
+    is_daytime? && is_today?(event) && event.going
   end
 
   # Determines if the event is happening and there's a live tracking link.
@@ -54,8 +63,8 @@ module EventsHelpers
     return icon_svg("classic", "light",   "calendar-xmark") if !event.going
     return icon_svg("classic", "light",   "calendar-star")  if is_trackable?(event)
     return icon_svg("classic", "regular", "calendar-star")  if is_in_progress?(event)
-    return icon_svg("classic", "light",   "calendar-star")  if is_today?(event) && is_going?(event)
-    return icon_svg("classic", "light",   "calendar-check") if is_going?(event)
+    return icon_svg("classic", "light",   "calendar-star")  if is_today?(event) && event.going
+    return icon_svg("classic", "light",   "calendar-check") if event.going
     icon_svg("classic", "light", "calendar")
   end
 

@@ -106,6 +106,13 @@ module WeatherHelpers
     data.conditions.dig(condition_code, :phrases, :forecast) || "calls for #{condition_code.underscore.gsub('_', ' ')}"
   end
 
+  # Formats the weather condition based on its condition code.
+  # @param [String] condition_code - The condition code representing the weather.
+  # @return [String] The formatted weather condition description.
+  def format_condition(condition_code)
+    data.conditions.dig(condition_code, :phrases, :simplified) || condition_code.underscore.gsub('_', ' ')
+  end
+
   # Formats a temperature value in Celsius to both Celsius and Fahrenheit.
   # @param [Float] temp - The temperature value in Celsius.
   # @return [String] A formatted temperature value with units in both Celsius and Fahrenheit.
@@ -152,27 +159,50 @@ module WeatherHelpers
     end
   end
 
+  # Formats a wind speed in kilometers per hour (km/h) to both metric and imperial units.
+  # @param [Float] speed - The wind speed in kilometers per hour (km/h).
+  # @return [String] A formatted string representing the wind speed in both metric and imperial units.
+  def format_wind_speed(speed)
+    wind_speed_metric = speed.round
+    wind_speed_imperial = kilometers_to_miles(speed).round
+    metric = "#{wind_speed_metric} km/h"
+    imperial = "#{wind_speed_imperial} mph"
+    units_tag(metric, imperial)
+  end
+
+  # Determines if the gusts should be shown based on the wind speed and gusts speed.
+  # @param [Float] wind_speed - The wind speed in kilometers per hour (km/h).
+  # @param [Float] gusts_speed - The gusts speed in kilometers per hour (km/h).
+  # @return [Boolean] True if the gusts should be shown, false otherwise.
+  def show_gusts?(wind_speed, gusts_speed)
+    wind_speed_knots = kph_to_knots(wind_speed)
+    gusts_knots = kph_to_knots(gusts_speed)
+
+    gusts_knots >= 16 && gusts_knots >= wind_speed_knots + 9
+  end
+
   # Converts a wind direction in degrees to a cardinal direction.
   # @param [Integer] degrees - The wind direction in degrees.
+  # @param [Boolean] abbreviated - Whether to return the abbreviated direction.
   # @return [String] The cardinal direction corresponding to the wind direction.
-  def wind_direction(degrees)
+  def wind_direction(degrees, abbreviated = false)
     case degrees
     when 0..22.5, 337.5..360
-      "North"
+      abbreviated ? "N" : "North"
     when 22.5..67.5
-      "Northeast"
+      abbreviated ? "NE" : "Northeast"
     when 67.5..112.5
-      "East"
+      abbreviated ? "E" : "East"
     when 112.5..157.5
-      "Southeast"
+      abbreviated ? "SE" : "Southeast"
     when 157.5..202.5
-      "South"
+      abbreviated ? "S" : "South"
     when 202.5..247.5
-      "Southwest"
+      abbreviated ? "SW" : "Southwest"
     when 247.5..292.5
-      "West"
+      abbreviated ? "W" : "West"
     when 292.5..337.5
-      "Northwest"
+      abbreviated ? "NW" : "Northwest"
     else
       nil
     end
@@ -326,25 +356,19 @@ module WeatherHelpers
   # @return [String] A string describing the current wind conditions.
   def wind
     direction = wind_direction(current_weather.wind_direction)
-    wind_speed_metric = current_weather.wind_speed.round
-    wind_speed_imperial = kilometers_to_miles(current_weather.wind_speed).round
+    formatted_wind_speed = format_wind_speed(current_weather.wind_speed)
     wind_speed_knots = kph_to_knots(current_weather.wind_speed)
 
-    gusts_metric = current_weather&.wind_gust.to_f.round
-    gusts_imperial = kilometers_to_miles(current_weather&.wind_gust.to_f).round
-    gusts_knots = kph_to_knots(current_weather&.wind_gust.to_f)
+    gusts_speed = current_weather&.wind_gust.to_f
+    formatted_gusts = format_wind_speed(gusts_speed)
 
     return if direction.blank? || beaufort_number(wind_speed_knots).zero?
 
-    metric = "#{wind_speed_metric} km/h"
-    imperial = "#{wind_speed_imperial} mph"
     text = []
-    text << "#{beaufort_description(wind_speed_knots)} of #{units_tag(metric, imperial)} from the #{direction.downcase}"
+    text << "#{beaufort_description(wind_speed_knots)} of #{formatted_wind_speed} from the #{direction.downcase}"
 
-    if gusts_knots >= 16 && gusts_knots >= wind_speed_knots + 9
-      metric = "#{gusts_metric} km/h"
-      imperial = "#{gusts_imperial} mph"
-      text << "with #{units_tag(metric, imperial)} gusts"
+    if show_gusts?(current_weather.wind_speed, gusts_speed)
+      text << "with #{formatted_gusts} gusts"
     end
 
     text.join(', ')
@@ -447,9 +471,10 @@ module WeatherHelpers
   end
 
   # Determines the weather icon to display based on current weather conditions.
+  # @param condition_code [String] The condition code to use for the icon.
   # @return [String] The name of the weather icon to display.
-  def weather_icon
-    condition = data.conditions[current_weather.condition_code]
+  def weather_icon(condition_code = current_weather.condition_code)
+    condition = data.conditions[condition_code]
     return 'cloud-question' if condition.blank?
     return condition[:icon] if condition[:icon].is_a?(String)
     is_daytime? ? condition[:icon][:day] : condition[:icon][:night]

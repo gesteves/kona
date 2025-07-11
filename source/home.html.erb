@@ -20,6 +20,6 @@
     <%= partial 'partials/weather' %>
   <% end %>
   <% if data.events.present? %>
-    <%= partial 'partials/collection', locals: { title: "Upcoming Races", items: upcoming_races, variant: "thirds" } %>
+    <%= partial 'partials/upcoming_races' %>
   <% end %>
 </div>

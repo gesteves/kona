@@ -23,7 +23,13 @@
 }
 
 .collection__item {
+  display: grid;
   grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+
+  & > * {
+    grid-column: 1 / -1;
+  }
 }
 
 .collection--centered {
@@ -67,5 +73,33 @@
 
   .collection__item {
     grid-column: 1 / -1;
+  }
+}
+
+.collection--has-featured .collection__item:first-child {
+  grid-column: 1 / -1;
+}
+
+.collection--featured-two_thirds .collection__item:first-child {
+  @include bp-medium {
+    grid-column: span 8;
+  }
+}
+
+.collection--featured-two_thirds .collection__item:nth-child(2) {
+  @include bp-medium {
+    grid-column: span 4;
+  }
+}
+
+.collection--featured-three_quarters .collection__item:first-child {
+  @include bp-medium {
+    grid-column: span 9;
+  }
+}
+
+.collection--featured-three_quarters .collection__item:nth-child(2) {
+  @include bp-medium {
+    grid-column: span 3;
   }
 }

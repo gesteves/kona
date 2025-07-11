@@ -1,13 +1,13 @@
-<section class="collection <%= "collection--#{variant}" if defined?(variant) %>" <% if title.present? %>id="<%= title.parameterize %>"<% end %>>
+<section class="collection <%= "collection--#{variant}" if defined?(variant) %> <%= "collection--has-featured" if defined?(featured) && featured %>" <% if title.present? %>id="<%= title.parameterize %>"<% end %>>
   <% if title.present? %>
     <h3 class="collection__heading"><%= smartypants(title) %></h3>
   <% end %>
   <ol class="collection__list">
     <% items.each do |item| %>
       <li class="collection__item">
-        <% if item.entry_type.present? %>
+        <% if item.entry_type.present? && ['Article', 'Short'].include?(item.entry_type) %>
           <%= partial 'partials/article/summary', locals: { article: item } %>
-        <% else %>
+        <% elsif item.entry_type == 'Event' %>
           <%= partial 'partials/event', locals: { event: item } %>
         <% end %>
       </li>
