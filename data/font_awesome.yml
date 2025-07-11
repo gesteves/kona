@@ -67,6 +67,36 @@ icons:
       - clock-twelve-thirty
       - bars
       - xmark
+      - bolt-lightning
+      - cloud-bolt
+      - cloud-drizzle
+      - cloud-fog
+      - cloud-hail
+      - cloud-hail-mixed
+      - cloud-question
+      - cloud-rain
+      - cloud-showers
+      - cloud-showers-heavy
+      - cloud-sleet
+      - cloud-snow
+      - cloud-sun-rain
+      - clouds
+      - clouds-moon
+      - clouds-sun
+      - fire-smoke
+      - hurricane
+      - moon-cloud
+      - moon-stars
+      - snow-blowing
+      - snowflake
+      - snowflakes
+      - sun
+      - sun-cloud
+      - sun-dust
+      - temperature-snow
+      - temperature-sun
+      - tornado
+      - wind
     thin:
       - bolt-lightning
       - cloud-bolt

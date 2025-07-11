@@ -1,16 +1,18 @@
-<div class="event__weather">
-  <%= icon_svg("classic", "thin", weather_icon(event.weather.condition_code)) %>
-  <%= format_condition(event.weather.condition_code) %>
-  High: <%= format_temperature(event.weather.temperature_max) %>
-  Low: <%= format_temperature(event.weather.temperature_min) %>
-  Precipitation: <%= number_to_percentage(event.weather.precipitation_chance * 100, precision: 0) %>
-  Wind: <%= format_wind_speed([event.weather.wind_speed.to_f, event.weather.wind_speed_max.to_f].max) %> <%= wind_direction(event.weather.wind_direction, true) %>
+<p class="event__weather entry__meta">
+  <span class="event__weather-condition">
+    <%= icon_svg("classic", "light", weather_icon(event.weather.condition_code)) %>
+    <%= format_condition(event.weather.condition_code) %>
+  </span>
+  <span><%= format_temperature(event.weather.temperature_min) %></span>
+  <span><%= format_temperature(event.weather.temperature_max) %></span>
+  <span><%= number_to_percentage(event.weather.precipitation_chance * 100, precision: 0) %></span>
+  <span><%= format_wind_speed([event.weather.wind_speed.to_f, event.weather.wind_speed_max.to_f].max) %> <%= wind_direction(event.weather.wind_direction, true) %></span>
   <% if show_gusts?(event.weather.wind_speed, event.weather.wind_gust_speed_max) %>
-    Wind Gusts: <%= format_wind_speed(event.weather.wind_gust_speed_max) %>
+    <span><%= format_wind_speed(event.weather.wind_gust_speed_max) %></span>
   <% end %>
-  Humidity: <%= number_to_percentage(event.weather.humidity * 100, precision: 0) %>
-  Air Quality: <%= event.weather.aqi_condition %> (<%= event.weather.aqi %>)
-  Sunrise: <%= Time.parse(event.weather.sunrise).in_time_zone(event.time_zone).strftime("%I:%M %p").gsub(/(am|pm)/i, "<abbr>\\1</abbr>") %>
-  Sunset: <%= Time.parse(event.weather.sunset).in_time_zone(event.time_zone).strftime("%I:%M %p").gsub(/(am|pm)/i, "<abbr>\\1</abbr>") %>
-  Elevation: <%= format_elevation(event.elevation, true) %>
-</div>
+  <span><%= number_to_percentage(event.weather.humidity * 100, precision: 0) %></span>
+  <span><%= event.weather.aqi %> (<%= event.weather.aqi_condition %>)</span>
+  <span><%= Time.parse(event.weather.sunrise).in_time_zone(event.time_zone).strftime("%I:%M %p").gsub(/(am|pm)/i, "<abbr>\\1</abbr>") %></span>
+  <span><%= Time.parse(event.weather.sunset).in_time_zone(event.time_zone).strftime("%I:%M %p").gsub(/(am|pm)/i, "<abbr>\\1</abbr>") %></span>
+  <span><%= format_elevation(event.elevation, true) %></span>
+</p>
