@@ -42,6 +42,13 @@ module EventsHelpers
     event.weather.present?
   end
 
+  # Determines if the event should be featured.
+  # @param event [Event] The event to check.
+  # @return [Boolean] True if the event is featured; false otherwise.
+  def is_featured?(event)
+    is_close?(event) && is_next?(event) && has_weather_data?(event)
+  end
+
   # Determines if the event is currently in progress.
   # @param event [Object] The event object to check.
   # @return [Boolean] True if the event occurs today, is during daytime, and is confirmed.
