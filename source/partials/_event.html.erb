@@ -1,4 +1,4 @@
-<article class="entry entry--summary event <%= "event--has-weather" if is_featured?(event) %>" id="event-<%= event.sys.id.parameterize %>" aria-labelledby="hed-<%= event.sys.id.parameterize %>">
+<article class="entry entry--summary event <%= "event--has-weather" if is_featured?(event) && !is_today?(event) %>" id="event-<%= event.sys.id.parameterize %>" aria-labelledby="hed-<%= event.sys.id.parameterize %>">
   <div class="event__inner">
     <header class="entry__header">
       <p class="entry__meta">
@@ -20,7 +20,7 @@
       </div>
     <% end %>
   </div>
-  <% if is_featured?(event) %>
+  <% if is_featured?(event) && !is_today?(event) %>
     <%= partial 'partials/event_weather', locals: { event: event } %>
   <% end %>
 </article>

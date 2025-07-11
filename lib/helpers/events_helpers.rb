@@ -53,7 +53,7 @@ module EventsHelpers
   # @param event [Event] The event to check.
   # @return [Boolean] True if the event is featured; false otherwise.
   def is_featured?(event)
-    is_close?(event) && is_next?(event) && has_weather_data?(event)
+    is_close?(event) && is_next?(event)
   end
 
   # Determines if the event is currently in progress.
