@@ -1,5 +1,5 @@
-<section class="event__weather">
-  <h5 class="event__weather-heading">Race Day Forecast</h5>
+<section class="event__weather" aria-labelledby="weather-heading-<%= event.sys.id.parameterize %>">
+  <h5 class="event__weather-heading" id="weather-heading-<%= event.sys.id.parameterize %>"><% if is_today?(event) %>Today’s Forecast<% else %>Race Day Forecast<% end %></h5>
   <div class="event__weather-stats">
     <div class="event__weather-stat-group">
       <span class="event__weather-stat"><span class="sr-only">Conditions:</span> <%= icon_svg("classic", "light", weather_icon(event.weather.condition_code)) %> <%= format_condition(event.weather.condition_code) %></span>
@@ -10,7 +10,7 @@
           <span class="sr-only">Temperature:</span>
           <%= icon_svg("classic", "light", "temperature-three-quarters") %> 
           <%= format_temperature(event.weather.temperature_min) %>/<%= format_temperature(event.weather.temperature_max) %>
-        </span>
+          </span>
       </div>
     <% end %>
     <% if event.weather.humidity.present? || event.weather.precipitation_chance.present? %>
@@ -33,17 +33,17 @@
       <div class="event__weather-stat-group">
         <span class="event__weather-stat" title="Wind speed">
           <%= icon_svg("classic", "light", "wind") %><span class="sr-only">Wind speed:</span> <%= format_wind_speed(event.weather.wind_speed) %>
-          <abbr title="<%= wind_direction(event.weather.wind_direction) %>"><%= wind_direction(event.weather.wind_direction, true) %></abbr><% if show_gusts?(event.weather.wind_speed, event.weather.wind_gust_speed_max) %>/<%= format_wind_speed(event.weather.wind_gust_speed_max) %> gusts<% end %>
+          <abbr title="<%= wind_direction(event.weather.wind_direction) %>"><%= wind_direction(event.weather.wind_direction, true) %></abbr><% if show_gusts?(event.weather.wind_speed, event.weather.wind_gust_speed_max) %> with <%= format_wind_speed(event.weather.wind_gust_speed_max) %> gusts<% end %>
         </span>
       </div>
     <% end %>
     <% if event.weather.aqi.present? || event.weather.pollen_category.present? %>
       <div class="event__weather-stat-group">
         <% if event.weather.aqi.present? && event.weather.aqi_condition.present? %>
-          <span class="event__weather-stat" title="Air Quality Index"><span class="sr-only">Air Quality Index:</span> <%= icon_svg("classic", "light", "smog") %> <abbr title="Air Quality Index">AQI</abbr> <%= event.weather.aqi %> (<%= event.weather.aqi_condition %>)</span>
+          <span class="event__weather-stat" title="Air Quality Index"><span class="sr-only">Air Quality Index:</span> <%= icon_svg("classic", "light", "smog") %> <abbr title="Air Quality Index">AQI</abbr> <%= event.weather.aqi %></span>
         <% end %>
         <% if event.weather.pollen_category.present? %>
-          <span class="event__weather-stat" title="Universal Pollen Index"><span class="sr-only">Universal Pollen Index:</span> <%= icon_svg("classic", "light", "leaf") %> <abbr title="Universal Pollen Index">UPI</abbr> <%= event.weather.pollen_index %> (<%= event.weather.pollen_category %>)</span>
+          <span class="event__weather-stat"><%= icon_svg("classic", "light", "leaf") %> <%= event.weather.pollen_category %> Pollen</span>
         <% end %>
       </div>
     <% end %>
