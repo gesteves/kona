@@ -6,11 +6,16 @@
     </div>
     <% if event.weather.temperature_min.present? || event.weather.temperature_max.present? %>
       <div class="event__weather-stat-group">
-        <span class="event__weather-stat" title="Temperature">
-          <span class="sr-only">Temperature:</span>
-          <%= icon_svg("classic", "light", "temperature-three-quarters") %> 
-          <%= format_temperature(event.weather.temperature_min) %>/<%= format_temperature(event.weather.temperature_max) %>
-          </span>
+        <span class="event__weather-stat" title="Low">
+          <span class="sr-only">Low:</span>
+          <%= icon_svg("classic", "light", "temperature-low") %> 
+          <%= format_temperature(event.weather.temperature_min) %>
+        </span>
+        <span class="event__weather-stat" title="High">
+          <span class="sr-only">High:</span>
+          <%= icon_svg("classic", "light", "temperature-high") %> 
+          <%= format_temperature(event.weather.temperature_max) %>
+        </span>
       </div>
     <% end %>
     <% if event.weather.humidity.present? || event.weather.precipitation_chance.present? %>
