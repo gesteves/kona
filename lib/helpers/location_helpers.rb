@@ -49,12 +49,15 @@ module LocationHelpers
 
   # Returns the elevation for the current location formatted in meters and feet.
   # @return [String] A formatted elevation value with units in both meters and feet.
-  def format_elevation
-    elevation = data.location.elevation
+  def format_elevation(elevation = data.location.elevation, abbreviated = false)
     return if elevation.blank?
     meters = "#{number_to_rounded(elevation, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')} m"
     feet = number_to_rounded(meters_to_feet(elevation), precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')
-    feet = feet == "1" ? "#{feet} foot" : "#{feet} feet"
+    feet = if abbreviated
+      "#{feet} ft"
+    else
+      feet == "1" ? "#{feet} foot" : "#{feet} feet"
+    end
     units_tag(meters, feet)
   end
 
