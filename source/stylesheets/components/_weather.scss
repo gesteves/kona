@@ -28,7 +28,7 @@
   @extend .extend-body-styles;
   grid-column: span 12;
 
-  @media (min-width: #{$bp-small}) {
+  @include bp-small {
     grid-column: span 10;
   }
 

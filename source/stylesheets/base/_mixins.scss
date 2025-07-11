@@ -1,0 +1,70 @@
+// Media Query Mixins
+// Centralized breakpoint management to reduce fragmentation
+
+@mixin bp-small {
+  @media (min-width: #{$bp-small}) {
+    @content;
+  }
+}
+
+@mixin bp-medium {
+  @media (min-width: #{$bp-medium}) {
+    @content;
+  }
+}
+
+@mixin bp-large {
+  @media (min-width: #{$bp-large}) {
+    @content;
+  }
+}
+
+@mixin bp-social {
+  @media (min-width: #{$bp-social}) {
+    @content;
+  }
+}
+
+@mixin bp-nav {
+  @media (min-width: #{$bp-nav}) {
+    @content;
+  }
+}
+
+// Utility mixins for common media query patterns
+@mixin bp-above($breakpoint) {
+  @media (min-width: #{$breakpoint}) {
+    @content;
+  }
+}
+
+@mixin bp-below($breakpoint) {
+  @media (max-width: #{$breakpoint - 1px}) {
+    @content;
+  }
+}
+
+@mixin bp-between($min, $max) {
+  @media (min-width: #{$min}) and (max-width: #{$max - 1px}) {
+    @content;
+  }
+}
+
+// Motion and color scheme mixins
+@mixin reduced-motion {
+  @media (prefers-reduced-motion: reduce) {
+    @content;
+  }
+}
+
+@mixin dark-mode {
+  @media (prefers-color-scheme: dark) {
+    @content;
+  }
+}
+
+@mixin light-mode {
+  @media (prefers-color-scheme: light) {
+    @content;
+  }
+}

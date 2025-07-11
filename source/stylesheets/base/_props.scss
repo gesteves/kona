@@ -114,7 +114,7 @@
   --avatar-size:         48px;
   --light-icon-size:     0.8rem;
 
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     --column-gap:          2rem;
     --font-x-large:        clamp(36px, 10vw, 108px);
     --font-large:          clamp(36px, 6vw, 72px);
@@ -129,11 +129,11 @@
     --light-icon-size:     1rem;
   }
 
-  @media (min-width: #{$bp-large}) {
+  @include bp-large {
     --picture-outdent: calc((var(--max-width-container) - (var(--content-padding) * 2) - (11 * var(--column-gap)))/12 + var(--column-gap));
   }
 
-  @media (prefers-color-scheme: dark) {
+  @include dark-mode {
     --color-aside-background:           var(--color-rich-black-darker);
     --color-aside-border:               var(--color-oxford-blue);
     --color-aside-text:                 var(--color-alice-blue);
@@ -164,7 +164,7 @@
     --gradient-heading:                 linear-gradient(180deg, var(--color-alice-blue), var(--color-columbia-blue));
   }
 
-  @media (prefers-reduced-motion) {
+  @include reduced-motion {
     --transition-duration: 0;
   }
 }

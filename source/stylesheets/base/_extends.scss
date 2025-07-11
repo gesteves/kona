@@ -113,7 +113,7 @@
   ul {
     margin-inline: 1rem;
 
-    @media (min-width: #{$bp-medium}) {
+    @include bp-medium {
       margin: 0;
     }
   }
@@ -136,7 +136,7 @@
       line-height: var(--line-height-small);
       position: absolute;
 
-      @media (min-width: #{$bp-medium}) {
+      @include bp-medium {
         inset-inline-start: -2rem;
       }
     }
@@ -329,7 +329,7 @@
         line-height: 0.8;
         margin-inline-end: 0.25rem;
   
-        @media (min-width: #{$bp-medium}) {
+        @include bp-medium {
           font-size: 130px;
         }
       }
@@ -345,7 +345,7 @@
         margin-inline-end: 0.25rem;
         margin-top: 6px;
   
-        @media (min-width: #{$bp-medium}) {
+        @include bp-medium {
           font-size: 130px;
           margin-top: 9px;
         }

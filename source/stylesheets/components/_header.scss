@@ -5,7 +5,7 @@
   align-items: center;
   grid-column: 1 / -1;
 
-  @media (min-width: #{$bp-nav}) {
+  @include bp-nav {
     align-items: center;
     box-sizing: border-box;
     display: grid;
@@ -42,7 +42,7 @@
     transition: fill var(--transition-duration);
   }
 
-  @media (min-width: #{$bp-nav}) {
+  @include bp-nav {
     width: auto;
   }
 }
