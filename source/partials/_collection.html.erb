@@ -1,4 +1,4 @@
-<section class="collection <%= "collection--#{variant}" if defined?(variant) %> <%= "collection--has-featured" if defined?(featured) && featured %> <% if title.present? %>id="<%= title.parameterize %>"<% end %>>
+<section class="collection <%= "collection--#{variant}" if defined?(variant) %> <%= "collection--has-featured" if defined?(featured) && featured %>" <% if title.present? %>id="<%= title.parameterize %>"<% end %>>
   <% if title.present? %>
     <h3 class="collection__heading"><%= smartypants(title) %></h3>
   <% end %>
