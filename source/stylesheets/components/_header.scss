@@ -5,11 +5,11 @@
   align-items: center;
   grid-column: 1 / -1;
 
-  @media (min-width: #{$bp-nav}) {
+  @include bp-nav {
     align-items: center;
     box-sizing: border-box;
     display: grid;
-    grid-gap: var(--row-gap) var(--column-gap);
+    gap: var(--row-gap) var(--column-gap);
     grid-template-areas: "logo logo logo nav nav nav nav nav nav nav nav nav";
     grid-template-columns: subgrid;
   }
@@ -42,7 +42,7 @@
     transition: fill var(--transition-duration);
   }
 
-  @media (min-width: #{$bp-nav}) {
+  @include bp-nav {
     width: auto;
   }
 }

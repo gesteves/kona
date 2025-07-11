@@ -3,7 +3,7 @@
   display: grid;
   grid-column: 1 / -1;
   grid-column: 1 / -1;
-  grid-gap: var(--row-gap) var(--column-gap);
+  gap: var(--row-gap) var(--column-gap);
   grid-template-columns: subgrid;
   padding: var(--padding) 0 0 0;
 }
@@ -15,7 +15,7 @@
   grid-column: span 6;
   justify-content: space-between;
 
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     grid-column: span 3;
   }
 }
@@ -29,12 +29,12 @@
   margin: 0;
   padding: 0;
 
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     font-size: var(--font-large);
     line-height: var(--line-height-large);
   }
 
-  @media (min-width: #{$bp-large}) {
+  @include bp-large {
     font-size: var(--font-x-large);
     line-height: var(--line-height-x-large);
   }

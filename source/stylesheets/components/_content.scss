@@ -1,7 +1,7 @@
 .content {
   box-sizing: border-box;
   display: grid;
-  grid-gap: var(--row-gap) var(--column-gap);
+  gap: var(--row-gap) var(--column-gap);
   grid-template-columns: repeat(12, 1fr);
   max-width: var(--max-width-container);
   padding: var(--content-padding);
@@ -11,7 +11,7 @@
 .content__main {
   display: grid;
   grid-column: 1 / -1;
-  grid-gap: var(--row-gap) var(--column-gap);
+  gap: var(--row-gap) var(--column-gap);
   grid-template-columns: subgrid;
   width: 100%;
 }

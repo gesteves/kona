@@ -18,7 +18,7 @@
 .collection__list {
   display: grid;
   grid-column: 1 / -1;
-  grid-gap: var(--row-gap) var(--column-gap);
+  gap: var(--row-gap) var(--column-gap);
   grid-template-columns: subgrid;
 }
 
@@ -29,31 +29,31 @@
 .collection--centered {
   grid-column: 1 / -1;
 
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     grid-column: 3 / -3;
   }
 
   .collection__item {
-    @media (min-width: #{$bp-medium}) {
+    @include bp-medium {
       grid-column: span 4;
     }
   }
 }
 
 .collection--halves .collection__item {
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     grid-column: span 6;
   }
 }
 
 .collection--thirds .collection__item {
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     grid-column: span 4;
   }
 }
 
 .collection--quarters .collection__item {
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     grid-column: span 3;
   }
 }
@@ -61,7 +61,7 @@
 .collection--full-width {
   grid-column: 1 / -1;
 
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     grid-column: 3 / -3;
   }
 

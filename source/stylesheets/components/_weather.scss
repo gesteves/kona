@@ -2,7 +2,7 @@
   border-top: 2px solid var(--color-border);
   display: grid;
   grid-column: 1 / -1;
-  grid-gap: var(--column-gap);
+  gap: var(--column-gap);
   grid-template-columns: subgrid;
   padding: var(--padding) 0 0 0;
 }
@@ -28,7 +28,7 @@
   @extend .extend-body-styles;
   grid-column: span 12;
 
-  @media (min-width: #{$bp-small}) {
+  @include bp-small {
     grid-column: span 10;
   }
 

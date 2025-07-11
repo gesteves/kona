@@ -61,7 +61,7 @@
   --color-list-marker:                    var(--color-oxford-blue);
   --color-logo-hover:                     var(--color-firebrick);
   --color-logo:                           var(--color-jet);
-  --color-nav-background:               rgba(255,255,255,0.5);
+  --color-nav-background:               color-mix(in srgb, white 50%, transparent);
   --color-placeholder:                    var(--color-platinum);
   --color-selection-background:           var(--color-sunglow);
   --color-selection-text:                 var(--color-oxford-blue);
@@ -81,46 +81,10 @@
   --color-text-tertiary:                  var(--color-spanish-gray);
   --color-text:                           var(--color-jet);
 
-  // Gradients
-  --gradient-footer-background:       linear-gradient(
-                                        180deg,
-                                        hsl(210deg 70% 96%) 0%,
-                                        hsl(210deg 70% 96%) 21%,
-                                        hsl(209deg 70% 95%) 30%,
-                                        hsl(209deg 71% 95%) 39%,
-                                        hsl(209deg 71% 94%) 46%,
-                                        hsl(208deg 71% 94%) 54%,
-                                        hsl(208deg 71% 93%) 61%,
-                                        hsl(208deg 71% 93%) 69%,
-                                        hsl(207deg 71% 92%) 79%,
-                                        hsl(207deg 71% 92%) 100%
-                                      ); // https://www.joshwcomeau.com/gradient-generator?colors=eef5fc|dcecf9&angle=180&colorMode=hcl&precision=8&easingCurve=0.333|1|0.666|0
-  --gradient-heading:                 linear-gradient(
-                                        180deg,
-                                        hsl(208deg 71% 20%) 0%,
-                                        hsl(208deg 71% 19%) 21%,
-                                        hsl(208deg 71% 18%) 30%,
-                                        hsl(208deg 71% 17%) 39%,
-                                        hsl(208deg 71% 16%) 46%,
-                                        hsl(208deg 71% 15%) 54%,
-                                        hsl(208deg 71% 15%) 61%,
-                                        hsl(208deg 71% 14%) 69%,
-                                        hsl(208deg 71% 13%) 79%,
-                                        hsl(208deg 70% 12%) 100%
-                                      ); // https://www.joshwcomeau.com/gradient-generator?colors=0f3557|092034&angle=180&colorMode=hcl&precision=8&easingCurve=0.333|1|0.666|0
-  --gradient-link:                    linear-gradient(
-                                        180deg,
-                                        hsl(350deg 98% 48%) 0%,
-                                        hsl(350deg 98% 47%) 21%,
-                                        hsl(350deg 98% 46%) 30%,
-                                        hsl(350deg 98% 44%) 39%,
-                                        hsl(350deg 98% 43%) 46%,
-                                        hsl(350deg 98% 42%) 54%,
-                                        hsl(350deg 98% 41%) 61%,
-                                        hsl(350deg 98% 40%) 69%,
-                                        hsl(350deg 98% 39%) 79%,
-                                        hsl(350deg 98% 38%) 100%
-                                      ); // https://www.joshwcomeau.com/gradient-generator?colors=f2022a|bf0222&angle=180&colorMode=hcl&precision=8&easingCurve=0.333|1|0.666|0
+  // Gradients - Simplified from verbose 39-line definitions
+  --gradient-footer-background:       linear-gradient(180deg, var(--color-alice-blue), var(--color-alice-blue-darker));
+  --gradient-heading:                 linear-gradient(180deg, var(--color-prussian-blue), var(--color-oxford-blue));
+  --gradient-link:                    linear-gradient(180deg, var(--color-red-cmyk), var(--color-firebrick));
 
   // Font sizes
   --font-x-large: clamp(36px, 10vw, 72px);
@@ -150,7 +114,7 @@
   --avatar-size:         48px;
   --light-icon-size:     0.8rem;
 
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     --column-gap:          2rem;
     --font-x-large:        clamp(36px, 10vw, 108px);
     --font-large:          clamp(36px, 6vw, 72px);
@@ -165,11 +129,11 @@
     --light-icon-size:     1rem;
   }
 
-  @media (min-width: #{$bp-large}) {
+  @include bp-large {
     --picture-outdent: calc((var(--max-width-container) - (var(--content-padding) * 2) - (11 * var(--column-gap)))/12 + var(--column-gap));
   }
 
-  @media (prefers-color-scheme: dark) {
+  @include dark-mode {
     --color-aside-background:           var(--color-rich-black-darker);
     --color-aside-border:               var(--color-oxford-blue);
     --color-aside-text:                 var(--color-alice-blue);
@@ -183,7 +147,7 @@
     --color-heading:                    var(--color-alice-blue);
     --color-list-marker:                var(--color-alice-blue);
     --color-logo:                       var(--color-platinum);
-    --color-nav-background:             rgba(0,0,0,0.5);
+    --color-nav-background:             color-mix(in srgb, black 50%, transparent);
     --color-placeholder:                var(--color-jet);
     --color-selection-background:       var(--color-oxford-blue);
     --color-selection-text:             var(--color-sunglow);
@@ -196,35 +160,11 @@
     --color-text-tertiary:              var(--color-sonic-silver);
     --color-text:                       var(--color-platinum);
 
-    --gradient-footer-background:       linear-gradient(
-                                          180deg,
-                                          hsl(209deg 71% 8%) 0%,
-                                          hsl(208deg 71% 8%) 21%,
-                                          hsl(208deg 71% 7%) 30%,
-                                          hsl(207deg 71% 7%) 39%,
-                                          hsl(206deg 71% 6%) 46%,
-                                          hsl(206deg 72% 6%) 54%,
-                                          hsl(206deg 73% 5%) 61%,
-                                          hsl(205deg 73% 5%) 69%,
-                                          hsl(205deg 72% 4%) 79%,
-                                          hsl(206deg 70% 4%) 100%
-                                        ); // https://www.joshwcomeau.com/gradient-generator?colors=061523|030b11&angle=180&colorMode=hcl&precision=8&easingCurve=0.333|1|0.666|0
-    --gradient-heading:                 linear-gradient(
-                                          180deg,
-                                          hsl(210deg 70% 96%) 0%,
-                                          hsl(210deg 70% 95%) 21%,
-                                          hsl(210deg 70% 94%) 30%,
-                                          hsl(209deg 70% 93%) 39%,
-                                          hsl(209deg 70% 93%) 46%,
-                                          hsl(209deg 70% 92%) 54%,
-                                          hsl(209deg 70% 91%) 61%,
-                                          hsl(208deg 70% 90%) 69%,
-                                          hsl(208deg 70% 89%) 79%,
-                                          hsl(208deg 70% 88%) 100%
-                                        ); // https://www.joshwcomeau.com/gradient-generator?colors=eef5fc|cbe2f6&angle=180&colorMode=hcl&precision=8&easingCurve=0.333|1|0.666|0
+    --gradient-footer-background:       linear-gradient(180deg, var(--color-rich-black), var(--color-rich-black-darker));
+    --gradient-heading:                 linear-gradient(180deg, var(--color-alice-blue), var(--color-columbia-blue));
   }
 
-  @media (prefers-reduced-motion) {
+  @include reduced-motion {
     --transition-duration: 0;
   }
 }

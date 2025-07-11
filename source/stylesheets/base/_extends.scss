@@ -111,9 +111,9 @@
 
   ol,
   ul {
-    margin: 0 1rem;
+    margin-inline: 1rem;
 
-    @media (min-width: #{$bp-medium}) {
+    @include bp-medium {
       margin: 0;
     }
   }
@@ -132,12 +132,12 @@
       content: counter(ol-counter) ".";
       font-family: var(--ibm-plex-mono);
       font-size: var(--font-small);
-      left: -1rem;
+      inset-inline-start: -1rem;
       line-height: var(--line-height-small);
       position: absolute;
 
-      @media (min-width: #{$bp-medium}) {
-        left: -2rem;
+      @include bp-medium {
+        inset-inline-start: -2rem;
       }
     }
   }
@@ -224,7 +224,7 @@
     ol {
       color: var(--color-text-secondary);
       font-style: italic;
-      margin-left: 1.5rem;
+      margin-inline-start: 1.5rem;
     }
 
     i,
@@ -315,7 +315,7 @@
     @supports (initial-letter: 3) {
       & > p:first-of-type::first-letter {
         initial-letter: 3;
-        margin-right: 0.5rem;
+        margin-inline-end: 0.5rem;
       }
     }
   
@@ -327,9 +327,9 @@
         float: left;
         font-size: 85px;
         line-height: 0.8;
-        margin-right: 0.25rem;
+        margin-inline-end: 0.25rem;
   
-        @media (min-width: #{$bp-medium}) {
+        @include bp-medium {
           font-size: 130px;
         }
       }
@@ -342,10 +342,10 @@
       & > p:first-of-type::first-letter {
         float: left;
         font-size: 86px;
-        margin-right: 0.25rem;
+        margin-inline-end: 0.25rem;
         margin-top: 6px;
   
-        @media (min-width: #{$bp-medium}) {
+        @include bp-medium {
           font-size: 130px;
           margin-top: 9px;
         }
@@ -371,8 +371,8 @@
       content: "";
       display: inline-block;
       height: 0.5rem;
-      margin-left: 0.25rem;
-      margin-right: -0.75rem;
+      margin-inline-start: 0.25rem;
+      margin-inline-end: -0.75rem;
       margin-top: -2px;
       vertical-align: middle;
       width: 0.5rem;
@@ -405,7 +405,12 @@
 }
 
 .extend-box-shadow {
-  box-shadow: 0 1px 1px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.05), 0 4px 8px rgba(0,0,0,0.05), 0 8px 16px rgba(0,0,0,0.05), 0 16px 32px rgba(0,0,0,0.05);
+  box-shadow: 
+    0 1px 1px color-mix(in srgb, black 5%, transparent), 
+    0 2px 4px color-mix(in srgb, black 5%, transparent), 
+    0 4px 8px color-mix(in srgb, black 5%, transparent), 
+    0 8px 16px color-mix(in srgb, black 5%, transparent), 
+    0 16px 32px color-mix(in srgb, black 5%, transparent);
 }
 
 .extend-primary-button {

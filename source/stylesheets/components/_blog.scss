@@ -1,9 +1,9 @@
 .blog {
   grid-column: 1 / -1;
-  grid-gap: var(--row-gap) var(--column-gap);
+  gap: var(--row-gap) var(--column-gap);
   width: 100%;
 
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     grid-column: 3 / -3;
   }
 }
@@ -14,7 +14,7 @@
   margin-bottom: var(--padding);
   padding-bottom: var(--padding);
 
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     text-align: center;
 
     .entry__meta {

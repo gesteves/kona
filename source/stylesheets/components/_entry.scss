@@ -41,15 +41,15 @@
     }
   }
 
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     flex-flow: row wrap;
 
     span {
-      margin-right: 0.5rem;
+      margin-inline-end: 0.5rem;
     }
   
     span:last-of-type {
-      margin-right: 0;
+      margin-inline-end: 0;
     }
   }
 }
@@ -91,7 +91,7 @@
 .entry__highlight--live svg {
   animation: 1s blink ease infinite;
 
-  @media (prefers-reduced-motion: reduce) {
+  @include reduced-motion {
     animation: none;
   }
 }
@@ -151,7 +151,7 @@
   overflow-x: scroll;
   margin: 2rem calc(var(--content-padding) * -1);
 
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     margin: 2rem 0;
   }
 
@@ -201,7 +201,7 @@
 .entry--compact {
   grid-column: 1 / -1;
 
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     grid-column: 3 / -3;
   }
 }
@@ -212,7 +212,7 @@
     margin-bottom: var(--padding);
     padding-bottom: var(--padding);
 
-    @media (min-width: #{$bp-medium}) {
+    @include bp-medium {
       text-align: center;
 
       .entry__meta {
@@ -231,7 +231,7 @@
     margin: 0;
 
     @supports (text-box-edge: cap) and (text-box-trim: trim-both) {
-      @media (min-width: #{$bp-medium}) {
+      @include bp-medium {
         margin: 1rem;
       }
     }
@@ -239,7 +239,7 @@
     @supports not ((text-box-edge: cap) or (text-box-trim: trim-both)) {
       padding: 1rem 0;
 
-      @media (min-width: #{$bp-medium}) {
+      @include bp-medium {
         padding-top: 0;
       }
     }
@@ -301,8 +301,8 @@
   align-items: center;
   display: inline-flex;
   justify-items: center;
-  margin-left: -1.5rem;
-  margin-right: 0.5rem;
+  margin-inline-start: -1.5rem;
+  margin-inline-end: 0.5rem;
 
   svg {
     display: block;

@@ -1,14 +1,14 @@
 .home {
   display: grid;
   grid-column: 1 / -1;
-  grid-gap: var(--row-gap) var(--column-gap);
+  gap: var(--row-gap) var(--column-gap);
   grid-template-columns: subgrid;
 }
 
 .home__intro {
   display: grid;
   grid-column: 1 / -1;
-  grid-gap: 0 var(--column-gap);
+  gap: 0 var(--column-gap);
   grid-template-columns: subgrid;
 }
 
@@ -20,7 +20,7 @@
   line-height: var(--line-height-x-large);
   margin: 0 0 -1rem 0;
 
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     grid-column: 2 / -2;
   }
 }
@@ -29,7 +29,7 @@
   @extend .extend-body-styles;
   grid-column: 1 / -1;
 
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     grid-column: 3 / -2;
   }
 }
@@ -54,11 +54,11 @@
     border-radius: 100%;
   }
 
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     margin-right: calc(-1 * ((((100vw - (2 * var(--content-padding)) - (11 * var(--column-gap)))/12)) + var(--column-gap)));
   }
 
-  @media (min-width: #{$bp-large}) {
+  @include bp-large {
     margin-right: calc(-1 * ((((var(--max-width-container) - (2 * var(--content-padding)) - (11 * var(--column-gap)))/12)) + var(--column-gap)));
     width: calc((((var(--max-width-container) - (2 * var(--content-padding)) - (11 * var(--column-gap)))/12) * 5) + (4 * var(--column-gap)));
   }
@@ -75,7 +75,7 @@
 .home__entries-articles {
   grid-column: span 12;
 
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     grid-column: span 6;
   }
 }
@@ -83,7 +83,7 @@
 .home__entries-races {
   grid-column: span 12;
 
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     grid-column: span 4;
   }
 }

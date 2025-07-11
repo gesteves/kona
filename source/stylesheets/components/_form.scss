@@ -29,6 +29,16 @@
     font-style: normal;
     font-weight: 300;
     line-height: var(--line-height-medium);
+    
+    &:focus-visible {
+      border-color: var(--color-link);
+      outline: 2px solid var(--color-link);
+      outline-offset: 2px;
+    }
+    
+    &:focus:not(:focus-visible) {
+      outline: none;
+    }
   }
   
   textarea {

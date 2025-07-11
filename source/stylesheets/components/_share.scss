@@ -2,7 +2,7 @@
   grid-column: 1 / -1;
   position: relative;
 
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     grid-column: 3 / -3;
   }
 }
@@ -36,7 +36,7 @@
   margin: 0 0.25rem 0 0;
   padding: 0.5rem;
 
-  @media (min-width: #{$bp-medium}) {
+  @include bp-medium {
     padding: 1rem;
   }
 
