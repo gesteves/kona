@@ -35,6 +35,13 @@ module EventsHelpers
     event_date.to_date >= current_time.to_date && event_date.to_date <= 10.days.from_now.to_date
   end
 
+  # Determines if the event is the next one.
+  # @param event [Event] The event to check.
+  # @return [Boolean] True if the event is the next one; false otherwise.
+  def is_next?(event)
+    event == upcoming_races.first
+  end
+
   # Determines if the event has a weather forecast for the event date.
   # @param event [Event] The event to check.
   # @return [Boolean] True if the event has weather data; false otherwise.
