@@ -1,6 +1,6 @@
 .blog {
   grid-column: 1 / -1;
-  grid-gap: var(--row-gap) var(--column-gap);
+  gap: var(--row-gap) var(--column-gap);
   width: 100%;
 
   @include bp-medium {

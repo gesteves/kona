@@ -50,7 +50,7 @@
 .footer__wrapper {
   box-sizing: border-box;
   display: grid;
-  grid-gap: 1rem var(--column-gap);
+  gap: 1rem var(--column-gap);
   grid-template-columns: repeat(12, 1fr);
   max-width: var(--max-width-container);
   padding: var(--content-padding);

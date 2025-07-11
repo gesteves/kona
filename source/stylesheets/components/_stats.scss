@@ -3,7 +3,7 @@
   display: grid;
   grid-column: 1 / -1;
   grid-column: 1 / -1;
-  grid-gap: var(--row-gap) var(--column-gap);
+  gap: var(--row-gap) var(--column-gap);
   grid-template-columns: subgrid;
   padding: var(--padding) 0 0 0;
 }
