@@ -97,6 +97,17 @@ icons:
       - temperature-sun
       - tornado
       - wind
+      - temperature-low
+      - temperature-high
+      - raindrops
+      - windsock
+      - wind
+      - droplet-percent
+      - smog
+      - sunrise
+      - sunset
+      - mountains
+      - leaf
     thin:
       - bolt-lightning
       - cloud-bolt

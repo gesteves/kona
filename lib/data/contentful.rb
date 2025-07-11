@@ -354,6 +354,7 @@ class Contentful
   def process_events
     @content[:events].map! do |event|
       process_event_weather(event)
+      event[:entry_type] = 'Event'
       event
     end
   end

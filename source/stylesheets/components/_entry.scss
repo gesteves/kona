@@ -1,3 +1,12 @@
+.entry {
+  display: grid;
+  grid-template-columns: subgrid;
+
+  & > * {
+    grid-column: 1 / -1;
+  }
+}
+
 .entry__header {
   @extend .extend-entry-header;
 }
@@ -43,14 +52,7 @@
 
   @include bp-medium {
     flex-flow: row wrap;
-
-    span {
-      margin-inline-end: 0.5rem;
-    }
-  
-    span:last-of-type {
-      margin-inline-end: 0;
-    }
+    gap: 0 0.5rem;
   }
 }
 

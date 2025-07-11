@@ -1,0 +1,33 @@
+
+.event__weather {
+  color: var(--color-text-secondary);
+  display: flex;
+  flex-flow: column;
+  gap: 0 0.5rem;
+  font-family: var(--ibm-plex-mono);
+  font-size: var(--font-x-small);
+  line-height: var(--line-height-x-small);
+  text-box-edge: text;
+  text-box-trim: trim-both;
+  text-transform: uppercase;
+
+  svg {
+    display: inline-block;
+    height: var(--light-icon-size);
+    vertical-align: text-bottom;
+    width: var(--light-icon-size);
+
+    g,
+    path {
+      fill: var(--color-text-tertiary);
+    }
+  }
+
+  @include bp-medium {
+    flex-flow: row wrap;
+  }
+}
+
+.event__weather-heading {
+  color: var(--color-text-secondary);
+}

@@ -1,18 +1,48 @@
-<p class="event__weather entry__meta">
-  <span class="event__weather-condition">
-    <%= icon_svg("classic", "light", weather_icon(event.weather.condition_code)) %>
-    <%= format_condition(event.weather.condition_code) %>
-  </span>
-  <span><%= format_temperature(event.weather.temperature_min) %></span>
-  <span><%= format_temperature(event.weather.temperature_max) %></span>
-  <span><%= number_to_percentage(event.weather.precipitation_chance * 100, precision: 0) %></span>
-  <span><%= format_wind_speed([event.weather.wind_speed.to_f, event.weather.wind_speed_max.to_f].max) %> <%= wind_direction(event.weather.wind_direction, true) %></span>
-  <% if show_gusts?(event.weather.wind_speed, event.weather.wind_gust_speed_max) %>
-    <span><%= format_wind_speed(event.weather.wind_gust_speed_max) %></span>
-  <% end %>
-  <span><%= number_to_percentage(event.weather.humidity * 100, precision: 0) %></span>
-  <span><%= event.weather.aqi %> (<%= event.weather.aqi_condition %>)</span>
-  <span><%= Time.parse(event.weather.sunrise).in_time_zone(event.time_zone).strftime("%I:%M %p").gsub(/(am|pm)/i, "<abbr>\\1</abbr>") %></span>
-  <span><%= Time.parse(event.weather.sunset).in_time_zone(event.time_zone).strftime("%I:%M %p").gsub(/(am|pm)/i, "<abbr>\\1</abbr>") %></span>
-  <span><%= format_elevation(event.elevation, true) %></span>
-</p>
+<section class="event__weather">
+  <h5 class="event__weather-heading">Race Day Forecast</h5>
+  <div class="event__weather-stat-group">
+    <span class="event__weather-stat" aria-label="Conditions" title="Conditions"> <%= icon_svg("classic", "light", weather_icon(event.weather.condition_code)) %> <%= format_condition(event.weather.condition_code) %></span>
+  </div>
+  <div class="event__weather-stat-group">
+    <% if event.weather.temperature_min.present? %>
+      <span class="event__weather-stat" aria-label="Low" title="Low"> <%= icon_svg("classic", "light", "temperature-low") %> <%= format_temperature(event.weather.temperature_min) %></span>
+    <% end %>
+    <% if event.weather.temperature_max.present? %>
+      <span class="event__weather-stat" aria-label="High" title="High"> <%= icon_svg("classic", "light", "temperature-high") %> <%= format_temperature(event.weather.temperature_max) %></span>
+    <% end %>
+  </div>
+  <div class="event__weather-stat-group">
+    <% if event.weather.humidity.present? %>
+      <span class="event__weather-stat" aria-label="Humidity" title="Humidity"> <%= icon_svg("classic", "light", "droplet-percent") %> <%= number_to_percentage(event.weather.humidity * 100, precision: 0) %></span>
+    <% end %>
+    <% if event.weather.precipitation_chance.present? %>
+      <span class="event__weather-stat" aria-label="Chance of precipitation" title="Chance of precipitation"> <%= icon_svg("classic", "light", "raindrops") %> <%= number_to_percentage(event.weather.precipitation_chance * 100, precision: 0) %></span>
+    <% end %>
+  </div>
+  <div class="event__weather-stat-group">
+    <% if event.weather.wind_speed.present? && event.weather.wind_speed_max.present? && event.weather.wind_direction.present? %>
+      <span class="event__weather-stat" aria-label="Wind speed" title="Wind speed"> <%= icon_svg("classic", "light", "windsock") %> <%= format_wind_speed([event.weather.wind_speed.to_f, event.weather.wind_speed_max.to_f].max) %> <%= wind_direction(event.weather.wind_direction, true) %></span>
+    <% end %>
+    <% if show_gusts?(event.weather.wind_speed, event.weather.wind_gust_speed_max) %>
+      <span class="event__weather-stat" aria-label="Wind gusts" title="Wind gusts"> <%= icon_svg("classic", "light", "wind") %> <%= format_wind_speed(event.weather.wind_gust_speed_max) %></span>
+    <% end %>
+  </div>
+  <div class="event__weather-stat-group">
+    <% if event.weather.aqi.present? && event.weather.aqi_condition.present? %>
+      <span class="event__weather-stat" aria-label="Air Quality Index" title="Air Quality Index"> <%= icon_svg("classic", "light", "smog") %> <abbr title="Air Quality Index">AQI</abbr> <%= event.weather.aqi %></span>
+    <% end %>
+  </div>
+  <div class="event__weather-stat-group">
+    <% if event.weather.sunrise.present? && event.time_zone.present? %>
+      <span class="event__weather-stat" aria-label="Sunrise" title="Sunrise"> <%= icon_svg("classic", "light", "sunrise") %> <%= Time.parse(event.weather.sunrise).in_time_zone(event.time_zone).strftime("%I:%M %p").gsub(/(am|pm)/i, "<abbr>\\1</abbr>") %></span>
+    <% end %>
+    <% if event.weather.sunset.present? && event.time_zone.present? %>
+      <span class="event__weather-stat" aria-label="Sunset" title="Sunset"> <%= icon_svg("classic", "light", "sunset") %> <%= Time.parse(event.weather.sunset).in_time_zone(event.time_zone).strftime("%I:%M %p").gsub(/(am|pm)/i, "<abbr>\\1</abbr>") %></span>
+    <% end %>
+  </div>
+  <div class="event__weather-stat-group">
+    <% if event.elevation.present? %>
+      <span class="event__weather-stat" aria-label="Elevation" title="Elevation"> <%= icon_svg("classic", "light", "mountains") %> <%= format_elevation(event.elevation, true) %></span>
+    <% end %>
+  </div>
+</section>
