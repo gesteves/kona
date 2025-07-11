@@ -3,6 +3,7 @@ Blizzard:
   phrases:
     currently: there's a blizzard
     forecast: calls for blizzard conditions
+    simplified: Blizzard
   icon: snow-blowing
 
 BlowingDust:
@@ -10,6 +11,7 @@ BlowingDust:
   phrases:
     currently: there's blowing dust
     forecast: calls for blowing dust
+    simplified: Blowing dust
   icon: sun-dust
 
 BlowingSnow:
@@ -17,6 +19,7 @@ BlowingSnow:
   phrases:
     currently: there's blowing snow
     forecast: calls for blowing snow
+    simplified: Blowing snow
   icon: snow-blowing
 
 Breezy:
@@ -24,6 +27,7 @@ Breezy:
   phrases:
     currently: it's breezy
     forecast: is breezy
+    simplified: Breezy
   icon: wind
 
 Clear:
@@ -31,6 +35,7 @@ Clear:
   phrases:
     currently: it's clear
     forecast: is clear
+    simplified: Clear
   icon:
     day: sun
     night: moon-stars
@@ -40,6 +45,7 @@ Cloudy:
   phrases:
     currently: it's cloudy
     forecast: is cloudy
+    simplified: Cloudy
   icon: clouds
 
 Drizzle:
@@ -47,6 +53,7 @@ Drizzle:
   phrases:
     currently: it's raining lightly
     forecast: calls for light rain
+    simplified: Drizzle
   icon: cloud-drizzle
 
 Dust:
@@ -54,6 +61,7 @@ Dust:
   phrases:
     currently: it's dusty
     forecast: calls for dusty conditions
+    simplified: Dust
   icon: sun-dust
 
 Flurries:
@@ -61,6 +69,7 @@ Flurries:
   phrases:
     currently: there are flurries
     forecast: calls for flurries
+    simplified: Flurries
   icon: cloud-snow
 
 Fog:
@@ -68,6 +77,7 @@ Fog:
   phrases:
     currently: it's foggy
     forecast: is foggy
+    simplified: Fog
   icon: cloud-fog
 
 FreezingDrizzle:
@@ -75,6 +85,7 @@ FreezingDrizzle:
   phrases:
     currently: there's a freezing drizzle
     forecast: calls for freezing drizzle
+    simplified: Freezing drizzle
   icon: cloud-hail-mixed
 
 FreezingRain:
@@ -82,6 +93,7 @@ FreezingRain:
   phrases:
     currently: there's freezing rain
     forecast: calls for freezing rain
+    simplified: Freezing rain
   icon: cloud-sleet
 
 Frigid:
@@ -89,6 +101,7 @@ Frigid:
   phrases:
     currently: it's frigid outside
     forecast: is extremely cold
+    simplified: Frigid
   icon: temperature-snow
 
 Hail:
@@ -96,6 +109,7 @@ Hail:
   phrases:
     currently: it's hailing
     forecast: calls for hail
+    simplified: Hail
   icon: cloud-hail
 
 Haze:
@@ -103,6 +117,7 @@ Haze:
   phrases:
     currently: it's hazy
     forecast: is hazy
+    simplified: Haze
   icon: cloud-fog
 
 HeavyRain:
@@ -110,6 +125,7 @@ HeavyRain:
   phrases:
     currently: it's raining heavily
     forecast: calls for heavy rain
+    simplified: Heavy rain
   icon: cloud-showers-heavy
 
 HeavySnow:
@@ -117,6 +133,7 @@ HeavySnow:
   phrases:
     currently: it's snowing heavily
     forecast: calls for heavy snow
+    simplified: Heavy snow
   icon: snowflakes
 
 IsolatedThunderstorms:
@@ -124,6 +141,7 @@ IsolatedThunderstorms:
   phrases:
     currently: there are isolated thunderstorms
     forecast: calls for isolated thunderstorms
+    simplified: Isolated thunderstorms
   icon: cloud-bolt
 
 MixedRainAndSleet:
@@ -131,6 +149,7 @@ MixedRainAndSleet:
   phrases:
     currently: there's a mix of rain and sleet
     forecast: calls for mixed rain and sleet
+    simplified: Mixed rain and sleet
   icon: cloud-sleet
 
 MixedRainAndSnow:
@@ -138,6 +157,7 @@ MixedRainAndSnow:
   phrases:
     currently: there's a mix of rain and snow
     forecast: calls for mixed rain and snow
+    simplified: Mixed rain and snow
   icon: cloud-sleet
 
 MixedRainfall:
@@ -145,6 +165,7 @@ MixedRainfall:
   phrases:
     currently: there's mixed rainfall
     forecast: calls for mixed rainfall
+    simplified: Mixed rainfall
   icon: cloud-sleet
 
 MixedSnowAndSleet:
@@ -152,6 +173,7 @@ MixedSnowAndSleet:
   phrases:
     currently: there's a mix of snow and sleet
     forecast: calls for mixed snow and sleet
+    simplified: Mixed snow and sleet
   icon: cloud-hail-mixed
 
 MostlyClear:
@@ -159,6 +181,7 @@ MostlyClear:
   phrases:
     currently: it's mostly clear
     forecast: is mostly clear
+    simplified: Mostly clear
   icon:
     day: sun-cloud
     night: moon-cloud
@@ -168,6 +191,7 @@ MostlyCloudy:
   phrases:
     currently: it's mostly cloudy
     forecast: is mostly cloudy
+    simplified: Mostly cloudy
   icon:
     day: clouds-sun
     night: clouds-moon
@@ -177,6 +201,7 @@ PartlyCloudy:
   phrases:
     currently: it's partly cloudy
     forecast: is partly cloudy
+    simplified: Partly cloudy
   icon:
     day: clouds-sun
     night: clouds-moon
@@ -186,6 +211,7 @@ Rain:
   phrases:
     currently: it's raining
     forecast: calls for rain
+    simplified: Rain
   icon: cloud-rain
 
 ScatteredShowers:
@@ -193,6 +219,7 @@ ScatteredShowers:
   phrases:
     currently: there are scattered showers
     forecast: calls for scattered showers
+    simplified: Scattered showers
   icon: cloud-showers
 
 ScatteredSnowShowers:
@@ -200,6 +227,7 @@ ScatteredSnowShowers:
   phrases:
     currently: there are scattered snow showers
     forecast: calls for scattered snow showers
+    simplified: Scattered snow showers
   icon: cloud-snow
 
 SevereThunderstorm:
@@ -207,6 +235,7 @@ SevereThunderstorm:
   phrases:
     currently: there's a severe thunderstorm
     forecast: calls for severe thunderstorms
+    simplified: Severe thunderstorm
   icon: bolt-lightning
 
 Sleet:
@@ -214,6 +243,7 @@ Sleet:
   phrases:
     currently: it's sleeting
     forecast: calls for sleet
+    simplified: Sleet
   icon: cloud-snow
 
 Smoke:
@@ -221,6 +251,7 @@ Smoke:
   phrases:
     currently: it's smoky
     forecast: calls for smoky conditions
+    simplified: Smoke
   icon: fire-smoke
 
 Snow:
@@ -228,6 +259,7 @@ Snow:
   phrases:
     currently: it's snowing
     forecast: calls for snow
+    simplified: Snow
   icon: snowflake
 
 SnowShowers:
@@ -235,6 +267,7 @@ SnowShowers:
   phrases:
     currently: there are snow showers
     forecast: calls for snow showers
+    simplified: Snow showers
   icon: cloud-hail-mixed
 
 SunFlurries:
@@ -242,6 +275,7 @@ SunFlurries:
   phrases:
     currently: it's sunny with snow flurries
     forecast: calls for sun and snow flurries
+    simplified: Sun flurries
   icon: cloud-snow
 
 SunShowers:
@@ -249,6 +283,7 @@ SunShowers:
   phrases:
     currently: it's sunny and raining
     forecast: calls for sun and rain
+    simplified: Sun showers
   icon: cloud-sun-rain
 
 Thunderstorms:
@@ -256,6 +291,7 @@ Thunderstorms:
   phrases:
     currently: there are thunderstorms
     forecast: calls for thunderstorms
+    simplified: Thunderstorms
   icon: cloud-bolt
 
 Tornado:
@@ -263,6 +299,7 @@ Tornado:
   phrases:
     currently: there's a tornado
     forecast: calls for tornado conditions
+    simplified: Tornado
   icon: tornado
 
 TropicalStorm:
@@ -270,6 +307,7 @@ TropicalStorm:
   phrases:
     currently: there's a tropical storm
     forecast: calls for a tropical storm
+    simplified: Tropical storm
   icon: hurricane
 
 Windy:
@@ -277,4 +315,5 @@ Windy:
   phrases:
     currently: it's windy
     forecast: calls for windy conditions
+    simplified: Windy
   icon: wind
