@@ -498,12 +498,19 @@ module WeatherHelpers
 
   # Determines the weather icon to display based on current weather conditions.
   # @param condition_code [String] The condition code to use for the icon.
+  # @param variant [Symbol] The variant of the icon to display.
   # @return [String] The name of the weather icon to display.
-  def weather_icon(condition_code = current_weather.condition_code)
+  def weather_icon(condition_code = current_weather.condition_code, variant = :auto)
     condition = data.conditions[condition_code]
     return 'cloud-question' if condition.blank?
     return condition[:icon] if condition[:icon].is_a?(String)
-    is_daytime? ? condition[:icon][:day] : condition[:icon][:night]
+    if variant == :auto
+      is_daytime? ? condition[:icon][:day] : condition[:icon][:night]
+    elsif variant == :day
+      condition[:icon][:day]
+    elsif variant == :night
+      condition[:icon][:night]
+    end
   end
 
   # Returns an array of the weather alerts, sorted by precedence.
