@@ -3,7 +3,7 @@
     grid-column: 1 / -1;
 
     @include bp-medium {
-      grid-column: span 7;
+      grid-column: span 8;
     }
   }
 }
@@ -30,7 +30,7 @@
   }
 
   @include bp-medium {
-    grid-column: span 5;
+    grid-column: span 4;
   }
 }
 
