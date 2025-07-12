@@ -34,7 +34,7 @@
     line-height: var(--line-height-large);
   }
 
-  @include bp-large {
+  @include bp-x-large {
     font-size: var(--font-x-large);
     line-height: var(--line-height-x-large);
   }

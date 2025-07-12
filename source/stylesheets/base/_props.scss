@@ -129,7 +129,7 @@
     --light-icon-size:     1rem;
   }
 
-  @include bp-large {
+  @include bp-x-large {
     --picture-outdent: calc((var(--max-width-container) - (var(--content-padding) * 2) - (11 * var(--column-gap)))/12 + var(--column-gap));
   }
 

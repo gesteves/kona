@@ -19,6 +19,12 @@
   }
 }
 
+@mixin bp-x-large {
+  @media (min-width: #{$bp-x-large}) {
+    @content;
+  }
+}
+
 @mixin bp-social {
   @media (min-width: #{$bp-social}) {
     @content;

@@ -58,7 +58,7 @@
     margin-right: calc(-1 * ((((100vw - (2 * var(--content-padding)) - (11 * var(--column-gap)))/12)) + var(--column-gap)));
   }
 
-  @include bp-large {
+  @include bp-x-large {
     margin-right: calc(-1 * ((((var(--max-width-container) - (2 * var(--content-padding)) - (11 * var(--column-gap)))/12)) + var(--column-gap)));
     width: calc((((var(--max-width-container) - (2 * var(--content-padding)) - (11 * var(--column-gap)))/12) * 5) + (4 * var(--column-gap)));
   }
