@@ -40,8 +40,13 @@
           <%= icon_svg("classic", "light", wind_direction_icon(event.weather.daytime_forecast.wind_direction)) %>
           <span class="sr-only">Wind:</span> <%= format_wind_speed(event.weather.daytime_forecast.wind_speed) %>
           <span class="sr-only"><%= wind_direction(event.weather.daytime_forecast.wind_direction) %></span>
-          <% if show_gusts?(event.weather.daytime_forecast.wind_speed, event.weather.daytime_forecast.wind_gust_speed_max) %>, with <%= format_wind_speed(event.weather.daytime_forecast.wind_gust_speed_max) %> gusts<% end %>
         </span>
+        <% if show_gusts?(event.weather.daytime_forecast.wind_speed, event.weather.daytime_forecast.wind_gust_speed_max) %>
+          <span class="event__weather-stat" title="Gusts">
+            <%= icon_svg("classic", "light", "wind") %>
+            <span class="sr-only">Gusts:</span> <%= format_wind_speed(event.weather.daytime_forecast.wind_gust_speed_max) %>
+          </span>
+        <% end %>
       </div>
     <% end %>
     <% if event.weather.aqi.present? || event.weather.pollen_category.present? %>
