@@ -47,10 +47,10 @@
     <% if event.weather.aqi.present? || event.weather.pollen_category.present? %>
       <div class="event__weather-stat-group">
         <% if event.weather.aqi.present? && event.weather.aqi_condition.present? %>
-          <span class="event__weather-stat" title="Air Quality Index"><span class="sr-only">Air Quality Index:</span> <%= icon_svg("classic", "light", "smog") %> <abbr title="Air Quality Index">AQI</abbr> <%= event.weather.aqi %></span>
+          <span class="event__weather-stat"><%= icon_svg("classic", "light", "smog") %> <abbr title="Air Quality Index">AQI</abbr> <%= event.weather.aqi %></span>
         <% end %>
         <% if event.weather.pollen_category.present? %>
-          <span class="event__weather-stat"><%= icon_svg("classic", "light", "leaf") %> <%= event.weather.pollen_category %> Pollen</span>
+          <span class="event__weather-stat"><%= icon_svg("classic", "light", "leaf") %> <%= event.weather.pollen_category %> pollen</span>
         <% end %>
       </div>
     <% end %>
