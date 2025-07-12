@@ -3,7 +3,7 @@
     grid-column: 1 / -1;
 
     @include bp-medium {
-      grid-column: span 8;
+      grid-column: span 7;
     }
   }
 }
@@ -32,7 +32,7 @@
   }
 
   @include bp-medium {
-    grid-column: span 4;
+    grid-column: span 5;
     margin: 0;
   }
 }
@@ -62,4 +62,8 @@
 
 .event__weather-stat {
   white-space: nowrap;
+
+  abbr {
+    text-decoration: none;
+  }
 }

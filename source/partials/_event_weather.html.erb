@@ -1,5 +1,5 @@
 <section class="event__weather" aria-labelledby="weather-hed-<%= event.sys.id.parameterize %>">
-  <h5 class="event__weather-heading" id="weather-hed-<%= event.sys.id.parameterize %>"><% if is_today?(event) %>Today’s Weather<% else %>Race Day Forecast<% end %></h5>
+  <h5 class="event__weather-heading" id="weather-hed-<%= event.sys.id.parameterize %>"><% if is_today?(event) %>Today’s Weather<% else %>Race Day Weather<% end %></h5>
   <div class="event__weather-stats">
     <div class="event__weather-stat-group">
       <span class="event__weather-stat"><span class="sr-only">Conditions:</span> <%= icon_svg("classic", "light", weather_icon(event.weather.condition_code)) %> <%= format_condition(event.weather.condition_code) %></span>
@@ -65,7 +65,7 @@
     <% if event.elevation.present? %>
       <div class="event__weather-stat-group">
         <span class="event__weather-stat" title="Elevation"><span class="sr-only">Elevation:</span> <%= icon_svg("classic", "light", "mountains") %> <%= format_elevation(event.elevation, true) %></span>
-        </div>
+      </div>
     <% end %>
   </div>
 </section>
