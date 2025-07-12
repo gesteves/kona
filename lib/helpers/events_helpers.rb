@@ -3,6 +3,7 @@ module EventsHelpers
   # @param event [Event] The event to check.
   # @return [Boolean] Returns true if the given event is today; false otherwise.
   def is_today?(event)
+    return false if event.blank?
     event_date = Time.parse(event.date).in_time_zone(location_time_zone)
     event_date.to_date == current_time.to_date
   end
@@ -33,6 +34,7 @@ module EventsHelpers
   # @param event [Event] The event to check.
   # @return [Boolean] True if the event is happening in the next 10 days; false otherwise.
   def is_close?(event)
+    return false if event.blank?
     event_date = Time.parse(event.date).in_time_zone(location_time_zone)
     event_date.to_date >= current_time.to_date && event_date.to_date <= 10.days.from_now.to_date
   end
@@ -41,6 +43,7 @@ module EventsHelpers
   # @param event [Event] The event to check.
   # @return [Boolean] True if the event is the next one; false otherwise.
   def is_next?(event)
+    return false if event.blank?
     event == upcoming_races.first
   end
 
@@ -48,6 +51,7 @@ module EventsHelpers
   # @param event [Event] The event to check.
   # @return [Boolean] True if the event has weather data; false otherwise.
   def has_weather_data?(event)
+    return false if event.blank?
     event.weather.present?
   end
 
@@ -55,6 +59,7 @@ module EventsHelpers
   # @param event [Event] The event to check.
   # @return [Boolean] True if the event is featured; false otherwise.
   def is_featured?(event)
+    return false if event.blank?
     is_close?(event) && is_next?(event) && has_weather_data?(event)
   end
 
@@ -62,6 +67,7 @@ module EventsHelpers
   # @param event [Object] The event object to check.
   # @return [Boolean] True if the event occurs today, is during daytime, and is confirmed.
   def is_in_progress?(event)
+    return false if event.blank?
     is_daytime? && is_today?(event) && event.going
   end
 
@@ -69,6 +75,7 @@ module EventsHelpers
   # @param event [Object] The event object to check.
   # @return [Boolean] True if the event is in progress and has a tracking URL, otherwise false.
   def is_trackable?(event)
+    return false if event.blank?
     is_in_progress?(event) && event.tracking_url.present?
   end
 
