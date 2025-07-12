@@ -418,22 +418,7 @@ class Contentful
 
     return unless event_forecast.present?
 
-    daytime_forecast = event_forecast[:daytimeForecast]
-    event[:weather] = {
-      cloud_cover: daytime_forecast[:cloudCover],
-      humidity: daytime_forecast[:humidity],
-      precipitation_chance: daytime_forecast[:precipitationChance],
-      precipitation_type: daytime_forecast[:precipitationType],
-      temperature_max: daytime_forecast[:temperatureMax],
-      temperature_min: daytime_forecast[:temperatureMin],
-      wind_direction: daytime_forecast[:windDirection],
-      wind_speed: daytime_forecast[:windSpeed],
-      wind_speed_max: daytime_forecast[:windSpeedMax],
-      wind_gust_speed_max: daytime_forecast[:windGustSpeedMax],
-      condition_code: daytime_forecast[:conditionCode],
-      sunrise: event_forecast[:sunrise],
-      sunset: event_forecast[:sunset]
-    }
+    event[:weather] = event_forecast.deep_transform_keys { |k| k.to_s.underscore.to_sym }
   end
 
   # Adds AQI data to an event
