@@ -109,6 +109,14 @@ icons:
       - sunset
       - mountains
       - leaf
+      - arrow-up
+      - arrow-down
+      - arrow-up-right
+      - arrow-down-right
+      - arrow-up-left
+      - arrow-down-left
+      - arrow-left
+      - arrow-right
     thin:
       - bolt-lightning
       - cloud-bolt

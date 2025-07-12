@@ -37,8 +37,10 @@
     <% if event.weather.wind_speed.present? && event.weather.wind_direction.present? %>
       <div class="event__weather-stat-group">
         <span class="event__weather-stat" title="Wind speed">
-          <%= icon_svg("classic", "light", "wind") %><span class="sr-only">Wind speed:</span> <%= format_wind_speed(event.weather.wind_speed) %>
-          <abbr title="<%= wind_direction(event.weather.wind_direction) %>"><%= wind_direction(event.weather.wind_direction, true) %></abbr><% if show_gusts?(event.weather.wind_speed, event.weather.wind_gust_speed_max) %> with <%= format_wind_speed(event.weather.wind_gust_speed_max) %> gusts<% end %>
+          <%= icon_svg("classic", "light", wind_direction_icon(event.weather.wind_direction)) %>
+          <span class="sr-only">Wind:</span> <%= format_wind_speed(event.weather.wind_speed) %>
+          <span class="sr-only"><%= wind_direction(event.weather.wind_direction) %></span>
+          <% if show_gusts?(event.weather.wind_speed, event.weather.wind_gust_speed_max) %>, with <%= format_wind_speed(event.weather.wind_gust_speed_max) %> gusts<% end %>
         </span>
       </div>
     <% end %>
