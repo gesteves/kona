@@ -77,7 +77,6 @@ module EventsHelpers
   # @return [String] The HTML-safe SVG icon representing the event's current status.
   def event_icon_svg(event)
     return icon_svg("classic", "light",   "calendar-xmark") if !event.going
-    return icon_svg("classic", "light",   "calendar-star")  if is_trackable?(event)
     return icon_svg("classic", "regular", "calendar-star")  if is_in_progress?(event)
     return icon_svg("classic", "light",   "calendar-star")  if is_today?(event) && event.going
     return icon_svg("classic", "light",   "calendar-check") if event.going
@@ -95,22 +94,12 @@ module EventsHelpers
     end
   end
 
-  # Generates an HTML span tag with the event's tracking link.
-  # @param event [Object] The event object to render.
-  # @return [String] An HTML-safe string with the event's tracking link.
-  def event_tracking_tag(event)
-    return "" unless is_trackable?(event)
-    content_tag :span, class: "entry__highlight entry__highlight--live" do
-      "#{icon_svg("classic", "solid", "circle-small")} #{content_tag(:a, "Live results", href: event.tracking_url, rel: "noopener", target: "_blank")}"
-    end
-  end
-
   # Generates an HTML span tag with the event's icon and timestamp.
   # @param event [Object] The event object to render.
   # @return [String] An HTML-safe string with the event's icon and formatted timestamp.
   def event_timestamp_tag(event)
     options = {}
-    options[:class] = "entry__highlight" if is_in_progress?(event) && !is_trackable?(event)
+    options[:class] = "entry__highlight" if is_in_progress?(event)
     content_tag :span, options do
       "#{event_icon_svg(event)} #{event_timestamp(event)}"
     end

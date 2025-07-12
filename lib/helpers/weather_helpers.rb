@@ -341,6 +341,7 @@ module WeatherHelpers
     summary << precipitation
     summary << sunrise_or_sunset
     summary << activities
+    summary << live_tracking
     markdown_to_html(summary.reject(&:blank?).map { |t| "<span>#{t}</span>" }.join(' '))
   end
 
@@ -353,7 +354,10 @@ module WeatherHelpers
   # Formats my current location.
   # @return [String] A Markdown-formatted string indicating my current location.
   def current_location
-    "I'm currently in **#{format_location}**"
+    location = "I'm currently in **#{format_location}**"
+    the = todays_race&.title&.downcase&.start_with?("ironman") ? "" : "the"
+    location << ", racing #{the} **#{todays_race.title}**" if is_race_day? && !is_evening?
+    location
   end
 
   def elevation
@@ -524,5 +528,14 @@ module WeatherHelpers
                                     .map { |token, grouped_alerts| grouped_alerts.min_by { |alert| alert.precedence } }
     # Sort the remaining alerts by precedence
     alerts.sort_by { |alert| alert.precedence }
+  end
+
+  # Generates a live tracking link.
+  # @return [String] A string containing the live tracking link.
+  def live_tracking
+    return unless is_trackable?(todays_race)
+    content_tag :span, class: "weather__highlight weather__highlight--live" do
+      "#{content_tag(:a, "Live results", href: todays_race.tracking_url, rel: "noopener", target: "_blank")} #{icon_svg("classic", "solid", "circle-small")}"
+    end
   end
 end

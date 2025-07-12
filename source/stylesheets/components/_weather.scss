@@ -97,3 +97,63 @@
     width: 1rem;
   }
 }
+
+.weather__highlight {
+  color: var(--color-firebrick);
+  display: inline-flex;
+  flex-flow: row nowrap;
+  font-weight: 600;
+  gap: .25rem;
+  white-space: nowrap;
+
+  a {
+    &:link,
+    &:visited {
+      color: currentColor;
+      text-decoration: none;
+    }
+  
+    &:hover,
+    &:active {
+      color: currentColor;
+      text-decoration: underline;
+    }
+
+    &:focus {
+      text-decoration: none;
+    }
+  }
+
+  &::after {
+    font-weight: normal;
+  }
+
+  svg {
+    align-self: center;
+    display: inline-block;
+    height: .8rem;
+    width: .8rem;
+
+    g,
+    path {
+      fill: var(--color-firebrick);
+    }
+  }
+}
+
+.weather__highlight--live svg {
+  animation: 1s blink ease infinite;
+
+  @include reduced-motion {
+    animation: none;
+  }
+}
+
+@keyframes blink {
+  from, to {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}

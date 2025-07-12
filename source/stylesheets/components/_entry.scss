@@ -90,23 +90,6 @@
   }
 }
 
-.entry__highlight--live svg {
-  animation: 1s blink ease infinite;
-
-  @include reduced-motion {
-    animation: none;
-  }
-}
-
-@keyframes blink {
-  from, to {
-    opacity: 0;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
 .entry__body {
   @extend .extend-body-styles;
   
