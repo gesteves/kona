@@ -3,6 +3,7 @@ require 'active_support/all'
 
 # The GoogleAirQuality class interfaces with the Google Air Quality API to fetch the AQI for a location.
 class GoogleAirQuality
+  attr_reader :aqi
   GOOGLE_AQI_API_URL = 'https://airquality.googleapis.com/v1'
 
   # Initializes the GoogleAirQuality class with geographical coordinates.

@@ -375,7 +375,7 @@ class Contentful
     maps = GoogleMaps.new(lat, lon)
     time_zone = maps.time_zone_id
     country_code = maps.country_code
-    elevation = maps.instance_variable_get(:@location)&.dig(:elevation)
+    elevation = maps.location&.dig(:elevation)
 
     return unless time_zone.present? && country_code.present?
 
@@ -403,7 +403,7 @@ class Contentful
     country_code = event[:country_code]
 
     weather_kit = WeatherKit.new(lat, lon, time_zone, country_code)
-    weather_data = weather_kit.instance_variable_get(:@weather)
+    weather_data = weather_kit.weather
 
     return unless weather_data.present?
 
@@ -443,7 +443,7 @@ class Contentful
     country_code = event[:country_code]
 
     aqi_service = GoogleAirQuality.new(lat, lon, country_code, 'usa_epa_nowcast')
-    aqi_data = aqi_service.instance_variable_get(:@aqi)
+    aqi_data = aqi_service.aqi
 
     return unless aqi_data.present?
 
@@ -459,7 +459,7 @@ class Contentful
 
     event_date = Date.parse(event[:date])
     pollen_service = GooglePollen.new(lat, lon, 4)
-    pollen_data = pollen_service.instance_variable_get(:@pollen)
+    pollen_data = pollen_service.pollen
 
     return unless pollen_data.present?
 

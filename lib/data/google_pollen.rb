@@ -3,6 +3,7 @@ require 'active_support/all'
 
 # The GooglePollen class interfaces with the Google Pollen API to fetch pollen data for a location.
 class GooglePollen
+  attr_reader :pollen
   GOOGLE_POLLEN_API_URL = 'https://pollen.googleapis.com/v1'
 
   # Initializes the GooglePollen class with geographical coordinates.
