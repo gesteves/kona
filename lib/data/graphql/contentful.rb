@@ -170,6 +170,7 @@ module ContentfulClient
       events: eventCollection(skip: $skip, limit: $limit) {
         items {
           title
+          summary
           description
           location
           coordinates {

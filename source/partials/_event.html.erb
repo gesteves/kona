@@ -15,7 +15,11 @@
     </header>
     <% if event.description.present? %>
       <div class="entry__body event__description">
-        <%= render_body(event.description) %>
+        <% if is_featured?(event) %>
+          <%= render_body(event.description.present? ? event.description : event.summary) %>
+        <% else %>
+          <%= render_body(event.summary) %>
+        <% end %>
       </div>
     <% end %>
   </div>
