@@ -12,9 +12,7 @@
   color: var(--color-text);
   display: flex;
   flex-flow: column;
-  gap: 0 1rem;
   grid-column: 1 / -1;
-  margin-top: .5rem;
   text-box-edge: text;
   text-box-trim: trim-both;
   text-transform: uppercase;
@@ -33,7 +31,6 @@
 
   @include bp-medium {
     grid-column: span 5;
-    margin: 0;
   }
 }
 
