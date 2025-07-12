@@ -362,7 +362,7 @@ class Contentful
 
   # Processes weather data for a single event
   def process_event_weather(event)
-    return unless event[:coordinates]&.dig(:lat) && event[:coordinates]&.dig(:lon)
+    return unless event[:coordinates]&.dig(:lat) && event[:coordinates]&.dig(:lon) && event[:going]
 
     lat = event[:coordinates][:lat]
     lon = event[:coordinates][:lon]
