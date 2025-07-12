@@ -18,7 +18,7 @@ module EventsHelpers
   # @return [Array<Event>] An array of event objects that are today or in the future.
   def upcoming_races
     upcoming = data.events.sort_by { |e| Time.parse(e.date) }.select { |e| Time.parse(e.date).in_time_zone(location_time_zone).beginning_of_day >= current_time.beginning_of_day && e.going }
-    upcoming.take(is_close?(upcoming.first) ? 4 : 3)
+    upcoming.take(is_featured?(upcoming.first) ? 4 : 3)
   end
 
   # Determines if today is a race day.
