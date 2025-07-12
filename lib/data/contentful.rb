@@ -441,8 +441,9 @@ class Contentful
     lat = event[:coordinates][:lat]
     lon = event[:coordinates][:lon]
     country_code = event[:country_code]
+    event_date = DateTime.parse(event[:date])
 
-    aqi_service = GoogleAirQuality.new(lat, lon, country_code, 'usa_epa_nowcast')
+    aqi_service = GoogleAirQuality.new(lat, lon, country_code, 'usa_epa_nowcast', event_date)
     aqi_data = aqi_service.aqi
 
     return unless aqi_data.present?
