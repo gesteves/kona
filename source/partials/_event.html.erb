@@ -1,26 +1,28 @@
 <article class="entry entry--summary event <%= "event--has-weather" if is_featured?(event) %>" id="event-<%= event.sys.id.parameterize %>" aria-labelledby="hed-<%= event.sys.id.parameterize %>">
-  <header class="entry__header event__header">
-    <p class="entry__meta">
-      <%= event_timestamp_tag(event) %>
-      <span><%= icon_svg("classic", "light", "location-dot") %> <%= event.location %></span>
-    </p>
-    <h4 class="entry__hed" id="hed-<%= event.sys.id.parameterize %>">
-      <% if event.url.present? %>
-        <%= link_to smartypants(event.title), event.url, rel: "noopener", target: "_blank" %>
-      <% else %>
-        <%= smartypants(event.title) %>
-      <% end %>
-    </h4>
-  </header>
-  <% if event.description.present? %>
-    <div class="entry__body event__description">
-      <% if is_featured?(event) %>
-        <%= render_body(event.description.present? ? event.description : event.summary) %>
-      <% else %>
-        <%= render_body(event.summary) %>
-      <% end %>
-    </div>
-  <% end %>
+  <div class="event__inner">
+    <header class="entry__header">
+      <p class="entry__meta">
+        <%= event_timestamp_tag(event) %>
+        <span><%= icon_svg("classic", "light", "location-dot") %> <%= event.location %></span>
+      </p>
+      <h4 class="entry__hed" id="hed-<%= event.sys.id.parameterize %>">
+        <% if event.url.present? %>
+          <%= link_to smartypants(event.title), event.url, rel: "noopener", target: "_blank" %>
+        <% else %>
+          <%= smartypants(event.title) %>
+        <% end %>
+      </h4>
+    </header>
+    <% if event.description.present? %>
+      <div class="entry__body event__description">
+        <% if is_featured?(event) %>
+          <%= render_body(event.description.present? ? event.description : event.summary) %>
+        <% else %>
+          <%= render_body(event.summary) %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
   <% if is_featured?(event) %>
     <%= partial 'partials/event_weather', locals: { event: event } %>
   <% end %>
