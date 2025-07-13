@@ -149,7 +149,7 @@ MixedRainAndSleet:
   phrases:
     currently: there's a mix of rain and sleet
     forecast: calls for mixed rain and sleet
-    simplified: Mixed rain and sleet
+    simplified: Mixed rain & sleet
   icon: cloud-sleet
 
 MixedRainAndSnow:
@@ -157,7 +157,7 @@ MixedRainAndSnow:
   phrases:
     currently: there's a mix of rain and snow
     forecast: calls for mixed rain and snow
-    simplified: Mixed rain and snow
+    simplified: Mixed rain & snow
   icon: cloud-sleet
 
 MixedRainfall:
@@ -173,7 +173,7 @@ MixedSnowAndSleet:
   phrases:
     currently: there's a mix of snow and sleet
     forecast: calls for mixed snow and sleet
-    simplified: Mixed snow and sleet
+    simplified: Mixed snow & sleet
   icon: cloud-hail-mixed
 
 MostlyClear:
