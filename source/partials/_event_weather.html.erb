@@ -37,7 +37,7 @@
           <span class="event__weather-stat">
             <%= icon_svg("classic", "light", "raindrops") %>
             <%= number_to_percentage(event.weather.daytime_forecast.precipitation_chance * 100, precision: 0) %>
-            chance of <%= event.weather.daytime_forecast.precipitation_type == 'clear' ? 'rain' : event.weather.daytime_forecast.precipitation_type %>
+            chance of <%= event.weather.daytime_forecast.precipitation_type.downcase == 'clear' ? 'rain' : event.weather.daytime_forecast.precipitation_type.downcase %>
         <% end %>
       </div>
     <% end %>
