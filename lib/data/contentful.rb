@@ -364,6 +364,10 @@ class Contentful
   def process_event_weather(event)
     return unless event[:coordinates]&.dig(:lat) && event[:coordinates]&.dig(:lon) && event[:going]
 
+    if ENV['DEBUG_EVENT_WEATHER'].present?
+      event[:date] = 3.days.from_now.to_s
+    end
+
     lat = event[:coordinates][:lat]
     lon = event[:coordinates][:lon]
     event_date = Date.parse(event[:date])
