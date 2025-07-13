@@ -170,6 +170,26 @@ module WeatherHelpers
     units_tag(metric, imperial)
   end
 
+  # Formats a wind speed range in kilometers per hour (km/h) to both metric and imperial units.
+  # @param [Float] min - The minimum wind speed in kilometers per hour (km/h).
+  # @param [Float] max - The maximum wind speed in kilometers per hour (km/h).
+  # @return [String] A formatted string representing the wind speed range in both metric and imperial units.
+  def format_wind_speed_range(min, max)
+    return nil if min.blank? && max.blank?
+    return format_wind_speed(max) if min.blank?
+    return format_wind_speed(min) if max.blank?
+    return format_wind_speed(min) if min == max
+
+    min_metric = min.round
+    min_imperial = kilometers_to_miles(min).round
+    max_metric = max.round
+    max_imperial = kilometers_to_miles(max).round
+
+    metric = "#{min_metric}–#{max_metric} km/h"
+    imperial = "#{min_imperial}–#{max_imperial} mph"
+    units_tag(metric, imperial)
+  end
+
   # Determines if the gusts should be shown based on the wind speed and gusts speed.
   # @param [Float] wind_speed - The wind speed in kilometers per hour (km/h).
   # @param [Float] gusts_speed - The gusts speed in kilometers per hour (km/h).
