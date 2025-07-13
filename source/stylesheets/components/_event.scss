@@ -41,6 +41,10 @@
   font-family: var(--ibm-plex-mono);
   font-size: var(--font-x-small);
   line-height: var(--line-height-x-small);
+
+  @include bp-large {
+    flex-flow: column;
+  }
 }
 
 .event__weather-stat-group {

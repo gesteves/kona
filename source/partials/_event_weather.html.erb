@@ -1,6 +1,12 @@
 <section class="event__weather" aria-labelledby="weather-hed-<%= event.sys.id.parameterize %>" data-nosnippet>
   <h5 class="event__weather-heading" id="weather-hed-<%= event.sys.id.parameterize %>"><% if is_today?(event) %>Today’s Weather<% else %>Race Day Weather<% end %></h5>
   <div class="event__weather-stats">
+    <div class="event__weather-stats-group">
+      <span class="event__weather-stat"><span class="sr-only">Location:</span> <%= icon_svg("classic", "light", "location-dot") %> <%= event.location %></span>
+      <% if event.elevation.present? %>
+        <span class="event__weather-stat" title="Elevation"><span class="sr-only">Elevation:</span> <%= icon_svg("classic", "light", "mountains") %> <%= format_elevation(event.elevation, true) %></span>
+      <% end %>
+    </div>
     <div class="event__weather-stat-group">
       <span class="event__weather-stat"><%= icon_svg("classic", "light", weather_icon(event.weather.daytime_forecast.condition_code, :day)) %> <%= format_condition(event.weather.daytime_forecast.condition_code) %></span>
     </div>
@@ -70,11 +76,6 @@
         <% if event.weather.sunset.present? && event.time_zone.present? %>
           <span class="event__weather-stat" title="Sunset"><span class="sr-only">Sunset:</span> <%= icon_svg("classic", "light", "sunset") %> <%= Time.parse(event.weather.sunset).in_time_zone(event.time_zone).strftime("%I:%M %p").gsub(/(am|pm)/i, "<abbr>\\1</abbr>") %></span>
         <% end %>
-      </div>
-    <% end %>  
-    <% if event.elevation.present? %>
-      <div class="event__weather-stat-group">
-        <span class="event__weather-stat" title="Elevation"><span class="sr-only">Elevation:</span> <%= icon_svg("classic", "light", "mountains") %> <%= format_elevation(event.elevation, true) %></span>
       </div>
     <% end %>
   </div>
