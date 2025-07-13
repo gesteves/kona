@@ -558,4 +558,18 @@ module WeatherHelpers
       "#{content_tag(:a, "Live results", href: todays_race.tracking_url, rel: "noopener", target: "_blank")} #{icon_svg("classic", "solid", "circle-small")}"
     end
   end
+
+  # Returns the icon for the AQI.
+  # @param aqi [Integer] The AQI value.
+  # @return [String] The icon for the AQI.
+  def aqi_icon(aqi)
+    case aqi
+    when 0..100
+      "smog"
+    when 101..200
+      "smoke"
+    else
+      "fire-smoke"
+    end
+  end
 end
