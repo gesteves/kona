@@ -13,15 +13,20 @@
         <% end %>
       </h4>
     </header>
-    <% if event.description.present? %>
-      <div class="entry__body event__description">
-        <% if is_featured?(event) %>
-          <%= render_body(event.description.present? ? event.description : event.summary) %>
-        <% else %>
-          <%= render_body(event.summary) %>
-        <% end %>
+    <div class="entry__body event__description">
+      <% if is_featured?(event) %>
+        <%= render_body(event.description.present? ? event.description : event.summary) %>
+      <% else %>
+        <%= render_body(event.summary) %>
+      <% end %>
+    </div>
+    <% if is_featured?(event) && event_race_reports(event).any? %>
+      <div class="entry__meta entry__meta--row entry__meta--separators">
+        <% reports = event_race_reports(event) %>
+        <span class="entry__meta-highlight">Race <%= pluralize(reports.count, 'report').split(' ').last %></span> <%= reports.group_by { |report| DateTime.parse(report.published_at).year }.sort.reverse.map { |year, reports| link_to year, reports.first.path }.join('') %>
       </div>
     <% end %>
+    
   </div>
   <% if is_featured?(event) %>
     <%= partial 'partials/event_weather', locals: { event: event } %>

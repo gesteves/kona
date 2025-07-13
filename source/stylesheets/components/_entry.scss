@@ -54,6 +54,27 @@
     flex-flow: row wrap;
     gap: 0 0.5rem;
   }
+
+  &--row {
+    flex-flow: row wrap;
+    gap: 0 0.5rem;
+  }
+
+  &--separators > * {
+    &::after {
+      color: var(--color-text-tertiary);
+      content: " / ";
+      font-weight: 300;
+    }
+
+    &:last-child::after {
+      content: none;
+    }
+  }
+
+  &-highlight {
+    font-weight: 600;
+  }
 }
 
 .entry__highlight {

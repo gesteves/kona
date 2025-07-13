@@ -111,4 +111,22 @@ module EventsHelpers
       "#{event_icon_svg(event)} #{event_timestamp(event)}"
     end
   end
+
+  # Finds all race reports associated with the given event.
+  # @param event [Object] The event to find race reports for.
+  # @param count [Integer] (Optional) The number of race reports to return.
+  # @return [Array<Object>] A list of race reports from the event, sorted by publication date in reverse chronological order.
+  def event_race_reports(event, count: 5)
+    return [] unless event&.sys&.id
+
+    # Find all articles that are linked to this event
+    race_reports = data.articles
+      .select { |a| a.event&.sys&.id == event.sys.id }
+      .reject { |a| a.draft }
+      .reject { |a| a.entry_type == 'Short' }
+      .sort_by { |a| -DateTime.parse(a.published_at).to_i }
+      .take(count)
+
+    race_reports
+  end
 end
