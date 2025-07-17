@@ -401,7 +401,7 @@ class Contentful
 
   # Adds weather forecast data to an event
   def add_weather_forecast(event)
-    event_date = Date.parse(event[:date])
+    event_date = DateTime.parse(event[:date]).in_time_zone(event[:time_zone]).to_date
     lat = event[:coordinates][:lat]
     lon = event[:coordinates][:lon]
     time_zone = event[:time_zone]
@@ -412,12 +412,10 @@ class Contentful
 
     return unless weather_data.present?
 
-    # Use camelCase keys as returned by the API
     daily_forecast = weather_data.dig(:forecastDaily, :days)
 
-    # Match based on the date portion only, ignoring time
     event_forecast = daily_forecast&.find do |day|
-      forecast_date = Date.parse(day[:forecastStart]) rescue nil
+      forecast_date = DateTime.parse(day[:forecastStart]).in_time_zone(event[:time_zone]).to_date rescue nil
       forecast_date == event_date
     end
 
@@ -431,7 +429,7 @@ class Contentful
     lat = event[:coordinates][:lat]
     lon = event[:coordinates][:lon]
     country_code = event[:country_code]
-    event_date = DateTime.parse(event[:date])
+    event_date = DateTime.parse(event[:date]).in_time_zone(event[:time_zone])
 
     aqi_service = GoogleAirQuality.new(lat, lon, country_code, 'usa_epa_nowcast', event_date)
     aqi_data = aqi_service.aqi
@@ -448,7 +446,7 @@ class Contentful
     lat = event[:coordinates][:lat]
     lon = event[:coordinates][:lon]
 
-    event_date = Date.parse(event[:date])
+    event_date = DateTime.parse(event[:date]).in_time_zone(event[:time_zone]).to_date
     pollen_service = GooglePollen.new(lat, lon, 4)
     pollen_data = pollen_service.pollen
 
