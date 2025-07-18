@@ -70,5 +70,5 @@
 }
 
 .event__weather-wind-direction svg {
-  transform: rotate(calc((var(--wind-direction) + 180) * 1deg));
+  transform: rotate(calc(var(--wind-direction) * 1deg));
 }
