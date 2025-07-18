@@ -44,7 +44,9 @@
     <% if event.weather.daytime_forecast.wind_speed.present? && event.weather.daytime_forecast.wind_direction.present? %>
       <div class="event__weather-stat-group">
         <span class="event__weather-stat">
-          <span title="<%= wind_direction(event.weather.daytime_forecast.wind_direction) %>"><%= icon_svg("classic", "light", wind_direction_icon(event.weather.daytime_forecast.wind_direction)) %></span>
+          <span class="event__weather-wind-direction" style="--wind-direction: <%= event.weather.daytime_forecast.wind_direction %>;" title="<%= wind_direction(event.weather.daytime_forecast.wind_direction) %>">
+            <%= icon_svg("classic", "light", "arrow-up") %>
+          </span>
           <%= format_wind_speed_range(event.weather.daytime_forecast.wind_speed, event.weather.daytime_forecast.wind_speed_max) %>
           wind
           <span class="sr-only">from the <%= wind_direction(event.weather.daytime_forecast.wind_direction) %></span>

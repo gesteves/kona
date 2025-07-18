@@ -228,32 +228,6 @@ module WeatherHelpers
     end
   end
 
-  # Determines the wind direction icon based on the wind direction.
-  # @param [Integer] direction - The wind direction in degrees.
-  # @return [String] The name of the wind direction icon.
-  def wind_direction_icon(direction)
-    case direction
-    when 0..22.5, 337.5..360
-      "arrow-down"
-    when 22.5..67.5
-      "arrow-down-left"
-    when 67.5..112.5
-      "arrow-left"
-    when 112.5..157.5
-      "arrow-up-left"
-    when 157.5..202.5
-      "arrow-up"
-    when 202.5..247.5
-      "arrow-up-right"
-    when 247.5..292.5
-      "arrow-right"
-    when 292.5..337.5
-      "arrow-down-right"
-    else
-      "arrow-down"
-    end
-  end
-
   # Method to convert wind speed in knots to Beaufort scale number (0-12)
   # @param [Float] The wind speed in knots
   # @return [Integer] The Beaufort scale number (0-12)
