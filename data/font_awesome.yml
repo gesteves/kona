@@ -111,7 +111,7 @@ icons:
       - leaf
       - fire-smoke
       - smoke
-      - arrow-up
+      - arrow-down
     thin:
       - bolt-lightning
       - cloud-bolt
