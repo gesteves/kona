@@ -2,7 +2,7 @@ module WorkoutsHelpers
   # Checks if there are any workouts scheduled in TrainerRoad.
   # @return [Boolean] True if there are scheduled workouts, otherwise false.
   def is_workout_scheduled?
-    data.trainerroad.workouts.any? || data.runna.workouts.any?
+    data.trainerroad.workouts.any?
   end
 
   # Determines if the current day is a rest day based on the absence of scheduled workouts.
@@ -17,10 +17,10 @@ module WorkoutsHelpers
     data.trainerroad.workouts.any? { |w| w.discipline == 'Bike' }
   end
 
-  # Checks if there are any running workouts scheduled in TrainerRoad or Runna.
+  # Checks if there are any running workouts scheduled in TrainerRoad.
   # @return [Boolean] True if there are running workouts scheduled, otherwise false.
   def is_run_scheduled?
-    data.trainerroad.workouts.any? { |w| w.discipline == 'Run' } || data.runna.workouts.any?
+    data.trainerroad.workouts.any? { |w| w.discipline == 'Run' }
   end
 
   # Checks if there are any swimming workouts scheduled in TrainerRoad.
