@@ -3,12 +3,12 @@
  * @param {string} message The text for the notification
  * @param {string} status The type of notification
  */
-export function sendNotification (message, status = 'success') {
+export function sendNotification(message, status = 'success') {
   const event = new CustomEvent('notify', {
     detail: {
       message: message,
-      status: status
-    }
+      status: status,
+    },
   });
   document.dispatchEvent(event);
 }
@@ -19,7 +19,7 @@ export function sendNotification (message, status = 'success') {
  * @param {Element} element The element to prepend to.
  */
 export function prependToElement(html, element) {
-  const tempContainer = document.createElement("div");
+  const tempContainer = document.createElement('div');
   tempContainer.innerHTML = html;
   while (tempContainer.firstChild) {
     element.prepend(tempContainer.firstChild);
@@ -32,7 +32,7 @@ export function prependToElement(html, element) {
  * @param {Element} element The element to append to.
  */
 export function appendToElement(html, element) {
-  const tempContainer = document.createElement("div");
+  const tempContainer = document.createElement('div');
   tempContainer.innerHTML = html;
   while (tempContainer.firstChild) {
     element.appendChild(tempContainer.firstChild);
@@ -45,7 +45,7 @@ export function appendToElement(html, element) {
  * @param {Element} element The element to replace.
  */
 export function replaceElement(html, element) {
-  const tempContainer = document.createElement("div");
+  const tempContainer = document.createElement('div');
   tempContainer.innerHTML = html;
   while (tempContainer.firstChild) {
     element.replaceWith(tempContainer.firstChild);

@@ -4,9 +4,11 @@
  * Sets up the Plausible analytics queue if it doesn't already exist.
  */
 function setupPlausibleQueue() {
-  window.plausible = window.plausible || function() {
-    (window.plausible.q = window.plausible.q || []).push(arguments);
-  }
+  window.plausible =
+    window.plausible ||
+    function () {
+      (window.plausible.q = window.plausible.q || []).push(arguments);
+    };
 }
 
 /**
@@ -47,12 +49,12 @@ export function cleanUpUrl() {
     'utm_medium',
     'utm_campaign',
     'utm_content',
-    'utm_term'
+    'utm_term',
   ];
 
   let paramRemoved = false;
 
-  paramsToRemove.forEach(param => {
+  paramsToRemove.forEach((param) => {
     if (params.has(param)) {
       params.delete(param);
       paramRemoved = true;
@@ -60,7 +62,10 @@ export function cleanUpUrl() {
   });
 
   if (paramRemoved) {
-    const cleanURL = window.location.origin + window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+    const cleanURL =
+      window.location.origin +
+      window.location.pathname +
+      (params.toString() ? '?' + params.toString() : '');
     window.history.replaceState({}, document.title, cleanURL);
   }
 }

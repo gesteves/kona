@@ -1,4 +1,4 @@
-import { Controller } from "@hotwired/stimulus";
+import { Controller } from '@hotwired/stimulus';
 
 /**
  * Controller for going back to the top of the page.
@@ -12,11 +12,13 @@ export default class extends Controller {
     event.preventDefault();
     const rootElement = document.documentElement;
 
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const prefersReducedMotion = window.matchMedia(
+      '(prefers-reduced-motion: reduce)'
+    ).matches;
 
     rootElement.scrollTo({
       top: 0,
-      behavior: prefersReducedMotion ? "instant" : "smooth",
+      behavior: prefersReducedMotion ? 'instant' : 'smooth',
     });
   }
 }

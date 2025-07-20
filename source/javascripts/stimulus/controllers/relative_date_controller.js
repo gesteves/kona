@@ -1,12 +1,19 @@
-import { Controller } from "@hotwired/stimulus";
-import { formatDistanceToNow, minutesToSeconds, hoursToSeconds, hoursToMilliseconds, minutesToMilliseconds, secondsToMilliseconds } from "date-fns";
+import { Controller } from '@hotwired/stimulus';
+import {
+  formatDistanceToNow,
+  minutesToSeconds,
+  hoursToSeconds,
+  hoursToMilliseconds,
+  minutesToMilliseconds,
+  secondsToMilliseconds,
+} from 'date-fns';
 
 export default class extends Controller {
   static values = {
     datetime: String,
     addSuffix: { type: Boolean, default: true },
     includeSeconds: { type: Boolean, default: true },
-    liveUpdating: { type: Boolean, default: true }
+    liveUpdating: { type: Boolean, default: true },
   };
 
   connect() {
@@ -43,7 +50,7 @@ export default class extends Controller {
     // Determine the update interval.
     // This roughly matches the formatting used by formatDistanceToNow: https://date-fns.org/v4.1.0/docs/formatDistanceToNow
     let nextUpdate;
-    if ((differenceInSeconds < minutesToSeconds(1)) && this.includeSecondsValue) {
+    if (differenceInSeconds < minutesToSeconds(1) && this.includeSecondsValue) {
       // If the date is less than a minute ago, update every second.
       nextUpdate = secondsToMilliseconds(1);
     } else if (differenceInSeconds < minutesToSeconds(45)) {

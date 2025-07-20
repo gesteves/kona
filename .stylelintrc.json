@@ -1,13 +1,7 @@
 {
-  "extends": [
-    "stylelint-config-standard-scss"
-  ],
-  "plugins": [
-    "stylelint-scss"
-  ],
-  "ignoreFiles": [
-    "**/vendors/**"
-  ],
+  "extends": ["stylelint-config-standard-scss"],
+  "plugins": ["stylelint-scss"],
+  "ignoreFiles": ["**/vendors/**"],
   "rules": {
     "scss/at-rule-no-unknown": true,
     "scss/selector-no-redundant-nesting-selector": null,

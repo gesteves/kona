@@ -24,6 +24,7 @@ Kona is a static site generator built on **Middleman** that creates a blog power
 ## Essential Commands
 
 ### Development
+
 ```bash
 # Import data without rebuilding site
 bundle exec rake import
@@ -44,12 +45,14 @@ npm run build
 ```
 
 ### Build Process
+
 ```bash
 # Production build used by Netlify
 bundle exec rake build
 ```
 
 ### Partial Data Import
+
 ```bash
 # Import specific data types
 bundle exec rake import:content    # Contentful
@@ -60,27 +63,32 @@ bundle exec rake import:icons      # Font Awesome icons
 ## Key File Locations
 
 ### Configuration
+
 - `config.rb` - Middleman configuration and proxy setup
 - `netlify.toml` - Netlify build settings and redirects
 - `Rakefile` - Main rake tasks and Redis setup
 
 ### Data Layer
+
 - `lib/data/*.rb` - API client classes for external services
 - `lib/tasks/import.rake` - Data import orchestration
 - `data/*.json` - Generated data files (git-ignored)
 
 ### Frontend Code
+
 - `source/layouts/layout.erb` - Main layout template
 - `source/partials/` - Reusable ERB components
 - `lib/helpers/` - Ruby helper methods for templates
 - `source/javascripts/stimulus/` - Stimulus controllers for interactivity
 
 ### Build Output
+
 - `build/` - Generated static site (git-ignored)
 
 ## Testing
 
 The project uses RSpec for testing helper methods and utilities. Tests are located in `spec/` and focus on:
+
 - Helper method functionality
 - Text processing utilities
 - Markdown rendering
@@ -89,15 +97,19 @@ The project uses RSpec for testing helper methods and utilities. Tests are locat
 ## Development Notes
 
 ### Data Import Dependencies
+
 Many data sources have dependencies on each other:
+
 - Weather data requires location data from Google Maps
 - Purple Air AQI requires location and weather setup
 - TrainerRoad requires timezone data from Google Maps
 
 ### Cache Strategy
+
 The project uses Redis caching to speed up API calls during development and builds. Cache keys are typically based on API endpoints and parameters.
 
 ### Environment Variables
+
 Extensive environment configuration is required for all external services. Check `.env.example` or README for required variables.
 
 ## Code Style

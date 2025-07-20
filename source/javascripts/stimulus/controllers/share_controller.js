@@ -1,18 +1,18 @@
-import { Controller } from "@hotwired/stimulus";
+import { Controller } from '@hotwired/stimulus';
 import { trackEvent } from '../lib/analytics';
 
 /**
  * Controller for managing social sharing functionality.
  */
 export default class extends Controller {
-  static classes = ["hidden"];
+  static classes = ['hidden'];
   static values = {
     popupWidth: Number,
     popupHeight: Number,
     isNative: Boolean,
     text: String,
     url: String,
-    via: String
+    via: String,
   };
 
   /**
@@ -31,7 +31,11 @@ export default class extends Controller {
    * @returns {string} The URL to share.
    */
   getShareUrl() {
-    return this.urlValue || document.querySelector('link[rel="canonical"]')?.href || window.location.href
+    return (
+      this.urlValue ||
+      document.querySelector('link[rel="canonical"]')?.href ||
+      window.location.href
+    );
   }
 
   /**
@@ -40,7 +44,11 @@ export default class extends Controller {
    * @returns {string} The text to share.
    */
   getShareText() {
-    return this.textValue || document.querySelector('meta[property="og:title"]')?.content || document.title;
+    return (
+      this.textValue ||
+      document.querySelector('meta[property="og:title"]')?.content ||
+      document.title
+    );
   }
 
   /**
@@ -52,12 +60,14 @@ export default class extends Controller {
     event.preventDefault();
     trackEvent('Share', { url: this.getShareUrl(), via: 'Native' });
 
-    navigator.share({
-      title: this.getShareText(),
-      url: this.getShareUrl()
-    }).catch(() => {
-      // Handle potential error silently
-    });
+    navigator
+      .share({
+        title: this.getShareText(),
+        url: this.getShareUrl(),
+      })
+      .catch(() => {
+        // Handle potential error silently
+      });
   }
 
   /**
@@ -67,13 +77,17 @@ export default class extends Controller {
   openPopup(event) {
     event.preventDefault();
     const linkURL = this.element.href;
-    
+
     trackEvent('Share', { url: this.getShareUrl(), via: this.viaValue });
-    
+
     const width = this.popupWidthValue || 400;
     const height = this.popupHeightValue || 300;
 
-    window.open(linkURL, 'share', `width=${width},height=${height},scrollbars=yes`);
+    window.open(
+      linkURL,
+      'share',
+      `width=${width},height=${height},scrollbars=yes`
+    );
   }
 
   /**

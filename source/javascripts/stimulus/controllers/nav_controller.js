@@ -1,15 +1,15 @@
-import { Controller } from "@hotwired/stimulus";
+import { Controller } from '@hotwired/stimulus';
 import { trackEvent } from '../lib/analytics';
 
 /**
  * Controller for toggling the navigation menu.
  */
 export default class extends Controller {
-  static classes = ["open"];
-  static targets = ["button"];
+  static classes = ['open'];
+  static targets = ['button'];
   static values = {
-    openAriaLabel: { type: String, default: "Open menu" },
-    closeAriaLabel: { type: String, default: "Close menu" },
+    openAriaLabel: { type: String, default: 'Open menu' },
+    closeAriaLabel: { type: String, default: 'Close menu' },
   };
 
   /**
@@ -20,7 +20,7 @@ export default class extends Controller {
     event.preventDefault();
     document.body.classList.toggle(this.openClass);
     this.updateButtonAttributes();
-    trackEvent("Nav", { state: this.isNavOpen() ? "Open" : "Closed" });
+    trackEvent('Nav', { state: this.isNavOpen() ? 'Open' : 'Closed' });
   }
 
   /**
@@ -35,8 +35,11 @@ export default class extends Controller {
    * Updates the button's ARIA attributes to match the nav's state.
    */
   updateButtonAttributes() {
-    this.buttonTarget.setAttribute("aria-expanded", this.isNavOpen());
-    this.buttonTarget.setAttribute("aria-label", this.isNavOpen() ? this.closeAriaLabelValue : this.openAriaLabelValue);
+    this.buttonTarget.setAttribute('aria-expanded', this.isNavOpen());
+    this.buttonTarget.setAttribute(
+      'aria-label',
+      this.isNavOpen() ? this.closeAriaLabelValue : this.openAriaLabelValue
+    );
   }
 
   /**

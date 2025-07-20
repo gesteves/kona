@@ -3,7 +3,9 @@
     "build": "webpack --mode=production",
     "watch": "webpack --mode=development --watch",
     "lint:scss": "stylelint \"source/stylesheets/**/*.scss\"",
-    "lint:scss:fix": "stylelint \"source/stylesheets/**/*.scss\" --fix"
+    "lint:scss:fix": "stylelint \"source/stylesheets/**/*.scss\" --fix",
+    "format": "prettier --write \"**/*.{js,json,md}\"",
+    "format:check": "prettier --check \"**/*.{js,json,md}\""
   },
   "dependencies": {
     "@babel/core": "^7.28.0",
@@ -21,6 +23,7 @@
     "webpack-cli": "^6.0.1"
   },
   "devDependencies": {
+    "prettier": "^3.6.2",
     "stylelint": "^16.22.0",
     "stylelint-config-standard-scss": "^15.0.1",
     "stylelint-scss": "^6.12.1"

@@ -1,6 +1,6 @@
-import { Controller } from "@hotwired/stimulus";
+import { Controller } from '@hotwired/stimulus';
 import { prependToElement } from '../lib/utils';
-import Handlebars from "handlebars";
+import Handlebars from 'handlebars';
 
 /**
  * Controls the notifications.
@@ -10,7 +10,7 @@ export default class extends Controller {
   static classes = ['transparent', 'closed'];
   static targets = ['container', 'notification', 'template'];
 
-  connect () {
+  connect() {
     this.toggle();
   }
 
@@ -18,7 +18,7 @@ export default class extends Controller {
    * Adds a new notification to the notifications container
    * @param {Event} event Custom `notify` event.
    */
-  add (event) {
+  add(event) {
     const status = event.detail.status;
     const message = event.detail.message;
     // Get the Handlebars template from the target element
@@ -54,10 +54,13 @@ export default class extends Controller {
   /**
    * Hides all the existing notifications on the page.
    */
-  closeAll () {
+  closeAll() {
     this.notificationTargets
-      .filter(notification => !notification.classList.contains(this.transparentClass))
-      .forEach(notification => {
+      .filter(
+        (notification) =>
+          !notification.classList.contains(this.transparentClass)
+      )
+      .forEach((notification) => {
         notification.classList.add(this.transparentClass, this.closedClass);
       });
   }
@@ -66,7 +69,7 @@ export default class extends Controller {
    * Closes the notification
    * @param {Event} event Click event.
    */
-  close (event) {
+  close(event) {
     event.currentTarget.classList.add(this.transparentClass, this.closedClass);
   }
 
@@ -74,14 +77,22 @@ export default class extends Controller {
    * Removes all notifications that have been marked as closed from the DOM,
    * and displays any pending transparent notifications.
    */
-  toggle () {
+  toggle() {
     this.notificationTargets
-      .filter(notification => notification.classList.contains(this.closedClass))
-      .forEach(notification => notification.remove());
-    this.notificationTargets
-      .forEach(notification => {
-        setTimeout(() => notification.classList.remove(this.transparentClass), 10);
-        setTimeout(() => notification.classList.add(this.transparentClass, this.closedClass), 2000);
-      });
+      .filter((notification) =>
+        notification.classList.contains(this.closedClass)
+      )
+      .forEach((notification) => notification.remove());
+    this.notificationTargets.forEach((notification) => {
+      setTimeout(
+        () => notification.classList.remove(this.transparentClass),
+        10
+      );
+      setTimeout(
+        () =>
+          notification.classList.add(this.transparentClass, this.closedClass),
+        2000
+      );
+    });
   }
 }

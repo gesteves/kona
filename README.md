@@ -1,6 +1,6 @@
 # Kona
 
-This is a very fast and streamlined blogging system written in [Middleman](https://middlemanapp.com/), powered by [Contentful](https://www.contentful.com/), and hosted on [Netlify](https://www.netlify.com/). Check it out at *[Given to Tri](https://www.giventotri.com/)*.
+This is a very fast and streamlined blogging system written in [Middleman](https://middlemanapp.com/), powered by [Contentful](https://www.contentful.com/), and hosted on [Netlify](https://www.netlify.com/). Check it out at _[Given to Tri](https://www.giventotri.com/)_.
 
 [![Netlify Status](https://api.netlify.com/api/v1/badges/f87f4e00-a5a5-436d-b6df-a3628c3fb919/deploy-status)](https://app.netlify.com/sites/giventotri/deploys)
 
@@ -40,13 +40,13 @@ Kona uses Intervals.icu to show the activity stats on the home page. You'll need
 
 #### Google Maps
 
-Kona uses Google Maps to geocode the location shown on the home page, and fetch pollen and air quality data. You'll need to set up a project and an API key at https://console.cloud.google.com and make sure the API key has access to the following APIs: 
+Kona uses Google Maps to geocode the location shown on the home page, and fetch pollen and air quality data. You'll need to set up a project and an API key at https://console.cloud.google.com and make sure the API key has access to the following APIs:
 
-* Geocoding API
-* Time Zone API
-* Maps Elevation API
-* Air Quality API
-* Pollen API
+- Geocoding API
+- Time Zone API
+- Maps Elevation API
+- Air Quality API
+- Pollen API
 
 Then, add the API key to the `GOOGLE_API_KEY` environment variable.
 
@@ -86,7 +86,6 @@ This imports updated robots.txt directives from [Dark Visitors](https://darkvisi
 
 To keep the information on the home page current, you can use a [Netlify build hook](https://docs.netlify.com/configure-builds/build-hooks/) to rebuild the site hourly. To set this up, create a build hook in the site's build configuration and add it to the `BUILD_HOOK_URL` environment variable.
 
-
 #### Plausible
 
 Kona uses [Plausible](https://plausible.io/) for traffic analytics, and uses the traffic data to show trending or most-read articles on the home page. To set this up, you'll need to create an API key at https://plausible.io/settings and set up your site ID and API key in the `PLAUSIBLE_SITE_ID` and `PLAUSIBLE_API_KEY` environment variables, respectively.
@@ -99,15 +98,15 @@ Contentful's free tier has a pretty low monthly bandwidth quota for images. To s
 
 Requirements:
 
-* Ruby
-* Node
-* [Netlify CLI](https://docs.netlify.com/cli/get-started/)
+- Ruby
+- Node
+- [Netlify CLI](https://docs.netlify.com/cli/get-started/)
 
 Steps:
 
 1. Set up the services above and add the environment variables to either the site's configuration in Netlify or to the `.env` file
 2. Install dependencies with `bundle install` and `npm install`
-4. Build the site with `netlify build`, which will run the data import tasks
-5. Run the local server with `netlify dev`
-6. In another terminal tab, run `npm run watch`
-7. If you want to reload the data without rebuilding the site, run `bundle exec rake import`
+3. Build the site with `netlify build`, which will run the data import tasks
+4. Run the local server with `netlify dev`
+5. In another terminal tab, run `npm run watch`
+6. If you want to reload the data without rebuilding the site, run `bundle exec rake import`

@@ -1,10 +1,10 @@
-import { Controller } from "@hotwired/stimulus";
+import { Controller } from '@hotwired/stimulus';
 
 /**
  * Controller for dynamically setting unit measurements based on the user's locale.
  */
 export default class extends Controller {
-  static values = { imperial: String, metric: String }
+  static values = { imperial: String, metric: String };
 
   /**
    * Sets the units of measurement based on the user's locale when the controller is connected.

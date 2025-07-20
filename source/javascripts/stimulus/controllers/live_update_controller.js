@@ -1,4 +1,4 @@
-import { Controller } from "@hotwired/stimulus";
+import { Controller } from '@hotwired/stimulus';
 import { replaceElement } from '../lib/utils';
 
 /**
@@ -6,14 +6,14 @@ import { replaceElement } from '../lib/utils';
  */
 export default class extends Controller {
   static values = {
-    url: String
+    url: String,
   };
 
   /**
    * Updates content when the page becomes visible.
    */
   handleVisibilityChange() {
-    if (document.visibilityState === "visible") {
+    if (document.visibilityState === 'visible') {
       this.fetchAndUpdateContent();
     }
   }
@@ -28,8 +28,8 @@ export default class extends Controller {
       try {
         let response = await fetch(this.urlValue);
         let data = await response.text();
-        
-        if (data.trim().length > 0) {  
+
+        if (data.trim().length > 0) {
           replaceElement(data.trim(), this.element);
         }
       } catch (error) {

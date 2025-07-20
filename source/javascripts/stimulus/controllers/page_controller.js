@@ -1,5 +1,5 @@
 import { trackPageView } from '../lib/analytics';
-import { Controller } from "@hotwired/stimulus";
+import { Controller } from '@hotwired/stimulus';
 
 /**
  * Controller class for managing page views.

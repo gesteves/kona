@@ -1,18 +1,21 @@
-import { Controller } from "@hotwired/stimulus";
+import { Controller } from '@hotwired/stimulus';
 import { sendNotification } from '../lib/utils';
 import { trackEvent } from '../lib/analytics';
 import ClipboardJS from 'clipboard';
 
 export default class extends Controller {
-  static classes = ['hidden']
+  static classes = ['hidden'];
   static targets = ['link', 'check'];
   static values = {
-    successMessage: { type: String, default: "The link has been copied to your clipboard." }
-  }
+    successMessage: {
+      type: String,
+      default: 'The link has been copied to your clipboard.',
+    },
+  };
 
   connect() {
     this.clipboard = new ClipboardJS(this.element, {
-      text: () => this.getPermalink()
+      text: () => this.getPermalink(),
     });
 
     this.clipboard.on('success', () => this.successfulCopy());
@@ -27,7 +30,7 @@ export default class extends Controller {
    * Convenience method to stop the button from doing its thing.
    * @param  {Event} event Click event from the button.
    */
-  preventDefault (event) {
+  preventDefault(event) {
     event.preventDefault();
   }
 
@@ -67,7 +70,7 @@ export default class extends Controller {
     }
 
     sendNotification(this.successMessageValue);
-    trackEvent("Copy to Clipboard", { url: this.getPermalink() });
+    trackEvent('Copy to Clipboard', { url: this.getPermalink() });
   }
 
   /**
