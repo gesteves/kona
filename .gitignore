@@ -13,3 +13,8 @@ source/javascripts/site.js*
 .netlify
 tmp/
 prompts/
+
+# Next.js v2 app
+v2/.next/
+v2/out/
+v2/.env*.local
