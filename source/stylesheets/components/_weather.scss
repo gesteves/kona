@@ -26,6 +26,7 @@
 
 .weather__text {
   @extend .extend-body-styles;
+
   grid-column: span 12;
 
   @include bp-small {
@@ -67,6 +68,7 @@
   &:link, &:visited {
     color: var(--color-text-secondary);
     text-decoration: none;
+
     g,
     path {
       fill: var(--color-text-tertiary);
@@ -76,6 +78,7 @@
   &:hover, &:active {
     color: var(--color-link-hover);
     text-decoration: none;
+
     g,
     path {
       fill: var(--color-link-hover);
@@ -109,13 +112,13 @@
   a {
     &:link,
     &:visited {
-      color: currentColor;
+      color: currentcolor;
       text-decoration: none;
     }
   
     &:hover,
     &:active {
-      color: currentColor;
+      color: currentcolor;
       text-decoration: underline;
     }
 
@@ -150,9 +153,10 @@
 }
 
 @keyframes blink {
-  from, to {
+  0%, 100% {
     opacity: 0;
   }
+
   50% {
     opacity: 1;
   }

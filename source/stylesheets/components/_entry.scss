@@ -84,13 +84,13 @@
   a {
     &:link,
     &:visited {
-      color: currentColor;
+      color: currentcolor;
       text-decoration: none;
     }
   
     &:hover,
     &:active {
-      color: currentColor;
+      color: currentcolor;
       text-decoration: underline;
     }
 
@@ -179,7 +179,7 @@
 
   th,
   td {
-    padding: 1rem 1rem;
+    padding: 1rem;
     white-space: nowrap;
   }
 
@@ -285,7 +285,7 @@
 
 .entry--full {
   .entry__figure {
-    margin: 1.5rem calc(var(--picture-outdent) * -1) 1.5rem calc(var(--picture-outdent) * -1);
+    margin: 1.5rem calc(var(--picture-outdent) * -1);
 
     figcaption {
       margin: 0 var(--picture-outdent) 0 var(--picture-outdent);
@@ -304,11 +304,9 @@
 }
 
 .entry__heading-permalink {
-  align-items: center;
+  place-items: center center;
   display: inline-flex;
-  justify-items: center;
-  margin-inline-start: -1.5rem;
-  margin-inline-end: 0.5rem;
+  margin-inline: -1.5rem 0.5rem;
 
   svg {
     display: block;

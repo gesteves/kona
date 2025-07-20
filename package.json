@@ -1,7 +1,9 @@
 {
   "scripts": {
     "build": "webpack --mode=production",
-    "watch": "webpack --mode=development --watch"
+    "watch": "webpack --mode=development --watch",
+    "lint:scss": "stylelint \"source/stylesheets/**/*.scss\"",
+    "lint:scss:fix": "stylelint \"source/stylesheets/**/*.scss\" --fix"
   },
   "dependencies": {
     "@babel/core": "^7.28.0",
@@ -17,5 +19,10 @@
     "node-fetch": "^3.3.2",
     "webpack": "^5.100.2",
     "webpack-cli": "^6.0.1"
+  },
+  "devDependencies": {
+    "stylelint": "^16.22.0",
+    "stylelint-config-standard-scss": "^15.0.1",
+    "stylelint-scss": "^6.12.1"
   }
 }

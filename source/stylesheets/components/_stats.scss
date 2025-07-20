@@ -2,7 +2,6 @@
   border-top: 2px solid var(--color-border);
   display: grid;
   grid-column: 1 / -1;
-  grid-column: 1 / -1;
   gap: var(--row-gap) var(--column-gap);
   grid-template-columns: subgrid;
   padding: var(--padding) 0 0 0;
@@ -22,6 +21,7 @@
 
 .stats__number {
   @extend .extend-heading-gradient;
+
   font-family: var(--ibm-plex-sans-condensed);
   font-size: var(--font-x-large);
   font-weight: 700;
@@ -57,14 +57,14 @@
   a {
     &:link,
     &:visited {
-      color: currentColor;
+      color: currentcolor;
       text-decoration-color: var(--color-text-tertiary);
     }
 
     &:hover,
     &:active {
       color: var(--color-link);
-      text-decoration-color: currentColor;
+      text-decoration-color: currentcolor;
     }
   }
 }

@@ -1,5 +1,6 @@
 .footer {
   --line-height-x-small: 2;
+
   align-items: center;
   background: var(--gradient-background);
   box-sizing: border-box;
@@ -31,7 +32,7 @@
   
     a:hover, a:active {
       color: var(--color-link-hover);
-      text-decoration-color: currentColor;
+      text-decoration-color: currentcolor;
     }
   }
 

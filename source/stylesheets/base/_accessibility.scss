@@ -22,7 +22,7 @@
   }
 }
 
-.sr-only:not(:focus):not(:active) {
+.sr-only:not(:focus, :active) {
   clip: rect(0 0 0 0);
   clip-path: inset(100%);
   height: 1px;
@@ -42,6 +42,7 @@
     box-shadow: none !important;
     text-shadow: none !important;
   }
+
   // scss-lint:enable ImportantRule
 }
 

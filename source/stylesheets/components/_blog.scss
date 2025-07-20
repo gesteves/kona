@@ -10,6 +10,7 @@
 
 .blog__header {
   @extend .extend-entry-header;
+
   border-bottom: 1px solid var(--color-border);
   margin-bottom: var(--padding);
   padding-bottom: var(--padding);
@@ -24,6 +25,7 @@
 
   .blog__hed {
     @extend .extend-heading-gradient;
+
     margin: 0;
   
     @supports not ((text-box-edge: cap) or (text-box-trim: trim-both)) {

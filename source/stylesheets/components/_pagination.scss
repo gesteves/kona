@@ -29,7 +29,7 @@
 }
 
 .pagination__link--next::after {
-  color: currentColor;
+  color: currentcolor;
   content: "»";
   left: 0.5rem;
   position: relative;
@@ -37,7 +37,7 @@
 }
 
 .pagination__link--previous::before {
-  color: currentColor;
+  color: currentcolor;
   content: "«";
   position: relative;
   right: 0.5rem;

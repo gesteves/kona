@@ -9,7 +9,7 @@
     font-family: var(--ibm-plex-mono);
     font-size: var(--font-x-small);
     line-height: var(--line-height-x-small);
-    margin: 0 0 2rem 0;
+    margin: 0 0 2rem;
     text-indent: 0;
     text-transform: uppercase;
   
@@ -45,9 +45,10 @@
     height: 240px;
   }
   
-  button[type=submit] {
+  button[type="submit"] {
     @extend .extend-primary-button;
     @extend .extend-pushable-button;
+
     align-self: flex-start;
   }
 }

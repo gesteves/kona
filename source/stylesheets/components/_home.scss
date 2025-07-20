@@ -14,11 +14,12 @@
 
 .home__headline {
   @extend .extend-heading-gradient;
+
   font-family: var(--ibm-plex-sans-condensed);
   font-size: var(--font-x-large);
   grid-column: 1 / -1;
   line-height: var(--line-height-x-large);
-  margin: 0 0 -1rem 0;
+  margin: 0 0 -1rem;
 
   @include bp-medium {
     grid-column: 2 / -2;
@@ -27,6 +28,7 @@
 
 .home__body {
   @extend .extend-body-styles;
+
   grid-column: 1 / -1;
 
   @include bp-medium {
@@ -47,20 +49,21 @@
   margin-bottom: 1rem;
   margin-left: 1rem;
   shape-outside: margin-box;
-  width: calc((((100vw - (2 * var(--content-padding)) - (11 * var(--column-gap)))/12) * 5) + (4 * var(--column-gap)));
+  width: calc((((100vw - (2 * var(--content-padding)) - (11 * var(--column-gap))) / 12) * 5) + (4 * var(--column-gap)));
 
   img { 
     @extend .extend-box-shadow;
+
     border-radius: 100%;
   }
 
   @include bp-medium {
-    margin-right: calc(-1 * ((((100vw - (2 * var(--content-padding)) - (11 * var(--column-gap)))/12)) + var(--column-gap)));
+    margin-right: calc(-1 * ((((100vw - (2 * var(--content-padding)) - (11 * var(--column-gap))) / 12)) + var(--column-gap)));
   }
 
   @include bp-x-large {
-    margin-right: calc(-1 * ((((var(--max-width-container) - (2 * var(--content-padding)) - (11 * var(--column-gap)))/12)) + var(--column-gap)));
-    width: calc((((var(--max-width-container) - (2 * var(--content-padding)) - (11 * var(--column-gap)))/12) * 5) + (4 * var(--column-gap)));
+    margin-right: calc(-1 * ((((var(--max-width-container) - (2 * var(--content-padding)) - (11 * var(--column-gap))) / 12)) + var(--column-gap)));
+    width: calc((((var(--max-width-container) - (2 * var(--content-padding)) - (11 * var(--column-gap))) / 12) * 5) + (4 * var(--column-gap)));
   }
 }
 

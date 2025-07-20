@@ -26,7 +26,6 @@
       @media screen {
         @supports (background-clip: text) or (-webkit-background-clip: text) {
           background: var(--gradient-link);
-          -webkit-background-clip: text;
           background-clip: text;
           color: transparent;
           text-decoration-color: var(--color-link);
@@ -281,14 +280,14 @@
 
   a:link,
   a:visited {
-    color: currentColor;
+    color: currentcolor;
     text-decoration-color: var(--color-link);
   }
 
   a:hover,
   a:active {
     color: var(--color-link-hover);
-    text-decoration-color: currentColor;
+    text-decoration-color: currentcolor;
   }
 
   a:focus {
@@ -371,8 +370,7 @@
       content: "";
       display: inline-block;
       height: 0.5rem;
-      margin-inline-start: 0.25rem;
-      margin-inline-end: -0.75rem;
+      margin-inline: 0.25rem -0.75rem;
       margin-top: -2px;
       vertical-align: middle;
       width: 0.5rem;
@@ -390,14 +388,13 @@
   @media screen {
     @supports (background-clip: text) or (-webkit-background-clip: text) {
       background: var(--gradient-heading);
-      -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
     }
 
     @supports (text-box-edge: cap) and (text-box-trim: trim-both) {
-      margin: 1rem 0 1rem 0;
-      padding: 1rem 0 1rem 0;
+      margin: 1rem 0;
+      padding: 1rem 0;
       text-box-edge: cap alphabetic;
       text-box-trim: trim-both;
     }
@@ -451,7 +448,7 @@
 
     g,
     path {
-      fill: currentColor;
+      fill: currentcolor;
     }
   }
 }

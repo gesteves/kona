@@ -10,22 +10,25 @@
   --color-oxford-blue:           #092034;
   --color-rich-black:            #061523;
   --color-rich-black-darker:     #030B11;
+
   // Reds
   --color-red-cmyk:         #F2022A;
   --color-rojo:             #DE0227;
   --color-firebrick:        #BF0222;
   --color-firebrick-darker: #B60220;
   --color-madder:           #A2021C;
+
   // Yellows
   --color-sunglow:        #F9CB40;
+
   // Pure Grays
   --color-cultured:       #FAFAFA;
   --color-platinum:       #EBEBEB;
   --color-gainsboro:      #E0E0E0;
   --color-silver-chalice: #ADADAD;
-  --color-spanish-gray:   #999999;
+  --color-spanish-gray:   #999;
   --color-sonic-silver:   #7A7A7A;
-  --color-granite-gray:   #666666;
+  --color-granite-gray:   #666;
   --color-jet:            #292929;
   --color-eerie-black:    #141414;
 
@@ -104,9 +107,9 @@
   --line-height-x-small:    2.4;
 
   // Fonts
-  --ibm-plex-mono:           'IBM Plex Mono', ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
-  --lato:                    'Lato', Inter, Roboto, 'Helvetica Neue', 'Arial Nova', 'Nimbus Sans', Arial, sans-serif;
-  --ibm-plex-sans-condensed: 'IBM Plex Sans Condensed', 'DIN Alternate', Bahnschrift, 'Franklin Gothic Medium', 'Nimbus Sans Narrow', sans-serif-condensed, sans-serif;
+  --ibm-plex-mono:           'IBM Plex Mono', ui-monospace, 'Cascadia Code', 'Source Code Pro', menlo, consolas, 'DejaVu Sans Mono', monospace;
+  --lato:                    'Lato', inter, roboto, 'Helvetica Neue', 'Arial Nova', 'Nimbus Sans', arial, sans-serif;
+  --ibm-plex-sans-condensed: 'IBM Plex Sans Condensed', 'DIN Alternate', bahnschrift, 'Franklin Gothic Medium', 'Nimbus Sans Narrow', sans-serif-condensed, sans-serif;
 
   // Other
   --transition-duration: 250ms;
@@ -124,13 +127,13 @@
     --font-x-small:        12px;
     --line-height-x-small: 3;
     --padding:             4rem;
-    --picture-outdent:     calc((100vw - (var(--content-padding) * 2) - (11 * var(--column-gap)))/12 + var(--column-gap));
+    --picture-outdent:     calc((100vw - (var(--content-padding) * 2) - (11 * var(--column-gap))) / 12 + var(--column-gap));
     --row-gap:             4rem;
     --light-icon-size:     1rem;
   }
 
   @include bp-x-large {
-    --picture-outdent: calc((var(--max-width-container) - (var(--content-padding) * 2) - (11 * var(--column-gap)))/12 + var(--column-gap));
+    --picture-outdent: calc((var(--max-width-container) - (var(--content-padding) * 2) - (11 * var(--column-gap))) / 12 + var(--column-gap));
   }
 
   @include dark-mode {
@@ -159,7 +162,6 @@
     --color-text-secondary:             var(--color-silver-chalice);
     --color-text-tertiary:              var(--color-sonic-silver);
     --color-text:                       var(--color-platinum);
-
     --gradient-background:       linear-gradient(180deg, var(--color-rich-black), var(--color-rich-black-darker));
     --gradient-heading:                 linear-gradient(180deg, var(--color-alice-blue), var(--color-columbia-blue));
   }
