@@ -99,3 +99,7 @@ The project uses Redis caching to speed up API calls during development and buil
 
 ### Environment Variables
 Extensive environment configuration is required for all external services. Check `.env.example` or README for required variables.
+
+## Code Style
+
+- Follow the rules defined in `.editorconfig`
