@@ -47,7 +47,6 @@ class PurpleAir
     fields = sensors['fields']
     lat_index = fields.index('latitude')
     lon_index = fields.index('longitude')
-    pm25_index = fields.index('pm2.5_atm')
     confidence_index = fields.index('confidence')
 
     valid_sensors = sensors['data'].reject { |sensor| sensor[confidence_index] < 50 }
