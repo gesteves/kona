@@ -1,4 +1,4 @@
-version: "6.7.1"
+version: "7.0.0"
 icons:
   classic:
     brands:
@@ -112,6 +112,7 @@ icons:
       - fire-smoke
       - smoke
       - arrow-down
+      - cloud-rainbow
     thin:
       - bolt-lightning
       - cloud-bolt

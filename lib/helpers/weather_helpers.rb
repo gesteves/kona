@@ -538,7 +538,9 @@ module WeatherHelpers
   # @return [String] The icon for the AQI.
   def aqi_icon(aqi)
     case aqi
-    when 0..100
+    when 0..50
+      "cloud-rainbow"
+    when 51..100
       "smog"
     when 101..200
       "smoke"
