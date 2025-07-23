@@ -539,7 +539,7 @@ module WeatherHelpers
   def aqi_icon(aqi)
     case aqi
     when 0..50
-      "rainbow"
+      "sun-haze"
     when 51..150
       "smog"
     when 151..200
