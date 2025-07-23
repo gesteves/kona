@@ -66,7 +66,6 @@ icons:
       - cloud-hail-mixed
       - cloud-question
       - cloud-rain
-      - cloud-rainbow
       - cloud-showers
       - cloud-showers-heavy
       - cloud-sleet
@@ -86,6 +85,7 @@ icons:
       - moon-cloud
       - moon-stars
       - mountains
+      - rainbow
       - raindrops
       - retweet
       - smog
