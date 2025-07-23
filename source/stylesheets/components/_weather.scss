@@ -18,9 +18,13 @@
     }
   }
 
-  g,
-  path {
-    fill: var(--color-heading);
+  svg {
+    aspect-ratio: 1 / 1;
+    
+    g,
+    path {
+      fill: var(--color-heading);
+    }
   }
 }
 
