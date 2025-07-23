@@ -540,9 +540,9 @@ module WeatherHelpers
     case aqi
     when 0..50
       "cloud-rainbow"
-    when 51..100
+    when 51..150
       "smog"
-    when 101..200
+    when 151..200
       "smoke"
     else
       "fire-smoke"
