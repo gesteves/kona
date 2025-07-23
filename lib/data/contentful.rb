@@ -394,9 +394,6 @@ class Contentful
 
     # Get AQI data for events in the next 4 days
     add_aqi_data(event) if days_until_event <= 4
-
-    # Get pollen data for events in the next 4 days
-    add_pollen_data(event) if days_until_event <= 4
   end
 
   # Adds weather forecast data to an event
@@ -439,52 +436,7 @@ class Contentful
     event[:weather] ||= {}
     event[:weather][:aqi] = aqi_data[:aqi]
     event[:weather][:aqi_condition] = aqi_data[:category]
-  end
-
-  # Adds pollen data to an event
-  def add_pollen_data(event)
-    lat = event[:coordinates][:lat]
-    lon = event[:coordinates][:lon]
-
-    event_date = DateTime.parse(event[:date]).in_time_zone(event[:time_zone]).to_date
-    pollen_service = GooglePollen.new(lat, lon, 4)
-    pollen_data = pollen_service.pollen
-
-    return unless pollen_data.present?
-
-    # Find the forecast for the specific event date
-    daily_info = pollen_data.dig(:dailyInfo)
-    return unless daily_info.present?
-
-    # Match based on the date portion only, ignoring time
-    event_pollen = daily_info.find do |day|
-      date_obj = day[:date]
-      next unless date_obj.present?
-
-      forecast_date = Date.new(date_obj[:year], date_obj[:month], date_obj[:day]) rescue nil
-      forecast_date == event_date
-    end
-
-    return unless event_pollen.present?
-
-    # Get the pollen index value and category using the same logic as the helpers
-    pollen_types = event_pollen[:pollenTypeInfo]
-    return unless pollen_types.present?
-
-    # Find the highest pollen index value
-    pollen_index = pollen_types.select { |p| p&.dig(:indexInfo, :value).to_i > 0 }
-                              .map { |p| p.dig(:indexInfo, :value) }
-                              .max.to_i
-
-    return if pollen_index.zero?
-
-    # Find the category for the highest pollen index
-    pollen_category = pollen_types.find { |p| p&.dig(:indexInfo, :value).to_i == pollen_index }
-                                 &.dig(:indexInfo, :category)
-
-    event[:weather] ||= {}
-    event[:weather][:pollen_index] = pollen_index
-    event[:weather][:pollen_category] = pollen_category
+    event[:weather][:aqi_description] = aqi_data[:description]
   end
 end
 

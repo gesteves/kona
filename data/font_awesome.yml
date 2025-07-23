@@ -27,47 +27,38 @@ icons:
       - calendar-star
       - typewriter
     light:
+      - arrow-down
       - arrow-right
+      - bars
+      - bolt-lightning
       - calendar
       - calendar-check
       - calendar-star
       - calendar-xmark
-      - comment
-      - eye
-      - heart
-      - location-dot
-      - retweet
-      - stopwatch
-      - tag
-      - tags
-      - triangle-exclamation
-      - clock-one
-      - clock-one-thirty
-      - clock-two
-      - clock-two-thirty
-      - clock-three
-      - clock-three-thirty
       - clock
-      - clock-four-thirty
-      - clock-five
-      - clock-five-thirty
-      - clock-six
-      - clock-six-thirty
-      - clock-seven
-      - clock-seven-thirty
       - clock-eight
       - clock-eight-thirty
-      - clock-nine
-      - clock-nine-thirty
-      - clock-ten
-      - clock-ten-thirty
       - clock-eleven
       - clock-eleven-thirty
+      - clock-five
+      - clock-five-thirty
+      - clock-four-thirty
+      - clock-nine
+      - clock-nine-thirty
+      - clock-one
+      - clock-one-thirty
+      - clock-seven
+      - clock-seven-thirty
+      - clock-six
+      - clock-six-thirty
+      - clock-ten
+      - clock-ten-thirty
+      - clock-three
+      - clock-three-thirty
       - clock-twelve
       - clock-twelve-thirty
-      - bars
-      - xmark
-      - bolt-lightning
+      - clock-two
+      - clock-two-thirty
       - cloud-bolt
       - cloud-drizzle
       - cloud-fog
@@ -75,6 +66,7 @@ icons:
       - cloud-hail-mixed
       - cloud-question
       - cloud-rain
+      - cloud-rainbow
       - cloud-showers
       - cloud-showers-heavy
       - cloud-sleet
@@ -83,36 +75,42 @@ icons:
       - clouds
       - clouds-moon
       - clouds-sun
+      - comment
+      - droplet-percent
+      - eye
       - fire-smoke
+      - fire-smoke
+      - heart
       - hurricane
+      - location-dot
       - moon-cloud
       - moon-stars
+      - mountains
+      - raindrops
+      - retweet
+      - smog
+      - smoke
       - snow-blowing
       - snowflake
       - snowflakes
+      - stopwatch
       - sun
       - sun-cloud
       - sun-dust
-      - temperature-snow
-      - temperature-sun
-      - tornado
-      - wind
-      - temperature-three-quarters
-      - temperature-low
-      - temperature-high
-      - raindrops
-      - windsock
-      - wind
-      - droplet-percent
-      - smog
       - sunrise
       - sunset
-      - mountains
-      - leaf
-      - fire-smoke
-      - smoke
-      - arrow-down
-      - cloud-rainbow
+      - tag
+      - tags
+      - temperature-high
+      - temperature-low
+      - temperature-snow
+      - temperature-sun
+      - temperature-three-quarters
+      - tornado
+      - triangle-exclamation
+      - wind
+      - wind
+      - xmark
     thin:
       - bolt-lightning
       - cloud-bolt
