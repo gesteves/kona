@@ -362,7 +362,7 @@ module WeatherHelpers
   # Determines if it's a hot one.
   # @return [String, nil] The opening words of the Grammy-award winning 1999 hit SMOOTH by Santana featuring Rob Thomas of Matchbox Twenty off the multi-platinum album Supernatural.
   def smooth
-    "Man, it's a hot one!" if !is_race_day? && is_hot?
+    "Man, it's a hot one!" if !is_race_day? && is_hot? && is_daytime?
   end
 
   # Provides a summary of current weather conditions.
