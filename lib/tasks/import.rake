@@ -140,7 +140,7 @@ def measure_and_output(method, description)
     puts "✅ #{description} completed in #{format_duration(duration)}"
   rescue => e
     duration = Time.now - start_time
-    puts "❌ #{description} failed after #{format_duration(duration)}"
+    puts "❎ #{description} failed after #{format_duration(duration)}"
     puts "   Error: #{e.message}"
     raise e
   end
