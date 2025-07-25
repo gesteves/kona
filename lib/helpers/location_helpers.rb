@@ -3,9 +3,10 @@ module LocationHelpers
   # Formats location information based on address components from the Google Maps API.
   # Handles special formatting for some specific locations.
   # @see https://developers.google.com/maps/documentation/geocoding/requests-geocoding#GeocodingResponses
+  # @param location [Hash] The location data hash containing geocoded information.
   # @return [String] The formatted location string.
-  def format_location
-    components = data.location.geocoded.address_components
+  def format_location(location = data.location)
+    components = location.geocoded.address_components
 
     # Extract city, state/region, and country names from the components
     city = components.find { |component| component.types.include?('locality') }&.long_name || components.find { |component| component.types.include?('sublocality') }&.long_name
@@ -47,9 +48,11 @@ module LocationHelpers
     end
   end
 
-  # Returns the elevation for the current location formatted in meters and feet.
+  # Returns the elevation for the location formatted in meters and feet.
+  # @param elevation [Float] The elevation value in meters.
+  # @param abbreviated [Boolean] Whether to use abbreviated units (ft vs feet).
   # @return [String] A formatted elevation value with units in both meters and feet.
-  def format_elevation(elevation = data.location.elevation, abbreviated = false)
+  def format_elevation(elevation = data.location&.elevation, abbreviated = false)
     return if elevation.blank?
     meters = "#{number_to_rounded(elevation, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')} m"
     feet = number_to_rounded(meters_to_feet(elevation), precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')
@@ -62,15 +65,17 @@ module LocationHelpers
   end
 
   # Checks if the location is, well, Jackson Hole.
+  # @param location [Hash] The location data hash containing geocoded information.
   # @return [Boolean] True if the location matches, false otherwise.
-  def in_jackson_hole?
-    format_location == 'Jackson Hole, Wyoming'
+  def in_jackson_hole?(location = data.location)
+    format_location(location) == 'Jackson Hole, Wyoming'
   end
 
-  # Returns the time zone ID for the current location.
-  # @return [String] The time zone ID for the current location.
-  def location_time_zone
-    data&.location&.time_zone&.time_zone_id || 'America/Denver'
+  # Returns the time zone ID for the location.
+  # @param location [Hash] The location data hash containing time zone information.
+  # @return [String] The time zone ID for the location.
+  def location_time_zone(location = data.location)
+    location&.time_zone&.time_zone_id || 'America/Denver'
   end
 
   # Returns the current time in the current location's time zone
