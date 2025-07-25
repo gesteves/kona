@@ -1,5 +1,5 @@
 <section class="event__weather" aria-labelledby="weather-hed-<%= event.sys.id.parameterize %>" data-nosnippet>
-  <h5 class="event__weather-heading" id="weather-hed-<%= event.sys.id.parameterize %>"><% if is_today?(event) %>Today’s Weather<% else %>Race Day Weather<% end %></h5>
+  <h5 class="event__weather-heading" id="weather-hed-<%= event.sys.id.parameterize %>">Race Day Weather</h5>
   <div class="event__weather-stats">
     <div class="event__weather-stat-group">
       <span class="event__weather-stat"><span class="sr-only">Location:</span> <%= icon_svg("classic", "light", "location-dot") %> <%= event.location %></span>
