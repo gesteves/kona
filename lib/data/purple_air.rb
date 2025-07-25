@@ -128,7 +128,8 @@ class PurpleAir
                       [calculate_aqi(pm25, 225.5, 500.0, 301, 500), 'Hazardous']
                     end
 
-    { aqi: aqi, category: category }.compact
+    description = category == 'Unhealthy for sensitive groups' ? 'Unhealthy air quality for sensitive groups' : "#{category} air quality"
+    { aqi: aqi, category: category, description: description }.compact
   end
 
   # Calculates the AQI based on PM2.5 value and breakpoints.

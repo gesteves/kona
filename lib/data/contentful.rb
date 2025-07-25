@@ -380,63 +380,45 @@ class Contentful
     maps = GoogleMaps.new(lat, lon)
     time_zone = maps.time_zone_id
     country_code = maps.country_code
-    elevation = maps.location&.dig(:elevation)
 
     return unless time_zone.present? && country_code.present?
 
-    # Add time zone and elevation to base event
-    event[:time_zone] = time_zone
-    event[:elevation] = elevation
-    event[:country_code] = country_code
+    # Add location data to event
+    event[:location_data] = maps.location
 
     # Get weather forecast
-    add_weather_forecast(event)
+    add_weather_forecast(event, time_zone, country_code)
 
     # Get AQI data for events in the next 4 days
     add_aqi_data(event) if days_until_event <= 4
   end
 
   # Adds weather forecast data to an event
-  def add_weather_forecast(event)
-    event_date = DateTime.parse(event[:date]).in_time_zone(event[:time_zone]).to_date
+  def add_weather_forecast(event, time_zone, country_code)
     lat = event[:coordinates][:lat]
     lon = event[:coordinates][:lon]
-    time_zone = event[:time_zone]
-    country_code = event[:country_code]
 
     weather_kit = WeatherKit.new(lat, lon, time_zone, country_code)
     weather_data = weather_kit.weather
 
     return unless weather_data.present?
 
-    daily_forecast = weather_data.dig(:forecastDaily, :days)
-
-    event_forecast = daily_forecast&.find do |day|
-      forecast_date = DateTime.parse(day[:forecastStart]).in_time_zone(event[:time_zone]).to_date rescue nil
-      forecast_date == event_date
-    end
-
-    return unless event_forecast.present?
-
-    event[:weather] = event_forecast.deep_transform_keys { |k| k.to_s.underscore.to_sym }
+    event[:weather] = weather_data
   end
 
   # Adds AQI data to an event
   def add_aqi_data(event)
     lat = event[:coordinates][:lat]
     lon = event[:coordinates][:lon]
-    country_code = event[:country_code]
-    event_date = DateTime.parse(event[:date]).in_time_zone(event[:time_zone])
+    country_code = event[:location_data]&.dig(:geocoded, :address_components)&.find { |component| component[:types].include?('country') }&.dig(:short_name)
+    event_date = DateTime.parse(event[:date]).in_time_zone(event[:location_data]&.dig(:time_zone, :time_zone_id))
 
     aqi_service = GoogleAirQuality.new(lat, lon, country_code, 'usa_epa_nowcast', event_date)
     aqi_data = aqi_service.aqi
 
     return unless aqi_data.present?
 
-    event[:weather] ||= {}
-    event[:weather][:aqi] = aqi_data[:aqi]
-    event[:weather][:aqi_condition] = aqi_data[:category]
-    event[:weather][:aqi_description] = aqi_data[:description]
+    event[:aqi] = aqi_data
   end
 end
 
