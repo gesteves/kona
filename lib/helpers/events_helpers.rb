@@ -60,6 +60,7 @@ module EventsHelpers
   # @return [Boolean] True if the event is featured; false otherwise.
   def is_featured?(event)
     return false if event.blank?
+    return false if is_today?(event) && is_evening?
     is_close?(event) && is_next?(event) && has_weather_data?(event)
   end
 
