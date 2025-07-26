@@ -262,6 +262,8 @@
 
 .entry--compact,
 .entry--summary {
+  grid-template-rows: auto 1fr;
+  
   .entry__hed {
     font-size: var(--font-medium);
     line-height: var(--line-height-medium);
