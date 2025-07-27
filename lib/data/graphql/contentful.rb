@@ -172,7 +172,6 @@ module ContentfulClient
           title
           summary
           description
-          location
           coordinates {
             lat
             lon

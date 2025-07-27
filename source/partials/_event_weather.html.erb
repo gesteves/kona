@@ -6,7 +6,7 @@
   <h5 class="event__weather-heading" id="weather-hed-<%= event.sys.id.parameterize %>">Race Day Weather</h5>
   <div class="event__weather-stats">
     <div class="event__weather-stat-group">
-      <span class="event__weather-stat"><span class="sr-only">Location:</span> <%= icon_svg("classic", "light", "location-dot") %> <%= event.location_data&.present? ? format_location(event.location_data) : event.location %></span>
+      <span class="event__weather-stat"><span class="sr-only">Location:</span> <%= icon_svg("classic", "light", "location-dot") %> <%= format_location(event.location_data) %></span>
       <% if event.location_data&.elevation.present? %>
         <span class="event__weather-stat" title="Elevation"><span class="sr-only">Elevation:</span> <%= icon_svg("classic", "light", "mountains") %> <%= format_elevation(event.location_data.elevation, true) %></span>
       <% end %>

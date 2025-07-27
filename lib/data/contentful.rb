@@ -354,49 +354,43 @@ class Contentful
   # Processes events and adds weather forecasts for upcoming races within the next 10 days.
   def process_events
     @content[:events].map! do |event|
-      process_event_weather(event)
+      if ENV['DEBUG_EVENT_DATE'].present?
+        days = ENV['DEBUG_EVENT_DATE'].to_i
+        event[:date] = days.days.from_now.to_s
+      end
+
+      add_event_location(event)
+      add_event_weather(event)
+      add_event_aqi(event)
+
       event[:entry_type] = 'Event'
       event
     end
   end
 
-  # Processes weather data for a single event
-  def process_event_weather(event)
-    return unless event[:coordinates]&.dig(:lat) && event[:coordinates]&.dig(:lon) && event[:going]
+  # Geocodes the event coordinates and adds the location data to the event.
+  def add_event_location(event)
+    lat = event.dig(:coordinates, :lat)
+    lon = event.dig(:coordinates, :lon)
+    return if lat.blank? || lon.blank?
 
-    if ENV['DEBUG_EVENT_WEATHER'].present?
-      days = ENV['DEBUG_EVENT_WEATHER'].to_i
-      event[:date] = days.days.from_now.to_s
-    end
-
-    lat = event[:coordinates][:lat]
-    lon = event[:coordinates][:lon]
-    event_date = Date.parse(event[:date])
-    days_until_event = (event_date - Date.current).to_i
-
-    return unless days_until_event.between?(0, 10)
-
-    # Get location data from Google Maps
     maps = GoogleMaps.new(lat, lon)
-    time_zone = maps.time_zone_id
-    country_code = maps.country_code
-
-    return unless time_zone.present? && country_code.present?
-
-    # Add location data to event
-    event[:location_data] = maps.location
-
-    # Get weather forecast
-    add_weather_forecast(event, time_zone, country_code)
-
-    # Get AQI data for events in the next 4 days
-    add_aqi_data(event) if days_until_event <= 4
+    event[:location] = maps.location
   end
 
-  # Adds weather forecast data to an event
-  def add_weather_forecast(event, time_zone, country_code)
-    lat = event[:coordinates][:lat]
-    lon = event[:coordinates][:lon]
+  # Adds weather forecast data to an event.
+  def add_event_weather(event)
+    puts event[:title]
+    lat = event.dig(:coordinates, :lat)
+    lon = event.dig(:coordinates, :lon)
+    country_code = event.dig(:location, :geocoded, :address_components)&.find { |component| component[:types].include?('country') }&.dig(:short_name)
+    puts "country_code: #{country_code}"
+    time_zone = event.dig(:location, :time_zone, :time_zone_id)
+    puts "time_zone: #{time_zone}"
+    event_date = DateTime.parse(event[:date]).in_time_zone(time_zone)
+    days_until_event = (event_date - Date.current).to_i
+
+    return if lat.blank? || lon.blank? || time_zone.blank? || country_code.blank? || days_until_event.between?(0, 10)
 
     weather_kit = WeatherKit.new(lat, lon, time_zone, country_code)
     weather_data = weather_kit.weather
@@ -406,12 +400,16 @@ class Contentful
     event[:weather] = weather_data
   end
 
-  # Adds AQI data to an event
-  def add_aqi_data(event)
-    lat = event[:coordinates][:lat]
-    lon = event[:coordinates][:lon]
-    country_code = event[:location_data]&.dig(:geocoded, :address_components)&.find { |component| component[:types].include?('country') }&.dig(:short_name)
-    event_date = DateTime.parse(event[:date]).in_time_zone(event[:location_data]&.dig(:time_zone, :time_zone_id))
+  # Adds AQI data to an event.
+  def add_event_aqi(event)
+    lat = event.dig(:coordinates, :lat)
+    lon = event.dig(:coordinates, :lon)
+    country_code = event.dig(:location, :geocoded, :address_components)&.find { |component| component[:types].include?('country') }&.dig(:short_name)
+    time_zone = event.dig(:location, :time_zone, :time_zone_id)
+    event_date = DateTime.parse(event[:date]).in_time_zone(time_zone)
+    days_until_event = (event_date - Date.current).to_i
+
+    return if lat.blank? || lon.blank? || country_code.blank? || days_until_event.between?(0, 4)
 
     aqi_service = GoogleAirQuality.new(lat, lon, country_code, 'usa_epa_nowcast', event_date)
     aqi_data = aqi_service.aqi
