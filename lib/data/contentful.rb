@@ -385,9 +385,10 @@ class Contentful
     country_code = event.dig(:location, :geocoded, :address_components)&.find { |component| component[:types].include?('country') }&.dig(:short_name)
     time_zone = event.dig(:location, :time_zone, :time_zone_id)
     event_date = DateTime.parse(event[:date]).in_time_zone(time_zone)
-    days_until_event = (event_date.to_date - Date.current).to_i
+    days_until_event = (event_date.to_date - Time.current.in_time_zone(time_zone).to_date).to_i
 
-    return if lat.blank? || lon.blank? || time_zone.blank? || country_code.blank? || days_until_event.between?(0, 10)
+    return if lat.blank? || lon.blank? || time_zone.blank? || country_code.blank?
+    return unless days_until_event.between?(0, 10)
 
     weather_kit = WeatherKit.new(lat, lon, time_zone, country_code)
     weather_data = weather_kit.weather
@@ -404,9 +405,10 @@ class Contentful
     country_code = event.dig(:location, :geocoded, :address_components)&.find { |component| component[:types].include?('country') }&.dig(:short_name)
     time_zone = event.dig(:location, :time_zone, :time_zone_id)
     event_date = DateTime.parse(event[:date]).in_time_zone(time_zone)
-    days_until_event = (event_date.to_date - Date.current).to_i
+    days_until_event = (event_date.to_date - Time.current.in_time_zone(time_zone).to_date).to_i
 
-    return if lat.blank? || lon.blank? || country_code.blank? || days_until_event.between?(0, 4)
+    return if lat.blank? || lon.blank? || country_code.blank?
+    return unless days_until_event.between?(0, 4)
 
     aqi_service = GoogleAirQuality.new(lat, lon, country_code, 'usa_epa_nowcast', event_date)
     aqi_data = aqi_service.aqi
