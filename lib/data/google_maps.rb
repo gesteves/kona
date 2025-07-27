@@ -16,8 +16,8 @@ class GoogleMaps
     @latitude = latitude
     @longitude = longitude
     @location = {}
-    @location[:geocoded] = reverse_geocode&.deep_transform_keys { |key| key.to_s.underscore }
-    @location[:time_zone] = get_time_zone&.deep_transform_keys { |key| key.to_s.underscore }
+    @location[:geocoded] = reverse_geocode&.deep_transform_keys { |key| key.to_s.underscore.to_sym }
+    @location[:time_zone] = get_time_zone&.deep_transform_keys { |key| key.to_s.underscore.to_sym }
     @location[:elevation] = get_elevation&.dig(:elevation)
   end
 

@@ -20,7 +20,7 @@ class WeatherKit
     @longitude = longitude
     @time_zone = time_zone
     @country = country
-    @weather = get_weather&.deep_transform_keys { |key| key.to_s.underscore }
+    @weather = get_weather&.deep_transform_keys { |key| key.to_s.underscore.to_sym }
   end
 
   # Saves the current weather data to a JSON file.
