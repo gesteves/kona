@@ -66,11 +66,11 @@ def initialize_location
 end
 
 def import_contentful
-  safely_perform { Contentful.new.save_data }
+  Contentful.new.save_data
 end
 
 def import_font_awesome
-  safely_perform { FontAwesome.new.save_data }
+  FontAwesome.new.save_data
 end
 
 def import_intervals
@@ -119,9 +119,7 @@ end
 
 
 def import_dark_visitors
-  safely_perform {
-    DarkVisitors.new.save_data
-  }
+  DarkVisitors.new.save_data
 end
 
 def safely_perform
