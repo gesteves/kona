@@ -6,6 +6,7 @@ module LocationHelpers
   # @param location [Hash] The location data hash containing geocoded information.
   # @return [String] The formatted location string.
   def format_location(location = data.location)
+    return if location.blank?
     components = location.geocoded.address_components
 
     # Extract city, state/region, and country names from the components
