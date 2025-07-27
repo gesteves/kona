@@ -3,7 +3,7 @@
     <header class="entry__header">
       <p class="entry__meta">
         <%= event_timestamp_tag(event) %>
-        <span><%= icon_svg("classic", "light", "location-dot") %> <%= event.location %></span>
+        <span><%= icon_svg("classic", "light", "location-dot") %> <%= format_location(event.location) %></span>
       </p>
       <h4 class="entry__hed" id="hed-<%= event.sys.id.parameterize %>">
         <% if event.url.present? %>

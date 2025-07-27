@@ -20,12 +20,12 @@ class WeatherKit
     @longitude = longitude
     @time_zone = time_zone
     @country = country
-    @weather = get_weather
+    @weather = get_weather&.deep_transform_keys { |key| key.to_s.underscore.to_sym }
   end
 
   # Saves the current weather data to a JSON file.
   def save_data
-    File.open('data/weather.json','w'){ |f| f << @weather&.deep_transform_keys { |key| key.to_s.underscore }.to_json }
+    File.open('data/weather.json','w'){ |f| f << @weather.to_json }
   end
 
   private

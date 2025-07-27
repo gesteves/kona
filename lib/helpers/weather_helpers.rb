@@ -9,77 +9,105 @@ module WeatherHelpers
   }
 
   # Returns if the current weather data is still current.
+  # @param weather [Hash] The weather data hash.
   # @return [Boolean] True if the weather data is still current.
-  def weather_data_is_current?
-    current_weather.present? && todays_forecast.present?
+  def weather_data_is_current?(weather = data.weather)
+    current_weather(weather).present? && todays_forecast(weather).present?
   end
 
   # Returns if the current weather data is stale/out of date.
+  # @param weather [Hash] The weather data hash.
   # @return [Boolean] True if the weather data is stale.
-  def weather_data_is_stale?
-    !weather_data_is_current?
+  def weather_data_is_stale?(weather = data.weather)
+    !weather_data_is_current?(weather)
   end
 
   # Retrieves the current weather conditions.
+  # @param weather [Hash] The weather data hash.
   # @return [Hash, nil] The current weather conditions data, or nil if not found.
-  def current_weather
-    data.weather.current_weather
+  def current_weather(weather = data.weather)
+    weather&.current_weather
   end
 
   # Retrieves the forecast for the current day.
+  # @param weather [Hash] The weather data hash.
   # @return [Hash, nil] The forecast data for today, or nil if not found.
-  def todays_forecast
+  def todays_forecast(weather = data.weather)
     now = Time.now
-    data.weather.forecast_daily&.days&.find { |d| d.rest_of_day_forecast.present? && Time.parse(d.forecast_start) <= now && Time.parse(d.forecast_end) >= now }
+    weather&.forecast_daily&.days&.find { |d| d.rest_of_day_forecast.present? && Time.parse(d.forecast_start) <= now && Time.parse(d.forecast_end) >= now }
   end
 
   # Returns the forecast for the rest of the day if it's daytime, or the overnight forecast after sunset.
+  # @param weather [Hash] The weather data hash.
   # @return [Hash] The forecast data for the rest of the day or night.
-  def rest_of_day_forecast
-    is_evening? ? todays_forecast.overnight_forecast : todays_forecast.rest_of_day_forecast
+  def rest_of_day_forecast(weather = data.weather)
+    forecast = todays_forecast(weather)
+    is_evening? ? forecast&.overnight_forecast : forecast&.rest_of_day_forecast
   end
 
   # Retrieves the forecast for tomorrow.
+  # @param weather [Hash] The weather data hash.
   # @return [Hash, nil] The forecast data for tomorrow, or nil if not found.
-  def tomorrows_forecast
+  def tomorrows_forecast(weather = data.weather)
     now = Time.now
-    data.weather.forecast_daily.days.find { |d| Time.parse(d.forecast_start) > now }
+    weather&.forecast_daily&.days&.find { |d| Time.parse(d.forecast_start) > now }
   end
 
   # Retrieves the time of sunrise for today.
+  # @param weather [Hash] The weather data hash.
+  # @param location [Hash] The location data hash.
   # @return [Time, nil] The time of sunrise today, or nil if not found.
-  def sunrise
-    Time.parse(todays_forecast.sunrise).in_time_zone(location_time_zone)
+  def sunrise(weather = data.weather, location = data.location)
+    forecast = todays_forecast(weather)
+    return nil unless forecast&.sunrise
+    Time.parse(forecast.sunrise).in_time_zone(location_time_zone(location))
   end
 
   # Retrieves the time of sunrise for tomorrow.
+  # @param weather [Hash] The weather data hash.
+  # @param location [Hash] The location data hash.
   # @return [Time, nil] The time of sunrise tomorrow, or nil if not found.
-  def tomorrows_sunrise
-    Time.parse(tomorrows_forecast.sunrise).in_time_zone(location_time_zone)
+  def tomorrows_sunrise(weather = data.weather, location = data.location)
+    forecast = tomorrows_forecast(weather)
+    return nil unless forecast&.sunrise
+    Time.parse(forecast.sunrise).in_time_zone(location_time_zone(location))
   end
 
   # Retrieves the time of sunset for today.
+  # @param weather [Hash] The weather data hash.
+  # @param location [Hash] The location data hash.
   # @return [Time, nil] The time of sunset today, or nil if not found.
-  def sunset
-    Time.parse(todays_forecast.sunset).in_time_zone(location_time_zone)
+  def sunset(weather = data.weather, location = data.location)
+    forecast = todays_forecast(weather)
+    return nil unless forecast&.sunset
+    Time.parse(forecast.sunset).in_time_zone(location_time_zone(location))
   end
 
   # Checks if it is currently daytime (i.e. between sunrise and sunset).
+  # @param weather [Hash] The weather data hash.
+  # @param location [Hash] The location data hash.
   # @return [Boolean] true if it is daytime, false otherwise.
-  def is_daytime?
+  def is_daytime?(weather = data.weather, location = data.location)
     now = Time.now
-    if data.weather.present?
-      now >= sunrise.beginning_of_hour && now <= sunset.beginning_of_hour
+    if weather.present?
+      sunrise_time = sunrise(weather, location)
+      sunset_time = sunset(weather, location)
+      return now.hour >= 6 && now.hour < 18 unless sunrise_time && sunset_time
+      now >= sunrise_time.beginning_of_hour && now <= sunset_time.beginning_of_hour
     else
       now.hour >= 6 && now.hour < 18
     end
   end
 
   # Checks if it is currently evening (i.e. after sunset).
+  # @param weather [Hash] The weather data hash.
+  # @param location [Hash] The location data hash.
   # @return [Boolean] true if it is evening, false otherwise.
-  def is_evening?
-    if data.weather.present?
-      Time.now >= sunset.beginning_of_hour
+  def is_evening?(weather = data.weather, location = data.location)
+    if weather.present?
+      sunset_time = sunset(weather, location)
+      return Time.now.hour >= 18 unless sunset_time
+      Time.now >= sunset_time.beginning_of_hour
     else
       Time.now.hour >= 18
     end
@@ -87,9 +115,11 @@ module WeatherHelpers
 
   # Determines whether to refer to the current time as "Today" or "Tonight"
   # based on the time of day (evening or not).
+  # @param weather [Hash] The weather data hash.
+  # @param location [Hash] The location data hash.
   # @return [String] "Today" if it's not evening, "Tonight" if it's evening.
-  def today_or_tonight
-    is_evening? ? "Tonight" : "Today"
+  def today_or_tonight(weather = data.weather, location = data.location)
+    is_evening?(weather, location) ? "Tonight" : "Today"
   end
 
   # Formats the current weather condition based on its condition code.
@@ -497,13 +527,15 @@ module WeatherHelpers
   # Determines the weather icon to display based on current weather conditions.
   # @param condition_code [String] The condition code to use for the icon.
   # @param variant [Symbol] The variant of the icon to display.
+  # @param weather [Hash] The weather data hash.
+  # @param location [Hash] The location data hash.
   # @return [String] The name of the weather icon to display.
-  def weather_icon(condition_code = current_weather.condition_code, variant = :auto)
+  def weather_icon(condition_code = current_weather&.condition_code, variant = :auto, weather = data.weather, location = data.location)
     condition = data.conditions[condition_code]
     return 'cloud-question' if condition.blank?
     return condition[:icon] if condition[:icon].is_a?(String)
     if variant == :auto
-      is_daytime? ? condition[:icon][:day] : condition[:icon][:night]
+      is_daytime?(weather, location) ? condition[:icon][:day] : condition[:icon][:night]
     elsif variant == :day
       condition[:icon][:day]
     elsif variant == :night

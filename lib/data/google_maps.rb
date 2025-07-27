@@ -16,15 +16,15 @@ class GoogleMaps
     @latitude = latitude
     @longitude = longitude
     @location = {}
-    @location[:geocoded] = reverse_geocode
-    @location[:time_zone] = get_time_zone
+    @location[:geocoded] = reverse_geocode&.deep_transform_keys { |key| key.to_s.underscore.to_sym }
+    @location[:time_zone] = get_time_zone&.deep_transform_keys { |key| key.to_s.underscore.to_sym }
     @location[:elevation] = get_elevation&.dig(:elevation)
   end
 
   # Returns a timezone ID of the form "America/Denver".
   # @return [String, nil] the timezone ID.
   def time_zone_id
-    @location&.dig(:time_zone, :timeZoneId)
+    @location&.dig(:time_zone, :time_zone_id)
   end
 
   # Returns the country code for the specified coordinates.
@@ -35,7 +35,7 @@ class GoogleMaps
 
   # Saves the geocode and time zone data to JSON files.
   def save_data
-    File.open('data/location.json', 'w') { |f| f << @location&.deep_transform_keys { |key| key.to_s.underscore }.to_json }
+    File.open('data/location.json', 'w') { |f| f << @location.to_json }
   end
 
   private
@@ -110,7 +110,7 @@ class GoogleMaps
     data = JSON.parse(response.body, symbolize_names: true)
     return unless data[:status] == 'OK'
 
-    $redis.setex(cache_key, 1.hour, data.to_json)
+    $redis.setex(cache_key, 1.day, data.to_json)
     data
   end
 end
