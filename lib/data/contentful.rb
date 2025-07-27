@@ -380,15 +380,12 @@ class Contentful
 
   # Adds weather forecast data to an event.
   def add_event_weather(event)
-    puts event[:title]
     lat = event.dig(:coordinates, :lat)
     lon = event.dig(:coordinates, :lon)
     country_code = event.dig(:location, :geocoded, :address_components)&.find { |component| component[:types].include?('country') }&.dig(:short_name)
-    puts "country_code: #{country_code}"
     time_zone = event.dig(:location, :time_zone, :time_zone_id)
-    puts "time_zone: #{time_zone}"
     event_date = DateTime.parse(event[:date]).in_time_zone(time_zone)
-    days_until_event = (event_date - Date.current).to_i
+    days_until_event = (event_date.to_date - Date.current).to_i
 
     return if lat.blank? || lon.blank? || time_zone.blank? || country_code.blank? || days_until_event.between?(0, 10)
 
@@ -407,7 +404,7 @@ class Contentful
     country_code = event.dig(:location, :geocoded, :address_components)&.find { |component| component[:types].include?('country') }&.dig(:short_name)
     time_zone = event.dig(:location, :time_zone, :time_zone_id)
     event_date = DateTime.parse(event[:date]).in_time_zone(time_zone)
-    days_until_event = (event_date - Date.current).to_i
+    days_until_event = (event_date.to_date - Date.current).to_i
 
     return if lat.blank? || lon.blank? || country_code.blank? || days_until_event.between?(0, 4)
 
