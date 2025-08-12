@@ -75,11 +75,11 @@
     <% end %>
     <% if event_day&.sunrise.present? || event_day&.sunset.present? %>
       <div class="event__weather-stat-group">
-        <% if event_day&.sunrise.present? && event.location_data&.time_zone&.timeZoneId.present? %>
-          <span class="event__weather-stat" title="Sunrise"><span class="sr-only">Sunrise:</span> <%= icon_svg("classic", "light", "sunrise") %> <%= Time.parse(event_day.sunrise).in_time_zone(event.location_data.time_zone.timeZoneId).strftime("%I:%M %p").gsub(/(am|pm)/i, "<abbr>\\1</abbr>") %></span>
+        <% if event_day&.sunrise.present? && event.location&.time_zone&.time_zone_id.present? %>
+          <span class="event__weather-stat" title="Sunrise"><span class="sr-only">Sunrise:</span> <%= icon_svg("classic", "light", "sunrise") %> <%= Time.parse(event_day.sunrise).in_time_zone(event.location.time_zone.time_zone_id).strftime("%I:%M %p").gsub(/(am|pm)/i, "<abbr>\\1</abbr>") %></span>
         <% end %>
-        <% if event_day&.sunset.present? && event.location_data&.time_zone&.timeZoneId.present? %>
-          <span class="event__weather-stat" title="Sunset"><span class="sr-only">Sunset:</span> <%= icon_svg("classic", "light", "sunset") %> <%= Time.parse(event_day.sunset).in_time_zone(event.location_data.time_zone.timeZoneId).strftime("%I:%M %p").gsub(/(am|pm)/i, "<abbr>\\1</abbr>") %></span>
+        <% if event_day&.sunset.present? && event.location&.time_zone&.time_zone_id.present? %>
+          <span class="event__weather-stat" title="Sunset"><span class="sr-only">Sunset:</span> <%= icon_svg("classic", "light", "sunset") %> <%= Time.parse(event_day.sunset).in_time_zone(event.location.time_zone.time_zone_id).strftime("%I:%M %p").gsub(/(am|pm)/i, "<abbr>\\1</abbr>") %></span>
         <% end %>
       </div>
     <% end %>
