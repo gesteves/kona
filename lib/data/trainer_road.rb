@@ -70,7 +70,8 @@ class TrainerRoad
     discipline = determine_discipline(name)
 
     summary = human_readable_summary(duration, discipline)
-    description = event.description.sub(/.*?Description: /, '')
+    description_text = event.description.is_a?(Array) ? event.description.first.to_s : event.description.to_s
+    description = description_text.sub(/.*?Description: /, '')
 
     {
       duration: duration,
