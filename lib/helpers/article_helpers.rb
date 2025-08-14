@@ -336,7 +336,7 @@ module ArticleHelpers
     path = article.path.gsub(/\/index.html$/, '/')
     from = DateTime.parse(article.published_at).in_time_zone(location_time_zone).strftime('%Y-%m-%d')
     to = current_time.strftime('%Y-%m-%d')
-    "https://plausible.io/#{ENV['PLAUSIBLE_SITE_ID']}?period=custom&filters=((is,page,(#{path})))&from=#{from}&to=#{to}"
+    "https://plausible.io/#{ENV['PLAUSIBLE_SITE_ID']}?f=is,page,#{path}&period=custom&from=#{from}&to=#{to}&r=v2"
   end
 
   # Calculates the number of days since an article was published.
