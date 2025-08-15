@@ -38,7 +38,7 @@ class WhoopOAuth
     params = {
       client_id: @client_id,
       response_type: 'code',
-      scope: 'offline read:sleep read:recovery read:cycles',
+      scope: 'offline read:recovery read:cycles read:workout read:sleep read:profile read:body_measurement',
       redirect_uri: @redirect_uri,
       state: state
     }

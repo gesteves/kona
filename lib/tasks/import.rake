@@ -28,6 +28,15 @@ namespace :import do
     measure_and_output(:import_aqi, "Importing air quality data")
     measure_and_output(:import_pollen, "Importing pollen data")
   end
+
+  desc 'Imports Whoop data'
+  task :whoop => [:dotenv] do
+    setup_data_directory
+    initialize_redis
+    initialize_location
+    measure_and_output(:import_whoop, "Importing Whoop data")
+  end
+
 end
 
 desc 'Imports all content for the site'
@@ -49,6 +58,7 @@ task :import => [:dotenv, :clobber] do
   measure_and_output(:import_aqi, "Importing air quality data")
   measure_and_output(:import_pollen, "Importing pollen data")
   measure_and_output(:import_trainer_road, "Importing today's workouts")
+  measure_and_output(:import_whoop, "Importing Whoop data")
   measure_and_output(:import_dark_visitors, "Importing robots.txt directives")
   
   total_duration = Time.now - overall_start_time
@@ -117,6 +127,13 @@ def import_trainer_road
   }
 end
 
+
+def import_whoop
+  safely_perform { 
+    @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
+    Whoop.new(@google_maps.time_zone_id).save_data 
+  }
+end
 
 def import_dark_visitors
   DarkVisitors.new.save_data
