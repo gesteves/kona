@@ -2,8 +2,9 @@ require 'dotenv/tasks'
 require 'rake/clean'
 require 'redis'
 
-# Require all Ruby files in the lib/data directory
+# Require all Ruby files in the lib/data and lib/utils directories
 Dir["lib/data/*.rb"].each { |file| require_relative file }
+Dir["lib/utils/*.rb"].each { |file| require_relative file }
 
 # Import tasks from lib/tasks
 Dir.glob('lib/tasks/**/*.rake').each { |r| import r }
