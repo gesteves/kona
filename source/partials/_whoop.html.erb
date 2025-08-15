@@ -1,0 +1,5 @@
+<section class="stats" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= url_for('/xhr/whoop.html') %>" data-action="visibilitychange@document->live-update#handleVisibilityChange">
+  <%= partial 'partials/stats/whoop', locals: { metric: 'Sleep', value: whoop_sleep_score, unit: '%' } %>
+  <%= partial 'partials/stats/whoop', locals: { metric: 'Recovery', value: whoop_recovery_score, unit: '%' } %>
+  <%= partial 'partials/stats/whoop', locals: { metric: 'Strain', value: whoop_strain_score } %>
+</section>

@@ -68,3 +68,15 @@
     }
   }
 }
+
+.stats__unit {
+  font-size: var(--font-large);
+  
+  @include bp-medium {
+    font-size: var(--font-medium);
+  }
+
+  @include bp-x-large {
+    font-size: var(--font-large);
+  }
+}
