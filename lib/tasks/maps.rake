@@ -1,4 +1,3 @@
-require_relative '../utils/static_map'
 namespace :maps do
   # Loops through the GPX files stored in the StaticMap::GPX_FOLDER folder (data/maps/gpx),
   # generates a map for each as a static PNG image, and saves it to the StaticMap::IMAGES_FOLDER folder (data/mapbox/images).
