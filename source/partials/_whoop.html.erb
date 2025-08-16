@@ -1,5 +1,6 @@
-<section class="stats" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= url_for('/xhr/whoop.html') %>" data-action="visibilitychange@document->live-update#handleVisibilityChange">
-  <%= partial 'partials/stats/whoop', locals: { metric: 'Sleep', value: whoop_sleep_score, unit: '%', label: whoop_sleep_label } %>
-  <%= partial 'partials/stats/whoop', locals: { metric: 'Recovery', value: whoop_recovery_score, unit: '%', label: whoop_recovery_label } %>
-  <%= partial 'partials/stats/whoop', locals: { metric: 'Strain', value: whoop_strain_score, label: whoop_strain_label } %>
+<section class="stats stats--has-three" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= url_for('/xhr/whoop.html') %>" data-action="visibilitychange@document->live-update#handleVisibilityChange">
+  <h3 class="stats__heading">Today’s Status, Brought to You by Whoop</h3>
+  <%= partial 'partials/stats/stat', locals: { icon: 'snooze', top: 'Sleep Performance', value: whoop_sleep_score, unit: '%', bottom: whoop_sleep_label } %>
+  <%= partial 'partials/stats/stat', locals: { icon: whoop_recovery_icon, top: 'Recovery', value: whoop_recovery_score, unit: '%', bottom: whoop_recovery_label } %>
+  <%= partial 'partials/stats/stat', locals: { icon: 'fire-flame-curved', top: 'Strain', value: whoop_strain_score, bottom: whoop_strain_label } %>
 </section>
