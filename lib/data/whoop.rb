@@ -16,13 +16,13 @@ class Whoop
   # Fetches and saves today's Whoop data (sleep score, recovery score, strain) to a JSON file.
   def save_data
     # Get sleep data first, then find the corresponding recovery
-    sleep_data = get_sleep_data
+    sleep_data = get_latest_sleep
     recovery_data = get_recovery_for_sleep(sleep_data['id']) if sleep_data
     
     data = {
       sleep_score: sleep_data&.dig('score', 'sleep_performance_percentage'),
       recovery_score: recovery_data&.dig('score', 'recovery_score'),
-      strain: strain
+      strain: get_latest_cycle&.dig('score', 'strain')
     }
 
     File.open('data/whoop.json', 'w') do |f|
@@ -34,7 +34,7 @@ class Whoop
 
   # Fetches the most recent SCORED sleep data from the Whoop API.
   # @return [Hash, nil] The full sleep record or nil if unavailable.
-  def get_sleep_data
+  def get_latest_sleep
     access_token = get_access_token
     return if access_token.blank?
 
@@ -46,14 +46,14 @@ class Whoop
       sleep_data = JSON.parse(cached_response)
       records = sleep_data['records']
       if records.present?
-        return records.find { |record| record['score_state'] == 'SCORED' }
+        return records.find { |record| record['score_state'] == 'SCORED' && !record['nap'] }
       end
     end
 
     # Get today's sleep activities
     response = HTTParty.get(
       "#{WHOOP_API_URL}/v2/activity/sleep",
-      query: { start: today_start, limit: 10 },
+      query: { start: today_start },
       headers: { "Authorization" => "Bearer #{access_token}" }
     )
 
@@ -67,8 +67,8 @@ class Whoop
     records = sleep_data['records']
     return if records.blank?
 
-    # Find the first SCORED sleep record
-    records.find { |record| record['score_state'] == 'SCORED' }
+    # Find the first SCORED sleep record that's not a nap
+    records.find { |record| record['score_state'] == 'SCORED' && !record['nap'] }
   rescue StandardError
     nil
   end
@@ -100,7 +100,7 @@ class Whoop
     # Get today's recovery data
     response = HTTParty.get(
       "#{WHOOP_API_URL}/v2/recovery",
-      query: { start: today_start, limit: 10 },
+      query: { start: today_start },
       headers: { "Authorization" => "Bearer #{access_token}" }
     )
 
@@ -122,9 +122,9 @@ class Whoop
     nil
   end
 
-  # Fetches the most recent SCORED strain score from the Whoop API.
-  # @return [Float, nil] Strain score (0-21), or nil if unavailable.
-  def strain
+  # Fetches the most recent SCORED cycle data from the Whoop API.
+  # @return [Hash, nil] The full cycle record or nil if unavailable.
+  def get_latest_cycle
     access_token = get_access_token
     return if access_token.blank?
 
@@ -136,15 +136,14 @@ class Whoop
       cycle_data = JSON.parse(cached_response)
       records = cycle_data['records']
       if records.present?
-        scored_cycle = records.find { |record| record['score_state'] == 'SCORED' }
-        return scored_cycle&.dig('score', 'strain')
+        return records.find { |record| record['score_state'] == 'SCORED' }
       end
     end
 
     # Get today's cycle data
     response = HTTParty.get(
       "#{WHOOP_API_URL}/v2/cycle",
-      query: { start: today_start, limit: 10 },
+      query: { start: today_start },
       headers: { "Authorization" => "Bearer #{access_token}" }
     )
 
@@ -159,8 +158,7 @@ class Whoop
     return if records.blank?
 
     # Find the first SCORED cycle record
-    scored_cycle = records.find { |record| record['score_state'] == 'SCORED' }
-    scored_cycle&.dig('score', 'strain')
+    records.find { |record| record['score_state'] == 'SCORED' }
   rescue StandardError
     nil
   end
