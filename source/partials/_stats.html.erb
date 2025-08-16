@@ -1,6 +1,7 @@
-<section class="stats" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= url_for('/xhr/stats.html') %>" data-action="visibilitychange@document->live-update#handleVisibilityChange">
-  <%= partial 'partials/stats/total',    locals: { timeframe: 'in the past month', total: stats.total_activities } %>
-  <%= partial 'partials/stats/activity', locals: { activity: 'Swimming', distance: stats.swim_distance } %>
-  <%= partial 'partials/stats/activity', locals: { activity: 'Cycling', distance: stats.bike_distance } %>
-  <%= partial 'partials/stats/activity', locals: { activity: 'Running', distance: stats.run_distance } %>
+<section class="stats stats--has-four" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= url_for('/xhr/stats.html') %>" data-action="visibilitychange@document->live-update#handleVisibilityChange" aria-labelledby="hed-stats">
+  <h3 class="stats__heading" id="hed-stats">Monthly Totals <i>from</i> Intervals.icu</h3>
+  <%= partial 'partials/stats/stat',    locals: { icon: 'wave-pulse', top: "Activity".pluralize(stats.total_activities), value: number_to_delimited(stats.total_activities), bottom: 'in the past month' } %>
+  <%= partial 'partials/stats/activity', locals: { icon: 'person-swimming', activity: 'Swimming', distance: stats.swim_distance } %>
+  <%= partial 'partials/stats/activity', locals: { icon: 'person-biking', activity: 'Cycling', distance: stats.bike_distance } %>
+  <%= partial 'partials/stats/activity', locals: { icon: 'person-running', activity: 'Running', distance: stats.run_distance } %>
 </section>

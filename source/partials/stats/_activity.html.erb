@@ -1,5 +1,5 @@
 <div class="stats__stat">
-  <span class="stats__meta"><%= activity %> <%= %w{ 🥴 🙃 🥲 😬 }.sample if distance == 0 %></span>
+  <span class="stats__meta"><% if defined?(icon) %><%= icon_svg("classic", "light", icon) %> <% end %> <%= activity %></span>
   <span class="stats__number" data-controller="units" data-units-imperial-value="<%= distance_value(distance, units: 'imperial') %>" data-units-metric-value="<%= distance_value(distance) %>"><%= distance_value(distance) %></span>
   <span class="stats__meta"   data-controller="units" data-units-imperial-value="<%= distance_unit(distance, units: 'imperial') %>"   data-units-metric-value="<%= distance_unit(distance) %>"><%= distance_unit(distance) %></span>
 </div>

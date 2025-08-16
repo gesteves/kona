@@ -112,6 +112,14 @@ icons:
       - wind
       - wind
       - xmark
+      - person-running
+      - person-biking
+      - person-swimming
+      - person-meditating
+      - wave-pulse
+      - fire-flame-curved
+      - snooze
+      - skull
     thin:
       - bolt-lightning
       - cloud-bolt
