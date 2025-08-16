@@ -111,4 +111,8 @@
 .stats__unit {
   font-size: var(--font-medium);
   font-weight: 400;
+
+  i {
+    font-style: italic;
+  }
 }
