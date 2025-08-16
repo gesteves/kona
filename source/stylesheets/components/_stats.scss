@@ -43,6 +43,11 @@
   text-box-trim: trim-both;
   text-transform: uppercase;
   white-space: nowrap;
+
+  i {
+    font-style: italic;
+    text-transform: none;
+  }
 }
 
 .stats__number {
