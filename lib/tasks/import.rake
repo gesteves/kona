@@ -157,7 +157,6 @@ def measure_and_output(method, description)
     duration = Time.now - start_time
     puts "❎ #{description} failed after #{format_duration(duration)}"
     puts "   Error: #{e.message}"
-    raise e
   end
 end
 

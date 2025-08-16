@@ -122,10 +122,6 @@ class WhoopOAuth
     puts "=" * 50
     puts
     
-    # Step 1: Get authorization URL
-    auth_info = get_authorization_url
-    
-    # Step 2: Get authorization code from user
     authorization_code = STDIN.gets.chomp
     
     if authorization_code.empty?

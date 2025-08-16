@@ -196,7 +196,10 @@ class Whoop
       headers: { 'Content-Type' => 'application/x-www-form-urlencoded' }
     )
 
-    return unless response.success?
+    unless response.success?
+      puts "Failed to get Whoop access token (HTTP #{response.code}: #{response.body}). Run 'bundle exec rake oauth:whoop' to get a new refresh token."
+      return
+    end
 
     token_data = JSON.parse(response.body)
     access_token = token_data['access_token']
