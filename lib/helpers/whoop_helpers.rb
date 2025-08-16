@@ -26,7 +26,7 @@ module WhoopHelpers
   end
 
   # Returns the descriptive label for the current strain level.
-  # @return [String] The strain label (Light, Moderate, High, All Out) or empty string if not available.
+  # @return [String] The strain label (Light, Moderate, Strenuous, All Out) or empty string if not available.
   def whoop_strain_label
     strain = data.whoop.strain
     return "" if strain.blank?
@@ -37,7 +37,7 @@ module WhoopHelpers
     when 10..13.9
       "Moderate"
     when 14..17.9
-      "High"
+      "Strenuous"
     when 18..21
       "All Out"
     else
