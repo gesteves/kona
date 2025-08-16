@@ -22,11 +22,7 @@
   }
 
   &.stats--has-three .stats__stat {
-    grid-column: span 12;
-
-    @include bp-medium {
-      grid-column: span 4;
-    }
+    grid-column: span 4;
   }
 }
 
