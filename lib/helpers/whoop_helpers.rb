@@ -53,10 +53,10 @@ module WhoopHelpers
   end
 
   # Returns the descriptive label for the current strain level.
-  # @return [String] The strain label (Light, Moderate, Strenuous, All Out) or empty string if not available.
+  # @return [String] The strain label (Light, Moderate, Strenuous, All Out, etc.)
   def whoop_strain_label
     strain = data.whoop.physiological_cycle.score.strain
-    return "" if strain.blank?
+    return "Nothing" if strain.blank? || strain.zero?
     
     case strain
     when 0...10
@@ -67,16 +67,14 @@ module WhoopHelpers
       "Strenuous"
     when 18..21
       "All Out"
-    else
-      ""
     end
   end
 
   # Returns the descriptive label for the current sleep score.
-  # @return [String] The sleep label (Poor, Sufficient, Optimal) or empty string if not available.
+  # @return [String] The sleep label (Poor, Sufficient, Optimal, etc.)
   def whoop_sleep_label
     sleep_score = data.whoop.sleep.score.sleep_performance_percentage
-    return "" if sleep_score.blank?
+    return "None" if sleep_score.blank? || sleep_score.zero?
     
     case sleep_score
     when 0...70
@@ -85,16 +83,14 @@ module WhoopHelpers
       "Sufficient"
     when 85..100
       "Optimal"
-    else
-      ""
     end
   end
 
   # Returns the descriptive label for the current recovery score.
-  # @return [String] The recovery label (Low, Adequate, Sufficient) or empty string if not available.
+  # @return [String] The recovery label (Low, Adequate, Sufficient, etc.)
   def whoop_recovery_label
     recovery = data.whoop.recovery.score.recovery_score
-    return "" if recovery.blank?
+    return "Zilch" if recovery.blank? || recovery.zero?
     
     case recovery
     when 0...34
@@ -103,8 +99,6 @@ module WhoopHelpers
       "Adequate"
     when 67..100
       "Sufficient"
-    else
-      ""
     end
   end
 
