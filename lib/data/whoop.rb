@@ -20,15 +20,16 @@ class Whoop
     cycle_id = cycle&.dig(:id)
     
     sleeps = get_sleeps
-    sleep_record = sleeps&.dig(:records)&.find { |sleep| sleep[:score_state] == 'SCORED' && !sleep[:nap] }
+    sleep = sleeps&.dig(:records)&.find { |sleep| sleep[:score_state] == 'SCORED' && !sleep[:nap] }
+    sleep_id = sleep&.dig(:id)
     
     recoveries = get_recoveries
-    recovery_record = recoveries&.dig(:records)&.find { |recovery| recovery[:cycle_id] == cycle_id }
+    recovery = recoveries&.dig(:records)&.find { |recovery| recovery[:sleep_id] == sleep_id }
     
     data = {
       physiological_cycle: cycle,
-      sleep: sleep_record,
-      recovery: recovery_record
+      sleep: sleep,
+      recovery: recovery
     }
     
     File.write('data/whoop.json', data.to_json)
