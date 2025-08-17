@@ -13,16 +13,18 @@ class Whoop
     @timezone = timezone
   end
 
-  # Fetches and saves today's Whoop data (sleep score, recovery score, strain) to a JSON file.
+  # Fetches and saves the most recent Whoop data (sleep score, recovery score, strain) to a JSON file.
   def save_data
+    # Get the most recent scored cycle.
     cycle = get_most_recent_scored_cycle
-
     cycle_id = cycle&.dig(:id)
     
+    # Get the non-nap sleep that corresponds to the cycle.
     sleeps = get_sleeps
     sleep = sleeps&.dig(:records)&.find { |sleep| sleep[:score_state] == 'SCORED' && !sleep[:nap] && sleep[:cycle_id] == cycle_id }
     sleep_id = sleep&.dig(:id)
     
+    # Get the recovery that corresponds to that sleep.
     recoveries = get_recoveries
     recovery = recoveries&.dig(:records)&.find { |recovery| recovery[:sleep_id] == sleep_id }
     
