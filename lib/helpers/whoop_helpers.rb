@@ -32,16 +32,16 @@ module WhoopHelpers
     return "" if strain.blank?
     
     case strain
-    when 0..9.9
+    when 0...10
       "Light"
-    when 10..13.9
+    when 10...14
       "Moderate"
-    when 14..17.9
+    when 14...18
       "Strenuous"
     when 18..21
       "All Out"
     else
-      "—"
+      ""
     end
   end
 
@@ -52,9 +52,9 @@ module WhoopHelpers
     return "" if sleep_score.blank?
     
     case sleep_score
-    when 0..69
+    when 0...70
       "Poor"
-    when 70..84
+    when 70...85
       "Sufficient"
     when 85..100
       "Optimal"
@@ -70,9 +70,9 @@ module WhoopHelpers
     return "" if recovery.blank?
     
     case recovery
-    when 0..33
+    when 0...34
       "Low"
-    when 34..66
+    when 34...67
       "Adequate"
     when 67..100
       "Sufficient"
