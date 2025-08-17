@@ -93,12 +93,18 @@ module WhoopHelpers
     return "Zilch" if recovery.blank? || recovery.zero?
     
     case recovery
-    when 0...34
-      "Low"
+    when 0...2
+      "RIP"
+    when 2...34
+      "Poor"
     when 34...67
       "Adequate"
-    when 67..100
+    when 67...90
       "Sufficient"
+    when 90...98
+      "Primed"
+    when 98..100
+      "Fully Recovered"
     end
   end
 
