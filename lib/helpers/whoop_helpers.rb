@@ -93,9 +93,9 @@ module WhoopHelpers
     return "Zilch" if recovery.blank? || recovery.zero?
     
     case recovery
-    when 0...2
-      "RIP"
-    when 2...34
+    when 0...11
+      "Basically Dead"
+    when 11...34
       "Poor"
     when 34...67
       "Adequate"
