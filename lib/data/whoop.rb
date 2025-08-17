@@ -20,7 +20,7 @@ class Whoop
     cycle_id = cycle&.dig(:id)
     
     sleeps = get_sleeps
-    sleep = sleeps&.dig(:records)&.find { |sleep| sleep[:score_state] == 'SCORED' && !sleep[:nap] }
+    sleep = sleeps&.dig(:records)&.find { |sleep| sleep[:score_state] == 'SCORED' && !sleep[:nap] && sleep[:cycle_id] == cycle_id }
     sleep_id = sleep&.dig(:id)
     
     recoveries = get_recoveries
