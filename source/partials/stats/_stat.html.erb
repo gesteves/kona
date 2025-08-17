@@ -1,5 +1,5 @@
 <div class="stats__stat">
   <span class="stats__meta"><% if defined?(icon) %><%= icon_svg("classic", "light", icon) %> <% end %><%= top %></span>
   <span class="stats__number"><%= value %><% if defined?(unit) %><span class="stats__unit"><%= unit %></span><% end %></span>
-  <span class="stats__meta"><%= bottom %></span>
+  <span class="stats__meta"><%= bottom %><% if defined?(info_url) %> <a href="<%= info_url %>" target="_blank" rel="nofollow noopener"><%= icon_svg("classic", "light", "circle-info") %></a><% end %></span>
 </div>
