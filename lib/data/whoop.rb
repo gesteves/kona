@@ -15,155 +15,95 @@ class Whoop
 
   # Fetches and saves today's Whoop data (sleep score, recovery score, strain) to a JSON file.
   def save_data
-    # Get sleep data first, then find the corresponding recovery
-    sleep_data = get_latest_sleep
-    recovery_data = get_recovery_for_sleep(sleep_data['id']) if sleep_data
+    cycle = get_most_recent_scored_cycle
+
+    cycle_id = cycle&.dig(:id)
+    
+    sleeps = get_sleeps
+    sleep_record = sleeps&.dig(:records)&.find { |sleep| sleep[:score_state] == 'SCORED' && !sleep[:nap] }
+    
+    recoveries = get_recoveries
+    recovery_record = recoveries&.dig(:records)&.find { |recovery| recovery[:cycle_id] == cycle_id }
     
     data = {
-      sleep_score: sleep_data&.dig('score', 'sleep_performance_percentage'),
-      recovery_score: recovery_data&.dig('score', 'recovery_score'),
-      strain: get_latest_cycle&.dig('score', 'strain')
+      physiological_cycle: cycle,
+      sleep: sleep_record,
+      recovery: recovery_record
     }
-
-    File.open('data/whoop.json', 'w') do |f|
-      f << data.to_json
-    end
+    
+    File.write('data/whoop.json', data.to_json)
   end
 
   private
 
-  # Fetches the most recent SCORED sleep data from the Whoop API.
-  # @return [Hash, nil] The full sleep record or nil if unavailable.
-  def get_latest_sleep
+  # Fetches sleep data from the Whoop API.
+  # @return [Hash, nil] The full sleep data or nil if unavailable.
+  def get_sleeps
     access_token = get_access_token
     return if access_token.blank?
 
-    today_start = Time.current.in_time_zone(@timezone).beginning_of_day.iso8601
-    cache_key = "whoop:sleep:#{Date.current.in_time_zone(@timezone)}"
+    cache_key = "whoop:#{@client_id}:sleeps"
     cached_response = $redis.get(cache_key)
 
-    if cached_response.present?
-      sleep_data = JSON.parse(cached_response)
-      records = sleep_data['records']
-      if records.present?
-        return records.find { |record| record['score_state'] == 'SCORED' && !record['nap'] }
-      end
-    end
+    return JSON.parse(cached_response, symbolize_names: true) if cached_response.present?
 
-    # Get today's sleep activities
     response = HTTParty.get(
       "#{WHOOP_API_URL}/v2/activity/sleep",
-      query: { start: today_start },
       headers: { "Authorization" => "Bearer #{access_token}" }
     )
 
     return unless response.success?
-
-    sleep_data = JSON.parse(response.body)
     
-    # Cache the entire response
     $redis.setex(cache_key, 5.minutes, response.body)
     
-    records = sleep_data['records']
-    return if records.blank?
-
-    # Find the first SCORED sleep record that's not a nap
-    records.find { |record| record['score_state'] == 'SCORED' && !record['nap'] }
-  rescue StandardError
-    nil
+    JSON.parse(response.body, symbolize_names: true)
   end
 
-  # Fetches recovery data for a specific sleep ID.
-  # @param sleep_id [String] The sleep ID to find recovery for.
-  # @return [Hash, nil] The recovery record or nil if unavailable.
-  def get_recovery_for_sleep(sleep_id)
-    return if sleep_id.blank?
-    
+  # Fetches recovery data.
+  # @return [Hash, nil] The recovery data or nil if unavailable.
+  def get_recoveries
     access_token = get_access_token
     return if access_token.blank?
 
-    today_start = Time.current.in_time_zone(@timezone).beginning_of_day.iso8601
-    cache_key = "whoop:recovery:#{Date.current.in_time_zone(@timezone)}"
+    cache_key = "whoop:#{@client_id}:recoveries"
     cached_response = $redis.get(cache_key)
 
-    if cached_response.present?
-      recovery_data = JSON.parse(cached_response)
-      records = recovery_data['records']
-      if records.present?
-        # Find the recovery that matches our sleep ID and is SCORED
-        return records.find do |record| 
-          record['sleep_id'] == sleep_id && record['score_state'] == 'SCORED'
-        end
-      end
-    end
+    return JSON.parse(cached_response, symbolize_names: true) if cached_response.present?
 
-    # Get today's recovery data
     response = HTTParty.get(
       "#{WHOOP_API_URL}/v2/recovery",
-      query: { start: today_start },
       headers: { "Authorization" => "Bearer #{access_token}" }
     )
 
     return unless response.success?
 
-    recovery_data = JSON.parse(response.body)
-    
-    # Cache the entire response
     $redis.setex(cache_key, 5.minutes, response.body)
     
-    records = recovery_data['records']
-    return if records.blank?
-
-    # Find the recovery that matches our sleep ID and is SCORED
-    records.find do |record| 
-      record['sleep_id'] == sleep_id && record['score_state'] == 'SCORED'
-    end
-  rescue StandardError
-    nil
+    JSON.parse(response.body, symbolize_names: true)
   end
 
-  # Fetches the most recent SCORED cycle data from the Whoop API.
-  # @return [Hash, nil] The full cycle record or nil if unavailable.
-  def get_latest_cycle
+  # Fetches cycle data from the Whoop API.
+  # @return [Hash, nil] The full cycle data or nil if unavailable.
+  def get_cycles
     access_token = get_access_token
     return if access_token.blank?
 
-    today_start = Time.current.in_time_zone(@timezone).beginning_of_day.iso8601
-    cache_key = "whoop:strain:#{Date.current.in_time_zone(@timezone)}"
+    cache_key = "whoop:#{@client_id}:cycles"
     cached_response = $redis.get(cache_key)
 
-    if cached_response.present?
-      cycle_data = JSON.parse(cached_response)
-      records = cycle_data['records']
-      if records.present?
-        return records.find { |record| record['score_state'] == 'SCORED' }
-      end
-    end
+    return JSON.parse(cached_response, symbolize_names: true) if cached_response.present?
 
     # Get today's cycle data
     response = HTTParty.get(
       "#{WHOOP_API_URL}/v2/cycle",
-      query: { start: today_start },
       headers: { "Authorization" => "Bearer #{access_token}" }
     )
 
     return unless response.success?
 
-    cycle_data = JSON.parse(response.body)
-    
-    # Cache the entire response
     $redis.setex(cache_key, 5.minutes, response.body)
-    
-    records = cycle_data['records']
-    return if records.blank?
-
-    # Find the first SCORED cycle record
-    records.find { |record| record['score_state'] == 'SCORED' }
-  rescue StandardError
-    nil
+    JSON.parse(response.body, symbolize_names: true)
   end
-
-
 
   # Gets a valid access token, refreshing if necessary.
   # Handles token rotation by storing new refresh tokens when they're returned.
@@ -217,5 +157,14 @@ class Whoop
   rescue StandardError => e
     puts "Error refreshing Whoop token: #{e.message}" if ENV['DEBUG']
     nil
+  end
+
+  # Fetches the most recent scored cycle from the Whoop API.
+  # @return [Hash, nil] The cycle data or nil if unavailable.
+  def get_most_recent_scored_cycle
+    cycles = get_cycles
+    return if cycles.blank?
+
+    cycles&.dig(:records)&.find { |cycle| cycle[:score_state] == 'SCORED' }
   end
 end
