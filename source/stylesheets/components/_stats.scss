@@ -27,23 +27,8 @@
 }
 
 .stats__heading {
-  color: var(--color-text-secondary);
-  font-family: var(--ibm-plex-mono);
-  font-size: var(--font-x-small);
-  font-weight: normal;
   grid-column: 1 / -1;
-  line-height: var(--line-height-x-small);
   margin-bottom: calc(var(--row-gap) * -1);
-  text-align: center;
-  text-box-edge: text;
-  text-box-trim: trim-both;
-  text-transform: uppercase;
-  white-space: nowrap;
-
-  i {
-    font-style: italic;
-    text-transform: none;
-  }
 }
 
 .stats__number {
@@ -71,27 +56,42 @@
   }
 }
 
-.stats__meta {
+.stats__meta,
+.stats__heading {
   color: var(--color-text-secondary);
   font-family: var(--ibm-plex-mono);
   font-size: var(--font-x-small);
+  font-weight: normal;
   line-height: var(--line-height-x-small);
+  text-align: center;
   text-box-edge: text;
   text-box-trim: trim-both;
   text-transform: uppercase;
   white-space: nowrap;
 
+  i {
+    font-style: italic;
+    text-transform: none;
+  }
+
   a {
+    display: inline-block;
+
     &:link,
     &:visited {
       color: currentcolor;
-      text-decoration-color: var(--color-text-tertiary);
+      text-decoration: none;
     }
 
     &:hover,
     &:active {
       color: var(--color-link);
-      text-decoration-color: currentcolor;
+      text-decoration: none;
+
+      g,
+      path {
+        fill: var(--color-link);
+      }
     }
   }
 

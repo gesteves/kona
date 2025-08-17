@@ -17,7 +17,7 @@ module WhoopHelpers
     else
       "Latest"
     end
-    "#{label} Metrics <i>from</i> Whoop"
+    "#{label} Metrics <i>from</i> <a href='https://www.whoop.com' target='_blank' rel='nofollow noopener'>Whoop</a>"
   end
 
   # Returns the start time of the Whoop cycle.
