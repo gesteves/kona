@@ -19,10 +19,11 @@ module WhoopHelpers
     data.whoop.recovery_score.round
   end
 
-  # Returns the Whoop strain score formatted to one decimal place.
-  # @return [String] The strain score as a string with one decimal place.
+  # Returns the Whoop strain score formatted to one decimal place, omitting .0.
+  # @return [String] The strain score as a string with one decimal place, or no decimal if .0.
   def whoop_strain_score
-    data.whoop.strain.round(1).to_s
+    rounded = data.whoop.strain.round(1)
+    rounded % 1 == 0 ? rounded.to_i.to_s : rounded.to_s
   end
 
   # Returns the descriptive label for the current strain level.
