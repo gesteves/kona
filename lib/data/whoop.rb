@@ -114,12 +114,14 @@ class Whoop
   def get_access_token
     return if @client_id.blank? || @client_secret.blank?
 
+    access_token_key = "whoop:#{@client_id}:access_token"
+    refresh_token_key = "whoop:#{@client_id}:refresh_token"
     # Check if we have a cached access token
-    cached_token = $redis.get('whoop:access_token')
+    cached_token = $redis.get(access_token_key)
     return cached_token if cached_token.present?
 
     # Get refresh token from Redis
-    refresh_token = $redis.get('whoop:refresh_token')
+    refresh_token = $redis.get(refresh_token_key)
     return if refresh_token.blank?
 
     # Refresh the access token
@@ -142,18 +144,18 @@ class Whoop
       return
     end
 
-    token_data = JSON.parse(response.body)
-    access_token = token_data['access_token']
-    new_refresh_token = token_data['refresh_token']
-    expires_in = token_data['expires_in'] || 3600
+    token_data = JSON.parse(response.body, symbolize_names: true)
+    access_token = token_data[:access_token]
+    new_refresh_token = token_data[:refresh_token]
+    expires_in = token_data[:expires_in] || 3600
 
     # Store the new access token with expiration (5 minute buffer)
     cache_duration = [expires_in - 300, 300].max
-    $redis.setex('whoop:access_token', cache_duration, access_token)
+    $redis.setex(access_token_key, cache_duration, access_token)
 
     # Store the new refresh token (single-use tokens)
     if new_refresh_token.present?
-      $redis.set('whoop:refresh_token', new_refresh_token)
+      $redis.set(refresh_token_key, new_refresh_token)
     end
 
     access_token

@@ -79,25 +79,27 @@ class WhoopOAuth
     )
 
     if response.success?
-      token_data = JSON.parse(response.body)
+      access_token_key = "whoop:#{@client_id}:access_token"
+      refresh_token_key = "whoop:#{@client_id}:refresh_token"
+      token_data = JSON.parse(response.body, symbolize_names: true)
       
       # Store tokens in Redis
-      access_token = token_data['access_token']
-      refresh_token = token_data['refresh_token']
-      expires_in = token_data['expires_in'] || 3600
+      access_token = token_data[:access_token]
+      refresh_token = token_data[:refresh_token]
+      expires_in = token_data[:expires_in] || 3600
       
       # Store access token with expiration (5 minute buffer)
       access_cache_duration = [expires_in - 300, 300].max
-      @redis.setex('whoop:access_token', access_cache_duration, access_token)
+      @redis.setex(access_token_key, access_cache_duration, access_token)
       
       # Store refresh token (no expiration since we don't know when it expires)
-      @redis.set('whoop:refresh_token', refresh_token)
+      @redis.set(refresh_token_key, refresh_token)
       
       puts "✅ Success! Tokens stored in Redis:"
       puts
       puts "Access Token: #{access_token[0..20]}... (expires in #{expires_in} seconds)"
       puts "Refresh Token: #{refresh_token[0..20]}... (stored permanently)"
-      puts "Scope: #{token_data['scope']}"
+      puts "Scope: #{token_data[:scope]}"
       puts
       puts "🎉 Tokens are now stored in Redis and ready for use!"
       puts "   Redis keys:"
@@ -118,10 +120,11 @@ class WhoopOAuth
   end
 
   def run
-    puts "🏃‍♂️ Whoop OAuth 2.0 Setup"
+    puts "Whoop OAuth 2.0 Setup"
     puts "=" * 50
     puts
     
+    get_authorization_url
     authorization_code = STDIN.gets.chomp
     
     if authorization_code.empty?
@@ -132,7 +135,7 @@ class WhoopOAuth
     # Step 3: Exchange code for tokens
     tokens = exchange_code_for_tokens(authorization_code)
     
-    if tokens && tokens['refresh_token']
+    if tokens && tokens[:refresh_token]
       puts "🎉 Setup complete! You can now use the Whoop API."
     else
       puts "❎ Failed to get refresh token. Please try again."
