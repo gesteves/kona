@@ -73,7 +73,7 @@ module WhoopHelpers
   # Returns the descriptive label for the current sleep score.
   # @return [String] The sleep label (Poor, Sufficient, Optimal, etc.)
   def whoop_sleep_label
-    sleep_score = data.whoop.sleep.score.sleep_performance_percentage
+    sleep_score = whoop_sleep_score
     return "None" if sleep_score.blank? || sleep_score.zero?
     
     case sleep_score
@@ -89,8 +89,9 @@ module WhoopHelpers
   # Returns the descriptive label for the current recovery score.
   # @return [String] The recovery label (Low, Adequate, Sufficient, etc.)
   def whoop_recovery_label
-    recovery = data.whoop.recovery.score.recovery_score
+    recovery = whoop_recovery_score
     return "Zilch" if recovery.blank? || recovery.zero?
+    return "Nice." if recovery == 69
     
     case recovery
     when 0...11
@@ -111,7 +112,7 @@ module WhoopHelpers
   # Returns the appropriate Font Awesome icon for the current recovery level.
   # @return [String] The icon name (skull for low recovery, person-meditating otherwise).
   def whoop_recovery_icon
-    recovery = data.whoop.recovery.score.recovery_score
+    recovery = whoop_recovery_score
     return "person-meditating" if recovery.blank?
     
     case recovery
