@@ -18,6 +18,7 @@ activate :asset_hash
 activate :directory_indexes
 
 ignore "/article.html"
+ignore "/tag.html"
 ignore "/articles.html"
 ignore "/home.html"
 ignore "/javascripts/stimulus/*"
