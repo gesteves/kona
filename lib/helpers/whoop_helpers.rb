@@ -19,8 +19,6 @@ module WhoopHelpers
       "Today’s"
     elsif wakeup_time.to_date == current_date - 1.day
       "Yesterday’s"
-    elsif wakeup_time.to_date >= current_date - 7.days
-      "#{wakeup_time.strftime('%A')}’s"
     else
       "Latest"
     end
