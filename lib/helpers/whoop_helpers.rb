@@ -10,27 +10,29 @@ module WhoopHelpers
   # Returns the heading for the Whoop section.
   # @return [String] The heading for the Whoop section.
   def whoop_heading
-    label = if whoop_cycle_start.present? && whoop_cycle_end.blank?
+    wakeup_time = whoop_last_wakeup_time
+    current_date = current_time.in_time_zone(location_time_zone).to_date
+    
+    label = if wakeup_time.blank?
+      "Latest"
+    elsif wakeup_time.to_date == current_date
       "Today’s"
-    elsif whoop_cycle_end&.to_date == current_time.in_time_zone(location_time_zone).to_date - 1.day
+    elsif wakeup_time.to_date == current_date - 1.day
       "Yesterday’s"
+    elsif wakeup_time.to_date >= current_date - 7.days
+      "#{wakeup_time.strftime('%A')}’s"
     else
       "Latest"
     end
+    
     "#{label} Metrics <i>from</i> <a href='https://www.whoop.com' target='_blank' rel='nofollow noopener'>Whoop</a>"
   end
 
-  # Returns the start time of the Whoop cycle.
-  # @return [DateTime] The start time of the Whoop cycle.
-  def whoop_cycle_start
-    DateTime.parse(data.whoop.physiological_cycle.start).in_time_zone(location_time_zone)
-  end
-
-  # Returns the end time of the Whoop cycle.
-  # @return [DateTime] The end time of the Whoop cycle.
-  def whoop_cycle_end
-    return if data.whoop.physiological_cycle.end.blank?
-    DateTime.parse(data.whoop.physiological_cycle.end).in_time_zone(location_time_zone)
+  # Returns the time I last woke up, i.e. the end of the last sleep.
+  # @return [DateTime] The wakeup time.
+  def whoop_last_wakeup_time
+    return if data.whoop.sleep.end.blank?
+    DateTime.parse(data.whoop.sleep.end).in_time_zone(location_time_zone)
   end
 
   # Returns the rounded Whoop sleep score.
