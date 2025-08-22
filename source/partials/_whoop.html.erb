@@ -1,11 +1,13 @@
 <section class="stats stats--has-three" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= url_for('/xhr/whoop.html') %>" data-action="visibilitychange@document->live-update#handleVisibilityChange" aria-labelledby="hed-whoop">
   <h3 class="stats__heading" id="hed-whoop"><%= whoop_heading %></h3>
-  <%= partial 'partials/stats/stat', locals: { icon: 'snooze', top: 'Sleep', value: whoop_sleep_score, unit: '%', bottom: whoop_sleep_label } %>
-  <%= partial 'partials/stats/stat', locals: { icon: whoop_recovery_icon, top: 'Recovery', value: whoop_recovery_score, unit: '%', bottom: whoop_recovery_label } %>
-  <%= partial 'partials/stats/stat', locals: { icon: 'fire-flame-curved', top: 'Strain', value: whoop_strain_score, unit: '/21', bottom: whoop_strain_label } %>
+  <div class="stats__container">
+    <%= partial 'partials/stats/stat', locals: { icon: 'snooze', top: 'Sleep', value: whoop_sleep_score, unit: '%', bottom: whoop_sleep_label } %>
+    <%= partial 'partials/stats/stat', locals: { icon: whoop_recovery_icon, top: 'Recovery', value: whoop_recovery_score, unit: '%', bottom: whoop_recovery_label } %>
+    <%= partial 'partials/stats/stat', locals: { icon: 'fire-flame-curved', top: 'Strain', value: whoop_strain_score, unit: '/21', bottom: whoop_strain_label } %>
+  </div>
   <% if ENV['WHOOP_REFERRAL_URL'].present? %>
     <p class="stats__footer">
-      <%= link_to 'Join Whoop and get one month free', ENV['WHOOP_REFERRAL_URL'], target: '_blank', rel: 'nofollow noopener sponsored' %>
+      <%= link_to 'Join Whoop <i>and</i> get one month free', ENV['WHOOP_REFERRAL_URL'], target: '_blank', rel: 'nofollow noopener sponsored' %>
     </p>
   <% end %>
 </section>

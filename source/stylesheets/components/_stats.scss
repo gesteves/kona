@@ -2,7 +2,7 @@
   border-top: 2px solid var(--color-border);
   display: grid;
   grid-column: 1 / -1;
-  gap: var(--row-gap) var(--column-gap);
+  gap: 0;
   grid-template-columns: subgrid;
   padding: var(--padding) 0 0 0;
 
@@ -26,9 +26,16 @@
   }
 }
 
+.stats__container {
+  display: grid;
+  gap: var(--row-gap) var(--column-gap);
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+
 .stats__heading {
   grid-column: 1 / -1;
-  margin-bottom: calc(var(--row-gap) * -1);
+  margin-bottom: 1rem;
 }
 
 .stats__number {
@@ -120,5 +127,5 @@
 
 .stats__footer {
   grid-column: 1 / -1;
-  margin-top: calc(var(--row-gap) * -1);
+  margin-top: 1rem;
 }
