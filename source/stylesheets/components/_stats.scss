@@ -57,7 +57,8 @@
 }
 
 .stats__meta,
-.stats__heading {
+.stats__heading,
+.stats__footer {
   color: var(--color-text-secondary);
   font-family: var(--ibm-plex-mono);
   font-size: var(--font-x-small);
@@ -115,4 +116,9 @@
   i {
     font-style: italic;
   }
+}
+
+.stats__footer {
+  grid-column: 1 / -1;
+  margin-top: calc(var(--row-gap) * -1);
 }
