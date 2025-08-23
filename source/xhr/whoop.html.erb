@@ -2,4 +2,6 @@
 layout: false
 ---
 
-<%= partial 'partials/whoop' %>
+<% if show_whoop? %>
+  <%= partial 'partials/whoop' %>
+<% end %>
