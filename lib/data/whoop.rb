@@ -16,22 +16,15 @@ class Whoop
   # Fetches and saves the most recent Whoop data (sleep score, recovery score, strain) to a JSON file.
   def save_data
     # Get the most recent scored cycle.
-    cycle = get_most_recent_scored_cycle
-    cycle_id = cycle&.dig(:id)
-    
-    # Get the non-nap sleep that corresponds to the cycle.
-    sleeps = get_sleeps
-    sleep = sleeps&.dig(:records)&.find { |sleep| sleep[:score_state] == 'SCORED' && !sleep[:nap] && sleep[:cycle_id] == cycle_id }
-    sleep_id = sleep&.dig(:id)
-    
-    # Get the recovery that corresponds to that sleep.
-    recoveries = get_recoveries
-    recovery = recoveries&.dig(:records)&.find { |recovery| recovery[:sleep_id] == sleep_id }
+    cycle_data = get_most_recent_scored_cycle
+    cycle_id = cycle_data&.dig(:id)
+    sleep_data = get_sleep_for_cycle(cycle_id)
+    recovery_data = get_recovery_for_sleep(sleep_data&.dig(:id))
     
     data = {
-      physiological_cycle: cycle,
-      sleep: sleep,
-      recovery: recovery
+      physiological_cycle: cycle_data,
+      sleep: sleep_data,
+      recovery: recovery_data
     }
     
     File.write('data/whoop.json', data.to_json)
@@ -171,5 +164,21 @@ class Whoop
     return if cycles.blank?
 
     cycles&.dig(:records)&.find { |cycle| cycle[:score_state] == 'SCORED' }
+  end
+
+  # Fetches the sleep data for a given cycle.
+  # @param cycle_id [String] The ID of the cycle to fetch sleep data for.
+  # @return [Hash, nil] The sleep data or nil if unavailable.
+  def get_sleep_for_cycle(cycle_id)
+    sleeps = get_sleeps
+    sleeps&.dig(:records)&.find { |sleep| sleep[:cycle_id] == cycle_id }
+  end
+
+  # Fetches the recovery data for a given sleep.
+  # @param sleep_id [String] The ID of the sleep to fetch recovery data for.
+  # @return [Hash, nil] The recovery data or nil if unavailable.
+  def get_recovery_for_sleep(sleep_id)
+    recoveries = get_recoveries
+    recoveries&.dig(:records)&.find { |recovery| recovery[:sleep_id] == sleep_id }
   end
 end
