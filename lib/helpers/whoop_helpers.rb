@@ -91,7 +91,7 @@ module WhoopHelpers
   # @return [String] The recovery label (Poor, Adequate, Sufficient.)
   def whoop_recovery_label
     recovery = whoop_recovery_score
-    return "Zilch" if recovery.blank? || recovery.zero?
+    return "None" if recovery.blank? || recovery.zero?
     return "Nice." if recovery == 69 && whoop_sleep_score != 69
     
     case recovery
