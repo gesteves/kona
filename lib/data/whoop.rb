@@ -15,7 +15,6 @@ class Whoop
 
   # Fetches and saves the most recent Whoop data (sleep score, recovery score, strain) to a JSON file.
   def save_data
-    # Get the most recent scored cycle.
     cycle_data = get_most_recent_scored_cycle
     cycle_id = cycle_data&.dig(:id)
     sleep_data = get_sleep_for_cycle(cycle_id)
@@ -32,7 +31,7 @@ class Whoop
 
   private
 
-  # Fetches sleep data from the Whoop API.
+  # Fetches most recent sleep data from the Whoop API.
   # @see https://developer.whoop.com/api#tag/Sleep/operation/getSleepCollection
   # @see https://developer.whoop.com/docs/developing/user-data/sleep/
   # @return [Hash, nil] The full sleep data or nil if unavailable.
@@ -57,7 +56,7 @@ class Whoop
     JSON.parse(response.body, symbolize_names: true)
   end
 
-  # Fetches recovery data.
+  # Fetches most recent recovery data from the Whoop API.
   # @see https://developer.whoop.com/api#tag/Recovery/operation/getRecoveryCollection
   # @see https://developer.whoop.com/docs/developing/user-data/recovery/
   # @return [Hash, nil] The recovery data or nil if unavailable.
@@ -82,7 +81,7 @@ class Whoop
     JSON.parse(response.body, symbolize_names: true)
   end
 
-  # Fetches cycle data from the Whoop API.
+  # Fetches most recent cycle data from the Whoop API.
   # @see https://developer.whoop.com/api/#tag/Cycle/operation/getCycleCollection
   # @see https://developer.whoop.com/docs/developing/user-data/cycle/
   # @return [Hash, nil] The full cycle data or nil if unavailable.
@@ -95,7 +94,6 @@ class Whoop
 
     return JSON.parse(cached_response, symbolize_names: true) if cached_response.present?
 
-    # Get today's cycle data
     response = HTTParty.get(
       "#{WHOOP_API_URL}/v2/cycle",
       headers: { "Authorization" => "Bearer #{access_token}" }
@@ -122,7 +120,10 @@ class Whoop
 
     # Get refresh token from Redis
     refresh_token = $redis.get(refresh_token_key)
-    return if refresh_token.blank?
+    if refresh_token.blank?
+      puts "❎ No Whoop refresh token found. Run 'bundle exec rake oauth:whoop' to get a new refresh token."
+      return
+    end
 
     # Refresh the access token
     refresh_params = {
@@ -140,23 +141,20 @@ class Whoop
     )
 
     unless response.success?
-      puts "Failed to get Whoop access token (HTTP #{response.code}: #{response.body}). Run 'bundle exec rake oauth:whoop' to get a new refresh token."
+      puts "❎ Failed to get Whoop access token (HTTP #{response.code}: #{response.body}). Run 'bundle exec rake oauth:whoop' to get a new refresh token."
       return
     end
 
     token_data = JSON.parse(response.body, symbolize_names: true)
     access_token = token_data[:access_token]
-    new_refresh_token = token_data[:refresh_token]
     expires_in = token_data[:expires_in] || 3600
 
-    # Store the new access token with expiration (5 minute buffer)
-    cache_duration = [expires_in - 300, 300].max
+    # Store the new access token with expiration (with a 60-second buffer)
+    cache_duration = [expires_in - 60, 60].max
     $redis.setex(access_token_key, cache_duration, access_token)
 
     # Store the new refresh token (single-use tokens)
-    if new_refresh_token.present?
-      $redis.set(refresh_token_key, new_refresh_token)
-    end
+    $redis.set(refresh_token_key, new_refresh_token) if new_refresh_token.present?
 
     access_token
   rescue StandardError => e
