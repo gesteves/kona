@@ -33,6 +33,8 @@ class Whoop
   private
 
   # Fetches sleep data from the Whoop API.
+  # @see https://developer.whoop.com/api#tag/Sleep/operation/getSleepCollection
+  # @see https://developer.whoop.com/docs/developing/user-data/sleep/
   # @return [Hash, nil] The full sleep data or nil if unavailable.
   def get_sleeps
     access_token = get_access_token
@@ -56,6 +58,8 @@ class Whoop
   end
 
   # Fetches recovery data.
+  # @see https://developer.whoop.com/api#tag/Recovery/operation/getRecoveryCollection
+  # @see https://developer.whoop.com/docs/developing/user-data/recovery/
   # @return [Hash, nil] The recovery data or nil if unavailable.
   def get_recoveries
     access_token = get_access_token
@@ -79,6 +83,8 @@ class Whoop
   end
 
   # Fetches cycle data from the Whoop API.
+  # @see https://developer.whoop.com/api/#tag/Cycle/operation/getCycleCollection
+  # @see https://developer.whoop.com/docs/developing/user-data/cycle/
   # @return [Hash, nil] The full cycle data or nil if unavailable.
   def get_cycles
     access_token = get_access_token
@@ -103,6 +109,7 @@ class Whoop
 
   # Gets a valid access token, refreshing if necessary.
   # Handles token rotation by storing new refresh tokens when they're returned.
+  # @see https://developer.whoop.com/docs/developing/oauth#access-token-expiration
   # @return [String, nil] Access token or nil if unable to refresh.
   def get_access_token
     return if @client_id.blank? || @client_secret.blank?
