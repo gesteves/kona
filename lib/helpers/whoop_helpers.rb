@@ -75,6 +75,7 @@ module WhoopHelpers
   def whoop_sleep_label
     sleep_score = whoop_sleep_score
     return "None" if sleep_score.blank? || sleep_score.zero?
+    return "Nice." if sleep_score == 69 && whoop_recovery_score != 69
     
     case sleep_score
     when 0..69
@@ -91,7 +92,7 @@ module WhoopHelpers
   def whoop_recovery_label
     recovery = whoop_recovery_score
     return "Zilch" if recovery.blank? || recovery.zero?
-    return "Nice." if recovery == 69
+    return "Nice." if recovery == 69 && whoop_sleep_score != 69
     
     case recovery
     when 0..33
