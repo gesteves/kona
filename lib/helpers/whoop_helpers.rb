@@ -71,7 +71,7 @@ module WhoopHelpers
   end
 
   # Returns the descriptive label for the current sleep score.
-  # @return [String] The sleep label (Poor, Sufficient, Optimal, etc.)
+  # @return [String] The sleep label (Poor, Sufficient, Optimal.)
   def whoop_sleep_label
     sleep_score = whoop_sleep_score
     return "None" if sleep_score.blank? || sleep_score.zero?
@@ -88,7 +88,7 @@ module WhoopHelpers
   end
 
   # Returns the descriptive label for the current recovery score.
-  # @return [String] The recovery label (Low, Adequate, Sufficient, etc.)
+  # @return [String] The recovery label (Poor, Adequate, Sufficient.)
   def whoop_recovery_label
     recovery = whoop_recovery_score
     return "Zilch" if recovery.blank? || recovery.zero?
