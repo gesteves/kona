@@ -81,7 +81,7 @@ module WhoopHelpers
       "Poor"
     when 70...85
       "Sufficient"
-    when 85..100
+    when 85...100
       "Optimal"
     end
   end
@@ -94,16 +94,12 @@ module WhoopHelpers
     return "Nice." if recovery == 69
     
     case recovery
-    when 0...11
-      "Basically Dead"
-    when 11...34
+    when 0...34
       "Poor"
     when 34...67
       "Adequate"
-    when 67...90
+    when 67...100
       "Sufficient"
-    when 90...100
-      "Excellent"
     end
   end
 
