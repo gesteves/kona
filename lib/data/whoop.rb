@@ -97,7 +97,7 @@ class Whoop
 
     return unless response.success?
 
-    $redis.setex(cache_key, 5.minutes, response.body)
+    $redis.setex(cache_key, 1.minute, response.body)
     JSON.parse(response.body, symbolize_names: true)
   end
 
