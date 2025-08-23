@@ -102,10 +102,8 @@ module WhoopHelpers
       "Adequate"
     when 67...90
       "Sufficient"
-    when 90...98
-      "Primed"
-    when 98..100
-      "Fully Recovered"
+    when 90...100
+      "Excellent"
     end
   end
 
