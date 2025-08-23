@@ -148,13 +148,14 @@ class Whoop
     token_data = JSON.parse(response.body, symbolize_names: true)
     access_token = token_data[:access_token]
     expires_in = token_data[:expires_in] || 3600
+    refresh_token = token_data[:refresh_token]
 
     # Store the new access token with expiration (with a 60-second buffer)
     cache_duration = [expires_in - 60, 60].max
     $redis.setex(access_token_key, cache_duration, access_token)
 
     # Store the new refresh token (single-use tokens)
-    $redis.set(refresh_token_key, new_refresh_token) if new_refresh_token.present?
+    $redis.set(refresh_token_key, refresh_token) if refresh_token.present?
 
     access_token
   rescue StandardError => e
