@@ -77,11 +77,11 @@ module WhoopHelpers
     return "None" if sleep_score.blank? || sleep_score.zero?
     
     case sleep_score
-    when 0...70
+    when 0..69
       "Poor"
-    when 70...85
+    when 70..84
       "Sufficient"
-    when 85...100
+    when 85..100
       "Optimal"
     end
   end
@@ -94,11 +94,11 @@ module WhoopHelpers
     return "Nice." if recovery == 69
     
     case recovery
-    when 0...34
+    when 0..33
       "Poor"
-    when 34...67
+    when 34..66
       "Adequate"
-    when 67...100
+    when 67..100
       "Sufficient"
     end
   end
