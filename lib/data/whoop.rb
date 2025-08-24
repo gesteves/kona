@@ -177,7 +177,7 @@ class Whoop
   # @return [Hash, nil] The sleep data or nil if unavailable.
   def get_sleep_for_cycle(cycle_id)
     sleeps = get_sleeps
-    sleeps&.dig(:records)&.find { |sleep| sleep[:cycle_id] == cycle_id }
+    sleeps&.dig(:records)&.find { |sleep| sleep[:cycle_id] == cycle_id && sleep[:score_state] == 'SCORED' && !sleep[:nap] }
   end
 
   # Fetches the recovery data for a given sleep.
@@ -185,6 +185,6 @@ class Whoop
   # @return [Hash, nil] The recovery data or nil if unavailable.
   def get_recovery_for_sleep(sleep_id)
     recoveries = get_recoveries
-    recoveries&.dig(:records)&.find { |recovery| recovery[:sleep_id] == sleep_id }
+    recoveries&.dig(:records)&.find { |recovery| recovery[:sleep_id] == sleep_id && recovery[:score_state] == 'SCORED' }
   end
 end
