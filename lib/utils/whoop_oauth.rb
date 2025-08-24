@@ -1,49 +1,26 @@
-require 'httparty'
-require 'uri'
-require 'securerandom'
-require 'json'
-require 'active_support/all'
-require 'redis'
+require_relative '../data/whoop'
 
 # Utility class to handle Whoop OAuth 2.0 flow
 class WhoopOAuth
-  AUTH_URL = 'https://api.prod.whoop.com/oauth/oauth2/auth'
-  TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token'
-
   def initialize
-    @client_id = ENV['WHOOP_CLIENT_ID']
-    @client_secret = ENV['WHOOP_CLIENT_SECRET']
-    @redirect_uri = ENV['WHOOP_REDIRECT_URI'] || 'http://localhost:3000/callback'
+    @whoop = Whoop.new
     
-    # Initialize Redis connection
-    @redis = Redis.new(
-      host: ENV['REDIS_HOST'] || 'localhost',
-      port: ENV['REDIS_PORT'] || 6379,
-      username: ENV['REDIS_USERNAME'],
-      password: ENV['REDIS_PASSWORD']
-    )
-    
-    if @client_id.blank? || @client_secret.blank?
+    unless @whoop.valid_credentials?
       puts "❎ Missing required environment variables:"
       puts "   WHOOP_CLIENT_ID - Your app's client ID from WHOOP Developer Dashboard"
       puts "   WHOOP_CLIENT_SECRET - Your app's client secret from WHOOP Developer Dashboard" 
-      puts "   WHOOP_REDIRECT_URI - Your redirect URI (optional, defaults to http://localhost:3000/callback)"
+      puts "   WHOOP_REDIRECT_URI - Your redirect URI"
       exit 1
     end
   end
 
   def get_authorization_url
-    state = SecureRandom.hex(4) # 8 character state parameter
+    auth_data = @whoop.get_authorization_url
+    return unless auth_data
     
-    params = {
-      client_id: @client_id,
-      response_type: 'code',
-      scope: 'offline read:recovery read:cycles read:workout read:sleep read:profile read:body_measurement',
-      redirect_uri: @redirect_uri,
-      state: state
-    }
-    
-    url = "#{AUTH_URL}?" + URI.encode_www_form(params)
+    url = auth_data[:url]
+    state = auth_data[:state]
+    redirect_uri = auth_data[:redirect_uri]
     
     puts "🔗 Opening authorization URL in your browser..."
     puts url
@@ -53,47 +30,25 @@ class WhoopOAuth
     
     puts
     puts "📝 After authorization, you'll be redirected to:"
-    puts "   #{@redirect_uri}?code=AUTHORIZATION_CODE&state=#{state}"
+    puts "   #{redirect_uri}?code=AUTHORIZATION_CODE&state=#{state}"
     puts
     puts "📋 Copy the authorization code and paste it here:"
     print "Authorization code: "
     
-    { url: url, state: state }
+    auth_data
   end
 
   def exchange_code_for_tokens(authorization_code)
     puts "\n🔄 Exchanging authorization code for tokens..."
     
-    params = {
-      client_id: @client_id,
-      client_secret: @client_secret,
-      code: authorization_code,
-      grant_type: 'authorization_code',
-      redirect_uri: @redirect_uri
-    }
-
-    response = HTTParty.post(
-      TOKEN_URL,
-      body: params,
-      headers: { 'Content-Type' => 'application/x-www-form-urlencoded' }
-    )
-
-    if response.success?
-      access_token_key = "whoop:#{@client_id}:access_token"
-      refresh_token_key = "whoop:#{@client_id}:refresh_token"
-      token_data = JSON.parse(response.body, symbolize_names: true)
-      
-      # Store tokens in Redis
+    token_data = @whoop.exchange_code_for_tokens(authorization_code)
+    
+    if token_data
       access_token = token_data[:access_token]
       refresh_token = token_data[:refresh_token]
       expires_in = token_data[:expires_in] || 3600
-      
-      # Store access token with expiration (5 minute buffer)
       access_cache_duration = [expires_in - 300, 300].max
-      @redis.setex(access_token_key, access_cache_duration, access_token)
-      
-      # Store refresh token (no expiration since we don't know when it expires)
-      @redis.set(refresh_token_key, refresh_token)
+      client_id = ENV['WHOOP_CLIENT_ID']
       
       puts "✅ Success! Tokens stored in Redis:"
       puts
@@ -103,20 +58,15 @@ class WhoopOAuth
       puts
       puts "🎉 Tokens are now stored in Redis and ready for use!"
       puts "   Redis keys:"
-      puts "   - whoop:access_token (expires in #{access_cache_duration} seconds)"
-      puts "   - whoop:refresh_token (permanent)"
+      puts "   - whoop:#{client_id}:access_token (expires in #{access_cache_duration} seconds)"
+      puts "   - whoop:#{client_id}:refresh_token (permanent)"
       puts
       
       token_data
     else
-      puts "❌ Error exchanging code for tokens:"
-      puts "Status: #{response.code}"
-      puts "Body: #{response.body}"
+      puts "❌ Error exchanging code for tokens"
       nil
     end
-  rescue => e
-    puts "❌ Error: #{e.message}"
-    nil
   end
 
   def run

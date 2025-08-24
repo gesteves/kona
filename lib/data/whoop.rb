@@ -1,10 +1,12 @@
 require 'httparty'
 require 'active_support/all'
+require 'uri'
+require 'securerandom'
 
 # Class to interact with the Whoop API to fetch today's sleep, recovery, and strain data.
 class Whoop
   WHOOP_API_URL = 'https://api.prod.whoop.com/developer/v2'
-  OAUTH_TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token'
+  WHOOP_OAUTH_URL = 'https://api.prod.whoop.com/oauth/oauth2'
 
   def initialize
     @client_id = ENV['WHOOP_CLIENT_ID']
@@ -28,7 +30,88 @@ class Whoop
     File.write('data/whoop.json', data.to_json)
   end
 
+  # Validates that required environment variables are present
+  # @return [Boolean] true if all required variables are set
+  def valid_credentials?
+    @client_id.present? && @client_secret.present? && @redirect_uri.present?
+  end
+
+  # Generates the OAuth authorization URL for initial setup
+  # @return [Hash] Hash containing the authorization URL and state parameter
+  def get_authorization_url
+    return unless valid_credentials?
+
+    state = SecureRandom.hex(4)
+    
+    params = {
+      client_id: @client_id,
+      response_type: 'code',
+      scope: 'offline read:recovery read:cycles read:workout read:sleep read:profile read:body_measurement',
+      redirect_uri: @redirect_uri,
+      state: state
+    }
+    
+    url = "#{WHOOP_OAUTH_URL}/auth?" + URI.encode_www_form(params)
+    
+    { url: url, state: state, redirect_uri: @redirect_uri }
+  end
+
+  # Exchanges an authorization code for access and refresh tokens
+  # @param authorization_code [String] The authorization code from OAuth callback
+  # @return [Hash, nil] Token data hash or nil if exchange failed
+  def exchange_code_for_tokens(authorization_code)
+    return unless valid_credentials?
+    
+    params = {
+      client_id: @client_id,
+      client_secret: @client_secret,
+      code: authorization_code,
+      grant_type: 'authorization_code',
+      redirect_uri: @redirect_uri
+    }
+
+    response = HTTParty.post(
+      "#{WHOOP_OAUTH_URL}/token",
+      body: params,
+      headers: { 'Content-Type' => 'application/x-www-form-urlencoded' }
+    )
+
+    return unless response.success?
+
+    token_data = JSON.parse(response.body, symbolize_names: true)
+    store_tokens(token_data)
+    token_data
+  rescue StandardError => e
+    puts "Error exchanging authorization code: #{e.message}" if ENV['DEBUG']
+    nil
+  end
+
   private
+
+  # Fetches the most recent scored cycle from the Whoop API.
+  # @return [Hash, nil] The cycle data or nil if unavailable.
+  def get_most_recent_scored_cycle
+    cycles = get_cycles
+    return if cycles.blank?
+
+    cycles&.dig(:records)&.find { |cycle| cycle[:score_state] == 'SCORED' }
+  end
+
+  # Fetches the most recent scored non-nap sleep data for a given cycle.
+  # @param cycle_id [String] The ID of the cycle to fetch sleep data for.
+  # @return [Hash, nil] The sleep data or nil if unavailable.
+  def get_sleep_for_cycle(cycle_id)
+    sleeps = get_sleeps
+    sleeps&.dig(:records)&.find { |sleep| sleep[:cycle_id] == cycle_id && sleep[:score_state] == 'SCORED' && !sleep[:nap] }
+  end
+
+  # Fetches the most recent scored recovery data for a given sleep.
+  # @param sleep_id [String] The ID of the sleep to fetch recovery data for.
+  # @return [Hash, nil] The recovery data or nil if unavailable.
+  def get_recovery_for_sleep(sleep_id)
+    recoveries = get_recoveries
+    recoveries&.dig(:records)&.find { |recovery| recovery[:sleep_id] == sleep_id && recovery[:score_state] == 'SCORED' }
+  end
 
   # Fetches most recent sleep data from the Whoop API.
   # @see https://developer.whoop.com/api#tag/Sleep/operation/getSleepCollection
@@ -109,7 +192,7 @@ class Whoop
   # @see https://developer.whoop.com/docs/developing/oauth#access-token-expiration
   # @return [String, nil] Access token or nil if unable to refresh.
   def get_access_token
-    return if @client_id.blank? || @client_secret.blank?
+    return unless valid_credentials?
 
     access_token_key = "whoop:#{@client_id}:access_token"
     refresh_token_key = "whoop:#{@client_id}:refresh_token"
@@ -134,7 +217,7 @@ class Whoop
     }
 
     response = HTTParty.post(
-      OAUTH_TOKEN_URL,
+      "#{WHOOP_OAUTH_URL}/token",
       body: refresh_params,
       headers: { 'Content-Type' => 'application/x-www-form-urlencoded' }
     )
@@ -146,15 +229,7 @@ class Whoop
 
     token_data = JSON.parse(response.body, symbolize_names: true)
     access_token = token_data[:access_token]
-    expires_in = token_data[:expires_in]
-    refresh_token = token_data[:refresh_token]
-
-    # Store the new access token with expiration (with a 60-second buffer)
-    cache_duration = [expires_in - 60, 0].max
-    $redis.setex(access_token_key, cache_duration, access_token)
-
-    # Store the new refresh token (single-use tokens)
-    $redis.set(refresh_token_key, refresh_token) if refresh_token.present?
+    store_tokens(token_data)
 
     access_token
   rescue StandardError => e
@@ -162,28 +237,21 @@ class Whoop
     nil
   end
 
-  # Fetches the most recent scored cycle from the Whoop API.
-  # @return [Hash, nil] The cycle data or nil if unavailable.
-  def get_most_recent_scored_cycle
-    cycles = get_cycles
-    return if cycles.blank?
-
-    cycles&.dig(:records)&.find { |cycle| cycle[:score_state] == 'SCORED' }
-  end
-
-  # Fetches the most recent scored non-nap sleep data for a given cycle.
-  # @param cycle_id [String] The ID of the cycle to fetch sleep data for.
-  # @return [Hash, nil] The sleep data or nil if unavailable.
-  def get_sleep_for_cycle(cycle_id)
-    sleeps = get_sleeps
-    sleeps&.dig(:records)&.find { |sleep| sleep[:cycle_id] == cycle_id && sleep[:score_state] == 'SCORED' && !sleep[:nap] }
-  end
-
-  # Fetches the most recent scored recovery data for a given sleep.
-  # @param sleep_id [String] The ID of the sleep to fetch recovery data for.
-  # @return [Hash, nil] The recovery data or nil if unavailable.
-  def get_recovery_for_sleep(sleep_id)
-    recoveries = get_recoveries
-    recoveries&.dig(:records)&.find { |recovery| recovery[:sleep_id] == sleep_id && recovery[:score_state] == 'SCORED' }
+  # Stores access and refresh tokens in Redis
+  # @param token_data [Hash] Token response from OAuth API
+  def store_tokens(token_data)
+    access_token = token_data[:access_token]
+    refresh_token = token_data[:refresh_token]
+    expires_in = token_data[:expires_in] || 3600
+    
+    access_token_key = "whoop:#{@client_id}:access_token"
+    refresh_token_key = "whoop:#{@client_id}:refresh_token"
+    
+    # Store access token with expiration (1 minute buffer)
+    access_cache_duration = [expires_in - 60, 0].max
+    $redis.setex(access_token_key, access_cache_duration, access_token)
+    
+    # Store refresh token (no expiration)
+    $redis.set(refresh_token_key, refresh_token) if refresh_token.present?
   end
 end
