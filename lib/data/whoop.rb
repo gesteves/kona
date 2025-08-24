@@ -242,12 +242,12 @@ class Whoop
   def store_tokens(token_data)
     access_token = token_data[:access_token]
     refresh_token = token_data[:refresh_token]
-    expires_in = token_data[:expires_in] || 3600
+    expires_in = token_data[:expires_in].to_i
     
     access_token_key = "whoop:#{@client_id}:access_token"
     refresh_token_key = "whoop:#{@client_id}:refresh_token"
     
-    # Store access token with expiration (1 minute buffer)
+    # Store access token with expiration (1-minute buffer)
     access_cache_duration = [expires_in - 60, 0].max
     $redis.setex(access_token_key, access_cache_duration, access_token)
     
