@@ -6,11 +6,10 @@ class Whoop
   WHOOP_API_URL = 'https://api.prod.whoop.com/developer/v2'
   OAUTH_TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token'
 
-  def initialize(timezone = "America/Denver")
+  def initialize
     @client_id = ENV['WHOOP_CLIENT_ID']
     @client_secret = ENV['WHOOP_CLIENT_SECRET']
     @redirect_uri = ENV['WHOOP_REDIRECT_URI']
-    @timezone = timezone
   end
 
   # Fetches and saves the most recent Whoop data (sleep score, recovery score, strain) to a JSON file.

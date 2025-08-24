@@ -130,8 +130,7 @@ end
 
 def import_whoop
   safely_perform { 
-    @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
-    Whoop.new(@google_maps.time_zone_id).save_data 
+    Whoop.new.save_data 
   }
 end
 
