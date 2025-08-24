@@ -91,10 +91,23 @@ export default class extends Controller {
   }
 
   /**
-   * Tracks share events for regular links.
+   * Tracks share events for regular links. Prevents default link behavior
+   * to avoid duplicate tracking, then opens the link appropriately.
    * @param {Event} event - The event that triggered the share action.
    */
   trackShare(event) {
+    event.preventDefault();
+    const linkURL = this.element.href;
+    
     trackEvent('Share', { url: this.getShareUrl(), via: this.viaValue });
+    
+    // Handle special URL schemes (mailto:, sms:) differently than HTTP(S) URLs
+    if (linkURL.startsWith('mailto:') || linkURL.startsWith('sms:')) {
+      // For mailto/sms, navigate in the current window to trigger the app
+      window.location.href = linkURL;
+    } else {
+      // For HTTP(S) URLs, open in a new window/tab
+      window.open(linkURL, '_blank', 'noopener,noreferrer');
+    }
   }
 }
