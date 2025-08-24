@@ -3,7 +3,7 @@ require 'active_support/all'
 
 # Class to interact with the Whoop API to fetch today's sleep, recovery, and strain data.
 class Whoop
-  WHOOP_API_URL = 'https://api.prod.whoop.com/developer'
+  WHOOP_API_URL = 'https://api.prod.whoop.com/developer/v2'
   OAUTH_TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token'
 
   def initialize(timezone = "America/Denver")
@@ -45,7 +45,7 @@ class Whoop
     return JSON.parse(cached_response, symbolize_names: true) if cached_response.present?
 
     response = HTTParty.get(
-      "#{WHOOP_API_URL}/v2/activity/sleep",
+      "#{WHOOP_API_URL}/activity/sleep",
       headers: { "Authorization" => "Bearer #{access_token}" }
     )
 
@@ -70,7 +70,7 @@ class Whoop
     return JSON.parse(cached_response, symbolize_names: true) if cached_response.present?
 
     response = HTTParty.get(
-      "#{WHOOP_API_URL}/v2/recovery",
+      "#{WHOOP_API_URL}/recovery",
       headers: { "Authorization" => "Bearer #{access_token}" }
     )
 
@@ -95,7 +95,7 @@ class Whoop
     return JSON.parse(cached_response, symbolize_names: true) if cached_response.present?
 
     response = HTTParty.get(
-      "#{WHOOP_API_URL}/v2/cycle",
+      "#{WHOOP_API_URL}/cycle",
       headers: { "Authorization" => "Bearer #{access_token}" }
     )
 
