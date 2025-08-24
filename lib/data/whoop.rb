@@ -147,11 +147,11 @@ class Whoop
 
     token_data = JSON.parse(response.body, symbolize_names: true)
     access_token = token_data[:access_token]
-    expires_in = token_data[:expires_in] || 3600
+    expires_in = token_data[:expires_in]
     refresh_token = token_data[:refresh_token]
 
     # Store the new access token with expiration (with a 60-second buffer)
-    cache_duration = [expires_in - 60, 60].max
+    cache_duration = [expires_in - 60, 0].max
     $redis.setex(access_token_key, cache_duration, access_token)
 
     # Store the new refresh token (single-use tokens)
@@ -172,7 +172,7 @@ class Whoop
     cycles&.dig(:records)&.find { |cycle| cycle[:score_state] == 'SCORED' }
   end
 
-  # Fetches the sleep data for a given cycle.
+  # Fetches the most recent scored non-nap sleep data for a given cycle.
   # @param cycle_id [String] The ID of the cycle to fetch sleep data for.
   # @return [Hash, nil] The sleep data or nil if unavailable.
   def get_sleep_for_cycle(cycle_id)
@@ -180,7 +180,7 @@ class Whoop
     sleeps&.dig(:records)&.find { |sleep| sleep[:cycle_id] == cycle_id && sleep[:score_state] == 'SCORED' && !sleep[:nap] }
   end
 
-  # Fetches the recovery data for a given sleep.
+  # Fetches the most recent scored recovery data for a given sleep.
   # @param sleep_id [String] The ID of the sleep to fetch recovery data for.
   # @return [Hash, nil] The recovery data or nil if unavailable.
   def get_recovery_for_sleep(sleep_id)
