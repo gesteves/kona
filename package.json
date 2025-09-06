@@ -8,7 +8,7 @@
     "format:check": "prettier --check \"**/*.{js,json,md}\""
   },
   "dependencies": {
-    "@babel/core": "^7.28.3",
+    "@babel/core": "^7.28.4",
     "@babel/preset-env": "^7.28.3",
     "@hotwired/stimulus": "^3.2.2",
     "@hotwired/stimulus-webpack-helpers": "^1.0.1",
