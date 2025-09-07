@@ -64,18 +64,18 @@ module ShareHelpers
   # @param article [Article] The article to be shared.
   # @return [String] A randomly selected share heading.
   def share_heading(article)
-    type = entry_type(article).downcase
+    type = article&.contentful_metadata&.tags&.any? { |tag| tag.name.downcase == 'race reports' } ? 'race report' : entry_type(article).downcase
     headings = [
       "Enjoyed this #{type}? Share it with your friends!",
-      "Found this helpful? Pass it along!",
-      "Think someone would enjoy reading this? Share away!",
+      "Found this #{type} helpful? Pass it along!",
+      "Think someone would enjoy reading this #{type}? Share away!",
       "Enjoyed what you just read? Share it!",
       "Worth sharing? Send it to your friends!",
-      "Know someone who needs to read this? Share it!",
+      "Know someone who needs to read this #{type}? Share it!",
       "Spread the word—share this #{type}",
       "Hit share and spread the word",
       "Share the love (and this #{type})",
-      "Share this #{type} with your followers",
+      "Share this #{type} with your friends",
     ]
     headings.sample
   end
