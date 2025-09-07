@@ -59,4 +59,24 @@ module ShareHelpers
     encoded_url = ERB::Util.url_encode(url)
     "https://www.threads.com/intent/post?text=#{encoded_text}&url=#{encoded_url}"
   end
+
+  # Returns a random heading for the share section for an article.
+  # @param article [Article] The article to be shared.
+  # @return [String] A randomly selected share heading.
+  def share_heading(article)
+    type = entry_type(article).downcase
+    headings = [
+      "Enjoyed this #{type}? Share it with your friends!",
+      "Found this helpful? Pass it along!",
+      "Think someone would enjoy reading this? Share away!",
+      "Enjoyed what you just read? Share it!",
+      "Worth sharing? Send it to your friends!",
+      "Know someone who needs to read this? Share it!",
+      "Spread the word—share this #{type}",
+      "Hit share and spread the word",
+      "Share the love (and this #{type})",
+      "Share this #{type} with your followers",
+    ]
+    headings.sample
+  end
 end
