@@ -23,7 +23,7 @@
     <% if is_featured?(event) && event_race_reports(event).any? %>
       <div class="entry__meta entry__meta--row entry__meta--separators">
         <% reports = event_race_reports(event) %>
-        <span class="entry__meta-highlight">Race <%= pluralize(reports.count, 'report').split(' ').last %></span> <%= reports.group_by { |report| DateTime.parse(report.published_at).year }.sort.reverse.map { |year, reports| link_to year, reports.first.path }.join('') %>
+        <span class="entry__meta-highlight">Race Reports</span> <%= reports.group_by { |report| DateTime.parse(report.published_at).year }.sort.reverse.map { |year, reports| link_to year, reports.first.path }.join('') %>
       </div>
     <% end %>
     
