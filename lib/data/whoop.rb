@@ -204,10 +204,12 @@ class Whoop
 
     return JSON.parse(cached_response, symbolize_names: true) if cached_response.present?
 
+    query = { start: start_date, end: end_date, limit: 25 }.compact
+
     response = HTTParty.get(
       "#{WHOOP_API_URL}/activity/workout",
       headers: { "Authorization" => "Bearer #{access_token}" },
-      query: { start: start_date, end: end_date, limit: 25 }
+      query: query
     )
 
     return unless response.success?
