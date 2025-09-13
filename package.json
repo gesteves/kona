@@ -24,7 +24,7 @@
   },
   "devDependencies": {
     "prettier": "^3.6.2",
-    "stylelint": "^16.23.1",
+    "stylelint": "^16.24.0",
     "stylelint-config-standard-scss": "^16.0.0",
     "stylelint-scss": "^6.12.1"
   }
