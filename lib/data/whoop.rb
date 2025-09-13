@@ -20,11 +20,13 @@ class Whoop
     cycle_id = cycle_data&.dig(:id)
     sleep_data = get_sleep_for_cycle(cycle_id)
     recovery_data = get_recovery_for_sleep(sleep_data&.dig(:id))
+    workout_data = get_workouts(cycle_data&.dig(:start), cycle_data&.dig(:end))
     
     data = {
       physiological_cycle: cycle_data,
       sleep: sleep_data,
-      recovery: recovery_data
+      recovery: recovery_data,
+      workouts: workout_data
     }
     
     File.write('data/whoop.json', data.to_json)
@@ -184,6 +186,34 @@ class Whoop
     return unless response.success?
 
     $redis.setex(cache_key, 1.minute, response.body)
+    JSON.parse(response.body, symbolize_names: true)
+  end
+
+  # Fetches most recent workouts from the Whoop API.
+  # @param start_date [String] The start date of the workouts to fetch.
+  # @param end_date [String] The end date of the workouts to fetch.
+  # @see https://developer.whoop.com/api/#tag/Workout/operation/getWorkoutCollection
+  # @see https://developer.whoop.com/docs/developing/user-data/workout
+  # @return [Hash, nil] The workout data or nil if unavailable.
+  def get_workouts(start_date = nil, end_date = nil)
+    access_token = get_access_token
+    return if access_token.blank?
+
+    cache_key = "whoop:#{@client_id}:workouts:#{start_date.to_i}:#{end_date.to_i}"
+    cached_response = $redis.get(cache_key)
+
+    return JSON.parse(cached_response, symbolize_names: true) if cached_response.present?
+
+    response = HTTParty.get(
+      "#{WHOOP_API_URL}/activity/workout",
+      headers: { "Authorization" => "Bearer #{access_token}" },
+      query: { start: start_date, end: end_date, limit: 25 }
+    )
+
+    return unless response.success?
+
+    $redis.setex(cache_key, 1.minute, response.body)
+    
     JSON.parse(response.body, symbolize_names: true)
   end
 
