@@ -208,15 +208,14 @@ module WeatherHelpers
     return nil if min.blank? && max.blank?
     return format_wind_speed(max) if min.blank?
     return format_wind_speed(min) if max.blank?
-    return format_wind_speed(min) if min == max
 
     min_metric = min.round
     min_imperial = kilometers_to_miles(min).round
     max_metric = max.round
     max_imperial = kilometers_to_miles(max).round
 
-    metric = "#{min_metric}–#{max_metric} km/h"
-    imperial = "#{min_imperial}–#{max_imperial} mph"
+    metric = min_metric == max_metric ? "#{min_metric} km/h" : "#{min_metric}–#{max_metric} km/h"
+    imperial = min_imperial == max_imperial ? "#{min_imperial} mph" : "#{min_imperial}–#{max_imperial} mph"
     units_tag(metric, imperial)
   end
 
