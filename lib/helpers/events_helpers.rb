@@ -152,4 +152,21 @@ module EventsHelpers
 
     race_reports
   end
+
+  # Returns the variant class for the upcoming races collection.
+  # @return [String] The CSS class.
+  def event_collection_variant
+    count = upcoming_races.count
+
+    case count
+    when 1
+      "single"
+    when 2
+      is_featured?(upcoming_races.first) ? "single" : "halves"
+    when 3
+      is_featured?(upcoming_races.first) ? "halves" : "thirds"
+    else
+      "thirds"
+    end
+  end
 end

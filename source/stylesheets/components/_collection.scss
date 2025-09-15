@@ -46,6 +46,12 @@
   }
 }
 
+.collection--single .collection__item {
+  @include bp-medium {
+    grid-column: span 12;
+  }
+}
+
 .collection--halves .collection__item {
   @include bp-medium {
     grid-column: span 6;
