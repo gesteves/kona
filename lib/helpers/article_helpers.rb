@@ -22,6 +22,15 @@ module ArticleHelpers
     article_date.to_date == current_time.to_date
   end
 
+  # Determines if the article was published in the last week.
+  # @param article [Object] The article.
+  # @return [Boolean] If the article was published in the last week.
+  def new_article?(article)
+    return false if article.draft
+    article_date = Time.parse(article.published_at).in_time_zone(location_time_zone)
+    article_date.to_date >= 1.week.ago.to_date
+  end
+
   # Returns a permalink anchor tag for the article, with the date it was published.
   # If the article was published today, includes attributes to render the date as a relative timestamp.
   # @param article [Object] The article.

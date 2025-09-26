@@ -26,6 +26,7 @@ icons:
     regular:
       - calendar-star
       - typewriter
+      - sparkles
     light:
       - arrow-down
       - arrow-right
