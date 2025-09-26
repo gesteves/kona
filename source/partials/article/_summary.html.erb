@@ -1,6 +1,9 @@
 <article class="entry entry--summary" id="entry-<%= article.sys.id.parameterize %>" aria-labelledby="hed-<%= article.sys.id.parameterize %>">
   <header class="entry__header">
     <p class="entry__meta">
+      <% if new_article?(article) %>
+        <span class="entry__highlight"><%= icon_svg("classic", "regular", "sparkles") %> New</span>
+      <% end %>
       <span>
         <% if published_today?(article) || article.draft %>
           <%= clock_icon_svg(DateTime.parse(article.published_at)) %>
