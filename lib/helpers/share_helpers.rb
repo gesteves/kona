@@ -74,7 +74,6 @@ module ShareHelpers
       "Know someone who needs to read this #{type}? Share it!",
       "Spread the word—share this #{type}",
       "Hit share and spread the word",
-      "Share the love (and this #{type})",
       "Share this #{type} with your friends",
     ]
     headings.sample
