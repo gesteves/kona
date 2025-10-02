@@ -33,7 +33,7 @@ class PurpleAir
 
     corrected_pm25 = apply_epa_correction(sensor['pm2.5_atm'], sensor['humidity'])
     data = format_aqi(corrected_pm25)
-    return if data.dig(:aqi).blank? || data.dig(:aqi).zero?
+    return if data.dig(:aqi).blank? || data.dig(:aqi) <= 0
     data
   end
 
