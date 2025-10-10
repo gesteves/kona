@@ -140,4 +140,21 @@ module SiteHelpers
     return 0 if tag.blank?
     tag.pages.map { |t| t.items }.flatten.uniq.size
   end
+
+  # Checks if Plausible analytics is properly installed by verifying required redirects exist.
+  # @return [Boolean] True if both required Plausible redirects are present in data/redirects.json
+  def is_plausible_installed?
+    return false unless data.redirects.present?
+    
+    required_redirects = [
+      { from: '/js/script.js', status: 200 },
+      { from: '/api/event', status: 200 }
+    ]
+    
+    required_redirects.all? do |required|
+      data.redirects.any? do |redirect|
+        redirect['from'] == required[:from] && redirect['status'] == required[:status]
+      end
+    end
+  end
 end

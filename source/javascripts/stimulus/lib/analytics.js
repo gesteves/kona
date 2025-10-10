@@ -3,12 +3,18 @@
 /**
  * Sets up the Plausible analytics queue if it doesn't already exist.
  */
-function setupPlausibleQueue() {
+function setUpPlausible() {
   window.plausible =
     window.plausible ||
     function () {
       (window.plausible.q = window.plausible.q || []).push(arguments);
     };
+  window.plausible.init =
+    window.plausible.init ||
+    function (i) {
+      window.plausible.o = i || {};
+    };
+  window.plausible.init({ autoCapturePageviews: false });
 }
 
 /**
@@ -16,7 +22,7 @@ function setupPlausibleQueue() {
  * Currently supports Plausible.
  */
 export function trackPageView() {
-  setupPlausibleQueue();
+  setUpPlausible();
   plausible('pageview', { u: window.location.href });
   cleanUpUrl();
 }
@@ -28,7 +34,7 @@ export function trackPageView() {
  * @param {Object} props - Additional properties to send with the event.
  */
 export function trackEvent(event, props = {}) {
-  setupPlausibleQueue();
+  setUpPlausible();
   plausible(event, { props: props });
 }
 

@@ -1,12 +1,3 @@
-[[redirects]]
-from = "/js/script.js"
-to = "https://plausible.io/js/script.manual.outbound-links.tagged-events.js"
-status = 200
-
-[[redirects]]
-from = "/api/event"
-to = "https://plausible.io/api/event"
-status = 200
 
 [functions]
   node_bundler = "esbuild"
