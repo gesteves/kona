@@ -98,9 +98,9 @@ export default class extends Controller {
   trackShare(event) {
     event.preventDefault();
     const linkURL = this.element.href;
-    
+
     trackEvent('Share', { url: this.getShareUrl(), via: this.viaValue });
-    
+
     // Handle special URL schemes (mailto:, sms:) differently than HTTP(S) URLs
     if (linkURL.startsWith('mailto:') || linkURL.startsWith('sms:')) {
       // For mailto/sms, navigate in the current window to trigger the app

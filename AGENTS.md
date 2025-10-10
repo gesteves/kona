@@ -26,19 +26,23 @@ Kona is a static site generator built on **Middleman** that creates a blog power
 **ALL agents MUST follow these requirements in order:**
 
 ### 1. Tests Must Pass
+
 - **ALWAYS** run `bundle exec rake test` after making changes
 - **NEVER** commit code that fails tests
 - If tests fail, fix them before proceeding
 
 ### 2. Full Build Must Succeed
+
 - **ALWAYS** run `bundle exec rake build:verbose` after making changes
 - **NEVER** commit code that fails the build process
 - The build process includes: tests → data import → JavaScript build → Middleman build
 
 ### 3. Follow EditorConfig Conventions
+
 - **ALWAYS** follow the rules defined in `.editorconfig`
 
 ### 4. Lint Code Using Available Tools
+
 - **ALWAYS** run `npm run lint:scss` for SCSS files
 - **ALWAYS** run `npm run format:check` for JavaScript, JSON, and Markdown files
 - **ALWAYS** fix linting issues before committing
@@ -46,6 +50,7 @@ Kona is a static site generator built on **Middleman** that creates a blog power
 - Use `npm run format` to auto-fix formatting issues
 
 ### 5. Build JavaScript When Making JS Changes
+
 - **ALWAYS** run `npm run build` after making changes to JavaScript files
 - **NEVER** commit JavaScript changes without building them first
 
@@ -54,6 +59,7 @@ Kona is a static site generator built on **Middleman** that creates a blog power
 ### Rake Commands
 
 #### Core Development
+
 ```bash
 # Import all data (run this first)
 bundle exec rake import
@@ -69,6 +75,7 @@ bundle exec rake build:verbose
 ```
 
 #### Partial Data Import
+
 ```bash
 # Import specific data types
 bundle exec rake import:content    # Contentful
@@ -78,6 +85,7 @@ bundle exec rake import:whoop      # Whoop data
 ```
 
 #### Utility Commands
+
 ```bash
 # Clear Redis cache (for human use only—AI agents must **NEVER** use this)
 bundle exec rake redis:clear
@@ -98,6 +106,7 @@ bundle exec rake clobber
 ### NPM Commands
 
 #### JavaScript/CSS Development
+
 ```bash
 # Build JavaScript for production (MANDATORY after JS changes)
 npm run build
@@ -107,6 +116,7 @@ npm run watch
 ```
 
 #### Code Quality
+
 ```bash
 # Lint SCSS files (MANDATORY)
 npm run lint:scss
@@ -122,6 +132,7 @@ npm run format
 ```
 
 ### Middleman Commands
+
 ```bash
 # Local development server
 bundle exec middleman
@@ -133,17 +144,20 @@ bundle exec middleman build
 ## Key File Locations
 
 ### Configuration
+
 - `config.rb` - Middleman configuration and proxy setup
 - `netlify.toml` - Netlify build settings and redirects
 - `Rakefile` - Main rake tasks and Redis setup
 - `.editorconfig` - Code formatting rules
 
 ### Data Layer
+
 - `lib/data/*.rb` - API client classes for external services
 - `lib/tasks/import.rake` - Data import orchestration
 - `data/*.json` - Generated data files (git-ignored)
 
 ### Frontend Code
+
 - `source/layouts/layout.erb` - Main layout template
 - `source/partials/` - Reusable ERB components
 - `lib/helpers/` - Ruby helper methods for templates
@@ -151,16 +165,19 @@ bundle exec middleman build
 - `source/stylesheets/` - SCSS stylesheets
 
 ### Build Output
+
 - `build/` - Generated static site (git-ignored)
 
 ## Development Workflow
 
 ### Starting Development
+
 1. **ALWAYS** run `bundle exec rake import` first to get fresh data
 2. Run `bundle exec middleman` for the development server
 3. In a separate terminal, run `npm run watch` for JavaScript/CSS changes
 
 ### Making Changes
+
 1. Make your changes
 2. **ALWAYS** run `npm run lint:scss` and `npm run format:check`
 3. Fix any linting issues
@@ -169,6 +186,7 @@ bundle exec middleman build
 6. **ALWAYS** run `bundle exec rake build:verbose` before committing
 
 ### Testing
+
 - Tests are located in `spec/` directory
 - Focus on helper methods, text processing, markdown rendering, and data transformation
 - Use `bundle exec rake test` to run tests
@@ -176,6 +194,7 @@ bundle exec middleman build
 ## Environment & Dependencies
 
 ### Required Services
+
 - **Redis**: For caching API responses
 - **Contentful**: CMS for blog content
 - **Font Awesome**: For icons
@@ -184,6 +203,7 @@ bundle exec middleman build
 - **Netlify**: For hosting and deployment
 
 ### Environment Variables
+
 - Check `.env.example` for required variables
 - Set up all services before running the project
 - Many services have dependencies on each other
@@ -191,6 +211,7 @@ bundle exec middleman build
 ## Code Organization Rules
 
 ### Adding New Features
+
 - **Helper Methods**: Add business logic to `lib/helpers/` files
 - **Data Classes**: API clients go in `lib/data/` with `save_data` method
 - **Components**: Reusable UI components in `source/partials/`
@@ -198,6 +219,7 @@ bundle exec middleman build
 - **Styles**: SCSS files in `source/stylesheets/`
 
 ### Error Handling
+
 - Use `safely_perform` pattern for API calls that might fail
 - Check console output for failed operations during import
 - Validate `data/*.json` files exist and have expected structure
@@ -205,12 +227,14 @@ bundle exec middleman build
 ## Deployment
 
 ### Netlify Integration
+
 - Uses `netlify build` command for production builds
 - Scheduled functions in `netlify/functions/` for automated rebuilds
 - Build hooks for external service integration
 - Image CDN optimization via CloudFront
 
 ### CI/CD Process
+
 1. Tests run automatically
 2. Data import happens during build
 3. JavaScript builds via Webpack
@@ -220,8 +244,8 @@ bundle exec middleman build
 ## Troubleshooting
 
 ### Debugging
+
 - Check `data/*.json` files for expected structure
 - Use verbose build: `bundle exec rake build:verbose`
-
 
 Remember: **Tests → Lint → Build → Commit** - this is the mandatory workflow for all changes.
