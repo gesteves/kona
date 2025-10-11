@@ -27,7 +27,7 @@ GEM
       execjs (~> 2)
     base64 (0.3.0)
     benchmark (0.4.1)
-    bigdecimal (3.2.3)
+    bigdecimal (3.3.1)
     coffee-script (2.4.1)
       coffee-script-source
       execjs
@@ -36,7 +36,7 @@ GEM
     connection_pool (2.5.4)
     contracts (0.17.2)
     crass (1.0.6)
-    csv (3.3.3)
+    csv (3.3.5)
     diff-lcs (1.6.2)
     dotenv (3.1.8)
     drb (2.2.3)
@@ -64,7 +64,7 @@ GEM
     hashie (5.0.0)
     htmlcompressor (0.2.0)
     htmlentities (4.3.4)
-    httparty (0.23.1)
+    httparty (0.23.2)
       csv
       mini_mime (>= 1.0.0)
       multi_xml (>= 0.5.2)
@@ -132,7 +132,7 @@ GEM
       logger
     mini_mime (1.1.5)
     minitest (5.25.5)
-    multi_xml (0.7.1)
+    multi_xml (0.7.2)
       bigdecimal (~> 3.1)
     nokogiri (1.18.10-arm64-darwin)
       racc (~> 1.4)
