@@ -53,7 +53,7 @@ module WhoopHelpers
   end
 
   # Returns the descriptive label for the current strain level.
-  # @return [String] The strain label (Light, Moderate, Strenuous, All Out, etc.)
+  # @return [String] The strain label (Light, Moderate, High, All Out, etc.)
   def whoop_strain_label
     strain = data.whoop.physiological_cycle.score.strain
     return "Nothing" if strain.blank? || strain.zero?
@@ -64,7 +64,7 @@ module WhoopHelpers
     when 10...14
       "Moderate"
     when 14...18
-      "Strenuous"
+      "High"
     when 18..21
       "All Out"
     end
