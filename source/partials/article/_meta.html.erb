@@ -4,15 +4,11 @@
   <% end %>
   <% if new_article?(article) %>
     <span class="entry__highlight"><%= icon_svg("classic", "regular", "sparkles") %> New</span>
-    <span>
-      <%= article_permalink_timestamp(article) %>
-    </span>
-  <% else %>
-    <span>
-      <%= icon_svg("classic", "light", "calendar") %>
-      <%= article_permalink_timestamp(article) %>
-    </span>
   <% end %>
+  <span>
+    <%= icon_svg("classic", "light", "calendar") %>
+    <%= article_permalink_timestamp(article) %>
+  </span>
   <% if article.contentful_metadata.tags.present? %>
     <span>
       <% if article.contentful_metadata.tags.size == 1 %>

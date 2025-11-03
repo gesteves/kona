@@ -3,15 +3,11 @@
     <p class="entry__meta">
       <% if new_article?(article) %>
         <span class="entry__highlight"><%= icon_svg("classic", "regular", "sparkles") %> New</span>
-        <span>
-          <%= article_permalink_timestamp(article) %>
-        </span>
-      <% else %>
-        <span>
-          <%= icon_svg("classic", "light", "calendar") %>
-          <%= article_permalink_timestamp(article) %>
-        </span>
       <% end %>
+      <span>
+        <%= icon_svg("classic", "light", "calendar") %>
+        <%= article_permalink_timestamp(article) %>
+      </span>
     </p>
     <h4 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">
       <%= link_to smartypants(article.title), article.path %>
