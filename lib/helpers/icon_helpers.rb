@@ -28,6 +28,7 @@ module IconHelpers
       suffix = "thirty" # Round to half-past
     else
       hours = (hours + 1) % 12 # Round up to the next hour
+      hours = 12 if hours == 0
       suffix = ""
     end
 
