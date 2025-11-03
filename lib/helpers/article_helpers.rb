@@ -22,13 +22,19 @@ module ArticleHelpers
     article_date.to_date == current_time.to_date
   end
 
-  # Determines if the article was published in the last week.
+  # Determines if the article is "new".
+  # A full length article is "new" if it was published less than a week ago.
+  # A short article is "new" if it was published today.
   # @param article [Object] The article.
-  # @return [Boolean] If the article was published in the last week.
+  # @return [Boolean] If the article is considered new.
   def new_article?(article)
     return false if article.draft
-    article_date = Time.parse(article.published_at).in_time_zone(location_time_zone)
-    article_date.to_date >= 1.week.ago.to_date
+    if article.entry_type == 'Short'
+      published_today?(article)
+    else
+      article_date = Time.parse(article.published_at).in_time_zone(location_time_zone)
+      article_date.to_date >= 1.week.ago.to_date
+    end
   end
 
   # Returns a permalink anchor tag for the article, with the date it was published.
