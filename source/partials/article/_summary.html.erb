@@ -5,11 +5,7 @@
         <span class="entry__highlight"><%= icon_svg("classic", "regular", "sparkles") %> New</span>
       <% end %>
       <span>
-        <% if published_today?(article) || article.draft %>
-          <%= clock_icon_svg(DateTime.parse(article.published_at)) %>
-        <% else %>
-          <%= icon_svg("classic", "light", "calendar") %>
-        <% end %>
+        <%= icon_svg("classic", "light", "calendar") %>
         <%= article_permalink_timestamp(article) %>
       </span>
     </p>
