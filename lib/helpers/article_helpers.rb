@@ -22,6 +22,14 @@ module ArticleHelpers
     article_date.to_date == current_time.to_date
   end
 
+  # Determines if the article was published in the past week in the current timezone.
+  # @param article [Object] The article.
+  # @return [Boolean] If the article was published in the past week.
+  def published_in_the_past_week?(article)
+    article_date = Time.parse(article.published_at).in_time_zone(location_time_zone)
+    article_date.to_date >= 1.week.ago.to_date
+  end
+
   # Determines if the article is "new".
   # A full length article is "new" if it was published less than a week ago.
   # A short article is "new" if it was published today.
@@ -32,8 +40,7 @@ module ArticleHelpers
     if article.entry_type == 'Short'
       published_today?(article)
     else
-      article_date = Time.parse(article.published_at).in_time_zone(location_time_zone)
-      article_date.to_date >= 1.week.ago.to_date
+      published_in_the_past_week?(article)
     end
   end
 
