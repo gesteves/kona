@@ -66,9 +66,9 @@ module ShareHelpers
   def mastodon_share_url(article)
     title = sanitize(article.title)
     url = full_url(article.path, utm_source: 'mastodon', utm_medium: 'social')
-    encoded_text = ERB::Util.url_encode(title)
-    encoded_url = ERB::Util.url_encode(url)
-    "https://share.joinmastodon.org/?text=#{encoded_text}&url=#{encoded_url}"
+    text = "#{title}\n\n#{url}"
+    encoded_text = ERB::Util.url_encode(text)
+    "https://share.joinmastodon.org/?text=#{encoded_text}"
   end
 
   # Returns a random heading for the share section for an article.
