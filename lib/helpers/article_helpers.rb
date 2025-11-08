@@ -306,11 +306,8 @@ module ArticleHelpers
 
   # Generates a social media post for a given entry.
   # @param entry [Object] The entry to generate a social media post for.
-  # @param include_url [Boolean] Whether to include the URL in the post.
-  # @param include_tags [Boolean] Whether to include the tags in the post.
   # @return [String] The social media post content.
-  def social_media_post(entry, include_url: true, include_tags: true)
-    body = []
+  def social_media_post(entry)
     content = if entry.social_media_summary.present?
       entry.social_media_summary
     elsif entry.summary.present?
@@ -318,10 +315,7 @@ module ArticleHelpers
     else
       entry.title
     end
-    body << smartypants(sanitize(content))
-    body << full_url(entry.path) if include_url
-    body << entry.contentful_metadata.tags.sort { |a, b| a.name <=> b.name }.map { |t| camelcase_hashtag(t.name) }.join(' ') if include_tags
-    body.reject(&:blank?).join("\n\n")
+    smartypants(sanitize(content))
   end
 
   # Formats the reading time for an article.
