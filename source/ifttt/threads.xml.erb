@@ -20,7 +20,7 @@
       <author>
         <name><%=h entry.author.name %></name>
       </author>
-      <content><%=h social_media_post(entry, include_tags: true) %></content>
+      <content><%=h social_media_post(entry, include_url: false, include_tags: false) %></content>
     </entry>
   <% end %>
 </feed>
