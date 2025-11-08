@@ -31,6 +31,10 @@
         <%= icon_svg("classic", "brands", "facebook") %>
       </a>
 
+      <a aria-label="Share on Mastodon" title="Share on Mastodon" class="share__button" href="<%= mastodon_share_url(article) %>" rel="noopener nofollow" target="_blank" data-controller="share" data-share-via-value="Mastodon" data-action="click->share#trackShare">
+        <%= icon_svg("classic", "brands", "mastodon") %>
+      </a>
+
       <a aria-label="Share on Reddit" title="Share on Reddit" class="share__button" href="<%= reddit_share_url(article) %>" rel="noopener nofollow" target="_blank" data-controller="share" data-share-via-value="Reddit" data-action="click->share#trackShare">
         <%= icon_svg("classic", "brands", "reddit") %>
       </a>

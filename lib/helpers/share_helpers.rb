@@ -60,6 +60,17 @@ module ShareHelpers
     "https://www.threads.com/intent/post?text=#{encoded_text}&url=#{encoded_url}"
   end
 
+  # Generates a URL for sharing an article on Mastodon.
+  # @param article [Article] The article to be shared.
+  # @return [String] The Mastodon share URL.
+  def mastodon_share_url(article)
+    title = sanitize(article.title)
+    url = full_url(article.path, utm_source: 'mastodon', utm_medium: 'social')
+    encoded_text = ERB::Util.url_encode(title)
+    encoded_url = ERB::Util.url_encode(url)
+    "https://share.joinmastodon.org/?text=#{encoded_text}&url=#{encoded_url}"
+  end
+
   # Returns a random heading for the share section for an article.
   # @param article [Article] The article to be shared.
   # @return [String] A randomly selected share heading.
