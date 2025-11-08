@@ -2,11 +2,11 @@
   <h3 class="share__heading"><%= share_heading(article) %></h3>
 
   <div class="share__buttons">
-      <button aria-label="Open sharing options" title="Open sharing options" class="share__button --is-hidden" data-controller="share" data-share-text-value="<%= sanitize(article.title) %>" data-share-url-value="<%= full_url(article.path, ref: 'Share') %>" data-share-is-native-value="true" data-share-via-value="Native" data-action="click->share#openShareSheet" data-share-hidden-class="--is-hidden">
+      <button aria-label="Open sharing options" title="Open sharing options" class="share__button --is-hidden" data-controller="share" data-share-text-value="<%= sanitize(article.title) %>" data-share-url-value="<%= full_url(article.path, utm_source: 'share', utm_medium: 'share') %>" data-share-is-native-value="true" data-share-via-value="Native" data-action="click->share#openShareSheet" data-share-hidden-class="--is-hidden">
         <%= icon_svg("classic", "solid", "arrow-up-from-bracket") %>
       </button>
 
-      <a aria-label="Copy link to clipboard" title="Copy link to clipboard" class="share__button" href="<%= full_url(article.path, ref: 'Copy') %>" data-controller="clipboard" data-clipboard-hidden-class="share__hidden" data-clipboard-success-message-value="A link to this <%= entry_type(article).downcase %> has been copied to your clipboard." data-action="click->clipboard#preventDefault">
+      <a aria-label="Copy link to clipboard" title="Copy link to clipboard" class="share__button" href="<%= full_url(article.path, utm_source: 'copy', utm_medium: 'copy') %>" data-controller="clipboard" data-clipboard-hidden-class="share__hidden" data-clipboard-success-message-value="A link to this <%= entry_type(article).downcase %> has been copied to your clipboard." data-action="click->clipboard#preventDefault">
         <span data-clipboard-target="link">
           <%= icon_svg("classic", "solid", "link") %>
         </span>

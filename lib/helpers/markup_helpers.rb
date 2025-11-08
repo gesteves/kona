@@ -455,7 +455,7 @@ module MarkupHelpers
       heading_id = heading['id']
       next if heading_id.blank?
       permalink = <<~HTML
-        <a href="##{heading_id}?ref=Copy" class="entry__heading-permalink" aria-label="Permalink to "#{heading.text}" title="Permalink to "#{heading.text}" data-controller="clipboard" data-clipboard-hidden-class="entry__heading-permalink-icon--hidden" data-clipboard-success-message-value="A link to this section has been copied to your clipboard." data-action="click->clipboard#preventDefault">
+        <a href="##{heading_id}?utm_source=copy&utm_medium=copy" class="entry__heading-permalink" aria-label="Permalink to "#{heading.text}" title="Permalink to "#{heading.text}" data-controller="clipboard" data-clipboard-hidden-class="entry__heading-permalink-icon--hidden" data-clipboard-success-message-value="A link to this section has been copied to your clipboard." data-action="click->clipboard#preventDefault">
           <span data-clipboard-target="link" class="entry__heading-permalink-icon">
             #{icon_svg("classic", "solid", "link-simple")}
           </span>
