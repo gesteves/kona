@@ -2,7 +2,7 @@
   <h3 class="share__heading"><%= share_heading(article) %></h3>
 
   <div class="share__buttons">
-      <button aria-label="Open sharing options" title="Open sharing options" class="share__button --is-hidden" data-controller="share" data-share-text-value="<%= sanitize(article.title) %>" data-share-url-value="<%= full_url(article.path, utm_source: 'share', utm_medium: 'share', utm_content: 'share-button') %>" data-share-is-native-value="true" data-share-via-value="Native" data-action="click->share#openShareSheet" data-share-hidden-class="--is-hidden">
+      <button aria-label="Open sharing options" title="Open sharing options" class="share__button --is-hidden" data-controller="share" data-share-text-value="<%= sanitize(article.title) %>" data-share-url-value="<%= full_url(article.path, utm_source: 'Share', utm_medium: 'share', utm_content: 'share-button') %>" data-share-is-native-value="true" data-share-via-value="Native" data-action="click->share#openShareSheet" data-share-hidden-class="--is-hidden">
         <%= icon_svg("classic", "solid", "arrow-up-from-bracket") %>
       </button>
 
