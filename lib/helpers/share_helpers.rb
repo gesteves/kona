@@ -6,7 +6,7 @@ module ShareHelpers
   # @return [String] The mailto URL.
   def mail_share_url(article)
     subject = ERB::Util.url_encode(sanitize(article.title))
-    body = ERB::Util.url_encode(full_url(article.path))
+    body = ERB::Util.url_encode(full_url(article.path, utm_source: 'email', utm_medium: 'email', utm_content: 'share-button'))
     "mailto:?subject=#{subject}&body=#{body}"
   end
 
@@ -15,7 +15,7 @@ module ShareHelpers
   # @return [String] The SMS URL.
   def sms_share_url(article)
     title = sanitize(article.title)
-    url = full_url(article.path)
+    url = full_url(article.path, utm_source: 'sms', utm_medium: 'sms', utm_content: 'share-button')
     text = "#{title} #{url}"
     body = ERB::Util.url_encode(text)
     "sms:?&body=#{body}"
@@ -25,7 +25,7 @@ module ShareHelpers
   # @param article [Article] The article to be shared.
   # @return [String] The Facebook share URL.
   def facebook_share_url(article)
-    url = ERB::Util.url_encode(full_url(article.path))
+    url = ERB::Util.url_encode(full_url(article.path, utm_source: 'facebook', utm_medium: 'social', utm_content: 'share-button'))
     "https://www.facebook.com/sharer/sharer.php?u=#{url}"
   end
 
@@ -34,7 +34,7 @@ module ShareHelpers
   # @return [String] The Reddit share URL.
   def reddit_share_url(article)
     title = ERB::Util.url_encode(sanitize(article.title))
-    url = ERB::Util.url_encode(full_url(article.path))
+    url = ERB::Util.url_encode(full_url(article.path, utm_source: 'reddit', utm_medium: 'social', utm_content: 'share-button'))
     "https://reddit.com/submit?title=#{title}&url=#{url}"
   end
 
@@ -43,7 +43,7 @@ module ShareHelpers
   # @return [String] The Bluesky share URL.
   def bluesky_share_url(article)
     title = sanitize(article.title)
-    url = full_url(article.path)
+    url = full_url(article.path, utm_source: 'bluesky', utm_medium: 'social', utm_content: 'share-button')
     text = "#{title}\n\n#{url}"
     encoded_text = ERB::Util.url_encode(text)
     "https://bsky.app/intent/compose?text=#{encoded_text}"
@@ -54,7 +54,7 @@ module ShareHelpers
   # @return [String] The Threads share URL.
   def threads_share_url(article)
     title = sanitize(article.title)
-    url = full_url(article.path)
+    url = full_url(article.path, utm_source: 'threads', utm_medium: 'social', utm_content: 'share-button')
     encoded_text = ERB::Util.url_encode(title)
     encoded_url = ERB::Util.url_encode(url)
     "https://www.threads.com/intent/post?text=#{encoded_text}&url=#{encoded_url}"
@@ -65,7 +65,7 @@ module ShareHelpers
   # @return [String] The Mastodon share URL.
   def mastodon_share_url(article)
     title = sanitize(article.title)
-    url = full_url(article.path)
+    url = full_url(article.path, utm_source: 'mastodon', utm_medium: 'social', utm_content: 'share-button')
     text = "#{title}\n\n#{url}"
     encoded_text = ERB::Util.url_encode(text)
     "https://share.joinmastodon.org/?text=#{encoded_text}"
