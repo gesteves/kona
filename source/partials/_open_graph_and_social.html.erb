@@ -40,6 +40,14 @@
   <% if content&.updated_at.present? %>
     <meta property="article:modified_time" content="<%= DateTime.parse(content.updated_at).iso8601 %>">
   <% end %>
+  <% if content&.author&.name.present? %>
+    <meta property="article:author" content="<%= h content.author.name %>">
+  <% end %>
+  <% if content&.contentful_metadata&.tags.present? %>
+    <% content.contentful_metadata.tags.each do |tag| %>
+      <meta property="article:tag" content="<%= h tag.name %>">
+    <% end %>
+  <% end %>
 <% end %>
 
 <meta property="og:site_name" content="<%= data.site.title %>">

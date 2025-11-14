@@ -1,0 +1,4 @@
+<% if defined?(content) && content.entry_type == 'Article' && !content.draft %>
+<script type="application/ld+json"><%= breadcrumb_schema(content) %></script>
+<% end %>
+

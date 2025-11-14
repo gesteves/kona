@@ -280,11 +280,31 @@ module ArticleHelpers
     return if content.draft
     schema = {
       "@context": "https://schema.org",
-      "@type": "Article",
+      "@type": "BlogPosting",
       "headline": sanitize(content.title),
+      "description": sanitize(content_summary(content)),
       "datePublished": DateTime.parse(content.published_at).iso8601,
       "dateModified": DateTime.parse(content.sys.published_at).iso8601,
-      "author": { "@type": "Person", "name": content.author.name, "url": full_url("/author/#{content.author.slug}") }
+      "author": {
+        "@type": "Person",
+        "name": content.author.name,
+        "url": full_url("/author/#{content.author.slug}")
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": data.site.title
+      }.tap do |publisher|
+        if data.site.logo.present?
+          publisher["logo"] = {
+            "@type": "ImageObject",
+            "url": site_icon_url(w: 180)
+          }
+        end
+      end,
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": canonical_url
+      }
     }
     if content&.cover_image&.url.present?
       schema["image"] = ["1000x1000", "1600x900", "1600x1200"].map do |s|
@@ -293,6 +313,41 @@ module ArticleHelpers
         cdn_image_url(content.cover_image.url, params)
       end
     end
+    schema.to_json
+  end
+
+  # Generates a JSON-LD schema string for breadcrumb navigation, based on the provided content.
+  # @param content [Object] An object containing the article's data.
+  # @see https://developers.google.com/search/docs/appearance/structured-data/breadcrumb
+  # @return [String] A JSON-LD formatted string representing the breadcrumb schema.
+  def breadcrumb_schema(content)
+    return if content.draft || content.entry_type != 'Article'
+    
+    schema = {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": full_url('/')
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Blog",
+          "item": full_url('/blog')
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": sanitize(content.title),
+          "item": canonical_url
+        }
+      ]
+    }
+    
     schema.to_json
   end
 

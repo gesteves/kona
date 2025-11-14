@@ -157,4 +157,30 @@ module SiteHelpers
       end
     end
   end
+
+  # Generates a JSON-LD schema string for the organization, based on the site data.
+  # @see https://developers.google.com/search/docs/appearance/structured-data/organization
+  # @return [String] A JSON-LD formatted string representing the organization's schema.
+  def organization_schema
+    schema = {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": sanitize(data.site.title),
+      "url": full_url('/')
+    }
+
+    if data.site.logo.present?
+      schema["logo"] = site_icon_url(w: 180)
+    end
+
+    if data.site.socials_collection.items.present?
+      same_as_urls = data.site.socials_collection.items
+        .reject { |s| s.title.downcase == 'feed' }
+        .map { |s| s.destination }
+      
+      schema["sameAs"] = same_as_urls if same_as_urls.present?
+    end
+
+    schema.to_json
+  end
 end
