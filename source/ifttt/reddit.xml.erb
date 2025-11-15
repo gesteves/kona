@@ -14,7 +14,7 @@
       <% updated = DateTime.parse(entry.updated_at) %>
       <id><%= atom_tag(full_url(entry.path), DateTime.parse(entry.published_at)) %></id>
       <title><%=h smartypants(sanitize(entry.title)) %></title>
-      <link rel="alternate" type="text/html" href="<%= ERB::Util.url_encode(full_url(entry.path, utm_source: 'Reddit', utm_medium: 'social', utm_campaign: 'u/giventotri')) %>"/>
+      <link rel="alternate" type="text/html" href="<%= ERB::Util.url_encode(full_url(entry.path, utm_source: 'Reddit', utm_medium: 'social', utm_campaign: 'u_giventotri')) %>"/>
       <published><%= DateTime.parse(entry.published_at).rfc3339 %></published>
       <updated><%= updated.rfc3339 %></updated>
       <author>
