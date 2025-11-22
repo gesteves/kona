@@ -62,7 +62,7 @@ GEM
       concurrent-ruby (~> 1.0)
     hashie (5.0.0)
     htmlcompressor (0.2.0)
-    htmlentities (4.3.4)
+    htmlentities (4.4.2)
     httparty (0.23.2)
       csv
       mini_mime (>= 1.0.0)
