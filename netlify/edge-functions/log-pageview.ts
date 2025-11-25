@@ -1,7 +1,6 @@
 import type { Context } from "@netlify/edge-functions";
 
 export default async function handler(req: Request, context: Context) {
-  // Only accept POST requests
   if (req.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
   }
@@ -10,19 +9,20 @@ export default async function handler(req: Request, context: Context) {
     const body = await req.json();
     const { page, referrer } = body;
 
-    const userAgent = req.headers.get("User-Agent") || "Unknown";
-    const clientIP = context.ip || "Unknown";
-    const country = context.geo?.country?.name || "Unknown";
-    const city = context.geo?.city || "Unknown";
+    const userAgent = req.headers.get("User-Agent");
+    const clientIP = context.ip;
+    const country = context.geo?.country?.name;
+    const city = context.geo?.city;
 
-    console.log(JSON.stringify({
+    const parts = [
       page,
-      referrer: referrer || "Direct",
+      referrer,
       userAgent,
       clientIP,
-      country,
-      city,
-    }));
+      city && country ? `${city}, ${country}` : city || country,
+    ].filter(Boolean);
+
+    console.log(parts.join(" | "));
 
     return new Response(null, { status: 204 });
   } catch (error) {
@@ -34,4 +34,3 @@ export default async function handler(req: Request, context: Context) {
 export const config = {
   path: "/log-pageview",
 };
-
