@@ -1,6 +1,28 @@
 /* global plausible */
 
 /**
+ * Sends pageview data to the logging edge function.
+ * Uses sendBeacon for reliability during page unloads.
+ * @param {string} page - The page URL being viewed.
+ */
+function logPageView(page) {
+  const data = JSON.stringify({
+    page,
+    referrer: document.referrer,
+  });
+
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon('/log-pageview', data);
+  } else {
+    fetch('/log-pageview', {
+      method: 'POST',
+      body: data,
+      keepalive: true,
+    });
+  }
+}
+
+/**
  * Sets up the Plausible analytics queue if it doesn't already exist.
  */
 function setUpPlausible() {
@@ -39,6 +61,7 @@ export function trackPageView(additionalProps = {}) {
   }
 
   plausible('pageview', params);
+  logPageView(currentUrl.href);
   cleanUpUrl();
 }
 
