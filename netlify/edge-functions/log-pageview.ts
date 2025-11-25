@@ -22,7 +22,7 @@ export default async function handler(req: Request, context: Context) {
       city && country ? `${city}, ${country}` : city || country,
     ].filter(Boolean);
 
-    console.log(parts.join(" | "));
+    console.info(parts.join(" | "));
 
     return new Response(null, { status: 204 });
   } catch (error) {

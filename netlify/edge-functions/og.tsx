@@ -146,7 +146,14 @@ export default async function handler(req: Request, context: Context) {
       }
     );
 
-    console.info(targetUrl, req.headers.get("User-Agent"));
+    console.info([
+      targetUrl,
+      req.headers.get("User-Agent"),
+      context.ip,
+      context.geo?.city && context.geo?.country?.name
+        ? `${context.geo.city}, ${context.geo.country.name}`
+        : context.geo?.city || context.geo?.country?.name,
+    ].filter(Boolean).join(" | "));
     return imageResponse;
   } catch (error) {
     console.error("Error generating the image:", error);
