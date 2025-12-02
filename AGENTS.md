@@ -84,25 +84,6 @@ bundle exec rake import:weather    # Weather, AQI, pollen
 bundle exec rake import:whoop      # Whoop data
 ```
 
-#### Utility Commands
-
-```bash
-# Clear Redis cache (for human use only—AI agents must **NEVER** use this)
-bundle exec rake redis:clear
-
-# Generate static map images from GPX files
-bundle exec rake maps:generate
-
-# Setup Whoop OAuth tokens
-bundle exec rake oauth:whoop
-
-# Clean temporary files
-bundle exec rake clean
-
-# Remove all generated files
-bundle exec rake clobber
-```
-
 ### NPM Commands
 
 #### JavaScript/CSS Development
@@ -148,7 +129,6 @@ bundle exec middleman build
 - `config.rb` - Middleman configuration and proxy setup
 - `netlify.toml` - Netlify build settings and redirects
 - `Rakefile` - Main rake tasks and Redis setup
-- `.editorconfig` - Code formatting rules
 
 ### Data Layer
 
@@ -190,56 +170,6 @@ bundle exec middleman build
 - Tests are located in `spec/` directory
 - Focus on helper methods, text processing, markdown rendering, and data transformation
 - Use `bundle exec rake test` to run tests
-
-## Environment & Dependencies
-
-### Required Services
-
-- **Redis**: For caching API responses
-- **Contentful**: CMS for blog content
-- **Font Awesome**: For icons
-- **Google Maps**: For location and weather data
-- **WeatherKit**: For weather conditions
-- **Netlify**: For hosting and deployment
-
-### Environment Variables
-
-- Check `.env.example` for required variables
-- Set up all services before running the project
-- Many services have dependencies on each other
-
-## Code Organization Rules
-
-### Adding New Features
-
-- **Helper Methods**: Add business logic to `lib/helpers/` files
-- **Data Classes**: API clients go in `lib/data/` with `save_data` method
-- **Components**: Reusable UI components in `source/partials/`
-- **JavaScript**: Interactive code in `source/javascripts/stimulus/`
-- **Styles**: SCSS files in `source/stylesheets/`
-
-### Error Handling
-
-- Use `safely_perform` pattern for API calls that might fail
-- Check console output for failed operations during import
-- Validate `data/*.json` files exist and have expected structure
-
-## Deployment
-
-### Netlify Integration
-
-- Uses `netlify build` command for production builds
-- Scheduled functions in `netlify/functions/` for automated rebuilds
-- Build hooks for external service integration
-- Image CDN optimization via CloudFront
-
-### CI/CD Process
-
-1. Tests run automatically
-2. Data import happens during build
-3. JavaScript builds via Webpack
-4. Middleman generates static site
-5. Netlify deploys the `build/` directory
 
 ## Troubleshooting
 
