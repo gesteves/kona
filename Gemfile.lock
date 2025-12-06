@@ -36,7 +36,7 @@ GEM
     crass (1.0.6)
     csv (3.3.5)
     diff-lcs (1.6.2)
-    dotenv (3.1.8)
+    dotenv (3.2.0)
     drb (2.2.3)
     erubi (1.13.1)
     execjs (2.10.0)
