@@ -55,7 +55,7 @@ module MarkupHelpers
     html = add_image_data_attributes(html)
     html = add_figure_elements_to_images(html, base_class: 'home')
     html = set_caption_credit(html)
-    html = responsivize_images(html, widths: data.srcsets.home.widths, sizes: data.srcsets.home.sizes.join(', '), formats: data.srcsets.entry.formats, lazy: false, square: true)
+    html = responsivize_images(html, widths: data.srcsets.home.widths, sizes: data.srcsets.home.sizes.join(', '), formats: data.srcsets.entry.formats, square: true)
     html = resize_images(html)
     html = add_image_placeholders(html)
     html = set_alt_text(html)
