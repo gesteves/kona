@@ -369,6 +369,7 @@ module MarkupHelpers
     options[:srcset] = srcset(url: url, widths: options[:widths], square: options[:square], options: srcset_opts)
     options.delete(:widths)
     options.delete(:format)
+    options.delete(:square)
     tag :source, options
   end
 
