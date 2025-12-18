@@ -1,5 +1,6 @@
 entry:
   sizes:
+    - auto
     - "(min-width: 1280px) 800px"
     - "(min-width: 768px) calc((((100vw - 4rem - (11 * 2rem))/12) * 8) + (7 * 2rem))"
     - "calc(100vw - 4rem)"
@@ -31,6 +32,7 @@ entry:
     - jpg
 full:
   sizes:
+    - auto
     - "(min-width: 1280px) 1008px"
     - "(min-width: 768px) calc((((100vw - 4rem - (11 * 2rem))/12) * 10) + (9 * 2rem))"
     - "100vw"
@@ -62,6 +64,7 @@ full:
     - jpg
 avatar:
   sizes:
+    - auto
     - "(min-width: 1280px) 72px"
     - "(min-width: 768px) calc(((100vw - 4rem - (11 * 2rem))/12))"
     - "calc((((100vw - 4rem - (11 * 2rem))/12) * 2) + 2rem)"
@@ -78,6 +81,7 @@ avatar:
     - jpg
 home:
   sizes:
+    - auto
     - "(min-width: 1280px) 488px"
     - "(min-width: 768px) calc((((100vw - 4rem - (11 * 2rem))/12) * 5) + (4 * 2rem))"
     - "calc((((100vw - 4rem - (11 * 1rem))/12) * 5) + (4 * 1rem))"
