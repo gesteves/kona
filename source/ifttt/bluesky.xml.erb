@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <% articles = feed_articles %>
+  <% updated = articles.map { |e| DateTime.parse(e.updated_at) }.max %>
+  <id><%= atom_tag(full_url("/index.html"), articles.map { |e| DateTime.parse(e.published_at) }.min) %></id>
+  <title><%=h feed_title %></title>
+  <% if feed_subtitle.present? %><subtitle><%=h feed_subtitle %></subtitle><% end %>
+  <updated><%= updated.rfc3339 %></updated>
+  <link rel="alternate" type="text/html" href="<%=h full_url("/index.html") %>"/>
+  <link rel="self" type="application/atom+xml" href="<%=h full_url("/ifttt/bluesky.xml") %>"/>
+  <rights>© <%= copyright_years %> <%= data.site.copyright %></rights>
+  <% articles.each do |entry| %>
+    <entry>
+      <% updated = DateTime.parse(entry.updated_at) %>
+      <id><%= atom_tag(full_url(entry.path), DateTime.parse(entry.published_at)) %></id>
+      <title><%=h smartypants(sanitize(entry.title)) %></title>
+      <link rel="alternate" type="text/html" href="<%=h full_url(entry.path, utm_source: 'Bluesky', utm_medium: 'social', utm_campaign: '@giventotri.com') %>"/>
+      <published><%= DateTime.parse(entry.published_at).rfc3339 %></published>
+      <updated><%= updated.rfc3339 %></updated>
+      <author>
+        <name><%=h entry.author.name %></name>
+      </author>
+      <content><%=h social_media_post(entry) %></content>
+    </entry>
+  <% end %>
+</feed>
