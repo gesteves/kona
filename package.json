@@ -8,8 +8,8 @@
     "format:check": "prettier --check \"**/*.{js,json,md}\""
   },
   "dependencies": {
-    "@babel/core": "^7.28.6",
-    "@babel/preset-env": "^7.28.6",
+    "@babel/core": "^7.29.0",
+    "@babel/preset-env": "^7.29.0",
     "@hotwired/stimulus": "^3.2.2",
     "@hotwired/stimulus-webpack-helpers": "^1.0.1",
     "@hotwired/turbo": "^8.0.23",
@@ -19,12 +19,12 @@
     "date-fns": "^4.1.0",
     "handlebars": "^4.7.8",
     "node-fetch": "^3.3.2",
-    "webpack": "^5.104.1",
+    "webpack": "^5.105.0",
     "webpack-cli": "^6.0.1"
   },
   "devDependencies": {
     "prettier": "^3.8.1",
-    "stylelint": "^17.1.0",
+    "stylelint": "^17.1.1",
     "stylelint-config-standard-scss": "^17.0.0",
     "stylelint-scss": "^7.0.0"
   }
