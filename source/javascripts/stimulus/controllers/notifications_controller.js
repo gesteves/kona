@@ -11,7 +11,13 @@ export default class extends Controller {
   static targets = ['container', 'notification', 'template'];
 
   connect() {
+    this.timers = [];
     this.toggle();
+  }
+
+  disconnect() {
+    this.timers.forEach((id) => clearTimeout(id));
+    this.timers = [];
   }
 
   /**
@@ -35,11 +41,9 @@ export default class extends Controller {
 
     if (this.hasNotificationTarget) {
       this.closeAll();
-      prependToElement(rendered, this.containerTarget);
-    } else {
-      prependToElement(rendered, this.containerTarget);
-      this.toggle();
     }
+    prependToElement(rendered, this.containerTarget);
+    this.toggle();
   }
 
   /**
@@ -84,14 +88,18 @@ export default class extends Controller {
       )
       .forEach((notification) => notification.remove());
     this.notificationTargets.forEach((notification) => {
-      setTimeout(
-        () => notification.classList.remove(this.transparentClass),
-        10
+      this.timers.push(
+        setTimeout(
+          () => notification.classList.remove(this.transparentClass),
+          10
+        )
       );
-      setTimeout(
-        () =>
-          notification.classList.add(this.transparentClass, this.closedClass),
-        2000
+      this.timers.push(
+        setTimeout(
+          () =>
+            notification.classList.add(this.transparentClass, this.closedClass),
+          2000
+        )
       );
     });
   }

@@ -23,6 +23,7 @@ export default class extends Controller {
   }
 
   disconnect() {
+    clearTimeout(this.revertTimer);
     this.clipboard.destroy();
   }
 
@@ -62,8 +63,8 @@ export default class extends Controller {
       // Hide the link icon and show the circle-check icon
       this.linkTarget.classList.add(this.hiddenClass);
       this.checkTarget.classList.remove(this.hiddenClass);
-      // Revert back after 5 seconds
-      setTimeout(() => {
+      // Revert back after 2 seconds
+      this.revertTimer = setTimeout(() => {
         this.linkTarget.classList.remove(this.hiddenClass);
         this.checkTarget.classList.add(this.hiddenClass);
       }, 2000);
@@ -74,10 +75,9 @@ export default class extends Controller {
   }
 
   /**
-   * Show the link in an alert if copying fails.
+   * Show a notification if copying fails.
    */
   unsuccessfulCopy() {
-    const href = this.element.getAttribute('href');
-    alert(href);
+    sendNotification('Failed to copy link to clipboard.', 'error');
   }
 }

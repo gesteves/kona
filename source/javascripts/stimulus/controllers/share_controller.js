@@ -65,8 +65,10 @@ export default class extends Controller {
         title: this.getShareText(),
         url: this.getShareUrl(),
       })
-      .catch(() => {
-        // Handle potential error silently
+      .catch((error) => {
+        if (error.name !== 'AbortError') {
+          console.error('Share failed:', error);
+        }
       });
   }
 
