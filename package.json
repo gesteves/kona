@@ -19,12 +19,12 @@
     "date-fns": "^4.1.0",
     "handlebars": "^4.7.8",
     "node-fetch": "^3.3.2",
-    "webpack": "^5.105.0",
+    "webpack": "^5.105.2",
     "webpack-cli": "^6.0.1"
   },
   "devDependencies": {
     "prettier": "^3.8.1",
-    "stylelint": "^17.1.1",
+    "stylelint": "^17.3.0",
     "stylelint-config-standard-scss": "^17.0.0",
     "stylelint-scss": "^7.0.0"
   }
