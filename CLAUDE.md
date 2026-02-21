@@ -12,7 +12,7 @@ Kona is a static site generator built on **Middleman** that creates a blog power
 - **Proxy System**: Middleman uses data files to generate pages dynamically via proxies (articles, pages, tags)
 - **Helper Architecture**: Business logic is organized in modular helpers in `lib/helpers/`
 - **Component Structure**: ERB partials in `source/partials/` provide reusable UI components
-- **Asset Pipeline**: Webpack handles JavaScript bundling, Sass for stylesheets
+- **Asset Pipeline**: esbuild handles JavaScript bundling, Sass for stylesheets
 
 ### Data Flow
 
@@ -172,6 +172,10 @@ bundle exec middleman build
 - Use `bundle exec rake test` to run tests
 
 ## Troubleshooting
+
+### Netlify Deployment
+
+- **Build tools must be in `dependencies`, not `devDependencies`.** Netlify installs packages with `NODE_ENV=production`, which skips `devDependencies`. Any package needed during the build (e.g., esbuild) must be listed under `dependencies`.
 
 ### Debugging
 
