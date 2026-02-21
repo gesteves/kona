@@ -2,7 +2,6 @@
 build/
 node_modules/
 source/javascripts/site.js
-source/javascripts/site.js.LICENSE.txt
 
 # Vendor files
 **/vendor/**

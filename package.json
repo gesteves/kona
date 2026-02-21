@@ -1,28 +1,23 @@
 {
   "scripts": {
-    "build": "webpack --mode=production",
-    "watch": "webpack --mode=development --watch",
+    "build": "esbuild source/javascripts/stimulus/index.js --bundle --minify --target=es2020 --outfile=source/javascripts/site.js",
+    "watch": "esbuild source/javascripts/stimulus/index.js --bundle --target=es2020 --outfile=source/javascripts/site.js --watch",
     "lint:scss": "stylelint \"source/stylesheets/**/*.scss\"",
     "lint:scss:fix": "stylelint \"source/stylesheets/**/*.scss\" --fix",
     "format": "prettier --write \"**/*.{js,json,md}\"",
     "format:check": "prettier --check \"**/*.{js,json,md}\""
   },
   "dependencies": {
-    "@babel/core": "^7.29.0",
-    "@babel/preset-env": "^7.29.0",
     "@hotwired/stimulus": "^3.2.2",
-    "@hotwired/stimulus-webpack-helpers": "^1.0.1",
     "@hotwired/turbo": "^8.0.23",
     "@netlify/functions": "^5.1.2",
-    "babel-loader": "^10.0.0",
     "clipboard": "^2.0.11",
     "date-fns": "^4.1.0",
     "handlebars": "^4.7.8",
-    "node-fetch": "^3.3.2",
-    "webpack": "^5.105.2",
-    "webpack-cli": "^6.0.1"
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
+    "esbuild": "^0.25.0",
     "prettier": "^3.8.1",
     "stylelint": "^17.3.0",
     "stylelint-config-standard-scss": "^17.0.0",
