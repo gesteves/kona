@@ -1,6 +1,5 @@
 require 'nokogiri'
 require 'public_suffix'
-require 'cgi'
 
 module AffiliateLinksHelpers
   # Checks if the provided content contains any Amazon Associates links.
@@ -21,7 +20,7 @@ module AffiliateLinksHelpers
   def is_amazon_associates_link?(url)
     begin
       uri = URI.parse(url)
-      params = uri.query ? CGI.parse(uri.query) : {}
+      params = uri.query ? URI.decode_www_form(uri.query).to_h : {}
       domain = PublicSuffix.domain(uri.host)
       domain == 'amzn.to' || (domain == 'amazon.com' && params.key?('tag'))
     rescue
