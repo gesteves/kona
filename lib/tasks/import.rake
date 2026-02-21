@@ -44,23 +44,47 @@ task :import => [:dotenv, :clobber] do
   puts "=" * 60
   puts "🚀 Starting full site data import"
   puts "=" * 60
-  
+
   overall_start_time = Time.now
   setup_data_directory
   initialize_redis
   initialize_location
-  
-  measure_and_output(:import_contentful, "Importing site content")
-  measure_and_output(:import_font_awesome, "Importing icons")
-  measure_and_output(:import_intervals, "Importing activity stats")
-  measure_and_output(:import_location, "Importing location data")
-  measure_and_output(:import_weather, "Importing weather data")
-  measure_and_output(:import_aqi, "Importing air quality data")
-  measure_and_output(:import_pollen, "Importing pollen data")
-  measure_and_output(:import_trainer_road, "Importing today's workouts")
-  measure_and_output(:import_whoop, "Importing Whoop data")
-  measure_and_output(:import_dark_visitors, "Importing robots.txt directives")
-  
+
+  output_mutex = Mutex.new
+
+  # Group A: independent imports that can run in parallel
+  independent_threads = [
+    [:import_contentful, "Importing site content"],
+    [:import_font_awesome, "Importing icons"],
+    [:import_intervals, "Importing activity stats"],
+    [:import_whoop, "Importing Whoop data"],
+    [:import_dark_visitors, "Importing robots.txt directives"]
+  ].map do |method, description|
+    Thread.new do
+      measure_and_output(method, description, mutex: output_mutex)
+    end
+  end
+
+  # Group B: sequential chain (location -> weather/aqi/pollen/trainer_road)
+  sequential_thread = Thread.new do
+    measure_and_output(:import_location, "Importing location data", mutex: output_mutex)
+    measure_and_output(:import_weather, "Importing weather data", mutex: output_mutex)
+
+    # AQI, pollen, and trainer road can run in parallel after weather
+    [
+      [:import_aqi, "Importing air quality data"],
+      [:import_pollen, "Importing pollen data"],
+      [:import_trainer_road, "Importing today's workouts"]
+    ].map do |method, description|
+      Thread.new do
+        measure_and_output(method, description, mutex: output_mutex)
+      end
+    end.each(&:join)
+  end
+
+  # Wait for all threads to complete
+  (independent_threads + [sequential_thread]).each(&:join)
+
   total_duration = Time.now - overall_start_time
   puts "\n" + "=" * 60
   puts "🎉 Import completed! Total time: #{format_duration(total_duration)}"
@@ -144,18 +168,20 @@ rescue => e
   puts "Error occurred: #{e.message}"
 end
 
-def measure_and_output(method, description)
-  puts "\n🔄 #{description}..."
+def measure_and_output(method, description, mutex: nil)
+  log = ->(msg) { mutex ? mutex.synchronize { puts msg } : puts(msg) }
+
+  log.call("\n🔄 #{description}...")
   start_time = Time.now
-  
+
   begin
     send(method)
     duration = Time.now - start_time
-    puts "✅ #{description} completed in #{format_duration(duration)}"
+    log.call("✅ #{description} completed in #{format_duration(duration)}")
   rescue => e
     duration = Time.now - start_time
-    puts "❎ #{description} failed after #{format_duration(duration)}"
-    puts "   Error: #{e.message}"
+    log.call("❎ #{description} failed after #{format_duration(duration)}")
+    log.call("   Error: #{e.message}")
   end
 end
 

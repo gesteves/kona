@@ -200,8 +200,8 @@ RSpec.describe MarkupHelpers do
     end
 
     context 'when html is blank' do
-      it 'returns the html unchanged' do
-        expect(wrap_figcaption_emoji('')).to eq('')
+      it 'returns nil' do
+        expect(wrap_figcaption_emoji('')).to be_nil
         expect(wrap_figcaption_emoji(nil)).to be_nil
       end
     end

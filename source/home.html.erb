@@ -10,14 +10,16 @@
   <% if data.intervals.present? %>
     <%= partial 'partials/stats', locals: { stats: data.intervals } %>
   <% end %>
-  <% if recent_articles.present? %>
-    <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent_articles, variant: "halves" } %>
+  <% recent = recent_articles %>
+  <% if recent.present? %>
+    <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent, variant: "halves" } %>
   <% end %>
   <% if show_whoop? %>
     <%= partial 'partials/whoop' %>
   <% end %>
-  <% if non_recent_trending_articles.present? %>
-    <%= partial 'partials/collection', locals: { title: "Trending Articles", items: non_recent_trending_articles, variant: "halves" } %>
+  <% trending = non_recent_trending_articles %>
+  <% if trending.present? %>
+    <%= partial 'partials/collection', locals: { title: "Trending Articles", items: trending, variant: "halves" } %>
   <% end %>
   <% if weather_data_is_current? %>
     <%= partial 'partials/weather' %>

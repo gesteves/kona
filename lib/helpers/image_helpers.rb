@@ -12,11 +12,17 @@ module ImageHelpers
     url.split('/')[4]
   end
 
+  # Returns a memoized hash of assets keyed by sys.id for O(1) lookups.
+  # @return [Hash] A hash mapping asset IDs to asset objects.
+  def asset_index
+    @asset_index ||= data.assets.each_with_object({}) { |a, h| h[a.sys.id] = a }
+  end
+
   # Retrieves the dimensions (width and height) of an asset by its ID.
   # @param asset_id [String] The ID of the asset for which to retrieve dimensions.
   # @return [Integer, Integer] The width and height of the asset, or nil if the asset is not found.
   def get_asset_dimensions(asset_id)
-    asset = data.assets.find { |a| a.sys.id == asset_id }
+    asset = asset_index[asset_id]
     return asset&.width, asset&.height
   end
 
@@ -24,7 +30,7 @@ module ImageHelpers
   # @param asset_id [String] The ID of the asset for which to retrieve the description.
   # @return [String, nil] The description of the asset, or nil if the asset is not found or has no description.
   def get_asset_description(asset_id)
-    asset = data.assets.find { |a| a.sys.id == asset_id }
+    asset = asset_index[asset_id]
     asset&.description&.strip
   end
 
@@ -32,7 +38,7 @@ module ImageHelpers
   # @param asset_id [String] The ID of the asset for which to retrieve the content type.
   # @return [String, nil] The content type of the asset, or nil if the asset is not found.
   def get_asset_content_type(asset_id)
-    asset = data.assets.find { |a| a.sys.id == asset_id }
+    asset = asset_index[asset_id]
     asset&.content_type
   end
 
@@ -40,7 +46,7 @@ module ImageHelpers
   # @param asset_id [String] The ID of the asset for which to retrieve the URL.
   # @return [String, nil] The URL of the asset, or nil if the asset is not found.
   def get_asset_url(asset_id)
-    asset = data.assets.find { |a| a.sys.id == asset_id }
+    asset = asset_index[asset_id]
     asset&.url
   end
 
@@ -48,7 +54,7 @@ module ImageHelpers
   # @param asset_id [String] The ID of the asset for which to retrieve the published version.
   # @return [Integer, nil] The published version of the asset, or nil if the asset is not found.
   def get_asset_published_version(asset_id)
-    asset = data.assets.find { |a| a.sys.id == asset_id }
+    asset = asset_index[asset_id]
     asset&.sys&.published_version
   end
 

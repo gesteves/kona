@@ -213,15 +213,15 @@ module ArticleHelpers
   # @param article [Object] The article for which to calculate the trending score.
   # @return [Float] The normalized trending score between 0 and 1.
   def trending_score(article)
-    scores = data.articles
-      .reject { |a| a.draft }                 # Exclude drafts
-      .reject { |a| a.entry_type == 'Short' } # Exclude short posts
+    @max_trending_score ||= data.articles
+      .reject { |a| a.draft }
+      .reject { |a| a.entry_type == 'Short' }
       .map { |a| absolute_trending_score(a) }
+      .max
 
-    max_score = scores.max
-    return 0 if max_score.zero?
+    return 0 if @max_trending_score.zero?
 
-    (absolute_trending_score(article) / max_score)
+    (absolute_trending_score(article) / @max_trending_score)
   end
 
   # Calculates an overall similarity score between two articles.

@@ -1,3 +1,4 @@
-<% if related_articles(article).present? %>
-  <%= partial 'partials/collection', locals: { title: "You May Also Like", items: related_articles(article), variant: "centered" } %>
+<% related = related_articles(article) %>
+<% if related.present? %>
+  <%= partial 'partials/collection', locals: { title: "You May Also Like", items: related, variant: "centered" } %>
 <% end %>
