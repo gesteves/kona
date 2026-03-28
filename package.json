@@ -14,12 +14,12 @@
     "clipboard": "^2.0.11",
     "date-fns": "^4.1.0",
     "esbuild": "^0.27.4",
-    "handlebars": "^4.7.8",
+    "handlebars": "^4.7.9",
     "node-fetch": "^3.3.2"
   },
   "devDependencies": {
     "prettier": "^3.8.1",
-    "stylelint": "^17.5.0",
+    "stylelint": "^17.6.0",
     "stylelint-config-standard-scss": "^17.0.0",
     "stylelint-scss": "^7.0.0"
   }
