@@ -18,8 +18,8 @@
     "node-fetch": "^3.3.2"
   },
   "devDependencies": {
-    "prettier": "^3.8.2",
-    "stylelint": "^17.6.0",
+    "prettier": "^3.8.3",
+    "stylelint": "^17.8.0",
     "stylelint-config-standard-scss": "^17.0.0",
     "stylelint-scss": "^7.0.0"
   }
