@@ -20,7 +20,80 @@ class Intervals
     end
   end
 
+  # Updates the athlete's weather forecast configuration on Intervals.icu
+  # using the current location and upcoming races within the next 7 days.
+  # @see https://intervals.icu/api-docs.html
+  def update_weather_config
+    forecasts = build_forecasts
+    return if forecasts.blank?
+
+    HTTParty.put(
+      "#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/weather-config",
+      body: { forecasts: forecasts }.to_json,
+      headers: { 'Content-Type' => 'application/json' },
+      basic_auth: { username: 'API_KEY', password: @api_key }
+    )
+  end
+
   private
+
+  # Builds the array of forecast entries for the weather config from the
+  # current location and any upcoming races within the next 7 days.
+  # @return [Array<Hash>] Forecast entries with sequential ids.
+  def build_forecasts
+    entries = [current_location_forecast, *upcoming_race_forecasts].compact
+    entries.each_with_index.map do |entry, index|
+      entry.merge(id: index, provider: 'OPEN_WEATHER', enabled: true)
+    end
+  end
+
+  # Builds a forecast entry from data/location.json.
+  # @return [Hash, nil] The forecast entry, or nil if the file or required fields are missing.
+  def current_location_forecast
+    return nil unless File.exist?('data/location.json')
+
+    data = JSON.parse(File.read('data/location.json'))
+    formatted_address = data.dig('geocoded', 'formatted_address')
+    coords = data.dig('geocoded', 'geometry', 'location')
+    return nil if formatted_address.blank? || coords.blank?
+
+    {
+      location: formatted_address,
+      label: formatted_address,
+      lat: coords['lat'],
+      lon: coords['lng']
+    }
+  end
+
+  # Builds forecast entries for races in data/events.json that are within the
+  # next 7 days and the athlete is going to.
+  # @return [Array<Hash>] The forecast entries.
+  def upcoming_race_forecasts
+    return [] unless File.exist?('data/events.json')
+
+    events = JSON.parse(File.read('data/events.json'))
+    cutoff = 7.days.from_now
+    now = Time.now
+
+    events.select do |event|
+      next false unless event['going'] == true
+      next false if event['date'].blank?
+
+      date = Time.parse(event['date'])
+      date >= now && date <= cutoff
+    end.map do |event|
+      formatted_address = event.dig('location', 'geocoded', 'formatted_address')
+      coords = event['coordinates']
+      next nil if formatted_address.blank? || coords.blank?
+
+      {
+        location: formatted_address,
+        label: formatted_address,
+        lat: coords['lat'],
+        lon: coords['lon']
+      }
+    end.compact
+  end
 
   # Fetch activities from the Intervals.icu API for the past month.
   # @return [Array<Hash>] List of activities.

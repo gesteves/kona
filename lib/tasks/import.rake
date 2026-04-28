@@ -85,6 +85,8 @@ task :import => [:dotenv, :clobber] do
   # Wait for all threads to complete
   (independent_threads + [sequential_thread]).each(&:join)
 
+  measure_and_output(:update_intervals_weather_config, "Updating Intervals.icu weather config")
+
   total_duration = Time.now - overall_start_time
   puts "\n" + "=" * 60
   puts "🎉 Import completed! Total time: #{format_duration(total_duration)}"
@@ -109,6 +111,10 @@ end
 
 def import_intervals
   safely_perform { Intervals.new.save_data }
+end
+
+def update_intervals_weather_config
+  safely_perform { Intervals.new.update_weather_config }
 end
 
 def import_location
