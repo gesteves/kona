@@ -1,8 +1,12 @@
 require 'httparty'
 require 'active_support/all'
+require 'ostruct'
+require_relative '../helpers/location_helpers'
 
 # Class to interact with the Intervals.icu API to fetch and save athlete activity statistics.
 class Intervals
+  include LocationHelpers
+
   INTERVALS_ICU_API_URL = 'https://intervals.icu/api/v1'
 
   def initialize
@@ -39,9 +43,17 @@ class Intervals
 
   # Builds the array of forecast entries for the weather config from the
   # current location and any upcoming races within the next 7 days.
+  # Entries are deduplicated by label, with races taking precedence over the
+  # current location.
   # @return [Array<Hash>] Forecast entries with sequential ids.
   def build_forecasts
-    entries = [current_location_forecast, *upcoming_race_forecasts].compact
+    races = upcoming_race_forecasts.uniq { |race| race[:label] }
+    current = current_location_forecast
+
+    entries = []
+    entries << current if current && races.none? { |race| race[:label] == current[:label] }
+    entries.concat(races)
+
     entries.each_with_index.map do |entry, index|
       entry.merge(id: index, provider: 'OPEN_WEATHER', enabled: true)
     end
@@ -52,16 +64,16 @@ class Intervals
   def current_location_forecast
     return nil unless File.exist?('data/location.json')
 
-    data = JSON.parse(File.read('data/location.json'))
-    formatted_address = data.dig('geocoded', 'formatted_address')
-    coords = data.dig('geocoded', 'geometry', 'location')
+    location = deep_open_struct(JSON.parse(File.read('data/location.json')))
+    formatted_address = location.geocoded&.formatted_address
+    coords = location.geocoded&.geometry&.location
     return nil if formatted_address.blank? || coords.blank?
 
     {
       location: formatted_address,
-      label: formatted_address,
-      lat: coords['lat'],
-      lon: coords['lng']
+      label: format_location(location).presence || formatted_address,
+      lat: coords.lat,
+      lon: coords.lng
     }
   end
 
@@ -86,13 +98,29 @@ class Intervals
       coords = event['coordinates']
       next nil if formatted_address.blank? || coords.blank?
 
+      location = deep_open_struct(event['location'])
       {
         location: formatted_address,
-        label: formatted_address,
+        label: format_location(location).presence || formatted_address,
         lat: coords['lat'],
         lon: coords['lon']
       }
     end.compact
+  end
+
+  # Recursively converts a Hash into an OpenStruct so it supports the dot-access
+  # that the LocationHelpers module expects.
+  # @param obj [Object] The object to convert.
+  # @return [Object] An OpenStruct, Array of converted values, or the original object.
+  def deep_open_struct(obj)
+    case obj
+    when Hash
+      OpenStruct.new(obj.transform_values { |v| deep_open_struct(v) })
+    when Array
+      obj.map { |v| deep_open_struct(v) }
+    else
+      obj
+    end
   end
 
   # Fetch activities from the Intervals.icu API for the past month.
