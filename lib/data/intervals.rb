@@ -100,13 +100,13 @@ class Intervals
   end
 
   # Builds forecast entries for races in data/events.json that are within the
-  # next 7 days and the athlete is going to.
+  # next 10 days and the athlete is going to.
   # @return [Array<Hash>] The forecast entries.
   def upcoming_race_forecasts
     return [] unless File.exist?('data/events.json')
 
     events = JSON.parse(File.read('data/events.json'))
-    cutoff = 7.days.from_now
+    cutoff = 10.days.from_now
     now = Time.now
 
     events.select do |event|
