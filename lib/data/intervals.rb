@@ -24,22 +24,44 @@ class Intervals
     end
   end
 
-  # Updates the athlete's weather forecast configuration on Intervals.icu
-  # using the current location and upcoming races within the next 7 days.
+  # Updates the athlete's weather forecast configuration on Intervals.icu by
+  # merging forecasts for the current location and upcoming races within the
+  # next 7 days into the existing config. Existing entries with matching labels
+  # are preserved as-is, and the request is skipped if nothing would change.
   # @see https://intervals.icu/api-docs.html
   def update_weather_config
-    forecasts = build_forecasts
-    return if forecasts.blank?
+    existing = fetch_weather_config
+    return if existing.nil?
+
+    existing_labels = existing.map { |entry| entry['label'] }
+    additions = build_forecasts.reject { |forecast| existing_labels.include?(forecast[:label]) }
+    return if additions.empty?
+
+    merged = existing + additions.map(&:stringify_keys)
+    merged.each_with_index { |entry, index| entry['id'] = index }
 
     HTTParty.put(
       "#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/weather-config",
-      body: { forecasts: forecasts }.to_json,
+      body: { forecasts: merged }.to_json,
       headers: { 'Content-Type' => 'application/json' },
       basic_auth: { username: 'API_KEY', password: @api_key }
     )
   end
 
   private
+
+  # Fetches the athlete's current weather forecast configuration from Intervals.icu.
+  # @return [Array<Hash>, nil] The existing forecast entries, or nil on failure.
+  def fetch_weather_config
+    response = HTTParty.get(
+      "#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/weather-config",
+      basic_auth: { username: 'API_KEY', password: @api_key }
+    )
+    return nil unless response.success?
+
+    body = JSON.parse(response.body)
+    body.is_a?(Hash) ? (body['forecasts'] || []) : Array(body)
+  end
 
   # Builds the array of forecast entries for the weather config from the
   # current location and any upcoming races within the next 7 days.
