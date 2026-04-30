@@ -61,15 +61,13 @@ class Intervals
     body.is_a?(Hash) ? (body['forecasts'] || []) : Array(body)
   end
 
-  # Compares two lists of forecasts by lat/lon, ignoring order.
+  # Compares two lists of forecasts by label, ignoring order. We can't compare
+  # lat/lon because Intervals.icu truncates them when saving.
   # @param existing [Array<Hash>] Forecasts returned from the API (string keys).
   # @param new_forecasts [Array<Hash>] Forecasts we'd send (symbol keys).
-  # @return [Boolean] True if the two lists have the same set of coordinates.
+  # @return [Boolean] True if the two lists have the same set of labels.
   def forecasts_equal?(existing, new_forecasts)
-    return false unless existing.size == new_forecasts.size
-
-    existing.map { |entry| [entry['lat'], entry['lon']] }.sort ==
-      new_forecasts.map { |entry| [entry[:lat], entry[:lon]] }.sort
+    existing.map { |entry| entry['label'] }.sort == new_forecasts.map { |entry| entry[:label] }.sort
   end
 
   # Builds a single-entry forecast list for the current location, sourced from
