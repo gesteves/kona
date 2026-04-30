@@ -24,25 +24,20 @@ class Intervals
     end
   end
 
-  # Updates the athlete's weather forecast configuration on Intervals.icu by
-  # merging forecasts for the current location and upcoming races within the
-  # next 7 days into the existing config. Existing entries with matching labels
-  # are preserved as-is, and the request is skipped if nothing would change.
+  # Overwrites the athlete's weather forecast configuration on Intervals.icu
+  # with forecasts for the current location and upcoming races within the next
+  # 10 days. The request is skipped if the new config matches what's already
+  # there.
   # @see https://intervals.icu/api-docs.html
   def update_weather_config
+    new_forecasts = build_forecasts
     existing = fetch_weather_config
     return if existing.nil?
-
-    existing_labels = existing.map { |entry| entry['label'] }
-    additions = build_forecasts.reject { |forecast| existing_labels.include?(forecast[:label]) }
-    return if additions.empty?
-
-    merged = existing + additions.map(&:stringify_keys)
-    merged.each_with_index { |entry, index| entry['id'] = index }
+    return if forecasts_equal?(existing, new_forecasts)
 
     HTTParty.put(
       "#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/weather-config",
-      body: { forecasts: merged }.to_json,
+      body: { forecasts: new_forecasts }.to_json,
       headers: { 'Content-Type' => 'application/json' },
       basic_auth: { username: 'API_KEY', password: @api_key }
     )
@@ -61,6 +56,16 @@ class Intervals
 
     body = JSON.parse(response.body)
     body.is_a?(Hash) ? (body['forecasts'] || []) : Array(body)
+  end
+
+  # Compares two lists of forecasts by location, ignoring order. We only check
+  # location because Intervals.icu adjusts lat/lon precision when saving, which
+  # would otherwise cause spurious diffs.
+  # @param existing [Array<Hash>] Forecasts returned from the API (string keys).
+  # @param new_forecasts [Array<Hash>] Forecasts we'd send (symbol keys).
+  # @return [Boolean] True if the two lists have the same set of locations.
+  def forecasts_equal?(existing, new_forecasts)
+    existing.map { |entry| entry['location'] }.sort == new_forecasts.map { |entry| entry[:location] }.sort
   end
 
   # Builds the array of forecast entries for the weather config from the
@@ -92,7 +97,7 @@ class Intervals
     return nil if formatted_address.blank? || coords.blank?
 
     {
-      location: format_location(location).presence || formatted_address,
+      location: formatted_address,
       label: format_location(location).presence || formatted_address,
       lat: coords.lat,
       lon: coords.lng
@@ -122,7 +127,7 @@ class Intervals
 
       location = deep_open_struct(event['location'])
       {
-        location: format_location(location).presence || formatted_address,
+        location: formatted_address,
         label: format_location(location).presence || formatted_address,
         lat: coords['lat'],
         lon: coords['lon']
