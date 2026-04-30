@@ -92,7 +92,7 @@ class Intervals
     return nil if formatted_address.blank? || coords.blank?
 
     {
-      location: formatted_address,
+      location: format_location(location).presence || formatted_address,
       label: format_location(location).presence || formatted_address,
       lat: coords.lat,
       lon: coords.lng
@@ -122,7 +122,7 @@ class Intervals
 
       location = deep_open_struct(event['location'])
       {
-        location: formatted_address,
+        location: format_location(location).presence || formatted_address,
         label: format_location(location).presence || formatted_address,
         lat: coords['lat'],
         lon: coords['lon']
