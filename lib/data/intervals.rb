@@ -1,6 +1,8 @@
 require 'httparty'
 require 'active_support/all'
 require 'ostruct'
+require_relative 'location'
+require_relative 'google_maps'
 require_relative '../helpers/location_helpers'
 
 # Class to interact with the Intervals.icu API to fetch and save athlete activity statistics.
@@ -25,12 +27,13 @@ class Intervals
   end
 
   # Overwrites the athlete's weather forecast configuration on Intervals.icu
-  # with forecasts for the current location and upcoming races within the next
-  # 10 days. The request is skipped if the new config matches what's already
-  # there.
+  # with a single forecast entry for the current location. Skipped when the
+  # existing config already matches by lat/lon.
   # @see https://intervals.icu/api-docs.html
   def update_weather_config
     new_forecasts = build_forecasts
+    return if new_forecasts.blank?
+
     existing = fetch_weather_config
     return if existing.nil?
     return if forecasts_equal?(existing, new_forecasts)
@@ -58,81 +61,41 @@ class Intervals
     body.is_a?(Hash) ? (body['forecasts'] || []) : Array(body)
   end
 
-  # Compares two lists of forecasts by location, ignoring order. We only check
-  # location because Intervals.icu adjusts lat/lon precision when saving, which
-  # would otherwise cause spurious diffs.
+  # Compares two lists of forecasts by lat/lon, ignoring order.
   # @param existing [Array<Hash>] Forecasts returned from the API (string keys).
   # @param new_forecasts [Array<Hash>] Forecasts we'd send (symbol keys).
-  # @return [Boolean] True if the two lists have the same set of locations.
+  # @return [Boolean] True if the two lists have the same set of coordinates.
   def forecasts_equal?(existing, new_forecasts)
-    existing.map { |entry| entry['location'] }.sort == new_forecasts.map { |entry| entry[:location] }.sort
+    return false unless existing.size == new_forecasts.size
+
+    existing.map { |entry| [entry['lat'], entry['lon']] }.sort ==
+      new_forecasts.map { |entry| [entry[:lat], entry[:lon]] }.sort
   end
 
-  # Builds the array of forecast entries for the weather config from the
-  # current location and any upcoming races within the next 7 days.
-  # Entries are deduplicated by label, with races taking precedence over the
-  # current location.
-  # @return [Array<Hash>] Forecast entries with sequential ids.
-  def build_forecasts
-    races = upcoming_race_forecasts.uniq { |race| race[:label] }
-    current = current_location_forecast
-
-    entries = []
-    entries << current if current && races.none? { |race| race[:label] == current[:label] }
-    entries.concat(races)
-
-    entries.each_with_index.map do |entry, index|
-      entry.merge(id: index, provider: 'OPEN_WEATHER', enabled: true)
-    end
-  end
-
-  # Builds a forecast entry from data/location.json.
-  # @return [Hash, nil] The forecast entry, or nil if the file or required fields are missing.
-  def current_location_forecast
-    return nil unless File.exist?('data/location.json')
-
-    location = deep_open_struct(JSON.parse(File.read('data/location.json')))
-    formatted_address = location.geocoded&.formatted_address
-    coords = location.geocoded&.geometry&.location
-    return nil if formatted_address.blank? || coords.blank?
-
-    {
-      location: formatted_address,
-      label: format_location(location).presence || formatted_address,
-      lat: coords.lat,
-      lon: coords.lng
-    }
-  end
-
-  # Builds forecast entries for races in data/events.json that are within the
-  # next 10 days and the athlete is going to.
+  # Builds a single-entry forecast list for the current location, sourced from
+  # the Location class so we get the raw coordinates rather than the geocoded
+  # ones in data/location.json. The label comes from format_location applied
+  # to GoogleMaps' reverse-geocoded data.
   # @return [Array<Hash>] The forecast entries.
-  def upcoming_race_forecasts
-    return [] unless File.exist?('data/events.json')
+  def build_forecasts
+    raw_location = Location.new
+    return [] if raw_location.latitude.blank? || raw_location.longitude.blank?
 
-    events = JSON.parse(File.read('data/events.json'))
-    cutoff = 10.days.from_now
-    now = Time.now
+    google_maps = GoogleMaps.new(raw_location.latitude, raw_location.longitude)
+    location_struct = deep_open_struct(google_maps.location)
+    label = format_location(location_struct).presence ||
+      location_struct.geocoded&.formatted_address.presence ||
+      'Current location'
 
-    events.select do |event|
-      next false unless event['going'] == true
-      next false if event['date'].blank?
-
-      date = Time.parse(event['date'])
-      date >= now && date <= cutoff
-    end.map do |event|
-      formatted_address = event.dig('location', 'geocoded', 'formatted_address')
-      coords = event['coordinates']
-      next nil if formatted_address.blank? || coords.blank?
-
-      location = deep_open_struct(event['location'])
-      {
-        location: formatted_address,
-        label: format_location(location).presence || formatted_address,
-        lat: coords['lat'],
-        lon: coords['lon']
-      }
-    end.compact
+    [{
+      id: 0,
+      provider: 'OPEN_WEATHER',
+      location: label,
+      label: label,
+      lat: google_maps.latitude,
+      lon: google_maps.longitude,
+      enabled: true
+    }]
   end
 
   # Recursively converts a Hash into an OpenStruct so it supports the dot-access
