@@ -157,10 +157,17 @@ class Intervals
     google_maps = GoogleMaps.new(raw_location.latitude, raw_location.longitude)
     components = google_maps.location.dig(:geocoded, :address_components) || []
 
-    city = components.find { |c| c[:types].include?('locality') }&.dig(:long_name) ||
-      components.find { |c| c[:types].include?('sublocality') }&.dig(:long_name)
+    city = %w[locality sublocality administrative_area_level_3 administrative_area_level_2]
+      .lazy
+      .map { |type| components.find { |c| c[:types].include?(type) }&.dig(:long_name) }
+      .find(&:present?)
     state = components.find { |c| c[:types].include?('administrative_area_level_1') }&.dig(:long_name)
     country = components.find { |c| c[:types].include?('country') }&.dig(:long_name)
+    county = components.find { |c| c[:types].include?('administrative_area_level_2') }&.dig(:long_name)
+
+    # Jackson Hole isn't a real city, but it obfuscates exactly where in Teton
+    # County we are when we sync this to Intervals.icu.
+    city = 'Jackson Hole' if county == 'Teton County' && state == 'Wyoming'
 
     location_struct = deep_open_struct(google_maps.location)
     label = format_location(location_struct).presence ||
