@@ -54,6 +54,10 @@ Kona is a static site generator built on **Middleman** that creates a blog power
 - **ALWAYS** run `npm run build` after making changes to JavaScript files
 - **NEVER** commit JavaScript changes without building them first
 
+### 6. Use the Correct Node Version
+
+- **ALWAYS** run `nvm use` before any `npm` command to ensure the right version of Node is used
+
 ## Available Commands
 
 ### Rake Commands
