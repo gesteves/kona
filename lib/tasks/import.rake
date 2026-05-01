@@ -85,7 +85,9 @@ task :import => [:dotenv, :clobber] do
   # Wait for all threads to complete
   (independent_threads + [sequential_thread]).each(&:join)
 
-  measure_and_output(:update_intervals_weather_config, "Updating Intervals.icu weather config")
+  if @location.from_webhook?
+    measure_and_output(:update_intervals_weather_config, "Updating Intervals.icu weather config")
+  end
 
   total_duration = Time.now - overall_start_time
   puts "\n" + "=" * 60
