@@ -28,7 +28,7 @@ class Intervals
 
   # Overwrites the athlete's weather forecast configuration on Intervals.icu
   # with a single forecast entry for the current location. Skipped when the
-  # existing config already matches by lat/lon.
+  # existing config already matches by label.
   # @see https://intervals.icu/api-docs.html
   def update_weather_config
     new_forecasts = build_forecasts
@@ -41,6 +41,35 @@ class Intervals
     HTTParty.put(
       "#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/weather-config",
       body: { forecasts: new_forecasts }.to_json,
+      headers: { 'Content-Type' => 'application/json' },
+      basic_auth: { username: 'API_KEY', password: @api_key }
+    )
+  end
+
+  # Updates the athlete's profile city/state/country/timezone on Intervals.icu
+  # to match the current location. Sends only those four fields and relies on
+  # the API treating the body as a sparse update. Skipped when the existing
+  # profile already matches.
+  # @see https://intervals.icu/api-docs.html
+  def update_athlete_profile
+    ctx = location_context
+    return if ctx.nil?
+
+    new_profile = {
+      city: ctx[:city],
+      state: ctx[:state],
+      country: ctx[:country],
+      timezone: ctx[:timezone]
+    }
+    return if new_profile.values.all?(&:blank?)
+
+    existing = fetch_athlete_profile
+    return if existing.nil?
+    return if profile_equal?(existing, new_profile)
+
+    HTTParty.put(
+      "#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}",
+      body: new_profile.to_json,
       headers: { 'Content-Type' => 'application/json' },
       basic_auth: { username: 'API_KEY', password: @api_key }
     )
@@ -70,30 +99,86 @@ class Intervals
     existing.map { |entry| entry['label'] }.sort == new_forecasts.map { |entry| entry[:label] }.sort
   end
 
-  # Builds a single-entry forecast list for the current location, sourced from
-  # the Location class so we get the raw coordinates rather than the geocoded
-  # ones in data/location.json. The label comes from format_location applied
-  # to GoogleMaps' reverse-geocoded data.
+  # Fetches the athlete's current profile from Intervals.icu.
+  # @return [Hash, nil] The profile hash (string keys), or nil on failure.
+  def fetch_athlete_profile
+    response = HTTParty.get(
+      "#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/profile",
+      basic_auth: { username: 'API_KEY', password: @api_key }
+    )
+    return nil unless response.success?
+
+    body = JSON.parse(response.body)
+    return nil unless body.is_a?(Hash)
+    body['athlete'].is_a?(Hash) ? body['athlete'] : body
+  end
+
+  # @param existing [Hash] Profile returned from the API (string keys).
+  # @param new_profile [Hash] Profile we'd send (symbol keys).
+  # @return [Boolean] True if city/state/country/timezone all match.
+  def profile_equal?(existing, new_profile)
+    existing['city'] == new_profile[:city] &&
+      existing['state'] == new_profile[:state] &&
+      existing['country'] == new_profile[:country] &&
+      existing['timezone'] == new_profile[:timezone]
+  end
+
+  # Builds a single-entry forecast list for the current location.
   # @return [Array<Hash>] The forecast entries.
   def build_forecasts
+    ctx = location_context
+    return [] if ctx.nil?
+
+    [{
+      id: 0,
+      provider: 'OPEN_WEATHER',
+      location: ctx[:location],
+      label: ctx[:label],
+      lat: ctx[:lat],
+      lon: ctx[:lon],
+      enabled: true
+    }]
+  end
+
+  # Resolves the current location into the bag of values used by both the
+  # weather-config and athlete-profile updates. Sourced from Location so we
+  # get the raw coordinates rather than the geocoded ones in
+  # data/location.json. Memoized so a single Intervals instance only does the
+  # GoogleMaps lookup once.
+  # @return [Hash, nil] The location context, or nil if no coordinates are available.
+  def location_context
+    return @location_context if defined?(@location_context)
+
     raw_location = Location.new
-    return [] if raw_location.latitude.blank? || raw_location.longitude.blank?
+    if raw_location.latitude.blank? || raw_location.longitude.blank?
+      return @location_context = nil
+    end
 
     google_maps = GoogleMaps.new(raw_location.latitude, raw_location.longitude)
+    components = google_maps.location.dig(:geocoded, :address_components) || []
+
+    city = components.find { |c| c[:types].include?('locality') }&.dig(:long_name) ||
+      components.find { |c| c[:types].include?('sublocality') }&.dig(:long_name)
+    state = components.find { |c| c[:types].include?('administrative_area_level_1') }&.dig(:long_name)
+    country = components.find { |c| c[:types].include?('country') }&.dig(:long_name)
+
     location_struct = deep_open_struct(google_maps.location)
     label = format_location(location_struct).presence ||
       location_struct.geocoded&.formatted_address.presence ||
       'Current location'
 
-    [{
-      id: 0,
-      provider: 'OPEN_WEATHER',
-      location: label,
-      label: label,
+    location_string = [city, state, country].compact.join(', ').presence || label
+
+    @location_context = {
       lat: google_maps.latitude,
       lon: google_maps.longitude,
-      enabled: true
-    }]
+      label: label,
+      location: location_string,
+      city: city,
+      state: state,
+      country: country,
+      timezone: google_maps.time_zone_id
+    }
   end
 
   # Recursively converts a Hash into an OpenStruct so it supports the dot-access

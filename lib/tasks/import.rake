@@ -87,6 +87,7 @@ task :import => [:dotenv, :clobber] do
 
   if @location.from_webhook?
     measure_and_output(:update_intervals_weather_config, "Updating Intervals.icu weather config")
+    measure_and_output(:update_intervals_athlete_profile, "Updating Intervals.icu athlete profile")
   end
 
   total_duration = Time.now - overall_start_time
@@ -117,6 +118,10 @@ end
 
 def update_intervals_weather_config
   safely_perform { Intervals.new.update_weather_config }
+end
+
+def update_intervals_athlete_profile
+  safely_perform { Intervals.new.update_athlete_profile }
 end
 
 def import_location
