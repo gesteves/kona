@@ -3,13 +3,14 @@ require 'graphql/client/http'
 require 'dotenv'
 require 'httparty'
 require 'redis'
+require_relative '../../utils/safe_redis'
 
 module FontAwesomeClient
   Dotenv.load
 
   FONT_AWESOME_API_URL = "https://api.fontawesome.com"
 
-  $redis ||= Redis.new(
+  $redis ||= SafeRedis.new(
     host: ENV['REDIS_HOST'] || 'localhost',
     port: ENV['REDIS_PORT'] || 6379,
     username: ENV['REDIS_USERNAME'],

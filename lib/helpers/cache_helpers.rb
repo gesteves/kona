@@ -1,6 +1,8 @@
+require_relative '../utils/safe_redis'
+
 module CacheHelpers
   def redis
-    $redis ||= Redis.new(
+    $redis ||= SafeRedis.new(
       host: ENV['REDIS_HOST'] || 'localhost',
       port: ENV['REDIS_PORT'] || 6379,
       username: ENV['REDIS_USERNAME'],
