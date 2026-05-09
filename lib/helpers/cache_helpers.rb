@@ -1,10 +1,7 @@
 module CacheHelpers
   def redis
     $redis ||= Redis.new(
-      host: ENV['REDIS_HOST'] || 'localhost',
-      port: ENV['REDIS_PORT'] || 6379,
-      username: ENV['REDIS_USERNAME'],
-      password: ENV['REDIS_PASSWORD'],
+      url: ENV['REDIS_URL'] || 'redis://localhost:6379',
       connect_timeout: 5,
       read_timeout: 3,
       write_timeout: 3,
