@@ -85,11 +85,6 @@ task :import => [:dotenv, :clobber] do
   # Wait for all threads to complete
   (independent_threads + [sequential_thread]).each(&:join)
 
-  if @location.from_webhook?
-    measure_and_output(:update_intervals_weather_config, "Updating Intervals.icu weather config")
-    measure_and_output(:update_intervals_athlete_profile, "Updating Intervals.icu athlete profile")
-  end
-
   total_duration = Time.now - overall_start_time
   puts "\n" + "=" * 60
   puts "🎉 Import completed! Total time: #{format_duration(total_duration)}"
@@ -114,14 +109,6 @@ end
 
 def import_intervals
   safely_perform { Intervals.new.save_data }
-end
-
-def update_intervals_weather_config
-  safely_perform { Intervals.new.update_weather_config }
-end
-
-def update_intervals_athlete_profile
-  safely_perform { Intervals.new.update_athlete_profile }
 end
 
 def import_location

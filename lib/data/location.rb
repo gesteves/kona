@@ -7,16 +7,7 @@ class Location
 
   # Initializes the Location instance by fetching the current location from available sources.
   def initialize
-    @from_webhook = false
     @latitude, @longitude = split_into_coordinates(current_location)
-  end
-
-  # Whether this build's location was just delivered by a Netlify build hook
-  # payload (as opposed to being read from cache or env). Used to decide
-  # whether to push the location to downstream services like Intervals.icu.
-  # @return [Boolean]
-  def from_webhook?
-    @from_webhook
   end
 
   private
@@ -34,7 +25,6 @@ class Location
     if valid_coordinates?(latitude, longitude)
       location = "#{latitude},#{longitude}"
       $redis.set(LOCATION_CACHE_KEY, location)
-      @from_webhook = true
       location
     else
       $redis.get(LOCATION_CACHE_KEY)
