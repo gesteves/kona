@@ -71,14 +71,14 @@ GEM
     humanize (3.1.0)
     i18n (1.14.8)
       concurrent-ruby (~> 1.0)
-    icalendar (2.12.2)
+    icalendar (2.12.3)
       base64
       ice_cube (~> 0.16)
       logger
       ostruct
     ice_cube (0.17.0)
     json (2.19.3)
-    jwt (3.1.2)
+    jwt (3.2.0)
       base64
     kramdown (2.5.2)
       rexml (>= 3.4.4)
