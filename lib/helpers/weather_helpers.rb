@@ -358,6 +358,7 @@ module WeatherHelpers
     summary << current_location
     summary << elevation
     summary << currently
+    summary << bay_water_temperature_sentence
     summary << current_aqi
     summary << format_pollen_level
     summary << forecast

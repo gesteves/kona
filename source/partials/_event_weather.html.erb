@@ -68,6 +68,23 @@
       </div>
     <% end %>
     <% end %>
+    <% bay = in_san_francisco?(event.location) ? bay_conditions_at(Time.parse(event.date)) : nil %>
+    <% if bay.present? %>
+      <div class="event__weather-stat-group">
+        <span class="event__weather-stat">
+          <%= icon_svg("classic", "light", "water-temperature") %>
+          <%= format_temperature(bay.water_temp_c) %>
+        </span>
+        <span class="event__weather-stat">
+          <span class="event__weather-wind-direction" style="--wind-direction: <%= (bay.current_bearing_deg + 180) % 360 %>;" title="<%= wind_direction(bay.current_bearing_deg) %>">
+            <%= icon_svg("classic", "light", "arrow-down") %>
+          </span>
+          <%= format_bay_current_speed(bay.current_speed_ms) %>
+          current
+          <span class="sr-only">toward the <%= wind_direction(bay.current_bearing_deg) %></span>
+        </span>
+      </div>
+    <% end %>
     <% if event.aqi.present? %>
       <div class="event__weather-stat-group">
         <span class="event__weather-stat"><%= icon_svg("classic", "light", aqi_icon(event.aqi.aqi)) %> <abbr title="Air Quality Index">AQI</abbr> <%= event.aqi.aqi %> &middot; <%= event.aqi.description %></span>

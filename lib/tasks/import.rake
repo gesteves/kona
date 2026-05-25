@@ -37,6 +37,13 @@ namespace :import do
     measure_and_output(:import_whoop, "Importing Whoop data")
   end
 
+  desc 'Imports San Francisco Bay conditions'
+  task :goodspeed => [:dotenv] do
+    setup_data_directory
+    initialize_redis
+    measure_and_output(:import_goodspeed, "Importing bay conditions")
+  end
+
 end
 
 desc 'Imports all content for the site'
@@ -58,7 +65,8 @@ task :import => [:dotenv, :clobber] do
     [:import_font_awesome, "Importing icons"],
     [:import_intervals, "Importing activity stats"],
     [:import_whoop, "Importing Whoop data"],
-    [:import_dark_visitors, "Importing robots.txt directives"]
+    [:import_dark_visitors, "Importing robots.txt directives"],
+    [:import_goodspeed, "Importing bay conditions"]
   ].map do |method, description|
     Thread.new do
       measure_and_output(method, description, mutex: output_mutex)
@@ -153,9 +161,13 @@ end
 
 
 def import_whoop
-  safely_perform { 
-    Whoop.new.save_data 
+  safely_perform {
+    Whoop.new.save_data
   }
+end
+
+def import_goodspeed
+  safely_perform { Goodspeed.new.save_data }
 end
 
 def import_dark_visitors

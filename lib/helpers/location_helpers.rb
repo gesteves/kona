@@ -72,6 +72,13 @@ module LocationHelpers
     format_location(location) == 'Jackson Hole, Wyoming'
   end
 
+  # Checks if the location is San Francisco.
+  # @param location [Hash] The location data hash containing geocoded information.
+  # @return [Boolean] True if the location matches, false otherwise.
+  def in_san_francisco?(location = data.location)
+    format_location(location) == 'San Francisco, California'
+  end
+
   # Returns the time zone ID for the location.
   # @param location [Hash] The location data hash containing time zone information.
   # @return [String] The time zone ID for the location.
