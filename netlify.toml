@@ -2,6 +2,13 @@
 [functions]
   node_bundler = "esbuild"
 
+[functions.og]
+  included_files = [
+    "build/og/data.json",
+    "source/fonts/IBMPlexSansCondensed-Bold.ttf"
+  ]
+  external_node_modules = ["@vercel/og"]
+
 [images]
   remote_images = [".*\\.ctfassets\\.net/.*", ".*\\.cloudfront\\.net/.*"]
 
