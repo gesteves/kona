@@ -266,17 +266,20 @@ class StandardSite
   end
 
   # Fetches a resized image as raw bytes, keeping blobs comfortably under 1MB.
-  # In production this uses Netlify's Image CDN (same path blurhash uses during
-  # the build); otherwise it falls back to Contentful's Images API.
+  # The source is resolved to its CloudFront-backed asset URL first (see
+  # #cdn_source_url) so transforms never hit Contentful's rate-limited image CDN.
+  # In production this uses Netlify's Image CDN (the same path blurhash uses
+  # during the build); otherwise it falls back to Contentful's Images API.
   # @return [Array(String, String), nil] [bytes, mime_type] or nil.
   def fetch_resized_image(url, content_type, w:, h:)
-    url = "https:#{url}" if url.to_s.start_with?('//')
+    source = cdn_source_url(url)
+    source = "https:#{source}" if source.to_s.start_with?('//')
     format = content_type == 'image/png' ? 'png' : 'jpg'
     mime = format == 'png' ? 'image/png' : 'image/jpeg'
     cdn_url = if ENV['URL'].present?
-      "#{ENV['URL'].chomp('/')}/.netlify/images?url=#{URI.encode_www_form_component(url)}&w=#{w}&h=#{h}&fit=cover&fm=#{format}"
+      "#{ENV['URL'].chomp('/')}/.netlify/images?url=#{URI.encode_www_form_component(source)}&w=#{w}&h=#{h}&fit=cover&fm=#{format}"
     else
-      images_api_url(url, w: w, h: h, fm: format)
+      images_api_url(source, w: w, h: h, fm: format)
     end
     response = HTTParty.get(cdn_url)
     return unless response.success?
@@ -285,8 +288,31 @@ class StandardSite
     nil
   end
 
+  # Resolves an inline image URL to its asset's canonical URL, which has already
+  # been rewritten to CloudFront (with a version cache-buster) by Contentful's
+  # process_assets. Mirrors ImageHelpers#cdn_image_url so the blob source is
+  # cached by CloudFront rather than fetched from Contentful on every transform.
+  # Falls back to the original URL if the asset isn't in the index.
+  # @param original_url [String]
+  # @return [String]
+  def cdn_source_url(original_url)
+    asset_id = original_url.to_s.split('/')[4]
+    asset_index[asset_id].presence || original_url
+  end
+
+  # A hash mapping asset sys.id to its (CloudFront-rewritten) URL, from
+  # data/assets.json. Empty if the file is missing.
+  # @return [Hash<String, String>]
+  def asset_index
+    @asset_index ||= Array(load_json('data/assets.json')).each_with_object({}) do |asset, index|
+      id = asset.dig('sys', 'id')
+      index[id] = asset['url'] if id.present?
+    end
+  end
+
   # Builds a Contentful Images API URL, normalizing to the images.ctfassets.net
-  # host (the downloads host doesn't support image transformations).
+  # host (the downloads host doesn't support image transformations). Used only as
+  # the local fallback; CloudFront hosts are left untouched.
   # @return [String]
   def images_api_url(url, w:, h:, fm:)
     uri = URI.parse(url)
