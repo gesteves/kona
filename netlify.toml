@@ -21,6 +21,11 @@
   [headers.values]
     Referrer-Policy = "no-referrer-when-downgrade"
 
+[[headers]]
+  for = "/.well-known/site.standard.publication"
+  [headers.values]
+    Content-Type = "text/plain; charset=utf-8"
+
 [[redirects]]
   from = "/.well-known/host-meta*"
   to = "https://fed.brid.gy/.well-known/host-meta:splat"

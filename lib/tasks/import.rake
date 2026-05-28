@@ -44,6 +44,13 @@ namespace :import do
     measure_and_output(:import_goodspeed, "Importing bay conditions")
   end
 
+  desc 'Syncs standard.site records to the PDS (requires content to be imported first)'
+  task :standard_site => [:dotenv] do
+    setup_data_directory
+    initialize_redis
+    measure_and_output(:import_standard_site, "Syncing standard.site records")
+  end
+
 end
 
 desc 'Imports all content for the site'
@@ -92,6 +99,10 @@ task :import => [:dotenv, :clobber] do
 
   # Wait for all threads to complete
   (independent_threads + [sequential_thread]).each(&:join)
+
+  # Runs after the parallel imports so it can read the freshly-written
+  # data/articles.json and data/site.json. No-ops outside production.
+  measure_and_output(:import_standard_site, "Syncing standard.site records", mutex: output_mutex)
 
   total_duration = Time.now - overall_start_time
   puts "\n" + "=" * 60
@@ -168,6 +179,10 @@ end
 
 def import_goodspeed
   safely_perform { Goodspeed.new.save_data }
+end
+
+def import_standard_site
+  safely_perform { StandardSite.new.save_data }
 end
 
 def import_dark_visitors

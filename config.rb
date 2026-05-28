@@ -43,6 +43,10 @@ end
   proxy page.path, page.template, locals: { content: page }, ignore: true
 end
 
+# Render the standard.site publication verification endpoint as a bare, plain-text
+# file at /.well-known/site.standard.publication (no layout, no directory index).
+page "/.well-known/site.standard.publication", layout: false, directory_index: false
+
 configure :development do
   activate :relative_assets
 end
