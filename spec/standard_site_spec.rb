@@ -57,8 +57,14 @@ describe StandardSite do
       expect(record['description']).to eq('A triathlon training & racing blog.')
     end
 
-    it 'omits the icon when there is no PDS session' do
+    it 'omits the icon when no blob is supplied' do
       expect(record).not_to have_key('icon')
+    end
+
+    it 'includes the icon when a blob is supplied' do
+      blob = { '$type' => 'blob', 'ref' => { '$link' => 'bafy' } }
+      record = client.build_publication_record(site, icon: blob)
+      expect(record['icon']).to eq(blob)
     end
   end
 
@@ -91,8 +97,14 @@ describe StandardSite do
       expect(record['tags']).to eq(%w[Ironman News])
     end
 
-    it 'omits the cover image when there is no PDS session' do
+    it 'omits the cover image when no blob is supplied' do
       expect(record).not_to have_key('coverImage')
+    end
+
+    it 'includes the cover image when a blob is supplied' do
+      blob = { '$type' => 'blob', 'ref' => { '$link' => 'bafy' } }
+      record = client.build_document_record(post, publication_uri, cover_image: blob)
+      expect(record['coverImage']).to eq(blob)
     end
 
     it 'prefers an explicit summary over the intro' do
@@ -128,6 +140,61 @@ describe StandardSite do
 
     it 'handles empty inputs' do
       expect(client.rkeys_to_prune([], %w[a])).to eq([])
+    end
+  end
+
+  describe '#document_fingerprint' do
+    subject(:fingerprint) { client.document_fingerprint(post, publication_uri) }
+
+    it 'is stable for identical posts' do
+      expect(fingerprint).to eq(client.document_fingerprint(post.dup, publication_uri))
+    end
+
+    it 'changes when the publication URI changes' do
+      other = client.document_fingerprint(post, 'at://did:plc:other/site.standard.publication/self')
+      expect(fingerprint).not_to eq(other)
+    end
+
+    {
+      'title' => 'A different title',
+      'updated_at' => '2026-03-01T00:00:00.000Z',
+      'body' => 'A completely different body.'
+    }.each do |field, value|
+      it "changes when #{field} changes" do
+        expect(fingerprint).not_to eq(client.document_fingerprint(post.merge(field => value), publication_uri))
+      end
+    end
+
+    it 'changes when a tag changes' do
+      changed = post.merge('contentful_metadata' => { 'tags' => [{ 'id' => 'racing', 'name' => 'Racing' }] })
+      expect(fingerprint).not_to eq(client.document_fingerprint(changed, publication_uri))
+    end
+
+    it 'changes when the cover image source changes' do
+      changed = post.merge('cover_image' => { 'url' => '//images.ctfassets.net/a/b/c/new.jpg', 'content_type' => 'image/jpeg' })
+      expect(fingerprint).not_to eq(client.document_fingerprint(changed, publication_uri))
+    end
+  end
+
+  describe '#publication_fingerprint' do
+    subject(:fingerprint) { client.publication_fingerprint(site) }
+
+    it 'is stable for identical site data' do
+      expect(fingerprint).to eq(client.publication_fingerprint(site.dup))
+    end
+
+    {
+      'title' => 'A New Name',
+      'meta_description' => 'A different description.'
+    }.each do |field, value|
+      it "changes when #{field} changes" do
+        expect(fingerprint).not_to eq(client.publication_fingerprint(site.merge(field => value)))
+      end
+    end
+
+    it 'changes when the logo source changes' do
+      changed = site.merge('logo' => { 'url' => '//images.ctfassets.net/x/y/z/new-avatar.png', 'content_type' => 'image/png' })
+      expect(fingerprint).not_to eq(client.publication_fingerprint(changed))
     end
   end
 end

@@ -1,4 +1,5 @@
 require 'httparty'
+require 'digest'
 require 'json'
 require 'uri'
 require 'time'
@@ -19,6 +20,12 @@ require 'active_support/all'
 #     case of a sys.id changing), and
 #   - writes data/standard_site.json so the build can emit the on-site
 #     verification endpoints (the .well-known endpoint and <link> tags).
+#
+# The build runs hourly but content rarely changes, so the sync is incremental:
+# a SHA-256 fingerprint of each record's content is cached in Redis, and a
+# record is only re-uploaded (the expensive part — a cover-image blob upload
+# plus a putRecord) when its fingerprint changes. A run with no content changes
+# makes no putRecord/uploadBlob calls at all.
 #
 # Local `middleman build` and Netlify deploy-preview/branch-deploy builds never
 # touch the PDS: save_data returns before any network call and writes no data
@@ -53,14 +60,16 @@ class StandardSite
     return if site.blank? || articles.blank?
 
     publication_uri = "at://#{@did}/#{PUBLICATION_COLLECTION}/#{PUBLICATION_RKEY}"
-    put_record(PUBLICATION_COLLECTION, PUBLICATION_RKEY, build_publication_record(site))
+    sync_publication(site)
 
     documents = {}
     publishable_posts(articles).each do |post|
       rkey = post.dig('sys', 'id')
       next if rkey.blank? || !RKEY_PATTERN.match?(rkey)
-      put_record(DOCUMENT_COLLECTION, rkey, build_document_record(post, publication_uri))
+      # The URI is deterministic, so the verification map is always complete even
+      # when the record itself is left untouched as unchanged.
       documents[rkey] = "at://#{@did}/#{DOCUMENT_COLLECTION}/#{rkey}"
+      sync_document(post, rkey, publication_uri)
     end
 
     # Remove any document records that no longer map to a published post.
@@ -90,9 +99,13 @@ class StandardSite
   end
 
   # Builds a site.standard.publication record from the site data.
+  # The icon blob is supplied by the caller (rather than uploaded here) so the
+  # record can be built cheaply for fingerprinting without touching the network.
   # @param site [Hash] Parsed data/site.json (string keys).
+  # @param icon [Hash, String, nil] The uploaded icon blob, or a source
+  #   descriptor when building a fingerprint.
   # @return [Hash]
-  def build_publication_record(site)
+  def build_publication_record(site, icon: nil)
     record = {
       '$type' => PUBLICATION_COLLECTION,
       'url' => publication_url,
@@ -101,16 +114,19 @@ class StandardSite
     }
     description = plain_text(site['meta_description'])
     record['description'] = truncate_graphemes(description, 3000) if description.present?
-    icon = upload_image_blob(site.dig('logo', 'url'), site.dig('logo', 'content_type'), w: 512, h: 512)
     record['icon'] = icon if icon.present?
     record
   end
 
   # Builds a site.standard.document record for a post.
+  # The cover image blob is supplied by the caller (rather than uploaded here) so
+  # the record can be built cheaply for fingerprinting without touching the network.
   # @param post [Hash] A processed article (string keys).
   # @param publication_uri [String] The publication's at:// URI.
+  # @param cover_image [Hash, String, nil] The uploaded cover image blob, or a
+  #   source descriptor when building a fingerprint.
   # @return [Hash]
-  def build_document_record(post, publication_uri)
+  def build_document_record(post, publication_uri, cover_image: nil)
     record = {
       '$type' => DOCUMENT_COLLECTION,
       'site' => publication_uri,
@@ -131,8 +147,7 @@ class StandardSite
     tags = Array(post.dig('contentful_metadata', 'tags')).map { |t| t['name'] }.compact_blank
     record['tags'] = tags if tags.present?
 
-    cover = upload_image_blob(post.dig('cover_image', 'url'), post.dig('cover_image', 'content_type'), w: 1200, h: 630)
-    record['coverImage'] = cover if cover.present?
+    record['coverImage'] = cover_image if cover_image.present?
     record
   end
 
@@ -144,7 +159,102 @@ class StandardSite
     Array(existing) - Array(current)
   end
 
+  # A content fingerprint for a post's document record. Built from the same
+  # builder as the synced record, with the cover image represented by its source
+  # URL instead of the uploaded blob, so any change to the record's content
+  # (including swapping the cover image) changes the fingerprint without needing
+  # a network round trip to compute it.
+  # @param post [Hash] A processed article (string keys).
+  # @param publication_uri [String] The publication's at:// URI.
+  # @return [String]
+  def document_fingerprint(post, publication_uri)
+    record = build_document_record(post, publication_uri, cover_image: cover_source(post['cover_image']))
+    Digest::SHA256.hexdigest(record.to_json)
+  end
+
+  # A content fingerprint for the publication record. Built from the same builder
+  # as the synced record, with the icon represented by its source descriptor.
+  # @param site [Hash] Parsed data/site.json (string keys).
+  # @return [String]
+  def publication_fingerprint(site)
+    record = build_publication_record(site, icon: cover_source(site['logo']))
+    Digest::SHA256.hexdigest(record.to_json)
+  end
+
   private
+
+  # A stable descriptor of an image's source, used in place of an uploaded blob
+  # when fingerprinting. The Contentful URL carries a version cache-buster, so a
+  # replaced asset yields a different descriptor.
+  # @param image [Hash, nil] An object with 'url' and 'content_type' keys.
+  # @return [String, nil]
+  def cover_source(image)
+    url = image&.dig('url')
+    return if url.blank?
+    "#{url}|#{image['content_type']}"
+  end
+
+  # Syncs the publication record, skipping the upload + putRecord when its
+  # content fingerprint is unchanged since the last run.
+  # @param site [Hash] Parsed data/site.json (string keys).
+  def sync_publication(site)
+    fingerprint = publication_fingerprint(site)
+    return if fingerprint == stored_fingerprint(PUBLICATION_COLLECTION, PUBLICATION_RKEY)
+    icon = upload_image_blob(site.dig('logo', 'url'), site.dig('logo', 'content_type'), w: 512, h: 512)
+    record = build_publication_record(site, icon: icon)
+    if put_record(PUBLICATION_COLLECTION, PUBLICATION_RKEY, record)
+      store_fingerprint(PUBLICATION_COLLECTION, PUBLICATION_RKEY, fingerprint)
+    end
+  end
+
+  # Syncs a single document record, skipping the cover-image upload + putRecord
+  # when its content fingerprint is unchanged since the last run.
+  # @param post [Hash] A processed article (string keys).
+  # @param rkey [String] The record key (the post's sys.id).
+  # @param publication_uri [String] The publication's at:// URI.
+  def sync_document(post, rkey, publication_uri)
+    fingerprint = document_fingerprint(post, publication_uri)
+    return if fingerprint == stored_fingerprint(DOCUMENT_COLLECTION, rkey)
+    cover = upload_image_blob(post.dig('cover_image', 'url'), post.dig('cover_image', 'content_type'), w: 1200, h: 630)
+    record = build_document_record(post, publication_uri, cover_image: cover)
+    if put_record(DOCUMENT_COLLECTION, rkey, record)
+      store_fingerprint(DOCUMENT_COLLECTION, rkey, fingerprint)
+    end
+  end
+
+  # The Redis key under which a record's content fingerprint is cached. Scoped by
+  # collection so a document and the publication can never collide on rkey.
+  # @param collection [String]
+  # @param rkey [String]
+  # @return [String]
+  def fingerprint_key(collection, rkey)
+    "standard_site:fingerprint:#{collection}:#{rkey}"
+  end
+
+  # @param collection [String]
+  # @param rkey [String]
+  # @return [String, nil] The last-synced fingerprint, or nil if none/no Redis.
+  def stored_fingerprint(collection, rkey)
+    return unless defined?($redis) && $redis
+    $redis.get(fingerprint_key(collection, rkey))
+  end
+
+  # Persists a record's content fingerprint (no TTL — it should outlive a build).
+  # @param collection [String]
+  # @param rkey [String]
+  # @param value [String]
+  def store_fingerprint(collection, rkey, value)
+    return unless defined?($redis) && $redis
+    $redis.set(fingerprint_key(collection, rkey), value)
+  end
+
+  # Drops a document record's cached fingerprint, so a pruned record doesn't
+  # leave a stale entry behind (and would re-sync if it ever reappears).
+  # @param rkey [String]
+  def forget_fingerprint(rkey)
+    return unless defined?($redis) && $redis
+    $redis.del(fingerprint_key(DOCUMENT_COLLECTION, rkey))
+  end
 
   # The publication's base URL: the production site root, without a trailing slash.
   # @return [String]
@@ -213,6 +323,7 @@ class StandardSite
   def prune_documents(current_rkeys)
     rkeys_to_prune(list_record_rkeys(DOCUMENT_COLLECTION), current_rkeys).each do |rkey|
       delete_record(DOCUMENT_COLLECTION, rkey)
+      forget_fingerprint(rkey)
     end
   end
 
