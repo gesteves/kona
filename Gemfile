@@ -1,5 +1,5 @@
 source 'https://rubygems.org'
-ruby '4.0.3'
+ruby '4.0.5'
 
 gem 'middleman', '~> 4.6'
 gem 'middleman-autoprefixer', '~> 3.0'
