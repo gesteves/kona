@@ -1,0 +1,15 @@
+.bundle
+.cache
+.DS_Store
+.sass-cache
+build/
+.env
+data/*.json
+data/maps
+node_modules
+source/javascripts/site.js*
+
+# Local Netlify folder
+.netlify
+tmp/
+prompts/

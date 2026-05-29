@@ -13,6 +13,7 @@
   remote_images = [".*\\.ctfassets\\.net/.*", ".*\\.cloudfront\\.net/.*"]
 
 [build]
+  base = "web"
   command = "bundle exec rake build"
   publish = "build/"
 
