@@ -140,6 +140,10 @@ bundle exec middleman build
 - `lib/tasks/import.rake` - Data import orchestration
 - `data/*.json` - Generated data files (git-ignored)
 
+### Icons
+
+- `data/font_awesome.yml` - Allowlist of Font Awesome icons available to the site. **Any new icon must be added here (under the correct family/style, e.g. `classic.light`) before it can be used** via `icon_svg`; `rake import:icons` only fetches icons listed in this file.
+
 ### Frontend Code
 
 - `source/layouts/layout.erb` - Main layout template
