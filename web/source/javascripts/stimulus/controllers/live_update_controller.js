@@ -7,7 +7,18 @@ import { replaceElement } from '../lib/utils';
 export default class extends Controller {
   static values = {
     url: String,
+    fetchOnConnect: Boolean,
   };
+
+  /**
+   * Fetches content on connect when opted in (e.g. for markup served by an external API
+   * rather than server-rendered into the page).
+   */
+  connect() {
+    if (this.fetchOnConnectValue) {
+      this.fetchAndUpdateContent();
+    }
+  }
 
   /**
    * Updates content when the page becomes visible.

@@ -7,9 +7,7 @@
       <%= render_home_body(content.body) %>
     </div>
   </section>
-  <% if data.intervals.present? %>
-    <%= partial 'partials/stats', locals: { stats: data.intervals } %>
-  <% end %>
+  <%= partial 'partials/stats' %>
   <% recent = recent_articles %>
   <% if recent.present? %>
     <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent, variant: "halves" } %>

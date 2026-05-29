@@ -47,7 +47,5 @@ export function appendToElement(html, element) {
 export function replaceElement(html, element) {
   const tempContainer = document.createElement('div');
   tempContainer.innerHTML = html;
-  while (tempContainer.firstChild) {
-    element.replaceWith(tempContainer.firstChild);
-  }
+  element.replaceWith(...tempContainer.childNodes);
 }

@@ -70,7 +70,6 @@ task :import => [:dotenv, :clobber] do
   independent_threads = [
     [:import_contentful, "Importing site content"],
     [:import_font_awesome, "Importing icons"],
-    [:import_intervals, "Importing activity stats"],
     [:import_whoop, "Importing Whoop data"],
     [:import_dark_visitors, "Importing robots.txt directives"],
     [:import_goodspeed, "Importing bay conditions"]
@@ -124,10 +123,6 @@ end
 
 def import_font_awesome
   FontAwesome.new.save_data
-end
-
-def import_intervals
-  safely_perform { Intervals.new.save_data }
 end
 
 def import_location

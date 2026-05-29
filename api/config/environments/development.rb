@@ -37,8 +37,9 @@ Rails.application.configure do
   # Raises error for missing translations.
   # config.i18n.raise_on_missing_translations = true
 
-  # Annotate rendered view with file names.
-  config.action_view.annotate_rendered_view_with_filenames = true
+  # Don't annotate rendered views with file names: this app serves machine-consumed
+  # markup, and the injected HTML comments would otherwise differ from production output.
+  config.action_view.annotate_rendered_view_with_filenames = false
 
   # Raise error when a before_action's only/except options reference missing actions.
   config.action_controller.raise_on_missing_callback_actions = true

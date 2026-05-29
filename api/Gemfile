@@ -8,7 +8,22 @@ gem "puma", ">= 5.0"
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem "tzinfo-data", platforms: %i[ windows jruby ]
 
+# HTTP client for the Intervals.icu and Font Awesome APIs
+gem "httparty"
+# Redis caching (shares REDIS_URL with the web app)
+gem "redis"
+# GraphQL client for the Font Awesome API
+gem "graphql-client"
+# Cross-origin resource sharing for the public /activity-stats endpoint
+gem "rack-cors"
+
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"
+  # Loads environment variables from .env for local development (production uses real env/secrets)
+  gem "dotenv-rails"
+end
+
+group :test do
+  gem "rspec-rails"
 end

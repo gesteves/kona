@@ -1,24 +1,32 @@
-# README
+# kona-api
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+Rails app serving dynamic, embeddable markup for the otherwise-static Kona site.
+Will sit behind CloudFront.
 
-Things you may want to cover:
+## Endpoints
 
-* Ruby version
+- `GET /up` — health check.
+- `GET /activity-stats` — returns the monthly activity-stats markup (from Intervals.icu),
+  ready to be inserted into the page by the site's `live-update` Stimulus controller.
+  Serves permissive CORS (any origin) and caching headers
+  (`Cache-Control: public, max-age=300, stale-while-revalidate=3600`). The upstream
+  Intervals.icu response is cached in Redis for 5 minutes; Font Awesome icon SVGs are
+  cached in Redis (per version) as well.
 
-* System dependencies
+## Configuration
 
-* Configuration
+Set these environment variables (e.g. as fly secrets):
 
-* Database creation
+- `REDIS_URL` — Redis connection (shared with the web app; `rediss://` for TLS).
+- `ICU_ATHLETE_ID`, `ICU_API_KEY` — Intervals.icu credentials.
+- `FONT_AWESOME_API_TOKEN` — Font Awesome API token.
+- `FONT_AWESOME_VERSION` — (optional) Font Awesome version, defaults to `7.2.0`.
+- `ACTIVITY_STATS_URL` — (optional) absolute URL the embedded markup should refetch from
+  on `visibilitychange`. Defaults to the request's own scheme/host/path; set this when
+  the public URL differs from the origin host (e.g. behind CloudFront).
 
-* Database initialization
+## Tests
 
-* How to run the test suite
-
-* Services (job queues, cache servers, search engines, etc.)
-
-* Deployment instructions
-
-* ...
+```bash
+bundle exec rspec
+```
