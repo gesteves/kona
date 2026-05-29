@@ -1,0 +1,48 @@
+# fly.toml app configuration file for kona-api
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'kona-api'
+primary_region = 'iad'
+console_command = '/rails/bin/rails console'
+kill_signal = 'SIGTERM'
+kill_timeout = 30
+
+[build]
+
+[env]
+  RAILS_ENV = 'production'
+  RAILS_LOG_TO_STDOUT = 'true'
+  RAILS_SERVE_STATIC_FILES = 'true'
+  RAILS_MAX_THREADS = '3'
+  WEB_CONCURRENCY = '1'
+  RUBY_YJIT_ENABLE = '1'
+
+[[restart]]
+  policy = 'on-failure'
+  retries = 10
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+  [http_service.concurrency]
+    type = 'requests'
+    soft_limit = 25
+
+  [[http_service.checks]]
+    interval = '15s'
+    timeout = '10s'
+    grace_period = '30s'
+    method = 'GET'
+    path = '/up'
+
+[[vm]]
+  cpu_kind = 'shared'
+  cpus = 1
+  memory = '512mb'
