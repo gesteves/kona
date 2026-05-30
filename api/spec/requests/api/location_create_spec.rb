@@ -9,12 +9,12 @@ RSpec.describe "Location", type: :request do
   end
 
   it "rejects requests without a bearer token" do
-    post "/location", params: { latitude: 43.48, longitude: -110.76 }
+    post "/api/location", params: { latitude: 43.48, longitude: -110.76 }
     expect(response).to have_http_status(:unauthorized)
   end
 
   it "rejects requests with the wrong bearer token" do
-    post "/location",
+    post "/api/location",
       params: { latitude: 43.48, longitude: -110.76 },
       headers: { "Authorization" => "Bearer nope" }
     expect(response).to have_http_status(:unauthorized)
@@ -23,7 +23,7 @@ RSpec.describe "Location", type: :request do
   it "stores valid coordinates in Redis" do
     expect($redis).to receive(:set).with("location:current", "43.48,-110.76")
 
-    post "/location",
+    post "/api/location",
       params: { latitude: 43.48, longitude: -110.76 },
       headers: { "Authorization" => "Bearer #{token}" }
 
@@ -31,7 +31,7 @@ RSpec.describe "Location", type: :request do
   end
 
   it "rejects out-of-range coordinates" do
-    post "/location",
+    post "/api/location",
       params: { latitude: 200, longitude: 0 },
       headers: { "Authorization" => "Bearer #{token}" }
 
@@ -39,7 +39,7 @@ RSpec.describe "Location", type: :request do
   end
 
   it "rejects missing coordinates" do
-    post "/location",
+    post "/api/location",
       params: { latitude: 43.48 },
       headers: { "Authorization" => "Bearer #{token}" }
 
