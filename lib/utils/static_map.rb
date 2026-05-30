@@ -36,8 +36,16 @@ class StaticMap
   PADDING = 50
   MIN_KM = 1  # Minimum width and height of the map's viewable area in kilometers
 
+  # Approximate length of one degree of latitude in kilometers. One degree of
+  # longitude is this value scaled by the cosine of the latitude.
+  KM_PER_DEGREE = 111.32
+
+  # Defaults for the image download HTTP request.
+  HTTP_TIMEOUT = 30      # seconds
+  HTTP_MAX_ATTEMPTS = 3
+
   def initialize(gpx_file_path, options = {})
-    options.reverse_merge!(
+    options = options.reverse_merge(
       min_km: MIN_KM,
       padding: PADDING,
       reverse_markers: false,
@@ -53,7 +61,7 @@ class StaticMap
     @bounding_box = calculate_bounding_box(@coordinates)
     @width = WIDTH
     @height = if options[:height].to_i > top_and_bottom_padding(@padding)
-      [options[:height].to_i, MAX_HEIGHT].min
+      options[:height].to_i.clamp(MIN_HEIGHT, MAX_HEIGHT)
     else
       (@width / bounding_box_aspect_ratio(@bounding_box)).ceil.clamp(MIN_HEIGHT, MAX_HEIGHT)
     end
@@ -90,6 +98,8 @@ class StaticMap
   # Extracts data from a GPX file and saves it in instance variables.
   # @param gpx_file_path [String] The path to the GPX file
   def extract_data_from_gpx(gpx_file_path)
+    raise "GPX file not found: #{gpx_file_path}" unless File.exist?(gpx_file_path)
+
     doc = Nokogiri::XML(File.open(gpx_file_path))
     @activity_name = doc.at_xpath('//xmlns:trk/xmlns:name')&.text || File.basename(gpx_file_path)
     @activity_type = doc.at_xpath('//xmlns:trk/xmlns:type')&.text&.titleize || 'Other'
@@ -118,22 +128,18 @@ class StaticMap
     # Calculate the average latitude (center of the bounding box in terms of latitude)
     center_lat = (min_lat + max_lat) / 2
 
-    # Convert the center latitude to radians for trigonometric calculations
-    # We use radians because trigonometric functions in Ruby (like Math.cos) expect radians.
-    center_lat_in_radians = center_lat * Math::PI / 180
-
     # The cosine of the latitude adjusts the length of one degree of longitude.
-    # At the equator (latitude 0°), cos(0) = 1, so 1° of longitude is approximately 111.32 km.
+    # At the equator (latitude 0°), cos(0) = 1, so 1° of longitude is approximately KM_PER_DEGREE km.
     # As you move toward the poles, cos(latitude) decreases, making longitude degrees shorter.
-    cos_lat = Math.cos(center_lat_in_radians)
+    cos = cos_lat(center_lat)
 
     # Calculate the minimum viewable size of the bounding box in degrees of latitude.
-    # 1° of latitude ≈ 111.32 km everywhere on Earth.
-    min_viewable_lat = @min_km / 111.32
+    # 1° of latitude ≈ KM_PER_DEGREE km everywhere on Earth.
+    min_viewable_lat = @min_km / KM_PER_DEGREE
 
     # Calculate the minimum viewable size of the bounding box in degrees of longitude at the given latitude.
-    # 1° of longitude ≈ 111.32 km * cos(latitude).
-    min_viewable_lon = @min_km / (111.32 * cos_lat)
+    # 1° of longitude ≈ KM_PER_DEGREE km * cos(latitude).
+    min_viewable_lon = @min_km / (KM_PER_DEGREE * cos)
 
     # Ensure the longitude span is at least the minimum size
     if (max_lon - min_lon) < min_viewable_lon
@@ -168,14 +174,23 @@ class StaticMap
   # @return [Float] The aspect ratio (width in km / height in km)
   def bounding_box_aspect_ratio(bounding_box)
     center_lat = (bounding_box[:min_lat] + bounding_box[:max_lat]) / 2
-    cos_lat = Math.cos(center_lat * Math::PI / 180) # Cosine of latitude for longitude adjustment
 
     # Convert the differences in longitude and latitude to kilometers
-    width_km = (bounding_box[:max_lon] - bounding_box[:min_lon]) * 111.32 * cos_lat
-    height_km = (bounding_box[:max_lat] - bounding_box[:min_lat]) * 111.32
+    width_km = (bounding_box[:max_lon] - bounding_box[:min_lon]) * KM_PER_DEGREE * cos_lat(center_lat)
+    height_km = (bounding_box[:max_lat] - bounding_box[:min_lat]) * KM_PER_DEGREE
 
-    # Calculate the aspect ratio as width in km divided by height in km
-    width_km / height_km
+    # Calculate the aspect ratio as width in km divided by height in km, guarding
+    # against a zero/degenerate span so the caller can fall back to a clamped height.
+    ratio = width_km / height_km
+    ratio.finite? && ratio.positive? ? ratio : 1.0
+  end
+
+  # Returns the cosine of a latitude given in degrees, used to scale the length
+  # of a degree of longitude at that latitude.
+  # @param latitude [Float] The latitude in degrees
+  # @return [Float] The cosine of the latitude
+  def cos_lat(latitude)
+    Math.cos(latitude * Math::PI / 180)
   end
 
   # Generates the URL for a static map image from Mapbox.
@@ -227,46 +242,75 @@ class StaticMap
   # @param image_url [String] The URL of the image to download
   # @param output_file_path [String] The path to save the image
   def download_image(image_url, output_file_path)
-    response = HTTParty.get(image_url)
+    response = get_with_retries(image_url)
 
-    raise JSON.parse(response.body, symbolize_names: true)[:message] unless response.success?
+    raise error_message_from(response) unless response.success?
 
     FileUtils.mkdir_p(File.dirname(output_file_path))
     File.open(output_file_path, 'wb') { |f| f.write(response.body) }
   end
 
-  # Validates the padding value.
+  # Performs an HTTP GET with a timeout, retrying a bounded number of times on
+  # transient failures (network errors or 5xx responses).
+  # @param url [String] The URL to fetch
+  # @return [HTTParty::Response] The HTTP response
+  def get_with_retries(url)
+    attempt = 0
+    begin
+      attempt += 1
+      response = HTTParty.get(url, timeout: HTTP_TIMEOUT)
+      return response if response.success? || response.code < 500 || attempt >= HTTP_MAX_ATTEMPTS
+      raise "Mapbox returned status #{response.code}"
+    rescue Net::OpenTimeout, Net::ReadTimeout, SocketError, Errno::ECONNRESET, HTTParty::Error, RuntimeError => e
+      raise e if attempt >= HTTP_MAX_ATTEMPTS
+      sleep(attempt)
+      retry
+    end
+  end
+
+  # Builds a human-readable error message from a failed Mapbox response,
+  # falling back to the status code when the body isn't JSON.
+  # @param response [HTTParty::Response] The failed HTTP response
+  # @return [String] The error message
+  def error_message_from(response)
+    message = begin
+      JSON.parse(response.body, symbolize_names: true)[:message]
+    rescue JSON::ParserError, TypeError
+      nil
+    end
+    message.presence || "Mapbox request failed with status #{response.code}"
+  end
+
+  # Validates the padding value, normalizing it to a Mapbox "top,right,bottom,left"
+  # string regardless of how many values were provided.
   # @param padding [String, Integer] The padding value
-  # @return [Integer] The padding value
+  # @return [String] The normalized "top,right,bottom,left" padding
   def validate_padding(padding)
     # Convert input to string and split by commas, taking only first 4 values
     values = padding.to_s.split(',').map(&:to_i).first(4)
 
-    case values.length
+    top, right, bottom, left = case values.length
     when 1  # Single value: apply to all sides
-      values[0]
+      [values[0]] * 4
     when 2  # Two values: top/bottom, left/right
-      "#{values[0]},#{values[1]},#{values[0]},#{values[1]}"
+      [values[0], values[1], values[0], values[1]]
     when 3  # Three values: top, left/right, bottom
-      "#{values[0]},#{values[1]},#{values[2]},#{values[1]}"
+      [values[0], values[1], values[2], values[1]]
     when 4  # Four values: top, right, bottom, left
-      values.join(',')
+      values
     else
-      PADDING  # Default padding if empty input
+      [PADDING] * 4  # Default padding if empty input
     end
+
+    [top, right, bottom, left].join(',')
   end
 
   # Calculates the sum of the top and bottom padding.
-  # @param padding [String, Integer] The padding value
+  # @param padding [String] The normalized "top,right,bottom,left" padding
   # @return [Integer] The total padding
   def top_and_bottom_padding(padding)
-    if padding.is_a?(Integer)
-      padding * 2  # Single value: double it for top and bottom
-    else
-      # String with 4 values: sum first (top) and third (bottom) values
-      values = padding.to_s.split(',').map(&:to_i)
-      values[0] + values[2]
-    end
+    top, _right, bottom, _left = padding.to_s.split(',').map(&:to_i)
+    top.to_i + bottom.to_i
   end
 
   # Generates a layer for a Mapbox tileset, which should be the GPX file uploaded to Mapbox.
