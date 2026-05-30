@@ -6,9 +6,11 @@
     </h2>
     <p class="entry__meta">
       <span><%= icon_svg("classic", "light", "stopwatch") %> <%= reading_time(article) %></span>
-      <% if plausible_url(article).present? %>
-        <span><%= icon_svg("classic", "light", "eye") %> <%= link_to article_views(article), plausible_url(article), rel: "noopener noreferrer nofollow", target: "_blank" %></span>
-      <% end %>
+      <%# The view-count span (icon + linked "Viewed N times") is fetched live from the API, %>
+      <%# keyed by Contentful ID, and swapped in for this "Never viewed" placeholder so it %>
+      <%# stays fresh between daily rebuilds. %>
+      <% views_url = "#{ENV['KONA_API_URL']}/api/plausible/pageviews/#{article.sys.id}" %>
+      <span data-controller="live-update" data-live-update-url-value="<%= views_url %>" data-live-update-fetch-on-connect-value="true"><%= icon_svg("classic", "light", "eye") %> Never viewed</span>
     </p>
   </header>
   <div class="entry__body">

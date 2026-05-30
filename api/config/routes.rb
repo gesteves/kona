@@ -17,6 +17,9 @@ Rails.application.routes.draw do
   # Current location, geocoded — the source of truth the static-site build fetches.
   get "/api/location" => "api/location#show"
 
+  # All-time Plausible pageview count for an article, keyed by Contentful ID.
+  get "/api/plausible/pageviews/:id" => "api/plausible#pageviews"
+
   # Returns the Whoop stats markup.
   get "/api/whoop" => "whoop#show"
 

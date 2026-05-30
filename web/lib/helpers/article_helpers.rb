@@ -385,31 +385,6 @@ module ArticleHelpers
     "#{article} #{minutes}-minute read"
   end
 
-  # Formats the number of pageviews for an article.
-  # @param article [Object] The article to show the pageviews for.
-  # @return [String] The formatted number of views.
-  def article_views(article)
-    views = article&.metrics&.all&.pageviews.to_i
-    return "Never viewed" if views.zero?
-    times = case views
-    when 1
-      "once"
-    when 2
-      "twice"
-    else
-      "#{number_to_delimited(views)} times"
-    end
-    "Viewed #{times}"
-  end
-
-  def plausible_url(article)
-    return unless ENV['PLAUSIBLE_SITE_ID'].present?
-    path = article.path.gsub(/\/index.html$/, '/')
-    from = DateTime.parse(article.published_at).in_time_zone(location_time_zone).strftime('%Y-%m-%d')
-    to = current_time.strftime('%Y-%m-%d')
-    "https://plausible.io/#{ENV['PLAUSIBLE_SITE_ID']}?f=is,page,#{path}&period=custom&from=#{from}&to=#{to}&r=v2"
-  end
-
   # Calculates the number of days since an article was published.
   # @param article [Object] The article to calculate the days since published for.
   # @return [Integer] The number of days since the article was published.
