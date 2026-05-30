@@ -16,7 +16,7 @@ RSpec.describe "Activity stats", type: :request do
   end
 
   it "renders the stats markup" do
-    get "/activity-stats"
+    get "/api/activity-stats"
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("stats__heading")
@@ -27,7 +27,7 @@ RSpec.describe "Activity stats", type: :request do
   end
 
   it "sets the caching headers" do
-    get "/activity-stats"
+    get "/api/activity-stats"
 
     cache_control = response.headers["Cache-Control"]
     expect(cache_control).to include("public")
@@ -36,7 +36,7 @@ RSpec.describe "Activity stats", type: :request do
   end
 
   it "allows cross-origin requests from any origin" do
-    get "/activity-stats", headers: { "Origin" => "https://example.com" }
+    get "/api/activity-stats", headers: { "Origin" => "https://example.com" }
 
     expect(response.headers["Access-Control-Allow-Origin"]).to eq("*")
   end
@@ -45,7 +45,7 @@ RSpec.describe "Activity stats", type: :request do
     before { allow_any_instance_of(Intervals).to receive(:stats).and_return(nil) }
 
     it "returns an empty body so the live-update controller no-ops" do
-      get "/activity-stats"
+      get "/api/activity-stats"
 
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty

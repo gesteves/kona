@@ -60,7 +60,7 @@ RSpec.describe "Weather", type: :request do
   end
 
   it "renders the weather markup" do
-    get "/weather"
+    get "/api/weather/current"
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('class="weather"')
@@ -74,7 +74,7 @@ RSpec.describe "Weather", type: :request do
   end
 
   it "sets the caching headers" do
-    get "/weather"
+    get "/api/weather/current"
 
     cache_control = response.headers["Cache-Control"]
     expect(cache_control).to include("public")
@@ -83,7 +83,7 @@ RSpec.describe "Weather", type: :request do
   end
 
   it "allows cross-origin requests from any origin" do
-    get "/weather", headers: { "Origin" => "https://example.com" }
+    get "/api/weather/current", headers: { "Origin" => "https://example.com" }
 
     expect(response.headers["Access-Control-Allow-Origin"]).to eq("*")
   end
@@ -92,7 +92,7 @@ RSpec.describe "Weather", type: :request do
     before { allow_any_instance_of(WeatherKit).to receive(:data).and_return(nil) }
 
     it "returns an empty body so the live-update controller no-ops" do
-      get "/weather"
+      get "/api/weather/current"
 
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty

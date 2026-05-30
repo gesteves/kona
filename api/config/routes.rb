@@ -5,17 +5,17 @@ Rails.application.routes.draw do
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
 
-  # Returns the activity-stats markup embedded into the static site.
-  get "/activity-stats" => "activity_stats#show"
+  # Widget fragments embedded into the static site, under the /api namespace.
+  get "/api/activity-stats" => "activity_stats#show"
 
-  # Returns the weather widget markup embedded into the static site.
-  get "/weather" => "weather#show"
+  # Current weather widget markup.
+  get "/api/weather/current" => "weather#show"
 
   # Per-event race-day weather, keyed by Contentful event ID.
   get "/api/weather/event/:id" => "api/weather#event"
 
-  # Returns the Whoop stats markup embedded into the static site.
-  get "/whoop" => "whoop#show"
+  # Returns the Whoop stats markup.
+  get "/api/whoop" => "whoop#show"
 
   # Whoop OAuth flow (owner-only authorize, public callback validated by state).
   get "/whoop/auth" => "whoop_oauth#authorize"

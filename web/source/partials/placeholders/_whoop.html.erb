@@ -1,4 +1,4 @@
-<% whoop_url = "#{ENV.fetch('KONA_API_URL', 'https://kona-api.fly.dev')}/whoop" %>
+<% whoop_url = "#{ENV['KONA_API_URL']}/api/whoop" %>
 <%# Placeholder mirroring the real /whoop markup, zeroed out. The live-update controller %>
 <%# swaps in the real markup on connect (or leaves this in place if there's no Whoop data). %>
 <section data-nosnippet class="stats stats--has-three" data-controller="live-update" data-live-update-url-value="<%= whoop_url %>" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange" aria-labelledby="hed-whoop">

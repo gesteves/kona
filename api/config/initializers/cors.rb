@@ -5,9 +5,6 @@
 Rails.application.config.middleware.insert_before 0, Rack::Cors do
   allow do
     origins "*"
-    resource "/activity-stats", headers: :any, methods: [:get, :options], credentials: false
-    resource "/whoop", headers: :any, methods: [:get, :options], credentials: false
-    resource "/weather", headers: :any, methods: [:get, :options], credentials: false
-    resource "/api/weather/event/*", headers: :any, methods: [:get, :options], credentials: false
+    resource "/api/*", headers: :any, methods: [:get, :options], credentials: false
   end
 end

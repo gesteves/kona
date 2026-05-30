@@ -32,6 +32,6 @@
     <%# Empty live-update shell: the race-day weather is fetched from the API by event ID %>
     <%# on connect and swapped in. Kept free of inner whitespace so `.event__weather:empty` %>
     <%# collapses it until content arrives. %>
-    <section class="event__weather" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= "#{ENV.fetch('KONA_API_URL', 'https://kona-api.fly.dev')}/api/weather/event/#{event.sys.id}" %>" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange"></section>
+    <section class="event__weather" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= "#{ENV['KONA_API_URL']}/api/weather/event/#{event.sys.id}" %>" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange"></section>
   <% end %>
 </article>
