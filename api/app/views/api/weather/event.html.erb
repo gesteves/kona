@@ -8,7 +8,7 @@
   <div class="event__weather-stats">
     <% if event.location.present? %>
       <div class="event__weather-stat-group">
-        <span class="event__weather-stat"><span class="sr-only">Location:</span> <%= raw icon_svg("classic", "light", "location-dot") %> <%= format_location(event.location) %></span>
+        <span class="event__weather-stat"><span class="sr-only">Location:</span> <%= raw icon_svg("classic", "light", "location-dot") %> <%= event.location_label.presence || format_location(event.location) %></span>
         <% if event.location.elevation.present? %>
           <span class="event__weather-stat" title="Elevation"><span class="sr-only">Elevation:</span> <%= raw icon_svg("classic", "light", "mountains") %> <%= format_elevation(event.location.elevation, true) %></span>
         <% end %>

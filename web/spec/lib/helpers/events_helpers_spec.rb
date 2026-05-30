@@ -5,7 +5,6 @@ RSpec.describe EventsHelpers do
     Class.new do
       include EventsHelpers
       include LocationHelpers
-      include WeatherHelpers
       attr_accessor :data
     end
   end
@@ -24,8 +23,7 @@ RSpec.describe EventsHelpers do
     allow(test_instance.data).to receive(:location).and_return(double('location', 
       time_zone: double('time_zone', time_zone_id: 'America/Denver')))
     allow(test_instance).to receive(:current_time).and_return(Time.parse('2024-01-15 12:00:00 -0700'))
-    allow(test_instance).to receive(:is_daytime?).and_return(true)
-    
+
     # Setup event mock
     allow(mock_event).to receive(:blank?).and_return(false)
     allow(mock_event).to receive(:date).and_return('2024-01-15T10:00:00Z')
@@ -103,13 +101,8 @@ RSpec.describe EventsHelpers do
       allow(test_instance).to receive(:is_today?).with(mock_event).and_return(true)
     end
 
-    it "returns true when event is today, daytime, and confirmed going" do
+    it "returns true when event is today and confirmed going" do
       expect(test_instance.is_in_progress?(mock_event)).to be true
-    end
-
-    it "returns false when it's not daytime" do
-      allow(test_instance).to receive(:is_daytime?).and_return(false)
-      expect(test_instance.is_in_progress?(mock_event)).to be false
     end
 
     it "returns false when event is not today" do

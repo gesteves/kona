@@ -24,6 +24,7 @@ class Events
         items {
           title
           date
+          location
           coordinates { lat lon }
           sys { id }
         }

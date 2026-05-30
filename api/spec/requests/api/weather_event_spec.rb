@@ -4,7 +4,7 @@ RSpec.describe "Api::Weather event", type: :request do
   let(:event_date) { Time.now + 3.days }
 
   let(:event_record) do
-    DeepOstruct.wrap(sys: { id: "abc123" }, date: event_date.iso8601, coordinates: { lat: 40.01, lon: -105.27 })
+    DeepOstruct.wrap(sys: { id: "abc123" }, date: event_date.iso8601, location: "The Rockies", coordinates: { lat: 40.01, lon: -105.27 })
   end
 
   let(:location_hash) do
@@ -63,7 +63,7 @@ RSpec.describe "Api::Weather event", type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('class="event__weather"')
     expect(response.body).to include("Race Day Weather")
-    expect(response.body).to include("Boulder, Colorado")
+    expect(response.body).to include("The Rockies")   # the Contentful location label
     expect(response.body).to include("Partly cloudy")              # format_condition
     expect(response.body).to include("data-units-metric-value")    # temp/wind toggle
     expect(response.body).to include("AQI")

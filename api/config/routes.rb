@@ -14,6 +14,9 @@ Rails.application.routes.draw do
   # Per-event race-day weather, keyed by Contentful event ID.
   get "/api/weather/event/:id" => "api/weather#event"
 
+  # Current location, geocoded — the source of truth the static-site build fetches.
+  get "/api/location" => "api/location#show"
+
   # Returns the Whoop stats markup.
   get "/api/whoop" => "whoop#show"
 

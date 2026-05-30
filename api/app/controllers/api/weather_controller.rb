@@ -23,7 +23,7 @@ module Api
       aqi = GoogleAirQuality.new(lat, lon, country, "usa_epa_nowcast", event_datetime).aqi if country.present? && days_until.between?(0, 4)
 
       @goodspeed = Goodspeed.new.data
-      @event = DeepOstruct.wrap(sys: { id: record.sys&.id }, date: record.date, location: gmaps.location, aqi: aqi)
+      @event = DeepOstruct.wrap(sys: { id: record.sys&.id }, date: record.date, location: gmaps.location, location_label: record.location, aqi: aqi)
       @event.weather = weather
 
       render :event, layout: false

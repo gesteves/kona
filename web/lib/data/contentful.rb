@@ -3,10 +3,6 @@ require 'public_suffix'
 require 'humanize'
 require_relative 'graphql/contentful'
 require_relative 'plausible'
-require_relative 'google_maps'
-require_relative 'weather_kit'
-require_relative 'google_air_quality'
-require_relative 'google_pollen'
 
 class Contentful
   def initialize
@@ -359,21 +355,9 @@ class Contentful
         event[:date] = days.days.from_now.to_s
       end
 
-      add_event_location(event)
-
       event[:entry_type] = 'Event'
       event
     end
-  end
-
-  # Geocodes the event coordinates and adds the location data to the event.
-  def add_event_location(event)
-    lat = event.dig(:coordinates, :lat)
-    lon = event.dig(:coordinates, :lon)
-    return if lat.blank? || lon.blank?
-
-    maps = GoogleMaps.new(lat, lon)
-    event[:location] = maps.location
   end
 end
 

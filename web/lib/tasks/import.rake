@@ -1,3 +1,5 @@
+require 'httparty'
+
 DATA_DIRECTORY = 'data'
 
 # Remove all existing data files from previous imports.
@@ -18,22 +20,11 @@ namespace :import do
     measure_and_output(:import_contentful, "Importing site content")
   end
 
-  desc 'Imports weather data'
-  task :weather => [:dotenv] do
+  desc 'Imports location data'
+  task :location => [:dotenv] do
     setup_data_directory
     initialize_redis
-    initialize_location
     measure_and_output(:import_location, "Importing location data")
-    measure_and_output(:import_weather, "Importing weather data")
-    measure_and_output(:import_aqi, "Importing air quality data")
-    measure_and_output(:import_pollen, "Importing pollen data")
-  end
-
-  desc 'Imports San Francisco Bay conditions'
-  task :goodspeed => [:dotenv] do
-    setup_data_directory
-    initialize_redis
-    measure_and_output(:import_goodspeed, "Importing bay conditions")
   end
 
   desc 'Syncs standard.site records to the PDS (requires content to be imported first)'
@@ -54,41 +45,23 @@ task :import => [:dotenv, :clobber] do
   overall_start_time = Time.now
   setup_data_directory
   initialize_redis
-  initialize_location
 
   output_mutex = Mutex.new
 
-  # Group A: independent imports that can run in parallel
+  # Independent imports that can run in parallel.
   independent_threads = [
     [:import_contentful, "Importing site content"],
     [:import_font_awesome, "Importing icons"],
-    [:import_dark_visitors, "Importing robots.txt directives"],
-    [:import_goodspeed, "Importing bay conditions"]
+    [:import_location, "Importing location data"],
+    [:import_dark_visitors, "Importing robots.txt directives"]
   ].map do |method, description|
     Thread.new do
       measure_and_output(method, description, mutex: output_mutex)
     end
   end
 
-  # Group B: sequential chain (location -> weather/aqi/pollen/trainer_road)
-  sequential_thread = Thread.new do
-    measure_and_output(:import_location, "Importing location data", mutex: output_mutex)
-    measure_and_output(:import_weather, "Importing weather data", mutex: output_mutex)
-
-    # AQI, pollen, and trainer road can run in parallel after weather
-    [
-      [:import_aqi, "Importing air quality data"],
-      [:import_pollen, "Importing pollen data"],
-      [:import_trainer_road, "Importing today's workouts"]
-    ].map do |method, description|
-      Thread.new do
-        measure_and_output(method, description, mutex: output_mutex)
-      end
-    end.each(&:join)
-  end
-
   # Wait for all threads to complete
-  (independent_threads + [sequential_thread]).each(&:join)
+  independent_threads.each(&:join)
 
   # Runs after the parallel imports so it can read the freshly-written
   # data/articles.json and data/site.json. No-ops outside production.
@@ -104,10 +77,6 @@ def setup_data_directory
   FileUtils.mkdir_p(DATA_DIRECTORY)
 end
 
-def initialize_location
-  @location ||= Location.new
-end
-
 def import_contentful
   Contentful.new.save_data
 end
@@ -116,49 +85,18 @@ def import_font_awesome
   FontAwesome.new.save_data
 end
 
+# Fetches the current location (geocoded into geocoded/time_zone/elevation) from the API —
+# the source of truth — and writes it to data/location.json. Always writes a valid file so
+# data.location is present even when the API is unreachable.
 def import_location
-  safely_perform {
-    @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
-    @google_maps.save_data
-  }
-end
-
-def import_weather
-  safely_perform {
-    @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
-    WeatherKit.new(@google_maps.latitude, @google_maps.longitude, @google_maps.time_zone_id, @google_maps.country_code).save_data
-  }
-end
-
-def import_aqi
-  safely_perform {
-    @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
-    purple_air = PurpleAir.new(@google_maps.latitude, @google_maps.longitude)
-    if purple_air.aqi.present?
-      purple_air.save_data
-    else
-      GoogleAirQuality.new(@google_maps.latitude, @google_maps.longitude, @google_maps.country_code).save_data
-    end
-  }
-end
-
-def import_pollen
-  safely_perform {
-    @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
-    GooglePollen.new(@google_maps.latitude, @google_maps.longitude).save_data
-  }
-end
-
-def import_trainer_road
-  safely_perform {
-    @google_maps ||= GoogleMaps.new(@location.latitude, @location.longitude)
-    TrainerRoad.new(@google_maps.time_zone_id).save_data
-  }
-end
-
-
-def import_goodspeed
-  safely_perform { Goodspeed.new.save_data }
+  body = begin
+    response = HTTParty.get("#{ENV['KONA_API_URL']}/api/location")
+    response.success? ? response.body : nil
+  rescue StandardError
+    nil
+  end
+  body ||= '{"geocoded":null,"time_zone":null,"elevation":null}'
+  File.open('data/location.json', 'w') { |f| f << body }
 end
 
 def import_standard_site

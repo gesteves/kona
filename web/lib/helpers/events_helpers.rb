@@ -53,7 +53,6 @@ module EventsHelpers
   # @return [Boolean] True if the event is featured; false otherwise.
   def is_featured?(event)
     return false if event.blank?
-    return false if is_today?(event) && is_evening?
     is_close?(event) && is_next?(event)
   end
 
@@ -62,7 +61,7 @@ module EventsHelpers
   # @return [Boolean] True if the event occurs today, is during daytime, and is confirmed.
   def is_in_progress?(event)
     return false if event.blank?
-    is_daytime? && is_today?(event) && event.going
+    is_today?(event) && event.going
   end
 
   # Determines if the event is happening and there's a live tracking link.
