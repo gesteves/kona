@@ -1,4 +1,3 @@
-<% live_update_url = ENV.fetch("WHOOP_URL") { "#{request.base_url}#{request.path}" } %>
 <section data-nosnippet class="stats stats--has-three" data-controller="live-update" data-live-update-url-value="<%= live_update_url %>" data-action="visibilitychange@document->live-update#handleVisibilityChange" aria-labelledby="hed-whoop">
   <h3 class="stats__heading" id="hed-whoop"><%= raw whoop_heading %></h3>
   <div class="stats__container">
