@@ -61,7 +61,12 @@ module FontAwesomeClient
     end
 
     def icons_query
-      @icons_query ||= client.parse(ICONS_QUERY)
+      # client.parse returns a Module whose named operations are nested constants
+      # (this query is `query Icons`). It must be assigned to a *named* constant:
+      # graphql-client derives the wire operation name from the module's name, so an
+      # anonymous module produces invalid GraphQL ("query #<Module:0x..>__Icons").
+      const_set(:Queries, client.parse(ICONS_QUERY)) unless const_defined?(:Queries, false)
+      self::Queries::Icons
     end
   end
 end
