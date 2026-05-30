@@ -6,12 +6,6 @@
   grid-template-columns: subgrid;
   padding: var(--padding) 0 0 0;
 
-  // A live-update shell that hasn't (yet) been filled by the API renders nothing,
-  // so it doesn't show a stray border/padding when there's no data to display.
-  &:empty {
-    display: none;
-  }
-
   .stats__stat {
     display: flex;
     flex-flow: column;
