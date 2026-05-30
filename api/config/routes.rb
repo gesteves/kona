@@ -6,10 +6,10 @@ Rails.application.routes.draw do
   get "up" => "rails/health#show", as: :rails_health_check
 
   # Widget fragments embedded into the static site, under the /api namespace.
-  get "/api/activity-stats" => "activity_stats#show"
+  get "/api/activity-stats" => "api/activity_stats#show"
 
   # Current weather widget markup.
-  get "/api/weather/current" => "weather#show"
+  get "/api/weather/current" => "api/weather#current"
 
   # Per-event race-day weather, keyed by Contentful event ID.
   get "/api/weather/event/:id" => "api/weather#event"
@@ -21,14 +21,14 @@ Rails.application.routes.draw do
   get "/api/plausible/pageviews/:id" => "api/plausible#pageviews"
 
   # Returns the Whoop stats markup.
-  get "/api/whoop" => "whoop#show"
+  get "/api/whoop" => "api/whoop#show"
 
   # Whoop OAuth flow (owner-only authorize, public callback validated by state).
   get "/whoop/auth" => "whoop_oauth#authorize"
   get "/whoop/callback" => "whoop_oauth#callback"
 
   # Sets the current location (bearer-token-secured), replacing the old Netlify build hook.
-  post "/location" => "location#create"
+  post "/location" => "api/location#create"
 
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
