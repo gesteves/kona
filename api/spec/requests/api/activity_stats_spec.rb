@@ -32,7 +32,7 @@ RSpec.describe "Activity stats", type: :request do
     cache_control = response.headers["Cache-Control"]
     expect(cache_control).to include("public")
     expect(cache_control).to include("max-age=300")
-    expect(cache_control).to include("stale-while-revalidate=3600")
+    expect(cache_control).to include("stale-while-revalidate=60")
   end
 
   it "allows cross-origin requests from any origin" do

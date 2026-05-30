@@ -9,7 +9,7 @@ module Api
     # renders the summary (or an empty body when weather is unavailable/stale, so the
     # live-update controller leaves the existing markup in place).
     def current
-      expires_in 5.minutes, public: true, stale_while_revalidate: 1.hour
+      expires_in 5.minutes, public: true, stale_while_revalidate: 1.minute
 
       location = Location.new
       return render(plain: "", layout: false) if location.latitude.blank?
@@ -31,7 +31,7 @@ module Api
     end
 
     def event
-      expires_in 1.hour, public: true, stale_while_revalidate: 1.hour
+      expires_in 1.hour, public: true, stale_while_revalidate: 1.minute
 
       record = Events.new.find(params[:id])
       lat = record&.coordinates&.lat
