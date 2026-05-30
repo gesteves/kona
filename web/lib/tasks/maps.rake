@@ -1,46 +1,57 @@
 namespace :maps do
   # Loops through the GPX files stored in the StaticMap::GPX_FOLDER folder (data/maps/gpx),
-  # generates a map for each as a static PNG image, and saves it to the StaticMap::IMAGES_FOLDER folder (data/mapbox/images).
+  # generates a map for each as a static PNG image, and saves it to the StaticMap::IMAGES_FOLDER folder (data/maps/images).
   # It uses the Mapbox Static API to generate the map image based on the bounding box of the GPX file,
   # but the GPX files must be uploaded manually to Mapbox Studio as tilesets first.
   # @todo Automate uploading the GPX files to Mapbox.
   desc 'Generate static map images from GPX files'
   task generate: :environment do
     gpx_files = Dir.glob(File.join(StaticMap::GPX_FOLDER, '*.gpx'))
-    
+
     if gpx_files.empty?
       puts "⚠️ No GPX files found in #{StaticMap::GPX_FOLDER}"
       next
     end
 
+    # These options apply to every file, so build them once.
+    options = {
+      reverse_markers: ENV['REVERSE_MARKERS'].present?,
+      padding: ENV['PADDING'],
+      height: ENV['HEIGHT'],
+      min_km: ENV['MIN_KM'],
+      dnf: ENV['DNF'].present?
+    }.compact
+
+    # A tileset ID identifies a single track, so it can only be reused via ENV when
+    # there's exactly one GPX file. Otherwise, prompt for each file individually.
+    options[:tileset_id] = ENV['TILESET_ID'] if gpx_files.one? && ENV['TILESET_ID'].present?
+
+    generated = skipped = failed = 0
+
     gpx_files.each do |gpx_file|
-      options = {
-        reverse_markers: ENV['REVERSE_MARKERS'].present?,
-        padding: ENV['PADDING'],
-        height: ENV['HEIGHT'],
-        min_km: ENV['MIN_KM'],
-        tileset_id: ENV['TILESET_ID'],
-        dnf: ENV['DNF'].present?
-      }.compact
       map = StaticMap.new(gpx_file, options)
-      
+
       unless map.tileset_id
         print "Enter the Mapbox tileset ID for #{map.activity_title}, or press Enter to skip: "
         map.tileset_id = STDIN.gets.chomp
         if map.tileset_id.empty?
           puts "⏭️  Skipping #{map.activity_title}.\n\n"
+          skipped += 1
           next
         end
       end
 
       begin
         map.generate_image!
+        generated += 1
       rescue => e
         puts "❎ Error generating map for #{map.activity_title}: #{e.message}"
+        failed += 1
         next
-      end   
+      end
     end
-    puts "✅ Map generation complete!"
+
+    puts "✅ Map generation complete! #{generated} generated, #{skipped} skipped, #{failed} failed."
   end
 
   desc 'Show help information for map generation tasks'
