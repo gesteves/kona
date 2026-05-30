@@ -6,7 +6,7 @@ module Api
   class ActivityStatsController < ActionController::Base
     def show
       @stats = Intervals.new.stats
-      expires_in 5.minutes, public: true, stale_while_revalidate: 1.hour
+      expires_in 5.minutes, public: true, stale_while_revalidate: 1.minute
 
       if @stats.nil?
         # The live-update controller no-ops on an empty response, leaving the existing markup in place.

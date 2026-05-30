@@ -6,7 +6,7 @@ module Api
     def show
       @time_zone = resolve_time_zone
       @whoop = Whoop.new.stats
-      expires_in 5.minutes, public: true, stale_while_revalidate: 1.hour
+      expires_in 5.minutes, public: true, stale_while_revalidate: 1.minute
 
       if @whoop.nil?
         # The live-update controller no-ops on an empty response, leaving the existing markup in place.

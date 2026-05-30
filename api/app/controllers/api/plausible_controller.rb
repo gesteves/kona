@@ -4,7 +4,7 @@ module Api
   # placeholder and swaps this in. Cached for an hour — view counts change slowly.
   class PlausibleController < ActionController::Base
     def pageviews
-      expires_in 1.hour, public: true, stale_while_revalidate: 1.hour
+      expires_in 1.hour, public: true, stale_while_revalidate: 1.minute
 
       article = Articles.new.find(params[:id])
       return render(plain: "") if article.nil?
