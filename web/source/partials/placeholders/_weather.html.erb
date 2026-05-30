@@ -1,0 +1,5 @@
+<% weather_url = "#{ENV.fetch('KONA_API_URL', 'https://kona-api.fly.dev')}/weather" %>
+<%# Empty live-update shell: the weather markup (or nothing, when there's no current %>
+<%# weather) is fetched from the API on connect and swapped in. Kept free of inner %>
+<%# whitespace so `.weather:empty` collapses it until content arrives. %>
+<div class="weather" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= weather_url %>" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange"></div>

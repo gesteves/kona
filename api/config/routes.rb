@@ -8,6 +8,9 @@ Rails.application.routes.draw do
   # Returns the activity-stats markup embedded into the static site.
   get "/activity-stats" => "activity_stats#show"
 
+  # Returns the weather widget markup embedded into the static site.
+  get "/weather" => "weather#show"
+
   # Returns the Whoop stats markup embedded into the static site.
   get "/whoop" => "whoop#show"
 

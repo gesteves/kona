@@ -50,6 +50,31 @@ module UnitsHelper
     end
   end
 
+  # Converts a temperature from Celsius to Fahrenheit.
+  def celsius_to_fahrenheit(celsius)
+    (celsius * (9.0 / 5.0)) + 32
+  end
+
+  # Converts kilometers to miles.
+  def kilometers_to_miles(km)
+    km * 0.621371
+  end
+
+  # Converts a speed from kilometers per hour to knots.
+  def kph_to_knots(kph)
+    kph * 0.539957
+  end
+
+  # Converts meters to feet.
+  def meters_to_feet(meters)
+    meters * 3.28084
+  end
+
+  # Converts millimeters to inches.
+  def millimeters_to_inches(millimeters)
+    millimeters / 25.4
+  end
+
   # Converts meters to miles or yards based on magnitude.
   def meters_to_imperial_units(meters)
     miles = meters_to_miles(meters)

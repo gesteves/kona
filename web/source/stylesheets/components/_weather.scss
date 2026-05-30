@@ -5,6 +5,12 @@
   gap: var(--column-gap);
   grid-template-columns: subgrid;
   padding: var(--padding) 0 0 0;
+
+  // The live-update shell starts empty and collapses (no stray border/padding) until
+  // the API swaps in the weather markup; it stays hidden when there's no current weather.
+  &:empty {
+    display: none;
+  }
 }
 
 .weather__icon {

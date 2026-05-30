@@ -1,0 +1,39 @@
+0:
+  name: Calm
+  description: "No wind"
+1:
+  name: Light air
+  description: "A very light breeze"
+2:
+  name: Light breeze
+  description: "A light breeze"
+3:
+  name: Gentle breeze
+  description: "A gentle breeze"
+4:
+  name: Moderate breeze
+  description: "A moderate breeze"
+5:
+  name: Fresh breeze
+  description: "A fresh breeze"
+6:
+  name: Strong breeze
+  description: "A strong breeze"
+7:
+  name: High winds
+  description: "High winds"
+8:
+  name: Gale
+  description: "A gale"
+9:
+  name: Strong gale
+  description: "A strong gale"
+10:
+  name: Storm
+  description: "Storm winds"
+11:
+  name: Violent storm
+  description: "Violent storm winds"
+12:
+  name: Hurricane-force
+  description: "Hurricane-force winds"

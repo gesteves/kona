@@ -12,6 +12,10 @@ gem "tzinfo-data", platforms: %i[ windows jruby ]
 gem "httparty"
 # Parses the TrainerRoad calendar (iCalendar) feed
 gem "icalendar"
+# Signs the ES256 JWT used to authenticate with Apple WeatherKit
+gem "jwt"
+# Renders the Markdown weather summary (bold + SmartyPants)
+gem "redcarpet"
 # Redis caching (shares REDIS_URL with the web app)
 gem "redis"
 # GraphQL client for the Font Awesome API
