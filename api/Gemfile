@@ -1,0 +1,35 @@
+source "https://rubygems.org"
+
+# Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
+gem "rails", "~> 8.1.3"
+# Use the Puma web server [https://github.com/puma/puma]
+gem "puma", ">= 5.0"
+
+# Windows does not include zoneinfo files, so bundle the tzinfo-data gem
+gem "tzinfo-data", platforms: %i[ windows jruby ]
+
+# HTTP client for the Intervals.icu, Whoop, Google Maps, and Font Awesome APIs
+gem "httparty"
+# Parses the TrainerRoad calendar (iCalendar) feed
+gem "icalendar"
+# Signs the ES256 JWT used to authenticate with Apple WeatherKit
+gem "jwt"
+# Renders the Markdown weather summary (bold + SmartyPants)
+gem "redcarpet"
+# Redis caching (shares REDIS_URL with the web app)
+gem "redis"
+# GraphQL client for the Font Awesome API
+gem "graphql-client"
+# Cross-origin resource sharing for the public /activity-stats endpoint
+gem "rack-cors"
+
+group :development, :test do
+  # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
+  gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"
+  # Loads environment variables from .env for local development (production uses real env/secrets)
+  gem "dotenv-rails"
+end
+
+group :test do
+  gem "rspec-rails"
+end

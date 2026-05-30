@@ -13,6 +13,7 @@
   remote_images = [".*\\.ctfassets\\.net/.*", ".*\\.cloudfront\\.net/.*"]
 
 [build]
+  base = "web"
   command = "bundle exec rake build"
   publish = "build/"
 
@@ -20,6 +21,7 @@
   for = "/*"
   [headers.values]
     Referrer-Policy = "no-referrer-when-downgrade"
+    Link = "<https://api.giventotri.com>; rel=preconnect; crossorigin"
 
 [[headers]]
   for = "/.well-known/site.standard.publication"

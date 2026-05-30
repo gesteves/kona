@@ -1,0 +1,11 @@
+<% whoop_url = "#{ENV['KONA_API_URL']}/api/whoop" %>
+<%# Placeholder mirroring the real /whoop markup, zeroed out. The live-update controller %>
+<%# swaps in the real markup on connect (or leaves this in place if there's no Whoop data). %>
+<section data-nosnippet class="stats stats--has-three" data-controller="live-update" data-live-update-url-value="<%= whoop_url %>" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange" aria-labelledby="hed-whoop">
+  <h3 class="stats__heading" id="hed-whoop">Latest Metrics <i>from</i> <a href="https://www.whoop.com" target="_blank" rel="nofollow noopener">Whoop</a></h3>
+  <div class="stats__container">
+    <%= partial 'partials/placeholders/stat', locals: { icon: 'moon',              top: 'Sleep',    value: '0', unit: '%',   bottom: 'None' } %>
+    <%= partial 'partials/placeholders/stat', locals: { icon: 'person-meditating', top: 'Recovery', value: '0', unit: '%',   bottom: 'None' } %>
+    <%= partial 'partials/placeholders/stat', locals: { icon: 'fire-flame-curved', top: 'Strain',   value: '0', unit: '/21', bottom: 'Nothing' } %>
+  </div>
+</section>

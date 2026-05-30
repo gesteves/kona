@@ -1,0 +1,24 @@
+<div class="home" aria-labelledby="hed">
+  <section class="home__intro">
+    <h2 class="home__headline" id="hed">
+      <%= smartypants(content.title) %>
+    </h2>
+    <div class="home__body">
+      <%= render_home_body(content.body) %>
+    </div>
+  </section>
+  <%= partial 'partials/placeholders/stats' %>
+  <% recent = recent_articles %>
+  <% if recent.present? %>
+    <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent, variant: "halves" } %>
+  <% end %>
+  <%= partial 'partials/placeholders/whoop' %>
+  <% trending = non_recent_trending_articles %>
+  <% if trending.present? %>
+    <%= partial 'partials/collection', locals: { title: "Trending Articles", items: trending, variant: "halves" } %>
+  <% end %>
+  <%= partial 'partials/placeholders/weather' %>
+  <% if data.events.present? %>
+    <%= partial 'partials/upcoming_races' %>
+  <% end %>
+</div>

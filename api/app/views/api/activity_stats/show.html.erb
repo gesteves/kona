@@ -1,0 +1,12 @@
+<section data-nosnippet class="stats stats--has-four" data-controller="live-update" data-live-update-url-value="<%= live_update_url %>" data-action="visibilitychange@document->live-update#handleVisibilityChange" aria-labelledby="hed-stats">
+  <h3 class="stats__heading" id="hed-stats">Monthly Totals <i>from</i> <a href="https://intervals.icu" target="_blank" rel="nofollow noopener">Intervals.icu</a></h3>
+  <div class="stats__container">
+    <%= render "stat",     icon: "wave-pulse",      top: "Activity".pluralize(@stats[:total_activities]), value: number_to_delimited(@stats[:total_activities]), bottom: "in the past month" %>
+    <%= render "activity", icon: "person-swimming", activity: "Swimming", distance: @stats[:swim_distance] %>
+    <%= render "activity", icon: "person-biking",   activity: "Cycling",  distance: @stats[:bike_distance] %>
+    <%= render "activity", icon: "person-running",  activity: "Running",  distance: @stats[:run_distance] %>
+  </div>
+  <p class="stats__footer">
+    (Just <i>for</i> public accountability)
+  </p>
+</section>

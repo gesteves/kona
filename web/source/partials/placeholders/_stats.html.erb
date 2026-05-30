@@ -1,0 +1,16 @@
+<% stats_url = "#{ENV['KONA_API_URL']}/api/activity-stats" %>
+<% zero_distance_unit = units_tag(distance_unit(0), distance_unit(0, units: 'imperial')) %>
+<%# Placeholder mirroring the real /activity-stats markup, zeroed out. The live-update %>
+<%# controller swaps in the real markup on connect. %>
+<section data-nosnippet class="stats stats--has-four" data-controller="live-update" data-live-update-url-value="<%= stats_url %>" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange" aria-labelledby="hed-stats">
+  <h3 class="stats__heading" id="hed-stats">Monthly Totals <i>from</i> <a href="https://intervals.icu" target="_blank" rel="nofollow noopener">Intervals.icu</a></h3>
+  <div class="stats__container">
+    <%= partial 'partials/placeholders/stat', locals: { icon: 'wave-pulse',      top: 'Activities', value: '0', bottom: 'in the past month' } %>
+    <%= partial 'partials/placeholders/stat', locals: { icon: 'person-swimming', top: 'Swimming',   value: '0', bottom: zero_distance_unit } %>
+    <%= partial 'partials/placeholders/stat', locals: { icon: 'person-biking',   top: 'Cycling',    value: '0', bottom: zero_distance_unit } %>
+    <%= partial 'partials/placeholders/stat', locals: { icon: 'person-running',  top: 'Running',    value: '0', bottom: zero_distance_unit } %>
+  </div>
+  <p class="stats__footer">
+    (Just <i>for</i> public accountability)
+  </p>
+</section>
