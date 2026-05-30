@@ -1,18 +1,10 @@
-require 'active_support/all'
-
-module WhoopHelpers
-  # Returns whether Whoop data should be displayed.
-  # @return [Boolean] True if all required Whoop metrics are present.
-  def show_whoop?
-    data.whoop.physiological_cycle.present? && data.whoop.sleep.present? && data.whoop.recovery.present?
-  end
-
-  # Returns the heading for the Whoop section.
-  # @return [String] The heading for the Whoop section.
+module WhoopHelper
+  # Returns the heading for the Whoop section, labeled relative to the last wakeup.
+  # @return [String] The heading HTML.
   def whoop_heading
     wakeup_time = whoop_last_wakeup_time
-    current_date = current_time.in_time_zone(location_time_zone).to_date
-    
+    current_date = current_time.to_date
+
     label = if wakeup_time.blank?
       "Latest"
     elsif wakeup_time.to_date == current_date
@@ -22,42 +14,42 @@ module WhoopHelpers
     else
       "Latest"
     end
-    
+
     "#{label} Metrics <i>from</i> <a href='https://www.whoop.com' target='_blank' rel='nofollow noopener'>Whoop</a>"
   end
 
   # Returns the time I last woke up, i.e. the end of the last sleep.
-  # @return [DateTime] The wakeup time.
+  # @return [ActiveSupport::TimeWithZone, nil] The wakeup time.
   def whoop_last_wakeup_time
-    return if data.whoop.sleep.end.blank?
-    DateTime.parse(data.whoop.sleep.end).in_time_zone(location_time_zone)
+    return if @whoop.dig(:sleep, :end).blank?
+    DateTime.parse(@whoop.dig(:sleep, :end)).in_time_zone(location_time_zone)
   end
 
   # Returns the rounded Whoop sleep score.
-  # @return [String] The sleep score rounded to the nearest integer.
+  # @return [Integer] The sleep score rounded to the nearest integer.
   def whoop_sleep_score
-    data.whoop.sleep.score.sleep_performance_percentage.round
+    @whoop.dig(:sleep, :score, :sleep_performance_percentage).round
   end
 
   # Returns the rounded Whoop recovery score.
-  # @return [String] The recovery score rounded to the nearest integer.
+  # @return [Integer] The recovery score rounded to the nearest integer.
   def whoop_recovery_score
-    data.whoop.recovery.score.recovery_score.round
+    @whoop.dig(:recovery, :score, :recovery_score).round
   end
 
   # Returns the Whoop strain score formatted to one decimal place, omitting .0.
-  # @return [String] The strain score as a string with one decimal place, or no decimal if .0.
+  # @return [String] The strain score.
   def whoop_strain_score
-    rounded = data.whoop.physiological_cycle.score.strain.round(1)
+    rounded = @whoop.dig(:physiological_cycle, :score, :strain).round(1)
     rounded % 1 == 0 ? rounded.to_i.to_s : rounded.to_s
   end
 
   # Returns the descriptive label for the current strain level.
   # @return [String] The strain label (Light, Moderate, High, All Out, etc.)
   def whoop_strain_label
-    strain = data.whoop.physiological_cycle.score.strain
+    strain = @whoop.dig(:physiological_cycle, :score, :strain)
     return "Nothing" if strain.blank? || strain.zero?
-    
+
     case strain
     when 0...10
       is_rest_day? ? "Rest Day" : "Light"
@@ -75,7 +67,7 @@ module WhoopHelpers
   def whoop_sleep_label
     sleep_score = whoop_sleep_score
     return "None" if sleep_score.blank? || sleep_score.zero?
-    
+
     case sleep_score
     when 0..69
       "Poor"
@@ -92,7 +84,7 @@ module WhoopHelpers
     recovery = whoop_recovery_score
     return "None" if recovery.blank? || recovery.zero?
     return "Nice." if recovery == 69
-    
+
     case recovery
     when 0..33
       "Poor"
@@ -108,7 +100,7 @@ module WhoopHelpers
   def whoop_recovery_icon
     recovery = whoop_recovery_score
     return "person-meditating" if recovery.blank?
-    
+
     case recovery
     when 0..33
       "skull"

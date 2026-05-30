@@ -12,9 +12,7 @@
   <% if recent.present? %>
     <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent, variant: "halves" } %>
   <% end %>
-  <% if show_whoop? %>
-    <%= partial 'partials/whoop' %>
-  <% end %>
+  <%= partial 'partials/whoop' %>
   <% trending = non_recent_trending_articles %>
   <% if trending.present? %>
     <%= partial 'partials/collection', locals: { title: "Trending Articles", items: trending, variant: "halves" } %>

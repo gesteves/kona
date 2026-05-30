@@ -29,14 +29,6 @@ namespace :import do
     measure_and_output(:import_pollen, "Importing pollen data")
   end
 
-  desc 'Imports Whoop data'
-  task :whoop => [:dotenv] do
-    setup_data_directory
-    initialize_redis
-    initialize_location
-    measure_and_output(:import_whoop, "Importing Whoop data")
-  end
-
   desc 'Imports San Francisco Bay conditions'
   task :goodspeed => [:dotenv] do
     setup_data_directory
@@ -70,7 +62,6 @@ task :import => [:dotenv, :clobber] do
   independent_threads = [
     [:import_contentful, "Importing site content"],
     [:import_font_awesome, "Importing icons"],
-    [:import_whoop, "Importing Whoop data"],
     [:import_dark_visitors, "Importing robots.txt directives"],
     [:import_goodspeed, "Importing bay conditions"]
   ].map do |method, description|
@@ -165,12 +156,6 @@ def import_trainer_road
   }
 end
 
-
-def import_whoop
-  safely_perform {
-    Whoop.new.save_data
-  }
-end
 
 def import_goodspeed
   safely_perform { Goodspeed.new.save_data }

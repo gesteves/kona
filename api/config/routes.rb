@@ -8,6 +8,16 @@ Rails.application.routes.draw do
   # Returns the activity-stats markup embedded into the static site.
   get "/activity-stats" => "activity_stats#show"
 
+  # Returns the Whoop stats markup embedded into the static site.
+  get "/whoop" => "whoop#show"
+
+  # Whoop OAuth flow (owner-only authorize, public callback validated by state).
+  get "/whoop/auth" => "whoop_oauth#authorize"
+  get "/whoop/callback" => "whoop_oauth#callback"
+
+  # Sets the current location (bearer-token-secured), replacing the old Netlify build hook.
+  post "/location" => "location#create"
+
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker

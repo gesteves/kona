@@ -8,8 +8,10 @@ gem "puma", ">= 5.0"
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem "tzinfo-data", platforms: %i[ windows jruby ]
 
-# HTTP client for the Intervals.icu and Font Awesome APIs
+# HTTP client for the Intervals.icu, Whoop, Google Maps, and Font Awesome APIs
 gem "httparty"
+# Parses the TrainerRoad calendar (iCalendar) feed
+gem "icalendar"
 # Redis caching (shares REDIS_URL with the web app)
 gem "redis"
 # GraphQL client for the Font Awesome API
