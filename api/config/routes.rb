@@ -11,6 +11,9 @@ Rails.application.routes.draw do
   # Returns the weather widget markup embedded into the static site.
   get "/weather" => "weather#show"
 
+  # Per-event race-day weather, keyed by Contentful event ID.
+  get "/api/weather/event/:id" => "api/weather#event"
+
   # Returns the Whoop stats markup embedded into the static site.
   get "/whoop" => "whoop#show"
 

@@ -360,8 +360,6 @@ class Contentful
       end
 
       add_event_location(event)
-      add_event_weather(event)
-      add_event_aqi(event)
 
       event[:entry_type] = 'Event'
       event
@@ -376,46 +374,6 @@ class Contentful
 
     maps = GoogleMaps.new(lat, lon)
     event[:location] = maps.location
-  end
-
-  # Adds weather forecast data to an event.
-  def add_event_weather(event)
-    lat = event.dig(:coordinates, :lat)
-    lon = event.dig(:coordinates, :lon)
-    country_code = event.dig(:location, :geocoded, :address_components)&.find { |component| component[:types].include?('country') }&.dig(:short_name)
-    time_zone = event.dig(:location, :time_zone, :time_zone_id)
-    event_date = DateTime.parse(event[:date]).in_time_zone(time_zone)
-    days_until_event = (event_date.to_date - Time.current.in_time_zone(time_zone).to_date).to_i
-
-    return if lat.blank? || lon.blank? || time_zone.blank? || country_code.blank?
-    return unless days_until_event.between?(0, 10)
-
-    weather_kit = WeatherKit.new(lat, lon, time_zone, country_code)
-    weather_data = weather_kit.weather
-
-    return unless weather_data.present?
-
-    event[:weather] = weather_data
-  end
-
-  # Adds AQI data to an event.
-  def add_event_aqi(event)
-    lat = event.dig(:coordinates, :lat)
-    lon = event.dig(:coordinates, :lon)
-    country_code = event.dig(:location, :geocoded, :address_components)&.find { |component| component[:types].include?('country') }&.dig(:short_name)
-    time_zone = event.dig(:location, :time_zone, :time_zone_id)
-    event_date = DateTime.parse(event[:date]).in_time_zone(time_zone)
-    days_until_event = (event_date.to_date - Time.current.in_time_zone(time_zone).to_date).to_i
-
-    return if lat.blank? || lon.blank? || country_code.blank?
-    return unless days_until_event.between?(0, 4)
-
-    aqi_service = GoogleAirQuality.new(lat, lon, country_code, 'usa_epa_nowcast', event_date)
-    aqi_data = aqi_service.aqi
-
-    return unless aqi_data.present?
-
-    event[:aqi] = aqi_data
   end
 end
 

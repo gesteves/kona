@@ -29,4 +29,20 @@ module EventsHelper
     return false if event.blank?
     is_in_progress?(event) && event.tracking_url.present?
   end
+
+  # The daytime forecast for the event's date, used by the per-event weather view.
+  def event_forecast(event)
+    event_forecast_day(event)&.daytime_forecast
+  end
+
+  # The forecast day covering the event's date (carries sunrise/sunset too).
+  def event_forecast_day(event)
+    return nil if event.blank? || event.weather&.forecast_daily&.days.blank?
+    event_date = Date.parse(event.date)
+    event.weather.forecast_daily.days.find do |day|
+      day_start = Date.parse(day.forecast_start)
+      day_end = Date.parse(day.forecast_end)
+      event_date >= day_start && event_date < day_end
+    end
+  end
 end

@@ -20,7 +20,7 @@ module EventsHelpers
   def upcoming_races
     upcoming = data.events.sort_by { |e| Time.parse(e.date) }.select { |e| Time.parse(e.date).in_time_zone(location_time_zone).beginning_of_day >= current_time.beginning_of_day && e.going }
     next_event = upcoming.first
-    featured = next_event.present? && is_close?(next_event) && has_weather_data?(next_event)
+    featured = next_event.present? && is_close?(next_event)
     upcoming.take(featured ? 4 : 3)
   end
 
@@ -47,43 +47,14 @@ module EventsHelpers
     event == upcoming_races.first
   end
 
-  # Gets the daytime forecast for the event date.
-  # @param event [Event] The event to get the forecast for.
-  # @return [Hash, nil] The daytime forecast object, or nil if not found.
-  def event_forecast(event)
-    forecast_day = event_forecast_day(event)
-    forecast_day&.daytime_forecast
-  end
-
-  # Gets the forecast day for the event date (used internally and for sunrise/sunset data).
-  # @param event [Event] The event to get the forecast day for.
-  # @return [Hash, nil] The forecast day object, or nil if not found.
-  def event_forecast_day(event)
-    return nil if event.blank? || event.weather&.forecast_daily&.days.blank?
-    
-    event_date = Date.parse(event.date)
-    event.weather.forecast_daily.days.find do |day|
-      day_start = Date.parse(day.forecast_start)
-      day_end = Date.parse(day.forecast_end)
-      event_date >= day_start && event_date < day_end
-    end
-  end
-
-  # Determines if the event has a weather forecast for the event date.
-  # @param event [Event] The event to check.
-  # @return [Boolean] True if the event has weather data; false otherwise.
-  def has_weather_data?(event)
-    return false if event.blank?
-    event_forecast(event).present?
-  end
-
-  # Determines if the event should be featured.
+  # Determines if the event should be featured. The featured event (the next upcoming
+  # race within 10 days) gets the expanded card and the live-updating race-day weather.
   # @param event [Event] The event to check.
   # @return [Boolean] True if the event is featured; false otherwise.
   def is_featured?(event)
     return false if event.blank?
     return false if is_today?(event) && is_evening?
-    is_close?(event) && is_next?(event) && has_weather_data?(event)
+    is_close?(event) && is_next?(event)
   end
 
   # Determines if the event is currently in progress.

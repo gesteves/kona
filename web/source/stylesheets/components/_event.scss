@@ -17,6 +17,11 @@
   text-box-trim: trim-both;
   text-transform: uppercase;
 
+  // The live-update shell starts empty and collapses until the API swaps in the markup.
+  &:empty {
+    display: none;
+  }
+
   svg {
     display: inline-block;
     height: var(--light-icon-size);
