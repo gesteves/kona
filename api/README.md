@@ -9,7 +9,7 @@ Will sit behind CloudFront.
 - `GET /activity-stats` — returns the monthly activity-stats markup (from Intervals.icu),
   ready to be inserted into the page by the site's `live-update` Stimulus controller.
   Serves permissive CORS (any origin) and caching headers
-  (`Cache-Control: public, max-age=300, stale-while-revalidate=3600`). The upstream
+  (`Cache-Control: public, max-age=300, stale-while-revalidate=60`). The upstream
   Intervals.icu response is cached in Redis for 5 minutes; Font Awesome icon SVGs are
   cached in Redis (per version) as well.
 
