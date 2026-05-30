@@ -39,7 +39,7 @@ module Api
     private
 
     def authenticate_token!
-      expected = ENV["LOCATION_API_TOKEN"].to_s
+      expected = ENV["API_TOKEN"].to_s
       provided = request.authorization.to_s.split(" ", 2).last.to_s
 
       return if expected.present? && ActiveSupport::SecurityUtils.secure_compare(provided, expected)

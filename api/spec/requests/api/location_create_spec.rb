@@ -5,7 +5,7 @@ RSpec.describe "Location", type: :request do
 
   before do
     allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("LOCATION_API_TOKEN").and_return(token)
+    allow(ENV).to receive(:[]).with("API_TOKEN").and_return(token)
   end
 
   it "rejects requests without a bearer token" do
