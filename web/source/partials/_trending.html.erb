@@ -1,4 +1,4 @@
-<% trending = trending_articles %>
-<% if trending.present? %>
-  <%= partial 'partials/collection', locals: { title: "You May Also Like", items: trending, variant: "centered" } %>
+<% recent = recent_articles %>
+<% if recent.present? %>
+  <%= partial 'partials/collection', locals: { title: "You May Also Like", items: recent, variant: "centered" } %>
 <% end %>

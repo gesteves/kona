@@ -114,116 +114,6 @@ module ArticleHelpers
       .take(count)
   end
 
-  # Returns the most viewed articles based on analytics data.
-  # @param count [Integer] (Optional) The number of articles to return.
-  # @param exclude [Object] (Optional) An article to exclude from the results.
-  # @return [Array<Object>] An array of the most viewed articles, up to the specified count.
-  def most_viewed_articles(count: 4, exclude: nil)
-    data.articles
-      .reject { |a| a.path == exclude&.path } # Exclude the given article, if applicable
-      .reject { |a| a.draft }                 # Exclude drafts
-      .reject { |a| a.entry_type == 'Short' } # Exclude short posts
-      .sort_by { |a| -a.metrics.all.pageviews } # Sort by all-time pageviews in descending order
-      .take(count)
-  end
-
-  # Returns the articles that are "trending", i.e. getting a surge of traffic.
-  # @param count [Integer] (Optional) The number of articles to return.
-  # @param exclude [Object] (Optional) An article to exclude from the results.
-  # @return [Array<Object>] An array of the trending articles, up to the specified count.
-  def trending_articles(count: 4, exclude: nil)
-    data.articles
-      .reject { |a| a.path == exclude&.path } # Exclude the given article, if applicable
-      .reject { |a| a.draft }                 # Exclude drafts
-      .reject { |a| a.entry_type == 'Short' } # Exclude short posts
-      .sort_by { |a| [-absolute_trending_score(a), -a.metrics[:"7d"].pageviews, -a.metrics[:"30d"].pageviews] } # Sort by trending score, then use pageviews as tiebreakers
-      .take(count)
-  end
-
-  # Returns the trending articles, excluding the recent articles.
-  # @param count [Integer] (Optional) The number of articles to return.
-  # @param exclude [Object] (Optional) An article to exclude from the results.
-  # @return [Array<Object>] An array of the trending articles, excluding the recent articles, up to the specified count.
-  def non_recent_trending_articles(count: 4, exclude: nil)
-    articles = trending_articles(count: count * 2, exclude: exclude) - recent_articles(count: count, exclude: exclude)
-    articles.take(count)
-  end
-
-  # Returns the average daily pageviews for the past week for an article.
-  # @param article [Object] The article to calculate the average daily pageviews for.
-  # @return [Float] The average pageviews.
-  def average_daily_views_past_week(article)
-    article.metrics[:"7d"].pageviews.to_f / 7
-  end
-
-  # Returns the average daily pageviews for the past month for an article.
-  # @param article [Object] The article to calculate the average daily pageviews for.
-  # @return [Float] The average pageviews.
-  def average_daily_views_past_month(article)
-    article.metrics[:"30d"].pageviews.to_f / 30
-  end
-
-  # Returns the average daily pageviews for an article since it was published.
-  # @param article [Object] The article to calculate the average daily pageviews for.
-  # @return [Float] The average pageviews.
-  def average_daily_views_all_time(article)
-    article.metrics.all.pageviews.to_f / days_since_published(article)
-  end
-
-  # Calculates an absolute trending score for an article based on its pageviews.
-  # @param article [Object] The article for which to calculate the trending score.
-  # @return [Float] The absolute trending score.
-  def absolute_trending_score(article)
-    relative_weight = ENV.fetch('TRENDING_SCORE_RELATIVE_WEIGHT', 1).to_f
-    absolute_weight = ENV.fetch('TRENDING_SCORE_ABSOLUTE_WEIGHT', 1).to_f
-
-    daily_views = article.metrics[:"1d"].pageviews.to_f
-    week_avg = average_daily_views_past_week(article)
-    all_time_avg = average_daily_views_all_time(article)
-
-    # Return 0 if there's no recent activity
-    return 0 if daily_views.zero? || week_avg.zero? || all_time_avg.zero?
-
-    # We use the higher of weekly average and all-time average as our baseline
-    # because we want to detect spikes relative to the article's "normal" traffic.
-    # If an article consistently gets high traffic (high all-time avg) or has been
-    # getting increased attention lately (high weekly avg), we need a higher
-    # baseline to determine if today's traffic represents an unusual spike.
-    baseline = [week_avg, all_time_avg].max
-
-    # We calculate two scores:
-    # 1. Relative score (daily_views / baseline): Measures if today's traffic is unusually high
-    #    compared to the article's normal traffic. This helps identify sudden spikes in interest,
-    #    even for articles that typically get low traffic.
-    # 2. Absolute score (daily_views / all_time_avg): Measures raw traffic volume relative to
-    #    the article's history. This helps ensure articles with significant absolute traffic
-    #    still rank highly, even if the spike isn't as dramatic percentage-wise.
-    #
-    # These scores are then weighted and combined. The relative score helps surface articles
-    # having unusual spikes, while the absolute score ensures articles with high raw traffic
-    # aren't completely overshadowed by low-traffic articles having small but dramatic spikes.
-    relative_score = daily_views / baseline
-    absolute_score = daily_views / all_time_avg
-    (relative_score * relative_weight) + (absolute_score * absolute_weight)
-  end
-
-  # Returns a normalized trending score between 0 and 1.
-  # The article with the highest absolute trending score gets a 1,
-  # and all other articles are scaled proportionally.
-  # @param article [Object] The article for which to calculate the trending score.
-  # @return [Float] The normalized trending score between 0 and 1.
-  def trending_score(article)
-    @max_trending_score ||= data.articles
-      .reject { |a| a.draft }
-      .reject { |a| a.entry_type == 'Short' }
-      .map { |a| absolute_trending_score(a) }
-      .max
-
-    return 0 if @max_trending_score.zero?
-
-    (absolute_trending_score(article) / @max_trending_score)
-  end
-
   # Calculates an overall similarity score between two articles.
   # The score is normalized to be between 0 and 1 and considers:
   # - Proportion of shared tags (articles with lots of tags in common are probably similar)
@@ -247,21 +137,19 @@ module ArticleHelpers
     (tags_score * tags_weight) + (title_score * title_weight)
   end
 
-  # Calculates a relevance score by adding up similarity_score, recency_score, and trending_score.
-  # Assumes that articles that are similar, recent, and trending are relevant to the given article.
+  # Calculates a relevance score by adding up similarity_score and recency_score.
+  # Assumes that articles that are similar and recent are relevant to the given article.
   # @param article [Object] The reference article.
   # @param candidate [Object] The article to evaluate for relevance.
   # @return [Float] The relevance score between 0 and 1.
   def relevance_score(article, candidate)
     similarity_weight = ENV.fetch('RELEVANCE_SCORE_SIMILARITY_WEIGHT', 1).to_f
     recency_weight = ENV.fetch('RELEVANCE_SCORE_RECENCY_WEIGHT', 1).to_f
-    trending_weight = ENV.fetch('RELEVANCE_SCORE_TRENDING_WEIGHT', 1).to_f
 
     similarity = similarity_score(article, candidate)
     recency = recency_score(candidate)
-    trending = trending_score(candidate)
 
-    ((similarity * similarity_weight) + (recency * recency_weight) + (trending * trending_weight))
+    (similarity * similarity_weight) + (recency * recency_weight)
   end
 
   # Calculates a recency score for an article based on its age.

@@ -2,7 +2,6 @@ require 'active_support/all'
 require 'public_suffix'
 require 'humanize'
 require_relative 'graphql/contentful'
-require_relative 'plausible'
 
 class Contentful
   def initialize
@@ -48,7 +47,6 @@ class Contentful
     process_site
     process_articles
     process_pages
-    process_analytics
     process_assets
     process_events
     generate_blog
@@ -287,42 +285,6 @@ class Contentful
       }
     end
     @content[:blog] = blog_pages
-  end
-
-  # Fetches traffic data from Plausible for articles,
-  # and stores it in each article.
-  def process_analytics
-    # Define the metrics to query
-    metrics = ["pageviews", "visits", "visitors"]
-
-    # Define the date ranges to process
-    date_ranges = ["all", "30d", "7d", "1d"]
-
-    # Initialize a hash to store analytics data for each date range
-    analytics_by_range = {}
-
-    date_ranges.each do |date_range|
-      # Query analytics for the current date range
-      analytics = Plausible.new.query(metrics: metrics, date_range: date_range, filters: [["matches", "event:page", ["^/20\\d{2}/"]]])
-
-      # Create a lookup hash for quick access to analytics data by path
-      analytics_by_range[date_range] = (analytics.dig(:results) || []).each_with_object({}) do |result, hash|
-        path = result[:dimensions].first.sub(/\/index\.html$/, '/') # Normalize the path
-        hash[path] = metrics.zip(result[:metrics]).to_h # Create a hash of metric names and values
-      end
-    end
-
-    # Add analytics data to each article under :metrics for each date range, defaulting metrics to 0
-    @content[:articles].each do |article|
-      normalized_path = article[:path].sub(/\/index\.html$/, '/') # Normalize the article path
-      article[:metrics] ||= {} # Initialize the metrics key if it doesn't exist
-
-      date_ranges.each do |date_range|
-        article[:metrics][date_range.to_sym] = metrics.each_with_object({}) do |metric, hash|
-          hash[metric] = analytics_by_range[date_range].dig(normalized_path, metric) || 0 # Default to 0 if missing
-        end
-      end
-    end
   end
 
   # Rewrites Contentful image URLs to CloudFront URLs.

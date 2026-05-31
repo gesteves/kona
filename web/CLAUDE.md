@@ -11,9 +11,9 @@ web↔api contract before touching any widget markup.
 ## Architecture & data flow
 
 - **Build-time data** (`rake import`): fetches external data into `data/*.json` (Redis
-  is used as a cache). Sources: Contentful content, Font Awesome icons, Plausible
-  metrics (merged into each article), the current location (fetched from the API),
-  dark-visitors robots data, and standard.site (Bluesky / AT Protocol) sync.
+  is used as a cache). Sources: Contentful content, Font Awesome icons, the current
+  location (fetched from the API), dark-visitors robots data, and standard.site
+  (Bluesky / AT Protocol) sync.
 - **Page generation**: Middleman proxies (`config.rb`) turn `data/*.json` into static
   pages — articles, pages, tags, blog index.
 - **Runtime dynamic content**: weather, activity stats, Whoop, per-article pageviews,
@@ -75,9 +75,8 @@ Names only — see `.env.example`; never commit values.
 - **Required**: `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`, `FONT_AWESOME_API_TOKEN`,
   `REDIS_URL`, `KONA_API_URL` (base URL of the `api/` app — used by `import:location`
   and the `/api/*` proxy).
-- **Optional**: `BUILD_HOOK_URL`, `DARK_VISITORS_ACCESS_TOKEN`, `PLAUSIBLE_API_KEY`,
-  `PLAUSIBLE_SITE_ID`, `CLOUDFRONT_DOMAIN`, `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`,
-  `BLUESKY_PDS_URL`.
+- **Optional**: `BUILD_HOOK_URL`, `DARK_VISITORS_ACCESS_TOKEN`, `CLOUDFRONT_DOMAIN`,
+  `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`, `BLUESKY_PDS_URL`.
 
 ## Conventions & gates
 
