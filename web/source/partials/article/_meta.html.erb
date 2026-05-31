@@ -1,16 +1,16 @@
-<p class="entry__meta">
+<p class="entry__meta"
+  data-controller="publish-date"
+  data-publish-date-datetime-value="<%= DateTime.parse(article.published_at).iso8601 %>"
+  data-publish-date-time-zone-value="<%= location_time_zone %>"
+  data-publish-date-entry-type-value="<%= article.entry_type %>"
+  data-publish-date-draft-value="<%= article.draft %>">
   <% if article.draft %>
     <span class="entry__highlight"><%= icon_svg("classic", "regular", "typewriter") %> Draft</span>
   <% end %>
-  <% if new_article?(article) %>
-    <span class="entry__highlight"><%= icon_svg("classic", "regular", "sparkles") %> New</span>
-  <% end %>
+  <span class="entry__highlight" data-publish-date-target="badge" hidden><%= icon_svg("classic", "regular", "sparkles") %> New</span>
   <span>
-    <% if published_today?(article) || article.draft %>
-      <%= clock_icon_svg(DateTime.parse(article.published_at)) %>
-    <% else %>
-      <%= icon_svg("classic", "light", "calendar") %>
-    <% end %>
+    <span data-publish-date-target="clock" hidden><%= clock_icon_svg(DateTime.parse(article.published_at)) %></span>
+    <span data-publish-date-target="calendar"><%= icon_svg("classic", "light", "calendar") %></span>
     <%= article_permalink_timestamp(article) %>
   </span>
   <% if article.contentful_metadata.tags.present? %>

@@ -4,16 +4,16 @@
 %>
 <article class="entry entry--summary" id="entry-<%= article.sys.id.parameterize %>" aria-labelledby="hed-<%= article.sys.id.parameterize %>">
   <header class="entry__header">
-    <p class="entry__meta">
-      <% if new_article?(article) %>
-        <span class="entry__highlight"><%= raw icon_svg("classic", "regular", "sparkles") %> New</span>
-      <% end %>
+    <p class="entry__meta"
+      data-controller="publish-date"
+      data-publish-date-datetime-value="<%= DateTime.parse(article.published_at).iso8601 %>"
+      data-publish-date-time-zone-value="<%= location_time_zone %>"
+      data-publish-date-entry-type-value="<%= article.entry_type %>"
+      data-publish-date-draft-value="<%= article.draft %>">
+      <span class="entry__highlight" data-publish-date-target="badge" hidden><%= raw icon_svg("classic", "regular", "sparkles") %> New</span>
       <span>
-        <% if published_today?(article) %>
-          <%= raw clock_icon_svg(DateTime.parse(article.published_at)) %>
-        <% else %>
-          <%= raw icon_svg("classic", "light", "calendar") %>
-        <% end %>
+        <span data-publish-date-target="clock" hidden><%= raw clock_icon_svg(DateTime.parse(article.published_at)) %></span>
+        <span data-publish-date-target="calendar"><%= raw icon_svg("classic", "light", "calendar") %></span>
         <%= article_permalink_timestamp(article) %>
       </span>
     </p>

@@ -14,49 +14,17 @@ module ArticleHelpers
     end
   end
 
-  # Determines if the article was published today in the current timezone.
+  # Returns a permalink anchor tag for the article, with the date it was published as its text.
+  # The publish-date Stimulus controller swaps in a live relative timestamp client-side for recent
+  # articles (so it stays correct without a rebuild); the absolute date here is the no-JS fallback.
   # @param article [Object] The article.
-  # @return [Boolean] If the article was published today.
-  def published_today?(article)
-    article_date = Time.parse(article.published_at).in_time_zone(location_time_zone)
-    article_date.to_date == current_time.to_date
-  end
-
-  # Determines if the article was published in the past week in the current timezone.
-  # @param article [Object] The article.
-  # @return [Boolean] If the article was published in the past week.
-  def published_in_the_past_week?(article)
-    article_date = Time.parse(article.published_at).in_time_zone(location_time_zone)
-    article_date.to_date >= 1.week.ago.to_date
-  end
-
-  # Determines if the article is "new".
-  # A full length article is "new" if it was published less than a week ago.
-  # A short article is "new" if it was published today.
-  # @param article [Object] The article.
-  # @return [Boolean] If the article is considered new.
-  def new_article?(article)
-    return false if article.draft
-    if article.entry_type == 'Short'
-      published_today?(article)
-    else
-      published_in_the_past_week?(article)
-    end
-  end
-
-  # Returns a permalink anchor tag for the article, with the date it was published.
-  # If the article was published today, includes attributes to render the date as a relative timestamp.
-  # @param article [Object] The article.
-  # @return [String] An <a> tag linking to the article, with a relative or absolute date as the text.
+  # @return [String] An <a> tag linking to the article, with the publish date as the text.
   def article_permalink_timestamp(article)
     options = {
       href: article.path,
-      title: "Published at #{DateTime.parse(article.published_at).strftime('%-I:%M %p')}"
+      title: "Published at #{DateTime.parse(article.published_at).strftime('%-I:%M %p')}",
+      "data-publish-date-target": "timestamp"
     }
-    if published_today?(article) || article.draft
-      options["data-controller"] = "relative-date"
-      options["data-relative-date-datetime-value"] = DateTime.parse(article.published_at).iso8601
-    end
     content_tag :a, options do
       DateTime.parse(article.published_at).strftime('%A, %B %-e, %Y')
     end
