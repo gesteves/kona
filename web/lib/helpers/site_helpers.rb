@@ -68,10 +68,16 @@ module SiteHelpers
     ].flatten.max
   end
 
+  # The year the earliest non-draft article was published — the start of the copyright range.
+  # @return [String] e.g. "2006".
+  def copyright_start_year
+    data.articles.reject(&:draft).map { |a| DateTime.parse(a.published_at) }.min.strftime('%Y')
+  end
+
   # Returns a range of years, from the year the earliest article was published to the current year.
   # @return [String] A range of years, like 2006-2024.
   def copyright_years
-    "#{data.articles.reject(&:draft).map { |a| DateTime.parse(a.published_at) }.min.strftime('%Y')}–#{current_time.strftime('%Y')}"
+    "#{copyright_start_year}–#{current_time.strftime('%Y')}"
   end
 
   # Returns the title for the RSS feed, based off the site's meta title.
@@ -125,11 +131,13 @@ module SiteHelpers
     end
   end
 
-  # Formats the text at the very bottom of the footer.
+  # Formats the text at the very bottom of the footer. The end year is wrapped in a span that the
+  # current-year Stimulus controller refreshes client-side, so the copyright stays correct without a
+  # rebuild (the build-time year is the no-JS fallback). Feeds keep the plain `copyright_years`.
   # @return [String] A string of HTML.
   def footer_text
-    text = "© #{copyright_years} #{data.site.copyright}"
-    markdown_to_html(text)
+    years = "#{copyright_start_year}–<span data-controller=\"current-year\">#{current_time.strftime('%Y')}</span>"
+    markdown_to_html("© #{years} #{data.site.copyright}")
   end
 
   # Returns the number of entries tagged with a specific tag.

@@ -52,8 +52,7 @@ task :import => [:dotenv, :clobber] do
   independent_threads = [
     [:import_contentful, "Importing site content"],
     [:import_font_awesome, "Importing icons"],
-    [:import_location, "Importing location data"],
-    [:import_dark_visitors, "Importing robots.txt directives"]
+    [:import_location, "Importing location data"]
   ].map do |method, description|
     Thread.new do
       measure_and_output(method, description, mutex: output_mutex)
@@ -101,10 +100,6 @@ end
 
 def import_standard_site
   safely_perform { StandardSite.new.save_data }
-end
-
-def import_dark_visitors
-  DarkVisitors.new.save_data
 end
 
 def safely_perform

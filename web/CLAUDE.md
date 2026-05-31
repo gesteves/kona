@@ -12,8 +12,8 @@ web↔api contract before touching any widget markup.
 
 - **Build-time data** (`rake import`): fetches external data into `data/*.json` (Redis
   is used as a cache). Sources: Contentful content, Font Awesome icons, the current
-  location (fetched from the API), dark-visitors robots data, and standard.site
-  (Bluesky / AT Protocol) sync.
+  location (fetched from the API), and standard.site (Bluesky / AT Protocol) sync.
+  (robots.txt is served at runtime by `netlify/functions/robots.mts`, not built here.)
 - **Page generation**: Middleman proxies (`config.rb`) turn `data/*.json` into static
   pages — articles, pages, tags, blog index.
 - **Runtime dynamic content**: weather, activity stats, Whoop, per-article pageviews,
@@ -55,7 +55,7 @@ Only these exist: `rake import` (runs all in parallel), `import:content` (Conten
 
 - `config.rb` — Middleman config + proxy setup; `Rakefile` — Redis init + task loader.
 - `lib/data/*.rb` — build-time clients: `contentful.rb`, `font_awesome.rb`,
-  `plausible.rb`, `dark_visitors.rb`, `standard_site.rb` (+ `graphql/`).
+  `standard_site.rb` (+ `graphql/`).
 - `lib/tasks/*.rake` — `import`, `build`, `test`, `maps`, `redis`.
 - `lib/helpers/*.rb` — 15 helper modules (article, markup, image, site, events, unit,
   share, icon, url, text, markdown, location, context, cache, affiliate_links);
@@ -63,7 +63,7 @@ Only these exist: `rake import` (runs all in parallel), `import:content` (Conten
 - `source/layouts/layout.erb`, `source/partials/` (incl. `placeholders/`),
   `source/javascripts/stimulus/`, `source/stylesheets/`.
 - `netlify/functions/` — `api-proxy.mts` (proxies `/api/*`; see root `CLAUDE.md`),
-  `og.mts` (OG images), `scheduled-deploy.js` (daily rebuild).
+  `og.mts` (OG images), `robots.mts` (serves `/robots.txt` with live Dark Visitors rules).
 - `data/font_awesome.yml` — **icon allowlist**. Any new icon must be added here (under
   the correct family/style, e.g. `classic.light`) before `icon_svg` / `rake import:icons`
   can use it.

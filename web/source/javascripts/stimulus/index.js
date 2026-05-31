@@ -5,6 +5,7 @@ import '@awesome.me/webawesome/dist/components/skeleton/skeleton.js';
 
 import BackToTopController from './controllers/back_to_top_controller';
 import ClipboardController from './controllers/clipboard_controller';
+import CurrentYearController from './controllers/current_year_controller';
 import ImagePlaceholderController from './controllers/image_placeholder_controller';
 import LiveUpdateController from './controllers/live_update_controller';
 import NavController from './controllers/nav_controller';
@@ -19,6 +20,7 @@ import UnitsController from './controllers/units_controller';
 window.Stimulus = Application.start();
 Stimulus.register('back-to-top', BackToTopController);
 Stimulus.register('clipboard', ClipboardController);
+Stimulus.register('current-year', CurrentYearController);
 Stimulus.register('image-placeholder', ImagePlaceholderController);
 Stimulus.register('live-update', LiveUpdateController);
 Stimulus.register('nav', NavController);
