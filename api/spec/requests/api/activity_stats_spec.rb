@@ -31,8 +31,14 @@ RSpec.describe "Activity stats", type: :request do
 
     cache_control = response.headers["Cache-Control"]
     expect(cache_control).to include("public")
-    expect(cache_control).to include("max-age=300")
-    expect(cache_control).to include("stale-while-revalidate=60")
+    expect(cache_control).to include("max-age=0")
+    expect(cache_control).to include("stale-while-revalidate=300")
+
+    edge = response.headers["Netlify-CDN-Cache-Control"]
+    expect(edge).to include("durable")
+    expect(edge).to include("max-age=300")
+    expect(edge).to include("stale-while-revalidate=86400")
+    expect(edge).to include("stale-if-error=86400")
   end
 
   it "embeds a relative same-origin refetch URL" do

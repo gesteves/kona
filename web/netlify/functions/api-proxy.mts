@@ -4,49 +4,10 @@ import type { Config } from '@netlify/functions';
 // Functions runtime scope on Netlify.
 const API_ORIGIN = process.env.KONA_API_URL;
 
-// Cache-Control directives that mean "don't store in a shared/edge cache".
-const UNCACHEABLE = /\b(?:no-store|no-cache|private)\b/i;
-
-// How long the edge may keep serving a stale response while it revalidates in the
-// background. Deliberately longer than the origin's own stale-while-revalidate so the
-// widgets keep rendering (slightly stale) even if fly.io is briefly slow or down. The
-// browser still receives the origin's own, shorter Cache-Control verbatim.
-const EDGE_STALE_WHILE_REVALIDATE = 86400; // 1 day
-
 // Only these request headers are forwarded upstream. Everything else (cookies, conditional
 // headers, etc.) is dropped so every viewer's request is identical and the whole audience
 // shares a single cache entry.
 const FORWARD_REQUEST_HEADERS = ['accept', 'authorization'];
-
-/**
- * Derives the Netlify edge cache header from the origin's Cache-Control:
- *  - adds `durable` so the response lands in Netlify's global durable cache (persisted
- *    across every edge node and across deploys), not just the local edge;
- *  - widens `stale-while-revalidate` to EDGE_STALE_WHILE_REVALIDATE for resilience.
- *
- * Returns null when the origin opts out of shared caching (no-store/no-cache/private) or
- * sends no Cache-Control, so those responses (e.g. /api/location, upstream errors) are
- * never stored at the edge.
- */
-function edgeCacheControl(cacheControl: string | null): string | null {
-  if (!cacheControl || UNCACHEABLE.test(cacheControl)) return null;
-
-  const directives = cacheControl
-    .split(',')
-    .map((d) => d.trim())
-    .filter(
-      (d) =>
-        d &&
-        !/^stale-while-revalidate=/i.test(d) &&
-        d.toLowerCase() !== 'durable'
-    );
-
-  directives.push(
-    `stale-while-revalidate=${EDGE_STALE_WHILE_REVALIDATE}`,
-    'durable'
-  );
-  return directives.join(', ');
-}
 
 function forwardHeaders(incoming: Headers): Headers {
   const headers = new Headers();
@@ -84,6 +45,7 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   const cacheControl = upstream.headers.get('cache-control');
+  const edge = upstream.headers.get('netlify-cdn-cache-control');
   const headers = new Headers();
 
   const contentType = upstream.headers.get('content-type');
@@ -91,10 +53,13 @@ export default async function handler(req: Request): Promise<Response> {
   // Pass the origin's Cache-Control through verbatim (this is what the browser sees).
   if (cacheControl) headers.set('cache-control', cacheControl);
 
+  // Forward the origin's durable-edge policy verbatim — the kona-api app authors the whole
+  // directive (durable, max-age, stale-while-revalidate, stale-if-error). The one guard here:
+  // never forward it for a non-2xx, so an error/redirect is never durably pinned at the edge,
+  // regardless of what the origin emits. Absent header (no-store paths) → not edge-cached.
   // No Netlify-Vary needed: the widget routes key entirely off the path (IDs are path
   // segments, no query params), so the path-based cache key already isolates entries.
-  const edge = edgeCacheControl(cacheControl);
-  if (edge) headers.set('Netlify-CDN-Cache-Control', edge);
+  if (edge && upstream.ok) headers.set('Netlify-CDN-Cache-Control', edge);
 
   return new Response(upstream.body, {
     status: upstream.status,

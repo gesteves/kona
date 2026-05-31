@@ -16,6 +16,7 @@ RSpec.describe "Api::Location", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.headers["Cache-Control"]).to include("no-store")
+      expect(response.headers["Netlify-CDN-Cache-Control"]).to be_nil
 
       body = JSON.parse(response.body)
       expect(body.dig("time_zone", "time_zone_id")).to eq("America/Denver")
