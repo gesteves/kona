@@ -1,13 +1,12 @@
 module LiveUpdateHelper
-  # The absolute URL the embedded markup should refetch itself from on visibilitychange.
+  # The URL the embedded markup should refetch itself from on visibilitychange.
   #
-  # The static site embeds this API behind CloudFront,
-  # but CloudFront forwards the *origin* Host to us, so request.base_url
-  # can't be trusted as the public URL. Set PUBLIC_BASE_URL to the public origin so the
-  # rendered markup points back at it; fall back to the request host for local/dev.
-  # @return [String] e.g. "https://api.giventotri.com/whoop"
+  # Intentionally relative (just the request path): the markup is embedded into the static
+  # site and re-fetched through a same-origin Netlify proxy that caches it on Netlify's edge.
+  # A relative URL keeps the refetch same-origin so it hits that cache instead of reaching the
+  # origin directly.
+  # @return [String] e.g. "/api/whoop"
   def live_update_url
-    base = ENV.fetch("PUBLIC_BASE_URL", request.base_url)
-    "#{base}#{request.path}"
+    request.path
   end
 end

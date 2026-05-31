@@ -1,7 +1,8 @@
 # kona-api
 
 Rails app serving dynamic, embeddable markup for the otherwise-static Kona site.
-Will sit behind CloudFront.
+Deployed to fly.io; the static site reaches it through a same-origin Netlify proxy
+(`/api/*`) that caches responses on Netlify's edge.
 
 ## Endpoints
 
@@ -21,9 +22,6 @@ Set these environment variables (e.g. as fly secrets):
 - `ICU_ATHLETE_ID`, `ICU_API_KEY` — Intervals.icu credentials.
 - `FONT_AWESOME_API_TOKEN` — Font Awesome API token.
 - `FONT_AWESOME_VERSION` — (optional) Font Awesome version, defaults to `7.2.0`.
-- `ACTIVITY_STATS_URL` — (optional) absolute URL the embedded markup should refetch from
-  on `visibilitychange`. Defaults to the request's own scheme/host/path; set this when
-  the public URL differs from the origin host (e.g. behind CloudFront).
 
 ## Tests
 

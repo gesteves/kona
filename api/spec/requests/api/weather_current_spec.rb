@@ -82,10 +82,10 @@ RSpec.describe "Weather", type: :request do
     expect(cache_control).to include("stale-while-revalidate=60")
   end
 
-  it "allows cross-origin requests from any origin" do
-    get "/api/weather/current", headers: { "Origin" => "https://example.com" }
+  it "embeds a relative same-origin refetch URL" do
+    get "/api/weather/current"
 
-    expect(response.headers["Access-Control-Allow-Origin"]).to eq("*")
+    expect(response.body).to include('data-live-update-url-value="/api/weather/current"')
   end
 
   context "when the weather is unavailable" do
