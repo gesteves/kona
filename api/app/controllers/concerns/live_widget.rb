@@ -57,10 +57,4 @@ module LiveWidget
     response.headers["Netlify-CDN-Cache-Control"] = "public, max-age=#{EMPTY_TTL.to_i}"
     render plain: ""
   end
-
-  # Marks the response as uncacheable (Cache-Control: no-store), for endpoints that must
-  # always serve a fresh value.
-  def no_store!
-    response.cache_control[:no_store] = true
-  end
 end

@@ -22,7 +22,6 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 | GET | `/api/weather/event/:id` | `weather#event` | HTML (race-day weather by Contentful id) | 1 hr |
 | GET | `/api/whoop` | `whoop#show` | HTML (sleep/recovery/strain) | 5 min |
 | GET | `/api/plausible/pageviews/:id` | `plausible#pageviews` | HTML (pageview count by Contentful id) | 1 hr |
-| GET | `/api/location` | `location#show` | JSON `{geocoded, time_zone, elevation}` | no-store |
 | POST | `/api/location` | `location#create` | sets Redis `location:current` (bearer-token gated) | — |
 | GET | `/whoop/auth` | `whoop_oauth#authorize` | redirect (HTTP-Basic gated) | — |
 | GET | `/whoop/callback` | `whoop_oauth#callback` | OAuth token exchange | — |
@@ -45,7 +44,6 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 - **Caching** — `app/controllers/concerns/live_widget.rb`. `cache_widget(ttl:)` sets:
   - Browser: `Cache-Control: public, max-age=0, stale-while-revalidate=86400`
   - Edge: `Netlify-CDN-Cache-Control: public, durable, max-age=<ttl>, stale-while-revalidate=86400, stale-if-error=86400`
-  - `no_store!` sets `Cache-Control: no-store` (used by `GET /api/location`).
   ⚠️ The proxy forwards the edge header **only on 2xx** — only emit durable headers on
   successful, cacheable responses.
 - **Errors** render as plain text via `lib/plain_text_exceptions.rb`.

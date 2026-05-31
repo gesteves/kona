@@ -1,27 +1,13 @@
 module Api
-  # Returns the current location, geocoded into { geocoded, time_zone, elevation } — the
-  # source of truth the static site's build fetches (instead of geocoding itself). Not
-  # cached, so a build triggered by a location change always gets the fresh value.
+  # Sets the current location used by the weather/Whoop widgets. A bearer-token-secured POST writes
+  # the shared "location:current" Redis key (read by this app's Location service); this replaced the
+  # old Netlify build-hook ingress.
   class LocationController < BaseController
     include TokenAuthentication
 
     skip_forgery_protection
     before_action :authenticate_bearer_token!, only: :create
 
-    def show
-      no_store!
-
-      location = Location.new
-      if location.latitude.blank?
-        render json: { geocoded: nil, time_zone: nil, elevation: nil }
-      else
-        render json: GoogleMaps.new(location.latitude, location.longitude).location
-      end
-    end
-
-    # Sets the current location used for timezone (and, later, weather/elevation) lookups.
-    # Replaces the old Netlify build-hook ingress: a bearer-token-secured POST writes the
-    # shared "location:current" Redis key read by both this app and the web app.
     def create
       if params[:latitude].blank? || params[:longitude].blank?
         return render json: { error: "Missing coordinates" }, status: :unprocessable_content

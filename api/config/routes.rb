@@ -17,9 +17,6 @@ Rails.application.routes.draw do
   # The home page's trending-articles section, ranked from Plausible analytics at request time.
   get "/api/articles/trending" => "api/articles#trending"
 
-  # Current location, geocoded — the source of truth the static-site build fetches.
-  get "/api/location" => "api/location#show"
-
   # All-time Plausible pageview count for an article, keyed by Contentful ID.
   get "/api/plausible/pageviews/:id" => "api/plausible#pageviews"
 

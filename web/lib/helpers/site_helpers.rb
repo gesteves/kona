@@ -77,7 +77,7 @@ module SiteHelpers
   # Returns a range of years, from the year the earliest article was published to the current year.
   # @return [String] A range of years, like 2006-2024.
   def copyright_years
-    "#{copyright_start_year}–#{current_time.strftime('%Y')}"
+    "#{copyright_start_year}–#{Time.current.year}"
   end
 
   # Returns the title for the RSS feed, based off the site's meta title.
@@ -136,7 +136,7 @@ module SiteHelpers
   # rebuild (the build-time year is the no-JS fallback). Feeds keep the plain `copyright_years`.
   # @return [String] A string of HTML.
   def footer_text
-    years = "#{copyright_start_year}–<span data-controller=\"current-year\">#{current_time.strftime('%Y')}</span>"
+    years = "#{copyright_start_year}–<span data-controller=\"current-year\">#{Time.current.year}</span>"
     markdown_to_html("© #{years} #{data.site.copyright}")
   end
 
