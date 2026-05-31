@@ -239,14 +239,6 @@ module ArticleHelpers
     schema.to_json
   end
 
-  # Turns a tag into a camelcased hashtag, e.g. "My Tag" => "#MyTag"
-  # @param tag [String] The tag to convert.
-  # @return [String] The camelcased hashtag.
-  def camelcase_hashtag(tag)
-    return if tag.blank?
-    "##{tag.parameterize.split('-').map(&:capitalize).join}"
-  end
-
   # Generates a social media post for a given entry.
   # @param entry [Object] The entry to generate a social media post for.
   # @return [String] The social media post content.
