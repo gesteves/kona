@@ -82,17 +82,6 @@ module ShareHelpers
            else
              entry_type(article).downcase
            end
-    headings = [
-      "Enjoyed this #{type}? Share it with your friends!",
-      "Found this #{type} helpful? Pass it along!",
-      "Think someone would enjoy reading this #{type}? Share away!",
-      "Enjoyed what you just read? Share it!",
-      "Worth sharing? Send it to your friends!",
-      "Know someone who needs to read this #{type}? Share it!",
-      "Spread the word—share this #{type}",
-      "Hit share and spread the word",
-      "Share this #{type} with your friends",
-    ]
-    headings.sample
+    "Share this #{type}"
   end
 end
