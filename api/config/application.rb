@@ -39,5 +39,10 @@ module Api
     config.generators do |g|
       g.test_framework :rspec
     end
+
+    # Render framework-level 4xx/5xx errors as plain text instead of the default HTML pages
+    # (this is a headless, machine-only API). The lambda defers resolving the constant until
+    # request time, when lib/ autoloading is active.
+    config.exceptions_app = ->(env) { PlainTextExceptions.call(env) }
   end
 end
