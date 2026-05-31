@@ -45,4 +45,68 @@ module EventsHelper
       event_date >= day_start && event_date < day_end
     end
   end
+
+  # The upcoming races to show: future-or-today confirmed events, soonest first. When the next
+  # one is within 10 days it's "featured" (expanded card + race-day weather) and we show four;
+  # otherwise three. Mirrors the static site's build-time helper, reading @events.
+  def upcoming_races
+    return [] if @events.blank?
+    upcoming = @events
+      .select { |e| e.going && Time.parse(e.date).in_time_zone(location_time_zone).beginning_of_day >= current_time.beginning_of_day }
+      .sort_by { |e| Time.parse(e.date) }
+    next_event = upcoming.first
+    featured = next_event.present? && is_close?(next_event)
+    upcoming.take(featured ? 4 : 3)
+  end
+
+  # Whether the event is today or within the next 10 days.
+  def is_close?(event)
+    return false if event.blank?
+    event_date = Time.parse(event.date).in_time_zone(location_time_zone).to_date
+    event_date >= current_time.to_date && event_date <= 10.days.from_now.to_date
+  end
+
+  # Whether the event is the next upcoming race.
+  def is_next?(event)
+    return false if event.blank?
+    event.sys&.id == upcoming_races.first&.sys&.id
+  end
+
+  # Whether the event gets the featured treatment (the next race, and within 10 days).
+  def is_featured?(event)
+    return false if event.blank?
+    is_close?(event) && is_next?(event)
+  end
+
+  # The layout variant for the upcoming-races collection, from the event count and whether the
+  # first is featured.
+  def event_collection_variant
+    case upcoming_races.count
+    when 1 then "single"
+    when 2 then is_featured?(upcoming_races.first) ? "single" : "halves"
+    when 3 then is_featured?(upcoming_races.first) ? "halves" : "thirds"
+    else "thirds"
+    end
+  end
+
+  # "Today" if the event is today, otherwise the formatted date (e.g. "January 1, 2026").
+  def event_timestamp(event)
+    is_today?(event) ? "Today" : DateTime.parse(event.date).strftime("%B %-e, %Y")
+  end
+
+  # The calendar icon reflecting the event's status (cancelled / in progress / today / upcoming).
+  def event_icon_svg(event)
+    return icon_svg("classic", "light", "calendar-xmark") unless event.going
+    return icon_svg("classic", "regular", "calendar-star") if is_in_progress?(event)
+    return icon_svg("classic", "light", "calendar-star") if is_today?(event) && event.going
+    return icon_svg("classic", "light", "calendar-check") if event.going
+    icon_svg("classic", "light", "calendar")
+  end
+
+  # The icon + timestamp span for an event (highlighted while the race is in progress).
+  def event_timestamp_tag(event)
+    options = {}
+    options[:class] = "entry__highlight" if is_in_progress?(event)
+    content_tag :span, raw("#{event_icon_svg(event)} #{event_timestamp(event)}"), options
+  end
 end

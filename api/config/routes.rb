@@ -11,8 +11,8 @@ Rails.application.routes.draw do
   # Current weather widget markup.
   get "/api/weather/current" => "api/weather#current"
 
-  # Per-event race-day weather, keyed by Contentful event ID.
-  get "/api/weather/event/:id" => "api/weather#event"
+  # The home page's upcoming-races section (the featured event includes inline race-day weather).
+  get "/api/events/upcoming" => "api/events#upcoming"
 
   # Current location, geocoded — the source of truth the static-site build fetches.
   get "/api/location" => "api/location#show"

@@ -1,1 +1,14 @@
-<%= partial 'partials/collection', locals: { title: "Upcoming Races", items: upcoming_races, variant: event_collection_variant, featured: is_featured?(upcoming_races.first) } %>
+<%# Loading skeleton for the "Upcoming Races" section. The whole section — including the %>
+<%# featured event's race-day weather — is now rendered server-side by the API and swapped in %>
+<%# by the live-update controller on connect (it removes this shell on an empty response, i.e. %>
+<%# when no races are upcoming). See api/app/views/api/events/. %>
+<section class="collection collection--thirds" id="upcoming-races" data-nosnippet data-controller="live-update" data-live-update-url-value="/api/events/upcoming" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange">
+  <h3 class="collection__heading">Upcoming Races</h3>
+  <ol class="collection__list">
+    <% 3.times do %>
+      <li class="collection__item">
+        <%= partial 'partials/placeholders/entry_skeleton' %>
+      </li>
+    <% end %>
+  </ol>
+</section>

@@ -1,0 +1,27 @@
+<%#
+  One event card for the upcoming-races section. Locals: `event`, `featured` (bool — expanded
+  card), `event_weather` (EventWeatherPresenter or nil — the featured event's race-day weather).
+%>
+<article class="entry entry--summary event<%= " event--is-featured" if featured %>" id="event-<%= event.sys.id.parameterize %>" aria-labelledby="hed-<%= event.sys.id.parameterize %>">
+  <div class="event__inner">
+    <header class="entry__header">
+      <p class="entry__meta">
+        <%= event_timestamp_tag(event) %>
+        <span><%= raw icon_svg("classic", "light", "location-dot") %> <%= event.location %></span>
+      </p>
+      <h4 class="entry__hed" id="hed-<%= event.sys.id.parameterize %>">
+        <% if event.url.present? %>
+          <%= link_to raw(smartypants(event.title)), event.url, rel: "noopener", target: "_blank" %>
+        <% else %>
+          <%= raw smartypants(event.title) %>
+        <% end %>
+      </h4>
+    </header>
+    <div class="entry__body event__description">
+      <%= raw render_event_body(featured ? (event.description.presence || event.summary) : event.summary) %>
+    </div>
+  </div>
+  <% if event_weather.present? %>
+    <%= render "event_weather", event_weather: event_weather %>
+  <% end %>
+</article>

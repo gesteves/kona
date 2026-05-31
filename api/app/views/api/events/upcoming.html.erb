@@ -1,0 +1,17 @@
+<%#
+  The "Upcoming Races" section, served as a live-update fragment that the static site swaps in.
+  The outer <section> carries the live-update attributes so it keeps refreshing after the swap
+  (and on visibilitychange). The featured event (first, when within 10 days) gets the expanded
+  card and inline race-day weather.
+%>
+<section class="collection collection--<%= event_collection_variant %><%= " collection--has-featured" if @featured %>" id="upcoming-races" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= live_update_url %>" data-action="visibilitychange@document->live-update#handleVisibilityChange">
+  <h3 class="collection__heading">Upcoming Races</h3>
+  <ol class="collection__list">
+    <% @upcoming.each do |event| %>
+      <% featured = event.sys&.id == @featured&.sys&.id %>
+      <li class="collection__item">
+        <%= render "event", event: event, featured: featured, event_weather: (featured ? @event_weather : nil) %>
+      </li>
+    <% end %>
+  </ol>
+</section>

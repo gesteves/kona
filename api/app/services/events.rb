@@ -1,6 +1,7 @@
-# Fetches race events from Contentful with a small, targeted GraphQL query — just the
-# fields the weather widget needs to spot today's race (title, date, going, trackingUrl).
-# Cached in Redis for 10 minutes. `all` returns an array wrapped for dot-access.
+# Fetches race events from Contentful. `all` pulls the full set of fields the upcoming-races
+# widget renders (title/summary/description/location/url/date/going/coordinates), which is a
+# superset of what the current-weather widget needs to spot today's race. Cached in Redis for
+# 10 minutes. `all` returns an array wrapped for dot-access.
 class Events < ApplicationService
   CONTENTFUL_API_URL = "https://graphql.contentful.com/content/v1/spaces"
   QUERY = <<~GRAPHQL.freeze
@@ -8,9 +9,15 @@ class Events < ApplicationService
       events: eventCollection {
         items {
           title
+          summary
+          description
+          location
+          url
+          trackingUrl
           date
           going
-          trackingUrl
+          coordinates { lat lon }
+          sys { id }
         }
       }
     }
@@ -48,7 +55,10 @@ class Events < ApplicationService
   # @return [Array<OpenStruct>]
   def all
     items = rescue_with([], context: "Error fetching events") do
-      cached_json("contentful:events", expires_in: 10.minutes) do
+      # Cache key carries a version suffix: the query's field set changed (the upcoming-races
+      # widget needs more than the old today's-race lookup), so a value cached under the old
+      # key would be missing fields.
+      cached_json("contentful:events:v2", expires_in: 10.minutes) do
         (query_events(QUERY) || []).map { |event| underscore_keys(event) }
       end
     end

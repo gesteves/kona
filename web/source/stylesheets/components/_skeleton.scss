@@ -103,3 +103,33 @@
   vertical-align: center;
   width: 5em;
 }
+
+// Entry summary card (upcoming races; reused for trending / recent articles): mirrors the
+// `.entry__meta` eyebrow, `.entry__hed` heading, and `.entry__body` body lines.
+.entry__meta .entry-skeleton-eyebrow {
+  display: inline-flex;
+  height: var(--font-x-small);
+  vertical-align: middle;
+  width: 8rem;
+}
+
+.entry__hed .entry-skeleton-heading {
+  height: var(--font-medium);
+  margin: 0.75rem 0;
+  width: 75%;
+}
+
+.entry__body .entry-skeleton-line {
+  height: var(--font-medium);
+  margin: 0.75rem 0;
+  width: 100%;
+
+  &:first-of-type {
+    margin-top: 0;
+  }
+
+  &:last-of-type {
+    margin-bottom: 0;
+    width: 60%;
+  }
+}

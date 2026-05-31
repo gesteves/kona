@@ -7,8 +7,6 @@
       <li class="collection__item">
         <% if item.entry_type.present? && ['Article', 'Short'].include?(item.entry_type) %>
           <%= partial 'partials/article/summary', locals: { article: item } %>
-        <% elsif item.entry_type == 'Event' %>
-          <%= partial 'partials/event', locals: { event: item } %>
         <% end %>
       </li>
     <% end %>

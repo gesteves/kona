@@ -1,7 +1,12 @@
+<%#
+  Race-day weather block for the featured event, rendered inline in the upcoming-races section.
+  Takes `event_weather` (an EventWeatherPresenter) as a local. Moved here from the former
+  standalone /api/weather/event view.
+%>
 <%
-  event = @event_weather.event
-  event_day = @event_weather.forecast_day
-  event_forecast = @event_weather.forecast
+  event = event_weather.event
+  event_day = event_weather.forecast_day
+  event_forecast = event_weather.forecast
 %>
 <section class="event__weather" aria-labelledby="weather-hed-<%= event.sys.id.parameterize %>" data-nosnippet>
   <h5 class="event__weather-heading" id="weather-hed-<%= event.sys.id.parameterize %>">Race Day Weather</h5>
@@ -45,7 +50,7 @@
           <span class="event__weather-stat">
             <%= raw icon_svg("classic", "light", "raindrops") %>
             <%= number_to_percentage(event_forecast.precipitation_chance * 100, precision: 0) %>
-            chance of <%= @event_weather.precipitation_label %>
+            chance of <%= event_weather.precipitation_label %>
         <% end %>
       </div>
     <% end %>
@@ -69,7 +74,7 @@
       </div>
     <% end %>
     <% end %>
-    <% bay = @event_weather.bay %>
+    <% bay = event_weather.bay %>
     <% if bay.present? %>
       <div class="event__weather-stat-group">
         <span class="event__weather-stat">
@@ -93,11 +98,11 @@
     <% end %>
     <% if event_day&.sunrise.present? || event_day&.sunset.present? %>
       <div class="event__weather-stat-group">
-        <% if @event_weather.sunrise.present? && @event_weather.time_zone_id.present? %>
-          <span class="event__weather-stat" title="Sunrise"><span class="sr-only">Sunrise:</span> <%= raw icon_svg("classic", "light", "sunrise") %> <%= raw time_with_meridiem_abbr(@event_weather.sunrise, @event_weather.time_zone_id) %></span>
+        <% if event_weather.sunrise.present? && event_weather.time_zone_id.present? %>
+          <span class="event__weather-stat" title="Sunrise"><span class="sr-only">Sunrise:</span> <%= raw icon_svg("classic", "light", "sunrise") %> <%= raw time_with_meridiem_abbr(event_weather.sunrise, event_weather.time_zone_id) %></span>
         <% end %>
-        <% if @event_weather.sunset.present? && @event_weather.time_zone_id.present? %>
-          <span class="event__weather-stat" title="Sunset"><span class="sr-only">Sunset:</span> <%= raw icon_svg("classic", "light", "sunset") %> <%= raw time_with_meridiem_abbr(@event_weather.sunset, @event_weather.time_zone_id) %></span>
+        <% if event_weather.sunset.present? && event_weather.time_zone_id.present? %>
+          <span class="event__weather-stat" title="Sunset"><span class="sr-only">Sunset:</span> <%= raw icon_svg("classic", "light", "sunset") %> <%= raw time_with_meridiem_abbr(event_weather.sunset, event_weather.time_zone_id) %></span>
         <% end %>
       </div>
     <% end %>
