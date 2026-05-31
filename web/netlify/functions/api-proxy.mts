@@ -1,4 +1,4 @@
-import type { Config } from '@netlify/functions';
+import type { Config, Context } from '@netlify/functions';
 
 // The kona-api origin (fly.io). Reuses the build-time var; must also be exposed to the
 // Functions runtime scope on Netlify.
@@ -18,7 +18,10 @@ function forwardHeaders(incoming: Headers): Headers {
   return headers;
 }
 
-export default async function handler(req: Request): Promise<Response> {
+export default async function handler(
+  req: Request,
+  context: Context
+): Promise<Response> {
   const incoming = new URL(req.url);
   const upstreamUrl = new URL(incoming.pathname + incoming.search, API_ORIGIN);
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
@@ -45,6 +48,20 @@ export default async function handler(req: Request): Promise<Response> {
       headers: { 'cache-control': 'public, max-age=10' },
     });
   }
+
+  console.info(
+    [
+      `${req.method} ${incoming.pathname}`,
+      `→ ${upstream.status}`,
+      req.headers.get('User-Agent'),
+      context.ip,
+      context.geo?.city && context.geo?.country?.name
+        ? `${context.geo.city}, ${context.geo.country.name}`
+        : context.geo?.city || context.geo?.country?.name,
+    ]
+      .filter(Boolean)
+      .join(' | ')
+  );
 
   const cacheControl = upstream.headers.get('cache-control');
   const edge = upstream.headers.get('netlify-cdn-cache-control');
