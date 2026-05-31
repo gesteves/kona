@@ -20,6 +20,8 @@ gem "redcarpet"
 gem "redis"
 # Condenses Rails' multi-line request logs into one structured line per request
 gem "lograge"
+# Caps total request wall-time so no single request can hold a Puma thread indefinitely
+gem "rack-timeout"
 # GraphQL client for the Font Awesome API
 gem "graphql-client"
 
