@@ -18,6 +18,8 @@ gem "jwt"
 gem "redcarpet"
 # Redis caching (shares REDIS_URL with the web app)
 gem "redis"
+# Condenses Rails' multi-line request logs into one structured line per request
+gem "lograge"
 # GraphQL client for the Font Awesome API
 gem "graphql-client"
 
