@@ -39,6 +39,10 @@ RSpec.describe "Api::Articles trending", type: :request do
       { results: rows }
     end
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
+    # The ranking is cached via cached_json; stub Redis so the suite stays Redis-free and examples
+    # don't leak cached results into each other.
+    allow($redis).to receive(:get).and_return(nil)
+    allow($redis).to receive(:setex)
   end
 
   it "renders the trending-articles section as a live-update fragment" do
