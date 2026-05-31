@@ -1,4 +1,4 @@
-<article class="entry entry--summary event <%= "event--has-weather" if is_featured?(event) %>" id="event-<%= event.sys.id.parameterize %>" aria-labelledby="hed-<%= event.sys.id.parameterize %>">
+<article class="entry entry--summary event <%= "event--is-featured" if is_featured?(event) %>" id="event-<%= event.sys.id.parameterize %>" aria-labelledby="hed-<%= event.sys.id.parameterize %>">
   <div class="event__inner">
     <header class="entry__header">
       <p class="entry__meta">
