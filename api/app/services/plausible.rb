@@ -1,8 +1,6 @@
-require "httparty"
-
 # Queries the Plausible Analytics API (v2). Ported from the web app's lib/data/plausible.rb.
 # Raw responses are cached in Redis for 5 minutes.
-class Plausible
+class Plausible < ApplicationService
   PLAUSIBLE_API_URL = "https://plausible.io/api/v2/query"
 
   def initialize
@@ -30,20 +28,13 @@ class Plausible
       pagination: { offset: offset, limit: limit }
     }.compact
 
-    cache_key = generate_cache_key(body)
-    cached = $redis.get(cache_key)
-    return JSON.parse(cached, symbolize_names: true) if cached.present?
-
-    headers = {
-      "Authorization" => "Bearer #{@access_token}",
-      "Content-Type" => "application/json"
-    }
-
-    response = HTTParty.post(PLAUSIBLE_API_URL, headers: headers, body: body.to_json)
-    return unless response.success?
-
-    $redis.setex(cache_key, 5.minutes, response.body)
-    JSON.parse(response.body, symbolize_names: true)
+    cached_json(generate_cache_key(body), expires_in: 5.minutes) do
+      headers = {
+        "Authorization" => "Bearer #{@access_token}",
+        "Content-Type" => "application/json"
+      }
+      post_json(PLAUSIBLE_API_URL, headers: headers, body: body.to_json)
+    end
   end
 
   private

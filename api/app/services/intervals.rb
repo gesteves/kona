@@ -1,8 +1,6 @@
-require "httparty"
-
 # Interacts with the Intervals.icu API to fetch and summarize the athlete's activity
 # stats for the past month. The raw API response is cached in Redis for 5 minutes.
-class Intervals
+class Intervals < ApplicationService
   INTERVALS_ICU_API_URL = "https://intervals.icu/api/v1"
 
   def initialize
@@ -22,27 +20,21 @@ class Intervals
 
   private
 
-  # Fetches activities from the Intervals.icu API for the past month, caching the raw
-  # response body in Redis for 5 minutes.
+  # Fetches activities from the Intervals.icu API for the past month, caching them in Redis
+  # for 5 minutes. Uses string keys (symbolize: false), as the summary reads a["type"] etc.
   # @return [Array<Hash>, nil] List of activities, or nil on failure.
   def fetch_activities
-    cache_key = "intervals.icu:stats:#{@athlete_id}"
-    data = $redis.get(cache_key)
-    return JSON.parse(data) if data.present?
+    cached_json("intervals.icu:stats:#{@athlete_id}", expires_in: 5.minutes, symbolize: false) do
+      newest = Date.today.to_s
+      oldest = 1.month.ago.to_date.to_s
 
-    newest = Date.today.to_s
-    oldest = 1.month.ago.to_date.to_s
-
-    response = HTTParty.get(
-      "#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/activities",
-      query: { oldest: oldest, newest: newest },
-      basic_auth: { username: "API_KEY", password: @api_key }
-    )
-
-    return unless response.success?
-
-    $redis.setex(cache_key, 5.minutes, response.body)
-    JSON.parse(response.body)
+      get_json(
+        "#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/activities",
+        symbolize: false,
+        query: { oldest: oldest, newest: newest },
+        basic_auth: { username: "API_KEY", password: @api_key }
+      )
+    end
   end
 
   # Summarizes activities into swim_distance, bike_distance, run_distance, and total_activities.

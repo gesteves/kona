@@ -3,23 +3,23 @@ module Api
   # ID) instead of baked into the event at build time. Looks the event up in Contentful,
   # geocodes it, fetches the forecast (≤10 days out) + AQI (≤4 days out) + bay data, and
   # renders the event-weather fragment. Cached for an hour (the forecast is days out).
-  class WeatherController < ActionController::Base
+  class WeatherController < BaseController
     # Renders the current-weather widget markup embedded into the static site. Resolves the
     # owner's current location, fetches weather + air quality + pollen + bay + race data, and
     # renders the summary (or an empty body when weather is unavailable/stale, so the
     # live-update controller leaves the existing markup in place).
     def current
-      expires_in 5.minutes, public: true, stale_while_revalidate: 1.minute
+      cache_widget(ttl: 5.minutes)
 
       location = Location.new
-      return render(plain: "", layout: false) if location.latitude.blank?
+      return render_empty if location.latitude.blank?
 
       gmaps = GoogleMaps.new(location.latitude, location.longitude)
-      @time_zone = gmaps.time_zone_id || ENV.fetch("TIME_ZONE", "America/Denver")
+      @time_zone = gmaps.time_zone_id || TimeZoneResolver.default
       @location = DeepOstruct.wrap(gmaps.location)
       @weather = WeatherKit.new(location.latitude, location.longitude, @time_zone, gmaps.country_code).data
 
-      return render(plain: "", layout: false) unless weather_current?(@weather)
+      return render_empty unless weather_current?(@weather)
 
       @air_quality = AirQuality.new(location.latitude, location.longitude, gmaps.country_code).data
       @pollen = GooglePollen.new(location.latitude, location.longitude).data
@@ -27,19 +27,19 @@ module Api
       @goodspeed = Goodspeed.new.data
       @workouts = TrainerRoad.new(@time_zone).workouts || []
 
-      render :current, layout: false
+      render :current
     end
 
     def event
-      expires_in 1.hour, public: true, stale_while_revalidate: 1.minute
+      cache_widget(ttl: 1.hour)
 
       record = Events.new.find(params[:id])
       lat = record&.coordinates&.lat
       lon = record&.coordinates&.lon
-      return render(plain: "", layout: false) if lat.blank? || lon.blank?
+      return render_empty if lat.blank? || lon.blank?
 
       gmaps = GoogleMaps.new(lat, lon)
-      @time_zone = gmaps.time_zone_id || ENV.fetch("TIME_ZONE", "America/Denver")
+      @time_zone = gmaps.time_zone_id || TimeZoneResolver.default
       country = gmaps.country_code
 
       event_datetime = DateTime.parse(record.date).in_time_zone(@time_zone)
@@ -48,11 +48,12 @@ module Api
       weather = WeatherKit.new(lat, lon, @time_zone, country).data if country.present? && days_until.between?(0, 10)
       aqi = GoogleAirQuality.new(lat, lon, country, "usa_epa_nowcast", event_datetime).aqi if country.present? && days_until.between?(0, 4)
 
-      @goodspeed = Goodspeed.new.data
+      goodspeed = Goodspeed.new.data
       @event = DeepOstruct.wrap(sys: { id: record.sys&.id }, date: record.date, location: gmaps.location, location_label: record.location, aqi: aqi)
       @event.weather = weather
+      @event_weather = EventWeatherPresenter.new(@event, goodspeed: goodspeed)
 
-      render :event, layout: false
+      render :event
     end
 
     private

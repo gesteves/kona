@@ -1,9 +1,8 @@
-require "httparty"
 require "icalendar"
 
 # Fetches today's workouts from a TrainerRoad calendar (an iCalendar feed). Used to
 # decide whether today is a rest day, which tweaks the Whoop strain label.
-class TrainerRoad
+class TrainerRoad < ApplicationService
   CALENDAR_URL = ENV["TRAINERROAD_CALENDAR_URL"]
   DISCIPLINE_ORDER = { "Swim" => 1, "Bike" => 2, "Run" => 3 }
 
@@ -18,27 +17,21 @@ class TrainerRoad
     return if CALENDAR_URL.blank?
 
     cache_key = "trainerroad:workouts:#{@timezone}:#{CALENDAR_URL.parameterize}"
-    data = $redis.get(cache_key)
+    cached_json(cache_key, expires_in: 5.minutes) do
+      response = HTTParty.get(CALENDAR_URL)
+      next [] unless response.success?
 
-    return JSON.parse(data, symbolize_names: true) if data.present?
+      calendar = Icalendar::Calendar.parse(response.body).first
+      today = Time.current.in_time_zone(@timezone).to_date
 
-    response = HTTParty.get(CALENDAR_URL)
-    return [] unless response.success?
+      todays_events = calendar.events.select do |event|
+        event.dtstart.to_datetime.to_date == today
+      end
 
-    calendars = Icalendar::Calendar.parse(response.body)
-    calendar = calendars.first
-    today = Time.current.in_time_zone(@timezone).to_date
-
-    todays_events = calendar.events.select do |event|
-      event.dtstart.to_datetime.to_date == today
+      todays_events.map { |event| parse_workout(event) }
+                   .compact
+                   .sort_by { |w| DISCIPLINE_ORDER[w[:discipline]] }
     end
-
-    workouts = todays_events.map { |event| parse_workout(event) }
-    workouts = workouts.compact.sort_by { |w| DISCIPLINE_ORDER[w[:discipline]] }
-
-    $redis.setex(cache_key, 5.minutes, workouts.to_json)
-
-    workouts
   end
 
   private

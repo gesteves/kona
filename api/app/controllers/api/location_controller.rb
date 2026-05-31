@@ -2,12 +2,14 @@ module Api
   # Returns the current location, geocoded into { geocoded, time_zone, elevation } — the
   # source of truth the static site's build fetches (instead of geocoding itself). Not
   # cached, so a build triggered by a location change always gets the fresh value.
-  class LocationController < ActionController::Base
+  class LocationController < BaseController
+    include TokenAuthentication
+
     skip_forgery_protection
-    before_action :authenticate_token!, only: :create
+    before_action :authenticate_bearer_token!, only: :create
 
     def show
-      response.headers["Cache-Control"] = "no-store"
+      no_store!
 
       location = Location.new
       if location.latitude.blank?
@@ -34,17 +36,6 @@ module Api
 
       $redis.set(Location::LOCATION_CACHE_KEY, "#{latitude},#{longitude}")
       head :no_content
-    end
-
-    private
-
-    def authenticate_token!
-      expected = ENV["API_TOKEN"].to_s
-      provided = request.authorization.to_s.split(" ", 2).last.to_s
-
-      return if expected.present? && ActiveSupport::SecurityUtils.secure_compare(provided, expected)
-
-      head :unauthorized
     end
   end
 end

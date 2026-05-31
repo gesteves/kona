@@ -1,9 +1,7 @@
-require "httparty"
-
 # Fetches air quality from the nearest PurpleAir sensor (US-centric), applying the EPA
 # humidity correction and converting PM2.5 to an AQI. `aqi` returns
 # { aqi:, category:, description: } or nil when no usable sensor is nearby.
-class PurpleAir
+class PurpleAir < ApplicationService
   attr_reader :aqi
   PURPLE_AIR_API_URL = "https://api.purpleair.com/v1/sensors"
 
@@ -50,14 +48,9 @@ class PurpleAir
     query = bounding_box.merge(location_type: 0, max_age: 1.hour, fields: "pm2.5_atm,latitude,longitude,humidity,confidence")
 
     cache_key = "purple_air:sensors:#{query.values.map(&:to_s).join(':')}"
-    cached = $redis.get(cache_key)
-    return JSON.parse(cached) if cached.present?
-
-    response = HTTParty.get(PURPLE_AIR_API_URL, query: query, headers: { "X-API-Key" => ENV["PURPLEAIR_API_KEY"] })
-    return unless response.success?
-
-    $redis.setex(cache_key, 5.minutes, response.body)
-    JSON.parse(response.body)
+    cached_json(cache_key, expires_in: 5.minutes, symbolize: false) do
+      get_json(PURPLE_AIR_API_URL, symbolize: false, query: query, headers: { "X-API-Key" => ENV["PURPLEAIR_API_KEY"] })
+    end
   end
 
   # Applies the EPA humidity correction to raw PM2.5.

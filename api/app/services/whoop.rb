@@ -5,7 +5,7 @@ require "uri"
 # data, and to run the OAuth2 flow that authorizes the app. Access and refresh tokens
 # are stored in Redis (shared with the web app) and the access token is refreshed as
 # needed, handling refresh-token rotation.
-class Whoop
+class Whoop < ApplicationService
   WHOOP_API_URL = "https://api.prod.whoop.com/developer/v2"
   WHOOP_OAUTH_URL = "https://api.prod.whoop.com/oauth/oauth2"
   SCOPE = "offline read:recovery read:cycles read:workout read:sleep read:profile read:body_measurement"
@@ -147,19 +147,12 @@ class Whoop
     access_token = get_access_token
     return if access_token.blank?
 
-    cache_key = "whoop:#{@client_id}:#{cache_name}"
-    cached_response = $redis.get(cache_key)
-    return JSON.parse(cached_response, symbolize_names: true) if cached_response.present?
-
-    response = HTTParty.get(
-      "#{WHOOP_API_URL}/#{path}",
-      headers: { "Authorization" => "Bearer #{access_token}" }
-    )
-
-    return unless response.success?
-
-    $redis.setex(cache_key, ttl, response.body)
-    JSON.parse(response.body, symbolize_names: true)
+    cached_json("whoop:#{@client_id}:#{cache_name}", expires_in: ttl) do
+      get_json(
+        "#{WHOOP_API_URL}/#{path}",
+        headers: { "Authorization" => "Bearer #{access_token}" }
+      )
+    end
   end
 
   # Gets a valid access token, refreshing if necessary. Handles token rotation by

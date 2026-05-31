@@ -6,7 +6,7 @@ require "base64"
 # Fetches weather from Apple's WeatherKit REST API. Authenticates with an ES256 JWT
 # signed from the WEATHERKIT_* credentials. The raw response is cached in Redis for
 # 5 minutes. `data` returns the weather wrapped for dot-access (or nil).
-class WeatherKit
+class WeatherKit < ApplicationService
   WEATHERKIT_API_URL = "https://weatherkit.apple.com/api/v1/"
 
   # @param latitude [Float]
@@ -23,7 +23,7 @@ class WeatherKit
   # @return [OpenStruct, nil] The weather data (snake_cased, dot-accessible), or nil.
   def data
     return @data if defined?(@data)
-    weather = get_weather&.deep_transform_keys { |key| key.to_s.underscore.to_sym }
+    weather = underscore_keys(get_weather)
     @data = weather && DeepOstruct.wrap(weather)
   end
 
@@ -35,62 +35,46 @@ class WeatherKit
   def get_weather
     return if @latitude.blank? || @longitude.blank? || @time_zone.blank? || @country.blank?
 
-    retries ||= 0
     cache_key = "weatherkit:weather:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
-    cached = $redis.get(cache_key)
-    return JSON.parse(cached, symbolize_names: true) if cached.present?
+    cached_json(cache_key, expires_in: 5.minutes) do
+      with_retries do
+        datasets = availability
+        next if datasets.blank?
 
-    datasets = availability
-    return if datasets.blank?
+        query = {
+          country: @country,
+          dataSets: datasets.join(","),
+          timezone: @time_zone
+        }
 
-    query = {
-      country: @country,
-      dataSets: datasets&.join(","),
-      timezone: @time_zone
-    }
+        response = HTTParty.get(
+          "#{WEATHERKIT_API_URL}weather/en/#{@latitude}/#{@longitude}",
+          query: query,
+          headers: { "Authorization" => "Bearer #{token}" }
+        )
+        raise "Failed to fetch weather data: #{response.code}" unless response.success?
 
-    response = HTTParty.get(
-      "#{WEATHERKIT_API_URL}weather/en/#{@latitude}/#{@longitude}",
-      query: query,
-      headers: { "Authorization" => "Bearer #{token}" }
-    )
-    raise "Failed to fetch weather data: #{response.code}" unless response.success?
-
-    $redis.setex(cache_key, 5.minutes, response.body)
-    JSON.parse(response.body, symbolize_names: true)
-  rescue StandardError
-    retries += 1
-    if retries <= 3
-      sleep(2**retries)
-      retry
+        JSON.parse(response.body, symbolize_names: true)
+      end
     end
-    nil
   end
 
   # Checks which datasets are available for the location, retrying with backoff on failure.
   # @return [Array, nil]
   def availability
-    retries ||= 0
     cache_key = "weatherkit:availability:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
-    cached = $redis.get(cache_key)
-    return JSON.parse(cached, symbolize_names: true) if cached.present?
+    cached_json(cache_key, expires_in: 5.minutes) do
+      with_retries do
+        response = HTTParty.get(
+          "#{WEATHERKIT_API_URL}availability/#{@latitude}/#{@longitude}",
+          query: { country: @country },
+          headers: { "Authorization" => "Bearer #{token}" }
+        )
+        raise "Failed to fetch availability data: #{response.code}" unless response.success?
 
-    response = HTTParty.get(
-      "#{WEATHERKIT_API_URL}availability/#{@latitude}/#{@longitude}",
-      query: { country: @country },
-      headers: { "Authorization" => "Bearer #{token}" }
-    )
-    raise "Failed to fetch availability data: #{response.code}" unless response.success?
-
-    $redis.setex(cache_key, 5.minutes, response.body)
-    JSON.parse(response.body, symbolize_names: true)
-  rescue StandardError
-    retries += 1
-    if retries <= 3
-      sleep(2**retries)
-      retry
+        JSON.parse(response.body, symbolize_names: true)
+      end
     end
-    nil
   end
 
   # Generates the ES256 JWT used to authenticate with WeatherKit.
