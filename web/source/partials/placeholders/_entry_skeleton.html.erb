@@ -1,15 +1,15 @@
-<%# Reusable loading skeleton for an entry summary card. Mirrors the entry summary structure — %>
-<%# eyebrow, heading, and four lines of body text — so it can stand in for any entry collection %>
-<%# (upcoming races now; trending / recent articles later). %>
-<article class="entry entry--summary">
-  <header class="entry__header">
-    <p class="entry__meta"><wa-skeleton class="entry-skeleton-eyebrow" effect="sheen"></wa-skeleton></p>
-    <h4 class="entry__hed"><wa-skeleton class="entry-skeleton-heading" effect="sheen"></wa-skeleton></h4>
-  </header>
-  <div class="entry__body">
-    <wa-skeleton class="entry-skeleton-line" effect="sheen"></wa-skeleton>
-    <wa-skeleton class="entry-skeleton-line" effect="sheen"></wa-skeleton>
-    <wa-skeleton class="entry-skeleton-line" effect="sheen"></wa-skeleton>
-    <wa-skeleton class="entry-skeleton-line" effect="sheen"></wa-skeleton>
+<%# Reusable loading skeleton for an entry card. Mirrors the entry summary structure — %>
+<%# eyebrow, heading, and `lines` lines of body text — so it can stand in for any entry %>
+<%# collection. Pass `lines:` to size the body: events need 4, summaries default to 2. %>
+<% line_count = defined?(lines) ? lines : 2 %>
+<div class="entry entry--summary">
+  <div class="entry__header">
+    <span class="entry__meta"><wa-skeleton class="entry-skeleton-eyebrow" effect="sheen"></wa-skeleton></span>
+    <span class="entry__hed"><wa-skeleton class="entry-skeleton-heading" effect="sheen"></wa-skeleton></span>
   </div>
-</article>
+  <div class="entry__body">
+    <% line_count.times do %>
+      <wa-skeleton class="entry-skeleton-line" effect="sheen"></wa-skeleton>
+    <% end %>
+  </div>
+</div>

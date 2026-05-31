@@ -9,15 +9,15 @@ module MarkupHelper
     end
   end
 
-  # Renders an event's Markdown body to HTML for the upcoming-races widget. This is a
-  # deliberately minimal subset of the static site's render_body: events are short prose with
-  # no images, tables, iframes, or embeds, so it skips the asset/figure/srcset/blurhash
-  # machinery (which is welded to the build-time asset index anyway) and does only the two
-  # lightweight transforms events actually use — unit-conversion spans and external links.
-  # Any Markdown image/table, were one ever added, degrades to a plain element.
+  # Renders a card's Markdown body (an event summary/description, an article summary) to HTML.
+  # A deliberately minimal subset of the static site's render_body: card bodies are short prose
+  # with no images, tables, iframes, or embeds, so it skips the asset/figure/srcset/blurhash
+  # machinery (welded to the build-time asset index anyway) and does only the two lightweight
+  # transforms these bodies use — unit-conversion spans and external links. Any Markdown
+  # image/table, were one ever added, degrades to a plain element.
   # @param text [String, nil]
   # @return [String, nil]
-  def render_event_body(text)
+  def render_summary_body(text)
     html = markdown_to_html(text)
     return if html.blank?
     doc = Nokogiri::HTML::DocumentFragment.parse(html)

@@ -7,7 +7,7 @@
   <ol class="collection__list">
     <% 3.times do %>
       <li class="collection__item">
-        <%= partial 'partials/placeholders/entry_skeleton' %>
+        <%= partial 'partials/placeholders/entry_skeleton', locals: { lines: 4 } %>
       </li>
     <% end %>
   </ol>

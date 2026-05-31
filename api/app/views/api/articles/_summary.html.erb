@@ -1,0 +1,27 @@
+<%#
+  Article summary card for the trending section. Local: `article`. Ported from the static site's
+  partials/article/_summary.html.erb — prose body via the minimal renderer; no cover image.
+%>
+<article class="entry entry--summary" id="entry-<%= article.sys.id.parameterize %>" aria-labelledby="hed-<%= article.sys.id.parameterize %>">
+  <header class="entry__header">
+    <p class="entry__meta">
+      <% if new_article?(article) %>
+        <span class="entry__highlight"><%= raw icon_svg("classic", "regular", "sparkles") %> New</span>
+      <% end %>
+      <span>
+        <% if published_today?(article) %>
+          <%= raw clock_icon_svg(DateTime.parse(article.published_at)) %>
+        <% else %>
+          <%= raw icon_svg("classic", "light", "calendar") %>
+        <% end %>
+        <%= article_permalink_timestamp(article) %>
+      </span>
+    </p>
+    <h4 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">
+      <%= link_to raw(smartypants(article.title)), article.path %>
+    </h4>
+  </header>
+  <div class="entry__body">
+    <%= raw render_summary_body(article.summary) %>
+  </div>
+</article>

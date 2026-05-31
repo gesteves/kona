@@ -7,4 +7,35 @@ module IconsHelper
   def icon_svg(family, style, icon_id)
     (@font_awesome ||= FontAwesome.new).svg(family, style, icon_id)
   end
+
+  # Integer hour (1–12) → word, for the clock-face icon ids (clock-three, clock-three-thirty, …).
+  CLOCK_NUMBER_WORDS = %w[zero one two three four five six seven eight nine ten eleven twelve].freeze
+
+  # Returns the SVG for the clock-face icon closest to the given time. Mirrors the static site's
+  # clock_icon_svg; the number words are inlined so no humanize gem is needed.
+  # @param datetime [DateTime, Time]
+  # @return [String, nil]
+  def clock_icon_svg(datetime, family = "classic", style = "light")
+    hours = datetime.hour % 12
+    hours = 12 if hours.zero?
+    minutes = datetime.min
+
+    if minutes < 15
+      suffix = ""
+    elsif minutes < 45
+      suffix = "thirty"
+    else
+      hours = (hours + 1) % 12
+      hours = 12 if hours.zero?
+      suffix = ""
+    end
+
+    icon_id = if hours == 4 && suffix.blank?
+      "clock" # there's no clock-four icon
+    else
+      ["clock", CLOCK_NUMBER_WORDS[hours], suffix].reject(&:blank?).join("-")
+    end
+
+    icon_svg(family, style, icon_id)
+  end
 end

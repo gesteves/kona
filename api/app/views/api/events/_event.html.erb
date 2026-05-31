@@ -18,7 +18,7 @@
       </h4>
     </header>
     <div class="entry__body event__description">
-      <%= raw render_event_body(featured ? (event.description.presence || event.summary) : event.summary) %>
+      <%= raw render_summary_body(featured ? (event.description.presence || event.summary) : event.summary) %>
     </div>
   </div>
   <% if event_weather.present? %>
