@@ -5,10 +5,17 @@ module LiveWidget
   extend ActiveSupport::Concern
 
   # How long Netlify's durable edge may keep serving a stale fragment while it revalidates
-  # against a slow/cold origin (swr) or recovers from a failing one (sie). Deliberately long
-  # so the widgets keep rendering even if the single fly.io machine is briefly down or
-  # cold-starting from zero.
+  # against a slow/cold or failing origin. Deliberately long so the widgets keep rendering
+  # even if the single fly.io machine is briefly down or cold-starting from zero: while the
+  # background revalidation is slow OR fails, the edge keeps serving the last good fragment
+  # for up to a day. This serve-stale-on-failed-revalidation behavior is what actually
+  # provides the down-origin resilience.
   EDGE_STALE_WHILE_REVALIDATE = 1.day
+  # `stale-if-error` is included aspirationally: it documents the intent (keep serving stale
+  # on an origin error) but Netlify's CDN currently ignores it — it's not in Netlify's list of
+  # supported Netlify-CDN-Cache-Control directives, and that header isn't passed downstream to
+  # anything that would honor it. The resilience above comes from stale-while-revalidate, not
+  # this. Kept so the directive activates automatically if Netlify ever adds support.
   EDGE_STALE_IF_ERROR = 1.day
 
   private
@@ -36,9 +43,17 @@ module LiveWidget
       "stale-if-error=#{EDGE_STALE_IF_ERROR.to_i}"
   end
 
-  # Renders an empty body. The live-update controller no-ops on it, leaving the existing
-  # markup in place rather than blanking the widget when data is unavailable.
+  # An empty body signals transient unavailability, not real data. The live-update controller
+  # no-ops on it, leaving the existing markup in place rather than blanking the widget.
+  # cache_widget already set the full durable policy; downgrade it here (short, non-durable)
+  # so a momentary origin blip doesn't pin a no-op fragment for the whole data TTL — the
+  # widget recovers within EMPTY_TTL instead of staying frozen for up to an hour. Still
+  # short-cached so a sustained outage doesn't hammer the single origin machine. (Only the
+  # edge header needs downgrading; the browser Cache-Control is already max-age=0.)
+  EMPTY_TTL = 1.minute
+
   def render_empty
+    response.headers["Netlify-CDN-Cache-Control"] = "public, max-age=#{EMPTY_TTL.to_i}"
     render plain: ""
   end
 

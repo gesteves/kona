@@ -37,8 +37,10 @@ export default async function handler(req: Request): Promise<Response> {
       upstreamUrl.toString(),
       error
     );
+    // Empty body so the live-update controller no-ops and leaves the existing widget markup
+    // in place (same contract as the origin's render_empty) instead of injecting error text.
     // Briefly cacheable so a momentary origin blip isn't hammered, but never durable.
-    return new Response('Bad Gateway', {
+    return new Response('', {
       status: 502,
       headers: { 'cache-control': 'public, max-age=10' },
     });

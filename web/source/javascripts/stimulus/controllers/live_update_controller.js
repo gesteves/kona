@@ -38,6 +38,8 @@ export default class extends Controller {
     if (this.hasUrlValue) {
       try {
         let response = await fetch(this.urlValue);
+        // Non-2xx (proxy 502, origin error page) → leave the existing markup in place.
+        if (!response.ok) return;
         let data = await response.text();
 
         if (data.trim().length > 0) {

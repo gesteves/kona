@@ -56,5 +56,13 @@ RSpec.describe "Activity stats", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty
     end
+
+    it "downgrades the edge cache to a short, non-durable TTL so a blip doesn't pin the no-op" do
+      get "/api/activity-stats"
+
+      edge = response.headers["Netlify-CDN-Cache-Control"]
+      expect(edge).to eq("public, max-age=60")
+      expect(edge).not_to include("durable")
+    end
   end
 end
