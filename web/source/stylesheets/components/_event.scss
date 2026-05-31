@@ -64,6 +64,11 @@
   text-transform: none;
   font-size: var(--font-small);
   line-height: var(--line-height-small);
+  margin-top: 1rem;
+
+  @include bp-large {
+    margin-top: 0;
+  }
 }
 
 .event__weather-stat {
