@@ -1,8 +1,8 @@
 import type { Config } from '@netlify/functions';
 
 // The kona-api origin (fly.io). Reuses the build-time var; must also be exposed to the
-// Functions runtime scope on Netlify. Falls back to the public host for safety.
-const API_ORIGIN = process.env.KONA_API_URL ?? 'https://api.giventotri.com';
+// Functions runtime scope on Netlify.
+const API_ORIGIN = process.env.KONA_API_URL;
 
 // Cache-Control directives that mean "don't store in a shared/edge cache".
 const UNCACHEABLE = /\b(?:no-store|no-cache|private)\b/i;
