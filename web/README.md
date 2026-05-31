@@ -1,4 +1,4 @@
-# Kona — web
+# kona-web
 
 The blog itself: a [Middleman](https://middlemanapp.com/) static site powered by [Contentful](https://www.contentful.com/) and hosted on [Netlify](https://www.netlify.com/). Live home-page widgets (weather, activity stats, Whoop, pageviews) are served at runtime by the [`api/`](../api/README.md) app through a Netlify `/api/*` proxy.
 
