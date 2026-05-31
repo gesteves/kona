@@ -394,7 +394,7 @@ module WeatherHelper
   def live_tracking
     return unless is_trackable?(todays_race)
     content_tag :span, class: "weather__highlight weather__highlight--live" do
-      "#{content_tag(:a, 'Live results', href: todays_race.tracking_url, rel: 'noopener', target: '_blank')} #{icon_svg('classic', 'solid', 'signal-stream')}".html_safe
+      "#{content_tag(:a, 'Live results', href: todays_race.tracking_url, rel: 'noopener', target: '_blank')} #{icon_svg('classic', 'solid', 'circle-small')}".html_safe
     end
   end
 
