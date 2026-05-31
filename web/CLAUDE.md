@@ -1,193 +1,98 @@
-# AGENTS.md
+# web/ — Kona static site
 
-This file provides guidance to AI agents when working with code in this repository.
+Middleman 4 static site generator (Ruby 4.0.5) that builds a **Contentful**-powered
+blog and deploys to **Netlify**. esbuild bundles JavaScript (Stimulus + Turbo); Sass
+compiles the stylesheets.
 
-## Core Architecture
+This app no longer fetches its own weather / activity / Whoop data — that moved to the
+`api/` app and is loaded at runtime. See the root [`CLAUDE.md`](../CLAUDE.md) for the
+web↔api contract before touching any widget markup.
 
-Kona is a static site generator built on **Middleman** that creates a blog powered by **Contentful**. The architecture follows a data-driven approach where external APIs are fetched at build time and cached as JSON files.
+## Architecture & data flow
 
-### Key Design Patterns
+- **Build-time data** (`rake import`): fetches external data into `data/*.json` (Redis
+  is used as a cache). Sources: Contentful content, Font Awesome icons, Plausible
+  metrics (merged into each article), the current location (fetched from the API),
+  dark-visitors robots data, and standard.site (Bluesky / AT Protocol) sync.
+- **Page generation**: Middleman proxies (`config.rb`) turn `data/*.json` into static
+  pages — articles, pages, tags, blog index.
+- **Runtime dynamic content**: weather, activity stats, Whoop, per-article pageviews,
+  and event weather are **not built here**. The `live-update` Stimulus controller
+  fetches them client-side from `/api/*` into placeholder partials (root `CLAUDE.md`).
 
-- **Data Layer**: All external data (CMS content, weather, activity stats) is fetched via rake tasks and stored in `data/*.json` files
-- **Proxy System**: Middleman uses data files to generate pages dynamically via proxies (articles, pages, tags)
-- **Helper Architecture**: Business logic is organized in modular helpers in `lib/helpers/`
-- **Component Structure**: ERB partials in `source/partials/` provide reusable UI components
-- **Asset Pipeline**: esbuild handles JavaScript bundling, Sass for stylesheets
+## Commands
 
-### Data Flow
-
-1. `rake import` fetches data from external APIs (Contentful, WeatherKit, Google APIs, etc.)
-2. Data is cached in Redis and saved as JSON files in `data/`
-3. Middleman reads JSON data files and generates static pages via proxies
-4. ERB templates use helper methods to render content and components
-
-## MANDATORY WORKFLOW REQUIREMENTS
-
-**ALL agents MUST follow these requirements in order:**
-
-### 1. Tests Must Pass
-
-- **ALWAYS** run `bundle exec rake test` after making changes
-- **NEVER** commit code that fails tests
-- If tests fail, fix them before proceeding
-
-### 2. Full Build Must Succeed
-
-- **ALWAYS** run `bundle exec rake build:verbose` after making changes
-- **NEVER** commit code that fails the build process
-- The build process includes: tests → data import → JavaScript build → Middleman build
-
-### 3. Follow EditorConfig Conventions
-
-- **ALWAYS** follow the rules defined in `.editorconfig`
-
-### 4. Lint Code Using Available Tools
-
-- **ALWAYS** run `npm run lint:scss` for SCSS files
-- **ALWAYS** run `npm run format:check` for JavaScript, JSON, and Markdown files
-- **ALWAYS** fix linting issues before committing
-- Use `npm run lint:scss:fix` to auto-fix SCSS issues
-- Use `npm run format` to auto-fix formatting issues
-
-### 5. Build JavaScript When Making JS Changes
-
-- **ALWAYS** run `npm run build` after making changes to JavaScript files
-- **NEVER** commit JavaScript changes without building them first
-
-### 6. Use the Correct Node Version
-
-- **ALWAYS** run `nvm use` before any `npm` command to ensure the right version of Node is used
-
-## Available Commands
-
-### Rake Commands
-
-#### Core Development
+Run `nvm use` before any `npm` command.
 
 ```bash
-# Import all data (run this first)
-bundle exec rake import
-
-# Run tests (MANDATORY after making changes)
+# Tests — single file (fast) then full suite
+bundle exec rspec spec/lib/helpers/markup_helpers_spec.rb
 bundle exec rake test
 
-# Full build process
-bundle exec rake build
+# Local dev
+bundle exec rake import          # fetch fresh data first
+bundle exec middleman            # dev server
+npm run watch                    # JS/CSS rebuild on change (separate terminal)
 
-# Build with verbose output (MANDATORY after making changes)
+# Lint / format
+npm run lint:scss                # stylelint (fix: npm run lint:scss:fix)
+npm run format:check             # prettier for JS/JSON/MD (fix: npm run format)
+
+# JS build — required after any JS change
+npm run build
+
+# Full production build: test → import → npm build → middleman build
 bundle exec rake build:verbose
 ```
 
-#### Partial Data Import
+### Import subtasks
 
-```bash
-# Import specific data types
-bundle exec rake import:content    # Contentful
-bundle exec rake import:icons      # Font Awesome icons
-bundle exec rake import:weather    # Weather, AQI, pollen
-bundle exec rake import:whoop      # Whoop data
-```
+Only these exist: `rake import` (runs all in parallel), `import:content` (Contentful),
+`import:icons` (Font Awesome), `import:location` (fetches `KONA_API_URL/api/location`),
+`import:standard_site` (Bluesky sync). Also `rake redis:empty` to flush the cache.
 
-### NPM Commands
+## Key locations
 
-#### JavaScript/CSS Development
+- `config.rb` — Middleman config + proxy setup; `Rakefile` — Redis init + task loader.
+- `lib/data/*.rb` — build-time clients: `contentful.rb`, `font_awesome.rb`,
+  `plausible.rb`, `dark_visitors.rb`, `standard_site.rb` (+ `graphql/`).
+- `lib/tasks/*.rake` — `import`, `build`, `test`, `maps`, `redis`.
+- `lib/helpers/*.rb` — 15 helper modules (article, markup, image, site, events, unit,
+  share, icon, url, text, markdown, location, context, cache, affiliate_links);
+  `helpers/custom_helpers.rb` registers them.
+- `source/layouts/layout.erb`, `source/partials/` (incl. `placeholders/`),
+  `source/javascripts/stimulus/`, `source/stylesheets/`.
+- `netlify/functions/` — `api-proxy.mts` (proxies `/api/*`; see root `CLAUDE.md`),
+  `og.mts` (OG images), `scheduled-deploy.js` (daily rebuild).
+- `data/font_awesome.yml` — **icon allowlist**. Any new icon must be added here (under
+  the correct family/style, e.g. `classic.light`) before `icon_svg` / `rake import:icons`
+  can use it.
 
-```bash
-# Build JavaScript for production (MANDATORY after JS changes)
-npm run build
+## Environment variables
 
-# Watch for JS/CSS changes during development
-npm run watch
-```
+Names only — see `.env.example`; never commit values.
 
-#### Code Quality
+- **Required**: `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`, `FONT_AWESOME_API_TOKEN`,
+  `REDIS_URL`, `KONA_API_URL` (base URL of the `api/` app — used by `import:location`
+  and the `/api/*` proxy).
+- **Optional**: `BUILD_HOOK_URL`, `DARK_VISITORS_ACCESS_TOKEN`, `PLAUSIBLE_API_KEY`,
+  `PLAUSIBLE_SITE_ID`, `CLOUDFRONT_DOMAIN`, `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`,
+  `BLUESKY_PDS_URL`.
 
-```bash
-# Lint SCSS files (MANDATORY)
-npm run lint:scss
+## Conventions & gates
 
-# Auto-fix SCSS linting issues
-npm run lint:scss:fix
+- **Before committing** (non-negotiable): `bundle exec rake test` passes →
+  `npm run lint:scss` + `npm run format:check` clean → `npm run build` if you changed
+  JS → `bundle exec rake build:verbose` succeeds. Follow `.editorconfig`.
+- **Netlify**: build tools must be in `dependencies`, not `devDependencies` — Netlify
+  installs with `NODE_ENV=production` and skips `devDependencies`.
+- **Tests** live in `spec/` and focus on helpers, text/markdown processing, and data
+  transformation.
+- **Widget markup**: editing a placeholder partial means editing the matching `api/`
+  view too (root `CLAUDE.md`).
 
-# Check formatting for JS/JSON/MD files (MANDATORY)
-npm run format:check
+### Permissions
 
-# Auto-fix formatting issues
-npm run format
-```
-
-### Middleman Commands
-
-```bash
-# Local development server
-bundle exec middleman
-
-# Build site only (without data import)
-bundle exec middleman build
-```
-
-## Key File Locations
-
-### Configuration
-
-- `config.rb` - Middleman configuration and proxy setup
-- `netlify.toml` - Netlify build settings and redirects
-- `Rakefile` - Main rake tasks and Redis setup
-
-### Data Layer
-
-- `lib/data/*.rb` - API client classes for external services
-- `lib/tasks/import.rake` - Data import orchestration
-- `data/*.json` - Generated data files (git-ignored)
-
-### Icons
-
-- `data/font_awesome.yml` - Allowlist of Font Awesome icons available to the site. **Any new icon must be added here (under the correct family/style, e.g. `classic.light`) before it can be used** via `icon_svg`; `rake import:icons` only fetches icons listed in this file.
-
-### Frontend Code
-
-- `source/layouts/layout.erb` - Main layout template
-- `source/partials/` - Reusable ERB components
-- `lib/helpers/` - Ruby helper methods for templates
-- `source/javascripts/stimulus/` - Stimulus controllers for interactivity
-- `source/stylesheets/` - SCSS stylesheets
-
-### Build Output
-
-- `build/` - Generated static site (git-ignored)
-
-## Development Workflow
-
-### Starting Development
-
-1. **ALWAYS** run `bundle exec rake import` first to get fresh data
-2. Run `bundle exec middleman` for the development server
-3. In a separate terminal, run `npm run watch` for JavaScript/CSS changes
-
-### Making Changes
-
-1. Make your changes
-2. **ALWAYS** run `npm run lint:scss` and `npm run format:check`
-3. Fix any linting issues
-4. **ALWAYS** run `npm run build` if you changed JavaScript files
-5. **ALWAYS** run `bundle exec rake test` after changes
-6. **ALWAYS** run `bundle exec rake build:verbose` before committing
-
-### Testing
-
-- Tests are located in `spec/` directory
-- Focus on helper methods, text processing, markdown rendering, and data transformation
-- Use `bundle exec rake test` to run tests
-
-## Troubleshooting
-
-### Netlify Deployment
-
-- **Build tools must be in `dependencies`, not `devDependencies`.** Netlify installs packages with `NODE_ENV=production`, which skips `devDependencies`. Any package needed during the build (e.g., esbuild) must be listed under `dependencies`.
-
-### Debugging
-
-- Check `data/*.json` files for expected structure
-- Use verbose build: `bundle exec rake build:verbose`
-
-Remember: **Tests → Lint → Build → Commit** - this is the mandatory workflow for all changes.
+- Autonomous: read files, single-file `rspec`, lint/format, local `middleman`.
+- Ask first: `git push`/commit, `rake redis:empty`, package installs, anything that
+  triggers a deploy or build hook.
