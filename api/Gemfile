@@ -20,8 +20,6 @@ gem "redcarpet"
 gem "redis"
 # GraphQL client for the Font Awesome API
 gem "graphql-client"
-# Cross-origin resource sharing for the public /activity-stats endpoint
-gem "rack-cors"
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem

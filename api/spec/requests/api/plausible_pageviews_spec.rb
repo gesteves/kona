@@ -44,11 +44,6 @@ RSpec.describe "Api::Plausible pageviews", type: :request do
     expect(cache_control).to include("max-age=3600")
   end
 
-  it "allows cross-origin requests from any origin" do
-    get "/api/plausible/pageviews/abc123", headers: { "Origin" => "https://example.com" }
-    expect(response.headers["Access-Control-Allow-Origin"]).to eq("*")
-  end
-
   context "when the article is not found" do
     before { allow_any_instance_of(Articles).to receive(:find).and_return(nil) }
 

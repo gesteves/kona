@@ -35,10 +35,10 @@ RSpec.describe "Activity stats", type: :request do
     expect(cache_control).to include("stale-while-revalidate=60")
   end
 
-  it "allows cross-origin requests from any origin" do
-    get "/api/activity-stats", headers: { "Origin" => "https://example.com" }
+  it "embeds a relative same-origin refetch URL" do
+    get "/api/activity-stats"
 
-    expect(response.headers["Access-Control-Allow-Origin"]).to eq("*")
+    expect(response.body).to include('data-live-update-url-value="/api/activity-stats"')
   end
 
   context "when the stats are unavailable" do

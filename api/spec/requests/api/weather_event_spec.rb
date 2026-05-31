@@ -79,12 +79,6 @@ RSpec.describe "Api::Weather event", type: :request do
     expect(cache_control).to include("max-age=3600")
   end
 
-  it "allows cross-origin requests from any origin" do
-    get "/api/weather/event/abc123", headers: { "Origin" => "https://example.com" }
-
-    expect(response.headers["Access-Control-Allow-Origin"]).to eq("*")
-  end
-
   context "when the event is not found" do
     before { allow_any_instance_of(Events).to receive(:find).and_return(nil) }
 
