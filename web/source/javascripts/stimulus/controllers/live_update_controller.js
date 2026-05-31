@@ -38,15 +38,27 @@ export default class extends Controller {
     if (this.hasUrlValue) {
       try {
         let response = await fetch(this.urlValue);
-        // Non-2xx (proxy 502, origin error page) → leave the existing markup in place.
-        if (!response.ok) return;
+        // Non-2xx (proxy 502, origin error page) → remove the placeholder so it
+        // collapses instead of leaving its loading skeleton stuck on the page.
+        if (!response.ok) {
+          this.element.remove();
+          return;
+        }
         let data = await response.text();
 
         if (data.trim().length > 0) {
           replaceElement(data.trim(), this.element);
+        } else {
+          // Empty body is a definitive "no data" answer (e.g. no current weather, no
+          // race-day forecast). Remove the placeholder so it collapses instead of
+          // leaving its loading skeleton on the page.
+          this.element.remove();
         }
       } catch (error) {
+        // Network failure (offline, DNS, abort) → same as above: collapse rather than
+        // leave a stuck skeleton.
         console.error('Error fetching content:', error);
+        this.element.remove();
       }
     }
   }
