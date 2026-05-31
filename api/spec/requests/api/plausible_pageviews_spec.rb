@@ -64,7 +64,7 @@ RSpec.describe "Api::Plausible pageviews", type: :request do
   context "when Plausible is unavailable" do
     before { allow_any_instance_of(Plausible).to receive(:query).and_return(nil) }
 
-    it "returns an empty body so the placeholder stays" do
+    it "returns an empty body so the live-update controller collapses the placeholder" do
       get "/api/plausible/pageviews/abc123"
       expect(response.body).to eq("")
     end

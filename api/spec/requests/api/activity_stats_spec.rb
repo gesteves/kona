@@ -50,14 +50,14 @@ RSpec.describe "Activity stats", type: :request do
   context "when the stats are unavailable" do
     before { allow_any_instance_of(Intervals).to receive(:stats).and_return(nil) }
 
-    it "returns an empty body so the live-update controller no-ops" do
+    it "returns an empty body so the live-update controller collapses the placeholder" do
       get "/api/activity-stats"
 
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty
     end
 
-    it "downgrades the edge cache to a short, non-durable TTL so a blip doesn't pin the no-op" do
+    it "downgrades the edge cache to a short, non-durable TTL so a blip doesn't pin the empty response" do
       get "/api/activity-stats"
 
       edge = response.headers["Netlify-CDN-Cache-Control"]

@@ -53,8 +53,9 @@ fragment. Consequences:
   `data-controller="live-update"` + `data-live-update-url-value` attributes, or it stops
   refreshing after the first swap.
 - Its tag, CSS class names, and DOM shape must match the placeholder.
-- An **empty** response is an intentional no-op (the placeholder stays as rendered) —
-  don't "fix" empty responses.
+- An **empty** response (or any non-2xx / network error) makes the controller **remove the
+  placeholder**, collapsing the widget rather than leaving a stuck loading skeleton. So an
+  empty body is the intentional "no data" signal — don't "fix" it by returning markup.
 
 On the web side, placeholders are built with the `live_update_section` helper; the API
 views build the matching outer element with `live_update_url`.

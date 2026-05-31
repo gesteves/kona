@@ -33,8 +33,8 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 - **Controllers** (`app/controllers/`): `Api::BaseController` (`layout false`, includes
   the `LiveWidget` concern); widget controllers fetch via a service, call
   `cache_widget(ttl:)`, then render an ERB fragment. Use `render_empty` (blank body)
-  when data is unavailable — the site's `live-update` controller treats an empty
-  response as a no-op, so prefer it over raising.
+  when data is unavailable — the site's `live-update` controller removes the placeholder
+  (collapsing the widget) on an empty response, so prefer it over raising.
 - **Services** (`app/services/`, base `ApplicationService`): one per external API —
   Intervals.icu, Apple WeatherKit (ES256 JWT), Google Maps / Air Quality / Pollen,
   PurpleAir, Whoop (OAuth2), TrainerRoad (iCal), Contentful (events/articles),

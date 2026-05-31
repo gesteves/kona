@@ -6,8 +6,8 @@ module Api
   class WeatherController < BaseController
     # Renders the current-weather widget markup embedded into the static site. Resolves the
     # owner's current location, fetches weather + air quality + pollen + bay + race data, and
-    # renders the summary (or an empty body when weather is unavailable/stale, so the
-    # live-update controller leaves the existing markup in place).
+    # renders the summary (or an empty body when weather is unavailable/stale, which tells the
+    # live-update controller to remove the placeholder so the widget collapses).
     def current
       cache_widget(ttl: 5.minutes)
 

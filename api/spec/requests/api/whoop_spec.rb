@@ -56,7 +56,7 @@ RSpec.describe "Whoop", type: :request do
   context "when the stats are unavailable" do
     before { allow_any_instance_of(Whoop).to receive(:stats).and_return(nil) }
 
-    it "returns an empty body so the live-update controller no-ops" do
+    it "returns an empty body so the live-update controller collapses the placeholder" do
       get "/api/whoop"
 
       expect(response).to have_http_status(:ok)

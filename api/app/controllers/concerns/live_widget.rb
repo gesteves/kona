@@ -1,6 +1,6 @@
 # Shared behavior for the live-updating widget endpoints embedded in the static site:
-# public HTTP caching headers, and an empty-body response the site's live-update Stimulus
-# controller treats as a no-op (leaving the existing markup in place).
+# public HTTP caching headers, and an empty-body response that signals "no data" — the
+# site's live-update Stimulus controller removes the placeholder so the widget collapses.
 module LiveWidget
   extend ActiveSupport::Concern
 
@@ -43,13 +43,14 @@ module LiveWidget
       "stale-if-error=#{EDGE_STALE_IF_ERROR.to_i}"
   end
 
-  # An empty body signals transient unavailability, not real data. The live-update controller
-  # no-ops on it, leaving the existing markup in place rather than blanking the widget.
-  # cache_widget already set the full durable policy; downgrade it here (short, non-durable)
-  # so a momentary origin blip doesn't pin a no-op fragment for the whole data TTL — the
-  # widget recovers within EMPTY_TTL instead of staying frozen for up to an hour. Still
-  # short-cached so a sustained outage doesn't hammer the single origin machine. (Only the
-  # edge header needs downgrading; the browser Cache-Control is already max-age=0.)
+  # An empty body signals "no data" rather than real markup. The live-update controller
+  # removes the placeholder on an empty response, collapsing the widget rather than leaving a
+  # stuck loading skeleton. cache_widget already set the full durable policy; downgrade it
+  # here (short, non-durable) so a momentary origin blip doesn't pin an empty response for the
+  # whole data TTL — fresh page loads get real data within EMPTY_TTL instead of a collapsed
+  # widget for up to an hour. Still short-cached so a sustained outage doesn't hammer the
+  # single origin machine. (Only the edge header needs downgrading; the browser Cache-Control
+  # is already max-age=0.)
   EMPTY_TTL = 1.minute
 
   def render_empty

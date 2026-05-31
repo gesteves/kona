@@ -40,8 +40,9 @@ export default async function handler(
       upstreamUrl.toString(),
       error
     );
-    // Empty body so the live-update controller no-ops and leaves the existing widget markup
-    // in place (same contract as the origin's render_empty) instead of injecting error text.
+    // 502 with an empty body: the live-update controller collapses the widget on any non-2xx
+    // (it removes the placeholder), and the empty body matches the origin's render_empty for
+    // any client that reads the body instead of the status — never "Bad Gateway" text.
     // Briefly cacheable so a momentary origin blip isn't hammered, but never durable.
     return new Response('', {
       status: 502,

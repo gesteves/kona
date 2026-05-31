@@ -97,7 +97,7 @@ RSpec.describe "Weather", type: :request do
   context "when the weather is unavailable" do
     before { allow_any_instance_of(WeatherKit).to receive(:data).and_return(nil) }
 
-    it "returns an empty body so the live-update controller no-ops" do
+    it "returns an empty body so the live-update controller collapses the placeholder" do
       get "/api/weather/current"
 
       expect(response).to have_http_status(:ok)
