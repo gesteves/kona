@@ -2,6 +2,10 @@
 @import 'base/variables';
 @import 'base/mixins';
 
+// Imported unlayered (and with specificity above `:host`) so these overrides beat
+// Web Awesome's own unlayered shadow-DOM styles for `<wa-skeleton>`. See the partial.
+@import 'components/skeleton';
+
 @layer reset {
   @import 'vendors/reset';
 }

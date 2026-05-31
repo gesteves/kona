@@ -1,5 +1,13 @@
 <% weather_url = "/api/weather/current" %>
-<%# Empty live-update shell: the weather markup (or nothing, when there's no current %>
-<%# weather) is fetched from the API on connect and swapped in. Kept free of inner %>
-<%# whitespace so `.weather:empty` collapses it until content arrives. %>
-<div class="weather" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= weather_url %>" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange"></div>
+<%# Loading skeleton mirroring the real weather layout (icon + text). The live-update %>
+<%# controller swaps in the real markup on connect, or removes this shell when there's %>
+<%# no current weather (empty response). %>
+<div class="weather" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= weather_url %>" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange">
+  <div class="weather__icon"><wa-skeleton class="weather-skeleton-icon" effect="sheen"></wa-skeleton></div>
+  <div class="weather__text">
+    <wa-skeleton class="weather-skeleton-text" effect="sheen"></wa-skeleton>
+    <wa-skeleton class="weather-skeleton-text" effect="sheen"></wa-skeleton>
+    <wa-skeleton class="weather-skeleton-text" effect="sheen"></wa-skeleton>
+    <wa-skeleton class="weather-skeleton-text" effect="sheen"></wa-skeleton>
+  </div>
+</div>

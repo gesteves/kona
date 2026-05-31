@@ -6,3 +6,6 @@ source/javascripts/site.js
 # Vendor files
 **/vendor/**
 **/vendors/**
+
+# Agent skills
+.agents/

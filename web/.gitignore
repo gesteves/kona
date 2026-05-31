@@ -13,3 +13,5 @@ source/javascripts/site.js*
 .netlify
 tmp/
 prompts/
+
+.agents/skills/

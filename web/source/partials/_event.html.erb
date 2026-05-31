@@ -29,9 +29,19 @@
     
   </div>
   <% if is_featured?(event) %>
-    <%# Empty live-update shell: the race-day weather is fetched from the API by event ID %>
-    <%# on connect and swapped in. Kept free of inner whitespace so `.event__weather:empty` %>
-    <%# collapses it until content arrives. %>
-    <section class="event__weather" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= "/api/weather/event/#{event.sys.id}" %>" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange"></section>
+    <%# Loading skeleton for the race-day weather, fetched from the API by event ID on %>
+    <%# connect and swapped in. The live-update controller removes this shell when there's %>
+    <%# no race-day weather (empty response). %>
+    <section class="event__weather" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= "/api/weather/event/#{event.sys.id}" %>" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange">
+      <h5 class="event__weather-heading">Race Day Weather</h5>
+      <div class="event__weather-stats">
+        <wa-skeleton class="event-weather-skeleton-line" effect="sheen"></wa-skeleton>
+        <wa-skeleton class="event-weather-skeleton-line" effect="sheen"></wa-skeleton>
+        <wa-skeleton class="event-weather-skeleton-line" effect="sheen"></wa-skeleton>
+        <wa-skeleton class="event-weather-skeleton-line" effect="sheen"></wa-skeleton>
+        <wa-skeleton class="event-weather-skeleton-line" effect="sheen"></wa-skeleton>
+        <wa-skeleton class="event-weather-skeleton-line" effect="sheen"></wa-skeleton>
+      </div>
+    </section>
   <% end %>
 </article>

@@ -1,0 +1,15 @@
+<%# Loading skeleton for a single stat card. The top label (icon + name) is static, so %>
+<%# it's rendered as real text; only the data-dependent number and footer are skeletons. %>
+<%# Reuses the real `.stats__stat` classes so each line reserves the same height, %>
+<%# avoiding layout shift when the live-update controller swaps in the real markup. %>
+<div class="stats__stat stats__stat--skeleton">
+  <span class="stats__meta"><%= icon_svg("classic", "light", icon) %> <%= top %></span>
+  <span class="stats__number"><wa-skeleton effect="sheen"></wa-skeleton></span>
+  <span class="stats__meta">
+    <% if defined?(bottom) %>
+      <%= bottom %>
+    <% else %>
+      <wa-skeleton effect="sheen"></wa-skeleton>
+    <% end %>
+  </span>
+</div>

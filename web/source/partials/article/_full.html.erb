@@ -7,10 +7,10 @@
     <p class="entry__meta">
       <span><%= icon_svg("classic", "light", "stopwatch") %> <%= reading_time(article) %></span>
       <%# The view-count span (icon + linked "Viewed N times") is fetched live from the API, %>
-      <%# keyed by Contentful ID, and swapped in for this "Never viewed" placeholder so it %>
-      <%# stays fresh between daily rebuilds. %>
+      <%# keyed by Contentful ID, and swapped in for this loading skeleton so it stays fresh %>
+      <%# between daily rebuilds. The controller removes the span if there's no count. %>
       <% views_url = "/api/plausible/pageviews/#{article.sys.id}" %>
-      <span data-controller="live-update" data-live-update-url-value="<%= views_url %>" data-live-update-fetch-on-connect-value="true"><%= icon_svg("classic", "light", "eye") %> Never viewed</span>
+      <span data-controller="live-update" data-live-update-url-value="<%= views_url %>" data-live-update-fetch-on-connect-value="true"><%= icon_svg("classic", "light", "eye") %> <wa-skeleton class="view-count-skeleton" effect="sheen"></wa-skeleton></span>
     </p>
   </header>
   <div class="entry__body">

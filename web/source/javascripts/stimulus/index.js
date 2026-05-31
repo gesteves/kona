@@ -1,6 +1,7 @@
 import * as Turbo from '@hotwired/turbo';
 import { Application } from '@hotwired/stimulus';
 import Handlebars from 'handlebars';
+import '@awesome.me/webawesome/dist/components/skeleton/skeleton.js';
 
 import BackToTopController from './controllers/back_to_top_controller';
 import ClipboardController from './controllers/clipboard_controller';

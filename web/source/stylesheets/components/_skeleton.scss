@@ -1,0 +1,105 @@
+// Loading skeletons for the live-update widgets (Web Awesome `<wa-skeleton>`).
+// We cherry-pick only the skeleton component (stimulus/index.js), so Web Awesome's
+// theme tokens aren't loaded: the component's `:host` rule defaults `--color` to an
+// undefined `--wa-*` token, which leaves the indicator transparent (invisible).
+// We override `--color` / `--sheen-color` with the site's placeholder colors.
+// Two cascade gotchas this file works around, so the overrides actually win:
+//   1. The component's `:host` rules have specificity (0,1,0). A bare `wa-skeleton`
+//      selector (0,0,1) loses to them, so every rule here is prefixed/scoped to reach
+//      at least (0,1,1).
+//   2. The shadow-DOM `:host` styles are unlayered; unlayered beats layered. So this
+//      partial is imported OUTSIDE the cascade layers (see site.css.scss).
+
+:root wa-skeleton {
+  --color: var(--color-placeholder);
+  --sheen-color: color-mix(in oklab, var(--color-placeholder), var(--color-background));
+}
+
+:root wa-skeleton::part(indicator) {
+  border-radius: 0.25rem;
+}
+
+// Stat cards (Activity Stats, Whoop): reuse the real `.stats__stat` markup so each
+// line reserves the same height as the real label / number / footer.
+.stats__stat--skeleton {
+  .stats__meta wa-skeleton,
+  .stats__number wa-skeleton {
+    display: inline-flex;
+    vertical-align: center;
+  }
+
+  .stats__meta wa-skeleton {
+    height: var(--font-x-small);
+    width: 5rem;
+  }
+
+  .stats__number wa-skeleton {
+    height: var(--font-x-large);
+    width: 60%;
+
+    @include bp-medium {
+      height: var(--font-large);
+    }
+
+    @include bp-x-large {
+      height: var(--font-x-large);
+    }
+  }
+}
+
+// Footer line (e.g. the Whoop "Join Whoop" line), centered to match `.stats__footer`.
+.stats__footer .stats-footer-skeleton {
+  display: inline-flex;
+  height: var(--font-x-small);
+  vertical-align: middle;
+  width: 20rem;
+}
+
+// Current weather (homepage): mirrors the `.weather__icon` + `.weather__text` grid.
+.weather__icon .weather-skeleton-icon {
+  aspect-ratio: 1;
+  height: auto;
+  width: 100%;
+
+  &::part(indicator) {
+    border-radius: var(--wa-border-radius-circle, 100%);
+  }
+}
+
+.weather__text .weather-skeleton-text {
+  height: var(--font-medium);
+  margin: 1.5rem 0;
+  width: 100%;
+
+  &:first-of-type {
+    margin-top: 0;
+  }
+
+  &:last-of-type {
+    margin-bottom: 0;
+    width: 80%;
+  }
+}
+
+// Event race-day weather: `.event__weather` is a flex column.
+.event__weather .event-weather-skeleton-line {
+  height: var(--font-x-small);
+  margin: .5rem 0;
+  width: 100px;
+
+  @include bp-large {
+    width: 80%;
+
+    &:last-of-type {
+      width: 60%;
+    }
+  }
+}
+
+// Inline article view count.
+.entry__meta .view-count-skeleton {
+  display: inline-flex;
+  height: var(--font-x-small);
+  vertical-align: center;
+  width: 5em;
+}
