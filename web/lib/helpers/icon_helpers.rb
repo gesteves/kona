@@ -7,7 +7,10 @@ module IconHelpers
   # @param icon_id [String] The unique identifier for the icon.
   # @return [String] The SVG content for the icon.
   def icon_svg(family, style, icon_id)
-    data.icons.dig(family, style)&.find { |i| i.id == icon_id }&.svg
+    svg = data.icons.dig(family, style)&.find { |i| i.id == icon_id }&.svg
+    # Decorative icons: hide from assistive tech (they always sit next to a text label or
+    # an aria-label'd parent). focusable="false" keeps legacy Edge/IE from tab-stopping the SVG.
+    svg&.sub("<svg", '<svg aria-hidden="true" focusable="false"')
   end
 
   # Returns the SVG for the clock icon closest to the given time.

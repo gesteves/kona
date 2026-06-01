@@ -112,13 +112,15 @@ module SiteHelpers
     options = if title.downcase == 'feed'
       {
         "title": "Subscribe to the feed",
+        "aria-label": "Subscribe to the feed",
         "data-controller": "clipboard",
         "data-action": "click->clipboard#preventDefault",
         "data-clipboard-success-message-value": "The link to the feed has been copied to your clipboard."
       }
     else
       {
-        "title": "Follow on #{title}"
+        "title": "Follow on #{title}",
+        "aria-label": "Follow on #{title}"
       }
     end
     options["rel"] = open_in_new_tab ? "me noopener" : "me"

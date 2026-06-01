@@ -8,6 +8,21 @@ RSpec.describe IconsHelper do
     end
   end
 
+  describe "#icon_svg" do
+    subject(:helper) { Class.new { include IconsHelper }.new }
+
+    it "marks the icon decorative (aria-hidden, non-focusable) for assistive tech" do
+      allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg viewBox="0 0 1 1"><path/></svg>')
+      expect(helper.icon_svg("classic", "light", "eye"))
+        .to eq('<svg aria-hidden="true" focusable="false" viewBox="0 0 1 1"><path/></svg>')
+    end
+
+    it "returns nil when the icon is unavailable" do
+      allow_any_instance_of(FontAwesome).to receive(:svg).and_return(nil)
+      expect(helper.icon_svg("classic", "light", "nope")).to be_nil
+    end
+  end
+
   describe "#clock_icon_svg" do
     def icon_at(time)
       helper.clock_icon_svg(Time.parse(time))
