@@ -96,6 +96,14 @@
   }
 }
 
+// Inline article view count.
+.entry__meta .view-count-skeleton {
+  display: inline-flex;
+  height: var(--font-x-small);
+  vertical-align: center;
+  width: 5em;
+}
+
 // Entry summary card (upcoming races; reused for trending / recent articles): mirrors the
 // `.entry__meta` eyebrow, `.entry__hed` heading, and `.entry__body` body lines.
 .entry__meta .entry-skeleton-eyebrow {
