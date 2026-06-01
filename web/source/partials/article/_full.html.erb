@@ -7,7 +7,7 @@
     <p class="entry__meta">
       <span><%= icon_svg("classic", "light", "stopwatch") %> <%= reading_time(article) %></span>
       <% views_url = "/api/plausible/pageviews/#{article.sys.id}" %>
-      <span data-controller="live-update" data-live-update-url-value="<%= views_url %>" data-live-update-fetch-on-connect-value="true"><%= icon_svg("classic", "light", "eye") %></span>
+      <span data-controller="live-update" data-live-update-url-value="<%= views_url %>" data-live-update-fetch-on-connect-value="true"></span>
     </p>
   </header>
   <div class="entry__body">
