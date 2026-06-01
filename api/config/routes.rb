@@ -42,6 +42,7 @@ Rails.application.routes.draw do
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
-  # Redirect the project root to the main site.
-  root to: redirect("https://www.giventotri.com/", status: 301)
+  # Redirect the project root to the main site. The host comes from SITE_URL (never
+  # hardcoded); evaluated per-request so it tracks the configured value.
+  root to: redirect(status: 301) { "#{ENV['SITE_URL'].to_s.chomp('/')}/" }
 end
