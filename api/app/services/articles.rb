@@ -37,7 +37,7 @@ class Articles < ApplicationService
     return if id.blank?
 
     item = rescue_with(context: "Error fetching article #{id}") do
-      cached_json("contentful:article:#{id}", expires_in: 1.hour) do
+      cached_json("contentful:article:#{id}", expires_in: 5.minutes) do
         underscore_keys(query_articles(FIND_QUERY, { id: id })&.first)
       end
     end
@@ -46,11 +46,12 @@ class Articles < ApplicationService
   end
 
   # The full published-article corpus, decorated with the derived fields the trending ranking and
-  # card rendering need (path / entry_type / draft / published_at). Cached for an hour.
+  # card rendering need (path / entry_type / draft / published_at). Cached for 5 minutes — the
+  # edge cache is the primary freshness layer; this just guards Contentful against a stampede.
   # @return [Array<OpenStruct>]
   def list
     items = rescue_with([], context: "Error fetching articles") do
-      cached_json("contentful:articles:list:v1", expires_in: 1.hour) do
+      cached_json("contentful:articles:list:v1", expires_in: 5.minutes) do
         fetch_all.map { |item| decorate(underscore_keys(item)) }
       end
     end
