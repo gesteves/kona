@@ -65,7 +65,13 @@ module ArticleHelpers
     data.articles.reject { |a| a.draft }.take(count)
   end
 
-  # Returns the articles most relevant to the given article.
+  # Short, common words that carry no topical signal — dropped before comparing titles so two
+  # titles don't look similar just because they both contain "the", "my", "a race", etc.
+  TITLE_STOPWORDS = %w[a an and as at but by for from in into of on or the to with my your our this that].freeze
+
+  # Returns the articles most relevant to the given article, most relevant first.
+  # Ranked purely on topical similarity (shared tags + title), with recency as a tiebreaker so the
+  # most genuinely-related posts win regardless of age and near-ties favor the newer post.
   # @param article [Object] The reference article for finding related articles.
   # @param count [Integer] (Optional) The number of articles to return.
   # @return [Array<Object>] A list of articles sorted by relevance.
@@ -78,14 +84,17 @@ module ArticleHelpers
       .reject { |a| a.draft }                            # Exclude drafts
       .reject { |a| a.entry_type == 'Short' }            # Exclude short posts
       .reject { |a| race_report_slugs.include?(a.slug) } # Exclude race reports shown in race reports section
-      .sort_by { |a| -relevance_score(article, a) }      # Sort by relevance score, in descending order
+      # Sort by topical similarity (desc), breaking ties toward the more recently published article.
+      .sort_by { |a| [-similarity_score(article, a), -DateTime.parse(a.published_at).to_i] }
       .take(count)
   end
 
-  # Calculates an overall similarity score between two articles.
-  # The score is normalized to be between 0 and 1 and considers:
-  # - Proportion of shared tags (articles with lots of tags in common are probably similar)
-  # - Similarity of the titles (articles with similar titles are probably similar)
+  # Calculates an overall topical-similarity score between two articles, considering:
+  # - Shared tags, weighted by rarity (a shared niche tag means far more than a shared broad one) and
+  #   normalized as a symmetric weighted Jaccard, so a heavily-tagged "about everything" post can't
+  #   score a perfect match against everything.
+  # - Title similarity (a secondary signal), after stripping stopwords so shared filler words don't
+  #   inflate it.
   # @param article [Object] The reference article.
   # @param candidate [Object] The article to evaluate for similarity.
   # @return [Float] The similarity score.
@@ -93,39 +102,52 @@ module ArticleHelpers
     tags_weight = ENV.fetch('SIMILARITY_SCORE_TAGS_WEIGHT', 1).to_f
     title_weight = ENV.fetch('SIMILARITY_SCORE_TITLE_WEIGHT', 1).to_f
 
-    # Tags score is the percentage of tags in common
-    total_tags = article.contentful_metadata.tags.map(&:id).size.to_f
-    shared_tags = (candidate.contentful_metadata.tags.map(&:id) & article.contentful_metadata.tags.map(&:id)).size
-    tags_score = total_tags.zero? ? 0 : (shared_tags / total_tags)
+    # Tags score: IDF-weighted Jaccard. Each tag contributes its inverse-document-frequency weight,
+    # so rare shared tags dominate and ubiquitous ones barely register; symmetric over the union.
+    ref = tag_ids(article)
+    cand = tag_ids(candidate)
+    shared = ref & cand
+    union = ref | cand
+    tags_score = union.empty? ? 0.0 : shared.sum { |id| tag_idf[id] } / union.sum { |id| tag_idf[id] }
 
-    # Title score uses Text::WhiteSimilarity to score how similar their titles are
-    white = Text::WhiteSimilarity.new
-    title_score = white.similarity(sanitize(article.title), sanitize(candidate.title))
+    # Title score uses Text::WhiteSimilarity over the normalized (stopword-stripped) titles.
+    title_score = white_similarity.similarity(normalize_title(article.title), normalize_title(candidate.title))
 
     (tags_score * tags_weight) + (title_score * title_weight)
   end
 
-  # Calculates a relevance score by adding up similarity_score and recency_score.
-  # Assumes that articles that are similar and recent are relevant to the given article.
-  # @param article [Object] The reference article.
-  # @param candidate [Object] The article to evaluate for relevance.
-  # @return [Float] The relevance score between 0 and 1.
-  def relevance_score(article, candidate)
-    similarity_weight = ENV.fetch('RELEVANCE_SCORE_SIMILARITY_WEIGHT', 1).to_f
-    recency_weight = ENV.fetch('RELEVANCE_SCORE_RECENCY_WEIGHT', 1).to_f
-
-    similarity = similarity_score(article, candidate)
-    recency = recency_score(candidate)
-
-    (similarity * similarity_weight) + (recency * recency_weight)
+  # The inverse-document-frequency weight of every tag, over the same universe related_articles ranks
+  # (published, non-draft, non-Short articles). A tag on every article weighs ~nothing; a rare one
+  # weighs a lot. Unseen tags default to the maximum (maximally-rare) weight. Memoized per render.
+  # @return [Hash{String=>Float}] tag id => idf weight (defaults to the max weight for unknown tags).
+  def tag_idf
+    @tag_idf ||= begin
+      corpus = data.articles.reject { |a| a.draft || a.entry_type == 'Short' }
+      n = corpus.size
+      document_frequency = Hash.new(0)
+      corpus.each { |a| tag_ids(a).each { |id| document_frequency[id] += 1 } }
+      idf = Hash.new(Math.log((n + 1.0) / 1) + 1) # default: an unseen tag is treated as maximally rare
+      document_frequency.each { |id, count| idf[id] = Math.log((n + 1.0) / (count + 1)) + 1 } # smoothed
+      idf
+    end
   end
 
-  # Calculates a recency score for an article based on its age.
-  # The score decays exponentially as the article gets older.
-  # @param article [Object] The article to evaluate.
-  # @return [Float] A score between 0 and 1 based on how recently the article was published.
-  def recency_score(article)
-    Math.exp((ENV.fetch('RECENCY_SCORE_DECAY_RATE', 0.1).to_f.abs * -1) * days_since_published(article))
+  # The tag ids on an article (empty array when it has none).
+  # @return [Array<String>]
+  def tag_ids(article)
+    Array(article.contentful_metadata&.tags).map(&:id)
+  end
+
+  # Strips an article title down to its meaningful words for comparison: plain text, lowercased,
+  # punctuation removed, stopwords dropped.
+  # @return [String]
+  def normalize_title(title)
+    sanitize(title).to_s.downcase.gsub(/[^a-z0-9\s]/, ' ').split(/\s+/).reject { |w| TITLE_STOPWORDS.include?(w) }.join(' ')
+  end
+
+  # A single reused WhiteSimilarity instance (it's stateless; no need to allocate one per comparison).
+  def white_similarity
+    @white_similarity ||= Text::WhiteSimilarity.new
   end
 
   # Generates a JSON-LD schema string for an article, based on the provided content.
@@ -231,13 +253,6 @@ module ArticleHelpers
     minutes = (word_count / wpm.to_f).ceil
     article = minutes.humanize.match?(/^(eight|eleven|eighteen)/i) ? 'An' : 'A'
     "#{article} #{minutes}-minute read"
-  end
-
-  # Calculates the number of days since an article was published.
-  # @param article [Object] The article to calculate the days since published for.
-  # @return [Integer] The number of days since the article was published.
-  def days_since_published(article)
-    ((Time.now - DateTime.parse(article.published_at)) / 1.day).ceil
   end
 
   # Finds related race reports from the same event as the current article.
