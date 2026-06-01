@@ -2,7 +2,8 @@ import { Controller } from '@hotwired/stimulus';
 import { replaceElement } from '../lib/utils';
 
 /**
- * Controller class for managing dynamic content updates.
+ * Fetches a server-rendered HTML fragment and swaps it into the page, replacing a placeholder
+ * skeleton; refreshes on tab focus. See the root CLAUDE.md cross-app HTML contract.
  */
 export default class extends Controller {
   static values = {
@@ -21,6 +22,14 @@ export default class extends Controller {
   }
 
   /**
+   * Cancels any in-flight request so a late response can't mutate a detached element (after a
+   * Turbo navigation, or once the fragment has already been swapped/removed).
+   */
+  disconnect() {
+    this.abortController?.abort();
+  }
+
+  /**
    * Updates content when the page becomes visible.
    */
   handleVisibilityChange() {
@@ -30,36 +39,46 @@ export default class extends Controller {
   }
 
   /**
-   * Fetches data from a specified URL and updates the content of the associated element.
+   * Fetches the fragment from the configured URL and swaps it into the element.
    * @async
-   * @returns {Promise<void>} A promise that resolves when the content is updated, or if an error occurs.
+   * @returns {Promise<void>} Resolves when the content is updated, or on a handled failure.
    */
   async fetchAndUpdateContent() {
-    if (this.hasUrlValue) {
-      try {
-        let response = await fetch(this.urlValue);
-        // Non-2xx (proxy 502, origin error page) → remove the placeholder so it
-        // collapses instead of leaving its loading skeleton stuck on the page.
-        if (!response.ok) {
-          this.element.remove();
-          return;
-        }
-        let data = await response.text();
+    if (!this.hasUrlValue) return;
 
-        if (data.trim().length > 0) {
-          replaceElement(data.trim(), this.element);
-        } else {
-          // Empty body is a definitive "no data" answer (e.g. no current weather, no
-          // race-day forecast). Remove the placeholder so it collapses instead of
-          // leaving its loading skeleton on the page.
-          this.element.remove();
-        }
-      } catch (error) {
-        // Network failure (offline, DNS, abort) → same as above: collapse rather than
-        // leave a stuck skeleton.
-        console.error('Error fetching content:', error);
+    this.abortController?.abort(); // supersede any in-flight request with this newer one
+    this.abortController = new AbortController();
+
+    try {
+      const response = await fetch(this.urlValue, {
+        signal: this.abortController.signal,
+      });
+      if (!response.ok) {
+        this.handleUnavailable();
+        return;
+      }
+      const markup = (await response.text()).trim();
+      if (markup.length > 0) {
+        replaceElement(markup, this.element);
+      } else {
+        // Empty body is the API's "no data" answer; collapse the widget.
         this.element.remove();
       }
+    } catch (error) {
+      if (error.name === 'AbortError') return; // superseded or disconnected — not a failure
+      console.error('Error fetching content:', error);
+      this.handleUnavailable();
+    }
+  }
+
+  /**
+   * Handles a failed fetch (non-2xx or network error). On the initial skeleton load
+   * (fetchOnConnect=true) the placeholder is collapsed so it doesn't sit stuck; but once real
+   * content is rendered (a visibilitychange refresh), a transient blip must not destroy it.
+   */
+  handleUnavailable() {
+    if (this.fetchOnConnectValue) {
+      this.element.remove();
     }
   }
 }
