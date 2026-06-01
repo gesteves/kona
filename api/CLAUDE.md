@@ -23,6 +23,8 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 | GET | `/api/whoop` | `whoop#show` | HTML (sleep/recovery/strain) | 5 min |
 | GET | `/api/plausible/pageviews/:id` | `plausible#pageviews` | HTML (pageview count by Contentful id) | 1 hr |
 | POST | `/api/location` | `location#create` | sets Redis `location:current` (bearer-token gated) | — |
+| POST | `/api/webhooks/contentful` | `webhooks#contentful` | syncs standard.site PDS records on publish/unpublish/delete (HMAC-gated); 204 | — |
+| GET | `/api/standard-site` | `standard_site#show` | JSON `{did, publication_uri}` for the web build's verification markup | 1 hr |
 | GET | `/whoop/auth` | `whoop_oauth#authorize` | redirect (HTTP-Basic gated) | — |
 | GET | `/whoop/callback` | `whoop_oauth#callback` | OAuth token exchange | — |
 | GET | `/` | redirect | 301 → main site | — |
@@ -37,8 +39,16 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 - **Services** (`app/services/`, base `ApplicationService`): one per external API —
   Intervals.icu, Apple WeatherKit (ES256 JWT), Google Maps / Air Quality / Pollen,
   PurpleAir, Whoop (OAuth2), TrainerRoad (iCal), Contentful (events/articles),
-  Plausible, Font Awesome, Goodspeed (bay conditions). Read-through Redis cache via
+  Plausible, Font Awesome, Goodspeed (bay conditions), `StandardSite` (publishes the
+  blog to the AT Protocol / Bluesky PDS as standard.site records — webhook-driven, plus
+  the `standard_site:backfill` rake task in `lib/tasks/`). Read-through Redis cache via
   `cached_json(key, expires_in:)`; HTTParty with retries; `DeepOstruct` for dot-access.
+- **Webhooks**: `Api::WebhooksController#contentful` receives Contentful publish/
+  unpublish/delete events and keeps the standard.site PDS records in sync. Verified with
+  Contentful's HMAC request-verification scheme (`ContentfulRequestVerification` concern,
+  `CONTENTFUL_WEBHOOK_SECRET`). Synchronous (no job queue) within Contentful's 30s
+  timeout; Contentful does **not** retry failures, so `rake standard_site:backfill` is
+  the reconciliation/recovery path. Operations log at info level (`standard.site: …`).
 - **Views** (`app/views/api/`) render raw HTML fragments; **helpers** (`app/helpers/`)
   were ported from the web app (weather, units, icons, markdown, time, etc.).
 - **Caching** — `app/controllers/concerns/live_widget.rb`. `cache_widget(ttl:)` sets:
@@ -79,9 +89,12 @@ secrets (and Rails `config/credentials.yml.enc` + `master.key`).
   `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET`, `WHOOP_REDIRECT_URI`, `WHOOP_AUTH_USERNAME`,
   `WHOOP_AUTH_PASSWORD`, `GOOGLE_API_KEY`, `API_TOKEN` (bearer for `POST /api/location`),
   `WEATHERKIT_KEY_ID`, `WEATHERKIT_TEAM_ID`, `WEATHERKIT_SERVICE_ID`,
-  `WEATHERKIT_PRIVATE_KEY` (base64 .p8), `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`.
+  `WEATHERKIT_PRIVATE_KEY` (base64 .p8), `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`,
+  `CONTENTFUL_WEBHOOK_SECRET` (64-char HMAC secret for the Contentful webhook), `SITE_URL`
+  (public site root, for the standard.site publication `url`).
 - **Optional**: `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`, `TRAINERROAD_CALENDAR_URL`,
-  `PURPLEAIR_API_KEY`, `LOCATION`, `TIME_ZONE`.
+  `PURPLEAIR_API_KEY`, `LOCATION`, `TIME_ZONE`, `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`,
+  `BLUESKY_PDS_URL` (standard.site publishing; no-ops when the handle/password are unset).
 
 ## Conventions & gates
 

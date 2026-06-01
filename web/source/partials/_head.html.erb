@@ -6,11 +6,8 @@
   <%= partial 'partials/schema/breadcrumb' if defined?(content) && content.entry_type == 'Article' && !content.draft %>
   <% if data.respond_to?(:standard_site) && data.standard_site&.publication_uri.present? %>
     <link rel="site.standard.publication" href="<%= data.standard_site.publication_uri %>">
-    <% if defined?(content) && %w[Article Short].include?(content.entry_type) && !content.draft %>
-      <% standard_site_document_uri = data.standard_site.documents&.[](content.sys.id) %>
-      <% if standard_site_document_uri.present? %>
-        <link rel="site.standard.document" href="<%= standard_site_document_uri %>">
-      <% end %>
+    <% if defined?(content) && %w[Article Short].include?(content.entry_type) && !content.draft && data.standard_site.did.present? %>
+      <link rel="site.standard.document" href="at://<%= data.standard_site.did %>/site.standard.document/<%= content.sys.id %>">
     <% end %>
   <% end %>
   <link rel="canonical" href="<%= canonical_url %>">

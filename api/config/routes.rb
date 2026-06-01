@@ -30,6 +30,14 @@ Rails.application.routes.draw do
   # Sets the current location (bearer-token-secured), replacing the old Netlify build hook.
   post "/api/location" => "api/location#create"
 
+  # Contentful webhook: re-syncs standard.site PDS records on entry publish/unpublish/delete
+  # (HMAC request-verification gated).
+  post "/api/webhooks/contentful" => "api/webhooks#contentful"
+
+  # standard.site verification data (DID + publication URI) the web build reads to emit
+  # the .well-known endpoint and the <link rel="site.standard.*"> tags.
+  get "/api/standard-site" => "api/standard_site#show"
+
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker

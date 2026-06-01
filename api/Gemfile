@@ -14,8 +14,13 @@ gem "httparty"
 gem "icalendar"
 # Signs the ES256 JWT used to authenticate with Apple WeatherKit
 gem "jwt"
-# Renders the Markdown weather summary (bold + SmartyPants)
+# Renders the Markdown weather summary (bold + SmartyPants), and the standard.site
+# document text (stripped to plain text via the gems below)
 gem "redcarpet"
+# Strips rendered Markdown to plain text for the standard.site document fields
+gem "sanitize"
+# Decodes HTML entities left by the Markdown→plain-text pass for standard.site
+gem "htmlentities"
 # Redis caching (shares REDIS_URL with the web app)
 gem "redis"
 # Condenses Rails' multi-line request logs into one structured line per request
