@@ -1,9 +1,12 @@
 /* global plausible */
 
+let plausibleInitialized = false;
+
 /**
- * Sets up the Plausible analytics queue if it doesn't already exist.
+ * Sets up the Plausible analytics queue if it doesn't already exist. Runs once per page load.
  */
 function setUpPlausible() {
+  if (plausibleInitialized) return;
   window.plausible =
     window.plausible ||
     function () {
@@ -15,6 +18,7 @@ function setUpPlausible() {
       window.plausible.o = i || {};
     };
   window.plausible.init({ autoCapturePageviews: false });
+  plausibleInitialized = true;
 }
 
 /**

@@ -21,9 +21,7 @@ export function sendNotification(message, status = 'success') {
 export function prependToElement(html, element) {
   const tempContainer = document.createElement('div');
   tempContainer.innerHTML = html;
-  while (tempContainer.firstChild) {
-    element.prepend(tempContainer.firstChild);
-  }
+  element.prepend(...tempContainer.childNodes);
 }
 
 /**

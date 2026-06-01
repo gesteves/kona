@@ -85,10 +85,11 @@ export default class extends Controller {
     const width = this.popupWidthValue || 400;
     const height = this.popupHeightValue || 300;
 
+    // `noopener` so the popup can't reach back to `window.opener` (reverse tabnabbing).
     window.open(
       linkURL,
       'share',
-      `width=${width},height=${height},scrollbars=yes`
+      `width=${width},height=${height},scrollbars=yes,noopener`
     );
   }
 

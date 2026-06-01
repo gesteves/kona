@@ -32,6 +32,11 @@ export default class extends Controller {
    * Replaces the element's text content with a relative time string.
    */
   updateRelativeTime() {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+
     const now = new Date();
     const timestamp = new Date(this.datetimeValue);
     const differenceInSeconds = Math.abs(Math.floor((now - timestamp) / 1000));

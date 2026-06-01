@@ -42,7 +42,9 @@ export default class extends Controller {
    */
   getPermalink() {
     const href = this.element.getAttribute('href');
-    if (href.startsWith('#')) {
+    if (!href) {
+      return window.location.href;
+    } else if (href.startsWith('#')) {
       return window.location.origin + window.location.pathname + href;
     } else if (href.startsWith('//')) {
       return href;
