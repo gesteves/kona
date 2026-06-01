@@ -26,7 +26,7 @@ Copy `.env.example` to `.env` for local development; in production set these as 
 - **Intervals.icu** — activity stats. Set `ICU_ATHLETE_ID`, `ICU_API_KEY` (from the Intervals.icu settings page).
 - **Google Maps** — geocodes the location and powers pollen/AQI lookups. Set `GOOGLE_API_KEY` for a project with the Geocoding, Time Zone, Maps Elevation, Air Quality, and Pollen APIs enabled.
 - **WeatherKit** — current weather and forecast. Follow Apple's [WeatherKit REST setup](https://developer.apple.com/documentation/weatherkitrestapi/request_authentication_for_weatherkit_rest_api) and set `WEATHERKIT_KEY_ID`, `WEATHERKIT_TEAM_ID`, `WEATHERKIT_SERVICE_ID`, and `WEATHERKIT_PRIVATE_KEY` (the base64-encoded `.p8` key).
-- **Whoop** — sleep/recovery/strain. Create a Whoop OAuth app and set `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET`, and `WHOOP_REDIRECT_URI` (must match the app, e.g. `https://kona-api.fly.dev/whoop/callback`). `GET /whoop/auth` is gated by HTTP Basic Auth (`WHOOP_AUTH_USERNAME`, `WHOOP_AUTH_PASSWORD`); visit it once to connect your account, after which tokens are stored in Redis.
+- **Whoop** — sleep/recovery/strain. Create a Whoop OAuth app and set `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET`, and `WHOOP_REDIRECT_URI` (must match the app, e.g. `https://<your-app-host>/whoop/callback`). `GET /whoop/auth` is gated by HTTP Basic Auth (`WHOOP_AUTH_USERNAME`, `WHOOP_AUTH_PASSWORD`); visit it once to connect your account, after which tokens are stored in Redis.
 - **API token** — set `API_TOKEN`, the bearer token required by `POST /api/location`.
 
 ### Optional services
@@ -37,7 +37,7 @@ Copy `.env.example` to `.env` for local development; in production set these as 
 - **Location** — set `LOCATION` to a `"latitude,longitude"` pair, or leave it unset and POST the coordinates instead. `LOCATION` takes precedence; otherwise the value set via POST (stored in Redis) is used:
 
   ```bash
-  curl -X POST https://kona-api.fly.dev/api/location \
+  curl -X POST https://<your-app-host>/api/location \
     -H "Authorization: Bearer $API_TOKEN" \
     -H "Content-Type: application/json" \
     -d '{"latitude": 19.639133263373843, "longitude": -155.9967081931534}'

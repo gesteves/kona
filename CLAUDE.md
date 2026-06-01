@@ -19,6 +19,21 @@ Work on one app from inside its own directory; each has its own `Gemfile`,
 
 Both apps share the same Redis (`REDIS_URL`).
 
+## Production domains — never hardcode
+
+⚠️ **Never hardcode or mention the production hostnames anywhere in the code, including
+comments, docs, examples, tests, and CI config.** This covers the public site host, the
+API/admin host, and the fly.io origin host. They are environment-specific and must always
+come from configuration:
+
+- The API origin is read from `KONA_API_URL` (web build + `/api/*` proxy).
+- The site URL is read from `URL` (web).
+- The Whoop redirect URI is read from `WHOOP_REDIRECT_URI`; CI's deploy URL from the
+  `API_PRODUCTION_URL` secret.
+
+When an example or placeholder genuinely needs a host, use a generic stand-in like
+`https://<your-app-host>/…` — never the real domain.
+
 ## How the two apps connect (request path)
 
 1. Browser requests `/api/*` on the main site.

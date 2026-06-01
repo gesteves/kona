@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PRODUCTION_URL: ${{ secrets.API_PRODUCTION_URL || 'https://kona-api.fly.dev' }}
+  PRODUCTION_URL: ${{ secrets.API_PRODUCTION_URL }}
 
 jobs:
   ruby-tests:
