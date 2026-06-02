@@ -8,6 +8,7 @@ data/*.json
 data/maps
 node_modules
 source/javascripts/site.js*
+source/javascripts/site.css*
 
 # Local Netlify folder
 .netlify

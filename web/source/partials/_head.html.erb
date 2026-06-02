@@ -18,6 +18,7 @@
     <link rel="manifest" href="/manifest.json">
   <% end %>
   <%= javascript_include_tag 'site', defer: 'defer', 'data-turbo-track': 'reload' %>
+  <%= stylesheet_link_tag '/javascripts/site', 'data-turbo-track': 'reload' %>
   <%= stylesheet_link_tag 'site', 'data-turbo-track': 'reload' %>
   <%= stylesheet_link_tag 'print', media: 'print', 'data-turbo-track': 'reload' %>
   <%= yield_content :assets %>

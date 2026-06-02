@@ -1,0 +1,12 @@
+// Web Awesome `<wa-toast>` notifications. We load only Web Awesome's color theme tokens
+// (stimulus/index.js), not its font tokens, and the toast stack renders in the top layer
+// where its shadow text inherits the document default (serif) rather than the site font.
+// `<wa-toast-item>` sets no font of its own, so setting the family on the host elements
+// makes it inherit into the item's shadow DOM. Imported unlayered (see site.css.scss) so
+// it beats Web Awesome's own shadow-DOM styles, and scoped to `:root …` to clear `:host`.
+
+:root wa-toast,
+:root wa-toast-item {
+  font-family: var(--lato);
+  line-height: var(--line-height-medium);
+}

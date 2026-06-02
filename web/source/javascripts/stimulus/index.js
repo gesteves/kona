@@ -1,8 +1,9 @@
 import * as Turbo from '@hotwired/turbo';
 import { Application } from '@hotwired/stimulus';
-import Handlebars from 'handlebars';
-import '@awesome.me/webawesome/dist/components/skeleton/skeleton.js';
-import '@awesome.me/webawesome/dist/components/relative-time/relative-time.js';
+import '@web.awesome.me/webawesome-pro/dist/styles/themes/default.css';
+import '@web.awesome.me/webawesome-pro/dist/components/skeleton/skeleton.js';
+import '@web.awesome.me/webawesome-pro/dist/components/relative-time/relative-time.js';
+import '@web.awesome.me/webawesome-pro/dist/components/toast/toast.js';
 
 import BackToTopController from './controllers/back_to_top_controller';
 import ClipboardController from './controllers/clipboard_controller';
@@ -10,7 +11,6 @@ import CurrentYearController from './controllers/current_year_controller';
 import ImagePlaceholderController from './controllers/image_placeholder_controller';
 import LiveUpdateController from './controllers/live_update_controller';
 import NavController from './controllers/nav_controller';
-import NotificationsController from './controllers/notifications_controller';
 import OauthCallbackController from './controllers/oauth_callback_controller';
 import PageController from './controllers/page_controller';
 import PublishDateController from './controllers/publish_date_controller';
@@ -24,13 +24,8 @@ Stimulus.register('current-year', CurrentYearController);
 Stimulus.register('image-placeholder', ImagePlaceholderController);
 Stimulus.register('live-update', LiveUpdateController);
 Stimulus.register('nav', NavController);
-Stimulus.register('notifications', NotificationsController);
 Stimulus.register('oauth-callback', OauthCallbackController);
 Stimulus.register('page', PageController);
 Stimulus.register('publish-date', PublishDateController);
 Stimulus.register('share', ShareController);
 Stimulus.register('units', UnitsController);
-
-Handlebars.registerHelper('pluralize', function (count, singular, plural) {
-  return count === 1 ? singular : plural;
-});

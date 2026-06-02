@@ -3,8 +3,9 @@
 @import 'base/mixins';
 
 // Imported unlayered (and with specificity above `:host`) so these overrides beat
-// Web Awesome's own unlayered shadow-DOM styles for `<wa-skeleton>`. See the partial.
+// Web Awesome's own unlayered shadow-DOM styles for `<wa-skeleton>` / `<wa-toast>`.
 @import 'components/skeleton';
+@import 'components/toast';
 
 @layer reset {
   @import 'vendors/reset';
@@ -33,7 +34,6 @@
   @import 'components/header';
   @import 'components/home';
   @import 'components/nav';
-  @import 'components/notifications';
   @import 'components/pagination';
   @import 'components/placeholder';
   @import 'components/stats';

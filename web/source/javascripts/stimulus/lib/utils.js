@@ -1,16 +1,18 @@
+// How long a toast stays on screen before auto-dismissing, in milliseconds.
+const TOAST_DURATION_MS = 3000;
+
 /**
- * Dispatches a custom `notify` event to trigger a notification
+ * Shows a toast notification via the Web Awesome <wa-toast> stack.
  * @param {string} message The text for the notification
- * @param {string} status The type of notification
+ * @param {string} status The type of notification ('success' or anything else → 'danger')
  */
 export function sendNotification(message, status = 'success') {
-  const event = new CustomEvent('notify', {
-    detail: {
-      message: message,
-      status: status,
-    },
-  });
-  document.dispatchEvent(event);
+  const toast = document.querySelector('wa-toast');
+  if (!toast?.create) {
+    return;
+  }
+  const variant = status === 'success' ? 'success' : 'danger';
+  toast.create(message, { variant, duration: TOAST_DURATION_MS });
 }
 
 /**
