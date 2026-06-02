@@ -45,10 +45,10 @@ RSpec.describe MarkupHelpers do
   describe '#responsivize_tables' do
     let(:html_with_table) { '<table><tr><td>Example</td></tr></table>' }
 
-    it 'wraps tables in responsive div containers' do
+    it 'wraps tables in a horizontal wa-scroller' do
       transformed_html = responsivize_tables(html_with_table)
-      expect(transformed_html).to include('<div class="entry__table"><table>')
-      expect(transformed_html).to include('</table></div>')
+      expect(transformed_html).to include('<wa-scroller class="entry__table" orientation="horizontal"><table>')
+      expect(transformed_html).to include('</table></wa-scroller>')
     end
   end
 

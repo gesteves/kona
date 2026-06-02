@@ -132,13 +132,13 @@
   }
 }
 
+// Scrolling and edge affordances are handled by the <wa-scroller> host. Match its
+// scroll-shadow to the page background so the fade works in light and dark mode.
 .entry__table {
-  overflow-x: scroll;
-  margin: 2rem calc(var(--content-padding) * -1);
+  --shadow-color: var(--color-background);
 
-  @include bp-medium {
-    margin: 2rem 0;
-  }
+  display: block;
+  margin: 2rem 0;
 
   table {
     border-collapse: collapse;

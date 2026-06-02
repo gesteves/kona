@@ -415,12 +415,13 @@ module MarkupHelpers
     end
   end
 
-  # Wraps HTML tables in responsive div containers.
+  # Wraps HTML tables in a Web Awesome <wa-scroller>, which makes them horizontally
+  # scrollable on small breakpoints with built-in scroll-affordance shadows.
   # @param html [String, Nokogiri::XML::Node] The HTML content with table elements.
-  # @return [String, Nokogiri::XML::Node] The HTML content with tables wrapped in responsive div containers.
+  # @return [String, Nokogiri::XML::Node] The HTML content with tables wrapped in <wa-scroller>.
   def responsivize_tables(html, css_class: "entry__table")
     with_nokogiri_doc(html) do |doc|
-      doc.css('table').each { |table| table.wrap("<div class=\"#{css_class}\"></div>") }
+      doc.css('table').each { |table| table.wrap("<wa-scroller class=\"#{css_class}\" orientation=\"horizontal\"></wa-scroller>") }
     end
   end
 
