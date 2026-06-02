@@ -1,5 +1,4 @@
 import { Controller } from '@hotwired/stimulus';
-import { formatDistanceToNow } from 'date-fns';
 
 /**
  * Renders the publish-date-dependent parts of an article's meta line on the client, so they stay
@@ -60,8 +59,8 @@ export default class extends Controller {
 
   /**
    * Shows a live-updating relative time for recent articles, or the server-rendered absolute date
-   * otherwise. While relative, re-renders every minute — which also flips the display to the
-   * absolute date once the article is no longer published "today".
+   * otherwise. The relative time is a self-syncing <wa-relative-time> element; we still re-render
+   * every minute so the display flips to the absolute date once the article is no longer "today".
    * @param {boolean} relative
    */
   renderTimestamp(relative) {
@@ -69,13 +68,15 @@ export default class extends Controller {
       this.timestampTarget.textContent = this.absoluteTimestamp;
       return;
     }
-    this.timestampTarget.textContent = formatDistanceToNow(
-      new Date(this.datetimeValue),
-      {
-        addSuffix: true,
-        includeSeconds: true,
-      }
-    );
+    if (!this.timestampTarget.querySelector('wa-relative-time')) {
+      const relativeTime = document.createElement('wa-relative-time');
+      relativeTime.setAttribute(
+        'date',
+        new Date(this.datetimeValue).toISOString()
+      );
+      relativeTime.setAttribute('sync', '');
+      this.timestampTarget.replaceChildren(relativeTime);
+    }
     this.timer = setTimeout(() => this.render(), 60000);
   }
 
