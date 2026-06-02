@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="robots" content="noindex">
+    <title>Form detection</title>
+  </head>
+  <body>
+    <!--
+      Hidden, native replica of the Contentful contact form (/contact).
+
+      The live form uses Web Awesome custom elements (<wa-input>, <wa-textarea>),
+      which Netlify's build-time form parser can't read — so this plain-HTML version
+      exists solely so Netlify detects the "contact" form and its field schema.
+      The live form submits the matching field names via form-associated custom elements.
+
+      Not linked from anywhere and noindex'd; it only needs to exist as a built HTML file
+      for Netlify's form bot to find. Keep the field names in sync with the Contentful form.
+    -->
+    <form name="contact" data-netlify="true" netlify-honeypot="comment" hidden>
+      <input type="hidden" name="form-name" value="contact">
+      <input type="text" name="name">
+      <input type="email" name="email">
+      <textarea name="comment"></textarea>
+      <textarea name="message"></textarea>
+    </form>
+  </body>
+</html>

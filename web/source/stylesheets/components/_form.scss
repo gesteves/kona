@@ -3,52 +3,31 @@
   flex-flow: column;
   margin: 1.5rem 0;
 
-  label {
-    display: flex;
-    flex-flow: column;
-    font-family: var(--ibm-plex-mono);
-    font-size: var(--font-x-small);
-    line-height: var(--line-height-x-small);
-    margin: 0 0 2rem;
-    text-indent: 0;
-    text-transform: uppercase;
-  
-    &.hp {
-      display: none;
-    }
-  }
-  
-  input,
-  textarea {
-    background-color: var(--color-background);
-    border: 1px solid var(--color-border);
-    border-radius: 2px;
-    color: var(--color-text-primary);
+  // The visible fields are Web Awesome custom elements (<wa-input>, <wa-textarea>) whose
+  // shadow controls use `font-family: inherit`, so setting the family on the host carries
+  // the site font into them. Width/margin lay the fields out in the flex column.
+  wa-input,
+  wa-textarea {
     font-family: var(--lato);
-    font-size: var(--font-small);
-    font-style: normal;
-    font-weight: 300;
-    line-height: var(--line-height-medium);
-    
-    &:focus-visible {
-      border-color: var(--color-link);
-      outline: 2px solid var(--color-link);
-      outline-offset: 2px;
-    }
-    
-    &:focus:not(:focus-visible) {
-      outline: none;
-    }
+    margin: 0 0 2rem;
+    width: 100%;
   }
-  
-  textarea {
-    height: 240px;
-  }
-  
-  button[type="submit"] {
-    @extend .extend-primary-button;
-    @extend .extend-pushable-button;
 
+  wa-button[type="submit"] {
     align-self: flex-start;
+    font-family: var(--lato);
+
+    // The send icon is a raw inline SVG slotted into the button's `end` slot
+    // (the site doesn't use <wa-icon>); size it to the label and inherit its color.
+    svg[slot="end"] {
+      fill: currentcolor;
+      height: 1em;
+      width: 1em;
+    }
+  }
+
+  // The Netlify honeypot is the one remaining native field; keep it hidden.
+  label.hp {
+    display: none;
   }
 }

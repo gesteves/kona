@@ -4,6 +4,9 @@ import '@web.awesome.me/webawesome-pro/dist/styles/themes/default.css';
 import '@web.awesome.me/webawesome-pro/dist/components/skeleton/skeleton.js';
 import '@web.awesome.me/webawesome-pro/dist/components/relative-time/relative-time.js';
 import '@web.awesome.me/webawesome-pro/dist/components/toast/toast.js';
+import '@web.awesome.me/webawesome-pro/dist/components/input/input.js';
+import '@web.awesome.me/webawesome-pro/dist/components/textarea/textarea.js';
+import '@web.awesome.me/webawesome-pro/dist/components/button/button.js';
 
 import BackToTopController from './controllers/back_to_top_controller';
 import ClipboardController from './controllers/clipboard_controller';

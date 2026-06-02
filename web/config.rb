@@ -47,6 +47,11 @@ end
 # file at /.well-known/site.standard.publication (no layout, no directory index).
 page "/.well-known/site.standard.publication", layout: false, directory_index: false
 
+# Hidden, native replica of the Contentful contact form so Netlify can detect the
+# "contact" form (its Web Awesome custom-element fields aren't parseable at build time).
+# Served bare at /__forms.html — no layout, no directory index.
+page "/__forms.html", layout: false, directory_index: false
+
 configure :development do
   activate :relative_assets
 end
