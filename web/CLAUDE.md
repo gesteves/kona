@@ -1,8 +1,10 @@
 # web/ — Kona static site
 
 Middleman 4 static site generator (Ruby 4.0.5) that builds a **Contentful**-powered
-blog and deploys to **Netlify**. esbuild bundles JavaScript (Stimulus + Turbo); Sass
-compiles the stylesheets.
+blog and deploys to **Netlify**. esbuild bundles JavaScript (Stimulus + Turbo) and the
+**Web Awesome** (Pro) component theme CSS; Sass compiles the rest of the stylesheets.
+UI components (toasts, form controls, skeletons, relative time, scroller) come from
+Web Awesome Pro, imported in `source/javascripts/stimulus/index.js`.
 
 This app no longer fetches its own weather / activity / Whoop data — that moved to the
 `api/` app and is loaded at runtime. See the root [`CLAUDE.md`](../CLAUDE.md) for the
@@ -77,7 +79,10 @@ Names only — see `.env.example`; never commit values.
 - **Required**: `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`, `FONT_AWESOME_API_TOKEN`,
   `REDIS_URL`, `KONA_API_URL` (base URL of the `api/` app — used by the `/api/*` proxy
   and the `import:standard_site` fetch).
-- **Optional**: `BUILD_HOOK_URL`, `DARK_VISITORS_ACCESS_TOKEN`, `CLOUDFRONT_DOMAIN`.
+- **Build credential**: `WEBAWESOME_NPM_TOKEN` — Web Awesome Pro npm registry auth, read
+  by `.npmrc` at `npm install` (not in `.env`). Set it in your shell and in Netlify's
+  build env, or the install fails.
+- **Optional**: `DARK_VISITORS_ACCESS_TOKEN`, `CLOUDFRONT_DOMAIN`.
 
 ## Conventions & gates
 

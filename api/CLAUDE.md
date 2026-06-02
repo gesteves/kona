@@ -19,7 +19,8 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 | GET | `/up` | `rails/health#show` | health check | — |
 | GET | `/api/activity-stats` | `activity_stats#show` | HTML (Intervals.icu totals) | 5 min |
 | GET | `/api/weather/current` | `weather#current` | HTML (weather/AQI/pollen) | 5 min |
-| GET | `/api/weather/event/:id` | `weather#event` | HTML (race-day weather by Contentful id) | 1 hr |
+| GET | `/api/events/upcoming` | `events#upcoming` | HTML (upcoming races; featured event has inline race-day weather) | 1 hr |
+| GET | `/api/articles/trending` | `articles#trending` | HTML (trending articles, ranked from Plausible) | 1 hr |
 | GET | `/api/whoop` | `whoop#show` | HTML (sleep/recovery/strain) | 5 min |
 | GET | `/api/plausible/pageviews/:id` | `plausible#pageviews` | HTML (pageview count by Contentful id) | 1 hr |
 | POST | `/api/location` | `location#create` | sets Redis `location:current` (bearer-token gated) | — |

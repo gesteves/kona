@@ -80,8 +80,9 @@ views build the matching outer element with `live_update_url`.
 | Activity stats | `web/source/partials/placeholders/_stats.html.erb` | `api/app/views/api/activity_stats/show.html.erb` | `/api/activity-stats` |
 | Whoop | `web/source/partials/placeholders/_whoop.html.erb` | `api/app/views/api/whoop/show.html.erb` | `/api/whoop` |
 | Current weather | `web/source/partials/placeholders/_weather.html.erb` | `api/app/views/api/weather/current.html.erb` | `/api/weather/current` |
-| Event weather | `web/source/partials/_event.html.erb` (inline `section.event__weather`) | `api/app/views/api/weather/event.html.erb` | `/api/weather/event/:id` |
 | Pageviews | `web/source/partials/article/_full.html.erb` (inline `span`) | `api/app/views/api/plausible/pageviews.html.erb` | `/api/plausible/pageviews/:id` |
+| Upcoming races (race-day weather is inline in the featured event) | `web/source/partials/_upcoming_races.html.erb` | `api/app/views/api/events/upcoming.html.erb` | `/api/events/upcoming` |
+| Trending articles | `web/source/home.html.erb` (inline `section#trending-articles`) | `api/app/views/api/articles/trending.html.erb` | `/api/articles/trending` |
 
 Shared CSS lives in `web/source/stylesheets/` (e.g. `stats`, `stats--has-four`,
 `stats--has-three`, `weather`, `event__weather`).

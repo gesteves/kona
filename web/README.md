@@ -18,12 +18,12 @@ Copy `.env.example` to `.env` and fill in the credentials below (also add them t
   <img width="1616" height="3182" alt="Contentful content model" src="https://github.com/user-attachments/assets/689d3caf-8b71-47a4-95e5-4630bf9c8281" />
 
 - **Font Awesome** — icons, pulled from the API at build time. Needs a Pro account and a token with the "Pro icons and metadata" read scope. Set `FONT_AWESOME_API_TOKEN`.
+- **Web Awesome Pro** — the web component library the UI is built on. Needs a Pro subscription; the private registry is configured in `.npmrc`, and `npm install` reads `WEBAWESOME_NPM_TOKEN` from the environment to authenticate. Set it locally (your shell) and in Netlify's build environment.
 - **Redis** — caches API responses to speed up builds. Set `REDIS_URL`.
 - **Kona API** — set `KONA_API_URL` to the deployed [`api/`](../api/README.md) app. The home-page weather/stats/Whoop widgets load from it at runtime.
 
 ### Optional services
 
-- **Plausible** — traffic analytics, used to show page views in articles. Set `PLAUSIBLE_SITE_ID` and `PLAUSIBLE_API_KEY`.
 - **Dark Visitors** — imports `robots.txt` directives to deter AI scrapers. Set `DARK_VISITORS_ACCESS_TOKEN`.
 - **CloudFront** — serves Contentful images via a CDN to avoid bandwidth limits. Set `CLOUDFRONT_DOMAIN`.
 
@@ -32,7 +32,7 @@ Copy `.env.example` to `.env` and fill in the credentials below (also add them t
 Requirements: Ruby, Node, and the [Netlify CLI](https://docs.netlify.com/cli/get-started/).
 
 1. Add the environment variables to `.env` (or the site config in Netlify).
-2. Install dependencies: `bundle install` and `npm install`.
+2. Install dependencies: `bundle install` and `npm install` (the latter needs `WEBAWESOME_NPM_TOKEN` set — see Web Awesome Pro above).
 3. Build the site (runs the data import): `netlify build`.
 4. Start the local server: `netlify dev`.
 5. In another tab, watch JS/CSS: `npm run watch`.
@@ -45,8 +45,7 @@ Requirements: Ruby, Node, and the [Netlify CLI](https://docs.netlify.com/cli/get
 | `bundle exec rake import` | Import all build-time data |
 | `bundle exec rake import:content` | Import Contentful content only |
 | `bundle exec rake import:icons` | Import Font Awesome icons only |
-| `bundle exec rake import:location` | Fetch the current location from the API |
-| `bundle exec rake import:standard_site` | Sync posts to Bluesky |
+| `bundle exec rake import:standard_site` | Fetch standard.site verification data from the API |
 | `bundle exec rake test` | Run the test suite |
 | `bundle exec rake build:verbose` | Full build: test → import → JS build → Middleman |
 | `npm run build` | Build the JavaScript bundle (required after JS changes) |
