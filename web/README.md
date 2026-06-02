@@ -2,7 +2,7 @@
 
 [![Netlify Status](https://api.netlify.com/api/v1/badges/f87f4e00-a5a5-436d-b6df-a3628c3fb919/deploy-status)](https://app.netlify.com/sites/giventotri/deploys)
 
-The blog itself: a [Middleman](https://middlemanapp.com/) static site powered by [Contentful](https://www.contentful.com/) and hosted on [Netlify](https://www.netlify.com/). Live home-page widgets (weather, activity stats, Whoop, pageviews) are served at runtime by the [`api/`](../api/README.md) app through a Netlify `/api/*` proxy.
+The blog itself: a [Middleman](https://middlemanapp.com/) static site powered by [Contentful](https://www.contentful.com/) and hosted on [Netlify](https://www.netlify.com/). Live home-page widgets (weather, activity stats, Whoop, pageviews) are served at runtime by the [`api/`](../api/README.md) app.
 
 Kona uses Middleman [data files](https://middlemanapp.com/advanced/data-files/): it calls various services at build time, manipulates the responses, and writes them as JSON to `data/`, where they're available to templates and helpers.
 
@@ -19,15 +19,13 @@ Copy `.env.example` to `.env` and fill in the credentials below (also add them t
 
 - **Font Awesome** — icons, pulled from the API at build time. Needs a Pro account and a token with the "Pro icons and metadata" read scope. Set `FONT_AWESOME_API_TOKEN`.
 - **Redis** — caches API responses to speed up builds. Set `REDIS_URL`.
-- **Kona API** — set `KONA_API_URL` to the deployed [`api/`](../api/README.md) app. The home-page weather/stats/Whoop widgets load from it at runtime, and `rake import:location` fetches the current location at build time.
+- **Kona API** — set `KONA_API_URL` to the deployed [`api/`](../api/README.md) app. The home-page weather/stats/Whoop widgets load from it at runtime.
 
 ### Optional services
 
-- **Plausible** — traffic analytics, used to surface trending articles. Set `PLAUSIBLE_SITE_ID` and `PLAUSIBLE_API_KEY`.
+- **Plausible** — traffic analytics, used to show page views in articles. Set `PLAUSIBLE_SITE_ID` and `PLAUSIBLE_API_KEY`.
 - **Dark Visitors** — imports `robots.txt` directives to deter AI scrapers. Set `DARK_VISITORS_ACCESS_TOKEN`.
 - **CloudFront** — serves Contentful images via a CDN to avoid bandwidth limits. Set `CLOUDFRONT_DOMAIN`.
-- **Bluesky** — syncs posts to the AT Protocol (standard.site). Set `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`, `BLUESKY_PDS_URL`.
-- **Netlify build hook** — rebuilds the site on a schedule to pick up new content. Set `BUILD_HOOK_URL`.
 
 ## Running locally
 
