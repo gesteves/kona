@@ -65,6 +65,18 @@ RSpec.describe ApplicationService do
 
       expect(service.cache("k", expires_in: 5.minutes) { nil }).to be_nil
     end
+
+    it "bypasses the cache entirely in development (always fetches fresh)" do
+      allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("development"))
+      expect($redis).not_to receive(:get)
+      expect($redis).not_to receive(:setex)
+      expect($redis).not_to receive(:set)
+
+      calls = 0
+      result = service.cache("k", expires_in: 5.minutes) { calls += 1; { a: calls } }
+      expect(result).to eq(a: 1)
+      expect(service.cache("k", expires_in: 5.minutes) { calls += 1; { a: calls } }).to eq(a: 2)
+    end
   end
 
   describe "#get_json / #post_json" do

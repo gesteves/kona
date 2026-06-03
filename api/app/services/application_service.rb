@@ -9,7 +9,8 @@ class ApplicationService
   # Read-through JSON cache. Returns the parsed cached value when the key is populated;
   # otherwise yields, caches the block's (JSON-serializable) result, and returns it. A blank
   # block result is returned without being cached, matching the services' "don't cache empty"
-  # behavior.
+  # behavior. In development the cache is bypassed entirely (always fetch fresh) so changes are
+  # visible immediately without waiting for a TTL to expire.
   #
   # @param key [String] The Redis key.
   # @param expires_in [ActiveSupport::Duration, Integer, nil] TTL in seconds. The result is
@@ -20,6 +21,8 @@ class ApplicationService
   # @yieldreturn [Object] The freshly fetched, JSON-serializable value.
   # @return [Object, nil]
   def cached_json(key, expires_in: nil, symbolize: true)
+    return yield if Rails.env.development?
+
     cached = $redis.get(key)
     return JSON.parse(cached, symbolize_names: symbolize) if cached.present?
 
