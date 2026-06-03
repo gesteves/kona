@@ -61,3 +61,21 @@ RACK_ATTACK_PLAIN_TEXT = { "content-type" => "text/plain; charset=utf-8" }.freez
 
 Rack::Attack.blocklisted_responder = ->(_req) { [403, RACK_ATTACK_PLAIN_TEXT.dup, ["403 Forbidden\n"]] }
 Rack::Attack.throttled_responder   = ->(_req) { [429, RACK_ATTACK_PLAIN_TEXT.dup, ["429 Too Many Requests\n"]] }
+
+# TEMPORARY diagnostic — confirm what client IP Rack::Attack keys its Fail2Ban ban on behind
+# fly's proxy. We suspect `req.ip` resolves to a shared fly load-balancer address rather than
+# the real client, which would make the per-IP ban effectively global. This fires only on
+# blocklist/throttle matches (no extra noise beyond already-blocked requests). Hit a probe path
+# from a known IP (e.g. `curl https://<origin>/api/.env`) and compare `req_ip` to `fly_client_ip`
+# / `x_forwarded_for` in the logs. Remove once we've decided which header to key on.
+ActiveSupport::Notifications.subscribe("rack.attack") do |_name, _start, _finish, _id, payload|
+  req = payload[:request]
+  next unless req
+
+  Rails.logger.info(
+    "rack_attack.match rule=#{req.env['rack.attack.matched'].inspect} " \
+    "type=#{req.env['rack.attack.match_type'].inspect} path=#{req.path} " \
+    "req_ip=#{req.ip} fly_client_ip=#{req.get_header('HTTP_FLY_CLIENT_IP').inspect} " \
+    "x_forwarded_for=#{req.get_header('HTTP_X_FORWARDED_FOR').inspect}"
+  )
+end
