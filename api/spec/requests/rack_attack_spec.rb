@@ -52,6 +52,25 @@ RSpec.describe "Rack::Attack", type: :request do
     expect(response).to have_http_status(:ok)
   end
 
+  describe "RACK_ATTACK_PROBE_PATH (probe detection)" do
+    it "matches probe paths, including percent-encoded ones scanners use to evade matching" do
+      expect(RACK_ATTACK_PROBE_PATH.call("/.env")).to be_truthy
+      expect(RACK_ATTACK_PROBE_PATH.call("/wp-login.php")).to be_truthy
+      expect(RACK_ATTACK_PROBE_PATH.call("/app/%2Eenv")).to be_truthy        # /app/.env
+      expect(RACK_ATTACK_PROBE_PATH.call("/%2Ewell-known/jwks%2Ejson")).to be_truthy
+    end
+
+    it "leaves legitimate paths alone" do
+      expect(RACK_ATTACK_PROBE_PATH.call("/api/weather/current")).to be_falsey
+      expect(RACK_ATTACK_PROBE_PATH.call("/up")).to be_falsey
+    end
+
+    it "is safe on malformed encoding (treats it as a non-probe rather than raising)" do
+      expect { RACK_ATTACK_PROBE_PATH.call("/%ZZ%2") }.not_to raise_error
+      expect(RACK_ATTACK_PROBE_PATH.call("/%ZZ%2")).to be_falsey
+    end
+  end
+
   it "throttles an IP hammering paths outside the known routes" do
     20.times { get "/no-such-page" }
     expect(response).not_to have_http_status(:too_many_requests)

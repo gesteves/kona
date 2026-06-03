@@ -19,6 +19,8 @@
 # registered so specs can exercise them by flipping Rack::Attack.enabled. Counters live in the
 # shared Redis in real environments and in memory under test.
 
+require "cgi"
+
 Rack::Attack.enabled = !Rails.env.test?
 
 Rack::Attack.cache.store =
@@ -37,12 +39,24 @@ end
 # Obvious scanner targets: dotfiles/secrets, common CMS/admin probes, script extensions,
 # and framework status/config endpoints we don't expose.
 RACK_ATTACK_PROBE_PATTERN = %r{
-  (^|/)\.(env|git|aws|ssh|htaccess|svn)  # dotfiles & secret stores
+  (^|/)\.(env|git|aws|ssh|htaccess|svn|well-known)  # dotfiles & secret stores
   | /wp-(login|admin|content|includes)   # WordPress
   | \.(php|asp|aspx|jsp|cgi)(/|$|\?)      # script extensions
   | /(actuator|phpmyadmin|pma|adminer)    # admin panels
   | /api/(secrets|config|debug|env|keys|status|version|health|v\d+/config) # config/secret probes
 }xi
+
+# Whether a path looks like a scanner probe. Scanners percent-encode the giveaway characters
+# (e.g. /app/%2Eenv for /app/.env) to dodge naive matching, and req.path keeps that encoding, so
+# test a decoded copy too. Guarded so a malformed %-sequence or invalid byte can't raise (it just
+# isn't treated as a probe — it'll 404 / get throttled instead).
+RACK_ATTACK_PROBE_PATH = lambda do |path|
+  return true if RACK_ATTACK_PROBE_PATTERN.match?(path)
+  decoded = CGI.unescape(path).scrub
+  decoded != path && RACK_ATTACK_PROBE_PATTERN.match?(decoded)
+rescue ArgumentError
+  false
+end
 
 # Resolve the real client IP. Behind fly's proxy, Rack's own Request#ip can resolve to a shared
 # fly load-balancer address — which would make any per-IP rule effectively global — so prefer the
@@ -57,7 +71,7 @@ end
 # above: an IP ban would 403 the shared proxy/LB IPs that all real traffic shares). Blocking the
 # matching request sheds the probe before it reaches routing, with zero false positives.
 Rack::Attack.blocklist("probe-paths") do |req|
-  RACK_ATTACK_PROBE_PATTERN.match?(req.path)
+  RACK_ATTACK_PROBE_PATH.call(req.path)
 end
 
 # Safety net: throttle a single client hammering paths outside the known routes. Keyed on the real
