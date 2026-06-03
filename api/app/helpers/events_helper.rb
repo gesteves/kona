@@ -72,37 +72,30 @@ module EventsHelper
     is_close?(event) && is_next?(event)
   end
 
-  # The layout variant for the upcoming-races collection, from the event count and whether the
-  # first is featured.
-  def event_collection_variant
-    case upcoming_races.count
+  # The layout variant for a races collection, from the event count and whether the first is
+  # featured. Defaults to the full upcoming-races list; callers can pass an explicit count and
+  # featured flag (e.g. the race-day "Upcoming Races" section, which excludes today's race).
+  def event_collection_variant(count = upcoming_races.count, featured: is_featured?(upcoming_races.first))
+    case count
     when 1 then "single"
-    when 2 then is_featured?(upcoming_races.first) ? "single" : "halves"
-    when 3 then is_featured?(upcoming_races.first) ? "halves" : "thirds"
+    when 2 then featured ? "single" : "halves"
+    when 3 then featured ? "halves" : "thirds"
     else "thirds"
     end
   end
 
-  # "Today" if the event is today, otherwise the formatted date (e.g. "January 1, 2026").
+  # The formatted date for an event's timestamp (e.g. "January 1, 2026"). Today's race is shown
+  # in its own section whose heading already says it's today, so this is only ever rendered for
+  # upcoming events and never needs a "Today" label.
   def event_timestamp(event)
-    is_today?(event) ? "Today" : DateTime.parse(event.date).strftime("%B %-e, %Y")
+    DateTime.parse(event.date).strftime("%B %-e, %Y")
   end
 
-  # The calendar icon reflecting the event's status (cancelled / in progress / today / upcoming).
-  def event_icon_svg(event)
-    return icon_svg("classic", "light", "calendar-xmark") unless event.going
-    return icon_svg("classic", "regular", "calendar-star") if is_in_progress?(event) && event.tracking_url.blank?
-    return icon_svg("classic", "light", "calendar-star") if is_today?(event) && event.going
-    return icon_svg("classic", "light", "calendar-check") if event.going
-    icon_svg("classic", "light", "calendar")
-  end
-
-  # The icon + timestamp span for an event. Highlighted while the race is in progress, unless
-  # the event has a live-tracking link — then the highlight lives on the live-tracking tag.
+  # The icon + date span shown for an upcoming event. Not rendered for today's race (its section
+  # heading already says it's today). Only confirmed, upcoming events reach here — the list
+  # excludes cancelled ones — so the icon is always a calendar check.
   def event_timestamp_tag(event)
-    options = {}
-    options[:class] = "entry__highlight" if is_in_progress?(event) && event.tracking_url.blank?
-    content_tag :span, raw("#{event_icon_svg(event)} #{event_timestamp(event)}"), options
+    content_tag :span, raw("#{icon_svg('classic', 'light', 'calendar-check')} #{event_timestamp(event)}")
   end
 
   # The "Live tracking" indicator for an event with a tracking link, or nil if there's none.

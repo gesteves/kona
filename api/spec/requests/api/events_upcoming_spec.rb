@@ -177,6 +177,122 @@ RSpec.describe "Api::Events upcoming", type: :request do
     end
   end
 
+  # On race day today's race gets its own "Today's Race" section, with the rest under
+  # "Upcoming Races". The clock is frozen so "today" is deterministic; the controller's
+  # is_today? check runs in the default zone (America/Denver), so dates are built there.
+  context "on race day" do
+    include ActiveSupport::Testing::TimeHelpers
+
+    around { |example| travel_to(Time.utc(2026, 6, 15, 18, 0, 0)) { example.run } }
+
+    let(:denver_now) { Time.current.in_time_zone("America/Denver") }
+
+    let(:todays_race) do
+      DeepOstruct.wrap(
+        title: "Hometown Marathon",
+        summary: "The big one.",
+        description: nil,
+        location: "Boulder, Colorado",
+        url: "https://example.com/today",
+        tracking_url: nil,
+        date: denver_now.change(hour: 9).iso8601,
+        going: true,
+        coordinates: { lat: 40.01, lon: -105.27 },
+        sys: { id: "today123" }
+      )
+    end
+
+    let(:mid_event) do
+      DeepOstruct.wrap(
+        title: "Midweek Race",
+        summary: "Coming up.",
+        description: nil,
+        location: "Denver, Colorado",
+        url: nil,
+        tracking_url: nil,
+        date: (denver_now + 10.days).change(hour: 9).iso8601,
+        going: true,
+        coordinates: { lat: 39.74, lon: -104.99 },
+        sys: { id: "mid789" }
+      )
+    end
+
+    # Weather whose forecast day covers today, so the featured race-day weather renders.
+    let(:today_weather) do
+      DeepOstruct.wrap(
+        forecast_daily: {
+          days: [
+            {
+              forecast_start: denver_now.to_date.iso8601,
+              forecast_end: (denver_now.to_date + 1).iso8601,
+              sunrise: denver_now.change(hour: 6).iso8601,
+              sunset: denver_now.change(hour: 20).iso8601,
+              daytime_forecast: {
+                condition_code: "PartlyCloudy",
+                temperature_min: 12.0,
+                temperature_max: 22.0,
+                humidity: 0.5,
+                precipitation_chance: 0.2,
+                precipitation_type: "rain",
+                wind_speed: 14.0,
+                wind_direction: 250,
+                wind_speed_max: 20.0,
+                wind_gust_speed_max: 30.0
+              }
+            }
+          ]
+        }
+      )
+    end
+
+    before do
+      allow_any_instance_of(Events).to receive(:all).and_return([todays_race, featured_event, mid_event, later_event])
+      allow_any_instance_of(WeatherKit).to receive(:data).and_return(today_weather)
+    end
+
+    it "splits today's race into its own section, with the rest under Upcoming Races" do
+      get "/api/events/upcoming", headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Today’s Race")
+      expect(response.body).to include("Upcoming Races")
+      expect(response.body).to include("Hometown Marathon")
+
+      # Today's race: its own featured, single-card section, with race-day weather.
+      expect(response.body).to include('id="todays-race"')
+      expect(response.body).to include("collection--single collection--has-featured")
+      expect(response.body).to include("Race Day Weather")
+
+      # The remaining races render plain under a non-featured "Upcoming Races" section.
+      expect(response.body).to include('id="upcoming-races"')
+      expect(response.body).to include("collection--thirds")
+      expect(response.body).to include("June 18, 2026") # an upcoming event keeps its date
+
+      # The wrapper is the live-update root.
+      expect(response.body).to include('data-controller="live-update"')
+      expect(response.body).to include('data-live-update-url-value="/api/events/upcoming"')
+    end
+
+    it "omits today's race's timestamp (the heading already says it's today)" do
+      get "/api/events/upcoming", headers: auth_headers
+
+      # event_timestamp_tag would render "<span>…icon… Today</span>"; it's suppressed here.
+      expect(response.body).not_to include("Today</span>")
+    end
+
+    context "when today's race is the only race" do
+      before { allow_any_instance_of(Events).to receive(:all).and_return([todays_race]) }
+
+      it "renders only the Today's Race section" do
+        get "/api/events/upcoming", headers: auth_headers
+
+        expect(response.body).to include("Today’s Race")
+        expect(response.body).not_to include("Upcoming Races")
+        expect(response.body).to include("collection--single")
+      end
+    end
+  end
+
   it "requires the API_TOKEN bearer (the proxy injects it; direct hits are rejected)" do
     get "/api/events/upcoming"
     expect(response).to have_http_status(:unauthorized)

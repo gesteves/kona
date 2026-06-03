@@ -6,6 +6,13 @@
   padding: var(--padding) 0 0 0;
 }
 
+// Live-update wrapper around one or more sibling collections (the races widget's "Today's
+// Race" + "Upcoming Races" sections). display:contents keeps the wrapper boxless so the
+// collections still subgrid directly onto the page grid.
+.collection-group {
+  display: contents;
+}
+
 .collection__heading {
   font-family: var(--ibm-plex-sans-condensed);
   font-size: var(--font-semi-large);

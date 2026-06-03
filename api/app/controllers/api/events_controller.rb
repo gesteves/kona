@@ -17,6 +17,10 @@ module Api
       @featured = @upcoming.first if is_featured?(@upcoming.first)
       @event_weather = event_weather_for(@featured) if @featured
 
+      # On race day the featured event is today's race; give it its own section.
+      @todays_race = @featured if @featured && is_today?(@featured)
+      @other_races = @upcoming.drop(1) if @todays_race
+
       render :upcoming
     end
 

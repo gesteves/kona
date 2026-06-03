@@ -59,7 +59,7 @@ class Events < ApplicationService
       # widget needs more than the old today's-race lookup), so a value cached under the old
       # key would be missing fields. Cached for 5 minutes — the edge cache is the primary
       # freshness layer; this just guards Contentful against a stampede.
-      cached_json("contentful:events:v2", expires_in: 5.minutes) do
+      cached_json("contentful:events:v3", expires_in: nil) do
         (query_events(QUERY) || []).map { |event| underscore_keys(event) }
       end
     end

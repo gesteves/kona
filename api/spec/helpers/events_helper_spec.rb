@@ -102,51 +102,19 @@ RSpec.describe EventsHelper, type: :helper do
   end
 
   describe "#event_timestamp" do
-    it "says Today for an event happening today" do
-      expect(helper.event_timestamp(build_event(days_from_today: 0))).to eq("Today")
-    end
-
-    it "formats the date for other events" do
+    it "formats the event's date" do
       event = build_event(days_from_today: 5)
       expected = DateTime.parse(event.date).strftime("%B %-e, %Y")
       expect(helper.event_timestamp(event)).to eq(expected)
     end
   end
 
-  describe "#event_icon_svg" do
-    it "uses a crossed-out calendar for a cancelled event" do
-      expect(helper.event_icon_svg(build_event(going: false))).to include('data-icon="classic-light-calendar-xmark"')
-    end
-
-    it "uses a solid (regular) star while the race is in progress" do
-      expect(helper.event_icon_svg(build_event(days_from_today: 0))).to include('data-icon="classic-regular-calendar-star"')
-    end
-
-    it "uses a light star for today's race outside daytime" do
-      allow(helper).to receive(:is_daytime?).and_return(false)
-      expect(helper.event_icon_svg(build_event(days_from_today: 0))).to include('data-icon="classic-light-calendar-star"')
-    end
-
-    it "uses a check for a confirmed future event" do
-      expect(helper.event_icon_svg(build_event(days_from_today: 5))).to include('data-icon="classic-light-calendar-check"')
-    end
-  end
-
   describe "#event_timestamp_tag" do
-    it "highlights the in-progress timestamp when there's no tracking link" do
-      tag = helper.event_timestamp_tag(build_event(days_from_today: 0))
-      expect(tag).to include('class="entry__highlight"')
-      expect(tag).to include("Today")
-    end
-
-    it "does not highlight the timestamp when the in-progress event has a tracking link" do
-      tag = helper.event_timestamp_tag(build_event(days_from_today: 0, tracking_url: "https://track.example.com"))
-      expect(tag).not_to include("entry__highlight")
-      expect(tag).to include("Today")
-    end
-
-    it "does not highlight the timestamp for a future event" do
-      tag = helper.event_timestamp_tag(build_event(days_from_today: 5))
+    it "renders a calendar-check icon and the formatted date, with no highlight" do
+      event = build_event(days_from_today: 5)
+      tag = helper.event_timestamp_tag(event)
+      expect(tag).to include('data-icon="classic-light-calendar-check"')
+      expect(tag).to include(DateTime.parse(event.date).strftime("%B %-e, %Y"))
       expect(tag).not_to include("entry__highlight")
     end
   end
