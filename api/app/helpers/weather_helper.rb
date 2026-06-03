@@ -254,7 +254,6 @@ module WeatherHelper
     summary << precipitation
     summary << sunrise_or_sunset
     summary << activities
-    summary << live_tracking
     markdown_to_html(summary.reject(&:blank?).map { |t| "<span>#{t}</span>" }.join(" "))
   end
 
@@ -389,13 +388,6 @@ module WeatherHelper
     alerts = @weather.weather_alerts.alerts.group_by { |alert| alert.token }
                      .map { |_token, grouped_alerts| grouped_alerts.min_by { |alert| alert.precedence } }
     alerts.sort_by { |alert| alert.precedence }
-  end
-
-  def live_tracking
-    return unless is_trackable?(todays_race)
-    content_tag :span, class: "weather__highlight weather__highlight--live" do
-      "#{content_tag(:a, 'Live results', href: todays_race.tracking_url, rel: 'noopener', target: '_blank')} #{icon_svg('classic', 'solid', 'circle-small')}".html_safe
-    end
   end
 
   def aqi_icon(aqi)

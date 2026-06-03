@@ -150,4 +150,30 @@ RSpec.describe "Api::Events upcoming", type: :request do
       expect(response.body.strip).to be_empty
     end
   end
+
+  context "when the featured event has a live-tracking link but isn't in progress" do
+    before do
+      tracked = DeepOstruct.wrap(
+        title: "Featured Race",
+        summary: "A short summary.",
+        description: nil,
+        location: "Boulder, Colorado",
+        url: "https://example.com/race",
+        tracking_url: "https://track.example.com/race",
+        date: (Time.now + 3.days).iso8601,
+        going: true,
+        coordinates: { lat: 40.01, lon: -105.27 },
+        sys: { id: "featured123" }
+      )
+      allow_any_instance_of(Events).to receive(:all).and_return([tracked, later_event])
+    end
+
+    it "renders a muted Live tracking link without the live highlight" do
+      get "/api/events/upcoming", headers: auth_headers
+
+      expect(response.body).to include("Live tracking")
+      expect(response.body).to include('href="https://track.example.com/race"')
+      expect(response.body).not_to include("entry__highlight--live")
+    end
+  end
 end

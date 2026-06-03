@@ -6,6 +6,7 @@
   <div class="event__inner">
     <header class="entry__header">
       <p class="entry__meta">
+        <% if featured %><%= event_live_tracking_tag(event) %><% end %>
         <%= event_timestamp_tag(event) %>
         <span><%= raw icon_svg("classic", "light", "location-dot") %> <%= event.location %></span>
       </p>

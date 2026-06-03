@@ -24,12 +24,6 @@ module EventsHelper
     is_daytime? && is_today?(event) && event.going
   end
 
-  # Whether the event is in progress and has a live tracking link.
-  def is_trackable?(event)
-    return false if event.blank?
-    is_in_progress?(event) && event.tracking_url.present?
-  end
-
   # The daytime forecast for the event's date, used by the per-event weather view.
   def event_forecast(event)
     event_forecast_day(event)&.daytime_forecast
@@ -97,16 +91,31 @@ module EventsHelper
   # The calendar icon reflecting the event's status (cancelled / in progress / today / upcoming).
   def event_icon_svg(event)
     return icon_svg("classic", "light", "calendar-xmark") unless event.going
-    return icon_svg("classic", "regular", "calendar-star") if is_in_progress?(event)
+    return icon_svg("classic", "regular", "calendar-star") if is_in_progress?(event) && event.tracking_url.blank?
     return icon_svg("classic", "light", "calendar-star") if is_today?(event) && event.going
     return icon_svg("classic", "light", "calendar-check") if event.going
     icon_svg("classic", "light", "calendar")
   end
 
-  # The icon + timestamp span for an event (highlighted while the race is in progress).
+  # The icon + timestamp span for an event. Highlighted while the race is in progress, unless
+  # the event has a live-tracking link — then the highlight lives on the live-tracking tag.
   def event_timestamp_tag(event)
     options = {}
-    options[:class] = "entry__highlight" if is_in_progress?(event)
+    options[:class] = "entry__highlight" if is_in_progress?(event) && event.tracking_url.blank?
     content_tag :span, raw("#{event_icon_svg(event)} #{event_timestamp(event)}"), options
+  end
+
+  # The "Live tracking" indicator for an event with a tracking link, or nil if there's none.
+  # While the race is in progress it's highlighted and pulses; otherwise it's muted to signal
+  # tracking exists but isn't live yet.
+  def event_live_tracking_tag(event)
+    return if event.blank? || event.tracking_url.blank?
+    in_progress = is_in_progress?(event)
+    icon = in_progress ? icon_svg("classic", "regular", "signal-stream") : icon_svg("classic", "light", "signal-stream")
+    options = {}
+    options[:class] = "entry__highlight entry__highlight--live" if in_progress
+    content_tag :span, options do
+      raw("#{icon} #{content_tag(:a, 'Live tracking', href: event.tracking_url, rel: 'noopener', target: '_blank')}")
+    end
   end
 end
