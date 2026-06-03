@@ -79,4 +79,15 @@ RSpec.describe "Rack::Attack", type: :request do
     expect(response).to have_http_status(:too_many_requests)
     expect(response.body).to eq("429 Too Many Requests\n")
   end
+
+  # The throttle must key on the real client (Fly-Client-IP), not the shared transport IP — so one
+  # abusive client can't exhaust the budget for everyone behind the same fly proxy address.
+  it "throttles per real client IP from Fly-Client-IP, isolating distinct clients" do
+    21.times { get "/no-such-page", headers: { "Fly-Client-IP" => "1.1.1.1" } }
+    expect(response).to have_http_status(:too_many_requests)
+
+    # A different client (same transport, different Fly-Client-IP) keeps its own budget.
+    get "/no-such-page", headers: { "Fly-Client-IP" => "2.2.2.2" }
+    expect(response).not_to have_http_status(:too_many_requests)
+  end
 end
