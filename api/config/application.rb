@@ -44,5 +44,9 @@ module Api
     # (this is a headless, machine-only API). The lambda defers resolving the constant until
     # request time, when lib/ autoloading is active.
     config.exceptions_app = ->(env) { PlainTextExceptions.call(env) }
+
+    # Block/throttle abusive direct-to-origin requests before they reach routing.
+    # Configured in config/initializers/rack_attack.rb (no-op in the test env).
+    config.middleware.use Rack::Attack
   end
 end

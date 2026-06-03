@@ -50,12 +50,13 @@ Rails.application.configure do
   # the I18n.default_locale when a translation cannot be found).
   config.i18n.fallbacks = true
 
-  # Enable DNS rebinding protection and other `Host` header attacks.
-  # config.hosts = [
-  #   "example.com",     # Allow requests from example.com
-  #   /.*\.example\.com/ # Allow requests from subdomains like `www.example.com`
-  # ]
-  #
-  # Skip DNS rebinding protection for the default health check endpoint.
-  # config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
+  # Reject requests with a spoofed/raw-IP `Host` header (DNS rebinding & Host-header attacks),
+  # which is most of the direct-to-origin scanner traffic. The allowlist is read from
+  # ALLOWED_HOSTS (comma-separated) — never hardcode the hostname. Guarded so the app stays
+  # permissive until the var is set: deploy is safe, then set the fly secret to activate it.
+  # The /up health check is excluded so fly's checks (which hit the internal host) keep passing.
+  if ENV["ALLOWED_HOSTS"].present?
+    config.hosts.concat(ENV["ALLOWED_HOSTS"].split(",").map(&:strip).reject(&:empty?))
+    config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
+  end
 end

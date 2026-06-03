@@ -17,7 +17,19 @@ RSpec.describe "Api::Plausible pageviews", type: :request do
     expect(response.body).to include("<svg")                       # eye icon, rendered unescaped
     expect(response.body).to include("Viewed 1,234 times")
     expect(response.body).to include('href="https://plausible.io/')
-    expect(response.body).to include("/2026/05/01/my-race-report/") # reconstructed path in the dashboard link
+    # Reconstructed path in the dashboard link, URL-encoded into the query string.
+    expect(response.body).to include(ERB::Util.url_encode("/2026/05/01/my-race-report/"))
+  end
+
+  it "URL-encodes a slug with special characters in the dashboard link" do
+    weird = DeepOstruct.wrap(slug: "q&a-recap", published: "2026-05-01T09:00:00-06:00", sys: { id: "abc123", first_published_at: "2026-05-01T09:00:00Z" })
+    allow_any_instance_of(Articles).to receive(:find).and_return(weird)
+
+    get "/api/plausible/pageviews/abc123"
+
+    # The raw "&" must not leak into the query string (it would inject a bogus param).
+    expect(response.body).to include(ERB::Util.url_encode("/2026/05/01/q&a-recap/"))
+    expect(response.body).not_to include("page,/2026/05/01/q&a-recap/")
   end
 
   it "queries Plausible for the reconstructed article path" do

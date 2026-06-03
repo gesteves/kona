@@ -57,7 +57,21 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   - Edge: `Netlify-CDN-Cache-Control: public, durable, max-age=<ttl>, stale-while-revalidate=86400, stale-if-error=86400`
   ⚠️ The proxy forwards the edge header **only on 2xx** — only emit durable headers on
   successful, cacheable responses.
-- **Errors** render as plain text via `lib/plain_text_exceptions.rb`.
+- **Errors** render as plain text via `lib/plain_text_exceptions.rb`. Unmatched paths are
+  caught by the trailing `match "*unmatched"` route → `ApplicationController#route_not_found`
+  (plain-text 404), instead of raising `ActionController::RoutingError`. This is what keeps
+  scanner probes (`/api/.env`, `/wp-login.php`, …) to a single clean `status=404` lograge line
+  rather than an exception backtrace. ⚠️ That catch-all **must stay the last route** in
+  `routes.rb` or it will shadow everything below it.
+- **Abuse mitigation** — `config/initializers/rack_attack.rb` (rack-attack middleware, wired
+  up in `application.rb`). The origin is hit directly by vulnerability scanners, so it
+  blocklists obvious probe paths (Fail2Ban: repeat offenders get a flat 403 and never reach
+  routing) and throttles per-IP requests **to paths outside the known route prefixes**.
+  ⚠️ All legitimate `/api/*` traffic shares the Netlify proxy's egress IPs, so do **not** add
+  a blanket per-IP throttle — it would throttle real users. ⚠️ The throttle treats anything
+  outside `RACK_ATTACK_KNOWN_PREFIXES` (`/up`, `/api`, `/whoop`, `/`) as a probe: **if you add
+  a top-level route, add its prefix there** or it will be rate-limited. Disabled in the test
+  env (`Rack::Attack.enabled`); counters live in the shared Redis (in-memory under test).
 - **Redis** — global `$redis` from `config/initializers/redis.rb` (shares `REDIS_URL`
   with `web/`). No background jobs/workers; fly.toml runs a single `app` process.
 
@@ -67,12 +81,17 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 bin/dev                                              # local server (or bin/setup)
 bundle exec rspec spec/requests/api/activity_stats_spec.rb   # single spec (fast)
 bundle exec rspec                                    # full suite
-bin/ci                                               # setup + full suite (CI)
+bin/ci                                               # setup + full suite + security scan (CI)
+bundle exec brakeman -q --no-pager                   # static security scan
+bundle exec bundle-audit check --update              # dependency CVE scan
 fly deploy                                           # deploy to fly.io
-fly console                                          # production console
+fly console                                           # production console
 ```
 
-No Rubocop / linter is configured. `.rspec` requires `spec_helper`.
+No Rubocop / linter is configured. `.rspec` requires `spec_helper`. CI (`bin/ci` and the
+`security` job in `.github/workflows/api.yml`) runs Brakeman + bundler-audit; the deploy job
+**won't run unless both pass**. If Brakeman flags a verified false-positive, add a checked-in
+`config/brakeman.ignore` rather than weakening the code.
 
 ## Testing
 
@@ -95,7 +114,10 @@ secrets (and Rails `config/credentials.yml.enc` + `master.key`).
   (public site root, for the standard.site publication `url`).
 - **Optional**: `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`, `TRAINERROAD_CALENDAR_URL`,
   `PURPLEAIR_API_KEY`, `LOCATION`, `TIME_ZONE`, `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`,
-  `BLUESKY_PDS_URL` (standard.site publishing; no-ops when the handle/password are unset).
+  `BLUESKY_PDS_URL` (standard.site publishing; no-ops when the handle/password are unset),
+  `ALLOWED_HOSTS` (comma-separated `Host`-header allowlist; **production only**, enables
+  host authorization. Unset = all hosts accepted, so it's safe to deploy before setting it,
+  then activate by setting the fly secret. `/up` is always exempt. Never hardcode the host).
 
 ## Conventions & gates
 

@@ -24,7 +24,10 @@ module Api
       tz = TimeZoneResolver.default
       from = published.in_time_zone(tz).strftime("%Y-%m-%d")
       to = Time.current.in_time_zone(tz).strftime("%Y-%m-%d")
-      @plausible_url = "https://plausible.io/#{site_id}?f=is,page,#{path}&period=custom&from=#{from}&to=#{to}&r=v2"
+      # URL-encode the path before interpolating it into the query string; a slug containing
+      # URL-special characters would otherwise corrupt the f=is,page filter / inject params.
+      encoded_path = ERB::Util.url_encode(path)
+      @plausible_url = "https://plausible.io/#{site_id}?f=is,page,#{encoded_path}&period=custom&from=#{from}&to=#{to}&r=v2"
 
       render :pageviews
     end

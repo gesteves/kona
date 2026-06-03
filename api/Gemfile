@@ -27,6 +27,9 @@ gem "redis"
 gem "lograge"
 # Caps total request wall-time so no single request can hold a Puma thread indefinitely
 gem "rack-timeout"
+# Blocks/throttles abusive direct-to-origin requests (vulnerability scanners) at the edge of
+# the middleware stack, before they reach routing. See config/initializers/rack_attack.rb.
+gem "rack-attack"
 # GraphQL client for the Font Awesome API
 gem "graphql-client"
 
@@ -35,6 +38,10 @@ group :development, :test do
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"
   # Loads environment variables from .env for local development (production uses real env/secrets)
   gem "dotenv-rails"
+  # Static analysis security scanner; run in CI (bin/ci) and the GitHub Actions security job.
+  gem "brakeman", require: false
+  # Scans the bundle for gems with known CVEs; run alongside Brakeman in CI.
+  gem "bundler-audit", require: false
 end
 
 group :test do

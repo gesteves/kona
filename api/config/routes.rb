@@ -45,4 +45,10 @@ Rails.application.routes.draw do
   # Redirect the project root to the main site. The host comes from SITE_URL (never
   # hardcoded); evaluated per-request so it tracks the configured value.
   root to: redirect(status: 301) { "#{ENV['SITE_URL'].to_s.chomp('/')}/" }
+
+  # Catch-all for unmatched paths (mostly vulnerability scanners probing /api/.env and the
+  # like). Handling them in a controller action instead of letting them raise
+  # ActionController::RoutingError turns the multi-line exception+backtrace into a single
+  # clean status=404 line via lograge, while still returning a plain-text 404. Must stay last.
+  match "*unmatched", to: "application#route_not_found", via: :all
 end
