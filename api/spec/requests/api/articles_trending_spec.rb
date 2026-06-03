@@ -95,4 +95,12 @@ RSpec.describe "Api::Articles trending", type: :request do
       expect(response.body.strip).to be_empty
     end
   end
+
+  it "requires the API_TOKEN bearer (the proxy injects it; direct hits are rejected)" do
+    get "/api/articles/trending"
+    expect(response).to have_http_status(:unauthorized)
+
+    get "/api/articles/trending", headers: { "Authorization" => "Bearer wrong" }
+    expect(response).to have_http_status(:unauthorized)
+  end
 end

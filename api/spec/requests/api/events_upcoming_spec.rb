@@ -176,4 +176,12 @@ RSpec.describe "Api::Events upcoming", type: :request do
       expect(response.body).not_to include("entry__highlight--live")
     end
   end
+
+  it "requires the API_TOKEN bearer (the proxy injects it; direct hits are rejected)" do
+    get "/api/events/upcoming"
+    expect(response).to have_http_status(:unauthorized)
+
+    get "/api/events/upcoming", headers: { "Authorization" => "Bearer wrong" }
+    expect(response).to have_http_status(:unauthorized)
+  end
 end

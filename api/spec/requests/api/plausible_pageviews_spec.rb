@@ -81,4 +81,40 @@ RSpec.describe "Api::Plausible pageviews", type: :request do
       expect(response.body).to eq("")
     end
   end
+
+  context "when the article has no publish date" do
+    before do
+      undated = DeepOstruct.wrap(slug: "draft", published: nil, sys: { id: "abc123", first_published_at: nil })
+      allow_any_instance_of(Articles).to receive(:find).and_return(undated)
+    end
+
+    it "returns an empty body without querying Plausible" do
+      expect_any_instance_of(Plausible).not_to receive(:query)
+
+      get "/api/plausible/pageviews/abc123", headers: auth_headers
+      expect(response.body).to eq("")
+    end
+  end
+
+  context "when PLAUSIBLE_SITE_ID is unset" do
+    before do
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("PLAUSIBLE_SITE_ID").and_return(nil)
+    end
+
+    it "returns an empty body without querying Plausible" do
+      expect_any_instance_of(Plausible).not_to receive(:query)
+
+      get "/api/plausible/pageviews/abc123", headers: auth_headers
+      expect(response.body).to eq("")
+    end
+  end
+
+  it "requires the API_TOKEN bearer (the proxy injects it; direct hits are rejected)" do
+    get "/api/plausible/pageviews/abc123"
+    expect(response).to have_http_status(:unauthorized)
+
+    get "/api/plausible/pageviews/abc123", headers: { "Authorization" => "Bearer wrong" }
+    expect(response).to have_http_status(:unauthorized)
+  end
 end

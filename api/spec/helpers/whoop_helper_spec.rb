@@ -48,8 +48,12 @@ RSpec.describe WhoopHelper do
       whoop_helper(whoop: { sleep: { score: { sleep_performance_percentage: score } } }).whoop_sleep_label
     end
 
+    it { expect(label_for(0)).to eq("None") }
     it { expect(label_for(50)).to eq("Poor") }
-    it { expect(label_for(75)).to eq("Sufficient") }
+    it { expect(label_for(69)).to eq("Poor") }
+    it { expect(label_for(70)).to eq("Sufficient") }
+    it { expect(label_for(84)).to eq("Sufficient") }
+    it { expect(label_for(85)).to eq("Optimal") }
     it { expect(label_for(90)).to eq("Optimal") }
   end
 
@@ -58,8 +62,12 @@ RSpec.describe WhoopHelper do
       whoop_helper(whoop: { recovery: { score: { recovery_score: score } } }).whoop_recovery_label
     end
 
+    it { expect(label_for(0)).to eq("None") }
     it { expect(label_for(20)).to eq("Poor") }
-    it { expect(label_for(50)).to eq("Adequate") }
+    it { expect(label_for(33)).to eq("Poor") }
+    it { expect(label_for(34)).to eq("Adequate") }
+    it { expect(label_for(66)).to eq("Adequate") }
+    it { expect(label_for(67)).to eq("Sufficient") }
     it { expect(label_for(80)).to eq("Sufficient") }
     it("has an easter egg at 69") { expect(label_for(69)).to eq("Nice.") }
   end
@@ -70,12 +78,47 @@ RSpec.describe WhoopHelper do
     end
 
     it { expect(icon_for(20)).to eq("skull") }
+    it { expect(icon_for(33)).to eq("skull") }
+    it { expect(icon_for(34)).to eq("person-meditating") }
     it { expect(icon_for(80)).to eq("person-meditating") }
   end
 
+  describe "#whoop_last_wakeup_time" do
+    it "is nil when there's no recorded sleep end" do
+      expect(whoop_helper(whoop: {}).whoop_last_wakeup_time).to be_nil
+    end
+
+    it "parses the sleep end into the location's timezone" do
+      time = whoop_helper(whoop: { sleep: { end: "2026-06-15T13:00:00Z" } }).whoop_last_wakeup_time
+      expect(time).to be_a(ActiveSupport::TimeWithZone)
+      expect(time.time_zone.name).to eq("America/Denver")
+    end
+  end
+
   describe "#whoop_heading" do
+    include ActiveSupport::Testing::TimeHelpers
+
+    # Freeze to midday in the helper's timezone so "today"/"yesterday" are deterministic.
+    around { |example| travel_to(Time.utc(2026, 6, 15, 18, 0, 0)) { example.run } }
+
+    def heading_for(sleep_end)
+      whoop_helper(whoop: { sleep: { end: sleep_end } }).whoop_heading
+    end
+
     it "labels metrics 'Latest' when there's no recorded wakeup" do
       expect(whoop_helper(whoop: {}).whoop_heading).to include("Latest Metrics")
+    end
+
+    it "labels a wakeup from today 'Today’s'" do
+      expect(heading_for(Time.current.iso8601)).to include("Today’s Metrics")
+    end
+
+    it "labels a wakeup from yesterday 'Yesterday’s'" do
+      expect(heading_for((Time.current - 1.day).iso8601)).to include("Yesterday’s Metrics")
+    end
+
+    it "falls back to 'Latest' for older wakeups" do
+      expect(heading_for((Time.current - 5.days).iso8601)).to include("Latest Metrics")
     end
   end
 end

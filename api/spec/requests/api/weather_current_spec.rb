@@ -142,10 +142,60 @@ RSpec.describe "Weather", type: :request do
     expect(response.body).to include('data-live-update-url-value="/api/weather/current"')
   end
 
+  it "requires the API_TOKEN bearer (the proxy injects it; direct hits are rejected)" do
+    get "/api/weather/current"
+    expect(response).to have_http_status(:unauthorized)
+
+    get "/api/weather/current", headers: { "Authorization" => "Bearer wrong" }
+    expect(response).to have_http_status(:unauthorized)
+  end
+
   context "when the weather is unavailable" do
     before { allow_any_instance_of(WeatherKit).to receive(:data).and_return(nil) }
 
     it "returns an empty body so the live-update controller collapses the placeholder" do
+      get "/api/weather/current", headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body.strip).to be_empty
+    end
+  end
+
+  context "when the current location can't be resolved" do
+    before { allow(Location).to receive(:new).and_return(double(latitude: nil, longitude: nil)) }
+
+    it "returns an empty body without fetching weather" do
+      get "/api/weather/current", headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body.strip).to be_empty
+    end
+  end
+
+  context "when the weather payload is missing current conditions" do
+    before do
+      stale = weather.dup
+      stale.current_weather = nil
+      allow_any_instance_of(WeatherKit).to receive(:data).and_return(stale)
+    end
+
+    it "treats the data as stale and returns an empty body" do
+      get "/api/weather/current", headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body.strip).to be_empty
+    end
+  end
+
+  context "when no forecast day covers the current time" do
+    before do
+      future = weather.dup
+      future.forecast_daily.days.first.forecast_start = (now + 2.days).iso8601
+      future.forecast_daily.days.first.forecast_end = (now + 3.days).iso8601
+      allow_any_instance_of(WeatherKit).to receive(:data).and_return(future)
+    end
+
+    it "treats the data as stale and returns an empty body" do
       get "/api/weather/current", headers: auth_headers
 
       expect(response).to have_http_status(:ok)

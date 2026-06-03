@@ -35,6 +35,16 @@ RSpec.describe UnitsHelper do
       expect(helper.distance_value(5000, units: "metric")).to eq("5")
       expect(helper.distance_unit(5000, units: "metric")).to eq("kilometers")
     end
+
+    it "defaults to SI (metric) units" do
+      expect(helper.distance(5000)).to match(/\bkilometers?\b/)
+      expect(helper.distance(500)).to match(/\bmeters?\b/)
+    end
+
+    it "switches to kilometers at exactly 1 km, and stays in meters just below" do
+      expect(helper.meters_to_metric_units(1000)).to eq([1.0, { unit: "kilometer" }])
+      expect(helper.meters_to_metric_units(999).last).to eq(unit: "meters")
+    end
   end
 
   describe "#determine_precision" do
