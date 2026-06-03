@@ -4,17 +4,24 @@ import type { Config, Context } from '@netlify/functions';
 // Functions runtime scope on Netlify.
 const API_ORIGIN = process.env.KONA_API_URL;
 
-// Only these request headers are forwarded upstream. Everything else (cookies, conditional
-// headers, etc.) is dropped so every viewer's request is identical and the whole audience
-// shares a single cache entry.
-const FORWARD_REQUEST_HEADERS = ['accept', 'authorization'];
+// Shared bearer token the kona-api widget endpoints require. Injected here, server-side, so
+// the origin is closed to the public (direct hits without it get a cheap 401) while the token
+// is never exposed to the browser. It's the same for every viewer, so every upstream request
+// stays identical and the audience still shares a single edge-cache entry.
+const API_TOKEN = process.env.API_TOKEN;
 
-function forwardHeaders(incoming: Headers): Headers {
+// Only these request headers are forwarded upstream. Everything else (cookies, conditional
+// headers, the client's own authorization, etc.) is dropped so every viewer's request is
+// identical and the whole audience shares a single cache entry.
+const FORWARD_REQUEST_HEADERS = ['accept'];
+
+function upstreamHeaders(incoming: Headers): Headers {
   const headers = new Headers();
   for (const name of FORWARD_REQUEST_HEADERS) {
     const value = incoming.get(name);
     if (value) headers.set(name, value);
   }
+  if (API_TOKEN) headers.set('authorization', `Bearer ${API_TOKEN}`);
   return headers;
 }
 
@@ -30,7 +37,7 @@ export default async function handler(
   try {
     upstream = await fetch(upstreamUrl, {
       method: req.method,
-      headers: forwardHeaders(req.headers),
+      headers: upstreamHeaders(req.headers),
       body: hasBody ? await req.arrayBuffer() : undefined,
       redirect: 'manual',
     });

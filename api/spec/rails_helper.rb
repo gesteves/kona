@@ -22,9 +22,31 @@ require 'rspec/rails'
 #
 # Rails.root.glob('spec/support/**/*.rb').sort_by(&:to_s).each { |f| require f }
 
+# The /api/* widget endpoints require the API_TOKEN bearer (injected by the web proxy in
+# production). Request specs set a deterministic token and pass `headers: auth_headers` on
+# requests to gated endpoints.
+module ApiAuthHelper
+  API_TEST_TOKEN = "test-api-token".freeze
+
+  def auth_headers(extra = {})
+    { "Authorization" => "Bearer #{API_TEST_TOKEN}" }.merge(extra)
+  end
+end
+
 RSpec.configure do |config|
   # Remove this line to enable support for ActiveRecord
   config.use_active_record = false
+
+  config.include ApiAuthHelper, type: :request
+
+  config.before(type: :request) do
+    @original_api_token = ENV["API_TOKEN"]
+    ENV["API_TOKEN"] = ApiAuthHelper::API_TEST_TOKEN
+  end
+
+  config.after(type: :request) do
+    ENV["API_TOKEN"] = @original_api_token
+  end
 
   # If you enable ActiveRecord support you should uncomment these lines,
   # note if you'd prefer not to run each example within a transaction, you

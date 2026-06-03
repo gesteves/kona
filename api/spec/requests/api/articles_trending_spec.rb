@@ -46,7 +46,7 @@ RSpec.describe "Api::Articles trending", type: :request do
   end
 
   it "renders the trending-articles section as a live-update fragment" do
-    get "/api/articles/trending"
+    get "/api/articles/trending", headers: auth_headers
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('class="collection collection--halves"')
@@ -56,7 +56,7 @@ RSpec.describe "Api::Articles trending", type: :request do
   end
 
   it "excludes Shorts and the most-recent articles, and orders the rest by trending score" do
-    get "/api/articles/trending"
+    get "/api/articles/trending", headers: auth_headers
 
     expect(response.body).to include("Spiking Article")
     expect(response.body).to include("Steady Article")
@@ -66,13 +66,13 @@ RSpec.describe "Api::Articles trending", type: :request do
   end
 
   it "links each card to the article's computed path" do
-    get "/api/articles/trending"
+    get "/api/articles/trending", headers: auth_headers
 
     expect(response.body).to include('href="/2024/01/01/spiking/"')
   end
 
   it "sets a one-hour durable caching header" do
-    get "/api/articles/trending"
+    get "/api/articles/trending", headers: auth_headers
 
     cache_control = response.headers["Cache-Control"]
     expect(cache_control).to include("public")
@@ -89,7 +89,7 @@ RSpec.describe "Api::Articles trending", type: :request do
     before { allow_any_instance_of(Articles).to receive(:list).and_return([]) }
 
     it "returns an empty body so the placeholder collapses" do
-      get "/api/articles/trending"
+      get "/api/articles/trending", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty

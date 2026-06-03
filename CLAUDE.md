@@ -43,15 +43,21 @@ When an example or placeholder genuinely needs a host, use a generic stand-in li
 
 The proxy is deliberately strict:
 
-- Forwards only the `accept` and `authorization` **request** headers (so every
-  viewer's request is identical → one shared cache entry).
+- Forwards only the `accept` **request** header and **injects** a constant
+  `Authorization: Bearer <API_TOKEN>` (the client's own `authorization` is dropped). The
+  token is the same for every viewer, so every upstream request stays identical → one shared
+  cache entry. It authenticates to the origin (the API requires it on every widget endpoint),
+  so the widget origin is closed to the public; injecting it server-side keeps it out of the
+  browser. ⚠️ `API_TOKEN` must be set in Netlify's env and **match the API's `API_TOKEN`** or
+  every widget 401s and collapses site-wide.
 - Passes the origin's `Cache-Control` through verbatim (what the browser sees).
 - Forwards `Netlify-CDN-Cache-Control` (the durable edge policy) **only on 2xx**, so
   errors/redirects are never durably pinned at the edge.
 - Keys the edge cache on **path only** — no query params, no per-user vary.
 
 ⚠️ Don't break these: keep widget inputs in the **path** (IDs are path segments, not
-query strings), and only emit durable edge headers on success responses.
+query strings), only emit durable edge headers on success responses, and keep the injected
+`Authorization` constant (a per-request token would shatter the shared cache entry).
 
 ## The cross-app HTML contract (most important)
 

@@ -37,6 +37,12 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   `cache_widget(ttl:)`, then render an ERB fragment. Use `render_empty` (blank body)
   when data is unavailable — the site's `live-update` controller removes the placeholder
   (collapsing the widget) on an empty response, so prefer it over raising.
+- **Auth** — `BaseController` requires the `API_TOKEN` bearer (`TokenAuthentication` concern)
+  on **every** endpoint via a global `before_action`; the web app's Netlify proxy injects it,
+  so the widget origin is closed to direct/public hits (cheap 401 before any work). Two
+  endpoints `skip_before_action :authenticate_bearer_token!`: the Contentful webhook (HMAC
+  instead, hit directly by Contentful) and `standard-site` (public, build-time fetched directly
+  via `KONA_API_URL`). A new widget endpoint is gated automatically by inheriting `BaseController`.
 - **Services** (`app/services/`, base `ApplicationService`): one per external API —
   Intervals.icu, Apple WeatherKit (ES256 JWT), Google Maps / Air Quality / Pollen,
   PurpleAir, Whoop (OAuth2), TrainerRoad (iCal), Contentful (events/articles),
@@ -107,7 +113,8 @@ secrets (and Rails `config/credentials.yml.enc` + `master.key`).
 
 - **Required**: `REDIS_URL`, `ICU_ATHLETE_ID`, `ICU_API_KEY`, `FONT_AWESOME_API_TOKEN`,
   `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET`, `WHOOP_REDIRECT_URI`, `WHOOP_AUTH_USERNAME`,
-  `WHOOP_AUTH_PASSWORD`, `GOOGLE_API_KEY`, `API_TOKEN` (bearer for `POST /api/location`),
+  `WHOOP_AUTH_PASSWORD`, `GOOGLE_API_KEY`, `API_TOKEN` (bearer required on all `/api/*` widget
+  endpoints — injected by the web proxy — and on `POST /api/location`; must match the web app's),
   `WEATHERKIT_KEY_ID`, `WEATHERKIT_TEAM_ID`, `WEATHERKIT_SERVICE_ID`,
   `WEATHERKIT_PRIVATE_KEY` (base64 .p8), `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`,
   `CONTENTFUL_WEBHOOK_SECRET` (64-char HMAC secret for the Contentful webhook), `SITE_URL`

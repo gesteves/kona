@@ -83,7 +83,7 @@ RSpec.describe "Api::Events upcoming", type: :request do
   end
 
   it "renders the upcoming-races section as a live-update fragment" do
-    get "/api/events/upcoming"
+    get "/api/events/upcoming", headers: auth_headers
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('class="collection')
@@ -96,7 +96,7 @@ RSpec.describe "Api::Events upcoming", type: :request do
   end
 
   it "features the next race within 10 days, with its race-day weather inline" do
-    get "/api/events/upcoming"
+    get "/api/events/upcoming", headers: auth_headers
 
     expect(response.body).to include("collection--has-featured")
     expect(response.body).to include("event--is-featured")
@@ -105,7 +105,7 @@ RSpec.describe "Api::Events upcoming", type: :request do
   end
 
   it "renders the event body with unit toggles and external links opening in a new tab" do
-    get "/api/events/upcoming"
+    get "/api/events/upcoming", headers: auth_headers
 
     expect(response.body).to include("data-units-metric-value") # the <span data-imperial> conversion
     expect(response.body).to include('target="_blank"')         # external description link
@@ -113,7 +113,7 @@ RSpec.describe "Api::Events upcoming", type: :request do
   end
 
   it "sets a one-hour durable caching header" do
-    get "/api/events/upcoming"
+    get "/api/events/upcoming", headers: auth_headers
 
     cache_control = response.headers["Cache-Control"]
     expect(cache_control).to include("public")
@@ -131,7 +131,7 @@ RSpec.describe "Api::Events upcoming", type: :request do
     before { allow_any_instance_of(Events).to receive(:all).and_return([later_event]) }
 
     it "renders the section without a featured event or race-day weather" do
-      get "/api/events/upcoming"
+      get "/api/events/upcoming", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Later Race")
@@ -144,7 +144,7 @@ RSpec.describe "Api::Events upcoming", type: :request do
     before { allow_any_instance_of(Events).to receive(:all).and_return([]) }
 
     it "returns an empty body so the placeholder collapses" do
-      get "/api/events/upcoming"
+      get "/api/events/upcoming", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty

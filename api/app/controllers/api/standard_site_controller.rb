@@ -7,6 +7,11 @@ module Api
   # stable. When the Bluesky credentials are absent the DID can't be resolved; an empty
   # response makes the web build omit the verification markup.
   class StandardSiteController < BaseController
+    # Intentionally public: the data (DID + publication URI) is public on the AT Protocol, and
+    # this is fetched at build time directly via KONA_API_URL (not through the token-injecting
+    # proxy), so gating it would couple the web build to the shared secret.
+    skip_before_action :authenticate_bearer_token!
+
     def show
       did = StandardSite.new.did
       return render_empty if did.blank?

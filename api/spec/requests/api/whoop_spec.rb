@@ -18,7 +18,7 @@ RSpec.describe "Whoop", type: :request do
   end
 
   it "renders the Whoop markup" do
-    get "/api/whoop"
+    get "/api/whoop", headers: auth_headers
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("stats__heading")
@@ -33,7 +33,7 @@ RSpec.describe "Whoop", type: :request do
   end
 
   it "sets the caching headers" do
-    get "/api/whoop"
+    get "/api/whoop", headers: auth_headers
 
     cache_control = response.headers["Cache-Control"]
     expect(cache_control).to include("public")
@@ -48,7 +48,7 @@ RSpec.describe "Whoop", type: :request do
   end
 
   it "embeds a relative same-origin refetch URL" do
-    get "/api/whoop"
+    get "/api/whoop", headers: auth_headers
 
     expect(response.body).to include('data-live-update-url-value="/api/whoop"')
   end
@@ -57,7 +57,7 @@ RSpec.describe "Whoop", type: :request do
     before { allow_any_instance_of(Whoop).to receive(:stats).and_return(nil) }
 
     it "returns an empty body so the live-update controller collapses the placeholder" do
-      get "/api/whoop"
+      get "/api/whoop", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty

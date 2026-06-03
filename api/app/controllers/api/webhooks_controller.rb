@@ -11,6 +11,9 @@ module Api
   class WebhooksController < BaseController
     include ContentfulRequestVerification
 
+    # Authenticated by Contentful's HMAC request signature, not the API_TOKEN bearer (Contentful
+    # has no token to send), and hit directly by Contentful rather than through the proxy.
+    skip_before_action :authenticate_bearer_token!
     skip_forgery_protection
     before_action :verify_contentful_signature!, only: :contentful
 

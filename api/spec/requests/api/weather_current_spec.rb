@@ -60,7 +60,7 @@ RSpec.describe "Weather", type: :request do
   end
 
   it "renders the weather markup" do
-    get "/api/weather/current"
+    get "/api/weather/current", headers: auth_headers
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('class="weather"')
@@ -74,7 +74,7 @@ RSpec.describe "Weather", type: :request do
   end
 
   it "sets the caching headers" do
-    get "/api/weather/current"
+    get "/api/weather/current", headers: auth_headers
 
     cache_control = response.headers["Cache-Control"]
     expect(cache_control).to include("public")
@@ -89,7 +89,7 @@ RSpec.describe "Weather", type: :request do
   end
 
   it "embeds a relative same-origin refetch URL" do
-    get "/api/weather/current"
+    get "/api/weather/current", headers: auth_headers
 
     expect(response.body).to include('data-live-update-url-value="/api/weather/current"')
   end
@@ -98,7 +98,7 @@ RSpec.describe "Weather", type: :request do
     before { allow_any_instance_of(WeatherKit).to receive(:data).and_return(nil) }
 
     it "returns an empty body so the live-update controller collapses the placeholder" do
-      get "/api/weather/current"
+      get "/api/weather/current", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty

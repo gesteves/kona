@@ -78,7 +78,9 @@ Names only — see `.env.example`; never commit values.
 
 - **Required**: `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`, `FONT_AWESOME_API_TOKEN`,
   `REDIS_URL`, `KONA_API_URL` (base URL of the `api/` app — used by the `/api/*` proxy
-  and the `import:standard_site` fetch).
+  and the `import:standard_site` fetch), `API_TOKEN` (shared bearer the `/api/*` proxy
+  injects on every upstream request; **must match the `api/` app's `API_TOKEN`**, and must be
+  set in Netlify's runtime env or every widget 401s at the origin and collapses on the site).
 - **Build credential**: `WEBAWESOME_NPM_TOKEN` — Web Awesome Pro npm registry auth, read
   by `.npmrc` at `npm install` (not in `.env`). Set it in your shell and in Netlify's
   build env, or the install fails.

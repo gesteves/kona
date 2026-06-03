@@ -3,10 +3,9 @@ module Api
   # the shared "location:current" Redis key (read by this app's Location service); this replaced the
   # old Netlify build-hook ingress.
   class LocationController < BaseController
-    include TokenAuthentication
-
+    # The API_TOKEN bearer check is inherited from BaseController; only forgery protection
+    # (this is a POST) needs handling here.
     skip_forgery_protection
-    before_action :authenticate_bearer_token!, only: :create
 
     def create
       if params[:latitude].blank? || params[:longitude].blank?

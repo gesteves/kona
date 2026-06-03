@@ -16,7 +16,7 @@ RSpec.describe "Activity stats", type: :request do
   end
 
   it "renders the stats markup" do
-    get "/api/activity-stats"
+    get "/api/activity-stats", headers: auth_headers
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("stats__heading")
@@ -27,7 +27,7 @@ RSpec.describe "Activity stats", type: :request do
   end
 
   it "sets the caching headers" do
-    get "/api/activity-stats"
+    get "/api/activity-stats", headers: auth_headers
 
     cache_control = response.headers["Cache-Control"]
     expect(cache_control).to include("public")
@@ -42,23 +42,31 @@ RSpec.describe "Activity stats", type: :request do
   end
 
   it "embeds a relative same-origin refetch URL" do
-    get "/api/activity-stats"
+    get "/api/activity-stats", headers: auth_headers
 
     expect(response.body).to include('data-live-update-url-value="/api/activity-stats"')
+  end
+
+  it "requires the API_TOKEN bearer (the proxy injects it; direct hits are rejected)" do
+    get "/api/activity-stats"
+    expect(response).to have_http_status(:unauthorized)
+
+    get "/api/activity-stats", headers: { "Authorization" => "Bearer wrong" }
+    expect(response).to have_http_status(:unauthorized)
   end
 
   context "when the stats are unavailable" do
     before { allow_any_instance_of(Intervals).to receive(:stats).and_return(nil) }
 
     it "returns an empty body so the live-update controller collapses the placeholder" do
-      get "/api/activity-stats"
+      get "/api/activity-stats", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty
     end
 
     it "downgrades the edge cache to a short, non-durable TTL so a blip doesn't pin the empty response" do
-      get "/api/activity-stats"
+      get "/api/activity-stats", headers: auth_headers
 
       edge = response.headers["Netlify-CDN-Cache-Control"]
       expect(edge).to eq("public, max-age=60")
