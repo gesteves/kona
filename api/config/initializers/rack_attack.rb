@@ -2,15 +2,18 @@
 #
 # The origin is hit directly (bypassing the Netlify edge cache) by a steady stream of
 # vulnerability scanners probing paths like /api/.env, /api/secrets, /wp-login.php, etc.
-# This sheds that load and stops repeat offenders from reaching routing at all (which also
+# This sheds that load by blocking known probe paths before they reach routing (which also
 # keeps them out of the logs).
 #
 # Design note — all LEGITIMATE /api/* traffic arrives through the Netlify proxy from a small,
-# shared set of egress IPs. A blanket per-IP throttle would therefore throttle real users, so:
-#   * the blocklist matches PATH PATTERNS (IP-agnostic, no false positives — real traffic only
-#     ever hits the known routes), and
-#   * the throttle keys on IP but applies ONLY to requests outside the known route prefixes,
-#     so proxied widget traffic is never throttled regardless of source IP.
+# shared set of egress IPs (and behind fly's proxy a single request's source IP can resolve to
+# a shared fly load-balancer address). A per-IP BAN is therefore dangerous: one scanner probing
+# an /api/* path through the public proxy would ban a shared IP and 403 every visitor at once.
+# So:
+#   * the blocklist matches PATH PATTERNS only (IP-agnostic) — it blocks the probe request
+#     itself, never bans an IP across paths, so it can't take down shared-IP traffic, and
+#   * the throttle keys on the real client IP (Fly-Client-IP) but applies ONLY to requests
+#     outside the known route prefixes, so proxied widget traffic is never throttled.
 #
 # Enforcement is disabled in the test env (so the suite isn't rate-limited); the rules are still
 # registered so specs can exercise them by flipping Rack::Attack.enabled. Counters live in the
@@ -41,18 +44,27 @@ RACK_ATTACK_PROBE_PATTERN = %r{
   | /api/(secrets|config|debug|env|keys|status|version|health|v\d+/config) # config/secret probes
 }xi
 
-# Ban IPs that repeatedly hit obvious probe paths. Once banned they get a flat 403 at the
-# middleware and never reach routing (so no ActionController::RoutingError log noise either).
-Rack::Attack.blocklist("probe-fail2ban") do |req|
-  Rack::Attack::Fail2Ban.filter("probes-#{req.ip}", maxretry: 3, findtime: 10.minutes, bantime: 1.hour) do
-    RACK_ATTACK_PROBE_PATTERN.match?(req.path)
+# Resolve the real client IP. Behind fly's proxy, Rack's own Request#ip can resolve to a shared
+# fly load-balancer address — which would make any per-IP rule effectively global — so prefer the
+# Fly-Client-IP header fly sets to the true client.
+class Rack::Attack::Request < ::Rack::Request
+  def client_ip
+    @client_ip ||= get_header("HTTP_FLY_CLIENT_IP").presence || ip
   end
 end
 
-# Safety net: throttle any single IP hammering paths outside the known routes. Generous, and
-# excludes legitimate /api/* traffic by construction (so the shared proxy IPs are never hit).
+# Block obvious scanner probe paths outright — matched by PATH, never by IP (see the design note
+# above: an IP ban would 403 the shared proxy/LB IPs that all real traffic shares). Blocking the
+# matching request sheds the probe before it reaches routing, with zero false positives.
+Rack::Attack.blocklist("probe-paths") do |req|
+  RACK_ATTACK_PROBE_PATTERN.match?(req.path)
+end
+
+# Safety net: throttle a single client hammering paths outside the known routes. Keyed on the real
+# client IP and excluding the known prefixes (incl. /api/*) by construction, so the shared proxy
+# IPs are never throttled.
 Rack::Attack.throttle("unknown-paths/ip", limit: 20, period: 1.minute) do |req|
-  req.ip unless RACK_ATTACK_KNOWN_ROUTE.call(req.path)
+  req.client_ip unless RACK_ATTACK_KNOWN_ROUTE.call(req.path)
 end
 
 # Plain-text responses matching lib/plain_text_exceptions.rb. No durable cache headers — the
@@ -61,21 +73,3 @@ RACK_ATTACK_PLAIN_TEXT = { "content-type" => "text/plain; charset=utf-8" }.freez
 
 Rack::Attack.blocklisted_responder = ->(_req) { [403, RACK_ATTACK_PLAIN_TEXT.dup, ["403 Forbidden\n"]] }
 Rack::Attack.throttled_responder   = ->(_req) { [429, RACK_ATTACK_PLAIN_TEXT.dup, ["429 Too Many Requests\n"]] }
-
-# TEMPORARY diagnostic — confirm what client IP Rack::Attack keys its Fail2Ban ban on behind
-# fly's proxy. We suspect `req.ip` resolves to a shared fly load-balancer address rather than
-# the real client, which would make the per-IP ban effectively global. This fires only on
-# blocklist/throttle matches (no extra noise beyond already-blocked requests). Hit a probe path
-# from a known IP (e.g. `curl https://<origin>/api/.env`) and compare `req_ip` to `fly_client_ip`
-# / `x_forwarded_for` in the logs. Remove once we've decided which header to key on.
-ActiveSupport::Notifications.subscribe("rack.attack") do |_name, _start, _finish, _id, payload|
-  req = payload[:request]
-  next unless req
-
-  Rails.logger.info(
-    "rack_attack.match rule=#{req.env['rack.attack.matched'].inspect} " \
-    "type=#{req.env['rack.attack.match_type'].inspect} path=#{req.path} " \
-    "req_ip=#{req.ip} fly_client_ip=#{req.get_header('HTTP_FLY_CLIENT_IP').inspect} " \
-    "x_forwarded_for=#{req.get_header('HTTP_X_FORWARDED_FOR').inspect}"
-  )
-end

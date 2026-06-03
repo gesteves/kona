@@ -29,12 +29,27 @@ RSpec.describe "Rack::Attack", type: :request do
     expect(response).to have_http_status(:forbidden)
   end
 
-  it "escalates to a full ban after repeated probes from the same IP" do
-    4.times { get "/api/.env" } # exceeds maxretry (3), banning the IP for bantime
+  it "blocks probe paths by pattern without banning the IP for anything else" do
+    4.times do
+      get "/api/.env"
+      expect(response).to have_http_status(:forbidden)
+    end
 
-    # Once banned, even an otherwise-innocuous path from that IP is blocked.
-    get "/some-normal-looking-page"
+    # The block is path-scoped, not an IP ban: legitimate traffic from the same IP still works.
+    get "/up"
+    expect(response).to have_http_status(:ok)
+  end
+
+  # Regression: an /api/* probe path is reachable through the public Netlify proxy, where it
+  # arrives on a SHARED egress IP. Blocking it must never ban that IP, or every visitor's widgets
+  # would 403 at once. (This is the bug that took the site down: an IP-based Fail2Ban here.)
+  it "does not let an /api/* probe ban the shared proxy IP it arrives on" do
+    get "/api/status" # matches the probe pattern; proxied through Netlify in production
     expect(response).to have_http_status(:forbidden)
+
+    # Same IP, a legitimate request — must be unaffected.
+    get "/up"
+    expect(response).to have_http_status(:ok)
   end
 
   it "throttles an IP hammering paths outside the known routes" do

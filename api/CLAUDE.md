@@ -71,13 +71,17 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   `routes.rb` or it will shadow everything below it.
 - **Abuse mitigation** — `config/initializers/rack_attack.rb` (rack-attack middleware, wired
   up in `application.rb`). The origin is hit directly by vulnerability scanners, so it
-  blocklists obvious probe paths (Fail2Ban: repeat offenders get a flat 403 and never reach
-  routing) and throttles per-IP requests **to paths outside the known route prefixes**.
-  ⚠️ All legitimate `/api/*` traffic shares the Netlify proxy's egress IPs, so do **not** add
-  a blanket per-IP throttle — it would throttle real users. ⚠️ The throttle treats anything
-  outside `RACK_ATTACK_KNOWN_PREFIXES` (`/up`, `/api`, `/whoop`, `/`) as a probe: **if you add
-  a top-level route, add its prefix there** or it will be rate-limited. Disabled in the test
-  env (`Rack::Attack.enabled`); counters live in the shared Redis (in-memory under test).
+  blocklists obvious probe paths (a flat 403 by **path pattern**, before routing) and throttles
+  requests **to paths outside the known route prefixes** (keyed on the real client IP via the
+  `Fly-Client-IP` header — Rack's `req.ip` resolves to a shared fly LB address behind the proxy).
+  ⚠️ The probe blocklist must stay **IP-agnostic** — never ban by IP. Some probe paths (e.g.
+  `/api/status`) are reachable through the public Netlify `/api/*` proxy, and all legitimate
+  `/api/*` traffic shares the Netlify egress IPs, so an IP ban would 403 every visitor's widgets
+  at once (this once took the site down). Same reason: do **not** add a blanket per-IP throttle.
+  ⚠️ The throttle treats anything outside `RACK_ATTACK_KNOWN_PREFIXES` (`/up`, `/api`, `/whoop`,
+  `/`) as a probe: **if you add a top-level route, add its prefix there** or it will be
+  rate-limited. Disabled in the test env (`Rack::Attack.enabled`); counters live in the shared
+  Redis (in-memory under test).
 - **Redis** — global `$redis` from `config/initializers/redis.rb` (shares `REDIS_URL`
   with `web/`). No background jobs/workers; fly.toml runs a single `app` process.
 
