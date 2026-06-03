@@ -73,6 +73,54 @@ RSpec.describe "Weather", type: :request do
     expect(response.body).to include("AQI")
   end
 
+  it "renders the full summary: forecast, sun times, and an activity suggestion" do
+    get "/api/weather/current", headers: auth_headers
+
+    expect(response.body).to include("forecast is clear, with a high of") # forecast()
+    expect(response.body).to include("will be at")                        # sunrise_or_sunset()
+    expect(response.body).to include("a good day to be outside!")         # activities() (mild, no workout)
+    expect(response.body).to include("</span>")                           # sentences wrapped as spans
+  end
+
+  context "when it's race day" do
+    let(:race) do
+      DeepOstruct.wrap(
+        title: "San Francisco Marathon",
+        date: Time.now.in_time_zone("America/Los_Angeles").iso8601, # today, in the resolved zone
+        going: true,
+        tracking_url: nil,
+        sys: { id: "sfm" }
+      )
+    end
+
+    before { allow_any_instance_of(Events).to receive(:all).and_return([race]) }
+
+    it "announces the race and weaves it into the summary" do
+      get "/api/weather/current", headers: auth_headers
+
+      expect(response.body).to include("race day")               # race_day()
+      expect(response.body).to include("racing the")             # current_location()
+      expect(response.body).to include("San Francisco Marathon")
+      expect(response.body).to include("Good weather for racing!") # activities() (mild fixture)
+    end
+  end
+
+  context "when there are active weather alerts" do
+    before do
+      weather.weather_alerts = DeepOstruct.wrap(alerts: [
+        { token: "heat", precedence: 1, description: "Heat advisory", details_url: "https://example.com/alert" }
+      ])
+    end
+
+    it "renders the alert with its link" do
+      get "/api/weather/current", headers: auth_headers
+
+      expect(response.body).to include("weather__alert")
+      expect(response.body).to include("Heat advisory")
+      expect(response.body).to include('href="https://example.com/alert"')
+    end
+  end
+
   it "sets the caching headers" do
     get "/api/weather/current", headers: auth_headers
 
