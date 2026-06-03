@@ -99,8 +99,8 @@
 // Inline article view count.
 .entry__meta .view-count-skeleton {
   display: inline-flex;
-  height: var(--font-x-small);
-  vertical-align: center;
+  height: 1ex;
+  vertical-align: middle;
   width: 16ch;
 }
 
