@@ -41,11 +41,21 @@ RSpec.describe ApplicationService do
       expect(service.cache("k", expires_in: 5.minutes) { { a: 1 } }).to eq(a: 1)
     end
 
-    it "caches indefinitely (set, not setex) when no TTL is given" do
+    it "does not cache when no TTL is given (never caches indefinitely)" do
       allow($redis).to receive(:get).with("k").and_return(nil)
-      expect($redis).to receive(:set).with("k", '{"a":1}')
+      expect($redis).not_to receive(:setex)
+      expect($redis).not_to receive(:set)
 
-      service.cache("k") { { a: 1 } }
+      expect(service.cache("k") { { a: 1 } }).to eq(a: 1)
+    end
+
+    it "does not cache when the TTL is zero or falsey" do
+      allow($redis).to receive(:get).with("k").and_return(nil)
+      expect($redis).not_to receive(:setex)
+      expect($redis).not_to receive(:set)
+
+      expect(service.cache("k", expires_in: 0) { { a: 1 } }).to eq(a: 1)
+      expect(service.cache("k", expires_in: false) { { a: 1 } }).to eq(a: 1)
     end
 
     it "does not cache a blank value" do

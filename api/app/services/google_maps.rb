@@ -63,7 +63,7 @@ class GoogleMaps < ApplicationService
   def reverse_geocode
     return if @latitude.blank? || @longitude.blank?
 
-    cached_json("google:maps:geocoded:#{@latitude}:#{@longitude}") do
+    cached_json("google:maps:geocoded:#{@latitude}:#{@longitude}", expires_in: 1.day) do
       query = {
         latlng: "#{@latitude},#{@longitude}",
         result_type: "political",
@@ -80,7 +80,7 @@ class GoogleMaps < ApplicationService
   def get_elevation
     return if @latitude.blank? || @longitude.blank?
 
-    cached_json("google:maps:elevation:#{@latitude}:#{@longitude}") do
+    cached_json("google:maps:elevation:#{@latitude}:#{@longitude}", expires_in: 1.day) do
       query = {
         locations: "#{@latitude},#{@longitude}",
         key: api_key

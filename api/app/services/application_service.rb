@@ -12,7 +12,9 @@ class ApplicationService
   # behavior.
   #
   # @param key [String] The Redis key.
-  # @param expires_in [ActiveSupport::Duration, nil] TTL; nil caches indefinitely.
+  # @param expires_in [ActiveSupport::Duration, Integer, nil] TTL in seconds. The result is
+  #   cached only with a positive TTL; a nil/false/zero TTL skips caching entirely (we never
+  #   want to cache indefinitely).
   # @param symbolize [Boolean] Parse cached JSON with symbolized keys (false for the
   #   string-keyed services, e.g. Intervals and PurpleAir).
   # @yieldreturn [Object] The freshly fetched, JSON-serializable value.
@@ -24,11 +26,8 @@ class ApplicationService
     value = yield
     return value if value.blank?
 
-    if expires_in
-      $redis.setex(key, expires_in, value.to_json)
-    else
-      $redis.set(key, value.to_json)
-    end
+    ttl = expires_in.to_i if expires_in
+    $redis.setex(key, ttl, value.to_json) if ttl&.positive?
     value
   end
 
