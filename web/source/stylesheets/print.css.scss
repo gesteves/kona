@@ -50,6 +50,6 @@ img {
   height: auto;
   margin: 0 auto;
   max-height: 90vh;
-  page-break-inside: avoid;
-  width: auto
+  break-inside: avoid;
+  width: auto;
 }

@@ -16,7 +16,7 @@
 .weather__icon {
   grid-column: span 2;
 
-  @media (min-width: 1024px) {
+  @include bp-large {
     grid-column: span 1;
 
     @supports not ((text-box-edge: cap) or (text-box-trim: trim-both)) {
@@ -41,7 +41,7 @@
     grid-column: span 10;
   }
 
-  @media (min-width: 1024px) {
+  @include bp-large {
     grid-column: span 11;
   }
 

@@ -452,12 +452,3 @@
     }
   }
 }
-
-.extend-pushable-button {
-  box-shadow: 0 2px 0 var(--color-button-border);
-
-  &:active {
-    box-shadow: none;
-    transform: translateY(2px);
-  }
-}

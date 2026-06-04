@@ -12,6 +12,7 @@
     "no-duplicate-selectors": null,
     "selector-pseudo-element-no-unknown": null,
     "declaration-block-no-shorthand-property-overrides": null,
-    "media-feature-range-notation": null
+    "media-feature-range-notation": null,
+    "no-invalid-position-at-import-rule": null
   }
 }

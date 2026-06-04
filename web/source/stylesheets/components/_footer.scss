@@ -124,7 +124,7 @@
   }
 
   a {
-    padding: .5rem;
+    padding: 0.5rem;
 
     @include bp-medium {
       padding: 1rem;
@@ -174,10 +174,10 @@
     color: var(--color-border-footer);
     content: "/";
     display: inline-block;
-    margin: 0 .25rem;
+    margin: 0 0.25rem;
 
     @include bp-small {
-      margin: 0 .5rem;
+      margin: 0 0.5rem;
     }
 
     @include bp-medium {
