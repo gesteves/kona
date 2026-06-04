@@ -29,30 +29,33 @@
   }
 
   .stats__meta wa-skeleton {
-    height: var(--font-x-small);
-    width: 5rem;
+    font-size: var(--font-x-small);
+    height: 1cap;
+    width: 10ch;
   }
 
   .stats__number wa-skeleton {
-    height: var(--font-x-large);
-    width: 60%;
+    font-size: var(--font-x-large);
+    height: 1cap;
+    width: 5ch;
 
     @include bp-medium {
-      height: var(--font-large);
+      font-size: var(--font-large);
     }
 
     @include bp-x-large {
-      height: var(--font-x-large);
-    }
+      font-size: var(--font-x-large);
+    }    
   }
 }
 
 // Footer line (e.g. the Whoop "Join Whoop" line), centered to match `.stats__footer`.
 .stats__footer .stats-footer-skeleton {
   display: inline-flex;
-  height: var(--font-x-small);
+  font-size: var(--font-x-small);
+  height: 1cap;
   vertical-align: middle;
-  width: 20rem;
+  width: 33ch;
 }
 
 // Current weather (homepage): mirrors the `.weather__icon` + `.weather__text` grid.
@@ -67,8 +70,9 @@
 }
 
 .weather__text .weather-skeleton-text {
-  height: var(--font-medium);
-  margin: 1.5rem 0;
+  font-size: var(--font-medium);
+  height: 2cap;
+  margin: .75rem 0;
   width: 100%;
 
   &:first-of-type {
@@ -81,25 +85,11 @@
   }
 }
 
-// Event race-day weather: `.event__weather` is a flex column.
-.event__weather .event-weather-skeleton-line {
-  height: var(--font-x-small);
-  margin: .5rem 0;
-  width: 100px;
-
-  @include bp-large {
-    width: 80%;
-
-    &:last-of-type {
-      width: 60%;
-    }
-  }
-}
-
 // Inline article view count.
 .entry__meta .view-count-skeleton {
   display: inline-flex;
-  height: 1ex;
+  font-size: var(--font-x-small);
+  height: 1cap;
   vertical-align: middle;
   width: 16ch;
 }
@@ -108,19 +98,22 @@
 // `.entry__meta` eyebrow, `.entry__hed` heading, and `.entry__body` body lines.
 .entry__meta .entry-skeleton-eyebrow {
   display: inline-flex;
-  height: var(--font-x-small);
+  font-size: var(--font-x-small);
+  height: 1cap;
   vertical-align: middle;
-  width: 8rem;
+  width: 33%;
 }
 
 .entry__hed .entry-skeleton-heading {
-  height: var(--font-medium);
+  height: 1cap;
+  font-size: var(--font-large);
   margin: 0.75rem 0;
   width: 75%;
 }
 
 .entry__body .entry-skeleton-line {
-  height: var(--font-medium);
+  height: 1cap;
+  font-size: var(--font-medium);
   margin: 0.75rem 0;
   width: 100%;
 
