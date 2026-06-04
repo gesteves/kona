@@ -6,11 +6,13 @@
 
     <% socials = data.site.socials_collection.items.compact %>
     <% if socials.present? %>
-      <ul class="footer__socials">
-        <% socials.each do |i| %>
-          <li class="footer__social-item"><%= social_media_link(title: i.title, destination: i.destination, css_class: "share__button", open_in_new_tab: i.open_in_new_tab) %></li>
-        <% end %>
-      </ul>
+      <wa-scroller class="footer__socials" orientation="horizontal" without-scrollbar>
+        <ul class="footer__socials-list">
+          <% socials.each do |i| %>
+            <li class="footer__social-item"><%= social_media_link(title: i.title, destination: i.destination, css_class: "share__button", open_in_new_tab: i.open_in_new_tab) %></li>
+          <% end %>
+        </ul>
+      </wa-scroller>
     <% end %>
 
     <hr class="footer__line">

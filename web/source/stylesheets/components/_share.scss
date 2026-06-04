@@ -18,10 +18,21 @@
   margin: 0 0 1rem;
 }
 
+// <wa-scroller> host: scrolls the buttons horizontally instead of wrapping at narrow
+// widths. Match the scroll-shadow fade to the page background so it works in both modes.
+.share__scroller {
+  --shadow-color: var(--color-background);
+
+  display: block;
+}
+
+// max-content + auto inline margins: centered when the row fits, and when it overflows the
+// margins collapse to 0 so it left-aligns and the scroller scrolls (first button reachable).
 .share__buttons {
   display: flex;
-  flex-flow: row wrap;
-  justify-content: center;
+  flex-flow: row nowrap;
+  margin-inline: auto;
+  width: max-content;
 }
 
 .share__button {

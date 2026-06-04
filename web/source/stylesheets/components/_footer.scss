@@ -101,17 +101,33 @@
   grid-column: span 12;
 }
 
+// <wa-scroller> host: scrolls the social links horizontally instead of wrapping at narrow
+// widths. Match the scroll-shadow fade to the footer gradient's top color in each mode.
 .footer__socials {
-  align-items: center;
-  display: flex;
-  flex-flow: row wrap;
+  --shadow-color: var(--color-alice-blue);
+
   grid-column: span 12;
-  justify-content: flex-start;
 
   @include bp-medium {
     grid-column: 3 / -1;
     grid-row: 1;
-    justify-content: flex-end;
+  }
+
+  @include dark-mode {
+    --shadow-color: var(--color-rich-black);
+  }
+}
+
+// max-content keeps the row from wrapping; left-aligned by default, right-aligned when it
+// fits on wider footers. On overflow the auto margin collapses to 0 so the scroller scrolls.
+.footer__socials-list {
+  align-items: center;
+  display: flex;
+  flex-flow: row nowrap;
+  width: max-content;
+
+  @include bp-medium {
+    margin-inline-start: auto;
   }
 }
 
