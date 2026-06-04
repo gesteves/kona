@@ -9,6 +9,36 @@
 //      at least (0,1,1).
 //   2. The shadow-DOM `:host` styles are unlayered; unlayered beats layered. So this
 //      partial is imported OUTSIDE the cascade layers (see site.css.scss).
+// Placeholders below stay local to this file so the generated rules remain unlayered.
+
+// Randomized width for stacked skeleton lines, gated behind `@supports` below so the
+// fixed fallback widths still apply where it isn't available. Wrapped in `unquote()` so
+// LibSass emits the CSS `random()` notation verbatim instead of evaluating its own
+// (single-argument) Sass `random()` function and erroring on the two arguments.
+$skeleton-random-width: unquote('random(70%, 100%)');
+
+// Inline meta skeletons: a single short line at the eyebrow/footer font size, sized to
+// sit on one text line. Width is set per use; everything else is shared.
+%skeleton-inline-meta {
+  display: inline-flex;
+  font-size: var(--font-x-small);
+  height: 1cap;
+  vertical-align: middle;
+}
+
+// Stacked body lines: vertical rhythm between stacked skeleton lines, with the outer
+// margins collapsed so the block aligns flush with its container's top and bottom.
+%skeleton-stacked-line {
+  margin: 0.75rem 0;
+
+  &:first-of-type {
+    margin-top: 0;
+  }
+
+  &:last-of-type {
+    margin-bottom: 0;
+  }
+}
 
 :root wa-skeleton {
   --color: var(--color-placeholder);
@@ -25,18 +55,17 @@
   .stats__meta wa-skeleton,
   .stats__number wa-skeleton {
     display: inline-flex;
+    height: 1cap;
     vertical-align: center;
   }
 
   .stats__meta wa-skeleton {
     font-size: var(--font-x-small);
-    height: 1cap;
     width: 10ch;
   }
 
   .stats__number wa-skeleton {
     font-size: var(--font-x-large);
-    height: 1cap;
     width: 5ch;
 
     @include bp-medium {
@@ -45,16 +74,14 @@
 
     @include bp-x-large {
       font-size: var(--font-x-large);
-    }    
+    }
   }
 }
 
 // Footer line (e.g. the Whoop "Join Whoop" line), centered to match `.stats__footer`.
 .stats__footer .stats-footer-skeleton {
-  display: inline-flex;
-  font-size: var(--font-x-small);
-  height: 1cap;
-  vertical-align: middle;
+  @extend %skeleton-inline-meta;
+
   width: 33ch;
 }
 
@@ -70,37 +97,29 @@
 }
 
 .weather__text .weather-skeleton-text {
+  @extend %skeleton-stacked-line;
+
   font-size: var(--font-medium);
   height: 2cap;
-  margin: .75rem 0;
   width: 100%;
 
-  &:first-of-type {
-    margin-top: 0;
-  }
-
   &:last-of-type {
-    margin-bottom: 0;
     width: 80%;
   }
 }
 
 // Inline article view count.
 .entry__meta .view-count-skeleton {
-  display: inline-flex;
-  font-size: var(--font-x-small);
-  height: 1cap;
-  vertical-align: middle;
+  @extend %skeleton-inline-meta;
+
   width: 16ch;
 }
 
 // Entry summary card (upcoming races; reused for trending / recent articles): mirrors the
 // `.entry__meta` eyebrow, `.entry__hed` heading, and `.entry__body` body lines.
 .entry__meta .entry-skeleton-eyebrow {
-  display: inline-flex;
-  font-size: var(--font-x-small);
-  height: 1cap;
-  vertical-align: middle;
+  @extend %skeleton-inline-meta;
+
   width: 33%;
 }
 
@@ -112,17 +131,32 @@
 }
 
 .entry__body .entry-skeleton-line {
-  height: 1cap;
+  @extend %skeleton-stacked-line;
+
   font-size: var(--font-medium);
-  margin: 0.75rem 0;
+  height: 1cap;
   width: 100%;
 
-  &:first-of-type {
-    margin-top: 0;
-  }
-
   &:last-of-type {
-    margin-bottom: 0;
     width: 60%;
+  }
+}
+
+// Progressive enhancement: where the CSS `random()` function is supported, give every
+// stacked line an organically varied width instead of the fixed fallbacks above. The
+// default `random()` caching key is the function's position in the stylesheet, so a single
+// shared declaration would resolve to the SAME width for every line. Emitting one
+// `random()` per `:nth-of-type()` position instead gives each line its own value. These
+// selectors also match the `:last-of-type` fallback's specificity and come later in source
+// order, so the random widths win (including on the otherwise-shortened last line). Four
+// lines covers every widget today (weather and event cards each render four).
+@supports (width: #{$skeleton-random-width}) {
+  .weather__text .weather-skeleton-text,
+  .entry__body .entry-skeleton-line {
+    @for $i from 1 through 4 {
+      &:nth-of-type(#{$i}) {
+        width: $skeleton-random-width;
+      }
+    }
   }
 }
