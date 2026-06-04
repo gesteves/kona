@@ -104,7 +104,7 @@ module EventsHelper
   def event_live_tracking_tag(event)
     return if event.blank? || event.tracking_url.blank?
     in_progress = is_in_progress?(event)
-    icon = in_progress ? icon_svg("classic", "regular", "signal-stream") : icon_svg("classic", "light", "signal-stream-slash")
+    icon = in_progress ? icon_svg("classic", "regular", "signal-stream") : icon_svg("classic", "light", "signal-stream")
     options = {}
     options[:class] = "entry__highlight entry__highlight--live" if in_progress
     content_tag :span, options do

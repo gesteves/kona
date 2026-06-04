@@ -132,7 +132,7 @@ RSpec.describe EventsHelper, type: :helper do
       let(:tag) { helper.event_live_tracking_tag(build_event(days_from_today: 5, tracking_url: "https://track.example.com")) }
 
       it "renders a muted, light-icon Live tracking link with no highlight" do
-        expect(tag).to include('data-icon="classic-light-signal-stream-slash"')
+        expect(tag).to include('data-icon="classic-light-signal-stream"')
         expect(tag).to include(">Live tracking</a>")
         expect(tag).to include('href="https://track.example.com"')
         expect(tag).not_to include("entry__highlight")
@@ -158,7 +158,7 @@ RSpec.describe EventsHelper, type: :helper do
     it "is muted (not highlighted) for a tracking link on today's race at night" do
       allow(helper).to receive(:is_daytime?).and_return(false)
       tag = helper.event_live_tracking_tag(build_event(days_from_today: 0, tracking_url: "https://track.example.com"))
-      expect(tag).to include('data-icon="classic-light-signal-stream-slash"')
+      expect(tag).to include('data-icon="classic-light-signal-stream"')
       expect(tag).not_to include("entry__highlight")
     end
   end
