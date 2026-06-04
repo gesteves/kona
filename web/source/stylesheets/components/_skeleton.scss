@@ -11,12 +11,6 @@
 //      partial is imported OUTSIDE the cascade layers (see site.css.scss).
 // Placeholders below stay local to this file so the generated rules remain unlayered.
 
-// Randomized width for stacked skeleton lines, gated behind `@supports` below so the
-// fixed fallback widths still apply where it isn't available. Wrapped in `unquote()` so
-// LibSass emits the CSS `random()` notation verbatim instead of evaluating its own
-// (single-argument) Sass `random()` function and erroring on the two arguments.
-$skeleton-random-width: unquote('random(70%, 100%)');
-
 // Inline meta skeletons: a single short line at the eyebrow/footer font size, sized to
 // sit on one text line. Width is set per use; everything else is shared.
 %skeleton-inline-meta {
@@ -139,24 +133,5 @@ $skeleton-random-width: unquote('random(70%, 100%)');
 
   &:last-of-type {
     width: 60%;
-  }
-}
-
-// Progressive enhancement: where the CSS `random()` function is supported, give every
-// stacked line an organically varied width instead of the fixed fallbacks above. The
-// default `random()` caching key is the function's position in the stylesheet, so a single
-// shared declaration would resolve to the SAME width for every line. Emitting one
-// `random()` per `:nth-of-type()` position instead gives each line its own value. These
-// selectors also match the `:last-of-type` fallback's specificity and come later in source
-// order, so the random widths win (including on the otherwise-shortened last line). Four
-// lines covers every widget today (weather and event cards each render four).
-@supports (width: #{$skeleton-random-width}) {
-  .weather__text .weather-skeleton-text,
-  .entry__body .entry-skeleton-line {
-    @for $i from 1 through 4 {
-      &:nth-of-type(#{$i}) {
-        width: $skeleton-random-width;
-      }
-    }
   }
 }
