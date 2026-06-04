@@ -110,7 +110,11 @@
 
 .entry__body {
   @extend .extend-body-styles;
-  
+
+  > :first-child {
+    margin-top: 0;
+  }
+
   .entry__read-more {
     @extend .extend-primary-button;
   }
@@ -265,10 +269,6 @@
     font-size: var(--font-medium);
     line-height: var(--line-height-medium);
     margin: 0;
-  }
-  
-  .entry__body > p:first-child {
-    margin-top: 0;
   }
 }
 
