@@ -80,6 +80,7 @@
         <span class="event__weather-stat">
           <%= raw icon_svg("classic", "light", "water-temperature") %>
           <%= format_temperature(bay.water_temp_c) %>
+          water
         </span>
         <span class="event__weather-stat">
           <span class="event__weather-wind-direction" style="--wind-direction: <%= (bay.current_bearing_deg + 180) % 360 %>;" title="<%= wind_direction(bay.current_bearing_deg) %>">
