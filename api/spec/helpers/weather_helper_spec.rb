@@ -6,9 +6,10 @@ require "rails_helper"
 #
 # Most tests build a `@weather` fixture whose forecast window and sunrise/sunset are expressed
 # as offsets from the current time, so they're self-consistent without freezing the clock. The
-# few methods that read the wall clock directly (the no-forecast daytime/evening fallback and
-# the indoor-season month check) use `travel_to(Time.now.change(...))` so the system-zone hour
-# and month are deterministic regardless of where the suite runs.
+# no-forecast daytime/evening fallback reads the wall clock in the location's timezone
+# (`@time_zone`), so it freezes a fixed UTC instant and asserts against the Denver-local hour.
+# The indoor-season month check uses `travel_to(Time.now.change(...))` so the month is
+# deterministic regardless of where the suite runs.
 #
 # Cross-domain predicates the summary leans on (`is_race_day?`, `todays_race`, `format_location`,
 # `format_elevation`, `is_workout_scheduled?`, …) live in sibling helpers with their own specs,
@@ -259,13 +260,16 @@ RSpec.describe WeatherHelper, type: :helper do
       expect(helper.is_evening?).to be(true)
     end
 
-    it "falls back to clock hours when there's no weather" do
-      travel_to(Time.now.change(hour: 12)) do
+    it "falls back to clock hours in the location's timezone when there's no weather" do
+      # @time_zone is America/Denver (UTC-6 in June), so the fallback reads the Denver-local
+      # hour, not the machine's. 18:00 UTC == 12:00 MDT (daytime).
+      travel_to(Time.utc(2026, 6, 3, 18, 0, 0)) do
         expect(helper.is_daytime?).to be(true)
         expect(helper.is_evening?).to be(false)
       end
 
-      travel_to(Time.now.change(hour: 22)) do
+      # 04:00 UTC == 22:00 MDT the previous evening.
+      travel_to(Time.utc(2026, 6, 4, 4, 0, 0)) do
         expect(helper.is_daytime?).to be(false)
         expect(helper.is_evening?).to be(true)
       end

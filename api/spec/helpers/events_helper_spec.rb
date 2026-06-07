@@ -6,8 +6,8 @@ require "rails_helper"
 # fixed midday in the race timezone (America/Denver) to keep "today" deterministic regardless
 # of the machine's own timezone.
 #
-# `is_daytime?` is weather-derived (covered by the weather specs) and falls back to the system
-# clock, so it's stubbed here to isolate the event logic. `icon_svg` is stubbed to echo the
+# `is_daytime?` is weather-derived (covered by the weather specs) and falls back to the
+# location-local clock, so it's stubbed here to isolate the event logic. `icon_svg` is stubbed to echo the
 # family/style/id it was asked for, so we can assert which icon each helper picked.
 RSpec.describe EventsHelper, type: :helper do
   include ActiveSupport::Testing::TimeHelpers
