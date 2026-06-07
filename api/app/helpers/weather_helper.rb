@@ -55,7 +55,7 @@ module WeatherHelper
   end
 
   def is_daytime?(weather = @weather, location = @location)
-    now = Time.now
+    now = current_time
     if weather.present?
       sunrise_time = sunrise(weather, location)
       sunset_time = sunset(weather, location)
@@ -67,12 +67,13 @@ module WeatherHelper
   end
 
   def is_evening?(weather = @weather, location = @location)
+    now = current_time
     if weather.present?
       sunset_time = sunset(weather, location)
-      return Time.now.hour >= 18 unless sunset_time
-      Time.now >= sunset_time.beginning_of_hour
+      return now.hour >= 18 unless sunset_time
+      now >= sunset_time.beginning_of_hour
     else
-      Time.now.hour >= 18
+      now.hour >= 18
     end
   end
 
