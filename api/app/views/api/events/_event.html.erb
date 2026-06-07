@@ -8,7 +8,7 @@
   <div class="event__inner">
     <header class="entry__header">
       <p class="entry__meta">
-        <% if featured %><%= event_live_tracking_tag(event) %><% end %>
+        <% if featured %><%= event_live_tracking_tag(event, event_weather) %><% end %>
         <% if local_assigns.fetch(:show_timestamp, true) %><%= event_timestamp_tag(event) %><% end %>
         <span><%= raw icon_svg("classic", "light", "location-dot") %> <%= event.location %></span>
       </p>

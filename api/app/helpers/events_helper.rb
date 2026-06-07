@@ -18,10 +18,27 @@ module EventsHelper
     todays_race.present?
   end
 
-  # Whether the event is happening right now (today, daytime, confirmed).
-  def is_in_progress?(event)
-    return false if event.blank?
-    is_daytime? && is_today?(event) && event.going
+  # Whether the event is happening right now. Confirmed (going) events only. Prefers the event's
+  # own race-day weather — the sunrise..sunset window for the event's date, at the event's
+  # location — which we already fetch for the featured race; covering "now" means it's both the
+  # event's day and daytime there. Falls back to today-and-daytime in the owner's current
+  # timezone when that weather (and thus its sun times) isn't available.
+  def is_in_progress?(event, event_weather = nil)
+    return false if event.blank? || !event.going
+    window = event_daylight_window(event_weather)
+    return window.cover?(Time.current) if window
+    is_daytime? && is_today?(event)
+  end
+
+  # The event-day daylight window (sunrise..sunset) drawn from the featured race's already-fetched
+  # weather, or nil when those sun times aren't available. The forecast day covers the event's
+  # date and the sun times are absolute instants, so callers compare the current time against this
+  # window without converting timezones.
+  def event_daylight_window(event_weather = nil)
+    sunrise = event_weather&.sunrise
+    sunset = event_weather&.sunset
+    return if sunrise.blank? || sunset.blank?
+    Time.parse(sunrise)..Time.parse(sunset)
   end
 
   # The daytime forecast for the event's date, used by the per-event weather view.
@@ -101,9 +118,9 @@ module EventsHelper
   # The "Live tracking" indicator for an event with a tracking link, or nil if there's none.
   # While the race is in progress it's highlighted and pulses; otherwise it's muted to signal
   # tracking exists but isn't live yet.
-  def event_live_tracking_tag(event)
+  def event_live_tracking_tag(event, event_weather = nil)
     return if event.blank? || event.tracking_url.blank?
-    in_progress = is_in_progress?(event)
+    in_progress = is_in_progress?(event, event_weather)
     icon = in_progress ? icon_svg("classic", "regular", "signal-stream") : icon_svg("classic", "light", "signal-stream")
     options = {}
     options[:class] = "entry__highlight entry__highlight--live" if in_progress
