@@ -6,9 +6,11 @@ require "rails_helper"
 # fixed midday in the race timezone (America/Denver) to keep "today" deterministic regardless
 # of the machine's own timezone.
 #
-# `is_daytime?` is weather-derived (covered by the weather specs) and falls back to the system
-# clock, so it's stubbed here to isolate the event logic. `icon_svg` is stubbed to echo the
-# family/style/id it was asked for, so we can assert which icon each helper picked.
+# `is_in_progress?` prefers the featured race's fetched weather (its sunrise..sunset window) and
+# otherwise falls back to `is_daytime?` — itself weather-derived (covered by the weather specs)
+# and ultimately the location-local clock — so `is_daytime?` is stubbed here to isolate the event
+# logic, and a small `build_event_weather` stands in for the presenter's sun times. `icon_svg` is
+# stubbed to echo the family/style/id it was asked for, so we can assert which icon each helper picked.
 RSpec.describe EventsHelper, type: :helper do
   include ActiveSupport::Testing::TimeHelpers
 
@@ -38,6 +40,14 @@ RSpec.describe EventsHelper, type: :helper do
       coordinates: { lat: 40.01, lon: -105.27 },
       sys: { id: "evt-#{days_from_today}-#{overrides[:tracking_url] ? 'tracked' : 'plain'}" }
     }.merge(overrides))
+  end
+
+  # A stand-in for the featured race's EventWeatherPresenter, exposing just the sunrise/sunset
+  # the in-progress check reads. `offset_hours` brackets the frozen "now" by default (sun up an
+  # hour ago, down in an hour); pass times to place the window elsewhere. Sun times are absolute
+  # (UTC "Z") instants, matching WeatherKit's payload.
+  def build_event_weather(sunrise: 1.hour.ago, sunset: 1.hour.from_now)
+    DeepOstruct.wrap(sunrise: sunrise&.utc&.iso8601, sunset: sunset&.utc&.iso8601)
   end
 
   describe "#is_today?" do
@@ -75,6 +85,30 @@ RSpec.describe EventsHelper, type: :helper do
 
     it "is false when the event isn't today" do
       expect(helper.is_in_progress?(build_event(days_from_today: 1))).to be(false)
+    end
+
+    context "with the featured race's fetched weather" do
+      it "uses the event's daylight window over the fallback clock — in progress within it" do
+        # is_daytime? (the fallback) is stubbed false, so a true result can only come from the
+        # event's own sunrise..sunset window bracketing now.
+        allow(helper).to receive(:is_daytime?).and_return(false)
+        in_progress = helper.is_in_progress?(build_event(days_from_today: 0), build_event_weather)
+        expect(in_progress).to be(true)
+      end
+
+      it "uses the event's daylight window over the fallback clock — not in progress outside it" do
+        # Fallback clock says daytime, but the event's sun has already set, so it's not live.
+        weather = build_event_weather(sunrise: 8.hours.ago, sunset: 1.hour.ago)
+        expect(helper.is_in_progress?(build_event(days_from_today: 0), weather)).to be(false)
+      end
+
+      it "still requires the event to be confirmed (going)" do
+        expect(helper.is_in_progress?(build_event(days_from_today: 0, going: false), build_event_weather)).to be(false)
+      end
+
+      it "falls back to today-and-daytime when the weather has no sun times" do
+        expect(helper.is_in_progress?(build_event(days_from_today: 0), build_event_weather(sunrise: nil))).to be(true)
+      end
     end
   end
 
@@ -160,6 +194,15 @@ RSpec.describe EventsHelper, type: :helper do
       tag = helper.event_live_tracking_tag(build_event(days_from_today: 0, tracking_url: "https://track.example.com"))
       expect(tag).to include('data-icon="classic-light-signal-stream"')
       expect(tag).not_to include("entry__highlight")
+    end
+
+    it "highlights based on the featured race's fetched weather window, not the fallback clock" do
+      # Fallback clock would say night, but the event's sun is currently up → live and pulsing.
+      allow(helper).to receive(:is_daytime?).and_return(false)
+      event = build_event(days_from_today: 0, tracking_url: "https://track.example.com")
+      tag = helper.event_live_tracking_tag(event, build_event_weather)
+      expect(tag).to include("entry__highlight entry__highlight--live")
+      expect(tag).to include('data-icon="classic-regular-signal-stream"')
     end
   end
 
