@@ -2,6 +2,7 @@ require 'httparty'
 require 'nokogiri'
 require 'fileutils'
 require 'active_support/all'
+require_relative 'mapbox_tileset'
 
 class StaticMap
   attr_accessor :tileset_id
@@ -11,6 +12,11 @@ class StaticMap
 
   MAPBOX_ACCESS_TOKEN = ENV['MAPBOX_ACCESS_TOKEN'] || raise('Mapbox access token is missing!')
   MAPBOX_STYLE_URL = ENV['MAPBOX_STYLE_URL'] || "mapbox://styles/mapbox/outdoors-v12"
+
+  # The render request uses the secret token when present so it can read the
+  # private tilesets uploaded via MTS; it falls back to the public access token
+  # (e.g. the manual TILESET_ID override against a public tileset).
+  RENDER_TOKEN = ENV['MAPBOX_SECRET_TOKEN'].presence || MAPBOX_ACCESS_TOKEN
 
   # Maki icons
   # @see https://labs.mapbox.com/maki-icons/
@@ -34,7 +40,7 @@ class StaticMap
   MAX_HEIGHT = 1280
   MIN_HEIGHT = 800
   PADDING = 50
-  MIN_KM = 1  # Minimum width and height of the map's viewable area in kilometers
+  MIN_KM = 0  # Default kilometers added to each side of the map's viewable area
 
   # Approximate length of one degree of latitude in kilometers. One degree of
   # longitude is this value scaled by the cosine of the latitude.
@@ -53,10 +59,16 @@ class StaticMap
     )
 
     @tileset_id = options[:tileset_id]
-    @min_km = options[:min_km].to_f
+    # Source-layer defaults to the legacy name for the manual override path; an
+    # auto-upload resets it to MapboxTileset::LAYER_NAME once the tileset exists.
+    @source_layer = ENV['SOURCE_LAYER'].presence || 'tracks'
+    # Per-side margins (km) added to the bounding box, in CSS "top,right,bottom,left"
+    # shorthand — e.g. "2,0,0,0" adds 2 km of map above the track.
+    @margins_km = parse_box_shorthand(options[:min_km], default: MIN_KM, cast: :to_f)
     @padding = validate_padding(options[:padding])
     @reverse_markers = options[:reverse_markers]
     @dnf = options[:dnf]
+    @force_upload = options[:force_upload]
     extract_data_from_gpx(gpx_file_path)
     @bounding_box = calculate_bounding_box(@coordinates)
     @width = WIDTH
@@ -69,6 +81,7 @@ class StaticMap
 
   # Generates a map as a static image and saves it to the IMAGES_FOLDER folder.
   def generate_image!
+    ensure_tileset!
     puts "🔄 Generating map for #{activity_title}"
     output_file_path = File.join(IMAGES_FOLDER, image_file_name)
     image_url = mapbox_image_url
@@ -87,7 +100,42 @@ class StaticMap
     "#{title} - #{@activity_type}"
   end
 
+  # Ensures a Mapbox tileset exists for this track. When no tileset_id was
+  # provided, reuses the existing tileset if one is already published (so tweaking
+  # render-time image settings doesn't re-upload), otherwise uploads the GPX
+  # coordinates to Mapbox as a private tileset (via MTS). Pass force_upload to
+  # always re-upload (e.g. when the GPX itself changed).
+  def ensure_tileset!
+    return if @tileset_id.present?
+
+    uploader = MapboxTileset.new(
+      username: ENV['MAPBOX_USERNAME'],
+      token: ENV['MAPBOX_SECRET_TOKEN']
+    )
+    id = tileset_source_id
+
+    if !@force_upload && (existing = uploader.find(id))
+      @tileset_id, @source_layer = existing
+      puts "♻️  Reusing existing Mapbox tileset for #{activity_title}…"
+      return
+    end
+
+    puts "⬆️  Uploading #{activity_title} to Mapbox…"
+    @tileset_id = uploader.create_from_coordinates!(
+      id: id,
+      name: activity_title,
+      coordinates: @coordinates
+    )
+    @source_layer = MapboxTileset::LAYER_NAME
+  end
+
   private
+
+  # Derives a Mapbox-safe tileset/source id from the activity title: the id is
+  # capped at 32 characters and may only contain letters, numbers, `-`, and `_`.
+  def tileset_source_id
+    activity_title.parameterize.tr('-', '_').first(32).gsub(/_+$/, '')
+  end
 
   # Returns the file name for the map image based on the activity title
   # @return [String] The file name for the map image
@@ -133,33 +181,14 @@ class StaticMap
     # As you move toward the poles, cos(latitude) decreases, making longitude degrees shorter.
     cos = cos_lat(center_lat)
 
-    # Calculate the minimum viewable size of the bounding box in degrees of latitude.
-    # 1° of latitude ≈ KM_PER_DEGREE km everywhere on Earth.
-    min_viewable_lat = @min_km / KM_PER_DEGREE
-
-    # Calculate the minimum viewable size of the bounding box in degrees of longitude at the given latitude.
+    # Expand the bounding box outward by the per-side margins (in km), converting
+    # each km offset to degrees. 1° of latitude ≈ KM_PER_DEGREE km everywhere;
     # 1° of longitude ≈ KM_PER_DEGREE km * cos(latitude).
-    min_viewable_lon = @min_km / (KM_PER_DEGREE * cos)
-
-    # Ensure the longitude span is at least the minimum size
-    if (max_lon - min_lon) < min_viewable_lon
-      # Calculate the center of the current longitude span
-      center_lon = (min_lon + max_lon) / 2
-
-      # Adjust the min and max longitude so the total span is equal to min_viewable_lon
-      min_lon = center_lon - (min_viewable_lon / 2)
-      max_lon = center_lon + (min_viewable_lon / 2)
-    end
-
-    # Ensure the latitude span is at least the minimum size
-    if (max_lat - min_lat) < min_viewable_lat
-      # Calculate the center of the current latitude span
-      center_lat = (min_lat + max_lat) / 2
-
-      # Adjust the min and max latitude so the total span is equal to min_viewable_lat
-      min_lat = center_lat - (min_viewable_lat / 2)
-      max_lat = center_lat + (min_viewable_lat / 2)
-    end
+    top_km, right_km, bottom_km, left_km = @margins_km
+    max_lat += top_km / KM_PER_DEGREE
+    min_lat -= bottom_km / KM_PER_DEGREE
+    max_lon += right_km / (KM_PER_DEGREE * cos)
+    min_lon -= left_km / (KM_PER_DEGREE * cos)
 
     {
       min_lon: min_lon,
@@ -205,7 +234,7 @@ class StaticMap
 
     base_params = {
       padding: @padding,
-      access_token: MAPBOX_ACCESS_TOKEN
+      access_token: RENDER_TOKEN
     }.compact
 
     url = "https://api.mapbox.com/styles/v1/#{username}/#{style}/static/#{markers.join(',')}/#{bbox}/#{@width}x#{@height}@2x?#{base_params.to_query}"
@@ -286,10 +315,20 @@ class StaticMap
   # @param padding [String, Integer] The padding value
   # @return [String] The normalized "top,right,bottom,left" padding
   def validate_padding(padding)
-    # Convert input to string and split by commas, taking only first 4 values
-    values = padding.to_s.split(',').map(&:to_i).first(4)
+    parse_box_shorthand(padding, default: PADDING, cast: :to_i).join(',')
+  end
 
-    top, right, bottom, left = case values.length
+  # Expands a CSS-style "top,right,bottom,left" shorthand into a 4-element
+  # [top, right, bottom, left] array, accepting 1–4 comma-separated values using
+  # the same rules as CSS and falling back to `default` on all sides.
+  # @param value [String, Numeric] The shorthand value
+  # @param default [Numeric] Value applied to all sides when nothing parses
+  # @param cast [Symbol] How to coerce each value (:to_i or :to_f)
+  # @return [Array<Numeric>] [top, right, bottom, left]
+  def parse_box_shorthand(value, default:, cast: :to_f)
+    values = value.to_s.split(',').map(&:strip).reject(&:empty?).map(&cast).first(4)
+
+    case values.length
     when 1  # Single value: apply to all sides
       [values[0]] * 4
     when 2  # Two values: top/bottom, left/right
@@ -299,10 +338,8 @@ class StaticMap
     when 4  # Four values: top, right, bottom, left
       values
     else
-      [PADDING] * 4  # Default padding if empty input
+      [default] * 4  # Default applied to all sides on empty input
     end
-
-    [top, right, bottom, left].join(',')
   end
 
   # Calculates the sum of the top and bottom padding.
@@ -324,7 +361,7 @@ class StaticMap
         "type": "vector",
         "url": "mapbox://#{@tileset_id}"
       },
-      "source-layer": "tracks",
+      "source-layer": @source_layer,
       "paint": {
         "line-color": URI.encode_www_form_component("##{TRACK_COLOR}"),
         "line-width": TRACK_WIDTH,

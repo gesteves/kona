@@ -1,9 +1,9 @@
 namespace :maps do
   # Loops through the GPX files stored in the StaticMap::GPX_FOLDER folder (data/maps/gpx),
   # generates a map for each as a static PNG image, and saves it to the StaticMap::IMAGES_FOLDER folder (data/maps/images).
-  # It uses the Mapbox Static API to generate the map image based on the bounding box of the GPX file,
-  # but the GPX files must be uploaded manually to Mapbox Studio as tilesets first.
-  # @todo Automate uploading the GPX files to Mapbox.
+  # Each GPX file is uploaded to Mapbox automatically as a private vector tileset (via the
+  # Mapbox Tiling Service), then rendered with the Mapbox Static API based on the bounding
+  # box of the GPX file. Pass TILESET_ID to skip the upload and reuse an existing tileset.
   desc 'Generate static map images from GPX files'
   task generate: :environment do
     gpx_files = Dir.glob(File.join(StaticMap::GPX_FOLDER, '*.gpx'))
@@ -19,27 +19,19 @@ namespace :maps do
       padding: ENV['PADDING'],
       height: ENV['HEIGHT'],
       min_km: ENV['MIN_KM'],
-      dnf: ENV['DNF'].present?
+      dnf: ENV['DNF'].present?,
+      force_upload: ENV['FORCE_UPLOAD'].present?
     }.compact
 
-    # A tileset ID identifies a single track, so it can only be reused via ENV when
-    # there's exactly one GPX file. Otherwise, prompt for each file individually.
+    # By default each GPX file is uploaded to Mapbox automatically. A tileset ID
+    # identifies a single track, so the TILESET_ID override (skip upload, reuse an
+    # existing tileset) only applies when there's exactly one GPX file.
     options[:tileset_id] = ENV['TILESET_ID'] if gpx_files.one? && ENV['TILESET_ID'].present?
 
-    generated = skipped = failed = 0
+    generated = failed = 0
 
     gpx_files.each do |gpx_file|
       map = StaticMap.new(gpx_file, options)
-
-      unless map.tileset_id
-        print "Enter the Mapbox tileset ID for #{map.activity_title}, or press Enter to skip: "
-        map.tileset_id = STDIN.gets.chomp
-        if map.tileset_id.empty?
-          puts "⏭️  Skipping #{map.activity_title}.\n\n"
-          skipped += 1
-          next
-        end
-      end
 
       begin
         map.generate_image!
@@ -51,7 +43,7 @@ namespace :maps do
       end
     end
 
-    puts "✅ Map generation complete! #{generated} generated, #{skipped} skipped, #{failed} failed."
+    puts "✅ Map generation complete! #{generated} generated, #{failed} failed."
   end
 
   desc 'Show help information for map generation tasks'
@@ -60,13 +52,19 @@ namespace :maps do
       Map Generation Help
       ==================
 
-      This rake task generates static map images from GPX files using Mapbox's Static API.
+      This rake task generates static map images from GPX files. Each GPX file is uploaded
+      to Mapbox automatically as a private vector tileset (Mapbox Tiling Service), then
+      rendered with Mapbox's Static API.
 
       Prerequisites:
       -------------
-      1. A Mapbox account and access token (set MAPBOX_ACCESS_TOKEN environment variable)
-      2. GPX files uploaded to Mapbox Studio as tilesets
-      3. GPX files placed in #{StaticMap::GPX_FOLDER}
+      1. A Mapbox account, with:
+         - MAPBOX_ACCESS_TOKEN: token used to render the static map image.
+         - MAPBOX_USERNAME: your Mapbox account username (required for the upload).
+         - MAPBOX_SECRET_TOKEN: a secret token with the `tilesets:write` and
+           `tilesets:read` scopes (required for the upload; also used to render so it
+           can read the private tilesets it creates).
+      2. GPX files placed in #{StaticMap::GPX_FOLDER}
 
       Usage:
       ------
@@ -74,7 +72,12 @@ namespace :maps do
 
       Options:
       --------
-      TILESET_ID=<id>     Mapbox tileset ID for the GPX file. If not provided, you'll be prompted for each file.
+      TILESET_ID=<id>     Skip the upload and render from an existing Mapbox tileset
+                          (full "username.tileset" form). Only applies to a single GPX file.
+      SOURCE_LAYER=<name> Source-layer to read when using TILESET_ID (default: tracks).
+      FORCE_UPLOAD        Re-upload the GPX even if its tileset already exists. Use this
+                          when the GPX itself changed; tweaking the image settings below
+                          reuses the existing tileset automatically (no re-upload).
       REVERSE_MARKERS     Reverse the start/end markers (default: false)
       PADDING=<value>     Padding around the map in pixels. Can be:
                           - Single value (e.g., 50) for all sides
@@ -83,12 +86,18 @@ namespace :maps do
                           - Four values (e.g., 50,100,75,25) for top, right, bottom, left
                           Default: 50
       HEIGHT=<value>      Custom height for the map in pixels (default: calculated based on aspect ratio)
-      MIN_KM=<value>      Minimum width and height of the map's viewable area in kilometers (default: 1)
+      MIN_KM=<value>      Kilometers of map to add around the track, in CSS-style
+                          "top,right,bottom,left" shorthand (like PADDING but in km):
+                          - Single value (e.g., 2) for all sides
+                          - Two values (e.g., 2,1) for top/bottom, left/right
+                          - Three values (e.g., 2,1,0) for top, left/right, bottom
+                          - Four values (e.g., 2,1,0,1) for top, right, bottom, left
+                          Default: 0. Example: MIN_KM=2,0,0,0 adds 2 km above the track.
       DNF                 Mark the activity as Did Not Finish (changes end marker icon)
 
       Example:
       --------
-      rake maps:generate TILESET_ID=your-tileset-id PADDING=100 MIN_KM=2
+      rake maps:generate PADDING=100 MIN_KM=2
 
       Output:
       -------
