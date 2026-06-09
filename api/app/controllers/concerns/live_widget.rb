@@ -13,8 +13,8 @@ module LiveWidget
   # Kept short by default: this is a low-traffic site, so a long window mostly means the few
   # people who do see a widget get served hours- or day-old data while the background
   # revalidation lags, rather than meaningfully smoothing load. One hour balances some
-  # outage resilience against not serving badly stale data. The pageviews widget overrides
-  # this back up to a day (its data barely changes and freshness doesn't matter).
+  # outage resilience against not serving badly stale data. Widgets whose data barely changes
+  # (pageviews, upcoming races) override this back up to a day, where freshness doesn't matter.
   DEFAULT_EDGE_STALE_WHILE_REVALIDATE = 1.hour
   # `stale-if-error` is included aspirationally: it documents the intent (keep serving stale
   # on an origin error) but Netlify's CDN currently ignores it — it's not in Netlify's list of
