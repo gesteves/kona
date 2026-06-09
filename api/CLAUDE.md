@@ -60,9 +60,11 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   were ported from the web app (weather, units, icons, markdown, time, etc.).
 - **Caching** — `app/controllers/concerns/live_widget.rb`. `cache_widget(ttl:)` sets:
   - Browser: `Cache-Control: public, max-age=0, stale-while-revalidate=86400`
-  - Edge: `Netlify-CDN-Cache-Control: public, durable, max-age=<ttl>, stale-while-revalidate=86400, stale-if-error=86400`
+  - Edge: `Netlify-CDN-Cache-Control: public, durable, max-age=<ttl>, stale-while-revalidate=3600, stale-if-error=86400`
   ⚠️ The proxy forwards the edge header **only on 2xx** — only emit durable headers on
-  successful, cacheable responses.
+  successful, cacheable responses. Edge `stale-while-revalidate` defaults to one hour
+  (`DEFAULT_EDGE_STALE_WHILE_REVALIDATE`); the pageviews widget passes
+  `edge_stale_while_revalidate: 1.day` since its counts barely change.
 - **Errors** render as plain text via `lib/plain_text_exceptions.rb`. Unmatched paths are
   caught by the trailing `match "*unmatched"` route → `ApplicationController#route_not_found`
   (plain-text 404), instead of raising `ActionController::RoutingError`. This is what keeps
