@@ -8,7 +8,9 @@ module Api
     include TimeHelper
 
     def upcoming
-      cache_widget(ttl: 1.hour)
+      # Edge SWR kept at a day (vs. the one-hour default): the upcoming-races list changes
+      # rarely, so serving a stale copy while revalidating costs nothing.
+      cache_widget(ttl: 1.hour, edge_stale_while_revalidate: 1.day)
 
       @events = Events.new.all
       @upcoming = upcoming_races

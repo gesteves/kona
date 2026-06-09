@@ -132,7 +132,7 @@ RSpec.describe "Weather", type: :request do
     edge = response.headers["Netlify-CDN-Cache-Control"]
     expect(edge).to include("durable")
     expect(edge).to include("max-age=300")
-    expect(edge).to include("stale-while-revalidate=86400")
+    expect(edge).to include("stale-while-revalidate=3600")
     expect(edge).to include("stale-if-error=86400")
   end
 

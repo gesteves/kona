@@ -4,7 +4,9 @@ module Api
   # placeholder and swaps this in. Cached for an hour — view counts change slowly.
   class PlausibleController < BaseController
     def pageviews
-      cache_widget(ttl: 1.hour)
+      # Edge SWR kept at a day (vs. the one-hour default): view counts barely change, so
+      # serving a stale count while revalidating costs nothing.
+      cache_widget(ttl: 1.hour, edge_stale_while_revalidate: 1.day)
 
       article = Articles.new.find(params[:id])
       return render_empty if article.nil?
