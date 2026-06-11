@@ -1,3 +1,8 @@
+<%# Plausible analytics first-party proxy. Emitted first so the /api/event rewrite %>
+<%# is matched before the /api/* widget proxy function. See site_helpers.rb. %>
+<% plausible_proxy_redirects.each do |redirect| %>
+<%= redirect[:from] %> <%= redirect[:to] %> <%= redirect[:status] %>
+<% end %>
 <% data.articles.reject(&:draft).each do |article| %>
 /id/<%= article.sys.id %>/ <%= url_for article.path %> 301
 <% end %>
