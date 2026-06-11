@@ -151,21 +151,30 @@ module SiteHelpers
     tag.pages.map { |t| t.items }.flatten.uniq.size
   end
 
-  # Checks if Plausible analytics is properly installed by verifying required redirects exist.
-  # @return [Boolean] True if both required Plausible redirects are present in data/redirects.json
+  # The Plausible first-party proxy rewrites baked into the Netlify `_redirects`
+  # file (emitted by source/redirects.erb). The analytics script loads from
+  # /js/script.js and events post to /api/event, both rewritten (status 200) to
+  # Plausible so they're served from this domain. The /api/event rule must match
+  # before the /api/* widget proxy function, so these are emitted ahead of the
+  # other redirects.
+  # @see https://plausible.io/docs/proxy/guides/netlify
+  PLAUSIBLE_PROXY_REDIRECTS = [
+    { from: '/js/script.js', to: 'https://plausible.io/js/pa-_6bvfc1qgJNBImkaSg1ZD.js', status: 200 },
+    { from: '/api/event', to: 'https://plausible.io/api/event', status: 200 }
+  ].freeze
+
+  # The Plausible proxy rewrite rules to emit into the `_redirects` file.
+  # @return [Array<Hash>] Each rule with :from, :to, and :status keys.
+  def plausible_proxy_redirects
+    PLAUSIBLE_PROXY_REDIRECTS
+  end
+
+  # Checks if Plausible analytics is installed, i.e. the first-party proxy
+  # rewrites are built into the site (see plausible_proxy_redirects). Gates the
+  # analytics script tag in partials/_analytics.html.erb.
+  # @return [Boolean] True when the Plausible proxy rewrites are configured.
   def is_plausible_installed?
-    return false unless data.redirects.present?
-    
-    required_redirects = [
-      { from: '/js/script.js', status: 200 },
-      { from: '/api/event', status: 200 }
-    ]
-    
-    required_redirects.all? do |required|
-      data.redirects.any? do |redirect|
-        redirect['from'] == required[:from] && redirect['status'] == required[:status]
-      end
-    end
+    plausible_proxy_redirects.present?
   end
 
   # Generates a JSON-LD schema string for the organization, based on the site data.
