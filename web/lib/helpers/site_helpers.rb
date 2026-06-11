@@ -151,26 +151,46 @@ module SiteHelpers
     tag.pages.map { |t| t.items }.flatten.uniq.size
   end
 
-  # The Plausible first-party proxy rewrites baked into the Netlify `_redirects`
-  # file (emitted by source/redirects.erb).
+  # First-party proxy paths for Plausible analytics. Both the inline init
+  # snippet (partials/_analytics.html.erb) and the Netlify `_redirects` rewrites
+  # (source/redirects.erb) read these, so the browser-facing path and the proxy
+  # target stay in sync from a single source.
   # @see https://plausible.io/docs/proxy/guides/netlify
-  PLAUSIBLE_PROXY_REDIRECTS = [
-    { from: '/plsbl/script.js', to: ENV['PLAUSIBLE_SCRIPT_URL'], status: 200 },
-    { from: '/plsbl/event', to: 'https://plausible.io/api/event', status: 200 }
-  ].freeze
+  PLAUSIBLE_SCRIPT_PATH = '/plsbl/script.js'
+  PLAUSIBLE_EVENT_PATH = '/plsbl/event'
+  PLAUSIBLE_EVENT_UPSTREAM = 'https://plausible.io/api/event'
 
-  # The Plausible proxy rewrite rules to emit into the `_redirects` file.
-  # @return [Array<Hash>] Each rule with :from, :to, and :status keys.
-  def plausible_proxy_redirects
-    PLAUSIBLE_PROXY_REDIRECTS
+  # The first-party path the Plausible script is proxied from.
+  # @return [String]
+  def plausible_script_path
+    PLAUSIBLE_SCRIPT_PATH
   end
 
-  # Checks if Plausible analytics is installed, i.e. the first-party proxy
-  # rewrites are built into the site (see plausible_proxy_redirects). Gates the
-  # analytics script tag in partials/_analytics.html.erb.
-  # @return [Boolean] True when the Plausible proxy rewrites are configured.
+  # The first-party path Plausible events are sent to (the `endpoint` passed to
+  # `plausible.init`). Proxied to the upstream Plausible event API.
+  # @return [String]
+  def plausible_event_path
+    PLAUSIBLE_EVENT_PATH
+  end
+
+  # The Plausible proxy rewrite rules to emit into the `_redirects` file. Only
+  # built when an upstream script URL is configured (see is_plausible_installed?),
+  # so a missing `PLAUSIBLE_SCRIPT_URL` never emits a malformed rewrite line.
+  # @return [Array<Hash>] Each rule with :from, :to, and :status keys.
+  def plausible_proxy_redirects
+    return [] unless is_plausible_installed?
+    [
+      { from: PLAUSIBLE_SCRIPT_PATH, to: ENV['PLAUSIBLE_SCRIPT_URL'], status: 200 },
+      { from: PLAUSIBLE_EVENT_PATH, to: PLAUSIBLE_EVENT_UPSTREAM, status: 200 }
+    ]
+  end
+
+  # Checks if Plausible analytics is installed, i.e. the upstream script URL is
+  # configured so the first-party proxy can be built. Gates both the analytics
+  # script tag (partials/_analytics.html.erb) and the proxy rewrites.
+  # @return [Boolean] True when `PLAUSIBLE_SCRIPT_URL` is set.
   def is_plausible_installed?
-    plausible_proxy_redirects.present?
+    ENV['PLAUSIBLE_SCRIPT_URL'].present?
   end
 
   # Generates a JSON-LD schema string for the organization, based on the site data.
