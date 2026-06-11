@@ -1,24 +1,14 @@
-/* global plausible */
-
-let plausibleInitialized = false;
-
 /**
- * Sets up the Plausible analytics queue if it doesn't already exist. Runs once per page load.
+ * Sends a call to Plausible if it's available. The queue stub and configuration
+ * are set up inline in the page head (partials/_analytics.html.erb) before the
+ * deferred script loads, so here we only need to guard against Plausible being
+ * absent (e.g. in development, where the script isn't injected), which turns
+ * every tracking call into a no-op instead of a ReferenceError.
+ * @param {...*} args - Arguments forwarded to `window.plausible`.
  */
-function setUpPlausible() {
-  if (plausibleInitialized) return;
-  window.plausible =
-    window.plausible ||
-    function () {
-      (window.plausible.q = window.plausible.q || []).push(arguments);
-    };
-  window.plausible.init =
-    window.plausible.init ||
-    function (i) {
-      window.plausible.o = i || {};
-    };
-  window.plausible.init({ autoCapturePageviews: false, endpoint: '/plsbl/event' });
-  plausibleInitialized = true;
+function track(...args) {
+  if (typeof window.plausible !== 'function') return;
+  window.plausible(...args);
 }
 
 /**
@@ -27,8 +17,6 @@ function setUpPlausible() {
  * @param {Object} additionalProps - Optional additional properties to include with the pageview.
  */
 export function trackPageView(additionalProps = {}) {
-  setUpPlausible();
-
   const currentUrl = new URL(window.location.href);
   const searchQuery = currentUrl.searchParams.get('q');
 
@@ -42,7 +30,7 @@ export function trackPageView(additionalProps = {}) {
     }
   }
 
-  plausible('pageview', params);
+  track('pageview', params);
   cleanUpUrl();
 }
 
@@ -53,8 +41,32 @@ export function trackPageView(additionalProps = {}) {
  * @param {Object} props - Additional properties to send with the event.
  */
 export function trackEvent(event, props = {}) {
-  setUpPlausible();
-  plausible(event, { props });
+  track(event, { props });
+}
+
+/**
+ * Tracks an event and then runs a callback, guaranteeing the callback runs even
+ * if the event can't be sent. Use this when the callback navigates the page away
+ * (e.g. `window.location.href = …`), which would otherwise cancel an in-flight
+ * tracking request. Relies on Plausible's `callback` option, with a short timeout
+ * as a fallback in case the callback never fires (or Plausible isn't loaded).
+ * @param {string} event - The event name to be tracked.
+ * @param {Object} props - Additional properties to send with the event.
+ * @param {Function} done - Callback to run once the event is sent (or times out).
+ */
+export function trackEventThen(event, props, done) {
+  let ran = false;
+  const go = () => {
+    if (ran) return;
+    ran = true;
+    done();
+  };
+
+  if (typeof window.plausible !== 'function') return go();
+
+  track(event, { props, callback: go });
+  // Fallback so navigation isn't blocked if the callback never fires.
+  setTimeout(go, 150);
 }
 
 /**

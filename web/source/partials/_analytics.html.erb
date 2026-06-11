@@ -1,3 +1,11 @@
 <% if is_production? && is_plausible_installed? %>
-  <script defer src="/plsbl/script.js"></script>
+  <%# Register Plausible's config inline, before the deferred script loads, so our %>
+  <%# settings (manual pageviews + first-party endpoint) apply before the script can %>
+  <%# auto-initialize with its defaults (autoCapturePageviews:true, public endpoint). %>
+  <script>
+    window.plausible = window.plausible || function () { (window.plausible.q = window.plausible.q || []).push(arguments) };
+    window.plausible.init = window.plausible.init || function (i) { window.plausible.o = i || {} };
+    plausible.init({ autoCapturePageviews: false, endpoint: '<%= plausible_event_path %>' });
+  </script>
+  <script defer src="<%= plausible_script_path %>"></script>
 <% end %>

@@ -1,5 +1,5 @@
 import { Controller } from '@hotwired/stimulus';
-import { trackEvent } from '../lib/analytics';
+import { trackEvent, trackEventThen } from '../lib/analytics';
 
 /**
  * Controller for managing social sharing functionality.
@@ -101,15 +101,19 @@ export default class extends Controller {
   trackShare(event) {
     event.preventDefault();
     const linkURL = this.element.href;
-
-    trackEvent('Share', { url: this.getShareUrl(), via: this.viaValue });
+    const props = { url: this.getShareUrl(), via: this.viaValue };
 
     // Handle special URL schemes (mailto:, sms:) differently than HTTP(S) URLs
     if (linkURL.startsWith('mailto:') || linkURL.startsWith('sms:')) {
-      // For mailto/sms, navigate in the current window to trigger the app
-      window.location.href = linkURL;
+      // For mailto/sms, navigating the current window can cancel an in-flight
+      // tracking request, so wait until the event is sent before navigating.
+      trackEventThen('Share', props, () => {
+        window.location.href = linkURL;
+      });
     } else {
-      // For HTTP(S) URLs, open in a new window/tab
+      // For HTTP(S) URLs, open in a new window/tab (the current page stays put,
+      // so the tracking request isn't interrupted).
+      trackEvent('Share', props);
       window.open(linkURL, '_blank', 'noopener,noreferrer');
     }
   }

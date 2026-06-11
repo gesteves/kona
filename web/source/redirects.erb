@@ -1,5 +1,5 @@
-<%# Plausible analytics first-party proxy. Emitted first so the /api/event rewrite %>
-<%# is matched before the /api/* widget proxy function. See site_helpers.rb. %>
+<%# Plausible analytics first-party proxy (/plsbl/*). Emitted first so a catch-all %>
+<%# redirect from Contentful (below) can't shadow these rewrites. See site_helpers.rb. %>
 <% plausible_proxy_redirects.each do |redirect| %>
 <%= redirect[:from] %> <%= redirect[:to] %> <%= redirect[:status] %>
 <% end %>
