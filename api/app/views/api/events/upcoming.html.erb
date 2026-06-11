@@ -30,7 +30,7 @@
       </section>
     <% end %>
   <% else %>
-    <section class="collection collection--<%= event_collection_variant %><%= " collection--has-featured" if @featured %>" id="upcoming-races">
+    <section class="collection collection--<%= event_collection_variant(@upcoming.size, featured: @featured.present?) %><%= " collection--has-featured" if @featured %>" id="upcoming-races">
       <h3 class="collection__heading">Upcoming Races</h3>
       <ol class="collection__list">
         <% @upcoming.each do |event| %>
