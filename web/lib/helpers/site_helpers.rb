@@ -160,7 +160,7 @@ module SiteHelpers
   # @see https://plausible.io/docs/proxy/guides/netlify
   PLAUSIBLE_PROXY_REDIRECTS = [
     { from: '/js/script.js', to: 'https://plausible.io/js/pa-_6bvfc1qgJNBImkaSg1ZD.js', status: 200 },
-    { from: '/api/event', to: 'https://plausible.io/api/event', status: 200 }
+    { from: '/plsbl/api/event', to: 'https://plausible.io/api/event', status: 200 }
   ].freeze
 
   # The Plausible proxy rewrite rules to emit into the `_redirects` file.
