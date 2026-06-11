@@ -140,6 +140,23 @@ RSpec.describe "Api::Events upcoming", type: :request do
     end
   end
 
+  context "when the next race is featured but has no race-day weather" do
+    # The featured window (is_close?, owner timezone) and the weather-fetch window (the event's
+    # own timezone) disagree at the 10-day boundary, so the forecast never gets fetched. The
+    # event must not get the featured layout — no expanded card, no empty "Race Day Weather" block.
+    before { allow_any_instance_of(WeatherKit).to receive(:data).and_return(nil) }
+
+    it "demotes it to a regular upcoming race without the featured layout or weather block" do
+      get "/api/events/upcoming", headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Featured Race")
+      expect(response.body).not_to include("collection--has-featured")
+      expect(response.body).not_to include("event--is-featured")
+      expect(response.body).not_to include("Race Day Weather")
+    end
+  end
+
   context "when there are no upcoming races" do
     before { allow_any_instance_of(Events).to receive(:all).and_return([]) }
 
