@@ -152,14 +152,10 @@ module SiteHelpers
   end
 
   # The Plausible first-party proxy rewrites baked into the Netlify `_redirects`
-  # file (emitted by source/redirects.erb). The analytics script loads from
-  # /js/script.js and events post to /api/event, both rewritten (status 200) to
-  # Plausible so they're served from this domain. The /api/event rule must match
-  # before the /api/* widget proxy function, so these are emitted ahead of the
-  # other redirects.
+  # file (emitted by source/redirects.erb).
   # @see https://plausible.io/docs/proxy/guides/netlify
   PLAUSIBLE_PROXY_REDIRECTS = [
-    { from: '/js/script.js', to: 'https://plausible.io/js/pa-_6bvfc1qgJNBImkaSg1ZD.js', status: 200 },
+    { from: '/js/script.js', to: ENV['PLAUSIBLE_SCRIPT_URL'], status: 200 },
     { from: '/plsbl/api/event', to: 'https://plausible.io/api/event', status: 200 }
   ].freeze
 
