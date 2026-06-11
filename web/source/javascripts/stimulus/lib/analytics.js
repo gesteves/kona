@@ -17,7 +17,7 @@ function setUpPlausible() {
     function (i) {
       window.plausible.o = i || {};
     };
-  window.plausible.init({ autoCapturePageviews: false, endpoint: '/plsbl/api/event' });
+  window.plausible.init({ autoCapturePageviews: false, endpoint: '/plsbl/event' });
   plausibleInitialized = true;
 }
 
