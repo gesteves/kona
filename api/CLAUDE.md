@@ -65,6 +65,10 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   successful, cacheable responses. Edge `stale-while-revalidate` defaults to one hour
   (`DEFAULT_EDGE_STALE_WHILE_REVALIDATE`); the pageviews and upcoming-races widgets pass
   `edge_stale_while_revalidate: 1.day` since their data barely changes.
+- **Error reporting** — `config/initializers/bugsnag.rb` wires the `bugsnag` gem; its railtie
+  auto-inserts the Rack middleware and hooks ActionDispatch, so unhandled exceptions are
+  reported even though errors render as plain text. `notify_release_stages` is limited to
+  `production` and `BUGSNAG_API_KEY` is unset locally/in CI, so it's a no-op outside production.
 - **Errors** render as plain text via `lib/plain_text_exceptions.rb`. Unmatched paths are
   caught by the trailing `match "*unmatched"` route → `ApplicationController#route_not_found`
   (plain-text 404), instead of raising `ActionController::RoutingError`. This is what keeps
@@ -128,6 +132,8 @@ secrets (and Rails `config/credentials.yml.enc` + `master.key`).
 - **Optional**: `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`, `TRAINERROAD_CALENDAR_URL`,
   `PURPLEAIR_API_KEY`, `LOCATION`, `TIME_ZONE`, `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`,
   `BLUESKY_PDS_URL` (standard.site publishing; no-ops when the handle/password are unset),
+  `BUGSNAG_API_KEY` (error reporting; **production only** — notifies only in the production
+  release stage, and is unset in development/CI, so it's a no-op there),
   `ALLOWED_HOSTS` (comma-separated `Host`-header allowlist; **production only**, enables
   host authorization. Unset = all hosts accepted, so it's safe to deploy before setting it,
   then activate by setting the fly secret. `/up` is always exempt. Never hardcode the host).
