@@ -30,6 +30,9 @@ gem "rack-timeout"
 # Blocks/throttles abusive direct-to-origin requests (vulnerability scanners) at the edge of
 # the middleware stack, before they reach routing. See config/initializers/rack_attack.rb.
 gem "rack-attack"
+# Reports unhandled exceptions to Bugsnag (production only). See
+# config/initializers/bugsnag.rb.
+gem "bugsnag"
 # GraphQL client for the Font Awesome API
 gem "graphql-client"
 
