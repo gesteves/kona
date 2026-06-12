@@ -500,6 +500,7 @@ class StandardSite < ApplicationService
     )
     unless response.success?
       Rails.logger.warn("standard.site: failed to authenticate with the PDS (HTTP #{response.code})")
+      report_upstream_error("HTTP #{response.code}", context: "standard.site PDS session", status: response.code)
       return false
     end
     data = JSON.parse(response.body)
@@ -510,6 +511,7 @@ class StandardSite < ApplicationService
     @access_jwt.present? && @did.present?
   rescue StandardError => e
     Rails.logger.error("standard.site: error creating PDS session: #{e.message}")
+    report_upstream_error(e, context: "standard.site PDS session")
     false
   end
 
@@ -531,7 +533,10 @@ class StandardSite < ApplicationService
       body: { repo: @did, collection: collection, rkey: rkey, validate: false, record: record }.to_json,
       headers: auth_headers
     )
-    Rails.logger.warn("standard.site: failed to put #{collection}/#{rkey} (HTTP #{response.code}: #{response.body})") unless response.success?
+    unless response.success?
+      Rails.logger.warn("standard.site: failed to put #{collection}/#{rkey} (HTTP #{response.code}: #{response.body})")
+      report_upstream_error("HTTP #{response.code}", context: "standard.site putRecord #{collection}/#{rkey}", status: response.code)
+    end
     response.success?
   end
 
@@ -554,7 +559,10 @@ class StandardSite < ApplicationService
       query = { repo: @did, collection: collection, limit: 100 }
       query[:cursor] = cursor if cursor.present?
       response = HTTParty.get("#{@service_url}/xrpc/com.atproto.repo.listRecords", query: query, headers: auth_headers)
-      break unless response.success?
+      unless response.success?
+        report_upstream_error("HTTP #{response.code}", context: "standard.site listRecords #{collection}", status: response.code)
+        break
+      end
       body = JSON.parse(response.body)
       records = Array(body["records"])
       rkeys.concat(records.map { |r| r["uri"].to_s.split("/").last })
@@ -587,9 +595,13 @@ class StandardSite < ApplicationService
       body: bytes,
       headers: { "Content-Type" => mime, "Authorization" => "Bearer #{@access_jwt}" }
     )
-    return unless response.success?
+    unless response.success?
+      report_upstream_error("HTTP #{response.code}", context: "standard.site uploadBlob", status: response.code)
+      return
+    end
     JSON.parse(response.body)["blob"]
-  rescue StandardError
+  rescue StandardError => e
+    report_upstream_error(e, context: "standard.site uploadBlob")
     nil
   end
 
@@ -602,10 +614,15 @@ class StandardSite < ApplicationService
     source = url.to_s.start_with?("//") ? "https:#{url}" : url
     format = content_type == "image/png" ? "png" : "jpg"
     mime = format == "png" ? "image/png" : "image/jpeg"
-    response = HTTParty.get(images_api_url(source, w: w, h: h, fm: format))
-    return unless response.success?
+    image_url = images_api_url(source, w: w, h: h, fm: format)
+    response = HTTParty.get(image_url)
+    unless response.success?
+      report_upstream_error("HTTP #{response.code}", context: "standard.site image fetch", status: response.code, url: image_url)
+      return
+    end
     [response.body, mime]
-  rescue StandardError
+  rescue StandardError => e
+    report_upstream_error(e, context: "standard.site image fetch")
     nil
   end
 

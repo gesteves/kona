@@ -101,7 +101,8 @@ class WeatherKit < ApplicationService
 
     private_key = OpenSSL::PKey::EC.new(private_key_content)
     JWT.encode(claims, private_key, "ES256", header)
-  rescue StandardError
+  rescue StandardError => e
+    report_upstream_error(e, context: "WeatherKit JWT generation")
     nil
   end
 end

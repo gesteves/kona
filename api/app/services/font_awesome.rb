@@ -33,6 +33,7 @@ class FontAwesome
     svg
   rescue StandardError => e
     Rails.logger.error("Error fetching Font Awesome icon #{icon_id}: #{e}")
+    ErrorReporter.report_upstream(e, service: "FontAwesome", context: "Font Awesome icon #{icon_id}")
     nil
   end
 

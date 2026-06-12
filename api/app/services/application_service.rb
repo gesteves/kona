@@ -51,7 +51,10 @@ class ApplicationService
   # @param response [HTTParty::Response]
   # @return [Object, nil] The parsed body, or nil when the response was not successful.
   def parse_json(response, symbolize: true)
-    return unless response.success?
+    unless response.success?
+      report_upstream_error("HTTP #{response.code}", status: response.code, url: response.request&.last_uri&.to_s)
+      return
+    end
 
     JSON.parse(response.body, symbolize_names: symbolize)
   end
@@ -69,12 +72,13 @@ class ApplicationService
     attempts = 0
     begin
       yield
-    rescue StandardError
+    rescue StandardError => e
       attempts += 1
       if attempts <= max
         sleep(2**attempts)
         retry
       end
+      report_upstream_error(e)
       nil
     end
   end
@@ -86,6 +90,15 @@ class ApplicationService
     yield
   rescue StandardError => e
     Rails.logger.error("#{context}: #{e}")
+    report_upstream_error(e, context: context)
     fallback
+  end
+
+  # Reports a handled upstream-API failure to Bugsnag, tagged with this service's class name.
+  # Thin wrapper over ErrorReporter so subclasses don't repeat the service: argument. Purely
+  # additive — callers keep their existing logging and graceful-degradation return values.
+  # @see ErrorReporter.report_upstream
+  def report_upstream_error(error, context: self.class.name, status: nil, url: nil)
+    ErrorReporter.report_upstream(error, service: self.class.name, context: context, status: status, url: url)
   end
 end
