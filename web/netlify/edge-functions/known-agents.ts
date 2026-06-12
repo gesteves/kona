@@ -1,7 +1,7 @@
 import type { Config, Context } from '@netlify/edge-functions';
 
 // Records every page request server-side with Known Agents (the Dark Visitors company,
-// using the same DARK_VISITORS_ACCESS_TOKEN as robots.mts). This captures bots, AI
+// using the DARK_VISITORS_ACCESS_TOKEN). This captures bots, AI
 // crawlers, and LLM-referral traffic that never execute the client-side Plausible JS,
 // so it complements — not replaces — that analytics. Mirrors the documented Cloudflare
 // Worker pattern: time the request, then POST the visit in the background.
