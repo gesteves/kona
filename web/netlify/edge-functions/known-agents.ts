@@ -71,8 +71,11 @@ export default async function handler(request: Request, context: Context): Promi
 }
 
 export const config: Config = {
-  // Run on every request, then exclude everything that isn't a real page view:
-  // built assets, the other Netlify functions, the Plausible proxy, and feeds.
+  // Run on every request, then exclude everything that isn't a meaningful page view:
+  // built assets, the other Netlify functions, the Plausible proxy, the IFTTT
+  // syndication feeds (polled constantly by automation), and the sitemap. The Atom
+  // feed (/feed.xml) is intentionally *not* excluded — it carries full article content,
+  // so agents fetching it is exactly the kind of traffic worth capturing.
   path: '/*',
   excludedPath: [
     '/javascripts/*',
@@ -83,8 +86,8 @@ export const config: Config = {
     '/og',
     '/robots.txt',
     '/plsbl/*',
+    '/ifttt/*',
     '/sitemap.xml',
-    '/feed.xml',
     '/.well-known/*',
     '/favicon.ico',
     '/*.png',
@@ -101,7 +104,6 @@ export const config: Config = {
     '/*.css',
     '/*.js',
     '/*.json',
-    '/*.xml',
     '/*.txt',
     '/*.map',
   ],
