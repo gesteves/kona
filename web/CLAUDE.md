@@ -68,6 +68,9 @@ to flush the cache.
   `source/javascripts/stimulus/`, `source/stylesheets/`.
 - `netlify/functions/` — `api-proxy.mts` (proxies `/api/*`; see root `CLAUDE.md`),
   `og.mts` (OG images), `robots.mts` (serves `/robots.txt` with live Dark Visitors rules).
+- `netlify/edge-functions/` — `known-agents.ts` (records every page view server-side to
+  Known Agents / Dark Visitors, capturing bot + AI-agent traffic Plausible can't see;
+  production-only, reuses `DARK_VISITORS_ACCESS_TOKEN`).
 - `data/font_awesome.yml` — **icon allowlist**. Any new icon must be added here (under
   the correct family/style, e.g. `classic.light`) before `icon_svg` / `rake import:icons`
   can use it.
