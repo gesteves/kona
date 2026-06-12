@@ -83,6 +83,7 @@ class Whoop < ApplicationService
     token_data
   rescue StandardError => e
     Rails.logger.error("Error exchanging Whoop authorization code: #{e}")
+    report_upstream_error(e, context: "Whoop OAuth code exchange")
     nil
   end
 
@@ -190,6 +191,7 @@ class Whoop < ApplicationService
 
     unless response.success?
       Rails.logger.warn("Failed to refresh Whoop access token (HTTP #{response.code}). Visit /whoop/auth to re-authorize.")
+      report_upstream_error("HTTP #{response.code}", context: "Whoop token refresh", status: response.code)
       return
     end
 
@@ -198,6 +200,7 @@ class Whoop < ApplicationService
     token_data[:access_token]
   rescue StandardError => e
     Rails.logger.error("Error refreshing Whoop token: #{e}")
+    report_upstream_error(e, context: "Whoop token refresh")
     nil
   end
 

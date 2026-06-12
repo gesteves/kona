@@ -19,7 +19,10 @@ class TrainerRoad < ApplicationService
     cache_key = "trainerroad:workouts:#{@timezone}:#{CALENDAR_URL.parameterize}"
     cached_json(cache_key, expires_in: 5.minutes) do
       response = HTTParty.get(CALENDAR_URL)
-      next [] unless response.success?
+      unless response.success?
+        report_upstream_error("HTTP #{response.code}", context: "TrainerRoad calendar", status: response.code)
+        next []
+      end
 
       calendar = Icalendar::Calendar.parse(response.body).first
       today = Time.current.in_time_zone(@timezone).to_date

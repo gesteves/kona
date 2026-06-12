@@ -36,13 +36,17 @@ module FontAwesomeClient
       }
 
       response = HTTParty.post("#{FONT_AWESOME_API_URL}/token", headers: headers)
-      return unless response.success?
+      unless response.success?
+        ErrorReporter.report_upstream("HTTP #{response.code}", service: "FontAwesomeClient", context: "Font Awesome token", status: response.code, url: "#{FONT_AWESOME_API_URL}/token")
+        return
+      end
 
       data = JSON.parse(response.body, symbolize_names: true)
       $redis.setex("font_awesome:access_token", data[:expires_in], data[:access_token])
       data[:access_token]
     rescue StandardError => e
       Rails.logger.error("Error fetching the Font Awesome access token: #{e}")
+      ErrorReporter.report_upstream(e, service: "FontAwesomeClient", context: "Font Awesome token")
       nil
     end
 

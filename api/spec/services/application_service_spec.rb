@@ -14,8 +14,9 @@ RSpec.describe ApplicationService do
   end
   let(:service) { service_class.new }
 
-  def response_double(success:, body:)
-    instance_double(HTTParty::Response, success?: success, body: body)
+  def response_double(success:, body:, code: 200, url: "https://example.test/path")
+    request = instance_double(HTTParty::Request, last_uri: URI.parse(url))
+    instance_double(HTTParty::Response, success?: success, body: body, code: code, request: request)
   end
 
   describe "#cached_json" do
@@ -90,6 +91,23 @@ RSpec.describe ApplicationService do
       expect(service.http_get("https://example.test")).to be_nil
     end
 
+    it "reports a non-success response to Bugsnag with its status code and url" do
+      allow(HTTParty).to receive(:get)
+        .and_return(response_double(success: false, body: "nope", code: 429, url: "https://upstream.test/data?key=secret"))
+      message, kwargs = nil
+      allow(ErrorReporter).to receive(:report_upstream) { |msg, **kw| message = msg; kwargs = kw }
+
+      expect(service.http_get("https://upstream.test/data")).to be_nil
+      expect(message).to eq("HTTP 429")
+      expect(kwargs).to include(status: 429, url: "https://upstream.test/data?key=secret")
+    end
+
+    it "does not report a successful response" do
+      allow(HTTParty).to receive(:get).and_return(response_double(success: true, body: '{"a":1}'))
+      expect(ErrorReporter).not_to receive(:report_upstream)
+      service.http_get("https://example.test")
+    end
+
     it "posts and parses with string keys when symbolize: false" do
       allow(HTTParty).to receive(:post).and_return(response_double(success: true, body: '{"a":1}'))
       expect(service.http_post("https://example.test", symbolize: false)).to eq("a" => 1)
@@ -122,6 +140,21 @@ RSpec.describe ApplicationService do
       expect(result).to be_nil
       expect(calls).to eq(3) # initial + 2 retries
     end
+
+    it "reports the error to Bugsnag once, only after the retries are exhausted" do
+      reported = nil
+      allow(ErrorReporter).to receive(:report_upstream) { |err, **| reported = err }
+      service.retrying(max: 2) { raise "boom" }
+      expect(ErrorReporter).to have_received(:report_upstream).once
+      expect(reported).to be_a(RuntimeError).and have_attributes(message: "boom")
+    end
+
+    it "does not report when the block eventually succeeds" do
+      expect(ErrorReporter).not_to receive(:report_upstream)
+      attempts = 0
+      result = service.retrying(max: 2) { attempts += 1; raise "boom" if attempts < 2; "ok" }
+      expect(result).to eq("ok")
+    end
   end
 
   describe "#rescue_with" do
@@ -132,6 +165,17 @@ RSpec.describe ApplicationService do
     it "logs and returns the fallback when the block raises" do
       expect(Rails.logger).to receive(:error).with(/boom/)
       expect(service.guarded([], context: "ctx") { raise "boom" }).to eq([])
+    end
+
+    it "reports the error to Bugsnag in addition to logging" do
+      allow(Rails.logger).to receive(:error)
+      reported = nil
+      context = nil
+      allow(ErrorReporter).to receive(:report_upstream) { |err, **kw| reported = err; context = kw[:context] }
+
+      service.guarded([], context: "ctx") { raise "boom" }
+      expect(reported).to be_a(RuntimeError).and have_attributes(message: "boom")
+      expect(context).to eq("ctx")
     end
   end
 end
