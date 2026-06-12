@@ -92,6 +92,7 @@ export const config: Config = {
     '/ifttt/*',
     '/sitemap.xml',
     '/.well-known/*',
+    '/.netlify/images*',
     '/favicon.ico',
     '/*.png',
     '/*.jpg',
