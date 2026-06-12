@@ -17,7 +17,7 @@ web↔api contract before touching any widget markup.
   standard.site verification data (DID + publication URI fetched from the `api/`
   `/api/standard-site` endpoint — the actual AT Protocol / Bluesky PDS publishing now
   lives in `api/`, webhook-driven).
-  (robots.txt is served at runtime by `netlify/functions/robots.mts`, not built here.)
+  (robots.txt is a static Middleman template, `source/robots.txt.erb`, built here.)
 - **Page generation**: Middleman proxies (`config.rb`) turn `data/*.json` into static
   pages — articles, pages, tags, blog index.
 - **Runtime dynamic content**: weather, activity stats, Whoop, per-article pageviews,
@@ -67,7 +67,7 @@ to flush the cache.
 - `source/layouts/layout.erb`, `source/partials/` (incl. `placeholders/`),
   `source/javascripts/stimulus/`, `source/stylesheets/`.
 - `netlify/functions/` — `api-proxy.mts` (proxies `/api/*`; see root `CLAUDE.md`),
-  `og.mts` (OG images), `robots.mts` (serves `/robots.txt` with live Dark Visitors rules).
+  `og.mts` (OG images).
 - `netlify/edge-functions/` — `known-agents.ts` (records every page view server-side to
   Known Agents / Dark Visitors, capturing bot + AI-agent traffic Plausible can't see;
   production-only, reuses `DARK_VISITORS_ACCESS_TOKEN`).

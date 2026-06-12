@@ -24,7 +24,7 @@ Copy `.env.example` to `.env` and fill in the credentials below (also add them t
 
 ### Optional services
 
-- **Dark Visitors** — imports `robots.txt` directives to deter AI scrapers. Set `DARK_VISITORS_ACCESS_TOKEN`.
+- **Dark Visitors / Known Agents** — records bot and AI-agent page views server-side via the Known Agents edge function. Set `DARK_VISITORS_ACCESS_TOKEN`.
 - **CloudFront** — serves Contentful images via a CDN to avoid bandwidth limits. Set `CLOUDFRONT_DOMAIN`.
 
 ## Running locally
