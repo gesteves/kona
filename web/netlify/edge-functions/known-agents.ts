@@ -50,11 +50,14 @@ async function trackVisit(
 }
 
 export default async function handler(request: Request, context: Context): Promise<Response> {
-  const token = Deno.env.get('DARK_VISITORS_ACCESS_TOKEN');
+  const token = Netlify.env.get('DARK_VISITORS_ACCESS_TOKEN');
 
   // Fail open: no token, or not a production deploy → pass straight through, untracked.
   // (Skipping previews/branch deploys keeps bot scans of those URLs out of the dataset.)
-  if (!token || Deno.env.get('CONTEXT') !== 'production') {
+  // Read the deploy context from the Context object: the CONTEXT env var is build-time
+  // only and is NOT present in the edge runtime, so reading it here always yields
+  // undefined and would skip tracking everywhere — including production.
+  if (!token || context.deploy.context !== 'production') {
     return context.next();
   }
 
