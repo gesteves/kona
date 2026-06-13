@@ -242,20 +242,6 @@ module ArticleHelpers
     schema.to_json
   end
 
-  # Generates a social media post for a given entry.
-  # @param entry [Object] The entry to generate a social media post for.
-  # @return [String] The social media post content.
-  def social_media_post(entry)
-    content = if entry.social_media_summary.present?
-      entry.social_media_summary
-    elsif entry.summary.present?
-      entry.summary
-    else
-      entry.title
-    end
-    smartypants(sanitize(content))
-  end
-
   # Counts the words in an article's prose (intro + body, as plain text). Shared by the reading-time
   # estimate and the BlogPosting schema's wordCount.
   # @param article [Object] The article.
