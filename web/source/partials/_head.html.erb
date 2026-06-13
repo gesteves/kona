@@ -2,8 +2,9 @@
   <%= partial 'partials/meta' %>
   <%= partial 'partials/open_graph_and_social' %>
   <%= partial 'partials/schema/article', locals: { article: content } if defined?(content) && content.entry_type == 'Article' && !content.draft %>
-  <%= partial 'partials/schema/organization' %>
+  <%= partial 'partials/schema/site' %>
   <%= partial 'partials/schema/breadcrumb' if defined?(content) && content.entry_type == 'Article' && !content.draft %>
+  <%= partial 'partials/schema/profile' if defined?(content) && content.entry_type == 'Page' && content.slug == 'about' %>
   <% if data.respond_to?(:standard_site) && data.standard_site&.publication_uri.present? %>
     <link rel="site.standard.publication" href="<%= data.standard_site.publication_uri %>">
     <% if defined?(content) && %w[Article Short].include?(content.entry_type) && !content.draft && data.standard_site.did.present? %>

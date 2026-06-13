@@ -193,29 +193,86 @@ module SiteHelpers
     ENV['PLAUSIBLE_SCRIPT_URL'].present?
   end
 
-  # Generates a JSON-LD schema string for the organization, based on the site data.
+  # Builds a stable, URL-based @id for a sitewide schema.org entity. Anchoring the @id to a
+  # real URL + fragment makes the node a resolvable entity that other nodes (and the per-article
+  # BlogPosting schema) can reference by @id instead of duplicating it.
+  # @param fragment [String] The fragment naming the entity, e.g. "organization".
+  # @param path [String] The page the entity is anchored to. Defaults to the home page.
+  # @return [String] An absolute URL with a fragment, e.g. "https://example.com/#organization".
+  def schema_entity_id(fragment, path: '/')
+    "#{full_url(path)}##{fragment}"
+  end
+
+  # The author's social-profile URLs for schema.org `sameAs` (the feed is excluded — it isn't a
+  # social profile). Shared by the Organization and Person nodes in the entity graph.
+  # @return [Array<String>] Social profile URLs, or an empty array when none are configured.
+  def author_same_as
+    return [] if data.site.socials_collection.items.blank?
+    data.site.socials_collection.items
+      .reject { |s| s.title.downcase == 'feed' }
+      .map { |s| s.destination }
+  end
+
+  # Generates a JSON-LD @graph of the site's sitewide entities — the Organization (publisher),
+  # the WebSite, and the author Person — connected by @id so consumers can resolve "who runs this
+  # site / who wrote this / what site is this". Per-article BlogPosting schema references these
+  # nodes by @id rather than duplicating them. Rendered sitewide.
   # @see https://developers.google.com/search/docs/appearance/structured-data/organization
-  # @return [String] A JSON-LD formatted string representing the organization's schema.
-  def organization_schema
-    schema = {
-      "@context": "https://schema.org",
+  # @return [String] A JSON-LD formatted string.
+  def site_schema_graph
+    same_as = author_same_as
+
+    organization = {
       "@type": "Organization",
+      "@id": schema_entity_id('organization'),
       "name": sanitize(data.site.title),
       "url": full_url('/')
     }
+    organization["logo"] = site_icon_url(w: 180) if data.site.logo.present?
+    organization["sameAs"] = same_as if same_as.present?
 
-    if data.site.logo.present?
-      schema["logo"] = site_icon_url(w: 180)
+    website = {
+      "@type": "WebSite",
+      "@id": schema_entity_id('website'),
+      "name": sanitize(data.site.title),
+      "url": full_url('/'),
+      "inLanguage": "en-US",
+      "publisher": { "@id": schema_entity_id('organization') }
+    }
+
+    person = {
+      "@type": "Person",
+      "@id": schema_entity_id('person', path: '/about'),
+      "name": data.site.author.name,
+      "url": full_url('/about')
+    }
+    person["sameAs"] = same_as if same_as.present?
+    if data.site.author.profile_picture&.url.present?
+      picture = data.site.author.profile_picture
+      person["image"] = {
+        "@type": "ImageObject",
+        "url": cdn_image_url(picture.url, { w: 500, h: 500, fit: 'cover' }),
+        "width": 500,
+        "height": 500
+      }
+      person["image"]["caption"] = sanitize(picture.description) if picture.description.present?
     end
 
-    if data.site.socials_collection.items.present?
-      same_as_urls = data.site.socials_collection.items
-        .reject { |s| s.title.downcase == 'feed' }
-        .map { |s| s.destination }
-      
-      schema["sameAs"] = same_as_urls if same_as_urls.present?
-    end
+    {
+      "@context": "https://schema.org",
+      "@graph": [organization, website, person]
+    }.to_json
+  end
 
-    schema.to_json
+  # Generates a JSON-LD ProfilePage schema for the about page, marking it as the canonical page
+  # about the author Person (referenced by @id from the sitewide entity graph).
+  # @see https://developers.google.com/search/docs/appearance/structured-data/profile-page
+  # @return [String] A JSON-LD formatted string.
+  def profile_page_schema
+    {
+      "@context": "https://schema.org",
+      "@type": "ProfilePage",
+      "mainEntity": { "@id": schema_entity_id('person', path: '/about') }
+    }.to_json
   end
 end

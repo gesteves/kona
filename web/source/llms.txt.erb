@@ -1,0 +1,19 @@
+# <%= data.site.title %>
+
+> <%= data.site.meta_description %>
+
+This is the personal blog of <%= data.site.author.name %>. Articles are published at
+permalinks of the form `/YYYY/MM/DD/{slug}/` and listed newest first below. The full,
+paginated archive lives at <%= full_url('/blog') %>.
+
+## Key pages
+
+- [About](<%= full_url('/about') %>): About <%= data.site.author.name %> and this site.
+- [Blog](<%= full_url('/blog') %>): The complete archive of articles, newest first.
+- [Atom feed](<%= full_url('/feed.xml') %>): Machine-readable feed of recent articles.
+
+## Articles
+<% llms_articles.each do |article| %>
+- [<%= article.title %>](<%= full_url(article.path) %>)<%= ": #{article.summary}" if article.summary.present? %>
+<% end %>
+- [Browse the full archive](<%= full_url('/blog') %>) for older articles not listed here.

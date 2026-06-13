@@ -65,6 +65,17 @@ module ArticleHelpers
     data.articles.reject { |a| a.draft }.take(count)
   end
 
+  # Retrieves the articles to list in llms.txt: full articles only (no shorts), indexable, and
+  # newest first (data.articles is already sorted by publish date, descending).
+  # @param count [Integer] (Optional) The maximum number of articles to return. Default is 100.
+  # @return [Array<Object>] An array of the most recent indexable full articles.
+  def llms_articles(count: 100)
+    data.articles
+      .reject { |a| a.draft || !a.index_in_search_engines }
+      .reject { |a| a.entry_type == 'Short' }
+      .take(count)
+  end
+
   # Short, common words that carry no topical signal — dropped before comparing titles so two
   # titles don't look similar just because they both contain "the", "my", "a race", etc.
   TITLE_STOPWORDS = %w[a an and as at but by for from in into of on or the to with my your our this that].freeze
@@ -163,32 +174,34 @@ module ArticleHelpers
       "description": sanitize(content_summary(content)),
       "datePublished": DateTime.parse(content.published_at).iso8601,
       "dateModified": DateTime.parse(content.sys.published_at).iso8601,
-      "author": {
-        "@type": "Person",
-        "name": content.author.name,
-        "url": full_url("/author/#{content.author.slug}")
-      },
-      "publisher": {
-        "@type": "Organization",
-        "name": data.site.title
-      }.tap do |publisher|
-        if data.site.logo.present?
-          publisher["logo"] = {
-            "@type": "ImageObject",
-            "url": site_icon_url(w: 180)
-          }
-        end
-      end,
+      "inLanguage": "en-US",
+      "isAccessibleForFree": true,
+      "wordCount": article_word_count(content),
+      "timeRequired": "PT#{reading_time_minutes(content)}M",
+      # Reference the sitewide entity-graph nodes (partials/schema/_site) by @id rather than
+      # duplicating them, so consumers resolve the author and publisher to a single entity each.
+      "author": { "@id": schema_entity_id('person', path: '/about') },
+      "publisher": { "@id": schema_entity_id('organization') },
+      "isPartOf": { "@id": schema_entity_id('website') },
       "mainEntityOfPage": {
         "@type": "WebPage",
         "@id": canonical_url
       }
     }
+    tags = Array(content.contentful_metadata&.tags)
+    if tags.present?
+      schema["keywords"] = tags.map(&:name)
+      schema["articleSection"] = tags.first.name
+    end
     if content&.cover_image&.url.present?
       schema["image"] = ["1000x1000", "1600x900", "1600x1200"].map do |s|
-        w, h = s.split('x')
-        params = { w: w, h: h, fit: 'cover' }
-        cdn_image_url(content.cover_image.url, params)
+        w, h = s.split('x').map(&:to_i)
+        {
+          "@type": "ImageObject",
+          "url": cdn_image_url(content.cover_image.url, { w: w, h: h, fit: 'cover' }),
+          "width": w,
+          "height": h
+        }
       end
     end
     schema.to_json
@@ -243,14 +256,28 @@ module ArticleHelpers
     smartypants(sanitize(content))
   end
 
+  # Counts the words in an article's prose (intro + body, as plain text). Shared by the reading-time
+  # estimate and the BlogPosting schema's wordCount.
+  # @param article [Object] The article.
+  # @return [Integer] The number of words.
+  def article_word_count(article)
+    plain_text = sanitize([article.intro, article.body].reject(&:blank?).join("\n\n"), escape_html_entities: true)
+    plain_text.split(/\s+/).size
+  end
+
+  # The estimated reading time for an article, in whole minutes (rounded up).
+  # @param article [Object] The article.
+  # @return [Integer] Reading time in minutes.
+  def reading_time_minutes(article)
+    wpm = ENV.fetch('READING_TIME_WPM', 200).to_i
+    (article_word_count(article) / wpm.to_f).ceil
+  end
+
   # Formats the reading time for an article.
   # @param article [Object] The article to calculate the reading time for.
   # @return [String] The formatted reading time.
   def reading_time(article)
-    wpm = ENV.fetch('READING_TIME_WPM', 200).to_i
-    plain_text = sanitize([article.intro, article.body].reject(&:blank?).join("\n\n"), escape_html_entities: true)
-    word_count = plain_text.split(/\s+/).size
-    minutes = (word_count / wpm.to_f).ceil
+    minutes = reading_time_minutes(article)
     article = minutes.humanize.match?(/^(eight|eleven|eighteen)/i) ? 'An' : 'A'
     "#{article} #{minutes}-minute read"
   end
