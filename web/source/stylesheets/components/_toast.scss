@@ -9,4 +9,21 @@
 :root wa-toast-item {
   font-family: var(--lato);
   line-height: var(--line-height-medium);
+
+  // The toast surface is driven by Web Awesome's global theme tokens (raised
+  // surface, border, normal text, neutral close button + progress track), not by
+  // the variant. Those tokens only flip to their dark values under a `.wa-dark`
+  // class, which we never set — the site toggles dark mode via
+  // `prefers-color-scheme` — so the toast would otherwise stay light (white panel,
+  // near-black text) on a dark page. Re-point them here to the same dark-palette
+  // values Web Awesome's own dark theme uses. The variant only colors the accent
+  // stripe/icon (a `-50` shade that reads the same in both modes), so it's left
+  // untouched.
+  @include dark-mode {
+    --wa-color-surface-raised:    var(--wa-color-neutral-10);
+    --wa-color-surface-border:    var(--wa-color-neutral-20);
+    --wa-color-text-normal:       var(--wa-color-neutral-95);
+    --wa-color-neutral-on-quiet:  var(--wa-color-neutral-60);
+    --wa-color-neutral-fill-quiet: var(--wa-color-neutral-10);
+  }
 }
