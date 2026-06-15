@@ -193,44 +193,6 @@ module SiteHelpers
     ENV['PLAUSIBLE_SCRIPT_URL'].present?
   end
 
-  # PostHog's own app URL, passed as `ui_host` in the snippet. Required whenever
-  # `api_host` points at a reverse proxy so first-party-proxied installs still
-  # resolve the toolbar and "view in PostHog" links to the real app rather than
-  # the proxy. A public PostHog host (not a Kona host), so it's safe to hardcode.
-  # @see https://posthog.com/docs/advanced/proxy
-  POSTHOG_UI_HOST = 'https://us.posthog.com'
-
-  # The PostHog project API key (`phc_...`) passed to `posthog.init`. Public by
-  # design (it ships in the browser), but read from the env so it can be toggled
-  # per environment and doubles as half of the install gate (see is_posthog_installed?).
-  # @return [String, nil]
-  def posthog_key
-    ENV['POSTHOG_KEY']
-  end
-
-  # The reverse-proxy origin PostHog ingestion and static assets are routed through
-  # (the `api_host` in the snippet). Read from the env, never hardcoded: it's a
-  # subdomain of the production site host, which must always come from configuration.
-  # @see the root CLAUDE.md "Production domains — never hardcode"
-  # @return [String, nil]
-  def posthog_api_host
-    ENV['POSTHOG_API_HOST']
-  end
-
-  # PostHog's app URL for the `ui_host` snippet option.
-  # @return [String]
-  def posthog_ui_host
-    POSTHOG_UI_HOST
-  end
-
-  # Checks if PostHog analytics is installed. Requires both the project key and the
-  # reverse-proxy origin, so a half-configured setup never emits a snippet whose
-  # assets/events would 404. Gates the PostHog script tag (partials/_analytics.html.erb).
-  # @return [Boolean] True when both `POSTHOG_KEY` and `POSTHOG_API_HOST` are set.
-  def is_posthog_installed?
-    posthog_key.present? && posthog_api_host.present?
-  end
-
   # Builds a stable, URL-based @id for a sitewide schema.org entity. Anchoring the @id to a
   # real URL + fragment makes the node a resolvable entity that other nodes (and the per-article
   # BlogPosting schema) can reference by @id instead of duplicating it.
