@@ -84,4 +84,28 @@ RSpec.describe SiteHelpers do
       expect(schema['mainEntity']).to eq('@id' => 'https://example.com/about#person')
     end
   end
+
+  describe '#is_posthog_installed?' do
+    around do |example|
+      original = ENV.values_at('POSTHOG_KEY', 'POSTHOG_API_HOST')
+      example.run
+      ENV['POSTHOG_KEY'], ENV['POSTHOG_API_HOST'] = original
+    end
+
+    it 'is true only when both the key and the proxy origin are set' do
+      ENV['POSTHOG_KEY'] = 'phc_test'
+      ENV['POSTHOG_API_HOST'] = 'https://example.test'
+      expect(is_posthog_installed?).to be true
+    end
+
+    it 'is false when either var is missing' do
+      ENV['POSTHOG_KEY'] = 'phc_test'
+      ENV['POSTHOG_API_HOST'] = nil
+      expect(is_posthog_installed?).to be false
+
+      ENV['POSTHOG_KEY'] = nil
+      ENV['POSTHOG_API_HOST'] = 'https://example.test'
+      expect(is_posthog_installed?).to be false
+    end
+  end
 end
