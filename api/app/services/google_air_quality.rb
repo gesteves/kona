@@ -5,6 +5,10 @@ class GoogleAirQuality < ApplicationService
   attr_reader :aqi
   GOOGLE_AQI_API_URL = "https://airquality.googleapis.com/v1"
 
+  # Google's forecast endpoint only covers the next 96 hours (4 days); a dateTime beyond that
+  # returns 400 "The specified time period is not supported". Bail before requesting one.
+  FORECAST_MAX_HORIZON = 96.hours
+
   def initialize(latitude, longitude, country_code, aqi_code = "usa_epa_nowcast", datetime = nil)
     @latitude = latitude
     @longitude = longitude
@@ -51,6 +55,7 @@ class GoogleAirQuality < ApplicationService
   # @see https://developers.google.com/maps/documentation/air-quality/reference/rest/v1/forecast/lookup
   def get_forecast
     return if @latitude.blank? || @longitude.blank? || @country_code.blank? || @datetime.blank?
+    return if @datetime > Time.current + FORECAST_MAX_HORIZON
 
     cache_key = "google:aqi:forecast:#{@latitude}:#{@longitude}:#{@country_code}:#{@aqi_code}:#{@datetime.iso8601}"
     cached_json(cache_key, expires_in: 5.minutes) do
