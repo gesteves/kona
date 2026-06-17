@@ -3,7 +3,9 @@ require "rails_helper"
 RSpec.describe ErrorReporter do
   describe ".report_upstream" do
     # A stand-in for the Bugsnag::Report yielded to the notify block.
-    let(:report) { double("Bugsnag::Report", :severity= => nil, add_metadata: nil) }
+    let(:report) do
+      double("Bugsnag::Report", :severity= => nil, :context= => nil, :grouping_hash= => nil, add_metadata: nil)
+    end
 
     it "notifies Bugsnag at warning severity with the upstream metadata" do
       allow(Bugsnag).to receive(:notify) { |_exception, &block| block.call(report) }
@@ -20,17 +22,46 @@ RSpec.describe ErrorReporter do
       )
     end
 
+    it "tags the report with a service·context label and a grouping hash so failures stay distinct" do
+      allow(Bugsnag).to receive(:notify) { |_exception, &block| block.call(report) }
+
+      described_class.report_upstream("HTTP 400", service: "GoogleAirQuality", context: "events#weather", status: 400)
+
+      expect(report).to have_received(:context=).with("GoogleAirQuality · events#weather")
+      expect(report).to have_received(:grouping_hash=).with("GoogleAirQuality:events#weather:400")
+    end
+
     it "passes an exception through to Bugsnag unchanged" do
       error = ArgumentError.new("nope")
       expect(Bugsnag).to receive(:notify).with(error)
       described_class.report_upstream(error, service: "Whoop")
     end
 
-    it "wraps a non-exception message in an UpstreamError" do
-      expect(Bugsnag).to receive(:notify).with(an_instance_of(ErrorReporter::UpstreamError)) do |exception|
+    it "wraps a non-exception message in a per-service UpstreamError subclass" do
+      expect(Bugsnag).to receive(:notify).with(be_a(ErrorReporter::UpstreamError)) do |exception|
+        expect(exception).to be_a(ErrorReporter::WeatherKitError)
         expect(exception.message).to eq("HTTP 500")
       end
       described_class.report_upstream("HTTP 500", service: "WeatherKit")
+    end
+
+    it "appends the context to the wrapped message so the cause and location read off the headline" do
+      expect(Bugsnag).to receive(:notify) do |exception|
+        expect(exception).to be_a(ErrorReporter::GoogleAirQualityError)
+        expect(exception.message).to eq("HTTP 400 — Api::EventsController#event_weather_for")
+      end
+      described_class.report_upstream("HTTP 400", service: "GoogleAirQuality", context: "Api::EventsController#event_weather_for")
+    end
+
+    it "reuses the same subclass object for a given service instead of redefining it" do
+      first = described_class.exception_class_for("GoogleMaps")
+      second = described_class.exception_class_for("GoogleMaps")
+      expect(first).to equal(second)
+      expect(first.name).to eq("ErrorReporter::GoogleMapsError")
+    end
+
+    it "falls back to the bare UpstreamError when the service name has no usable characters" do
+      expect(described_class.exception_class_for("")).to eq(ErrorReporter::UpstreamError)
     end
 
     it "omits nil metadata fields so only what's known is reported" do
