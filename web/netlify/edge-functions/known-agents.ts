@@ -74,6 +74,13 @@ export default async function handler(request: Request, context: Context): Promi
 }
 
 export const config: Config = {
+  // If this function ever crashes, never block the page: bypass the error so the request
+  // chain continues and the downstream page/asset is returned unchanged. The crash is
+  // still written to the edge function logs. This function only reports page views to
+  // Known Agents — it must never interrupt rendering. (The fail-open token/context check
+  // and the swallowed trackVisit errors above cover the expected paths; on: 'bypass' is
+  // the backstop for any unexpected crash outside those guards.)
+  onError: 'bypass',
   // Run on every request, then exclude everything that isn't a meaningful page view:
   // built assets, the other Netlify functions, the Plausible proxy, the IFTTT
   // syndication feeds (polled constantly by automation), and the sitemap. The Atom
