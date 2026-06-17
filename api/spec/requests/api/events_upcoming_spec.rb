@@ -310,6 +310,28 @@ RSpec.describe "Api::Events upcoming", type: :request do
     end
   end
 
+  context "when a single upstream data source fails" do
+    it "still renders the widget when the AQI service raises, just without AQI" do
+      allow(GoogleAirQuality).to receive(:new).and_raise(StandardError, "boom")
+
+      get "/api/events/upcoming", headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Featured Race")
+      expect(response.body).to include("Race Day Weather") # weather still renders
+    end
+
+    it "still renders the widget when the bay-conditions service raises" do
+      allow_any_instance_of(Goodspeed).to receive(:data).and_raise(StandardError, "boom")
+
+      get "/api/events/upcoming", headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Featured Race")
+      expect(response.body).to include("Race Day Weather")
+    end
+  end
+
   it "requires the API_TOKEN bearer (the proxy injects it; direct hits are rejected)" do
     get "/api/events/upcoming"
     expect(response).to have_http_status(:unauthorized)
