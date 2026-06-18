@@ -8,6 +8,7 @@ import '@web.awesome.me/webawesome-pro/dist/components/input/input.js';
 import '@web.awesome.me/webawesome-pro/dist/components/textarea/textarea.js';
 import '@web.awesome.me/webawesome-pro/dist/components/button/button.js';
 import '@web.awesome.me/webawesome-pro/dist/components/scroller/scroller.js';
+import './lib/patch_scroller_aria';
 
 import BackToTopController from './controllers/back_to_top_controller';
 import ClipboardController from './controllers/clipboard_controller';
