@@ -4,6 +4,9 @@
 // PageSpeed Insights' "accessibility tree is not well-formed" + "[aria-*]
 // attributes do not match their roles" audits) flags it.
 //
+// TODO: Remove this shim once the upstream bug is fixed and we've upgraded:
+// https://github.com/shoelace-style/webawesome/issues/2364
+//
 // The offending markup lives in the component's shadow DOM, so it can't be
 // fixed from our own templates. Patch the element's `updated()` lifecycle hook
 // to strip the attribute from the shadow root after every render. Matching on
