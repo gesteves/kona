@@ -5,6 +5,8 @@ module Api
   # (Per-event race-day weather now lives in Api::EventsController, rendered inline with the
   # featured upcoming race.)
   class WeatherController < BaseController
+    include WeatherHelper
+
     # Renders the current-weather widget markup embedded into the static site. Resolves the
     # owner's current location, fetches weather + air quality + pollen + bay + race data, and
     # renders the summary (or an empty body when weather is unavailable/stale, which tells the
@@ -20,7 +22,7 @@ module Api
       @location = DeepOstruct.wrap(gmaps.location)
       @weather = WeatherKit.new(location.latitude, location.longitude, @time_zone, gmaps.country_code).data
 
-      return render_empty unless weather_current?(@weather)
+      return render_empty unless weather_data_is_current?(@weather)
 
       @air_quality = AirQuality.new(location.latitude, location.longitude, gmaps.country_code).data
       @pollen = GooglePollen.new(location.latitude, location.longitude).data
@@ -29,19 +31,6 @@ module Api
       @workouts = TrainerRoad.new(@time_zone).workouts || []
 
       render :current
-    end
-
-    private
-
-    # Mirrors WeatherHelper#weather_data_is_current? without pulling the view helpers into the
-    # controller: current conditions present and a daily forecast covering right now.
-    def weather_current?(weather)
-      return false if weather.blank?
-      now = Time.now
-      today = weather.forecast_daily&.days&.find do |d|
-        d.rest_of_day_forecast.present? && Time.parse(d.forecast_start) <= now && Time.parse(d.forecast_end) >= now
-      end
-      weather.current_weather.present? && today.present?
     end
   end
 end

@@ -90,13 +90,20 @@ module ArticleHelpers
     # Get race reports that will be shown in the race reports section
     race_report_slugs = related_race_reports(article).map(&:slug)
 
+    # The reference article's tags and normalized title are constant across every comparison,
+    # so compute them (and the weights) once here instead of per-candidate inside the sort.
+    ref_tags = tag_ids(article)
+    ref_title = normalize_title(article.title)
+    tags_weight = ENV.fetch('SIMILARITY_SCORE_TAGS_WEIGHT', 1).to_f
+    title_weight = ENV.fetch('SIMILARITY_SCORE_TITLE_WEIGHT', 1).to_f
+
     data.articles
       .reject { |a| a.path == article.path }             # Exclude the current article
       .reject { |a| a.draft }                            # Exclude drafts
       .reject { |a| a.entry_type == 'Short' }            # Exclude short posts
       .reject { |a| race_report_slugs.include?(a.slug) } # Exclude race reports shown in race reports section
       # Sort by topical similarity (desc), breaking ties toward the more recently published article.
-      .sort_by { |a| [-similarity_score(article, a), -DateTime.parse(a.published_at).to_i] }
+      .sort_by { |a| [-similarity_against(a, ref_tags, ref_title, tags_weight, title_weight), -DateTime.parse(a.published_at).to_i] }
       .take(count)
   end
 
@@ -112,17 +119,23 @@ module ArticleHelpers
   def similarity_score(article, candidate)
     tags_weight = ENV.fetch('SIMILARITY_SCORE_TAGS_WEIGHT', 1).to_f
     title_weight = ENV.fetch('SIMILARITY_SCORE_TITLE_WEIGHT', 1).to_f
+    similarity_against(candidate, tag_ids(article), normalize_title(article.title), tags_weight, title_weight)
+  end
 
+  # Scores a candidate against an already-resolved reference article (its tag ids and normalized
+  # title), so callers ranking many candidates against one article don't recompute the reference
+  # side every comparison. See {#similarity_score} for the scoring rationale.
+  # @return [Float] The similarity score.
+  def similarity_against(candidate, ref_tags, ref_title, tags_weight, title_weight)
     # Tags score: IDF-weighted Jaccard. Each tag contributes its inverse-document-frequency weight,
     # so rare shared tags dominate and ubiquitous ones barely register; symmetric over the union.
-    ref = tag_ids(article)
     cand = tag_ids(candidate)
-    shared = ref & cand
-    union = ref | cand
+    shared = ref_tags & cand
+    union = ref_tags | cand
     tags_score = union.empty? ? 0.0 : shared.sum { |id| tag_idf[id] } / union.sum { |id| tag_idf[id] }
 
     # Title score uses Text::WhiteSimilarity over the normalized (stopword-stripped) titles.
-    title_score = white_similarity.similarity(normalize_title(article.title), normalize_title(candidate.title))
+    title_score = white_similarity.similarity(ref_title, normalize_title(candidate.title))
 
     (tags_score * tags_weight) + (title_score * title_weight)
   end
@@ -132,15 +145,28 @@ module ArticleHelpers
   # weighs a lot. Unseen tags default to the maximum (maximally-rare) weight. Memoized per render.
   # @return [Hash{String=>Float}] tag id => idf weight (defaults to the max weight for unknown tags).
   def tag_idf
-    @tag_idf ||= begin
-      corpus = data.articles.reject { |a| a.draft || a.entry_type == 'Short' }
-      n = corpus.size
-      document_frequency = Hash.new(0)
-      corpus.each { |a| tag_ids(a).each { |id| document_frequency[id] += 1 } }
-      idf = Hash.new(Math.log((n + 1.0) / 1) + 1) # default: an unseen tag is treated as maximally rare
-      document_frequency.each { |id, count| idf[id] = Math.log((n + 1.0) / (count + 1)) + 1 } # smoothed
-      idf
-    end
+    ArticleHelpers.tag_idf(data.articles)
+  end
+
+  # Computes the per-tag IDF weights once per build rather than once per article-page render
+  # (Middleman builds a fresh template context per page, so the instance-level memo never
+  # persisted across pages — this was O(corpus) repeated for every article). Memoized at the
+  # module level, keyed on the corpus array's identity: in a build `data.articles` returns the
+  # same object across renders → one computation; each spec example stubs a distinct array → no
+  # result bleed even when two corpora happen to be the same size.
+  # @param articles [Array<Object>] The full article corpus (`data.articles`).
+  # @return [Hash{String=>Float}] tag id => idf weight (defaults to the max weight for unknown tags).
+  def self.tag_idf(articles)
+    return @tag_idf if defined?(@tag_idf_articles) && @tag_idf_articles.equal?(articles)
+
+    @tag_idf_articles = articles
+    corpus = articles.reject { |a| a.draft || a.entry_type == 'Short' }
+    n = corpus.size
+    document_frequency = Hash.new(0)
+    corpus.each { |a| Array(a.contentful_metadata&.tags).map(&:id).each { |id| document_frequency[id] += 1 } }
+    idf = Hash.new(Math.log((n + 1.0) / 1) + 1) # default: an unseen tag is treated as maximally rare
+    document_frequency.each { |id, count| idf[id] = Math.log((n + 1.0) / (count + 1)) + 1 } # smoothed
+    @tag_idf = idf
   end
 
   # The tag ids on an article (empty array when it has none).

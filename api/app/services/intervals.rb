@@ -3,6 +3,13 @@
 class Intervals < ApplicationService
   INTERVALS_ICU_API_URL = "https://intervals.icu/api/v1"
 
+  # Maps each summarized distance bucket to the Intervals.icu activity types that feed it.
+  SPORT_TYPES = {
+    swim_distance: %w[Swim OpenWaterSwim],
+    bike_distance: %w[Ride VirtualRide],
+    run_distance:  %w[Run VirtualRun]
+  }.freeze
+
   def initialize
     @athlete_id = ENV["ICU_ATHLETE_ID"]
     @api_key = ENV["ICU_API_KEY"]
@@ -41,15 +48,21 @@ class Intervals < ApplicationService
   # @param activities [Array<Hash>] List of activities.
   # @return [Hash] Summarized activity statistics.
   def summarize_activities(activities)
-    swim_distance = activities.select { |a| ["Swim", "OpenWaterSwim"].include?(a["type"]) }.sum { |a| a["distance"] || 0 }
-    bike_distance = activities.select { |a| ["Ride", "VirtualRide"].include?(a["type"]) }.sum { |a| a["distance"] || 0 }
-    run_distance = activities.select { |a| ["Run", "VirtualRun"].include?(a["type"]) }.sum { |a| a["distance"] || 0 }
-    total_activities = activities.count { |a| ["Swim", "OpenWaterSwim", "Ride", "VirtualRide", "Run", "VirtualRun"].include?(a["type"]) }
+    distances = Hash.new(0)
+    total_activities = 0
+
+    activities.each do |a|
+      bucket, = SPORT_TYPES.find { |_, types| types.include?(a["type"]) }
+      next unless bucket
+
+      distances[bucket] += a["distance"] || 0
+      total_activities += 1
+    end
 
     {
-      swim_distance: swim_distance,
-      bike_distance: bike_distance,
-      run_distance: run_distance,
+      swim_distance: distances[:swim_distance],
+      bike_distance: distances[:bike_distance],
+      run_distance: distances[:run_distance],
       total_activities: total_activities
     }
   end
