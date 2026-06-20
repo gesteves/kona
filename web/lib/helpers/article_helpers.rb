@@ -76,6 +76,21 @@ module ArticleHelpers
       .take(count)
   end
 
+  # Returns the chronologically adjacent entries for sequential "Read next" navigation.
+  # data.articles is sorted newest-first, so the entry before the current one is the newer
+  # neighbor and the entry after it is the older neighbor. Traverses all published entries
+  # (Shorts included), so the nav works on both full-article and Short pages.
+  # @param article [Object] The current entry.
+  # @return [Hash] { newer:, older: } — either value is nil at the ends of the archive (or both
+  #   when the entry isn't in the published sequence, e.g. a draft preview).
+  def adjacent_articles(article)
+    sequence = data.articles.reject { |a| a.draft }
+    index = sequence.index { |a| a.path == article.path }
+    return { newer: nil, older: nil } if index.nil?
+
+    { newer: index.positive? ? sequence[index - 1] : nil, older: sequence[index + 1] }
+  end
+
   # Short, common words that carry no topical signal — dropped before comparing titles so two
   # titles don't look similar just because they both contain "the", "my", "a race", etc.
   TITLE_STOPWORDS = %w[a an and as at but by for from in into of on or the to with my your our this that].freeze

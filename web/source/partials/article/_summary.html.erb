@@ -16,7 +16,9 @@
       <%= link_to smartypants(article.title), article.path %>
     </h4>
   </header>
-  <div class="entry__body">
-    <%= render_body(article.summary) %>
-  </div>
+  <% if !defined?(show_body) || show_body %>
+    <div class="entry__body">
+      <%= render_body(article.summary) %>
+    </div>
+  <% end %>
 </article>

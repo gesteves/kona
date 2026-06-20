@@ -1,0 +1,17 @@
+<%# Sequential "Read Next" navigation: the chronologically newer and older entries, rendered as
+    entry summary boxes without the body (icon + date eyebrow + title only) inside the collection
+    grid so they match the recommendation sections. Renders nothing at the ends of the archive. %>
+<% adjacent = adjacent_articles(article) %>
+<% entries = [adjacent[:older], adjacent[:newer]].compact %>
+<% if entries.present? %>
+  <nav class="collection collection--halves" aria-label="More entries">
+    <h3 class="collection__heading">Read Next</h3>
+    <ol class="collection__list">
+      <% entries.each do |entry| %>
+        <li class="collection__item">
+          <%= partial 'partials/article/summary', locals: { article: entry, show_body: false } %>
+        </li>
+      <% end %>
+    </ol>
+  </nav>
+<% end %>

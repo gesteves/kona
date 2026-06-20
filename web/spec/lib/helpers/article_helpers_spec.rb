@@ -136,6 +136,59 @@ RSpec.describe ArticleHelpers do
     end
   end
 
+  describe '#adjacent_articles' do
+    # data.articles arrives sorted newest-first, so index-1 is newer and index+1 is older.
+    let(:corpus) do
+      [
+        article(slug: 'newest', published_at: '2024-03-01T00:00:00Z'),
+        article(slug: 'middle', published_at: '2024-02-01T00:00:00Z'),
+        article(slug: 'oldest', published_at: '2024-01-01T00:00:00Z')
+      ]
+    end
+
+    it 'returns the newer and older neighbors for a middle entry' do
+      stub_corpus(corpus)
+      result = adjacent_articles(corpus[1])
+      expect(result[:newer].slug).to eq('newest')
+      expect(result[:older].slug).to eq('oldest')
+    end
+
+    it 'has no newer neighbor for the newest entry' do
+      stub_corpus(corpus)
+      result = adjacent_articles(corpus[0])
+      expect(result[:newer]).to be_nil
+      expect(result[:older].slug).to eq('middle')
+    end
+
+    it 'has no older neighbor for the oldest entry' do
+      stub_corpus(corpus)
+      result = adjacent_articles(corpus[2])
+      expect(result[:newer].slug).to eq('middle')
+      expect(result[:older]).to be_nil
+    end
+
+    it 'includes Shorts in the sequence but excludes drafts' do
+      mixed = [
+        article(slug: 'newest', published_at: '2024-03-01T00:00:00Z'),
+        article(slug: 'draft',  published_at: '2024-02-15T00:00:00Z', draft: true),
+        article(slug: 'short',  published_at: '2024-02-01T00:00:00Z', entry_type: 'Short'),
+        article(slug: 'oldest', published_at: '2024-01-01T00:00:00Z')
+      ]
+      stub_corpus(mixed)
+      # The draft is dropped from the sequence, so 'newest' sits next to the Short.
+      expect(adjacent_articles(mixed[0])[:older].slug).to eq('short')
+      result = adjacent_articles(mixed[2])
+      expect(result[:newer].slug).to eq('newest')
+      expect(result[:older].slug).to eq('oldest')
+    end
+
+    it 'returns no neighbors when the entry is not in the published sequence' do
+      stub_corpus(corpus)
+      orphan = article(slug: 'draft-preview', draft: true)
+      expect(adjacent_articles(orphan)).to eq(newer: nil, older: nil)
+    end
+  end
+
   describe '#article_word_count' do
     it 'counts words across the intro and body' do
       a = article(slug: 'a', intro: 'one two three', body: 'four five')

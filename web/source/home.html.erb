@@ -13,18 +13,7 @@
     <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent, variant: "halves" } %>
   <% end %>
   <%= partial 'partials/placeholders/whoop' %>
-  <%# "Trending Articles" is ranked from Plausible analytics at request time by the API and %>
-  <%# swapped in by the live-update controller (which removes it when nothing is trending). %>
-  <section class="collection collection--halves" id="trending-articles" data-nosnippet data-controller="live-update" data-live-update-url-value="/api/articles/trending" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange">
-    <h3 class="collection__heading">Trending Articles</h3>
-    <ol class="collection__list">
-      <% 4.times do %>
-        <li class="collection__item">
-          <%= partial 'partials/placeholders/entry_skeleton' %>
-        </li>
-      <% end %>
-    </ol>
-  </section>
+  <%= partial 'partials/placeholders/trending' %>
   <%= partial 'partials/placeholders/weather' %>
   <% if data.events.present? %>
     <%= partial 'partials/upcoming_races' %>
