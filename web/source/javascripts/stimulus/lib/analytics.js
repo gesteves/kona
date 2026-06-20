@@ -69,6 +69,41 @@ export function trackEventThen(event, props, done) {
   setTimeout(go, 150);
 }
 
+let searchTrackingReady = false;
+
+/**
+ * Subscribes to the Pagefind modal's shared search instance and forwards each
+ * settled query to Plausible as a `Search` event. Idempotent and guarded by a
+ * module-level flag, so it subscribes exactly once no matter how many "Search"
+ * buttons call it or how many Turbo navigations occur. No-ops (leaving the flag
+ * unset, so a later call can retry) until the Pagefind Component UI has loaded —
+ * e.g. in development, where `/pagefind/` doesn't exist.
+ */
+export function initSearchTracking() {
+  if (searchTrackingReady) return;
+  const instance =
+    window.PagefindComponents?.getInstanceManager?.().getInstance?.('default');
+  if (typeof instance?.on !== 'function') return;
+  searchTrackingReady = true;
+
+  let timer;
+  let lastTracked = '';
+  instance.on('results', (search) => {
+    const term = (instance.searchTerm || '').trim();
+    if (!term) return;
+    const results =
+      search?.unfilteredTotalCount ?? search?.results?.length ?? 0;
+    // Trailing-debounce so we record the query the user settled on, once —
+    // not every keystroke prefix (`z`, `zw`, `zwi`, …).
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      if (term === lastTracked) return;
+      lastTracked = term;
+      trackEvent('Search', { search_query: term, results });
+    }, 1200);
+  });
+}
+
 /**
  * Removes specific UTM parameters and other query parameters from the page URL.
  * This function modifies the current URL by removing marketing and tracking parameters,
