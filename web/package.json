@@ -5,7 +5,8 @@
     "lint:scss": "stylelint \"source/stylesheets/**/*.scss\"",
     "lint:scss:fix": "stylelint \"source/stylesheets/**/*.scss\" --fix",
     "format": "prettier --write \"**/*.{js,json,md}\"",
-    "format:check": "prettier --check \"**/*.{js,json,md}\""
+    "format:check": "prettier --check \"**/*.{js,json,md}\"",
+    "pagefind": "pagefind --site build"
   },
   "dependencies": {
     "@hotwired/stimulus": "^3.2.2",
@@ -16,6 +17,7 @@
     "clipboard": "^2.0.11",
     "esbuild": "^0.28.1",
     "node-fetch": "^3.3.2",
+    "pagefind": "^1.5.2",
     "react": "^19.2.7"
   },
   "devDependencies": {

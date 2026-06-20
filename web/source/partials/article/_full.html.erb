@@ -1,7 +1,7 @@
 <article class="entry entry--full entry--article" id="entry-<%= article.sys.id.parameterize %>" aria-labelledby="hed-<%= article.sys.id.parameterize %>">
   <header class="entry__header">
     <%= partial 'partials/article/meta', locals: { article: article } %>
-    <h2 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">
+    <h2 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>" data-pagefind-meta="title">
       <%= smartypants(article.title) %>
     </h2>
     <p class="entry__meta">
@@ -10,7 +10,7 @@
       <span data-controller="live-update" data-live-update-url-value="<%= views_url %>" data-live-update-fetch-on-connect-value="true"><%= icon_svg("classic", "light", "eye") %> <wa-skeleton class="view-count-skeleton" effect="sheen"></wa-skeleton></span>
     </p>
   </header>
-  <div class="entry__body">
+  <div class="entry__body"<%= ' data-pagefind-body'.html_safe unless article.draft %>>
     <%= render_body(article.intro, image_variant: :full) %>
     <%= render_body(article.body, image_variant: :full) %>
     <%= partial 'partials/disclosure', locals: { entry: article } %>

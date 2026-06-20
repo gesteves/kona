@@ -18,4 +18,5 @@ def build_site(verbose: false)
   middleman_command = verbose ? 'middleman build --verbose' : 'middleman build'
   sh middleman_command
   File.rename("#{BUILD_DIRECTORY}/redirects", "#{BUILD_DIRECTORY}/_redirects")
+  sh 'npm run pagefind'
 end

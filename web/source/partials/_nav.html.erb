@@ -12,6 +12,9 @@
         <% end %>
       </li>
     <% end %>
+      <li class="nav__item nav__item--search">
+        <button type="button" data-controller="search" data-action="click->search#open">Search</button>
+      </li>
     </ol>
     <button id="nav-button" aria-expanded="false" aria-label="Open menu" aria-controls="nav-menu" class="nav__hamburger" data-nav-target="button" data-action="click->nav#toggleNav">
       <span class="nav__hamburger-closed" aria-hidden="true">

@@ -19,6 +19,7 @@ import NavController from './controllers/nav_controller';
 import OauthCallbackController from './controllers/oauth_callback_controller';
 import PageController from './controllers/page_controller';
 import PublishDateController from './controllers/publish_date_controller';
+import SearchController from './controllers/search_controller';
 import ShareController from './controllers/share_controller';
 import UnitsController from './controllers/units_controller';
 
@@ -32,5 +33,6 @@ Stimulus.register('nav', NavController);
 Stimulus.register('oauth-callback', OauthCallbackController);
 Stimulus.register('page', PageController);
 Stimulus.register('publish-date', PublishDateController);
+Stimulus.register('search', SearchController);
 Stimulus.register('share', ShareController);
 Stimulus.register('units', UnitsController);

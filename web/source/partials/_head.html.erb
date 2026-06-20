@@ -18,6 +18,8 @@
     <link rel="apple-touch-icon" href="<%= site_icon_url(w: 180) %>">
     <link rel="manifest" href="/manifest.json">
   <% end %>
+  <link rel="stylesheet" href="/pagefind/pagefind-component-ui.css">
+  <script type="module" src="/pagefind/pagefind-component-ui.js"></script>
   <%= javascript_include_tag 'site', defer: 'defer', 'data-turbo-track': 'reload' %>
   <%= stylesheet_link_tag '/javascripts/site', 'data-turbo-track': 'reload' %>
   <%= stylesheet_link_tag 'site', 'data-turbo-track': 'reload' %>

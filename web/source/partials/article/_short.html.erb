@@ -1,8 +1,10 @@
+<% index_body = defined?(indexable) && indexable && !article.draft %>
 <article class="entry entry--compact" id="entry-<%= article.sys.id.parameterize %>">
   <header class="entry__header">
+    <% if index_body %><span hidden data-pagefind-meta="title"><%= smartypants(article.title) %></span><% end %>
     <%= partial 'partials/article/meta', locals: { article: article } %>
   </header>
-  <div class="entry__body">
+  <div class="entry__body"<%= ' data-pagefind-body'.html_safe if index_body %>>
     <%= prepend_title(smartypants(article.title), render_body(article.intro)) %>
     <%= partial 'partials/disclosure', locals: { entry: article } %>
   </div>
