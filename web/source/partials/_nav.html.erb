@@ -4,7 +4,7 @@
     <% items.each do |i| %>
       <li class="nav__item">
         <% if i.title.downcase == 'feed' %>
-          <%= link_to i.title, i.destination, "data-controller": "clipboard", "data-clipboard-success-message-value": "The link to the feed has been copied to your clipboard.", "data-action": "click->clipboard#preventDefault" %>
+          <%= link_to i.title, i.destination, "data-controller": "clipboard", "data-clipboard-success-message-value": "The link to the feed has been copied to your clipboard.", "data-action": "click->clipboard#copy" %>
         <% elsif i.open_in_new_tab %>
           <%= link_to i.title, i.destination, rel: "noopener", target: "_blank" %>
         <% else %>

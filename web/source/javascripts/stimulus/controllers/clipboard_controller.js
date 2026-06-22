@@ -1,7 +1,6 @@
 import { Controller } from '@hotwired/stimulus';
 import { sendNotification } from '../lib/utils';
 import { trackEvent } from '../lib/analytics';
-import ClipboardJS from 'clipboard';
 
 export default class extends Controller {
   static classes = ['hidden'];
@@ -13,26 +12,21 @@ export default class extends Controller {
     },
   };
 
-  connect() {
-    this.clipboard = new ClipboardJS(this.element, {
-      text: () => this.getPermalink(),
-    });
-
-    this.clipboard.on('success', () => this.successfulCopy());
-    this.clipboard.on('error', () => this.unsuccessfulCopy());
-  }
-
   disconnect() {
     clearTimeout(this.revertTimer);
-    this.clipboard.destroy();
   }
 
   /**
-   * Convenience method to stop the button from doing its thing.
+   * Copies the permalink to the clipboard via the native Clipboard API, stopping the link
+   * from navigating. Runs inside the click gesture, so writeText is allowed.
    * @param  {Event} event Click event from the button.
    */
-  preventDefault(event) {
+  copy(event) {
     event.preventDefault();
+    navigator.clipboard
+      .writeText(this.getPermalink())
+      .then(() => this.successfulCopy())
+      .catch(() => this.unsuccessfulCopy());
   }
 
   /**
