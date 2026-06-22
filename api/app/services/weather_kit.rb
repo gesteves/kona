@@ -77,10 +77,19 @@ class WeatherKit < ApplicationService
     end
   end
 
-  # Generates the ES256 JWT used to authenticate with WeatherKit.
-  # @see https://developer.apple.com/documentation/weatherkitrestapi/request_authentication_for_weatherkit_rest_api
+  # The ES256 JWT used to authenticate with WeatherKit. It's app-global (no lat/lon) and valid
+  # for one minute, but signing it (EC key load + sign) is relatively expensive, so cache it in
+  # Redis just under its expiry and reuse it across requests/instances.
   # @return [String, nil]
   def token
+    $redis.get("weatherkit:jwt") || generate_token
+  end
+
+  # Signs a fresh ES256 JWT and caches it in Redis for 50s (< the 60s exp, leaving a buffer for
+  # clock skew and in-flight requests). Returns nil without caching on failure.
+  # @see https://developer.apple.com/documentation/weatherkitrestapi/request_authentication_for_weatherkit_rest_api
+  # @return [String, nil]
+  def generate_token
     key_id = ENV["WEATHERKIT_KEY_ID"]
     team_id = ENV["WEATHERKIT_TEAM_ID"]
     service_id = ENV["WEATHERKIT_SERVICE_ID"]
@@ -100,7 +109,9 @@ class WeatherKit < ApplicationService
     }
 
     private_key = OpenSSL::PKey::EC.new(private_key_content)
-    JWT.encode(claims, private_key, "ES256", header)
+    jwt = JWT.encode(claims, private_key, "ES256", header)
+    $redis.setex("weatherkit:jwt", 50, jwt)
+    jwt
   rescue StandardError => e
     report_upstream_error(e, context: "WeatherKit JWT generation")
     nil
