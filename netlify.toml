@@ -27,6 +27,17 @@
   [headers.values]
     Content-Type = "text/plain; charset=utf-8"
 
+# Preload the home page's runtime widget fragments. The live-update controller only
+# fetch()es these after the JS bundle boots, so they're discovered late; preloading them
+# here starts the fetch during HTML parse, in parallel with the bundle. Scoped to the root
+# only (the widgets render solely on the home page). Same-origin, so no crossorigin — that
+# keeps the preload's credentials mode matching the controller's bare fetch() so it's reused
+# rather than double-fetched.
+[[headers]]
+  for = "/"
+  [headers.values]
+    Link = "</api/activity-stats>; rel=preload; as=fetch, </api/whoop>; rel=preload; as=fetch, </api/articles/trending>; rel=preload; as=fetch, </api/weather/current>; rel=preload; as=fetch, </api/events/upcoming>; rel=preload; as=fetch"
+
 [[redirects]]
   from = "/.well-known/host-meta*"
   to = "https://fed.brid.gy/.well-known/host-meta:splat"

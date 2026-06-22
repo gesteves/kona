@@ -24,6 +24,10 @@
   <%= stylesheet_link_tag '/javascripts/site', 'data-turbo-track': 'reload' %>
   <%= stylesheet_link_tag 'site', 'data-turbo-track': 'reload' %>
   <%= stylesheet_link_tag 'print', media: 'print', 'data-turbo-track': 'reload' %>
+  <%# Preload the per-article pageviews fragment (URL matches _full.html.erb's views_url). %>
+  <% if defined?(content) && content.entry_type == 'Article' %>
+    <link rel="preload" as="fetch" href="/api/plausible/pageviews/<%= content.sys.id %>">
+  <% end %>
   <%= yield_content :assets %>
   <%= partial 'partials/analytics' %>
 </head>
