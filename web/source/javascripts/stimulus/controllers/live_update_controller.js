@@ -1,6 +1,11 @@
 import { Controller } from '@hotwired/stimulus';
 import { replaceElement } from '../lib/utils';
 
+// Minimum gap between visibilitychange-triggered refetches. Without it, every tab refocus
+// refetches every widget at once (5 on the home page); this collapses rapid alt-tab storms.
+// Well below the shortest widget data TTL (5 min), so it never withholds genuinely fresh data.
+const MIN_VISIBILITY_REFETCH_MS = 60_000;
+
 /**
  * Fetches a server-rendered HTML fragment and swaps it into the page, replacing a placeholder
  * skeleton; refreshes on tab focus. See the root CLAUDE.md cross-app HTML contract.
@@ -33,9 +38,15 @@ export default class extends Controller {
    * Updates content when the page becomes visible.
    */
   handleVisibilityChange() {
-    if (document.visibilityState === 'visible') {
-      this.fetchAndUpdateContent();
+    if (document.visibilityState !== 'visible') return;
+    // Skip refocus refetches that arrive too soon after the last fetch attempt.
+    if (
+      this.lastFetchAt &&
+      Date.now() - this.lastFetchAt < MIN_VISIBILITY_REFETCH_MS
+    ) {
+      return;
     }
+    this.fetchAndUpdateContent();
   }
 
   /**
@@ -45,6 +56,8 @@ export default class extends Controller {
    */
   async fetchAndUpdateContent() {
     if (!this.hasUrlValue) return;
+
+    this.lastFetchAt = Date.now(); // mark the attempt so handleVisibilityChange can throttle refocus refetches
 
     this.abortController?.abort(); // supersede any in-flight request with this newer one
     this.abortController = new AbortController();
