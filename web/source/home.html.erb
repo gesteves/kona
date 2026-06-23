@@ -13,7 +13,11 @@
     <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent, variant: "halves" } %>
   <% end %>
   <%= partial 'partials/placeholders/whoop' %>
-  <%= partial 'partials/placeholders/trending' %>
+  <%# Exclude the Recent Articles shown above so trending doesn't repeat them; ids sorted for a %>
+  <%# canonical, cache-friendly path. Falls back to the bare endpoint when there's nothing to drop. %>
+  <% trending_exclude_ids = (recent || []).map { |a| a.sys.id }.uniq.sort %>
+  <% trending_url = trending_exclude_ids.any? ? "/api/articles/trending/exclude/#{trending_exclude_ids.join(',')}" : "/api/articles/trending" %>
+  <%= partial 'partials/placeholders/trending', locals: { url: trending_url } %>
   <%= partial 'partials/placeholders/weather' %>
   <% if data.events.present? %>
     <%= partial 'partials/upcoming_races' %>

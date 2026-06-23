@@ -66,55 +66,80 @@ RSpec.describe TrendingArticles do
     end
   end
 
-  it "ranks the spiking article ahead of steady ones, excluding the recent set" do
-    ids = service.non_recent(count: 4).map { |a| a.sys.id }
-    expect(ids).to eq(%w[a5 a6]) # a1–a4 are the four most recent and are dropped
+  describe "#all" do
+    it "ranks the spiking article ahead of steady ones, then the rest by recency" do
+      ids = service.all(count: 10).map { |a| a.sys.id }
+      # a5 spikes, a6 is steady; the zero-scored remainder follows newest-first (a1 is the newest).
+      expect(ids).to eq(%w[a5 a6 a1 a2 a3 a4])
+    end
+
+    it "includes recent articles (no recency exclusion lives in the service anymore)" do
+      expect(service.all(count: 4).map { |a| a.sys.id }).to include("a1")
+    end
+
+    it "excludes drafts and Shorts" do
+      ids = service.all(count: 10).map { |a| a.sys.id }
+      expect(ids).not_to include("s1", "d1")
+    end
+
+    it "scores articles with no recent activity at 0, so spiking wins" do
+      expect(service.all(count: 4).first.sys.id).to eq("a5")
+    end
+
+    it "ignores low-volume noise below the eligibility floor" do
+      # A 0→2 'spike' (6 views total, below MIN_WINDOW_PAGEVIEWS) would score a z≈2 without the floor
+      # and leapfrog the steady article; the floor zeroes it, so it sinks to recency order (oldest last).
+      noisy = article(id: "n1", slug: "noisy", published_at: "2023-11-01T10:00:00Z")
+      allow(articles_service).to receive(:list).and_return(corpus + [noisy])
+      stub_series(series.merge(noisy.path => spike_series(base: 0, spike: 2)))
+      ids = service.all(count: 10).map { |a| a.sys.id }
+      expect(ids).to eq(%w[a5 a6 a1 a2 a3 a4 n1]) # spike wins, steady second, noise scored 0 → last
+    end
+
+    it "falls back to recency order when analytics are unavailable" do
+      stub_series({}) # no pageviews for anyone → all scores 0
+      ids = service.all(count: 10).map { |a| a.sys.id }
+      expect(ids).to eq(%w[a1 a2 a3 a4 a5 a6])
+    end
+
+    it "returns an empty list when there are no candidates" do
+      allow(articles_service).to receive(:list).and_return([])
+      expect(service.all(count: 4)).to eq([])
+    end
+
+    it "respects the requested count" do
+      expect(service.all(count: 1).size).to eq(1)
+    end
+
+    it "degrades to an empty list instead of raising on a malformed publish date" do
+      bad = article(id: "x1", slug: "bad", published_at: "2024-01-01T10:00:00Z")
+      allow(bad).to receive(:published_at).and_return("not-a-date")
+      allow(articles_service).to receive(:list).and_return(corpus + [bad])
+      expect(service.all(count: 4)).to eq([])
+    end
+
+    it "matches Plausible pageviews by the article's /YYYY/MM/DD/slug/ path" do
+      expect(art_spiking.path).to eq("/2024/01/01/spiking/")
+      # spiking only surfaces because its daily series is keyed by that exact path
+      expect(service.all(count: 10).map { |a| a.sys.id }).to include("a5")
+    end
   end
 
-  it "excludes drafts and Shorts" do
-    ids = service.non_recent(count: 4).map { |a| a.sys.id }
-    expect(ids).not_to include("s1", "d1")
-  end
+  describe "#excluding" do
+    it "drops every article whose Contentful id is in the list" do
+      ids = service.excluding(%w[a5 a6], count: 4).map { |a| a.sys.id }
+      expect(ids).not_to include("a5", "a6")
+      expect(ids).to eq(%w[a1 a2 a3 a4]) # the rest, in ranked (here recency) order
+    end
 
-  it "scores articles with no recent activity at 0, so spiking wins" do
-    expect(service.non_recent(count: 4).first.sys.id).to eq("a5")
-  end
+    it "tolerates ids that aren't in the corpus" do
+      ids = service.excluding(%w[nope], count: 4).map { |a| a.sys.id }
+      expect(ids).to eq(service.all(count: 4).map { |a| a.sys.id })
+    end
 
-  it "ignores low-volume noise below the eligibility floor" do
-    # A 0→2 'spike' (6 views total, below MIN_WINDOW_PAGEVIEWS) would score a z≈2 without the floor
-    # and leapfrog the steady article; the floor zeroes it, so it sinks below steady to recency order.
-    noisy = article(id: "n1", slug: "noisy", published_at: "2023-11-01T10:00:00Z")
-    allow(articles_service).to receive(:list).and_return(corpus + [noisy])
-    stub_series(series.merge(noisy.path => spike_series(base: 0, spike: 2)))
-    ids = service.non_recent(count: 4).map { |a| a.sys.id }
-    expect(ids).to eq(%w[a5 a6 n1]) # spike wins, steady second, noise scored 0 → last (recency)
-  end
-
-  it "falls back to recency order when analytics are unavailable" do
-    stub_series({}) # no pageviews for anyone → all scores 0
-    ids = service.non_recent(count: 4).map { |a| a.sys.id }
-    expect(ids).to eq(%w[a5 a6])
-  end
-
-  it "returns an empty list when there are no candidates" do
-    allow(articles_service).to receive(:list).and_return([])
-    expect(service.non_recent(count: 4)).to eq([])
-  end
-
-  it "respects the requested count" do
-    expect(service.non_recent(count: 1).size).to eq(1)
-  end
-
-  it "degrades to an empty list instead of raising on a malformed publish date" do
-    bad = article(id: "x1", slug: "bad", published_at: "2024-01-01T10:00:00Z")
-    allow(bad).to receive(:published_at).and_return("not-a-date")
-    allow(articles_service).to receive(:list).and_return(corpus + [bad])
-    expect(service.non_recent(count: 4)).to eq([])
-  end
-
-  it "matches Plausible pageviews by the article's /YYYY/MM/DD/slug/ path" do
-    expect(art_spiking.path).to eq("/2024/01/01/spiking/")
-    # spiking only surfaces because its daily series is keyed by that exact path
-    expect(service.non_recent(count: 4).map { |a| a.sys.id }).to include("a5")
+    it "still excludes drafts and Shorts" do
+      ids = service.excluding(%w[a5], count: 10).map { |a| a.sys.id }
+      expect(ids).not_to include("s1", "d1")
+    end
   end
 end

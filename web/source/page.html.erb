@@ -1,4 +1,4 @@
 <%= partial 'partials/article/page', locals: { article: content } %>
 <% if content.show_recommendations %>
-  <%= partial 'partials/placeholders/trending' %>
+  <%= partial 'partials/placeholders/trending', locals: { url: '/api/articles/trending' } %>
 <% end %>

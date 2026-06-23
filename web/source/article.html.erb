@@ -2,5 +2,9 @@
 <%= partial 'partials/share', locals: { article: content } %>
 <%= partial 'partials/race_reports', locals: { article: content } %>
 <%= partial 'partials/related', locals: { article: content } %>
-<%= partial 'partials/placeholders/trending' %>
+<%# Exclude this article and every other card on the page (related + read-next neighbors) so %>
+<%# trending adds variety instead of repeating them; ids sorted for a canonical, cache-friendly path. %>
+<% adjacent = adjacent_articles(content) %>
+<% trending_exclude_ids = ([content] + related_articles(content) + [adjacent[:older], adjacent[:newer]].compact).map { |a| a.sys.id }.uniq.sort %>
+<%= partial 'partials/placeholders/trending', locals: { url: "/api/articles/trending/exclude/#{trending_exclude_ids.join(',')}" } %>
 <%= partial 'partials/read_next', locals: { article: content } %>

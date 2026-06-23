@@ -102,6 +102,11 @@ module ArticleHelpers
   # @param count [Integer] (Optional) The number of articles to return.
   # @return [Array<Object>] A list of articles sorted by relevance.
   def related_articles(article, count: 4)
+    # The article page asks for this twice per render (the "You May Also Like" section and the
+    # trending widget's exclusion set), so memoize the similarity computation within the page render.
+    @related_articles_memo ||= {}
+    return @related_articles_memo[[article.path, count]] if @related_articles_memo.key?([article.path, count])
+
     # Get race reports that will be shown in the race reports section
     race_report_slugs = related_race_reports(article).map(&:slug)
 
@@ -112,7 +117,7 @@ module ArticleHelpers
     tags_weight = ENV.fetch('SIMILARITY_SCORE_TAGS_WEIGHT', 1).to_f
     title_weight = ENV.fetch('SIMILARITY_SCORE_TITLE_WEIGHT', 1).to_f
 
-    data.articles
+    @related_articles_memo[[article.path, count]] = data.articles
       .reject { |a| a.path == article.path }             # Exclude the current article
       .reject { |a| a.draft }                            # Exclude drafts
       .reject { |a| a.entry_type == 'Short' }            # Exclude short posts

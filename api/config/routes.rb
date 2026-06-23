@@ -14,8 +14,12 @@ Rails.application.routes.draw do
   # The home page's upcoming-races section (the featured event includes inline race-day weather).
   get "/api/events/upcoming" => "api/events#upcoming"
 
-  # The home page's trending-articles section, ranked from Plausible analytics at request time.
+  # The trending-articles widget, ranked from Plausible analytics at request time. The bare path
+  # returns every trending article; /exclude/:ids drops a caller-supplied, comma-separated set of
+  # Contentful ids (the cards the embedding page already shows), keyed in the path so the edge cache
+  # (path-only) gives each exclusion set its own entry.
   get "/api/articles/trending" => "api/articles#trending"
+  get "/api/articles/trending/exclude/:ids" => "api/articles#trending_excluding"
 
   # All-time Plausible pageview count for an article, keyed by Contentful ID.
   get "/api/plausible/pageviews/:id" => "api/plausible#pageviews"

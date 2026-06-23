@@ -1,9 +1,11 @@
 require "set"
 
-# Ranks the home page's "Trending Articles" at request time from Plausible analytics, replacing the
+# Ranks the "Trending Articles" widget at request time from Plausible analytics, replacing the
 # build-time bake. Loads the published article corpus (Articles#list) plus a per-article daily
 # pageview series, scores each article by how much its recent traffic is spiking *relative to its own
-# normal volume*, and returns the non-recent trending set.
+# normal volume*, and returns the trending set. The ranking is computed once and shared; callers pick
+# `all` (every trending article) or `excluding(ids)` (minus a caller-supplied set of Contentful ids —
+# how the home and article pages drop the cards they already show, so trending doesn't repeat them).
 #
 # Scoring (per article), all derived from one daily time series over WINDOW_DAYS:
 #   * recent_rate = mean pageviews over the last RECENT_DAYS — a single day is too noisy to trust.
@@ -25,14 +27,12 @@ class TrendingArticles < ApplicationService
   RECENT_DAYS = 3
   # Days of pre-recent, post-publish history an article needs before its baseline mean/σ is
   # trustworthy. Younger or sparser articles rank on volume alone, so a fresh post's launch burst
-  # can't masquerade as a spike (the most-recent posts are dropped from this widget anyway).
+  # can't masquerade as a spike.
   MIN_BASELINE_DAYS = 7
   # Ignore articles with essentially no traffic over the window — their ratios are pure noise.
   MIN_WINDOW_PAGEVIEWS = 10
   # Only article pages (paths like /2026/05/24/slug/), matching web's process_analytics filter.
   ARTICLE_PATH_FILTER = [["matches", "event:page", ["^/20\\d{2}/"]]].freeze
-  # Consider this many top-trending articles before dropping the most-recent ones.
-  CANDIDATE_MULTIPLIER = 2
   # The ranking is identical for every viewer and changes slowly, so memoize it briefly.
   RESULT_TTL = 10.minutes
 
@@ -43,22 +43,35 @@ class TrendingArticles < ApplicationService
     @plausible = plausible
   end
 
-  # The home page's trending set: the top trending articles, minus the N most recent, capped at N.
-  # Cached briefly, and degrades to an empty list (→ render_empty) on any error rather than raising.
-  # @return [Array<OpenStruct>]
-  def non_recent(count: 4)
+  # The top `count` trending articles. @return [Array<OpenStruct>]
+  def all(count: 4)
+    ranked.first(count)
+  end
+
+  # The top `count` trending articles, minus any whose Contentful id is in `ids` — lets a caller drop
+  # the cards it already shows on the page (the home page's recent set, an article's related/read-next
+  # neighbors) so trending doesn't repeat them. @return [Array<OpenStruct>]
+  def excluding(ids, count: 4)
+    excluded = Array(ids).to_set
+    ranked.reject { |article| excluded.include?(article.sys&.id) }.first(count)
+  end
+
+  private
+
+  # The full ranked trending list (corpus DeepOstructs, best first), computed once and shared by every
+  # variant. Cached briefly, and degrades to an empty list (→ render_empty) on any error rather than
+  # raising.
+  def ranked
     rescue_with([], context: self.class.name) do
-      items = cached_json("trending:articles:non_recent:v2:count:#{count}", expires_in: RESULT_TTL) do
-        rank(count).map { |article| payload(article) }
+      items = cached_json("trending:articles:ranked:v3", expires_in: RESULT_TTL) do
+        rank.map { |article| payload(article) }
       end
       (items || []).map { |item| DeepOstruct.wrap(item) }
     end
   end
 
-  private
-
-  # Computes the ranked, non-recent trending articles (returns the corpus DeepOstructs).
-  def rank(count)
+  # Ranks every candidate by trending score (returns the corpus DeepOstructs, best first).
+  def rank
     articles = candidates
     return [] if articles.blank?
 
@@ -75,13 +88,9 @@ class TrendingArticles < ApplicationService
 
     # Sort by spike score, then recent volume, then recency — the last key makes the no-analytics
     # fallback deterministic (newest first) instead of relying on stable sort.
-    trending = evaluated
+    evaluated
       .sort_by { |e| [-e[:score], -e[:recent], -e[:published].to_time.to_i] }
       .map { |e| e[:article] }
-      .take(count * CANDIDATE_MULTIPLIER)
-
-    recent_paths = Set.new(articles.max_by(count) { |a| published[a.path] }.map(&:path))
-    trending.reject { |a| recent_paths.include?(a.path) }.take(count)
   end
 
   # Published, non-Short articles with a resolvable path (drafts/Shorts excluded — matches web).
