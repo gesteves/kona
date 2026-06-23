@@ -318,7 +318,7 @@ module ArticleHelpers
   # @param article [Object] The current article to find race reports for.
   # @param count [Integer] (Optional) The number of race reports to return.
   # @return [Array<Object>] A list of race reports from the same event, sorted by publication date in reverse chronological order.
-  def related_race_reports(article, count: 5)
+  def related_race_reports(article, count: 4)
     return [] unless article.event&.sys&.id
 
     # Find all articles that are linked to the same event
