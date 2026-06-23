@@ -69,7 +69,9 @@ class MapboxTileset
   private
 
   # Builds line-delimited GeoJSON (a single LineString Feature on one line) and
-  # POSTs it as a tileset source, replacing any existing source with the same id.
+  # PUTs it as a tileset source, replacing any existing source with the same id.
+  # (POST would append to an existing source, accumulating stale tracks; PUT
+  # replaces, so re-uploads always reflect just this track.)
   def upload_source(id, coordinates)
     feature = {
       type: 'Feature',
@@ -80,7 +82,7 @@ class MapboxTileset
     Tempfile.create([id, '.geojson.ld']) do |file|
       file.write("#{feature.to_json}\n")
       file.rewind
-      response = HTTParty.post(
+      response = HTTParty.put(
         "#{API}/sources/#{@username}/#{id}",
         query: { access_token: @token },
         body: { file: file },

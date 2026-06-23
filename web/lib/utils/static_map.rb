@@ -1,6 +1,7 @@
 require 'httparty'
 require 'nokogiri'
 require 'fileutils'
+require 'digest'
 require 'active_support/all'
 require_relative 'mapbox_tileset'
 
@@ -133,8 +134,13 @@ class StaticMap
 
   # Derives a Mapbox-safe tileset/source id from the activity title: the id is
   # capped at 32 characters and may only contain letters, numbers, `-`, and `_`.
+  # A short digest of the full title is appended so distinct activities that
+  # share a long common prefix (e.g. a race's swim/bike/run) don't collapse to
+  # the same id once truncated.
   def tileset_source_id
-    activity_title.parameterize.tr('-', '_').first(32).gsub(/_+$/, '')
+    slug = activity_title.parameterize.tr('-', '_').first(23).gsub(/_+$/, '')
+    digest = Digest::MD5.hexdigest(activity_title).first(8)
+    "#{slug}_#{digest}"
   end
 
   # Returns the file name for the map image based on the activity title
