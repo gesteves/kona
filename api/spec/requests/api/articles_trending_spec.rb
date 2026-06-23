@@ -125,6 +125,14 @@ RSpec.describe "Api::Articles trending", type: :request do
       expect(response.body).to include('data-live-update-url-value="/api/articles/trending/exclude/a5,a6"')
     end
 
+    it "sanitizes the id list: honors valid ids, ignores garbage, and never errors" do
+      get "/api/articles/trending/exclude/a5,@@@,#{'x' * 100}", headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("Spiking Article") # a5 is honored
+      expect(response.body).to include("Steady Article")       # garbage (@@@, over-long) is dropped
+    end
+
     it "requires the API_TOKEN bearer" do
       get "/api/articles/trending/exclude/a5,a6"
       expect(response).to have_http_status(:unauthorized)

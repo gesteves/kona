@@ -33,6 +33,10 @@ class TrendingArticles < ApplicationService
   MIN_WINDOW_PAGEVIEWS = 10
   # Only article pages (paths like /2026/05/24/slug/), matching web's process_analytics filter.
   ARTICLE_PATH_FILTER = [["matches", "event:page", ["^/20\\d{2}/"]]].freeze
+  # Cache and serve only the top slice of the ranking. A caller excludes at most the handful of cards
+  # it shows, so this is always enough to fill `count` after exclusions, while bounding the JSON we
+  # cache and the work each (potentially abusive) request does deserializing/filtering it.
+  MAX_POOL = 50
   # The ranking is identical for every viewer and changes slowly, so memoize it briefly.
   RESULT_TTL = 10.minutes
 
@@ -87,9 +91,11 @@ class TrendingArticles < ApplicationService
     end
 
     # Sort by spike score, then recent volume, then recency — the last key makes the no-analytics
-    # fallback deterministic (newest first) instead of relying on stable sort.
+    # fallback deterministic (newest first) instead of relying on stable sort. Keep only the top pool:
+    # enough to fill the widget after any legitimate exclusion, without caching the whole corpus.
     evaluated
       .sort_by { |e| [-e[:score], -e[:recent], -e[:published].to_time.to_i] }
+      .first(MAX_POOL)
       .map { |e| e[:article] }
   end
 

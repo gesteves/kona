@@ -142,4 +142,23 @@ RSpec.describe TrendingArticles do
       expect(ids).not_to include("s1", "d1")
     end
   end
+
+  describe "caching" do
+    it "computes the ranking once and reuses it across variants, so extra requests hit no upstream APIs" do
+      # A real (in-memory) read-through cache instead of the suite's get→nil stub, so the second and
+      # later calls genuinely hit the cache.
+      store = {}
+      allow($redis).to receive(:get) { |key| store[key] }
+      allow($redis).to receive(:setex) { |key, _ttl, value| store[key] = value }
+
+      service.all(count: 4)
+      service.excluding(%w[a5], count: 4)
+      service.excluding(%w[garbage-id], count: 4) # different (and bogus) exclusion set → same cache key
+
+      # rank — the only code that calls Plausible and Articles#list — runs exactly once; every other
+      # request (any exclusion set, garbage included) is served from the single id-independent key.
+      expect(plausible_service).to have_received(:query).once
+      expect(articles_service).to have_received(:list).once
+    end
+  end
 end
