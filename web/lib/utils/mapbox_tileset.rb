@@ -14,6 +14,10 @@ class MapboxTileset
   # The recipe layer key, which becomes the tileset's source-layer name.
   LAYER_NAME = 'track'
 
+  # Mapbox caps the human-readable tileset name at 64 characters and only allows
+  # alphanumerics, spaces, "-", "_", and ".".
+  MAX_NAME_LENGTH = 64
+
   # MTS publish jobs are asynchronous; poll until the job finishes.
   POLL_INTERVAL = 5   # seconds between job-status polls
   POLL_TIMEOUT  = 300 # give up after this many seconds
@@ -106,7 +110,7 @@ class MapboxTileset
       "#{API}/#{@username}.#{id}",
       query: { access_token: @token },
       headers: { 'Content-Type' => 'application/json' },
-      body: { recipe: recipe, name: name, private: true }.to_json,
+      body: { recipe: recipe, name: sanitize_name(name), private: true }.to_json,
       timeout: HTTP_TIMEOUT
     )
 
@@ -114,6 +118,17 @@ class MapboxTileset
     return if already_exists?(response)
 
     raise upload_error('create tileset', response)
+  end
+
+  # Coerces a human-readable name into Mapbox's allowed set: transliterates to
+  # ASCII (so "Coeur d’Alene" loses its curly apostrophe and accents flatten),
+  # drops anything outside [alnum, space, -, _, .], collapses whitespace, and
+  # caps the result at MAX_NAME_LENGTH.
+  def sanitize_name(name)
+    ActiveSupport::Inflector.transliterate(name.to_s)
+      .gsub(/[^a-zA-Z0-9 \-_.]/, '')
+      .squish
+      .first(MAX_NAME_LENGTH)
   end
 
   # Triggers a publish job for the tileset and returns its job id.
