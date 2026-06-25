@@ -11,7 +11,7 @@ class FontAwesome
   # @param icon_id [String] The icon's identifier (e.g., "person-running").
   # @return [String, nil] The SVG markup, or nil if not found.
   def svg(family, style, icon_id)
-    version = ENV.fetch("FONT_AWESOME_VERSION", DEFAULT_VERSION)
+    version = ENV["FONT_AWESOME_VERSION"].presence || DEFAULT_VERSION
     cached = $redis.get(cache_key_for(version, family, style, icon_id))
     return cached if cached.present?
 
