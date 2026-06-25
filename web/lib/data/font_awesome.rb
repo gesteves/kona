@@ -26,7 +26,7 @@ class FontAwesome
   # @return [Hash] The complete icons data including families, styles, and SVG content.
   def get_icons
     data = YAML.load_file('data/font_awesome.yml')
-    version = data['version']
+    version = ENV.fetch('FONT_AWESOME_VERSION', data['version'])
     icon_metadata = get_icon_metadata(data['icons'], version)
 
     cache_keys = icon_metadata.keys

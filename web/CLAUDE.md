@@ -87,7 +87,8 @@ Names only — see `.env.example`; never commit values.
 - **Build credential**: `WEBAWESOME_NPM_TOKEN` — Web Awesome Pro npm registry auth, read
   by `.npmrc` at `npm install` (not in `.env`). Set it in your shell and in Netlify's
   build env, or the install fails.
-- **Optional**: `DARK_VISITORS_ACCESS_TOKEN`, `CLOUDFRONT_DOMAIN`.
+- **Optional**: `DARK_VISITORS_ACCESS_TOKEN`, `CLOUDFRONT_DOMAIN`, `FONT_AWESOME_VERSION`
+  (overrides the version in `data/font_awesome.yml`, the committed default).
 
 ## Conventions & gates
 
