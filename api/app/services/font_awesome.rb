@@ -3,7 +3,7 @@ require "active_support/core_ext/object/blank"
 # Fetches Font Awesome icon SVGs, caching them in Redis. Icons are immutable for a
 # given version, so cached SVGs are stored without an expiry.
 class FontAwesome
-  DEFAULT_VERSION = "7.2.0"
+  DEFAULT_VERSION = "7.3.0"
 
   # Returns the SVG markup for an icon, from Redis if cached or the Font Awesome API otherwise.
   # @param family [String] The icon's Font Awesome family (e.g., "classic").
