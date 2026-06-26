@@ -10,7 +10,7 @@ module MarkupHelpers
   # @return [String] The rendered HTML with added attributes and transformations.
   def render_body(text, image_variant: :entry)
     srcset = data.srcsets[image_variant]
-    html = markdown_to_html(text)
+    html = markdown_to_html(fix_degrees(text))
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
     open_external_links_in_new_tabs(doc)
     copy_feed_links(doc)
@@ -36,7 +36,7 @@ module MarkupHelpers
   # @param text [String] The Markdown text to render.
   # @return [String] The rendered HTML with added attributes and transformations.
   def render_feed_body(text)
-    html = markdown_to_html(text)
+    html = markdown_to_html(fix_degrees(text))
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
     add_image_data_attributes(doc)
     add_figure_elements_to_images(doc)
