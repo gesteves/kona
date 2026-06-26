@@ -87,8 +87,8 @@ RSpec.describe WeatherHelper, type: :helper do
   describe "#format_temperature" do
     it "renders both Celsius and Fahrenheit with the unit toggle" do
       html = helper.format_temperature(18.0)
-      expect(html).to include("18ºC")
-      expect(html).to include('data-units-imperial-value="64ºF"')
+      expect(html).to include("18°C")
+      expect(html).to include('data-units-imperial-value="64°F"')
     end
   end
 
@@ -298,7 +298,7 @@ RSpec.describe WeatherHelper, type: :helper do
   # Weather quality
   # ---------------------------------------------------------------------------
   describe "#is_hot?" do
-    it "is hot at or above 30º for either actual or apparent temperature" do
+    it "is hot at or above 30° for either actual or apparent temperature" do
       build_weather(current: { temperature: 31.0, temperature_apparent: 28.0 })
       expect(helper.is_hot?).to be(true)
     end

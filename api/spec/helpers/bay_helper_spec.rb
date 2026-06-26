@@ -83,6 +83,6 @@ RSpec.describe BayHelper, "#bay_water_temperature_sentence", type: :helper do
 
     sentence = helper.bay_water_temperature_sentence
     expect(sentence).to include("The water temperature in San Francisco Bay is")
-    expect(sentence).to include("15ºC")
+    expect(sentence).to include("15°C")
   end
 end
