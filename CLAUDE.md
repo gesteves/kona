@@ -17,7 +17,9 @@ Work on one app from inside its own directory; each has its own `Gemfile`,
 | `api/` | Rails 8.1 API (Ruby 4.0.5). Serves small dynamic HTML fragments ("widgets") embedded into the static pages at runtime. | fly.io (`kona-api`) |
 | `netlify.toml` (root) | Drives the Netlify build: `base = "web"`, `command = "bundle exec rake build"`, `publish = "build/"`. | — |
 
-Both apps share the same Redis (`REDIS_URL`).
+Each app has its own Redis, configured via its own `REDIS_URL`: `api/` uses the dedicated
+`kona-redis` fly app (`redis/fly.toml`); `web/` uses a separate Upstash instance. The apps
+keep distinct keyspaces, so there's no cross-app data sharing to preserve.
 
 ## Production domains — never hardcode
 

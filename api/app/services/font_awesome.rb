@@ -1,9 +1,11 @@
 require "active_support/core_ext/object/blank"
 
 # Fetches Font Awesome icon SVGs, caching them in Redis. Icons are immutable for a
-# given version, so cached SVGs are stored without an expiry.
+# given version, so cached SVGs are cached for a year — long enough to stay warm, but
+# bounded so icons from a superseded version don't linger forever.
 class FontAwesome
   DEFAULT_VERSION = "7.3.0"
+  CACHE_TTL = 1.year
 
   # Returns the SVG markup for an icon, from Redis if cached or the Font Awesome API otherwise.
   # @param family [String] The icon's Font Awesome family (e.g., "classic").
@@ -29,7 +31,7 @@ class FontAwesome
     results = response.data.search.map(&:to_h)
     icon = results.find { |i| i["id"] == icon_id }
     svg = icon&.dig("svgs")&.find { |s| s.dig("familyStyle", "family") == family && s.dig("familyStyle", "style") == style }&.dig("html")
-    $redis.set(cache_key_for(version, family, style, icon_id), svg) if svg.present?
+    $redis.setex(cache_key_for(version, family, style, icon_id), CACHE_TTL, svg) if svg.present?
     svg
   rescue StandardError => e
     Rails.logger.error("Error fetching Font Awesome icon #{icon_id}: #{e}")

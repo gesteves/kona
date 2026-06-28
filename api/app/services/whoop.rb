@@ -3,8 +3,9 @@ require "uri"
 
 # Interacts with the Whoop API to fetch the most recent sleep, recovery, and strain
 # data, and to run the OAuth2 flow that authorizes the app. Access and refresh tokens
-# are stored in Redis (shared with the web app) and the access token is refreshed as
-# needed, handling refresh-token rotation.
+# are stored in this app's Redis (the refresh token is the only durable credential —
+# there's no DB) and the access token is refreshed as needed, handling refresh-token
+# rotation.
 class Whoop < ApplicationService
   WHOOP_API_URL = "https://api.prod.whoop.com/developer/v2"
   WHOOP_OAUTH_URL = "https://api.prod.whoop.com/oauth/oauth2"

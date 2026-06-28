@@ -89,8 +89,10 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   `/`) as a probe: **if you add a top-level route, add its prefix there** or it will be
   rate-limited. Disabled in the test env (`Rack::Attack.enabled`); counters live in the shared
   Redis (in-memory under test).
-- **Redis** — global `$redis` from `config/initializers/redis.rb` (shares `REDIS_URL`
-  with `web/`). No background jobs/workers; fly.toml runs a single `app` process.
+- **Redis** — global `$redis` from `config/initializers/redis.rb`, configured via `REDIS_URL`.
+  In production this is the API's own dedicated `kona-redis` fly app (`redis/fly.toml` at the
+  repo root); `web/` uses a separate Upstash instance, so the keyspaces don't overlap. No
+  background jobs/workers; fly.toml runs a single `app` process.
 
 ## Commands
 
@@ -151,5 +153,5 @@ secrets (and Rails `config/credentials.yml.enc` + `master.key`).
 ### Permissions
 
 - Autonomous: read files, single-file `rspec`, local `bin/dev`.
-- Ask first: `fly deploy`, secret changes, anything that flushes shared Redis,
+- Ask first: `fly deploy`, secret changes, anything that flushes Redis,
   `git push`/commit, package installs.

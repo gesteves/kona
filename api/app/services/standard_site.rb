@@ -498,7 +498,7 @@ class StandardSite < ApplicationService
     }
   end
 
-  # --- Fingerprint cache (Redis, shared with the web app) -----------------------------
+  # --- Fingerprint cache (this app's Redis; not read by the web app) ------------------
 
   # The Redis key under which a record's content fingerprint is cached. Scoped by
   # collection so a document and the publication can never collide on rkey.
