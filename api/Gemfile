@@ -21,8 +21,10 @@ gem "redcarpet"
 gem "sanitize"
 # Decodes HTML entities left by the Markdown→plain-text pass for standard.site
 gem "htmlentities"
-# Redis caching (shares REDIS_URL with the web app)
+# Redis caching (uses the API's own REDIS_URL — the dedicated kona-redis instance)
 gem "redis"
+# Background job queue (standard.site PDS sync) + its web UI. Stores queues in the same Redis.
+gem "sidekiq"
 # Condenses Rails' multi-line request logs into one structured line per request
 gem "lograge"
 # Caps total request wall-time so no single request can hold a Puma thread indefinitely
@@ -53,4 +55,6 @@ end
 
 group :test do
   gem "rspec-rails"
+  # Readable matchers for asserting enqueued Sidekiq jobs (have_enqueued_sidekiq_job)
+  gem "rspec-sidekiq"
 end

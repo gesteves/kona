@@ -53,12 +53,7 @@ class WhoopOauthController < ActionController::Base
 
   def authenticate_owner!
     authenticate_or_request_with_http_basic("Whoop OAuth") do |username, password|
-      expected_user = ENV["WHOOP_AUTH_USERNAME"].to_s
-      expected_pass = ENV["WHOOP_AUTH_PASSWORD"].to_s
-      next false if expected_user.empty? || expected_pass.empty?
-
-      ActiveSupport::SecurityUtils.secure_compare(username, expected_user) &
-        ActiveSupport::SecurityUtils.secure_compare(password, expected_pass)
+      OwnerBasicAuth.valid?(username, password)
     end
   end
 end

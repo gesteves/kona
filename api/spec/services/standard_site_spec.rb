@@ -220,4 +220,50 @@ describe StandardSite do
       expect(fingerprint).not_to eq(client.publication_fingerprint(changed))
     end
   end
+
+  describe "#backfill" do
+    # A raw (symbol-keyed) CDA article item, as fetch_all_articles returns it.
+    # publishedVersion present ⇒ not a draft; body present ⇒ Article ⇒ publishable.
+    def raw_article(id, published_version: 3)
+      {
+        sys: { id: id, publishedVersion: published_version, publishedAt: "2026-02-24T22:07:58.616Z",
+               firstPublishedAt: "2026-02-24T15:00:00.000-07:00" },
+        title: "Title #{id}", slug: "slug-#{id}", summary: nil, intro: "Intro", body: "Body",
+        coverImage: nil, contentfulMetadata: { tags: [] }
+      }
+    end
+
+    before do
+      # Stub the network boundary; backfill's orchestration + enqueuing is what's under test.
+      allow(client).to receive(:valid_credentials?).and_return(true)
+      allow(client).to receive(:create_session).and_return(true)
+      allow(client).to receive(:fetch_site).and_return(site)
+      allow(client).to receive(:do_sync_publication)
+      allow(client).to receive(:prune_legacy_publication)
+      allow(client).to receive(:prune_documents).and_return(0)
+    end
+
+    it "enqueues one document sync job per publishable post (skipping drafts) and still prunes" do
+      allow(client).to receive(:fetch_all_articles).and_return([
+        raw_article("AAA111"), raw_article("BBB222"),
+        raw_article("DRAFT0", published_version: nil) # draft ⇒ excluded
+      ])
+
+      expect(client).to receive(:prune_documents).with(array_including(kind_of(String))).and_return(0)
+      client.backfill
+
+      expect(StandardSiteSyncJob).to have_enqueued_sidekiq_job("sync_document", "AAA111")
+      expect(StandardSiteSyncJob).to have_enqueued_sidekiq_job("sync_document", "BBB222")
+      expect(StandardSiteSyncJob.jobs.size).to eq(2)
+    end
+
+    it "does not prune (or enqueue) when the article fetch fails" do
+      allow(client).to receive(:fetch_all_articles).and_return(nil)
+      expect(client).not_to receive(:prune_documents)
+
+      client.backfill
+
+      expect(StandardSiteSyncJob.jobs).to be_empty
+    end
+  end
 end

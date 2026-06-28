@@ -169,8 +169,13 @@ class StandardSite < ApplicationService
   end
 
   # Reconciles the whole PDS repo with the published Contentful corpus: syncs the
-  # publication and every publishable post, then prunes orphaned document records. This
-  # is the safety net for any webhook delivery that failed (Contentful does not retry).
+  # publication inline, enqueues a background sync job for every publishable post, then
+  # prunes orphaned document records. This is the safety net for any webhook delivery that
+  # failed (Contentful does not retry). The per-post syncs run as StandardSiteSyncJob jobs
+  # so a large corpus fans out across the worker (and each is individually retried) instead
+  # of blocking the task serially; a Sidekiq worker must be running to drain them. Pruning
+  # stays inline and is safe to run immediately: it only deletes records outside `current`
+  # (the full published set), which the enqueued jobs never touch.
   def backfill
     return log_skip("backfill", "no Bluesky credentials") unless valid_credentials?
     return log_skip("backfill", "could not authenticate with the PDS") unless create_session
@@ -178,7 +183,6 @@ class StandardSite < ApplicationService
     log("backfill starting")
     site = fetch_site
     return log_skip("backfill", "no site data") if site.blank?
-    publication_uri = self.class.publication_uri(@did)
     do_sync_publication(site)
     prune_legacy_publication
 
@@ -191,13 +195,12 @@ class StandardSite < ApplicationService
     publishable_posts(items.map { |item| decorate_post(item) }).each do |post|
       sys_id = post.dig("sys", "id")
       next if sys_id.blank? || !ENTRY_ID_PATTERN.match?(sys_id)
-      rkey = document_rkey(sys_id)
-      current << rkey
-      do_sync_document(post, rkey, publication_uri)
+      current << document_rkey(sys_id)
+      StandardSiteSyncJob.perform_async("sync_document", sys_id)
     end
 
     pruned = prune_documents(current)
-    log("backfill complete: #{current.size} published post(s), #{pruned} record(s) pruned")
+    log("backfill complete: #{current.size} document sync job(s) enqueued, #{pruned} record(s) pruned")
   end
 
   # The account's DID, for the /api/standard-site endpoint the web build reads. Served

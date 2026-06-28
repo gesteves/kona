@@ -42,6 +42,10 @@ Rails.application.routes.draw do
   # the .well-known endpoint and the <link rel="site.standard.*"> tags.
   get "/api/standard-site" => "api/standard_site#show"
 
+  # Sidekiq web UI for the standard.site sync queue. Gated by owner HTTP Basic Auth
+  # (Rack::Auth::Basic via OwnerBasicAuth, wired in config/initializers/sidekiq.rb).
+  mount Sidekiq::Web => "/sidekiq"
+
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker

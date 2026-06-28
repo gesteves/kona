@@ -1,0 +1,6 @@
+# Sidekiq runs as a dedicated fly.io `worker` process (see fly.toml [processes]). Concurrency
+# is kept modest to suit the 512MB VM and to avoid the per-entry backfill fan-out hammering the
+# PDS (each job opens its own session). One default queue is enough for this workload.
+:concurrency: 5
+:queues:
+  - default

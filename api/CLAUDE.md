@@ -25,10 +25,11 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 | GET | `/api/whoop` | `whoop#show` | HTML (sleep/recovery/strain) | 5 min |
 | GET | `/api/plausible/pageviews/:id` | `plausible#pageviews` | HTML (pageview count by Contentful id) | 1 hr |
 | POST | `/api/location` | `location#create` | sets Redis `location:current` (bearer-token gated) | — |
-| POST | `/api/webhooks/contentful` | `webhooks#contentful` | syncs standard.site PDS records on publish/unpublish/delete (HMAC-gated); 204 | — |
+| POST | `/api/webhooks/contentful` | `webhooks#contentful` | enqueues a standard.site PDS sync job on publish/unpublish/delete (HMAC-gated); 204 | — |
 | GET | `/api/standard-site` | `standard_site#show` | JSON `{did, publication_uri}` for the web build's verification markup | 1 hr |
 | GET | `/whoop/auth` | `whoop_oauth#authorize` | redirect (HTTP-Basic gated) | — |
 | GET | `/whoop/callback` | `whoop_oauth#callback` | OAuth token exchange | — |
+| — | `/sidekiq` | `Sidekiq::Web` (mounted) | background-job dashboard (owner HTTP-Basic gated) | — |
 | GET | `/` | redirect | 301 → main site | — |
 
 ## Architecture
@@ -54,9 +55,19 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 - **Webhooks**: `Api::WebhooksController#contentful` receives Contentful publish/
   unpublish/delete events and keeps the standard.site PDS records in sync. Verified with
   Contentful's HMAC request-verification scheme (`ContentfulRequestVerification` concern,
-  `CONTENTFUL_WEBHOOK_SECRET`). Synchronous (no job queue) within Contentful's 30s
-  timeout; Contentful does **not** retry failures, so `rake standard_site:backfill` is
-  the reconciliation/recovery path. Operations log at info level (`standard.site: …`).
+  `CONTENTFUL_WEBHOOK_SECRET`). The request only **enqueues a `StandardSiteSyncJob`** and
+  returns 204; the sync runs on the Sidekiq worker (Sidekiq retries on failure). Contentful
+  does **not** retry deliveries, so `rake standard_site:backfill` remains the broader
+  reconciliation/recovery path. Operations log at info level (`standard.site: …`).
+- **Background jobs** — native **Sidekiq** (`Sidekiq::Job`, not ActiveJob — ActiveJob stays
+  disabled in `application.rb`). Jobs live in `app/sidekiq/`; `StandardSiteSyncJob(operation,
+  entry_id)` runs the standard.site sync (webhook- and backfill-driven). Args are plain strings
+  and every operation is idempotent, so its `retry: 5` is safe; exhausted retries land in the
+  Dead set. Config in `config/initializers/sidekiq.rb` (Redis = `REDIS_URL`, web UI auth) and
+  `config/sidekiq.yml` (concurrency). The **`/sidekiq` web UI** is mounted in `routes.rb` and
+  gated by owner HTTP Basic Auth (`OwnerBasicAuth`, shared with `/whoop/auth` — the same
+  `WHOOP_AUTH_*` creds for now). Sidekiq runs as a dedicated **`worker` fly process** (see
+  fly.toml); a worker must be running to drain the queue (locally: `bundle exec sidekiq`).
 - **Views** (`app/views/api/`) render raw HTML fragments; **helpers** (`app/helpers/`)
   were ported from the web app (weather, units, icons, markdown, time, etc.).
 - **Caching** — `app/controllers/concerns/live_widget.rb`. `cache_widget(ttl:)` sets:
@@ -86,24 +97,26 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   `/api/*` traffic shares the Netlify egress IPs, so an IP ban would 403 every visitor's widgets
   at once (this once took the site down). Same reason: do **not** add a blanket per-IP throttle.
   ⚠️ The throttle treats anything outside `RACK_ATTACK_KNOWN_PREFIXES` (`/up`, `/api`, `/whoop`,
-  `/`) as a probe: **if you add a top-level route, add its prefix there** or it will be
-  rate-limited. Disabled in the test env (`Rack::Attack.enabled`); counters live in the shared
-  Redis (in-memory under test).
+  `/sidekiq`, `/`) as a probe: **if you add a top-level route, add its prefix there** or it will
+  be rate-limited (the `/sidekiq` UI is in the list for exactly this reason). Disabled in the
+  test env (`Rack::Attack.enabled`); counters live in Redis (in-memory under test).
 - **Redis** — global `$redis` from `config/initializers/redis.rb`, configured via `REDIS_URL`.
   In production this is the API's own dedicated `kona-redis` fly app (`redis/fly.toml` at the
-  repo root); `web/` uses a separate Upstash instance, so the keyspaces don't overlap. No
-  background jobs/workers; fly.toml runs a single `app` process.
+  repo root); `web/` uses a separate Upstash instance, so the keyspaces don't overlap. The same
+  Redis backs the Sidekiq queues. fly.toml runs two process groups: `app` (Puma) and `worker`
+  (Sidekiq).
 
 ## Commands
 
 ```bash
 bin/dev                                              # local server (or bin/setup)
+bundle exec sidekiq -C config/sidekiq.yml            # local worker (needed to drain jobs)
 bundle exec rspec spec/requests/api/activity_stats_spec.rb   # single spec (fast)
 bundle exec rspec                                    # full suite
 bin/ci                                               # setup + full suite + security scan (CI)
 bundle exec brakeman -q --no-pager                   # static security scan
 bundle exec bundle-audit check --update              # dependency CVE scan
-fly deploy                                           # deploy to fly.io
+fly deploy                                           # deploy to fly.io (app + worker processes)
 fly console                                           # production console
 ```
 
