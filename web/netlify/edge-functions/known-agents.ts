@@ -94,10 +94,8 @@ export const config: Config = {
     '/fonts/*',
     '/api/*',
     '/og',
-    '/robots.txt',
     '/plsbl/*',
     '/ifttt/*',
-    '/sitemap.xml',
     '/.well-known/*',
     '/.netlify/images*',
     '/favicon.ico',
@@ -117,5 +115,6 @@ export const config: Config = {
     '/*.json',
     '/*.txt',
     '/*.map',
+    '/*.xml',
   ],
 };
