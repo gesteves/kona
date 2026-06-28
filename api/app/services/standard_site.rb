@@ -7,8 +7,8 @@ require "digest"
 # driven by Contentful webhooks (see Api::WebhooksController) plus the
 # `standard_site:backfill` rake task, rather than running on every static build:
 #   - one site.standard.publication record (rkey "self") tracks the site,
-#   - one site.standard.document record per published post (rkey = the post's
-#     Contentful sys.id) tracks each Article/Short,
+#   - one site.standard.document record per published post (rkey = a TID derived
+#     deterministically from the post's Contentful sys.id) tracks each Article/Short,
 #   - records are pruned when a post is unpublished/deleted (per-event) or no longer
 #     maps to a published post (backfill).
 #
@@ -31,9 +31,15 @@ class StandardSite < ApplicationService
   CONTENTFUL_API_URL = "https://graphql.contentful.com/content/v1/spaces"
   PAGE_SIZE = 100
 
-  # Valid AT Protocol record-key characters (a subset is plenty for sys.ids).
-  # @see https://atproto.com/specs/record-key
-  RKEY_PATTERN = /\A[a-zA-Z0-9._~:-]{1,512}\z/
+  # Sanity guard for a Contentful sys.id before it's turned into a record key.
+  ENTRY_ID_PATTERN = /\A[a-zA-Z0-9._~:-]{1,512}\z/
+
+  # AT Protocol "sortable base32" alphabet, used to encode TIDs. The
+  # site.standard.document lexicon requires each record key to be a TID — a
+  # 13-character base32-sortable identifier — so the Contentful sys.id can't be used
+  # as the rkey directly.
+  # @see https://atproto.com/specs/tid
+  TID_ALPHABET = "234567abcdefghijklmnopqrstuvwxyz"
 
   # The article fields the document builders need, shared by the by-id and list queries.
   ARTICLE_ITEM_FIELDS = <<~GRAPHQL.freeze
@@ -106,7 +112,7 @@ class StandardSite < ApplicationService
     end
 
     publication_uri = "at://#{@did}/#{PUBLICATION_COLLECTION}/#{PUBLICATION_RKEY}"
-    do_sync_document(post, entry_id, publication_uri)
+    do_sync_document(post, document_rkey(entry_id), publication_uri)
   end
 
   # Removes the document record for an unpublished/deleted entry (idempotent: deleting a
@@ -118,7 +124,7 @@ class StandardSite < ApplicationService
     return log_skip("document #{entry_id}", "invalid entry id") unless eligible?(entry_id)
     return log_skip("document #{entry_id}", "could not authenticate with the PDS") unless create_session
 
-    remove_document(entry_id)
+    remove_document(document_rkey(entry_id))
   end
 
   # Re-syncs the publication record from the current site entry.
@@ -152,8 +158,9 @@ class StandardSite < ApplicationService
 
     current = []
     publishable_posts(items.map { |item| decorate_post(item) }).each do |post|
-      rkey = post.dig("sys", "id")
-      next if rkey.blank? || !RKEY_PATTERN.match?(rkey)
+      sys_id = post.dig("sys", "id")
+      next if sys_id.blank? || !ENTRY_ID_PATTERN.match?(sys_id)
+      rkey = document_rkey(sys_id)
       current << rkey
       do_sync_document(post, rkey, publication_uri)
     end
@@ -241,6 +248,21 @@ class StandardSite < ApplicationService
     record
   end
 
+  # The document record key for a Contentful entry: a TID derived deterministically
+  # from the sys.id, so every operation (sync, delete, prune) computes the same key
+  # from the entry id alone — a delete has no post data to work from. The post's real
+  # publish time lives in the record's publishedAt field, so nothing depends on
+  # decoding a meaningful timestamp out of the key; the low 63 bits of the sys.id's
+  # SHA-256 digest become the TID's value (the top bit stays 0, as a TID requires).
+  # ⚠️ web's StandardSiteHelpers#document_rkey must use the identical algorithm, or the
+  # <link rel="site.standard.document"> AT URI won't match the published record.
+  # @param entry_id [String] The Contentful sys.id.
+  # @return [String] A valid 13-character TID.
+  def document_rkey(entry_id)
+    value = Digest::SHA256.hexdigest(entry_id.to_s).to_i(16) & ((1 << 63) - 1)
+    encode_tid(value)
+  end
+
   # Returns the rkeys that exist on the PDS but are not in the current set.
   # @param existing [Array<String>] rkeys currently in the document collection.
   # @param current [Array<String>] rkeys that should remain.
@@ -289,7 +311,19 @@ class StandardSite < ApplicationService
   # @param entry_id [String, nil]
   # @return [Boolean] true if the id is a usable AT Protocol record key.
   def eligible?(entry_id)
-    entry_id.present? && RKEY_PATTERN.match?(entry_id.to_s)
+    entry_id.present? && ENTRY_ID_PATTERN.match?(entry_id.to_s)
+  end
+
+  # Encodes a non-negative integer below 2**63 as a 13-character base32-sortable TID.
+  # @param value [Integer]
+  # @return [String]
+  def encode_tid(value)
+    encoded = +""
+    while value.positive?
+      encoded = TID_ALPHABET[value % 32] + encoded
+      value /= 32
+    end
+    encoded.rjust(13, TID_ALPHABET[0])
   end
 
   # A stable descriptor of an image's source, used in place of an uploaded blob

@@ -8,7 +8,7 @@
   <% if data.respond_to?(:standard_site) && data.standard_site&.publication_uri.present? %>
     <link rel="site.standard.publication" href="<%= data.standard_site.publication_uri %>">
     <% if defined?(content) && %w[Article Short].include?(content.entry_type) && !content.draft && data.standard_site.did.present? %>
-      <link rel="site.standard.document" href="at://<%= data.standard_site.did %>/site.standard.document/<%= content.sys.id %>">
+      <link rel="site.standard.document" href="at://<%= data.standard_site.did %>/site.standard.document/<%= document_rkey(content.sys.id) %>">
     <% end %>
   <% end %>
   <link rel="canonical" href="<%= canonical_url %>">
