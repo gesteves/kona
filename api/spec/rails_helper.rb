@@ -35,11 +35,40 @@ module ApiAuthHelper
   end
 end
 
+# Owner-only surfaces (/whoop/auth, /sidekiq) are gated by a Google OAuth sign-in. OmniAuth test
+# mode short-circuits the provider, so `sign_in_as` just mocks the auth hash and drives the
+# callback, leaving the owner session set for subsequent requests in the same example.
+OmniAuth.config.test_mode = true
+OmniAuth.config.logger = Rails.logger
+
+module OwnerAuthHelper
+  def mock_owner_auth(email:, verified: true)
+    OmniAuth.config.mock_auth[:google_oauth2] = OmniAuth::AuthHash.new(
+      provider: "google_oauth2",
+      uid: "test-uid",
+      info: { email: email },
+      extra: { raw_info: { email_verified: verified } }
+    )
+  end
+
+  # Completes a Google sign-in as the given email (defaults to the test owner) and returns once
+  # the owner session cookie is set.
+  def sign_in_as(email: "owner@example.com", verified: true)
+    mock_owner_auth(email: email, verified: verified)
+    get "/auth/google_oauth2/callback"
+  end
+end
+
 RSpec.configure do |config|
   # Remove this line to enable support for ActiveRecord
   config.use_active_record = false
 
   config.include ApiAuthHelper, type: :request
+  config.include OwnerAuthHelper, type: :request
+
+  config.before do
+    OmniAuth.config.mock_auth[:google_oauth2] = nil
+  end
 
   config.before(type: :request) do
     @original_api_token = ENV["API_TOKEN"]

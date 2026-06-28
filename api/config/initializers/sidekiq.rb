@@ -8,8 +8,22 @@ redis_config = { url: ENV.fetch("REDIS_URL", "redis://localhost:6379") }
 Sidekiq.configure_server { |config| config.redis = redis_config }
 Sidekiq.configure_client { |config| config.redis = redis_config }
 
-# Gate the web UI behind the same owner HTTP Basic Auth as the Whoop OAuth flow (for now).
-# The block runs per-request, so OwnerBasicAuth resolves at request time (autoloaded).
-Sidekiq::Web.use(Rack::Auth::Basic, "Sidekiq") do |username, password|
-  OwnerBasicAuth.valid?(username, password)
+# Gate the web UI behind the owner session set by Google sign-in (SessionsController). Sidekiq's
+# web app is a Rack app, not a Rails controller, but it's mounted downstream of the session
+# middleware, so the Rails session is in env["rack.session"]. Unauthenticated hits redirect to
+# /login. Defined inline to avoid autoload-at-boot ordering concerns.
+class SidekiqOwnerGuard
+  def initialize(app)
+    @app = app
+  end
+
+  def call(env)
+    session = env["rack.session"]
+    owner = ENV["OWNER_EMAIL"].to_s
+    return @app.call(env) if owner.present? && session && session["owner_email"] == owner
+
+    [302, { "location" => "/login" }, []]
+  end
 end
+
+Sidekiq::Web.use SidekiqOwnerGuard

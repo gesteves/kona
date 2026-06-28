@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>Sign in</title>
+    <style>
+      body { font: 1rem/1.5 system-ui, sans-serif; display: grid; place-items: center; min-height: 100vh; margin: 0; }
+      button { font: inherit; padding: 0.6rem 1.2rem; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <%= button_to "Sign in with Google", "/auth/google_oauth2", method: :post %>
+    </main>
+  </body>
+</html>

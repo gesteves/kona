@@ -27,9 +27,12 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 | POST | `/api/location` | `location#create` | sets Redis `location:current` (bearer-token gated) | — |
 | POST | `/api/webhooks/contentful` | `webhooks#contentful` | enqueues a standard.site PDS sync job on publish/unpublish/delete (HMAC-gated); 204 | — |
 | GET | `/api/standard-site` | `standard_site#show` | JSON `{did, publication_uri}` for the web build's verification markup | 1 hr |
-| GET | `/whoop/auth` | `whoop_oauth#authorize` | redirect (HTTP-Basic gated) | — |
+| GET | `/whoop/auth` | `whoop_oauth#authorize` | redirect (owner-session gated) | — |
 | GET | `/whoop/callback` | `whoop_oauth#callback` | OAuth token exchange | — |
-| — | `/sidekiq` | `Sidekiq::Web` (mounted) | background-job dashboard (owner HTTP-Basic gated) | — |
+| GET | `/login` | `sessions#new` | owner sign-in page (Google button) | — |
+| GET | `/auth/google_oauth2/callback` | `sessions#create` | Google OAuth callback → sets owner session | — |
+| POST | `/logout` | `sessions#destroy` | clears the owner session | — |
+| — | `/sidekiq` | `Sidekiq::Web` (mounted) | background-job dashboard (owner-session gated) | — |
 | GET | `/` | redirect | 301 → main site | — |
 
 ## Architecture
@@ -45,6 +48,13 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   endpoints `skip_before_action :authenticate_bearer_token!`: the Contentful webhook (HMAC
   instead, hit directly by Contentful) and `standard-site` (public, build-time fetched directly
   via `KONA_API_URL`). A new widget endpoint is gated automatically by inheriting `BaseController`.
+- **Owner auth** — the owner-only surfaces (`/whoop/auth` and the `/sidekiq` UI) are gated by a
+  **Google OAuth** sign-in restricted to a single identity, **not** the `API_TOKEN` bearer.
+  `SessionsController` runs the OmniAuth (`omniauth-google-oauth2`) flow and accepts a login only
+  when the verified email equals `OWNER_EMAIL` (and the provider's `hd` domain check passes),
+  then stores `owner_email` in the signed cookie session. The `Authentication` concern
+  (`require_owner!`) gates the Whoop controller; a small Rack guard in the Sidekiq initializer
+  gates the mounted `Sidekiq::Web` on the same session (unauthenticated → redirect to `/login`).
 - **Services** (`app/services/`, base `ApplicationService`): one per external API —
   Intervals.icu, Apple WeatherKit (ES256 JWT), Google Maps / Air Quality / Pollen,
   PurpleAir, Whoop (OAuth2), TrainerRoad (iCal), Contentful (events/articles),
@@ -63,11 +73,11 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   disabled in `application.rb`). Jobs live in `app/sidekiq/`; `StandardSiteSyncJob(operation,
   entry_id)` runs the standard.site sync (webhook- and backfill-driven). Args are plain strings
   and every operation is idempotent, so its `retry: 5` is safe; exhausted retries land in the
-  Dead set. Config in `config/initializers/sidekiq.rb` (Redis = `REDIS_URL`, web UI auth) and
+  Dead set. Config in `config/initializers/sidekiq.rb` (Redis = `REDIS_URL`, web UI guard) and
   `config/sidekiq.yml` (concurrency). The **`/sidekiq` web UI** is mounted in `routes.rb` and
-  gated by owner HTTP Basic Auth (`OwnerBasicAuth`, shared with `/whoop/auth` — the same
-  `WHOOP_AUTH_*` creds for now). Sidekiq runs as a dedicated **`worker` fly process** (see
-  fly.toml); a worker must be running to drain the queue (locally: `bundle exec sidekiq`).
+  gated by the owner session (Google OAuth — see **Owner auth** above), shared with `/whoop/auth`.
+  Sidekiq runs as a dedicated **`worker` fly process** (see fly.toml); a worker must be running
+  to drain the queue (locally: `bundle exec sidekiq`).
 - **Views** (`app/views/api/`) render raw HTML fragments; **helpers** (`app/helpers/`)
   were ported from the web app (weather, units, icons, markdown, time, etc.).
 - **Caching** — `app/controllers/concerns/live_widget.rb`. `cache_widget(ttl:)` sets:
@@ -97,8 +107,9 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   `/api/*` traffic shares the Netlify egress IPs, so an IP ban would 403 every visitor's widgets
   at once (this once took the site down). Same reason: do **not** add a blanket per-IP throttle.
   ⚠️ The throttle treats anything outside `RACK_ATTACK_KNOWN_PREFIXES` (`/up`, `/api`, `/whoop`,
-  `/sidekiq`, `/`) as a probe: **if you add a top-level route, add its prefix there** or it will
-  be rate-limited (the `/sidekiq` UI is in the list for exactly this reason). Disabled in the
+  `/sidekiq`, `/login`, `/logout`, `/auth`, `/`) as a probe: **if you add a top-level route, add
+  its prefix there** or it will be rate-limited (the `/sidekiq` UI and the OAuth login routes are
+  in the list for exactly this reason). Disabled in the
   test env (`Rack::Attack.enabled`); counters live in Redis (in-memory under test).
 - **Redis** — global `$redis` from `config/initializers/redis.rb`, configured via `REDIS_URL`.
   In production this is the API's own dedicated `kona-redis` fly app (`redis/fly.toml` at the
@@ -138,10 +149,12 @@ Names only — see `.env.example`; never commit values. Production values live a
 secrets (and Rails `config/credentials.yml.enc` + `master.key`).
 
 - **Required**: `REDIS_URL`, `ICU_ATHLETE_ID`, `ICU_API_KEY`, `FONT_AWESOME_API_TOKEN`,
-  `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET`, `WHOOP_REDIRECT_URI`, `WHOOP_AUTH_USERNAME`,
-  `WHOOP_AUTH_PASSWORD`, `GOOGLE_API_KEY`, `API_TOKEN` (bearer required on all `/api/*` widget
-  endpoints — injected by the web proxy — and on `POST /api/location`; must match the web app's),
-  `WEATHERKIT_KEY_ID`, `WEATHERKIT_TEAM_ID`, `WEATHERKIT_SERVICE_ID`,
+  `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET`, `WHOOP_REDIRECT_URI`, `GOOGLE_OAUTH_CLIENT_ID`,
+  `GOOGLE_OAUTH_CLIENT_SECRET`, `OWNER_EMAIL` (the three gate owner sign-in for `/whoop/auth`
+  + `/sidekiq` — Google OAuth restricted to this email/its hosted domain), `GOOGLE_API_KEY`,
+  `API_TOKEN` (bearer required on all `/api/*` widget endpoints — injected by the web proxy —
+  and on `POST /api/location`; must match the web app's), `WEATHERKIT_KEY_ID`,
+  `WEATHERKIT_TEAM_ID`, `WEATHERKIT_SERVICE_ID`,
   `WEATHERKIT_PRIVATE_KEY` (base64 .p8), `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`,
   `CONTENTFUL_WEBHOOK_SECRET` (64-char HMAC secret for the Contentful webhook), `SITE_URL`
   (public site root, for the standard.site publication `url`).

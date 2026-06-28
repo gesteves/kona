@@ -2,18 +2,21 @@ require "rails_helper"
 
 RSpec.describe "Whoop OAuth", type: :request do
   describe "GET /whoop/auth" do
-    it "requires HTTP Basic Auth" do
-      get "/whoop/auth"
-      expect(response).to have_http_status(:unauthorized)
+    let(:owner_email) { "owner@example.com" }
+
+    before do
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
     end
 
-    context "with valid credentials" do
-      let(:basic_auth) { { "Authorization" => ActionController::HttpAuthentication::Basic.encode_credentials("owner", "secret") } }
+    it "redirects to the login page when not signed in" do
+      get "/whoop/auth"
+      expect(response).to redirect_to("/login")
+    end
 
+    context "when signed in as the owner" do
       before do
-        allow(ENV).to receive(:[]).and_call_original
-        allow(ENV).to receive(:[]).with("WHOOP_AUTH_USERNAME").and_return("owner")
-        allow(ENV).to receive(:[]).with("WHOOP_AUTH_PASSWORD").and_return("secret")
+        sign_in_as(email: owner_email)
         allow($redis).to receive(:setex)
         allow_any_instance_of(Whoop).to receive(:get_authorization_url).and_return("https://api.prod.whoop.com/oauth/oauth2/auth?x=1")
       end
@@ -21,7 +24,7 @@ RSpec.describe "Whoop OAuth", type: :request do
       it "stores a state and redirects to Whoop" do
         expect($redis).to receive(:setex).with("whoop:oauth:state", 10.minutes, anything)
 
-        get "/whoop/auth", headers: basic_auth
+        get "/whoop/auth"
 
         expect(response).to have_http_status(:redirect)
         expect(response.location).to start_with("https://api.prod.whoop.com/oauth/oauth2/auth")
@@ -30,7 +33,7 @@ RSpec.describe "Whoop OAuth", type: :request do
       it "returns 503 when Whoop OAuth isn't configured" do
         allow_any_instance_of(Whoop).to receive(:get_authorization_url).and_return(nil)
 
-        get "/whoop/auth", headers: basic_auth
+        get "/whoop/auth"
 
         expect(response).to have_http_status(:service_unavailable)
         expect(response.body).to include("not configured")

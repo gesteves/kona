@@ -25,6 +25,10 @@ gem "htmlentities"
 gem "redis"
 # Background job queue (standard.site PDS sync) + its web UI. Stores queues in the same Redis.
 gem "sidekiq"
+# Owner authentication for /whoop/auth and the Sidekiq UI: Google OAuth restricted to one identity.
+# omniauth-rails_csrf_protection forces the OmniAuth request phase to be a CSRF-protected POST.
+gem "omniauth-google-oauth2"
+gem "omniauth-rails_csrf_protection"
 # Condenses Rails' multi-line request logs into one structured line per request
 gem "lograge"
 # Caps total request wall-time so no single request can hold a Puma thread indefinitely

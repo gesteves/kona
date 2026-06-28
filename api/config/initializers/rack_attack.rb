@@ -31,7 +31,7 @@ Rack::Attack.cache.store =
   end
 
 # Prefixes of the app's real routes. Anything outside these is, by definition, a probe.
-RACK_ATTACK_KNOWN_PREFIXES = %w[/up /api /whoop /sidekiq].freeze
+RACK_ATTACK_KNOWN_PREFIXES = %w[/up /api /whoop /sidekiq /login /logout /auth].freeze
 RACK_ATTACK_KNOWN_ROUTE = lambda do |path|
   path == "/" || RACK_ATTACK_KNOWN_PREFIXES.any? { |prefix| path == prefix || path.start_with?("#{prefix}/") }
 end

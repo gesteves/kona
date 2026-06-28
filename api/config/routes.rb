@@ -42,8 +42,16 @@ Rails.application.routes.draw do
   # the .well-known endpoint and the <link rel="site.standard.*"> tags.
   get "/api/standard-site" => "api/standard_site#show"
 
-  # Sidekiq web UI for the standard.site sync queue. Gated by owner HTTP Basic Auth
-  # (Rack::Auth::Basic via OwnerBasicAuth, wired in config/initializers/sidekiq.rb).
+  # Owner authentication (Google OAuth, restricted to OWNER_EMAIL). The OmniAuth request phase
+  # (POST /auth/google_oauth2) is handled by the OmniAuth middleware before routing, so only the
+  # callback/failure/login/logout need routes.
+  get  "/login" => "sessions#new"
+  post "/logout" => "sessions#destroy"
+  get  "/auth/google_oauth2/callback" => "sessions#create"
+  get  "/auth/failure" => "sessions#failure"
+
+  # Sidekiq web UI for the standard.site sync queue. Gated by the owner session via a Rack guard
+  # wired in config/initializers/sidekiq.rb (unauthenticated hits redirect to /login).
   mount Sidekiq::Web => "/sidekiq"
 
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)

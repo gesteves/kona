@@ -4,9 +4,11 @@ require "securerandom"
 # Basic Auth so only the owner can attach an account; the callback is additionally
 # guarded by a one-time state validated against Redis.
 class WhoopOauthController < ActionController::Base
+  include Authentication
+
   STATE_CACHE_KEY = "whoop:oauth:state"
 
-  before_action :authenticate_owner!, only: :authorize
+  before_action :require_owner!, only: :authorize
 
   # Starts the flow: stores a one-time state in Redis and redirects to Whoop.
   def authorize
@@ -49,11 +51,5 @@ class WhoopOauthController < ActionController::Base
   def valid_state?(state)
     expected = $redis.get(STATE_CACHE_KEY)
     state.present? && expected.present? && ActiveSupport::SecurityUtils.secure_compare(state, expected)
-  end
-
-  def authenticate_owner!
-    authenticate_or_request_with_http_basic("Whoop OAuth") do |username, password|
-      OwnerBasicAuth.valid?(username, password)
-    end
   end
 end

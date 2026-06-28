@@ -1,24 +1,16 @@
 require "rails_helper"
 
 # Guards the security-critical wiring: the Sidekiq web UI must never be reachable without the
-# owner credentials. These cases are rejected by Rack::Auth::Basic before any Redis access, so
-# they need no running Redis. (The authenticated success path renders from Redis and isn't
-# exercised here.)
+# owner session. The Rack guard redirects unauthenticated hits to /login before any Redis access,
+# so this needs no running Redis. (The authenticated render reads from Redis and isn't exercised.)
 RSpec.describe "Sidekiq::Web mount", type: :request do
   before do
     allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("WHOOP_AUTH_USERNAME").and_return("owner")
-    allow(ENV).to receive(:[]).with("WHOOP_AUTH_PASSWORD").and_return("secret")
+    allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return("owner@example.com")
   end
 
-  it "returns 401 without credentials" do
+  it "redirects to /login without an owner session" do
     get "/sidekiq"
-    expect(response).to have_http_status(:unauthorized)
-  end
-
-  it "returns 401 with wrong credentials" do
-    creds = ActionController::HttpAuthentication::Basic.encode_credentials("owner", "nope")
-    get "/sidekiq", headers: { "Authorization" => creds }
-    expect(response).to have_http_status(:unauthorized)
+    expect(response).to redirect_to("/login")
   end
 end
