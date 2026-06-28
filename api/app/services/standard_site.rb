@@ -20,9 +20,38 @@ require "digest"
 # Everything no-ops when the Bluesky credentials are absent, so a misconfigured or
 # credential-free environment simply doesn't publish.
 class StandardSite < ApplicationService
+  # AT Protocol "sortable base32" alphabet, used to encode TIDs. Both standard.site
+  # lexicons require every record key to be a TID — a 13-character base32-sortable
+  # identifier — so neither the publication's "self" nor a Contentful sys.id can be used
+  # as the rkey directly.
+  # @see https://atproto.com/specs/tid
+  TID_ALPHABET = "234567abcdefghijklmnopqrstuvwxyz"
+
+  # Derives a stable, valid 13-character TID from a seed string: the low 63 bits of the
+  # seed's SHA-256 digest become the TID's value (the top bit stays 0, as a TID
+  # requires). Deterministic, so the same seed always maps to the same record key.
+  # ⚠️ web's StandardSiteHelpers#document_rkey must use the identical algorithm for the
+  # document seed, or the <link rel="site.standard.document"> AT URI won't match the
+  # published record.
+  # @param seed [String]
+  # @return [String] A valid TID.
+  def self.tid(seed)
+    value = Digest::SHA256.hexdigest(seed.to_s).to_i(16) & ((1 << 63) - 1)
+    encoded = +""
+    while value.positive?
+      encoded = TID_ALPHABET[value % 32] + encoded
+      value /= 32
+    end
+    encoded.rjust(13, TID_ALPHABET[0])
+  end
+
   PUBLICATION_COLLECTION = "site.standard.publication"
   DOCUMENT_COLLECTION = "site.standard.document"
-  PUBLICATION_RKEY = "self"
+  # The publication is the repo's singleton, historically at rkey "self"; the lexicon now
+  # requires a TID, so it lives at a stable TID derived from that "self" seed.
+  PUBLICATION_RKEY = tid("self")
+  # The publication used to live at this literal rkey; backfill prunes the legacy record.
+  LEGACY_PUBLICATION_RKEY = "self"
   DEFAULT_PDS_URL = "https://bsky.social"
   # The DID is stable for an account, so it's cached without a TTL and reused by the
   # /api/standard-site endpoint the web build reads.
@@ -34,12 +63,13 @@ class StandardSite < ApplicationService
   # Sanity guard for a Contentful sys.id before it's turned into a record key.
   ENTRY_ID_PATTERN = /\A[a-zA-Z0-9._~:-]{1,512}\z/
 
-  # AT Protocol "sortable base32" alphabet, used to encode TIDs. The
-  # site.standard.document lexicon requires each record key to be a TID — a
-  # 13-character base32-sortable identifier — so the Contentful sys.id can't be used
-  # as the rkey directly.
-  # @see https://atproto.com/specs/tid
-  TID_ALPHABET = "234567abcdefghijklmnopqrstuvwxyz"
+  # Builds the publication's at:// URI for a DID. Single source of truth for the format,
+  # shared by the sync paths and the /api/standard-site endpoint.
+  # @param did [String]
+  # @return [String]
+  def self.publication_uri(did)
+    "at://#{did}/#{PUBLICATION_COLLECTION}/#{PUBLICATION_RKEY}"
+  end
 
   # The article fields the document builders need, shared by the by-id and list queries.
   ARTICLE_ITEM_FIELDS = <<~GRAPHQL.freeze
@@ -111,7 +141,7 @@ class StandardSite < ApplicationService
       return remove_document(entry_id)
     end
 
-    publication_uri = "at://#{@did}/#{PUBLICATION_COLLECTION}/#{PUBLICATION_RKEY}"
+    publication_uri = self.class.publication_uri(@did)
     do_sync_document(post, document_rkey(entry_id), publication_uri)
   end
 
@@ -148,8 +178,9 @@ class StandardSite < ApplicationService
     log("backfill starting")
     site = fetch_site
     return log_skip("backfill", "no site data") if site.blank?
-    publication_uri = "at://#{@did}/#{PUBLICATION_COLLECTION}/#{PUBLICATION_RKEY}"
+    publication_uri = self.class.publication_uri(@did)
     do_sync_publication(site)
+    prune_legacy_publication
 
     items = fetch_all_articles
     # Bail before pruning if the article fetch failed, so a transient error can never
@@ -252,15 +283,11 @@ class StandardSite < ApplicationService
   # from the sys.id, so every operation (sync, delete, prune) computes the same key
   # from the entry id alone — a delete has no post data to work from. The post's real
   # publish time lives in the record's publishedAt field, so nothing depends on
-  # decoding a meaningful timestamp out of the key; the low 63 bits of the sys.id's
-  # SHA-256 digest become the TID's value (the top bit stays 0, as a TID requires).
-  # ⚠️ web's StandardSiteHelpers#document_rkey must use the identical algorithm, or the
-  # <link rel="site.standard.document"> AT URI won't match the published record.
+  # decoding a meaningful timestamp out of the key.
   # @param entry_id [String] The Contentful sys.id.
   # @return [String] A valid 13-character TID.
   def document_rkey(entry_id)
-    value = Digest::SHA256.hexdigest(entry_id.to_s).to_i(16) & ((1 << 63) - 1)
-    encode_tid(value)
+    self.class.tid(entry_id)
   end
 
   # Returns the rkeys that exist on the PDS but are not in the current set.
@@ -314,18 +341,6 @@ class StandardSite < ApplicationService
     entry_id.present? && ENTRY_ID_PATTERN.match?(entry_id.to_s)
   end
 
-  # Encodes a non-negative integer below 2**63 as a 13-character base32-sortable TID.
-  # @param value [Integer]
-  # @return [String]
-  def encode_tid(value)
-    encoded = +""
-    while value.positive?
-      encoded = TID_ALPHABET[value % 32] + encoded
-      value /= 32
-    end
-    encoded.rjust(13, TID_ALPHABET[0])
-  end
-
   # A stable descriptor of an image's source, used in place of an uploaded blob
   # when fingerprinting. The Contentful URL carries a version cache-buster, so a
   # replaced asset yields a different descriptor.
@@ -353,6 +368,15 @@ class StandardSite < ApplicationService
     end
     store_fingerprint(PUBLICATION_COLLECTION, PUBLICATION_RKEY, fingerprint)
     log("publication synced", :synced)
+  end
+
+  # One-time migration cleanup: the publication used to live at rkey "self", which the
+  # lexicon no longer accepts (it must be a TID). Deletes that legacy record so the repo
+  # doesn't carry a stale, invalid publication. Idempotent — deleting a record that's
+  # already gone is a harmless no-op, so this can run on every backfill.
+  def prune_legacy_publication
+    return if PUBLICATION_RKEY == LEGACY_PUBLICATION_RKEY
+    delete_record(PUBLICATION_COLLECTION, LEGACY_PUBLICATION_RKEY)
   end
 
   # Syncs a single document record, skipping the cover-image upload + putRecord

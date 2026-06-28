@@ -19,7 +19,7 @@ module Api
       cache_widget(ttl: 1.hour)
       render json: {
         did: did,
-        publication_uri: "at://#{did}/site.standard.publication/self"
+        publication_uri: StandardSite.publication_uri(did)
       }
     end
   end

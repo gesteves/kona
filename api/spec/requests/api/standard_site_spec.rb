@@ -10,7 +10,7 @@ RSpec.describe "Api::StandardSite", type: :request do
       expect(response).to have_http_status(:ok)
       json = JSON.parse(response.body)
       expect(json["did"]).to eq("did:plc:abc")
-      expect(json["publication_uri"]).to eq("at://did:plc:abc/site.standard.publication/self")
+      expect(json["publication_uri"]).to eq("at://did:plc:abc/site.standard.publication/73k3tsvpuwib6")
     end
 
     it "sets a durable one-hour edge cache" do

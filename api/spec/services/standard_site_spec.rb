@@ -126,6 +126,17 @@ describe StandardSite do
     end
   end
 
+  describe "the publication record key" do
+    it "is a valid 13-character TID, not the literal 'self'" do
+      expect(StandardSite::PUBLICATION_RKEY).to eq("73k3tsvpuwib6")
+      expect(StandardSite::PUBLICATION_RKEY).to match(/\A[234567abcdefghij][234567abcdefghijklmnopqrstuvwxyz]{12}\z/)
+    end
+
+    it "builds the publication URI from the TID" do
+      expect(StandardSite.publication_uri("did:plc:abc")).to eq("at://did:plc:abc/site.standard.publication/73k3tsvpuwib6")
+    end
+  end
+
   describe "#document_rkey" do
     # The exact TID for the fixture sys.id is asserted here (and in web's matching spec)
     # so the two apps can never drift: the <link> AT URI must equal the published record.
