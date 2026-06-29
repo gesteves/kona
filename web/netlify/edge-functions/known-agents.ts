@@ -81,11 +81,7 @@ export const config: Config = {
   // and the swallowed trackVisit errors above cover the expected paths; on: 'bypass' is
   // the backstop for any unexpected crash outside those guards.)
   onError: 'bypass',
-  // Run on every request, then exclude everything that isn't a meaningful page view:
-  // built assets, the other Netlify functions, the Plausible proxy, the IFTTT
-  // syndication feeds (polled constantly by automation), and the sitemap. The Atom
-  // feed (/feed.xml) is intentionally *not* excluded — it carries full article content,
-  // so agents fetching it is exactly the kind of traffic worth capturing.
+  // Run on every request, then exclude everything that isn't a meaningful page view.
   path: '/*',
   excludedPath: [
     '/javascripts/*',
