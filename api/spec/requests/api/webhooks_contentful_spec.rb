@@ -37,16 +37,18 @@ RSpec.describe "Api::Webhooks contentful", type: :request do
   end
 
   context "with a valid signature" do
-    it "enqueues a document sync on an article publish" do
+    it "enqueues a document sync and an embedding refresh on an article publish" do
       post_webhook(entry_payload("entry123", "article"), topic: "ContentManagement.Entry.publish")
       expect(response).to have_http_status(:no_content)
       expect(StandardSiteSyncJob).to have_enqueued_sidekiq_job("sync_document", "entry123")
+      expect(ArticleEmbeddingJob).to have_enqueued_sidekiq_job("embed", "entry123")
     end
 
-    it "enqueues a document delete on an article unpublish" do
+    it "enqueues a document delete and an embedding delete on an article unpublish" do
       post_webhook(entry_payload("entry123", "article"), topic: "ContentManagement.Entry.unpublish")
       expect(response).to have_http_status(:no_content)
       expect(StandardSiteSyncJob).to have_enqueued_sidekiq_job("delete_document", "entry123")
+      expect(ArticleEmbeddingJob).to have_enqueued_sidekiq_job("delete", "entry123")
     end
 
     it "enqueues a document delete on an article delete" do
@@ -65,6 +67,13 @@ RSpec.describe "Api::Webhooks contentful", type: :request do
       post_webhook(entry_payload("page1", "page"), topic: "ContentManagement.Entry.publish")
       expect(response).to have_http_status(:no_content)
       expect(StandardSiteSyncJob.jobs).to be_empty
+      expect(ArticleEmbeddingJob.jobs).to be_empty
+    end
+
+    it "does not enqueue an embedding refresh for a site publish" do
+      post_webhook(entry_payload("site1", "site"), topic: "ContentManagement.Entry.publish")
+      expect(response).to have_http_status(:no_content)
+      expect(ArticleEmbeddingJob.jobs).to be_empty
     end
 
     it "logs receipt and the dispatched operation" do

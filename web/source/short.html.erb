@@ -1,7 +1,6 @@
 <%= partial 'partials/article/short', locals: { article: content, indexable: true } %>
 <%= partial 'partials/share', locals: { article: content } %>
-<%= partial 'partials/related', locals: { article: content } %>
-<%# Exclude this entry and every other card on the page (related) so trending adds variety %>
-<%# instead of repeating them; ids sorted for a canonical, cache-friendly path. %>
-<% trending_exclude_ids = ([content] + related_articles(content)).map { |a| a.sys.id }.uniq.sort %>
-<%= partial 'partials/placeholders/trending', locals: { url: "/api/articles/trending/exclude/#{trending_exclude_ids.join(',')}" } %>
+<%# Shorts have no event, so they always show the semantically-related "You May Also Like" widget. %>
+<%= partial 'partials/placeholders/related', locals: { url: "/api/articles/related/#{content.sys.id}" } %>
+<%# Exclude only this entry so trending doesn't repeat it. %>
+<%= partial 'partials/placeholders/trending', locals: { url: "/api/articles/trending/#{content.sys.id}" } %>

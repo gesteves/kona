@@ -21,7 +21,8 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 | GET | `/api/weather/current` | `weather#current` | HTML (weather/AQI/pollen) | 5 min |
 | GET | `/api/events/upcoming` | `events#upcoming` | HTML (upcoming races; featured event has inline race-day weather) | 1 hr |
 | GET | `/api/articles/trending` | `articles#trending` | HTML (all trending articles, ranked from Plausible) | 1 hr |
-| GET | `/api/articles/trending/exclude/:ids` | `articles#trending_excluding` | HTML (trending minus a caller-supplied, comma-separated set of Contentful ids) | 1 hr |
+| GET | `/api/articles/trending/:id` | `articles#trending_excluding` | HTML (trending minus one Contentful id — an article page passes its own id so it isn't listed) | 1 hr |
+| GET | `/api/articles/related/:id` | `articles#related` | HTML ("You May Also Like" — articles semantically related to `:id`, ranked from precomputed Voyage embeddings) | 1 hr |
 | GET | `/api/whoop` | `whoop#show` | HTML (sleep/recovery/strain) | 5 min |
 | GET | `/api/plausible/pageviews/:id` | `plausible#pageviews` | HTML (pageview count by Contentful id) | 1 hr |
 | POST | `/api/location` | `location#create` | sets Redis `location:current` (bearer-token gated) | — |
@@ -71,9 +72,12 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   reconciliation/recovery path. Operations log at info level (`standard.site: …`).
 - **Background jobs** — native **Sidekiq** (`Sidekiq::Job`, not ActiveJob — ActiveJob stays
   disabled in `application.rb`). Jobs live in `app/sidekiq/`; `StandardSiteSyncJob(operation,
-  entry_id)` runs the standard.site sync (webhook- and backfill-driven). Args are plain strings
-  and every operation is idempotent, so its `retry: 5` is safe; exhausted retries land in the
-  Dead set. Config in `config/initializers/sidekiq.rb` (Redis = `REDIS_URL`, web UI guard) and
+  entry_id)` runs the standard.site sync (webhook- and backfill-driven), and
+  `ArticleEmbeddingJob(operation, entry_id)` keeps an article's Voyage embedding (the
+  `embeddings:article:<id>` Redis key) in sync for the related-articles widget — `"embed"` on
+  publish, `"delete"` on unpublish/delete (webhook-driven, plus the `embeddings:backfill` rake
+  task). Args are plain strings and every operation is idempotent, so `retry: 5` is safe; exhausted
+  retries land in the Dead set. Config in `config/initializers/sidekiq.rb` (Redis = `REDIS_URL`, web UI guard) and
   `config/sidekiq.yml` (concurrency). The **`/sidekiq` web UI** is mounted in `routes.rb` and
   gated by the owner session (Google OAuth — see **Owner auth** above), shared with `/whoop/auth`.
   Sidekiq runs as a dedicated **`worker` fly process** (see fly.toml); a worker must be running
@@ -85,8 +89,9 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   - Edge: `Netlify-CDN-Cache-Control: public, durable, max-age=<ttl>, stale-while-revalidate=3600, stale-if-error=86400`
   ⚠️ The proxy forwards the edge header **only on 2xx** — only emit durable headers on
   successful, cacheable responses. Edge `stale-while-revalidate` defaults to one hour
-  (`DEFAULT_EDGE_STALE_WHILE_REVALIDATE`); the pageviews and upcoming-races widgets pass
-  `edge_stale_while_revalidate: 1.day` since their data barely changes.
+  (`DEFAULT_EDGE_STALE_WHILE_REVALIDATE`); the pageviews, upcoming-races, trending, and
+  related-articles widgets pass `edge_stale_while_revalidate: 1.day` since their data changes
+  slowly relative to the hourly edge max-age.
 - **Error reporting** — `config/initializers/bugsnag.rb` wires the `bugsnag` gem; its railtie
   auto-inserts the Rack middleware and hooks ActionDispatch, so unhandled exceptions are
   reported even though errors render as plain text. `notify_release_stages` is limited to

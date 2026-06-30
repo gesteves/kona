@@ -15,11 +15,15 @@ Rails.application.routes.draw do
   get "/api/events/upcoming" => "api/events#upcoming"
 
   # The trending-articles widget, ranked from Plausible analytics at request time. The bare path
-  # returns every trending article; /exclude/:ids drops a caller-supplied, comma-separated set of
-  # Contentful ids (the cards the embedding page already shows), keyed in the path so the edge cache
-  # (path-only) gives each exclusion set its own entry.
+  # returns every trending article; /:id drops one Contentful id (an article page passes its own id
+  # so it isn't listed as trending), keyed in the path so the edge cache (path-only) gives each its
+  # own entry.
   get "/api/articles/trending" => "api/articles#trending"
-  get "/api/articles/trending/exclude/:ids" => "api/articles#trending_excluding"
+  get "/api/articles/trending/:id" => "api/articles#trending_excluding"
+
+  # The "You May Also Like" widget: articles semantically related to :id (a Contentful entry id),
+  # ranked at request time from precomputed Voyage embeddings.
+  get "/api/articles/related/:id" => "api/articles#related"
 
   # All-time Plausible pageview count for an article, keyed by Contentful ID.
   get "/api/plausible/pageviews/:id" => "api/plausible#pageviews"

@@ -1,7 +1,7 @@
 <%# "Trending Articles" is ranked from Plausible analytics at request time by the API and %>
 <%# swapped in by the live-update controller (which removes it when nothing is trending). %>
-<%# `url` (required local) is the API endpoint: the bare trending path, or an /exclude/:ids %>
-<%# path carrying the sys.ids of cards the page already shows, so trending doesn't repeat them. %>
+<%# `url` (required local) is the API endpoint: the bare trending path, or /:id carrying the %>
+<%# sys.id of the current article, so trending doesn't list the post you're reading. %>
 <section class="collection collection--halves" id="trending-articles" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= url %>" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange">
   <h3 class="collection__heading">Trending Articles</h3>
   <ol class="collection__list">

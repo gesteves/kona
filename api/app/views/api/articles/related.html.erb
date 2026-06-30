@@ -1,0 +1,16 @@
+<%#
+  The "You May Also Like" section, served as a live-update fragment the static site swaps in.
+  Mirrors the trending widget's structure (same collection/entry markup) so the placeholder and this
+  fragment stay structurally in sync; the outer <section> carries the live-update attributes so it
+  keeps refreshing after the swap (and on visibilitychange).
+%>
+<section class="collection collection--halves" id="you-may-also-like" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= live_update_url %>" data-action="visibilitychange@document->live-update#handleVisibilityChange">
+  <h3 class="collection__heading">You May Also Like</h3>
+  <ol class="collection__list">
+    <% @articles.each do |article| %>
+      <li class="collection__item">
+        <%= render "summary", article: article %>
+      </li>
+    <% end %>
+  </ol>
+</section>

@@ -91,7 +91,7 @@ RSpec.describe "Api::Articles trending", type: :request do
       edge = response.headers["Netlify-CDN-Cache-Control"]
       expect(edge).to include("durable")
       expect(edge).to include("max-age=3600")
-      expect(edge).to include("stale-while-revalidate=3600")
+      expect(edge).to include("stale-while-revalidate=86400")
     end
 
     context "when there are no articles" do
@@ -114,27 +114,27 @@ RSpec.describe "Api::Articles trending", type: :request do
     end
   end
 
-  describe "GET /api/articles/trending/exclude/:ids" do
-    it "drops the listed articles and advertises the exclude path as its refetch URL" do
-      get "/api/articles/trending/exclude/a5,a6", headers: auth_headers
+  describe "GET /api/articles/trending/:id" do
+    it "drops the given article and advertises the path as its refetch URL" do
+      get "/api/articles/trending/a5", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).not_to include("Spiking Article")
-      expect(response.body).not_to include("Steady Article")
-      expect(response.body).to include("Newest Article") # a non-excluded article still trends
-      expect(response.body).to include('data-live-update-url-value="/api/articles/trending/exclude/a5,a6"')
+      expect(response.body).not_to include("Spiking Article") # a5 is excluded
+      expect(response.body).to include("Steady Article")       # a non-excluded article still trends
+      expect(response.body).to include("Newest Article")
+      expect(response.body).to include('data-live-update-url-value="/api/articles/trending/a5"')
     end
 
-    it "sanitizes the id list: honors valid ids, ignores garbage, and never errors" do
-      get "/api/articles/trending/exclude/a5,@@@,#{'x' * 100}", headers: auth_headers
+    it "ignores a malformed id (serves full trending) and never errors" do
+      get "/api/articles/trending/@@@", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).not_to include("Spiking Article") # a5 is honored
-      expect(response.body).to include("Steady Article")       # garbage (@@@, over-long) is dropped
+      expect(response.body).to include("Spiking Article") # nothing excluded
+      expect(response.body).to include("Steady Article")
     end
 
     it "requires the API_TOKEN bearer" do
-      get "/api/articles/trending/exclude/a5,a6"
+      get "/api/articles/trending/a5"
       expect(response).to have_http_status(:unauthorized)
     end
   end

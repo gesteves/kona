@@ -1,0 +1,13 @@
+<%# "You May Also Like" is ranked by semantic similarity (article embeddings) at request time by %>
+<%# the API and swapped in by the live-update controller (which removes it when there's nothing %>
+<%# related). `url` (required local) is the API endpoint carrying the article's Contentful id. %>
+<section class="collection collection--halves" id="you-may-also-like" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= url %>" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange">
+  <h3 class="collection__heading">You May Also Like</h3>
+  <ol class="collection__list">
+    <% 4.times do %>
+      <li class="collection__item">
+        <%= partial 'partials/placeholders/entry_skeleton' %>
+      </li>
+    <% end %>
+  </ol>
+</section>

@@ -43,6 +43,12 @@ module Api
 
       StandardSiteSyncJob.perform_async(operation, entry_id) if operation
 
+      # Keep the article's embedding in sync too, so the related-articles widget stays current
+      # without a rebuild (publish (re)embeds; unpublish/delete drops the stored vector).
+      if content_type == ARTICLE_TYPE && entry_id.present?
+        ArticleEmbeddingJob.perform_async(action == "publish" ? "embed" : "delete", entry_id)
+      end
+
       Rails.logger.info("Contentful webhook handled: contentType=#{content_type} entry=#{entry_id} action=#{action} operation=#{operation || 'ignored'}")
       head :no_content
     rescue StandardError => e

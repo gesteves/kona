@@ -15,6 +15,21 @@ class Articles < ApplicationService
     }
   GRAPHQL
 
+  # The text + content version for one article, used to (re)compute its embedding. publishedVersion
+  # bumps on every publish, so it doubles as a content fingerprint for the cached vector.
+  EMBED_QUERY = <<~GRAPHQL.freeze
+    query($id: String!) {
+      articles: articleCollection(where: { sys: { id: $id } }, limit: 1) {
+        items {
+          title
+          intro
+          body
+          sys { id publishedVersion }
+        }
+      }
+    }
+  GRAPHQL
+
   LIST_QUERY = <<~GRAPHQL.freeze
     query($skip: Int, $limit: Int) {
       articles: articleCollection(skip: $skip, limit: $limit) {
@@ -40,6 +55,20 @@ class Articles < ApplicationService
       cached_json("contentful:article:#{id}", expires_in: 5.minutes) do
         underscore_keys(query_articles(FIND_QUERY, { id: id })&.first)
       end
+    end
+
+    item && DeepOstruct.wrap(item)
+  end
+
+  # One article's embedding inputs (title / intro / body / sys.published_version — the real article
+  # content, which is intro+body for a full Article and intro only for a Short), fetched fresh
+  # for the embedding job — not cached, since it's only called on a publish webhook and the version
+  # must reflect the just-published entry. @return [OpenStruct, nil]
+  def find_for_embedding(id)
+    return if id.blank?
+
+    item = rescue_with(context: "Error fetching article #{id} for embedding") do
+      underscore_keys(query_articles(EMBED_QUERY, { id: id })&.first)
     end
 
     item && DeepOstruct.wrap(item)

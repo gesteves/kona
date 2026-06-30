@@ -91,7 +91,8 @@ views build the matching outer element with `live_update_url`.
 | Current weather | `web/source/partials/placeholders/_weather.html.erb` | `api/app/views/api/weather/current.html.erb` | `/api/weather/current` |
 | Pageviews | `web/source/partials/article/_full.html.erb` (inline `span`) | `api/app/views/api/plausible/pageviews.html.erb` | `/api/plausible/pageviews/:id` |
 | Upcoming races (race-day weather is inline in the featured event) | `web/source/partials/_upcoming_races.html.erb` | `api/app/views/api/events/upcoming.html.erb` | `/api/events/upcoming` |
-| Trending articles | `web/source/partials/placeholders/_trending.html.erb` (the embedding page supplies the `url`: bare or `/exclude/:ids`) | `api/app/views/api/articles/trending.html.erb` | `/api/articles/trending` and `/api/articles/trending/exclude/:ids` |
+| Trending articles | `web/source/partials/placeholders/_trending.html.erb` (the embedding page supplies the `url`: bare or `/:id` to exclude the current article) | `api/app/views/api/articles/trending.html.erb` | `/api/articles/trending` and `/api/articles/trending/:id` |
+| Related articles ("You May Also Like") | `web/source/partials/placeholders/_related.html.erb` (the embedding page supplies the `url` with the article's Contentful id) | `api/app/views/api/articles/related.html.erb` | `/api/articles/related/:id` |
 
 Shared CSS lives in `web/source/stylesheets/` (e.g. `stats`, `stats--has-four`,
 `stats--has-three`, `weather`, `event__weather`).
