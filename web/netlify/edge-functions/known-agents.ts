@@ -61,8 +61,6 @@ export default async function handler(request: Request, context: Context): Promi
     return context.next();
   }
 
-  console.log('Visit:', new URL(request.url).pathname, '—', request.headers.get('user-agent') ?? '(none)');
-
   const start = Date.now();
   // The downstream static page / CDN response, returned to the client unchanged.
   const response = await context.next();
