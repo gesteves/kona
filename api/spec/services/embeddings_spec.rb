@@ -29,7 +29,7 @@ RSpec.describe Embeddings do
       described_class::VOYAGE_API_URL,
       hash_including(
         headers: hash_including("Authorization" => "Bearer test-voyage-key"),
-        body: a_string_including('"model":"voyage-4"', '"input_type":"document"', '"input":"Some article text"')
+        body: a_string_including('"model":"voyage-4-large"', '"input_type":"document"', '"input":"Some article text"')
       )
     )
   end

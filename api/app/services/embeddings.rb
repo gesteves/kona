@@ -4,9 +4,10 @@
 # HTTParty + retry/error-handling plumbing from ApplicationService.
 class Embeddings < ApplicationService
   VOYAGE_API_URL = "https://api.voyageai.com/v1/embeddings".freeze
-  # voyage-4: best general-purpose retrieval quality; 1024-dim default. All 4-series embeddings are
-  # mutually compatible, so the stored corpus vectors and a freshly-embedded one are comparable.
-  MODEL = "voyage-4".freeze
+  # voyage-4-large: the best general-purpose retrieval quality in the 4 series; 1024-dim default.
+  # All 4-series embeddings are mutually compatible, but switching models means re-running
+  # embeddings:backfill so the whole corpus is ranked on one model.
+  MODEL = "voyage-4-large".freeze
 
   def initialize
     @api_key = ENV["VOYAGE_API_KEY"]
