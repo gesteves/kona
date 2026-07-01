@@ -1,39 +1,34 @@
 require "set"
 
-# Ranks the "Trending Articles" widget at request time as a "hot right now" signal: which articles are
-# being read *more than their own normal*, right now. Recomputed each clock hour off a short, rolling,
-# hour-granular Plausible window, so the widget genuinely changes through the day instead of echoing a
-# slow 30-day average. The ranking is computed once per hour and shared; callers pick `all` (every hot
+# Ranks the "Trending Articles" widget at request time as a "hot today" signal: which articles are
+# being read *more than their own normal* over roughly the last day or two. Recomputed each clock hour
+# off a short, rolling Plausible window, so the widget moves through the day (as the window rolls and
+# today's pageviews accrue) without the hour-to-hour jumpiness a "right now" signal would have on a
+# low-traffic site. The ranking is computed once per hour and shared; callers pick `all` (every hot
 # article) or `excluding(ids)` (minus a caller-supplied set of Contentful ids — how an article page
 # drops itself so it isn't listed as trending).
 #
 # Scoring (per article), from two Plausible queries anchored on the current clock hour:
-#   * heat    = time-decayed recent pageviews, Σ pv_h · 0.5^(age_hours / HALF_LIFE_HOURS) over the last
-#               RECENT_WINDOW_HOURS — recent hours count most, older ones taper off. This is the
-#               absolute "how much attention is it getting now" term.
+#   * heat    = pageviews over the last RECENT_WINDOW_HOURS (a flat window — every view in the window
+#               counts equally, so a post read this morning still counts tonight). The absolute "how
+#               much attention is it getting" term.
 #   * baseline_rate = the article's normal pageviews/hour over the BASELINE_DAYS *before* the recent
 #               window (so a surge can't inflate its own baseline), spread over the hours it existed.
-#   * surge   = heat / (baseline_rate · S + K) — how much hotter than normal it is, where S is the
-#               decay-weight sum (the heat we'd expect at the normal rate) and K smooths near-zero
-#               baselines. This is the "having a moment" term the widget leans on.
+#   * surge   = heat / (baseline_rate · RECENT_WINDOW_HOURS + K) — how much hotter than normal it is
+#               (K smooths near-zero baselines). This is the "having a moment" term the widget leans on.
 #   * score   = log(surge + 1) · relative_weight + log(heat + 1) · absolute_weight
-# Articles below MIN_RECENT_PAGEVIEWS of raw recent traffic score 0 (noise floor) and fall to the
-# recency tail; articles too new to have a baseline rank on volume alone.
+# Articles below MIN_RECENT_PAGEVIEWS of recent traffic score 0 (noise floor) and fall to the recency
+# tail; articles too new to have a baseline rank on volume alone.
 class TrendingArticles < ApplicationService
-  # The rolling recent window (hours). Hour-granular so the ranking moves through the day; short so it
-  # reflects "now" rather than a slow average. Env-overridable like the weights below.
-  RECENT_WINDOW_HOURS = Integer(ENV.fetch("TRENDING_RECENT_WINDOW_HOURS", 72))
-  # Decay half-life (hours): traffic this many hours old counts half as much. ~24h → the last day
-  # dominates while older hours still contribute a little (so the pool doesn't collapse to nothing).
-  HALF_LIFE_HOURS = Float(ENV.fetch("TRENDING_HALF_LIFE_HOURS", 24))
+  # The rolling recent window (hours). Short enough to be "recent/today", long enough to accumulate a
+  # usable signal on a low-traffic site. Env-overridable like the weights below.
+  RECENT_WINDOW_HOURS = Integer(ENV.fetch("TRENDING_RECENT_WINDOW_HOURS", 48))
   # How far back the "normal rate" baseline reaches (days), ending where the recent window begins.
   BASELINE_DAYS = Integer(ENV.fetch("TRENDING_BASELINE_DAYS", 30))
   # Ignore articles with essentially no recent traffic — their surge ratios are pure noise.
-  MIN_RECENT_PAGEVIEWS = 10
+  MIN_RECENT_PAGEVIEWS = 5
   # Poisson-style smoother in the surge denominator so a near-zero baseline can't explode the ratio.
   SMOOTHING = 1.0
-  # Base of the exponential decay (0.5 == "half-life").
-  DECAY_BASE = 0.5
   # Only article pages (paths like /2026/05/24/slug/), matching web's process_analytics filter.
   ARTICLE_PATH_FILTER = [["matches", "event:page", ["^/20\\d{2}/"]]].freeze
   # Cache and serve only the top slice of the ranking. A caller excludes at most the handful of cards
@@ -79,13 +74,13 @@ class TrendingArticles < ApplicationService
     end
   end
 
-  # Ranks every candidate by "hot right now" score (returns the corpus DeepOstructs, hottest first).
+  # Ranks every candidate by "hot today" score (returns the corpus DeepOstructs, hottest first).
   def rank(t_end)
     articles = candidates
     return [] if articles.blank?
 
-    recent = recent_hourly_series(t_end)  # { path => { heat:, raw: } }
-    baseline = baseline_totals(t_end)     # { path => total_pageviews }
+    recent = pageviews_by_path(date_range: [(t_end - (RECENT_WINDOW_HOURS * 3600)).iso8601, t_end.iso8601])
+    baseline = pageviews_by_path(date_range: [(t_end - (BASELINE_DAYS * 86_400)).iso8601, (t_end - (RECENT_WINDOW_HOURS * 3600)).iso8601])
     warn_if_no_analytics(articles, recent)
 
     baseline_end = t_end - (RECENT_WINDOW_HOURS * 3600)
@@ -94,7 +89,7 @@ class TrendingArticles < ApplicationService
     published = articles.to_h { |article| [article.path, DateTime.parse(article.published_at)] }
 
     evaluated = articles.map do |article|
-      score, heat = evaluate(recent[article.path], baseline[article.path].to_f, published[article.path], baseline_start, baseline_end)
+      score, heat = evaluate(recent[article.path].to_i, baseline[article.path].to_f, published[article.path], baseline_start, baseline_end)
       { article: article, score: score, heat: heat, published: published[article.path] }
     end
 
@@ -112,61 +107,29 @@ class TrendingArticles < ApplicationService
     @articles.list.reject { |a| a.draft || a.entry_type == "Short" || a.path.blank? }
   end
 
-  # One Plausible call → { path => { heat:, raw: } } for the recent window: `heat` is the time-decayed
-  # pageview sum, `raw` the undecayed sum (for the eligibility floor). Decay age is measured from the
-  # latest hour Plausible actually returned (robust to any site/server timezone drift), and the S
-  # normalizer is a pure function of the window (see #decay_weights_sum).
-  def recent_hourly_series(t_end)
+  # One Plausible call → { path => total_pageviews } over the given date range (a flat per-page count).
+  # Used for both the recent window and the baseline period.
+  def pageviews_by_path(date_range:)
     rows = @plausible.query(
       metrics: ["pageviews"],
-      date_range: [(t_end - (RECENT_WINDOW_HOURS * 3600)).iso8601, t_end.iso8601],
-      dimensions: ["event:page", "time:hour"],
-      filters: ARTICLE_PATH_FILTER
-    )&.dig(:results) || []
-
-    parsed = rows.filter_map do |row|
-      path = normalize_path(row[:dimensions]&.first)
-      hour = parse_hour(row[:dimensions] && row[:dimensions][1])
-      next if path.blank? || hour.nil?
-      [path, hour, row[:metrics]&.first.to_i]
-    end
-    return {} if parsed.empty?
-
-    anchor = parsed.map { |(_path, hour, _pv)| hour }.max
-    parsed.each_with_object({}) do |(path, hour, pv), by_path|
-      age_hours = (anchor - hour) / 3600.0
-      next if age_hours.negative? || age_hours >= RECENT_WINDOW_HOURS
-      entry = (by_path[path] ||= { heat: 0.0, raw: 0 })
-      entry[:heat] += pv * (DECAY_BASE**(age_hours / HALF_LIFE_HOURS))
-      entry[:raw] += pv
-    end
-  end
-
-  # One Plausible call → { path => total_pageviews } over the baseline period (the BASELINE_DAYS ending
-  # where the recent window begins), used to derive each article's normal pageviews/hour.
-  def baseline_totals(t_end)
-    rows = @plausible.query(
-      metrics: ["pageviews"],
-      date_range: [(t_end - (BASELINE_DAYS * 86_400)).iso8601, (t_end - (RECENT_WINDOW_HOURS * 3600)).iso8601],
+      date_range: date_range,
       dimensions: ["event:page"],
       filters: ARTICLE_PATH_FILTER
     )&.dig(:results) || []
 
-    rows.each_with_object({}) do |row, totals|
+    rows.each_with_object(Hash.new(0)) do |row, totals|
       path = normalize_path(row[:dimensions]&.first)
       next if path.blank?
-      totals[path] = row[:metrics]&.first.to_i
+      totals[path] += row[:metrics]&.first.to_i
     end
   end
 
   # Scores one article. Returns [score, heat] (heat is the tiebreaker). Below the recent-traffic floor
   # → [0, 0] (sorts into the recency tail). Too new for a baseline → volume-only.
-  def evaluate(recent, baseline_total, published, baseline_start, baseline_end)
-    recent ||= { heat: 0.0, raw: 0 }
-    return [0.0, 0.0] if recent[:raw] < MIN_RECENT_PAGEVIEWS
+  def evaluate(recent_pageviews, baseline_total, published, baseline_start, baseline_end)
+    return [0.0, 0.0] if recent_pageviews < MIN_RECENT_PAGEVIEWS
 
-    heat = recent[:heat]
-    volume = Math.log(heat + 1)
+    volume = Math.log(recent_pageviews + 1)
 
     # Hours the article existed within the baseline window (before the recent window), so a young post
     # isn't penalized for the pre-publish days it didn't exist.
@@ -179,28 +142,21 @@ class TrendingArticles < ApplicationService
         # young-post branch), so a launch burst still surfaces without an infinite surge ratio.
         volume * absolute_weight
       else
-        baseline_rate = baseline_total / baseline_hours
-        expected_heat = baseline_rate * decay_weights_sum
-        surge = heat / (expected_heat + SMOOTHING)
+        baseline_rate = baseline_total / baseline_hours                 # pageviews/hour
+        expected = baseline_rate * RECENT_WINDOW_HOURS                  # expected pageviews over the window
+        surge = recent_pageviews / (expected + SMOOTHING)
         Math.log(surge + 1) * relative_weight + volume * absolute_weight
       end
 
-    [score, heat]
-  end
-
-  # Σ over the window of the per-hour decay weights — the heat an article would accrue at a steady rate
-  # of one pageview/hour, i.e. the normalizer that turns baseline_rate into an expected heat. Constant
-  # for a given window/half-life, so memoized.
-  def decay_weights_sum
-    @decay_weights_sum ||= (0...RECENT_WINDOW_HOURS).sum { |i| DECAY_BASE**(i / HALF_LIFE_HOURS) }
+    [score, recent_pageviews.to_f]
   end
 
   def relative_weight
     @relative_weight ||= ENV.fetch("TRENDING_SCORE_RELATIVE_WEIGHT", 1).to_f
   end
 
-  # Defaults below 1 so the volume term stays a guard (keeping a 0→3 blip from outranking a real surge)
-  # while the surge term leads — the widget is "having a moment", not "most-read of all time".
+  # Defaults below 1 so the volume term stays a guard (keeping a small blip from outranking a real
+  # surge) while the surge term leads — the widget is "having a moment", not "most-read of all time".
   def absolute_weight
     @absolute_weight ||= ENV.fetch("TRENDING_SCORE_ABSOLUTE_WEIGHT", 0.5).to_f
   end
@@ -209,14 +165,6 @@ class TrendingArticles < ApplicationService
   def normalize_path(path)
     return if path.blank?
     path.to_s.sub(/index\.html\z/, "")
-  end
-
-  # Parses a Plausible time:hour bucket label ("YYYY-MM-DD HH:MM:SS") to a Time, or nil if unparseable.
-  def parse_hour(label)
-    return if label.blank?
-    Time.parse(label.to_s)
-  rescue ArgumentError
-    nil
   end
 
   # The fields the trending-card view renders, so the cached ranking is self-contained.
@@ -236,7 +184,7 @@ class TrendingArticles < ApplicationService
   # Cheap signal for "analytics unavailable or a path-format regression": candidates present but zero
   # recent pageviews for all of them → trending silently collapses to recency order.
   def warn_if_no_analytics(articles, recent)
-    return if articles.any? { |a| recent[a.path]&.fetch(:raw, 0).to_i.positive? }
+    return if articles.any? { |a| recent[a.path].to_i.positive? }
     Rails.logger.info("TrendingArticles: no recent pageviews for any of #{articles.size} candidates over #{RECENT_WINDOW_HOURS}h (Plausible down or path mismatch?)")
   end
 end

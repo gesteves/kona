@@ -12,13 +12,12 @@ RSpec.describe TrendingArticles do
     )
   end
 
-  # Frozen "now" so the rolling hour window and cache key are deterministic.
+  # Frozen "now" so the rolling window and cache key are deterministic.
   let(:now) { Time.utc(2024, 6, 15, 12, 0, 0) }
-  let(:t_end) { now.beginning_of_hour }
 
-  # a1–a4 have no recent traffic (they fill the recency tail); a5 surges (small recent burst on a low
-  # baseline); a6 is steadily popular (lots of traffic, but in line with its own high baseline). a5/a6
-  # were published well before the baseline window starts, so they have a full baseline history.
+  # a1–a4 have no recent traffic (they fill the recency tail); a5 surges (a modest recent count on a
+  # tiny baseline); a6 is steadily popular (lots of traffic, but in line with its own high baseline).
+  # a5/a6 were published well before the baseline window starts, so they have a full baseline history.
   let(:art_newest)   { article(id: "a1", slug: "newest",   published_at: "2024-05-30T10:00:00Z") }
   let(:art_april)    { article(id: "a2", slug: "april",    published_at: "2024-04-01T10:00:00Z") }
   let(:art_march)    { article(id: "a3", slug: "march",    published_at: "2024-03-01T10:00:00Z") }
@@ -31,14 +30,9 @@ RSpec.describe TrendingArticles do
   let(:corpus) { [art_newest, art_april, art_march, art_february, art_spiking, art_steady, art_short, art_draft] }
 
   # a5: 15 recent views (over the floor) on a tiny baseline → big surge.
-  # a6: steady 3 views/hour for the last day on a large baseline → high volume, surge ≈ 1.
-  let(:hourly) do
-    hourly_rows(
-      art_spiking.path => [[0, 8], [1, 7]],
-      art_steady.path  => (0..23).map { |h| [h, 3] }
-    )
-  end
-  let(:baseline) { baseline_rows(art_spiking.path => 30, art_steady.path => 2000) }
+  # a6: 72 recent views on a large baseline → high volume, but surge ≈ 1.
+  let(:recent) { rows(art_spiking.path => 15, art_steady.path => 72) }
+  let(:baseline) { rows(art_spiking.path => 30, art_steady.path => 2000) }
 
   let(:articles_service) { instance_double(Articles, list: corpus) }
   let(:plausible_service) { instance_double(Plausible) }
@@ -48,33 +42,24 @@ RSpec.describe TrendingArticles do
   after { travel_back }
 
   before do
-    stub_plausible(hourly: hourly, baseline: baseline)
+    stub_plausible(recent: recent, baseline: baseline)
     # The ranking is cached via cached_json; stub Redis so the suite stays Redis-free and isolated.
     allow($redis).to receive(:get).and_return(nil)
     allow($redis).to receive(:setex)
   end
 
-  # A Plausible time:hour bucket label `hours_ago` before the window end.
-  def hour_label(hours_ago)
-    (t_end - (hours_ago * 3600)).strftime("%Y-%m-%d %H:00:00")
-  end
-
-  # { path => [[hours_ago, pv], ...] } → time:hour rows.
-  def hourly_rows(by_path)
-    by_path.flat_map do |path, points|
-      points.map { |hours_ago, pv| { dimensions: [path, hour_label(hours_ago)], metrics: [pv] } }
-    end
-  end
-
-  # { path => total } → event:page aggregate rows (baseline).
-  def baseline_rows(by_path)
+  # { path => total_pageviews } → event:page rows.
+  def rows(by_path)
     by_path.map { |path, total| { dimensions: [path], metrics: [total] } }
   end
 
-  # Branch on the query: the hourly recent series vs. the aggregate baseline.
-  def stub_plausible(hourly:, baseline:)
+  # The recent window and the baseline are two event:page queries over different date ranges; branch on
+  # the range span (recent is short, baseline is ~a month) to answer each.
+  def stub_plausible(recent:, baseline:)
     allow(plausible_service).to receive(:query) do |**kwargs|
-      (kwargs[:dimensions] || []).include?("time:hour") ? { results: hourly } : { results: baseline }
+      first, last = kwargs[:date_range]
+      span_hours = (Time.parse(last) - Time.parse(first)) / 3600.0
+      { results: span_hours <= (described_class::RECENT_WINDOW_HOURS + 1) ? recent : baseline }
     end
   end
 
@@ -86,39 +71,35 @@ RSpec.describe TrendingArticles do
       expect(ids).to eq(%w[a5 a6 a1 a2 a3 a4])
     end
 
+    it "ranks a small surge over its own low baseline above the same recent volume on a high baseline" do
+      low  = article(id: "l1", slug: "low",  published_at: "2024-01-01T10:00:00Z")
+      high = article(id: "h1", slug: "high", published_at: "2024-01-01T10:00:00Z")
+      allow(articles_service).to receive(:list).and_return([low, high])
+      # Identical recent volume, but `low` is way above its own normal while `high` is below its.
+      stub_plausible(
+        recent: rows(low.path => 20, high.path => 20),
+        baseline: rows(low.path => 20, high.path => 4000)
+      )
+      expect(service.all(count: 2).map { |a| a.sys.id }).to eq(%w[l1 h1])
+    end
+
     it "excludes drafts and Shorts" do
       ids = service.all(count: 10).map { |a| a.sys.id }
       expect(ids).not_to include("s1", "d1")
     end
 
     it "ignores recent traffic below the eligibility floor" do
-      # 6 recent views (< MIN_RECENT_PAGEVIEWS) on a zero baseline would surge hugely without the floor;
+      # 3 recent views (< MIN_RECENT_PAGEVIEWS) on a zero baseline would surge hugely without the floor;
       # the floor zeroes it, so it sinks to recency order (oldest last).
       noisy = article(id: "n1", slug: "noisy", published_at: "2023-11-01T10:00:00Z")
       allow(articles_service).to receive(:list).and_return(corpus + [noisy])
-      stub_plausible(
-        hourly: hourly + hourly_rows(noisy.path => [[0, 3], [1, 3]]),
-        baseline: baseline
-      )
+      stub_plausible(recent: recent + rows(noisy.path => 3), baseline: baseline)
       ids = service.all(count: 10).map { |a| a.sys.id }
       expect(ids).to eq(%w[a5 a6 a1 a2 a3 a4 n1])
     end
 
-    it "weights recent hours above older ones (decay)" do
-      recent = article(id: "r1", slug: "recent", published_at: "2024-01-01T10:00:00Z")
-      old    = article(id: "o1", slug: "older",  published_at: "2024-01-01T10:00:00Z")
-      allow(articles_service).to receive(:list).and_return([recent, old])
-      # Same total views and same baseline, but `recent`'s are in the last two hours and `old`'s are
-      # ~40 hours back, so decay ranks recent first.
-      stub_plausible(
-        hourly: hourly_rows(recent.path => [[0, 10], [1, 10]], old.path => [[40, 10], [41, 10]]),
-        baseline: baseline_rows(recent.path => 100, old.path => 100)
-      )
-      expect(service.all(count: 2).map { |a| a.sys.id }).to eq(%w[r1 o1])
-    end
-
     it "falls back to recency order when there's no recent traffic" do
-      stub_plausible(hourly: [], baseline: [])
+      stub_plausible(recent: [], baseline: [])
       ids = service.all(count: 10).map { |a| a.sys.id }
       expect(ids).to eq(%w[a1 a2 a3 a4 a5 a6])
     end
