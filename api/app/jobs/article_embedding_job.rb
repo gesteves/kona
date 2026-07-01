@@ -4,11 +4,8 @@
 # (embed overwrites, delete is a no-op on a missing key), so the retries below are safe. The stored
 # value is a JSON `{ version:, vector: }` keyed by Contentful id; RelatedArticles reads it at request
 # time so the related-articles endpoint never has to call Voyage itself.
-class ArticleEmbeddingJob
-  include Sidekiq::Job
+class ArticleEmbeddingJob < ApplicationJob
   include MarkdownHelper # markdown_to_html, to strip the body down to plain prose before embedding
-
-  sidekiq_options retry: 5
 
   REDIS_KEY_PREFIX = "embeddings:article:".freeze
 

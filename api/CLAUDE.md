@@ -71,7 +71,8 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   does **not** retry deliveries, so `rake standard_site:backfill` remains the broader
   reconciliation/recovery path. Operations log at info level (`standard.site: …`).
 - **Background jobs** — native **Sidekiq** (`Sidekiq::Job`, not ActiveJob — ActiveJob stays
-  disabled in `application.rb`). Jobs live in `app/sidekiq/`; `StandardSiteSyncJob(operation,
+  disabled in `application.rb`). Jobs live in `app/jobs/` and inherit from `ApplicationJob` (a
+  plain `Sidekiq::Job` superclass holding the shared `retry: 5`); `StandardSiteSyncJob(operation,
   entry_id)` runs the standard.site sync (webhook- and backfill-driven), and
   `ArticleEmbeddingJob(operation, entry_id)` keeps an article's Voyage embedding (the
   `embeddings:article:<id>` Redis key) in sync for the related-articles widget — `"embed"` on

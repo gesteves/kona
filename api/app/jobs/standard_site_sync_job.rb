@@ -4,11 +4,7 @@
 # no-op on a missing record — so the automatic retries below are safe. After the retries are
 # exhausted the job lands in the Dead set (visible in the web UI); the standard_site:backfill
 # task remains the broader reconciliation path.
-class StandardSiteSyncJob
-  include Sidekiq::Job
-
-  sidekiq_options retry: 5
-
+class StandardSiteSyncJob < ApplicationJob
   # @param operation [String] "sync_document", "delete_document", or "sync_publication".
   # @param entry_id [String, nil] The Contentful entry id (unused for "sync_publication").
   def perform(operation, entry_id = nil)
