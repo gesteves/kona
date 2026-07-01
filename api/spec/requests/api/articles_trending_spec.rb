@@ -20,31 +20,37 @@ RSpec.describe "Api::Articles trending", type: :request do
 
   let(:corpus) { [art_newest, art_april, art_march, art_february, art_spiking, art_steady, art_short] }
 
-  # The spiking article has a low baseline with a big recent surge; the steady one has flat,
-  # moderate traffic; everyone else has none. So ranking is: spiking, steady, then the rest by recency.
-  def days_back(count)
-    (0...count).map { |i| Date.current - i }
+  # a5 surges (a small recent burst on a tiny baseline); a6 is steadily popular (high traffic in line
+  # with its own high baseline); everyone else has no traffic. So ranking is: a5, a6, then the rest by
+  # recency. Hour-bucket labels are relative to a fixed reference — only their spacing matters, since
+  # the service anchors decay on the latest returned bucket.
+  let(:ref) { Time.utc(2024, 6, 15, 12, 0, 0) }
+
+  def hour_label(hours_ago)
+    (ref - (hours_ago * 3600)).strftime("%Y-%m-%d %H:00:00")
   end
 
-  def spike_series(base:, spike:, days: TrendingArticles::WINDOW_DAYS)
-    days_back(days).each_with_index.to_h { |day, i| [day, i < TrendingArticles::RECENT_DAYS ? spike : base] }
+  def hourly_rows(by_path)
+    by_path.flat_map do |path, points|
+      points.map { |hours_ago, pv| { dimensions: [path, hour_label(hours_ago)], metrics: [pv] } }
+    end
   end
 
-  def flat_series(rate:, days: TrendingArticles::WINDOW_DAYS)
-    days_back(days).to_h { |day| [day, rate] }
+  def baseline_rows(by_path)
+    by_path.map { |path, total| { dimensions: [path], metrics: [total] } }
   end
 
   before do
     allow_any_instance_of(Articles).to receive(:list).and_return(corpus)
-    allow_any_instance_of(Plausible).to receive(:query) do
-      series = {
-        art_spiking.path => spike_series(base: 2, spike: 40),
-        art_steady.path  => flat_series(rate: 5)
-      }
-      rows = series.flat_map do |path, by_day|
-        by_day.map { |day, pv| { dimensions: [path, day.iso8601], metrics: [pv] } }
-      end
-      { results: rows }
+    hourly = hourly_rows(
+      art_spiking.path => [[0, 8], [1, 7]],
+      art_steady.path  => (0..23).map { |h| [h, 3] }
+    )
+    baseline = baseline_rows(art_spiking.path => 30, art_steady.path => 2000)
+    # The recent hourly series and the aggregate baseline are two separate queries; branch on the
+    # time:hour dimension to answer each.
+    allow_any_instance_of(Plausible).to receive(:query) do |**kwargs|
+      (kwargs[:dimensions] || []).include?("time:hour") ? { results: hourly } : { results: baseline }
     end
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
     # The ranking is cached via cached_json; stub Redis so the suite stays Redis-free and examples

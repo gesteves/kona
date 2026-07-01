@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe TrendingArticles do
+  include ActiveSupport::Testing::TimeHelpers
+
   # Builds a decorated article the way Articles#list returns it.
   def article(id:, slug:, published_at:, title: "Title", summary: "Summary.", entry_type: "Article", draft: false)
     path = "/#{DateTime.parse(published_at).strftime('%Y/%m/%d')}/#{slug}/"
@@ -10,71 +12,78 @@ RSpec.describe TrendingArticles do
     )
   end
 
-  # a1–a4 are the four most recent (the "recent" set); a5 (spiking) and a6 (steady) are older.
-  let(:art_newest)   { article(id: "a1", slug: "newest",   published_at: "2024-12-30T10:00:00Z") }
+  # Frozen "now" so the rolling hour window and cache key are deterministic.
+  let(:now) { Time.utc(2024, 6, 15, 12, 0, 0) }
+  let(:t_end) { now.beginning_of_hour }
+
+  # a1–a4 have no recent traffic (they fill the recency tail); a5 surges (small recent burst on a low
+  # baseline); a6 is steadily popular (lots of traffic, but in line with its own high baseline). a5/a6
+  # were published well before the baseline window starts, so they have a full baseline history.
+  let(:art_newest)   { article(id: "a1", slug: "newest",   published_at: "2024-05-30T10:00:00Z") }
   let(:art_april)    { article(id: "a2", slug: "april",    published_at: "2024-04-01T10:00:00Z") }
   let(:art_march)    { article(id: "a3", slug: "march",    published_at: "2024-03-01T10:00:00Z") }
   let(:art_february) { article(id: "a4", slug: "february", published_at: "2024-02-01T10:00:00Z") }
-  let(:art_spiking)  { article(id: "a5", slug: "spiking",  published_at: "2024-01-01T10:00:00Z") }
-  let(:art_steady)   { article(id: "a6", slug: "steady",   published_at: "2023-12-01T10:00:00Z") }
-  let(:art_short)    { article(id: "s1", slug: "short",    published_at: "2024-06-01T10:00:00Z", entry_type: "Short") }
-  let(:art_draft)    { article(id: "d1", slug: "draft",    published_at: "2024-05-01T10:00:00Z", draft: true) }
+  let(:art_spiking)  { article(id: "a5", slug: "spiking",  published_at: "2024-01-15T10:00:00Z") }
+  let(:art_steady)   { article(id: "a6", slug: "steady",   published_at: "2024-01-01T10:00:00Z") }
+  let(:art_short)    { article(id: "s1", slug: "short",    published_at: "2024-05-01T10:00:00Z", entry_type: "Short") }
+  let(:art_draft)    { article(id: "d1", slug: "draft",    published_at: "2024-05-02T10:00:00Z", draft: true) }
 
   let(:corpus) { [art_newest, art_april, art_march, art_february, art_spiking, art_steady, art_short, art_draft] }
 
-  # Daily series keyed by path. The spiking article has a low baseline with a big recent surge; the
-  # steady article has flat, moderate traffic. Everyone else has none.
-  let(:series) do
-    {
-      art_spiking.path => spike_series(base: 2, spike: 40),
-      art_steady.path  => flat_series(rate: 5)
-    }
+  # a5: 15 recent views (over the floor) on a tiny baseline → big surge.
+  # a6: steady 3 views/hour for the last day on a large baseline → high volume, surge ≈ 1.
+  let(:hourly) do
+    hourly_rows(
+      art_spiking.path => [[0, 8], [1, 7]],
+      art_steady.path  => (0..23).map { |h| [h, 3] }
+    )
   end
+  let(:baseline) { baseline_rows(art_spiking.path => 30, art_steady.path => 2000) }
 
   let(:articles_service) { instance_double(Articles, list: corpus) }
   let(:plausible_service) { instance_double(Plausible) }
   subject(:service) { described_class.new(articles: articles_service, plausible: plausible_service) }
 
+  before { travel_to(now) }
+  after { travel_back }
+
   before do
-    stub_series(series)
+    stub_plausible(hourly: hourly, baseline: baseline)
     # The ranking is cached via cached_json; stub Redis so the suite stays Redis-free and isolated.
     allow($redis).to receive(:get).and_return(nil)
     allow($redis).to receive(:setex)
   end
 
-  # The last `WINDOW_DAYS` calendar dates, most-recent first.
-  def days_back(count)
-    (0...count).map { |i| Date.current - i }
+  # A Plausible time:hour bucket label `hours_ago` before the window end.
+  def hour_label(hours_ago)
+    (t_end - (hours_ago * 3600)).strftime("%Y-%m-%d %H:00:00")
   end
 
-  # Flat baseline with `spike` pageviews on the last RECENT_DAYS days, `base` before that.
-  def spike_series(base:, spike:, days: described_class::WINDOW_DAYS)
-    days_back(days).each_with_index.to_h { |day, i| [day, i < described_class::RECENT_DAYS ? spike : base] }
+  # { path => [[hours_ago, pv], ...] } → time:hour rows.
+  def hourly_rows(by_path)
+    by_path.flat_map do |path, points|
+      points.map { |hours_ago, pv| { dimensions: [path, hour_label(hours_ago)], metrics: [pv] } }
+    end
   end
 
-  def flat_series(rate:, days: described_class::WINDOW_DAYS)
-    days_back(days).to_h { |day| [day, rate] }
+  # { path => total } → event:page aggregate rows (baseline).
+  def baseline_rows(by_path)
+    by_path.map { |path, total| { dimensions: [path], metrics: [total] } }
   end
 
-  # Stubs Plausible#query to return time:day rows ({ dimensions: [path, "YYYY-MM-DD"], metrics: [pv] }).
-  def stub_series(series_by_path)
-    allow(plausible_service).to receive(:query) do
-      rows = series_by_path.flat_map do |path, by_day|
-        by_day.map { |day, pv| { dimensions: [path, day.iso8601], metrics: [pv] } }
-      end
-      { results: rows }
+  # Branch on the query: the hourly recent series vs. the aggregate baseline.
+  def stub_plausible(hourly:, baseline:)
+    allow(plausible_service).to receive(:query) do |**kwargs|
+      (kwargs[:dimensions] || []).include?("time:hour") ? { results: hourly } : { results: baseline }
     end
   end
 
   describe "#all" do
-    it "ranks the spiking article ahead of steady ones, then the rest by recency" do
+    it "ranks the surging article ahead of a steadily-popular one, then the rest by recency" do
       ids = service.all(count: 10).map { |a| a.sys.id }
-      # a5 spikes, a6 is steady; the zero-scored remainder follows newest-first (a1 is the newest).
+      # a5 is hot relative to its own normal; a6 is popular but in line with its baseline; the
+      # zero-traffic remainder follows newest-first (a1 is the newest).
       expect(ids).to eq(%w[a5 a6 a1 a2 a3 a4])
-    end
-
-    it "includes recent articles (no recency exclusion lives in the service anymore)" do
-      expect(service.all(count: 4).map { |a| a.sys.id }).to include("a1")
     end
 
     it "excludes drafts and Shorts" do
@@ -82,22 +91,34 @@ RSpec.describe TrendingArticles do
       expect(ids).not_to include("s1", "d1")
     end
 
-    it "scores articles with no recent activity at 0, so spiking wins" do
-      expect(service.all(count: 4).first.sys.id).to eq("a5")
-    end
-
-    it "ignores low-volume noise below the eligibility floor" do
-      # A 0→2 'spike' (6 views total, below MIN_WINDOW_PAGEVIEWS) would score a z≈2 without the floor
-      # and leapfrog the steady article; the floor zeroes it, so it sinks to recency order (oldest last).
+    it "ignores recent traffic below the eligibility floor" do
+      # 6 recent views (< MIN_RECENT_PAGEVIEWS) on a zero baseline would surge hugely without the floor;
+      # the floor zeroes it, so it sinks to recency order (oldest last).
       noisy = article(id: "n1", slug: "noisy", published_at: "2023-11-01T10:00:00Z")
       allow(articles_service).to receive(:list).and_return(corpus + [noisy])
-      stub_series(series.merge(noisy.path => spike_series(base: 0, spike: 2)))
+      stub_plausible(
+        hourly: hourly + hourly_rows(noisy.path => [[0, 3], [1, 3]]),
+        baseline: baseline
+      )
       ids = service.all(count: 10).map { |a| a.sys.id }
-      expect(ids).to eq(%w[a5 a6 a1 a2 a3 a4 n1]) # spike wins, steady second, noise scored 0 → last
+      expect(ids).to eq(%w[a5 a6 a1 a2 a3 a4 n1])
     end
 
-    it "falls back to recency order when analytics are unavailable" do
-      stub_series({}) # no pageviews for anyone → all scores 0
+    it "weights recent hours above older ones (decay)" do
+      recent = article(id: "r1", slug: "recent", published_at: "2024-01-01T10:00:00Z")
+      old    = article(id: "o1", slug: "older",  published_at: "2024-01-01T10:00:00Z")
+      allow(articles_service).to receive(:list).and_return([recent, old])
+      # Same total views and same baseline, but `recent`'s are in the last two hours and `old`'s are
+      # ~40 hours back, so decay ranks recent first.
+      stub_plausible(
+        hourly: hourly_rows(recent.path => [[0, 10], [1, 10]], old.path => [[40, 10], [41, 10]]),
+        baseline: baseline_rows(recent.path => 100, old.path => 100)
+      )
+      expect(service.all(count: 2).map { |a| a.sys.id }).to eq(%w[r1 o1])
+    end
+
+    it "falls back to recency order when there's no recent traffic" do
+      stub_plausible(hourly: [], baseline: [])
       ids = service.all(count: 10).map { |a| a.sys.id }
       expect(ids).to eq(%w[a1 a2 a3 a4 a5 a6])
     end
@@ -119,8 +140,7 @@ RSpec.describe TrendingArticles do
     end
 
     it "matches Plausible pageviews by the article's /YYYY/MM/DD/slug/ path" do
-      expect(art_spiking.path).to eq("/2024/01/01/spiking/")
-      # spiking only surfaces because its daily series is keyed by that exact path
+      expect(art_spiking.path).to eq("/2024/01/15/spiking/")
       expect(service.all(count: 10).map { |a| a.sys.id }).to include("a5")
     end
   end
@@ -144,21 +164,32 @@ RSpec.describe TrendingArticles do
   end
 
   describe "caching" do
-    it "computes the ranking once and reuses it across variants, so extra requests hit no upstream APIs" do
-      # A real (in-memory) read-through cache instead of the suite's get→nil stub, so the second and
-      # later calls genuinely hit the cache.
+    it "computes the ranking once per clock hour and reuses it across variants" do
       store = {}
       allow($redis).to receive(:get) { |key| store[key] }
       allow($redis).to receive(:setex) { |key, _ttl, value| store[key] = value }
 
       service.all(count: 4)
       service.excluding(%w[a5], count: 4)
-      service.excluding(%w[garbage-id], count: 4) # different (and bogus) exclusion set → same cache key
+      service.excluding(%w[garbage-id], count: 4)
 
-      # rank — the only code that calls Plausible and Articles#list — runs exactly once; every other
-      # request (any exclusion set, garbage included) is served from the single id-independent key.
-      expect(plausible_service).to have_received(:query).once
+      # rank runs once for the hour: the two Plausible queries (recent + baseline) and Articles#list
+      # each fire exactly once, no matter the exclusion set.
+      expect(plausible_service).to have_received(:query).twice
       expect(articles_service).to have_received(:list).once
+    end
+
+    it "recomputes when the clock rolls to a new hour" do
+      store = {}
+      allow($redis).to receive(:get) { |key| store[key] }
+      allow($redis).to receive(:setex) { |key, _ttl, value| store[key] = value }
+
+      service.all(count: 4)
+      travel_to(now + 1.hour)
+      service.all(count: 4)
+
+      # A fresh hour → a fresh cache key → a second compute (two more Plausible queries).
+      expect(plausible_service).to have_received(:query).exactly(4).times
     end
   end
 end

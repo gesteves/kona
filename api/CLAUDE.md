@@ -20,7 +20,7 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 | GET | `/api/activity-stats` | `activity_stats#show` | HTML (Intervals.icu totals) | 5 min |
 | GET | `/api/weather/current` | `weather#current` | HTML (weather/AQI/pollen) | 5 min |
 | GET | `/api/events/upcoming` | `events#upcoming` | HTML (upcoming races; featured event has inline race-day weather) | 1 hr |
-| GET | `/api/articles/trending` | `articles#trending` | HTML (all trending articles, ranked from Plausible) | 1 hr |
+| GET | `/api/articles/trending` | `articles#trending` | HTML ("hot right now" articles — hour-granular Plausible surge vs. each post's own baseline, recomputed hourly) | 1 hr |
 | GET | `/api/articles/trending/:id` | `articles#trending_excluding` | HTML (trending minus one Contentful id — an article page passes its own id so it isn't listed) | 1 hr |
 | GET | `/api/articles/related/:id` | `articles#related` | HTML ("You May Also Like" — articles semantically related to `:id`, ranked from precomputed Voyage embeddings) | 1 hr |
 | GET | `/api/whoop` | `whoop#show` | HTML (sleep/recovery/strain) | 5 min |
