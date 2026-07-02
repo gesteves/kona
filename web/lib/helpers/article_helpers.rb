@@ -24,9 +24,12 @@ module ArticleHelpers
       title: "Published at #{published.strftime('%-I:%M %p')}",
       "data-publish-date-target": "timestamp"
     }
-    content_tag :a, options do
+    link = content_tag :a, options do
       published.strftime('%A, %B %-e, %Y')
     end
+    # Wrap in a <time> so the ISO publish instant is machine-readable. The Stimulus controller
+    # swaps the inner <a>'s content for recent posts; this wrapper (and its datetime) is untouched.
+    content_tag :time, link, datetime: published.iso8601
   end
 
   # Determines whether the content should be hidden from search engines.
@@ -141,7 +144,7 @@ module ArticleHelpers
   # @see https://developers.google.com/search/docs/appearance/structured-data/breadcrumb
   # @return [String] A JSON-LD formatted string representing the breadcrumb schema.
   def breadcrumb_schema(content)
-    return if content.draft || content.entry_type != 'Article'
+    return if content.draft || !%w[Article Short].include?(content.entry_type)
     
     schema = {
       "@context": "https://schema.org",

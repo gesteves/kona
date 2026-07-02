@@ -27,10 +27,10 @@
 <% end %>
 
 <meta property="og:url" content="<%= full_url(current_page.url) %>">
-<% if defined?(content) && content.entry_type == 'Article' %>
-  <meta property="og:type" content="Article">
+<% if defined?(content) && %w[Article Short].include?(content.entry_type) %>
+  <meta property="og:type" content="article">
 <% else %>
-  <meta property="og:type" content="Website">
+  <meta property="og:type" content="website">
 <% end %>
 
 <% if defined?(content) && %w{ Article Short }.include?(content.entry_type) %>

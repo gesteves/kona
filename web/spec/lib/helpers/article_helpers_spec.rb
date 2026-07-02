@@ -1,5 +1,6 @@
 require 'spec_helper'
 require 'ostruct'
+require 'padrino-helpers'
 
 # RSpec auto-includes the described module, so ArticleHelpers' instance methods are callable directly.
 RSpec.describe ArticleHelpers do
@@ -179,6 +180,36 @@ RSpec.describe ArticleHelpers do
       expect(schema['image']).to all(include('@type' => 'ImageObject'))
       expect(schema['image'].map { |i| [i['width'], i['height']] })
         .to eq([[1000, 1000], [1600, 900], [1600, 1200]])
+    end
+  end
+
+  describe '#breadcrumb_schema' do
+    def full_url(path) = "https://example.com#{path}"
+    def canonical_url = 'https://example.com/2024/01/01/post/'
+
+    it 'builds a Home > Blog > title breadcrumb for both articles and shorts' do
+      %w[Article Short].each do |type|
+        schema = JSON.parse(breadcrumb_schema(article(slug: 'post', title: 'A Post', entry_type: type)))
+        expect(schema['@type']).to eq('BreadcrumbList')
+        expect(schema['itemListElement'].map { |i| i['name'] }).to eq(%w[Home Blog] + ['A Post'])
+      end
+    end
+
+    it 'returns nil for drafts and for non-article/short entries' do
+      expect(breadcrumb_schema(article(slug: 'draft', draft: true))).to be_nil
+      expect(breadcrumb_schema(article(slug: 'about', entry_type: 'Page'))).to be_nil
+    end
+  end
+
+  describe '#article_permalink_timestamp' do
+    include Padrino::Helpers
+
+    it 'wraps the permalink anchor in a <time> carrying the ISO publish instant' do
+      result = article_permalink_timestamp(article(slug: 'post', published_at: '2024-01-01T10:00:00Z'))
+      expect(result).to start_with('<time datetime="2024-01-01T10:00:00+00:00">')
+      expect(result).to end_with('</time>')
+      expect(result).to include('data-publish-date-target="timestamp"')
+      expect(result).to include('Monday, January 1, 2024')
     end
   end
 end

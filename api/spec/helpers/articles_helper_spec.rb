@@ -20,5 +20,11 @@ RSpec.describe ArticlesHelper do
     it "renders the publication date as the (no-JS fallback) text" do
       expect(helper.article_permalink_timestamp(article)).to include("Monday, January 1, 2024")
     end
+
+    it "wraps the anchor in a <time> carrying the machine-readable publish instant" do
+      result = helper.article_permalink_timestamp(article)
+      expect(result).to start_with('<time datetime="2024-01-01T10:00:00+00:00">')
+      expect(result).to end_with("</time>")
+    end
   end
 end
