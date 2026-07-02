@@ -2,9 +2,9 @@
 // often typed by mistake, with the proper degree sign (°, U+00B0) in article body/intro.
 // Mirrors the web render-time helper `fix_degrees` (lib/helpers/text_helpers.rb).
 //
-// Run with `npm run fix:degrees`, which loads web/.env (via `node --env-file`) so
-// CONTENTFUL_SPACE and CONTENTFUL_MANAGEMENT_TOKEN are available. It prints the plan and
-// prompts before applying. Optional env vars:
+// Run with `npm run fix:degrees` (from contentful/), which loads contentful/.env (via
+// `node --env-file`) so CONTENTFUL_SPACE and CONTENTFUL_MANAGEMENT_TOKEN are available.
+// It prints the plan and prompts before applying. Optional env vars:
 //   ENTRY_ID=<sys.id>             restrict the fix to a single entry (extra-safe trial)
 //   CONTENTFUL_ENVIRONMENT=<env>  target a non-master environment (default: master)
 const { runMigration } = require('contentful-migration');
@@ -39,7 +39,7 @@ const accessToken = process.env.CONTENTFUL_MANAGEMENT_TOKEN;
 
 if (!spaceId || !accessToken) {
   console.error(
-    'Missing CONTENTFUL_SPACE and/or CONTENTFUL_MANAGEMENT_TOKEN — set them in web/.env.'
+    'Missing CONTENTFUL_SPACE and/or CONTENTFUL_MANAGEMENT_TOKEN — set them in contentful/.env.'
   );
   process.exit(1);
 }

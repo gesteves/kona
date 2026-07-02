@@ -1,0 +1,13 @@
+{
+  "name": "kona-contentful-migrations",
+  "private": true,
+  "description": "One-off Contentful content migrations for the Kona blog. Lives outside web/ so edits here don't trigger Netlify builds.",
+  "scripts": {
+    "fix:degrees": "node --env-file=.env scripts/fix-degrees.js",
+    "migrate:headings": "node --env-file=.env scripts/bump-heading-levels.js",
+    "migrate:headings:revert": "node --env-file=.env scripts/revert-heading-levels.js"
+  },
+  "dependencies": {
+    "contentful-migration": "^5.0.0"
+  }
+}

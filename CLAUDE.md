@@ -5,6 +5,7 @@ app-specific commands and conventions, read the nearest `CLAUDE.md`:
 
 - [`web/CLAUDE.md`](web/CLAUDE.md) — Middleman static site (the blog).
 - [`api/CLAUDE.md`](api/CLAUDE.md) — Rails API serving dynamic widgets.
+- [`contentful/CLAUDE.md`](contentful/CLAUDE.md) — one-off Contentful content migrations.
 
 Work on one app from inside its own directory; each has its own `Gemfile`,
 `.env.example`, and test suite.
@@ -16,11 +17,16 @@ Work on one app from inside its own directory; each has its own `Gemfile`,
 | `web/` | Middleman 4 static site generator (Ruby 4.0.5). Builds the Contentful-powered blog and serves all static pages. | Netlify |
 | `api/` | Rails 8.1 API (Ruby 4.0.5). Serves small dynamic HTML fragments ("widgets") embedded into the static pages at runtime, plus a Sidekiq `worker` process for background jobs (standard.site PDS sync). | fly.io (`kona-api`: `app` + `worker`) |
 | `redis/` | Config (`fly.toml`) for the `kona-redis` fly app — the API's dedicated Redis (cache + Sidekiq queues). | fly.io (`kona-redis`) |
+| `contentful/` | One-off Contentful content migrations (Node scripts, run locally). Deliberately outside `web/` so edits don't trigger Netlify builds. | — (never deployed) |
 | `netlify.toml` (root) | Drives the Netlify build: `base = "web"`, `command = "bundle exec rake build"`, `publish = "build/"`. | — |
 
 Each app has its own Redis, configured via its own `REDIS_URL`: `api/` uses the dedicated
 `kona-redis` fly app (`redis/fly.toml`); `web/` uses a separate Upstash instance. The apps
 keep distinct keyspaces, so there's no cross-app data sharing to preserve.
+
+One-off **Contentful content migrations** (scripts that rewrite the content itself) live
+in `contentful/` — see [`contentful/CLAUDE.md`](contentful/CLAUDE.md) for the conventions
+(dry runs, skip-unchanged, inverses, rollout ordering).
 
 ## Production domains — never hardcode
 
