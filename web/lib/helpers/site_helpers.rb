@@ -42,6 +42,25 @@ module SiteHelpers
     end
   end
 
+  # Registers a runtime-widget fragment to be <link rel="preload" as="fetch">ed in the <head>
+  # (rendered high up by the `yield_content :preloads` slot). The live-update controller only fetch()es
+  # these after the deferred JS bundle boots, so the browser discovers them late; preloading
+  # starts the request during HTML parse, in parallel with the bundle. crossorigin="anonymous"
+  # makes the preload's mode ("cors") and credentials mode ("same-origin") match the
+  # controller's bare same-origin fetch(), so the browser reuses the preloaded response instead
+  # of discarding it as unused (the "preload was not used within a few seconds" console warning)
+  # and issuing a second request. Call it alongside each widget placeholder, under the same
+  # condition, so a fragment is only preloaded on pages that actually fetch it.
+  # @param url [String] The same-origin widget endpoint the live-update controller will fetch.
+  # @return [void]
+  def preload_widget(url)
+    content_for :preloads do
+      # url is always an app-generated same-origin path (widget endpoint, ids are alphanumeric),
+      # never user input, so it needs no escaping here.
+      %(<link rel="preload" as="fetch" href="#{url}" crossorigin="anonymous">).html_safe
+    end
+  end
+
   # Retrieves a summary of the content, falling back to the site's meta description if not present.
   # @param content [Object] The content object which may contain a summary.
   # @return [String] The content summary or the site's meta description.

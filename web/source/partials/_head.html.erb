@@ -1,5 +1,6 @@
 <head>
   <%= partial 'partials/meta' %>
+  <%= yield_content :preloads %>
   <%= partial 'partials/open_graph_and_social' %>
   <%= partial 'partials/schema/article', locals: { article: content } if defined?(content) && %w[Article Short].include?(content.entry_type) && !content.draft %>
   <%= partial 'partials/schema/site' %>
@@ -24,10 +25,6 @@
   <%= stylesheet_link_tag '/javascripts/site', 'data-turbo-track': 'reload' %>
   <%= stylesheet_link_tag 'site', 'data-turbo-track': 'reload' %>
   <%= stylesheet_link_tag 'print', media: 'print', 'data-turbo-track': 'reload' %>
-  <%# Preload the per-article pageviews fragment (URL matches _full.html.erb's views_url). %>
-  <% if defined?(content) && content.entry_type == 'Article' %>
-    <link rel="preload" as="fetch" href="/api/plausible/pageviews/<%= content.sys.id %>">
-  <% end %>
   <%= yield_content :assets %>
   <%= partial 'partials/analytics' %>
 </head>

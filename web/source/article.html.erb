@@ -1,3 +1,6 @@
+<%# The per-article pageviews fragment (URL matches _full.html.erb's views_url) is fetched by a
+    live-update span inside the article body; preload it here so the request starts during parse. %>
+<% preload_widget "/api/plausible/pageviews/#{content.sys.id}" %>
 <%= partial 'partials/article/full', locals: { article: content } %>
 <%= partial 'partials/share', locals: { article: content } %>
 <%# Show race reports from the same event when there are any; otherwise show the semantically- %>
@@ -6,8 +9,12 @@
 <% if related_race_reports(content).present? %>
   <%= partial 'partials/race_reports', locals: { article: content } %>
 <% else %>
-  <%= partial 'partials/placeholders/related', locals: { url: "/api/articles/related/#{content.sys.id}" } %>
+  <% related_url = "/api/articles/related/#{content.sys.id}" %>
+  <% preload_widget related_url %>
+  <%= partial 'partials/placeholders/related', locals: { url: related_url } %>
 <% end %>
 <%# Exclude only this article so trending doesn't repeat it. %>
-<%= partial 'partials/placeholders/trending', locals: { url: "/api/articles/trending/#{content.sys.id}" } %>
+<% trending_url = "/api/articles/trending/#{content.sys.id}" %>
+<% preload_widget trending_url %>
+<%= partial 'partials/placeholders/trending', locals: { url: trending_url } %>
 <%= partial 'partials/read_next', locals: { article: content } %>
