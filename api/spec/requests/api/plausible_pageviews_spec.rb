@@ -4,6 +4,11 @@ RSpec.describe "Api::Plausible pageviews", type: :request do
   let(:article) { DeepOstruct.wrap(slug: "my-race-report", published: "2026-05-01T09:00:00-06:00", sys: { id: "abc123", first_published_at: "2026-05-01T09:00:00Z" }) }
 
   before do
+    # The widget renders empty without a site id; stub it so the spec doesn't depend on the
+    # developer's local .env (it's unset in CI).
+    allow(ENV).to receive(:[]).and_call_original
+    allow(ENV).to receive(:[]).with("PLAUSIBLE_SITE_ID").and_return("example.com")
+
     allow_any_instance_of(Articles).to receive(:find).and_return(article)
     allow_any_instance_of(Plausible).to receive(:query).and_return(results: [{ metrics: [1234], dimensions: [] }])
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
