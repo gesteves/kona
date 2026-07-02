@@ -10,3 +10,4 @@
 <% end %>
 <%# Exclude only this article so trending doesn't repeat it. %>
 <%= partial 'partials/placeholders/trending', locals: { url: "/api/articles/trending/#{content.sys.id}" } %>
+<%= partial 'partials/read_next', locals: { article: content } %>

@@ -4,3 +4,4 @@
 <%= partial 'partials/placeholders/related', locals: { url: "/api/articles/related/#{content.sys.id}" } %>
 <%# Exclude only this entry so trending doesn't repeat it. %>
 <%= partial 'partials/placeholders/trending', locals: { url: "/api/articles/trending/#{content.sys.id}" } %>
+<%= partial 'partials/read_next', locals: { article: content } %>
