@@ -1,5 +1,5 @@
 <section data-nosnippet class="stats stats--has-three" data-controller="live-update" data-live-update-url-value="<%= live_update_url %>" data-action="visibilitychange@document->live-update#handleVisibilityChange" aria-labelledby="hed-whoop">
-  <h3 class="stats__heading" id="hed-whoop"><%= raw whoop_heading %></h3>
+  <h2 class="stats__heading" id="hed-whoop"><%= raw whoop_heading %></h2>
   <div class="stats__container">
     <%= render "api/activity_stats/stat", icon: "moon",                 top: "Sleep",    value: whoop_sleep_score,    unit: "%",   bottom: whoop_sleep_label %>
     <%= render "api/activity_stats/stat", icon: whoop_recovery_icon,    top: "Recovery", value: whoop_recovery_score, unit: "%",   bottom: whoop_recovery_label %>

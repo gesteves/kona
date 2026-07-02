@@ -1,4 +1,5 @@
 .extend-entry-header {
+  h1,
   h2,
   h3,
   h4 {
@@ -34,6 +35,7 @@
     }
   }
 
+  h1,
   h2 {
     font-size: var(--font-large);
     line-height: var(--line-height-large);
@@ -51,6 +53,7 @@
 }
 
 .extend-body-styles {
+  h2,
   h3,
   h4,
   h5,
@@ -61,12 +64,13 @@
     text-wrap: pretty;
   }
 
-  h3 {
+  h2 {
     font-size: var(--font-semi-large);
     line-height: var(--line-height-semi-large);
     margin: 1.125rem 0;
   }
 
+  h3,
   h4,
   h5,
   h6 {

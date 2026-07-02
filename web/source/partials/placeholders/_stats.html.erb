@@ -2,7 +2,7 @@
 <%# Loading skeleton for the /activity-stats markup. The live-update controller swaps %>
 <%# in the real markup on connect (or removes this section if there's no data). %>
 <section data-nosnippet class="stats stats--has-four" data-controller="live-update" data-live-update-url-value="<%= stats_url %>" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange" aria-labelledby="hed-stats">
-  <h3 class="stats__heading" id="hed-stats">Monthly Totals <i>from</i> <a href="https://intervals.icu" target="_blank" rel="nofollow noopener">Intervals.icu</a></h3>
+  <h2 class="stats__heading" id="hed-stats">Monthly Totals <i>from</i> <a href="https://intervals.icu" target="_blank" rel="nofollow noopener">Intervals.icu</a></h2>
   <div class="stats__container">
     <%# "Activities"/"in the past month" match the API view's usual output (it pluralizes and %>
     <%# lowercases), so the swap doesn't flip the text. %>

@@ -9,7 +9,7 @@
 <div class="collection-group" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= live_update_url %>" data-action="visibilitychange@document->live-update#handleVisibilityChange">
   <% if @todays_race %>
     <section class="collection collection--single collection--has-featured" id="todays-race">
-      <h3 class="collection__heading">Today’s Race</h3>
+      <h2 class="collection__heading">Today’s Race</h2>
       <ol class="collection__list">
         <li class="collection__item">
           <%# show_timestamp: false — the "Today's Race" heading already says it's today. %>
@@ -19,7 +19,7 @@
     </section>
     <% if @other_races.present? %>
       <section class="collection collection--<%= event_collection_variant(@other_races.size, featured: false) %>" id="upcoming-races">
-        <h3 class="collection__heading">Upcoming Races</h3>
+        <h2 class="collection__heading">Upcoming Races</h2>
         <ol class="collection__list">
           <% @other_races.each do |event| %>
             <li class="collection__item">
@@ -31,7 +31,7 @@
     <% end %>
   <% else %>
     <section class="collection collection--<%= event_collection_variant(@upcoming.size, featured: @featured.present?) %><%= " collection--has-featured" if @featured %>" id="upcoming-races">
-      <h3 class="collection__heading">Upcoming Races</h3>
+      <h2 class="collection__heading">Upcoming Races</h2>
       <ol class="collection__list">
         <% @upcoming.each do |event| %>
           <% featured = event.sys&.id == @featured&.sys&.id %>

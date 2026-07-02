@@ -3,7 +3,7 @@
 <%# `url` (required local) is the API endpoint: the bare trending path, or /:id carrying the %>
 <%# sys.id of the current article, so trending doesn't list the post you're reading. %>
 <section class="collection collection--halves" id="trending-articles" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= url %>" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange">
-  <h3 class="collection__heading">Trending Articles</h3>
+  <h2 class="collection__heading">Trending Articles</h2>
   <ol class="collection__list">
     <% 4.times do %>
       <li class="collection__item">

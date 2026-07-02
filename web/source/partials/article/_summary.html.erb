@@ -1,9 +1,9 @@
 <article class="entry entry--summary" id="entry-<%= article.sys.id.parameterize %>" aria-labelledby="hed-<%= article.sys.id.parameterize %>">
   <header class="entry__header">
     <%= partial 'partials/article/meta', locals: { article: article, show_draft: false, show_tags: false } %>
-    <h4 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">
+    <h3 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">
       <%= link_to smartypants(article.title), article.path %>
-    </h4>
+    </h3>
   </header>
   <% if !defined?(show_body) || show_body %>
     <div class="entry__body">

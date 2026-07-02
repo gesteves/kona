@@ -68,14 +68,19 @@ module MarkupHelpers
   # Prepends the title of the entry to the body.
   # @param title [String] The title of the entry.
   # @param html [String] The rendered HTML of the body of the entry.
+  # @param hidden_from_at [Boolean] Marks the inline title aria-hidden. Used on standalone
+  #   short pages, where a visually-hidden <h1> already announces the title — hiding the
+  #   run-in from assistive tech avoids announcing it twice. Leave false in list contexts,
+  #   where the run-in is the only title.
   # @return [String] The body of the entry with the entry at the beginning.
-  def prepend_title(title, html)
+  def prepend_title(title, html, hidden_from_at: false)
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
 
+    aria = hidden_from_at ? ' aria-hidden="true"' : ''
     if title.match?(/[a-zA-Z0-9]$/)
-      formatted_title = "<b>#{title}.</b>"
+      formatted_title = "<b#{aria}>#{title}.</b>"
     else
-      formatted_title = "<b>#{title}</b>"
+      formatted_title = "<b#{aria}>#{title}</b>"
     end
 
     if doc.children.first.name == 'p'
@@ -427,7 +432,7 @@ module MarkupHelpers
 
   def add_heading_permalinks(html)
     with_nokogiri_doc(html) do |doc|
-      doc.css('h3, h4').each do |heading|
+      doc.css('h2, h3').each do |heading|
         heading_id = heading['id']
         next if heading_id.blank?
         permalink = <<~HTML

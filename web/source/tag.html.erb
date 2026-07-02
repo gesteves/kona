@@ -1,8 +1,8 @@
 <div class="blog">
   <header class="blog__header">
-    <h2 id="hed" class="blog__hed">
+    <h1 id="hed" class="blog__hed">
       <%= smartypants(content.title) %>
-    </h2>
+    </h1>
   </header>
 
   <%= partial 'partials/blog_list', locals: { content: content } %>

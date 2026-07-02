@@ -6,9 +6,9 @@ body: I'm sorry, but the page you were looking for can't be found.
 
 <div class="home" aria-labelledby="hed">
   <section class="home__intro">
-    <h2 class="home__headline" id="hed">
+    <h1 class="home__headline" id="hed">
       <%= smartypants(current_page.data.title) %>
-    </h2>
+    </h1>
     <div class="home__body">
       <%= smartypants(markdown_to_html(current_page.data.body)) %>
     </div>

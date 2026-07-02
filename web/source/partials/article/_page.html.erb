@@ -3,9 +3,9 @@
     <% if article.draft %>
       <p class="entry__meta"><span class="entry__highlight"><%= icon_svg("classic", "regular", "typewriter") %> Draft</span></p>
     <% end %>
-    <h2 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">
+    <h1 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">
       <%= smartypants(article.title) %>
-    </h2>
+    </h1>
   </header>
   <div class="entry__body">
     <%= render_body(article.intro, image_variant: :full) %>

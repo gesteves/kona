@@ -135,6 +135,59 @@ RSpec.describe MarkupHelpers do
     end
   end
 
+  describe '#prepend_title' do
+    context 'when the body starts with a paragraph' do
+      it 'prepends the bold title inline into the first paragraph' do
+        transformed_html = prepend_title('A short title', '<p>The body text.</p>')
+        expect(transformed_html).to eq('<p><b>A short title.</b> The body text.</p>')
+      end
+
+      it 'does not add a period when the title ends with punctuation' do
+        transformed_html = prepend_title('A short title!', '<p>The body text.</p>')
+        expect(transformed_html).to eq('<p><b>A short title!</b> The body text.</p>')
+      end
+    end
+
+    context 'when the body does not start with a paragraph' do
+      it 'inserts the title as its own paragraph' do
+        transformed_html = prepend_title('A short title', '<figure></figure>')
+        expect(transformed_html).to eq('<p><b>A short title.</b></p><figure></figure>')
+      end
+    end
+
+    context 'when hidden_from_at is true' do
+      it 'marks the inline title aria-hidden' do
+        transformed_html = prepend_title('A short title', '<p>The body text.</p>', hidden_from_at: true)
+        expect(transformed_html).to eq('<p><b aria-hidden="true">A short title.</b> The body text.</p>')
+      end
+    end
+  end
+
+  describe '#add_heading_permalinks' do
+    before do
+      allow(self).to receive(:icon_svg).and_return('<svg></svg>')
+    end
+
+    it 'adds permalink anchors to h2 and h3 headings with ids' do
+      html = '<h2 id="first">First</h2><h3 id="second">Second</h3>'
+      transformed_html = add_heading_permalinks(html)
+      expect(transformed_html).to include('<a href="#first" class="entry__heading-permalink"')
+      expect(transformed_html).to include('<a href="#second" class="entry__heading-permalink"')
+    end
+
+    it 'does not add permalink anchors to other heading levels' do
+      html = '<h4 id="fourth">Fourth</h4><h5 id="fifth">Fifth</h5>'
+      transformed_html = add_heading_permalinks(html)
+      expect(transformed_html).not_to include('entry__heading-permalink')
+    end
+
+    it 'skips headings without an id' do
+      html = '<h2>No anchor</h2>'
+      transformed_html = add_heading_permalinks(html)
+      expect(transformed_html).not_to include('entry__heading-permalink')
+    end
+  end
+
   describe '#wrap_figcaption_emoji' do
     context 'when given a figcaption with emojis' do
       it 'wraps single emoji in <span class="emoji"> tags' do

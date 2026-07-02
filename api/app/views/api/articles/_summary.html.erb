@@ -16,9 +16,9 @@
         <%= article_permalink_timestamp(article) %>
       </span>
     </p>
-    <h4 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">
+    <h3 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">
       <%= link_to raw(smartypants(article.title)), article.path %>
-    </h4>
+    </h3>
   </header>
   <div class="entry__body">
     <%= raw render_summary_body(article.summary) %>
