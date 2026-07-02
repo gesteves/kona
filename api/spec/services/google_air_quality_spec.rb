@@ -36,7 +36,7 @@ RSpec.describe GoogleAirQuality do
     end
 
     it "hits currentConditions:lookup for a datetime in the past" do
-      described_class.new(latitude, longitude, country, "usa_epa_nowcast", 1.hour.ago)
+      described_class.new(latitude, longitude, country, "usa_epa_nowcast", 1.hour.ago).aqi
 
       expect(HTTParty).to have_received(:post).with(a_string_matching(%r{/currentConditions:lookup}), any_args)
     end

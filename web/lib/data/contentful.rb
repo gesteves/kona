@@ -99,7 +99,8 @@ class Contentful
       set_template(item)
     end
 
-    @content[:articles].sort! { |a, b| DateTime.parse(b[:published_at]) <=> DateTime.parse(a[:published_at]) }
+    # sort_by! parses each date once (vs. twice per comparison with sort!).
+    @content[:articles].sort_by! { |item| DateTime.parse(item[:published_at]) }.reverse!
   end
 
   # Processes pages from the fetched content.
@@ -112,7 +113,7 @@ class Contentful
       set_template(item)
     end
 
-    @content[:pages].sort! { |a, b| DateTime.parse(b[:published_at]) <=> DateTime.parse(a[:published_at]) }
+    @content[:pages].sort_by! { |item| DateTime.parse(item[:published_at]) }.reverse!
   end
 
   # Processes assets from the fetched content.
@@ -204,46 +205,13 @@ class Contentful
   # Each tag includes a paginated collection of articles with that tag, and other metadata.
   # @return [Array<Hash>] A collection of tag pages.
   def generate_tags
-    entries_per_page = @content[:site][:entries_per_page]
     tags = @content[:articles].reject { |a| a[:draft] }.map { |a| a.dig(:contentful_metadata, :tags) }.flatten.uniq
     paginated_tags = tags.map do |tag|
       tag = tag.dup
       tagged_articles = @content[:articles].select { |a| !a[:draft] && a.dig(:contentful_metadata, :tags).include?(tag) }
-      sliced = tagged_articles.each_slice(entries_per_page)
-      summary = "Browse #{tagged_articles.size.humanize} #{'entry'.pluralize(tagged_articles.size)} tagged ”#{tag[:name]}.”"
-      paginated_tag_pages = sliced.map.with_index do |page, index|
-        current_page = index + 1
-        previous_page = index.zero? ? nil : index
-        next_page = index == sliced.size - 1 ? nil : index + 2
-        path = current_page == 1 ? "/tagged/#{tag[:id]}/index.html" : "/tagged/#{tag[:id]}/page/#{current_page}/index.html"
-        previous_page_path = if previous_page.blank?
-          nil
-        elsif previous_page == 1
-          "/tagged/#{tag[:id]}/index.html"
-        else
-          "/tagged/#{tag[:id]}/page/#{previous_page}/index.html"
-        end
-        next_page_path = if next_page.blank?
-          nil
-        else
-          "/tagged/#{tag[:id]}/page/#{next_page}/index.html"
-        end
-
-        {
-          current_page: current_page,
-          previous_page: previous_page,
-          next_page: next_page,
-          template: "/tag.html",
-          path: path,
-          previous_page_path: previous_page_path,
-          next_page_path: next_page_path,
-          title: tag[:name],
-          summary: summary,
-          items: page,
-          index_in_search_engines: true
-        }
-      end
-      { tag: tag, pages: paginated_tag_pages }
+      summary = "Browse #{tagged_articles.size.humanize} #{'entry'.pluralize(tagged_articles.size)} tagged “#{tag[:name]}.”"
+      pages = paginate(tagged_articles, base_path: "/tagged/#{tag[:id]}", template: "/tag.html", title: tag[:name], summary: summary)
+      { tag: tag, pages: pages }
     end
     @content[:tags] = paginated_tags
   end
@@ -252,39 +220,39 @@ class Contentful
   # Each page includes articles for that page, and other metadata.
   # @return [Array<Hash>] A collection of blog pages.
   def generate_blog
-    entries_per_page = @content[:site][:entries_per_page]
-    sliced_articles = @content[:articles].reject { |a| a[:draft] }.each_slice(entries_per_page)
-    blog_pages = sliced_articles.map.with_index do |page, index|
+    @content[:blog] = paginate(@content[:articles].reject { |a| a[:draft] }, base_path: "/blog", template: "/articles.html", title: "Blog")
+  end
+
+  # Slices a list of articles into pages carrying the pagination metadata the blog/tag
+  # templates expect. Page 1 lives at "#{base_path}/index.html", later pages at
+  # "#{base_path}/page/N/index.html".
+  # @return [Array<Hash>] One hash per page.
+  def paginate(articles, base_path:, template:, title:, summary: nil)
+    sliced = articles.each_slice(@content[:site][:entries_per_page])
+    sliced.map.with_index do |page, index|
       current_page = index + 1
       previous_page = index.zero? ? nil : index
-      next_page = index == sliced_articles.size - 1 ? nil : index + 2
-      path = current_page == 1 ? "/blog/index.html" : "/blog/page/#{current_page}/index.html"
-      previous_page_path = if previous_page.blank?
-        nil
-      elsif previous_page == 1
-        "/blog/index.html"
-      else
-        "/blog/page/#{previous_page}/index.html"
-      end
-      next_page_path = if next_page.blank?
-        nil
-      else
-        "/blog/page/#{next_page}/index.html"
-      end
-      {
+      next_page = index == sliced.size - 1 ? nil : index + 2
+      page_data = {
         current_page: current_page,
         previous_page: previous_page,
         next_page: next_page,
-        template: "/articles.html",
-        path: path,
-        previous_page_path: previous_page_path,
-        next_page_path: next_page_path,
-        title: "Blog",
-        items: page,
-        index_in_search_engines: true
+        template: template,
+        path: paginated_path(base_path, current_page),
+        previous_page_path: previous_page && paginated_path(base_path, previous_page),
+        next_page_path: next_page && paginated_path(base_path, next_page),
+        title: title
       }
+      page_data[:summary] = summary if summary
+      page_data[:items] = page
+      page_data[:index_in_search_engines] = true
+      page_data
     end
-    @content[:blog] = blog_pages
+  end
+
+  # The path for one page of a paginated collection.
+  def paginated_path(base_path, page_number)
+    page_number == 1 ? "#{base_path}/index.html" : "#{base_path}/page/#{page_number}/index.html"
   end
 
   # Rewrites Contentful image URLs to CloudFront URLs.

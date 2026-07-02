@@ -2,10 +2,22 @@ require 'nokogiri'
 require 'public_suffix'
 
 module AffiliateLinksHelpers
-  # Checks if the provided content contains any Amazon Associates links.
+  # Checks if the provided content contains any Amazon Associates links. Memoized per entry —
+  # rendering + parsing the whole article is expensive, and the disclosure partial consults
+  # this several times per page.
   # @param content [Object] The content object which may contain affiliate links in its intro or body.
   # @return [Boolean] True if affiliate links are found, otherwise false.
   def has_amazon_associates_links?(content)
+    @has_amazon_associates_links ||= {}
+    key = content.sys&.id
+    return scan_for_amazon_associates_links(content) if key.blank?
+
+    @has_amazon_associates_links[key] = scan_for_amazon_associates_links(content) unless @has_amazon_associates_links.key?(key)
+    @has_amazon_associates_links[key]
+  end
+
+  # @see #has_amazon_associates_links?
+  def scan_for_amazon_associates_links(content)
     text = [content.intro, content.body].compact.join("\n\n")
     doc = Nokogiri::HTML::DocumentFragment.parse(markdown_to_html(text))
     doc.css('a').each do |a|
@@ -18,14 +30,13 @@ module AffiliateLinksHelpers
   # @param url [String] The URL to be checked for being an affiliate link.
   # @return [Boolean] True if the URL is an Amazon Associates link, otherwise false.
   def is_amazon_associates_link?(url)
-    begin
-      uri = URI.parse(url)
-      params = uri.query ? URI.decode_www_form(uri.query).to_h : {}
-      domain = PublicSuffix.domain(uri.host)
-      domain == 'amzn.to' || (domain == 'amazon.com' && params.key?('tag'))
-    rescue
-      false
-    end
+    uri = URI.parse(url)
+    params = uri.query ? URI.decode_www_form(uri.query).to_h : {}
+    domain = PublicSuffix.domain(uri.host)
+    domain == 'amzn.to' || (domain == 'amazon.com' && params.key?('tag'))
+  rescue StandardError
+    # Malformed author-supplied hrefs just aren't affiliate links.
+    false
   end
 
   # Returns an appropriate disclosure for entries containing affliate links.

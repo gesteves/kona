@@ -17,7 +17,7 @@ module Api
       return render_empty if @upcoming.blank?
 
       @featured = @upcoming.first if is_featured?(@upcoming.first)
-      @event_weather = event_weather_for(@featured) if @featured
+      @event_weather = RaceDayWeather.new(@featured).presenter if @featured
 
       # On race day the featured event is today's race; give it its own section.
       @todays_race = @featured if @featured && is_today?(@featured)
@@ -38,44 +38,6 @@ module Api
       @other_races = @upcoming.drop(1) if @todays_race
 
       render :upcoming
-    end
-
-    private
-
-    # Builds the race-day weather presenter for the featured event (geocode → forecast ≤10
-    # days → AQI ≤4 days → bay), or nil when coordinates/weather are unavailable. Ported from
-    # the former WeatherController#event.
-    # @return [EventWeatherPresenter, nil]
-    def event_weather_for(event)
-      lat = event&.coordinates&.lat
-      lon = event&.coordinates&.lon
-      return if lat.blank? || lon.blank?
-
-      gmaps = GoogleMaps.new(lat, lon)
-      time_zone = safely("GoogleMaps") { gmaps.time_zone_id } || TimeZoneResolver.default
-      country = safely("GoogleMaps") { gmaps.country_code }
-
-      event_datetime = DateTime.parse(event.date).in_time_zone(time_zone)
-      days_until = (event_datetime.to_date - Time.current.in_time_zone(time_zone).to_date).to_i
-
-      weather = safely("WeatherKit") { WeatherKit.new(lat, lon, time_zone, country).data } if country.present? && days_until.between?(0, 10)
-      aqi = safely("GoogleAirQuality") { GoogleAirQuality.new(lat, lon, country, "usa_epa_nowcast", event_datetime).aqi } if country.present? && days_until.between?(0, 4)
-      goodspeed = safely("Goodspeed") { Goodspeed.new.data }
-
-      location = safely("GoogleMaps") { gmaps.location }
-      record = DeepOstruct.wrap(sys: { id: event.sys&.id }, date: event.date, location: location, location_label: event.location, aqi: aqi)
-      record.weather = weather
-      EventWeatherPresenter.new(record, goodspeed: goodspeed)
-    end
-
-    # Isolates a single upstream data source so one service raising doesn't collapse the whole
-    # widget. Reports the failure (matching the service layer's graceful-degradation contract)
-    # and falls back so the rest of the race-day card still renders.
-    def safely(service, fallback = nil)
-      yield
-    rescue StandardError => e
-      ErrorReporter.report_upstream(e, service: service, context: "#{self.class}#event_weather_for")
-      fallback
     end
   end
 end

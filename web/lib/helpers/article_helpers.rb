@@ -18,13 +18,14 @@ module ArticleHelpers
   # @param article [Object] The article.
   # @return [String] An <a> tag linking to the article, with the publish date as the text.
   def article_permalink_timestamp(article)
+    published = DateTime.parse(article.published_at)
     options = {
       href: article.path,
-      title: "Published at #{DateTime.parse(article.published_at).strftime('%-I:%M %p')}",
+      title: "Published at #{published.strftime('%-I:%M %p')}",
       "data-publish-date-target": "timestamp"
     }
     content_tag :a, options do
-      DateTime.parse(article.published_at).strftime('%A, %B %-e, %Y')
+      published.strftime('%A, %B %-e, %Y')
     end
   end
 
@@ -156,10 +157,20 @@ module ArticleHelpers
   end
 
   # Counts the words in an article's prose (intro + body, as plain text). Shared by the reading-time
-  # estimate and the BlogPosting schema's wordCount.
+  # estimate and the BlogPosting schema's wordCount. Memoized per entry — sanitizing the whole
+  # article is expensive and this gets called several times per page (reading time + schema).
   # @param article [Object] The article.
   # @return [Integer] The number of words.
   def article_word_count(article)
+    @article_word_counts ||= {}
+    key = article.sys&.id
+    return compute_article_word_count(article) if key.blank?
+
+    @article_word_counts[key] ||= compute_article_word_count(article)
+  end
+
+  # @see #article_word_count
+  def compute_article_word_count(article)
     plain_text = sanitize([article.intro, article.body].reject(&:blank?).join("\n\n"), escape_html_entities: true)
     plain_text.split(/\s+/).size
   end
@@ -177,26 +188,26 @@ module ArticleHelpers
   # @return [String] The formatted reading time.
   def reading_time(article)
     minutes = reading_time_minutes(article)
-    article = minutes.humanize.match?(/^(eight|eleven|eighteen)/i) ? 'An' : 'A'
-    "#{article} #{minutes}-minute read"
+    # \b so e.g. "eighty" or "eight hundred" doesn't get "An".
+    indefinite_article = minutes.humanize.match?(/^(eight|eleven|eighteen)\b/i) ? 'An' : 'A'
+    "#{indefinite_article} #{minutes}-minute read"
   end
 
-  # Finds related race reports from the same event as the current article.
+  # Finds related race reports from the same event as the current article. Memoized — the
+  # article template consults this once to pick a section and the partial again to render it.
   # @param article [Object] The current article to find race reports for.
   # @param count [Integer] (Optional) The number of race reports to return.
   # @return [Array<Object>] A list of race reports from the same event, sorted by publication date in reverse chronological order.
   def related_race_reports(article, count: 4)
     return [] unless article.event&.sys&.id
 
-    # Find all articles that are linked to the same event
-    race_reports = data.articles
+    @related_race_reports ||= {}
+    @related_race_reports[[article.slug, count]] ||= data.articles
       .select { |a| a.event&.sys&.id == article.event.sys.id }
       .reject { |a| a.slug == article.slug }
       .reject { |a| a.draft }
       .reject { |a| a.entry_type == 'Short' }
       .sort_by { |a| -DateTime.parse(a.published_at).to_i }
       .take(count)
-
-    race_reports
   end
 end

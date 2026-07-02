@@ -1,1 +1,5 @@
+<%# Deliberately NOT a live-update fragment (no data-controller/url attributes, unlike every
+    other widget): the placeholder span fetches once on connect with no visibilitychange
+    action, so pageviews is one-shot by design. Don't "fix" it by adding the live-update
+    attributes — a refresh wired here would die after the first swap anyway. %>
 <span><%= raw icon_svg("classic", "light", "eye") %> <%= link_to pageviews_label(@pageviews), @plausible_url, rel: "noopener noreferrer nofollow", target: "_blank" %></span>

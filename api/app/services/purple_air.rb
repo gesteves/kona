@@ -2,12 +2,15 @@
 # humidity correction and converting PM2.5 to an AQI. `aqi` returns
 # { aqi:, category:, description: } or nil when no usable sensor is nearby.
 class PurpleAir < ApplicationService
-  attr_reader :aqi
   PURPLE_AIR_API_URL = "https://api.purpleair.com/v1/sensors"
 
   def initialize(latitude, longitude)
     @latitude = latitude
     @longitude = longitude
+  end
+
+  def aqi
+    return @aqi if defined?(@aqi)
     @aqi = get_aqi
   end
 
@@ -63,17 +66,21 @@ class PurpleAir < ApplicationService
     when 0...30
       0.524 * pm25 - 0.0862 * humidity + 5.75
     when 30...50
-      ((0.786 * (pm25 / 20 - 3 / 2) + 0.524 * (1 - (pm25 / 20 - 3 / 2))) * pm25) - 0.0862 * humidity + 5.75
+      # Transition band: blend the low and mid corrections by w = pm25/20 - 1.5 (0→1 across the band).
+      w = pm25 / 20.0 - 1.5
+      ((0.786 * w + 0.524 * (1 - w)) * pm25) - 0.0862 * humidity + 5.75
     when 50...210
       0.786 * pm25 - 0.0862 * humidity + 5.75
     when 210...260
-      ((0.69 * (pm25 / 50 - 21 / 5) + 0.786 * (1 - (pm25 / 50 - 21 / 5))) * pm25) -
-        0.0862 * humidity * (1 - (pm25 / 50 - 21 / 5)) +
-        2.966 * (pm25 / 50 - 21 / 5) +
-        5.75 * (1 - (pm25 / 50 - 21 / 5)) +
-        8.84 * (10**(-4)) * pm25**2 * (pm25 / 50 - 21 / 5)
+      # Transition band: blend the mid and high corrections by w = pm25/50 - 4.2 (0→1 across the band).
+      w = pm25 / 50.0 - 4.2
+      ((0.69 * w + 0.786 * (1 - w)) * pm25) -
+        0.0862 * humidity * (1 - w) +
+        2.966 * w +
+        5.75 * (1 - w) +
+        8.84e-4 * pm25**2 * w
     else
-      2.966 + 0.69 * pm25 + 8.841 * (10**(-4)) * pm25**2
+      2.966 + 0.69 * pm25 + 8.841e-4 * pm25**2
     end
   end
 

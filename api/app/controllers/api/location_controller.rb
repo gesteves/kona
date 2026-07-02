@@ -12,8 +12,10 @@ module Api
         return render json: { error: "Missing coordinates" }, status: :unprocessable_content
       end
 
-      latitude = params[:latitude].to_f
-      longitude = params[:longitude].to_f
+      # Float() (not to_f) so non-numeric input is rejected instead of silently becoming 0.0
+      # (the Gulf of Guinea) and corrupting the stored location.
+      latitude = Float(params[:latitude], exception: false)
+      longitude = Float(params[:longitude], exception: false)
 
       unless Location.valid_coordinates?(latitude, longitude)
         return render json: { error: "Invalid coordinates" }, status: :unprocessable_content

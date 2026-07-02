@@ -23,9 +23,10 @@ export default class extends Controller {
    */
   copy(event) {
     event.preventDefault();
+    const permalink = this.getPermalink();
     navigator.clipboard
-      .writeText(this.getPermalink())
-      .then(() => this.successfulCopy())
+      .writeText(permalink)
+      .then(() => this.successfulCopy(permalink))
       .catch(() => this.unsuccessfulCopy());
   }
 
@@ -53,8 +54,9 @@ export default class extends Controller {
    * Handles successful copy event.
    * Show the check icon and hide the link icon.
    * Revert back after a few seconds.
+   * @param {String} permalink The URL that was copied.
    */
-  successfulCopy() {
+  successfulCopy(permalink) {
     if (this.hasLinkTarget && this.hasCheckTarget) {
       // Hide the link icon and show the circle-check icon
       this.linkTarget.classList.add(this.hiddenClass);
@@ -67,7 +69,7 @@ export default class extends Controller {
     }
 
     sendNotification(this.successMessageValue);
-    trackEvent('Copy to Clipboard', { url: this.getPermalink() });
+    trackEvent('Copy to Clipboard', { url: permalink });
   }
 
   /**

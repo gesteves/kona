@@ -16,7 +16,8 @@ module Api
       return render_empty if published_at.blank? || site_id.blank?
 
       published = DateTime.parse(published_at)
-      path = "/#{published.strftime('%Y/%m/%d')}/#{article.slug}/"
+      path = ArticleAttributes.path(slug: article.slug, published_at: published_at)
+      return render_empty if path.blank?
 
       result = Plausible.new.query(metrics: ["pageviews"], date_range: "all", dimensions: [], filters: [["is", "event:page", [path]]])
       return render_empty if result.nil?

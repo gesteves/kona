@@ -6,6 +6,7 @@ module Api
   # featured upcoming race.)
   class WeatherController < BaseController
     include WeatherHelper
+    include TimeHelper # weather_data_is_current? → rest_of_day_forecast → is_evening? → current_time
 
     # Renders the current-weather widget markup embedded into the static site. Resolves the
     # owner's current location, fetches weather + air quality + pollen + bay + race data, and
@@ -17,18 +18,32 @@ module Api
       location = Location.new
       return render_empty if location.latitude.blank?
 
+      # Each upstream is isolated (safely) so a timeout or raise degrades to "no data" — the
+      # widget then collapses via render_empty or omits a section, instead of 500ing.
       gmaps = GoogleMaps.new(location.latitude, location.longitude)
-      @time_zone = gmaps.time_zone_id || TimeZoneResolver.default
-      @location = DeepOstruct.wrap(gmaps.location)
-      @weather = WeatherKit.new(location.latitude, location.longitude, @time_zone, gmaps.country_code).data
+      @time_zone = safely("GoogleMaps") { gmaps.time_zone_id } || TimeZoneResolver.default
+      @location = DeepOstruct.wrap(safely("GoogleMaps") { gmaps.location })
+      country = safely("GoogleMaps") { gmaps.country_code }
+      @weather = safely("WeatherKit") { WeatherKit.new(location.latitude, location.longitude, @time_zone, country).data }
 
       return render_empty unless weather_data_is_current?(@weather)
 
-      @air_quality = AirQuality.new(location.latitude, location.longitude, gmaps.country_code).data
-      @pollen = GooglePollen.new(location.latitude, location.longitude).data
-      @events = Events.new.all
-      @goodspeed = Goodspeed.new.data
-      @workouts = TrainerRoad.new(@time_zone).workouts || []
+      @air_quality = safely("AirQuality") { AirQuality.new(location.latitude, location.longitude, country).data }
+      @pollen = safely("GooglePollen") { GooglePollen.new(location.latitude, location.longitude).data }
+      @events = safely("Events", []) { Events.new.all }
+      @goodspeed = safely("Goodspeed") { Goodspeed.new.data }
+      @workouts = safely("TrainerRoad") { TrainerRoad.new(@time_zone).workouts } || []
+
+      @summary = WeatherSummaryPresenter.new(
+        weather: @weather,
+        location: @location,
+        air_quality: @air_quality,
+        pollen: @pollen,
+        events: @events,
+        goodspeed: @goodspeed,
+        workouts: @workouts,
+        time_zone: @time_zone
+      )
 
       render :current
     end

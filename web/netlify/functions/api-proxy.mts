@@ -15,11 +15,17 @@ const API_TOKEN = process.env.API_TOKEN;
 // identical and the whole audience shares a single cache entry.
 const FORWARD_REQUEST_HEADERS = ['accept'];
 
-function upstreamHeaders(incoming: Headers): Headers {
+function upstreamHeaders(incoming: Headers, hasBody: boolean): Headers {
   const headers = new Headers();
   for (const name of FORWARD_REQUEST_HEADERS) {
     const value = incoming.get(name);
     if (value) headers.set(name, value);
+  }
+  // A forwarded body needs its content-type or the origin can't parse the params. Bodied
+  // requests are non-GET (never edge-cached), so this doesn't affect the shared cache entry.
+  if (hasBody) {
+    const contentType = incoming.get('content-type');
+    if (contentType) headers.set('content-type', contentType);
   }
   if (API_TOKEN) headers.set('authorization', `Bearer ${API_TOKEN}`);
   return headers;
@@ -37,7 +43,7 @@ export default async function handler(
   try {
     upstream = await fetch(upstreamUrl, {
       method: req.method,
-      headers: upstreamHeaders(req.headers),
+      headers: upstreamHeaders(req.headers, hasBody),
       body: hasBody ? await req.arrayBuffer() : undefined,
       redirect: 'manual',
     });

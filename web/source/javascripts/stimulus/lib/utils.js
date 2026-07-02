@@ -16,30 +16,6 @@ export function sendNotification(message, status = 'success') {
 }
 
 /**
- * Prepends the given HTML to the element
- * @param {String} html An HTML string.
- * @param {Element} element The element to prepend to.
- */
-export function prependToElement(html, element) {
-  const tempContainer = document.createElement('div');
-  tempContainer.innerHTML = html;
-  element.prepend(...tempContainer.childNodes);
-}
-
-/**
- * Appends the given HTML to the element
- * @param {String} html An HTML string.
- * @param {Element} element The element to append to.
- */
-export function appendToElement(html, element) {
-  const tempContainer = document.createElement('div');
-  tempContainer.innerHTML = html;
-  while (tempContainer.firstChild) {
-    element.appendChild(tempContainer.firstChild);
-  }
-}
-
-/**
  * Replace the given element with the given HTML
  * @param {String} html An HTML string.
  * @param {Element} element The element to replace.

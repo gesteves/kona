@@ -2,8 +2,8 @@ require 'spec_helper'
 
 RSpec.describe AffiliateLinksHelpers do
   describe '#has_amazon_associates_links?' do
-    let(:content_with_affiliate) { double('Content', intro: 'Check out this product', body: '<a href="https://www.amazon.com/example?tag=affiliate-20">Product Link</a>') }
-    let(:content_without_affiliate) { double('Content', intro: 'Just some intro', body: '<a href="https://example.com">Normal Link</a>') }
+    let(:content_with_affiliate) { double('Content', sys: double('Sys', id: 'with-affiliate'), intro: 'Check out this product', body: '<a href="https://www.amazon.com/example?tag=affiliate-20">Product Link</a>') }
+    let(:content_without_affiliate) { double('Content', sys: double('Sys', id: 'without-affiliate'), intro: 'Just some intro', body: '<a href="https://example.com">Normal Link</a>') }
 
     it 'returns true for content with affiliate links' do
       expect(has_amazon_associates_links?(content_with_affiliate)).to be true

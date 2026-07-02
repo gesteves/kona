@@ -4,7 +4,9 @@
 <section data-nosnippet class="stats stats--has-four" data-controller="live-update" data-live-update-url-value="<%= stats_url %>" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange" aria-labelledby="hed-stats">
   <h3 class="stats__heading" id="hed-stats">Monthly Totals <i>from</i> <a href="https://intervals.icu" target="_blank" rel="nofollow noopener">Intervals.icu</a></h3>
   <div class="stats__container">
-    <%= partial 'partials/placeholders/stat_skeleton', locals: { icon: 'wave-pulse',      top: 'Activities', bottom: "In the past month" } %>
+    <%# "Activities"/"in the past month" match the API view's usual output (it pluralizes and %>
+    <%# lowercases), so the swap doesn't flip the text. %>
+    <%= partial 'partials/placeholders/stat_skeleton', locals: { icon: 'wave-pulse',      top: 'Activities', bottom: "in the past month" } %>
     <%= partial 'partials/placeholders/stat_skeleton', locals: { icon: 'person-swimming', top: 'Swimming' } %>
     <%= partial 'partials/placeholders/stat_skeleton', locals: { icon: 'person-biking',   top: 'Cycling' } %>
     <%= partial 'partials/placeholders/stat_skeleton', locals: { icon: 'person-running',  top: 'Running' } %>

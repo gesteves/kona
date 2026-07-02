@@ -1,0 +1,31 @@
+<%# The paginated entry list + Previous/Next nav shared by the blog index (articles.html.erb)
+    and tag pages (tag.html.erb). `content` is one page hash from Contentful#paginate. %>
+<% if content.items.present? %>
+  <ol class="blog__list">
+    <% content.items.each do |item| %>
+      <li class="blog__list-item">
+        <% if item.entry_type == 'Short' %>
+          <%= partial 'partials/article/short', locals: { article: item } %>
+        <% else %>
+          <%= partial 'partials/article/compact', locals: { article: item } %>
+        <% end %>
+        <% unless item == content.items.last %><hr class="blog__separator"><% end %>
+      </li>
+    <% end %>
+  </ol>
+<% end %>
+
+<% if content.next_page.present? || content.previous_page.present? %>
+  <nav class="pagination">
+  <% if content.previous_page.present? %>
+    <%= link_to "Previous", content.previous_page_path, class: "pagination__link pagination__link--active pagination__link--previous" %>
+  <% else %>
+    <span class="pagination__link pagination__link--previous">Previous</span>
+  <% end %>
+  <% if content.next_page.present? %>
+    <%= link_to "Next", content.next_page_path, class: "pagination__link pagination__link--active pagination__link--next" %>
+  <% else %>
+    <span class="pagination__link pagination__link--next">Next</span>
+  <% end %>
+  </nav>
+<% end %>

@@ -3,7 +3,6 @@
 # superset of what the current-weather widget needs to spot today's race. Cached in Redis for
 # 10 minutes. `all` returns an array wrapped for dot-access.
 class Events < ApplicationService
-  CONTENTFUL_API_URL = "https://graphql.contentful.com/content/v1/spaces"
   QUERY = <<~GRAPHQL.freeze
     query {
       events: eventCollection {
@@ -72,19 +71,11 @@ class Events < ApplicationService
   # Runs a Contentful GraphQL query and returns its `events.items`, or nil when the API
   # isn't configured or the request fails.
   def query_events(query, variables = nil)
-    space = ENV["CONTENTFUL_SPACE"]
-    token = ENV["CONTENTFUL_TOKEN"]
-    return if space.blank? || token.blank?
+    contentful.items(query, variables, collection: :events)
+  end
 
-    body = { query: query }
-    body[:variables] = variables if variables.present?
-
-    data = post_json(
-      "#{CONTENTFUL_API_URL}/#{space}",
-      body: body.to_json,
-      headers: { "Authorization" => "Bearer #{token}", "Content-Type" => "application/json" }
-    )
-    data&.dig(:data, :events, :items)
+  def contentful
+    @contentful ||= ContentfulClient.new(self.class.name)
   end
 
   def wrap(items)

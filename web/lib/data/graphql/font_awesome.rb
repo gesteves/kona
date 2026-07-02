@@ -2,20 +2,14 @@ require 'graphql/client'
 require 'graphql/client/http'
 require 'dotenv'
 require 'httparty'
-require 'redis'
+require_relative '../../utils/redis_connection'
 
 module FontAwesomeClient
   Dotenv.load
 
   FONT_AWESOME_API_URL = "https://api.fontawesome.com"
 
-  $redis ||= Redis.new(
-    url: ENV['REDIS_URL'] || 'redis://localhost:6379',
-    connect_timeout: 5,
-    read_timeout: 3,
-    write_timeout: 3,
-    reconnect_attempts: [0.1, 0.5, 1.0]
-  )
+  RedisConnection.connection
 
   def self.get_access_token(api_token)
     access_token = $redis.get("font_awesome:access_token")

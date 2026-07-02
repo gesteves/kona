@@ -10,6 +10,8 @@ class Whoop < ApplicationService
   WHOOP_API_URL = "https://api.prod.whoop.com/developer/v2"
   WHOOP_OAUTH_URL = "https://api.prod.whoop.com/oauth/oauth2"
   SCOPE = "offline read:recovery read:cycles read:workout read:sleep read:profile read:body_measurement"
+  # How long a single token refresh may hold the serialization lock before it's presumed dead.
+  REFRESH_LOCK_TTL = 30.seconds
 
   def initialize
     @client_id = ENV["WHOOP_CLIENT_ID"]
@@ -164,44 +166,74 @@ class Whoop < ApplicationService
   def get_access_token
     return unless valid_credentials?
 
-    access_token_key = "whoop:#{@client_id}:access_token"
-    refresh_token_key = "whoop:#{@client_id}:refresh_token"
-
     cached_token = $redis.get(access_token_key)
     return cached_token if cached_token.present?
 
-    refresh_token = $redis.get(refresh_token_key)
-    if refresh_token.blank?
-      Rails.logger.warn("No Whoop refresh token found. Visit /whoop/auth to authorize.")
-      return
+    refresh_access_token
+  end
+
+  # Refreshes the access token using the stored refresh token. Whoop rotates refresh tokens —
+  # each refresh invalidates the token it was made with — so two concurrent refreshes race:
+  # the loser POSTs an already-rotated token, gets rejected, and can wedge the integration
+  # until a manual re-auth. A short Redis lock serializes refreshes; losers wait for the
+  # winner's token instead of racing it, and the winner re-checks the cache inside the lock.
+  # @return [String, nil] Access token or nil if unable to refresh.
+  def refresh_access_token
+    return wait_for_refreshed_token unless $redis.set(refresh_lock_key, "1", nx: true, ex: REFRESH_LOCK_TTL.to_i)
+
+    begin
+      # Another request may have finished refreshing between our cache miss and taking the lock.
+      cached_token = $redis.get(access_token_key)
+      return cached_token if cached_token.present?
+
+      refresh_token = $redis.get(refresh_token_key)
+      if refresh_token.blank?
+        Rails.logger.warn("No Whoop refresh token found. Visit /whoop/auth to authorize.")
+        return
+      end
+
+      refresh_params = {
+        "grant_type" => "refresh_token",
+        "refresh_token" => refresh_token,
+        "client_id" => @client_id,
+        "client_secret" => @client_secret,
+        "scope" => SCOPE
+      }
+
+      response = HTTParty.post(
+        "#{WHOOP_OAUTH_URL}/token",
+        body: refresh_params,
+        headers: { "Content-Type" => "application/x-www-form-urlencoded" }
+      )
+
+      unless response.success?
+        Rails.logger.warn("Failed to refresh Whoop access token (HTTP #{response.code}). Visit /whoop/auth to re-authorize.")
+        report_upstream_error("HTTP #{response.code}", context: "Whoop token refresh", status: response.code)
+        return
+      end
+
+      token_data = JSON.parse(response.body, symbolize_names: true)
+      store_tokens(token_data)
+      token_data[:access_token]
+    ensure
+      $redis.del(refresh_lock_key)
     end
-
-    refresh_params = {
-      "grant_type" => "refresh_token",
-      "refresh_token" => refresh_token,
-      "client_id" => @client_id,
-      "client_secret" => @client_secret,
-      "scope" => SCOPE
-    }
-
-    response = HTTParty.post(
-      "#{WHOOP_OAUTH_URL}/token",
-      body: refresh_params,
-      headers: { "Content-Type" => "application/x-www-form-urlencoded" }
-    )
-
-    unless response.success?
-      Rails.logger.warn("Failed to refresh Whoop access token (HTTP #{response.code}). Visit /whoop/auth to re-authorize.")
-      report_upstream_error("HTTP #{response.code}", context: "Whoop token refresh", status: response.code)
-      return
-    end
-
-    token_data = JSON.parse(response.body, symbolize_names: true)
-    store_tokens(token_data)
-    token_data[:access_token]
   rescue StandardError => e
     Rails.logger.error("Error refreshing Whoop token: #{e}")
     report_upstream_error(e, context: "Whoop token refresh")
+    nil
+  end
+
+  # Briefly polls for the access token a concurrent refresh (the lock holder) is fetching.
+  # @return [String, nil] The winner's access token, or nil if it doesn't appear in time.
+  def wait_for_refreshed_token(attempts: 10, interval: 0.3)
+    attempts.times do
+      sleep(interval)
+      token = $redis.get(access_token_key)
+      return token if token.present?
+    end
+
+    Rails.logger.warn("Timed out waiting for a concurrent Whoop token refresh.")
     nil
   end
 
@@ -212,14 +244,23 @@ class Whoop < ApplicationService
     refresh_token = token_data[:refresh_token]
     expires_in = token_data[:expires_in].to_i
 
-    access_token_key = "whoop:#{@client_id}:access_token"
-    refresh_token_key = "whoop:#{@client_id}:refresh_token"
-
     # Store the access token with a 1-minute buffer before its actual expiry.
     access_cache_duration = [expires_in - 60, 0].max
     $redis.setex(access_token_key, access_cache_duration, access_token)
 
     # Store the refresh token without an expiry.
     $redis.set(refresh_token_key, refresh_token) if refresh_token.present?
+  end
+
+  def access_token_key
+    "whoop:#{@client_id}:access_token"
+  end
+
+  def refresh_token_key
+    "whoop:#{@client_id}:refresh_token"
+  end
+
+  def refresh_lock_key
+    "whoop:#{@client_id}:refresh_lock"
   end
 end

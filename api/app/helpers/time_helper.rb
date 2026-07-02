@@ -21,9 +21,13 @@ module TimeHelper
   def time_with_meridiem_abbr(time, time_zone)
     return if time.blank? || time_zone.blank?
 
-    Time.parse(time.to_s)
-        .in_time_zone(time_zone)
-        .strftime("%I:%M %p")
-        .gsub(/(am|pm)/i, "<abbr>\\1</abbr>")
+    meridiem_abbr(Time.parse(time.to_s).in_time_zone(time_zone).strftime("%I:%M %p"))
+  end
+
+  # Wraps the meridiem (AM/PM) in an <abbr> tag. Shared by the time and weather formatters.
+  # @param text [String]
+  # @return [String]
+  def meridiem_abbr(text)
+    text.gsub(/(am|pm)/i, "<abbr>\\1</abbr>")
   end
 end

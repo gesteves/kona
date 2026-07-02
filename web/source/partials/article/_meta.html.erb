@@ -1,25 +1,30 @@
+<%# The publish-date meta line, shared by the full/compact/short entries (draft label + tags)
+    and the summary card (`show_draft`/`show_tags` false). The date is parsed once here. %>
+<% render_draft = !defined?(show_draft) || show_draft %>
+<% render_tags = !defined?(show_tags) || show_tags %>
+<% published = DateTime.parse(article.published_at) %>
 <p class="entry__meta"
   data-controller="publish-date"
-  data-publish-date-datetime-value="<%= DateTime.parse(article.published_at).iso8601 %>"
+  data-publish-date-datetime-value="<%= published.iso8601 %>"
   data-publish-date-entry-type-value="<%= article.entry_type %>"
   data-publish-date-draft-value="<%= article.draft %>">
-  <% if article.draft %>
+  <% if render_draft && article.draft %>
     <span class="entry__highlight"><%= icon_svg("classic", "regular", "typewriter") %> Draft</span>
   <% end %>
   <span class="entry__highlight" data-publish-date-target="badge" hidden><%= icon_svg("classic", "regular", "sparkles") %> New</span>
   <span>
-    <span data-publish-date-target="clock" hidden><%= clock_icon_svg(DateTime.parse(article.published_at)) %></span>
+    <span data-publish-date-target="clock" hidden><%= clock_icon_svg(published) %></span>
     <span data-publish-date-target="calendar"><%= icon_svg("classic", "light", "calendar") %></span>
     <%= article_permalink_timestamp(article) %>
   </span>
-  <% if article.contentful_metadata.tags.present? %>
+  <% if render_tags && article.contentful_metadata.tags.present? %>
     <span>
       <% if article.contentful_metadata.tags.size == 1 %>
         <%= icon_svg("classic", "light", "tag") %>
       <% else %>
         <%= icon_svg("classic", "light", "tags") %>
       <% end %>
-      <%= article.contentful_metadata.tags.sort { |a, b| a.name <=> b.name }.map { |tag| link_to tag.name, "/tagged/#{tag.id}/index.html" }.join(', ') %>
+      <%= article.contentful_metadata.tags.sort_by(&:name).map { |tag| link_to tag.name, "/tagged/#{tag.id}/index.html" }.join(', ') %>
     </span>
   <% end %>
 </p>

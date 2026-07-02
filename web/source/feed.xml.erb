@@ -11,12 +11,12 @@
   <rights>© <%= copyright_years %> <%= data.site.copyright %></rights>
   <% articles.each do |entry| %>
     <entry>
-      <% updated = DateTime.parse(entry.updated_at) %>
-      <id><%= atom_tag(full_url(entry.path), DateTime.parse(entry.published_at)) %></id>
+      <% entry_published = DateTime.parse(entry.published_at) %>
+      <id><%= atom_tag(full_url(entry.path), entry_published) %></id>
       <title><%=h smartypants(sanitize(entry.title)) %></title>
       <link rel="alternate" type="text/html" href="<%=h full_url(entry.path, ref: 'Feed') %>"/>
-      <published><%= DateTime.parse(entry.published_at).rfc3339 %></published>
-      <updated><%= updated.rfc3339 %></updated>
+      <published><%= entry_published.rfc3339 %></published>
+      <updated><%= DateTime.parse(entry.updated_at).rfc3339 %></updated>
       <author>
         <name><%=h entry.author.name %></name>
       </author>
@@ -27,7 +27,7 @@
         <%=h partial 'partials/disclosure', locals: { entry: entry } %>
       </content>
       <% if entry.contentful_metadata.tags.present? %>
-        <% entry.contentful_metadata.tags.sort { |a, b| a.name <=> b.name }.each do |tag| %>
+        <% entry.contentful_metadata.tags.sort_by(&:name).each do |tag| %>
           <category term="<%=h tag.name %>" />
         <% end %>
       <% end %>

@@ -61,9 +61,9 @@ to flush the cache.
 - `config.rb` — Middleman config + proxy setup; `Rakefile` — Redis init + task loader.
 - `lib/data/*.rb` — build-time clients: `contentful.rb`, `font_awesome.rb` (+ `graphql/`).
 - `lib/tasks/*.rake` — `import`, `build`, `test`, `maps`, `redis`.
-- `lib/helpers/*.rb` — 13 helper modules (article, markup, image, site, unit, share, icon,
-  url, text, markdown, context, cache, affiliate_links);
-  `helpers/custom_helpers.rb` registers them.
+- `lib/helpers/*.rb` — helper modules (article, markup, image, site, share, icon,
+  url, text, markdown, context, cache, affiliate_links, standard_site);
+  `config.rb` requires and registers every module in that directory.
 - `source/layouts/layout.erb`, `source/partials/` (incl. `placeholders/`),
   `source/javascripts/stimulus/`, `source/stylesheets/`.
 - `netlify/functions/` — `api-proxy.mts` (proxies `/api/*`; see root `CLAUDE.md`),

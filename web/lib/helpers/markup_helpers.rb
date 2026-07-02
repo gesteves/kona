@@ -469,7 +469,8 @@ module MarkupHelpers
         href = a['href']
         next unless href&.start_with?('http://', 'https://')
 
-        link_host = URI.parse(href).host
+        # Author-supplied links can be malformed; skip them rather than failing the build.
+        link_host = URI.parse(href).host rescue next
         next if link_host.blank? || link_host == current_host
 
         a['rel'] = 'noopener'

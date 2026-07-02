@@ -5,10 +5,15 @@ module IconsHelper
   # @param icon_id [String] The icon's identifier (e.g., "person-running").
   # @return [String, nil] The SVG markup for the icon.
   def icon_svg(family, style, icon_id)
-    svg = (@font_awesome ||= FontAwesome.new).svg(family, style, icon_id)
+    # Memoize per request (the helper context): fragments repeat icon ids (e.g. arrow-down
+    # per stat), and each un-memoized lookup is a Redis round-trip.
+    @icon_svg_cache ||= {}
+    key = [family, style, icon_id]
+    @icon_svg_cache[key] = (@font_awesome ||= FontAwesome.new).svg(family, style, icon_id) unless @icon_svg_cache.key?(key)
+
     # Decorative icons: hide from assistive tech (they always sit next to a text label or
     # an aria-label'd parent). focusable="false" keeps legacy Edge/IE from tab-stopping the SVG.
-    svg&.sub("<svg", '<svg aria-hidden="true" focusable="false"')
+    @icon_svg_cache[key]&.sub("<svg", '<svg aria-hidden="true" focusable="false"')
   end
 
   # Integer hour (1–12) → word, for the clock-face icon ids (clock-three, clock-three-thirty, …).

@@ -150,6 +150,30 @@ RSpec.describe "Weather", type: :request do
     expect(response).to have_http_status(:unauthorized)
   end
 
+  context "when the weather upstream raises (e.g. a network timeout)" do
+    before { allow_any_instance_of(WeatherKit).to receive(:data).and_raise(Net::ReadTimeout) }
+
+    it "collapses the widget with an empty, non-durable response instead of a 500" do
+      get "/api/weather/current", headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body.strip).to be_empty
+      expect(response.headers["Netlify-CDN-Cache-Control"]).not_to include("durable")
+    end
+  end
+
+  context "when a non-critical upstream raises" do
+    before { allow_any_instance_of(AirQuality).to receive(:data).and_raise(Net::ReadTimeout) }
+
+    it "still renders the weather, just without that section" do
+      get "/api/weather/current", headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include('class="weather"')
+      expect(response.body).not_to include("AQI")
+    end
+  end
+
   context "when the weather is unavailable" do
     before { allow_any_instance_of(WeatherKit).to receive(:data).and_return(nil) }
 
@@ -180,6 +204,22 @@ RSpec.describe "Weather", type: :request do
     end
 
     it "treats the data as stale and returns an empty body" do
+      get "/api/weather/current", headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body.strip).to be_empty
+    end
+  end
+
+  context "in the evening with no overnight forecast in the payload" do
+    before do
+      day = weather.forecast_daily.days.first
+      day.sunset = (now - 1.hour).iso8601 # it's after sunset, so the summary reads overnight_forecast
+      day.overnight_forecast = nil
+      allow_any_instance_of(WeatherKit).to receive(:data).and_return(weather)
+    end
+
+    it "treats the data as stale and collapses instead of crashing on the missing slice" do
       get "/api/weather/current", headers: auth_headers
 
       expect(response).to have_http_status(:ok)

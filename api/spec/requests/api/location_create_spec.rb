@@ -45,4 +45,14 @@ RSpec.describe "Location", type: :request do
 
     expect(response).to have_http_status(:unprocessable_content)
   end
+
+  it "rejects non-numeric coordinates instead of storing them as 0.0,0.0" do
+    expect($redis).not_to receive(:set)
+
+    post "/api/location",
+      params: { latitude: "abc", longitude: "def" },
+      headers: { "Authorization" => "Bearer #{token}" }
+
+    expect(response).to have_http_status(:unprocessable_content)
+  end
 end

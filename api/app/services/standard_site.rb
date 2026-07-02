@@ -57,9 +57,6 @@ class StandardSite < ApplicationService
   # /api/standard-site endpoint the web build reads.
   DID_CACHE_KEY = "standard_site:did"
 
-  CONTENTFUL_API_URL = "https://graphql.contentful.com/content/v1/spaces"
-  PAGE_SIZE = 100
-
   # Sanity guard for a Contentful sys.id before it's turned into a record key.
   ENTRY_ID_PATTERN = /\A[a-zA-Z0-9._~:-]{1,512}\z/
 
@@ -424,65 +421,51 @@ class StandardSite < ApplicationService
     item && decorate_site(item)
   end
 
-  # Pages through the whole article collection (the delivery API returns published
-  # entries only).
+  # Pages through the whole article collection. Strict: the sync must never act on a
+  # partial corpus, so any failed page aborts the whole fetch.
   # @return [Array<Hash>, nil] All raw article items, or nil if any page request failed.
   def fetch_all_articles
-    all = []
-    skip = 0
-    loop do
-      items = query_contentful(ARTICLES_LIST_QUERY, { skip: skip, limit: PAGE_SIZE })&.dig(:articles, :items)
-      return nil if items.nil?
-      all.concat(items)
-      break if items.size < PAGE_SIZE
-      skip += PAGE_SIZE
-    end
-    all
+    contentful.paginate(ARTICLES_LIST_QUERY, collection: :articles, strict: true)
   end
 
   # Runs a Contentful GraphQL query and returns its `data` hash, or nil when the API
   # isn't configured or the request failed.
   def query_contentful(query, variables = nil)
-    space = ENV["CONTENTFUL_SPACE"]
-    token = ENV["CONTENTFUL_TOKEN"]
-    return if space.blank? || token.blank?
+    contentful.query(query, variables)
+  end
 
-    body = { query: query }
-    body[:variables] = variables if variables.present?
-
-    post_json(
-      "#{CONTENTFUL_API_URL}/#{space}",
-      body: body.to_json,
-      headers: { "Authorization" => "Bearer #{token}", "Content-Type" => "application/json" }
-    )&.dig(:data)
+  def contentful
+    @contentful ||= ContentfulClient.new(self.class.name)
   end
 
   # Maps a raw (symbolized) GraphQL article item to the string-keyed shape the record
-  # builders expect. Mirrors web's Contentful#process_articles / api's Articles#decorate.
+  # builders expect. The shared derivation (ArticleAttributes) keeps draft/entry_type/path
+  # consistent with Articles#decorate and the web build.
   # @param item [Hash]
   # @return [Hash]
   def decorate_post(item)
     sys = item[:sys] || {}
-    draft = sys[:publishedVersion].blank?
-    published_at = item[:published].presence || sys[:firstPublishedAt]
-    slug = item[:slug]
-    path = if !draft && slug.present? && published_at.present?
-      "/#{DateTime.parse(published_at).strftime('%Y/%m/%d')}/#{slug}/"
-    end
+    derived = ArticleAttributes.derive(
+      slug: item[:slug],
+      published_version: sys[:publishedVersion],
+      published: item[:published],
+      first_published_at: sys[:firstPublishedAt],
+      body: item[:body]
+    )
     cover = item[:coverImage]
 
     {
       "sys" => { "id" => sys[:id] },
       "title" => item[:title],
-      "slug" => slug,
+      "slug" => item[:slug],
       "summary" => item[:summary],
       "intro" => item[:intro],
       "body" => item[:body],
-      "entry_type" => item[:body].present? ? "Article" : "Short",
-      "draft" => draft,
-      "published_at" => published_at,
+      "entry_type" => derived[:entry_type],
+      "draft" => derived[:draft],
+      "published_at" => derived[:published_at],
       "updated_at" => sys[:publishedAt],
-      "path" => path,
+      "path" => derived[:path],
       "cover_image" => cover && { "url" => cover[:url], "content_type" => cover[:contentType] },
       "contentful_metadata" => {
         "tags" => Array(item.dig(:contentfulMetadata, :tags)).map { |t| { "id" => t[:id], "name" => t[:name] } }

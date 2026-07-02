@@ -1,23 +1,6 @@
 <%=
-  normalize = ->(p) {
-    next nil if p.nil?
-    p = p.sub(/\/index\.html\z/, '/')
-    p = '/' if p.empty?
-    p
-  }
-
-  titles = {}
-  (data.articles || []).reject(&:draft).each do |a|
-    key = normalize.call(a.path)
-    titles[key] = page_title(a) if key && a.title
-  end
-  (data.pages || []).reject(&:draft).each do |p|
-    key = normalize.call(p.path)
-    titles[key] = page_title(p) if key && p.title
-  end
-
   {
     logoUrl: cdn_image_url(data.site.small_logo&.url),
-    titles: titles
+    titles: og_page_titles
   }.to_json
 %>

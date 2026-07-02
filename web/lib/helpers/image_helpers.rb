@@ -6,16 +6,31 @@ require 'erb'
 
 module ImageHelpers
   # Extracts the asset ID from a URL.
-  # @param url [String] The URL from which to extract the asset ID.
-  # @return [String] The asset ID extracted from the URL.
+  # @param url [String, nil] The URL from which to extract the asset ID.
+  # @return [String, nil] The asset ID extracted from the URL, or nil for a blank URL.
   def get_asset_id(url)
+    return if url.blank?
     url.split('/')[4]
   end
 
-  # Returns a memoized hash of assets keyed by sys.id for O(1) lookups.
+  # Build-level cache for asset_index. Helper instance variables don't survive across
+  # Middleman's per-page template contexts, so the memo lives on the module, keyed by the
+  # data collection's identity (a dev-server data reload produces a new collection and
+  # rebuilds the index).
+  class << self
+    attr_accessor :asset_index_cache
+  end
+
+  # Returns a hash of assets keyed by sys.id for O(1) lookups, built once per build.
   # @return [Hash] A hash mapping asset IDs to asset objects.
   def asset_index
-    @asset_index ||= data.assets.each_with_object({}) { |a, h| h[a.sys.id] = a }
+    assets = data.assets
+    cached_key, cached_index = ImageHelpers.asset_index_cache
+    return cached_index if cached_key == assets.object_id
+
+    index = assets.each_with_object({}) { |a, h| h[a.sys.id] = a }
+    ImageHelpers.asset_index_cache = [assets.object_id, index]
+    index
   end
 
   # Retrieves the dimensions (width and height) of an asset by its ID.
@@ -62,10 +77,13 @@ module ImageHelpers
   # Uses Netlify's Image CDN or Contentful's, as needed.
   # @see https://docs.netlify.com/image-cdn/overview/
   # @see https://www.contentful.com/developers/docs/references/images-api/
-  # @param original_url [String] The original URL of the image.
+  # @param original_url [String, nil] The original URL of the image.
   # @param params [Hash] (Optional) Query parameters to be appended to the URL.
-  # @return [String] The CDN image URL with optional query parameters.
+  # @return [String, nil] The CDN image URL with optional query parameters, or nil for a
+  #   blank URL (e.g. a site entry with no logo) so callers don't crash the build.
   def cdn_image_url(original_url, params = {})
+    return if original_url.blank?
+
     asset_id = get_asset_id(original_url)
     asset_url = get_asset_url(asset_id)
     original_url = asset_url if asset_url.present?
@@ -203,7 +221,8 @@ module ImageHelpers
     # Cache that shit for later.
     redis.set(cache_key, jpeg)
     jpeg
-  rescue
+  rescue StandardError => e
+    warn "Blurhash JPEG generation failed for asset #{asset_id}: #{e.message}"
     nil
   end
 
@@ -228,7 +247,8 @@ module ImageHelpers
       # Fall back to encoding the Blurhash manually.
       encode_blurhash(asset_id, width, height)
     end
-  rescue
+  rescue StandardError => e
+    warn "Blurhash fetch failed for asset #{asset_id}: #{e.message}"
     nil
   end
 
@@ -241,7 +261,8 @@ module ImageHelpers
     url = get_asset_url(asset_id)
     image = MiniMagick::Image.open(cdn_image_url(url, { w: width, h: height }))
     Blurhash.encode(image.width, image.height, image.get_pixels.flatten)
-  rescue
+  rescue StandardError => e
+    warn "Blurhash encoding failed for asset #{asset_id}: #{e.message}"
     nil
   end
 end

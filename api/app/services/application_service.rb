@@ -4,6 +4,8 @@ require "httparty"
 # the HTTParty + JSON-parse boilerplate, the camelCase→snake_case key transform, and the
 # retry/error-handling patterns that were copy-pasted across every service.
 class ApplicationService
+  include UpstreamIsolation
+
   private
 
   # Read-through JSON cache. Returns the parsed cached value when the key is populated;
@@ -11,6 +13,10 @@ class ApplicationService
   # block result is returned without being cached, matching the services' "don't cache empty"
   # behavior. In development the cache is bypassed entirely (always fetch fresh) so changes are
   # visible immediately without waiting for a TTL to expire.
+  #
+  # Deliberately uses the shared $redis (not Rails.cache): the keyspace predates this app and
+  # keeps explicit, greppable key names, and the semantics differ from Rails.cache.fetch —
+  # blank results are never cached, and development bypasses caching entirely.
   #
   # @param key [String] The Redis key.
   # @param expires_in [ActiveSupport::Duration, Integer, nil] TTL in seconds. The result is
@@ -84,14 +90,11 @@ class ApplicationService
   end
 
   # Runs the block, logging and swallowing any error and returning the fallback instead.
+  # Sugar over UpstreamIsolation#safely with this service's class name as the upstream label.
   # @param fallback [Object] The value to return on error (default nil).
   # @param context [String] A label for the log line.
   def rescue_with(fallback = nil, context: self.class.name)
-    yield
-  rescue StandardError => e
-    Rails.logger.error("#{context}: #{e}")
-    report_upstream_error(e, context: context)
-    fallback
+    safely(self.class.name, fallback, context: context) { yield }
   end
 
   # Reports a handled upstream-API failure to Bugsnag, tagged with this service's class name.

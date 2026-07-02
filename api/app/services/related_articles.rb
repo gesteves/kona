@@ -5,6 +5,8 @@
 # neighbors (recency breaks ties). The ranking is computed once per article and cached briefly. The
 # request path never calls Voyage — it only reads stored vectors and does the arithmetic.
 class RelatedArticles < ApplicationService
+  include ArticleRanking # candidates + payload, shared with TrendingArticles
+
   # Cache (and serve) only the top slice of the ranking — plenty to fill the widget, while bounding
   # the JSON we cache. Keyed per article, unlike trending's single shared ranking.
   MAX_POOL = 12
@@ -44,7 +46,8 @@ class RelatedArticles < ApplicationService
     query_vector = load_vector(id)
     return [] if query_vector.blank?
 
-    pool = candidates(id)
+    # The trending candidate set, minus the current article (the only id-based exclusion).
+    pool = candidates.reject { |article| article.sys&.id == id }
     return [] if pool.blank?
 
     vectors = load_vectors(pool.map { |article| article.sys&.id })
@@ -59,12 +62,6 @@ class RelatedArticles < ApplicationService
       .sort_by { |e| [-e[:score], -e[:published].to_time.to_i] }
       .first(MAX_POOL)
       .map { |e| e[:article] }
-  end
-
-  # Published, non-Short articles with a resolvable path, minus the current article (matches the
-  # trending candidate set; the current article is the only id-based exclusion).
-  def candidates(id)
-    @articles.list.reject { |a| a.draft || a.entry_type == "Short" || a.path.blank? || a.sys&.id == id }
   end
 
   # The current article's stored embedding vector (nil when it hasn't been embedded yet).
@@ -103,18 +100,4 @@ class RelatedArticles < ApplicationService
     dot / (Math.sqrt(norm_a) * Math.sqrt(norm_b))
   end
 
-  # The fields the card view renders, so the cached ranking is self-contained (mirrors
-  # TrendingArticles#payload).
-  def payload(article)
-    {
-      title: article.title,
-      summary: article.summary,
-      slug: article.slug,
-      path: article.path,
-      published_at: article.published_at,
-      entry_type: article.entry_type,
-      draft: article.draft,
-      sys: { id: article.sys&.id }
-    }
-  end
 end

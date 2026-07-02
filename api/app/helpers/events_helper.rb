@@ -59,15 +59,20 @@ module EventsHelper
 
   # The upcoming races to show: future-or-today confirmed events, soonest first. When the next
   # one is within 10 days it's "featured" (expanded card + race-day weather) and we show four;
-  # otherwise three. Mirrors the static site's build-time helper, reading @events.
+  # otherwise three. Mirrors the static site's build-time helper, reading @events. Memoized —
+  # it's consulted several times per request (selection, is_next?, the view) and each
+  # computation re-parses and re-sorts every event.
   def upcoming_races
-    return [] if @events.blank?
-    upcoming = @events
-      .select { |e| e.going && Time.parse(e.date).in_time_zone(location_time_zone).beginning_of_day >= current_time.beginning_of_day }
-      .sort_by { |e| Time.parse(e.date) }
-    next_event = upcoming.first
-    featured = next_event.present? && is_close?(next_event)
-    upcoming.take(featured ? 4 : 3)
+    @upcoming_races ||= if @events.blank?
+      []
+    else
+      upcoming = @events
+        .select { |e| e.going && Time.parse(e.date).in_time_zone(location_time_zone).beginning_of_day >= current_time.beginning_of_day }
+        .sort_by { |e| Time.parse(e.date) }
+      next_event = upcoming.first
+      featured = next_event.present? && is_close?(next_event)
+      upcoming.take(featured ? 4 : 3)
+    end
   end
 
   # Whether the event is today or within the next 10 days.

@@ -2,7 +2,6 @@
 # no nearby sensor, e.g. outside the US). `aqi` returns { aqi:, category:, description: }
 # or nil.
 class GoogleAirQuality < ApplicationService
-  attr_reader :aqi
   GOOGLE_AQI_API_URL = "https://airquality.googleapis.com/v1"
 
   # Google's forecast endpoint only covers the next 96 hours (4 days); a dateTime beyond that
@@ -15,6 +14,10 @@ class GoogleAirQuality < ApplicationService
     @country_code = country_code
     @aqi_code = aqi_code
     @datetime = datetime
+  end
+
+  def aqi
+    return @aqi if defined?(@aqi)
     @aqi = get_aqi
   end
 

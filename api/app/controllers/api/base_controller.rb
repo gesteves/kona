@@ -12,6 +12,7 @@ module Api
   class BaseController < ActionController::Base
     include LiveWidget
     include TokenAuthentication
+    include UpstreamIsolation
 
     layout false
 

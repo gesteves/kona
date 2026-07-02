@@ -20,6 +20,8 @@ require "set"
 # Articles below MIN_RECENT_PAGEVIEWS of recent traffic score 0 (noise floor) and fall to the recency
 # tail; articles too new to have a baseline rank on volume alone.
 class TrendingArticles < ApplicationService
+  include ArticleRanking # candidates + payload, shared with RelatedArticles
+
   # The rolling recent window (hours). Short enough to be "recent/today", long enough to accumulate a
   # usable signal on a low-traffic site. Env-overridable like the weights below.
   RECENT_WINDOW_HOURS = Integer(ENV.fetch("TRENDING_RECENT_WINDOW_HOURS", 48))
@@ -102,11 +104,6 @@ class TrendingArticles < ApplicationService
       .map { |e| e[:article] }
   end
 
-  # Published, non-Short articles with a resolvable path (drafts/Shorts excluded — matches web).
-  def candidates
-    @articles.list.reject { |a| a.draft || a.entry_type == "Short" || a.path.blank? }
-  end
-
   # One Plausible call → { path => total_pageviews } over the given date range (a flat per-page count).
   # Used for both the recent window and the baseline period.
   def pageviews_by_path(date_range:)
@@ -165,20 +162,6 @@ class TrendingArticles < ApplicationService
   def normalize_path(path)
     return if path.blank?
     path.to_s.sub(/index\.html\z/, "")
-  end
-
-  # The fields the trending-card view renders, so the cached ranking is self-contained.
-  def payload(article)
-    {
-      title: article.title,
-      summary: article.summary,
-      slug: article.slug,
-      path: article.path,
-      published_at: article.published_at,
-      entry_type: article.entry_type,
-      draft: article.draft,
-      sys: { id: article.sys&.id }
-    }
   end
 
   # Cheap signal for "analytics unavailable or a path-format regression": candidates present but zero

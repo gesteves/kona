@@ -1,17 +1,6 @@
 <article class="entry entry--summary" id="entry-<%= article.sys.id.parameterize %>" aria-labelledby="hed-<%= article.sys.id.parameterize %>">
   <header class="entry__header">
-    <p class="entry__meta"
-      data-controller="publish-date"
-      data-publish-date-datetime-value="<%= DateTime.parse(article.published_at).iso8601 %>"
-      data-publish-date-entry-type-value="<%= article.entry_type %>"
-      data-publish-date-draft-value="<%= article.draft %>">
-      <span class="entry__highlight" data-publish-date-target="badge" hidden><%= icon_svg("classic", "regular", "sparkles") %> New</span>
-      <span>
-        <span data-publish-date-target="clock" hidden><%= clock_icon_svg(DateTime.parse(article.published_at)) %></span>
-        <span data-publish-date-target="calendar"><%= icon_svg("classic", "light", "calendar") %></span>
-        <%= article_permalink_timestamp(article) %>
-      </span>
-    </p>
+    <%= partial 'partials/article/meta', locals: { article: article, show_draft: false, show_tags: false } %>
     <h4 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">
       <%= link_to smartypants(article.title), article.path %>
     </h4>
