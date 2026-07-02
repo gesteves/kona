@@ -132,6 +132,9 @@ RSpec.describe ArticleHelpers do
     def canonical_url = 'https://example.com/2024/01/01/post/'
     def schema_entity_id(fragment, path: '/') = "https://example.com#{path == '/' ? '/' : "#{path}/"}##{fragment}"
     def cdn_image_url(url, params = {}) = "#{url}?w=#{params[:w]}&h=#{params[:h]}"
+    def full_url(path) = "https://example.com#{path}"
+    def generate_open_graph_image_url(url) = "https://example.com/og?url=#{url}"
+    def current_page = OpenStruct.new(url: '/2024/01/01/post/')
 
     def schema_article(**overrides)
       cover_image = overrides.delete(:cover_image)
@@ -167,11 +170,10 @@ RSpec.describe ArticleHelpers do
       expect(schema['mainEntityOfPage']).to eq('@type' => 'WebPage', '@id' => canonical_url)
     end
 
-    it 'omits keywords and image when the article has none' do
+    it 'omits keywords when the article has no tags' do
       schema = JSON.parse(article_schema(schema_article(tags: [])))
       expect(schema).not_to have_key('keywords')
       expect(schema).not_to have_key('articleSection')
-      expect(schema).not_to have_key('image')
     end
 
     it 'emits cover images as ImageObjects with dimensions' do
@@ -180,6 +182,16 @@ RSpec.describe ArticleHelpers do
       expect(schema['image']).to all(include('@type' => 'ImageObject'))
       expect(schema['image'].map { |i| [i['width'], i['height']] })
         .to eq([[1000, 1000], [1600, 900], [1600, 1200]])
+    end
+
+    it 'falls back to the generated Open Graph card when there is no cover image (e.g. a Short)' do
+      schema = JSON.parse(article_schema(schema_article(cover_image: nil)))
+      expect(schema['image']).to eq([{
+        '@type' => 'ImageObject',
+        'url' => 'https://example.com/og?url=https://example.com/2024/01/01/post/',
+        'width' => 1200,
+        'height' => 630
+      }])
     end
   end
 
