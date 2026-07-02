@@ -1,17 +1,33 @@
-<%# Sequential "Read Next" navigation: the chronologically newer and older entries, rendered as
-    entry summary boxes without the body (icon + date eyebrow + title only) inside the collection
-    grid so they match the recommendation sections. Renders nothing at the ends of the archive. %>
+<%# Sequential archive navigation, split into two halves that sit side by side at the larger
+    breakpoints: the chronologically older entry on the left ("Previous") and the newer entry on
+    the right ("Next"), each a body-less summary card, so the reader can step backward or
+    forward through the archive. Each side is its own collection so it carries its own heading;
+    at an end of the archive only one side renders (and centers itself — see .collection--adjacent).
+    Renders nothing when the entry has no neighbors (e.g. a draft preview). %>
 <% adjacent = adjacent_articles(article) %>
-<% entries = [adjacent[:older], adjacent[:newer]].compact %>
-<% if entries.present? %>
-  <nav class="collection collection--halves" aria-label="More entries">
-    <h2 class="collection__heading">Read Next</h2>
-    <ol class="collection__list">
-      <% entries.each do |entry| %>
-        <li class="collection__item">
-          <%= partial 'partials/article/summary', locals: { article: entry, show_body: false } %>
-        </li>
-      <% end %>
-    </ol>
+<% older = adjacent[:older] %>
+<% newer = adjacent[:newer] %>
+<% if older || newer %>
+  <nav class="collection-group" aria-label="More entries">
+    <% if older %>
+      <section class="collection collection--adjacent">
+        <h2 class="collection__heading">Previous</h2>
+        <ol class="collection__list">
+          <li class="collection__item">
+            <%= partial 'partials/article/summary', locals: { article: older, show_body: false } %>
+          </li>
+        </ol>
+      </section>
+    <% end %>
+    <% if newer %>
+      <section class="collection collection--adjacent">
+        <h2 class="collection__heading">Next</h2>
+        <ol class="collection__list">
+          <li class="collection__item">
+            <%= partial 'partials/article/summary', locals: { article: newer, show_body: false } %>
+          </li>
+        </ol>
+      </section>
+    <% end %>
   </nav>
 <% end %>

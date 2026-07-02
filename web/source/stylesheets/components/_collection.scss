@@ -71,6 +71,24 @@
   }
 }
 
+// Half-width collection holding a single entry. Two of these sit side by side at bp-medium
+// (the "Read Next" older/newer pair — older left, newer right, following source order) and
+// stack on small screens. Unlike the item-span variants above, this sets the *collection's*
+// own span so each side is an independent half-width subgrid.
+.collection--adjacent {
+  @include bp-medium {
+    grid-column: span 6;
+  }
+
+  // At an end of the archive only one neighbor exists; center the lone card so it doesn't
+  // sit against one edge with an empty half beside it.
+  &:only-child {
+    @include bp-medium {
+      grid-column: 4 / span 6;
+    }
+  }
+}
+
 .collection--quarters .collection__item {
   @include bp-medium {
     grid-column: span 3;
