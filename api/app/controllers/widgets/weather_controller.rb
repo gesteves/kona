@@ -1,8 +1,8 @@
-module Api
+module Widgets
   # The current-weather widget embedded in the static site: resolves the owner's current
   # location, fetches weather + air quality + pollen + bay + race data, and renders the summary
   # fragment (or an empty body when weather is unavailable/stale). Cached for five minutes.
-  # (Per-event race-day weather now lives in Api::EventsController, rendered inline with the
+  # (Per-event race-day weather now lives in Widgets::EventsController, rendered inline with the
   # featured upcoming race.)
   class WeatherController < BaseController
     include WeatherHelper

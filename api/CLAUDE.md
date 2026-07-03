@@ -1,9 +1,11 @@
 # api/ — Kona widget API
 
 Rails 8.1 API (Ruby 4.0.5) that serves small embeddable **HTML fragments** ("widgets")
-— plus one JSON endpoint — for the static `web/` site. Deployed to **fly.io** as
-`kona-api`; reached through the web app's same-origin Netlify proxy (`/api/*`).
-Redis-backed caching, **no database**.
+— plus structured-data endpoints and inbound webhooks — for the static `web/` site.
+Deployed to **fly.io** as `kona-api`. Routes are split by namespace: `/widgets/*` (HTML
+fragments, reached through the web app's same-origin Netlify proxy), `/api/*` (structured
+data, hit directly at the origin), and `/webhooks/*` (inbound webhooks, hit directly by
+the sending service). Redis-backed caching, **no database**.
 
 Minimal Rails: only ActiveModel + ActionController + ActionView are loaded (no
 ActiveRecord / ActiveJob / ActionMailer / ActionCable). See the root
@@ -11,23 +13,23 @@ ActiveRecord / ActiveJob / ActionMailer / ActionCable). See the root
 
 ## Endpoints
 
-All `/api/*` widget responses are HTML fragments (`layout false`) with the cache
+All `/widgets/*` responses are HTML fragments (`layout false`) with the cache
 headers below. Edge TTL = how long Netlify serves a cached copy before revalidating.
 
 | Method | Path | Action | Returns | Edge TTL |
 |---|---|---|---|---|
 | GET | `/up` | `rails/health#show` | health check | — |
-| GET | `/api/activity-stats` | `activity_stats#show` | HTML (Intervals.icu totals) | 5 min |
-| GET | `/api/weather/current` | `weather#current` | HTML (weather/AQI/pollen) | 5 min |
-| GET | `/api/events/upcoming` | `events#upcoming` | HTML (upcoming races; featured event has inline race-day weather) | 1 hr |
-| GET | `/api/articles/trending` | `articles#trending` | HTML ("hot today" articles — Plausible pageviews over a flat 48h window vs. each post's own baseline, recomputed hourly) | 1 hr |
-| GET | `/api/articles/trending/:id` | `articles#trending_excluding` | HTML (trending minus one Contentful id — an article page passes its own id so it isn't listed) | 1 hr |
-| GET | `/api/articles/related/:id` | `articles#related` | HTML ("You May Also Like" — articles semantically related to `:id`, ranked from precomputed Voyage embeddings) | 1 hr |
-| GET | `/api/whoop` | `whoop#show` | HTML (sleep/recovery/strain) | 5 min |
-| GET | `/api/plausible/pageviews/:id` | `plausible#pageviews` | HTML (pageview count by Contentful id) | 1 hr |
-| POST | `/api/location` | `location#create` | sets Redis `location:current` (bearer-token gated) | — |
-| POST | `/api/webhooks/contentful` | `webhooks#contentful` | enqueues a standard.site PDS sync job on publish/unpublish/delete (HMAC-gated); 204 | — |
-| GET | `/api/standard-site` | `standard_site#show` | JSON `{did, publication_uri}` for the web build's verification markup | 1 hr |
+| GET | `/widgets/activity-stats` | `widgets/activity_stats#show` | HTML (Intervals.icu totals) | 5 min |
+| GET | `/widgets/weather/current` | `widgets/weather#current` | HTML (weather/AQI/pollen) | 5 min |
+| GET | `/widgets/events/upcoming` | `widgets/events#upcoming` | HTML (upcoming races; featured event has inline race-day weather) | 1 hr |
+| GET | `/widgets/articles/trending` | `widgets/articles#trending` | HTML ("hot today" articles — Plausible pageviews over a flat 48h window vs. each post's own baseline, recomputed hourly) | 1 hr |
+| GET | `/widgets/articles/trending/:id` | `widgets/articles#trending_excluding` | HTML (trending minus one Contentful id — an article page passes its own id so it isn't listed) | 1 hr |
+| GET | `/widgets/articles/related/:id` | `widgets/articles#related` | HTML ("You May Also Like" — articles semantically related to `:id`, ranked from precomputed Voyage embeddings) | 1 hr |
+| GET | `/widgets/whoop` | `widgets/whoop#show` | HTML (sleep/recovery/strain) | 5 min |
+| GET | `/widgets/plausible/pageviews/:id` | `widgets/plausible#pageviews` | HTML (pageview count by Contentful id) | 1 hr |
+| POST | `/api/location` | `api/location#create` | sets Redis `location:current` (bearer-token gated) | — |
+| POST | `/webhooks/contentful` | `webhooks/contentful#create` | enqueues a standard.site PDS sync job on publish/unpublish/delete (HMAC-gated); 204 | — |
+| GET | `/api/standard-site` | `api/standard_site#show` | JSON `{did, publication_uri}` for the web build's verification markup | 1 hr |
 | GET | `/whoop/auth` | `whoop_oauth#authorize` | redirect (owner-session gated) | — |
 | GET | `/whoop/callback` | `whoop_oauth#callback` | OAuth token exchange | — |
 | GET | `/login` | `sessions#new` | owner sign-in page (Google button) | — |
@@ -38,17 +40,24 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 
 ## Architecture
 
-- **Controllers** (`app/controllers/`): `Api::BaseController` (`layout false`, includes
-  the `LiveWidget` concern); widget controllers fetch via a service, call
-  `cache_widget(ttl:)`, then render an ERB fragment. Use `render_empty` (blank body)
-  when data is unavailable — the site's `live-update` controller removes the placeholder
-  (collapsing the widget) on an empty response, so prefer it over raising.
-- **Auth** — `BaseController` requires the `API_TOKEN` bearer (`TokenAuthentication` concern)
-  on **every** endpoint via a global `before_action`; the web app's Netlify proxy injects it,
-  so the widget origin is closed to direct/public hits (cheap 401 before any work). Two
-  endpoints `skip_before_action :authenticate_bearer_token!`: the Contentful webhook (HMAC
-  instead, hit directly by Contentful) and `standard-site` (public, build-time fetched directly
-  via `KONA_API_URL`). A new widget endpoint is gated automatically by inheriting `BaseController`.
+- **Controllers** (`app/controllers/`), one namespace per kind of endpoint:
+  - `widgets/` — HTML-only widget endpoints. `Widgets::BaseController` (`layout false`,
+    includes the `LiveWidget` concern); widget controllers fetch via a service, call
+    `cache_widget(ttl:)`, then render an ERB fragment. Use `render_empty` (blank body)
+    when data is unavailable — the site's `live-update` controller removes the placeholder
+    (collapsing the widget) on an empty response, so prefer it over raising.
+  - `api/` — structured-data endpoints (accept or return data, not markup):
+    `Api::LocationController`, `Api::StandardSiteController` under `Api::BaseController`.
+  - `webhooks/` — inbound webhooks, one controller per sending service under
+    `Webhooks::BaseController` (currently `Webhooks::ContentfulController`).
+- **Auth** — `Widgets::BaseController` and `Api::BaseController` require the `API_TOKEN`
+  bearer (`TokenAuthentication` concern) via a global `before_action`; the web app's Netlify
+  proxy injects it on widget requests, so the widget origin is closed to direct/public hits
+  (cheap 401 before any work). `standard-site` skips it (public, build-time fetched directly
+  via `KONA_API_URL`). Webhook controllers don't use the bearer at all — senders can't carry
+  our token, so each authenticates with its service's own scheme (Contentful: HMAC request
+  verification). A new widget endpoint is gated automatically by inheriting
+  `Widgets::BaseController`.
 - **Owner auth** — the owner-only surfaces (`/whoop/auth` and the `/sidekiq` UI) are gated by a
   **Google OAuth** sign-in restricted to a single identity, **not** the `API_TOKEN` bearer.
   `SessionsController` runs the OmniAuth (`omniauth-google-oauth2`) flow and accepts a login only
@@ -63,7 +72,7 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   blog to the AT Protocol / Bluesky PDS as standard.site records — webhook-driven, plus
   the `standard_site:backfill` rake task in `lib/tasks/`). Read-through Redis cache via
   `cached_json(key, expires_in:)`; HTTParty with retries; `DeepOstruct` for dot-access.
-- **Webhooks**: `Api::WebhooksController#contentful` receives Contentful publish/
+- **Webhooks**: `Webhooks::ContentfulController#create` receives Contentful publish/
   unpublish/delete events and keeps the standard.site PDS records in sync. Verified with
   Contentful's HMAC request-verification scheme (`ContentfulRequestVerification` concern,
   `CONTENTFUL_WEBHOOK_SECRET`). The request only **enqueues a `StandardSiteSyncJob`** and
@@ -83,7 +92,7 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   gated by the owner session (Google OAuth — see **Owner auth** above), shared with `/whoop/auth`.
   Sidekiq runs as a dedicated **`worker` fly process** (see fly.toml); a worker must be running
   to drain the queue (locally: `bundle exec sidekiq`).
-- **Views** (`app/views/api/`) render raw HTML fragments; **helpers** (`app/helpers/`)
+- **Views** (`app/views/widgets/`) render raw HTML fragments; **helpers** (`app/helpers/`)
   were ported from the web app (weather, units, icons, markdown, time, etc.).
 - **Caching** — `app/controllers/concerns/live_widget.rb`. `cache_widget(ttl:)` sets:
   - Browser: `Cache-Control: public, max-age=0, stale-while-revalidate=86400`
@@ -109,11 +118,12 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   requests **to paths outside the known route prefixes** (keyed on the real client IP via the
   `Fly-Client-IP` header — Rack's `req.ip` resolves to a shared fly LB address behind the proxy).
   ⚠️ The probe blocklist must stay **IP-agnostic** — never ban by IP. Some probe paths (e.g.
-  `/api/status`) are reachable through the public Netlify `/api/*` proxy, and all legitimate
-  `/api/*` traffic shares the Netlify egress IPs, so an IP ban would 403 every visitor's widgets
-  at once (this once took the site down). Same reason: do **not** add a blanket per-IP throttle.
-  ⚠️ The throttle treats anything outside `RACK_ATTACK_KNOWN_PREFIXES` (`/up`, `/api`, `/whoop`,
-  `/sidekiq`, `/login`, `/logout`, `/auth`, `/`) as a probe: **if you add a top-level route, add
+  `/widgets/.env`) are reachable through the public Netlify `/widgets/*` proxy, and all
+  legitimate widget traffic shares the Netlify egress IPs, so an IP ban would 403 every
+  visitor's widgets at once (this once took the site down). Same reason: do **not** add a
+  blanket per-IP throttle.
+  ⚠️ The throttle treats anything outside `RACK_ATTACK_KNOWN_PREFIXES` (`/up`, `/api`, `/widgets`,
+  `/webhooks`, `/whoop`, `/sidekiq`, `/login`, `/logout`, `/auth`, `/`) as a probe: **if you add a top-level route, add
   its prefix there** or it will be rate-limited (the `/sidekiq` UI and the OAuth login routes are
   in the list for exactly this reason). Disabled in the
   test env (`Rack::Attack.enabled`); counters live in Redis (in-memory under test).
@@ -128,7 +138,7 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 ```bash
 bin/dev                                              # local server (or bin/setup)
 bundle exec sidekiq -C config/sidekiq.yml            # local worker (needed to drain jobs)
-bundle exec rspec spec/requests/api/activity_stats_spec.rb   # single spec (fast)
+bundle exec rspec spec/requests/widgets/activity_stats_spec.rb   # single spec (fast)
 bundle exec rspec                                    # full suite
 bin/ci                                               # setup + full suite + security scan (CI)
 bundle exec brakeman -q --no-pager                   # static security scan
@@ -158,7 +168,7 @@ secrets (and Rails `config/credentials.yml.enc` + `master.key`).
   `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET`, `WHOOP_REDIRECT_URI`, `GOOGLE_OAUTH_CLIENT_ID`,
   `GOOGLE_OAUTH_CLIENT_SECRET`, `OWNER_EMAIL` (the three gate owner sign-in for `/whoop/auth`
   + `/sidekiq` — Google OAuth restricted to this email/its hosted domain), `GOOGLE_API_KEY`,
-  `API_TOKEN` (bearer required on all `/api/*` widget endpoints — injected by the web proxy —
+  `API_TOKEN` (bearer required on all `/widgets/*` endpoints — injected by the web proxy —
   and on `POST /api/location`; must match the web app's), `WEATHERKIT_KEY_ID`,
   `WEATHERKIT_TEAM_ID`, `WEATHERKIT_SERVICE_ID`,
   `WEATHERKIT_PRIVATE_KEY` (base64 .p8), `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`,

@@ -12,7 +12,7 @@ Copy `.env.example` to `.env` and fill in the credentials below (also add them t
 
 ### Required services
 
-- **Netlify** — hosting. Kona can run anywhere as a static site, but relies on Netlify [functions](https://docs.netlify.com/functions/overview/) (the `/api/*` proxy, OG images), [Image CDN](https://docs.netlify.com/image-cdn/overview/), and [build hooks](https://docs.netlify.com/configure-builds/build-hooks/).
+- **Netlify** — hosting. Kona can run anywhere as a static site, but relies on Netlify [functions](https://docs.netlify.com/functions/overview/) (the `/widgets/*` proxy, OG images), [Image CDN](https://docs.netlify.com/image-cdn/overview/), and [build hooks](https://docs.netlify.com/configure-builds/build-hooks/).
 - **Contentful** — the CMS for the site's content. Create an API key under Settings → API Keys and set `CONTENTFUL_SPACE` and `CONTENTFUL_TOKEN` (Content Preview token). You'll want a content model like this:
 
   <img width="1616" height="3182" alt="Contentful content model" src="https://github.com/user-attachments/assets/689d3caf-8b71-47a4-95e5-4630bf9c8281" />

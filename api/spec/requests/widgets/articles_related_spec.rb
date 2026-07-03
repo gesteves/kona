@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Api::Articles related", type: :request do
+RSpec.describe "Widgets::Articles related", type: :request do
   def article(id:, title:, slug:, published_at:, summary: "A short summary.", entry_type: "Article", draft: false)
     path = "/#{DateTime.parse(published_at).strftime('%Y/%m/%d')}/#{slug}/"
     DeepOstruct.wrap(
@@ -21,19 +21,19 @@ RSpec.describe "Api::Articles related", type: :request do
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
   end
 
-  describe "GET /api/articles/related/:id" do
+  describe "GET /widgets/articles/related/:id" do
     it "renders the You May Also Like section as a live-update fragment" do
-      get "/api/articles/related/abc123", headers: auth_headers
+      get "/widgets/articles/related/abc123", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include('class="collection collection--halves"')
       expect(response.body).to include("You May Also Like")
       expect(response.body).to include('data-controller="live-update"')
-      expect(response.body).to include('data-live-update-url-value="/api/articles/related/abc123"')
+      expect(response.body).to include('data-live-update-url-value="/widgets/articles/related/abc123"')
     end
 
     it "renders a card per related article, linking to its computed path" do
-      get "/api/articles/related/abc123", headers: auth_headers
+      get "/widgets/articles/related/abc123", headers: auth_headers
 
       expect(response.body).to include("First Related")
       expect(response.body).to include("Second Related")
@@ -41,7 +41,7 @@ RSpec.describe "Api::Articles related", type: :request do
     end
 
     it "sets a one-hour durable caching header" do
-      get "/api/articles/related/abc123", headers: auth_headers
+      get "/widgets/articles/related/abc123", headers: auth_headers
 
       cache_control = response.headers["Cache-Control"]
       expect(cache_control).to include("public")
@@ -57,7 +57,7 @@ RSpec.describe "Api::Articles related", type: :request do
       before { allow_any_instance_of(RelatedArticles).to receive(:for_article).and_return([]) }
 
       it "returns an empty body so the placeholder collapses" do
-        get "/api/articles/related/abc123", headers: auth_headers
+        get "/widgets/articles/related/abc123", headers: auth_headers
 
         expect(response).to have_http_status(:ok)
         expect(response.body.strip).to be_empty
@@ -66,17 +66,17 @@ RSpec.describe "Api::Articles related", type: :request do
 
     it "returns an empty body for a malformed id without invoking the service" do
       expect_any_instance_of(RelatedArticles).not_to receive(:for_article)
-      get "/api/articles/related/@@@", headers: auth_headers
+      get "/widgets/articles/related/@@@", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty
     end
 
     it "requires the API_TOKEN bearer (the proxy injects it; direct hits are rejected)" do
-      get "/api/articles/related/abc123"
+      get "/widgets/articles/related/abc123"
       expect(response).to have_http_status(:unauthorized)
 
-      get "/api/articles/related/abc123", headers: { "Authorization" => "Bearer wrong" }
+      get "/widgets/articles/related/abc123", headers: { "Authorization" => "Bearer wrong" }
       expect(response).to have_http_status(:unauthorized)
     end
   end

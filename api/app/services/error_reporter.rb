@@ -55,7 +55,7 @@ module ErrorReporter
   # their actual class (Net::ReadTimeout, JSON::ParserError, …) and backtrace are more useful
   # than a generic wrapper. A non-exception message (a non-2xx response) is wrapped in the
   # per-service UpstreamError subclass, with the context appended so the cause and where it
-  # happened both read off the headline (e.g. "HTTP 400 — Api::EventsController#event_weather_for").
+  # happened both read off the headline (e.g. "HTTP 400 — Widgets::EventsController#event_weather_for").
   #
   # @param error [Exception, String]
   # @param service [String]

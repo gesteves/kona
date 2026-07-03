@@ -35,7 +35,7 @@ comments, docs, examples, tests, and CI config.** This covers the public site ho
 API/admin host, and the fly.io origin host. They are environment-specific and must always
 come from configuration:
 
-- The API origin is read from `KONA_API_URL` (web build + `/api/*` proxy).
+- The API origin is read from `KONA_API_URL` (web build + `/widgets/*` proxy).
 - The site URL is read from `URL` (web).
 - The Whoop redirect URI is read from `WHOOP_REDIRECT_URI`; CI's deploy URL from the
   `API_PRODUCTION_URL` secret.
@@ -45,9 +45,14 @@ When an example or placeholder genuinely needs a host, use a generic stand-in li
 
 ## How the two apps connect (request path)
 
-1. Browser requests `/api/*` on the main site.
-2. The Netlify Function `web/netlify/functions/api-proxy.mts` claims that path
-   (`config.path = '/api/*'`) and proxies to `KONA_API_URL` (the fly.io origin).
+The API's routes are split by namespace: `/widgets/*` returns HTML widget fragments (proxied,
+below), `/api/*` accepts or returns structured data (`POST /api/location`,
+`GET /api/standard-site` — hit directly at `KONA_API_URL`, not proxied), and `/webhooks/*`
+receives inbound webhooks from external services (also hit directly, e.g. by Contentful).
+
+1. Browser requests `/widgets/*` on the main site.
+2. The Netlify Function `web/netlify/functions/widget-proxy.mts` claims that path
+   (`config.path = '/widgets/*'`) and proxies to `KONA_API_URL` (the fly.io origin).
 3. The response is cached at Netlify's edge and reused by all viewers.
 
 The proxy is deliberately strict:
@@ -92,13 +97,13 @@ views build the matching outer element with `live_update_url`.
 
 | Widget | web placeholder | api view | endpoint |
 |---|---|---|---|
-| Activity stats | `web/source/partials/placeholders/_stats.html.erb` | `api/app/views/api/activity_stats/show.html.erb` | `/api/activity-stats` |
-| Whoop | `web/source/partials/placeholders/_whoop.html.erb` | `api/app/views/api/whoop/show.html.erb` | `/api/whoop` |
-| Current weather | `web/source/partials/placeholders/_weather.html.erb` | `api/app/views/api/weather/current.html.erb` | `/api/weather/current` |
-| Pageviews | `web/source/partials/article/_full.html.erb` (inline `span`) | `api/app/views/api/plausible/pageviews.html.erb` | `/api/plausible/pageviews/:id` |
-| Upcoming races (race-day weather is inline in the featured event) | `web/source/partials/_upcoming_races.html.erb` | `api/app/views/api/events/upcoming.html.erb` | `/api/events/upcoming` |
-| Trending articles | `web/source/partials/placeholders/_trending.html.erb` (the embedding page supplies the `url`: bare or `/:id` to exclude the current article) | `api/app/views/api/articles/trending.html.erb` | `/api/articles/trending` and `/api/articles/trending/:id` |
-| Related articles ("You May Also Like") | `web/source/partials/placeholders/_related.html.erb` (the embedding page supplies the `url` with the article's Contentful id) | `api/app/views/api/articles/related.html.erb` | `/api/articles/related/:id` |
+| Activity stats | `web/source/partials/placeholders/_stats.html.erb` | `api/app/views/widgets/activity_stats/show.html.erb` | `/widgets/activity-stats` |
+| Whoop | `web/source/partials/placeholders/_whoop.html.erb` | `api/app/views/widgets/whoop/show.html.erb` | `/widgets/whoop` |
+| Current weather | `web/source/partials/placeholders/_weather.html.erb` | `api/app/views/widgets/weather/current.html.erb` | `/widgets/weather/current` |
+| Pageviews | `web/source/partials/article/_full.html.erb` (inline `span`) | `api/app/views/widgets/plausible/pageviews.html.erb` | `/widgets/plausible/pageviews/:id` |
+| Upcoming races (race-day weather is inline in the featured event) | `web/source/partials/_upcoming_races.html.erb` | `api/app/views/widgets/events/upcoming.html.erb` | `/widgets/events/upcoming` |
+| Trending articles | `web/source/partials/placeholders/_trending.html.erb` (the embedding page supplies the `url`: bare or `/:id` to exclude the current article) | `api/app/views/widgets/articles/trending.html.erb` | `/widgets/articles/trending` and `/widgets/articles/trending/:id` |
+| Related articles ("You May Also Like") | `web/source/partials/placeholders/_related.html.erb` (the embedding page supplies the `url` with the article's Contentful id) | `api/app/views/widgets/articles/related.html.erb` | `/widgets/articles/related/:id` |
 
 Shared CSS lives in `web/source/stylesheets/` (e.g. `stats`, `stats--has-four`,
 `stats--has-three`, `weather`, `event__weather`).

@@ -1,4 +1,4 @@
-module Api
+module Webhooks
   # Receives Contentful webhooks and keeps the standard.site PDS records in sync as
   # entries are published/unpublished/deleted. The actual sync runs in the background: the
   # request only enqueues a StandardSiteSyncJob and returns 204 immediately, so a slow CDA
@@ -9,19 +9,17 @@ module Api
   # Routing is driven by the X-Contentful-Topic header (the action) and the payload's
   # sys.contentType.sys.id (which content type) + sys.id (which entry). The body is never
   # trusted for entry content — the job re-fetches the resolved entry from the CDA.
-  class WebhooksController < BaseController
+  class ContentfulController < BaseController
     include ContentfulRequestVerification
 
-    # Authenticated by Contentful's HMAC request signature, not the API_TOKEN bearer (Contentful
-    # has no token to send), and hit directly by Contentful rather than through the proxy.
-    skip_before_action :authenticate_bearer_token!
-    skip_forgery_protection
-    before_action :verify_contentful_signature!, only: :contentful
+    # Authenticated by Contentful's HMAC request signature (Contentful has no bearer token to
+    # send), and hit directly by Contentful rather than through the proxy.
+    before_action :verify_contentful_signature!, only: :create
 
     ARTICLE_TYPE = "article".freeze
     SITE_TYPE = "site".freeze
 
-    def contentful
+    def create
       payload = JSON.parse(request.raw_post)
       content_type = payload.dig("sys", "contentType", "sys", "id")
       entry_id = payload.dig("sys", "id")

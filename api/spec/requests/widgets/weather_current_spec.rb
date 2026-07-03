@@ -60,7 +60,7 @@ RSpec.describe "Weather", type: :request do
   end
 
   it "renders the weather markup" do
-    get "/api/weather/current", headers: auth_headers
+    get "/widgets/weather/current", headers: auth_headers
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('class="weather"')
@@ -74,7 +74,7 @@ RSpec.describe "Weather", type: :request do
   end
 
   it "renders the full summary: forecast, sun times, and an activity suggestion" do
-    get "/api/weather/current", headers: auth_headers
+    get "/widgets/weather/current", headers: auth_headers
 
     expect(response.body).to include("forecast is clear, with a high of") # forecast()
     expect(response.body).to include("will be at")                        # sunrise_or_sunset()
@@ -96,7 +96,7 @@ RSpec.describe "Weather", type: :request do
     before { allow_any_instance_of(Events).to receive(:all).and_return([race]) }
 
     it "announces the race and weaves it into the summary" do
-      get "/api/weather/current", headers: auth_headers
+      get "/widgets/weather/current", headers: auth_headers
 
       expect(response.body).to include("race day")               # race_day()
       expect(response.body).to include("racing the")             # current_location()
@@ -113,7 +113,7 @@ RSpec.describe "Weather", type: :request do
     end
 
     it "renders the alert with its link" do
-      get "/api/weather/current", headers: auth_headers
+      get "/widgets/weather/current", headers: auth_headers
 
       expect(response.body).to include("weather__alert")
       expect(response.body).to include("Heat advisory")
@@ -122,7 +122,7 @@ RSpec.describe "Weather", type: :request do
   end
 
   it "sets the caching headers" do
-    get "/api/weather/current", headers: auth_headers
+    get "/widgets/weather/current", headers: auth_headers
 
     cache_control = response.headers["Cache-Control"]
     expect(cache_control).to include("public")
@@ -137,16 +137,16 @@ RSpec.describe "Weather", type: :request do
   end
 
   it "embeds a relative same-origin refetch URL" do
-    get "/api/weather/current", headers: auth_headers
+    get "/widgets/weather/current", headers: auth_headers
 
-    expect(response.body).to include('data-live-update-url-value="/api/weather/current"')
+    expect(response.body).to include('data-live-update-url-value="/widgets/weather/current"')
   end
 
   it "requires the API_TOKEN bearer (the proxy injects it; direct hits are rejected)" do
-    get "/api/weather/current"
+    get "/widgets/weather/current"
     expect(response).to have_http_status(:unauthorized)
 
-    get "/api/weather/current", headers: { "Authorization" => "Bearer wrong" }
+    get "/widgets/weather/current", headers: { "Authorization" => "Bearer wrong" }
     expect(response).to have_http_status(:unauthorized)
   end
 
@@ -154,7 +154,7 @@ RSpec.describe "Weather", type: :request do
     before { allow_any_instance_of(WeatherKit).to receive(:data).and_raise(Net::ReadTimeout) }
 
     it "collapses the widget with an empty, non-durable response instead of a 500" do
-      get "/api/weather/current", headers: auth_headers
+      get "/widgets/weather/current", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty
@@ -166,7 +166,7 @@ RSpec.describe "Weather", type: :request do
     before { allow_any_instance_of(AirQuality).to receive(:data).and_raise(Net::ReadTimeout) }
 
     it "still renders the weather, just without that section" do
-      get "/api/weather/current", headers: auth_headers
+      get "/widgets/weather/current", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include('class="weather"')
@@ -178,7 +178,7 @@ RSpec.describe "Weather", type: :request do
     before { allow_any_instance_of(WeatherKit).to receive(:data).and_return(nil) }
 
     it "returns an empty body so the live-update controller collapses the placeholder" do
-      get "/api/weather/current", headers: auth_headers
+      get "/widgets/weather/current", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty
@@ -189,7 +189,7 @@ RSpec.describe "Weather", type: :request do
     before { allow(Location).to receive(:new).and_return(double(latitude: nil, longitude: nil)) }
 
     it "returns an empty body without fetching weather" do
-      get "/api/weather/current", headers: auth_headers
+      get "/widgets/weather/current", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty
@@ -204,7 +204,7 @@ RSpec.describe "Weather", type: :request do
     end
 
     it "treats the data as stale and returns an empty body" do
-      get "/api/weather/current", headers: auth_headers
+      get "/widgets/weather/current", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty
@@ -220,7 +220,7 @@ RSpec.describe "Weather", type: :request do
     end
 
     it "treats the data as stale and collapses instead of crashing on the missing slice" do
-      get "/api/weather/current", headers: auth_headers
+      get "/widgets/weather/current", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty
@@ -236,7 +236,7 @@ RSpec.describe "Weather", type: :request do
     end
 
     it "treats the data as stale and returns an empty body" do
-      get "/api/weather/current", headers: auth_headers
+      get "/widgets/weather/current", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty

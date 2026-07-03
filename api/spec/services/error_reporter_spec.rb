@@ -48,9 +48,9 @@ RSpec.describe ErrorReporter do
     it "appends the context to the wrapped message so the cause and location read off the headline" do
       expect(Bugsnag).to receive(:notify) do |exception|
         expect(exception).to be_a(ErrorReporter::GoogleAirQualityError)
-        expect(exception.message).to eq("HTTP 400 — Api::EventsController#event_weather_for")
+        expect(exception.message).to eq("HTTP 400 — Widgets::EventsController#event_weather_for")
       end
-      described_class.report_upstream("HTTP 400", service: "GoogleAirQuality", context: "Api::EventsController#event_weather_for")
+      described_class.report_upstream("HTTP 400", service: "GoogleAirQuality", context: "Widgets::EventsController#event_weather_for")
     end
 
     it "reuses the same subclass object for a given service instead of redefining it" do

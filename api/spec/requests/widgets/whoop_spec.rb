@@ -18,7 +18,7 @@ RSpec.describe "Whoop", type: :request do
   end
 
   it "renders the Whoop markup" do
-    get "/api/whoop", headers: auth_headers
+    get "/widgets/whoop", headers: auth_headers
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("stats__heading")
@@ -33,7 +33,7 @@ RSpec.describe "Whoop", type: :request do
   end
 
   it "sets the caching headers" do
-    get "/api/whoop", headers: auth_headers
+    get "/widgets/whoop", headers: auth_headers
 
     cache_control = response.headers["Cache-Control"]
     expect(cache_control).to include("public")
@@ -48,16 +48,16 @@ RSpec.describe "Whoop", type: :request do
   end
 
   it "embeds a relative same-origin refetch URL" do
-    get "/api/whoop", headers: auth_headers
+    get "/widgets/whoop", headers: auth_headers
 
-    expect(response.body).to include('data-live-update-url-value="/api/whoop"')
+    expect(response.body).to include('data-live-update-url-value="/widgets/whoop"')
   end
 
   context "when the stats are unavailable" do
     before { allow_any_instance_of(Whoop).to receive(:stats).and_return(nil) }
 
     it "returns an empty body so the live-update controller collapses the placeholder" do
-      get "/api/whoop", headers: auth_headers
+      get "/widgets/whoop", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty
@@ -65,10 +65,10 @@ RSpec.describe "Whoop", type: :request do
   end
 
   it "requires the API_TOKEN bearer (the proxy injects it; direct hits are rejected)" do
-    get "/api/whoop"
+    get "/widgets/whoop"
     expect(response).to have_http_status(:unauthorized)
 
-    get "/api/whoop", headers: { "Authorization" => "Bearer wrong" }
+    get "/widgets/whoop", headers: { "Authorization" => "Bearer wrong" }
     expect(response).to have_http_status(:unauthorized)
   end
 end

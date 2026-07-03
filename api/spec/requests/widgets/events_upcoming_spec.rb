@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Api::Events upcoming", type: :request do
+RSpec.describe "Widgets::Events upcoming", type: :request do
   let(:featured_event) do
     DeepOstruct.wrap(
       title: "Featured Race",
@@ -83,7 +83,7 @@ RSpec.describe "Api::Events upcoming", type: :request do
   end
 
   it "renders the upcoming-races section as a live-update fragment" do
-    get "/api/events/upcoming", headers: auth_headers
+    get "/widgets/events/upcoming", headers: auth_headers
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('class="collection')
@@ -92,11 +92,11 @@ RSpec.describe "Api::Events upcoming", type: :request do
     expect(response.body).to include("Later Race")
     # Outer element keeps refreshing after the static site swaps it in.
     expect(response.body).to include('data-controller="live-update"')
-    expect(response.body).to include('data-live-update-url-value="/api/events/upcoming"')
+    expect(response.body).to include('data-live-update-url-value="/widgets/events/upcoming"')
   end
 
   it "features the next race within 10 days, with its race-day weather inline" do
-    get "/api/events/upcoming", headers: auth_headers
+    get "/widgets/events/upcoming", headers: auth_headers
 
     expect(response.body).to include("collection--has-featured")
     expect(response.body).to include("event--is-featured")
@@ -105,7 +105,7 @@ RSpec.describe "Api::Events upcoming", type: :request do
   end
 
   it "renders the event body with unit toggles and external links opening in a new tab" do
-    get "/api/events/upcoming", headers: auth_headers
+    get "/widgets/events/upcoming", headers: auth_headers
 
     expect(response.body).to include("data-units-metric-value") # the <span data-imperial> conversion
     expect(response.body).to include('target="_blank"')         # external description link
@@ -113,7 +113,7 @@ RSpec.describe "Api::Events upcoming", type: :request do
   end
 
   it "sets a one-hour durable caching header" do
-    get "/api/events/upcoming", headers: auth_headers
+    get "/widgets/events/upcoming", headers: auth_headers
 
     cache_control = response.headers["Cache-Control"]
     expect(cache_control).to include("public")
@@ -131,7 +131,7 @@ RSpec.describe "Api::Events upcoming", type: :request do
     before { allow_any_instance_of(Events).to receive(:all).and_return([later_event]) }
 
     it "renders the section without a featured event or race-day weather" do
-      get "/api/events/upcoming", headers: auth_headers
+      get "/widgets/events/upcoming", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Later Race")
@@ -147,7 +147,7 @@ RSpec.describe "Api::Events upcoming", type: :request do
     before { allow_any_instance_of(WeatherKit).to receive(:data).and_return(nil) }
 
     it "demotes it to a regular upcoming race without the featured layout or weather block" do
-      get "/api/events/upcoming", headers: auth_headers
+      get "/widgets/events/upcoming", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Featured Race")
@@ -161,7 +161,7 @@ RSpec.describe "Api::Events upcoming", type: :request do
     before { allow_any_instance_of(Events).to receive(:all).and_return([]) }
 
     it "returns an empty body so the placeholder collapses" do
-      get "/api/events/upcoming", headers: auth_headers
+      get "/widgets/events/upcoming", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty
@@ -186,7 +186,7 @@ RSpec.describe "Api::Events upcoming", type: :request do
     end
 
     it "renders a muted Live tracking link without the live highlight" do
-      get "/api/events/upcoming", headers: auth_headers
+      get "/widgets/events/upcoming", headers: auth_headers
 
       expect(response.body).to include("Live tracking")
       expect(response.body).to include('href="https://track.example.com/race"')
@@ -268,7 +268,7 @@ RSpec.describe "Api::Events upcoming", type: :request do
     end
 
     it "splits today's race into its own section, with the rest under Upcoming Races" do
-      get "/api/events/upcoming", headers: auth_headers
+      get "/widgets/events/upcoming", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Today’s Race")
@@ -287,11 +287,11 @@ RSpec.describe "Api::Events upcoming", type: :request do
 
       # The wrapper is the live-update root.
       expect(response.body).to include('data-controller="live-update"')
-      expect(response.body).to include('data-live-update-url-value="/api/events/upcoming"')
+      expect(response.body).to include('data-live-update-url-value="/widgets/events/upcoming"')
     end
 
     it "omits today's race's timestamp (the heading already says it's today)" do
-      get "/api/events/upcoming", headers: auth_headers
+      get "/widgets/events/upcoming", headers: auth_headers
 
       # event_timestamp_tag would render "<span>…icon… Today</span>"; it's suppressed here.
       expect(response.body).not_to include("Today</span>")
@@ -301,7 +301,7 @@ RSpec.describe "Api::Events upcoming", type: :request do
       before { allow_any_instance_of(Events).to receive(:all).and_return([todays_race]) }
 
       it "renders only the Today's Race section" do
-        get "/api/events/upcoming", headers: auth_headers
+        get "/widgets/events/upcoming", headers: auth_headers
 
         expect(response.body).to include("Today’s Race")
         expect(response.body).not_to include("Upcoming Races")
@@ -314,7 +314,7 @@ RSpec.describe "Api::Events upcoming", type: :request do
     it "still renders the widget when the AQI service raises, just without AQI" do
       allow(GoogleAirQuality).to receive(:new).and_raise(StandardError, "boom")
 
-      get "/api/events/upcoming", headers: auth_headers
+      get "/widgets/events/upcoming", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Featured Race")
@@ -324,7 +324,7 @@ RSpec.describe "Api::Events upcoming", type: :request do
     it "still renders the widget when the bay-conditions service raises" do
       allow_any_instance_of(Goodspeed).to receive(:data).and_raise(StandardError, "boom")
 
-      get "/api/events/upcoming", headers: auth_headers
+      get "/widgets/events/upcoming", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Featured Race")
@@ -333,10 +333,10 @@ RSpec.describe "Api::Events upcoming", type: :request do
   end
 
   it "requires the API_TOKEN bearer (the proxy injects it; direct hits are rejected)" do
-    get "/api/events/upcoming"
+    get "/widgets/events/upcoming"
     expect(response).to have_http_status(:unauthorized)
 
-    get "/api/events/upcoming", headers: { "Authorization" => "Bearer wrong" }
+    get "/widgets/events/upcoming", headers: { "Authorization" => "Bearer wrong" }
     expect(response).to have_http_status(:unauthorized)
   end
 end

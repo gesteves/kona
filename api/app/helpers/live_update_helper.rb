@@ -5,7 +5,7 @@ module LiveUpdateHelper
   # site and re-fetched through a same-origin Netlify proxy that caches it on Netlify's edge.
   # A relative URL keeps the refetch same-origin so it hits that cache instead of reaching the
   # origin directly.
-  # @return [String] e.g. "/api/whoop"
+  # @return [String] e.g. "/widgets/whoop"
   def live_update_url
     request.path
   end

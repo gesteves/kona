@@ -1,4 +1,4 @@
-module Api
+module Widgets
   # Renders the Whoop stats markup (sleep, recovery, strain) embedded into the static site.
   class WhoopController < BaseController
     def show

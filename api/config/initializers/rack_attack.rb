@@ -5,10 +5,11 @@
 # This sheds that load by blocking known probe paths before they reach routing (which also
 # keeps them out of the logs).
 #
-# Design note — all LEGITIMATE /api/* traffic arrives through the Netlify proxy from a small,
-# shared set of egress IPs (and behind fly's proxy a single request's source IP can resolve to
-# a shared fly load-balancer address). A per-IP BAN is therefore dangerous: one scanner probing
-# an /api/* path through the public proxy would ban a shared IP and 403 every visitor at once.
+# Design note — all LEGITIMATE /widgets/* traffic arrives through the Netlify proxy from a
+# small, shared set of egress IPs (and behind fly's proxy a single request's source IP can
+# resolve to a shared fly load-balancer address). A per-IP BAN is therefore dangerous: one
+# scanner probing a path through the public proxy would ban a shared IP and 403 every visitor
+# at once.
 # So:
 #   * the blocklist matches PATH PATTERNS only (IP-agnostic) — it blocks the probe request
 #     itself, never bans an IP across paths, so it can't take down shared-IP traffic, and
@@ -31,7 +32,7 @@ Rack::Attack.cache.store =
   end
 
 # Prefixes of the app's real routes. Anything outside these is, by definition, a probe.
-RACK_ATTACK_KNOWN_PREFIXES = %w[/up /api /whoop /sidekiq /login /logout /auth].freeze
+RACK_ATTACK_KNOWN_PREFIXES = %w[/up /api /widgets /webhooks /whoop /sidekiq /login /logout /auth].freeze
 RACK_ATTACK_KNOWN_ROUTE = lambda do |path|
   path == "/" || RACK_ATTACK_KNOWN_PREFIXES.any? { |prefix| path == prefix || path.start_with?("#{prefix}/") }
 end
@@ -75,8 +76,8 @@ Rack::Attack.blocklist("probe-paths") do |req|
 end
 
 # Safety net: throttle a single client hammering paths outside the known routes. Keyed on the real
-# client IP and excluding the known prefixes (incl. /api/*) by construction, so the shared proxy
-# IPs are never throttled.
+# client IP and excluding the known prefixes (incl. /widgets/*) by construction, so the shared
+# proxy IPs are never throttled.
 Rack::Attack.throttle("unknown-paths/ip", limit: 20, period: 1.minute) do |req|
   req.client_ip unless RACK_ATTACK_KNOWN_ROUTE.call(req.path)
 end

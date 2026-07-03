@@ -1,4 +1,4 @@
-module Api
+module Widgets
   # The "Trending Articles" widget, ranked from Plausible analytics at request time (instead of baked
   # into the static build) so it tracks recent traffic instead of going stale between daily rebuilds.
   # Cached for an hour. Two flavors: every trending article, or all but one (the `:id` an article page

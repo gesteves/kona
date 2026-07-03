@@ -1,4 +1,4 @@
-module Api
+module Widgets
   # Returns the article's Plausible view-count markup (eye icon + "Viewed N times" linked to
   # the Plausible dashboard), keyed by Contentful ID. The static site embeds a "Never viewed"
   # placeholder and swaps this in. Cached for an hour — view counts change slowly.

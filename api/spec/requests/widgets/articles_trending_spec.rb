@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Api::Articles trending", type: :request do
+RSpec.describe "Widgets::Articles trending", type: :request do
   # Builds a decorated article the way Articles#list would return it.
   def article(id:, title:, slug:, published_at:, summary: "A short summary.", entry_type: "Article", draft: false)
     path = "/#{DateTime.parse(published_at).strftime('%Y/%m/%d')}/#{slug}/"
@@ -45,19 +45,19 @@ RSpec.describe "Api::Articles trending", type: :request do
     allow($redis).to receive(:setex)
   end
 
-  describe "GET /api/articles/trending (all)" do
+  describe "GET /widgets/articles/trending (all)" do
     it "renders the trending-articles section as a live-update fragment" do
-      get "/api/articles/trending", headers: auth_headers
+      get "/widgets/articles/trending", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include('class="collection collection--halves"')
       expect(response.body).to include("Trending Articles")
       expect(response.body).to include('data-controller="live-update"')
-      expect(response.body).to include('data-live-update-url-value="/api/articles/trending"')
+      expect(response.body).to include('data-live-update-url-value="/widgets/articles/trending"')
     end
 
     it "includes recent articles, excludes Shorts, and orders the rest by trending score" do
-      get "/api/articles/trending", headers: auth_headers
+      get "/widgets/articles/trending", headers: auth_headers
 
       expect(response.body).to include("Spiking Article")
       expect(response.body).to include("Steady Article")
@@ -67,13 +67,13 @@ RSpec.describe "Api::Articles trending", type: :request do
     end
 
     it "links each card to the article's computed path" do
-      get "/api/articles/trending", headers: auth_headers
+      get "/widgets/articles/trending", headers: auth_headers
 
       expect(response.body).to include('href="/2024/01/01/spiking/"')
     end
 
     it "sets a one-hour durable caching header" do
-      get "/api/articles/trending", headers: auth_headers
+      get "/widgets/articles/trending", headers: auth_headers
 
       cache_control = response.headers["Cache-Control"]
       expect(cache_control).to include("public")
@@ -90,7 +90,7 @@ RSpec.describe "Api::Articles trending", type: :request do
       before { allow_any_instance_of(Articles).to receive(:list).and_return([]) }
 
       it "returns an empty body so the placeholder collapses" do
-        get "/api/articles/trending", headers: auth_headers
+        get "/widgets/articles/trending", headers: auth_headers
 
         expect(response).to have_http_status(:ok)
         expect(response.body.strip).to be_empty
@@ -98,27 +98,27 @@ RSpec.describe "Api::Articles trending", type: :request do
     end
 
     it "requires the API_TOKEN bearer (the proxy injects it; direct hits are rejected)" do
-      get "/api/articles/trending"
+      get "/widgets/articles/trending"
       expect(response).to have_http_status(:unauthorized)
 
-      get "/api/articles/trending", headers: { "Authorization" => "Bearer wrong" }
+      get "/widgets/articles/trending", headers: { "Authorization" => "Bearer wrong" }
       expect(response).to have_http_status(:unauthorized)
     end
   end
 
-  describe "GET /api/articles/trending/:id" do
+  describe "GET /widgets/articles/trending/:id" do
     it "drops the given article and advertises the path as its refetch URL" do
-      get "/api/articles/trending/a5", headers: auth_headers
+      get "/widgets/articles/trending/a5", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body).not_to include("Spiking Article") # a5 is excluded
       expect(response.body).to include("Steady Article")       # a non-excluded article still trends
       expect(response.body).to include("Newest Article")
-      expect(response.body).to include('data-live-update-url-value="/api/articles/trending/a5"')
+      expect(response.body).to include('data-live-update-url-value="/widgets/articles/trending/a5"')
     end
 
     it "ignores a malformed id (serves full trending) and never errors" do
-      get "/api/articles/trending/@@@", headers: auth_headers
+      get "/widgets/articles/trending/@@@", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Spiking Article") # nothing excluded
@@ -126,7 +126,7 @@ RSpec.describe "Api::Articles trending", type: :request do
     end
 
     it "requires the API_TOKEN bearer" do
-      get "/api/articles/trending/a5"
+      get "/widgets/articles/trending/a5"
       expect(response).to have_http_status(:unauthorized)
     end
   end

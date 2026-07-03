@@ -1,7 +1,7 @@
 require "rails_helper"
 require "openssl"
 
-RSpec.describe "Api::Webhooks contentful", type: :request do
+RSpec.describe "Webhooks::Contentful", type: :request do
   let(:webhook_secret) { "a" * 64 }
 
   before do
@@ -18,10 +18,10 @@ RSpec.describe "Api::Webhooks contentful", type: :request do
   # header (mirroring ContentfulRequestVerification#canonical_request).
   def post_webhook(payload, topic:, secret: webhook_secret, timestamp: now_ms, signature: nil)
     body = payload.to_json
-    canonical = ["POST", "/api/webhooks/contentful", "x-contentful-timestamp:#{timestamp}", body].join("\n")
+    canonical = ["POST", "/webhooks/contentful", "x-contentful-timestamp:#{timestamp}", body].join("\n")
     signature ||= OpenSSL::HMAC.hexdigest("SHA256", secret, canonical)
 
-    post "/api/webhooks/contentful",
+    post "/webhooks/contentful",
       params: body,
       headers: {
         "Content-Type" => "application/json",

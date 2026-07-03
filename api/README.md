@@ -1,6 +1,6 @@
 # kona-api
 
-Rails app serving dynamic, embeddable markup for the otherwise-static [Kona](../README.md) site — weather, activity stats, Whoop, pageviews, etc. Deployed to fly.io; the [`web/`](../web/README.md) site reaches it through a same-origin Netlify proxy (`/api/*`) that caches responses on Netlify's edge.
+Rails app serving dynamic, embeddable markup for the otherwise-static [Kona](../README.md) site — weather, activity stats, Whoop, pageviews, etc. Deployed to fly.io; the [`web/`](../web/README.md) site reaches it through a same-origin Netlify proxy (`/widgets/*`) that caches responses on Netlify's edge.
 
 ## Setup
 
@@ -49,7 +49,7 @@ Requirements: Ruby.
 | Command | Description |
 | --- | --- |
 | `bundle exec rspec` | Run the test suite |
-| `bundle exec rspec spec/requests/api/activity_stats_spec.rb` | Run a single spec |
+| `bundle exec rspec spec/requests/widgets/activity_stats_spec.rb` | Run a single spec |
 | `bin/ci` | Set up and run the full suite (as CI does) |
 | `bundle exec rake standard_site:backfill` | Reconcile standard.site PDS records (recovery for missed webhooks) |
 | `fly deploy` | Deploy to fly.io |

@@ -1,8 +1,8 @@
-module Api
+module Widgets
   # The home page's "Upcoming Races" section, rendered server-side at request time (instead of
   # baked into the static build) so the featured event, the three-vs-four count, and "Today"
   # labels stay fresh. When an event is featured, its race-day weather renders inline here —
-  # replacing the former standalone /api/weather/event widget. Cached for an hour.
+  # replacing the former standalone weather/event widget. Cached for an hour.
   class EventsController < BaseController
     include EventsHelper
     include TimeHelper

@@ -7,21 +7,21 @@
       <%= render_home_body(content.body) %>
     </div>
   </section>
-  <% preload_widget "/api/activity-stats" %>
+  <% preload_widget "/widgets/activity-stats" %>
   <%= partial 'partials/placeholders/stats' %>
   <% recent = recent_articles %>
   <% if recent.present? %>
     <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent, variant: "halves" } %>
   <% end %>
-  <% preload_widget "/api/whoop" %>
+  <% preload_widget "/widgets/whoop" %>
   <%= partial 'partials/placeholders/whoop' %>
-  <% trending_url = "/api/articles/trending" %>
+  <% trending_url = "/widgets/articles/trending" %>
   <% preload_widget trending_url %>
   <%= partial 'partials/placeholders/trending', locals: { url: trending_url } %>
-  <% preload_widget "/api/weather/current" %>
+  <% preload_widget "/widgets/weather/current" %>
   <%= partial 'partials/placeholders/weather' %>
   <% if data.events.present? %>
-    <% preload_widget "/api/events/upcoming" %>
+    <% preload_widget "/widgets/events/upcoming" %>
     <%= partial 'partials/upcoming_races' %>
   <% end %>
 </div>

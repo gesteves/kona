@@ -5,7 +5,7 @@
 # backoff, and any non-HTTP work — so no request can exceed the budget regardless of where it
 # blocks. rack-timeout injects a `RequestTimeoutException` (a direct Exception subclass, so the
 # services' broad `rescue StandardError` in with_retries/rescue_with can't swallow it). A killed
-# request returns non-2xx, which the api-proxy refuses to durably cache, and the live-update
+# request returns non-2xx, which the widget-proxy refuses to durably cache, and the live-update
 # controller recovers on the next visibilitychange.
 #
 # The middleware is auto-inserted by rack-timeout's Railtie (skipped in test). Its budget can't

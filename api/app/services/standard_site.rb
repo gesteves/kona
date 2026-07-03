@@ -4,7 +4,7 @@ require "digest"
 # @see https://standard.site
 #
 # This is the api-side, event-driven successor to the web build's StandardSite. It is
-# driven by Contentful webhooks (see Api::WebhooksController) plus the
+# driven by Contentful webhooks (see Webhooks::ContentfulController) plus the
 # `standard_site:backfill` rake task, rather than running on every static build:
 #   - one site.standard.publication record (rkey "self") tracks the site,
 #   - one site.standard.document record per published post (rkey = a TID derived

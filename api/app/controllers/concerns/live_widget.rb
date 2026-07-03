@@ -33,7 +33,7 @@ module LiveWidget
   #    refresh on visibilitychange instead of sitting on a browser-cached copy for `ttl`.
   #  - The edge keeps the fragment fresh for `ttl` (the data cadence), then serves it stale
   #    for up to a day while revalidating the origin. This is the complete Netlify
-  #    durable-cache policy; the api-proxy function forwards it verbatim (only dropping it on
+  #    durable-cache policy; the widget-proxy function forwards it verbatim (only dropping it on
   #    non-2xx). It lives here rather than in the proxy so the whole cache policy reads in one
   #    place.
   # @param ttl [ActiveSupport::Duration] How long the fragment stays fresh at the edge.

@@ -88,7 +88,7 @@ export const config: Config = {
     '/stylesheets/*',
     '/images/*',
     '/fonts/*',
-    '/api/*',
+    '/widgets/*',
     '/og',
     '/plsbl/*',
     '/ifttt/*',

@@ -1,4 +1,4 @@
-module Api
+module Widgets
   # Serves the activity-stats markup that the static site embeds via its live-update
   # Stimulus controller.
   class ActivityStatsController < BaseController

@@ -5,31 +5,31 @@ Rails.application.routes.draw do
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
 
-  # Widget fragments embedded into the static site, under the /api namespace.
-  get "/api/activity-stats" => "api/activity_stats#show"
+  # Widget fragments (HTML) embedded into the static site, under the /widgets namespace.
+  get "/widgets/activity-stats" => "widgets/activity_stats#show"
 
   # Current weather widget markup.
-  get "/api/weather/current" => "api/weather#current"
+  get "/widgets/weather/current" => "widgets/weather#current"
 
   # The home page's upcoming-races section (the featured event includes inline race-day weather).
-  get "/api/events/upcoming" => "api/events#upcoming"
+  get "/widgets/events/upcoming" => "widgets/events#upcoming"
 
   # The trending-articles widget, ranked from Plausible analytics at request time. The bare path
   # returns every trending article; /:id drops one Contentful id (an article page passes its own id
   # so it isn't listed as trending), keyed in the path so the edge cache (path-only) gives each its
   # own entry.
-  get "/api/articles/trending" => "api/articles#trending"
-  get "/api/articles/trending/:id" => "api/articles#trending_excluding"
+  get "/widgets/articles/trending" => "widgets/articles#trending"
+  get "/widgets/articles/trending/:id" => "widgets/articles#trending_excluding"
 
   # The "You May Also Like" widget: articles semantically related to :id (a Contentful entry id),
   # ranked at request time from precomputed Voyage embeddings.
-  get "/api/articles/related/:id" => "api/articles#related"
+  get "/widgets/articles/related/:id" => "widgets/articles#related"
 
   # All-time Plausible pageview count for an article, keyed by Contentful ID.
-  get "/api/plausible/pageviews/:id" => "api/plausible#pageviews"
+  get "/widgets/plausible/pageviews/:id" => "widgets/plausible#pageviews"
 
   # Returns the Whoop stats markup.
-  get "/api/whoop" => "api/whoop#show"
+  get "/widgets/whoop" => "widgets/whoop#show"
 
   # Whoop OAuth flow (owner-only authorize, public callback validated by state).
   get "/whoop/auth" => "whoop_oauth#authorize"
@@ -38,9 +38,10 @@ Rails.application.routes.draw do
   # Sets the current location (bearer-token-secured), replacing the old Netlify build hook.
   post "/api/location" => "api/location#create"
 
-  # Contentful webhook: re-syncs standard.site PDS records on entry publish/unpublish/delete
+  # Inbound webhooks, one controller per service under the /webhooks namespace.
+  # Contentful: re-syncs standard.site PDS records on entry publish/unpublish/delete
   # (HMAC request-verification gated).
-  post "/api/webhooks/contentful" => "api/webhooks#contentful"
+  post "/webhooks/contentful" => "webhooks/contentful#create"
 
   # standard.site verification data (DID + publication URI) the web build reads to emit
   # the .well-known endpoint and the <link rel="site.standard.*"> tags.

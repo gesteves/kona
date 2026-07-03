@@ -22,7 +22,7 @@ web↔api contract before touching any widget markup.
   pages — articles, pages, tags, blog index.
 - **Runtime dynamic content**: weather, activity stats, Whoop, per-article pageviews,
   and event weather are **not built here**. The `live-update` Stimulus controller
-  fetches them client-side from `/api/*` into placeholder partials (root `CLAUDE.md`).
+  fetches them client-side from `/widgets/*` into placeholder partials (root `CLAUDE.md`).
 
 ## Commands
 
@@ -66,7 +66,7 @@ to flush the cache.
   `config.rb` requires and registers every module in that directory.
 - `source/layouts/layout.erb`, `source/partials/` (incl. `placeholders/`),
   `source/javascripts/stimulus/`, `source/stylesheets/`.
-- `netlify/functions/` — `api-proxy.mts` (proxies `/api/*`; see root `CLAUDE.md`),
+- `netlify/functions/` — `widget-proxy.mts` (proxies `/widgets/*`; see root `CLAUDE.md`),
   `og.mts` (OG images).
 - `netlify/edge-functions/` — `known-agents.ts` (records every page view server-side to
   Known Agents / Dark Visitors, capturing bot + AI-agent traffic Plausible can't see;
@@ -80,8 +80,8 @@ to flush the cache.
 Names only — see `.env.example`; never commit values.
 
 - **Required**: `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`, `FONT_AWESOME_API_TOKEN`,
-  `REDIS_URL`, `KONA_API_URL` (base URL of the `api/` app — used by the `/api/*` proxy
-  and the `import:standard_site` fetch), `API_TOKEN` (shared bearer the `/api/*` proxy
+  `REDIS_URL`, `KONA_API_URL` (base URL of the `api/` app — used by the `/widgets/*` proxy
+  and the `import:standard_site` fetch), `API_TOKEN` (shared bearer the `/widgets/*` proxy
   injects on every upstream request; **must match the `api/` app's `API_TOKEN`**, and must be
   set in Netlify's runtime env or every widget 401s at the origin and collapses on the site).
 - **Build credential**: `WEBAWESOME_NPM_TOKEN` — Web Awesome Pro npm registry auth, read

@@ -40,11 +40,11 @@ RSpec.describe "Rack::Attack", type: :request do
     expect(response).to have_http_status(:ok)
   end
 
-  # Regression: an /api/* probe path is reachable through the public Netlify proxy, where it
-  # arrives on a SHARED egress IP. Blocking it must never ban that IP, or every visitor's widgets
+  # Regression: probe requests can arrive through the public Netlify proxy, where they come in
+  # on a SHARED egress IP. Blocking one must never ban that IP, or every visitor's widgets
   # would 403 at once. (This is the bug that took the site down: an IP-based Fail2Ban here.)
-  it "does not let an /api/* probe ban the shared proxy IP it arrives on" do
-    get "/api/status" # matches the probe pattern; proxied through Netlify in production
+  it "does not let a probe ban the shared proxy IP it arrives on" do
+    get "/api/status" # matches the probe pattern
     expect(response).to have_http_status(:forbidden)
 
     # Same IP, a legitimate request — must be unaffected.
@@ -61,7 +61,7 @@ RSpec.describe "Rack::Attack", type: :request do
     end
 
     it "leaves legitimate paths alone" do
-      expect(RACK_ATTACK_PROBE_PATH.call("/api/weather/current")).to be_falsey
+      expect(RACK_ATTACK_PROBE_PATH.call("/widgets/weather/current")).to be_falsey
       expect(RACK_ATTACK_PROBE_PATH.call("/up")).to be_falsey
     end
 

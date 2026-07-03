@@ -49,7 +49,7 @@ export default async function handler(
     });
   } catch (error) {
     console.error(
-      'API proxy upstream fetch failed:',
+      'Widget proxy upstream fetch failed:',
       upstreamUrl.toString(),
       error
     );
@@ -102,5 +102,5 @@ export default async function handler(
 }
 
 export const config: Config = {
-  path: '/api/*',
+  path: '/widgets/*',
 };

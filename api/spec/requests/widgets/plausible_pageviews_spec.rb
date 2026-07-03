@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Api::Plausible pageviews", type: :request do
+RSpec.describe "Widgets::Plausible pageviews", type: :request do
   let(:article) { DeepOstruct.wrap(slug: "my-race-report", published: "2026-05-01T09:00:00-06:00", sys: { id: "abc123", first_published_at: "2026-05-01T09:00:00Z" }) }
 
   before do
@@ -15,7 +15,7 @@ RSpec.describe "Api::Plausible pageviews", type: :request do
   end
 
   it "renders the view-count span (icon + linked count)" do
-    get "/api/plausible/pageviews/abc123", headers: auth_headers
+    get "/widgets/plausible/pageviews/abc123", headers: auth_headers
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("<span")
@@ -30,7 +30,7 @@ RSpec.describe "Api::Plausible pageviews", type: :request do
     weird = DeepOstruct.wrap(slug: "q&a-recap", published: "2026-05-01T09:00:00-06:00", sys: { id: "abc123", first_published_at: "2026-05-01T09:00:00Z" })
     allow_any_instance_of(Articles).to receive(:find).and_return(weird)
 
-    get "/api/plausible/pageviews/abc123", headers: auth_headers
+    get "/widgets/plausible/pageviews/abc123", headers: auth_headers
 
     # The raw "&" must not leak into the query string (it would inject a bogus param).
     expect(response.body).to include(ERB::Util.url_encode("/2026/05/01/q&a-recap/"))
@@ -42,19 +42,19 @@ RSpec.describe "Api::Plausible pageviews", type: :request do
       .with(hash_including(filters: [["is", "event:page", ["/2026/05/01/my-race-report/"]]]))
       .and_return(results: [{ metrics: [5] }])
 
-    get "/api/plausible/pageviews/abc123", headers: auth_headers
+    get "/widgets/plausible/pageviews/abc123", headers: auth_headers
     expect(response.body).to include("Viewed 5 times")
   end
 
   it "renders 'Never viewed' for zero pageviews" do
     allow_any_instance_of(Plausible).to receive(:query).and_return(results: [{ metrics: [0] }])
 
-    get "/api/plausible/pageviews/abc123", headers: auth_headers
+    get "/widgets/plausible/pageviews/abc123", headers: auth_headers
     expect(response.body).to include("Never viewed")
   end
 
   it "sets a one-hour caching header" do
-    get "/api/plausible/pageviews/abc123", headers: auth_headers
+    get "/widgets/plausible/pageviews/abc123", headers: auth_headers
 
     cache_control = response.headers["Cache-Control"]
     expect(cache_control).to include("public")
@@ -72,7 +72,7 @@ RSpec.describe "Api::Plausible pageviews", type: :request do
     before { allow_any_instance_of(Articles).to receive(:find).and_return(nil) }
 
     it "returns an empty body" do
-      get "/api/plausible/pageviews/nope", headers: auth_headers
+      get "/widgets/plausible/pageviews/nope", headers: auth_headers
       expect(response).to have_http_status(:ok)
       expect(response.body).to eq("")
     end
@@ -82,7 +82,7 @@ RSpec.describe "Api::Plausible pageviews", type: :request do
     before { allow_any_instance_of(Plausible).to receive(:query).and_return(nil) }
 
     it "returns an empty body so the live-update controller collapses the placeholder" do
-      get "/api/plausible/pageviews/abc123", headers: auth_headers
+      get "/widgets/plausible/pageviews/abc123", headers: auth_headers
       expect(response.body).to eq("")
     end
   end
@@ -96,7 +96,7 @@ RSpec.describe "Api::Plausible pageviews", type: :request do
     it "returns an empty body without querying Plausible" do
       expect_any_instance_of(Plausible).not_to receive(:query)
 
-      get "/api/plausible/pageviews/abc123", headers: auth_headers
+      get "/widgets/plausible/pageviews/abc123", headers: auth_headers
       expect(response.body).to eq("")
     end
   end
@@ -110,16 +110,16 @@ RSpec.describe "Api::Plausible pageviews", type: :request do
     it "returns an empty body without querying Plausible" do
       expect_any_instance_of(Plausible).not_to receive(:query)
 
-      get "/api/plausible/pageviews/abc123", headers: auth_headers
+      get "/widgets/plausible/pageviews/abc123", headers: auth_headers
       expect(response.body).to eq("")
     end
   end
 
   it "requires the API_TOKEN bearer (the proxy injects it; direct hits are rejected)" do
-    get "/api/plausible/pageviews/abc123"
+    get "/widgets/plausible/pageviews/abc123"
     expect(response).to have_http_status(:unauthorized)
 
-    get "/api/plausible/pageviews/abc123", headers: { "Authorization" => "Bearer wrong" }
+    get "/widgets/plausible/pageviews/abc123", headers: { "Authorization" => "Bearer wrong" }
     expect(response).to have_http_status(:unauthorized)
   end
 end
