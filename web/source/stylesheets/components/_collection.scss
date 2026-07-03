@@ -76,6 +76,11 @@
 // stack on small screens. Unlike the item-span variants above, this sets the *collection's*
 // own span so each side is an independent half-width subgrid.
 .collection--adjacent {
+  // Two halves sit side by side in one page-grid row, so the shorter one is stretched to the
+  // taller one's height. Anchor its rows to the top (default is stretch, which spreads the free
+  // space between the heading and the list) so both cards' timestamps and headlines line up.
+  align-content: start;
+
   @include bp-medium {
     grid-column: span 6;
   }
