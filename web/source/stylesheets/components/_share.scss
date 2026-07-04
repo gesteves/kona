@@ -75,14 +75,13 @@
   &:last-child {
     margin-right: 0;
   }
-
-  &.--is-hidden {
-    display: none;
-  }
 }
 
-// Scoped under .share__button so it outranks the `span, svg { display: block }` sizing
-// above (the clipboard controller toggles this class on the link/check icon spans).
+// The component's one hidden state: the native-share <button> carries it directly (the share
+// controller removes it when navigator.share exists), and the clipboard button's link/check
+// icon spans swap it on copy. Scoped under .share__button so it outranks both the button's
+// own display and the `span, svg { display: block }` sizing above.
+.share__button.share__hidden,
 .share__button .share__hidden {
   display: none;
 }
