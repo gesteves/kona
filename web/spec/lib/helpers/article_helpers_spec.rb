@@ -246,12 +246,12 @@ RSpec.describe ArticleHelpers do
     # breadcrumb trail can resolve ancestors. Includes the topic hierarchy + a races branch.
     def data
       tags = [
-        concept('triathlon', 'Triathlon', path: '/tagged/triathlon'),
-        concept('ironman-703', 'Ironman 70.3', path: '/tagged/triathlon/ironman-703', parent_id: 'triathlon'),
-        concept('race-reports', 'Race Reports', path: '/tagged/race-reports'),
-        concept('running', 'Running', path: '/tagged/running'),
-        concept('races', 'Races', path: '/tagged/races'),
-        concept('ironman-703-coeur-dalene', 'Ironman 70.3 Coeur d’Alene', path: '/tagged/races/ironman-703-coeur-dalene', parent_id: 'races')
+        concept('triathlon', 'Triathlon', path: '/tagged/triathlon/'),
+        concept('ironman-703', 'Ironman 70.3', path: '/tagged/triathlon/ironman-703/', parent_id: 'triathlon'),
+        concept('race-reports', 'Race Reports', path: '/tagged/race-reports/'),
+        concept('running', 'Running', path: '/tagged/running/'),
+        concept('races', 'Races', path: '/tagged/races/'),
+        concept('ironman-703-coeur-dalene', 'Ironman 70.3 Coeur d’Alene', path: '/tagged/races/ironman-703-coeur-dalene/', parent_id: 'races')
       ].map { |c| OpenStruct.new(tag: c) }
       OpenStruct.new(articles: @corpus || [], tags: tags)
     end
@@ -279,7 +279,7 @@ RSpec.describe ArticleHelpers do
         schema = JSON.parse(breadcrumb_schema(art))
         expect(schema['itemListElement'].map { |i| i['name'] }).to eq(['Home', 'Blog', 'Triathlon', 'Ironman 70.3', 'A Post'])
         expect(schema['itemListElement'].map { |i| i['position'] }).to eq([1, 2, 3, 4, 5])
-        expect(schema['itemListElement'][2]['item']).to eq('https://example.com/tagged/triathlon')
+        expect(schema['itemListElement'][2]['item']).to eq('https://example.com/tagged/triathlon/')
       end
     end
 

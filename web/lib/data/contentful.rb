@@ -245,7 +245,8 @@ class Contentful
 
       description = concept[:description].presence
       summary = description || default_tag_summary(concept[:name], tagged.size)
-      pages = paginate(tagged, base_path: concept[:path], template: "/tag.html",
+      # `path` carries a trailing slash (the canonical URL); paginate wants the bare base.
+      pages = paginate(tagged, base_path: concept[:path].chomp('/'), template: "/tag.html",
                        title: concept[:name], summary: summary, description: description)
       { tag: concept.slice(:id, :name, :path, :parent_id, :description), pages: pages }
     end
@@ -413,8 +414,9 @@ class Contentful
     field.values.first
   end
 
-  # The nested archive path for a concept: `/tagged/<root…>/<id>`, following parent links up
-  # to the root (a root concept is just `/tagged/<id>`). Guards against cycles.
+  # The nested archive URL for a concept: `/tagged/<root…>/<id>/`, following parent links up to
+  # the root (a root concept is just `/tagged/<id>/`). The trailing slash matches the built
+  # directory-index page, so links to it don't redirect. Guards against cycles.
   def concept_path(id, by_id)
     chain = []
     cur = id
@@ -424,7 +426,7 @@ class Contentful
       chain.unshift(cur)
       cur = by_id[cur][:parent_id]
     end
-    "/tagged/#{chain.join('/')}"
+    "/tagged/#{chain.join('/')}/"
   end
 
   # Processes events and adds weather forecasts for upcoming races within the next 10 days.

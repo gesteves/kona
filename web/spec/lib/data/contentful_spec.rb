@@ -189,11 +189,11 @@ RSpec.describe Contentful do
       it 'resolves localized labels, parent from broader, and nested paths' do
         taxo = importer_with.send(:taxonomy)
         expect(taxo['ironman-703']).to include(
-          name: 'Ironman 70.3', parent_id: 'triathlon', path: '/tagged/triathlon/ironman-703',
+          name: 'Ironman 70.3', parent_id: 'triathlon', path: '/tagged/triathlon/ironman-703/',
           description: 'The 70.3-mile distance.', synonyms: ['Half Ironman', '70.3']
         )
-        expect(taxo['triathlon'][:path]).to eq('/tagged/triathlon')
-        expect(taxo['cda'][:path]).to eq('/tagged/races/cda')
+        expect(taxo['triathlon'][:path]).to eq('/tagged/triathlon/')
+        expect(taxo['cda'][:path]).to eq('/tagged/races/cda/')
       end
 
       it 'derives short_name as the shortest of the name and synonyms (name wins ties)' do
@@ -214,7 +214,7 @@ RSpec.describe Contentful do
         article = instance.instance_variable_get(:@content)[:articles].first
         tags = article[:contentful_metadata][:tags]
         expect(tags.map { |t| t[:id] }).to eq(['ironman-703', 'cda'])
-        expect(tags.map { |t| t[:path] }).to eq(['/tagged/triathlon/ironman-703', '/tagged/races/cda'])
+        expect(tags.map { |t| t[:path] }).to eq(['/tagged/triathlon/ironman-703/', '/tagged/races/cda/'])
         expect(tags.map { |t| t[:short_name] }).to eq(['70.3', 'CdA'])
         expect(article[:contentful_metadata]).not_to have_key(:concepts)
       end
