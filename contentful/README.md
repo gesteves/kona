@@ -140,6 +140,11 @@ script needed:
 - **`taxonomy:create`** (`scripts/create-taxonomy.js`) — reconciles concepts + the scheme
   from `lib/taxonomy.js`; race concepts are derived from live `event` entries plus the
   static extras. Re-run after adding events/races.
+- **`taxonomy:describe`** (`scripts/set-descriptions.js`) — sets each concept's `definition`
+  (the description shown on its `/tagged` archive page and in that page's meta/OG tags). The
+  copy lives in the script — tweak it, then re-run (idempotent, skip-unchanged). Markdown is
+  supported. Org-level, so it needs `CONTENTFUL_ORGANIZATION_ID`. Optional; run any time after
+  `taxonomy:create`. (`taxonomy:create` never writes descriptions, so the two don't conflict.)
 - **`taxonomy:delete`** (`scripts/delete-taxonomy.js`) — inverse; deletes the scheme then
   concepts deepest-first; refuses while any entry links a concept.
 - **`taxonomy:assign`** (`scripts/assign-concepts.js`) — assigns concepts to `article`

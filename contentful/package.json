@@ -8,6 +8,7 @@
     "migrate:headings": "node --env-file=.env scripts/bump-heading-levels.js",
     "migrate:headings:revert": "node --env-file=.env scripts/revert-heading-levels.js",
     "taxonomy:create": "node --env-file=.env scripts/create-taxonomy.js",
+    "taxonomy:describe": "node --env-file=.env scripts/set-descriptions.js",
     "taxonomy:delete": "node --env-file=.env scripts/delete-taxonomy.js",
     "taxonomy:assign": "node --env-file=.env scripts/assign-concepts.js",
     "taxonomy:unassign": "node --env-file=.env scripts/unassign-concepts.js",
