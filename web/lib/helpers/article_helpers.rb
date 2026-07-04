@@ -213,32 +213,62 @@ module ArticleHelpers
   def breadcrumb_schema(content)
     return unless published_post?(content)
 
-    schema = {
-      "@context": "https://schema.org",
-      "@type": "BreadcrumbList",
-      "itemListElement": [
-        {
-          "@type": "ListItem",
-          "position": 1,
-          "name": "Home",
-          "item": full_url('/')
-        },
-        {
-          "@type": "ListItem",
-          "position": 2,
-          "name": "Blog",
-          "item": full_url('/blog')
-        },
-        {
-          "@type": "ListItem",
-          "position": 3,
-          "name": sanitize(content.title),
-          "item": canonical_url
-        }
-      ]
-    }
-    
-    schema.to_json
+    items = [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": full_url('/') },
+      { "@type": "ListItem", "position": 2, "name": "Blog", "item": full_url('/blog') }
+    ]
+    # Insert the article's topic trail (Triathlon > Ironman 70.3, …) between Blog and the article.
+    taxonomy_trail(content).each do |node|
+      items << { "@type": "ListItem", "position": items.size + 1, "name": sanitize(node[:name]), "item": full_url(node[:path]) }
+    end
+    items << { "@type": "ListItem", "position": items.size + 1, "name": sanitize(content.title), "item": canonical_url }
+
+    { "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": items }.to_json
+  end
+
+  # The taxonomy trail for an article's breadcrumb: the ancestor chain (root topic → … →
+  # concept) of the article's deepest-nested topic concept, tie-broken by assignment order.
+  # The Races branch is excluded — races are a cross-cutting facet surfaced by the "More
+  # Reports From This Race" widget and the race archive, not the topic breadcrumb. Returns
+  # [] when the article has no taxonomy (pre-migration) so the breadcrumb stays Home > Blog.
+  # @param content [Object] The article.
+  # @return [Array<Hash>] Ordered [{ name:, path: }] from root to the chosen concept.
+  def taxonomy_trail(content)
+    tags = Array(content.contentful_metadata&.tags)
+    return [] if tags.empty?
+
+    chains = tags.map { |t| concept_chain(t.id) }
+                 .reject { |chain| chain.empty? || chain.first[:id] == 'races' }
+    return [] if chains.empty?
+
+    # Longest chain wins; on a tie the earliest (assignment order) wins.
+    chains.each_with_index.max_by { |chain, i| [chain.length, -i] }.first
+  end
+
+  # The ancestor chain of a concept id, root-first and inclusive, resolved from data.tags.
+  # @return [Array<Hash>] [{ id:, name:, path: }] or [] if the id isn't a known concept.
+  def concept_chain(id)
+    index = taxonomy_index
+    chain = []
+    cur = id
+    seen = {}
+    while cur && (node = index[cur]) && !seen[cur]
+      seen[cur] = true
+      chain.unshift({ id: cur, name: node[:name], path: node[:path] })
+      cur = node[:parent_id]
+    end
+    chain
+  end
+
+  # Concept id => { name:, path:, parent_id: }, built from the generated tag pages (data.tags).
+  # Ancestors always have a page (they inherit every descendant's articles), so the chain
+  # resolves fully. Memoized per render.
+  # @return [Hash{String=>Hash}]
+  def taxonomy_index
+    @taxonomy_index ||= Array(data.tags).each_with_object({}) do |entry, index|
+      tag = entry.tag
+      index[tag.id] = { name: tag.name, path: tag.path, parent_id: tag.parent_id }
+    end
   end
 
   # Counts the words in an article's prose (intro + body, as plain text). Shared by the reading-time
@@ -282,15 +312,41 @@ module ArticleHelpers
   # @param count [Integer] (Optional) The number of race reports to return.
   # @return [Array<Object>] A list of race reports from the same event, sorted by publication date in reverse chronological order.
   def related_race_reports(article, count: 4)
-    return [] unless article.event&.sys&.id
+    race_id = race_concept_id(article)
+    event_id = article.event&.sys&.id
+    return [] if race_id.nil? && event_id.nil?
 
     memoize_by_key(:@related_race_reports, [article.slug, count]) do
-      published_articles
-        .select { |a| a.event&.sys&.id == article.event.sys.id }
+      # Group by the shared Races concept once assigned; fall back to the legacy event link
+      # during the transition (and before Phase 5 removes the article→event field).
+      peers = if race_id
+        published_articles.select { |a| race_report?(a) && race_concept_id(a) == race_id }
+      else
+        published_articles.select { |a| a.event&.sys&.id == event_id }
+      end
+
+      peers
         .reject { |a| a.slug == article.slug }
         .reject { |a| a.entry_type == 'Short' }
         .sort_by { |a| -published_datetime(a).to_i }
         .take(count)
     end
+  end
+
+  # The id of an article's race concept — the assigned concept under the Races branch
+  # (parent_id == 'races') — or nil. Drives race-report grouping post-migration.
+  # @param article [Object] The article.
+  # @return [String, nil]
+  def race_concept_id(article)
+    Array(article.contentful_metadata&.tags).find { |t| t.parent_id == 'races' }&.id
+  end
+
+  # Whether an article is tagged as a race report. Guards the race-report grouping so a
+  # non-report article that happens to share a race concept (e.g. a race preview) can't
+  # slip into "More Reports From This Race".
+  # @param article [Object] The article.
+  # @return [Boolean]
+  def race_report?(article)
+    Array(article.contentful_metadata&.tags).any? { |t| t.id == 'race-reports' }
   end
 end

@@ -221,6 +221,40 @@ describe StandardSite do
     end
   end
 
+  describe "#article_tags (taxonomy concepts, legacy-tag fallback)" do
+    def raw(concepts: nil, tags: [])
+      cm = { tags: tags }
+      cm[:concepts] = concepts if concepts
+      { contentfulMetadata: cm }
+    end
+
+    it "prefers assigned concepts, resolving ids to names via TaxonomyConcepts, in order" do
+      allow_any_instance_of(TaxonomyConcepts).to receive(:names).and_return(
+        "ironman-703" => "Ironman 70.3", "ironman-703-coeur-dalene" => "Ironman 70.3 Coeur d’Alene"
+      )
+      item = raw(concepts: [{ id: "ironman-703" }, { id: "ironman-703-coeur-dalene" }], tags: [{ id: "old", name: "Old" }])
+      expect(client.send(:article_tags, item)).to eq([
+        { "id" => "ironman-703", "name" => "Ironman 70.3" },
+        { "id" => "ironman-703-coeur-dalene", "name" => "Ironman 70.3 Coeur d’Alene" }
+      ])
+    end
+
+    it "drops concept ids the taxonomy doesn't know" do
+      allow_any_instance_of(TaxonomyConcepts).to receive(:names).and_return("known" => "Known")
+      expect(client.send(:article_tags, raw(concepts: [{ id: "known" }, { id: "missing" }]))).to eq([{ "id" => "known", "name" => "Known" }])
+    end
+
+    it "falls back to legacy metadata tags when the article has no concepts" do
+      expect(client.send(:article_tags, raw(tags: [{ id: "news", name: "News" }]))).to eq([{ "id" => "news", "name" => "News" }])
+    end
+
+    it "falls back to legacy tags when the taxonomy names are unavailable" do
+      allow_any_instance_of(TaxonomyConcepts).to receive(:names).and_return({})
+      item = raw(concepts: [{ id: "ironman-703" }], tags: [{ id: "news", name: "News" }])
+      expect(client.send(:article_tags, item)).to eq([{ "id" => "news", "name" => "News" }])
+    end
+  end
+
   describe "#backfill" do
     # A raw (symbol-keyed) CDA article item, as fetch_all_articles returns it.
     # publishedVersion present ⇒ not a draft; body present ⇒ Article ⇒ publishable.
@@ -229,7 +263,7 @@ describe StandardSite do
         sys: { id: id, publishedVersion: published_version, publishedAt: "2026-02-24T22:07:58.616Z",
                firstPublishedAt: "2026-02-24T15:00:00.000-07:00" },
         title: "Title #{id}", slug: "slug-#{id}", summary: nil, intro: "Intro", body: "Body",
-        coverImage: nil, contentfulMetadata: { tags: [] }
+        coverImage: nil, contentfulMetadata: { tags: [], concepts: [] }
       }
     end
 

@@ -224,4 +224,94 @@ RSpec.describe ArticleHelpers do
       expect(result).to include('Monday, January 1, 2024')
     end
   end
+
+  # The taxonomy-aware helpers need tags carrying path/parent_id (not just id/name) and a
+  # data.tags hierarchy, so this group defines richer builders that override the outer ones.
+  describe 'taxonomy-aware helpers' do
+    def full_url(path) = "https://example.com#{path}"
+    def canonical_url = 'https://example.com/2024/01/01/post/'
+
+    # A concept "tag" as it appears on an article after taxonomy normalization.
+    def concept(id, name, path:, parent_id: nil)
+      OpenStruct.new(id: id, name: name, path: path, parent_id: parent_id)
+    end
+
+    # An article whose contentful_metadata.tags are full concept doubles.
+    def tagged_article(slug:, concepts:, **opts)
+      a = article(slug: slug, **opts)
+      a.contentful_metadata = OpenStruct.new(tags: concepts)
+      a
+    end
+
+    # data.tags mirrors the generated tag pages: one { tag: <concept> } per concept, so the
+    # breadcrumb trail can resolve ancestors. Includes the topic hierarchy + a races branch.
+    def data
+      tags = [
+        concept('triathlon', 'Triathlon', path: '/tagged/triathlon'),
+        concept('ironman-703', 'Ironman 70.3', path: '/tagged/triathlon/ironman-703', parent_id: 'triathlon'),
+        concept('race-reports', 'Race Reports', path: '/tagged/race-reports'),
+        concept('running', 'Running', path: '/tagged/running'),
+        concept('races', 'Races', path: '/tagged/races'),
+        concept('ironman-703-coeur-dalene', 'Ironman 70.3 Coeur d’Alene', path: '/tagged/races/ironman-703-coeur-dalene', parent_id: 'races')
+      ].map { |c| OpenStruct.new(tag: c) }
+      OpenStruct.new(articles: @corpus || [], tags: tags)
+    end
+
+    describe '#taxonomy_trail' do
+      it 'returns the deepest topic chain, excluding the races branch' do
+        art = tagged_article(slug: 'cda', concepts: [
+          concept('ironman-703', 'Ironman 70.3', path: '/tagged/triathlon/ironman-703', parent_id: 'triathlon'),
+          concept('race-reports', 'Race Reports', path: '/tagged/race-reports'),
+          concept('ironman-703-coeur-dalene', 'Ironman 70.3 Coeur d’Alene', path: '/tagged/races/ironman-703-coeur-dalene', parent_id: 'races')
+        ])
+        expect(taxonomy_trail(art).map { |n| n[:name] }).to eq(['Triathlon', 'Ironman 70.3'])
+      end
+
+      it 'is empty when the article has no taxonomy' do
+        expect(taxonomy_trail(article(slug: 'x'))).to eq([])
+      end
+    end
+
+    describe '#breadcrumb_schema with a taxonomy trail' do
+      it 'inserts the topic trail between Blog and the article, numbered in order' do
+        art = tagged_article(slug: 'post', title: 'A Post', concepts: [
+          concept('ironman-703', 'Ironman 70.3', path: '/tagged/triathlon/ironman-703', parent_id: 'triathlon')
+        ])
+        schema = JSON.parse(breadcrumb_schema(art))
+        expect(schema['itemListElement'].map { |i| i['name'] }).to eq(['Home', 'Blog', 'Triathlon', 'Ironman 70.3', 'A Post'])
+        expect(schema['itemListElement'].map { |i| i['position'] }).to eq([1, 2, 3, 4, 5])
+        expect(schema['itemListElement'][2]['item']).to eq('https://example.com/tagged/triathlon')
+      end
+    end
+
+    describe '#race_concept_id / #related_race_reports' do
+      it 'reads the concept under the races branch' do
+        art = tagged_article(slug: 'cda-2025', concepts: [
+          concept('ironman-703-coeur-dalene', 'Ironman 70.3 Coeur d’Alene', path: '/tagged/races/ironman-703-coeur-dalene', parent_id: 'races')
+        ])
+        expect(race_concept_id(art)).to eq('ironman-703-coeur-dalene')
+        expect(race_concept_id(article(slug: 'no-race', tags: %w[triathlon]))).to be_nil
+      end
+
+      it 'groups race reports by their shared races concept, excluding non-reports and Shorts' do
+        race = concept('ironman-703-coeur-dalene', 'Ironman 70.3 Coeur d’Alene', path: '/tagged/races/ironman-703-coeur-dalene', parent_id: 'races')
+        rr = concept('race-reports', 'Race Reports', path: '/tagged/race-reports')
+        a2025 = tagged_article(slug: 'cda-2025', concepts: [rr, race], published_at: '2025-06-01T00:00:00Z')
+        a2024 = tagged_article(slug: 'cda-2024', concepts: [rr, race], published_at: '2024-06-01T00:00:00Z')
+        short = tagged_article(slug: 'cda-short', concepts: [rr, race], entry_type: 'Short', published_at: '2023-06-01T00:00:00Z')
+        preview = tagged_article(slug: 'cda-preview', concepts: [race], published_at: '2023-01-01T00:00:00Z') # same race, but not a report
+        other = tagged_article(slug: 'other', concepts: [concept('running', 'Running', path: '/tagged/running')], published_at: '2025-01-01T00:00:00Z')
+        stub_corpus([a2025, a2024, short, preview, other])
+
+        expect(related_race_reports(a2025).map(&:slug)).to eq(['cda-2024'])
+      end
+
+      it 'falls back to the legacy event link when no race concept is assigned' do
+        a1 = article(slug: 'e1', event_id: 'evt', published_at: '2025-01-01T00:00:00Z')
+        a2 = article(slug: 'e2', event_id: 'evt', published_at: '2024-01-01T00:00:00Z')
+        stub_corpus([a1, a2])
+        expect(related_race_reports(a1).map(&:slug)).to eq(['e2'])
+      end
+    end
+  end
 end

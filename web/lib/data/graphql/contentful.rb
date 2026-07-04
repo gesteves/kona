@@ -79,6 +79,9 @@ module ContentfulClient
               id
               name
             }
+            concepts {
+              id
+            }
           }
         }
       }

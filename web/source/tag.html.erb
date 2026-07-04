@@ -5,5 +5,9 @@
     </h1>
   </header>
 
+  <% if content.description.present? %>
+    <div class="blog__description"><%= markdown_to_html(content.description) %></div>
+  <% end %>
+
   <%= partial 'partials/blog_list', locals: { content: content } %>
 </div>

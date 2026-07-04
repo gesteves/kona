@@ -15,6 +15,10 @@ cp .env.example .env   # fill in CONTENTFUL_SPACE + CONTENTFUL_MANAGEMENT_TOKEN
 personal CMA token (the web app's delivery token won't work) — generate it in Contentful
 under **Settings → API keys → Content management tokens**.
 
+`CONTENTFUL_ORGANIZATION_ID` is required **only by the taxonomy CRUD scripts**
+(`taxonomy:create`, `taxonomy:delete`) — concept schemes and concepts are managed at the
+organization level, not per space. Everything else ignores it.
+
 ## Options (supported by every script)
 
 | Env var | Effect |
@@ -55,6 +59,100 @@ exist, so a bump + revert round-trip is byte-identical.
 `scripts/fix-degrees.js`. Replaces the masculine ordinal indicator (`º`, U+00BA), often
 typed by mistake, with the proper degree sign (`°`, U+00B0) in `article` `intro`/`body`.
 Mirrors the render-time helper `fix_degrees` in `web/lib/helpers/text_helpers.rb`.
+
+## Tags → taxonomy migration
+
+A grouped set of scripts that move the blog from Contentful **metadata tags** to a
+**taxonomy** (`topics` concept scheme + a `races` branch). The concept vocabulary,
+hierarchy, slug rules, static extra races, and the article-slug → race map all live in
+`scripts/lib/taxonomy.js` — edit that one file to adjust the design.
+
+⚠️ **Concepts and schemes are organization-level and permanent-ish** — there is no
+environment sandbox for them, and their ids become the `/tagged/<id>` URL segments on the
+site. Entry *assignment* (`taxonomy:assign`) is environment-scoped, so rehearse it on a
+sandbox first. Dry-run everything.
+
+Run order (additive-first, so the site never has a window with missing categories):
+
+| Step | Command | What it does |
+| --- | --- | --- |
+| 1 | `taxonomy:create` | Create/reconcile the `topics` scheme + all concepts (idempotent). **Org-level.** Needs `CONTENTFUL_ORGANIZATION_ID`. Only touches `prefLabel`/`broader`, never descriptions/synonyms you add later. |
+| 2 | `taxonomy:validate-article` | Add the scheme as a taxonomy validation on the `article` type (shows the editor Taxonomy tab). |
+| 3 | `taxonomy:assign` | Set each article's `metadata.concepts` (tags 1:1 + race concept). Idempotent, skip-unchanged, publish-preserving. Rehearse with `DRY_RUN`/`ENTRY_ID`/a sandbox env. |
+| — | *(deploy web + api)* | Both apps read concepts with a legacy-tag fallback, so deploy order is safe. |
+| 4 | `taxonomy:remove-tags` | **Phase 5 only**, after everything's verified in production: strip `metadata.tags`. Second republish of tagged entries. |
+| 5 | `migrate:remove-event-field` | **Phase 5 only**, after `related_race_reports` is confirmed concept-driven: delete the `article` → `event` reference field. |
+
+Inverses: `taxonomy:unassign` (clear concepts), `taxonomy:delete` (remove scheme +
+concepts — refuses while any entry still links one, so unassign first),
+`taxonomy:validate-article:revert`, `taxonomy:restore-tags` (rebuild tags from concepts,
+skipping race concepts), `migrate:remove-event-field:revert` (re-create the field —
+**cannot** restore the per-entry links; the space export backup is the real safety net).
+
+Every script supports `DRY_RUN` / `ENTRY_ID` / `CONTENTFUL_ENVIRONMENT` as above.
+
+### Preflight (Phase 0)
+
+Before step 1, confirm the two things the apps depend on and take a backup. The two
+verification curls use the **delivery/preview** tokens from the `web/` and `api/` apps (CPA
+for `preview.contentful.com`, CDA for `cdn.contentful.com`) — those live in those apps'
+`.env` files, not `contentful/.env`, so set them inline; the backup runs as an npm script.
+
+```bash
+# 1. GraphQL exposes concept ids on entries (both apps read this):
+curl -s "https://graphql.contentful.com/content/v1/spaces/$CONTENTFUL_SPACE" \
+  -H "Authorization: Bearer $CONTENTFUL_DELIVERY_TOKEN" -H 'Content-Type: application/json' \
+  --data '{"query":"{ __type(name:\"ContentfulMetadata\"){ fields { name } } }"}'
+# → the fields list must include "concepts".
+
+# 2. The delivery taxonomy REST endpoint works on BOTH hosts the apps use.
+#    web hits preview.contentful.com (its CONTENTFUL_TOKEN is a CPA token); api hits cdn.contentful.com.
+#    Path is /taxonomy/concepts (singular). After step 1 it returns items with prefLabel + broader.
+for host in cdn preview; do
+  curl -s "https://$host.contentful.com/spaces/$CONTENTFUL_SPACE/environments/master/taxonomy/concepts?limit=1" \
+    -H "Authorization: Bearer <token for that host>" | head -c 400; echo
+done
+
+# 3. Backup master before any write (loads .env like the other scripts):
+npm run backup
+```
+
+Both apps fall back to legacy tags until concepts are assigned and the taxonomy endpoint
+returns data, so the code can deploy before or after the content migration.
+
+### Redirects for the 6 moved tag URLs
+
+Hierarchy nests child tags under their parents, so six `/tagged/*` URLs move. Add these as
+Contentful `redirect` entries (same as the existing `/tagged/bikes → /tagged/cycling`) — no
+script needed:
+
+| From | To |
+| --- | --- |
+| `/tagged/ironman` | `/tagged/triathlon/ironman` |
+| `/tagged/ironman-703` | `/tagged/triathlon/ironman-703` |
+| `/tagged/olympic` | `/tagged/triathlon/olympic` |
+| `/tagged/half-marathon` | `/tagged/running/half-marathon` |
+| `/tagged/nutrition-hydration` | `/tagged/training/nutrition-hydration` |
+| `/tagged/zwift` | `/tagged/apps/zwift` |
+
+### Individual scripts
+
+- **`taxonomy:create`** (`scripts/create-taxonomy.js`) — reconciles concepts + the scheme
+  from `lib/taxonomy.js`; race concepts are derived from live `event` entries plus the
+  static extras. Re-run after adding events/races.
+- **`taxonomy:delete`** (`scripts/delete-taxonomy.js`) — inverse; deletes the scheme then
+  concepts deepest-first; refuses while any entry links a concept.
+- **`taxonomy:assign`** (`scripts/assign-concepts.js`) — assigns concepts to `article`
+  entries per the rules in `lib/taxonomy.js`.
+- **`taxonomy:unassign`** (`scripts/unassign-concepts.js`) — inverse; clears
+  `metadata.concepts`.
+- **`taxonomy:validate-article`** / **`:revert`** — add / clear the article taxonomy
+  validation.
+- **`taxonomy:remove-tags`** (`scripts/remove-tags.js`) / **`taxonomy:restore-tags`** —
+  strip / rebuild `metadata.tags` (restore skips race concepts, which were never tags).
+- **`migrate:remove-event-field`** (`scripts/remove-article-event-field.js`) / **`:revert`**
+  — delete / re-create the `article` `event` reference field (the `event` content type and
+  its entries stay for the Upcoming Races widget).
 
 ## Recommended workflow for destructive migrations
 

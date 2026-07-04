@@ -24,12 +24,24 @@
     @extend %heading-gradient;
 
     margin: 0;
-  
+
     @include text-box-trim-fallback {
       margin: 0;
       padding: 0;
     }
   }
+}
+
+// The optional archive intro (a concept's Markdown description), sitting below the header
+// and above the list. Styled like blog post body text; %body-styles zeroes its trailing
+// margin (& > *:last-child). Carries the same bottom border/spacing as the header so it's
+// clearly separated from the entry list.
+.blog__description {
+  @extend %body-styles;
+
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--padding);
+  padding-bottom: var(--padding);
 }
 
 .blog__list-item {

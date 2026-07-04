@@ -79,7 +79,7 @@ class StandardSite < ApplicationService
     summary
     published
     coverImage { url contentType }
-    contentfulMetadata { tags { id name } }
+    contentfulMetadata { tags { id name } concepts { id } }
     sys { id firstPublishedAt publishedAt publishedVersion }
   GRAPHQL
 
@@ -466,9 +466,34 @@ class StandardSite < ApplicationService
       "path" => derived[:path],
       "cover_image" => cover && { "url" => cover[:url], "content_type" => cover[:contentType] },
       "contentful_metadata" => {
-        "tags" => Array(item.dig(:contentfulMetadata, :tags)).map { |t| { "id" => t[:id], "name" => t[:name] } }
+        "tags" => article_tags(item)
       }
     }
+  end
+
+  # The article's tags as { "id", "name" } hashes for the standard.site record. Prefers the
+  # assigned taxonomy concepts (ids from GraphQL, names joined via TaxonomyConcepts), and falls
+  # back to the legacy metadata tags when an article has no concepts yet or the taxonomy names
+  # aren't available — so the tags→concepts migration is safe in either deploy order.
+  # @param item [Hash] A raw (symbolized) GraphQL article item.
+  # @return [Array<Hash>]
+  def article_tags(item)
+    concepts = Array(item.dig(:contentfulMetadata, :concepts))
+    if concepts.present? && taxonomy_names.present?
+      concepts.filter_map do |concept|
+        name = taxonomy_names[concept[:id].to_s]
+        { "id" => concept[:id], "name" => name } if name.present?
+      end
+    else
+      Array(item.dig(:contentfulMetadata, :tags)).map { |t| { "id" => t[:id], "name" => t[:name] } }
+    end
+  end
+
+  # Concept id => name for the whole taxonomy, fetched once per sync (empty when the taxonomy
+  # isn't available — callers then fall back to legacy tags).
+  # @return [Hash{String=>String}]
+  def taxonomy_names
+    @taxonomy_names ||= TaxonomyConcepts.new.names || {}
   end
 
   # @param item [Hash] A raw (symbolized) GraphQL site item.

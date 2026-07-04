@@ -3,11 +3,23 @@
   "private": true,
   "description": "One-off Contentful content migrations for the Kona blog. Lives outside web/ so edits here don't trigger Netlify builds.",
   "scripts": {
+    "backup": "node --env-file=.env scripts/backup.js",
     "fix:degrees": "node --env-file=.env scripts/fix-degrees.js",
     "migrate:headings": "node --env-file=.env scripts/bump-heading-levels.js",
-    "migrate:headings:revert": "node --env-file=.env scripts/revert-heading-levels.js"
+    "migrate:headings:revert": "node --env-file=.env scripts/revert-heading-levels.js",
+    "taxonomy:create": "node --env-file=.env scripts/create-taxonomy.js",
+    "taxonomy:delete": "node --env-file=.env scripts/delete-taxonomy.js",
+    "taxonomy:assign": "node --env-file=.env scripts/assign-concepts.js",
+    "taxonomy:unassign": "node --env-file=.env scripts/unassign-concepts.js",
+    "taxonomy:validate-article": "node --env-file=.env scripts/add-taxonomy-validation.js",
+    "taxonomy:validate-article:revert": "node --env-file=.env scripts/revert-taxonomy-validation.js",
+    "taxonomy:remove-tags": "node --env-file=.env scripts/remove-tags.js",
+    "taxonomy:restore-tags": "node --env-file=.env scripts/restore-tags.js",
+    "migrate:remove-event-field": "node --env-file=.env scripts/remove-article-event-field.js",
+    "migrate:remove-event-field:revert": "node --env-file=.env scripts/restore-article-event-field.js"
   },
   "dependencies": {
+    "contentful-management": "^11.0.0",
     "contentful-migration": "^5.0.0"
   }
 }
