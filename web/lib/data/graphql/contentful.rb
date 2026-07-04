@@ -70,10 +70,6 @@ module ContentfulClient
             ...SysFields
           }
           contentfulMetadata {
-            tags {
-              id
-              name
-            }
             concepts {
               id
             }

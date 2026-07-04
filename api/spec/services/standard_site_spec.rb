@@ -221,19 +221,16 @@ describe StandardSite do
     end
   end
 
-  describe "#article_tags (taxonomy concepts, legacy-tag fallback)" do
-    def raw(concepts: nil, tags: [])
-      cm = { tags: tags }
-      cm[:concepts] = concepts if concepts
-      { contentfulMetadata: cm }
+  describe "#article_tags (taxonomy concepts)" do
+    def raw(*concept_ids)
+      { contentfulMetadata: { concepts: concept_ids.map { |id| { id: id } } } }
     end
 
-    it "prefers assigned concepts, resolving ids to names via TaxonomyConcepts, in order" do
+    it "resolves concept ids to names via TaxonomyConcepts, in order" do
       allow_any_instance_of(TaxonomyConcepts).to receive(:names).and_return(
         "ironman-703" => "Ironman 70.3", "ironman-703-coeur-dalene" => "Ironman 70.3 Coeur d’Alene"
       )
-      item = raw(concepts: [{ id: "ironman-703" }, { id: "ironman-703-coeur-dalene" }], tags: [{ id: "old", name: "Old" }])
-      expect(client.send(:article_tags, item)).to eq([
+      expect(client.send(:article_tags, raw("ironman-703", "ironman-703-coeur-dalene"))).to eq([
         { "id" => "ironman-703", "name" => "Ironman 70.3" },
         { "id" => "ironman-703-coeur-dalene", "name" => "Ironman 70.3 Coeur d’Alene" }
       ])
@@ -241,17 +238,16 @@ describe StandardSite do
 
     it "drops concept ids the taxonomy doesn't know" do
       allow_any_instance_of(TaxonomyConcepts).to receive(:names).and_return("known" => "Known")
-      expect(client.send(:article_tags, raw(concepts: [{ id: "known" }, { id: "missing" }]))).to eq([{ "id" => "known", "name" => "Known" }])
+      expect(client.send(:article_tags, raw("known", "missing"))).to eq([{ "id" => "known", "name" => "Known" }])
     end
 
-    it "falls back to legacy metadata tags when the article has no concepts" do
-      expect(client.send(:article_tags, raw(tags: [{ id: "news", name: "News" }]))).to eq([{ "id" => "news", "name" => "News" }])
+    it "returns [] when the article has no concepts" do
+      expect(client.send(:article_tags, raw)).to eq([])
     end
 
-    it "falls back to legacy tags when the taxonomy names are unavailable" do
+    it "returns [] when no concept name resolves" do
       allow_any_instance_of(TaxonomyConcepts).to receive(:names).and_return({})
-      item = raw(concepts: [{ id: "ironman-703" }], tags: [{ id: "news", name: "News" }])
-      expect(client.send(:article_tags, item)).to eq([{ "id" => "news", "name" => "News" }])
+      expect(client.send(:article_tags, raw("ironman-703"))).to eq([])
     end
   end
 
@@ -263,7 +259,7 @@ describe StandardSite do
         sys: { id: id, publishedVersion: published_version, publishedAt: "2026-02-24T22:07:58.616Z",
                firstPublishedAt: "2026-02-24T15:00:00.000-07:00" },
         title: "Title #{id}", slug: "slug-#{id}", summary: nil, intro: "Intro", body: "Body",
-        coverImage: nil, contentfulMetadata: { tags: [], concepts: [] }
+        coverImage: nil, contentfulMetadata: { concepts: [] }
       }
     end
 

@@ -173,18 +173,16 @@ RSpec.describe Contentful do
       ]
     end
 
-    # An importer whose taxonomy fetch is stubbed to `concepts` (nil = the 404/empty fallback).
+    # An importer whose taxonomy fetch is stubbed to `concepts` (empty = no taxonomy).
     def importer_with(concepts: concept_fixture, articles: [])
       importer(articles: articles).tap do |instance|
         allow(instance).to receive(:fetch_taxonomy_concepts).and_return(Array(concepts))
       end
     end
 
-    def article_with(concepts: nil, tags: nil)
-      cm = {}
-      cm[:tags] = tags if tags
-      cm[:concepts] = concepts if concepts
-      { contentful_metadata: cm }
+    # An article carrying the given concept ids — the shape apply_taxonomy_to_articles reads.
+    def article_with(*concept_ids)
+      { contentful_metadata: { concepts: concept_ids.map { |id| { id: id } } } }
     end
 
     describe '#build_taxonomy' do
@@ -204,30 +202,28 @@ RSpec.describe Contentful do
         expect(taxo['triathlon'][:short_name]).to eq('Triathlon')    # no synonyms → the name
       end
 
-      it 'is empty (fallback) when the endpoint yields nothing' do
+      it 'is empty when the endpoint yields no concepts' do
         expect(importer_with(concepts: []).send(:taxonomy)).to eq({})
       end
     end
 
     describe '#apply_taxonomy_to_articles' do
       it 'rebuilds tags from concepts with names and nested paths, dropping the concepts key' do
-        instance = importer_with(articles: [article_with(
-          tags: [{ id: 'ironman-703', name: 'Ironman 70.3' }],
-          concepts: [{ id: 'ironman-703' }, { id: 'cda' }]
-        )])
+        instance = importer_with(articles: [article_with('ironman-703', 'cda')])
         instance.send(:apply_taxonomy_to_articles)
-        tags = instance.instance_variable_get(:@content)[:articles].first[:contentful_metadata][:tags]
+        article = instance.instance_variable_get(:@content)[:articles].first
+        tags = article[:contentful_metadata][:tags]
         expect(tags.map { |t| t[:id] }).to eq(['ironman-703', 'cda'])
         expect(tags.map { |t| t[:path] }).to eq(['/tagged/triathlon/ironman-703', '/tagged/races/cda'])
         expect(tags.map { |t| t[:short_name] }).to eq(['70.3', 'CdA'])
-        expect(instance.instance_variable_get(:@content)[:articles].first[:contentful_metadata]).not_to have_key(:concepts)
+        expect(article[:contentful_metadata]).not_to have_key(:concepts)
       end
 
-      it 'falls back to legacy tags (with /tagged/<id> paths) when concepts are absent' do
-        instance = importer_with(concepts: [], articles: [article_with(tags: [{ id: 'gear', name: 'Gear' }])])
+      it 'drops concept ids the taxonomy does not know' do
+        instance = importer_with(articles: [article_with('ironman-703', 'nope')])
         instance.send(:apply_taxonomy_to_articles)
         tags = instance.instance_variable_get(:@content)[:articles].first[:contentful_metadata][:tags]
-        expect(tags).to eq([{ id: 'gear', name: 'Gear', short_name: 'Gear', parent_id: nil, path: '/tagged/gear' }])
+        expect(tags.map { |t| t[:id] }).to eq(['ironman-703'])
       end
     end
 
@@ -240,8 +236,7 @@ RSpec.describe Contentful do
       end
 
       it 'rolls descendants up into parents and lists all races under the Races branch' do
-        tags = built_tags([article_with(tags: [{ id: 'ironman-703', name: 'Ironman 70.3' }],
-                                        concepts: [{ id: 'ironman-703' }, { id: 'cda' }])])
+        tags = built_tags([article_with('ironman-703', 'cda')])
         ids = tags.map { |t| t[:tag][:id] }
         # Triathlon (via descendant), Ironman 70.3, Races (via descendant), CdA — but not childless Running.
         expect(ids).to match_array(%w[triathlon ironman-703 races cda])
@@ -253,8 +248,7 @@ RSpec.describe Contentful do
       end
 
       it "uses a concept's description as the page copy, else the boilerplate summary" do
-        tags = built_tags([article_with(tags: [{ id: 'ironman-703', name: 'Ironman 70.3' }],
-                                        concepts: [{ id: 'ironman-703' }])])
+        tags = built_tags([article_with('ironman-703')])
         im703 = tags.find { |t| t[:tag][:id] == 'ironman-703' }
         expect(im703[:pages].first[:summary]).to eq('The 70.3-mile distance.')
         expect(im703[:pages].first[:description]).to eq('The 70.3-mile distance.')
@@ -262,15 +256,6 @@ RSpec.describe Contentful do
         triathlon = tags.find { |t| t[:tag][:id] == 'triathlon' }
         expect(triathlon[:pages].first[:summary]).to eq('Browse one entry tagged “Triathlon.”')
         expect(triathlon[:pages].first).not_to have_key(:description)
-      end
-
-      it 'falls back to flat legacy tag pages when the taxonomy is unavailable' do
-        instance = importer_with(concepts: [], articles: [article_with(tags: [{ id: 'gear', name: 'Gear' }])])
-        instance.send(:apply_taxonomy_to_articles)
-        instance.send(:generate_tags)
-        tags = instance.instance_variable_get(:@content)[:tags]
-        expect(tags.map { |t| t[:tag][:id] }).to eq(['gear'])
-        expect(tags.first[:pages].first[:path]).to eq('/tagged/gear/index.html')
       end
     end
   end

@@ -97,25 +97,15 @@ class Contentful
   end
 
   # Rewrites each article's contentful_metadata[:tags] from its assigned taxonomy concepts,
-  # joining concept ids to their name/parent/nested-path via the taxonomy lookup. Falls back
-  # to the legacy metadata tags (enriched with a taxonomy path when the concept exists) when
-  # an article has no concepts yet or the taxonomy isn't available — so the two-app rollout is
-  # safe in either deploy order. The downstream feed/OG/JSON-LD/share helpers keep reading
-  # :id/:name unchanged; :path and :parent_id are additive.
+  # joining concept ids to their name/short_name/parent/nested-path via the taxonomy lookup.
+  # The downstream feed/OG/JSON-LD/share helpers keep reading :id/:name; :short_name, :path,
+  # and :parent_id are additive.
   def apply_taxonomy_to_articles
     taxo = taxonomy
     @content[:articles].each do |item|
       cm = (item[:contentful_metadata] ||= {})
       concept_ids = Array(cm[:concepts]).map { |c| c[:id] }.compact
-
-      cm[:tags] = if concept_ids.any? && taxo.any?
-        concept_ids.filter_map { |cid| taxo[cid] }.map { |c| c.slice(:id, :name, :short_name, :parent_id, :path) }
-      else
-        Array(cm[:tags]).map do |t|
-          info = taxo[t[:id]]
-          { id: t[:id], name: t[:name], short_name: t[:name], parent_id: info&.dig(:parent_id), path: info&.dig(:path) || "/tagged/#{t[:id]}" }
-        end
-      end
+      cm[:tags] = concept_ids.filter_map { |cid| taxo[cid] }.map { |c| c.slice(:id, :name, :short_name, :parent_id, :path) }
       cm.delete(:concepts)
     end
   end
@@ -235,26 +225,18 @@ class Contentful
     item
   end
 
-  # Generates the per-tag archive pages. When the taxonomy is available, pages are built from
-  # the concept hierarchy (a page per concept that has articles directly or via its
-  # descendants, at its nested `/tagged/<ancestors…>/<id>` path, with the concept's
-  # description as the page copy). Otherwise it falls back to the flat, legacy tag behavior.
+  # Generates the per-tag archive pages from the concept hierarchy: a page per concept that has
+  # articles directly or via its descendants (so e.g. Triathlon lists Ironman 70.3 reports, and
+  # the Races parent lists every race report even though it's never assigned directly), at its
+  # nested `/tagged/<ancestors…>/<id>` path, with the concept's description as the page copy.
+  # Concepts with no articles anywhere in their subtree get no page. Article order follows
+  # published_articles (newest-first).
   def generate_tags
     taxo = taxonomy
-    @content[:tags] = taxo.any? ? generate_taxonomy_tags(taxo) : generate_legacy_tags
-  end
-
-  # Hierarchy-aware tag pages. Each concept collects its own articles plus all of its
-  # descendants' (so e.g. Triathlon lists Ironman 70.3 reports, and the Races parent lists
-  # every race report even though it's never assigned directly); concepts with no articles
-  # anywhere in their subtree get no page. Article order follows published_articles
-  # (newest-first).
-  # @return [Array<Hash>]
-  def generate_taxonomy_tags(taxo)
     children = Hash.new { |h, k| h[k] = [] }
     taxo.each_value { |c| children[c[:parent_id]] << c[:id] if c[:parent_id] }
 
-    taxo.values.filter_map do |concept|
+    @content[:tags] = taxo.values.filter_map do |concept|
       id_set = ([concept[:id]] + descendant_ids(concept[:id], children)).to_set
       tagged = published_articles.select do |a|
         Array(a.dig(:contentful_metadata, :tags)).any? { |t| id_set.include?(t[:id]) }
@@ -266,22 +248,6 @@ class Contentful
       pages = paginate(tagged, base_path: concept[:path], template: "/tag.html",
                        title: concept[:name], summary: summary, description: description)
       { tag: concept.slice(:id, :name, :path, :parent_id, :description), pages: pages }
-    end
-  end
-
-  # The flat, pre-taxonomy tag pages: one page per unique metadata tag. Used during the
-  # transition (before the taxonomy exists) and as a safety net.
-  # @return [Array<Hash>]
-  def generate_legacy_tags
-    tags = published_articles.flat_map { |a| Array(a.dig(:contentful_metadata, :tags)) }.uniq { |t| t[:id] }
-    tags.map do |tag|
-      tagged_articles = published_articles.select do |a|
-        Array(a.dig(:contentful_metadata, :tags)).any? { |t| t[:id] == tag[:id] }
-      end
-      base_path = tag[:path] || "/tagged/#{tag[:id]}"
-      summary = default_tag_summary(tag[:name], tagged_articles.size)
-      pages = paginate(tagged_articles, base_path: base_path, template: "/tag.html", title: tag[:name], summary: summary)
-      { tag: tag.slice(:id, :name, :path, :parent_id), pages: pages }
     end
   end
 
@@ -375,8 +341,8 @@ class Contentful
 
   # The taxonomy concepts, keyed by id, memoized for the build. GraphQL only returns concept
   # ids on entries, so names/hierarchy/descriptions are joined from the delivery taxonomy REST
-  # endpoint here. Each value: { id:, name:, parent_id:, path:, description:, synonyms: }.
-  # Empty when the taxonomy isn't available yet (callers fall back to legacy tags).
+  # endpoint here. Each value: { id:, name:, short_name:, parent_id:, path:, description:,
+  # synonyms: }.
   # @return [Hash{String=>Hash}]
   def taxonomy
     @taxonomy ||= build_taxonomy
@@ -414,9 +380,9 @@ class Contentful
   end
 
   # Fetches every concept from the delivery taxonomy endpoint (CPA host + preview token, same
-  # credentials as the GraphQL client). Cursor-paginated via `pages.next`. A 404 means the
-  # taxonomy isn't enabled yet — we warn and fall back to legacy tags rather than break the
-  # build; any other non-2xx raises (matching the GraphQL error handling).
+  # credentials as the GraphQL client). Cursor-paginated via `pages.next`. Concepts are the
+  # sole source of article categorization now, so any non-2xx raises and fails the build
+  # (matching the GraphQL error handling).
   # @return [Array<Hash>] raw concept hashes (string keys, localized fields as locale maps).
   def fetch_taxonomy_concepts
     space = ENV['CONTENTFUL_SPACE']
@@ -428,10 +394,6 @@ class Contentful
     items = []
     loop do
       response = HTTParty.get(url, headers: headers)
-      if response.code == 404
-        warn '[taxonomy] delivery concepts endpoint returned 404 — taxonomy not available yet; falling back to legacy tags'
-        return []
-      end
       raise "Error fetching taxonomy concepts: #{response.code} #{response.body}" unless response.code.between?(200, 299)
 
       body = response.parsed_response

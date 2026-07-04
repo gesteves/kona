@@ -79,7 +79,7 @@ class StandardSite < ApplicationService
     summary
     published
     coverImage { url contentType }
-    contentfulMetadata { tags { id name } concepts { id } }
+    contentfulMetadata { concepts { id } }
     sys { id firstPublishedAt publishedAt publishedVersion }
   GRAPHQL
 
@@ -471,21 +471,15 @@ class StandardSite < ApplicationService
     }
   end
 
-  # The article's tags as { "id", "name" } hashes for the standard.site record. Prefers the
-  # assigned taxonomy concepts (ids from GraphQL, names joined via TaxonomyConcepts), and falls
-  # back to the legacy metadata tags when an article has no concepts yet or the taxonomy names
-  # aren't available — so the tags→concepts migration is safe in either deploy order.
+  # The article's tags as { "id", "name" } hashes for the standard.site record, built from the
+  # assigned taxonomy concepts (ids from GraphQL, names joined via TaxonomyConcepts). Concepts
+  # whose name can't be resolved are dropped.
   # @param item [Hash] A raw (symbolized) GraphQL article item.
   # @return [Array<Hash>]
   def article_tags(item)
-    concepts = Array(item.dig(:contentfulMetadata, :concepts))
-    if concepts.present? && taxonomy_names.present?
-      concepts.filter_map do |concept|
-        name = taxonomy_names[concept[:id].to_s]
-        { "id" => concept[:id], "name" => name } if name.present?
-      end
-    else
-      Array(item.dig(:contentfulMetadata, :tags)).map { |t| { "id" => t[:id], "name" => t[:name] } }
+    Array(item.dig(:contentfulMetadata, :concepts)).filter_map do |concept|
+      name = taxonomy_names[concept[:id].to_s]
+      { "id" => concept[:id], "name" => name } if name.present?
     end
   end
 
