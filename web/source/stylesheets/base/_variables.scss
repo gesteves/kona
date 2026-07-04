@@ -3,4 +3,7 @@ $bp-small: 400px;
 $bp-medium: 768px;
 $bp-large: 1024px;
 $bp-x-large: 1280px;
-$bp-nav: 768px;
+
+// The nav's own breakpoint — a semantic alias that's deliberately the same value as
+// $bp-medium today; defined in terms of it so they can't silently drift apart.
+$bp-nav: $bp-medium;

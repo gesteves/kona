@@ -52,7 +52,7 @@ module WhoopHelper
 
     case strain
     when 0...10
-      is_rest_day? ? "Rest Day" : "Light"
+      rest_day? ? "Rest Day" : "Light"
     when 10...14
       "Moderate"
     when 14...18

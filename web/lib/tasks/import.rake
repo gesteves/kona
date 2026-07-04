@@ -9,21 +9,21 @@ namespace :import do
   desc 'Imports FontAwesome icons'
   task :icons => [:dotenv] do
     setup_data_directory
-    initialize_redis
+    RedisConnection.connection
     measure_and_output(:import_font_awesome, "Importing icons")
   end
 
   desc 'Imports Contentful content'
   task :content => [:dotenv] do
     setup_data_directory
-    initialize_redis
+    RedisConnection.connection
     measure_and_output(:import_contentful, "Importing site content")
   end
 
   desc 'Fetches standard.site verification data (DID + publication URI) from the api'
   task :standard_site => [:dotenv] do
     setup_data_directory
-    initialize_redis
+    RedisConnection.connection
     measure_and_output(:import_standard_site, "Fetching standard.site verification data")
   end
 
@@ -37,7 +37,7 @@ task :import => [:dotenv, :clobber] do
 
   overall_start_time = Time.now
   setup_data_directory
-  initialize_redis
+  RedisConnection.connection
 
   output_mutex = Mutex.new
 

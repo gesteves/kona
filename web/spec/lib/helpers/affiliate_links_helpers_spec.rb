@@ -14,21 +14,21 @@ RSpec.describe AffiliateLinksHelpers do
     end
   end
 
-  describe '#is_amazon_associates_link?' do
+  describe '#amazon_associates_link?' do
     it 'returns true for an Amazon affiliate link' do
-      expect(is_amazon_associates_link?('https://www.amazon.com/example?tag=affiliate-20')).to be true
+      expect(amazon_associates_link?('https://www.amazon.com/example?tag=affiliate-20')).to be true
     end
 
     it 'returns true for an Amazon short link' do
-      expect(is_amazon_associates_link?('https://amzn.to/abc123')).to be true
+      expect(amazon_associates_link?('https://amzn.to/abc123')).to be true
     end
 
     it 'returns false for a non-affiliate Amazon link' do
-      expect(is_amazon_associates_link?('https://amazon.com/product')).to be false
+      expect(amazon_associates_link?('https://amazon.com/product')).to be false
     end
 
     it 'returns false for non-Amazon links' do
-      expect(is_amazon_associates_link?('https://example.com')).to be false
+      expect(amazon_associates_link?('https://example.com')).to be false
     end
   end
 end

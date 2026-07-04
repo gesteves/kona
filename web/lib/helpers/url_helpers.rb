@@ -17,9 +17,9 @@ module UrlHelpers
   # @see https://docs.netlify.com/configure-builds/environment-variables/#deploy-urls-and-metadata
   # @return [String] The root URL of the application.
   def root_url
-    if is_production?
+    if production?
       ENV['URL']
-    elsif is_netlify?
+    elsif netlify?
       ENV['DEPLOY_URL']
     else
       'http://localhost:4567'

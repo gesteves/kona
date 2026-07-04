@@ -22,17 +22,7 @@
     display: none;
   }
 
-  svg {
-    display: inline-block;
-    height: var(--light-icon-size);
-    vertical-align: text-bottom;
-    width: var(--light-icon-size);
-
-    g,
-    path {
-      fill: var(--color-text-tertiary);
-    }
-  }
+  @include light-icon;
 
   @include bp-large {
     grid-column: span 4;

@@ -3,10 +3,10 @@
 <% plausible_proxy_redirects.each do |redirect| %>
 <%= redirect[:from] %> <%= redirect[:to] %> <%= redirect[:status] %>
 <% end %>
-<% data.articles.reject(&:draft).each do |article| %>
+<% published_articles.each do |article| %>
 /id/<%= article.sys.id %>/ <%= url_for article.path %> 301
 <% end %>
-<% data.pages.reject(&:draft).each do |page| %>
+<% published_pages.each do |page| %>
 /id/<%= page.sys.id %>/ <%= url_for page.path %> 301
 <% end %>
 <% data.redirects.each do |redirect| %>

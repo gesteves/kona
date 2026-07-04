@@ -9,8 +9,8 @@ require "rails_helper"
 # indoor-season month check uses `travel_to(Time.now.change(...))` so the month is
 # deterministic regardless of where the suite runs.
 #
-# Cross-domain predicates the summary leans on (`is_race_day?`, `todays_race`, `format_location`,
-# `format_elevation`, `is_workout_scheduled?`, …) come from the included helpers with their own
+# Cross-domain predicates the summary leans on (`race_day?`, `todays_race`, `format_location`,
+# `format_elevation`, `workout_scheduled?`, …) come from the included helpers with their own
 # specs, so they're stubbed here to keep these tests about the prose logic.
 RSpec.describe WeatherSummaryPresenter do
   include ActiveSupport::Testing::TimeHelpers
@@ -65,15 +65,15 @@ RSpec.describe WeatherSummaryPresenter do
   # ---------------------------------------------------------------------------
   # Weather quality
   # ---------------------------------------------------------------------------
-  describe "#is_hot?" do
+  describe "#hot?" do
     it "is hot at or above 30° for either actual or apparent temperature" do
       build_weather(current: { temperature: 31.0, temperature_apparent: 28.0 })
-      expect(presenter.is_hot?).to be(true)
+      expect(presenter.hot?).to be(true)
     end
 
     it "is not hot on a mild day" do
       build_weather
-      expect(presenter.is_hot?).to be(false)
+      expect(presenter.hot?).to be(false)
     end
   end
 
@@ -89,47 +89,47 @@ RSpec.describe WeatherSummaryPresenter do
     end
   end
 
-  describe "#is_bad_weather? / #is_good_weather?" do
+  describe "#bad_weather? / #good_weather?" do
     it "is good weather on a mild, calm, clear day" do
       build_weather
-      expect(presenter.is_good_weather?).to be(true)
-      expect(presenter.is_bad_weather?).to be(false)
+      expect(presenter.good_weather?).to be(true)
+      expect(presenter.bad_weather?).to be(false)
     end
 
     it "is bad when the air quality is unhealthy" do
       build_weather
       presenter.instance_variable_set(:@air_quality, DeepOstruct.wrap(aqi: 150, category: "Unhealthy"))
-      expect(presenter.is_bad_weather?).to be(true)
+      expect(presenter.bad_weather?).to be(true)
     end
 
     it "is bad in dangerous heat (by apparent temperature)" do
       build_weather(current: { temperature_apparent: 36.0 })
-      expect(presenter.is_bad_weather?).to be(true)
+      expect(presenter.bad_weather?).to be(true)
     end
 
     it "is bad when the forecast high is freezing or scorching" do
       build_weather(today: { temperature_max: 36.0 })
-      expect(presenter.is_bad_weather?).to be(true)
+      expect(presenter.bad_weather?).to be(true)
     end
 
     it "is bad when rain is likely" do
       build_weather(rest_of_day: { precipitation_chance: 0.6 })
-      expect(presenter.is_bad_weather?).to be(true)
+      expect(presenter.bad_weather?).to be(true)
     end
 
     it "is bad when it's windy" do
       build_weather(current: { wind_speed: 45.0 })
-      expect(presenter.is_bad_weather?).to be(true)
+      expect(presenter.bad_weather?).to be(true)
     end
 
     it "is bad when snow is expected" do
       build_weather(rest_of_day: { precipitation_type: "snow", snowfall_amount: 5 })
-      expect(presenter.is_bad_weather?).to be(true)
+      expect(presenter.bad_weather?).to be(true)
     end
 
     it "is bad under an adverse current condition" do
       build_weather(current: { condition_code: "Blizzard" })
-      expect(presenter.is_bad_weather?).to be(true)
+      expect(presenter.bad_weather?).to be(true)
     end
   end
 
@@ -138,18 +138,18 @@ RSpec.describe WeatherSummaryPresenter do
   # ---------------------------------------------------------------------------
   describe "#race_day" do
     it "announces race day during the day" do
-      allow(presenter).to receive(:is_race_day?).and_return(true)
-      allow(presenter).to receive(:is_evening?).and_return(false)
+      allow(presenter).to receive(:race_day?).and_return(true)
+      allow(presenter).to receive(:evening?).and_return(false)
       expect(presenter.race_day).to eq("**It's race day!**")
     end
 
     it "says nothing in the evening or on a non-race day" do
-      allow(presenter).to receive(:is_race_day?).and_return(true)
-      allow(presenter).to receive(:is_evening?).and_return(true)
+      allow(presenter).to receive(:race_day?).and_return(true)
+      allow(presenter).to receive(:evening?).and_return(true)
       expect(presenter.race_day).to be_nil
 
-      allow(presenter).to receive(:is_race_day?).and_return(false)
-      allow(presenter).to receive(:is_evening?).and_return(false)
+      allow(presenter).to receive(:race_day?).and_return(false)
+      allow(presenter).to receive(:evening?).and_return(false)
       expect(presenter.race_day).to be_nil
     end
   end
@@ -158,20 +158,20 @@ RSpec.describe WeatherSummaryPresenter do
     before { allow(presenter).to receive(:format_location).and_return("Boulder, Colorado") }
 
     it "states the location with no race mention off race day" do
-      allow(presenter).to receive(:is_race_day?).and_return(false)
+      allow(presenter).to receive(:race_day?).and_return(false)
       expect(presenter.current_location).to eq("I'm currently in **Boulder, Colorado**")
     end
 
     it "adds the race with a definite article on race day" do
-      allow(presenter).to receive(:is_race_day?).and_return(true)
-      allow(presenter).to receive(:is_evening?).and_return(false)
+      allow(presenter).to receive(:race_day?).and_return(true)
+      allow(presenter).to receive(:evening?).and_return(false)
       allow(presenter).to receive(:todays_race).and_return(DeepOstruct.wrap(title: "Boston Marathon"))
       expect(presenter.current_location).to eq("I'm currently in **Boulder, Colorado**, racing the **Boston Marathon**")
     end
 
     it "drops the article for Ironman races" do
-      allow(presenter).to receive(:is_race_day?).and_return(true)
-      allow(presenter).to receive(:is_evening?).and_return(false)
+      allow(presenter).to receive(:race_day?).and_return(true)
+      allow(presenter).to receive(:evening?).and_return(false)
       allow(presenter).to receive(:todays_race).and_return(DeepOstruct.wrap(title: "Ironman World Championship"))
       result = presenter.current_location
       expect(result).to include("**Ironman World Championship**")
@@ -191,16 +191,16 @@ RSpec.describe WeatherSummaryPresenter do
 
   describe "#smooth" do
     it "quips on a hot non-race daytime" do
-      allow(presenter).to receive(:is_race_day?).and_return(false)
-      allow(presenter).to receive(:is_hot?).and_return(true)
-      allow(presenter).to receive(:is_daytime?).and_return(true)
+      allow(presenter).to receive(:race_day?).and_return(false)
+      allow(presenter).to receive(:hot?).and_return(true)
+      allow(presenter).to receive(:daytime?).and_return(true)
       expect(presenter.smooth).to eq("Man, it's a hot one!")
     end
 
     it "stays quiet on race day" do
-      allow(presenter).to receive(:is_race_day?).and_return(true)
-      allow(presenter).to receive(:is_hot?).and_return(true)
-      allow(presenter).to receive(:is_daytime?).and_return(true)
+      allow(presenter).to receive(:race_day?).and_return(true)
+      allow(presenter).to receive(:hot?).and_return(true)
+      allow(presenter).to receive(:daytime?).and_return(true)
       expect(presenter.smooth).to be_nil
     end
   end
@@ -279,7 +279,7 @@ RSpec.describe WeatherSummaryPresenter do
   describe "#forecast" do
     it "gives a high and low during the day" do
       build_weather
-      allow(presenter).to receive(:is_evening?).and_return(false)
+      allow(presenter).to receive(:evening?).and_return(false)
       text = presenter.forecast
       expect(text).to include("Today's forecast is clear")
       expect(text).to include("with a high of")
@@ -288,7 +288,7 @@ RSpec.describe WeatherSummaryPresenter do
 
     it "gives only a low in the evening" do
       build_weather(overnight: { condition_code: "Clear" })
-      allow(presenter).to receive(:is_evening?).and_return(true)
+      allow(presenter).to receive(:evening?).and_return(true)
       text = presenter.forecast
       expect(text).to include("Tonight's forecast is clear")
       expect(text).to include("with a low of")
@@ -304,13 +304,13 @@ RSpec.describe WeatherSummaryPresenter do
 
     it "states the chance of rain later today" do
       build_weather(rest_of_day: { precipitation_chance: 0.4, precipitation_type: "rain" })
-      allow(presenter).to receive(:is_evening?).and_return(false)
+      allow(presenter).to receive(:evening?).and_return(false)
       expect(presenter.precipitation).to include("chance of rain later today")
     end
 
     it "adds an expected amount for snow" do
       build_weather(rest_of_day: { precipitation_chance: 0.5, precipitation_type: "snow", snowfall_amount: 30 })
-      allow(presenter).to receive(:is_evening?).and_return(false)
+      allow(presenter).to receive(:evening?).and_return(false)
       text = presenter.precipitation
       expect(text).to include("chance of snow")
       expect(text).to include("expected")
@@ -339,69 +339,69 @@ RSpec.describe WeatherSummaryPresenter do
   # ---------------------------------------------------------------------------
   describe "#activities" do
     before do
-      allow(presenter).to receive(:is_daytime?).and_return(true)
-      allow(presenter).to receive(:is_race_day?).and_return(false)
-      allow(presenter).to receive(:is_indoor_season?).and_return(false)
-      allow(presenter).to receive(:is_workout_scheduled?).and_return(false)
-      allow(presenter).to receive(:is_good_weather?).and_return(true)
-      allow(presenter).to receive(:is_hot?).and_return(false)
+      allow(presenter).to receive(:daytime?).and_return(true)
+      allow(presenter).to receive(:race_day?).and_return(false)
+      allow(presenter).to receive(:indoor_season?).and_return(false)
+      allow(presenter).to receive(:workout_scheduled?).and_return(false)
+      allow(presenter).to receive(:good_weather?).and_return(true)
+      allow(presenter).to receive(:hot?).and_return(false)
     end
 
     it "says nothing at night" do
-      allow(presenter).to receive(:is_daytime?).and_return(false)
+      allow(presenter).to receive(:daytime?).and_return(false)
       expect(presenter.activities).to be_nil
     end
 
     it "calls the racing weather on race day" do
-      allow(presenter).to receive(:is_race_day?).and_return(true)
+      allow(presenter).to receive(:race_day?).and_return(true)
       expect(presenter.activities).to eq("Good weather for racing!")
 
-      allow(presenter).to receive(:is_good_weather?).and_return(false)
+      allow(presenter).to receive(:good_weather?).and_return(false)
       expect(presenter.activities).to eq("Tough weather for racing!")
     end
 
     it "suggests indoor training or rest during indoor season" do
-      allow(presenter).to receive(:is_indoor_season?).and_return(true)
+      allow(presenter).to receive(:indoor_season?).and_return(true)
 
-      allow(presenter).to receive(:is_workout_scheduled?).and_return(true)
+      allow(presenter).to receive(:workout_scheduled?).and_return(true)
       expect(presenter.activities).to eq("It's a good day to train indoors!")
 
-      allow(presenter).to receive(:is_workout_scheduled?).and_return(false)
+      allow(presenter).to receive(:workout_scheduled?).and_return(false)
       expect(presenter.activities).to eq("It's a good day to rest!")
     end
 
     it "tailors a scheduled workout to the weather" do
-      allow(presenter).to receive(:is_workout_scheduled?).and_return(true)
+      allow(presenter).to receive(:workout_scheduled?).and_return(true)
 
-      allow(presenter).to receive(:is_hot?).and_return(true)
+      allow(presenter).to receive(:hot?).and_return(true)
       expect(presenter.activities).to eq("It's a good day for some heat training!")
 
-      allow(presenter).to receive(:is_hot?).and_return(false)
+      allow(presenter).to receive(:hot?).and_return(false)
       expect(presenter.activities).to eq("It's a good day to train outside!")
 
-      allow(presenter).to receive(:is_good_weather?).and_return(false)
+      allow(presenter).to receive(:good_weather?).and_return(false)
       expect(presenter.activities).to eq("It's a good day to train indoors!")
     end
 
     it "falls back to outside / rest with no workout scheduled" do
       expect(presenter.activities).to eq("It's a good day to be outside!")
 
-      allow(presenter).to receive(:is_good_weather?).and_return(false)
+      allow(presenter).to receive(:good_weather?).and_return(false)
       expect(presenter.activities).to eq("It's a good day to rest!")
     end
   end
 
-  describe "#is_indoor_season?" do
+  describe "#indoor_season?" do
     it "is true only in Jackson Hole during the winter months" do
       allow(presenter).to receive(:in_jackson_hole?).and_return(true)
 
-      travel_to(Time.now.change(month: 12)) { expect(presenter.is_indoor_season?).to be(true) }
-      travel_to(Time.now.change(month: 7)) { expect(presenter.is_indoor_season?).to be(false) }
+      travel_to(Time.now.change(month: 12)) { expect(presenter.indoor_season?).to be(true) }
+      travel_to(Time.now.change(month: 7)) { expect(presenter.indoor_season?).to be(false) }
     end
 
     it "is false away from Jackson Hole even in winter" do
       allow(presenter).to receive(:in_jackson_hole?).and_return(false)
-      travel_to(Time.now.change(month: 12)) { expect(presenter.is_indoor_season?).to be(false) }
+      travel_to(Time.now.change(month: 12)) { expect(presenter.indoor_season?).to be(false) }
     end
   end
 
@@ -411,11 +411,11 @@ RSpec.describe WeatherSummaryPresenter do
   describe "#weather_summary" do
     before do
       build_weather
-      allow(presenter).to receive(:is_race_day?).and_return(true)
-      allow(presenter).to receive(:is_evening?).and_return(false)
-      allow(presenter).to receive(:is_daytime?).and_return(true)
-      allow(presenter).to receive(:is_good_weather?).and_return(true)
-      allow(presenter).to receive(:is_workout_scheduled?).and_return(false)
+      allow(presenter).to receive(:race_day?).and_return(true)
+      allow(presenter).to receive(:evening?).and_return(false)
+      allow(presenter).to receive(:daytime?).and_return(true)
+      allow(presenter).to receive(:good_weather?).and_return(true)
+      allow(presenter).to receive(:workout_scheduled?).and_return(false)
       allow(presenter).to receive(:todays_race).and_return(DeepOstruct.wrap(title: "Boston Marathon"))
       allow(presenter).to receive(:format_location).and_return("Boston, Massachusetts")
       allow(presenter).to receive(:format_elevation).and_return("43 m")
@@ -432,7 +432,7 @@ RSpec.describe WeatherSummaryPresenter do
     end
 
     it "omits the race-day note and racing clause off race day" do
-      allow(presenter).to receive(:is_race_day?).and_return(false)
+      allow(presenter).to receive(:race_day?).and_return(false)
       html = presenter.weather_summary
       expect(html).not_to include("race day")
       expect(html).not_to include("racing")

@@ -1,10 +1,7 @@
 .share {
-  grid-column: 1 / -1;
-  position: relative;
+  @extend %centered-column;
 
-  @include bp-medium {
-    grid-column: 3 / -3;
-  }
+  position: relative;
 }
 
 .share__heading {
@@ -38,7 +35,7 @@
 .share__button {
   align-items: center;
   background: var(--color-share-button-background);
-  border-radius: 25px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--color-share-button-border);
   color: var(--color-share-button-text);
   display: flex;
@@ -63,7 +60,7 @@
     color: var(--color-share-button-text-hover);
   }
 
-  .span,
+  span,
   svg {
     display: block;
     height: 1rem;
@@ -84,6 +81,8 @@
   }
 }
 
-.share__hidden {
+// Scoped under .share__button so it outranks the `span, svg { display: block }` sizing
+// above (the clipboard controller toggles this class on the link/check icon spans).
+.share__button .share__hidden {
   display: none;
 }

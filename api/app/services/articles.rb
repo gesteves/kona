@@ -1,6 +1,8 @@
 # Fetches articles from Contentful. `find` looks up one by entry ID (for the pageviews widget);
 # `list` pulls the whole published corpus (for the request-time trending ranking). Cached in Redis.
 class Articles < ApplicationService
+  include ContentfulConsumer
+
   FIND_QUERY = <<~GRAPHQL.freeze
     query($id: String!) {
       articles: articleCollection(where: { sys: { id: $id } }, limit: 1) {
@@ -45,15 +47,8 @@ class Articles < ApplicationService
 
   # @return [OpenStruct, nil]
   def find(id)
-    return if id.blank?
-
-    item = rescue_with(context: "Error fetching article #{id}") do
-      cached_json("contentful:article:#{id}", expires_in: 5.minutes) do
-        underscore_keys(query_articles(FIND_QUERY, { id: id })&.first)
-      end
-    end
-
-    item && DeepOstruct.wrap(item)
+    find_cached_item(id, query: FIND_QUERY, collection: :articles,
+                         cache_key: "contentful:article", context: "Error fetching article #{id}")
   end
 
   # One article's embedding inputs (title / intro / body / sys.published_version — the real article
@@ -111,9 +106,5 @@ class Articles < ApplicationService
   # configured or the request fails.
   def query_articles(query, variables)
     contentful.items(query, variables, collection: :articles)
-  end
-
-  def contentful
-    @contentful ||= ContentfulClient.new(self.class.name)
   end
 end

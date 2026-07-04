@@ -1,0 +1,8 @@
+<%# An entry's full prose: intro + body + affiliate-links disclosure (shared by the article and
+    page templates). `pagefind` (optional local) adds the data-pagefind-body attribute marking
+    the div as search-indexable. %>
+<div class="entry__body"<%= ' data-pagefind-body'.html_safe if defined?(pagefind) && pagefind %>>
+  <%= render_body(article.intro, image_variant: :full) %>
+  <%= render_body(article.body, image_variant: :full) %>
+  <%= partial 'partials/disclosure', locals: { entry: article } %>
+</div>

@@ -92,8 +92,9 @@ fragment. Consequences:
   placeholder**, collapsing the widget rather than leaving a stuck loading skeleton. So an
   empty body is the intentional "no data" signal — don't "fix" it by returning markup.
 
-On the web side, placeholders are built with the `live_update_section` helper; the API
-views build the matching outer element with `live_update_url`.
+On the web side, placeholders build the shared attribute cluster with the
+`live_update_attrs` helper (`web/lib/helpers/site_helpers.rb`); the API views build the
+matching outer element with `live_update_url`.
 
 | Widget | web placeholder | api view | endpoint |
 |---|---|---|---|

@@ -6,9 +6,9 @@ require "rails_helper"
 # fixed midday in the race timezone (America/Denver) to keep "today" deterministic regardless
 # of the machine's own timezone.
 #
-# `is_in_progress?` prefers the featured race's fetched weather (its sunrise..sunset window) and
-# otherwise falls back to `is_daytime?` — itself weather-derived (covered by the weather specs)
-# and ultimately the location-local clock — so `is_daytime?` is stubbed here to isolate the event
+# `in_progress?` prefers the featured race's fetched weather (its sunrise..sunset window) and
+# otherwise falls back to `daytime?` — itself weather-derived (covered by the weather specs)
+# and ultimately the location-local clock — so `daytime?` is stubbed here to isolate the event
 # logic, and a small `build_event_weather` stands in for the presenter's sun times. `icon_svg` is
 # stubbed to echo the family/style/id it was asked for, so we can assert which icon each helper picked.
 RSpec.describe EventsHelper, type: :helper do
@@ -19,7 +19,7 @@ RSpec.describe EventsHelper, type: :helper do
 
   before do
     helper.instance_variable_set(:@time_zone, "America/Denver")
-    allow(helper).to receive(:is_daytime?).and_return(true)
+    allow(helper).to receive(:daytime?).and_return(true)
     allow(helper).to receive(:icon_svg) { |family, style, id| %(<svg data-icon="#{family}-#{style}-#{id}"></svg>).html_safe }
   end
 
@@ -50,88 +50,88 @@ RSpec.describe EventsHelper, type: :helper do
     DeepOstruct.wrap(sunrise: sunrise&.utc&.iso8601, sunset: sunset&.utc&.iso8601)
   end
 
-  describe "#is_today?" do
+  describe "#today?" do
     it "is false for a blank event" do
-      expect(helper.is_today?(nil)).to be(false)
+      expect(helper.today?(nil)).to be(false)
     end
 
     it "is true for an event dated today in the race timezone" do
-      expect(helper.is_today?(build_event(days_from_today: 0))).to be(true)
+      expect(helper.today?(build_event(days_from_today: 0))).to be(true)
     end
 
     it "is false for a future or past event" do
-      expect(helper.is_today?(build_event(days_from_today: 1))).to be(false)
-      expect(helper.is_today?(build_event(days_from_today: -1))).to be(false)
+      expect(helper.today?(build_event(days_from_today: 1))).to be(false)
+      expect(helper.today?(build_event(days_from_today: -1))).to be(false)
     end
   end
 
-  describe "#is_in_progress?" do
+  describe "#in_progress?" do
     it "is false for a blank event" do
-      expect(helper.is_in_progress?(nil)).to be(false)
+      expect(helper.in_progress?(nil)).to be(false)
     end
 
     it "is true when the event is today, confirmed, and it's daytime" do
-      expect(helper.is_in_progress?(build_event(days_from_today: 0))).to be(true)
+      expect(helper.in_progress?(build_event(days_from_today: 0))).to be(true)
     end
 
     it "is false at night even when the event is today and confirmed" do
-      allow(helper).to receive(:is_daytime?).and_return(false)
-      expect(helper.is_in_progress?(build_event(days_from_today: 0))).to be(false)
+      allow(helper).to receive(:daytime?).and_return(false)
+      expect(helper.in_progress?(build_event(days_from_today: 0))).to be(false)
     end
 
     it "is false when the event is today but not confirmed (not going)" do
-      expect(helper.is_in_progress?(build_event(days_from_today: 0, going: false))).to be(false)
+      expect(helper.in_progress?(build_event(days_from_today: 0, going: false))).to be(false)
     end
 
     it "is false when the event isn't today" do
-      expect(helper.is_in_progress?(build_event(days_from_today: 1))).to be(false)
+      expect(helper.in_progress?(build_event(days_from_today: 1))).to be(false)
     end
 
     context "with the featured race's fetched weather" do
       it "uses the event's daylight window over the fallback clock — in progress within it" do
-        # is_daytime? (the fallback) is stubbed false, so a true result can only come from the
+        # daytime? (the fallback) is stubbed false, so a true result can only come from the
         # event's own sunrise..sunset window bracketing now.
-        allow(helper).to receive(:is_daytime?).and_return(false)
-        in_progress = helper.is_in_progress?(build_event(days_from_today: 0), build_event_weather)
+        allow(helper).to receive(:daytime?).and_return(false)
+        in_progress = helper.in_progress?(build_event(days_from_today: 0), build_event_weather)
         expect(in_progress).to be(true)
       end
 
       it "uses the event's daylight window over the fallback clock — not in progress outside it" do
         # Fallback clock says daytime, but the event's sun has already set, so it's not live.
         weather = build_event_weather(sunrise: 8.hours.ago, sunset: 1.hour.ago)
-        expect(helper.is_in_progress?(build_event(days_from_today: 0), weather)).to be(false)
+        expect(helper.in_progress?(build_event(days_from_today: 0), weather)).to be(false)
       end
 
       it "still requires the event to be confirmed (going)" do
-        expect(helper.is_in_progress?(build_event(days_from_today: 0, going: false), build_event_weather)).to be(false)
+        expect(helper.in_progress?(build_event(days_from_today: 0, going: false), build_event_weather)).to be(false)
       end
 
       it "falls back to today-and-daytime when the weather has no sun times" do
-        expect(helper.is_in_progress?(build_event(days_from_today: 0), build_event_weather(sunrise: nil))).to be(true)
+        expect(helper.in_progress?(build_event(days_from_today: 0), build_event_weather(sunrise: nil))).to be(true)
       end
     end
   end
 
-  describe "#todays_race / #is_race_day?" do
+  describe "#todays_race / #race_day?" do
     it "returns today's confirmed race and reports a race day" do
       race = build_event(days_from_today: 0)
       helper.instance_variable_set(:@events, [build_event(days_from_today: 5), race])
 
       expect(helper.todays_race).to eq(race)
-      expect(helper.is_race_day?).to be(true)
+      expect(helper.race_day?).to be(true)
     end
 
     it "ignores a today event that isn't confirmed" do
       helper.instance_variable_set(:@events, [build_event(days_from_today: 0, going: false)])
 
       expect(helper.todays_race).to be_nil
-      expect(helper.is_race_day?).to be(false)
+      expect(helper.race_day?).to be(false)
     end
 
     it "reports no race day when nothing is today" do
       helper.instance_variable_set(:@events, [build_event(days_from_today: 3)])
 
-      expect(helper.is_race_day?).to be(false)
+      expect(helper.race_day?).to be(false)
     end
   end
 
@@ -190,7 +190,7 @@ RSpec.describe EventsHelper, type: :helper do
     end
 
     it "is muted (not highlighted) for a tracking link on today's race at night" do
-      allow(helper).to receive(:is_daytime?).and_return(false)
+      allow(helper).to receive(:daytime?).and_return(false)
       tag = helper.event_live_tracking_tag(build_event(days_from_today: 0, tracking_url: "https://track.example.com"))
       expect(tag).to include('data-icon="classic-light-signal-stream"')
       expect(tag).not_to include("entry__highlight")
@@ -198,7 +198,7 @@ RSpec.describe EventsHelper, type: :helper do
 
     it "highlights based on the featured race's fetched weather window, not the fallback clock" do
       # Fallback clock would say night, but the event's sun is currently up → live and pulsing.
-      allow(helper).to receive(:is_daytime?).and_return(false)
+      allow(helper).to receive(:daytime?).and_return(false)
       event = build_event(days_from_today: 0, tracking_url: "https://track.example.com")
       tag = helper.event_live_tracking_tag(event, build_event_weather)
       expect(tag).to include("entry__highlight entry__highlight--live")
@@ -206,19 +206,19 @@ RSpec.describe EventsHelper, type: :helper do
     end
   end
 
-  describe "#is_close?" do
+  describe "#close?" do
     it "is false for a blank event" do
-      expect(helper.is_close?(nil)).to be(false)
+      expect(helper.close?(nil)).to be(false)
     end
 
     it "is true for an event today or within the next 10 days" do
-      expect(helper.is_close?(build_event(days_from_today: 0))).to be(true)
-      expect(helper.is_close?(build_event(days_from_today: 10))).to be(true)
+      expect(helper.close?(build_event(days_from_today: 0))).to be(true)
+      expect(helper.close?(build_event(days_from_today: 10))).to be(true)
     end
 
     it "is false for an event more than 10 days out or in the past" do
-      expect(helper.is_close?(build_event(days_from_today: 11))).to be(false)
-      expect(helper.is_close?(build_event(days_from_today: -1))).to be(false)
+      expect(helper.close?(build_event(days_from_today: 11))).to be(false)
+      expect(helper.close?(build_event(days_from_today: -1))).to be(false)
     end
   end
 
@@ -253,24 +253,24 @@ RSpec.describe EventsHelper, type: :helper do
     end
   end
 
-  describe "#is_next? / #is_featured?" do
+  describe "#next? / #featured?" do
     it "marks the soonest upcoming race as next" do
       first = build_event(days_from_today: 0)
       second = build_event(days_from_today: 5)
       helper.instance_variable_set(:@events, [second, first])
 
-      expect(helper.is_next?(first)).to be(true)
-      expect(helper.is_next?(second)).to be(false)
+      expect(helper.next?(first)).to be(true)
+      expect(helper.next?(second)).to be(false)
     end
 
     it "features the next race only when it's close" do
       near = build_event(days_from_today: 0)
       helper.instance_variable_set(:@events, [near])
-      expect(helper.is_featured?(near)).to be(true)
+      expect(helper.featured?(near)).to be(true)
 
       far = build_event(days_from_today: 20)
       helper.instance_variable_set(:@events, [far])
-      expect(helper.is_featured?(far)).to be(false)
+      expect(helper.featured?(far)).to be(false)
     end
   end
 

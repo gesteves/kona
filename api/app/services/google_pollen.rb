@@ -11,16 +11,14 @@ class GooglePollen < ApplicationService
 
   # @return [OpenStruct, nil]
   def data
-    return @data if defined?(@data)
-    pollen = underscore_keys(get_pollen_forecast)
-    @data = pollen && DeepOstruct.wrap(pollen)
+    fetch_wrapped { underscore_keys(get_pollen_forecast) }
   end
 
   private
 
   # @see https://developers.google.com/maps/documentation/pollen/reference/rest/v1/forecast/lookup
   def get_pollen_forecast
-    return if @latitude.blank? || @longitude.blank?
+    return unless coordinates?
 
     cached_json("google:pollen:#{@latitude}:#{@longitude}:#{@days}", expires_in: 1.hour) do
       query = {

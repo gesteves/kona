@@ -53,7 +53,7 @@ bundle exec rake build:verbose
 
 Only these exist: `rake import` (runs all in parallel), `import:content` (Contentful),
 `import:icons` (Font Awesome), `import:standard_site` (fetches the standard.site DID +
-publication URI from the `api/` `/api/standard-site` endpoint). Also `rake redis:empty`
+publication URI from the `api/` `/api/standard-site` endpoint). Also `rake redis:clear`
 to flush the cache.
 
 ## Key locations
@@ -105,5 +105,5 @@ Names only — see `.env.example`; never commit values.
 ### Permissions
 
 - Autonomous: read files, single-file `rspec`, lint/format, local `middleman`.
-- Ask first: `git push`/commit, `rake redis:empty`, package installs, anything that
+- Ask first: `git push`/commit, `rake redis:clear`, package installs, anything that
   triggers a deploy or build hook.

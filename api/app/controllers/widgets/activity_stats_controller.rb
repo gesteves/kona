@@ -3,12 +3,7 @@ module Widgets
   # Stimulus controller.
   class ActivityStatsController < BaseController
     def show
-      cache_widget(ttl: 5.minutes)
-
-      @stats = Intervals.new.stats
-      return render_empty if @stats.nil?
-
-      render :show
+      render_widget(:show, ttl: 5.minutes) { @stats = Intervals.new.stats }
     end
   end
 end

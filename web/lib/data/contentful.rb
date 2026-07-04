@@ -91,29 +91,30 @@ class Contentful
 
   # Processes articles from the fetched content.
   def process_articles
-    @content[:articles].map! do |item|
-      set_entry_type(item)
-      set_draft_status(item)
-      set_timestamps(item)
-      set_article_path(item)
-      set_template(item)
-    end
-
-    # sort_by! parses each date once (vs. twice per comparison with sort!).
-    @content[:articles].sort_by! { |item| DateTime.parse(item[:published_at]) }.reverse!
+    process_collection(:articles, :set_article_path)
   end
 
   # Processes pages from the fetched content.
   def process_pages
-    @content[:pages].map! do |item|
-      set_entry_type(item, 'Page')
+    process_collection(:pages, :set_page_path, entry_type: 'Page')
+  end
+
+  # The shared shape of the article/page collections: derive the entry fields, set the
+  # path via the given setter, and sort newest-first.
+  # @param key [Symbol] The @content collection to process.
+  # @param path_setter [Symbol] The method that sets each item's :path.
+  # @param entry_type [String, nil] A fixed entry type, or nil to derive it per item.
+  def process_collection(key, path_setter, entry_type: nil)
+    @content[key].map! do |item|
+      set_entry_type(item, entry_type)
       set_draft_status(item)
       set_timestamps(item)
-      set_page_path(item)
+      send(path_setter, item)
       set_template(item)
     end
 
-    @content[:pages].sort_by! { |item| DateTime.parse(item[:published_at]) }.reverse!
+    # sort_by! parses each date once (vs. twice per comparison with sort!).
+    @content[key].sort_by! { |item| DateTime.parse(item[:published_at]) }.reverse!
   end
 
   # Processes assets from the fetched content.
@@ -158,12 +159,19 @@ class Contentful
     item
   end
 
+  # The stable id-based preview path drafts live at, regardless of collection.
+  # @param item [Hash] The draft item.
+  # @return [String] The draft's path.
+  def draft_path(item)
+    "/id/#{item.dig(:sys, :id)}/index.html"
+  end
+
   # Sets the path for an article based on its draft status and publication date.
   # @param item [Hash] The article to be processed.
   # @return [Hash] The article with the path set.
   def set_article_path(item)
     item[:path] = if item[:draft]
-      "/id/#{item.dig(:sys, :id)}/index.html"
+      draft_path(item)
     else
       published = DateTime.parse(item[:published_at])
       "/#{published.strftime('%Y')}/#{published.strftime('%m')}/#{published.strftime('%d')}/#{item[:slug]}/index.html"
@@ -176,7 +184,7 @@ class Contentful
   # @return [Hash] The page with the path set.
   def set_page_path(item)
     item[:path] = if item[:draft]
-      "/id/#{item.dig(:sys, :id)}/index.html"
+      draft_path(item)
     elsif item[:is_home_page]
       "/index.html"
     else
@@ -205,10 +213,10 @@ class Contentful
   # Each tag includes a paginated collection of articles with that tag, and other metadata.
   # @return [Array<Hash>] A collection of tag pages.
   def generate_tags
-    tags = @content[:articles].reject { |a| a[:draft] }.map { |a| a.dig(:contentful_metadata, :tags) }.flatten.uniq
+    tags = published_articles.map { |a| a.dig(:contentful_metadata, :tags) }.flatten.uniq
     paginated_tags = tags.map do |tag|
       tag = tag.dup
-      tagged_articles = @content[:articles].select { |a| !a[:draft] && a.dig(:contentful_metadata, :tags).include?(tag) }
+      tagged_articles = published_articles.select { |a| a.dig(:contentful_metadata, :tags).include?(tag) }
       summary = "Browse #{tagged_articles.size.humanize} #{'entry'.pluralize(tagged_articles.size)} tagged “#{tag[:name]}.”"
       pages = paginate(tagged_articles, base_path: "/tagged/#{tag[:id]}", template: "/tag.html", title: tag[:name], summary: summary)
       { tag: tag, pages: pages }
@@ -220,7 +228,13 @@ class Contentful
   # Each page includes articles for that page, and other metadata.
   # @return [Array<Hash>] A collection of blog pages.
   def generate_blog
-    @content[:blog] = paginate(@content[:articles].reject { |a| a[:draft] }, base_path: "/blog", template: "/articles.html", title: "Blog")
+    @content[:blog] = paginate(published_articles, base_path: "/blog", template: "/articles.html", title: "Blog")
+  end
+
+  # The non-draft articles, in the collection's newest-first order.
+  # @return [Array<Hash>]
+  def published_articles
+    @content[:articles].reject { |a| a[:draft] }
   end
 
   # Slices a list of articles into pages carrying the pagination metadata the blog/tag

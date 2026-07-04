@@ -8,13 +8,7 @@ module Widgets
   # proxy (web/netlify/functions/widget-proxy.mts) — they are not meant to be hit directly.
   # This keeps the widget origin closed to the public so scanners/abusers get a cheap 401
   # before any controller or upstream-API work.
-  class BaseController < ActionController::Base
-    include LiveWidget
-    include TokenAuthentication
+  class BaseController < TokenGatedController
     include UpstreamIsolation
-
-    layout false
-
-    before_action :authenticate_bearer_token!
   end
 end

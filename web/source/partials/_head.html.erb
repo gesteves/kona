@@ -2,13 +2,13 @@
   <%= partial 'partials/meta' %>
   <%= yield_content :preloads %>
   <%= partial 'partials/open_graph_and_social' %>
-  <%= partial 'partials/schema/article', locals: { article: content } if defined?(content) && %w[Article Short].include?(content.entry_type) && !content.draft %>
+  <%= partial 'partials/schema/article', locals: { article: content } if defined?(content) && published_post?(content) %>
   <%= partial 'partials/schema/site' %>
-  <%= partial 'partials/schema/breadcrumb' if defined?(content) && %w[Article Short].include?(content.entry_type) && !content.draft %>
+  <%= partial 'partials/schema/breadcrumb' if defined?(content) && published_post?(content) %>
   <%= partial 'partials/schema/profile' if defined?(content) && content.entry_type == 'Page' && content.slug == 'about' %>
   <% if data.respond_to?(:standard_site) && data.standard_site&.publication_uri.present? %>
     <link rel="site.standard.publication" href="<%= data.standard_site.publication_uri %>">
-    <% if defined?(content) && %w[Article Short].include?(content.entry_type) && !content.draft && data.standard_site.did.present? %>
+    <% if defined?(content) && published_post?(content) && data.standard_site.did.present? %>
       <link rel="site.standard.document" href="at://<%= data.standard_site.did %>/site.standard.document/<%= document_rkey(content.sys.id) %>">
     <% end %>
   <% end %>

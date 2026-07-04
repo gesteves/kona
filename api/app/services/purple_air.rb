@@ -17,7 +17,8 @@ class PurpleAir < ApplicationService
   private
 
   def get_aqi
-    return if @latitude.blank? || @longitude.blank? || ENV["PURPLEAIR_API_KEY"].blank?
+    return unless coordinates?
+    return if ENV["PURPLEAIR_API_KEY"].blank?
 
     sensor = nearest_sensor_within_distance
     return if sensor.blank?

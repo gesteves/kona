@@ -25,22 +25,17 @@ ignore "/javascripts/stimulus/*"
 ignore "/page.html"
 ignore "/short.html"
 
-@app.data.articles.each do |article|
-  proxy article.path, article.template, locals: { content: article }, ignore: true
-end
-
-@app.data.pages.each do |page|
-  proxy page.path, page.template, locals: { content: page }, ignore: true
-end
-
-@app.data.tags.each do |tag|
-  tag.pages.each do |page|
-    proxy page.path, page.template, locals: { content: page }, ignore: true
+# Every generated page — articles, pages, the paginated blog, and the per-tag pages —
+# proxies its template with itself as the `content` local.
+[
+  @app.data.articles,
+  @app.data.pages,
+  @app.data.blog,
+  @app.data.tags.flat_map(&:pages)
+].each do |collection|
+  collection.each do |content|
+    proxy content.path, content.template, locals: { content: content }, ignore: true
   end
-end
-
-@app.data.blog.each do |page|
-  proxy page.path, page.template, locals: { content: page }, ignore: true
 end
 
 # Render the standard.site publication verification endpoint as a bare, plain-text

@@ -64,4 +64,19 @@ module LiveWidget
     response.headers["Netlify-CDN-Cache-Control"] = "public, max-age=#{EMPTY_TTL.to_i}"
     render plain: ""
   end
+
+  # Runs the standard widget-action shape in one call: set the cache policy, fetch the data
+  # (the block), and render the view — or the empty "no data" body when the block's result is
+  # blank. Actions with several ivars and bail points (weather, events, plausible) keep the
+  # explicit cache_widget/render_empty calls instead.
+  # @param view [Symbol] The view to render on success.
+  # @param ttl [ActiveSupport::Duration] How long the fragment stays fresh at the edge.
+  # @param cache_opts [Hash] Passed through to cache_widget.
+  # @yieldreturn [Object] The widget's data; a blank result collapses the widget.
+  def render_widget(view, ttl:, **cache_opts)
+    cache_widget(ttl: ttl, **cache_opts)
+    return render_empty if yield.blank?
+
+    render view
+  end
 end

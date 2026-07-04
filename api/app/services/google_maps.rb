@@ -61,7 +61,7 @@ class GoogleMaps < ApplicationService
   # @see https://developers.google.com/maps/documentation/geocoding/requests-reverse-geocoding
   # @return [Hash, nil] The geocoding data, or nil if fetching fails.
   def reverse_geocode
-    return if @latitude.blank? || @longitude.blank?
+    return unless coordinates?
 
     cached_json("google:maps:geocoded:#{@latitude}:#{@longitude}", expires_in: 1.day) do
       query = {
@@ -78,7 +78,7 @@ class GoogleMaps < ApplicationService
   # @see https://developers.google.com/maps/documentation/elevation/requests-elevation
   # @return [Hash, nil] The elevation data, or nil if fetching fails.
   def get_elevation
-    return if @latitude.blank? || @longitude.blank?
+    return unless coordinates?
 
     cached_json("google:maps:elevation:#{@latitude}:#{@longitude}", expires_in: 1.day) do
       query = {
@@ -93,7 +93,7 @@ class GoogleMaps < ApplicationService
   # @see https://developers.google.com/maps/documentation/timezone/requests-timezone
   # @return [Hash, nil] The timezone data, or nil if fetching fails.
   def get_time_zone
-    return if @latitude.blank? || @longitude.blank?
+    return unless coordinates?
 
     cached_json("google:maps:time_zone:#{@latitude}:#{@longitude}", expires_in: 1.day) do
       query = {

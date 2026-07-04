@@ -1,5 +1,6 @@
 import { Controller } from '@hotwired/stimulus';
 import { trackEvent, trackEventThen } from '../lib/analytics';
+import { canonicalUrl } from '../lib/utils';
 
 /**
  * Controller for managing social sharing functionality.
@@ -31,11 +32,7 @@ export default class extends Controller {
    * @returns {string} The URL to share.
    */
   getShareUrl() {
-    return (
-      this.urlValue ||
-      document.querySelector('link[rel="canonical"]')?.href ||
-      window.location.href
-    );
+    return this.urlValue || canonicalUrl();
   }
 
   /**

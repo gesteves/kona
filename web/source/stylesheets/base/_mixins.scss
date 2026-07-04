@@ -43,3 +43,34 @@
     @content;
   }
 }
+
+// Feature-query forks for text-box trimming, so the verbose (and easy-to-mistype)
+// condition is written once. Use `text-box-trim-supported` for the trimmed styles and
+// `text-box-trim-fallback` for the margin/padding compensation in browsers without it.
+@mixin text-box-trim-supported {
+  @supports (text-box-edge: cap) and (text-box-trim: trim-both) {
+    @content;
+  }
+}
+
+@mixin text-box-trim-fallback {
+  @supports not ((text-box-edge: cap) or (text-box-trim: trim-both)) {
+    @content;
+  }
+}
+
+// The inline "light icon" treatment shared by the metadata rows (entry meta, stats,
+// event weather, buttons): an SVG sized to --light-icon-size and aligned to the text.
+@mixin light-icon($fill: var(--color-text-tertiary)) {
+  svg {
+    display: inline-block;
+    height: var(--light-icon-size);
+    vertical-align: text-bottom;
+    width: var(--light-icon-size);
+
+    g,
+    path {
+      fill: $fill;
+    }
+  }
+}

@@ -42,7 +42,8 @@ class GoogleAirQuality < ApplicationService
 
   # @see https://developers.google.com/maps/documentation/air-quality/reference/rest/v1/currentConditions/lookup
   def get_current_conditions
-    return if @latitude.blank? || @longitude.blank? || @country_code.blank?
+    return unless coordinates?
+    return if @country_code.blank?
 
     cached_json("google:aqi:#{@latitude}:#{@longitude}:#{@country_code}:#{@aqi_code}", expires_in: 5.minutes) do
       body = {
@@ -57,7 +58,8 @@ class GoogleAirQuality < ApplicationService
 
   # @see https://developers.google.com/maps/documentation/air-quality/reference/rest/v1/forecast/lookup
   def get_forecast
-    return if @latitude.blank? || @longitude.blank? || @country_code.blank? || @datetime.blank?
+    return unless coordinates?
+    return if @country_code.blank? || @datetime.blank?
     return if @datetime > Time.current + FORECAST_MAX_HORIZON
 
     cache_key = "google:aqi:forecast:#{@latitude}:#{@longitude}:#{@country_code}:#{@aqi_code}:#{@datetime.iso8601}"

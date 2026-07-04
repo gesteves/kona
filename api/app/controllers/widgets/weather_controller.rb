@@ -6,7 +6,7 @@ module Widgets
   # featured upcoming race.)
   class WeatherController < BaseController
     include WeatherHelper
-    include TimeHelper # weather_data_is_current? → rest_of_day_forecast → is_evening? → current_time
+    include TimeHelper # weather_data_is_current? → rest_of_day_forecast → evening? → current_time
 
     # Renders the current-weather widget markup embedded into the static site. Resolves the
     # owner's current location, fetches weather + air quality + pollen + bay + race data, and

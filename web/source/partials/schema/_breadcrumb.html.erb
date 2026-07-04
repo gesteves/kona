@@ -1,4 +1,4 @@
-<% if defined?(content) && %w[Article Short].include?(content.entry_type) && !content.draft %>
+<% if defined?(content) && published_post?(content) %>
 <script type="application/ld+json"><%= breadcrumb_schema(content) %></script>
 <% end %>
 

@@ -35,7 +35,7 @@ module WeatherHelper
 
   def rest_of_day_forecast(weather = @weather)
     forecast = todays_forecast(weather)
-    is_evening? ? forecast&.overnight_forecast : forecast&.rest_of_day_forecast
+    evening? ? forecast&.overnight_forecast : forecast&.rest_of_day_forecast
   end
 
   def tomorrows_forecast(weather = @weather)
@@ -61,7 +61,7 @@ module WeatherHelper
     Time.parse(forecast.sunset).in_time_zone(location_time_zone(location))
   end
 
-  def is_daytime?(weather = @weather, location = @location)
+  def daytime?(weather = @weather, location = @location)
     now = current_time
     if weather.present?
       sunrise_time = sunrise(weather, location)
@@ -73,7 +73,7 @@ module WeatherHelper
     end
   end
 
-  def is_evening?(weather = @weather, location = @location)
+  def evening?(weather = @weather, location = @location)
     now = current_time
     if weather.present?
       sunset_time = sunset(weather, location)
@@ -85,7 +85,7 @@ module WeatherHelper
   end
 
   def today_or_tonight(weather = @weather, location = @location)
-    is_evening?(weather, location) ? "Tonight" : "Today"
+    evening?(weather, location) ? "Tonight" : "Today"
   end
 
   def format_current_condition(condition_code)
@@ -217,7 +217,7 @@ module WeatherHelper
     return "cloud-question" if condition.blank?
     return condition[:icon] if condition[:icon].is_a?(String)
     if variant == :auto
-      is_daytime?(weather, location) ? condition[:icon][:day] : condition[:icon][:night]
+      daytime?(weather, location) ? condition[:icon][:day] : condition[:icon][:night]
     elsif variant == :day
       condition[:icon][:day]
     elsif variant == :night

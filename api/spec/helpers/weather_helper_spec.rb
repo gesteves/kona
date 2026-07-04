@@ -222,10 +222,10 @@ RSpec.describe WeatherHelper, type: :helper do
     it "returns the daytime forecast during the day and the overnight one in the evening" do
       build_weather(rest_of_day: { condition_code: "Rain" }, overnight: { condition_code: "Cloudy" })
 
-      allow(helper).to receive(:is_evening?).and_return(false)
+      allow(helper).to receive(:evening?).and_return(false)
       expect(helper.rest_of_day_forecast.condition_code).to eq("Rain")
 
-      allow(helper).to receive(:is_evening?).and_return(true)
+      allow(helper).to receive(:evening?).and_return(true)
       expect(helper.rest_of_day_forecast.condition_code).to eq("Cloudy")
     end
 
@@ -238,31 +238,31 @@ RSpec.describe WeatherHelper, type: :helper do
   # ---------------------------------------------------------------------------
   # Time of day
   # ---------------------------------------------------------------------------
-  describe "#is_daytime? / #is_evening?" do
+  describe "#daytime? / #evening?" do
     it "is daytime between sunrise and sunset" do
       build_weather # sunrise 5h ago, sunset in 5h
-      expect(helper.is_daytime?).to be(true)
-      expect(helper.is_evening?).to be(false)
+      expect(helper.daytime?).to be(true)
+      expect(helper.evening?).to be(false)
     end
 
     it "is evening (and not daytime) once the sun has set" do
       build_weather(sunset: Time.current - 1.hour)
-      expect(helper.is_daytime?).to be(false)
-      expect(helper.is_evening?).to be(true)
+      expect(helper.daytime?).to be(false)
+      expect(helper.evening?).to be(true)
     end
 
     it "falls back to clock hours in the location's timezone when there's no weather" do
       # @time_zone is America/Denver (UTC-6 in June), so the fallback reads the Denver-local
       # hour, not the machine's. 18:00 UTC == 12:00 MDT (daytime).
       travel_to(Time.utc(2026, 6, 3, 18, 0, 0)) do
-        expect(helper.is_daytime?).to be(true)
-        expect(helper.is_evening?).to be(false)
+        expect(helper.daytime?).to be(true)
+        expect(helper.evening?).to be(false)
       end
 
       # 04:00 UTC == 22:00 MDT the previous evening.
       travel_to(Time.utc(2026, 6, 4, 4, 0, 0)) do
-        expect(helper.is_daytime?).to be(false)
-        expect(helper.is_evening?).to be(true)
+        expect(helper.daytime?).to be(false)
+        expect(helper.evening?).to be(true)
       end
     end
 
@@ -299,9 +299,9 @@ RSpec.describe WeatherHelper, type: :helper do
     end
 
     it "auto-selects by daytime" do
-      allow(helper).to receive(:is_daytime?).and_return(true)
+      allow(helper).to receive(:daytime?).and_return(true)
       expect(helper.weather_icon("Clear", :auto)).to eq("sun")
-      allow(helper).to receive(:is_daytime?).and_return(false)
+      allow(helper).to receive(:daytime?).and_return(false)
       expect(helper.weather_icon("Clear", :auto)).to eq("moon-stars")
     end
 

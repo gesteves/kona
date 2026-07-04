@@ -2,8 +2,8 @@
 <%# it's display:contents, so the section lays out directly in the page grid. The API swaps %>
 <%# the whole wrapper in on connect — a single "Upcoming Races" section, or a "Today's Race" %>
 <%# + "Upcoming Races" pair on race day — and removes it on an empty response (no upcoming %>
-<%# races). See api/app/views/widgets/events/. %>
-<div class="collection-group" data-nosnippet data-controller="live-update" data-live-update-url-value="/widgets/events/upcoming" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange">
+<%# races). See api/app/views/widgets/events/. `url` (required local) is the API endpoint. %>
+<div class="collection-group" data-nosnippet <%= live_update_attrs(url) %>>
   <section class="collection collection--thirds" id="upcoming-races">
     <h2 class="collection__heading">Upcoming Races</h2>
     <ol class="collection__list">

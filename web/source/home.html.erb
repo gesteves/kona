@@ -7,21 +7,25 @@
       <%= render_home_body(content.body) %>
     </div>
   </section>
-  <% preload_widget "/widgets/activity-stats" %>
-  <%= partial 'partials/placeholders/stats' %>
+  <% stats_url = "/widgets/activity-stats" %>
+  <% preload_widget stats_url %>
+  <%= partial 'partials/placeholders/stats', locals: { url: stats_url } %>
   <% recent = recent_articles %>
   <% if recent.present? %>
     <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent, variant: "halves" } %>
   <% end %>
-  <% preload_widget "/widgets/whoop" %>
-  <%= partial 'partials/placeholders/whoop' %>
+  <% whoop_url = "/widgets/whoop" %>
+  <% preload_widget whoop_url %>
+  <%= partial 'partials/placeholders/whoop', locals: { url: whoop_url } %>
   <% trending_url = "/widgets/articles/trending" %>
   <% preload_widget trending_url %>
   <%= partial 'partials/placeholders/trending', locals: { url: trending_url } %>
-  <% preload_widget "/widgets/weather/current" %>
-  <%= partial 'partials/placeholders/weather' %>
+  <% weather_url = "/widgets/weather/current" %>
+  <% preload_widget weather_url %>
+  <%= partial 'partials/placeholders/weather', locals: { url: weather_url } %>
   <% if data.events.present? %>
-    <% preload_widget "/widgets/events/upcoming" %>
-    <%= partial 'partials/upcoming_races' %>
+    <% races_url = "/widgets/events/upcoming" %>
+    <% preload_widget races_url %>
+    <%= partial 'partials/upcoming_races', locals: { url: races_url } %>
   <% end %>
 </div>

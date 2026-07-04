@@ -20,6 +20,8 @@ require "digest"
 # Everything no-ops when the Bluesky credentials are absent, so a misconfigured or
 # credential-free environment simply doesn't publish.
 class StandardSite < ApplicationService
+  include ContentfulConsumer
+
   # AT Protocol "sortable base32" alphabet, used to encode TIDs. Both standard.site
   # lexicons require every record key to be a TID — a 13-character base32-sortable
   # identifier — so neither the publication's "self" nor a Contentful sys.id can be used
@@ -434,10 +436,6 @@ class StandardSite < ApplicationService
     contentful.query(query, variables)
   end
 
-  def contentful
-    @contentful ||= ContentfulClient.new(self.class.name)
-  end
-
   # Maps a raw (symbolized) GraphQL article item to the string-keyed shape the record
   # builders expect. The shared derivation (ArticleAttributes) keeps draft/entry_type/path
   # consistent with Articles#decorate and the web build.
@@ -688,6 +686,10 @@ class StandardSite < ApplicationService
 
   # Renders Markdown to plain text (no markup, decoded entities, collapsed whitespace).
   # Returns nil if blank.
+  #
+  # Deliberately NOT MarkdownHelper#markdown_to_plain_text: this variant skips SmartyPants
+  # and collapses whitespace, and its output feeds the sync's content fingerprints — changing
+  # it would re-sync every record.
   # @param text [String, nil]
   # @return [String, nil]
   def plain_text(text)
@@ -699,10 +701,7 @@ class StandardSite < ApplicationService
 
   # @return [Redcarpet::Markdown] A reusable Markdown renderer.
   def markdown
-    @markdown ||= Redcarpet::Markdown.new(
-      Redcarpet::Render::HTML.new,
-      fenced_code_blocks: true, disable_indented_code_blocks: true, tables: true, autolink: true, superscript: true
-    )
+    @markdown ||= Redcarpet::Markdown.new(Redcarpet::Render::HTML.new, **MarkdownHelper::EXTENSIONS)
   end
 
   # Parses a timestamp into a UTC RFC3339 string with millisecond precision.

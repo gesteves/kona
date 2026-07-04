@@ -9,10 +9,9 @@ module FontAwesomeClient
 
   FONT_AWESOME_API_URL = "https://api.fontawesome.com"
 
-  RedisConnection.connection
-
   def self.get_access_token(api_token)
-    access_token = $redis.get("font_awesome:access_token")
+    redis = RedisConnection.connection
+    access_token = redis.get("font_awesome:access_token")
     return access_token if access_token.present?
 
     headers = {
@@ -26,7 +25,7 @@ module FontAwesomeClient
     data = JSON.parse(response.body, symbolize_names: true)
     access_token = data[:access_token]
     expires_in = data[:expires_in]
-    $redis.setex("font_awesome:access_token", expires_in, access_token)
+    redis.setex("font_awesome:access_token", expires_in, access_token)
     access_token
   rescue StandardError => e
     puts "Error fetching the access token: #{e}"

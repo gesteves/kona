@@ -107,6 +107,11 @@
   --lato:                    'Lato', inter, roboto, 'Helvetica Neue', 'Arial Nova', 'Nimbus Sans', arial, sans-serif;
   --ibm-plex-sans-condensed: 'IBM Plex Sans Condensed', 'DIN Alternate', bahnschrift, 'Franklin Gothic Medium', 'Nimbus Sans Narrow', sans-serif-condensed, sans-serif;
 
+  // Radii
+  --radius-small:  2px;
+  --radius-medium: 4px;
+  --radius-pill:   25px;
+
   // Other
   --transition-duration: 250ms;
   --picture-outdent:     var(--content-padding);

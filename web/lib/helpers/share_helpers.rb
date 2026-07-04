@@ -1,74 +1,48 @@
 require 'erb'
 
 module ShareHelpers
-  # Generates a mailto URL for sharing an article via email.
+  # Each share network's endpoint and query params, in the order they appear in the URL.
+  # A Symbol param value carries that part of the share (:title or :url); a String value is
+  # a format template combining both, encoded as one blob. The article URL always carries
+  # the network's name as its ?ref= attribution param.
+  SHARE_NETWORKS = {
+    'Email'    => { base: 'mailto:?',                                    params: { subject: :title, body: :url } },
+    'SMS'      => { base: 'sms:?&',                                      params: { body: '%{title} %{url}' } },
+    'Facebook' => { base: 'https://www.facebook.com/sharer/sharer.php?', params: { u: :url } },
+    'Reddit'   => { base: 'https://reddit.com/submit?',                  params: { title: :title, url: :url } },
+    'Bluesky'  => { base: 'https://bsky.app/intent/compose?',            params: { text: "%{title}\n\n%{url}" } },
+    'Threads'  => { base: 'https://www.threads.com/intent/post?',        params: { text: :title, url: :url } },
+    'Mastodon' => { base: 'https://share.joinmastodon.org/?',            params: { text: "%{title}\n\n%{url}" } }
+  }.freeze
+
+  # Generates the URL for sharing an article on a network.
+  # @param network [String] A SHARE_NETWORKS key.
   # @param article [Article] The article to be shared.
-  # @return [String] The mailto URL.
-  def mail_share_url(article)
-    subject = ERB::Util.url_encode(sanitize(article.title))
-    body = ERB::Util.url_encode(full_url(article.path, ref: 'Email'))
-    "mailto:?subject=#{subject}&body=#{body}"
+  # @return [String] The share URL.
+  def share_url(network, article)
+    config = SHARE_NETWORKS.fetch(network)
+    parts = { title: sanitize(article.title), url: full_url(article.path, ref: network) }
+    query = config[:params].map do |param, value|
+      part = value.is_a?(Symbol) ? parts.fetch(value) : format(value, parts)
+      "#{param}=#{ERB::Util.url_encode(part)}"
+    end
+    "#{config[:base]}#{query.join('&')}"
   end
 
-  # Generates an SMS URL for sharing an article via text message or iMessage.
-  # @param article [Article] The article to be shared.
-  # @return [String] The SMS URL.
-  def sms_share_url(article)
-    title = sanitize(article.title)
-    url = full_url(article.path, ref: 'SMS')
-    text = "#{title} #{url}"
-    body = ERB::Util.url_encode(text)
-    "sms:?&body=#{body}"
-  end
-
-  # Generates a URL for sharing an article on Facebook.
-  # @param article [Article] The article to be shared.
-  # @return [String] The Facebook share URL.
-  def facebook_share_url(article)
-    url = ERB::Util.url_encode(full_url(article.path, ref: 'Facebook'))
-    "https://www.facebook.com/sharer/sharer.php?u=#{url}"
-  end
-
-  # Generates a URL for sharing an article on Reddit.
-  # @param article [Article] The article to be shared.
-  # @return [String] The Reddit share URL.
-  def reddit_share_url(article)
-    title = ERB::Util.url_encode(sanitize(article.title))
-    url = ERB::Util.url_encode(full_url(article.path, ref: 'Reddit'))
-    "https://reddit.com/submit?title=#{title}&url=#{url}"
-  end
-
-  # Generates a URL for sharing an article on Bluesky.
-  # @param article [Article] The article to be shared.
-  # @return [String] The Bluesky share URL.
-  def bluesky_share_url(article)
-    title = sanitize(article.title)
-    url = full_url(article.path, ref: 'Bluesky')
-    text = "#{title}\n\n#{url}"
-    encoded_text = ERB::Util.url_encode(text)
-    "https://bsky.app/intent/compose?text=#{encoded_text}"
-  end
-
-  # Generates a URL for sharing an article on Threads.
-  # @param article [Article] The article to be shared.
-  # @return [String] The Threads share URL.
-  def threads_share_url(article)
-    title = sanitize(article.title)
-    url = full_url(article.path, ref: 'Threads')
-    encoded_text = ERB::Util.url_encode(title)
-    encoded_url = ERB::Util.url_encode(url)
-    "https://www.threads.com/intent/post?text=#{encoded_text}&url=#{encoded_url}"
-  end
-
-  # Generates a URL for sharing an article on Mastodon.
-  # @param article [Article] The article to be shared.
-  # @return [String] The Mastodon share URL.
-  def mastodon_share_url(article)
-    title = sanitize(article.title)
-    url = full_url(article.path, ref: 'Mastodon')
-    text = "#{title}\n\n#{url}"
-    encoded_text = ERB::Util.url_encode(text)
-    "https://share.joinmastodon.org/?text=#{encoded_text}"
+  # The share buttons rendered by partials/_share.html.erb, in display order. Defaults the
+  # loop fills in: `via` falls back to the network name, `action` to "trackShare", and
+  # `new_tab` to true.
+  # @return [Array<Hash>]
+  def share_buttons
+    [
+      { label: 'Share by email',        network: 'Email',   icon: %w[solid envelope], new_tab: false },
+      { label: 'Share by text message', network: 'SMS',     via: 'Text', icon: %w[solid comment], new_tab: false },
+      { label: 'Share on Bluesky',      network: 'Bluesky', icon: %w[brands bluesky] },
+      { label: 'Share on Facebook',     network: 'Facebook', icon: %w[brands facebook], action: 'openPopup' },
+      { label: 'Share on Mastodon',     network: 'Mastodon', icon: %w[brands mastodon] },
+      { label: 'Share on Reddit',       network: 'Reddit',  icon: %w[brands reddit] },
+      { label: 'Share on Threads',      network: 'Threads', icon: %w[brands threads] }
+    ]
   end
 
   # Returns a random heading for the share section for an article.

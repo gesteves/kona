@@ -1,15 +1,11 @@
-<article class="entry entry--full entry--page" id="entry-<%= article.sys.id.parameterize %>" aria-labelledby="hed-<%= article.sys.id.parameterize %>">
+<article class="entry entry--full entry--page" id="<%= entry_dom_id(article) %>" aria-labelledby="<%= entry_heading_id(article) %>">
   <header class="entry__header">      
     <% if article.draft %>
       <p class="entry__meta"><span class="entry__highlight"><%= icon_svg("classic", "regular", "typewriter") %> Draft</span></p>
     <% end %>
-    <h1 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">
+    <h1 class="entry__hed" id="<%= entry_heading_id(article) %>">
       <%= smartypants(article.title) %>
     </h1>
   </header>
-  <div class="entry__body">
-    <%= render_body(article.intro, image_variant: :full) %>
-    <%= render_body(article.body, image_variant: :full) %>
-    <%= partial 'partials/disclosure', locals: { entry: article } %>
-  </div>
+  <%= partial 'partials/article/body', locals: { article: article } %>
 </article>

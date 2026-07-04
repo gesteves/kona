@@ -1,7 +1,7 @@
-<article class="entry entry--compact" id="entry-<%= article.sys.id.parameterize %>" aria-labelledby="hed-<%= article.sys.id.parameterize %>">
+<article class="entry entry--compact" id="<%= entry_dom_id(article) %>" aria-labelledby="<%= entry_heading_id(article) %>">
   <header class="entry__header">
     <%= partial 'partials/article/meta', locals: { article: article } %>
-    <h2 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">
+    <h2 class="entry__hed" id="<%= entry_heading_id(article) %>">
       <%= link_to smartypants(article.title), article.path %>
     </h2>
   </header>

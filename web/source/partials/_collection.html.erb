@@ -5,7 +5,7 @@
   <ol class="collection__list">
     <% items.each do |item| %>
       <li class="collection__item">
-        <% if item.entry_type.present? && ['Article', 'Short'].include?(item.entry_type) %>
+        <% if blog_post?(item) %>
           <%= partial 'partials/article/summary', locals: { article: item } %>
         <% end %>
       </li>

@@ -10,59 +10,56 @@ module MarkupHelpers
   # @return [String] The rendered HTML with added attributes and transformations.
   def render_body(text, image_variant: :entry)
     srcset = data.srcsets[image_variant]
-    html = markdown_to_html(fix_degrees(text))
-    doc = Nokogiri::HTML::DocumentFragment.parse(html)
-    open_external_links_in_new_tabs(doc)
-    copy_feed_links(doc)
-    add_unit_data_attributes(doc)
-    add_image_data_attributes(doc)
-    add_figure_elements_to_images(doc, base_class: 'entry')
-    add_figure_elements_to_iframes(doc, base_class: 'entry')
-    add_figure_elements_to_embeds(doc, base_class: 'entry')
-    set_caption_credit(doc)
-    wrap_figcaption_emoji(doc)
-    responsivize_images(doc, widths: srcset.widths, sizes: srcset.sizes.join(', '), formats: srcset.formats)
-    resize_images(doc, width: srcset.widths.max)
-    add_image_placeholders(doc)
-    set_alt_text(doc)
-    mark_affiliate_links(doc)
-    responsivize_tables(doc)
-    add_heading_permalinks(doc)
-    lazy_load_iframes(doc)
-    doc.to_html
+    render_markup(text) do |doc|
+      open_external_links_in_new_tabs(doc)
+      copy_feed_links(doc)
+      add_unit_data_attributes(doc)
+      add_image_data_attributes(doc)
+      add_figure_elements_to_images(doc, base_class: 'entry')
+      add_figure_elements_to_iframes(doc, base_class: 'entry')
+      add_figure_elements_to_embeds(doc, base_class: 'entry')
+      set_caption_credit(doc)
+      wrap_figcaption_emoji(doc)
+      responsivize_images(doc, widths: srcset.widths, sizes: srcset.sizes.join(', '), formats: srcset.formats)
+      resize_images(doc, width: srcset.widths.max)
+      add_image_placeholders(doc)
+      set_alt_text(doc)
+      mark_affiliate_links(doc)
+      responsivize_tables(doc)
+      add_heading_permalinks(doc)
+      lazy_load_iframes(doc)
+    end
   end
 
   # Renders the body text for the Atom feed with various transformations of the HTML output.
   # @param text [String] The Markdown text to render.
   # @return [String] The rendered HTML with added attributes and transformations.
   def render_feed_body(text)
-    html = markdown_to_html(fix_degrees(text))
-    doc = Nokogiri::HTML::DocumentFragment.parse(html)
-    add_image_data_attributes(doc)
-    add_figure_elements_to_images(doc)
-    add_figure_elements_to_iframes(doc)
-    add_figure_elements_to_embeds(doc)
-    set_caption_credit(doc)
-    resize_images(doc, width: data.srcsets.entry.widths.max)
-    set_alt_text(doc)
-    mark_affiliate_links(doc)
-    doc.to_html
+    render_markup(text) do |doc|
+      add_image_data_attributes(doc)
+      add_figure_elements_to_images(doc)
+      add_figure_elements_to_iframes(doc)
+      add_figure_elements_to_embeds(doc)
+      set_caption_credit(doc)
+      resize_images(doc, width: data.srcsets.entry.widths.max)
+      set_alt_text(doc)
+      mark_affiliate_links(doc)
+    end
   end
 
   # Renders the body text for the home page with various transformations of the HTML output.
   # @param text [String] The Markdown text to render.
   # @return [String] The rendered HTML with added attributes and transformations.
   def render_home_body(text)
-    html = markdown_to_html(text)
-    doc = Nokogiri::HTML::DocumentFragment.parse(html)
-    add_image_data_attributes(doc)
-    add_figure_elements_to_images(doc, base_class: 'home')
-    set_caption_credit(doc)
-    responsivize_images(doc, widths: data.srcsets.home.widths, sizes: data.srcsets.home.sizes.join(', '), formats: data.srcsets.entry.formats, square: true)
-    resize_images(doc)
-    add_image_placeholders(doc)
-    set_alt_text(doc)
-    doc.to_html
+    render_markup(text, degrees: false) do |doc|
+      add_image_data_attributes(doc)
+      add_figure_elements_to_images(doc, base_class: 'home')
+      set_caption_credit(doc)
+      responsivize_images(doc, widths: data.srcsets.home.widths, sizes: data.srcsets.home.sizes.join(', '), formats: data.srcsets.entry.formats, square: true)
+      resize_images(doc)
+      add_image_placeholders(doc)
+      set_alt_text(doc)
+    end
   end
 
   # Prepends the title of the entry to the body.
@@ -306,12 +303,7 @@ module MarkupHelpers
   # @return [String, Nokogiri::XML::Node] The HTML content with responsive picture elements.
   def responsivize_images(html, widths: [100, 200, 300], sizes: '100vw', formats: ['avif', 'webp', 'jpg'], lazy: true, square: false)
     with_nokogiri_doc(html) do |doc|
-      doc.css('img').each do |img|
-        original_url = img['data-original-url']
-        asset_id = img['data-asset-id']
-
-        next if asset_id.blank? || original_url.blank?
-
+      each_asset_image(doc) do |img, asset_id, original_url|
         width, height = get_asset_dimensions(asset_id)
         content_type = get_asset_content_type(asset_id)
 
@@ -366,21 +358,16 @@ module MarkupHelpers
   # @return [String, Nokogiri::XML::Node] The HTML content with images resized to the specified width.
   def resize_images(html, width: 1000)
     with_nokogiri_doc(html) do |doc|
-      doc.css('img').each do |img|
-        original_url = img['data-original-url']
-        asset_id = img['data-asset-id']
-
-        next if asset_id.blank? || original_url.blank?
-
+      each_asset_image(doc) do |img, asset_id, original_url|
         asset_width, _ = get_asset_dimensions(asset_id)
         content_type = get_asset_content_type(asset_id)
 
-        img['src'] = cdn_image_url(original_url)
-        img['data-asset-id'] = asset_id
-        next if content_type == 'image/gif'
-
-        resize_width = [width, asset_width].compact.min
-        img['src'] = cdn_image_url(original_url, { w: resize_width })
+        img['src'] = if content_type == 'image/gif'
+          # GIFs aren't resized (the Images API would drop the animation).
+          cdn_image_url(original_url)
+        else
+          cdn_image_url(original_url, { w: [width, asset_width].compact.min })
+        end
       end
     end
   end
@@ -390,11 +377,7 @@ module MarkupHelpers
   # @return [String, Nokogiri::XML::Node] The HTML content with image placeholders added as CSS background.
   def add_image_placeholders(html)
     with_nokogiri_doc(html) do |doc|
-      doc.css('img').each do |img|
-        asset_id = img['data-asset-id']
-
-        next if asset_id.blank?
-
+      each_asset_image(doc) do |img, asset_id, _original_url|
         blurhash_svg_data_uri = blurhash_svg_data_uri(asset_id)
         img['style'] = "--placeholder:url('#{blurhash_svg_data_uri}');" unless blurhash_svg_data_uri.blank?
         img['class'] = [img['class'], 'placeholder'].compact.join(' ')
@@ -409,11 +392,7 @@ module MarkupHelpers
   # @return [String, Nokogiri::XML::Node] The HTML content with alt text set for images.
   def set_alt_text(html)
     with_nokogiri_doc(html) do |doc|
-      doc.css('img').each do |img|
-        asset_id = img['data-asset-id']
-
-        next if asset_id.blank?
-
+      each_asset_image(doc) do |img, asset_id, _original_url|
         alt_text = get_asset_description(asset_id)
         img['alt'] = alt_text if alt_text.present?
       end
@@ -456,7 +435,7 @@ module MarkupHelpers
   def mark_affiliate_links(html)
     with_nokogiri_doc(html) do |doc|
       doc.css('a').each do |a|
-        if is_amazon_associates_link?(a['href'])
+        if amazon_associates_link?(a['href'])
           a['rel'] = "sponsored nofollow noopener"
           a['target'] = '_blank'
         end
@@ -523,6 +502,33 @@ module MarkupHelpers
   end
 
   private
+
+  # The shared shape of the render_*_body pipelines: render the Markdown to HTML, parse it
+  # once, yield the fragment to the variant's ordered transform steps, and serialize.
+  # @param text [String] The Markdown text to render.
+  # @param degrees [Boolean] Whether to normalize degree notation first (the home page body
+  #   skips it).
+  # @yield [Nokogiri::HTML::DocumentFragment] The parsed body for in-place transforms.
+  # @return [String] The transformed HTML.
+  def render_markup(text, degrees: true)
+    html = markdown_to_html(degrees ? fix_degrees(text) : text)
+    doc = Nokogiri::HTML::DocumentFragment.parse(html)
+    yield doc
+    doc.to_html
+  end
+
+  # Yields each <img> carrying the data-asset-id / data-original-url attributes stamped by
+  # add_image_data_attributes, skipping images without a resolvable asset.
+  # @param doc [Nokogiri::XML::Node] The parsed body.
+  # @yield [img, asset_id, original_url]
+  def each_asset_image(doc)
+    doc.css('img').each do |img|
+      asset_id = img['data-asset-id']
+      next if asset_id.blank?
+
+      yield img, asset_id, img['data-original-url']
+    end
+  end
 
   # Accepts either an HTML string or a Nokogiri document fragment.
   # When called with a string, parses it, yields the doc, and returns the serialized HTML.

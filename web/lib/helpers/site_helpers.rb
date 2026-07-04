@@ -61,6 +61,45 @@ module SiteHelpers
     end
   end
 
+  # The proxied `content` object for the current page, if any. Templates receive it as a
+  # local (set via `proxy … locals:` in config.rb), but helper methods can't see template
+  # locals — they read it from the page metadata instead.
+  # @return [Object, nil]
+  def page_content
+    locals = current_page.metadata[:locals]
+    locals && locals[:content]
+  end
+
+  # The object driving the current page's <title> and og:title: the proxied `content` object
+  # when the page has one, else the page frontmatter's title string (nil when neither exists —
+  # the caller emits nothing). Collapses the content-vs-frontmatter fallback that was
+  # open-coded in partials/_meta and partials/_open_graph_and_social.
+  # @return [Object, String, nil]
+  def meta_title_source
+    page_content || current_page.data.title.presence
+  end
+
+  # The current page's meta/og description: the content summary when the page has a `content`
+  # object (never blank — content_summary falls back to the site meta description), else the
+  # page frontmatter's summary (nil when neither exists).
+  # @return [String, nil]
+  def meta_description
+    return content_summary(page_content) if page_content
+    current_page.data.summary.presence
+  end
+
+  # The attribute cluster every live-update placeholder's outer element carries: wires the
+  # element to the live-update Stimulus controller, pointing at the widget endpoint it fetches
+  # on connect and refetches on visibilitychange (see root CLAUDE.md for the web↔api contract).
+  # Interpolate inside the placeholder's outer tag.
+  # @param url [String] The same-origin widget endpoint.
+  # @return [String] HTML attributes.
+  def live_update_attrs(url)
+    # url is always an app-generated same-origin path (widget endpoint, ids are alphanumeric),
+    # never user input, so it needs no escaping here.
+    %(data-controller="live-update" data-live-update-url-value="#{url}" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange").html_safe
+  end
+
   # Retrieves a summary of the content, falling back to the site's meta description if not present.
   # @param content [Object] The content object which may contain a summary.
   # @return [String] The content summary or the site's meta description.
@@ -81,8 +120,8 @@ module SiteHelpers
   # @return [DateTime] The latest date and time at which either a page, an article, or the site was updated.
   def site_updated_at
     [
-      data.pages.reject { |p| p.draft || !p.index_in_search_engines }.map { |p| DateTime.parse(p.sys.published_at) },
-      data.articles.reject { |a| a.draft || !a.index_in_search_engines }.map { |a| DateTime.parse(a.sys.published_at) },
+      indexable_pages.map { |p| DateTime.parse(p.sys.published_at) },
+      indexable_articles.map { |a| DateTime.parse(a.sys.published_at) },
       DateTime.parse(data.site.sys.published_at)
     ].flatten.max
   end
@@ -104,7 +143,7 @@ module SiteHelpers
     cached_key, cached_year = SiteHelpers.copyright_year_cache
     return cached_year if cached_key == articles.object_id
 
-    year = articles.reject(&:draft).map { |a| DateTime.parse(a.published_at) }.min.strftime('%Y')
+    year = articles.reject(&:draft).map { |a| published_datetime(a) }.min.strftime('%Y')
     SiteHelpers.copyright_year_cache = [articles.object_id, year]
     year
   end
@@ -168,6 +207,21 @@ module SiteHelpers
     end
   end
 
+  # A nav/footer menu link for a site shortcut item: the feed item copies its link to the
+  # clipboard instead of navigating, open_in_new_tab items get target=_blank + noopener,
+  # and everything else is a plain link.
+  # @param item [Object] A menu item with title, destination, and open_in_new_tab.
+  # @return [String] An anchor element.
+  def shortcut_link(item)
+    if item.title.downcase == 'feed'
+      link_to item.title, item.destination, "data-controller": "clipboard", "data-clipboard-success-message-value": "The link to the feed has been copied to your clipboard.", "data-action": "click->clipboard#copy"
+    elsif item.open_in_new_tab
+      link_to item.title, item.destination, rel: "noopener", target: "_blank"
+    else
+      link_to item.title, item.destination
+    end
+  end
+
   # Formats the text at the very bottom of the footer. The end year is wrapped in a span that the
   # current-year Stimulus controller refreshes client-side, so the copyright stays correct without a
   # rebuild (the build-time year is the no-JS fallback). Feeds keep the plain `copyright_years`.
@@ -222,11 +276,11 @@ module SiteHelpers
   end
 
   # The Plausible proxy rewrite rules to emit into the `_redirects` file. Only
-  # built when an upstream script URL is configured (see is_plausible_installed?),
+  # built when an upstream script URL is configured (see plausible_installed?),
   # so a missing `PLAUSIBLE_SCRIPT_URL` never emits a malformed rewrite line.
   # @return [Array<Hash>] Each rule with :from, :to, and :status keys.
   def plausible_proxy_redirects
-    return [] unless is_plausible_installed?
+    return [] unless plausible_installed?
     [
       { from: PLAUSIBLE_SCRIPT_PATH, to: ENV['PLAUSIBLE_SCRIPT_URL'], status: 200 },
       { from: PLAUSIBLE_EVENT_PATH, to: PLAUSIBLE_EVENT_UPSTREAM, status: 200 }
@@ -237,7 +291,7 @@ module SiteHelpers
   # configured so the first-party proxy can be built. Gates both the analytics
   # script tag (partials/_analytics.html.erb) and the proxy rewrites.
   # @return [Boolean] True when `PLAUSIBLE_SCRIPT_URL` is set.
-  def is_plausible_installed?
+  def plausible_installed?
     ENV['PLAUSIBLE_SCRIPT_URL'].present?
   end
 

@@ -1,0 +1,35 @@
+// Silent placeholders for the recurring page-grid idioms, @extend-ed by the components.
+// Imported first in the components layer: @extend emits the merged selectors here, so the
+// shared declarations stay in the same cascade layer as the components that use them.
+
+// A block that spans the full page grid and re-exposes its columns to its children.
+%subgrid-full {
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+
+// The readable centered column: full-width on small screens, inset by two columns on
+// either side from bp-medium up.
+%centered-column {
+  grid-column: 1 / -1;
+
+  @include bp-medium {
+    grid-column: 3 / -3;
+  }
+}
+
+// The top-level 12-column page container (.content, .footer__wrapper).
+%page-grid {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  max-width: var(--max-width-container);
+  padding: var(--content-padding);
+  width: 100%;
+}
+
+// The separator that tops each widget section (stats, weather, collections).
+%section-topped {
+  border-top: 2px solid var(--color-border);
+  padding: var(--padding) 0 0 0;
+}

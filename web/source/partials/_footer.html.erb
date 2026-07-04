@@ -24,11 +24,7 @@
       <ul class="footer__menu">
         <% menu_items.each do |i| %>
           <li class="footer__menu-item">
-            <% if i.open_in_new_tab %>
-              <%= link_to i.title, i.destination, rel: "noopener", target: "_blank" %>
-            <% else %>
-              <%= link_to i.title, i.destination %>
-            <% end %>
+            <%= shortcut_link(i) %>
           </li>
         <% end %>
         <li class="footer__menu-item"><a href="#" data-controller="search" data-action="click->search#open">Search</a></li>

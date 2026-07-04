@@ -8,7 +8,7 @@
 }
 
 .entry__header {
-  @extend .extend-entry-header;
+  @extend %entry-header;
 }
 
 .entry__meta {
@@ -38,17 +38,7 @@
     text-decoration: none;
   }
 
-  svg {
-    display: inline-block;
-    height: var(--light-icon-size);
-    vertical-align: text-bottom;
-    width: var(--light-icon-size);
-
-    g,
-    path {
-      fill: var(--color-text-tertiary);
-    }
-  }
+  @include light-icon;
 
   @include bp-medium {
     flex-flow: row wrap;
@@ -109,14 +99,14 @@
 }
 
 .entry__body {
-  @extend .extend-body-styles;
+  @extend %body-styles;
 
   > :first-child {
     margin-top: 0;
   }
 
   .entry__read-more {
-    @extend .extend-primary-button;
+    @extend %primary-button;
   }
 }
 
@@ -199,18 +189,14 @@
 }
 
 .entry--article .entry__body {
-  @extend .extend-drop-cap;
-  @extend .extend-lead-in;
-  @extend .extend-end-mark;
+  @extend %drop-cap;
+  @extend %lead-in;
+  @extend %end-mark;
 }
 
 .entry--full,
 .entry--compact {
-  grid-column: 1 / -1;
-
-  @include bp-medium {
-    grid-column: 3 / -3;
-  }
+  @extend %centered-column;
 }
 
 .entry--full {
@@ -229,7 +215,7 @@
   }
 
   .entry__hed {
-    @extend .extend-heading-gradient;
+    @extend %heading-gradient;
   }
 }
 
@@ -237,13 +223,13 @@
   .entry__hed {
     margin: 0;
 
-    @supports (text-box-edge: cap) and (text-box-trim: trim-both) {
+    @include text-box-trim-supported {
       @include bp-medium {
         margin: 1rem;
       }
     }
 
-    @supports not ((text-box-edge: cap) or (text-box-trim: trim-both)) {
+    @include text-box-trim-fallback {
       padding: 1rem 0;
 
       @include bp-medium {
@@ -255,7 +241,7 @@
 
 .entry--full.entry--page {
   .entry__hed {
-    @supports (text-box-edge: cap) and (text-box-trim: trim-both) {
+    @include text-box-trim-supported {
       margin-bottom: -1rem;
     }
   }

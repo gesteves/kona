@@ -1,9 +1,8 @@
 .collection {
-  border-top: 2px solid var(--color-border);
+  @extend %section-topped;
+  @extend %subgrid-full;
+
   display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: subgrid;
-  padding: var(--padding) 0 0 0;
 }
 
 // Live-update wrapper around one or more sibling collections (the races widget's "Today's
@@ -23,16 +22,16 @@
 }
 
 .collection__list {
+  @extend %subgrid-full;
+
   display: grid;
-  grid-column: 1 / -1;
   gap: var(--row-gap) var(--column-gap);
-  grid-template-columns: subgrid;
 }
 
 .collection__item {
+  @extend %subgrid-full;
+
   display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: subgrid;
 
   & > * {
     grid-column: 1 / -1;
@@ -40,11 +39,7 @@
 }
 
 .collection--centered {
-  grid-column: 1 / -1;
-
-  @include bp-medium {
-    grid-column: 3 / -3;
-  }
+  @extend %centered-column;
 
   .collection__item {
     @include bp-medium {
@@ -101,11 +96,7 @@
 }
 
 .collection--full-width {
-  grid-column: 1 / -1;
-
-  @include bp-medium {
-    grid-column: 3 / -3;
-  }
+  @extend %centered-column;
 
   .collection__item {
     grid-column: 1 / -1;

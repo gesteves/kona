@@ -1,13 +1,9 @@
 <meta charset="utf-8">
-<% if defined?(content) %>
-  <%= title_tag(content) %>
-<% elsif current_page.data.title.present? %>
-  <%= title_tag(current_page.data.title) %>
+<% if meta_title_source %>
+  <%= title_tag(meta_title_source) %>
 <% end %>
-<% if defined?(content) %>
-  <meta name="description" content="<%= h content_summary(content) %>">
-<% elsif current_page.data.summary.present? %>
-  <meta name="description" content="<%= h current_page.data.summary %>">
+<% if meta_description.present? %>
+  <meta name="description" content="<%= h meta_description %>">
 <% end %>
 <meta name="viewport" content="width=device-width,minimum-scale=1">
 <meta name="view-transition" content="same-origin">

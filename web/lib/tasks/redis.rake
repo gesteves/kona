@@ -5,7 +5,7 @@ namespace :redis do
     print 'Type "execute" to proceed: '
     confirmation = STDIN.gets.strip
     if confirmation.downcase == 'execute'
-      $redis.flushdb
+      RedisConnection.connection.flushdb
       puts 'Redis instance has been emptied.'
     else
       puts 'Redis empty action cancelled.'

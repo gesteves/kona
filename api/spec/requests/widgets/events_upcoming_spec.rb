@@ -141,7 +141,7 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
   end
 
   context "when the next race is featured but has no race-day weather" do
-    # The featured window (is_close?, owner timezone) and the weather-fetch window (the event's
+    # The featured window (close?, owner timezone) and the weather-fetch window (the event's
     # own timezone) disagree at the 10-day boundary, so the forecast never gets fetched. The
     # event must not get the featured layout — no expanded card, no empty "Race Day Weather" block.
     before { allow_any_instance_of(WeatherKit).to receive(:data).and_return(nil) }
@@ -196,7 +196,7 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
 
   # On race day today's race gets its own "Today's Race" section, with the rest under
   # "Upcoming Races". The clock is frozen so "today" is deterministic; the controller's
-  # is_today? check runs in the default zone (America/Denver), so dates are built there.
+  # today? check runs in the default zone (America/Denver), so dates are built there.
   context "on race day" do
     include ActiveSupport::Testing::TimeHelpers
 

@@ -22,9 +22,7 @@ class WeatherKit < ApplicationService
 
   # @return [OpenStruct, nil] The weather data (snake_cased, dot-accessible), or nil.
   def data
-    return @data if defined?(@data)
-    weather = underscore_keys(get_weather)
-    @data = weather && DeepOstruct.wrap(weather)
+    fetch_wrapped { underscore_keys(get_weather) }
   end
 
   private
@@ -33,7 +31,8 @@ class WeatherKit < ApplicationService
   # @see https://developer.apple.com/documentation/weatherkitrestapi
   # @return [Hash, nil]
   def get_weather
-    return if @latitude.blank? || @longitude.blank? || @time_zone.blank? || @country.blank?
+    return unless coordinates?
+    return if @time_zone.blank? || @country.blank?
 
     cache_key = "weatherkit:weather:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
     cached_json(cache_key, expires_in: 5.minutes) do
@@ -47,14 +46,11 @@ class WeatherKit < ApplicationService
           timezone: @time_zone
         }
 
-        response = HTTParty.get(
+        get_json!(
           "#{WEATHERKIT_API_URL}weather/en/#{@latitude}/#{@longitude}",
           query: query,
           headers: { "Authorization" => "Bearer #{token}" }
         )
-        raise "Failed to fetch weather data: #{response.code}" unless response.success?
-
-        JSON.parse(response.body, symbolize_names: true)
       end
     end
   end
@@ -65,14 +61,11 @@ class WeatherKit < ApplicationService
     cache_key = "weatherkit:availability:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
     cached_json(cache_key, expires_in: 5.minutes) do
       with_retries do
-        response = HTTParty.get(
+        get_json!(
           "#{WEATHERKIT_API_URL}availability/#{@latitude}/#{@longitude}",
           query: { country: @country },
           headers: { "Authorization" => "Bearer #{token}" }
         )
-        raise "Failed to fetch availability data: #{response.code}" unless response.success?
-
-        JSON.parse(response.body, symbolize_names: true)
       end
     end
   end

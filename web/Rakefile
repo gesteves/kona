@@ -9,6 +9,3 @@ Dir["lib/utils/*.rb"].each { |file| require_relative file }
 # Import tasks from lib/tasks
 Dir.glob('lib/tasks/**/*.rake').each { |r| import r }
 
-def initialize_redis
-  RedisConnection.connection
-end

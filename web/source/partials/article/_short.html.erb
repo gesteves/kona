@@ -1,13 +1,13 @@
 <% standalone = defined?(indexable) && indexable %>
 <% index_body = standalone && !article.draft %>
-<article class="entry entry--compact" id="entry-<%= article.sys.id.parameterize %>">
+<article class="entry entry--compact" id="<%= entry_dom_id(article) %>">
   <header class="entry__header">
     <%= partial 'partials/article/meta', locals: { article: article } %>
     <%# On its own page the short needs its title as the page's <h1>, but the visible title %>
     <%# is the inline run-in below — so the heading is screen-reader-only, and the run-in is %>
     <%# aria-hidden to avoid announcing the title twice. In lists there's no <h1>, so the %>
     <%# run-in stays audible. %>
-    <% if standalone %><h1 class="sr-only" id="hed-<%= article.sys.id.parameterize %>"><%= smartypants(article.title) %></h1><% end %>
+    <% if standalone %><h1 class="sr-only" id="<%= entry_heading_id(article) %>"><%= smartypants(article.title) %></h1><% end %>
     <% if index_body %><span hidden data-pagefind-meta="title"><%= smartypants(article.title) %></span><% end %>
   </header>
   <div class="entry__body"<%= ' data-pagefind-body'.html_safe if index_body %>>

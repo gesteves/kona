@@ -11,8 +11,8 @@ class WeatherSummaryPresenter
   include TimeHelper      # location_time_zone / current_time
   include TextHelper      # comma_join_with_and / with_indefinite_article / remove_widows
   include MarkdownHelper  # markdown_to_html for the composed summary
-  include WorkoutsHelper  # is_workout_scheduled?
-  include EventsHelper    # todays_race / is_race_day?
+  include WorkoutsHelper  # workout_scheduled?
+  include EventsHelper    # todays_race / race_day?
   include LocationHelper  # format_location / format_elevation / in_jackson_hole?
   include BayHelper       # bay_water_temperature_sentence
 
@@ -52,13 +52,13 @@ class WeatherSummaryPresenter
   end
 
   def race_day
-    "**It's race day!**" if is_race_day? && !is_evening?
+    "**It's race day!**" if race_day? && !evening?
   end
 
   def current_location
     location = "I'm currently in **#{format_location}**"
     the = todays_race&.title&.downcase&.start_with?("ironman") ? "" : "the"
-    location << ", racing #{the} **#{todays_race.title}**" if is_race_day? && !is_evening?
+    location << ", racing #{the} **#{todays_race.title}**" if race_day? && !evening?
     location
   end
 
@@ -68,7 +68,7 @@ class WeatherSummaryPresenter
   end
 
   def smooth
-    "Man, it's a hot one!" if !is_race_day? && is_hot? && is_daytime?
+    "Man, it's a hot one!" if !race_day? && hot? && daytime?
   end
 
   def currently
@@ -113,7 +113,7 @@ class WeatherSummaryPresenter
   def forecast
     text = []
     text << "#{today_or_tonight}'s forecast #{format_forecasted_condition(rest_of_day_forecast.condition_code).downcase}"
-    if is_evening?
+    if evening?
       text << "with a low of #{format_temperature(todays_forecast.temperature_min)}"
     else
       text << "with a high of #{format_temperature(todays_forecast.temperature_max)} and a low of #{format_temperature(todays_forecast.temperature_min)}"
@@ -138,34 +138,34 @@ class WeatherSummaryPresenter
   end
 
   def activities
-    return unless is_daytime?
+    return unless daytime?
 
-    if is_race_day?
-      return is_good_weather? ? "Good weather for racing!" : "Tough weather for racing!"
+    if race_day?
+      return good_weather? ? "Good weather for racing!" : "Tough weather for racing!"
     end
 
-    if is_indoor_season?
-      return is_workout_scheduled? ? "It's a good day to train indoors!" : "It's a good day to rest!"
+    if indoor_season?
+      return workout_scheduled? ? "It's a good day to train indoors!" : "It's a good day to rest!"
     end
 
-    if is_workout_scheduled?
-      if is_good_weather? && is_hot?
+    if workout_scheduled?
+      if good_weather? && hot?
         return "It's a good day for some heat training!"
-      elsif is_good_weather?
+      elsif good_weather?
         return "It's a good day to train outside!"
       else
         return "It's a good day to train indoors!"
       end
     end
 
-    is_good_weather? ? "It's a good day to be outside!" : "It's a good day to rest!"
+    good_weather? ? "It's a good day to be outside!" : "It's a good day to rest!"
   end
 
-  def is_indoor_season?
+  def indoor_season?
     in_jackson_hole? && (Time.now.month <= 3 || Time.now.month >= 11)
   end
 
-  def is_bad_weather?
+  def bad_weather?
     aqi = @air_quality&.aqi.to_i
     current_temperature = (current_weather.temperature_apparent || current_weather.temperature)
     high_temperature = todays_forecast.temperature_max
@@ -184,11 +184,11 @@ class WeatherSummaryPresenter
     CONDITIONS.dig(current_weather.condition_code&.to_sym, :adverse_weather) || CONDITIONS.dig(todays_forecast.condition_code&.to_sym, :adverse_weather)
   end
 
-  def is_good_weather?
-    !is_bad_weather?
+  def good_weather?
+    !bad_weather?
   end
 
-  def is_hot?
+  def hot?
     current_weather.temperature >= 30 || current_weather.temperature_apparent >= 30
   end
 

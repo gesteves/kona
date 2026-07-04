@@ -2,13 +2,4 @@
 <%# swapped in by the live-update controller (which removes it when nothing is trending). %>
 <%# `url` (required local) is the API endpoint: the bare trending path, or /:id carrying the %>
 <%# sys.id of the current article, so trending doesn't list the post you're reading. %>
-<section class="collection collection--halves" id="trending-articles" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= url %>" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange">
-  <h2 class="collection__heading">Trending Articles</h2>
-  <ol class="collection__list">
-    <% 4.times do %>
-      <li class="collection__item">
-        <%= partial 'partials/placeholders/entry_skeleton' %>
-      </li>
-    <% end %>
-  </ol>
-</section>
+<%= partial 'partials/placeholders/article_collection', locals: { section_id: 'trending-articles', heading: 'Trending Articles', url: url } %>

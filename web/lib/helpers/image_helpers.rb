@@ -87,30 +87,30 @@ module ImageHelpers
     asset_id = get_asset_id(original_url)
     asset_url = get_asset_url(asset_id)
     original_url = asset_url if asset_url.present?
-    if is_netlify? && original_url.match?('/.netlify/images')
-      uri = URI.parse(original_url)
-      existing_params = URI.decode_www_form(uri.query || "").to_h
-      merged_params = existing_params.merge(params)
-      query_params = URI.encode_www_form(merged_params)
-      uri.query = query_params
-      image_url = uri.to_s
-    elsif is_netlify?
+    if netlify? && original_url.match?('/.netlify/images')
+      merge_query(original_url, params)
+    elsif netlify?
       base_url = "#{ENV['URL']}/.netlify/images"
       original_url = "https:#{original_url}" if original_url.start_with?('//')
       query_params = URI.encode_www_form(params)
       image_url = "#{base_url}?url=#{URI.encode_www_form_component(original_url)}"
       image_url += "&#{query_params}" unless query_params.empty?
+      image_url
     else
       params[:fit] = "fill" if params[:fit] == "cover"
-      uri = URI.parse(original_url)
-      existing_params = URI.decode_www_form(uri.query || "").to_h
-      merged_params = existing_params.merge(params)
-      query_params = URI.encode_www_form(merged_params)
-      uri.query = query_params
-      image_url = uri.to_s
+      merge_query(original_url, params)
     end
+  end
 
-    image_url
+  # Merges query parameters into a URL, preserving (and overriding) any it already carries.
+  # @param url [String] The URL.
+  # @param params [Hash] The parameters to merge in.
+  # @return [String] The URL with the merged query string.
+  def merge_query(url, params)
+    uri = URI.parse(url)
+    existing_params = URI.decode_www_form(uri.query || "").to_h
+    uri.query = URI.encode_www_form(existing_params.merge(params))
+    uri.to_s
   end
 
   # Generates a responsive srcset for an image URL with specified widths and optional parameters.
@@ -235,7 +235,7 @@ module ImageHelpers
   # @return [String, nil] The generated Blurhash, or nil if not generated or retrieved.
   def blurhash_string(asset_id, width, height)
     # Encode the Blurhash manually if we're not on Netlify
-    return encode_blurhash(asset_id, width, height) unless is_netlify?
+    return encode_blurhash(asset_id, width, height) unless netlify?
 
     # Attempt to fetch the Blurhash from Netlify's Image CDN
     url = get_asset_url(asset_id)

@@ -1,0 +1,15 @@
+<%# Shared placeholder shell for the API-ranked article collections (trending / related): a
+    collection-section skeleton the live-update controller swaps for the API fragment, or
+    removes when the API has nothing to show (empty response). Locals: `section_id` and
+    `heading` (must match the API view's shared _collection partial so the swap is seamless),
+    and `url` (the API endpoint). %>
+<section class="collection collection--halves" id="<%= section_id %>" data-nosnippet <%= live_update_attrs(url) %>>
+  <h2 class="collection__heading"><%= heading %></h2>
+  <ol class="collection__list">
+    <% 4.times do %>
+      <li class="collection__item">
+        <%= partial 'partials/placeholders/entry_skeleton' %>
+      </li>
+    <% end %>
+  </ol>
+</section>

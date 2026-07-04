@@ -23,24 +23,16 @@ module Widgets
     # The "You May Also Like" widget: articles semantically related to :id (its Contentful entry id),
     # ranked by embedding similarity in the RelatedArticles service.
     def related
-      cache_widget(ttl: 1.hour, edge_stale_while_revalidate: 1.day)
-
-      id = params[:id].to_s
-      @articles = id.match?(ID_FORMAT) ? RelatedArticles.new.for_article(id, count: 4) : []
-      return render_empty if @articles.blank?
-
-      render :related
+      render_widget(:related, ttl: 1.hour, edge_stale_while_revalidate: 1.day) do
+        id = params[:id].to_s
+        @articles = id.match?(ID_FORMAT) ? RelatedArticles.new.for_article(id, count: 4) : []
+      end
     end
 
     private
 
     def render_trending(articles)
-      cache_widget(ttl: 1.hour, edge_stale_while_revalidate: 1.day)
-
-      @articles = articles
-      return render_empty if @articles.blank?
-
-      render :trending
+      render_widget(:trending, ttl: 1.hour, edge_stale_while_revalidate: 1.day) { @articles = articles }
     end
   end
 end

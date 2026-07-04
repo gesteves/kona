@@ -3,6 +3,7 @@ import { ImageResponse } from '@vercel/og';
 import type { Config, Context } from '@netlify/functions';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { requestLogLine } from './lib/log.mts';
 
 type OgData = {
   logoUrl?: string;
@@ -125,18 +126,7 @@ export default async function handler(
       children
     );
 
-    console.info(
-      [
-        targetUrl,
-        req.headers.get('User-Agent'),
-        context.ip,
-        context.geo?.city && context.geo?.country?.name
-          ? `${context.geo.city}, ${context.geo.country.name}`
-          : context.geo?.city || context.geo?.country?.name,
-      ]
-        .filter(Boolean)
-        .join(' | ')
-    );
+    console.info(requestLogLine(req, context, targetUrl));
 
     return new ImageResponse(element, {
       width: 1200,

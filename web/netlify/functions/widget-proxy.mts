@@ -1,4 +1,5 @@
 import type { Config, Context } from '@netlify/functions';
+import { requestLogLine } from './lib/log.mts';
 
 // The kona-api origin (fly.io). Reuses the build-time var; must also be exposed to the
 // Functions runtime scope on Netlify.
@@ -64,17 +65,12 @@ export default async function handler(
   }
 
   console.info(
-    [
+    requestLogLine(
+      req,
+      context,
       `${req.method} ${incoming.pathname}`,
-      `→ ${upstream.status}`,
-      req.headers.get('User-Agent'),
-      context.ip,
-      context.geo?.city && context.geo?.country?.name
-        ? `${context.geo.city}, ${context.geo.country.name}`
-        : context.geo?.city || context.geo?.country?.name,
-    ]
-      .filter(Boolean)
-      .join(' | ')
+      `→ ${upstream.status}`
+    )
   );
 
   const cacheControl = upstream.headers.get('cache-control');

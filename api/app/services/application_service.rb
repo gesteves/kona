@@ -54,6 +54,17 @@ class ApplicationService
     parse_json(HTTParty.post(url, **options), symbolize: symbolize)
   end
 
+  # Like get_json, but raises on a non-success response instead of swallowing it to nil —
+  # for use inside with_retries, which only retries on raised errors. (get_json inside
+  # with_retries quietly skips HTTP-level failures; this variant makes them retryable.)
+  # @raise [RuntimeError] on a non-success response.
+  def get_json!(url, symbolize: true, **options)
+    response = HTTParty.get(url, **options)
+    raise "HTTP #{response.code} from #{response.request&.last_uri}" unless response.success?
+
+    JSON.parse(response.body, symbolize_names: symbolize)
+  end
+
   # @param response [HTTParty::Response]
   # @return [Object, nil] The parsed body, or nil when the response was not successful.
   def parse_json(response, symbolize: true)
@@ -69,6 +80,23 @@ class ApplicationService
   # @param object [Hash, Array, nil]
   def underscore_keys(object)
     object&.deep_transform_keys { |key| key.to_s.underscore.to_sym }
+  end
+
+  # Memoized dot-access wrapper for a service's fetched payload: runs the block once
+  # (memoizing even a nil result, so a failed fetch isn't retried within the instance)
+  # and wraps a non-nil result with DeepOstruct.
+  # @yieldreturn [Hash, Array, nil] The raw payload (snake_cased by the caller if needed).
+  # @return [OpenStruct, Array, nil]
+  def fetch_wrapped
+    return @wrapped_data if defined?(@wrapped_data)
+    raw = yield
+    @wrapped_data = raw && DeepOstruct.wrap(raw)
+  end
+
+  # Whether the service was initialized with usable coordinates. The geo services all
+  # no-op without them.
+  def coordinates?
+    @latitude.present? && @longitude.present?
   end
 
   # Runs the block, retrying with exponential backoff (2, 4, 8, … seconds) on any error,

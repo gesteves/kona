@@ -1,6 +1,6 @@
 module EventsHelper
   # Whether the event is today, in the current location's timezone.
-  def is_today?(event)
+  def today?(event)
     return false if event.blank?
     event_date = Time.parse(event.date).in_time_zone(location_time_zone)
     event_date.to_date == current_time.to_date
@@ -10,11 +10,11 @@ module EventsHelper
   # @return [OpenStruct, nil]
   def todays_race
     return if @events.blank?
-    @events.find { |e| is_today?(e) && e.going }
+    @events.find { |e| today?(e) && e.going }
   end
 
   # Whether today is a race day.
-  def is_race_day?
+  def race_day?
     todays_race.present?
   end
 
@@ -23,11 +23,11 @@ module EventsHelper
   # location — which we already fetch for the featured race; covering "now" means it's both the
   # event's day and daytime there. Falls back to today-and-daytime in the owner's current
   # timezone when that weather (and thus its sun times) isn't available.
-  def is_in_progress?(event, event_weather = nil)
+  def in_progress?(event, event_weather = nil)
     return false if event.blank? || !event.going
     window = event_daylight_window(event_weather)
     return window.cover?(Time.current) if window
-    is_daytime? && is_today?(event)
+    daytime? && today?(event)
   end
 
   # The event-day daylight window (sunrise..sunset) drawn from the featured race's already-fetched
@@ -60,7 +60,7 @@ module EventsHelper
   # The upcoming races to show: future-or-today confirmed events, soonest first. When the next
   # one is within 10 days it's "featured" (expanded card + race-day weather) and we show four;
   # otherwise three. Mirrors the static site's build-time helper, reading @events. Memoized —
-  # it's consulted several times per request (selection, is_next?, the view) and each
+  # it's consulted several times per request (selection, next?, the view) and each
   # computation re-parses and re-sorts every event.
   def upcoming_races
     @upcoming_races ||= if @events.blank?
@@ -70,34 +70,34 @@ module EventsHelper
         .select { |e| e.going && Time.parse(e.date).in_time_zone(location_time_zone).beginning_of_day >= current_time.beginning_of_day }
         .sort_by { |e| Time.parse(e.date) }
       next_event = upcoming.first
-      featured = next_event.present? && is_close?(next_event)
+      featured = next_event.present? && close?(next_event)
       upcoming.take(featured ? 4 : 3)
     end
   end
 
   # Whether the event is today or within the next 10 days.
-  def is_close?(event)
+  def close?(event)
     return false if event.blank?
     event_date = Time.parse(event.date).in_time_zone(location_time_zone).to_date
     event_date >= current_time.to_date && event_date <= 10.days.from_now.to_date
   end
 
   # Whether the event is the next upcoming race.
-  def is_next?(event)
+  def next?(event)
     return false if event.blank?
     event.sys&.id == upcoming_races.first&.sys&.id
   end
 
   # Whether the event gets the featured treatment (the next race, and within 10 days).
-  def is_featured?(event)
+  def featured?(event)
     return false if event.blank?
-    is_close?(event) && is_next?(event)
+    close?(event) && next?(event)
   end
 
   # The layout variant for a races collection, from the event count and whether the first is
   # featured. Defaults to the full upcoming-races list; callers can pass an explicit count and
   # featured flag (e.g. the race-day "Upcoming Races" section, which excludes today's race).
-  def event_collection_variant(count = upcoming_races.count, featured: is_featured?(upcoming_races.first))
+  def event_collection_variant(count = upcoming_races.count, featured: featured?(upcoming_races.first))
     case count
     when 1 then "single"
     when 2 then featured ? "single" : "halves"
@@ -125,7 +125,7 @@ module EventsHelper
   # tracking exists but isn't live yet.
   def event_live_tracking_tag(event, event_weather = nil)
     return if event.blank? || event.tracking_url.blank?
-    in_progress = is_in_progress?(event, event_weather)
+    in_progress = in_progress?(event, event_weather)
     icon = in_progress ? icon_svg("classic", "regular", "signal-stream") : icon_svg("classic", "light", "signal-stream")
     options = {}
     options[:class] = "entry__highlight entry__highlight--live" if in_progress

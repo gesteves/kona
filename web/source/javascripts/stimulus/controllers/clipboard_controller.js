@@ -1,5 +1,5 @@
 import { Controller } from '@hotwired/stimulus';
-import { sendNotification } from '../lib/utils';
+import { absoluteUrl, sendNotification } from '../lib/utils';
 import { trackEvent } from '../lib/analytics';
 
 export default class extends Controller {
@@ -36,18 +36,7 @@ export default class extends Controller {
    * @return {String} Permalink URL.
    */
   getPermalink() {
-    const href = this.element.getAttribute('href');
-    if (!href) {
-      return window.location.href;
-    } else if (href.startsWith('#')) {
-      return window.location.origin + window.location.pathname + href;
-    } else if (href.startsWith('//')) {
-      return href;
-    } else if (href.startsWith('/')) {
-      return window.location.origin + href;
-    } else {
-      return href;
-    }
+    return absoluteUrl(this.element.getAttribute('href'));
   }
 
   /**

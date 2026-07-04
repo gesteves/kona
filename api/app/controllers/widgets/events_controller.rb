@@ -16,14 +16,14 @@ module Widgets
       @upcoming = upcoming_races
       return render_empty if @upcoming.blank?
 
-      @featured = @upcoming.first if is_featured?(@upcoming.first)
+      @featured = @upcoming.first if featured?(@upcoming.first)
       @event_weather = RaceDayWeather.new(@featured).presenter if @featured
 
       # On race day the featured event is today's race; give it its own section.
-      @todays_race = @featured if @featured && is_today?(@featured)
+      @todays_race = @featured if @featured && today?(@featured)
 
       # An upcoming (not-today) featured event only earns the expanded treatment when we actually
-      # have race-day weather to show. The featured window (is_close?, in the owner's timezone) and
+      # have race-day weather to show. The featured window (close?, in the owner's timezone) and
       # the weather-fetch window (days_until, computed in the event's own geocoded timezone) can
       # disagree at the 10-day boundary, which would otherwise leave a featured card carrying an
       # empty "Race Day Weather" block for an event that's effectively more than 10 days out. When

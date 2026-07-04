@@ -24,6 +24,8 @@
 }
 
 @layer components {
+  // First on purpose: the layout placeholders' shared declarations are emitted here.
+  @import 'components/layout';
   @import 'components/blog';
   @import 'components/collection';
   @import 'components/content';

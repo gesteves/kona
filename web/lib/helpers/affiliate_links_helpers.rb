@@ -21,7 +21,7 @@ module AffiliateLinksHelpers
     text = [content.intro, content.body].compact.join("\n\n")
     doc = Nokogiri::HTML::DocumentFragment.parse(markdown_to_html(text))
     doc.css('a').each do |a|
-      return true if is_amazon_associates_link?(a['href'])
+      return true if amazon_associates_link?(a['href'])
     end
     false
   end
@@ -29,7 +29,7 @@ module AffiliateLinksHelpers
   # Determines if a given URL is an Amazon Associates link.
   # @param url [String] The URL to be checked for being an affiliate link.
   # @return [Boolean] True if the URL is an Amazon Associates link, otherwise false.
-  def is_amazon_associates_link?(url)
+  def amazon_associates_link?(url)
     uri = URI.parse(url)
     params = uri.query ? URI.decode_www_form(uri.query).to_h : {}
     domain = PublicSuffix.domain(uri.host)

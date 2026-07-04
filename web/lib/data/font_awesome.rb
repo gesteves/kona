@@ -2,6 +2,7 @@ require 'yaml'
 require 'json'
 require 'active_support/all'
 require_relative 'graphql/font_awesome'
+require_relative '../utils/redis_connection'
 
 # The FontAwesome class fetches icon SVGs from the Font Awesome GraphQL API, caches them in Redis,
 # and saves the data to a JSON file.
@@ -30,8 +31,12 @@ class FontAwesome
     icon_metadata = get_icon_metadata(data['icons'], version)
 
     cache_keys = icon_metadata.keys
-    svgs_from_cache = $redis.mget(*cache_keys)
+    svgs_from_cache = redis.mget(*cache_keys)
     generate_icon_data(svgs_from_cache, icon_metadata, version)
+  end
+
+  def redis
+    RedisConnection.connection
   end
 
   # Returns a hash mapping cache keys to icon metadata
@@ -86,7 +91,7 @@ class FontAwesome
     results = response.data.search.map(&:to_h)
     icon = results.find { |i| i['id'] == icon_id }
     svg = icon.dig('svgs')&.find { |s| s.dig('familyStyle', 'family') == family && s.dig('familyStyle', 'style') == style }&.dig('html')
-    $redis.set(cache_key_for(version, family, style, icon_id), svg) if svg.present?
+    redis.set(cache_key_for(version, family, style, icon_id), svg) if svg.present?
     svg
   end
 

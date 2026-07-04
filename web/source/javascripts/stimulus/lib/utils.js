@@ -25,3 +25,35 @@ export function replaceElement(html, element) {
   tempContainer.innerHTML = html;
   element.replaceWith(...tempContainer.childNodes);
 }
+
+/**
+ * The canonical URL for the current page: the <link rel="canonical"> href when present,
+ * falling back to the window location.
+ * @returns {String} The canonical URL.
+ */
+export function canonicalUrl() {
+  return (
+    document.querySelector('link[rel="canonical"]')?.href ||
+    window.location.href
+  );
+}
+
+/**
+ * Resolves an anchor's href to an absolute URL. Handles missing, anchor-only (#…),
+ * protocol-relative (//…), root-relative (/…), and already-absolute hrefs.
+ * @param {String|null} href An href attribute value.
+ * @returns {String} The absolute URL (the current page for a missing href).
+ */
+export function absoluteUrl(href) {
+  if (!href) {
+    return window.location.href;
+  } else if (href.startsWith('#')) {
+    return window.location.origin + window.location.pathname + href;
+  } else if (href.startsWith('//')) {
+    return href;
+  } else if (href.startsWith('/')) {
+    return window.location.origin + href;
+  } else {
+    return href;
+  }
+}

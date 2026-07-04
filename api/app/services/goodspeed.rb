@@ -6,9 +6,7 @@ class Goodspeed < ApplicationService
 
   # @return [OpenStruct, nil]
   def data
-    return @data if defined?(@data)
-    parsed = fetch
-    @data = parsed && DeepOstruct.wrap(parsed)
+    fetch_wrapped { fetch }
   end
 
   private

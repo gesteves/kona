@@ -1,8 +1,7 @@
-<% weather_url = "/widgets/weather/current" %>
 <%# Loading skeleton mirroring the real weather layout (icon + text). The live-update %>
 <%# controller swaps in the real markup on connect, or removes this shell when there's %>
-<%# no current weather (empty response). %>
-<div class="weather" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= weather_url %>" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange">
+<%# no current weather (empty response). `url` (required local) is the API endpoint. %>
+<div class="weather" data-nosnippet <%= live_update_attrs(url) %>>
   <div class="weather__icon"><wa-skeleton class="weather-skeleton-icon" effect="sheen"></wa-skeleton></div>
   <div class="weather__text">
     <wa-skeleton class="weather-skeleton-text" effect="sheen"></wa-skeleton>

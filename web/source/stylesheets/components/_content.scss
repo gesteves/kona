@@ -1,18 +1,14 @@
 .content {
-  box-sizing: border-box;
-  display: grid;
+  @extend %page-grid;
+
   gap: var(--row-gap) var(--column-gap);
-  grid-template-columns: repeat(12, 1fr);
-  max-width: var(--max-width-container);
-  padding: var(--content-padding);
-  width: 100%;
 }
 
 .content__main {
+  @extend %subgrid-full;
+
   display: grid;
-  grid-column: 1 / -1;
   gap: var(--row-gap) var(--column-gap);
-  grid-template-columns: subgrid;
   width: 100%;
 }
 

@@ -7,12 +7,6 @@ module Api
   # Endpoints require the API_TOKEN bearer token by default (e.g. POST /api/location) so
   # scanners/abusers get a cheap 401 before any controller work. Intentionally public
   # endpoints (standard-site, build-time fetched) skip_before_action this check.
-  class BaseController < ActionController::Base
-    include LiveWidget
-    include TokenAuthentication
-
-    layout false
-
-    before_action :authenticate_bearer_token!
+  class BaseController < TokenGatedController
   end
 end

@@ -2,7 +2,7 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
   <% articles = feed_articles %>
   <% updated = articles.map { |e| DateTime.parse(e.updated_at) }.max %>
-  <id><%= atom_tag(full_url("/index.html"), articles.map { |e| DateTime.parse(e.published_at) }.min) %></id>
+  <id><%= atom_tag(full_url("/index.html"), articles.map { |e| published_datetime(e) }.min) %></id>
   <title><%=h feed_title %></title>
   <% if feed_subtitle.present? %><subtitle><%=h feed_subtitle %></subtitle><% end %>
   <updated><%= updated.rfc3339 %></updated>
@@ -11,7 +11,7 @@
   <rights>© <%= copyright_years %> <%= data.site.copyright %></rights>
   <% articles.each do |entry| %>
     <entry>
-      <% entry_published = DateTime.parse(entry.published_at) %>
+      <% entry_published = published_datetime(entry) %>
       <id><%= atom_tag(full_url(entry.path), entry_published) %></id>
       <title><%=h smartypants(sanitize(entry.title)) %></title>
       <link rel="alternate" type="text/html" href="<%=h full_url(entry.path, ref: 'Feed') %>"/>

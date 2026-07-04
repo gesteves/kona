@@ -3,6 +3,8 @@
 # superset of what the current-weather widget needs to spot today's race. Cached in Redis for
 # 10 minutes. `all` returns an array wrapped for dot-access.
 class Events < ApplicationService
+  include ContentfulConsumer
+
   QUERY = <<~GRAPHQL.freeze
     query {
       events: eventCollection {
@@ -40,15 +42,8 @@ class Events < ApplicationService
   # per-event weather endpoint. Cached in Redis for 5 minutes.
   # @return [OpenStruct, nil]
   def find(id)
-    return if id.blank?
-
-    item = rescue_with(context: "Error fetching event #{id}") do
-      cached_json("contentful:event:#{id}", expires_in: 5.minutes) do
-        underscore_keys(query_events(FIND_QUERY, { id: id })&.first)
-      end
-    end
-
-    item && DeepOstruct.wrap(item)
+    find_cached_item(id, query: FIND_QUERY, collection: :events,
+                         cache_key: "contentful:event", context: "Error fetching event #{id}")
   end
 
   # @return [Array<OpenStruct>]
@@ -72,10 +67,6 @@ class Events < ApplicationService
   # isn't configured or the request fails.
   def query_events(query, variables = nil)
     contentful.items(query, variables, collection: :events)
-  end
-
-  def contentful
-    @contentful ||= ContentfulClient.new(self.class.name)
   end
 
   def wrap(items)
