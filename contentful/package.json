@@ -15,7 +15,8 @@
     "taxonomy:validate-article": "node --env-file=.env scripts/add-taxonomy-validation.js",
     "taxonomy:validate-article:revert": "node --env-file=.env scripts/revert-taxonomy-validation.js",
     "taxonomy:remove-tags": "node --env-file=.env scripts/remove-tags.js",
-    "taxonomy:restore-tags": "node --env-file=.env scripts/restore-tags.js"
+    "taxonomy:restore-tags": "node --env-file=.env scripts/restore-tags.js",
+    "taxonomy:delete-tags": "node --env-file=.env scripts/delete-tags.js"
   },
   "dependencies": {
     "contentful-management": "^11.0.0",

@@ -81,6 +81,7 @@ Run order (additive-first, so the site never has a window with missing categorie
 | 3 | `taxonomy:assign` | Set each article's `metadata.concepts` (tags 1:1 + race concept). Idempotent, skip-unchanged, publish-preserving. Rehearse with `DRY_RUN`/`ENTRY_ID`/a sandbox env. |
 | — | *(deploy web + api)* | Both apps read concepts with a legacy-tag fallback, so deploy order is safe. |
 | 4 | `taxonomy:remove-tags` | **Phase 5 only**, after everything's verified in production: strip the migrated `metadata.tags` (private tags like `short` are preserved). Second republish of tagged entries. |
+| 5 | `taxonomy:delete-tags` | **Phase 5, last step**, after `taxonomy:remove-tags`: delete the migrated tag *definitions* from the space (keeps `short`; leaves any non-migrated tag alone and reports it). |
 
 Inverses: `taxonomy:unassign` (clear concepts), `taxonomy:delete` (remove scheme +
 concepts — refuses while any entry still links one, so unassign first),
@@ -155,6 +156,10 @@ script needed:
   remove the migrated `metadata.tags` / rebuild them from concepts. Non-concept tags (e.g.
   the private `short` marker) are preserved by remove and merged back by restore; race
   concepts, which were never tags, are skipped.
+- **`taxonomy:delete-tags`** (`scripts/delete-tags.js`) — deletes the migrated tag
+  *definitions* from the space (final step, after `taxonomy:remove-tags`). Keeps `short`,
+  leaves any non-migrated tag untouched and reports it, and skips (reports) any tag a
+  lingering reference blocks from deletion. No clean inverse — the space export is the safety net.
 
 ## Recommended workflow for destructive migrations
 
