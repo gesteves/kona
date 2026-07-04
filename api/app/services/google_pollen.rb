@@ -1,6 +1,8 @@
 # Fetches the pollen forecast from the Google Pollen API. The raw response is cached in
 # Redis for an hour. `data` returns it wrapped for dot-access (keys snake_cased), or nil.
 class GooglePollen < ApplicationService
+  include GoogleApi
+
   GOOGLE_POLLEN_API_URL = "https://pollen.googleapis.com/v1"
 
   def initialize(latitude, longitude, days = 1)
@@ -27,7 +29,7 @@ class GooglePollen < ApplicationService
         days: @days,
         plantsDescription: 0,
         languageCode: "en",
-        key: ENV["GOOGLE_API_KEY"]
+        key: google_api_key
       }
       get_json("#{GOOGLE_POLLEN_API_URL}/forecast:lookup", query: query)
     end

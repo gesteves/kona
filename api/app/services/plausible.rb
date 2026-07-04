@@ -3,9 +3,26 @@
 class Plausible < ApplicationService
   PLAUSIBLE_API_URL = "https://plausible.io/api/v2/query"
 
+  # The Plausible site id (the domain the dashboard lives under), or nil when unconfigured.
+  attr_reader :site_id
+
   def initialize
     @access_token = ENV["PLAUSIBLE_API_KEY"]
     @site_id = ENV["PLAUSIBLE_SITE_ID"]
+  end
+
+  # The public dashboard URL for one page's stats over a date range, or nil when the site id
+  # isn't configured. URL-encodes the path before interpolating it into the query string; a
+  # slug containing URL-special characters would otherwise corrupt the f=is,page filter /
+  # inject params.
+  # @param path [String] The page path (e.g. "/2026/05/01/my-race-report/").
+  # @param from [String] The range start (YYYY-MM-DD).
+  # @param to [String] The range end (YYYY-MM-DD).
+  # @return [String, nil]
+  def dashboard_url(path:, from:, to:)
+    return if @site_id.blank?
+    encoded_path = ERB::Util.url_encode(path)
+    "https://plausible.io/#{@site_id}?f=is,page,#{encoded_path}&period=custom&from=#{from}&to=#{to}&r=v2"
   end
 
   # @return [Hash, nil] The parsed API response, or nil if unavailable.

@@ -3,6 +3,8 @@
 # timezone won't trigger the geocode/elevation calls — and cached in Redis (timezone for a
 # day, geocode and elevation indefinitely).
 class GoogleMaps < ApplicationService
+  include GoogleApi
+
   attr_reader :latitude, :longitude
 
   GOOGLE_MAPS_API_URL = "https://maps.googleapis.com/maps/api"
@@ -53,10 +55,6 @@ class GoogleMaps < ApplicationService
 
   private
 
-  def api_key
-    ENV["GOOGLE_API_KEY"]
-  end
-
   # Reverse-geocodes the coordinates into a human-readable address.
   # @see https://developers.google.com/maps/documentation/geocoding/requests-reverse-geocoding
   # @return [Hash, nil] The geocoding data, or nil if fetching fails.
@@ -67,7 +65,7 @@ class GoogleMaps < ApplicationService
       query = {
         latlng: "#{@latitude},#{@longitude}",
         result_type: "political",
-        key: api_key,
+        key: google_api_key,
         language: "en"
       }
       get_json("#{GOOGLE_MAPS_API_URL}/geocode/json", query: query)&.dig(:results, 0)
@@ -83,7 +81,7 @@ class GoogleMaps < ApplicationService
     cached_json("google:maps:elevation:#{@latitude}:#{@longitude}", expires_in: 1.day) do
       query = {
         locations: "#{@latitude},#{@longitude}",
-        key: api_key
+        key: google_api_key
       }
       get_json("#{GOOGLE_MAPS_API_URL}/elevation/json", query: query)&.dig(:results, 0)
     end
@@ -98,7 +96,7 @@ class GoogleMaps < ApplicationService
     cached_json("google:maps:time_zone:#{@latitude}:#{@longitude}", expires_in: 1.day) do
       query = {
         location: "#{@latitude},#{@longitude}",
-        key: api_key,
+        key: google_api_key,
         timestamp: Time.now.to_i
       }
       data = get_json("#{GOOGLE_MAPS_API_URL}/timezone/json", query: query)

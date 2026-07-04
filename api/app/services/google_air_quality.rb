@@ -2,6 +2,8 @@
 # no nearby sensor, e.g. outside the US). `aqi` returns { aqi:, category:, description: }
 # or nil.
 class GoogleAirQuality < ApplicationService
+  include GoogleApi
+
   GOOGLE_AQI_API_URL = "https://airquality.googleapis.com/v1"
 
   # Google's forecast endpoint only covers the next 96 hours (4 days); a dateTime beyond that
@@ -78,7 +80,7 @@ class GoogleAirQuality < ApplicationService
   def post_aqi(endpoint, body)
     post_json(
       "#{GOOGLE_AQI_API_URL}/#{endpoint}",
-      query: { key: ENV["GOOGLE_API_KEY"] },
+      query: { key: google_api_key },
       body: body.to_json,
       headers: { "Content-Type": "application/json" }
     )

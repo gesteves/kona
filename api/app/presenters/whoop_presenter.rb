@@ -118,6 +118,13 @@ class WhoopPresenter
     end
   end
 
+  # The Whoop referral link for the widget's footer, or nil when not configured (the view
+  # omits the footer). Read here so the view doesn't touch ENV.
+  # @return [String, nil]
+  def referral_url
+    ENV["WHOOP_REFERRAL_URL"].presence
+  end
+
   private
 
   # The time I last woke up, i.e. the end of the last sleep.
