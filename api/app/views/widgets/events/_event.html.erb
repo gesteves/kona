@@ -1,14 +1,14 @@
 <%#
   One event card for the races widget. Locals: `event`, `featured` (bool — expanded card),
   `event_weather` (EventWeatherPresenter or nil — the featured event's race-day weather),
-  `show_timestamp` (bool, default true — false for today's race, whose section heading already
-  says it's today).
+  `time_zone` (IANA id, for the live-tracking in-progress check), `show_timestamp` (bool,
+  default true — false for today's race, whose section heading already says it's today).
 %>
 <article class="entry entry--summary event<%= " event--is-featured" if featured %>" id="event-<%= event.sys.id.parameterize %>" aria-labelledby="hed-<%= event.sys.id.parameterize %>">
   <div class="event__inner">
     <header class="entry__header">
       <p class="entry__meta">
-        <% if featured %><%= event_live_tracking_tag(event, @time_zone, event_weather: event_weather) %><% end %>
+        <% if featured %><%= event_live_tracking_tag(event, time_zone, event_weather: event_weather) %><% end %>
         <% if local_assigns.fetch(:show_timestamp, true) %><%= event_timestamp_tag(event) %><% end %>
         <span><%= raw icon_svg("classic", "light", "location-dot") %> <%= event.location %></span>
       </p>

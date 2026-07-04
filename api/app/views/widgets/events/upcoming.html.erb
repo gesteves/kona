@@ -7,36 +7,36 @@
   remaining races follow under "Upcoming Races".
 %>
 <div class="collection-group" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= live_update_url %>" data-action="visibilitychange@document->live-update#handleVisibilityChange">
-  <% if @todays_race %>
+  <% if @races.todays_race %>
     <section class="collection collection--single collection--has-featured" id="todays-race">
       <h2 class="collection__heading">Today’s Race</h2>
       <ol class="collection__list">
         <li class="collection__item">
           <%# show_timestamp: false — the "Today's Race" heading already says it's today. %>
-          <%= render "event", event: @todays_race, featured: true, event_weather: @event_weather, show_timestamp: false %>
+          <%= render "event", event: @races.todays_race, featured: true, event_weather: @races.event_weather, time_zone: @races.time_zone, show_timestamp: false %>
         </li>
       </ol>
     </section>
-    <% if @other_races.present? %>
-      <section class="collection collection--<%= event_collection_variant(@other_races.size, featured: false) %>" id="upcoming-races">
+    <% if @races.other_races.present? %>
+      <section class="collection collection--<%= @races.other_races_variant %>" id="upcoming-races">
         <h2 class="collection__heading">Upcoming Races</h2>
         <ol class="collection__list">
-          <% @other_races.each do |event| %>
+          <% @races.other_races.each do |event| %>
             <li class="collection__item">
-              <%= render "event", event: event, featured: false, event_weather: nil %>
+              <%= render "event", event: event, featured: false, event_weather: nil, time_zone: @races.time_zone %>
             </li>
           <% end %>
         </ol>
       </section>
     <% end %>
   <% else %>
-    <section class="collection collection--<%= event_collection_variant(@upcoming.size, featured: @featured.present?) %><%= " collection--has-featured" if @featured %>" id="upcoming-races">
+    <section class="collection collection--<%= @races.variant %><%= " collection--has-featured" if @races.featured %>" id="upcoming-races">
       <h2 class="collection__heading">Upcoming Races</h2>
       <ol class="collection__list">
-        <% @upcoming.each do |event| %>
-          <% featured = event.sys&.id == @featured&.sys&.id %>
+        <% @races.races.each do |event| %>
+          <% featured = @races.featured_event?(event) %>
           <li class="collection__item">
-            <%= render "event", event: event, featured: featured, event_weather: (featured ? @event_weather : nil) %>
+            <%= render "event", event: event, featured: featured, event_weather: (featured ? @races.event_weather : nil), time_zone: @races.time_zone %>
           </li>
         <% end %>
       </ol>

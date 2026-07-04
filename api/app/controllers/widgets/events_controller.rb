@@ -7,37 +7,13 @@ module Widgets
     def upcoming
       # Edge SWR kept at a day (vs. the one-hour default): the upcoming-races list changes
       # rarely, so serving a stale copy while revalidating costs nothing.
-      cache_widget(ttl: 1.hour, edge_stale_while_revalidate: 1.day)
-
-      # The owner's configured timezone anchors "today"/"soon" for the race list (this widget
-      # doesn't track the owner's current location).
-      @time_zone = TimeZoneResolver.default
-      events = Events.new.all
-      @upcoming = helpers.upcoming_races(events, @time_zone)
-      return render_empty if @upcoming.blank?
-
-      @featured = @upcoming.first if helpers.featured?(@upcoming.first, @upcoming, @time_zone)
-      @event_weather = RaceDayWeather.new(@featured).presenter if @featured
-
-      # On race day the featured event is today's race; give it its own section.
-      @todays_race = @featured if @featured && helpers.today?(@featured, @time_zone)
-
-      # An upcoming (not-today) featured event only earns the expanded treatment when we actually
-      # have race-day weather to show. The featured window (close?, in the owner's timezone) and
-      # the weather-fetch window (days_until, computed in the event's own geocoded timezone) can
-      # disagree at the 10-day boundary, which would otherwise leave a featured card carrying an
-      # empty "Race Day Weather" block for an event that's effectively more than 10 days out. When
-      # the weather's missing, demote it to a regular upcoming race (and trim back to the
-      # non-featured count). Today's race keeps its section regardless — it's race day.
-      if @featured && !@todays_race && @event_weather&.forecast.blank?
-        @featured = nil
-        @event_weather = nil
-        @upcoming = @upcoming.take(3)
+      render_widget(:upcoming, ttl: 1.hour, edge_stale_while_revalidate: 1.day) do
+        # The owner's configured timezone anchors "today"/"soon" for the race list (this
+        # widget doesn't track the owner's current location). The selection/featuring
+        # decisions live in the presenter; the view reads everything through @races.
+        @races = UpcomingRacesPresenter.new(events: Events.new.all, time_zone: TimeZoneResolver.default)
+        @races.races
       end
-
-      @other_races = @upcoming.drop(1) if @todays_race
-
-      render :upcoming
     end
   end
 end
