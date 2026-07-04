@@ -80,14 +80,12 @@ Run order (additive-first, so the site never has a window with missing categorie
 | 2 | `taxonomy:validate-article` | Add the scheme as a taxonomy validation on the `article` type (shows the editor Taxonomy tab). |
 | 3 | `taxonomy:assign` | Set each article's `metadata.concepts` (tags 1:1 + race concept). Idempotent, skip-unchanged, publish-preserving. Rehearse with `DRY_RUN`/`ENTRY_ID`/a sandbox env. |
 | — | *(deploy web + api)* | Both apps read concepts with a legacy-tag fallback, so deploy order is safe. |
-| 4 | `taxonomy:remove-tags` | **Phase 5 only**, after everything's verified in production: strip `metadata.tags`. Second republish of tagged entries. |
-| 5 | `migrate:remove-event-field` | **Phase 5 only**, after `related_race_reports` is confirmed concept-driven: delete the `article` → `event` reference field. |
+| 4 | `taxonomy:remove-tags` | **Phase 5 only**, after everything's verified in production: strip the migrated `metadata.tags` (private tags like `short` are preserved). Second republish of tagged entries. |
 
 Inverses: `taxonomy:unassign` (clear concepts), `taxonomy:delete` (remove scheme +
 concepts — refuses while any entry still links one, so unassign first),
 `taxonomy:validate-article:revert`, `taxonomy:restore-tags` (rebuild tags from concepts,
-skipping race concepts), `migrate:remove-event-field:revert` (re-create the field —
-**cannot** restore the per-entry links; the space export backup is the real safety net).
+skipping race concepts).
 
 Every script supports `DRY_RUN` / `ENTRY_ID` / `CONTENTFUL_ENVIRONMENT` as above.
 
@@ -154,14 +152,13 @@ script needed:
 - **`taxonomy:validate-article`** / **`:revert`** — add / clear the article taxonomy
   validation.
 - **`taxonomy:remove-tags`** (`scripts/remove-tags.js`) / **`taxonomy:restore-tags`** —
-  strip / rebuild `metadata.tags` (restore skips race concepts, which were never tags).
-- **`migrate:remove-event-field`** (`scripts/remove-article-event-field.js`) / **`:revert`**
-  — delete / re-create the `article` `event` reference field (the `event` content type and
-  its entries stay for the Upcoming Races widget).
+  remove the migrated `metadata.tags` / rebuild them from concepts. Non-concept tags (e.g.
+  the private `short` marker) are preserved by remove and merged back by restore; race
+  concepts, which were never tags, are skipped.
 
 ## Recommended workflow for destructive migrations
 
-1. **Backup**: `npx --yes contentful-cli space export --space-id "$CONTENTFUL_SPACE" --management-token "$CONTENTFUL_MANAGEMENT_TOKEN" --environment-id master`
+1. **Backup**: `npm run backup` (exports the space via contentful-cli, loading `.env`).
 2. **Dry-run** and review the diffs (`DRY_RUN=true npm run …`).
 3. Optionally test on a **sandbox environment** (`CONTENTFUL_ENVIRONMENT=sandbox`) or a
    **single entry** (`ENTRY_ID=…`) first.

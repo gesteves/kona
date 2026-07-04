@@ -306,26 +306,19 @@ module ArticleHelpers
     "#{indefinite_article} #{minutes}-minute read"
   end
 
-  # Finds related race reports from the same event as the current article. Memoized — the
-  # article template consults this once to pick a section and the partial again to render it.
+  # Finds other race reports for the same race as the current article, grouped by the shared
+  # Races-branch concept. Memoized — the article template consults this once to pick a section
+  # and the partial again to render it.
   # @param article [Object] The current article to find race reports for.
   # @param count [Integer] (Optional) The number of race reports to return.
-  # @return [Array<Object>] A list of race reports from the same event, sorted by publication date in reverse chronological order.
+  # @return [Array<Object>] A list of race reports for the same race, sorted by publication date in reverse chronological order.
   def related_race_reports(article, count: 4)
     race_id = race_concept_id(article)
-    event_id = article.event&.sys&.id
-    return [] if race_id.nil? && event_id.nil?
+    return [] if race_id.nil?
 
     memoize_by_key(:@related_race_reports, [article.slug, count]) do
-      # Group by the shared Races concept once assigned; fall back to the legacy event link
-      # during the transition (and before Phase 5 removes the article→event field).
-      peers = if race_id
-        published_articles.select { |a| race_report?(a) && race_concept_id(a) == race_id }
-      else
-        published_articles.select { |a| a.event&.sys&.id == event_id }
-      end
-
-      peers
+      published_articles
+        .select { |a| race_report?(a) && race_concept_id(a) == race_id }
         .reject { |a| a.slug == article.slug }
         .reject { |a| a.entry_type == 'Short' }
         .sort_by { |a| -published_datetime(a).to_i }

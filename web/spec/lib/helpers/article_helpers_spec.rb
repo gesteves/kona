@@ -6,7 +6,7 @@ require 'padrino-helpers'
 RSpec.describe ArticleHelpers do
   # Builds an article double shaped like a `data.articles` entry (dot-access, nested tags/event).
   def article(slug:, title: 'Title', tags: [], published_at: '2024-01-01T10:00:00Z',
-              entry_type: 'Article', draft: false, event_id: nil, index_in_search_engines: true,
+              entry_type: 'Article', draft: false, index_in_search_engines: true,
               intro: nil, body: nil, summary: nil)
     OpenStruct.new(
       slug: slug,
@@ -19,7 +19,6 @@ RSpec.describe ArticleHelpers do
       intro: intro,
       body: body,
       summary: summary,
-      event: event_id && OpenStruct.new(sys: OpenStruct.new(id: event_id)),
       contentful_metadata: OpenStruct.new(tags: tags.map { |id| OpenStruct.new(id: id, name: id.capitalize) })
     )
   end
@@ -306,11 +305,9 @@ RSpec.describe ArticleHelpers do
         expect(related_race_reports(a2025).map(&:slug)).to eq(['cda-2024'])
       end
 
-      it 'falls back to the legacy event link when no race concept is assigned' do
-        a1 = article(slug: 'e1', event_id: 'evt', published_at: '2025-01-01T00:00:00Z')
-        a2 = article(slug: 'e2', event_id: 'evt', published_at: '2024-01-01T00:00:00Z')
-        stub_corpus([a1, a2])
-        expect(related_race_reports(a1).map(&:slug)).to eq(['e2'])
+      it 'returns nothing when the article has no race concept' do
+        stub_corpus([tagged_article(slug: 'solo', concepts: [concept('running', 'Running', path: '/tagged/running')])])
+        expect(related_race_reports(article(slug: 'solo'))).to eq([])
       end
     end
   end

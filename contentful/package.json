@@ -15,9 +15,7 @@
     "taxonomy:validate-article": "node --env-file=.env scripts/add-taxonomy-validation.js",
     "taxonomy:validate-article:revert": "node --env-file=.env scripts/revert-taxonomy-validation.js",
     "taxonomy:remove-tags": "node --env-file=.env scripts/remove-tags.js",
-    "taxonomy:restore-tags": "node --env-file=.env scripts/restore-tags.js",
-    "migrate:remove-event-field": "node --env-file=.env scripts/remove-article-event-field.js",
-    "migrate:remove-event-field:revert": "node --env-file=.env scripts/restore-article-event-field.js"
+    "taxonomy:restore-tags": "node --env-file=.env scripts/restore-tags.js"
   },
   "dependencies": {
     "contentful-management": "^11.0.0",

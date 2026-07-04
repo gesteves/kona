@@ -66,11 +66,6 @@ module ContentfulClient
           coverImage {
             ...ImageFields
           }
-          event {
-            sys {
-              ...SysFields
-            }
-          }
           sys {
             ...SysFields
           }
