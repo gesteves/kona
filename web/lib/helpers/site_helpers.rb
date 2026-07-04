@@ -126,26 +126,14 @@ module SiteHelpers
     ].flatten.max
   end
 
-  # Build-level cache for copyright_start_year. Helper instance variables don't survive
-  # across Middleman's per-page template contexts, so the memo lives on the module, keyed by
-  # the data collection's identity (a dev-server data reload produces a new collection and
-  # recomputes).
-  class << self
-    attr_accessor :copyright_year_cache
-  end
-
   # The year the earliest non-draft article was published — the start of the copyright range.
-  # Computed once per build: it renders in the footer of every page, and each computation
-  # parses every article's publish date.
+  # Computed once per build (memoize_by_collection): it renders in the footer of every page,
+  # and each computation parses every article's publish date.
   # @return [String] e.g. "2006".
   def copyright_start_year
-    articles = data.articles
-    cached_key, cached_year = SiteHelpers.copyright_year_cache
-    return cached_year if cached_key == articles.object_id
-
-    year = articles.reject(&:draft).map { |a| published_datetime(a) }.min.strftime('%Y')
-    SiteHelpers.copyright_year_cache = [articles.object_id, year]
-    year
+    memoize_by_collection(:copyright_start_year, data.articles) do
+      published_articles.map { |a| published_datetime(a) }.min.strftime('%Y')
+    end
   end
 
   # Returns a range of years, from the year the earliest article was published to the current year.

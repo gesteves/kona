@@ -8,12 +8,9 @@ module AffiliateLinksHelpers
   # @param content [Object] The content object which may contain affiliate links in its intro or body.
   # @return [Boolean] True if affiliate links are found, otherwise false.
   def has_amazon_associates_links?(content)
-    @has_amazon_associates_links ||= {}
-    key = content.sys&.id
-    return scan_for_amazon_associates_links(content) if key.blank?
-
-    @has_amazon_associates_links[key] = scan_for_amazon_associates_links(content) unless @has_amazon_associates_links.key?(key)
-    @has_amazon_associates_links[key]
+    memoize_by_key(:@has_amazon_associates_links, content.sys&.id) do
+      scan_for_amazon_associates_links(content)
+    end
   end
 
   # @see #has_amazon_associates_links?

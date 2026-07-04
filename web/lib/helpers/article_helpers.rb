@@ -247,11 +247,9 @@ module ArticleHelpers
   # @param article [Object] The article.
   # @return [Integer] The number of words.
   def article_word_count(article)
-    @article_word_counts ||= {}
-    key = article.sys&.id
-    return compute_article_word_count(article) if key.blank?
-
-    @article_word_counts[key] ||= compute_article_word_count(article)
+    memoize_by_key(:@article_word_counts, article.sys&.id) do
+      compute_article_word_count(article)
+    end
   end
 
   # @see #article_word_count
@@ -286,12 +284,13 @@ module ArticleHelpers
   def related_race_reports(article, count: 4)
     return [] unless article.event&.sys&.id
 
-    @related_race_reports ||= {}
-    @related_race_reports[[article.slug, count]] ||= published_articles
-      .select { |a| a.event&.sys&.id == article.event.sys.id }
-      .reject { |a| a.slug == article.slug }
-      .reject { |a| a.entry_type == 'Short' }
-      .sort_by { |a| -published_datetime(a).to_i }
-      .take(count)
+    memoize_by_key(:@related_race_reports, [article.slug, count]) do
+      published_articles
+        .select { |a| a.event&.sys&.id == article.event.sys.id }
+        .reject { |a| a.slug == article.slug }
+        .reject { |a| a.entry_type == 'Short' }
+        .sort_by { |a| -published_datetime(a).to_i }
+        .take(count)
+    end
   end
 end

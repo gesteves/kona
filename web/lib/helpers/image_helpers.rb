@@ -13,24 +13,13 @@ module ImageHelpers
     url.split('/')[4]
   end
 
-  # Build-level cache for asset_index. Helper instance variables don't survive across
-  # Middleman's per-page template contexts, so the memo lives on the module, keyed by the
-  # data collection's identity (a dev-server data reload produces a new collection and
-  # rebuilds the index).
-  class << self
-    attr_accessor :asset_index_cache
-  end
-
-  # Returns a hash of assets keyed by sys.id for O(1) lookups, built once per build.
+  # Returns a hash of assets keyed by sys.id for O(1) lookups, built once per build
+  # (memoize_by_collection).
   # @return [Hash] A hash mapping asset IDs to asset objects.
   def asset_index
-    assets = data.assets
-    cached_key, cached_index = ImageHelpers.asset_index_cache
-    return cached_index if cached_key == assets.object_id
-
-    index = assets.each_with_object({}) { |a, h| h[a.sys.id] = a }
-    ImageHelpers.asset_index_cache = [assets.object_id, index]
-    index
+    memoize_by_collection(:asset_index, data.assets) do
+      data.assets.each_with_object({}) { |a, h| h[a.sys.id] = a }
+    end
   end
 
   # Retrieves the dimensions (width and height) of an asset by its ID.
