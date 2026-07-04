@@ -6,7 +6,7 @@
   </header>
 
   <% if content.description.present? %>
-    <div class="blog__description"><%= markdown_to_html(content.description) %></div>
+    <div class="blog__description"><%= render_tag_description(content.description) %></div>
   <% end %>
 
   <%= partial 'partials/blog_list', locals: { content: content } %>

@@ -62,6 +62,21 @@ module MarkupHelpers
     end
   end
 
+  # Renders a taxonomy concept's description (shown on its /tagged archive page). A trimmed
+  # version of the body pipeline for short prose: no images/figures/tables, just the inline
+  # treatments that make sense here — external links open in a new tab, unit spans get the
+  # units controller, and affiliate links are marked. Affiliate marking runs last so its
+  # rel/target wins over the external-link pass on Amazon links (as in render_body).
+  # @param text [String] The Markdown description.
+  # @return [String] The rendered HTML.
+  def render_tag_description(text)
+    render_markup(text) do |doc|
+      open_external_links_in_new_tabs(doc)
+      add_unit_data_attributes(doc)
+      mark_affiliate_links(doc)
+    end
+  end
+
   # Prepends the title of the entry to the body.
   # @param title [String] The title of the entry.
   # @param html [String] The rendered HTML of the body of the entry.

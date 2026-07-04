@@ -82,6 +82,24 @@ RSpec.describe MarkupHelpers do
     end
   end
 
+  describe '#render_tag_description' do
+    it 'renders Markdown and applies the external-link, unit, and affiliate transforms' do
+      allow(self).to receive(:amazon_associates_link?).with(external_link).and_return(false)
+      text = "Run [10 km](#{external_link}) in the [shoes](#{affiliate_link}) I use, over <span data-imperial=\"6.21 mi\">10 km</span>."
+      html = render_tag_description(text)
+
+      expect(html).to include('<p>')
+      # External (non-affiliate) link opens in a new tab.
+      expect(html).to include("<a href=\"#{external_link}\" rel=\"noopener\" target=\"_blank\">10 km</a>")
+      # Affiliate link is marked sponsored — its pass runs last, so it wins over the external pass.
+      expect(html).to include('rel="sponsored nofollow noopener"')
+      expect(html).to include("href=\"#{affiliate_link}\"")
+      # Unit span is wired to the units controller.
+      expect(html).to include('data-controller="units"')
+      expect(html).to include('data-units-imperial-value="6.21 mi"')
+    end
+  end
+
   describe '#set_caption_credit' do
     context 'when given a figcaption with a separator' do
       it 'wraps the credit in a cite tag' do
