@@ -109,11 +109,11 @@ class Contentful
       concept_ids = Array(cm[:concepts]).map { |c| c[:id] }.compact
 
       cm[:tags] = if concept_ids.any? && taxo.any?
-        concept_ids.filter_map { |cid| taxo[cid] }.map { |c| c.slice(:id, :name, :parent_id, :path) }
+        concept_ids.filter_map { |cid| taxo[cid] }.map { |c| c.slice(:id, :name, :short_name, :parent_id, :path) }
       else
         Array(cm[:tags]).map do |t|
           info = taxo[t[:id]]
-          { id: t[:id], name: t[:name], parent_id: info&.dig(:parent_id), path: info&.dig(:path) || "/tagged/#{t[:id]}" }
+          { id: t[:id], name: t[:name], short_name: t[:name], parent_id: info&.dig(:parent_id), path: info&.dig(:path) || "/tagged/#{t[:id]}" }
         end
       end
       cm.delete(:concepts)
@@ -390,16 +390,27 @@ class Contentful
     concepts.each do |c|
       id = c.dig('sys', 'id')
       next if id.blank?
+      name = localized(c['prefLabel'])
+      synonyms = Array(localized(c['altLabels']))
       by_id[id] = {
         id: id,
-        name: localized(c['prefLabel']),
+        name: name,
+        short_name: shortest_label(name, synonyms),
         parent_id: Array(c['broader']).first&.dig('sys', 'id'),
         description: localized(c['definition']),
-        synonyms: Array(localized(c['altLabels']))
+        synonyms: synonyms
       }
     end
     by_id.each_value { |c| c[:path] = concept_path(c[:id], by_id) }
     by_id
+  end
+
+  # The most compact label for a concept's chip: the shortest of its name and its synonyms
+  # (altLabels), preferring the name on ties. So adding a short altLabel like "Coeur d'Alene"
+  # to "Ironman 70.3 Coeur d'Alene" shows the short one in chips, while the full name is still
+  # used for the archive title, breadcrumb, and JSON-LD keywords.
+  def shortest_label(name, synonyms)
+    ([name].compact + Array(synonyms)).reject(&:blank?).min_by(&:length) || name
   end
 
   # Fetches every concept from the delivery taxonomy endpoint (CPA host + preview token, same

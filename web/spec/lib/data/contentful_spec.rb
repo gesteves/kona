@@ -198,6 +198,12 @@ RSpec.describe Contentful do
         expect(taxo['cda'][:path]).to eq('/tagged/races/cda')
       end
 
+      it 'derives short_name as the shortest of the name and synonyms (name wins ties)' do
+        taxo = importer_with.send(:taxonomy)
+        expect(taxo['ironman-703'][:short_name]).to eq('70.3')       # shorter than the name + "Half Ironman"
+        expect(taxo['triathlon'][:short_name]).to eq('Triathlon')    # no synonyms → the name
+      end
+
       it 'is empty (fallback) when the endpoint yields nothing' do
         expect(importer_with(concepts: []).send(:taxonomy)).to eq({})
       end
@@ -213,6 +219,7 @@ RSpec.describe Contentful do
         tags = instance.instance_variable_get(:@content)[:articles].first[:contentful_metadata][:tags]
         expect(tags.map { |t| t[:id] }).to eq(['ironman-703', 'cda'])
         expect(tags.map { |t| t[:path] }).to eq(['/tagged/triathlon/ironman-703', '/tagged/races/cda'])
+        expect(tags.map { |t| t[:short_name] }).to eq(['70.3', 'CdA'])
         expect(instance.instance_variable_get(:@content)[:articles].first[:contentful_metadata]).not_to have_key(:concepts)
       end
 
@@ -220,7 +227,7 @@ RSpec.describe Contentful do
         instance = importer_with(concepts: [], articles: [article_with(tags: [{ id: 'gear', name: 'Gear' }])])
         instance.send(:apply_taxonomy_to_articles)
         tags = instance.instance_variable_get(:@content)[:articles].first[:contentful_metadata][:tags]
-        expect(tags).to eq([{ id: 'gear', name: 'Gear', parent_id: nil, path: '/tagged/gear' }])
+        expect(tags).to eq([{ id: 'gear', name: 'Gear', short_name: 'Gear', parent_id: nil, path: '/tagged/gear' }])
       end
     end
 

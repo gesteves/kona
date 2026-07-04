@@ -24,7 +24,7 @@
       <% else %>
         <%= icon_svg("classic", "light", "tags") %>
       <% end %>
-      <%= article.contentful_metadata.tags.sort_by(&:name).map { |tag| link_to tag.name, tag.path }.join(', ') %>
+      <%= article.contentful_metadata.tags.sort_by(&:short_name).map { |tag| link_to tag.short_name, tag.path }.join(', ') %>
     </span>
   <% end %>
 </p>
