@@ -9,3 +9,6 @@ tmp/
 
 # Agent skills
 .agents/
+
+README.md
+CLAUDE.md
