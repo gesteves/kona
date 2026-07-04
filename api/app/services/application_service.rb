@@ -59,7 +59,20 @@ class ApplicationService
   # with_retries quietly skips HTTP-level failures; this variant makes them retryable.)
   # @raise [RuntimeError] on a non-success response.
   def get_json!(url, symbolize: true, **options)
-    response = HTTParty.get(url, **options)
+    parse_json!(HTTParty.get(url, **options), symbolize: symbolize)
+  end
+
+  # Like post_json, but raises on a non-success response instead of swallowing it to nil.
+  # @see #get_json!
+  # @raise [RuntimeError] on a non-success response.
+  def post_json!(url, symbolize: true, **options)
+    parse_json!(HTTParty.post(url, **options), symbolize: symbolize)
+  end
+
+  # @param response [HTTParty::Response]
+  # @return [Object] The parsed body.
+  # @raise [RuntimeError] when the response was not successful.
+  def parse_json!(response, symbolize: true)
     raise "HTTP #{response.code} from #{response.request&.last_uri}" unless response.success?
 
     JSON.parse(response.body, symbolize_names: symbolize)

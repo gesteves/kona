@@ -21,12 +21,10 @@ class Embeddings < ApplicationService
   def embed(text)
     return if @api_key.blank? || text.blank?
 
-    # NB: post_json returns nil on an HTTP error rather than raising, so with_retries only
-    # actually retries network-level exceptions (timeouts etc.), not HTTP 4xx/5xx responses.
-    # Switching to a raising variant (see get_json!) would newly retry HTTP errors — a
-    # deliberate behavior change to make separately if wanted.
+    # post_json! raises on an HTTP error, so with_retries covers Voyage 4xx/5xx responses
+    # (with backoff) as well as network-level exceptions, returning nil once exhausted.
     with_retries do
-      data = post_json(
+      data = post_json!(
         VOYAGE_API_URL,
         headers: { "Authorization" => "Bearer #{@api_key}", "Content-Type" => "application/json" },
         body: {

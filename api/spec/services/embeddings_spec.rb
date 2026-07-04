@@ -45,9 +45,13 @@ RSpec.describe Embeddings do
     expect(HTTParty).not_to have_received(:post)
   end
 
-  it "returns nil when the API responds with an error" do
+  it "retries on an HTTP error response and returns nil once exhausted" do
+    allow(embeddings).to receive(:sleep) # skip the real backoff
     allow(HTTParty).to receive(:post)
       .and_return(instance_double(HTTParty::Response, success?: false, code: 429, body: "", request: nil))
+
     expect(embeddings.embed("Some text")).to be_nil
+    # The first attempt plus with_retries' three retries.
+    expect(HTTParty).to have_received(:post).exactly(4).times
   end
 end
