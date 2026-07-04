@@ -1,7 +1,7 @@
 # Built files
 build/
 node_modules/
-source/javascripts/site.js
+tmp/
 
 # Vendor files
 **/vendor/**

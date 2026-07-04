@@ -2,9 +2,11 @@
 
 Middleman 4 static site generator (Ruby 4.0.5) that builds a **Contentful**-powered
 blog and deploys to **Netlify**. esbuild bundles JavaScript (Stimulus + Turbo) and the
-**Web Awesome** (Pro) component theme CSS; Sass compiles the rest of the stylesheets.
-UI components (toasts, form controls, skeletons, relative time, scroller) come from
-Web Awesome Pro, imported in `source/javascripts/stimulus/index.js`.
+**Web Awesome** (Pro) component theme CSS via Middleman's external pipeline (`config.rb`):
+Middleman runs esbuild itself, into the gitignored `tmp/dist/`, during both `middleman build`
+(one-shot) and the dev server (watch mode) — there's no separate JS build step. Sass compiles
+the rest of the stylesheets. UI components (toasts, form controls, skeletons, relative time,
+scroller) come from Web Awesome Pro, imported in `source/javascripts/stimulus/index.js`.
 
 This app no longer fetches its own weather / activity / Whoop data — that moved to the
 `api/` app and is loaded at runtime. See the root [`CLAUDE.md`](../CLAUDE.md) for the
@@ -35,17 +37,13 @@ bundle exec rake test
 
 # Local dev
 bundle exec rake import          # fetch fresh data first
-bundle exec middleman            # dev server
-npm run watch                    # JS/CSS rebuild on change (separate terminal)
+bundle exec middleman            # dev server (also runs the esbuild watcher — no separate terminal)
 
 # Lint / format
 npm run lint:scss                # stylelint (fix: npm run lint:scss:fix)
 npm run format:check             # prettier for JS/JSON/MD (fix: npm run format)
 
-# JS build — required after any JS change
-npm run build
-
-# Full production build: test → import → npm build → middleman build
+# Full production build: test → import → middleman build (esbuild runs inside it)
 bundle exec rake build:verbose
 ```
 
@@ -93,8 +91,8 @@ Names only — see `.env.example`; never commit values.
 ## Conventions & gates
 
 - **Before committing** (non-negotiable): `bundle exec rake test` passes →
-  `npm run lint:scss` + `npm run format:check` clean → `npm run build` if you changed
-  JS → `bundle exec rake build:verbose` succeeds. Follow `.editorconfig`.
+  `npm run lint:scss` + `npm run format:check` clean → `bundle exec rake build:verbose`
+  succeeds (it builds the JS bundle via the external pipeline). Follow `.editorconfig`.
 - **Netlify**: build tools must be in `dependencies`, not `devDependencies` — Netlify
   installs with `NODE_ENV=production` and skips `devDependencies`.
 - **Tests** live in `spec/` and focus on helpers, text/markdown processing, and data

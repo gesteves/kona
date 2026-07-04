@@ -1,7 +1,7 @@
 {
   "scripts": {
-    "build": "esbuild source/javascripts/stimulus/index.js --bundle --minify --target=es2020 --outfile=source/javascripts/site.js",
-    "watch": "esbuild source/javascripts/stimulus/index.js --bundle --target=es2020 --outfile=source/javascripts/site.js --watch",
+    "build": "esbuild source/javascripts/stimulus/index.js --bundle --minify --target=es2020 --outfile=tmp/dist/javascripts/site.js",
+    "watch": "esbuild source/javascripts/stimulus/index.js --bundle --target=es2020 --outfile=tmp/dist/javascripts/site.js --watch=forever",
     "lint:scss": "stylelint \"source/stylesheets/**/*.scss\"",
     "lint:scss:fix": "stylelint \"source/stylesheets/**/*.scss\" --fix",
     "format": "prettier --write \"**/*.{js,json,md}\"",

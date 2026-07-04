@@ -9,6 +9,19 @@ end
 config[:css_dir]             = 'stylesheets'
 config[:js_dir]              = 'javascripts'
 config[:images_dir]          = 'images'
+
+# esbuild bundles the Stimulus/Turbo JS (and the Web Awesome CSS it imports) into tmp/dist,
+# which Middleman ingests as if it lived in source/ — so asset_hash applies and the
+# /javascripts/site.* paths are unchanged. `middleman build` runs the one-shot build and waits
+# for it; the dev server runs the watcher (esbuild needs --watch=forever there — Middleman
+# spawns it without stdin, and plain --watch exits when stdin closes), so no separate
+# `npm run watch` terminal is needed.
+activate :external_pipeline,
+  name: :esbuild,
+  command: build? ? 'npm run build' : 'npm run watch',
+  source: 'tmp/dist',
+  latency: 1
+
 activate :gzip
 activate :dotenv
 activate :autoprefixer do |config|

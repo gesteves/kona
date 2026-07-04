@@ -34,9 +34,8 @@ Requirements: Ruby, Node, and the [Netlify CLI](https://docs.netlify.com/cli/get
 1. Add the environment variables to `.env` (or the site config in Netlify).
 2. Install dependencies: `bundle install` and `npm install` (the latter needs `WEBAWESOME_NPM_TOKEN` set — see Web Awesome Pro above).
 3. Build the site (runs the data import): `netlify build`.
-4. Start the local server: `netlify dev`.
-5. In another tab, watch JS/CSS: `npm run watch`.
-6. To refresh data without a full rebuild: `bundle exec rake import`.
+4. Start the local server: `netlify dev` (the Middleman dev server runs the esbuild watcher itself, so JS/CSS rebuild on change automatically).
+5. To refresh data without a full rebuild: `bundle exec rake import`.
 
 ## Common commands
 
@@ -47,8 +46,6 @@ Requirements: Ruby, Node, and the [Netlify CLI](https://docs.netlify.com/cli/get
 | `bundle exec rake import:icons` | Import Font Awesome icons only |
 | `bundle exec rake import:standard_site` | Fetch standard.site verification data from the API |
 | `bundle exec rake test` | Run the test suite |
-| `bundle exec rake build:verbose` | Full build: test → import → JS build → Middleman |
-| `npm run build` | Build the JavaScript bundle (required after JS changes) |
-| `npm run watch` | Rebuild JS/CSS on change |
+| `bundle exec rake build:verbose` | Full build: test → import → Middleman (which runs the JS build) |
 | `npm run lint:scss` / `npm run format:check` | Lint SCSS / check JS, JSON, MD formatting |
-| `bundle exec rake redis:empty` | Flush the Redis cache |
+| `bundle exec rake redis:clear` | Flush the Redis cache |
