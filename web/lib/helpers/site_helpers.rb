@@ -293,6 +293,27 @@ module SiteHelpers
     "#{full_url(path)}##{fragment}"
   end
 
+  # Generates a JSON-LD CollectionPage schema for a taxonomy archive page (`/tagged/*`),
+  # declaring the page as a collection about its topic, with the concept's description as the
+  # page description. References the sitewide WebSite node by @id rather than duplicating it.
+  # @param content [Object] The proxied tag-page object (title = concept name; summary/description).
+  # @see https://schema.org/CollectionPage
+  # @return [String] A JSON-LD formatted string.
+  def collection_page_schema(content)
+    {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      "name": sanitize(content.title),
+      "description": sanitize(content_summary(content)),
+      "url": canonical_url,
+      "about": {
+        "@type": "Thing",
+        "name": sanitize(content.title)
+      },
+      "isPartOf": { "@id": schema_entity_id('website') }
+    }.to_json
+  end
+
   # The author's social-profile URLs for schema.org `sameAs` (the feed is excluded — it isn't a
   # social profile). Shared by the Organization and Person nodes in the entity graph.
   # @return [Array<String>] Social profile URLs, or an empty array when none are configured.

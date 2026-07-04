@@ -28,6 +28,21 @@ RSpec.describe SiteHelpers do
     end
   end
 
+  describe '#collection_page_schema' do
+    def content_summary(content) = "About #{content.title}."
+    def canonical_url = 'https://example.com/tagged/triathlon/'
+
+    it 'declares a CollectionPage about the topic, tied to the WebSite node' do
+      schema = JSON.parse(collection_page_schema(OpenStruct.new(title: 'Triathlon')))
+      expect(schema['@type']).to eq('CollectionPage')
+      expect(schema['name']).to eq('Triathlon')
+      expect(schema['description']).to eq('About Triathlon.')
+      expect(schema['url']).to eq('https://example.com/tagged/triathlon/')
+      expect(schema['about']).to eq('@type' => 'Thing', 'name' => 'Triathlon')
+      expect(schema['isPartOf']).to eq('@id' => 'https://example.com/#website')
+    end
+  end
+
   describe '#author_same_as' do
     it 'returns social destinations, excluding the feed' do
       @site = site(socials: [['Feed', '/feed.xml'], ['Bluesky', 'https://bsky.app/x'], ['Mastodon', 'https://m.test/x']])
