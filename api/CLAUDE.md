@@ -117,8 +117,9 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   caught by the trailing `match "*unmatched"` route → `ApplicationController#route_not_found`
   (plain-text 404), instead of raising `ActionController::RoutingError`. This is what keeps
   scanner probes (`/api/.env`, `/wp-login.php`, …) to a single clean `status=404` lograge line
-  rather than an exception backtrace. ⚠️ That catch-all **must stay the last route** in
-  `routes.rb` or it will shadow everything below it.
+  rather than an exception backtrace. That catch-all **must stay the last route** in
+  `routes.rb` or it will shadow everything below it — enforced by
+  `spec/routing/routes_guard_spec.rb`.
 - **Abuse mitigation** — `config/initializers/rack_attack.rb` (rack-attack middleware, wired
   up in `application.rb`). The origin is hit directly by vulnerability scanners, so it
   blocklists obvious probe paths (a flat 403 by **path pattern**, before routing) and throttles
@@ -129,10 +130,11 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   legitimate widget traffic shares the Netlify egress IPs, so an IP ban would 403 every
   visitor's widgets at once (this once took the site down). Same reason: do **not** add a
   blanket per-IP throttle.
-  ⚠️ The throttle treats anything outside `RACK_ATTACK_KNOWN_PREFIXES` (`/up`, `/api`, `/widgets`,
+  The throttle treats anything outside `RACK_ATTACK_KNOWN_PREFIXES` (`/up`, `/api`, `/widgets`,
   `/webhooks`, `/whoop`, `/sidekiq`, `/login`, `/logout`, `/auth`, `/`) as a probe: **if you add a top-level route, add
   its prefix there** or it will be rate-limited (the `/sidekiq` UI and the OAuth login routes are
-  in the list for exactly this reason). Disabled in the
+  in the list for exactly this reason) — a missing prefix fails
+  `spec/routing/routes_guard_spec.rb`. Disabled in the
   test env (`Rack::Attack.enabled`); counters live in Redis (in-memory under test).
 - **Redis** — global `$redis` from `config/initializers/redis.rb`, configured via `REDIS_URL`.
   In production this is the API's own dedicated `kona-redis` fly app (`redis/fly.toml` at the
