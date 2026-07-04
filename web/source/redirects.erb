@@ -9,6 +9,9 @@
 <% published_pages.each do |page| %>
 /id/<%= page.sys.id %>/ <%= url_for page.path %> 301
 <% end %>
+<% taxonomy_synonym_redirects.each do |redirect| %>
+<%= redirect[:from] %> <%= redirect[:to] %> <%= redirect[:status] %>
+<% end %>
 <% data.redirects.each do |redirect| %>
 <%= redirect.from %> <%= redirect.to %> <%= redirect.status %><%= "!" if redirect.from.match? /^https?:\/\// %>
 <% end %>

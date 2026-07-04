@@ -175,6 +175,17 @@ RSpec.describe ArticleHelpers do
       expect(schema).not_to have_key('articleSection')
     end
 
+    it 'folds each concept\'s synonyms into the keywords, deduped' do
+      a = schema_article
+      a.contentful_metadata = OpenStruct.new(tags: [
+        OpenStruct.new(name: 'Ironman 70.3', synonyms: ['Half Ironman', '70.3']),
+        OpenStruct.new(name: 'Race Reports', synonyms: [])
+      ])
+      schema = JSON.parse(article_schema(a))
+      expect(schema['keywords']).to eq(['Ironman 70.3', 'Half Ironman', '70.3', 'Race Reports'])
+      expect(schema['articleSection']).to eq('Ironman 70.3')
+    end
+
     it 'emits cover images as ImageObjects with dimensions' do
       cover = OpenStruct.new(url: '//images/cover.jpg')
       schema = JSON.parse(article_schema(schema_article(cover_image: cover)))

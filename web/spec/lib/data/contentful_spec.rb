@@ -216,6 +216,7 @@ RSpec.describe Contentful do
         expect(tags.map { |t| t[:id] }).to eq(['ironman-703', 'cda'])
         expect(tags.map { |t| t[:path] }).to eq(['/tagged/triathlon/ironman-703/', '/tagged/races/cda/'])
         expect(tags.map { |t| t[:short_name] }).to eq(['70.3', 'CdA'])
+        expect(tags.map { |t| t[:synonyms] }).to eq([['Half Ironman', '70.3'], []])
         expect(article[:contentful_metadata]).not_to have_key(:concepts)
       end
 

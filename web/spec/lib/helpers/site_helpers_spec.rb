@@ -28,6 +28,30 @@ RSpec.describe SiteHelpers do
     end
   end
 
+  describe '#taxonomy_synonym_redirects' do
+    def data
+      OpenStruct.new(
+        tags: [
+          OpenStruct.new(tag: OpenStruct.new(path: '/tagged/triathlon/ironman-703/', synonyms: ['Half Ironman', '70.3'])),
+          OpenStruct.new(tag: OpenStruct.new(path: '/tagged/running/', synonyms: [])),
+          OpenStruct.new(tag: OpenStruct.new(path: '/tagged/triathlon/', synonyms: ['Multisport']))
+        ],
+        redirects: [OpenStruct.new(from: '/tagged/multisport')] # a configured redirect already claims this
+      )
+    end
+
+    it 'maps synonym slugs to the canonical concept page' do
+      expect(taxonomy_synonym_redirects).to include(
+        { from: '/tagged/half-ironman', to: '/tagged/triathlon/ironman-703/', status: 301 },
+        { from: '/tagged/70-3', to: '/tagged/triathlon/ironman-703/', status: 301 }
+      )
+    end
+
+    it 'skips synonyms that collide with a configured redirect' do
+      expect(taxonomy_synonym_redirects.map { |r| r[:from] }).not_to include('/tagged/multisport')
+    end
+  end
+
   describe '#collection_page_schema' do
     def content_summary(content) = "About #{content.title}."
     def canonical_url = 'https://example.com/tagged/triathlon/'

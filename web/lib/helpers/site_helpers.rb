@@ -314,6 +314,27 @@ module SiteHelpers
     }.to_json
   end
 
+  # Redirects from a concept's alternative labels (synonyms/altLabels) to its canonical archive
+  # page — e.g. /tagged/half-ironman → /tagged/triathlon/ironman-703/. Skips a synonym whose
+  # slug is blank, collides with a real tag page, or duplicates another synonym or a configured
+  # redirect. Rendered into the Netlify _redirects file (source/redirects.erb).
+  # @return [Array<Hash>] [{ from:, to:, status: }]
+  def taxonomy_synonym_redirects
+    page_paths = data.tags.map { |t| t.tag.path }.to_set
+    taken = data.redirects.map(&:from).to_set
+    data.tags.flat_map do |entry|
+      tag = entry.tag
+      Array(tag.synonyms).filter_map do |synonym|
+        slug = synonym.to_s.parameterize
+        next if slug.blank?
+        from = "/tagged/#{slug}"
+        next if page_paths.include?("#{from}/") || taken.include?(from)
+        taken << from
+        { from: from, to: tag.path, status: 301 }
+      end
+    end
+  end
+
   # The author's social-profile URLs for schema.org `sameAs` (the feed is excluded — it isn't a
   # social profile). Shared by the Organization and Person nodes in the entity graph.
   # @return [Array<String>] Social profile URLs, or an empty array when none are configured.

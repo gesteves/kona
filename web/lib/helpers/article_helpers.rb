@@ -180,7 +180,8 @@ module ArticleHelpers
     }
     tags = Array(content.contentful_metadata&.tags)
     if tags.present?
-      schema["keywords"] = tags.map(&:name)
+      # Each concept's name plus its synonyms (altLabels), deduped, as keywords.
+      schema["keywords"] = tags.flat_map { |t| [t.name, *Array(t.synonyms)] }.uniq
       schema["articleSection"] = tags.first.name
     end
     if content&.cover_image&.url.present?
