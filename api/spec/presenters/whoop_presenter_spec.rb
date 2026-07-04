@@ -1,38 +1,28 @@
 require "rails_helper"
 
-RSpec.describe WhoopHelper do
-  def whoop_helper(whoop:, workouts: [double("workout")])
-    Class.new do
-      include WhoopHelper
-      include WorkoutsHelper
-      include TimeHelper
-    end.new.tap do |h|
-      h.instance_variable_set(:@whoop, whoop)
-      h.instance_variable_set(:@workouts, workouts)
-      h.instance_variable_set(:@time_zone, "America/Denver")
-    end
+RSpec.describe WhoopPresenter do
+  def presenter(stats:, workouts: [double("workout")])
+    described_class.new(stats: stats, workouts: workouts, time_zone: "America/Denver")
   end
 
   describe "scores" do
     it "rounds the sleep score" do
-      helper = whoop_helper(whoop: { sleep: { score: { sleep_performance_percentage: 84.6 } } })
-      expect(helper.whoop_sleep_score).to eq(85)
+      expect(presenter(stats: { sleep: { score: { sleep_performance_percentage: 84.6 } } }).sleep_score).to eq(85)
     end
 
     it "rounds the recovery score" do
-      helper = whoop_helper(whoop: { recovery: { score: { recovery_score: 67.4 } } })
-      expect(helper.whoop_recovery_score).to eq(67)
+      expect(presenter(stats: { recovery: { score: { recovery_score: 67.4 } } }).recovery_score).to eq(67)
     end
 
     it "drops a trailing .0 from the strain score" do
-      expect(whoop_helper(whoop: { physiological_cycle: { score: { strain: 12.0 } } }).whoop_strain_score).to eq("12")
-      expect(whoop_helper(whoop: { physiological_cycle: { score: { strain: 12.46 } } }).whoop_strain_score).to eq("12.5")
+      expect(presenter(stats: { physiological_cycle: { score: { strain: 12.0 } } }).strain_score).to eq("12")
+      expect(presenter(stats: { physiological_cycle: { score: { strain: 12.46 } } }).strain_score).to eq("12.5")
     end
   end
 
-  describe "#whoop_strain_label" do
+  describe "#strain_label" do
     def label_for(strain, workouts: [double("workout")])
-      whoop_helper(whoop: { physiological_cycle: { score: { strain: strain } } }, workouts: workouts).whoop_strain_label
+      presenter(stats: { physiological_cycle: { score: { strain: strain } } }, workouts: workouts).strain_label
     end
 
     it { expect(label_for(5)).to eq("Light") }
@@ -43,9 +33,9 @@ RSpec.describe WhoopHelper do
     it { expect(label_for(0)).to eq("Nothing") }
   end
 
-  describe "#whoop_sleep_label" do
+  describe "#sleep_label" do
     def label_for(score)
-      whoop_helper(whoop: { sleep: { score: { sleep_performance_percentage: score } } }).whoop_sleep_label
+      presenter(stats: { sleep: { score: { sleep_performance_percentage: score } } }).sleep_label
     end
 
     it { expect(label_for(0)).to eq("None") }
@@ -57,9 +47,9 @@ RSpec.describe WhoopHelper do
     it { expect(label_for(90)).to eq("Optimal") }
   end
 
-  describe "#whoop_recovery_label" do
+  describe "#recovery_label" do
     def label_for(score)
-      whoop_helper(whoop: { recovery: { score: { recovery_score: score } } }).whoop_recovery_label
+      presenter(stats: { recovery: { score: { recovery_score: score } } }).recovery_label
     end
 
     it { expect(label_for(0)).to eq("None") }
@@ -72,9 +62,9 @@ RSpec.describe WhoopHelper do
     it("has an easter egg at 69") { expect(label_for(69)).to eq("Nice.") }
   end
 
-  describe "#whoop_recovery_icon" do
+  describe "#recovery_icon" do
     def icon_for(score)
-      whoop_helper(whoop: { recovery: { score: { recovery_score: score } } }).whoop_recovery_icon
+      presenter(stats: { recovery: { score: { recovery_score: score } } }).recovery_icon
     end
 
     it { expect(icon_for(20)).to eq("skull") }
@@ -83,30 +73,18 @@ RSpec.describe WhoopHelper do
     it { expect(icon_for(80)).to eq("person-meditating") }
   end
 
-  describe "#whoop_last_wakeup_time" do
-    it "is nil when there's no recorded sleep end" do
-      expect(whoop_helper(whoop: {}).whoop_last_wakeup_time).to be_nil
-    end
-
-    it "parses the sleep end into the location's timezone" do
-      time = whoop_helper(whoop: { sleep: { end: "2026-06-15T13:00:00Z" } }).whoop_last_wakeup_time
-      expect(time).to be_a(ActiveSupport::TimeWithZone)
-      expect(time.time_zone.name).to eq("America/Denver")
-    end
-  end
-
-  describe "#whoop_heading" do
+  describe "#heading" do
     include ActiveSupport::Testing::TimeHelpers
 
-    # Freeze to midday in the helper's timezone so "today"/"yesterday" are deterministic.
+    # Freeze to midday in the presenter's timezone so "today"/"yesterday" are deterministic.
     around { |example| travel_to(Time.utc(2026, 6, 15, 18, 0, 0)) { example.run } }
 
     def heading_for(sleep_end)
-      whoop_helper(whoop: { sleep: { end: sleep_end } }).whoop_heading
+      presenter(stats: { sleep: { end: sleep_end } }).heading
     end
 
     it "labels metrics 'Latest' when there's no recorded wakeup" do
-      expect(whoop_helper(whoop: {}).whoop_heading).to include("Latest Metrics")
+      expect(presenter(stats: {}).heading).to include("Latest Metrics")
     end
 
     it "labels a wakeup from today 'Today’s'" do
@@ -119,6 +97,13 @@ RSpec.describe WhoopHelper do
 
     it "falls back to 'Latest' for older wakeups" do
       expect(heading_for((Time.current - 5.days).iso8601)).to include("Latest Metrics")
+    end
+  end
+
+  describe "time zone fallback" do
+    it "falls back to the default time zone when none is given" do
+      p = described_class.new(stats: { sleep: { end: "2026-06-15T13:00:00Z" } }, time_zone: nil)
+      expect(p.send(:last_wakeup_time).time_zone.name).to eq(TimeZoneResolver.default)
     end
   end
 end

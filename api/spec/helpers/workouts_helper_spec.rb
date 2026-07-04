@@ -1,23 +1,20 @@
 require "rails_helper"
 
 RSpec.describe WorkoutsHelper do
-  def helper_with(workouts)
-    Class.new { include WorkoutsHelper }.new.tap { |h| h.instance_variable_set(:@workouts, workouts) }
+  let(:helper) { Class.new { include WorkoutsHelper }.new }
+
+  it "reports a scheduled workout when workouts are present" do
+    workouts = [double("workout")]
+    expect(helper.workout_scheduled?(workouts)).to be true
+    expect(helper.rest_day?(workouts)).to be false
   end
 
-  it "reports a scheduled workout when @workouts is present" do
-    helper = helper_with([double("workout")])
-    expect(helper.workout_scheduled?).to be true
-    expect(helper.rest_day?).to be false
+  it "reports a rest day when there are no workouts" do
+    expect(helper.workout_scheduled?([])).to be false
+    expect(helper.rest_day?([])).to be true
   end
 
-  it "reports a rest day when @workouts is empty" do
-    helper = helper_with([])
-    expect(helper.workout_scheduled?).to be false
-    expect(helper.rest_day?).to be true
-  end
-
-  it "reports a rest day when @workouts is nil" do
-    expect(helper_with(nil).rest_day?).to be true
+  it "reports a rest day when workouts are nil" do
+    expect(helper.rest_day?(nil)).to be true
   end
 end

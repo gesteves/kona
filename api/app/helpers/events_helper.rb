@@ -1,40 +1,49 @@
 module EventsHelper
-  # Whether the event is today, in the current location's timezone.
-  def today?(event)
+  # Whether the event is today, in the given timezone.
+  # @param event [OpenStruct, nil]
+  # @param time_zone [String] An IANA timezone id.
+  def today?(event, time_zone)
     return false if event.blank?
-    event_date = Time.parse(event.date).in_time_zone(location_time_zone)
-    event_date.to_date == current_time.to_date
+    event_date = Time.parse(event.date).in_time_zone(time_zone)
+    event_date.to_date == Time.current.in_time_zone(time_zone).to_date
   end
 
   # Today's race, if any (an event that's today and confirmed).
+  # @param events [Array<OpenStruct>, nil]
+  # @param time_zone [String] An IANA timezone id.
   # @return [OpenStruct, nil]
-  def todays_race
-    return if @events.blank?
-    @events.find { |e| today?(e) && e.going }
+  def todays_race(events, time_zone)
+    return if events.blank?
+    events.find { |e| today?(e, time_zone) && e.going }
   end
 
   # Whether today is a race day.
-  def race_day?
-    todays_race.present?
+  # @param events [Array<OpenStruct>, nil]
+  # @param time_zone [String] An IANA timezone id.
+  def race_day?(events, time_zone)
+    todays_race(events, time_zone).present?
   end
 
   # Whether the event is happening right now. Confirmed (going) events only. Prefers the event's
   # own race-day weather — the sunrise..sunset window for the event's date, at the event's
   # location — which we already fetch for the featured race; covering "now" means it's both the
-  # event's day and daytime there. Falls back to today-and-daytime in the owner's current
-  # timezone when that weather (and thus its sun times) isn't available.
-  def in_progress?(event, event_weather = nil)
+  # event's day and daytime there. Falls back to today-and-daytime in the given timezone when
+  # that weather (and thus its sun times) isn't available.
+  # @param event [OpenStruct, nil]
+  # @param time_zone [String] An IANA timezone id.
+  # @param event_weather [EventWeatherPresenter, nil] The featured race's weather.
+  def in_progress?(event, time_zone, event_weather: nil)
     return false if event.blank? || !event.going
     window = event_daylight_window(event_weather)
     return window.cover?(Time.current) if window
-    daytime? && today?(event)
+    daytime?(nil, time_zone) && today?(event, time_zone)
   end
 
   # The event-day daylight window (sunrise..sunset) drawn from the featured race's already-fetched
   # weather, or nil when those sun times aren't available. The forecast day covers the event's
   # date and the sun times are absolute instants, so callers compare the current time against this
   # window without converting timezones.
-  def event_daylight_window(event_weather = nil)
+  def event_daylight_window(event_weather)
     sunrise = event_weather&.sunrise
     sunset = event_weather&.sunset
     return if sunrise.blank? || sunset.blank?
@@ -59,45 +68,53 @@ module EventsHelper
 
   # The upcoming races to show: future-or-today confirmed events, soonest first. When the next
   # one is within 10 days it's "featured" (expanded card + race-day weather) and we show four;
-  # otherwise three. Mirrors the static site's build-time helper, reading @events. Memoized —
-  # it's consulted several times per request (selection, next?, the view) and each
-  # computation re-parses and re-sorts every event.
-  def upcoming_races
-    @upcoming_races ||= if @events.blank?
-      []
-    else
-      upcoming = @events
-        .select { |e| e.going && Time.parse(e.date).in_time_zone(location_time_zone).beginning_of_day >= current_time.beginning_of_day }
-        .sort_by { |e| Time.parse(e.date) }
-      next_event = upcoming.first
-      featured = next_event.present? && close?(next_event)
-      upcoming.take(featured ? 4 : 3)
-    end
+  # otherwise three. Mirrors the static site's build-time helper. The caller keeps the result —
+  # each computation re-parses and re-sorts every event.
+  # @param events [Array<OpenStruct>, nil]
+  # @param time_zone [String] An IANA timezone id.
+  # @return [Array<OpenStruct>]
+  def upcoming_races(events, time_zone)
+    return [] if events.blank?
+
+    now = Time.current.in_time_zone(time_zone)
+    upcoming = events
+      .select { |e| e.going && Time.parse(e.date).in_time_zone(time_zone).beginning_of_day >= now.beginning_of_day }
+      .sort_by { |e| Time.parse(e.date) }
+    next_event = upcoming.first
+    featured = next_event.present? && close?(next_event, time_zone)
+    upcoming.take(featured ? 4 : 3)
   end
 
   # Whether the event is today or within the next 10 days.
-  def close?(event)
+  # @param event [OpenStruct, nil]
+  # @param time_zone [String] An IANA timezone id.
+  def close?(event, time_zone)
     return false if event.blank?
-    event_date = Time.parse(event.date).in_time_zone(location_time_zone).to_date
-    event_date >= current_time.to_date && event_date <= 10.days.from_now.to_date
+    event_date = Time.parse(event.date).in_time_zone(time_zone).to_date
+    event_date >= Time.current.in_time_zone(time_zone).to_date && event_date <= 10.days.from_now.to_date
   end
 
-  # Whether the event is the next upcoming race.
-  def next?(event)
+  # Whether the event is the first of the upcoming races.
+  # @param event [OpenStruct, nil]
+  # @param upcoming [Array<OpenStruct>] The upcoming races (see #upcoming_races).
+  def next?(event, upcoming)
     return false if event.blank?
-    event.sys&.id == upcoming_races.first&.sys&.id
+    event.sys&.id == upcoming.first&.sys&.id
   end
 
   # Whether the event gets the featured treatment (the next race, and within 10 days).
-  def featured?(event)
+  # @param event [OpenStruct, nil]
+  # @param upcoming [Array<OpenStruct>] The upcoming races (see #upcoming_races).
+  # @param time_zone [String] An IANA timezone id.
+  def featured?(event, upcoming, time_zone)
     return false if event.blank?
-    close?(event) && next?(event)
+    close?(event, time_zone) && next?(event, upcoming)
   end
 
   # The layout variant for a races collection, from the event count and whether the first is
-  # featured. Defaults to the full upcoming-races list; callers can pass an explicit count and
-  # featured flag (e.g. the race-day "Upcoming Races" section, which excludes today's race).
-  def event_collection_variant(count = upcoming_races.count, featured: featured?(upcoming_races.first))
+  # featured (e.g. the race-day "Upcoming Races" section passes the count without today's race
+  # and featured: false).
+  def event_collection_variant(count, featured:)
     case count
     when 1 then "single"
     when 2 then featured ? "single" : "halves"
@@ -123,9 +140,12 @@ module EventsHelper
   # The "Live tracking" indicator for an event with a tracking link, or nil if there's none.
   # While the race is in progress it's highlighted and pulses; otherwise it's muted to signal
   # tracking exists but isn't live yet.
-  def event_live_tracking_tag(event, event_weather = nil)
+  # @param event [OpenStruct, nil]
+  # @param time_zone [String] An IANA timezone id.
+  # @param event_weather [EventWeatherPresenter, nil] The featured race's weather.
+  def event_live_tracking_tag(event, time_zone, event_weather: nil)
     return if event.blank? || event.tracking_url.blank?
-    in_progress = in_progress?(event, event_weather)
+    in_progress = in_progress?(event, time_zone, event_weather: event_weather)
     icon = in_progress ? icon_svg("classic", "regular", "signal-stream") : icon_svg("classic", "light", "signal-stream")
     options = {}
     options[:class] = "entry__highlight entry__highlight--live" if in_progress

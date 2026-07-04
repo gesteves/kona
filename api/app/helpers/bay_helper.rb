@@ -5,9 +5,10 @@ module BayHelper
   BAY_SLACK_CURRENT_KT = 0.15
 
   # Finds the Goodspeed timeseries entry closest to the given time (within `freshness`).
+  # @param goodspeed [OpenStruct, nil] The Goodspeed bay-conditions data.
   # @return [OpenStruct, nil]
-  def bay_conditions_at(time, freshness: 30.minutes)
-    series = @goodspeed&.timeseries
+  def bay_conditions_at(goodspeed, time, freshness: 30.minutes)
+    series = goodspeed&.timeseries
     return nil if series.blank?
 
     target = time.to_time
@@ -32,10 +33,12 @@ module BayHelper
   end
 
   # Sentence describing the current SF Bay water temperature, for weather_summary.
-  # @return [String, nil] nil unless the current location is SF and a recent entry exists.
-  def bay_water_temperature_sentence
-    return nil unless in_san_francisco?
-    entry = bay_conditions_at(Time.now)
+  # @param goodspeed [OpenStruct, nil] The Goodspeed bay-conditions data.
+  # @param location [OpenStruct, nil] The current location (a GoogleMaps result).
+  # @return [String, nil] nil unless the location is SF and a recent entry exists.
+  def bay_water_temperature_sentence(goodspeed, location)
+    return nil unless in_san_francisco?(location)
+    entry = bay_conditions_at(goodspeed, Time.now)
     return nil if entry.blank?
     "The water temperature in San Francisco Bay is #{format_temperature(entry.water_temp_c)}"
   end

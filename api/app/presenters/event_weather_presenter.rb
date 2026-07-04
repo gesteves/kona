@@ -32,7 +32,7 @@ class EventWeatherPresenter
   # @return [OpenStruct, nil]
   def bay
     return @bay if defined?(@bay)
-    @bay = in_san_francisco?(event.location) ? bay_conditions_at(Time.parse(event.date)) : nil
+    @bay = in_san_francisco?(event.location) ? bay_conditions_at(@goodspeed, Time.parse(event.date)) : nil
   end
 
   # @return [OpenStruct, nil] The event's air-quality reading.

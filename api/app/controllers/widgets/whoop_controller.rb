@@ -5,11 +5,11 @@ module Widgets
       cache_widget(ttl: 5.minutes)
 
       location = Location.new
-      @time_zone = TimeZoneResolver.call(location.latitude, location.longitude)
-      @whoop = Whoop.new.stats
-      return render_empty if @whoop.nil?
+      time_zone = TimeZoneResolver.call(location.latitude, location.longitude)
+      stats = Whoop.new.stats
+      return render_empty if stats.nil?
 
-      @workouts = TrainerRoad.new(@time_zone).workouts || []
+      @whoop = WhoopPresenter.new(stats: stats, workouts: TrainerRoad.new(time_zone).workouts, time_zone: time_zone)
       render :show
     end
   end

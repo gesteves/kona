@@ -1,8 +1,9 @@
 module LocationHelper
-  # Formats the current location from Google Maps geocoded address components, with a few
-  # special cases. Reads the controller-set @location (a dot-accessible GoogleMaps result).
+  # Formats a location from Google Maps geocoded address components, with a few
+  # special cases.
+  # @param location [OpenStruct, nil] A dot-accessible GoogleMaps result.
   # @return [String, nil]
-  def format_location(location = @location)
+  def format_location(location)
     return if location.blank?
     components = location.geocoded&.address_components
     return if components.blank?
@@ -34,8 +35,9 @@ module LocationHelper
   end
 
   # Formats the elevation in both meters and feet (with the metric/imperial toggle).
+  # @param elevation [Numeric, nil] The elevation in meters.
   # @return [String, nil]
-  def format_elevation(elevation = @location&.elevation, abbreviated = false)
+  def format_elevation(elevation, abbreviated = false)
     return if elevation.blank?
     meters = "#{number_to_rounded(elevation, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')} m"
     feet = number_to_rounded(meters_to_feet(elevation), precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ",")
@@ -47,11 +49,11 @@ module LocationHelper
     units_tag(meters, feet)
   end
 
-  def in_jackson_hole?(location = @location)
+  def in_jackson_hole?(location)
     format_location(location) == "Jackson Hole, Wyoming"
   end
 
-  def in_san_francisco?(location = @location)
+  def in_san_francisco?(location)
     format_location(location) == "San Francisco, California"
   end
 end

@@ -2,11 +2,11 @@ require "nokogiri"
 
 module MarkupHelper
   # Renders a tag carrying the data-* attributes that drive the client-side unit-conversion
-  # Stimulus controller (metric/imperial toggle). Defaults to a <span>.
+  # Stimulus controller (metric/imperial toggle). Defaults to a <span>. Non-block content_tag
+  # on purpose: the block form needs an output buffer, which plain objects (the presenters)
+  # don't have.
   def units_tag(metric, imperial, tag = :span)
-    content_tag tag.to_sym, "data-controller": "units", "data-units-imperial-value": imperial, "data-units-metric-value": metric, title: "#{metric} | #{imperial}" do
-      metric
-    end
+    content_tag tag.to_sym, metric, "data-controller": "units", "data-units-imperial-value": imperial, "data-units-metric-value": metric, title: "#{metric} | #{imperial}"
   end
 
   # Renders a card's Markdown body (an event summary/description, an article summary) to HTML.

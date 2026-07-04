@@ -1,11 +1,11 @@
-# Ported from web/lib/helpers/weather_helpers.rb. Reads controller-set ivars (@weather,
-# @air_quality, @pollen, @location) instead of Middleman's data.*, and the CONDITIONS /
-# BEAUFORT constants (config/initializers/weather_data.rb) instead of data.conditions /
-# data.beaufort. Condition codes (e.g. "Rain") are looked up symbolized.
+# Ported from web/lib/helpers/weather_helpers.rb. Pure selection and formatting functions:
+# every method takes the data it works on (the WeatherKit payload, a timezone, a pollen
+# payload) as explicit arguments. The CONDITIONS / BEAUFORT constants come from
+# config/initializers/weather_data.rb. Condition codes (e.g. "Rain") are looked up symbolized.
 #
 # This module holds the thin forecast-selection and formatting methods; the prose summary
 # and its business rules (good/bad weather, activity suggestions) live in
-# WeatherSummaryPresenter, which includes this module.
+# WeatherSummaryPresenter, which includes this module and passes it the request's data.
 module WeatherHelper
   PRECIPITATION_METRIC_UNITS = {
     unit: "mm",
@@ -16,56 +16,58 @@ module WeatherHelper
   # Validates the exact slices the summary consumes: rest_of_day_forecast switches to the
   # overnight forecast in the evening, so checking todays_forecast alone would let a payload
   # with no overnight data through and crash the evening summary.
-  def weather_data_is_current?(weather = @weather)
-    current_weather(weather).present? && todays_forecast(weather).present? && rest_of_day_forecast(weather).present?
+  def weather_data_is_current?(weather, time_zone)
+    current_weather(weather).present? && todays_forecast(weather).present? && rest_of_day_forecast(weather, time_zone).present?
   end
 
-  def weather_data_is_stale?(weather = @weather)
-    !weather_data_is_current?(weather)
+  def weather_data_is_stale?(weather, time_zone)
+    !weather_data_is_current?(weather, time_zone)
   end
 
-  def current_weather(weather = @weather)
+  def current_weather(weather)
     weather&.current_weather
   end
 
-  def todays_forecast(weather = @weather)
+  def todays_forecast(weather)
     now = Time.now
     weather&.forecast_daily&.days&.find { |d| d.rest_of_day_forecast.present? && Time.parse(d.forecast_start) <= now && Time.parse(d.forecast_end) >= now }
   end
 
-  def rest_of_day_forecast(weather = @weather)
+  def rest_of_day_forecast(weather, time_zone)
     forecast = todays_forecast(weather)
-    evening? ? forecast&.overnight_forecast : forecast&.rest_of_day_forecast
+    evening?(weather, time_zone) ? forecast&.overnight_forecast : forecast&.rest_of_day_forecast
   end
 
-  def tomorrows_forecast(weather = @weather)
+  def tomorrows_forecast(weather)
     now = Time.now
     weather&.forecast_daily&.days&.find { |d| Time.parse(d.forecast_start) > now }
   end
 
-  def sunrise(weather = @weather, location = @location)
+  def sunrise(weather, time_zone)
     forecast = todays_forecast(weather)
     return nil unless forecast&.sunrise
-    Time.parse(forecast.sunrise).in_time_zone(location_time_zone(location))
+    Time.parse(forecast.sunrise).in_time_zone(time_zone)
   end
 
-  def tomorrows_sunrise(weather = @weather, location = @location)
+  def tomorrows_sunrise(weather, time_zone)
     forecast = tomorrows_forecast(weather)
     return nil unless forecast&.sunrise
-    Time.parse(forecast.sunrise).in_time_zone(location_time_zone(location))
+    Time.parse(forecast.sunrise).in_time_zone(time_zone)
   end
 
-  def sunset(weather = @weather, location = @location)
+  def sunset(weather, time_zone)
     forecast = todays_forecast(weather)
     return nil unless forecast&.sunset
-    Time.parse(forecast.sunset).in_time_zone(location_time_zone(location))
+    Time.parse(forecast.sunset).in_time_zone(time_zone)
   end
 
-  def daytime?(weather = @weather, location = @location)
-    now = current_time
+  # Whether it's currently daytime: between today's sunrise and sunset when the weather
+  # payload carries them, else a 6am–6pm clock check in the given timezone.
+  def daytime?(weather, time_zone)
+    now = Time.current.in_time_zone(time_zone)
     if weather.present?
-      sunrise_time = sunrise(weather, location)
-      sunset_time = sunset(weather, location)
+      sunrise_time = sunrise(weather, time_zone)
+      sunset_time = sunset(weather, time_zone)
       return now.hour >= 6 && now.hour < 18 unless sunrise_time && sunset_time
       now >= sunrise_time.beginning_of_hour && now <= sunset_time.beginning_of_hour
     else
@@ -73,10 +75,12 @@ module WeatherHelper
     end
   end
 
-  def evening?(weather = @weather, location = @location)
-    now = current_time
+  # Whether it's currently evening: past today's sunset when the weather payload carries it,
+  # else a 6pm clock check in the given timezone.
+  def evening?(weather, time_zone)
+    now = Time.current.in_time_zone(time_zone)
     if weather.present?
-      sunset_time = sunset(weather, location)
+      sunset_time = sunset(weather, time_zone)
       return now.hour >= 18 unless sunset_time
       now >= sunset_time.beginning_of_hour
     else
@@ -84,8 +88,8 @@ module WeatherHelper
     end
   end
 
-  def today_or_tonight(weather = @weather, location = @location)
-    evening?(weather, location) ? "Tonight" : "Today"
+  def today_or_tonight(weather, time_zone)
+    evening?(weather, time_zone) ? "Tonight" : "Today"
   end
 
   def format_current_condition(condition_code)
@@ -194,30 +198,30 @@ module WeatherHelper
 
   def beaufort_description(knots)
     number = beaufort_number(knots)
-    content_tag :span, title: "Beaufort scale #{number}" do
-      BEAUFORT[number][:description].downcase
-    end
+    content_tag(:span, BEAUFORT[number][:description].downcase, title: "Beaufort scale #{number}")
   end
 
-  def pollen_index_value
-    @pollen&.pollen_type_info&.select { |p| p&.index_info&.value.to_i > 0 }&.map { |p| p.index_info.value }&.max.to_i
+  def pollen_index_value(pollen)
+    pollen&.pollen_type_info&.select { |p| p&.index_info&.value.to_i > 0 }&.map { |p| p.index_info.value }&.max.to_i
   end
 
-  def pollen_index_category
-    return "None" if pollen_index_value.zero?
-    @pollen.pollen_type_info&.find { |p| p&.index_info&.value.to_i == pollen_index_value }&.index_info&.category
+  def pollen_index_category(pollen)
+    return "None" if pollen_index_value(pollen).zero?
+    pollen.pollen_type_info&.find { |p| p&.index_info&.value.to_i == pollen_index_value(pollen) }&.index_info&.category
   end
 
   def format_time(time)
     meridiem_abbr(remove_widows(time.strftime("%l:%M %p")))
   end
 
-  def weather_icon(condition_code = current_weather&.condition_code, variant = :auto, weather = @weather, location = @location)
+  # The icon id for a condition code. :auto picks the day/night variant from the given
+  # weather + timezone (see #daytime?); :day / :night pick explicitly and need neither.
+  def weather_icon(condition_code, variant = :auto, weather: nil, time_zone: nil)
     condition = CONDITIONS[condition_code&.to_sym]
     return "cloud-question" if condition.blank?
     return condition[:icon] if condition[:icon].is_a?(String)
     if variant == :auto
-      daytime?(weather, location) ? condition[:icon][:day] : condition[:icon][:night]
+      daytime?(weather, time_zone) ? condition[:icon][:day] : condition[:icon][:night]
     elsif variant == :day
       condition[:icon][:day]
     elsif variant == :night
@@ -225,10 +229,10 @@ module WeatherHelper
     end
   end
 
-  def weather_alerts
-    return [] if @weather&.weather_alerts&.alerts.blank?
-    alerts = @weather.weather_alerts.alerts.group_by { |alert| alert.token }
-                     .map { |_token, grouped_alerts| grouped_alerts.min_by { |alert| alert.precedence } }
+  def weather_alerts(weather)
+    return [] if weather&.weather_alerts&.alerts.blank?
+    alerts = weather.weather_alerts.alerts.group_by { |alert| alert.token }
+                    .map { |_token, grouped_alerts| grouped_alerts.min_by { |alert| alert.precedence } }
     alerts.sort_by { |alert| alert.precedence }
   end
 

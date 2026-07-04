@@ -1,9 +1,7 @@
 require "rails_helper"
 
 RSpec.describe BayHelper do
-  def bay_helper(goodspeed: nil)
-    Class.new { include BayHelper }.new.tap { |h| h.instance_variable_set(:@goodspeed, goodspeed) }
-  end
+  let(:bay_helper) { Class.new { include BayHelper }.new }
 
   let(:target) { Time.utc(2024, 6, 1, 12, 0, 0) }
 
@@ -13,16 +11,16 @@ RSpec.describe BayHelper do
         { t: (target - 300).iso8601,  current_speed_kt: 1.0 },
         { t: (target - 2400).iso8601, current_speed_kt: 0.1 }
       ])
-      expect(bay_helper(goodspeed: goodspeed).bay_conditions_at(target).current_speed_kt).to eq(1.0)
+      expect(bay_helper.bay_conditions_at(goodspeed, target).current_speed_kt).to eq(1.0)
     end
 
     it "returns nil when the closest entry is outside the freshness window" do
       goodspeed = DeepOstruct.wrap(timeseries: [{ t: (target - 2400).iso8601, current_speed_kt: 0.1 }])
-      expect(bay_helper(goodspeed: goodspeed).bay_conditions_at(target)).to be_nil
+      expect(bay_helper.bay_conditions_at(goodspeed, target)).to be_nil
     end
 
     it "returns nil when there's no bay data" do
-      expect(bay_helper.bay_conditions_at(target)).to be_nil
+      expect(bay_helper.bay_conditions_at(nil, target)).to be_nil
     end
   end
 
@@ -62,26 +60,25 @@ end
 # bay_water_temperature_sentence reaches across helpers (in_san_francisco? and
 # format_temperature), so exercise it in a full helper context where those are available.
 RSpec.describe BayHelper, "#bay_water_temperature_sentence", type: :helper do
-  before { helper.instance_variable_set(:@time_zone, "America/Denver") }
+  let(:location) { double("location") }
 
   it "is nil away from San Francisco" do
-    allow(helper).to receive(:in_san_francisco?).and_return(false)
-    expect(helper.bay_water_temperature_sentence).to be_nil
+    allow(helper).to receive(:in_san_francisco?).with(location).and_return(false)
+    expect(helper.bay_water_temperature_sentence(nil, location)).to be_nil
   end
 
   it "is nil in San Francisco when there's no recent bay reading" do
-    allow(helper).to receive(:in_san_francisco?).and_return(true)
-    helper.instance_variable_set(:@goodspeed, nil)
-    expect(helper.bay_water_temperature_sentence).to be_nil
+    allow(helper).to receive(:in_san_francisco?).with(location).and_return(true)
+    expect(helper.bay_water_temperature_sentence(nil, location)).to be_nil
   end
 
   it "states the water temperature in San Francisco when a recent reading exists" do
-    allow(helper).to receive(:in_san_francisco?).and_return(true)
-    helper.instance_variable_set(:@goodspeed, DeepOstruct.wrap(timeseries: [
+    allow(helper).to receive(:in_san_francisco?).with(location).and_return(true)
+    goodspeed = DeepOstruct.wrap(timeseries: [
       { t: Time.now.iso8601, water_temp_c: 15.0, current_speed_kt: 0.5, current_bearing_deg: 110 }
-    ]))
+    ])
 
-    sentence = helper.bay_water_temperature_sentence
+    sentence = helper.bay_water_temperature_sentence(goodspeed, location)
     expect(sentence).to include("The water temperature in San Francisco Bay is")
     expect(sentence).to include("15°C")
   end

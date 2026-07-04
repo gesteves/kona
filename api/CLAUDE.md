@@ -92,8 +92,15 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   gated by the owner session (Google OAuth — see **Owner auth** above), shared with `/whoop/auth`.
   Sidekiq runs as a dedicated **`worker` fly process** (see fly.toml); a worker must be running
   to drain the queue (locally: `bundle exec sidekiq`).
-- **Views** (`app/views/widgets/`) render raw HTML fragments; **helpers** (`app/helpers/`)
-  were ported from the web app (weather, units, icons, markdown, time, etc.).
+- **Views** (`app/views/widgets/`) render raw HTML fragments. **Helpers** (`app/helpers/`,
+  originally ported from the web app) are pure formatting/selection functions — every method
+  takes the data it works on as explicit arguments; none read controller ivars. Request state
+  lives in **presenters** (`app/presenters/`): `WeatherSummaryPresenter` (the weather widget's
+  prose + business rules; the view reads everything through `@summary`), `EventWeatherPresenter`
+  (per-event race-day weather), and `WhoopPresenter` (scores/labels/heading). Presenters take
+  their data as constructor kwargs and pass it to the helper functions they compose. When a
+  controller body needs a helper, it calls it through the `helpers` proxy rather than
+  `include`-ing the module.
 - **Caching** — `app/controllers/concerns/live_widget.rb`. `cache_widget(ttl:)` sets:
   - Browser: `Cache-Control: public, max-age=0, stale-while-revalidate=86400`
   - Edge: `Netlify-CDN-Cache-Control: public, durable, max-age=<ttl>, stale-while-revalidate=3600, stale-if-error=86400`

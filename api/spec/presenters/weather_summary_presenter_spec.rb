@@ -406,6 +406,30 @@ RSpec.describe WeatherSummaryPresenter do
   end
 
   # ---------------------------------------------------------------------------
+  # Icon + alerts (the view reads both through the presenter)
+  # ---------------------------------------------------------------------------
+  describe "#icon / #alerts" do
+    it "picks the current condition's icon, day/night-aware" do
+      build_weather(current: { condition_code: "Clear" })
+
+      allow(presenter).to receive(:daytime?).and_return(true)
+      expect(presenter.icon).to eq("sun")
+
+      allow(presenter).to receive(:daytime?).and_return(false)
+      expect(presenter.icon).to eq("moon-stars")
+    end
+
+    it "exposes the deduped weather alerts" do
+      build_weather(alerts: [
+        { token: "flood", precedence: 3, description: "Flood B" },
+        { token: "flood", precedence: 1, description: "Flood A" }
+      ])
+
+      expect(presenter.alerts.map(&:description)).to eq(["Flood A"])
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Full summary (integration of the pieces above)
   # ---------------------------------------------------------------------------
   describe "#weather_summary" do

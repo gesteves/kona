@@ -4,23 +4,23 @@ module Widgets
   # labels stay fresh. When an event is featured, its race-day weather renders inline here —
   # replacing the former standalone weather/event widget. Cached for an hour.
   class EventsController < BaseController
-    include EventsHelper
-    include TimeHelper
-
     def upcoming
       # Edge SWR kept at a day (vs. the one-hour default): the upcoming-races list changes
       # rarely, so serving a stale copy while revalidating costs nothing.
       cache_widget(ttl: 1.hour, edge_stale_while_revalidate: 1.day)
 
-      @events = Events.new.all
-      @upcoming = upcoming_races
+      # The owner's configured timezone anchors "today"/"soon" for the race list (this widget
+      # doesn't track the owner's current location).
+      @time_zone = TimeZoneResolver.default
+      events = Events.new.all
+      @upcoming = helpers.upcoming_races(events, @time_zone)
       return render_empty if @upcoming.blank?
 
-      @featured = @upcoming.first if featured?(@upcoming.first)
+      @featured = @upcoming.first if helpers.featured?(@upcoming.first, @upcoming, @time_zone)
       @event_weather = RaceDayWeather.new(@featured).presenter if @featured
 
       # On race day the featured event is today's race; give it its own section.
-      @todays_race = @featured if @featured && today?(@featured)
+      @todays_race = @featured if @featured && helpers.today?(@featured, @time_zone)
 
       # An upcoming (not-today) featured event only earns the expanded treatment when we actually
       # have race-day weather to show. The featured window (close?, in the owner's timezone) and

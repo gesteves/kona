@@ -17,8 +17,9 @@ RSpec.describe EventsHelper, type: :helper do
   # 2026-06-03 18:00 UTC == 2026-06-03 12:00 MDT, so "today" in America/Denver is June 3, 2026.
   around { |example| travel_to(Time.utc(2026, 6, 3, 18, 0, 0)) { example.run } }
 
+  let(:time_zone) { "America/Denver" }
+
   before do
-    helper.instance_variable_set(:@time_zone, "America/Denver")
     allow(helper).to receive(:daytime?).and_return(true)
     allow(helper).to receive(:icon_svg) { |family, style, id| %(<svg data-icon="#{family}-#{style}-#{id}"></svg>).html_safe }
   end
@@ -52,39 +53,39 @@ RSpec.describe EventsHelper, type: :helper do
 
   describe "#today?" do
     it "is false for a blank event" do
-      expect(helper.today?(nil)).to be(false)
+      expect(helper.today?(nil, time_zone)).to be(false)
     end
 
     it "is true for an event dated today in the race timezone" do
-      expect(helper.today?(build_event(days_from_today: 0))).to be(true)
+      expect(helper.today?(build_event(days_from_today: 0), time_zone)).to be(true)
     end
 
     it "is false for a future or past event" do
-      expect(helper.today?(build_event(days_from_today: 1))).to be(false)
-      expect(helper.today?(build_event(days_from_today: -1))).to be(false)
+      expect(helper.today?(build_event(days_from_today: 1), time_zone)).to be(false)
+      expect(helper.today?(build_event(days_from_today: -1), time_zone)).to be(false)
     end
   end
 
   describe "#in_progress?" do
     it "is false for a blank event" do
-      expect(helper.in_progress?(nil)).to be(false)
+      expect(helper.in_progress?(nil, time_zone)).to be(false)
     end
 
     it "is true when the event is today, confirmed, and it's daytime" do
-      expect(helper.in_progress?(build_event(days_from_today: 0))).to be(true)
+      expect(helper.in_progress?(build_event(days_from_today: 0), time_zone)).to be(true)
     end
 
     it "is false at night even when the event is today and confirmed" do
       allow(helper).to receive(:daytime?).and_return(false)
-      expect(helper.in_progress?(build_event(days_from_today: 0))).to be(false)
+      expect(helper.in_progress?(build_event(days_from_today: 0), time_zone)).to be(false)
     end
 
     it "is false when the event is today but not confirmed (not going)" do
-      expect(helper.in_progress?(build_event(days_from_today: 0, going: false))).to be(false)
+      expect(helper.in_progress?(build_event(days_from_today: 0, going: false), time_zone)).to be(false)
     end
 
     it "is false when the event isn't today" do
-      expect(helper.in_progress?(build_event(days_from_today: 1))).to be(false)
+      expect(helper.in_progress?(build_event(days_from_today: 1), time_zone)).to be(false)
     end
 
     context "with the featured race's fetched weather" do
@@ -92,22 +93,22 @@ RSpec.describe EventsHelper, type: :helper do
         # daytime? (the fallback) is stubbed false, so a true result can only come from the
         # event's own sunrise..sunset window bracketing now.
         allow(helper).to receive(:daytime?).and_return(false)
-        in_progress = helper.in_progress?(build_event(days_from_today: 0), build_event_weather)
+        in_progress = helper.in_progress?(build_event(days_from_today: 0), time_zone, event_weather: build_event_weather)
         expect(in_progress).to be(true)
       end
 
       it "uses the event's daylight window over the fallback clock — not in progress outside it" do
         # Fallback clock says daytime, but the event's sun has already set, so it's not live.
         weather = build_event_weather(sunrise: 8.hours.ago, sunset: 1.hour.ago)
-        expect(helper.in_progress?(build_event(days_from_today: 0), weather)).to be(false)
+        expect(helper.in_progress?(build_event(days_from_today: 0), time_zone, event_weather: weather)).to be(false)
       end
 
       it "still requires the event to be confirmed (going)" do
-        expect(helper.in_progress?(build_event(days_from_today: 0, going: false), build_event_weather)).to be(false)
+        expect(helper.in_progress?(build_event(days_from_today: 0, going: false), time_zone, event_weather: build_event_weather)).to be(false)
       end
 
       it "falls back to today-and-daytime when the weather has no sun times" do
-        expect(helper.in_progress?(build_event(days_from_today: 0), build_event_weather(sunrise: nil))).to be(true)
+        expect(helper.in_progress?(build_event(days_from_today: 0), time_zone, event_weather: build_event_weather(sunrise: nil))).to be(true)
       end
     end
   end
@@ -115,23 +116,23 @@ RSpec.describe EventsHelper, type: :helper do
   describe "#todays_race / #race_day?" do
     it "returns today's confirmed race and reports a race day" do
       race = build_event(days_from_today: 0)
-      helper.instance_variable_set(:@events, [build_event(days_from_today: 5), race])
+      events = [build_event(days_from_today: 5), race]
 
-      expect(helper.todays_race).to eq(race)
-      expect(helper.race_day?).to be(true)
+      expect(helper.todays_race(events, time_zone)).to eq(race)
+      expect(helper.race_day?(events, time_zone)).to be(true)
     end
 
     it "ignores a today event that isn't confirmed" do
-      helper.instance_variable_set(:@events, [build_event(days_from_today: 0, going: false)])
+      events = [build_event(days_from_today: 0, going: false)]
 
-      expect(helper.todays_race).to be_nil
-      expect(helper.race_day?).to be(false)
+      expect(helper.todays_race(events, time_zone)).to be_nil
+      expect(helper.race_day?(events, time_zone)).to be(false)
     end
 
     it "reports no race day when nothing is today" do
-      helper.instance_variable_set(:@events, [build_event(days_from_today: 3)])
+      events = [build_event(days_from_today: 3)]
 
-      expect(helper.race_day?).to be(false)
+      expect(helper.race_day?(events, time_zone)).to be(false)
     end
   end
 
@@ -155,15 +156,15 @@ RSpec.describe EventsHelper, type: :helper do
 
   describe "#event_live_tracking_tag" do
     it "returns nil for a blank event" do
-      expect(helper.event_live_tracking_tag(nil)).to be_nil
+      expect(helper.event_live_tracking_tag(nil, time_zone)).to be_nil
     end
 
     it "returns nil when the event has no tracking link" do
-      expect(helper.event_live_tracking_tag(build_event(days_from_today: 0))).to be_nil
+      expect(helper.event_live_tracking_tag(build_event(days_from_today: 0), time_zone)).to be_nil
     end
 
     context "when the event has a tracking link but isn't in progress" do
-      let(:tag) { helper.event_live_tracking_tag(build_event(days_from_today: 5, tracking_url: "https://track.example.com")) }
+      let(:tag) { helper.event_live_tracking_tag(build_event(days_from_today: 5, tracking_url: "https://track.example.com"), time_zone) }
 
       it "renders a muted, light-icon Live tracking link with no highlight" do
         expect(tag).to include('data-icon="classic-light-signal-stream"')
@@ -179,7 +180,7 @@ RSpec.describe EventsHelper, type: :helper do
     end
 
     context "when the event has a tracking link and is in progress" do
-      let(:tag) { helper.event_live_tracking_tag(build_event(days_from_today: 0, tracking_url: "https://track.example.com")) }
+      let(:tag) { helper.event_live_tracking_tag(build_event(days_from_today: 0, tracking_url: "https://track.example.com"), time_zone) }
 
       it "renders a highlighted, pulsing (regular-icon) Live tracking link" do
         expect(tag).to include("entry__highlight entry__highlight--live")
@@ -191,7 +192,7 @@ RSpec.describe EventsHelper, type: :helper do
 
     it "is muted (not highlighted) for a tracking link on today's race at night" do
       allow(helper).to receive(:daytime?).and_return(false)
-      tag = helper.event_live_tracking_tag(build_event(days_from_today: 0, tracking_url: "https://track.example.com"))
+      tag = helper.event_live_tracking_tag(build_event(days_from_today: 0, tracking_url: "https://track.example.com"), time_zone)
       expect(tag).to include('data-icon="classic-light-signal-stream"')
       expect(tag).not_to include("entry__highlight")
     end
@@ -200,7 +201,7 @@ RSpec.describe EventsHelper, type: :helper do
       # Fallback clock would say night, but the event's sun is currently up → live and pulsing.
       allow(helper).to receive(:daytime?).and_return(false)
       event = build_event(days_from_today: 0, tracking_url: "https://track.example.com")
-      tag = helper.event_live_tracking_tag(event, build_event_weather)
+      tag = helper.event_live_tracking_tag(event, time_zone, event_weather: build_event_weather)
       expect(tag).to include("entry__highlight entry__highlight--live")
       expect(tag).to include('data-icon="classic-regular-signal-stream"')
     end
@@ -208,24 +209,23 @@ RSpec.describe EventsHelper, type: :helper do
 
   describe "#close?" do
     it "is false for a blank event" do
-      expect(helper.close?(nil)).to be(false)
+      expect(helper.close?(nil, time_zone)).to be(false)
     end
 
     it "is true for an event today or within the next 10 days" do
-      expect(helper.close?(build_event(days_from_today: 0))).to be(true)
-      expect(helper.close?(build_event(days_from_today: 10))).to be(true)
+      expect(helper.close?(build_event(days_from_today: 0), time_zone)).to be(true)
+      expect(helper.close?(build_event(days_from_today: 10), time_zone)).to be(true)
     end
 
     it "is false for an event more than 10 days out or in the past" do
-      expect(helper.close?(build_event(days_from_today: 11))).to be(false)
-      expect(helper.close?(build_event(days_from_today: -1))).to be(false)
+      expect(helper.close?(build_event(days_from_today: 11), time_zone)).to be(false)
+      expect(helper.close?(build_event(days_from_today: -1), time_zone)).to be(false)
     end
   end
 
   describe "#upcoming_races" do
     it "is empty when there are no events" do
-      helper.instance_variable_set(:@events, [])
-      expect(helper.upcoming_races).to eq([])
+      expect(helper.upcoming_races([], time_zone)).to eq([])
     end
 
     it "keeps only confirmed future-or-today events, soonest first" do
@@ -233,23 +233,20 @@ RSpec.describe EventsHelper, type: :helper do
       cancelled = build_event(days_from_today: 4, going: false)
       today = build_event(days_from_today: 0)
       soon = build_event(days_from_today: 3)
-      helper.instance_variable_set(:@events, [soon, past, cancelled, today])
 
-      expect(helper.upcoming_races).to eq([today, soon])
+      expect(helper.upcoming_races([soon, past, cancelled, today], time_zone)).to eq([today, soon])
     end
 
     it "shows up to four when the next race is featured (within 10 days)" do
       events = [0, 3, 8, 20, 25].map { |d| build_event(days_from_today: d) }
-      helper.instance_variable_set(:@events, events.shuffle)
 
-      expect(helper.upcoming_races.size).to eq(4)
+      expect(helper.upcoming_races(events.shuffle, time_zone).size).to eq(4)
     end
 
     it "shows up to three when the next race is more than 10 days out" do
       events = [15, 18, 22, 25].map { |d| build_event(days_from_today: d) }
-      helper.instance_variable_set(:@events, events.shuffle)
 
-      expect(helper.upcoming_races.size).to eq(3)
+      expect(helper.upcoming_races(events.shuffle, time_zone).size).to eq(3)
     end
   end
 
@@ -257,56 +254,53 @@ RSpec.describe EventsHelper, type: :helper do
     it "marks the soonest upcoming race as next" do
       first = build_event(days_from_today: 0)
       second = build_event(days_from_today: 5)
-      helper.instance_variable_set(:@events, [second, first])
+      upcoming = helper.upcoming_races([second, first], time_zone)
 
-      expect(helper.next?(first)).to be(true)
-      expect(helper.next?(second)).to be(false)
+      expect(helper.next?(first, upcoming)).to be(true)
+      expect(helper.next?(second, upcoming)).to be(false)
     end
 
     it "features the next race only when it's close" do
       near = build_event(days_from_today: 0)
-      helper.instance_variable_set(:@events, [near])
-      expect(helper.featured?(near)).to be(true)
+      upcoming = helper.upcoming_races([near], time_zone)
+      expect(helper.featured?(near, upcoming, time_zone)).to be(true)
 
       far = build_event(days_from_today: 20)
-      helper.instance_variable_set(:@events, [far])
-      expect(helper.featured?(far)).to be(false)
+      upcoming = helper.upcoming_races([far], time_zone)
+      expect(helper.featured?(far, upcoming, time_zone)).to be(false)
     end
   end
 
   describe "#event_collection_variant" do
-    def with_events(days)
-      helper.instance_variable_set(:@events, days.map { |d| build_event(days_from_today: d) })
+    def variant_for(days)
+      events = days.map { |d| build_event(days_from_today: d) }
+      upcoming = helper.upcoming_races(events, time_zone)
+      featured = helper.featured?(upcoming.first, upcoming, time_zone)
+      helper.event_collection_variant(upcoming.size, featured: featured)
     end
 
     it "is single for one race" do
-      with_events([0])
-      expect(helper.event_collection_variant).to eq("single")
+      expect(variant_for([0])).to eq("single")
     end
 
     it "is single for two races when the first is featured" do
-      with_events([0, 5])
-      expect(helper.event_collection_variant).to eq("single")
+      expect(variant_for([0, 5])).to eq("single")
     end
 
     it "is halves for two races when none is featured" do
-      with_events([15, 18])
-      expect(helper.event_collection_variant).to eq("halves")
+      expect(variant_for([15, 18])).to eq("halves")
     end
 
     it "is halves for three races when the first is featured" do
-      with_events([0, 5, 8])
-      expect(helper.event_collection_variant).to eq("halves")
+      expect(variant_for([0, 5, 8])).to eq("halves")
     end
 
     it "is thirds for three races when none is featured" do
-      with_events([15, 18, 22])
-      expect(helper.event_collection_variant).to eq("thirds")
+      expect(variant_for([15, 18, 22])).to eq("thirds")
     end
 
     it "is thirds for four races" do
-      with_events([0, 3, 8, 9])
-      expect(helper.event_collection_variant).to eq("thirds")
+      expect(variant_for([0, 3, 8, 9])).to eq("thirds")
     end
   end
 end
