@@ -54,7 +54,7 @@ module ShareHelpers
            elsif article&.contentful_metadata&.tags&.any? { |tag| tag.name.downcase == 'reviews' }
              'review'
            else
-             entry_type(article).downcase
+             entry_type(article)&.downcase || 'post'
            end
     "Share this #{type}"
   end

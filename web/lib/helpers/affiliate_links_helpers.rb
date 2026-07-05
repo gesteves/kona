@@ -41,7 +41,7 @@ module AffiliateLinksHelpers
   # @return [String] A disclosure message for the entry.
   def affiliate_links_disclosure(entry)
     disclosure = []
-    disclosure << "This #{entry_type(entry).downcase} contains affiliate links, which means I may earn a commission at no additional cost to you if you make a purchase through these links." if show_affiliate_links_disclosure?(entry)
+    disclosure << "This #{entry_type(entry)&.downcase || 'post'} contains affiliate links, which means I may earn a commission at no additional cost to you if you make a purchase through these links." if show_affiliate_links_disclosure?(entry)
     disclosure << "As an Amazon Associate I earn from qualifying purchases." if has_amazon_associates_links?(entry)
     markdown_to_html(disclosure.join(" "))
   end

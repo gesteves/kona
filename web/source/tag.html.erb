@@ -11,14 +11,9 @@
       <% ancestors = content.tag_id ? concept_chain(content.tag_id)[0...-1] : [] %>
       <% if ancestors.any? %>
         <span>
-          <% if ancestors.size == 1 %>
-            <%= icon_svg("classic", "light", "tag") %>
-          <% else %>
-            <%= icon_svg("classic", "light", "tags") %>
-          <% end %>
+          <%= tag_list_icon(ancestors.size) %>
           <span role="list" aria-label="Category">
-            <%= ancestors.map { |node| content_tag(:span, link_to(node[:name], node[:path]), role: 'listitem') }
-                  .join('<span class="entry__tag-separator" aria-hidden="true">/</span>') %>
+            <%= tag_chain_links([ancestors.map { |node| [node[:name], node[:path]] }]) %>
           </span>
         </span>
       <% end %>

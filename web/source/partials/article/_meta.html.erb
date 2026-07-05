@@ -9,7 +9,7 @@
   data-publish-date-entry-type-value="<%= article.entry_type %>"
   data-publish-date-draft-value="<%= article.draft %>">
   <% if render_draft && article.draft %>
-    <span class="entry__highlight"><%= icon_svg("classic", "regular", "typewriter") %> Draft</span>
+    <%= draft_badge %>
   <% end %>
   <span class="entry__highlight" data-publish-date-target="badge" hidden><%= icon_svg("classic", "regular", "sparkles") %> New</span>
   <span>
@@ -19,15 +19,9 @@
   </span>
   <% if render_tags && article.contentful_metadata.tags.present? %>
     <span>
-      <% if article.contentful_metadata.tags.size == 1 %>
-        <%= icon_svg("classic", "light", "tag") %>
-      <% else %>
-        <%= icon_svg("classic", "light", "tags") %>
-      <% end %>
+      <%= tag_list_icon(article.contentful_metadata.tags.size) %>
       <span class="entry__tags" role="list" aria-label="Tags">
-        <%= tag_breadcrumb_chains(article)
-              .map { |chain| chain.map { |tag| content_tag(:span, link_to(tag.short_name, tag.path), role: 'listitem') }.join('<span class="entry__tag-separator" aria-hidden="true">/</span>') }
-              .join('<span class="entry__tag-separator" aria-hidden="true">/</span>') %>
+        <%= tag_chain_links(tag_breadcrumb_chains(article).map { |chain| chain.map { |tag| [tag.short_name, tag.path] } }) %>
       </span>
     </span>
   <% end %>

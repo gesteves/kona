@@ -23,6 +23,7 @@ export default class extends Controller {
    */
   copy(event) {
     event.preventDefault();
+    if (!navigator.clipboard) return this.unsuccessfulCopy();
     const permalink = this.getPermalink();
     navigator.clipboard
       .writeText(permalink)

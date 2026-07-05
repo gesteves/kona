@@ -1,8 +1,12 @@
 require 'spec_helper'
 require 'ostruct'
+require 'padrino-helpers'
+require 'hashie'
 
 # RSpec auto-includes the described module, so SiteHelpers' instance methods are callable directly.
 RSpec.describe SiteHelpers do
+  include_context 'default helper stubs'
+
   # Builds a site double shaped like `data.site`.
   def site(socials: [], logo: 'logo', author_name: 'Jane Doe', profile_picture: nil)
     OpenStruct.new(
@@ -16,10 +20,8 @@ RSpec.describe SiteHelpers do
   # Collaborators normally mixed in from other helper modules; defined here so the schema builders
   # can be exercised in isolation.
   def data = OpenStruct.new(site: @site || site)
-  def full_url(path, *) = "https://example.com#{path}"
   def site_icon_url(w:) = "https://example.com/icon-#{w}.png"
   def cdn_image_url(url, params = {}) = "#{url}?w=#{params[:w]}"
-  def sanitize(text, **) = text
 
   describe '#schema_entity_id' do
     it 'anchors an entity to a URL + fragment' do
@@ -128,7 +130,6 @@ RSpec.describe SiteHelpers do
   end
 
   describe '#tag_breadcrumb_schema' do
-    def full_url(path, *) = "https://example.com#{path}"
     def concept_chain(id)
       {
         'half-distance' => [
@@ -183,6 +184,24 @@ RSpec.describe SiteHelpers do
 
     it 'yields an empty blogPost list when the page lists no entries' do
       expect(JSON.parse(blog_schema(OpenStruct.new(title: 'Blog')))['blogPost']).to eq([])
+    end
+  end
+
+  describe '#copyright_start_year' do
+    def data = OpenStruct.new(articles: @articles || [])
+
+    it 'is the year of the earliest published article' do
+      @articles = [
+        OpenStruct.new(draft: false, published_at: '2024-03-01T00:00:00Z'),
+        OpenStruct.new(draft: false, published_at: '2006-06-15T00:00:00Z'),
+        OpenStruct.new(draft: true,  published_at: '2001-01-01T00:00:00Z')
+      ]
+      expect(copyright_start_year).to eq('2006')
+    end
+
+    it 'falls back to the current year when no articles are published yet' do
+      @articles = [OpenStruct.new(draft: true, published_at: '2024-01-01T00:00:00Z')]
+      expect(copyright_start_year).to eq(Time.current.year.to_s)
     end
   end
 
@@ -259,6 +278,296 @@ RSpec.describe SiteHelpers do
       schema = JSON.parse(profile_page_schema)
       expect(schema['@type']).to eq('ProfilePage')
       expect(schema['mainEntity']).to eq('@id' => 'https://example.com/about#person')
+    end
+  end
+
+  # page_title branches on `content.is_a?(Hash)`, and the real proxied content objects are
+  # Middleman Mashes (Hash subclasses with dot access) — Hashie::Mash stands in for them here.
+  describe '#page_title' do
+    def data = OpenStruct.new(site: OpenStruct.new(meta_title: 'My Site'))
+
+    it "uses a content object's title, appending the page number past page 1" do
+      expect(page_title(Hashie::Mash.new(title: 'A Post'))).to eq('A Post')
+      expect(page_title(Hashie::Mash.new(title: 'Blog', current_page: 2))).to eq('Blog · Page 2')
+    end
+
+    it 'does not append "Page 1" on the first page of a paginated set' do
+      expect(page_title(Hashie::Mash.new(title: 'Blog', current_page: 1))).to eq('Blog')
+    end
+
+    it 'falls back to the site meta title for the home page and when there is no content' do
+      expect(page_title(Hashie::Mash.new(title: 'Home', is_home_page: true))).to eq('My Site')
+      expect(page_title(nil)).to eq('My Site')
+    end
+
+    it 'uses a plain string directly as the title' do
+      expect(page_title('Search')).to eq('Search')
+    end
+
+    it 'appends the site name on request, deduping when the title already is the site name' do
+      expect(page_title('Search', include_site_name: true)).to eq('Search · My Site')
+      expect(page_title(nil, include_site_name: true)).to eq('My Site')
+    end
+
+    it 'joins segments with a custom separator' do
+      expect(page_title('Search', include_site_name: true, separator: ' | ')).to eq('Search | My Site')
+    end
+  end
+
+  describe '#title_tag' do
+    include Padrino::Helpers
+
+    def data = OpenStruct.new(site: OpenStruct.new(meta_title: 'My Site'))
+
+    it 'wraps the page title, with the site name appended, in a <title> element' do
+      expect(title_tag(Hashie::Mash.new(title: 'A Post'))).to eq('<title>A Post · My Site</title>')
+    end
+  end
+
+  describe '#page_content' do
+    def current_page = OpenStruct.new(metadata: { locals: @locals })
+
+    it 'reads the proxied content object out of the page metadata locals' do
+      content = OpenStruct.new(title: 'A Post')
+      @locals = { content: content }
+      expect(page_content).to equal(content)
+    end
+
+    it 'is nil when the page has no locals' do
+      @locals = nil
+      expect(page_content).to be_nil
+    end
+  end
+
+  describe '#meta_title_source' do
+    def current_page = OpenStruct.new(metadata: { locals: @locals }, data: OpenStruct.new(title: @frontmatter_title))
+
+    it 'prefers the proxied content object over the frontmatter title' do
+      content = OpenStruct.new(title: 'A Post')
+      @locals = { content: content }
+      @frontmatter_title = 'Frontmatter Title'
+      expect(meta_title_source).to equal(content)
+    end
+
+    it 'falls back to the frontmatter title string' do
+      @locals = nil
+      @frontmatter_title = 'Frontmatter Title'
+      expect(meta_title_source).to eq('Frontmatter Title')
+    end
+
+    it 'is nil when the page has neither content nor a frontmatter title' do
+      @locals = nil
+      @frontmatter_title = ''
+      expect(meta_title_source).to be_nil
+    end
+  end
+
+  describe '#meta_description' do
+    # content_summary lives in this module but needs data.site; stubbed so the fallback
+    # ordering is what's under test.
+    def content_summary(content) = "Summary of #{content.title}."
+    def current_page = OpenStruct.new(metadata: { locals: @locals }, data: OpenStruct.new(summary: @frontmatter_summary))
+
+    it 'uses the content summary when the page has a content object' do
+      @locals = { content: OpenStruct.new(title: 'A Post') }
+      @frontmatter_summary = 'Ignored.'
+      expect(meta_description).to eq('Summary of A Post.')
+    end
+
+    it 'falls back to the frontmatter summary' do
+      @locals = nil
+      @frontmatter_summary = 'A page about things.'
+      expect(meta_description).to eq('A page about things.')
+    end
+
+    it 'is nil when the page has neither' do
+      @locals = nil
+      @frontmatter_summary = nil
+      expect(meta_description).to be_nil
+    end
+  end
+
+  describe '#og_normalized_path' do
+    it 'normalizes built paths to their public trailing-slash form' do
+      expect(og_normalized_path('/2024/01/01/post/index.html')).to eq('/2024/01/01/post/')
+      expect(og_normalized_path('/index.html')).to eq('/')
+      expect(og_normalized_path('/about/')).to eq('/about/')
+    end
+
+    it 'maps nil to nil and an empty path to the root' do
+      expect(og_normalized_path(nil)).to be_nil
+      expect(og_normalized_path('')).to eq('/')
+    end
+  end
+
+  describe '#og_page_titles' do
+    def data
+      OpenStruct.new(
+        site: OpenStruct.new(meta_title: 'My Site'),
+        articles: @articles || [],
+        pages: @pages
+      )
+    end
+
+    it "maps each non-draft entry's normalized path to its rendered title, skipping drafts and entries missing a path or title" do
+      @articles = [
+        Hashie::Mash.new(title: 'A Post', path: '/2024/01/01/post/index.html', draft: false),
+        Hashie::Mash.new(title: 'Hidden', path: '/2024/02/02/hidden/index.html', draft: true)
+      ]
+      @pages = [
+        Hashie::Mash.new(title: 'About', path: '/about/index.html', draft: false),
+        Hashie::Mash.new(title: nil, path: '/untitled/index.html', draft: false),
+        Hashie::Mash.new(title: 'Homeless', path: nil, draft: false)
+      ]
+      expect(og_page_titles).to eq(
+        '/2024/01/01/post/' => 'A Post',
+        '/about/' => 'About'
+      )
+    end
+
+    it 'titles the home page with the site meta title' do
+      @pages = [Hashie::Mash.new(title: 'Home', path: '/index.html', draft: false, is_home_page: true)]
+      expect(og_page_titles).to eq('/' => 'My Site')
+    end
+
+    it 'tolerates a missing collection' do
+      @articles = [Hashie::Mash.new(title: 'A Post', path: '/post/index.html', draft: false)]
+      @pages = nil
+      expect(og_page_titles).to eq('/post/' => 'A Post')
+    end
+  end
+
+  describe '#copyright_years' do
+    def data = OpenStruct.new(articles: [OpenStruct.new(draft: false, published_at: '2006-06-15T00:00:00Z')])
+
+    it 'spans from the earliest publish year to the current year, joined with an en dash' do
+      expect(copyright_years).to eq("2006–#{Time.current.year}")
+    end
+  end
+
+  describe '#live_update_attrs' do
+    it 'pins the exact attribute cluster the web↔api live-update contract requires' do
+      attrs = live_update_attrs('/widgets/weather/current')
+      expect(attrs).to eq('data-controller="live-update" data-live-update-url-value="/widgets/weather/current" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange"')
+      expect(attrs).to be_html_safe
+    end
+  end
+
+  describe '#preload_widget' do
+    include Padrino::Helpers
+
+    it 'registers a crossorigin fetch preload link under the :preloads slot' do
+      preload_widget('/widgets/whoop')
+      expect(yield_content(:preloads)).to eq('<link rel="preload" as="fetch" href="/widgets/whoop" crossorigin="anonymous">')
+    end
+
+    it 'accumulates one preload per registered widget' do
+      preload_widget('/widgets/whoop')
+      preload_widget('/widgets/activity-stats')
+      expect(yield_content(:preloads)).to eq(
+        '<link rel="preload" as="fetch" href="/widgets/whoop" crossorigin="anonymous">' \
+        '<link rel="preload" as="fetch" href="/widgets/activity-stats" crossorigin="anonymous">'
+      )
+    end
+  end
+
+  describe '#social_media_link' do
+    include Padrino::Helpers
+
+    # icon_svg lives in IconHelpers and reads data.icons; replaced with a recognizable marker.
+    # Marked html_safe to mirror the template rendering path, where the SVG lands in the page
+    # unescaped. Returns blank for 'obscuresite' to exercise the missing-brand-icon fallback.
+    def icon_svg(family, style, icon_id)
+      return '' if icon_id == 'obscuresite'
+      %(<svg data-icon="#{family}/#{style}/#{icon_id}"></svg>).html_safe
+    end
+
+    it 'renders the feed item as a clipboard-copy button with the RSS icon' do
+      expect(social_media_link(title: 'Feed', destination: '/feed.xml')).to eq(
+        '<a title="Subscribe to the feed" aria-label="Subscribe to the feed" data-controller="clipboard" ' \
+        'data-action="click-&gt;clipboard#copy" ' \
+        'data-clipboard-success-message-value="The link to the feed has been copied to your clipboard." ' \
+        'rel="me noopener" target="_blank" href="/feed.xml"><svg data-icon="classic/solid/rss"></svg></a>'
+      )
+    end
+
+    it 'renders a normal profile link with the brand icon, follow labels, and new-tab attributes' do
+      expect(social_media_link(title: 'Bluesky', destination: 'https://bsky.app/x', css_class: 'social')).to eq(
+        '<a title="Follow on Bluesky" aria-label="Follow on Bluesky" rel="me noopener" target="_blank" ' \
+        'class="social" href="https://bsky.app/x"><svg data-icon="classic/brands/bluesky"></svg></a>'
+      )
+    end
+
+    it 'drops target and noopener when the link opens in the same tab' do
+      expect(social_media_link(title: 'Mastodon', destination: 'https://m.test/x', open_in_new_tab: false)).to eq(
+        '<a title="Follow on Mastodon" aria-label="Follow on Mastodon" rel="me" ' \
+        'href="https://m.test/x"><svg data-icon="classic/brands/mastodon"></svg></a>'
+      )
+    end
+
+    it 'falls back to the generic link icon when no brand icon exists' do
+      expect(social_media_link(title: 'ObscureSite', destination: 'https://o.test/x')).to eq(
+        '<a title="Follow on ObscureSite" aria-label="Follow on ObscureSite" rel="me noopener" target="_blank" ' \
+        'href="https://o.test/x"><svg data-icon="classic/solid/link"></svg></a>'
+      )
+    end
+  end
+
+  describe '#shortcut_link' do
+    include Padrino::Helpers
+
+    it 'renders the feed item as a clipboard-copy link instead of a plain navigation' do
+      item = OpenStruct.new(title: 'Feed', destination: '/feed.xml')
+      # Attribute order follows the shared FEED_CLIPBOARD_ATTRS (controller, action, message).
+      expect(shortcut_link(item)).to eq(
+        '<a href="/feed.xml" data-controller="clipboard" ' \
+        'data-action="click-&gt;clipboard#copy" ' \
+        'data-clipboard-success-message-value="The link to the feed has been copied to your clipboard.">Feed</a>'
+      )
+    end
+
+    it 'adds target and noopener for items that open in a new tab' do
+      item = OpenStruct.new(title: 'GitHub', destination: 'https://github.com/x', open_in_new_tab: true)
+      expect(shortcut_link(item)).to eq('<a href="https://github.com/x" rel="noopener" target="_blank">GitHub</a>')
+    end
+
+    it 'renders everything else as a plain link' do
+      item = OpenStruct.new(title: 'About', destination: '/about', open_in_new_tab: false)
+      expect(shortcut_link(item)).to eq('<a href="/about">About</a>')
+    end
+  end
+
+  describe 'plausible proxy helpers' do
+    around do |example|
+      original = ENV['PLAUSIBLE_SCRIPT_URL']
+      example.run
+    ensure
+      original.nil? ? ENV.delete('PLAUSIBLE_SCRIPT_URL') : ENV['PLAUSIBLE_SCRIPT_URL'] = original
+    end
+
+    it 'exposes the fixed first-party proxy paths' do
+      expect(plausible_script_path).to eq('/plsbl/script.js')
+      expect(plausible_event_path).to eq('/plsbl/event')
+    end
+
+    it 'is installed only when the upstream script URL is configured' do
+      ENV.delete('PLAUSIBLE_SCRIPT_URL')
+      expect(plausible_installed?).to be(false)
+      ENV['PLAUSIBLE_SCRIPT_URL'] = 'https://plausible.example/js/script.js'
+      expect(plausible_installed?).to be(true)
+    end
+
+    it 'emits proxy rewrites for the script and the event endpoint when installed' do
+      ENV['PLAUSIBLE_SCRIPT_URL'] = 'https://plausible.example/js/script.js'
+      expect(plausible_proxy_redirects).to eq([
+        { from: '/plsbl/script.js', to: 'https://plausible.example/js/script.js', status: 200 },
+        { from: '/plsbl/event', to: 'https://plausible.io/api/event', status: 200 }
+      ])
+    end
+
+    it 'emits no rewrites when Plausible is not configured' do
+      ENV.delete('PLAUSIBLE_SCRIPT_URL')
+      expect(plausible_proxy_redirects).to eq([])
     end
   end
 end

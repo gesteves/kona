@@ -189,6 +189,9 @@ class Contentful
     item[:path] = if item[:draft]
       draft_path(item)
     else
+      # The Y/M/D segments come from the timestamp's own zone (as authored in Contentful),
+      # deliberately not normalized to UTC: published permalinks must never move, and the
+      # local date is the one the editor published under.
       published = DateTime.parse(item[:published_at])
       "/#{published.strftime('%Y')}/#{published.strftime('%m')}/#{published.strftime('%d')}/#{item[:slug]}/index.html"
     end

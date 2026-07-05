@@ -7,13 +7,13 @@ RSpec.describe MarkupHelpers do
 
   let(:affiliate_link) { 'https://www.amazon.com/abc123?tag=example-20' }
   let(:non_affiliate_link) { 'https://www.amazon.com/abc123' }
-  let(:external_link) { 'https://www.example.com/whatever' }
-  let(:internal_link) { 'https://www.giventotri.com/whatever' }
+  let(:external_link) { 'https://www.example.org/whatever' }
+  let(:internal_link) { 'https://www.example.com/whatever' }
 
   before do
     allow(self).to receive(:amazon_associates_link?).with(affiliate_link).and_return(true)
     allow(self).to receive(:amazon_associates_link?).with(non_affiliate_link).and_return(false)
-    allow(self).to receive(:root_url).and_return('https://www.giventotri.com')
+    allow(self).to receive(:root_url).and_return('https://www.example.com')
   end
 
   describe '#add_unit_data_attributes' do
@@ -204,6 +204,22 @@ RSpec.describe MarkupHelpers do
       transformed_html = add_heading_permalinks(html)
       expect(transformed_html).not_to include('entry__heading-permalink')
     end
+
+    it 'labels each permalink with the heading text for assistive tech' do
+      html = '<h2 id="first">First Heading</h2>'
+      doc = Nokogiri::HTML::DocumentFragment.parse(add_heading_permalinks(html))
+      anchor = doc.at_css('a.entry__heading-permalink')
+      expect(anchor['aria-label']).to eq('Permalink to First Heading')
+      expect(anchor['title']).to eq('Permalink to First Heading')
+    end
+
+    it 'escapes HTML-sensitive characters in the heading text' do
+      html = '<h2 id="qa">Q&amp;A about "gear" &lt;2026&gt;</h2>'
+      doc = Nokogiri::HTML::DocumentFragment.parse(add_heading_permalinks(html))
+      anchor = doc.at_css('a.entry__heading-permalink')
+      expect(anchor['aria-label']).to eq('Permalink to Q&A about "gear" <2026>')
+      expect(anchor['title']).to eq('Permalink to Q&A about "gear" <2026>')
+    end
   end
 
   describe '#wrap_figcaption_emoji' do
@@ -275,6 +291,269 @@ RSpec.describe MarkupHelpers do
         expect(wrap_figcaption_emoji('')).to be_nil
         expect(wrap_figcaption_emoji(nil)).to be_nil
       end
+    end
+  end
+
+  describe '#add_image_data_attributes' do
+    it 'stamps each image with its asset id and original URL' do
+      html = '<p><img src="https://images.ctfassets.net/space/asset-1/token/photo.jpg"></p>'
+      transformed_html = add_image_data_attributes(html)
+      expect(transformed_html).to eq('<p><img src="https://images.ctfassets.net/space/asset-1/token/photo.jpg" data-asset-id="asset-1" data-original-url="https://images.ctfassets.net/space/asset-1/token/photo.jpg"></p>')
+    end
+
+    it 'stamps a blank asset id for URLs that do not follow the Contentful path shape' do
+      html = '<p><img src="/images/local.jpg"></p>'
+      transformed_html = add_image_data_attributes(html)
+      expect(transformed_html).to eq('<p><img src="/images/local.jpg" data-asset-id="" data-original-url="/images/local.jpg"></p>')
+    end
+  end
+
+  describe '#add_figure_elements_to_images' do
+    let(:image_url) { 'https://images.ctfassets.net/space/asset-1/token/photo.jpg' }
+
+    before do
+      allow(self).to receive(:get_asset_content_type).with('asset-1').and_return('image/jpeg')
+    end
+
+    context 'with a base class' do
+      it 'replaces the paragraph with a figure carrying the base and content-type modifier classes, and moves the caption into a figcaption' do
+        html = %(<p><img src="#{image_url}">A caption | Credit</p>)
+        transformed_html = add_figure_elements_to_images(html, base_class: 'entry')
+        expect(transformed_html).to eq(%(<figure class="entry__figure entry__figure--jpeg"><img src="#{image_url}"><figcaption>A caption | Credit</figcaption></figure>))
+      end
+    end
+
+    context 'without a base class' do
+      it 'wraps the image in a bare figure and omits the figcaption when there is no caption' do
+        html = %(<p><img src="#{image_url}"></p>)
+        transformed_html = add_figure_elements_to_images(html)
+        expect(transformed_html).to eq(%(<figure><img src="#{image_url}"></figure>))
+      end
+    end
+
+    context 'when the asset has no known content type' do
+      # Suspected bug, pinned as current behavior: with a base_class, the figure class is
+      # built from `content_type.split('/')`, which raises for an image whose asset id
+      # doesn't resolve (e.g. a hotlinked non-Contentful image). Without a base_class the
+      # content type is unused and the same input works fine.
+      it 'raises NoMethodError when a base class is given' do
+        allow(self).to receive(:get_asset_content_type).and_return(nil)
+        html = %(<p><img src="#{image_url}"></p>)
+        expect { add_figure_elements_to_images(html, base_class: 'entry') }.to raise_error(NoMethodError)
+      end
+
+      it 'still wraps the image when no base class is given' do
+        allow(self).to receive(:get_asset_content_type).and_return(nil)
+        html = %(<p><img src="#{image_url}"></p>)
+        expect(add_figure_elements_to_images(html)).to eq(%(<figure><img src="#{image_url}"></figure>))
+      end
+    end
+  end
+
+  describe '#add_figure_elements_to_iframes' do
+    let(:iframe_html) { '<iframe src="https://player.example/embed/1"></iframe>' }
+
+    context 'with a base class' do
+      # Note the asymmetry with add_figure_elements_to_images: the figure replaces the
+      # iframe *inside* its parent — the wrapping <p> is kept, not replaced.
+      it 'wraps the iframe in a figure with the base and iframe modifier classes, inside the original parent' do
+        transformed_html = add_figure_elements_to_iframes("<p>#{iframe_html}</p>", base_class: 'entry')
+        expect(transformed_html).to eq(%(<p><figure class="entry__figure entry__figure--iframe">#{iframe_html}</figure></p>))
+      end
+
+      it 'reuses an existing figure parent, replacing its class instead of nesting a new figure' do
+        transformed_html = add_figure_elements_to_iframes("<figure>#{iframe_html}</figure>", base_class: 'entry')
+        expect(transformed_html).to eq(%(<figure class="entry__figure entry__figure--iframe">#{iframe_html}</figure>))
+      end
+    end
+
+    context 'without a base class' do
+      it 'wraps the iframe in a classless figure' do
+        transformed_html = add_figure_elements_to_iframes("<p>#{iframe_html}</p>")
+        expect(transformed_html).to eq(%(<p><figure>#{iframe_html}</figure></p>))
+      end
+    end
+  end
+
+  describe '#add_figure_elements_to_embeds' do
+    let(:embed_html) { '<blockquote class="bluesky-embed"><p>A post</p></blockquote><script src="https://embed.bsky.app/static/embed.js"></script>' }
+
+    context 'with a base class' do
+      it 'wraps the blockquote + script pair in a figure with the base and embed modifier classes' do
+        transformed_html = add_figure_elements_to_embeds(embed_html, base_class: 'entry')
+        # Nokogiri serializes a newline before the <script>; pinned as-is.
+        expect(transformed_html).to eq(%(<figure class="entry__figure entry__figure--embed"><blockquote class="bluesky-embed"><p>A post</p></blockquote>\n<script src="https://embed.bsky.app/static/embed.js"></script></figure>))
+      end
+
+      it 'reuses an existing figure parent, replacing its class instead of nesting a new figure' do
+        transformed_html = add_figure_elements_to_embeds("<figure>#{embed_html}</figure>", base_class: 'entry')
+        expect(transformed_html).to eq(%(<figure class="entry__figure entry__figure--embed"><blockquote class="bluesky-embed"><p>A post</p></blockquote>\n<script src="https://embed.bsky.app/static/embed.js"></script></figure>))
+      end
+    end
+
+    it 'leaves a blockquote without a following script untouched' do
+      html = '<blockquote><p>A post</p></blockquote>'
+      expect(add_figure_elements_to_embeds(html, base_class: 'entry')).to eq(html)
+    end
+  end
+
+  describe '#responsivize_images' do
+    let(:image_url) { 'https://images.ctfassets.net/space/asset-1/token/photo.jpg' }
+    let(:tagged_img) { %(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}">) }
+
+    before do
+      # Deterministic stand-in for the CDN URL builder: append the params as a query string.
+      allow(self).to receive(:cdn_image_url) do |url, params = {}|
+        params.nil? || params.empty? ? url : "#{url}?#{URI.encode_www_form(params)}"
+      end
+      allow(self).to receive(:get_asset_dimensions).with('asset-1').and_return([200, 100])
+      allow(self).to receive(:get_asset_content_type).with('asset-1').and_return('image/jpeg')
+    end
+
+    it 'wraps the image in a picture with one source per format, dropping widths larger than the asset' do
+      transformed_html = responsivize_images(tagged_img, widths: [100, 200, 300], sizes: '100vw', formats: ['webp', 'jpg'])
+      expect(transformed_html).to eq(
+        %(<picture>) +
+        %(<source sizes="100vw" type="image/webp" srcset="#{image_url}?fm=webp&amp;w=100 100w, #{image_url}?fm=webp&amp;w=200 200w"></source>) +
+        %(<source sizes="100vw" type="image/jpg" srcset="#{image_url}?fm=jpg&amp;w=100 100w, #{image_url}?fm=jpg&amp;w=200 200w"></source>) +
+        %(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}" loading="lazy" width="200" height="100">) +
+        %(</picture>)
+      )
+    end
+
+    it 'inserts the asset width as a srcset candidate when it falls below the largest requested width' do
+      allow(self).to receive(:get_asset_dimensions).with('asset-1').and_return([150, 75])
+      transformed_html = responsivize_images(tagged_img, widths: [100, 300], sizes: '100vw', formats: ['jpg'])
+      expect(transformed_html).to include(%(srcset="#{image_url}?fm=jpg&amp;w=100 100w, #{image_url}?fm=jpg&amp;w=150 150w"))
+    end
+
+    it 'crops square sources and sets the height to the width when square' do
+      transformed_html = responsivize_images(tagged_img, widths: [100], sizes: '100vw', formats: ['jpg'], square: true, lazy: false)
+      expect(transformed_html).to eq(
+        %(<picture>) +
+        %(<source sizes="100vw" type="image/jpg" srcset="#{image_url}?fm=jpg&amp;w=100&amp;h=100&amp;fit=cover 100w"></source>) +
+        %(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}" width="200" height="200">) +
+        %(</picture>)
+      )
+    end
+
+    it 'sets dimensions and lazy loading on gifs but does not wrap them in a picture' do
+      allow(self).to receive(:get_asset_content_type).with('asset-1').and_return('image/gif')
+      transformed_html = responsivize_images(tagged_img, widths: [100, 200], sizes: '100vw', formats: ['webp'])
+      expect(transformed_html).to eq(%(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}" loading="lazy" width="200" height="100">))
+    end
+
+    it 'skips images without a data-asset-id' do
+      html = %(<img src="#{image_url}">)
+      expect(responsivize_images(html)).to eq(html)
+    end
+  end
+
+  describe '#source_tag' do
+    let(:image_url) { 'https://images.ctfassets.net/space/asset-1/token/photo.jpg' }
+
+    before do
+      allow(self).to receive(:cdn_image_url) do |url, params = {}|
+        params.nil? || params.empty? ? url : "#{url}?#{URI.encode_www_form(params)}"
+      end
+    end
+
+    it 'renders a source element with a width-described srcset in the requested format' do
+      html = source_tag(image_url, sizes: '100vw', type: 'image/webp', format: 'webp', widths: [100, 200], square: false)
+      expect(html).to eq(%(<source sizes="100vw" type="image/webp" srcset="#{image_url}?fm=webp&amp;w=100 100w, #{image_url}?fm=webp&amp;w=200 200w" />))
+    end
+  end
+
+  describe '#resize_images' do
+    let(:image_url) { 'https://images.ctfassets.net/space/asset-1/token/photo.jpg' }
+    let(:tagged_img) { %(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}">) }
+
+    before do
+      allow(self).to receive(:cdn_image_url) do |url, params = {}|
+        params.nil? || params.empty? ? url : "#{url}?#{URI.encode_www_form(params)}"
+      end
+      allow(self).to receive(:get_asset_content_type).with('asset-1').and_return('image/jpeg')
+    end
+
+    it 'resizes to the asset width when it is smaller than the requested width' do
+      allow(self).to receive(:get_asset_dimensions).with('asset-1').and_return([200, 100])
+      transformed_html = resize_images(tagged_img, width: 1000)
+      expect(transformed_html).to eq(%(<img src="#{image_url}?w=200" data-asset-id="asset-1" data-original-url="#{image_url}">))
+    end
+
+    it 'resizes to the requested width when the asset is larger' do
+      allow(self).to receive(:get_asset_dimensions).with('asset-1').and_return([2000, 1000])
+      transformed_html = resize_images(tagged_img, width: 1000)
+      expect(transformed_html).to eq(%(<img src="#{image_url}?w=1000" data-asset-id="asset-1" data-original-url="#{image_url}">))
+    end
+
+    it 'does not resize gifs, pointing them at the CDN without params' do
+      allow(self).to receive(:get_asset_dimensions).with('asset-1').and_return([200, 100])
+      allow(self).to receive(:get_asset_content_type).with('asset-1').and_return('image/gif')
+      transformed_html = resize_images(tagged_img, width: 1000)
+      expect(transformed_html).to eq(tagged_img)
+    end
+  end
+
+  describe '#add_image_placeholders' do
+    let(:image_url) { 'https://images.ctfassets.net/space/asset-1/token/photo.jpg' }
+    let(:tagged_img) { %(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}">) }
+
+    it 'sets the blurhash placeholder as a CSS custom property and wires up the image-placeholder controller' do
+      allow(self).to receive(:blurhash_svg_data_uri).with('asset-1').and_return('data:image/svg+xml;charset=utf-8,%3Csvg%2F%3E')
+      transformed_html = add_image_placeholders(tagged_img)
+      expect(transformed_html).to eq(%(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}" style="--placeholder:url('data:image/svg+xml;charset=utf-8,%3Csvg%2F%3E');" class="placeholder" data-controller="image-placeholder" data-action="load-&gt;image-placeholder#removePlaceholder error-&gt;image-placeholder#removePlaceholder">))
+    end
+
+    it 'still adds the placeholder class and controller when no blurhash is available, but omits the style' do
+      allow(self).to receive(:blurhash_svg_data_uri).with('asset-1').and_return(nil)
+      transformed_html = add_image_placeholders(tagged_img)
+      expect(transformed_html).not_to include('style=')
+      expect(transformed_html).to include('class="placeholder"')
+      expect(transformed_html).to include('data-controller="image-placeholder"')
+    end
+
+    it 'appends the placeholder class to an existing class attribute' do
+      allow(self).to receive(:blurhash_svg_data_uri).with('asset-1').and_return(nil)
+      html = %(<img src="#{image_url}" class="hero" data-asset-id="asset-1" data-original-url="#{image_url}">)
+      expect(add_image_placeholders(html)).to include('class="hero placeholder"')
+    end
+  end
+
+  describe '#set_alt_text' do
+    let(:image_url) { 'https://images.ctfassets.net/space/asset-1/token/photo.jpg' }
+    let(:tagged_img) { %(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}">) }
+
+    it "sets the image's alt attribute to the asset description" do
+      allow(self).to receive(:get_asset_description).with('asset-1').and_return('A finish line')
+      transformed_html = set_alt_text(tagged_img)
+      expect(transformed_html).to eq(%(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}" alt="A finish line">))
+    end
+
+    it 'leaves the image untouched when the asset has no description' do
+      allow(self).to receive(:get_asset_description).with('asset-1').and_return(nil)
+      expect(set_alt_text(tagged_img)).to eq(tagged_img)
+    end
+  end
+
+  describe '#lazy_load_iframes' do
+    it 'adds loading="lazy" to iframes' do
+      html = '<iframe src="https://player.example/embed/1"></iframe>'
+      transformed_html = lazy_load_iframes(html)
+      expect(transformed_html).to eq('<iframe src="https://player.example/embed/1" loading="lazy"></iframe>')
+    end
+  end
+
+  describe '#copy_feed_links' do
+    it 'wires feed links to the clipboard controller with the success message' do
+      html = '<a href="https://example.com/feed.xml">Subscribe</a>'
+      transformed_html = copy_feed_links(html)
+      expect(transformed_html).to eq('<a href="https://example.com/feed.xml" data-controller="clipboard" data-action="click-&gt;clipboard#copy" data-clipboard-success-message-value="The link to the feed has been copied to your clipboard.">Subscribe</a>')
+    end
+
+    it 'leaves non-feed links untouched' do
+      html = '<a href="https://example.com/about">About</a>'
+      expect(copy_feed_links(html)).to eq(html)
     end
   end
 end

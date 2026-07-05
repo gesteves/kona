@@ -61,6 +61,16 @@ module SiteHelpers
     end
   end
 
+  # Preloads a widget endpoint and renders its placeholder partial in one call — the
+  # standard pairing for every runtime widget (see preload_widget for why both matter).
+  # @param name [String] The placeholder partial's basename under partials/placeholders/.
+  # @param url [String] The same-origin widget endpoint, passed to the partial as `url`.
+  # @return [String] The rendered placeholder.
+  def render_widget(name, url)
+    preload_widget(url)
+    partial "partials/placeholders/#{name}", locals: { url: url }
+  end
+
   # The proxied `content` object for the current page, if any. Templates receive it as a
   # local (set via `proxy … locals:` in config.rb), but helper methods can't see template
   # locals — they read it from the page metadata instead.
@@ -132,7 +142,8 @@ module SiteHelpers
   # @return [String] e.g. "2006".
   def copyright_start_year
     memoize_by_collection(:copyright_start_year, data.articles) do
-      published_articles.map { |a| published_datetime(a) }.min.strftime('%Y')
+      earliest = published_articles.map { |a| published_datetime(a) }.min
+      earliest.nil? ? Time.current.year.to_s : earliest.strftime('%Y')
     end
   end
 
@@ -180,6 +191,16 @@ module SiteHelpers
     subtitle
   end
 
+  # The clipboard-controller attribute set that makes a feed link copy its URL to the
+  # clipboard instead of navigating, with the shared confirmation message. Used by the
+  # social/shortcut link builders here and by MarkupHelpers#copy_feed_links for feed links
+  # inside rendered bodies.
+  FEED_CLIPBOARD_ATTRS = {
+    "data-controller": "clipboard",
+    "data-action": "click->clipboard#copy",
+    "data-clipboard-success-message-value": "The link to the feed has been copied to your clipboard."
+  }.freeze
+
   # Returns the markup for a social media link.
   # @param title [String] The title of the social media platform.
   # @param destination [String] The URL to the social media profile.
@@ -199,9 +220,7 @@ module SiteHelpers
       {
         "title": "Subscribe to the feed",
         "aria-label": "Subscribe to the feed",
-        "data-controller": "clipboard",
-        "data-action": "click->clipboard#copy",
-        "data-clipboard-success-message-value": "The link to the feed has been copied to your clipboard."
+        **FEED_CLIPBOARD_ATTRS
       }
     else
       {
@@ -226,7 +245,7 @@ module SiteHelpers
   # @return [String] An anchor element.
   def shortcut_link(item)
     if item.title.downcase == 'feed'
-      link_to item.title, item.destination, "data-controller": "clipboard", "data-clipboard-success-message-value": "The link to the feed has been copied to your clipboard.", "data-action": "click->clipboard#copy"
+      link_to item.title, item.destination, **FEED_CLIPBOARD_ATTRS
     elsif item.open_in_new_tab
       link_to item.title, item.destination, rel: "noopener", target: "_blank"
     else
@@ -351,28 +370,38 @@ module SiteHelpers
     schema.to_json
   end
 
+  # A JSON-LD ImageObject node, shared by the article schema (cover images + OG fallback) and
+  # the author Person's portrait in the sitewide entity graph.
+  # @return [Hash]
+  def image_object(url, width, height)
+    { "@type": "ImageObject", "url": url, "width": width, "height": height }
+  end
+
+  # Builds the JSON-LD BreadcrumbList shared by article pages (ArticleHelpers#breadcrumb_schema)
+  # and taxonomy archive pages (tag_breadcrumb_schema): Home › Blog › the given crumbs.
+  # @param crumbs [Array<Array(String, String)>] [name, url] pairs appended after Home › Blog.
+  # @see https://schema.org/BreadcrumbList
+  # @return [String] A JSON-LD formatted string.
+  def breadcrumb_list_schema(crumbs)
+    items = [['Home', full_url('/')], ['Blog', full_url('/blog')], *crumbs].map.with_index(1) do |(name, url), position|
+      { "@type": "ListItem", "position": position, "name": name, "item": url }
+    end
+    { "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": items }.to_json
+  end
+
   # Generates a JSON-LD BreadcrumbList for a taxonomy archive page (`/tagged/*`): Home › Blog ›
   # the concept's ancestor chain, ending at the concept itself. Mirrors the article breadcrumb
   # (ArticleHelpers#breadcrumb_schema) for the archive pages, whose nesting the article version
   # can't express. Each crumb points at the concept's canonical archive path (page 1), so it's
   # stable across paginated subpages. Returns nil when the page has no concept.
   # @param content [Object] The proxied tag-page object (carries `tag_id`).
-  # @see https://schema.org/BreadcrumbList
   # @return [String, nil] A JSON-LD formatted string, or nil.
   def tag_breadcrumb_schema(content)
     return unless content.tag_id
     chain = concept_chain(content.tag_id)
     return if chain.empty?
 
-    items = [
-      { "@type": "ListItem", "position": 1, "name": "Home", "item": full_url('/') },
-      { "@type": "ListItem", "position": 2, "name": "Blog", "item": full_url('/blog') }
-    ]
-    chain.each do |node|
-      items << { "@type": "ListItem", "position": items.size + 1, "name": sanitize(node[:name]), "item": full_url(node[:path]) }
-    end
-
-    { "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": items }.to_json
+    breadcrumb_list_schema(chain.map { |node| [sanitize(node[:name]), full_url(node[:path])] })
   end
 
   # Generates a JSON-LD Blog schema for the paginated blog index (`/blog`), declaring the page as
@@ -487,13 +516,8 @@ module SiteHelpers
     person["knowsAbout"] = knows_about if knows_about.present?
     if data.site.author.profile_picture&.url.present?
       picture = data.site.author.profile_picture
-      person["image"] = {
-        "@type": "ImageObject",
-        "url": cdn_image_url(picture.url, { w: 500, h: 500, fit: 'cover' }),
-        "width": 500,
-        "height": 500
-      }
-      person["image"]["caption"] = sanitize(picture.description) if picture.description.present?
+      person["image"] = image_object(cdn_image_url(picture.url, { w: 500, h: 500, fit: 'cover' }), 500, 500)
+      person["image"][:caption] = sanitize(picture.description) if picture.description.present?
     end
 
     {

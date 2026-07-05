@@ -14,7 +14,7 @@ module MarkdownHelpers
 
   # Applies SmartyPants rendering to the provided text for typographic improvements.
   # @param text [String] The text to be processed with SmartyPants rendering.
-  # @return [String] The text after SmartyPants rendering, or an empty string if the original text is blank.
+  # @return [String, nil] The text after SmartyPants rendering, or nil if the original text is blank.
   def smartypants(text)
     return if text.blank?
     Redcarpet::Render::SmartyPants.render(text)

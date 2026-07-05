@@ -1,6 +1,4 @@
 <%= partial 'partials/article/page', locals: { article: content } %>
 <% if content.show_recommendations %>
-  <% trending_url = '/widgets/articles/trending' %>
-  <% preload_widget trending_url %>
-  <%= partial 'partials/placeholders/trending', locals: { url: trending_url } %>
+  <%= render_widget 'trending', '/widgets/articles/trending' %>
 <% end %>

@@ -16,6 +16,8 @@ require 'middleman-core/load_paths'
 # it.
 #
 # See https://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
+Dir[File.expand_path('../support/**/*.rb', __FILE__)].sort.each { |file| require file }
+
 RSpec.configure do |config|
   helpers_path = File.expand_path('../../lib/helpers', __FILE__)
   Dir["#{helpers_path}/*.rb"].each do |file|
@@ -51,6 +53,14 @@ RSpec.configure do |config|
   # inherited by the metadata hash of host groups and examples, rather than
   # triggering implicit auto-inclusion in groups with matching metadata.
   config.shared_context_metadata_behavior = :apply_to_host_groups
+
+  # Run specs in random order to surface order dependencies. Reproduce a
+  # failure by passing the seed printed after each run: --seed 1234
+  config.order = :random
+
+  # Seed global randomization in this process using the `--seed` CLI option,
+  # so randomness inside examples is reproducible too.
+  Kernel.srand config.seed
 
 # The settings below are suggested to provide a good initial experience
 # with RSpec, but feel free to customize to your heart's content.

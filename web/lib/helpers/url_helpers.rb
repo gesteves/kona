@@ -25,11 +25,4 @@ module UrlHelpers
       'http://localhost:4567'
     end
   end
-
-  # Extracts and returns the domain from the application's root URL.
-  # @return [String] The domain of the application's root URL.
-  def site_domain
-    uri = URI.parse(root_url)
-    PublicSuffix.domain(uri.host)
-  end
 end

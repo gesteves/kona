@@ -26,6 +26,14 @@ RSpec.describe "Widgets::Plausible pageviews", type: :request do
     expect(response.body).to include(ERB::Util.url_encode("/2026/05/01/my-race-report/"))
   end
 
+  it "carries the live-update wiring so the count keeps refreshing after the first swap" do
+    get "/widgets/plausible/pageviews/abc123", headers: auth_headers
+
+    expect(response.body).to include('data-controller="live-update"')
+    expect(response.body).to include('data-live-update-url-value="/widgets/plausible/pageviews/abc123"')
+    expect(response.body).to include('data-action="visibilitychange@document->live-update#handleVisibilityChange"')
+  end
+
   it "URL-encodes a slug with special characters in the dashboard link" do
     weird = DeepOstruct.wrap(slug: "q&a-recap", published: "2026-05-01T09:00:00-06:00", sys: { id: "abc123", first_published_at: "2026-05-01T09:00:00Z" })
     allow_any_instance_of(Articles).to receive(:find).and_return(weird)

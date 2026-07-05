@@ -31,4 +31,19 @@ RSpec.describe AffiliateLinksHelpers do
       expect(amazon_associates_link?('https://example.com')).to be false
     end
   end
+
+  describe '#affiliate_links_disclosure' do
+    def entry(entry_type:, body: 'No links here.')
+      double('Entry', sys: double('Sys', id: 'entry-1'), entry_type: entry_type,
+                      show_affiliate_links_disclosure: true, intro: nil, body: body)
+    end
+
+    it "names the entry's type in the disclosure" do
+      expect(affiliate_links_disclosure(entry(entry_type: 'Article'))).to include('This article contains affiliate links')
+    end
+
+    it "falls back to 'post' when the entry has no type" do
+      expect(affiliate_links_disclosure(entry(entry_type: nil))).to include('This post contains affiliate links')
+    end
+  end
 end

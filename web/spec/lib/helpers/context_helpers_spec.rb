@@ -10,26 +10,17 @@ RSpec.describe ContextHelpers do
     with_context(nil)
     expect(netlify?).to be false
     expect(production?).to be false
-    expect(dev?).to be false
   end
 
   it 'is on Netlify in production' do
     with_context('production')
     expect(netlify?).to be true
     expect(production?).to be true
-    expect(dev?).to be false
   end
 
   it 'is on Netlify (but not production) for previews' do
     with_context('deploy-preview')
     expect(netlify?).to be true
-    expect(production?).to be false
-  end
-
-  it 'detects netlify dev' do
-    with_context('dev')
-    expect(netlify?).to be true
-    expect(dev?).to be true
     expect(production?).to be false
   end
 end

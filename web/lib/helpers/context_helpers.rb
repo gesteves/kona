@@ -11,10 +11,4 @@ module ContextHelpers
   def production?
     ENV['CONTEXT'] == 'production'
   end
-
-  # Determines if the site is currently running on dev using `netlify dev`.
-  # @return [Boolean] True if the site is on Netlify's dev environment.
-  def dev?
-    ENV['CONTEXT'] == 'dev'
-  end
 end

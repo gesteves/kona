@@ -74,6 +74,13 @@ RSpec.describe Contentful do
       expect(item[:path]).to eq('/2026/06/15/my-race/index.html')
     end
 
+    it "dates the path in the timestamp's own zone, not UTC (pins permalink stability)" do
+      # 22:30 on June 15 in -06:00 is already June 16 in UTC; the permalink keeps the
+      # local date the editor published under. Normalizing this would move existing URLs.
+      item = transform(:set_article_path, { draft: false, published_at: '2026-06-15T22:30:00-06:00', slug: 'my-race' })
+      expect(item[:path]).to eq('/2026/06/15/my-race/index.html')
+    end
+
     it 'gives drafts a stable id-based preview path in both collections' do
       article = transform(:set_article_path, { draft: true, sys: { id: 'abc' } })
       page = transform(:set_page_path, { draft: true, sys: { id: 'abc' } })

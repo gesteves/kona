@@ -124,5 +124,169 @@ RSpec.describe ImageHelpers do
       expect(url).to include('w=1200')
       expect(url).to include('h=630')
     end
+
+    it 'pins the exact Contentful-branch URL, with cover translated to fill' do
+      url = open_graph_image_url('https://images.ctfassets.net/s/a/t/p.jpg')
+      expect(url).to eq('https://images.ctfassets.net/s/a/t/p.jpg?w=1200&h=630&fit=fill')
+    end
+  end
+
+  describe '#get_asset_id edge cases' do
+    it 'is nil for a URL with fewer than five path segments' do
+      expect(get_asset_id('https://example.com/a.jpg')).to be_nil
+    end
+  end
+
+  describe 'asset lookup edge cases' do
+    it 'returns nil description when the asset has none' do
+      @assets = [OpenStruct.new(sys: OpenStruct.new(id: 'asset-1'), description: nil)]
+      expect(get_asset_description('asset-1')).to be_nil
+    end
+
+    it 'returns nils for content type, URL, and published version of an unknown asset' do
+      expect(get_asset_content_type('nope')).to be_nil
+      expect(get_asset_url('nope')).to be_nil
+      expect(get_asset_published_version('nope')).to be_nil
+    end
+  end
+
+  # Netlify branch, exact output pinned: it hand-builds the query string ("?url=…&…") rather
+  # than using merge_query, so param order (url first, then the passed params in insertion
+  # order) and the encoding of the url param must survive a refactor unchanged.
+  describe '#cdn_image_url exact Netlify output' do
+    before { stub_env(context: 'production', url: 'https://example.com') }
+
+    it 'pins the exact query string: encoded url param first, then params in order' do
+      url = cdn_image_url('https://images.ctfassets.net/space/asset-1/token/photo.jpg', w: 100, fm: 'jpg')
+      expect(url).to eq('https://example.com/.netlify/images?url=https%3A%2F%2Fimages.ctfassets.net%2Fspace%2Fasset-1%2Ftoken%2Fphoto.jpg&w=100&fm=jpg')
+    end
+
+    it 'omits the params separator entirely when there are no params' do
+      url = cdn_image_url('https://images.ctfassets.net/space/asset-1/token/photo.jpg')
+      expect(url).to eq('https://example.com/.netlify/images?url=https%3A%2F%2Fimages.ctfassets.net%2Fspace%2Fasset-1%2Ftoken%2Fphoto.jpg')
+    end
+
+    it 'pins the exact output for a protocol-relative source URL' do
+      url = cdn_image_url('//images.ctfassets.net/space/asset-1/token/photo.jpg', w: 50)
+      expect(url).to eq('https://example.com/.netlify/images?url=https%3A%2F%2Fimages.ctfassets.net%2Fspace%2Fasset-1%2Ftoken%2Fphoto.jpg&w=50')
+    end
+  end
+
+  describe '#site_icon_url' do
+    context 'when the site has a logo' do
+      def data
+        OpenStruct.new(
+          assets: [],
+          site: OpenStruct.new(logo: OpenStruct.new(url: 'https://images.ctfassets.net/space/logo-1/token/logo.png'))
+        )
+      end
+
+      it 'returns the CDN URL for the logo at the requested width' do
+        expect(site_icon_url(w: 32)).to eq('https://images.ctfassets.net/space/logo-1/token/logo.png?w=32')
+      end
+    end
+
+    context 'when the site has no logo' do
+      it 'rescues the lookup failure and returns nil' do
+        expect(site_icon_url(w: 32)).to be_nil
+      end
+    end
+  end
+
+  describe '#generate_open_graph_image_url' do
+    it 'points at the /og endpoint with the target URL fully percent-encoded' do
+      allow(self).to receive(:root_url).and_return('https://example.com')
+      url = generate_open_graph_image_url('https://example.com/articles/foo/')
+      expect(url).to eq('https://example.com/og?url=https%3A%2F%2Fexample.com%2Farticles%2Ffoo%2F')
+    end
+  end
+
+  describe 'blurhash pipeline' do
+    # A published 1600x900 JPEG; the 32px-wide blurhash thumb is 32x18.
+    def asset(content_type: 'image/jpeg', published_version: 3)
+      OpenStruct.new(
+        sys: OpenStruct.new(id: 'asset-1', published_version: published_version),
+        url: 'https://images.ctfassets.net/space/asset-1/token/photo.jpg',
+        width: 1600, height: 900, content_type: content_type
+      )
+    end
+
+    before { @assets = [asset] }
+
+    describe '#blurhash_jpeg_data_uri' do
+      let(:fake_redis) { double('redis', get: nil, set: nil) }
+      let(:fake_image) { double('image', to_blob: 'JPEGBYTES') }
+
+      before do
+        allow(self).to receive(:redis).and_return(fake_redis)
+        allow(self).to receive(:blurhash_string).with('asset-1', 32, 18).and_return('LEHV6nWB2yk8pyo0adR*.7kCMdnj')
+        allow(Blurhash).to receive(:decode).and_return([0, 0, 0, 255])
+        allow(MiniMagick::Image).to receive(:get_image_from_pixels).and_return(fake_image)
+      end
+
+      it 'decodes the blurhash into a JPEG and returns it as a base64 data URI' do
+        expect(blurhash_jpeg_data_uri('asset-1')).to eq('data:image/jpeg;base64,SlBFR0JZVEVT')
+      end
+
+      it 'caches the data URI in Redis keyed by asset, published version, and width' do
+        blurhash_jpeg_data_uri('asset-1')
+        expect(fake_redis).to have_received(:set).with('blurhash:jpeg:asset-1:3:32', 'data:image/jpeg;base64,SlBFR0JZVEVT')
+      end
+
+      it 'returns the cached data URI without regenerating' do
+        allow(fake_redis).to receive(:get).with('blurhash:jpeg:asset-1:3:32').and_return('data:image/jpeg;base64,cached')
+        expect(blurhash_jpeg_data_uri('asset-1')).to eq('data:image/jpeg;base64,cached')
+        expect(MiniMagick::Image).not_to have_received(:get_image_from_pixels)
+      end
+
+      it 'is nil for gifs' do
+        @assets = [asset(content_type: 'image/gif')]
+        expect(blurhash_jpeg_data_uri('asset-1')).to be_nil
+      end
+
+      it 'is nil when the asset has no published version' do
+        @assets = [asset(published_version: nil)]
+        expect(blurhash_jpeg_data_uri('asset-1')).to be_nil
+      end
+
+      it 'is nil when the blurhash string is invalid' do
+        allow(self).to receive(:blurhash_string).with('asset-1', 32, 18).and_return('not-a-blurhash')
+        expect(blurhash_jpeg_data_uri('asset-1')).to be_nil
+      end
+    end
+
+    describe '#blurhash_svg' do
+      it "embeds the blurhash JPEG in a blurred SVG sized to the asset's viewBox" do
+        allow(self).to receive(:blurhash_jpeg_data_uri).with('asset-1').and_return('data:image/jpeg;base64,abc123')
+        expect(blurhash_svg('asset-1')).to eq(
+          "<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' viewBox='0 0 1600 900'>\n" \
+          "      <filter id='blur' filterUnits='userSpaceOnUse' color-interpolation-filters='sRGB'>\n" \
+          "        <feGaussianBlur stdDeviation='100' edgeMode='duplicate' />\n" \
+          "        <feComponentTransfer>\n" \
+          "          <feFuncA type='discrete' tableValues='1 1' />\n" \
+          "        </feComponentTransfer>\n" \
+          "      </filter>\n" \
+          "      <image filter='url(#blur)' xlink:href='data:image/jpeg;base64,abc123' x='0' y='0' height='100%' width='100%'/>\n" \
+          "    </svg>"
+        )
+      end
+
+      it 'is nil when the JPEG data URI cannot be generated' do
+        allow(self).to receive(:blurhash_jpeg_data_uri).with('asset-1').and_return(nil)
+        expect(blurhash_svg('asset-1')).to be_nil
+      end
+    end
+
+    describe '#blurhash_svg_data_uri' do
+      it 'collapses whitespace and percent-encodes the SVG into a data URI' do
+        allow(self).to receive(:blurhash_svg).with('asset-1').and_return("<svg>  <g/>\n</svg>")
+        expect(blurhash_svg_data_uri('asset-1')).to eq('data:image/svg+xml;charset=utf-8,%3Csvg%3E%20%3Cg%2F%3E%20%3C%2Fsvg%3E')
+      end
+
+      it 'is nil when there is no SVG' do
+        allow(self).to receive(:blurhash_svg).with('asset-1').and_return(nil)
+        expect(blurhash_svg_data_uri('asset-1')).to be_nil
+      end
+    end
   end
 end

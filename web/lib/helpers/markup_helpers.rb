@@ -1,3 +1,4 @@
+require 'cgi'
 require 'nokogiri'
 
 # This module manipulates Markdown content in various ways that are
@@ -182,19 +183,7 @@ module MarkupHelpers
   def add_figure_elements_to_iframes(html, base_class: nil)
     with_nokogiri_doc(html) do |doc|
       doc.css('iframe').each do |iframe|
-        parent = iframe.parent
-
-        # If the iframe's immediate parent is not a figure tag
-        if parent.name != 'figure'
-          # Create a new figure element and wrap the iframe
-          figure = Nokogiri::XML::Node.new('figure', doc)
-          iframe.replace(figure)
-          figure.add_child(iframe)
-          # Update the parent to reference the newly created figure
-          parent = figure
-        end
-
-        parent['class'] = "#{base_class}__figure #{base_class}__figure--iframe" if base_class.present?
+        wrap_in_figure(doc, iframe, base_class: base_class, modifier: 'iframe')
       end
     end
   end
@@ -213,22 +202,7 @@ module MarkupHelpers
         # Ensure the previous element is actually a blockquote
         next unless blockquote.name == 'blockquote'
 
-        parent = blockquote.parent
-
-        # If the blockquote's immediate parent is not a figure tag
-        if parent.name != 'figure'
-          # Create a new figure element and wrap the blockquote and script
-          figure = Nokogiri::XML::Node.new('figure', doc)
-          blockquote.replace(figure)
-          figure.add_child(blockquote)
-          figure.add_child(script)
-
-          # Update the parent to reference the newly created figure
-          parent = figure
-        end
-
-        # Set classes if base_class is provided
-        parent['class'] = "#{base_class}__figure #{base_class}__figure--embed" if base_class.present?
+        wrap_in_figure(doc, blockquote, base_class: base_class, modifier: 'embed', trailing: script)
       end
     end
   end
@@ -429,8 +403,9 @@ module MarkupHelpers
       doc.css('h2, h3').each do |heading|
         heading_id = heading['id']
         next if heading_id.blank?
+        label = CGI.escapeHTML("Permalink to #{heading.text}")
         permalink = <<~HTML
-          <a href="##{heading_id}" class="entry__heading-permalink" aria-label="Permalink to "#{heading.text}" title="Permalink to "#{heading.text}" data-controller="clipboard" data-clipboard-hidden-class="entry__heading-permalink-icon--hidden" data-clipboard-success-message-value="A link to this section has been copied to your clipboard." data-action="click->clipboard#copy">
+          <a href="##{heading_id}" class="entry__heading-permalink" aria-label="#{label}" title="#{label}" data-controller="clipboard" data-clipboard-hidden-class="entry__heading-permalink-icon--hidden" data-clipboard-success-message-value="A link to this section has been copied to your clipboard." data-action="click->clipboard#copy">
             <span data-clipboard-target="link" class="entry__heading-permalink-icon">
               #{icon_svg("classic", "solid", "link-simple")}
             </span>
@@ -498,9 +473,7 @@ module MarkupHelpers
         href = link['href']
         next unless href&.end_with?('/feed.xml')
 
-        link['data-controller'] = 'clipboard'
-        link['data-clipboard-success-message-value'] = 'The link to the feed has been copied to your clipboard.'
-        link['data-action'] = 'click->clipboard#copy'
+        SiteHelpers::FEED_CLIPBOARD_ATTRS.each { |name, value| link[name.to_s] = value }
       end
     end
   end
@@ -517,6 +490,30 @@ module MarkupHelpers
   end
 
   private
+
+  # The shared wrap step behind the iframe/embed figure transforms: wraps a node (plus an
+  # optional trailing sibling, e.g. an embed's <script>) in a new <figure> unless its parent
+  # already is one, then applies the base_class figure classes to that figure.
+  # @param doc [Nokogiri::XML::Document] The document the node belongs to.
+  # @param node [Nokogiri::XML::Node] The node to wrap.
+  # @param base_class [String, nil] The base class for the figure's classes.
+  # @param modifier [String] The figure class's modifier suffix (e.g. "iframe", "embed").
+  # @param trailing [Nokogiri::XML::Node, nil] A sibling to move into the figure after the node.
+  # @return [void]
+  def wrap_in_figure(doc, node, base_class:, modifier:, trailing: nil)
+    parent = node.parent
+
+    # If the node's immediate parent is not a figure tag, create one and move the node into it.
+    if parent.name != 'figure'
+      figure = Nokogiri::XML::Node.new('figure', doc)
+      node.replace(figure)
+      figure.add_child(node)
+      figure.add_child(trailing) if trailing
+      parent = figure
+    end
+
+    parent['class'] = "#{base_class}__figure #{base_class}__figure--#{modifier}" if base_class.present?
+  end
 
   # The shared shape of the render_*_body pipelines: render the Markdown to HTML, parse it
   # once, yield the fragment to the variant's ordered transform steps, and serialize.

@@ -190,22 +190,12 @@ module ArticleHelpers
     if content&.cover_image&.url.present?
       schema["image"] = ["1000x1000", "1600x900", "1600x1200"].map do |s|
         w, h = s.split('x').map(&:to_i)
-        {
-          "@type": "ImageObject",
-          "url": cdn_image_url(content.cover_image.url, { w: w, h: h, fit: 'cover' }),
-          "width": w,
-          "height": h
-        }
+        image_object(cdn_image_url(content.cover_image.url, { w: w, h: h, fit: 'cover' }), w, h)
       end
     else
       # No cover image (typical for Shorts): fall back to the generated Open Graph card — the
       # same 1200×630 image used for social embeds — so the BlogPosting still carries an image.
-      schema["image"] = [{
-        "@type": "ImageObject",
-        "url": generate_open_graph_image_url(full_url(current_page.url)),
-        "width": 1200,
-        "height": 630
-      }]
+      schema["image"] = [image_object(generate_open_graph_image_url(full_url(current_page.url)), 1200, 630)]
     end
     schema.to_json
   end
@@ -217,17 +207,10 @@ module ArticleHelpers
   def breadcrumb_schema(content)
     return unless published_post?(content)
 
-    items = [
-      { "@type": "ListItem", "position": 1, "name": "Home", "item": full_url('/') },
-      { "@type": "ListItem", "position": 2, "name": "Blog", "item": full_url('/blog') }
-    ]
-    # Insert the article's topic trail (Triathlon > Ironman 70.3, …) between Blog and the article.
-    taxonomy_trail(content).each do |node|
-      items << { "@type": "ListItem", "position": items.size + 1, "name": sanitize(node[:name]), "item": full_url(node[:path]) }
-    end
-    items << { "@type": "ListItem", "position": items.size + 1, "name": sanitize(content.title), "item": canonical_url }
-
-    { "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": items }.to_json
+    # The article's topic trail (Triathlon > Ironman 70.3, …) sits between Blog and the article.
+    crumbs = taxonomy_trail(content).map { |node| [sanitize(node[:name]), full_url(node[:path])] }
+    crumbs << [sanitize(content.title), canonical_url]
+    breadcrumb_list_schema(crumbs)
   end
 
   # The taxonomy trail for an article's breadcrumb: the ancestor chain (root → … → concept) of
@@ -275,6 +258,33 @@ module ArticleHelpers
       # of keys), so it would silently return a constant instead of the archive's article total.
       index[tag.id] = { name: tag.name, path: tag.path, parent_id: tag.parent_id, scheme: tag.scheme, count: tag.entry_count }
     end
+  end
+
+  # The separator rendered between tag links in a breadcrumb chain.
+  TAG_SEPARATOR = '<span class="entry__tag-separator" aria-hidden="true">/</span>'.freeze
+
+  # The tag icon for a tag list: a single tag gets the "tag" icon, several get "tags".
+  # @param count [Integer] How many tags the list shows.
+  # @return [String, nil] The icon SVG.
+  def tag_list_icon(count)
+    icon_svg("classic", "light", count == 1 ? "tag" : "tags")
+  end
+
+  # Renders breadcrumb chains of tag links — [label, path] pairs — as slash-separated
+  # role="listitem" spans (both within and between chains). Shared by the article meta line
+  # and the tag-archive header.
+  # @param chains [Array<Array<Array(String, String)>>] Chains of [label, path] pairs.
+  # @return [String] The joined markup.
+  def tag_chain_links(chains)
+    chains.map do |chain|
+      chain.map { |label, path| content_tag(:span, link_to(label, path), role: 'listitem') }.join(TAG_SEPARATOR)
+    end.join(TAG_SEPARATOR)
+  end
+
+  # The "Draft" badge shown on unpublished entries' meta lines.
+  # @return [String] A highlight span with the typewriter icon.
+  def draft_badge
+    %(<span class="entry__highlight">#{icon_svg("classic", "regular", "typewriter")} Draft</span>)
   end
 
   # Counts the words in an article's prose (intro + body, as plain text). Shared by the reading-time

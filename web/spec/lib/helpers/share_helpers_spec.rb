@@ -2,13 +2,7 @@ require 'spec_helper'
 require 'ostruct'
 
 RSpec.describe ShareHelpers do
-  # Collaborators normally mixed in from other helper modules, pinned here for determinism.
-  def sanitize(text, **) = text
-
-  def full_url(path, params = {})
-    query = params.present? ? "?#{URI.encode_www_form(params)}" : ''
-    "https://example.com#{path}#{query}"
-  end
+  include_context 'default helper stubs'
 
   let(:article) { OpenStruct.new(title: 'My Race Report', path: '/2026/06/15/my-race-report/') }
 
@@ -97,6 +91,10 @@ RSpec.describe ShareHelpers do
     it 'falls back to the entry type' do
       expect(share_heading(article_with(entry_type: 'Article'))).to eq('Share this article')
       expect(share_heading(article_with(entry_type: 'Short'))).to eq('Share this post')
+    end
+
+    it "falls back to 'post' when the entry has no type" do
+      expect(share_heading(article_with(entry_type: nil))).to eq('Share this post')
     end
   end
 end

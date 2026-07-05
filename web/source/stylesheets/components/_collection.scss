@@ -89,20 +89,6 @@
   }
 }
 
-.collection--quarters .collection__item {
-  @include bp-medium {
-    grid-column: span 3;
-  }
-}
-
-.collection--full-width {
-  @extend %centered-column;
-
-  .collection__item {
-    grid-column: 1 / -1;
-  }
-}
-
 .collection--has-featured .collection__item:first-child {
   grid-column: 1 / -1;
 }

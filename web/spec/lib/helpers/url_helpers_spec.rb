@@ -39,11 +39,4 @@ RSpec.describe UrlHelpers do
       expect(full_url('/about/', ref: 'Feed')).to eq('https://example.com/about/?ref=Feed')
     end
   end
-
-  describe '#site_domain' do
-    it 'extracts the registrable domain from the root URL' do
-      stub_env(context: 'production', url: 'https://www.example.com')
-      expect(site_domain).to eq('example.com')
-    end
-  end
 end

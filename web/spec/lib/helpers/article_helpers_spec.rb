@@ -4,6 +4,11 @@ require 'padrino-helpers'
 
 # RSpec auto-includes the described module, so ArticleHelpers' instance methods are callable directly.
 RSpec.describe ArticleHelpers do
+  include_context 'default helper stubs'
+
+  # The canonical URL of the article under test, shared by the schema groups below.
+  def canonical_url = 'https://example.com/2024/01/01/post/'
+
   # Builds an article double shaped like a `data.articles` entry (dot-access, nested tags/event).
   def article(slug:, title: 'Title', tags: [], published_at: '2024-01-01T10:00:00Z',
               entry_type: 'Article', draft: false, index_in_search_engines: true,
@@ -28,15 +33,10 @@ RSpec.describe ArticleHelpers do
     @corpus = articles
   end
 
-  # The helper depends on these collaborators (normally mixed in from other modules); define them
+  # The helper depends on this collaborator (normally mixed in from another module); defined
   # directly so verifying-doubles doesn't reject stubbing methods this object doesn't implement.
   def data
     OpenStruct.new(articles: @corpus || [])
-  end
-
-  # Passthrough sanitize — the real one runs the markdown pipeline, which these scorers don't need.
-  def sanitize(text, **)
-    text
   end
 
   describe '#adjacent_articles' do
@@ -128,10 +128,8 @@ RSpec.describe ArticleHelpers do
     # Collaborators that live in other helper modules at runtime; stubbed here so the schema builder
     # is exercised in isolation.
     def content_summary(content) = content.summary
-    def canonical_url = 'https://example.com/2024/01/01/post/'
     def schema_entity_id(fragment, path: '/') = "https://example.com#{path == '/' ? '/' : "#{path}/"}##{fragment}"
     def cdn_image_url(url, params = {}) = "#{url}?w=#{params[:w]}&h=#{params[:h]}"
-    def full_url(path) = "https://example.com#{path}"
     def generate_open_graph_image_url(url) = "https://example.com/og?url=#{url}"
     def current_page = OpenStruct.new(url: '/2024/01/01/post/')
 
@@ -206,9 +204,6 @@ RSpec.describe ArticleHelpers do
   end
 
   describe '#breadcrumb_schema' do
-    def full_url(path) = "https://example.com#{path}"
-    def canonical_url = 'https://example.com/2024/01/01/post/'
-
     it 'builds a Home > Blog > title breadcrumb for both articles and shorts' do
       %w[Article Short].each do |type|
         schema = JSON.parse(breadcrumb_schema(article(slug: 'post', title: 'A Post', entry_type: type)))
@@ -220,6 +215,39 @@ RSpec.describe ArticleHelpers do
     it 'returns nil for drafts and for non-article/short entries' do
       expect(breadcrumb_schema(article(slug: 'draft', draft: true))).to be_nil
       expect(breadcrumb_schema(article(slug: 'about', entry_type: 'Page'))).to be_nil
+    end
+  end
+
+  describe 'tag list rendering' do
+    include Padrino::Helpers
+
+    describe '#tag_list_icon' do
+      def icon_svg(_family, _style, icon_id) = icon_id
+
+      it 'picks the single-tag icon for one tag and the plural icon otherwise' do
+        expect(tag_list_icon(1)).to eq('tag')
+        expect(tag_list_icon(2)).to eq('tags')
+      end
+    end
+
+    describe '#tag_chain_links' do
+      it 'renders each chain as slash-separated listitem links, joining chains the same way' do
+        html = tag_chain_links([[['Triathlon', '/tagged/triathlon/'], ['Half Distance', '/tagged/triathlon/half-distance/']], [['Race Reports', '/tagged/race-reports/']]])
+        separator = '<span class="entry__tag-separator" aria-hidden="true">/</span>'
+        expect(html).to eq(
+          '<span role="listitem"><a href="/tagged/triathlon/">Triathlon</a></span>' + separator +
+          '<span role="listitem"><a href="/tagged/triathlon/half-distance/">Half Distance</a></span>' + separator +
+          '<span role="listitem"><a href="/tagged/race-reports/">Race Reports</a></span>'
+        )
+      end
+    end
+  end
+
+  describe '#draft_badge' do
+    def icon_svg(_family, _style, icon_id) = "<svg data-icon=\"#{icon_id}\"></svg>"
+
+    it 'renders the highlight span with the typewriter icon' do
+      expect(draft_badge).to eq('<span class="entry__highlight"><svg data-icon="typewriter"></svg> Draft</span>')
     end
   end
 
@@ -235,12 +263,141 @@ RSpec.describe ArticleHelpers do
     end
   end
 
+  describe '#compute_article_word_count' do
+    it 'counts whitespace-separated words across the intro and body' do
+      a = article(slug: 'a', intro: "one two\nthree", body: 'four five')
+      expect(compute_article_word_count(a)).to eq(5)
+    end
+
+    it 'ignores blank segments so a missing intro adds no words' do
+      a = article(slug: 'a', intro: nil, body: 'one two')
+      expect(compute_article_word_count(a)).to eq(2)
+    end
+  end
+
+  describe '#reading_time_minutes' do
+    it 'rounds the word count up to whole minutes at the default 200 wpm' do
+      a = article(slug: 'a', intro: (['word'] * 250).join(' '))
+      expect(reading_time_minutes(a)).to eq(2)
+    end
+
+    it 'reads a custom words-per-minute rate from READING_TIME_WPM' do
+      a = article(slug: 'a', intro: (['word'] * 250).join(' '))
+      ENV['READING_TIME_WPM'] = '100'
+      expect(reading_time_minutes(a)).to eq(3)
+    ensure
+      ENV.delete('READING_TIME_WPM')
+    end
+
+    it 'is a single minute for a very short post' do
+      expect(reading_time_minutes(article(slug: 'a', intro: 'so short'))).to eq(1)
+    end
+  end
+
+  describe '#reading_time' do
+    # Exactly N minutes at the default 200 wpm.
+    def article_with_minutes(minutes)
+      article(slug: "m#{minutes}", intro: (['word'] * (minutes * 200)).join(' '))
+    end
+
+    it 'formats the estimate as "A N-minute read"' do
+      expect(reading_time(article_with_minutes(3))).to eq('A 3-minute read')
+    end
+
+    it 'uses "An" when the humanized minute count is eight, eleven, or eighteen' do
+      expect(reading_time(article_with_minutes(8))).to eq('An 8-minute read')
+      expect(reading_time(article_with_minutes(11))).to eq('An 11-minute read')
+      expect(reading_time(article_with_minutes(18))).to eq('An 18-minute read')
+    end
+
+    it 'keeps "A" for eighty — the \b guard stops the eight- prefix from matching' do
+      # NOTE: pins current behavior. Read aloud, "an eighty-minute read" would be the
+      # conventional article, but the helper deliberately (per its comment) excludes "eighty".
+      expect(reading_time(article_with_minutes(80))).to eq('A 80-minute read')
+    end
+  end
+
+  describe '#recent_articles' do
+    let(:corpus) do
+      [
+        article(slug: 'newest', published_at: '2024-05-01T00:00:00Z'),
+        article(slug: 'short',  published_at: '2024-04-01T00:00:00Z', entry_type: 'Short'),
+        article(slug: 'draft',  published_at: '2024-03-15T00:00:00Z', draft: true),
+        article(slug: 'second', published_at: '2024-03-01T00:00:00Z'),
+        article(slug: 'third',  published_at: '2024-02-01T00:00:00Z'),
+        article(slug: 'fourth', published_at: '2024-01-20T00:00:00Z'),
+        article(slug: 'fifth',  published_at: '2024-01-10T00:00:00Z')
+      ]
+    end
+
+    it 'returns the four newest full articles, skipping drafts and Shorts' do
+      stub_corpus(corpus)
+      expect(recent_articles.map(&:slug)).to eq(%w[newest second third fourth])
+    end
+
+    it 'excludes a given article by path and honors a custom count' do
+      stub_corpus(corpus)
+      expect(recent_articles(count: 2, exclude: corpus[0]).map(&:slug)).to eq(%w[second third])
+    end
+  end
+
+  describe '#feed_articles' do
+    it 'includes Shorts but not drafts, preserving newest-first order' do
+      stub_corpus([
+        article(slug: 'newest', published_at: '2024-03-01T00:00:00Z'),
+        article(slug: 'short',  published_at: '2024-02-01T00:00:00Z', entry_type: 'Short'),
+        article(slug: 'draft',  published_at: '2024-01-15T00:00:00Z', draft: true),
+        article(slug: 'oldest', published_at: '2024-01-01T00:00:00Z')
+      ])
+      expect(feed_articles.map(&:slug)).to eq(%w[newest short oldest])
+    end
+
+    it 'caps the list at the requested count' do
+      stub_corpus(6.times.map { |i| article(slug: "a#{i}") })
+      expect(feed_articles(count: 4).size).to eq(4)
+    end
+  end
+
+  describe '#canonical_url' do
+    # The outer group pins `canonical_url` as a plain stub for the schema groups; rebind the
+    # real module method here so this group exercises ArticleHelpers' implementation.
+    def canonical_url = ArticleHelpers.instance_method(:canonical_url).bind_call(self)
+    def current_page = OpenStruct.new(url: '/2024/01/01/post/')
+
+    it 'is the full URL of the current page when the page has no content object' do
+      expect(canonical_url).to eq('https://example.com/2024/01/01/post/')
+    end
+
+    context 'when the page has a content object' do
+      def content = OpenStruct.new(canonical_url: @content_canonical)
+
+      it "prefers the content's own canonical_url when present" do
+        @content_canonical = 'https://elsewhere.example/original/'
+        expect(canonical_url).to eq('https://elsewhere.example/original/')
+      end
+
+      it 'falls back to the current page URL when the content has none' do
+        @content_canonical = nil
+        expect(canonical_url).to eq('https://example.com/2024/01/01/post/')
+      end
+    end
+  end
+
+  describe '#entry_dom_id / #entry_heading_id' do
+    it 'derives the entry and heading DOM ids from the parameterized Contentful id' do
+      entry = article(slug: 'post')
+      entry.sys = OpenStruct.new(id: '1QxUv2jHbvRd9OqMxOneqZ')
+      # NOTE: pins current behavior — parameterize downcases, so mixed-case Contentful ids
+      # come out lowercased (the docstrings' "entry-1QxUv2jHbvRd9OqMxOneqZ" example overstates
+      # the casing, and ids differing only by case would collide).
+      expect(entry_dom_id(entry)).to eq('entry-1qxuv2jhbvrd9oqmxoneqz')
+      expect(entry_heading_id(entry)).to eq('hed-1qxuv2jhbvrd9oqmxoneqz')
+    end
+  end
+
   # The taxonomy-aware helpers need tags carrying path/parent_id (not just id/name) and a
   # data.tags hierarchy, so this group defines richer builders that override the outer ones.
   describe 'taxonomy-aware helpers' do
-    def full_url(path) = "https://example.com#{path}"
-    def canonical_url = 'https://example.com/2024/01/01/post/'
-
     # A concept "tag" as it appears on an article / in data.tags: id, name, short_name, path,
     # parent, scheme, and archive count (for the breadcrumb popularity tie-break).
     def concept(id, name, path:, parent_id: nil, scheme: nil, count: 0, short_name: nil)
@@ -368,6 +525,52 @@ RSpec.describe ArticleHelpers do
 
       it 'is empty when the article has no taxonomy' do
         expect(tag_breadcrumb_chains(article(slug: 'x'))).to eq([])
+      end
+    end
+
+    describe '#concept_chain' do
+      it 'resolves the root-first, inclusive ancestor chain from data.tags' do
+        expect(concept_chain('ironman-703-coeur-dalene')).to eq([
+          { id: 'triathlon', name: 'Triathlon', path: '/tagged/triathlon/' },
+          { id: 'half-distance', name: 'Half Distance', path: '/tagged/triathlon/half-distance/' },
+          { id: 'ironman-703-coeur-dalene', name: 'Ironman 70.3 Coeur d’Alene', path: '/tagged/triathlon/half-distance/ironman-703-coeur-dalene/' }
+        ])
+      end
+
+      it 'is a single-node chain for a root concept' do
+        expect(concept_chain('triathlon')).to eq([{ id: 'triathlon', name: 'Triathlon', path: '/tagged/triathlon/' }])
+      end
+
+      it 'is empty for an unknown concept id' do
+        expect(concept_chain('nope')).to eq([])
+      end
+
+      context 'when parents form a cycle' do
+        def data
+          OpenStruct.new(tags: [
+            OpenStruct.new(tag: OpenStruct.new(id: 'a', name: 'A', path: '/tagged/a/', parent_id: 'b', scheme: 'topics', entry_count: 1)),
+            OpenStruct.new(tag: OpenStruct.new(id: 'b', name: 'B', path: '/tagged/b/', parent_id: 'a', scheme: 'topics', entry_count: 1))
+          ])
+        end
+
+        it 'stops at the first repeated concept instead of looping' do
+          expect(concept_chain('a').map { |n| n[:id] }).to eq(%w[b a])
+        end
+      end
+    end
+
+    describe '#taxonomy_index' do
+      it 'indexes each concept by id with its name, path, parent, scheme, and archive count' do
+        expect(taxonomy_index['half-distance']).to eq(
+          name: 'Half Distance', path: '/tagged/triathlon/half-distance/', parent_id: 'triathlon', scheme: 'sports', count: 10
+        )
+        expect(taxonomy_index['race-reports']).to eq(
+          name: 'Race Reports', path: '/tagged/race-reports/', parent_id: nil, scheme: 'topics', count: 12
+        )
+      end
+
+      it 'memoizes the index within a render context' do
+        expect(taxonomy_index).to equal(taxonomy_index)
       end
     end
   end

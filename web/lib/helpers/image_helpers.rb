@@ -79,12 +79,8 @@ module ImageHelpers
     if netlify? && original_url.match?('/.netlify/images')
       merge_query(original_url, params)
     elsif netlify?
-      base_url = "#{ENV['URL']}/.netlify/images"
       original_url = "https:#{original_url}" if original_url.start_with?('//')
-      query_params = URI.encode_www_form(params)
-      image_url = "#{base_url}?url=#{URI.encode_www_form_component(original_url)}"
-      image_url += "&#{query_params}" unless query_params.empty?
-      image_url
+      merge_query("#{ENV['URL']}/.netlify/images", { url: original_url }.merge(params))
     else
       params[:fit] = "fill" if params[:fit] == "cover"
       merge_query(original_url, params)

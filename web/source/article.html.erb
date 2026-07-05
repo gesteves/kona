@@ -9,12 +9,8 @@
 <% if related_race_reports(content).present? %>
   <%= partial 'partials/race_reports', locals: { article: content } %>
 <% else %>
-  <% related_url = "/widgets/articles/related/#{content.sys.id}" %>
-  <% preload_widget related_url %>
-  <%= partial 'partials/placeholders/related', locals: { url: related_url } %>
+  <%= render_widget 'related', "/widgets/articles/related/#{content.sys.id}" %>
 <% end %>
 <%# Exclude only this article so trending doesn't repeat it. %>
-<% trending_url = "/widgets/articles/trending/#{content.sys.id}" %>
-<% preload_widget trending_url %>
-<%= partial 'partials/placeholders/trending', locals: { url: trending_url } %>
+<%= render_widget 'trending', "/widgets/articles/trending/#{content.sys.id}" %>
 <%= partial 'partials/read_next', locals: { article: content } %>
