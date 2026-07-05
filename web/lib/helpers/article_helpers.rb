@@ -271,7 +271,9 @@ module ArticleHelpers
   def taxonomy_index
     @taxonomy_index ||= Array(data.tags).each_with_object({}) do |entry, index|
       tag = entry.tag
-      index[tag.id] = { name: tag.name, path: tag.path, parent_id: tag.parent_id, scheme: tag.scheme, count: tag.count }
+      # Read `tag.entry_count`, not `tag.count`: `count` is Hash#count on the Mash (the number
+      # of keys), so it would silently return a constant instead of the archive's article total.
+      index[tag.id] = { name: tag.name, path: tag.path, parent_id: tag.parent_id, scheme: tag.scheme, count: tag.entry_count }
     end
   end
 

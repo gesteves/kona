@@ -248,7 +248,7 @@ RSpec.describe Contentful do
         expect(triathlon[:pages].first[:path]).to eq('/tagged/triathlon/index.html')
         expect(triathlon[:pages].first[:items].size).to eq(1)
         # The tag entry carries its scheme and archive article count (for breadcrumb tie-breaks).
-        expect(triathlon[:tag]).to include(scheme: 'sports', count: 1)
+        expect(triathlon[:tag]).to include(scheme: 'sports', entry_count: 1)
       end
 
       it "uses a concept's description as the page copy, else the boilerplate summary" do
@@ -260,6 +260,14 @@ RSpec.describe Contentful do
         triathlon = tags.find { |t| t[:tag][:id] == 'triathlon' }
         expect(triathlon[:pages].first[:summary]).to eq('Browse one entry tagged “Triathlon.”')
         expect(triathlon[:pages].first).not_to have_key(:description)
+      end
+
+      it 'carries archive metadata on each tag page: tag_id, post count, and the newest entry date' do
+        newer = article_with('ironman-703').merge(published_at: '2025-06-01T00:00:00Z')
+        older = article_with('ironman-703').merge(published_at: '2024-06-01T00:00:00Z')
+        tags = built_tags([newer, older]) # newest-first, as published_articles delivers them
+        page = tags.find { |t| t[:tag][:id] == 'ironman-703' }[:pages].first
+        expect(page).to include(tag_id: 'ironman-703', entry_count: 2, updated_at: '2025-06-01T00:00:00Z')
       end
     end
   end

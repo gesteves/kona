@@ -1,8 +1,32 @@
 <div class="blog">
   <header class="blog__header">
+    <p class="entry__meta">
+      <% if content.updated_at %>
+        <% updated = DateTime.parse(content.updated_at) %>
+        <span>
+          <%= icon_svg("classic", "light", "calendar") %>
+          Updated <%= content_tag :time, updated.strftime('%B %-e, %Y'), datetime: updated.iso8601 %>
+        </span>
+      <% end %>
+      <% ancestors = content.tag_id ? concept_chain(content.tag_id)[0...-1] : [] %>
+      <% if ancestors.any? %>
+        <span>
+          <%= icon_svg("classic", "light", "tags") %>
+          <span role="list" aria-label="Category">
+            <%= ancestors.map { |node| content_tag(:span, link_to(node[:name], node[:path]), role: 'listitem') }
+                  .join('<span class="entry__tag-separator" aria-hidden="true">›</span>') %>
+          </span>
+        </span>
+      <% end %>
+    </p>
     <h1 id="hed" class="blog__hed">
       <%= smartypants(content.title) %>
     </h1>
+    <% if content.entry_count %>
+      <p class="entry__meta">
+        <span><%= icon_svg("classic", "light", "file-lines") %> <%= content.entry_count %> <%= 'entry'.pluralize(content.entry_count) %></span>
+      </p>
+    <% end %>
   </header>
 
   <% if content.description.present? %>

@@ -244,7 +244,7 @@ RSpec.describe ArticleHelpers do
     # A concept "tag" as it appears on an article / in data.tags: id, name, short_name, path,
     # parent, scheme, and archive count (for the breadcrumb popularity tie-break).
     def concept(id, name, path:, parent_id: nil, scheme: nil, count: 0, short_name: nil)
-      OpenStruct.new(id: id, name: name, short_name: short_name || name, path: path, parent_id: parent_id, scheme: scheme, count: count)
+      OpenStruct.new(id: id, name: name, short_name: short_name || name, path: path, parent_id: parent_id, scheme: scheme, entry_count: count)
     end
 
     # An article whose contentful_metadata.tags are full concept doubles.
