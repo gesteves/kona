@@ -186,6 +186,25 @@ RSpec.describe SiteHelpers do
     end
   end
 
+  describe '#author_knows_about' do
+    def data = OpenStruct.new(tags: @tags)
+
+    it 'returns the top-level sports disciplines, sorted, excluding nested and non-sports concepts' do
+      @tags = [
+        OpenStruct.new(tag: OpenStruct.new(name: 'Triathlon', scheme: 'sports', parent_id: nil)),
+        OpenStruct.new(tag: OpenStruct.new(name: 'Half Distance', scheme: 'sports', parent_id: 'triathlon')),
+        OpenStruct.new(tag: OpenStruct.new(name: 'Running', scheme: 'sports', parent_id: nil)),
+        OpenStruct.new(tag: OpenStruct.new(name: 'Race Reports', scheme: 'topics', parent_id: nil))
+      ]
+      expect(author_knows_about).to eq(['Running', 'Triathlon'])
+    end
+
+    it 'returns an empty array when there are no tags' do
+      @tags = nil
+      expect(author_knows_about).to eq([])
+    end
+  end
+
   describe '#author_same_as' do
     it 'returns social destinations, excluding the feed' do
       @site = site(socials: [['Feed', '/feed.xml'], ['Bluesky', 'https://bsky.app/x'], ['Mastodon', 'https://m.test/x']])

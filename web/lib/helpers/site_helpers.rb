@@ -424,6 +424,21 @@ module SiteHelpers
     end
   end
 
+  # The author's areas of expertise for the Person node's schema.org `knowsAbout`: the top-level
+  # concepts of the `sports` scheme — the disciplines the blog covers (e.g. Triathlon, Running).
+  # Derived from the taxonomy, so it grows on its own as disciplines gain content (an empty branch
+  # has no tag page, so it doesn't appear until it does). Content-type/meta topics (Race Reports,
+  # News, Personal…) are deliberately excluded — they aren't subjects of expertise.
+  # @return [Array<String>] Sorted discipline names, or [] when none.
+  def author_knows_about
+    Array(data.tags)
+      .map(&:tag)
+      .select { |t| t.scheme == 'sports' && t.parent_id.blank? }
+      .map(&:name)
+      .uniq
+      .sort
+  end
+
   # The author's social-profile URLs for schema.org `sameAs` (the feed is excluded — it isn't a
   # social profile). Shared by the Organization and Person nodes in the entity graph.
   # @return [Array<String>] Social profile URLs, or an empty array when none are configured.
@@ -468,6 +483,8 @@ module SiteHelpers
       "url": full_url('/about')
     }
     person["sameAs"] = same_as if same_as.present?
+    knows_about = author_knows_about
+    person["knowsAbout"] = knows_about if knows_about.present?
     if data.site.author.profile_picture&.url.present?
       picture = data.site.author.profile_picture
       person["image"] = {
