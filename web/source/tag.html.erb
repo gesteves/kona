@@ -14,7 +14,7 @@
           <%= icon_svg("classic", "light", "tags") %>
           <span role="list" aria-label="Category">
             <%= ancestors.map { |node| content_tag(:span, link_to(node[:name], node[:path]), role: 'listitem') }
-                  .join('<span class="entry__tag-separator" aria-hidden="true">›</span>') %>
+                  .join('<span class="entry__tag-separator" aria-hidden="true">/</span>') %>
           </span>
         </span>
       <% end %>

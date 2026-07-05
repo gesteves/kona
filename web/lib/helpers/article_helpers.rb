@@ -356,7 +356,7 @@ module ArticleHelpers
   end
 
   # The article's concept chips as breadcrumb chains: each leaf concept's ancestor chain
-  # (root → leaf), for rendering as "Triathlon › Half Distance › <race> / Race Reports". The
+  # (root → leaf), for rendering as "Triathlon / Half Distance / <race> / Race Reports". The
   # chain is walked through the FULL taxonomy (`concept_chain`), then filtered to the concepts
   # the article actually carries — so an unassigned intermediate (e.g. an "Other" bucket the
   # author skipped) is dropped without splitting the chain. A leaf is a carried concept that

@@ -26,7 +26,7 @@
       <% end %>
       <span class="entry__tags" role="list" aria-label="Tags">
         <%= tag_breadcrumb_chains(article)
-              .map { |chain| chain.map { |tag| content_tag(:span, link_to(tag.short_name, tag.path), role: 'listitem') }.join('<span class="entry__tag-separator" aria-hidden="true">›</span>') }
+              .map { |chain| chain.map { |tag| content_tag(:span, link_to(tag.short_name, tag.path), role: 'listitem') }.join('<span class="entry__tag-separator" aria-hidden="true">/</span>') }
               .join('<span class="entry__tag-separator" aria-hidden="true">/</span>') %>
       </span>
     </span>
