@@ -65,6 +65,25 @@ RSpec.describe SiteHelpers do
       expect(schema['about']).to eq('@type' => 'Thing', 'name' => 'Triathlon')
       expect(schema['isPartOf']).to eq('@id' => 'https://example.com/#website')
     end
+
+    it 'omits mainEntity when the page lists no entries' do
+      schema = JSON.parse(collection_page_schema(OpenStruct.new(title: 'Triathlon')))
+      expect(schema).not_to have_key('mainEntity')
+    end
+
+    it 'enumerates the listed entries as a mainEntity ItemList' do
+      content = OpenStruct.new(title: 'Triathlon', items: [
+        OpenStruct.new(title: 'First Race', path: '/2025/01/01/first/'),
+        OpenStruct.new(title: 'Second Race', path: '/2025/02/02/second/')
+      ])
+      list = JSON.parse(collection_page_schema(content))['mainEntity']
+      expect(list['@type']).to eq('ItemList')
+      expect(list['numberOfItems']).to eq(2)
+      expect(list['itemListElement']).to eq([
+        { '@type' => 'ListItem', 'position' => 1, 'url' => 'https://example.com/2025/01/01/first/', 'name' => 'First Race' },
+        { '@type' => 'ListItem', 'position' => 2, 'url' => 'https://example.com/2025/02/02/second/', 'name' => 'Second Race' }
+      ])
+    end
   end
 
   describe '#alternate_feed_links' do

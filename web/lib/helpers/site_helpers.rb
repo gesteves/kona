@@ -320,11 +320,13 @@ module SiteHelpers
   # Generates a JSON-LD CollectionPage schema for a taxonomy archive page (`/tagged/*`),
   # declaring the page as a collection about its topic, with the concept's description as the
   # page description. References the sitewide WebSite node by @id rather than duplicating it.
-  # @param content [Object] The proxied tag-page object (title = concept name; summary/description).
+  # Its `mainEntity` is an ItemList enumerating the entries listed on this (paginated) page, so
+  # the collection's membership is explicit rather than just described.
+  # @param content [Object] The proxied tag-page object (title = concept name; summary/description; items).
   # @see https://schema.org/CollectionPage
   # @return [String] A JSON-LD formatted string.
   def collection_page_schema(content)
-    {
+    schema = {
       "@context": "https://schema.org",
       "@type": "CollectionPage",
       "name": sanitize(content.title),
@@ -335,7 +337,18 @@ module SiteHelpers
         "name": sanitize(content.title)
       },
       "isPartOf": { "@id": schema_entity_id('website') }
-    }.to_json
+    }
+    items = Array(content.items)
+    if items.present?
+      schema["mainEntity"] = {
+        "@type": "ItemList",
+        "numberOfItems": items.size,
+        "itemListElement": items.each_with_index.map do |item, i|
+          { "@type": "ListItem", "position": i + 1, "url": full_url(item.path), "name": sanitize(item.title) }
+        end
+      }
+    end
+    schema.to_json
   end
 
   # Generates a JSON-LD BreadcrumbList for a taxonomy archive page (`/tagged/*`): Home › Blog ›
