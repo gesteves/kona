@@ -6,7 +6,11 @@
     "lint:scss:fix": "stylelint \"source/stylesheets/**/*.scss\" --fix",
     "format": "prettier --write \"**/*.{js,json,md}\"",
     "format:check": "prettier --check \"**/*.{js,json,md}\"",
-    "pagefind": "pagefind --site build"
+    "pagefind": "pagefind --site build",
+    "build:status": "node --env-file=.env scripts/netlify-builds.js status",
+    "build:stop": "node --env-file=.env scripts/netlify-builds.js stop",
+    "build:activate": "node --env-file=.env scripts/netlify-builds.js activate",
+    "build:deploy": "node --env-file=.env scripts/netlify-builds.js deploy"
   },
   "dependencies": {
     "@hotwired/stimulus": "^3.2.2",

@@ -45,6 +45,13 @@ npm run format:check             # prettier for JS/JSON/MD (fix: npm run format)
 
 # Full production build: test → import → middleman build (esbuild runs inside it)
 bundle exec rake build:verbose
+
+# Netlify build control (scripts/netlify-builds.js) — e.g. a content freeze; needs
+# NETLIFY_AUTH_TOKEN + NETLIFY_SITE_ID in .env. activate does NOT deploy; use deploy for that.
+npm run build:status             # is the site's builds stopped or active?
+npm run build:stop               # stop all Netlify builds (pushes/webhooks/hooks won't deploy)
+npm run build:activate           # re-activate builds
+npm run build:deploy             # trigger one production build now
 ```
 
 ### Import subtasks

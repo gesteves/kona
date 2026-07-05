@@ -31,6 +31,32 @@ Without `DRY_RUN`, every script prints the migration plan and prompts before app
 All scripts skip entries that wouldn't change (no rewrite, no republish) and use
 `shouldPublish: 'preserve'` (published entries stay published, drafts stay drafts).
 
+## Pausing Netlify builds during a migration
+
+Publishing entries fires Contentful webhooks that each kick off a Netlify build, so a migration
+touching many entries can trigger a storm of redundant deploys. `scripts/lib/netlify-builds.js`
+avoids that: wrap the migration body in `withBuildsPaused(fn)` and it stops Netlify builds for the
+duration, then — after the migration succeeds — asks whether to trigger a single deploy that picks
+up everything at once.
+
+```js
+const { withBuildsPaused } = require('./lib/netlify-builds');
+
+await withBuildsPaused(() => runMigration({ /* … */ }));
+```
+
+It **always** re-activates builds — on success, on error, and on Ctrl-C — so an interrupted
+migration can never leave the site frozen. On success it prompts `Trigger a deploy now?`; declining
+leaves builds active but idle (the next push/webhook deploys as usual). Non-interactive shells
+(piped/CI) default to "no". Honors `DRY_RUN=true` (logs its intent, touches nothing).
+
+Requires two extra vars in `.env` (see `.env.example`), used **only** by wrapped migrations:
+
+| Env var | Where to find it |
+| --- | --- |
+| `NETLIFY_AUTH_TOKEN` | Netlify → User settings → Applications → New access token. |
+| `NETLIFY_SITE_ID` | Site configuration → General → Site information → Site ID. |
+
 ## Scripts
 
 ### `npm run migrate:headings` — bump heading levels up

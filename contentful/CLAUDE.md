@@ -126,6 +126,11 @@ planned Locations scheme — edit this file and re-run the relevant idempotent s
 **Utility:** `backup` — wraps `space export` to a timestamped JSON (self-loads `.env`); run before
 any destructive migration.
 
+**Utility lib:** `lib/netlify-builds.js` — `withBuildsPaused(fn)` stops Netlify builds around a
+migration (so per-entry publishes don't each trigger a deploy), always re-activates them (success,
+error, or Ctrl-C), then prompts to trigger one deploy. Needs `NETLIFY_AUTH_TOKEN` + `NETLIFY_SITE_ID`
+in `.env`; honors `DRY_RUN`. Wrap large multi-entry migrations with it. See [`README.md`](README.md).
+
 **Spent one-off transforms** — already run against production; kept as **reference/templates** for
 writing new migrations, not meant to be re-run:
 
