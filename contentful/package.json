@@ -10,6 +10,7 @@
     "taxonomy:preview": "node scripts/preview-taxonomy.js",
     "taxonomy:create": "node --env-file=.env scripts/create-taxonomy.js",
     "taxonomy:describe": "node --env-file=.env scripts/set-descriptions.js",
+    "taxonomy:describe-events": "node --env-file=.env scripts/set-event-descriptions.js",
     "taxonomy:delete": "node --env-file=.env scripts/delete-taxonomy.js",
     "taxonomy:assign": "node --env-file=.env scripts/assign-concepts.js",
     "taxonomy:unassign": "node --env-file=.env scripts/unassign-concepts.js",

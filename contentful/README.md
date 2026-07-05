@@ -137,7 +137,14 @@ cutover: nothing rebuilds while the taxonomy is torn down and rebuilt.
 - **`taxonomy:create`** (`scripts/create-taxonomy.js`) — creates/reconciles both schemes +
   all concepts from `lib/taxonomy.js` (prefLabel + broader only; describe owns the copy).
 - **`taxonomy:describe`** (`scripts/set-descriptions.js`) — writes each concept's `definition`
-  and `altLabels` from `lib/taxonomy.js`. Idempotent; re-run after editing copy.
+  and `altLabels` from `lib/taxonomy.js`. Idempotent; re-run after editing copy. ⚠ Reconciles
+  **every** concept, so it will overwrite descriptions edited directly in Contentful — sync
+  those back into `lib/taxonomy.js` first, or use the scoped script below.
+- **`taxonomy:describe-events`** (`scripts/set-event-descriptions.js`) — one-off, scoped to the
+  17 race/event concepts (the ones with copy in `event-descriptions.md`). Patches **only their
+  `/definition`** from `lib/taxonomy.js`, never `altLabels` and never any other concept, so
+  descriptions hand-edited in Contentful for the topic/distance/discipline concepts are left
+  alone. Idempotent, skip-unchanged, `DRY_RUN`.
 - **`taxonomy:assign`** (`scripts/assign-concepts.js`) — sets each `article`'s
   `metadata.concepts` from the `ASSIGNMENTS` map, expanding each concept up its `broader`
   chain (full path). Skip-unchanged, publish-preserving. Reports articles with no assignment.
