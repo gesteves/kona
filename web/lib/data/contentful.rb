@@ -248,11 +248,12 @@ class Contentful
       # tagged is newest-first (published order), so the first is the archive's most recent entry.
       updated_at = tagged.first[:published_at]
       # `path` carries a trailing slash (the canonical URL); paginate wants the bare base.
-      # NB: the key is `entry_count`, not `count` — `count` collides with Hash#count on the
-      # Hashie::Mash data object (content.count would return the number of keys, not the value).
       pages = paginate(tagged, base_path: concept[:path].chomp('/'), template: "/tag.html",
                        title: concept[:name], summary: summary, description: description,
-                       entry_count: tagged.size, updated_at: updated_at, tag_id: concept[:id])
+                       updated_at: updated_at, tag_id: concept[:id])
+      # NB: the tag-level key is `entry_count`, not `count` — `count` collides with Hash#count on
+      # the Hashie::Mash (tag.count would return the number of keys). Read for the breadcrumb
+      # popularity tie-break in ArticleHelpers#taxonomy_index.
       { tag: concept.slice(:id, :name, :path, :scheme, :parent_id, :description, :synonyms).merge(entry_count: tagged.size), pages: pages }
     end
   end
@@ -294,7 +295,7 @@ class Contentful
   # templates expect. Page 1 lives at "#{base_path}/index.html", later pages at
   # "#{base_path}/page/N/index.html".
   # @return [Array<Hash>] One hash per page.
-  def paginate(articles, base_path:, template:, title:, summary: nil, description: nil, entry_count: nil, updated_at: nil, tag_id: nil)
+  def paginate(articles, base_path:, template:, title:, summary: nil, description: nil, updated_at: nil, tag_id: nil)
     sliced = articles.each_slice(@content[:site][:entries_per_page])
     sliced.map.with_index do |page, index|
       current_page = index + 1
@@ -312,10 +313,9 @@ class Contentful
       }
       page_data[:summary] = summary if summary
       page_data[:description] = description if description
-      # Tag-archive metadata (nil for the blog index): the concept id (for its breadcrumb chain),
-      # the archive's total post count, and its most-recent entry's date.
+      # Tag-archive metadata (nil for the blog index): the concept id (for its breadcrumb chain
+      # and feed link) and its most-recent entry's date (for the "Updated" line).
       page_data[:tag_id] = tag_id if tag_id
-      page_data[:entry_count] = entry_count if entry_count
       page_data[:updated_at] = updated_at if updated_at
       page_data[:items] = page
       page_data[:index_in_search_engines] = true

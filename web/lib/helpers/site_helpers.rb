@@ -142,6 +142,30 @@ module SiteHelpers
     "#{copyright_start_year}–#{Time.current.year}"
   end
 
+  # The Atom feeds to advertise in the current page's <head> via <link rel="alternate">: always
+  # the main site feed, plus per-tag feeds — the tag's own feed on a tag archive page, and every
+  # one of the article's tags' feeds on a post. Reads the page's proxied content via page_content
+  # (helpers can't see the template's `content` local). Each entry is { href:, title: }.
+  # @return [Array<Hash>]
+  def alternate_feed_links
+    links = [{ href: full_url('/feed.xml'), title: sanitize(data.site.meta_title) }]
+    pc = page_content
+    tags = if pc.nil?
+      []
+    elsif pc.template == '/tag.html' && pc.tag_id
+      node = taxonomy_index[pc.tag_id] # the tag itself
+      node ? [node] : []
+    elsif published_post?(pc)
+      Array(pc.contentful_metadata&.tags).map { |t| { name: t.name, path: t.path } }
+    else
+      []
+    end
+    tags.each do |t|
+      links << { href: full_url("#{t[:path]}feed.xml"), title: sanitize("#{feed_title}: #{t[:name]}") }
+    end
+    links
+  end
+
   # Returns the title for the RSS feed, based off the site's meta title.
   # @return [String] The title for the feed.
   def feed_title

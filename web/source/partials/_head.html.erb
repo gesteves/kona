@@ -14,7 +14,9 @@
     <% end %>
   <% end %>
   <link rel="canonical" href="<%= canonical_url %>">
-  <link rel="alternate" type="application/atom+xml" title="<%= sanitize(data.site.meta_title) %>" href="<%= full_url("/feed.xml") %>" />
+  <% alternate_feed_links.each do |feed| %>
+    <link rel="alternate" type="application/atom+xml" title="<%= feed[:title] %>" href="<%= feed[:href] %>" />
+  <% end %>
   <link rel="icon" href="/favicon.ico" sizes="32x32">
   <% if data.site.logo.present? %>
     <link rel="apple-touch-icon" href="<%= site_icon_url(w: 180) %>">

@@ -67,6 +67,47 @@ RSpec.describe SiteHelpers do
     end
   end
 
+  describe '#alternate_feed_links' do
+    def data = OpenStruct.new(site: OpenStruct.new(meta_title: 'My Site'))
+    def page_content = @pc
+    def feed_title = 'My Site'
+    def taxonomy_index = { 'triathlon' => { name: 'Triathlon', path: '/tagged/triathlon/' } }
+    def published_post?(content) = %w[Article Short].include?(content.entry_type) && !content.draft
+
+    it 'advertises only the main site feed when the page has no content' do
+      @pc = nil
+      expect(alternate_feed_links).to eq([{ href: 'https://example.com/feed.xml', title: 'My Site' }])
+    end
+
+    it "adds the tag's own feed on a tag archive page" do
+      @pc = OpenStruct.new(template: '/tag.html', tag_id: 'triathlon')
+      expect(alternate_feed_links).to eq([
+        { href: 'https://example.com/feed.xml', title: 'My Site' },
+        { href: 'https://example.com/tagged/triathlon/feed.xml', title: 'My Site: Triathlon' }
+      ])
+    end
+
+    it "adds every tag's feed on an article page" do
+      @pc = OpenStruct.new(
+        template: '/article.html', entry_type: 'Article', draft: false,
+        contentful_metadata: OpenStruct.new(tags: [
+          OpenStruct.new(name: 'Triathlon', path: '/tagged/triathlon/'),
+          OpenStruct.new(name: 'Race Reports', path: '/tagged/race-reports/')
+        ])
+      )
+      expect(alternate_feed_links).to eq([
+        { href: 'https://example.com/feed.xml', title: 'My Site' },
+        { href: 'https://example.com/tagged/triathlon/feed.xml', title: 'My Site: Triathlon' },
+        { href: 'https://example.com/tagged/race-reports/feed.xml', title: 'My Site: Race Reports' }
+      ])
+    end
+
+    it 'advertises only the main site feed on a non-tag, non-post page' do
+      @pc = OpenStruct.new(template: '/page.html', entry_type: 'Page', draft: false)
+      expect(alternate_feed_links).to eq([{ href: 'https://example.com/feed.xml', title: 'My Site' }])
+    end
+  end
+
   describe '#author_same_as' do
     it 'returns social destinations, excluding the feed' do
       @site = site(socials: [['Feed', '/feed.xml'], ['Bluesky', 'https://bsky.app/x'], ['Mastodon', 'https://m.test/x']])

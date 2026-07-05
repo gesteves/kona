@@ -37,6 +37,7 @@ ignore "/home.html"
 ignore "/javascripts/stimulus/*"
 ignore "/page.html"
 ignore "/short.html"
+ignore "/tag_feed.xml"
 
 # Every generated page — articles, pages, the paginated blog, and the per-tag pages —
 # proxies its template with itself as the `content` local.
@@ -49,6 +50,12 @@ ignore "/short.html"
   collection.each do |content|
     proxy content.path, content.template, locals: { content: content }, ignore: true
   end
+end
+
+# Each tag also gets an Atom feed at "<tag path>feed.xml", listing that tag's entries — the
+# same articles as its archive pages (across every paginated page), newest first.
+@app.data.tags.each do |tag|
+  proxy "#{tag.tag.path}feed.xml", "/tag_feed.xml", locals: { content: tag }, ignore: true
 end
 
 # Render the standard.site publication verification endpoint as a bare, plain-text

@@ -1,0 +1,1 @@
+<%= partial 'partials/feed', locals: { articles: content.pages.flat_map(&:items).first(100), html_path: content.tag.path, feed_path: "#{content.tag.path}feed.xml", title: "#{feed_title}: #{content.tag.name}", subtitle: nil } %>
