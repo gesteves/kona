@@ -1,126 +1,248 @@
-// Shared data + helpers for the Contentful tags → taxonomy migration.
+// Single editable source of truth for the two-scheme taxonomy (Sports + Topics) and the
+// per-article assignments. `taxonomy:preview` renders everything here for review; the
+// create/describe/assign scripts all read from it, so what you preview is exactly what runs.
 //
-// Everything the taxonomy scripts need in one place: the canonical Topics hierarchy
-// (the 18 existing metadata tags, re-created as SKOS concepts with identical ids and
-// names), a new Races branch (one concept per race), the slug function, the races that
-// exist only in old race reports (no `event` entry), the article-slug → race-concept map
-// for race reports with no `event` link, and a plain contentful-management client factory.
+// EDIT FREELY:
+//   - CONCEPTS: names, hierarchy (`broader`), `altLabels`, and `description` copy.
+//   - ASSIGNMENTS: each article's most-specific concept(s); the assign script EXPANDS each up
+//     its `broader` chain, so an article gets the full path (e.g. a race → race+distance+discipline).
+//   - altLabels start empty — add short synonyms (e.g. "70.3", "CdA") to shorten chips and
+//     auto-generate /tagged/<synonym> redirects. (Leave races' altLabels off if a short form
+//     would collide, e.g. the full and 70.3 Coeur d'Alene races.)
 //
-// ⚠️ Concept ids and prefLabels are load-bearing:
-//   - ids become the `/tagged/<id>` URL segments in web/ (renaming an id moves a URL).
-//   - prefLabels are the display names the feed (<category>), Open Graph (article:tag),
-//     JSON-LD (keywords / articleSection), and share_helpers.rb name-matching all read.
-// Keep the topic prefLabels below EQUAL to the old tag names, or those surfaces drift.
-//
-// Concepts/schemes are ORG-LEVEL, so the CMA client here is authenticated with a
-// management token and addressed by CONTENTFUL_ORGANIZATION_ID — not the space/environment
-// the entry scripts use.
+// Concepts/schemes are ORG-LEVEL. prefLabels for "Race Reports"/"Reviews" must stay exact
+// (web share_helpers matches them). Descriptions are Markdown (rendered on the archive page,
+// stripped to plain text in meta tags).
 
 const contentful = require('contentful-management');
 
-// Contentful is single-locale here; all localized concept fields use this key.
 const LOCALE = 'en-US';
-
-// The content type id whose entries are races (used to derive race concepts).
 const EVENT_CONTENT_TYPE = 'event';
 
-// The single concept scheme all concepts belong to.
-const SCHEME = { id: 'topics', name: 'Topics' };
-
-// The 18 existing tags → concepts. `id`/`name` are copied verbatim from the current tag
-// vocabulary (web/data/tags.json); `broader` is the parent concept id (null = topConcept).
-// Order here is the intended topConcept order in the scheme.
-const TOPICS = [
-  { id: 'triathlon', name: 'Triathlon', broader: null },
-  { id: 'ironman', name: 'Ironman', broader: 'triathlon' },
-  { id: 'ironman-703', name: 'Ironman 70.3', broader: 'triathlon' },
-  { id: 'olympic', name: 'Olympic', broader: 'triathlon' },
-  { id: 'running', name: 'Running', broader: null },
-  { id: 'half-marathon', name: 'Half Marathon', broader: 'running' },
-  { id: 'cycling', name: 'Cycling', broader: null },
-  { id: 'swimming', name: 'Swimming', broader: null },
-  { id: 'race-reports', name: 'Race Reports', broader: null },
-  { id: 'news', name: 'News', broader: null },
-  { id: 'reviews', name: 'Reviews', broader: null },
-  { id: 'training', name: 'Training', broader: null },
-  { id: 'nutrition-hydration', name: 'Nutrition & Hydration', broader: 'training' },
-  { id: 'gear', name: 'Gear', broader: null },
-  { id: 'apps', name: 'Apps', broader: null },
-  { id: 'zwift', name: 'Zwift', broader: 'apps' },
-  { id: 'meta', name: 'Meta', broader: null },
-  { id: 'personal', name: 'Personal', broader: null },
-  // Races: a new topConcept whose children are individual races (added in getRaceConcepts).
-  { id: 'races', name: 'Races', broader: null },
+const SCHEMES = [
+  { id: 'sports', name: 'Sports' },
+  { id: 'topics', name: 'Topics' },
 ];
 
-// Races that exist only in old race reports with no `event` entry to derive them from.
-// (The other race concepts are derived from live `event` entries at runtime — see
-// getRaceConcepts — so they aren't hardcoded here.) `broader` is always `races`.
-const STATIC_EXTRA_RACES = [
-  { id: 'teton-mountain-runs-wild-15k', name: 'Teton Mountain Runs Wild 15K', broader: 'races' },
-  { id: 'ironman-coeur-dalene', name: 'Ironman Coeur d’Alene', broader: 'races' },
-  { id: 'ironman-703-arizona', name: 'Ironman 70.3 Arizona', broader: 'races' },
-  { id: 'bozeman-triathlon', name: 'Bozeman Triathlon', broader: 'races' },
+// Every concept: { id, name, scheme, broader (parent id | null), altLabels: [], description }.
+const CONCEPTS = [
+  // ─────────────── Sports ───────────────
+  { id: 'triathlon', name: 'Triathlon', scheme: 'sports', broader: null, altLabels: [],
+    description: 'Swim, bike, run---race reports, news, and training.' },
+
+  { id: 'full-distance', name: 'Full Distance', scheme: 'sports', broader: 'triathlon', altLabels: [],
+    description: 'Full-distance triathlon: a 2.4-mile swim, 112-mile bike, and 26.2-mile run.' },
+  { id: 'ironman-canada', name: 'Ironman Canada', scheme: 'sports', broader: 'full-distance', altLabels: [],
+    description: 'The now-defunct full-distance Ironman in Penticton, British Columbia.' },
+  { id: 'ironman-coeur-dalene', name: 'Ironman Coeur d’Alene', scheme: 'sports', broader: 'full-distance', altLabels: [],
+    description: 'The now-defunct full-distance Ironman in Coeur d’Alene, Idaho---140.6 miles on a challenging, unpredictable course.' },
+
+  { id: 'half-distance', name: 'Half Distance', scheme: 'sports', broader: 'triathlon', altLabels: [],
+    description: 'Half-distance triathlon: a 1.2-mile swim, 56-mile bike, and 13.1-mile run.' },
+  { id: 'ironman-703-coeur-dalene', name: 'Ironman 70.3 Coeur d’Alene', scheme: 'sports', broader: 'half-distance', altLabels: [],
+    description: 'The Ironman 70.3 in Coeur d’Alene, Idaho, where race day always seems to bring some weather surprise, from high winds to hailstorms to record heat.' },
+  { id: 'ironman-703-boise', name: 'Ironman 70.3 Boise', scheme: 'sports', broader: 'half-distance', altLabels: [],
+    description: 'The Ironman 70.3 in Boise, Idaho: a split-transition race with a Lucky Peak Reservoir swim, a bike around the Idaho countryside, and a run along the Greenbelt.' },
+  { id: 'ironman-703-washington-tri-cities', name: 'Ironman 70.3 Washington Tri-Cities', scheme: 'sports', broader: 'half-distance', altLabels: [],
+    description: 'A chill, late-season 70.3 in Richland, Washington, with a fast Columbia River swim, a ride past the vineyards, and a spectator-friendly run along the river.' },
+  { id: 'ironman-703-st-george', name: 'Ironman 70.3 St. George', scheme: 'sports', broader: 'half-distance', altLabels: [],
+    description: 'The now-defunct Ironman 70.3 in St. George, Utah, riding through Snow Canyon.' },
+  { id: 'ironman-703-boulder', name: 'Ironman 70.3 Boulder', scheme: 'sports', broader: 'half-distance', altLabels: [],
+    description: 'The Ironman 70.3 in Boulder, Colorado, in the shadow of the Flatirons.' },
+  { id: 'ironman-703-arizona', name: 'Ironman 70.3 Arizona', scheme: 'sports', broader: 'half-distance', altLabels: [],
+    description: 'The now-defunct Ironman 70.3 in Tempe, Arizona.' },
+  { id: 'ironman-703-ruidoso-new-mexico', name: 'Ironman 70.3 Ruidoso', scheme: 'sports', broader: 'half-distance', altLabels: [],
+    description: 'The new Ironman 70.3 in Ruidoso, New Mexico.' },
+
+  { id: 'olympic-distance', name: 'Olympic Distance', scheme: 'sports', broader: 'triathlon', altLabels: [],
+    description: 'Olympic-distance triathlon: a 1.5 km swim, 40 km bike, and 10 km run.' },
+  { id: 'gates-of-yellowstone-triathlon', name: 'Gates of Yellowstone Triathlon', scheme: 'sports', broader: 'olympic-distance', altLabels: ['Gates of Yellowstone'],
+    description: 'A local Olympic-distance triathlon just outside Yellowstone.' },
+  { id: 'bozeman-triathlon', name: 'Bozeman Triathlon', scheme: 'sports', broader: 'olympic-distance', altLabels: [],
+    description: 'An Olympic-distance triathlon in Bozeman, Montana.' },
+
+  { id: 'triathlon-other', name: 'Other', scheme: 'sports', broader: 'triathlon', altLabels: [],
+    description: 'Non-standard-distance triathlons.' },
+  { id: 'escape-from-alcatraz-triathlon', name: 'Escape from Alcatraz Triathlon', scheme: 'sports', broader: 'triathlon-other', altLabels: ['Escape from Alcatraz'],
+    description: 'One of the country’s oldest triathlons, with a plunge into San Francisco Bay near Alcatraz, a hilly ride through the Presidio, and a run up Baker Beach’s infamous Sand Ladder.' },
+
+  { id: 'running', name: 'Running', scheme: 'sports', broader: null, altLabels: [],
+    description: 'Running---race reports and training, from half marathons to shorter road races.' },
+  { id: 'half-marathon', name: 'Half Marathon', scheme: 'sports', broader: 'running', altLabels: [],
+    description: 'Half marathons---the 13.1-mile distance.' },
+  { id: 'grand-teton-half-marathon', name: 'Grand Teton Half Marathon', scheme: 'sports', broader: 'half-marathon', altLabels: [],
+    description: 'An early-summer half marathon along the Tetons, and one of my favorites of the year.' },
+  { id: 'jackson-hole-half-marathon', name: 'Jackson Hole Half Marathon', scheme: 'sports', broader: 'half-marathon', altLabels: [],
+    description: 'A fast half marathon at the foot of the Tetons, from Teton Village to downtown Jackson.' },
+  { id: 'hole-half-marathon', name: 'Hole Half Marathon', scheme: 'sports', broader: 'half-marathon', altLabels: ['Hole Half'],
+    description: 'A fall half marathon from Jackson to Teton Village, with the Tetons in view nearly the whole way.' },
+  { id: 'running-other', name: 'Other', scheme: 'sports', broader: 'running', altLabels: [],
+    description: 'Other running races---12Ks, 15Ks, and other distances.' },
+  { id: 'carrera-san-silvestre-12k', name: 'Carrera San Silvestre 12K', scheme: 'sports', broader: 'running-other', altLabels: ['Carrera San Silvestre', 'San Silvestre'],
+    description: 'A festive New Year’s Eve race in Mexico City.' },
+  { id: 'teton-mountain-runs-wild-15k', name: 'Teton Mountain Runs Wild 15K', scheme: 'sports', broader: 'running-other', altLabels: ['Wild 15K'],
+    description: 'A 15K trail running race in the Tetons.' },
+
+  { id: 'cycling', name: 'Cycling', scheme: 'sports', broader: null, altLabels: [],
+    description: 'Bikes, gear, and training on two wheels.' },
+  { id: 'swimming', name: 'Swimming', scheme: 'sports', broader: null, altLabels: [],
+    description: 'Pool and open-water training.' },
+
+  // ─────────────── Topics ───────────────
+  { id: 'race-reports', name: 'Race Reports', scheme: 'topics', broader: null, altLabels: [],
+    description: 'Play-by-play recaps of my races: how the swim, bike, and run actually went---weather, mishaps, and all.' },
+  { id: 'news', name: 'News', scheme: 'topics', broader: null, altLabels: [],
+    description: 'News about triathlon and endurance sports---rule changes, race announcements, and industry updates.' },
+  { id: 'reviews', name: 'Reviews', scheme: 'topics', broader: null, altLabels: [],
+    description: 'Hands-on reviews of the gear I train and race with.' },
+  { id: 'training', name: 'Training', scheme: 'topics', broader: null, altLabels: [],
+    description: 'How I train---workouts, data, and the systems that get me to the start line ready.' },
+  { id: 'nutrition-hydration', name: 'Nutrition & Hydration', scheme: 'topics', broader: 'training', altLabels: [],
+    description: 'Sweat testing, sodium loss, and dialing in race-day nutrition.' },
+  { id: 'tech', name: 'Tech', scheme: 'topics', broader: null, altLabels: [],
+    description: 'The tech I use to train and race---gear, devices, and apps.' },
+  { id: 'gear', name: 'Gear', scheme: 'topics', broader: 'tech', altLabels: [],
+    description: 'The gear I swim, bike, and run with---bikes, tech, and race-day equipment.' },
+  { id: 'apps', name: 'Apps', scheme: 'topics', broader: 'tech', altLabels: [],
+    description: 'The apps and software I use to plan, track, and analyze my training, and the news around them.' },
+  { id: 'zwift', name: 'Zwift', scheme: 'topics', broader: 'apps', altLabels: [],
+    description: 'Indoor training, integrations, and updates in Watopia.' },
+  { id: 'meta', name: 'Meta', scheme: 'topics', broader: null, altLabels: [],
+    description: 'About this blog.' },
+  { id: 'personal', name: 'Personal', scheme: 'topics', broader: null, altLabels: [],
+    description: 'Personal updates---the ups and downs of chasing races, injuries and all.' },
 ];
 
-// Race reports whose `event` reference field is empty, so their race concept can't be
-// derived from the linked event. Maps the article slug → the race concept id it should get.
-// Three point at races that DO have `event` entries (the article just isn't linked to them);
-// four point at STATIC_EXTRA_RACES above.
-const ARTICLE_RACE_MAP = {
-  'race-report-carrera-san-silvestre-2024': 'carrera-san-silvestre-12k',
-  'race-report-2024-ironman-canada': 'ironman-canada',
-  'race-report-ironman-70-3-boulder': 'ironman-703-boulder',
-  'race-report-wild-15k': 'teton-mountain-runs-wild-15k',
-  'race-report-ironman-coeur-dalene': 'ironman-coeur-dalene',
-  'race-report-ironman-69-1-arizona': 'ironman-703-arizona',
-  'race-report-bozeman-triathlon': 'bozeman-triathlon',
+// article slug → { sports: <most-specific concept id | null>, topics: [ids] }.
+// Seeded from each article's current concepts, then hand-reviewed. Assign expands each up its
+// broader chain. Conventions: general Ironman news → `triathlon` (the discipline, not a
+// distance); tech posts keep their sport discipline; a couple of recaps carry no content-type.
+const ASSIGNMENTS = {
+  'a-way-to-track-my-endless-pool-workouts': { sports: 'swimming', topics: ['apps', 'training'] },
+  'an-update-on-my-ankle': { sports: 'running', topics: ['personal'] },
+  'best-bike-split-integrates-with-zwift': { sports: 'cycling', topics: ['zwift', 'news'] },
+  'core-introduces-a-new-heat-adaptation-score': { sports: null, topics: ['gear', 'apps', 'news'] },
+  'elsewhere-on-the-web': { sports: null, topics: ['meta'] },
+  'escape-from-alcatraz-changes-starting-procedures-for-this-years-race': { sports: 'escape-from-alcatraz-triathlon', topics: ['news'] },
+  'escaping-from-alcatraz-next-june': { sports: 'escape-from-alcatraz-triathlon', topics: ['personal'] },
+  'gates-of-yellowstone-triathlon': { sports: 'gates-of-yellowstone-triathlon', topics: ['news'] },
+  'ironman-70-3-is-coming-back-to-boise': { sports: 'ironman-703-boise', topics: ['news'] },
+  'ironman-adopts-world-triathlon-bike-hydration-rules': { sports: 'triathlon', topics: ['news'] },
+  'ironman-announces-new-performance-based-qualification': { sports: 'triathlon', topics: ['news'] },
+  'ironman-comes-to-new-mexico': { sports: 'ironman-703-ruidoso-new-mexico', topics: ['news'] },
+  'ironman-competition-rules-2026': { sports: 'triathlon', topics: ['news'] },
+  'ironman-wont-enforce-new-world-triathlon-hydration-rules-for-age-groups': { sports: 'triathlon', topics: ['news'] },
+  'new-bike-day-trek-speed-concept-slr-7': { sports: 'cycling', topics: ['gear'] },
+  'new-world-triathlon-bike-hydration-rules': { sports: 'triathlon', topics: ['news'] },
+  'next-years-edition-of-ironman-70-3-st-george-will-be-the-final-one': { sports: 'ironman-703-st-george', topics: ['news'] },
+  'no-more-mortal-hydration-in-2026': { sports: 'triathlon', topics: ['news'] },
+  'one-last-race-this-year': { sports: 'carrera-san-silvestre-12k', topics: ['personal'] },
+  'paula-findlays-recap-of-ironman-70-3-boise': { sports: 'ironman-703-boise', topics: [] },
+  'race-report-2024-grand-teton-half-marathon': { sports: 'grand-teton-half-marathon', topics: ['race-reports'] },
+  'race-report-2024-ironman-70-3-coeur-dalene': { sports: 'ironman-703-coeur-dalene', topics: ['race-reports'] },
+  'race-report-2024-ironman-70-3-st-george': { sports: 'ironman-703-st-george', topics: ['race-reports'] },
+  'race-report-2024-ironman-70-3-washington-tri-cities': { sports: 'ironman-703-washington-tri-cities', topics: ['race-reports'] },
+  'race-report-2024-ironman-canada': { sports: 'ironman-canada', topics: ['race-reports'] },
+  'race-report-2025-grand-teton-half-marathon': { sports: 'grand-teton-half-marathon', topics: ['race-reports'] },
+  'race-report-2025-hole-half-marathon': { sports: 'hole-half-marathon', topics: ['race-reports'] },
+  'race-report-2025-ironman-70-3-boise': { sports: 'ironman-703-boise', topics: ['race-reports'] },
+  'race-report-2025-ironman-70-3-coeur-dalene': { sports: 'ironman-703-coeur-dalene', topics: ['race-reports'] },
+  'race-report-2025-ironman-70-3-st-george': { sports: 'ironman-703-st-george', topics: ['race-reports'] },
+  'race-report-2025-ironman-70-3-washington-tri-cities': { sports: 'ironman-703-washington-tri-cities', topics: ['race-reports'] },
+  'race-report-2025-jackson-hole-half-marathon': { sports: 'jackson-hole-half-marathon', topics: ['race-reports'] },
+  'race-report-2026-escape-from-alcatraz-triathlon': { sports: 'escape-from-alcatraz-triathlon', topics: ['race-reports'] },
+  'race-report-2026-ironman-70-3-coeur-dalene': { sports: 'ironman-703-coeur-dalene', topics: ['race-reports'] },
+  'race-report-bozeman-triathlon': { sports: 'bozeman-triathlon', topics: ['race-reports'] },
+  'race-report-carrera-san-silvestre-2024': { sports: 'carrera-san-silvestre-12k', topics: ['race-reports'] },
+  'race-report-grand-teton-half-marathon': { sports: 'grand-teton-half-marathon', topics: ['race-reports'] },
+  'race-report-hole-half-marathon': { sports: 'hole-half-marathon', topics: ['race-reports'] },
+  'race-report-hole-half-marathon-2023': { sports: 'hole-half-marathon', topics: ['race-reports'] },
+  'race-report-ironman-69-1-arizona': { sports: 'ironman-703-arizona', topics: ['race-reports'] },
+  'race-report-ironman-70-3-boulder': { sports: 'ironman-703-boulder', topics: ['race-reports'] },
+  'race-report-ironman-70-3-st-george': { sports: 'ironman-703-st-george', topics: ['race-reports'] },
+  'race-report-ironman-coeur-dalene': { sports: 'ironman-coeur-dalene', topics: ['race-reports'] },
+  'race-report-jackson-hole-half-marathon': { sports: 'jackson-hole-half-marathon', topics: ['race-reports'] },
+  'race-report-wild-15k': { sports: 'teton-mountain-runs-wild-15k', topics: ['race-reports'] },
+  'raceranger-age-groupers-challenge-wanaka': { sports: 'triathlon', topics: ['gear', 'news'] },
+  'review-technogym-myrun': { sports: 'running', topics: ['gear', 'reviews'] },
+  'runna-acquired-by-strava': { sports: 'running', topics: ['apps', 'news'] },
+  'send-runna-workouts-to-zwift-using-intervals-icu': { sports: 'running', topics: ['zwift'] },
+  't-2-weeks-to-escape-from-alcatraz': { sports: 'escape-from-alcatraz-triathlon', topics: [] },
+  'this-years-ironman-canada-will-be-the-last-in-penticton': { sports: 'ironman-canada', topics: ['news'] },
+  'trainerroad-launches-zwift-integration': { sports: 'cycling', topics: ['zwift', 'training'] },
+  'welcome-to-given-to-tri': { sports: null, topics: ['meta'] },
+  'well-i-had-to-skip-the-hole-half': { sports: 'hole-half-marathon', topics: ['personal'] },
+  'whats-the-water-temperature-at-lucky-peak-reservoir-in-july': { sports: 'ironman-703-boise', topics: [] },
+  'world-triathlon-updates-hydration-rules-again': { sports: 'triathlon', topics: ['news'] },
+  'understanding-my-sweat-and-sodium-loss-rates': { sports: null, topics: ['nutrition-hydration'] },
+  'zwift-automatic-incline-control-soon': { sports: 'running', topics: ['zwift', 'news'] },
 };
 
-// Turns a race title into a concept id in the same style as the existing tag ids:
-// lowercase, drop periods and apostrophes (straight or curly), collapse the rest to hyphens.
-//   "Ironman 70.3 Coeur d’Alene" → "ironman-703-coeur-dalene"
-//   "Ironman 70.3 St. George"    → "ironman-703-st-george"
-//   "Carrera San Silvestre 12K"  → "carrera-san-silvestre-12k"
-function slugify(title) {
-  return title
-    .toLowerCase()
-    .replace(/[.'’]/g, '')
-    .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
+// ─────────────── helpers ───────────────
 
-// Derives the race concepts from the live `event` entries plus the static extras.
-// Returns [{ id, name, broader: 'races' }], de-duplicated by id (static extras win on
-// collision, though there shouldn't be any). Pass the plain CMA client + space/environment.
-async function getRaceConcepts(client, { spaceId, environmentId }) {
-  const events = await paginateAll((skip) =>
-    client.entry.getMany({
-      spaceId,
-      environmentId,
-      query: { content_type: EVENT_CONTENT_TYPE, skip, limit: 100, order: 'sys.createdAt' },
-    })
-  );
+const byId = new Map(CONCEPTS.map((c) => [c.id, c]));
 
-  const byId = new Map();
-  for (const event of events) {
-    const title = event.fields?.title?.['en-US'];
-    if (!title) continue;
-    const id = slugify(title);
-    byId.set(id, { id, name: title, broader: 'races' });
+// A concept's id chain, most-specific first: [id, parent, grandparent, …].
+function expandAncestors(id) {
+  const chain = [];
+  let cur = id;
+  const seen = new Set();
+  while (cur && byId.has(cur) && !seen.has(cur)) {
+    seen.add(cur);
+    chain.push(cur);
+    cur = byId.get(cur).broader;
   }
-  for (const race of STATIC_EXTRA_RACES) byId.set(race.id, race);
-  return [...byId.values()];
+  return chain;
 }
 
-// The full concept list (topics + derived races) the create/delete scripts reconcile.
-async function getAllConcepts(client, opts) {
-  const races = await getRaceConcepts(client, opts);
-  return [...TOPICS, ...races];
+// The full set of concept ids an article should carry (both schemes' paths), de-duped in
+// scheme-then-depth order (Sports discipline→distance→race, then Topics). `unknown` collects
+// any id in the assignment that isn't a real concept.
+function resolveAssignment(slug, unknown = []) {
+  const a = ASSIGNMENTS[slug];
+  if (!a) return null;
+  const ids = [];
+  const push = (id) => {
+    if (!id) return;
+    if (!byId.has(id)) { unknown.push(id); return; }
+    for (const anc of expandAncestors(id).reverse()) if (!ids.includes(anc)) ids.push(anc);
+  };
+  push(a.sports);
+  (a.topics || []).forEach(push);
+  return ids;
 }
 
-// Pages through a getMany endpoint (limit/skip/total) and returns every item.
+const SCHEME_IDS = new Set(SCHEMES.map((s) => s.id));
+function conceptsForScheme(schemeId) {
+  return CONCEPTS.filter((c) => c.scheme === schemeId);
+}
+
+// Turns a title into an id in the existing style (lowercase, drop periods/apostrophes, hyphenate).
+function slugify(title) {
+  return title.toLowerCase().replace(/[.'’]/g, '').replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+const conceptLink = (id) => ({ sys: { type: 'Link', linkType: 'TaxonomyConcept', id } });
+const linkedIds = (links) => (links || []).map((l) => l.sys.id).sort();
+
+async function getExistingConcepts(client, { organizationId }) {
+  const items = [];
+  let pageUrl;
+  for (;;) {
+    const page = await client.concept.getMany({ organizationId, query: pageUrl ? { pageUrl } : {} });
+    items.push(...page.items);
+    pageUrl = page.pages?.next;
+    if (!pageUrl || page.items.length === 0) break;
+  }
+  return items;
+}
+
+async function getExistingSchemes(client, { organizationId }) {
+  const list = await client.conceptScheme.getMany({ organizationId, query: {} });
+  return list.items;
+}
+
 async function paginateAll(fetchPage) {
   const items = [];
   let skip = 0;
@@ -133,35 +255,6 @@ async function paginateAll(fetchPage) {
   return items;
 }
 
-// Fetches every existing concept in the org. Concepts use CURSOR pagination
-// (`pages.next` is a full pageUrl passed back as `query.pageUrl`), not skip/limit.
-async function getExistingConcepts(client, { organizationId }) {
-  const items = [];
-  let pageUrl;
-  for (;;) {
-    const page = await client.concept.getMany({
-      organizationId,
-      query: pageUrl ? { pageUrl } : {},
-    });
-    items.push(...page.items);
-    pageUrl = page.pages?.next;
-    if (!pageUrl || page.items.length === 0) break;
-  }
-  return items;
-}
-
-// A TaxonomyConcept link, as stored in a concept's `broader`/`related`, a scheme's
-// `topConcepts`/`concepts`, and an entry's `metadata.concepts`.
-function conceptLink(id) {
-  return { sys: { type: 'Link', linkType: 'TaxonomyConcept', id } };
-}
-
-// The concept ids linked in a `broader` (or any TaxonomyConcept link array), sorted.
-function linkedIds(links) {
-  return (links || []).map((l) => l.sys.id).sort();
-}
-
-// Builds a plain contentful-management client (built-in 429 retry). Requires a CMA token.
 function createPlainClient() {
   const accessToken = process.env.CONTENTFUL_MANAGEMENT_TOKEN;
   if (!accessToken) {
@@ -171,43 +264,18 @@ function createPlainClient() {
   return contentful.createClient({ accessToken }, { type: 'plain' });
 }
 
-// Reads the env vars the scripts share, exiting with a clear message if a required one
-// is missing. `org` is required only for the org-level taxonomy CRUD scripts.
 function readEnv({ requireOrg = false } = {}) {
   const spaceId = process.env.CONTENTFUL_SPACE;
   const organizationId = process.env.CONTENTFUL_ORGANIZATION_ID;
   const environmentId = process.env.CONTENTFUL_ENVIRONMENT || 'master';
-  if (!spaceId) {
-    console.error('Missing CONTENTFUL_SPACE — set it in contentful/.env.');
-    process.exit(1);
-  }
-  if (requireOrg && !organizationId) {
-    console.error('Missing CONTENTFUL_ORGANIZATION_ID — set it in contentful/.env.');
-    process.exit(1);
-  }
-  return {
-    spaceId,
-    organizationId,
-    environmentId,
-    dryRun: process.env.DRY_RUN === 'true',
-    onlyId: process.env.ENTRY_ID || null,
-  };
+  if (!spaceId) { console.error('Missing CONTENTFUL_SPACE — set it in contentful/.env.'); process.exit(1); }
+  if (requireOrg && !organizationId) { console.error('Missing CONTENTFUL_ORGANIZATION_ID — set it in contentful/.env.'); process.exit(1); }
+  return { spaceId, organizationId, environmentId, dryRun: process.env.DRY_RUN === 'true', onlyId: process.env.ENTRY_ID || null };
 }
 
 module.exports = {
-  LOCALE,
-  EVENT_CONTENT_TYPE,
-  SCHEME,
-  TOPICS,
-  STATIC_EXTRA_RACES,
-  ARTICLE_RACE_MAP,
-  slugify,
-  getRaceConcepts,
-  getAllConcepts,
-  getExistingConcepts,
-  conceptLink,
-  linkedIds,
-  paginateAll,
-  createPlainClient,
-  readEnv,
+  LOCALE, EVENT_CONTENT_TYPE, SCHEMES, CONCEPTS, ASSIGNMENTS, byId,
+  expandAncestors, resolveAssignment, conceptsForScheme, SCHEME_IDS,
+  slugify, conceptLink, linkedIds, getExistingConcepts, getExistingSchemes,
+  paginateAll, createPlainClient, readEnv,
 };

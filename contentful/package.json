@@ -7,6 +7,7 @@
     "fix:degrees": "node --env-file=.env scripts/fix-degrees.js",
     "migrate:headings": "node --env-file=.env scripts/bump-heading-levels.js",
     "migrate:headings:revert": "node --env-file=.env scripts/revert-heading-levels.js",
+    "taxonomy:preview": "node scripts/preview-taxonomy.js",
     "taxonomy:create": "node --env-file=.env scripts/create-taxonomy.js",
     "taxonomy:describe": "node --env-file=.env scripts/set-descriptions.js",
     "taxonomy:delete": "node --env-file=.env scripts/delete-taxonomy.js",
@@ -14,9 +15,7 @@
     "taxonomy:unassign": "node --env-file=.env scripts/unassign-concepts.js",
     "taxonomy:validate-article": "node --env-file=.env scripts/add-taxonomy-validation.js",
     "taxonomy:validate-article:revert": "node --env-file=.env scripts/revert-taxonomy-validation.js",
-    "taxonomy:remove-tags": "node --env-file=.env scripts/remove-tags.js",
-    "taxonomy:restore-tags": "node --env-file=.env scripts/restore-tags.js",
-    "taxonomy:delete-tags": "node --env-file=.env scripts/delete-tags.js"
+    "taxonomy:redirects": "node --env-file=.env scripts/create-redirects.js"
   },
   "dependencies": {
     "contentful-management": "^11.0.0",

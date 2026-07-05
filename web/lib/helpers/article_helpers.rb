@@ -182,7 +182,10 @@ module ArticleHelpers
     if tags.present?
       # Each concept's name plus its synonyms (altLabels), deduped, as keywords.
       schema["keywords"] = tags.flat_map { |t| [t.name, *Array(t.synonyms)] }.uniq
-      schema["articleSection"] = tags.first.name
+      # articleSection: the content-type concept, else any Topics concept, else the first tag.
+      section = tags.find { |t| %w[race-reports news reviews].include?(t.id) } ||
+                tags.find { |t| t.scheme == 'topics' } || tags.first
+      schema["articleSection"] = section.name
     end
     if content&.cover_image&.url.present?
       schema["image"] = ["1000x1000", "1600x900", "1600x1200"].map do |s|
@@ -227,23 +230,23 @@ module ArticleHelpers
     { "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": items }.to_json
   end
 
-  # The taxonomy trail for an article's breadcrumb: the ancestor chain (root topic → … →
-  # concept) of the article's deepest-nested topic concept, tie-broken by assignment order.
-  # The Races branch is excluded — races are a cross-cutting facet surfaced by the "More
-  # Reports From This Race" widget and the race archive, not the topic breadcrumb. Returns
-  # [] when the article has no taxonomy (pre-migration) so the breadcrumb stays Home > Blog.
+  # The taxonomy trail for an article's breadcrumb: the ancestor chain (root → … → concept) of
+  # the article's deepest-nested concept across either scheme, tie-broken by the concept's
+  # archive popularity (article count). So a race report gets its Sports chain (Triathlon >
+  # Half Distance > the race), while a post with only Topics concepts still gets a trail (e.g.
+  # Tech > Gear, or News). Returns [] when the article has no taxonomy.
   # @param content [Object] The article.
-  # @return [Array<Hash>] Ordered [{ name:, path: }] from root to the chosen concept.
+  # @return [Array<Hash>] Ordered [{ id:, name:, path: }] from root to the chosen concept.
   def taxonomy_trail(content)
     tags = Array(content.contentful_metadata&.tags)
     return [] if tags.empty?
 
-    chains = tags.map { |t| concept_chain(t.id) }
-                 .reject { |chain| chain.empty? || chain.first[:id] == 'races' }
+    index = taxonomy_index
+    chains = tags.map { |t| concept_chain(t.id) }.reject(&:empty?)
     return [] if chains.empty?
 
-    # Longest chain wins; on a tie the earliest (assignment order) wins.
-    chains.each_with_index.max_by { |chain, i| [chain.length, -i] }.first
+    # Deepest chain wins; ties broken by the deepest concept's archive article count.
+    chains.max_by { |chain| [chain.length, index.dig(chain.last[:id], :count).to_i] }
   end
 
   # The ancestor chain of a concept id, root-first and inclusive, resolved from data.tags.
@@ -268,7 +271,7 @@ module ArticleHelpers
   def taxonomy_index
     @taxonomy_index ||= Array(data.tags).each_with_object({}) do |entry, index|
       tag = entry.tag
-      index[tag.id] = { name: tag.name, path: tag.path, parent_id: tag.parent_id }
+      index[tag.id] = { name: tag.name, path: tag.path, parent_id: tag.parent_id, scheme: tag.scheme, count: tag.count }
     end
   end
 
@@ -327,12 +330,18 @@ module ArticleHelpers
     end
   end
 
-  # The id of an article's race concept — the assigned concept under the Races branch
-  # (parent_id == 'races') — or nil. Drives race-report grouping post-migration.
+  # The id of an article's race concept — its deepest Sports concept nested below the distance
+  # level (a specific race sits at discipline › distance › race, chain length ≥ 3) — or nil.
+  # Drives "More Reports From This Race" grouping.
   # @param article [Object] The article.
   # @return [String, nil]
   def race_concept_id(article)
-    Array(article.contentful_metadata&.tags).find { |t| t.parent_id == 'races' }&.id
+    Array(article.contentful_metadata&.tags)
+      .select { |t| t.scheme == 'sports' }
+      .map { |t| [t.id, concept_chain(t.id).length] }
+      .select { |_id, depth| depth >= 3 }
+      .max_by { |_id, depth| depth }
+      &.first
   end
 
   # Whether an article is tagged as a race report. Guards the race-report grouping so a

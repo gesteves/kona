@@ -72,21 +72,31 @@ environment sandbox for them, and their ids become the `/tagged/<id>` URL segmen
 site. Entry *assignment* (`taxonomy:assign`) is environment-scoped, so rehearse it on a
 sandbox first. Dry-run everything.
 
-Run order (additive-first, so the site never has a window with missing categories):
+The current design is **two schemes** — `sports` (Triathlon › distances › races, Running,
+Cycling, Swimming) and `topics` (Race Reports, News, Reviews, Training, Tech, …). Switching
+to it is a **teardown + rebuild** (the apps have no legacy-tag fallback, so old and new
+taxonomies can't be half-live). Iterate on the design first, then cut over with builds paused.
+
+**Review loop (no writes):** edit `scripts/lib/taxonomy.js` — the single source of truth for
+concepts, `altLabels`, `description` copy, and the per-article assignment map — then
+`npm run taxonomy:preview` and repeat until happy.
+
+Run order (DRY_RUN each first; **pause Netlify builds** during 2–8):
 
 | Step | Command | What it does |
 | --- | --- | --- |
-| 1 | `taxonomy:create` | Create/reconcile the `topics` scheme + all concepts (idempotent). **Org-level.** Needs `CONTENTFUL_ORGANIZATION_ID`. Only touches `prefLabel`/`broader`, never descriptions/synonyms you add later. |
-| 2 | `taxonomy:validate-article` | Add the scheme as a taxonomy validation on the `article` type (shows the editor Taxonomy tab). |
-| 3 | `taxonomy:assign` | Set each article's `metadata.concepts` (tags 1:1 + race concept). Idempotent, skip-unchanged, publish-preserving. Rehearse with `DRY_RUN`/`ENTRY_ID`/a sandbox env. |
-| — | *(deploy web + api)* | Both apps read concepts with a legacy-tag fallback, so deploy order is safe. |
-| 4 | `taxonomy:remove-tags` | **Phase 5 only**, after everything's verified in production: strip the migrated `metadata.tags` (private tags like `short` are preserved). Second republish of tagged entries. |
-| 5 | `taxonomy:delete-tags` | **Phase 5, last step**, after `taxonomy:remove-tags`: delete the migrated tag *definitions* from the space (keeps `short`; leaves any non-migrated tag alone and reports it). |
+| 1 | `taxonomy:preview` | Read-only: render the design + each article's resolved full-path assignment; validate. No writes. |
+| 2 | `taxonomy:unassign` | Clear `metadata.concepts` on all articles (so the old concepts can be deleted). |
+| 3 | `taxonomy:delete` | Delete the entire current org taxonomy (all schemes + concepts). |
+| 4 | `taxonomy:create` | Create both schemes + all concepts. **Org-level.** Needs `CONTENTFUL_ORGANIZATION_ID`. |
+| 5 | `taxonomy:validate-article` | Add both schemes as taxonomy validations on the `article` type. |
+| 6 | `taxonomy:assign` | Set each article's `metadata.concepts` to its full concept path (expands the map's most-specific concepts up their `broader` chains). |
+| 7 | `taxonomy:describe` | Write each concept's `definition` + `altLabels` from the concept list. |
+| 8 | `taxonomy:redirects` | Upsert Contentful `redirect` entries for moved `/tagged/*` URLs. **Run before re-importing web data** (old paths come from `web/data/tags.json`). |
+| — | *(deploy web + api, resume builds, backfill)* | |
 
-Inverses: `taxonomy:unassign` (clear concepts), `taxonomy:delete` (remove scheme +
-concepts — refuses while any entry still links one, so unassign first),
-`taxonomy:validate-article:revert`, `taxonomy:restore-tags` (rebuild tags from concepts,
-skipping race concepts).
+Inverses: `taxonomy:validate-article:revert` (clear validations); `taxonomy:unassign` +
+`taxonomy:delete` are themselves the teardown.
 
 Every script supports `DRY_RUN` / `ENTRY_ID` / `CONTENTFUL_ENVIRONMENT` as above.
 
@@ -116,50 +126,29 @@ done
 npm run backup
 ```
 
-Both apps fall back to legacy tags until concepts are assigned and the taxonomy endpoint
-returns data, so the code can deploy before or after the content migration.
-
-### Redirects for the 6 moved tag URLs
-
-Hierarchy nests child tags under their parents, so six `/tagged/*` URLs move. Add these as
-Contentful `redirect` entries (same as the existing `/tagged/bikes → /tagged/cycling`) — no
-script needed:
-
-| From | To |
-| --- | --- |
-| `/tagged/ironman` | `/tagged/triathlon/ironman` |
-| `/tagged/ironman-703` | `/tagged/triathlon/ironman-703` |
-| `/tagged/olympic` | `/tagged/triathlon/olympic` |
-| `/tagged/half-marathon` | `/tagged/running/half-marathon` |
-| `/tagged/nutrition-hydration` | `/tagged/training/nutrition-hydration` |
-| `/tagged/zwift` | `/tagged/apps/zwift` |
+With no fallback, the apps require the taxonomy at build/request time — hence the paused-builds
+cutover: nothing rebuilds while the taxonomy is torn down and rebuilt.
 
 ### Individual scripts
 
-- **`taxonomy:create`** (`scripts/create-taxonomy.js`) — reconciles concepts + the scheme
-  from `lib/taxonomy.js`; race concepts are derived from live `event` entries plus the
-  static extras. Re-run after adding events/races.
-- **`taxonomy:describe`** (`scripts/set-descriptions.js`) — sets each concept's `definition`
-  (the description shown on its `/tagged` archive page and in that page's meta/OG tags). The
-  copy lives in the script — tweak it, then re-run (idempotent, skip-unchanged). Markdown is
-  supported. Org-level, so it needs `CONTENTFUL_ORGANIZATION_ID`. Optional; run any time after
-  `taxonomy:create`. (`taxonomy:create` never writes descriptions, so the two don't conflict.)
-- **`taxonomy:delete`** (`scripts/delete-taxonomy.js`) — inverse; deletes the scheme then
-  concepts deepest-first; refuses while any entry links a concept.
-- **`taxonomy:assign`** (`scripts/assign-concepts.js`) — assigns concepts to `article`
-  entries per the rules in `lib/taxonomy.js`.
-- **`taxonomy:unassign`** (`scripts/unassign-concepts.js`) — inverse; clears
-  `metadata.concepts`.
-- **`taxonomy:validate-article`** / **`:revert`** — add / clear the article taxonomy
-  validation.
-- **`taxonomy:remove-tags`** (`scripts/remove-tags.js`) / **`taxonomy:restore-tags`** —
-  remove the migrated `metadata.tags` / rebuild them from concepts. Non-concept tags (e.g.
-  the private `short` marker) are preserved by remove and merged back by restore; race
-  concepts, which were never tags, are skipped.
-- **`taxonomy:delete-tags`** (`scripts/delete-tags.js`) — deletes the migrated tag
-  *definitions* from the space (final step, after `taxonomy:remove-tags`). Keeps `short`,
-  leaves any non-migrated tag untouched and reports it, and skips (reports) any tag a
-  lingering reference blocks from deletion. No clean inverse — the space export is the safety net.
+- **`taxonomy:preview`** (`scripts/preview-taxonomy.js`) — read-only. Renders every concept
+  (by scheme, with altLabels + description) and each article's resolved full-path assignment,
+  cross-checks coverage against `web/data/articles.json`, and validates the design. No creds.
+- **`taxonomy:create`** (`scripts/create-taxonomy.js`) — creates/reconciles both schemes +
+  all concepts from `lib/taxonomy.js` (prefLabel + broader only; describe owns the copy).
+- **`taxonomy:describe`** (`scripts/set-descriptions.js`) — writes each concept's `definition`
+  and `altLabels` from `lib/taxonomy.js`. Idempotent; re-run after editing copy.
+- **`taxonomy:assign`** (`scripts/assign-concepts.js`) — sets each `article`'s
+  `metadata.concepts` from the `ASSIGNMENTS` map, expanding each concept up its `broader`
+  chain (full path). Skip-unchanged, publish-preserving. Reports articles with no assignment.
+- **`taxonomy:unassign`** (`scripts/unassign-concepts.js`) — clears `metadata.concepts`.
+- **`taxonomy:delete`** (`scripts/delete-taxonomy.js`) — deletes ALL org schemes + concepts
+  (deepest-first); refuses while any entry links a concept (unassign first).
+- **`taxonomy:validate-article`** / **`:revert`** — add both scheme validations / clear all.
+- **`taxonomy:redirects`** (`scripts/create-redirects.js`) — upserts Contentful `redirect`
+  entries (301) for `/tagged/*` archive URLs that moved (old paths from `web/data/tags.json`,
+  new from the design) plus retired ids (`ironman`/`ironman-703`/`olympic`/`races`). Run
+  before re-importing.
 
 ## Recommended workflow for destructive migrations
 

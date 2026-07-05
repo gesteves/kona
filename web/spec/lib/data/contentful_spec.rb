@@ -156,20 +156,21 @@ RSpec.describe Contentful do
   end
 
   describe 'taxonomy' do
-    # A small taxonomy: Triathlon > Ironman 70.3 (with a description + synonyms), a Races
+    # A small Sports taxonomy: Triathlon > Ironman 70.3 (with a description + synonyms), a Races
     # branch with one race, and a childless Running topic. prefLabel/definition/altLabels are
-    # locale maps, matching the delivery API shape.
+    # locale maps and `conceptSchemes` carries scheme membership — matching the delivery API shape.
+    def sports = [{ 'sys' => { 'id' => 'sports' } }]
     def concept_fixture
       [
-        { 'sys' => { 'id' => 'triathlon' }, 'prefLabel' => { 'en-US' => 'Triathlon' } },
+        { 'sys' => { 'id' => 'triathlon' }, 'prefLabel' => { 'en-US' => 'Triathlon' }, 'conceptSchemes' => sports },
         { 'sys' => { 'id' => 'ironman-703' }, 'prefLabel' => { 'en-US' => 'Ironman 70.3' },
-          'broader' => [{ 'sys' => { 'id' => 'triathlon' } }],
+          'broader' => [{ 'sys' => { 'id' => 'triathlon' } }], 'conceptSchemes' => sports,
           'definition' => { 'en-US' => 'The 70.3-mile distance.' },
           'altLabels' => { 'en-US' => ['Half Ironman', '70.3'] } },
-        { 'sys' => { 'id' => 'races' }, 'prefLabel' => { 'en-US' => 'Races' } },
+        { 'sys' => { 'id' => 'races' }, 'prefLabel' => { 'en-US' => 'Races' }, 'conceptSchemes' => sports },
         { 'sys' => { 'id' => 'cda' }, 'prefLabel' => { 'en-US' => 'CdA' },
-          'broader' => [{ 'sys' => { 'id' => 'races' } }] },
-        { 'sys' => { 'id' => 'running' }, 'prefLabel' => { 'en-US' => 'Running' } }
+          'broader' => [{ 'sys' => { 'id' => 'races' } }], 'conceptSchemes' => sports },
+        { 'sys' => { 'id' => 'running' }, 'prefLabel' => { 'en-US' => 'Running' }, 'conceptSchemes' => sports }
       ]
     end
 
@@ -189,7 +190,7 @@ RSpec.describe Contentful do
       it 'resolves localized labels, parent from broader, and nested paths' do
         taxo = importer_with.send(:taxonomy)
         expect(taxo['ironman-703']).to include(
-          name: 'Ironman 70.3', parent_id: 'triathlon', path: '/tagged/triathlon/ironman-703/',
+          name: 'Ironman 70.3', scheme: 'sports', parent_id: 'triathlon', path: '/tagged/triathlon/ironman-703/',
           description: 'The 70.3-mile distance.', synonyms: ['Half Ironman', '70.3']
         )
         expect(taxo['triathlon'][:path]).to eq('/tagged/triathlon/')
@@ -246,6 +247,8 @@ RSpec.describe Contentful do
         triathlon = tags.find { |t| t[:tag][:id] == 'triathlon' }
         expect(triathlon[:pages].first[:path]).to eq('/tagged/triathlon/index.html')
         expect(triathlon[:pages].first[:items].size).to eq(1)
+        # The tag entry carries its scheme and archive article count (for breadcrumb tie-breaks).
+        expect(triathlon[:tag]).to include(scheme: 'sports', count: 1)
       end
 
       it "uses a concept's description as the page copy, else the boilerplate summary" do

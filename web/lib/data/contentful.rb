@@ -105,7 +105,7 @@ class Contentful
     @content[:articles].each do |item|
       cm = (item[:contentful_metadata] ||= {})
       concept_ids = Array(cm[:concepts]).map { |c| c[:id] }.compact
-      cm[:tags] = concept_ids.filter_map { |cid| taxo[cid] }.map { |c| c.slice(:id, :name, :short_name, :parent_id, :path, :synonyms) }
+      cm[:tags] = concept_ids.filter_map { |cid| taxo[cid] }.map { |c| c.slice(:id, :name, :short_name, :scheme, :parent_id, :path, :synonyms) }
       cm.delete(:concepts)
     end
   end
@@ -248,7 +248,7 @@ class Contentful
       # `path` carries a trailing slash (the canonical URL); paginate wants the bare base.
       pages = paginate(tagged, base_path: concept[:path].chomp('/'), template: "/tag.html",
                        title: concept[:name], summary: summary, description: description)
-      { tag: concept.slice(:id, :name, :path, :parent_id, :description, :synonyms), pages: pages }
+      { tag: concept.slice(:id, :name, :path, :scheme, :parent_id, :description, :synonyms).merge(count: tagged.size), pages: pages }
     end
   end
 
@@ -363,6 +363,7 @@ class Contentful
         id: id,
         name: name,
         short_name: shortest_label(name, synonyms),
+        scheme: Array(c['conceptSchemes']).first&.dig('sys', 'id'),
         parent_id: Array(c['broader']).first&.dig('sys', 'id'),
         description: localized(c['definition']),
         synonyms: synonyms
