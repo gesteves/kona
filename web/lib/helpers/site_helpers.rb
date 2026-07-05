@@ -338,6 +338,30 @@ module SiteHelpers
     }.to_json
   end
 
+  # Generates a JSON-LD BreadcrumbList for a taxonomy archive page (`/tagged/*`): Home › Blog ›
+  # the concept's ancestor chain, ending at the concept itself. Mirrors the article breadcrumb
+  # (ArticleHelpers#breadcrumb_schema) for the archive pages, whose nesting the article version
+  # can't express. Each crumb points at the concept's canonical archive path (page 1), so it's
+  # stable across paginated subpages. Returns nil when the page has no concept.
+  # @param content [Object] The proxied tag-page object (carries `tag_id`).
+  # @see https://schema.org/BreadcrumbList
+  # @return [String, nil] A JSON-LD formatted string, or nil.
+  def tag_breadcrumb_schema(content)
+    return unless content.tag_id
+    chain = concept_chain(content.tag_id)
+    return if chain.empty?
+
+    items = [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": full_url('/') },
+      { "@type": "ListItem", "position": 2, "name": "Blog", "item": full_url('/blog') }
+    ]
+    chain.each do |node|
+      items << { "@type": "ListItem", "position": items.size + 1, "name": sanitize(node[:name]), "item": full_url(node[:path]) }
+    end
+
+    { "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": items }.to_json
+  end
+
   # Redirects from a concept's alternative labels (synonyms/altLabels) to its canonical archive
   # page — e.g. /tagged/half-ironman → /tagged/triathlon/ironman-703/. Skips a synonym whose
   # slug is blank, collides with a real tag page, or duplicates another synonym or a configured

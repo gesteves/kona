@@ -108,6 +108,34 @@ RSpec.describe SiteHelpers do
     end
   end
 
+  describe '#tag_breadcrumb_schema' do
+    def full_url(path, *) = "https://example.com#{path}"
+    def concept_chain(id)
+      {
+        'half-distance' => [
+          { id: 'triathlon', name: 'Triathlon', path: '/tagged/triathlon/' },
+          { id: 'half-distance', name: 'Half Distance', path: '/tagged/triathlon/half-distance/' }
+        ]
+      }.fetch(id, [])
+    end
+
+    it 'builds Home > Blog > the concept ancestor chain, ending at the concept' do
+      schema = JSON.parse(tag_breadcrumb_schema(OpenStruct.new(tag_id: 'half-distance')))
+      expect(schema['@type']).to eq('BreadcrumbList')
+      expect(schema['itemListElement']).to eq([
+        { '@type' => 'ListItem', 'position' => 1, 'name' => 'Home', 'item' => 'https://example.com/' },
+        { '@type' => 'ListItem', 'position' => 2, 'name' => 'Blog', 'item' => 'https://example.com/blog' },
+        { '@type' => 'ListItem', 'position' => 3, 'name' => 'Triathlon', 'item' => 'https://example.com/tagged/triathlon/' },
+        { '@type' => 'ListItem', 'position' => 4, 'name' => 'Half Distance', 'item' => 'https://example.com/tagged/triathlon/half-distance/' }
+      ])
+    end
+
+    it 'returns nil when the page has no concept' do
+      expect(tag_breadcrumb_schema(OpenStruct.new(tag_id: nil))).to be_nil
+      expect(tag_breadcrumb_schema(OpenStruct.new(tag_id: 'unknown'))).to be_nil
+    end
+  end
+
   describe '#author_same_as' do
     it 'returns social destinations, excluding the feed' do
       @site = site(socials: [['Feed', '/feed.xml'], ['Bluesky', 'https://bsky.app/x'], ['Mastodon', 'https://m.test/x']])
