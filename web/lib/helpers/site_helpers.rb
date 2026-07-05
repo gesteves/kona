@@ -375,6 +375,34 @@ module SiteHelpers
     { "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": items }.to_json
   end
 
+  # Generates a JSON-LD Blog schema for the paginated blog index (`/blog`), declaring the page as
+  # the site's blog and listing the entries on this page as `blogPost` (BlogPosting) references.
+  # References the sitewide WebSite/Organization/Person nodes by @id rather than duplicating them.
+  # @param content [Object] The proxied blog-index page object (title = "Blog"; items).
+  # @see https://schema.org/Blog
+  # @return [String] A JSON-LD formatted string.
+  def blog_schema(content)
+    posts = Array(content.items).map do |item|
+      {
+        "@type": "BlogPosting",
+        "headline": sanitize(item.title),
+        "url": full_url(item.path),
+        "datePublished": published_datetime(item).iso8601,
+        "author": { "@id": schema_entity_id('person', path: '/about') }
+      }
+    end
+    {
+      "@context": "https://schema.org",
+      "@type": "Blog",
+      "name": sanitize(content.title),
+      "description": sanitize(data.site.meta_description),
+      "url": canonical_url,
+      "isPartOf": { "@id": schema_entity_id('website') },
+      "publisher": { "@id": schema_entity_id('organization') },
+      "blogPost": posts
+    }.to_json
+  end
+
   # Redirects from a concept's alternative labels (synonyms/altLabels) to its canonical archive
   # page — e.g. /tagged/half-ironman → /tagged/triathlon/ironman-703/. Skips a synonym whose
   # slug is blank, collides with a real tag page, or duplicates another synonym or a configured

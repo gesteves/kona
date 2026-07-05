@@ -155,6 +155,37 @@ RSpec.describe SiteHelpers do
     end
   end
 
+  describe '#blog_schema' do
+    def canonical_url = 'https://example.com/blog'
+    def published_datetime(item) = DateTime.parse(item.published_at)
+
+    before { @site = OpenStruct.new(meta_title: 'My Site', meta_description: 'A blog about triathlon.') }
+
+    it 'declares a Blog tied to the sitewide nodes, listing this page\'s entries as blogPost refs' do
+      content = OpenStruct.new(title: 'Blog', items: [
+        OpenStruct.new(title: 'First', path: '/2025/01/01/first/', published_at: '2025-01-01T00:00:00Z'),
+        OpenStruct.new(title: 'Second', path: '/2025/02/02/second/', published_at: '2025-02-02T00:00:00Z')
+      ])
+      schema = JSON.parse(blog_schema(content))
+      expect(schema['@type']).to eq('Blog')
+      expect(schema['name']).to eq('Blog')
+      expect(schema['description']).to eq('A blog about triathlon.')
+      expect(schema['url']).to eq('https://example.com/blog')
+      expect(schema['isPartOf']).to eq('@id' => 'https://example.com/#website')
+      expect(schema['publisher']).to eq('@id' => 'https://example.com/#organization')
+      expect(schema['blogPost']).to eq([
+        { '@type' => 'BlogPosting', 'headline' => 'First', 'url' => 'https://example.com/2025/01/01/first/',
+          'datePublished' => '2025-01-01T00:00:00+00:00', 'author' => { '@id' => 'https://example.com/about#person' } },
+        { '@type' => 'BlogPosting', 'headline' => 'Second', 'url' => 'https://example.com/2025/02/02/second/',
+          'datePublished' => '2025-02-02T00:00:00+00:00', 'author' => { '@id' => 'https://example.com/about#person' } }
+      ])
+    end
+
+    it 'yields an empty blogPost list when the page lists no entries' do
+      expect(JSON.parse(blog_schema(OpenStruct.new(title: 'Blog')))['blogPost']).to eq([])
+    end
+  end
+
   describe '#author_same_as' do
     it 'returns social destinations, excluding the feed' do
       @site = site(socials: [['Feed', '/feed.xml'], ['Bluesky', 'https://bsky.app/x'], ['Mastodon', 'https://m.test/x']])
