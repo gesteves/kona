@@ -144,15 +144,13 @@ RSpec.describe FontAwesome do
       expect(data['classic']['solid'].first).to eq(id: 'heart', svg: '<svg>heart</svg>')
     end
 
-    it 'omits icons the API cannot supply but still leaves the empty family/style scaffolding behind' do
+    it 'omits a family/style entirely when the API can supply none of its icons' do
       instance = importer
       allow(instance).to receive(:fetch_from_api).and_return(nil)
 
       data = instance.send(:generate_icon_data, [nil, nil], metadata, version)
 
-      # Pins current behavior: the family/style keys are created before the presence check,
-      # so a fully-unavailable style yields an empty array rather than being dropped.
-      expect(data).to eq('classic' => { 'solid' => [] })
+      expect(data).to eq({})
     end
   end
 
@@ -206,15 +204,12 @@ RSpec.describe FontAwesome do
       expect(importer.send(:fetch_from_api, version, 'classic', 'solid', 'heart')).to be_nil
     end
 
-    it 'raises when the search has results but none matches the exact id (pins a latent bug)' do
-      # results.find { |i| i['id'] == icon_id } comes back nil and the code calls
-      # nil.dig('svgs') unguarded — a fuzzy search that misses the exact id crashes the
-      # import instead of returning nil like the empty-search branch does.
+    it 'returns nil when the fuzzy search has results but none matches the exact id' do
       response = api_response([api_result('heart-pulse', [['classic', 'solid', '<svg>pulse</svg>']])])
       allow(client).to receive(:query).and_return(response)
 
-      expect { importer.send(:fetch_from_api, version, 'classic', 'solid', 'heart') }
-        .to raise_error(NoMethodError)
+      expect(importer.send(:fetch_from_api, version, 'classic', 'solid', 'heart')).to be_nil
+      expect(cache.store).to be_empty
     end
   end
 

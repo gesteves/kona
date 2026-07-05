@@ -45,16 +45,16 @@ module ArticleHelpers
     DateTime.parse(entry.published_at)
   end
 
-  # The DOM id for an entry element, from its Contentful id.
+  # The DOM id for an entry element, from its Contentful id (parameterize lowercases it).
   # @param entry [Object] The entry.
-  # @return [String] e.g. "entry-1QxUv2jHbvRd9OqMxOneqZ".
+  # @return [String] e.g. "entry-1qxuv2jhbvrd9oqmxoneqz".
   def entry_dom_id(entry)
     "entry-#{entry.sys.id.parameterize}"
   end
 
   # The DOM id for an entry's heading, referenced by the entry element's aria-labelledby.
   # @param entry [Object] The entry.
-  # @return [String] e.g. "hed-1QxUv2jHbvRd9OqMxOneqZ".
+  # @return [String] e.g. "hed-1qxuv2jhbvrd9oqmxoneqz".
   def entry_heading_id(entry)
     "hed-#{entry.sys.id.parameterize}"
   end
@@ -317,8 +317,9 @@ module ArticleHelpers
   # @return [String] The formatted reading time.
   def reading_time(article)
     minutes = reading_time_minutes(article)
-    # \b so e.g. "eighty" or "eight hundred" doesn't get "An".
-    indefinite_article = minutes.humanize.match?(/^(eight|eleven|eighteen)\b/i) ? 'An' : 'A'
+    # Numbers whose spoken form starts with a vowel sound take "An": eight, eighteen,
+    # eighty…, eight hundred…, eleven, eleven hundred….
+    indefinite_article = minutes.humanize.match?(/^(eight|eleven)/i) ? 'An' : 'A'
     "#{indefinite_article} #{minutes}-minute read"
   end
 

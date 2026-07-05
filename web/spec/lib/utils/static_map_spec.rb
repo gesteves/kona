@@ -187,12 +187,10 @@ RSpec.describe StaticMap do
       expect(map.activity_title).to eq('Morning Ride - Cycling')
     end
 
-    it 'leaves a double space behind when the year appears mid-name (pins current behavior)' do
-      # gsub removes the year but strip only trims the ends, so an interior year
-      # leaves two consecutive spaces. Pinned as-is; a squish would change existing ids.
+    it 'collapses the gap left when the year appears mid-name' do
       map = build_map(activity_name: 'IM 2024 Boulder', activity_type: 'Running',
                       activity_start: DateTime.parse('2024-06-01T07:00:00Z'))
-      expect(map.activity_title).to eq('2024 IM  Boulder - Running')
+      expect(map.activity_title).to eq('2024 IM Boulder - Running')
     end
   end
 
@@ -314,15 +312,15 @@ RSpec.describe StaticMap do
       expect(HTTParty).to have_received(:get).once
     end
 
-    it 'returns the failed response after exhausting retries on persistent 5xx (pins current behavior)' do
-      # On the final attempt the `attempt >= HTTP_MAX_ATTEMPTS` guard returns the 5xx
-      # response instead of raising; download_image is what turns it into an error.
+    it 'raises after exhausting retries on persistent 5xx' do
       bad = response_double(success: false, code: 500)
       allow(HTTParty).to receive(:get).and_return(bad)
       map = build_map
       allow(map).to receive(:sleep)
 
-      expect(map.send(:get_with_retries, 'https://example.com/map.png')).to eq(bad)
+      expect {
+        map.send(:get_with_retries, 'https://example.com/map.png')
+      }.to raise_error(RuntimeError, 'Mapbox returned status 500')
       expect(HTTParty).to have_received(:get).exactly(3).times
       expect(map).to have_received(:sleep).with(1).once
       expect(map).to have_received(:sleep).with(2).once

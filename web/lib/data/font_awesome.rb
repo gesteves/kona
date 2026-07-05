@@ -67,12 +67,13 @@ class FontAwesome
       key = icon_metadata.keys[index]
       family, style, icon_id = icon_metadata[key]
 
-      icon_data[family] ||= {}
-      icon_data[family][style] ||= []
-
       svg = fetch_from_api(version, family, style, icon_id) if svg.blank?
 
-      icon_data[family][style] << { id: icon_id, svg: svg } if svg.present?
+      if svg.present?
+        icon_data[family] ||= {}
+        icon_data[family][style] ||= []
+        icon_data[family][style] << { id: icon_id, svg: svg }
+      end
     end
     icon_data
   end
@@ -89,8 +90,9 @@ class FontAwesome
     return if response.data.search.empty?
 
     results = response.data.search.map(&:to_h)
+    # The search is fuzzy, so it can return results without an exact id match.
     icon = results.find { |i| i['id'] == icon_id }
-    svg = icon.dig('svgs')&.find { |s| s.dig('familyStyle', 'family') == family && s.dig('familyStyle', 'style') == style }&.dig('html')
+    svg = icon&.dig('svgs')&.find { |s| s.dig('familyStyle', 'family') == family && s.dig('familyStyle', 'style') == style }&.dig('html')
     redis.set(cache_key_for(version, family, style, icon_id), svg) if svg.present?
     svg
   end

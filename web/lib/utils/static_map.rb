@@ -96,7 +96,10 @@ class StaticMap
   # @return [String] The title for the activity
   def activity_title
     year = @activity_start&.strftime('%Y')
-    title = year.present? ? "#{year} #{@activity_name.gsub(/#{year}/, '').strip}" : @activity_name
+    # squish, not strip: a mid-name year (e.g. "IM 2024 Boulder") would otherwise leave a
+    # double space behind. Note the title feeds tileset_source_id's digest, so activities
+    # named that way get a fresh tileset id (and re-upload) on their next run.
+    title = year.present? ? "#{year} #{@activity_name.gsub(/#{year}/, '').squish}" : @activity_name
     return title if title =~ /swim|run|bike|biking|cycling|marathon|5k|10k|10-miler|ten-miler|carrera/i
     "#{title} - #{@activity_type}"
   end
@@ -294,7 +297,7 @@ class StaticMap
     begin
       attempt += 1
       response = HTTParty.get(url, timeout: HTTP_TIMEOUT)
-      return response if response.success? || response.code < 500 || attempt >= HTTP_MAX_ATTEMPTS
+      return response if response.success? || response.code < 500
       raise "Mapbox returned status #{response.code}"
     rescue Net::OpenTimeout, Net::ReadTimeout, SocketError, Errno::ECONNRESET, HTTParty::Error, RuntimeError => e
       raise e if attempt >= HTTP_MAX_ATTEMPTS

@@ -310,10 +310,8 @@ RSpec.describe ArticleHelpers do
       expect(reading_time(article_with_minutes(18))).to eq('An 18-minute read')
     end
 
-    it 'keeps "A" for eighty — the \b guard stops the eight- prefix from matching' do
-      # NOTE: pins current behavior. Read aloud, "an eighty-minute read" would be the
-      # conventional article, but the helper deliberately (per its comment) excludes "eighty".
-      expect(reading_time(article_with_minutes(80))).to eq('A 80-minute read')
+    it 'uses "An" for eighty too — its spoken form also starts with a vowel sound' do
+      expect(reading_time(article_with_minutes(80))).to eq('An 80-minute read')
     end
   end
 
@@ -387,9 +385,9 @@ RSpec.describe ArticleHelpers do
     it 'derives the entry and heading DOM ids from the parameterized Contentful id' do
       entry = article(slug: 'post')
       entry.sys = OpenStruct.new(id: '1QxUv2jHbvRd9OqMxOneqZ')
-      # NOTE: pins current behavior — parameterize downcases, so mixed-case Contentful ids
-      # come out lowercased (the docstrings' "entry-1QxUv2jHbvRd9OqMxOneqZ" example overstates
-      # the casing, and ids differing only by case would collide).
+      # parameterize downcases, so mixed-case Contentful ids come out lowercased. Accepted
+      # trade-off (documented in the helper): ids differing only by case would collide, but
+      # changing the derivation now would churn every published page's DOM ids.
       expect(entry_dom_id(entry)).to eq('entry-1qxuv2jhbvrd9oqmxoneqz')
       expect(entry_heading_id(entry)).to eq('hed-1qxuv2jhbvrd9oqmxoneqz')
     end

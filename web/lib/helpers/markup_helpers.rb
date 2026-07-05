@@ -163,8 +163,11 @@ module MarkupHelpers
         # Wrap the whole thing in a figure element,
         # with the caption in a figcaption, if present,
         # then replace the original paragraph with it.
+        # The content type is nil for images that aren't Contentful assets (e.g. hotlinked
+        # ones), which get the base figure class without a content-type modifier.
         figure = if base_class.present?
-          figure_class = "#{base_class}__figure #{base_class}__figure--#{content_type.split('/').last}"
+          modifier = content_type&.split('/')&.last
+          figure_class = ["#{base_class}__figure", ("#{base_class}__figure--#{modifier}" if modifier)].compact.join(' ')
           "<figure class=\"#{figure_class}\"></figure>"
         else
           "<figure></figure>"

@@ -332,14 +332,11 @@ RSpec.describe MarkupHelpers do
     end
 
     context 'when the asset has no known content type' do
-      # Suspected bug, pinned as current behavior: with a base_class, the figure class is
-      # built from `content_type.split('/')`, which raises for an image whose asset id
-      # doesn't resolve (e.g. a hotlinked non-Contentful image). Without a base_class the
-      # content type is unused and the same input works fine.
-      it 'raises NoMethodError when a base class is given' do
+      # E.g. a hotlinked non-Contentful image: no content-type modifier, just the base class.
+      it 'wraps the image in a figure with only the base figure class' do
         allow(self).to receive(:get_asset_content_type).and_return(nil)
         html = %(<p><img src="#{image_url}"></p>)
-        expect { add_figure_elements_to_images(html, base_class: 'entry') }.to raise_error(NoMethodError)
+        expect(add_figure_elements_to_images(html, base_class: 'entry')).to eq(%(<figure class="entry__figure"><img src="#{image_url}"></figure>))
       end
 
       it 'still wraps the image when no base class is given' do
