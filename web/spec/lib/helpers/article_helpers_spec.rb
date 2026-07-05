@@ -241,10 +241,10 @@ RSpec.describe ArticleHelpers do
     def full_url(path) = "https://example.com#{path}"
     def canonical_url = 'https://example.com/2024/01/01/post/'
 
-    # A concept "tag" as it appears on an article / in data.tags: id, name, path, parent, scheme,
-    # and archive count (for the breadcrumb popularity tie-break).
-    def concept(id, name, path:, parent_id: nil, scheme: nil, count: 0)
-      OpenStruct.new(id: id, name: name, path: path, parent_id: parent_id, scheme: scheme, count: count)
+    # A concept "tag" as it appears on an article / in data.tags: id, name, short_name, path,
+    # parent, scheme, and archive count (for the breadcrumb popularity tie-break).
+    def concept(id, name, path:, parent_id: nil, scheme: nil, count: 0, short_name: nil)
+      OpenStruct.new(id: id, name: name, short_name: short_name || name, path: path, parent_id: parent_id, scheme: scheme, count: count)
     end
 
     # An article whose contentful_metadata.tags are full concept doubles.
@@ -265,6 +265,8 @@ RSpec.describe ArticleHelpers do
         concept('triathlon', 'Triathlon', path: '/tagged/triathlon/', scheme: 'sports', count: 20),
         concept('half-distance', 'Half Distance', path: '/tagged/triathlon/half-distance/', parent_id: 'triathlon', scheme: 'sports', count: 10),
         concept('ironman-703-coeur-dalene', 'Ironman 70.3 Coeur d’Alene', path: '/tagged/triathlon/half-distance/ironman-703-coeur-dalene/', parent_id: 'half-distance', scheme: 'sports', count: 3),
+        concept('triathlon-other', 'Other', path: '/tagged/triathlon/triathlon-other/', parent_id: 'triathlon', scheme: 'sports', count: 2),
+        concept('escape-from-alcatraz-triathlon', 'Escape from Alcatraz Triathlon', short_name: 'Escape from Alcatraz', path: '/tagged/triathlon/triathlon-other/escape-from-alcatraz-triathlon/', parent_id: 'triathlon-other', scheme: 'sports', count: 2),
         concept('running', 'Running', path: '/tagged/running/', scheme: 'sports', count: 8),
         concept('race-reports', 'Race Reports', path: '/tagged/race-reports/', scheme: 'topics', count: 12),
         concept('news', 'News', path: '/tagged/news/', scheme: 'topics', count: 18),
@@ -328,6 +330,44 @@ RSpec.describe ArticleHelpers do
       it 'returns nothing when the article has no race concept' do
         stub_corpus([tagged_article(slug: 'solo', concepts: [concept('running', 'Running', path: '/tagged/running/', scheme: 'sports')])])
         expect(related_race_reports(article(slug: 'solo'))).to eq([])
+      end
+    end
+
+    describe '#tag_breadcrumb_chains' do
+      def triathlon = concept('triathlon', 'Triathlon', path: '/tagged/triathlon/', scheme: 'sports')
+      def half = concept('half-distance', 'Half Distance', path: '/tagged/triathlon/half-distance/', parent_id: 'triathlon', scheme: 'sports')
+
+      it 'builds each leaf’s root→leaf chain, deepest first' do
+        art = tagged_article(slug: 'cda', concepts: [triathlon, half, cda, race_reports])
+        chains = tag_breadcrumb_chains(art).map { |c| c.map(&:name) }
+        expect(chains).to eq([['Triathlon', 'Half Distance', 'Ironman 70.3 Coeur d’Alene'], ['Race Reports']])
+      end
+
+      it 'renders multiple chains within a scheme (Sports before Topics on a depth tie)' do
+        art = tagged_article(slug: 'rev', concepts: [
+          concept('running', 'Running', path: '/tagged/running/', scheme: 'sports'),
+          concept('tech', 'Tech', path: '/tagged/tech/', scheme: 'topics'),
+          concept('gear', 'Gear', path: '/tagged/tech/gear/', parent_id: 'tech', scheme: 'topics'),
+          concept('reviews', 'Reviews', path: '/tagged/reviews/', scheme: 'topics')
+        ])
+        chains = tag_breadcrumb_chains(art).map { |c| c.map(&:name) }
+        expect(chains).to eq([['Tech', 'Gear'], ['Running'], ['Reviews']])
+      end
+
+      it 'follows the full taxonomy to the root, omitting unassigned intermediates (e.g. "Other")' do
+        # The article carries the race + discipline but NOT the "Other" bucket in between.
+        art = tagged_article(slug: 'alcatraz', concepts: [
+          concept('triathlon', 'Triathlon', path: '/tagged/triathlon/', scheme: 'sports'),
+          concept('escape-from-alcatraz-triathlon', 'Escape from Alcatraz Triathlon', short_name: 'Escape from Alcatraz',
+                  path: '/tagged/triathlon/triathlon-other/escape-from-alcatraz-triathlon/', parent_id: 'triathlon-other', scheme: 'sports'),
+          race_reports
+        ])
+        chains = tag_breadcrumb_chains(art).map { |c| c.map(&:short_name) }
+        expect(chains).to eq([['Triathlon', 'Escape from Alcatraz'], ['Race Reports']])
+      end
+
+      it 'is empty when the article has no taxonomy' do
+        expect(tag_breadcrumb_chains(article(slug: 'x'))).to eq([])
       end
     end
   end

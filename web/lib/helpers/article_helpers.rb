@@ -352,4 +352,26 @@ module ArticleHelpers
   def race_report?(article)
     Array(article.contentful_metadata&.tags).any? { |t| t.id == 'race-reports' }
   end
+
+  # The article's concept chips as breadcrumb chains: each leaf concept's ancestor chain
+  # (root → leaf), for rendering as "Triathlon › Half Distance › <race> / Race Reports". The
+  # chain is walked through the FULL taxonomy (`concept_chain`), then filtered to the concepts
+  # the article actually carries — so an unassigned intermediate (e.g. an "Other" bucket the
+  # author skipped) is dropped without splitting the chain. A leaf is a carried concept that
+  # isn't an ancestor of another carried concept. Chains sort deepest-first (Sports before
+  # Topics on a tie).
+  # @param article [Object] The article.
+  # @return [Array<Array>] One array of tags per chain, ordered root → leaf.
+  def tag_breadcrumb_chains(article)
+    tags = Array(article.contentful_metadata&.tags)
+    return [] if tags.empty?
+
+    by_id = tags.to_h { |t| [t.id, t] }
+    chain_ids = tags.to_h { |t| [t.id, concept_chain(t.id).map { |n| n[:id] }] }
+    ancestor_ids = chain_ids.values.flat_map { |ids| ids[0...-1] }.to_set
+    leaves = tags.reject { |t| ancestor_ids.include?(t.id) }
+
+    chains = leaves.map { |leaf| chain_ids[leaf.id].filter_map { |id| by_id[id] } }
+    chains.sort_by { |chain| [-chain.length, chain.first.scheme == 'sports' ? 0 : 1, chain.last.short_name.to_s] }
+  end
 end
