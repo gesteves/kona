@@ -5,6 +5,7 @@
   "scripts": {
     "backup": "node --env-file=.env scripts/backup.js",
     "fix:degrees": "node --env-file=.env scripts/fix-degrees.js",
+    "fix:paces": "node --env-file=.env scripts/fix-paces.js",
     "migrate:headings": "node --env-file=.env scripts/bump-heading-levels.js",
     "migrate:headings:revert": "node --env-file=.env scripts/revert-heading-levels.js",
     "taxonomy:preview": "node scripts/preview-taxonomy.js",

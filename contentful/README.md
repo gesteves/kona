@@ -60,6 +60,23 @@ exist, so a bump + revert round-trip is byte-identical.
 typed by mistake, with the proper degree sign (`°`, U+00B0) in `article` `intro`/`body`.
 Mirrors the render-time helper `fix_degrees` in `web/lib/helpers/text_helpers.rb`.
 
+### `npm run fix:paces` — drop redundant "min" in paces
+
+`scripts/fix-paces.js`. Fixes pace notation in `article` `intro`/`body`, in two passes:
+(1) a `M:SS` time already carries the minutes, so `5:25 min/km` is redundant and becomes
+`5:25/km` (also fixes the imperial value inside `data-imperial="… min/mi"` attributes);
+(2) normalizes per-100 swim-pace spacing to the site's unit style (a space between number and
+unit, like `2.4 km`), so `2:16/100m` → `2:16/100 m` and `1:12/100yd` → `1:12/100 yd` — including
+paces already authored without `min`. Both passes are anchored on the preceding time, so a bare
+`5 min/km` (no seconds) is left alone. Units: `km`, `mi`, `100 yd`, `100 m`. Source-content only
+— no render-time counterpart.
+
+```bash
+ENTRY_ID=<sys.id> DRY_RUN=true npm run fix:paces   # trial one entry (optional)
+DRY_RUN=true npm run fix:paces                     # review the plan
+npm run fix:paces                                  # apply (prompts before writing)
+```
+
 ## Tags → taxonomy migration
 
 A grouped set of scripts that move the blog from Contentful **metadata tags** to a

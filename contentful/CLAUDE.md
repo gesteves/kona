@@ -130,6 +130,8 @@ any destructive migration.
 writing new migrations, not meant to be re-run:
 
 - `fix:degrees` (`fix-degrees.js`) — replace `º` (U+00BA) with `°` (U+00B0) in body/intro.
+- `fix:paces` (`fix-paces.js`) — drop the redundant `min` in `M:SS min/unit` paces
+  (`5:25 min/km` → `5:25/km`) in body/intro; anchored on the time so bare `5 min/km` is untouched.
 - `migrate:headings` (`bump-heading-levels.js`) + `migrate:headings:revert` — bump in-body
   heading levels for the entry-title H1 restructure. Backed by `lib/shift-headings.js`.
 
