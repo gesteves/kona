@@ -88,7 +88,7 @@ export default async function handler(
     );
     // no-store so the denial is never cached at the edge and can't leak onto a shared
     // cache entry for this URL that would then be served to legitimate visitors.
-    return new Response('403 Forbidden — access denied.\n', {
+    return new Response('403 Forbidden\n', {
       status: 403,
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
