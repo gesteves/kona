@@ -44,6 +44,31 @@ function isGoogleReferrer(referer: string): boolean {
   }
 }
 
+// One pipe-separated request log line: the given lead-in parts, then the requester's
+// referrer, user agent, IP, and geo (when known). Mirrors the format of the
+// known-agents edge function (web/netlify/edge-functions/known-agents.ts) so blocked
+// requests read the same way as the rest of the edge logs. context.ip is the
+// visitor's origin IP address.
+function requestLogLine(
+  request: Request,
+  context: Context,
+  ...parts: (string | null | undefined)[]
+): string {
+  const geo =
+    context.geo?.city && context.geo?.country?.name
+      ? `${context.geo.city}, ${context.geo.country.name}`
+      : context.geo?.city || context.geo?.country?.name;
+  return [
+    ...parts,
+    request.headers.get('Referer'),
+    request.headers.get('User-Agent'),
+    context.ip,
+    geo,
+  ]
+    .filter(Boolean)
+    .join(' | ');
+}
+
 export default async function handler(
   request: Request,
   context: Context
@@ -52,6 +77,15 @@ export default async function handler(
   const referer = request.headers.get('Referer') ?? '';
 
   if (isLinuxChrome(userAgent) && isGoogleReferrer(referer)) {
+    const url = new URL(request.url);
+    console.info(
+      requestLogLine(
+        request,
+        context,
+        `Blocked ${request.method} ${url.pathname}`,
+        '→ 403'
+      )
+    );
     // no-store so the denial is never cached at the edge and can't leak onto a shared
     // cache entry for this URL that would then be served to legitimate visitors.
     return new Response('403 Forbidden — access denied.\n', {
