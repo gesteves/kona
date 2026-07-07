@@ -10,7 +10,10 @@ const KNOWN_AGENTS_API_URL = 'https://api.knownagents.com/visits';
 // Don't forward headers that carry secrets or per-viewer identity to the analytics API.
 const SENSITIVE_HEADERS = new Set(['cookie', 'authorization']);
 
-function headersToObject(headers: Headers, omit?: Set<string>): Record<string, string> {
+function headersToObject(
+  headers: Headers,
+  omit?: Set<string>
+): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [key, value] of headers) {
     if (omit?.has(key)) continue;
@@ -19,13 +22,38 @@ function headersToObject(headers: Headers, omit?: Set<string>): Record<string, s
   return out;
 }
 
+// One pipe-separated request log line: the given lead-in parts, then the requester's
+// referrer, user agent, IP, and geo (when known). Mirrors the format of the widget proxy /
+// OG functions' requestLogLine (web/netlify/functions/lib/log.mts) — reimplemented inline
+// here rather than imported because that helper is a Node functions module and this runs in
+// the Deno edge runtime. context.ip is the visitor's origin IP address.
+function requestLogLine(
+  request: Request,
+  context: Context,
+  ...parts: (string | null | undefined)[]
+): string {
+  const geo =
+    context.geo?.city && context.geo?.country?.name
+      ? `${context.geo.city}, ${context.geo.country.name}`
+      : context.geo?.city || context.geo?.country?.name;
+  return [
+    ...parts,
+    request.headers.get('Referer'),
+    request.headers.get('User-Agent'),
+    context.ip,
+    geo,
+  ]
+    .filter(Boolean)
+    .join(' | ');
+}
+
 // Never throws into the request path: any failure (network, non-2xx, bad token) is
 // swallowed so tracking can't break or delay a page view.
 async function trackVisit(
   request: Request,
   response: Response,
   durationMs: number,
-  token: string,
+  token: string
 ): Promise<void> {
   try {
     const url = new URL(request.url);
@@ -40,7 +68,9 @@ async function trackVisit(
         request_method: request.method,
         request_headers: headersToObject(request.headers, SENSITIVE_HEADERS),
         response_status_code: response.status,
-        response_headers: { 'content-type': response.headers.get('content-type') ?? '' },
+        response_headers: {
+          'content-type': response.headers.get('content-type') ?? '',
+        },
         response_duration_in_milliseconds: durationMs,
       }),
     });
@@ -49,7 +79,10 @@ async function trackVisit(
   }
 }
 
-export default async function handler(request: Request, context: Context): Promise<Response> {
+export default async function handler(
+  request: Request,
+  context: Context
+): Promise<Response> {
   const token = Netlify.env.get('DARK_VISITORS_ACCESS_TOKEN');
 
   // Fail open: no token, or not a production deploy → pass straight through, untracked.
@@ -65,6 +98,16 @@ export default async function handler(request: Request, context: Context): Promi
   // The downstream static page / CDN response, returned to the client unchanged.
   const response = await context.next();
   const durationMs = Date.now() - start;
+
+  const url = new URL(request.url);
+  console.info(
+    requestLogLine(
+      request,
+      context,
+      `${request.method} ${url.pathname}`,
+      `→ ${response.status}`
+    )
+  );
 
   // Background work: waitUntil keeps the edge worker alive to finish the POST *after*
   // the response is sent, so tracking adds no latency to the page.
