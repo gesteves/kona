@@ -105,37 +105,5 @@ export const config: Config = {
   // If this function ever crashes, never block the page: bypass the error so the
   // request chain continues and the downstream page/asset is returned unchanged.
   onError: 'bypass',
-  // Run on every request, then exclude everything that isn't a meaningful page view —
-  // the bot targets article pages, which this covers. Mirrors known-agents.ts.
   path: '/*',
-  excludedPath: [
-    '/javascripts/*',
-    '/stylesheets/*',
-    '/images/*',
-    '/fonts/*',
-    '/widgets/*',
-    '/og',
-    '/plsbl/*',
-    '/ifttt/*',
-    '/.well-known/*',
-    '/.netlify/images*',
-    '/favicon.ico',
-    '/*.png',
-    '/*.jpg',
-    '/*.jpeg',
-    '/*.gif',
-    '/*.svg',
-    '/*.webp',
-    '/*.avif',
-    '/*.ico',
-    '/*.woff',
-    '/*.woff2',
-    '/*.ttf',
-    '/*.css',
-    '/*.js',
-    '/*.json',
-    '/*.txt',
-    '/*.map',
-    '/*.xml',
-  ],
 };
