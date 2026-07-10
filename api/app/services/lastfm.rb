@@ -6,7 +6,7 @@ class Lastfm < ApplicationService
   # Buffer added to the pre-start side of the workout window when querying Last.fm.
   # Captures songs scrobbled before the workout that may have still been playing when it
   # started; their actual overlap is then verified via track.getInfo.
-  WINDOW_BUFFER = 10.minutes
+  WINDOW_BUFFER = 5.minutes
 
   def initialize
     @username = ENV["LASTFM_USERNAME"]

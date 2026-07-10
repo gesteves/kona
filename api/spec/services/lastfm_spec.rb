@@ -55,14 +55,14 @@ RSpec.describe Lastfm do
       expect(described_class.new.played_songs_during(workout_start, workout_end)).to eq([])
     end
 
-    it "queries with a 10-minute pre-start buffer" do
+    it "queries with a 5-minute pre-start buffer" do
       stub_recent_tracks([])
 
       service.played_songs_during(workout_start, workout_end)
 
       expect(service).to have_received(:get_json!).with(
         Lastfm::LASTFM_API_URL,
-        query: hash_including(from: (workout_start - 10.minutes).to_i, to: workout_end.to_i, extended: 1)
+        query: hash_including(from: (workout_start - 5.minutes).to_i, to: workout_end.to_i, extended: 1)
       )
     end
 
