@@ -33,7 +33,7 @@ RSpec.describe WhoopWebhookProcessor do
     end
 
     it "refreshes the workout's local date, writes WhoopWorkoutStrain, and enqueues the description" do
-      processor.process("workout.updated", "w1", "t1")
+      processor.process("workout.updated", "w1")
 
       expect(whoop).to have_received(:raw_cycles).with("2026-07-08", "2026-07-10")
       expect(intervals).to have_received(:update_wellness!).with("2026-07-09", WhoopStrain: 14.2)
@@ -49,7 +49,7 @@ RSpec.describe WhoopWebhookProcessor do
       allow(intervals).to receive(:activities!).and_return([])
       allow(whoop).to receive(:raw_cycles).and_return([cycle_for(Date.new(2026, 7, 8))])
 
-      processor.process("workout.updated", "w1", "t1")
+      processor.process("workout.updated", "w1")
 
       expect(whoop).to have_received(:raw_cycles).with("2026-07-07", "2026-07-09")
       expect(intervals).to have_received(:update_wellness!).with("2026-07-08", WhoopStrain: 14.2)
@@ -58,7 +58,7 @@ RSpec.describe WhoopWebhookProcessor do
     it "skips silently when the workout isn't found or scored" do
       allow(whoop).to receive(:get_workout).and_return(nil)
 
-      processor.process("workout.updated", "w1", "t1")
+      processor.process("workout.updated", "w1")
 
       expect(intervals).not_to have_received(:update_wellness!)
       expect(intervals).not_to have_received(:update_activity!)
@@ -67,7 +67,7 @@ RSpec.describe WhoopWebhookProcessor do
     it "refreshes wellness but skips the activity write when nothing matches" do
       allow(intervals).to receive(:activities!).and_return([{ id: "i2", type: "Run", start_date_local: "2026-07-09T07:31:00" }])
 
-      processor.process("workout.updated", "w1", "t1")
+      processor.process("workout.updated", "w1")
 
       expect(intervals).to have_received(:update_wellness!)
       expect(intervals).not_to have_received(:update_activity!)
@@ -79,7 +79,7 @@ RSpec.describe WhoopWebhookProcessor do
       allow(whoop).to receive(:get_workout).and_return(strength_workout)
       allow(intervals).to receive(:activities!).and_return([{ id: "i3", type: "WeightTraining", start_date_local: "2026-07-09T07:31:00" }])
 
-      processor.process("workout.updated", "w1", "t1")
+      processor.process("workout.updated", "w1")
 
       expect(intervals).to have_received(:update_activity!).with("i3", WhoopWorkoutStrain: 12.4)
       expect(ActivityDescriptionJob.jobs).to be_empty
@@ -89,7 +89,7 @@ RSpec.describe WhoopWebhookProcessor do
       allow(intervals).to receive(:update_activity!).and_raise(ApplicationService::HttpError.new(422, "no field", "url"))
       allow(Rails.logger).to receive(:warn)
 
-      processor.process("workout.updated", "w1", "t1")
+      processor.process("workout.updated", "w1")
 
       expect(ActivityDescriptionJob).to have_enqueued_sidekiq_job("i1", 12.4)
     end
@@ -116,7 +116,7 @@ RSpec.describe WhoopWebhookProcessor do
     it "refreshes today and yesterday, and writes WhoopSleepPerformance for the offset end date" do
       today = Time.find_zone!(timezone).today
 
-      processor.process("sleep.updated", "s1", "t1")
+      processor.process("sleep.updated", "s1")
 
       expect(whoop).to have_received(:raw_cycles).with((today - 1).iso8601, (today + 1).iso8601)
       expect(whoop).to have_received(:raw_cycles).with((today - 2).iso8601, today.iso8601)
@@ -126,11 +126,11 @@ RSpec.describe WhoopWebhookProcessor do
 
     it "handles Z and colon-less positive offsets" do
       allow(whoop).to receive(:get_sleep).and_return(sleep_data.merge(timezone_offset: "Z"))
-      processor.process("sleep.updated", "s1", "t1")
+      processor.process("sleep.updated", "s1")
       expect(intervals).to have_received(:update_wellness!).with("2026-01-02", WhoopSleepPerformance: 88)
 
       allow(whoop).to receive(:get_sleep).and_return(sleep_data.merge(end: "2026-01-01T22:30:00Z", timezone_offset: "+0200"))
-      processor.process("sleep.updated", "s1", "t1")
+      processor.process("sleep.updated", "s1")
       # 22:30Z at +02:00 is 00:30 the next day.
       expect(intervals).to have_received(:update_wellness!).with("2026-01-02", WhoopSleepPerformance: 88).twice
     end
@@ -138,7 +138,7 @@ RSpec.describe WhoopWebhookProcessor do
     it "skips naps" do
       allow(whoop).to receive(:get_sleep).and_return(sleep_data.merge(nap: true))
 
-      processor.process("sleep.updated", "s1", "t1")
+      processor.process("sleep.updated", "s1")
 
       expect(intervals).not_to have_received(:update_wellness!).with(anything, hash_including(:WhoopSleepPerformance))
     end
@@ -146,7 +146,7 @@ RSpec.describe WhoopWebhookProcessor do
     it "skips sleeps without a performance percentage" do
       allow(whoop).to receive(:get_sleep).and_return(sleep_data.merge(score: {}))
 
-      processor.process("sleep.updated", "s1", "t1")
+      processor.process("sleep.updated", "s1")
 
       expect(intervals).not_to have_received(:update_wellness!).with(anything, hash_including(:WhoopSleepPerformance))
     end
@@ -154,7 +154,7 @@ RSpec.describe WhoopWebhookProcessor do
     it "skips missing/unscored sleeps" do
       allow(whoop).to receive(:get_sleep).and_return(nil)
 
-      expect { processor.process("sleep.updated", "s1", "t1") }.not_to raise_error
+      expect { processor.process("sleep.updated", "s1") }.not_to raise_error
     end
   end
 
@@ -171,7 +171,7 @@ RSpec.describe WhoopWebhookProcessor do
     end
 
     it "writes WhoopRecovery for the sleep's offset end date" do
-      processor.process("recovery.updated", "s1", "t1")
+      processor.process("recovery.updated", "s1")
 
       expect(intervals).to have_received(:update_wellness!).with("2026-01-01", WhoopRecovery: 82)
     end
@@ -179,7 +179,7 @@ RSpec.describe WhoopWebhookProcessor do
     it "skips when the recovery isn't scored" do
       allow(whoop).to receive(:get_recovery_for_cycle).and_return(nil)
 
-      processor.process("recovery.updated", "s1", "t1")
+      processor.process("recovery.updated", "s1")
 
       expect(intervals).not_to have_received(:update_wellness!).with(anything, hash_including(:WhoopRecovery))
     end
@@ -187,7 +187,7 @@ RSpec.describe WhoopWebhookProcessor do
     it "skips when the sleep isn't found" do
       allow(whoop).to receive(:get_sleep).and_return(nil)
 
-      processor.process("recovery.updated", "s1", "t1")
+      processor.process("recovery.updated", "s1")
 
       expect(whoop).not_to have_received(:get_recovery_for_cycle)
     end
@@ -200,7 +200,7 @@ RSpec.describe WhoopWebhookProcessor do
       it "refreshes only today's strain for #{event_type}" do
         today = Time.find_zone!(timezone).today
 
-        processor.process(event_type, "x1", "t1")
+        processor.process(event_type, "x1")
 
         expect(whoop).to have_received(:raw_cycles).once
         expect(intervals).to have_received(:update_wellness!).with(today.iso8601, WhoopStrain: 14.2)
@@ -217,7 +217,7 @@ RSpec.describe WhoopWebhookProcessor do
       it "counts it as today" do
         today = Time.find_zone!(timezone).today
 
-        processor.process("recovery.deleted", "x1", "t1")
+        processor.process("recovery.deleted", "x1")
 
         expect(intervals).to have_received(:update_wellness!).with(today.iso8601, WhoopStrain: 9.9)
       end
@@ -227,7 +227,7 @@ RSpec.describe WhoopWebhookProcessor do
       let(:cycles) { [cycle_for(Time.find_zone!(timezone).today, score_state: "PENDING_SCORE")] }
 
       it "leaves wellness untouched" do
-        processor.process("recovery.deleted", "x1", "t1")
+        processor.process("recovery.deleted", "x1")
 
         expect(intervals).not_to have_received(:update_wellness!)
       end
@@ -237,7 +237,7 @@ RSpec.describe WhoopWebhookProcessor do
       let(:cycles) { [] }
 
       it "leaves wellness untouched" do
-        processor.process("recovery.deleted", "x1", "t1")
+        processor.process("recovery.deleted", "x1")
 
         expect(intervals).not_to have_received(:update_wellness!)
       end
@@ -251,14 +251,14 @@ RSpec.describe WhoopWebhookProcessor do
       allow(intervals).to receive(:update_wellness!).and_raise(ApplicationService::HttpError.new(422, "no such field", "url"))
       allow(Rails.logger).to receive(:warn)
 
-      expect { processor.process("recovery.deleted", "x1", "t1") }.not_to raise_error
+      expect { processor.process("recovery.deleted", "x1") }.not_to raise_error
       expect(Rails.logger).to have_received(:warn).with(/Create the custom field/)
     end
 
     it "propagates other HTTP errors so the job can retry" do
       allow(intervals).to receive(:update_wellness!).and_raise(ApplicationService::HttpError.new(500, "boom", "url"))
 
-      expect { processor.process("recovery.deleted", "x1", "t1") }.to raise_error(ApplicationService::HttpError)
+      expect { processor.process("recovery.deleted", "x1") }.to raise_error(ApplicationService::HttpError)
     end
   end
 
@@ -269,7 +269,7 @@ RSpec.describe WhoopWebhookProcessor do
         { id: "s1", cycle_id: 1, nap: false, end: "2026-01-02T04:30:00Z", timezone_offset: "EST", score_state: "SCORED", score: { sleep_performance_percentage: 90 } }
       )
 
-      expect { processor.process("sleep.updated", "s1", "t1") }.to raise_error(ArgumentError, /Unrecognized fixed timezone offset/)
+      expect { processor.process("sleep.updated", "s1") }.to raise_error(ArgumentError, /Unrecognized fixed timezone offset/)
     end
   end
 end

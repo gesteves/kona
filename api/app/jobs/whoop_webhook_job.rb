@@ -8,7 +8,7 @@ class WhoopWebhookJob < ApplicationJob
   # @param resource_id [String] The event's resource UUID (a sleep UUID for sleep/recovery events).
   # @param trace_id [String] Whoop's trace id, for log correlation.
   def perform(event_type, resource_id, trace_id)
-    WhoopWebhookProcessor.new.process(event_type, resource_id, trace_id)
+    WhoopWebhookProcessor.new.process(event_type, resource_id)
     Rails.logger.info("Whoop webhook processed: #{event_type} (id=#{resource_id}, trace=#{trace_id})")
   end
 end

@@ -6,7 +6,7 @@ RSpec.describe WhoopWebhookJob do
   before { allow(WhoopWebhookProcessor).to receive(:new).and_return(processor) }
 
   it "delegates to the processor with the event's string args" do
-    expect(processor).to receive(:process).with("workout.updated", "workout-uuid", "trace-1")
+    expect(processor).to receive(:process).with("workout.updated", "workout-uuid")
     described_class.new.perform("workout.updated", "workout-uuid", "trace-1")
   end
 

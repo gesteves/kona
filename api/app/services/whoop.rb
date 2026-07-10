@@ -57,39 +57,30 @@ class Whoop < ApplicationService
   # @return [Hash, nil] A normalized workout hash (see #normalize_workout), or nil when the
   #   workout doesn't exist or isn't scored yet (PENDING_SCORE/UNSCORABLE carry no strain).
   def get_workout(uuid)
-    workout = authed_get!("activity/workout/#{uuid}")
-    return if workout[:score_state] != "SCORED" || workout[:score].nil?
+    workout = authed_get_or_nil("activity/workout/#{uuid}")
+    return if workout.nil? || workout[:score_state] != "SCORED" || workout[:score].nil?
 
     normalize_workout(workout)
-  rescue ApplicationService::HttpError => e
-    raise unless e.status == 404
-    nil
   end
 
   # Fetches a single sleep by UUID. Named get_sleep (not `sleep`) so it can't shadow
   # Kernel#sleep, which wait_for_refreshed_token relies on.
   # @return [Hash, nil] The raw sleep hash, or nil when missing or not SCORED.
   def get_sleep(uuid)
-    sleep_data = authed_get!("activity/sleep/#{uuid}")
-    return if sleep_data[:score_state] != "SCORED"
+    sleep_data = authed_get_or_nil("activity/sleep/#{uuid}")
+    return if sleep_data.nil? || sleep_data[:score_state] != "SCORED"
 
     sleep_data
-  rescue ApplicationService::HttpError => e
-    raise unless e.status == 404
-    nil
   end
 
   # Fetches the recovery scored against a cycle. Whoop v2 has no GET-by-recovery-id;
   # recoveries are keyed by their cycle.
   # @return [Hash, nil] The raw recovery hash, or nil when missing or not SCORED.
   def get_recovery_for_cycle(cycle_id)
-    recovery = authed_get!("cycle/#{cycle_id}/recovery")
+    recovery = authed_get_or_nil("cycle/#{cycle_id}/recovery")
     return if recovery.nil? || recovery[:score_state] != "SCORED"
 
     recovery
-  rescue ApplicationService::HttpError => e
-    raise unless e.status == 404
-    nil
   end
 
   # Fetches all cycles whose window may touch [start_ymd, end_ymd], following pagination.
@@ -212,6 +203,16 @@ class Whoop < ApplicationService
       query: query,
       headers: { "Authorization" => "Bearer #{access_token}" }
     )
+  end
+
+  # Like authed_get!, but returns nil on a 404 (a missing/expired resource) instead of
+  # raising — the single-resource fetchers treat "not found" as a clean skip, while any
+  # other error still propagates so Sidekiq can retry.
+  def authed_get_or_nil(path)
+    authed_get!(path)
+  rescue ApplicationService::HttpError => e
+    raise unless e.status == 404
+    nil
   end
 
   # Fetches the most recent scored cycle from the Whoop API.
