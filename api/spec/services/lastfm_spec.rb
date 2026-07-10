@@ -87,6 +87,18 @@ RSpec.describe Lastfm do
       expect(songs.first[:loved]).to be(false)
     end
 
+    it "skips the track.getInfo lookup for in-window scrobbles" do
+      stub_recent_tracks([scrobble("In Window", uts: workout_start.to_i + 60)])
+      stub_track_info(3 * 60 * 1000)
+
+      service.played_songs_during(workout_start, workout_end)
+
+      expect(service).not_to have_received(:get_json!).with(
+        Lastfm::LASTFM_API_URL,
+        query: hash_including(method: "track.getInfo")
+      )
+    end
+
     it "keeps a pre-start scrobble whose duration overlaps the start" do
       stub_recent_tracks([scrobble("Long Intro", uts: (workout_start - 3.minutes).to_i)])
       stub_track_info(5 * 60 * 1000) # 5 minutes — still playing at start

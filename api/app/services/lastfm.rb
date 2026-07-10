@@ -8,6 +8,10 @@ class Lastfm < ApplicationService
   # started; their actual overlap is then verified via track.getInfo.
   WINDOW_BUFFER = 5.minutes
 
+  # How many recent tracks to request per user.getrecenttracks call. Generous for any single
+  # workout window (200 short tracks is ~10+ hours), so no pagination is needed.
+  RECENT_TRACKS_LIMIT = 200
+
   def initialize
     @username = ENV["LASTFM_USERNAME"]
     @api_key = ENV["LASTFM_API_KEY"]
@@ -19,7 +23,7 @@ class Lastfm < ApplicationService
   end
 
   # Fetches songs played during a time window, in chronological order. Drops "now playing"
-  # entries (which have no scrobble date). The query is widened 10 minutes before the start
+  # entries (which have no scrobble date). The query is widened 5 minutes before the start
   # to catch songs that began before the workout but were still playing when it started;
   # each pre-start scrobble is kept only if its track.getInfo duration overlaps the start —
   # kept conservatively when the duration is unknown or the lookup fails. Last.fm's scrobble
@@ -44,24 +48,31 @@ class Lastfm < ApplicationService
 
   private
 
+  # GETs a Last.fm API method, merging in the shared credentials/format params. Last.fm signals
+  # failures with an HTTP 200 carrying an error body, so that's raised here (not by get_json!).
+  # @raise [RuntimeError] when Last.fm returns an error body.
+  def lastfm_get(method, **params)
+    response = get_json!(
+      LASTFM_API_URL,
+      query: { method: method, api_key: @api_key, format: "json", **params }
+    )
+    raise "Last.fm error #{response[:error]}: #{response[:message]}" if response[:error].present?
+
+    response
+  end
+
   # @return [Array<Hash>] Raw track hashes from user.getrecenttracks (extended=1 adds the
   #   loved flag and full artist names).
   # @raise [RuntimeError] when Last.fm returns an error body.
-  def recent_tracks(from_sec, to_sec, limit: 200)
-    response = get_json!(
-      LASTFM_API_URL,
-      query: {
-        method: "user.getrecenttracks",
-        user: @username,
-        api_key: @api_key,
-        format: "json",
-        limit: limit,
-        from: from_sec,
-        to: to_sec,
-        extended: 1
-      }
+  def recent_tracks(from_sec, to_sec)
+    response = lastfm_get(
+      "user.getrecenttracks",
+      user: @username,
+      limit: RECENT_TRACKS_LIMIT,
+      from: from_sec,
+      to: to_sec,
+      extended: 1
     )
-    raise "Last.fm error #{response[:error]}: #{response[:message]}" if response[:error].present?
 
     tracks = response.dig(:recenttracks, :track)
     return [] if tracks.blank?
@@ -72,19 +83,9 @@ class Lastfm < ApplicationService
   # A track's duration in seconds via track.getInfo, or nil when Last.fm doesn't have one
   # (the field is missing or "0" for sparsely-cataloged tracks).
   # @return [Float, nil]
+  # @raise [RuntimeError] when Last.fm returns an error body (caller keeps the song conservatively).
   def track_duration_seconds(artist, track)
-    response = get_json!(
-      LASTFM_API_URL,
-      query: {
-        method: "track.getInfo",
-        artist: artist,
-        track: track,
-        api_key: @api_key,
-        format: "json",
-        autocorrect: 1
-      }
-    )
-    return if response[:error].present?
+    response = lastfm_get("track.getInfo", artist: artist, track: track, autocorrect: 1)
 
     duration_ms = response.dig(:track, :duration).to_f
     return if duration_ms <= 0
@@ -99,14 +100,12 @@ class Lastfm < ApplicationService
   def overlaps_start?(song, start_time)
     return true if song[:played_at] >= start_time
 
-    duration = begin
-      track_duration_seconds(song[:artist], song[:name])
-    rescue StandardError
-      return true
-    end
+    duration = track_duration_seconds(song[:artist], song[:name])
     return true if duration.nil?
 
     song[:played_at] + duration > start_time
+  rescue StandardError
+    true # conservative keep when the duration lookup fails — better a false positive than a drop
   end
 
   # @return [Hash] The normalized song.
