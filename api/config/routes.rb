@@ -50,6 +50,10 @@ Rails.application.routes.draw do
     # Contentful: re-syncs standard.site PDS records on entry publish/unpublish/delete
     # (HMAC request-verification gated).
     post "contentful" => "contentful#create"
+
+    # Whoop: syncs strain/sleep/recovery to Intervals.icu wellness and regenerates the
+    # matched activity's description (HMAC signature gated, processed by WhoopWebhookJob).
+    post "whoop" => "whoop#create"
   end
 
   # Whoop OAuth flow (owner-only authorize, public callback validated by state).

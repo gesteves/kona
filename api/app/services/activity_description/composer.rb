@@ -1,0 +1,185 @@
+module ActivityDescription
+  # Pure functions that build and assemble the description's blocks. Layout: an optional
+  # user-written headline (preserved verbatim — never generated) sits above a stack of
+  # emoji-prefixed stat lines, in order: planned summary (🗓️) · weather · water temp (💧) ·
+  # power (⚡️) · heat (🌡️) · Whoop strain (🔥) · music (🎧). No I/O — the generator gathers
+  # the data and passes it in.
+  module Composer
+    # Codepoint ranges covering every emoji this module emits and every weather emoji the
+    # LLM is likely to pick: Misc Symbols/Dingbats plus the main emoji blocks. Headline
+    # content (user prose) starts with a letter, so this only ever strips stat-shaped lines.
+    EMOJI_RANGES = [0x2600..0x27BF, 0x1F300..0x1F6FF, 0x1F900..0x1F9FF, 0x1FA00..0x1FAFF].freeze
+
+    # How many artists the 🎧 line names before collapsing the rest into "and N more".
+    TOP_ARTISTS = 5
+
+    module_function
+
+    # Assembles the final description: the preserved headline (blank-line separated) above
+    # the emoji stat lines (joined by single newlines — a stacked stat block, not paragraphs).
+    # @return [String] Empty when there's nothing to say.
+    def compose(headline: nil, planned: nil, weather: nil, water_temp: nil, power: nil, heat: nil, whoop: nil, music: nil)
+      blocks = []
+      blocks << "🗓️ #{planned}" if planned.present?
+      blocks << weather if weather.present?
+      blocks << water_temp if water_temp.present?
+      blocks << power if power.present?
+      blocks << heat if heat.present?
+      blocks << whoop if whoop.present?
+      blocks << music if music.present?
+
+      stat_section = blocks.join("\n")
+
+      return "#{headline}\n\n#{stat_section}" if headline.present? && stat_section.present?
+      return headline.to_s if headline.present?
+
+      stat_section
+    end
+
+    # Extracts the user-written headline from an existing description: every line that isn't
+    # one of the emoji-prefixed stat lines, joined back together so multi-paragraph prose
+    # round-trips (runs of blank lines collapse to one). Nil when nothing non-stat remains.
+    # @return [String, nil]
+    def headline(description)
+      return if description.blank?
+
+      kept = description.split("\n", -1).map(&:strip).filter_map do |line|
+        next "" if line.empty? # preserve paragraph boundaries; trailing blanks fall to strip
+
+        starts_with_emoji?(line) ? nil : line
+      end
+
+      kept.join("\n").gsub(/\n{3,}/, "\n\n").strip.presence
+    end
+
+    # The cycling power line, e.g. "⚡️ Avg 200 W · NP 210 W · IF 0.71 · TSS 98".
+    # Partial data renders only the present fields; nil when the activity isn't cycling or
+    # carries no power fields.
+    # @param activity [Hash] Raw Intervals.icu activity (symbolized keys).
+    # @return [String, nil]
+    def power_block(activity)
+      return unless ActivityMatcher.normalize_type(activity[:type]) == "Cycling"
+
+      average = activity[:icu_average_watts] || activity[:average_watts]
+      normalized = activity[:icu_weighted_avg_watts] || activity[:weighted_avg_watts]
+      intensity = activity[:icu_intensity]
+      tss = activity[:icu_training_load]
+
+      parts = []
+      parts << "Avg #{average.round} W" if average.present?
+      parts << "NP #{normalized.round} W" if normalized.present?
+      parts << "IF #{format('%.2f', intensity / 100.0)}" unless intensity.nil?
+      parts << "TSS #{tss}" unless tss.nil?
+      return if parts.empty?
+
+      "⚡️ #{parts.join(' · ')}"
+    end
+
+    # The CORE heat line, combining the per-activity HSI (requires both max and median) with
+    # the daily heat-adaptation score (when positive). Suppressed for swims — the CORE
+    # sensor is inaccurate in water. E.g. "🌡️ Max HSI 2.5 · Median HSI 1.7 · 72% heat adapted".
+    # @return [String, nil]
+    def heat_block(max_hsi:, median_hsi:, heat_adaptation_score:, swim:)
+      return if swim
+
+      has_hsi = max_hsi.present? && median_hsi.present?
+      has_adaptation = heat_adaptation_score.is_a?(Numeric) && heat_adaptation_score.finite? && heat_adaptation_score.positive?
+      return unless has_hsi || has_adaptation
+
+      parts = []
+      if has_hsi
+        parts << "Max HSI #{format('%.1f', max_hsi)}"
+        parts << "Median HSI #{format('%.1f', median_hsi)}"
+      end
+      parts << "#{heat_adaptation_score.round}% heat adapted" if has_adaptation
+
+      "🌡️ #{parts.join(' · ')}"
+    end
+
+    # The Whoop strain line, e.g. "🔥 12.4 Whoop Strain". Suppressed for swims.
+    # @return [String, nil]
+    def whoop_block(strain, swim:)
+      return if swim || strain.nil?
+
+      "🔥 #{format('%.1f', strain)} Whoop Strain"
+    end
+
+    # The open-water swim water-temperature line, e.g. "💧 Water temperature 15.5 °C".
+    # Whole degrees render without the trailing .0 ("59 °F", not "59.0 °F").
+    # @param median_temp_celsius [Numeric, nil] Median of the activity's temp stream.
+    # @param unit [Symbol] :celsius or :fahrenheit (the athlete's preference).
+    # @return [String, nil]
+    def water_temp_block(median_temp_celsius, unit:)
+      return if median_temp_celsius.nil?
+
+      formatted =
+        if unit == :fahrenheit
+          "#{format('%.1f', (median_temp_celsius * 9.0 / 5) + 32)} °F"
+        else
+          "#{format('%.1f', median_temp_celsius)} °C"
+        end
+
+      "💧 Water temperature #{formatted.sub(/\.0(?=\s|\z)/, '')}"
+    end
+
+    # The music line, e.g. "🎧 Tracy Chapman, Radiohead, and 18 more". Names the top five
+    # artists; the "and N more" suffix appears only when more unique artists exist.
+    # @param songs [Array<Hash>] Normalized Last.fm songs.
+    # @return [String, nil]
+    def music_block(songs)
+      return if songs.blank?
+
+      top, remaining = pick_top_artists(songs)
+      return if top.empty?
+
+      suffix = remaining.positive? ? ", and #{remaining} more" : ""
+      "🎧 #{top.join(', ')}#{suffix}"
+    end
+
+    # Ranks artists deterministically: score = 2 × (notable-track count) + (total plays),
+    # where a track is notable when the athlete loved it OR played it more than once during
+    # the activity (repeating a track mid-workout is a "love"-equivalent signal). Ties break
+    # by plays desc, then earliest first-play (the artist that kicked off the playlist wins),
+    # then first appearance — Ruby's sort_by isn't stable, so insertion order is the last key.
+    # @return [Array(Array<String>, Integer)] The top artist names and how many were dropped.
+    def pick_top_artists(songs)
+      by_artist = {}
+
+      songs.each do |song|
+        artist = song[:artist].to_s.strip
+        next if artist.empty?
+
+        aggregate = by_artist[artist] ||= { plays: 0, first_played_at: song[:played_at], tracks: Hash.new { |h, k| h[k] = { plays: 0, loved: false } }, index: by_artist.size }
+        aggregate[:plays] += 1
+        aggregate[:first_played_at] = song[:played_at] if song[:played_at] < aggregate[:first_played_at]
+
+        track = aggregate[:tracks][song[:name].to_s.strip]
+        track[:plays] += 1
+        track[:loved] ||= song[:loved] ? true : false
+      end
+
+      ranked = by_artist.map do |artist, aggregate|
+        notable = aggregate[:tracks].values.count { |track| track[:loved] || track[:plays] > 1 }
+        {
+          artist: artist,
+          plays: aggregate[:plays],
+          first_played_at: aggregate[:first_played_at],
+          index: aggregate[:index],
+          score: (2 * notable) + aggregate[:plays]
+        }
+      end
+
+      ranked.sort_by! { |entry| [-entry[:score], -entry[:plays], entry[:first_played_at], entry[:index]] }
+
+      top = ranked.first(TOP_ARTISTS).map { |entry| entry[:artist] }
+      [top, [ranked.size - top.size, 0].max]
+    end
+
+    # Whether a line leads with a pictographic emoji (one of our stat prefixes, the
+    # LLM-picked weather emoji, or another tool's marker line).
+    def starts_with_emoji?(line)
+      codepoint = line.each_codepoint.first
+      codepoint.present? && EMOJI_RANGES.any? { |range| range.cover?(codepoint) }
+    end
+  end
+end

@@ -92,4 +92,117 @@ RSpec.describe Whoop do
       end
     end
   end
+
+  describe "webhook-path fetchers" do
+    before do
+      allow($redis).to receive(:get).with(access_token_key).and_return("token")
+    end
+
+    def http_error(status)
+      ApplicationService::HttpError.new(status, "", "url")
+    end
+
+    describe "#user_id" do
+      it "fetches the profile's user_id and caches it" do
+        allow(service).to receive(:get_json!).and_return({ user_id: 12345 })
+        expect($redis).to receive(:setex).with("whoop:cid:user_id", 1.day, "12345")
+
+        expect(service.user_id).to eq(12345)
+      end
+
+      it "raises without an access token" do
+        allow($redis).to receive(:get).with(access_token_key).and_return(nil)
+        allow($redis).to receive(:get).with(refresh_token_key).and_return(nil)
+
+        expect { service.user_id }.to raise_error(/No Whoop access token/)
+      end
+    end
+
+    describe "#get_workout" do
+      it "normalizes a SCORED workout, mapping the sport name" do
+        allow(service).to receive(:get_json!).and_return(
+          {
+            id: "w-uuid",
+            sport_name: "weightlifting",
+            start: "2026-07-09T13:30:00.000Z",
+            score_state: "SCORED",
+            score: { strain: 8.4 }
+          }
+        )
+
+        workout = service.get_workout("w-uuid")
+
+        expect(workout).to include(id: "w-uuid", activity_type: "Strength", strain: 8.4)
+        expect(workout[:start_time]).to eq(Time.iso8601("2026-07-09T13:30:00.000Z"))
+      end
+
+      it "maps unmapped sports to Other and spin to Cycling" do
+        base = { id: "w", start: "2026-07-09T13:30:00Z", score_state: "SCORED", score: { strain: 1 } }
+
+        allow(service).to receive(:get_json!).and_return(base.merge(sport_name: "Pickleball"))
+        expect(service.get_workout("w")[:activity_type]).to eq("Other")
+
+        allow(service).to receive(:get_json!).and_return(base.merge(sport_name: "Spin"))
+        expect(service.get_workout("w")[:activity_type]).to eq("Cycling")
+      end
+
+      it "returns nil on 404 and for unscored workouts" do
+        allow(service).to receive(:get_json!).and_raise(http_error(404))
+        expect(service.get_workout("gone")).to be_nil
+
+        allow(service).to receive(:get_json!).and_return({ id: "w", score_state: "PENDING_SCORE", score: nil })
+        expect(service.get_workout("w")).to be_nil
+      end
+
+      it "propagates other HTTP errors" do
+        allow(service).to receive(:get_json!).and_raise(http_error(500))
+        expect { service.get_workout("w") }.to raise_error(ApplicationService::HttpError)
+      end
+    end
+
+    describe "#get_sleep" do
+      it "returns the raw SCORED sleep and nil otherwise" do
+        sleep_data = { id: "s", score_state: "SCORED", nap: false }
+        allow(service).to receive(:get_json!).and_return(sleep_data)
+        expect(service.get_sleep("s")).to eq(sleep_data)
+
+        allow(service).to receive(:get_json!).and_return({ id: "s", score_state: "PENDING_SCORE" })
+        expect(service.get_sleep("s")).to be_nil
+
+        allow(service).to receive(:get_json!).and_raise(http_error(404))
+        expect(service.get_sleep("s")).to be_nil
+      end
+    end
+
+    describe "#get_recovery_for_cycle" do
+      it "returns the raw SCORED recovery and nil otherwise" do
+        recovery = { cycle_id: 42, score_state: "SCORED", score: { recovery_score: 82 } }
+        allow(service).to receive(:get_json!).and_return(recovery)
+        expect(service.get_recovery_for_cycle(42)).to eq(recovery)
+
+        allow(service).to receive(:get_json!).and_raise(http_error(404))
+        expect(service.get_recovery_for_cycle(42)).to be_nil
+      end
+    end
+
+    describe "#raw_cycles" do
+      it "queries the buffered UTC window and follows pagination" do
+        page_one = { records: [{ id: 1 }], next_token: "page2" }
+        page_two = { records: [{ id: 2 }], next_token: nil }
+        allow(service).to receive(:get_json!).and_return(page_one, page_two)
+
+        cycles = service.raw_cycles("2026-07-08", "2026-07-10")
+
+        expect(cycles.map { |c| c[:id] }).to eq([1, 2])
+        expect(service).to have_received(:get_json!).with(
+          "#{Whoop::WHOOP_API_URL}/cycle",
+          hash_including(query: hash_including(start: "2026-07-08T00:00:00.000Z", end: "2026-07-10T23:59:59.999Z"))
+        ).twice
+        expect(service).to have_received(:get_json!).with(
+          "#{Whoop::WHOOP_API_URL}/cycle",
+          hash_including(query: hash_including(nextToken: "page2"))
+        ).once
+      end
+    end
+  end
 end

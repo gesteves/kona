@@ -39,6 +39,10 @@ gem "rack-attack"
 # Reports unhandled exceptions to Bugsnag (production only). See
 # config/initializers/bugsnag.rb.
 gem "bugsnag"
+# Official Anthropic SDK, used to generate activity descriptions (planned-workout summary
+# + weather sentence) on Whoop workout webhooks. Structured outputs guarantee parseable
+# JSON, and per-request timeouts sidestep the global HTTParty read timeout.
+gem "anthropic"
 # GraphQL client for the Font Awesome API
 gem "graphql-client"
 # Faster JSON parsing/serialization for the read-through Redis cache and service responses

@@ -25,7 +25,125 @@ class Intervals < ApplicationService
     summarize_activities(activities)
   end
 
+  # The athlete's IANA timezone from the (nested) profile endpoint, cached for an hour.
+  # Falls back to UTC on any error — the failure isn't cached, so the next call retries.
+  # @return [String]
+  def athlete_timezone
+    cached_json("intervals.icu:timezone:#{@athlete_id}", expires_in: 1.hour) do
+      get_json!("#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/profile", basic_auth: auth)&.dig(:athlete, :timezone) || "UTC"
+    end
+  rescue StandardError => e
+    Rails.logger.warn("Intervals: failed to fetch athlete timezone, falling back to UTC: #{e.message}")
+    "UTC"
+  end
+
+  # The athlete's preferred temperature unit, derived from the root athlete endpoint the
+  # same way domestique's unit preferences were: an explicit fahrenheit flag wins; otherwise
+  # metric athletes (measurement_preference != "feet") get celsius. Cached for an hour.
+  # @return [Symbol] :celsius or :fahrenheit
+  def temperature_unit
+    cached = cached_json("intervals.icu:temperature_unit:#{@athlete_id}", expires_in: 1.hour) do
+      athlete = get_json!("#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}", basic_auth: auth)
+      if athlete[:fahrenheit] || athlete[:measurement_preference] == "feet"
+        "fahrenheit"
+      else
+        "celsius"
+      end
+    end
+    cached.to_sym
+  rescue StandardError => e
+    Rails.logger.warn("Intervals: failed to fetch temperature unit, falling back to celsius: #{e.message}")
+    :celsius
+  end
+
+  # Fetches the raw activity list for a date range (inclusive), raising on failure so the
+  # webhook job can retry. Uncached: the caller is matching against a just-finished workout.
+  # @param oldest [Date, String]
+  # @param newest [Date, String]
+  # @return [Array<Hash>]
+  # @raise [ApplicationService::HttpError]
+  def activities!(oldest:, newest:)
+    get_json!(
+      "#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/activities",
+      query: { oldest: oldest.to_s, newest: newest.to_s },
+      basic_auth: auth
+    )
+  end
+
+  # Fetches a single raw activity, raising on failure.
+  # @return [Hash]
+  # @raise [ApplicationService::HttpError]
+  def activity!(activity_id)
+    activity = get_json!("#{INTERVALS_ICU_API_URL}/activity/#{activity_id}", basic_auth: auth)
+    activity[:id] ||= activity_id
+    activity
+  end
+
+  # The activity's weather summary text, with Intervals.icu's own attribution prefix
+  # stripped. Any error → nil (weather isn't available for every activity).
+  # @return [String, nil]
+  def activity_weather_summary(activity_id)
+    response = get_json!("#{INTERVALS_ICU_API_URL}/activity/#{activity_id}/weather-summary", basic_auth: auth)
+    response&.dig(:description)&.sub(/\A-- Intervals icu --\n/i, "")&.strip.presence
+  rescue StandardError
+    nil
+  end
+
+  # Fetches activity streams by type. Intervals.icu expects repeated bare `types` params
+  # (types=a&types=b), which HTTParty would render as types[]= — so the query string is
+  # built by hand. Any error → nil (streams aren't available for every activity).
+  # @param types [Array<String>] e.g. ["heat_strain_index", "time"]
+  # @return [Array<Hash>, nil] Stream objects ({type:, data: [...]}), or nil.
+  def activity_streams(activity_id, types:)
+    query_string = types.map { |type| "types=#{type}" }.join("&")
+    get_json!("#{INTERVALS_ICU_API_URL}/activity/#{activity_id}/streams?#{query_string}", basic_auth: auth)
+  rescue StandardError
+    nil
+  end
+
+  # The wellness record for a date. Any error → nil (used for the optional
+  # CoreHeatAdaptationScore, which must never fail description generation).
+  # Keys are NOT underscored: custom fields like CoreHeatAdaptationScore are CamelCase.
+  # @param date [Date, String] YYYY-MM-DD.
+  # @return [Hash, nil]
+  def wellness(date)
+    get_json!("#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/wellness/#{date}", basic_auth: auth)
+  rescue StandardError
+    nil
+  end
+
+  # Partially updates the wellness record for a date (only the provided fields change).
+  # @param date [Date, String] YYYY-MM-DD (the wellness record's id).
+  # @param fields [Hash] e.g. { WhoopStrain: 14.2 }.
+  # @raise [ApplicationService::HttpError] on failure (422 = missing custom field).
+  def update_wellness!(date, fields)
+    put_json!(
+      "#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/wellness/#{date}",
+      body: fields.to_json,
+      headers: { "Content-Type" => "application/json" },
+      basic_auth: auth
+    )
+  end
+
+  # Partially updates an activity (only the provided fields change).
+  # @param fields [Hash] e.g. { WhoopWorkoutStrain: 12.4 } or { description: "..." }.
+  # @raise [ApplicationService::HttpError] on failure (422 = missing custom field).
+  def update_activity!(activity_id, fields)
+    put_json!(
+      "#{INTERVALS_ICU_API_URL}/activity/#{activity_id}",
+      body: fields.to_json,
+      headers: { "Content-Type" => "application/json" },
+      basic_auth: auth
+    )
+  end
+
   private
+
+  # HTTP Basic credentials for every Intervals.icu call: the username is the literal
+  # string "API_KEY", the password is the athlete's API key.
+  def auth
+    { username: "API_KEY", password: @api_key }
+  end
 
   # Fetches activities from the Intervals.icu API for the past month, caching them in Redis
   # for 5 minutes. Uses string keys (symbolize: false), as the summary reads a["type"] etc.

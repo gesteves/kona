@@ -42,6 +42,84 @@ class Whoop < ApplicationService
     @client_id.present? && @client_secret.present? && @redirect_uri.present?
   end
 
+  # The authenticated Whoop user's numeric id, used to verify webhook payloads belong to
+  # the configured athlete. The id never changes, so it's cached for a day — the webhook
+  # controller calls this in the request path and Whoop expects a 2xx within ~1s.
+  # @return [Integer]
+  # @raise [ApplicationService::HttpError] when the profile fetch fails.
+  def user_id
+    cached_json("whoop:#{@client_id}:user_id", expires_in: 1.day) do
+      authed_get!("user/profile/basic")[:user_id]
+    end
+  end
+
+  # Fetches a single workout by UUID.
+  # @return [Hash, nil] A normalized workout hash (see #normalize_workout), or nil when the
+  #   workout doesn't exist or isn't scored yet (PENDING_SCORE/UNSCORABLE carry no strain).
+  def get_workout(uuid)
+    workout = authed_get!("activity/workout/#{uuid}")
+    return if workout[:score_state] != "SCORED" || workout[:score].nil?
+
+    normalize_workout(workout)
+  rescue ApplicationService::HttpError => e
+    raise unless e.status == 404
+    nil
+  end
+
+  # Fetches a single sleep by UUID. Named get_sleep (not `sleep`) so it can't shadow
+  # Kernel#sleep, which wait_for_refreshed_token relies on.
+  # @return [Hash, nil] The raw sleep hash, or nil when missing or not SCORED.
+  def get_sleep(uuid)
+    sleep_data = authed_get!("activity/sleep/#{uuid}")
+    return if sleep_data[:score_state] != "SCORED"
+
+    sleep_data
+  rescue ApplicationService::HttpError => e
+    raise unless e.status == 404
+    nil
+  end
+
+  # Fetches the recovery scored against a cycle. Whoop v2 has no GET-by-recovery-id;
+  # recoveries are keyed by their cycle.
+  # @return [Hash, nil] The raw recovery hash, or nil when missing or not SCORED.
+  def get_recovery_for_cycle(cycle_id)
+    recovery = authed_get!("cycle/#{cycle_id}/recovery")
+    return if recovery.nil? || recovery[:score_state] != "SCORED"
+
+    recovery
+  rescue ApplicationService::HttpError => e
+    raise unless e.status == 404
+    nil
+  end
+
+  # Fetches all cycles whose window may touch [start_ymd, end_ymd], following pagination.
+  # The webhook's daily-strain refresh queries with a ±1-day buffer and buckets each cycle
+  # by its end time in the athlete's timezone, so callers pass the buffered range here.
+  # @param start_ymd [String] YYYY-MM-DD.
+  # @param end_ymd [String] YYYY-MM-DD.
+  # @return [Array<Hash>] Raw cycle hashes.
+  # @raise [ApplicationService::HttpError] when any page fetch fails (retryable in a job).
+  def raw_cycles(start_ymd, end_ymd)
+    cycles = []
+    next_token = nil
+
+    loop do
+      query = {
+        start: "#{start_ymd}T00:00:00.000Z",
+        end: "#{end_ymd}T23:59:59.999Z",
+        limit: 25
+      }
+      query[:nextToken] = next_token if next_token.present?
+
+      page = authed_get!("cycle", query)
+      cycles.concat(Array(page[:records]))
+      next_token = page[:next_token]
+      break if next_token.blank?
+    end
+
+    cycles
+  end
+
   # Builds the OAuth authorization URL for the given state.
   # @param state [String] An opaque value validated when Whoop redirects back.
   # @return [String, nil] The authorization URL, or nil if credentials are missing.
@@ -91,6 +169,50 @@ class Whoop < ApplicationService
   end
 
   private
+
+  # Maps Whoop sport_name values to the names ActivityMatcher's type map understands.
+  # Whoop deprecated sport_id after 2025-09-01; sport_name is the stable field.
+  SPORT_NAME_MAP = {
+    "running" => "Running",
+    "cycling" => "Cycling",
+    "swimming" => "Swimming",
+    "functional fitness" => "Functional Fitness",
+    "hiit" => "HIIT",
+    "skiing" => "Skiing",
+    "rowing" => "Rowing",
+    "weightlifting" => "Strength",
+    "strength trainer" => "Strength"
+  }.freeze
+
+  # Normalizes a raw SCORED workout down to the fields the webhook flow uses. start_time is
+  # kept as an instant; call sites render it as a local date in the athlete's timezone.
+  # @param workout [Hash] The raw Whoop workout.
+  # @return [Hash]
+  def normalize_workout(workout)
+    sport = SPORT_NAME_MAP[workout[:sport_name].to_s.downcase] || workout[:sport_name]
+
+    {
+      id: workout[:id].to_s,
+      activity_type: ActivityMatcher.normalize_type(sport),
+      start_time: Time.iso8601(workout[:start]),
+      strain: workout.dig(:score, :strain)
+    }
+  end
+
+  # GETs an authenticated Whoop API path, raising on failure (unlike the cached collection
+  # fetchers, webhook processing wants exceptions so Sidekiq can retry).
+  # @raise [RuntimeError] when no access token is available.
+  # @raise [ApplicationService::HttpError] on a non-success response.
+  def authed_get!(path, query = {})
+    access_token = get_access_token
+    raise "No Whoop access token available — visit /whoop/auth to authorize" if access_token.blank?
+
+    get_json!(
+      "#{WHOOP_API_URL}/#{path}",
+      query: query,
+      headers: { "Authorization" => "Bearer #{access_token}" }
+    )
+  end
 
   # Fetches the most recent scored cycle from the Whoop API.
   # @return [Hash, nil] The cycle data or nil if unavailable.

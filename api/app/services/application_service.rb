@@ -6,6 +6,19 @@ require "httparty"
 class ApplicationService
   include UpstreamIsolation
 
+  # Raised by the bang variants on a non-success response. Carries the HTTP status and body
+  # so callers can branch on the failure mode (e.g. 404 → nil, Intervals.icu's 422
+  # missing-custom-field → warn-and-continue) instead of string-matching messages.
+  class HttpError < StandardError
+    attr_reader :status, :body
+
+    def initialize(status, body, url)
+      @status = status
+      @body = body
+      super("HTTP #{status} from #{url}")
+    end
+  end
+
   private
 
   # Read-through JSON cache. Returns the parsed cached value when the key is populated;
@@ -64,18 +77,28 @@ class ApplicationService
 
   # Like post_json, but raises on a non-success response instead of swallowing it to nil.
   # @see #get_json!
-  # @raise [RuntimeError] on a non-success response.
+  # @raise [HttpError] on a non-success response.
   def post_json!(url, symbolize: true, **options)
     parse_json!(HTTParty.post(url, **options), symbolize: symbolize)
   end
 
-  # @param response [HTTParty::Response]
-  # @return [Object] The parsed body.
-  # @raise [RuntimeError] when the response was not successful.
-  def parse_json!(response, symbolize: true)
-    raise "HTTP #{response.code} from #{response.request&.last_uri}" unless response.success?
+  # PUTs to a URL and returns the parsed JSON body, raising on a non-success response.
+  # There is no swallowing variant: PUTs are writes, and callers need the failure (and its
+  # status — see HttpError) to decide between retrying and degrading.
+  # @param symbolize [Boolean] Parse with symbolized keys.
+  # @param options [Hash] Passed through to HTTParty (body, headers, basic_auth, …).
+  # @raise [HttpError] on a non-success response.
+  def put_json!(url, symbolize: true, **options)
+    parse_json!(HTTParty.put(url, **options), symbolize: symbolize)
+  end
 
-    JSON.parse(response.body, symbolize_names: symbolize)
+  # @param response [HTTParty::Response]
+  # @return [Object, nil] The parsed body (nil for an empty body).
+  # @raise [HttpError] when the response was not successful.
+  def parse_json!(response, symbolize: true)
+    raise HttpError.new(response.code, response.body, response.request&.last_uri) unless response.success?
+
+    JSON.parse(response.body, symbolize_names: symbolize) if response.body.present?
   end
 
   # @param response [HTTParty::Response]

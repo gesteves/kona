@@ -178,4 +178,36 @@ RSpec.describe ApplicationService do
       expect(context).to eq("ctx")
     end
   end
+
+  describe "#put_json! and HttpError" do
+    let(:put_class) do
+      Class.new(ApplicationService) do
+        def http_put(*args, **kwargs) = put_json!(*args, **kwargs)
+      end
+    end
+    let(:put_service) { put_class.new }
+
+    it "PUTs and returns the parsed body" do
+      allow(HTTParty).to receive(:put).and_return(response_double(success: true, body: '{"a":1}'))
+
+      expect(put_service.http_put("https://example.test/path", body: "{}")).to eq(a: 1)
+    end
+
+    it "returns nil for an empty success body" do
+      allow(HTTParty).to receive(:put).and_return(response_double(success: true, body: ""))
+
+      expect(put_service.http_put("https://example.test/path")).to be_nil
+    end
+
+    it "raises an HttpError carrying the status and body on failure" do
+      allow(HTTParty).to receive(:put).and_return(response_double(success: false, body: "no such field", code: 422))
+
+      expect { put_service.http_put("https://example.test/path") }
+        .to raise_error(ApplicationService::HttpError) do |error|
+          expect(error.status).to eq(422)
+          expect(error.body).to eq("no such field")
+          expect(error.message).to include("HTTP 422")
+        end
+    end
+  end
 end

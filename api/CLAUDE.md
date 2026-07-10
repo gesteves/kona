@@ -29,6 +29,7 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 | GET | `/widgets/plausible/pageviews/:id` | `widgets/plausible#pageviews` | HTML (pageview count by Contentful id) | 1 hr |
 | POST | `/api/location` | `api/location#create` | sets Redis `location:current` (bearer-token gated) | — |
 | POST | `/webhooks/contentful` | `webhooks/contentful#create` | enqueues a standard.site PDS sync job on publish/unpublish/delete (HMAC-gated); 204 | — |
+| POST | `/webhooks/whoop` | `webhooks/whoop#create` | enqueues a `WhoopWebhookJob` syncing strain/sleep/recovery to Intervals.icu wellness + regenerating the matched activity's description (HMAC-gated, user-verified); 200 `{ok: true}` | — |
 | GET | `/api/standard-site` | `api/standard_site#show` | JSON `{did, publication_uri}` for the web build's verification markup | 1 hr |
 | GET | `/whoop/auth` | `whoop_oauth#authorize` | redirect (owner-session gated) | — |
 | GET | `/whoop/callback` | `whoop_oauth#callback` | OAuth token exchange | — |
@@ -79,6 +80,23 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   returns 204; the sync runs on the Sidekiq worker (Sidekiq retries on failure). Contentful
   does **not** retry deliveries, so `rake standard_site:backfill` remains the broader
   reconciliation/recovery path. Operations log at info level (`standard.site: …`).
+  `Webhooks::WhoopController#create` receives Whoop v2 webhooks (`workout.updated`,
+  `sleep.updated`, `recovery.updated`, …), verified with Whoop's HMAC scheme
+  (`WhoopRequestVerification` concern — signed with `WHOOP_CLIENT_SECRET`, base64 HMAC over
+  timestamp + raw body, ±5 min skew) and a payload `user_id` check against the authenticated
+  athlete (Redis-cached for a day; foreign users get 403 so Whoop stops retrying). The
+  request enqueues a `WhoopWebhookJob` and responds 200 `{ok: true}` (Whoop expects a 2xx
+  within ~1s and retries on failure). Register the webhook URL with **Model Version V2** in
+  the Whoop developer dashboard. Processing (`WhoopWebhookProcessor`) writes the custom
+  wellness fields `WhoopStrain` / `WhoopSleepPerformance` / `WhoopRecovery` and the activity
+  field `WhoopWorkoutStrain` (all four must exist in Intervals.icu → Settings → Custom
+  Fields — a 422 is logged and skipped, not retried), then regenerates the matched
+  activity's description (`ActivityDescription::Generator` / `Composer` / `Llm`): emoji stat
+  lines (power, heat, Whoop strain, water temp, Last.fm top artists) plus two
+  Anthropic-generated lines (planned-workout summary matched against the TrainerRoad
+  calendar, weather sentence — prompts in `app/prompts/`, skipped when `ANTHROPIC_API_KEY`
+  is unset), preserving any user-written prose above the stat block. Duplicate triggers are
+  deduped with a per-activity Redis lock (`whoop:description_lock:*`).
 - **Background jobs** — native **Sidekiq** (`Sidekiq::Job`, not ActiveJob — ActiveJob stays
   disabled in `application.rb`). Jobs live in `app/jobs/` and inherit from `ApplicationJob` (a
   plain `Sidekiq::Job` superclass holding the shared `retry: 5`); `StandardSiteSyncJob(operation,
@@ -86,7 +104,9 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   `ArticleEmbeddingJob(operation, entry_id)` keeps an article's Voyage embedding (the
   `embeddings:article:<id>` Redis key) in sync for the related-articles widget — `"embed"` on
   publish, `"delete"` on unpublish/delete (webhook-driven, plus the `embeddings:backfill` rake
-  task). Args are plain strings and every operation is idempotent, so `retry: 5` is safe; exhausted
+  task), and `WhoopWebhookJob(event_type, resource_id, trace_id)` applies a Whoop webhook's
+  side effects to Intervals.icu (see **Webhooks** above). Args are plain strings and every
+  operation is idempotent, so `retry: 5` is safe; exhausted
   retries land in the Dead set. Config in `config/initializers/sidekiq.rb` (Redis = `REDIS_URL`, web UI guard) and
   `config/sidekiq.yml` (concurrency). The **`/sidekiq` web UI** is mounted in `routes.rb` and
   gated by the owner session (Google OAuth — see **Owner auth** above), shared with `/whoop/auth`.
@@ -183,7 +203,11 @@ secrets (and Rails `config/credentials.yml.enc` + `master.key`).
   `WEATHERKIT_PRIVATE_KEY` (base64 .p8), `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`,
   `CONTENTFUL_WEBHOOK_SECRET` (64-char HMAC secret for the Contentful webhook), `SITE_URL`
   (public site root, for the standard.site publication `url`).
-- **Optional**: `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`, `TRAINERROAD_CALENDAR_URL`,
+- **Optional**: `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`, `TRAINERROAD_CALENDAR_URL`
+  (rest-day check + planned-workout matching for generated activity descriptions),
+  `ANTHROPIC_API_KEY` + `ANTHROPIC_DESCRIPTION_MODEL` (the LLM lines of generated activity
+  descriptions; the default model is `claude-sonnet-5`), `LASTFM_USERNAME` + `LASTFM_API_KEY`
+  (the 🎧 top-artists line),
   `PURPLEAIR_API_KEY`, `LOCATION`, `TIME_ZONE`, `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`,
   `BLUESKY_PDS_URL` (standard.site publishing; no-ops when the handle/password are unset),
   `BUGSNAG_API_KEY` (error reporting; **production only** — notifies only in the production
