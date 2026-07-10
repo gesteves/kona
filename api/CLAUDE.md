@@ -90,13 +90,11 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   the Whoop developer dashboard. Processing (`WhoopWebhookProcessor`) writes the custom
   wellness fields `WhoopStrain` / `WhoopSleepPerformance` / `WhoopRecovery` and the activity
   field `WhoopWorkoutStrain` (all four must exist in Intervals.icu → Settings → Custom
-  Fields — a 422 is logged and skipped, not retried), then regenerates the matched
-  activity's description (`ActivityDescription::Generator` / `Composer` / `Llm`): emoji stat
-  lines (power, heat, Whoop strain, water temp, Last.fm top artists) plus two
-  Anthropic-generated lines (planned-workout summary matched against the TrainerRoad
-  calendar, weather sentence — prompts in `app/prompts/`, skipped when `ANTHROPIC_API_KEY`
-  is unset), preserving any user-written prose above the stat block. Duplicate triggers are
-  deduped with a per-activity Redis lock (`whoop:description_lock:*`).
+  Fields — a 422 is logged and skipped, not retried), then enqueues a separate
+  `ActivityDescriptionJob` (below) to regenerate the matched activity's description. The
+  metric sync and the description are deliberately split: if the Whoop integration ever goes
+  away, "sync Whoop metrics to Intervals.icu" disappears entirely, while "write activity
+  descriptions" keeps working (triggered by another source) and simply loses its 🔥 line.
 - **Background jobs** — native **Sidekiq** (`Sidekiq::Job`, not ActiveJob — ActiveJob stays
   disabled in `application.rb`). Jobs live in `app/jobs/` and inherit from `ApplicationJob` (a
   plain `Sidekiq::Job` superclass holding the shared `retry: 5`); `StandardSiteSyncJob(operation,
@@ -104,9 +102,18 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   `ArticleEmbeddingJob(operation, entry_id)` keeps an article's Voyage embedding (the
   `embeddings:article:<id>` Redis key) in sync for the related-articles widget — `"embed"` on
   publish, `"delete"` on unpublish/delete (webhook-driven, plus the `embeddings:backfill` rake
-  task), and `WhoopWebhookJob(event_type, resource_id, trace_id)` applies a Whoop webhook's
-  side effects to Intervals.icu (see **Webhooks** above). Args are plain strings and every
-  operation is idempotent, so `retry: 5` is safe; exhausted
+  task), `WhoopWebhookJob(event_type, resource_id, trace_id)` syncs a Whoop webhook's
+  metrics to Intervals.icu wellness/activity fields (see **Webhooks** above), and
+  `ActivityDescriptionJob(activity_id, whoop_strain = nil)` (re)generates an activity's
+  Strava description via `ActivityDescription::Generator` / `Composer` / `Llm` — emoji stat
+  lines (power, heat, Whoop strain, water temp, Last.fm top artists) plus two
+  Anthropic-generated lines (planned-workout summary matched against the TrainerRoad
+  calendar, weather sentence — prompts in `app/prompts/`, skipped when `ANTHROPIC_API_KEY` is
+  unset), preserving any user-written prose above the stat block, deduped per activity by a
+  Redis lock (`whoop:description_lock:*`). It's **source-agnostic**: the Whoop workout path
+  enqueues it today (passing the matched workout's strain for the 🔥 line), but it's
+  re-triggerable by any future webhook with no strain, losing only that line. Args are plain
+  strings/numbers and every operation is idempotent, so `retry: 5` is safe; exhausted
   retries land in the Dead set. Config in `config/initializers/sidekiq.rb` (Redis = `REDIS_URL`, web UI guard) and
   `config/sidekiq.yml` (concurrency). The **`/sidekiq` web UI** is mounted in `routes.rb` and
   gated by the owner session (Google OAuth — see **Owner auth** above), shared with `/whoop/auth`.

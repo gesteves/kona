@@ -3,8 +3,9 @@
 #
 #   - workout.updated: refresh the *workout's* date (Whoop sometimes scores workouts late
 #     or fires updates for retroactive edits, so the event's date isn't necessarily today).
-#     Also writes WhoopWorkoutStrain on the matching Intervals.icu activity and regenerates
-#     the activity's description.
+#     Also writes WhoopWorkoutStrain on the matching Intervals.icu activity and enqueues an
+#     ActivityDescriptionJob to (re)generate the activity's description (a separate,
+#     source-agnostic, independently-retried concern).
 #   - sleep.updated: refresh today and yesterday (sleep finalization is what marks the
 #     prior day's strain complete on Whoop), plus WhoopSleepPerformance.
 #   - recovery.updated: refresh today, plus WhoopRecovery.
@@ -81,14 +82,12 @@ class WhoopWebhookProcessor
       return
     end
 
-    # Best-effort: a flaky Anthropic call or Intervals.icu hiccup must never reverse (or
-    # retry past) the WhoopWorkoutStrain write above.
-    begin
-      ActivityDescription::Generator.new(intervals: @intervals).generate!(match[:id], whoop_workout: workout)
-    rescue StandardError => e
-      Rails.logger.error("Whoop webhook: description generation failed for activity #{match[:id]} (trace=#{trace_id}): #{e.message}")
-      ErrorReporter.report_upstream(e, service: self.class.name, context: "Whoop webhook description generation")
-    end
+    # The description runs in its own source-agnostic job (ActivityDescriptionJob), so it's
+    # decoupled from the Whoop metric sync above: it retries independently, and if the Whoop
+    # integration ever goes away the description keeps working (triggered elsewhere) minus the
+    # 🔥 line. Only the Whoop strain is passed through — the generator re-derives everything
+    # else from Intervals.icu.
+    ActivityDescriptionJob.perform_async(match[:id], workout[:strain])
   end
 
   # Writes the day's Whoop strain (the raw 0–21 cycle strain) to the Intervals.icu wellness

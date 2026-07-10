@@ -6,10 +6,8 @@ RSpec.describe WhoopWebhookProcessor do
   let(:whoop) { instance_double(Whoop) }
   let(:intervals) { instance_double(Intervals, athlete_timezone: timezone) }
   let(:timezone) { "America/Denver" }
-  let(:generator) { instance_double(ActivityDescription::Generator, generate!: nil) }
 
   before do
-    allow(ActivityDescription::Generator).to receive(:new).and_return(generator)
     allow(intervals).to receive(:update_wellness!)
     allow(intervals).to receive(:update_activity!)
   end
@@ -34,14 +32,14 @@ RSpec.describe WhoopWebhookProcessor do
       allow(intervals).to receive(:activities!).and_return([activity])
     end
 
-    it "refreshes the workout's local date, writes WhoopWorkoutStrain, and generates a description" do
+    it "refreshes the workout's local date, writes WhoopWorkoutStrain, and enqueues the description" do
       processor.process("workout.updated", "w1", "t1")
 
       expect(whoop).to have_received(:raw_cycles).with("2026-07-08", "2026-07-10")
       expect(intervals).to have_received(:update_wellness!).with("2026-07-09", WhoopStrain: 14.2)
       expect(intervals).to have_received(:activities!).with(oldest: Date.new(2026, 7, 8), newest: Date.new(2026, 7, 10))
       expect(intervals).to have_received(:update_activity!).with("i1", WhoopWorkoutStrain: 12.4)
-      expect(generator).to have_received(:generate!).with("i1", whoop_workout: hash_including(id: "w1"))
+      expect(ActivityDescriptionJob).to have_enqueued_sidekiq_job("i1", 12.4)
     end
 
     it "uses the workout's date in the athlete's timezone, not the UTC date" do
@@ -73,7 +71,7 @@ RSpec.describe WhoopWebhookProcessor do
 
       expect(intervals).to have_received(:update_wellness!)
       expect(intervals).not_to have_received(:update_activity!)
-      expect(generator).not_to have_received(:generate!)
+      expect(ActivityDescriptionJob.jobs).to be_empty
     end
 
     it "writes strain but skips the description for non-swim/bike/run matches" do
@@ -84,14 +82,16 @@ RSpec.describe WhoopWebhookProcessor do
       processor.process("workout.updated", "w1", "t1")
 
       expect(intervals).to have_received(:update_activity!).with("i3", WhoopWorkoutStrain: 12.4)
-      expect(generator).not_to have_received(:generate!)
+      expect(ActivityDescriptionJob.jobs).to be_empty
     end
 
-    it "never lets a description failure undo or fail the strain write" do
-      allow(generator).to receive(:generate!).and_raise("anthropic hiccup")
+    it "still enqueues the description when the strain write 422s (missing custom field)" do
+      allow(intervals).to receive(:update_activity!).and_raise(ApplicationService::HttpError.new(422, "no field", "url"))
+      allow(Rails.logger).to receive(:warn)
 
-      expect { processor.process("workout.updated", "w1", "t1") }.not_to raise_error
-      expect(intervals).to have_received(:update_activity!).with("i1", WhoopWorkoutStrain: 12.4)
+      processor.process("workout.updated", "w1", "t1")
+
+      expect(ActivityDescriptionJob).to have_enqueued_sidekiq_job("i1", 12.4)
     end
   end
 

@@ -25,17 +25,17 @@ module ActivityDescription
 
     # Generates and writes the description for an activity.
     # @param activity_id [String, Integer] The Intervals.icu activity id.
-    # @param whoop_workout [Hash, nil] The matched normalized Whoop workout ({strain:, …}),
-    #   or nil — the description is then composed without the 🔥 strain line.
-    def generate!(activity_id, whoop_workout: nil)
+    # @param whoop_strain [Float, nil] Optional Whoop strain for the 🔥 line, or nil — the
+    #   description is then composed without it (e.g. when triggered by a non-Whoop source).
+    def generate!(activity_id, whoop_strain: nil)
       with_dedup_lock(activity_id) do
-        run(activity_id, whoop_workout)
+        run(activity_id, whoop_strain)
       end
     end
 
     private
 
-    def run(activity_id, whoop_workout)
+    def run(activity_id, whoop_strain)
       activity = @intervals.activity!(activity_id)
       sport = ActivityMatcher.normalize_type(activity[:type])
 
@@ -56,7 +56,7 @@ module ActivityDescription
         water_temp: water_temp_line(activity, swim),
         power: Composer.power_block(activity),
         heat: heat_line(activity, swim),
-        whoop: Composer.whoop_block(whoop_workout&.dig(:strain), swim: swim),
+        whoop: Composer.whoop_block(whoop_strain, swim: swim),
         music: music_line(activity)
       )
 

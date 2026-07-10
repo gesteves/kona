@@ -86,7 +86,7 @@ RSpec.describe ActivityDescription::Generator do
     it "writes the composed description, preserving user prose above the stat block" do
       allow(intervals).to receive(:activity!).and_return(activity.merge(description: "Felt great.\n\n⚡️ Avg 190 W"))
 
-      generator.generate!("i1", whoop_workout: { id: "w1", strain: 12.42 })
+      generator.generate!("i1", whoop_strain: 12.42)
 
       expect(intervals).to have_received(:update_activity!).with(
         "i1",
@@ -281,7 +281,7 @@ RSpec.describe ActivityDescription::Generator do
       allow(trainer_road).to receive(:planned_workouts)
         .and_return([{ name: "Gibbs", sport: "Cycling", description: "2x20" }])
 
-      generator.generate!("i1", whoop_workout: { id: "w1", strain: 10.0 })
+      generator.generate!("i1", whoop_strain: 10.0)
 
       expect(intervals).to have_received(:update_activity!).with("i1", description: "⚡️ Avg 200 W\n🔥 10.0 Whoop Strain")
     end
