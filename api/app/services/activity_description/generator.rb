@@ -5,6 +5,9 @@ module ActivityDescription
   # Composer. Used by the Whoop workout.updated webhook; structured so a rake task or
   # endpoint could reuse it later.
   class Generator
+    # Prefix shared by every log line this generator emits, for greppability.
+    LOG_PREFIX = "Description:"
+
     # Activity types eligible for a generated description — swim/bike/run only.
     ELIGIBLE_SPORTS = %w[Cycling Running Swimming].freeze
 
@@ -40,11 +43,11 @@ module ActivityDescription
       sport = ActivityMatcher.normalize_type(activity[:type])
 
       unless ELIGIBLE_SPORTS.include?(sport)
-        Rails.logger.info("Description: activity #{activity_id} is not swim/bike/run (type=#{activity[:type] || 'unknown'}) — skipping")
+        log_info("activity #{activity_id} is not swim/bike/run (type=#{activity[:type] || 'unknown'}) — skipping")
         return
       end
       if activity[:pool_length].present?
-        Rails.logger.info("Description: activity #{activity_id} is a pool swim — skipping")
+        log_info("activity #{activity_id} is a pool swim — skipping")
         return
       end
 
@@ -61,12 +64,12 @@ module ActivityDescription
       )
 
       if description.blank?
-        Rails.logger.info("Description: activity #{activity_id}: composed description was empty — skipping write")
+        log_info("activity #{activity_id}: composed description was empty — skipping write")
         return
       end
 
       @intervals.update_activity!(activity_id, description: description)
-      Rails.logger.info("Description: activity #{activity_id}: description updated (#{description.length} chars)")
+      log_info("activity #{activity_id}: description updated (#{description.length} chars)")
     end
 
     # The 🗓️ planned-workout summary. The single TrainerRoad planned workout whose name
@@ -86,29 +89,28 @@ module ActivityDescription
       end
 
       if matches.empty?
-        Rails.logger.info("Description: no TR planned workout name appears in activity name #{activity[:name].inspect} — no headline")
+        log_info("no TR planned workout name appears in activity name #{activity[:name].inspect} — no headline")
         return
       end
       if matches.size > 1
-        Rails.logger.warn("Description: ambiguous TR name match for activity #{activity[:name].inspect}: #{matches.map { |m| m[:name] }.join(', ')} — refusing to pick, skipping headline")
+        log_warn("ambiguous TR name match for activity #{activity[:name].inspect}: #{matches.map { |m| m[:name] }.join(', ')} — refusing to pick, skipping headline")
         return
       end
 
       description = matches.first[:description]
       return if description.blank?
 
-      with_llm_rescue("planned summary") { Llm.planned_summary(description) }
+      safely("planned summary") { Llm.planned_summary(description) }
     end
 
     # @return [Array<Hash>] The TrainerRoad planned workouts for the activity's local date;
     #   empty when no feed is configured or the fetch fails (best-effort — a broken calendar
     #   must not lose the rest of the description).
     def planned_workouts_for(activity)
-      trainer_road = @trainer_road || TrainerRoad.new(@intervals.athlete_timezone)
-      trainer_road.planned_workouts(activity_date(activity)) || []
-    rescue StandardError => e
-      Rails.logger.warn("Description: failed to fetch TrainerRoad planned workouts: #{e.message}")
-      []
+      safely("TrainerRoad planned workouts", fallback: []) do
+        trainer_road = @trainer_road || TrainerRoad.new(@intervals.athlete_timezone)
+        trainer_road.planned_workouts(activity_date(activity)) || []
+      end
     end
 
     # The LLM weather sentence ("{emoji} {sentence}"). Indoor activities never get one.
@@ -119,7 +121,7 @@ module ActivityDescription
       text = @intervals.activity_weather_summary(activity[:id])
       return if text.blank?
 
-      result = with_llm_rescue("weather sentence") { Llm.weather_sentence(text) }
+      result = safely("weather sentence") { Llm.weather_sentence(text) }
       return if result.nil?
 
       "#{result[:emoji]} #{result[:sentence]}"
@@ -144,21 +146,25 @@ module ActivityDescription
     def heat_line(activity, swim)
       return if swim
 
-      max_hsi = nil
-      median_hsi = nil
-      if activity[:stream_types]&.include?("heat_strain_index")
-        samples = stream_data(activity[:id], "heat_strain_index")
-        if samples.present?
-          positive = samples.select(&:positive?)
-          max_hsi = round_tenth(samples.max)
-          median_hsi = round_tenth(median(positive.presence || samples) || 0)
-        end
-      end
+      max_hsi, median_hsi = heat_strain_values(activity)
 
       score = @intervals.wellness(activity_date(activity))&.dig(:CoreHeatAdaptationScore)
       score = nil unless score.is_a?(Numeric)
 
       Composer.heat_block(max_hsi: max_hsi, median_hsi: median_hsi, heat_adaptation_score: score, swim: swim)
+    end
+
+    # @return [Array(Numeric, Numeric), Array(nil, nil)] The [max, median] heat strain index
+    #   from the activity's HSI stream (median over positive samples only — CORE emits long
+    #   zero runs when thermoneutral), or [nil, nil] when the stream is absent or empty.
+    def heat_strain_values(activity)
+      return [nil, nil] unless activity[:stream_types]&.include?("heat_strain_index")
+
+      samples = stream_data(activity[:id], "heat_strain_index")
+      return [nil, nil] if samples.blank?
+
+      positive = samples.select(&:positive?)
+      [round_tenth(samples.max), round_tenth(median(positive.presence || samples) || 0)]
     end
 
     # The 🎧 music line, from Last.fm scrobbles during the activity's UTC time window.
@@ -167,14 +173,13 @@ module ActivityDescription
       return unless @lastfm.configured?
       return if activity[:start_date].blank?
 
-      start_time = Time.iso8601(activity[:start_date])
-      duration = activity[:moving_time] || activity[:elapsed_time] || 0
-      songs = @lastfm.played_songs_during(start_time, start_time + duration)
+      safely("Last.fm lookup") do
+        start_time = Time.iso8601(activity[:start_date])
+        duration = activity[:moving_time] || activity[:elapsed_time] || 0
+        songs = @lastfm.played_songs_during(start_time, start_time + duration)
 
-      Composer.music_block(songs)
-    rescue StandardError => e
-      Rails.logger.warn("Description: Last.fm lookup failed: #{e.message}")
-      nil
+        Composer.music_block(songs)
+      end
     end
 
     # @return [Array<Numeric>, nil] The named stream's numeric samples.
@@ -208,19 +213,22 @@ module ActivityDescription
         activity[:source].to_s.casecmp("zwift").zero?
     end
 
-    # Runs an LLM call, logging and swallowing failures so one flaky call loses only its
-    # own line — parity with domestique's Promise.allSettled split.
-    def with_llm_rescue(label)
+    # Runs a best-effort step (an LLM call, an external fetch), logging and swallowing any
+    # failure so one flaky source loses only its own line rather than the whole description —
+    # parity with domestique's Promise.allSettled split.
+    # @param fallback [Object] Value returned when the block raises (nil for a dropped line,
+    #   [] for a collection).
+    def safely(label, fallback: nil)
       yield
     rescue StandardError => e
-      Rails.logger.warn("Description: #{label} call failed: #{e.message}")
-      nil
+      log_warn("#{label} failed: #{e.message}")
+      fallback
     end
 
     def with_dedup_lock(activity_id)
       key = "whoop:description_lock:#{activity_id}"
       unless $redis.set(key, "1", nx: true, ex: LOCK_TTL.to_i)
-        Rails.logger.info("Description: activity #{activity_id}: description already being generated — skipping duplicate")
+        log_info("activity #{activity_id}: description already being generated — skipping duplicate")
         return
       end
 
@@ -229,6 +237,14 @@ module ActivityDescription
       ensure
         $redis.del(key)
       end
+    end
+
+    def log_info(message)
+      Rails.logger.info("#{LOG_PREFIX} #{message}")
+    end
+
+    def log_warn(message)
+      Rails.logger.warn("#{LOG_PREFIX} #{message}")
     end
   end
 end
