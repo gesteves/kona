@@ -149,5 +149,33 @@ RSpec.describe Lastfm do
 
       expect { service.played_songs_during(workout_start, workout_end) }.to raise_error(/Invalid API key/)
     end
+
+    it "does not retry a permanent Last.fm error body" do
+      allow(service).to receive(:sleep)
+      allow(service).to receive(:get_json!).and_return({ error: 10, message: "Invalid API key" })
+
+      expect { service.played_songs_during(workout_start, workout_end) }.to raise_error(/Invalid API key/)
+      expect(service).to have_received(:get_json!).once
+      expect(service).not_to have_received(:sleep)
+    end
+
+    it "retries a transient failure on the recent-tracks fetch" do
+      allow(service).to receive(:sleep) # skip the real backoff delay
+      attempt = 0
+      allow(service).to receive(:get_json!).with(
+        Lastfm::LASTFM_API_URL,
+        query: hash_including(method: "user.getrecenttracks")
+      ) do
+        attempt += 1
+        raise ApplicationService::HttpError.new(500, "boom", "url") if attempt == 1
+
+        { recenttracks: { track: [scrobble("Recovered")] } }
+      end
+
+      songs = service.played_songs_during(workout_start, workout_end)
+
+      expect(songs.map { |s| s[:name] }).to eq(["Recovered"])
+      expect(attempt).to eq(2)
+    end
   end
 end

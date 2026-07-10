@@ -50,12 +50,14 @@ class Lastfm < ApplicationService
 
   # GETs a Last.fm API method, merging in the shared credentials/format params. Last.fm signals
   # failures with an HTTP 200 carrying an error body, so that's raised here (not by get_json!).
-  # @raise [RuntimeError] when Last.fm returns an error body.
-  def lastfm_get(method, **params)
-    response = get_json!(
-      LASTFM_API_URL,
-      query: { method: method, api_key: @api_key, format: "json", **params }
-    )
+  # When retryable: true, transient transport failures (5xx/timeouts, which get_json! raises as
+  # HttpError) are retried with backoff; Last.fm error bodies come back as 200s and so are
+  # never retried — they're permanent and raise immediately.
+  # @raise [RuntimeError] on an error body, an empty body, or an exhausted retry.
+  def lastfm_get(method, retryable: false, **params)
+    query = { method: method, api_key: @api_key, format: "json", **params }
+    response = retryable ? with_retries { get_json!(LASTFM_API_URL, query: query) } : get_json!(LASTFM_API_URL, query: query)
+    raise "Last.fm #{method} request failed" if response.nil?
     raise "Last.fm error #{response[:error]}: #{response[:message]}" if response[:error].present?
 
     response
@@ -63,10 +65,11 @@ class Lastfm < ApplicationService
 
   # @return [Array<Hash>] Raw track hashes from user.getrecenttracks (extended=1 adds the
   #   loved flag and full artist names).
-  # @raise [RuntimeError] when Last.fm returns an error body.
+  # @raise [RuntimeError] when the fetch fails (after retries) or Last.fm returns an error body.
   def recent_tracks(from_sec, to_sec)
     response = lastfm_get(
       "user.getrecenttracks",
+      retryable: true,
       user: @username,
       limit: RECENT_TRACKS_LIMIT,
       from: from_sec,

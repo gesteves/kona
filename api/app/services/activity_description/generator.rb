@@ -175,7 +175,9 @@ module ActivityDescription
 
       safely("Last.fm lookup") do
         start_time = Time.iso8601(activity[:start_date])
-        duration = activity[:moving_time] || activity[:elapsed_time] || 0
+        # Wall-clock (elapsed) time, not moving time: you keep listening through stops and
+        # pauses, so the music window should span the whole session, not just moving time.
+        duration = activity[:elapsed_time] || activity[:moving_time] || 0
         songs = @lastfm.played_songs_during(start_time, start_time + duration)
 
         Composer.music_block(songs)
