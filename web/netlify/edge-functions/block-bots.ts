@@ -1,12 +1,16 @@
 import type { Config, Context } from '@netlify/edge-functions';
 
-// Blocks a distributed bot that hammers article pages from a generic Linux desktop
-// Chrome user agent while faking a Google search referrer. The traffic comes from
-// hundreds of rotating IPs worldwide, so it can't be blocklisted by address — the
-// only reliable signature is the UA + referrer combination, which is rare for genuine
-// visitors. Returning a 403 (instead of the page) means the bot never receives the
-// HTML or the client-side Plausible script, so it stops polluting analytics and
-// skewing the trending-articles widget.
+// Filters requests that share a distinctive signature: a generic Linux desktop Chrome
+// user agent combined with a faked Google search referrer, hitting article pages. A
+// burst of this traffic kept arriving before this function existed. We don't know who's
+// behind it, how it's driven, or why — only that the UA + referrer combination is the
+// one reliable tell (rare for genuine visitors), and that it spans enough IPs that
+// blocklisting by address isn't practical.
+//
+// For matching requests we return an empty 200 instead of the page. The point isn't to
+// stop the requests — we don't know whether anything we return changes their behavior —
+// it's that the response carries no HTML and no client-side Plausible script, so this
+// traffic stays out of Plausible and doesn't skew the trending-articles widget.
 
 // True when the UA looks like a plain Linux desktop Chrome browser (the shape the bot
 // sends: "Mozilla/5.0 (X11; Linux x86_64) … Chrome/… Safari/537.36"). Matches the
@@ -86,8 +90,9 @@ export default async function handler(
         '→ 200'
       )
     );
-    // no-store so the denial is never cached at the edge and can't leak onto a shared
-    // cache entry for this URL that would then be served to legitimate visitors.
+    // no-store so this empty response is never cached at the edge and can't leak onto a
+    // shared cache entry for this URL that would then be served to legitimate visitors.
+    // (A 200 is cacheable by default, so this matters more here than it would for an error.)
     return new Response(null, {
       status: 200,
       headers: {
