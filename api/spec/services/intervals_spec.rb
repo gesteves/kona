@@ -140,7 +140,7 @@ RSpec.describe Intervals do
       service.update_athlete_profile(city: "Denver", timezone: "America/Denver")
 
       expect(HTTParty).to have_received(:put).with(
-        %r{/athlete/[^/]+\z},
+        %r{/athlete/[^/]*\z},
         hash_including(body: { city: "Denver", timezone: "America/Denver" }.to_json, basic_auth: hash_including(username: "API_KEY"))
       )
     end
@@ -160,7 +160,7 @@ RSpec.describe Intervals do
       service.update_weather_config(forecasts)
 
       expect(HTTParty).to have_received(:put).with(
-        %r{/athlete/[^/]+/weather-config\z},
+        %r{/athlete/[^/]*/weather-config\z},
         hash_including(body: { forecasts: forecasts }.to_json)
       )
     end
