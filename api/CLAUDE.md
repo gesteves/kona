@@ -27,7 +27,7 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 | GET | `/widgets/articles/related/:id` | `widgets/articles#related` | HTML ("You May Also Like" — articles semantically related to `:id`, ranked from precomputed Voyage embeddings) | 1 hr |
 | GET | `/widgets/whoop` | `widgets/whoop#show` | HTML (sleep/recovery/strain) | 5 min |
 | GET | `/widgets/plausible/pageviews/:id` | `widgets/plausible#pageviews` | HTML (pageview count by Contentful id) | 1 hr |
-| POST | `/api/location` | `api/location#create` | sets Redis `location:current` (bearer-token gated) | — |
+| POST | `/api/location` | `api/location#create` | sets Redis `location:current` + enqueues a `LocationSyncJob` (bearer-token gated) | — |
 | POST | `/webhooks/contentful` | `webhooks/contentful#create` | enqueues a standard.site PDS sync job on publish/unpublish/delete (HMAC-gated); 204 | — |
 | POST | `/webhooks/whoop` | `webhooks/whoop#create` | enqueues a `WhoopWebhookJob` syncing strain/sleep/recovery to Intervals.icu wellness + regenerating the matched activity's description (HMAC-gated, user-verified); 200 `{ok: true}` | — |
 | GET | `/api/standard-site` | `api/standard_site#show` | JSON `{did, publication_uri}` for the web build's verification markup | 1 hr |
@@ -112,7 +112,13 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   unset), preserving any user-written prose above the stat block, deduped per activity by a
   Redis lock (`whoop:description_lock:*`). It's **source-agnostic**: the Whoop workout path
   enqueues it today (passing the matched workout's strain for the 🔥 line), but it's
-  re-triggerable by any future webhook with no strain, losing only that line. Args are plain
+  re-triggerable by any future webhook with no strain, losing only that line. Finally,
+  `LocationSyncJob(latitude, longitude)` propagates the current location to Intervals.icu
+  (enqueued by `POST /api/location`): via `LocationSync` / `LocationContext` it reverse-geocodes
+  the coordinates (`GoogleMaps`), then updates the athlete profile (city/state/country/timezone)
+  and replaces the weather config with a single current-location forecast — each write skipped
+  when Intervals.icu already matches, and the just-written timezone primed into the
+  `intervals.icu:timezone:*` cache. Args are plain
   strings/numbers and every operation is idempotent, so `retry: 5` is safe; exhausted
   retries land in the Dead set. Config in `config/initializers/sidekiq.rb` (Redis = `REDIS_URL`, web UI guard) and
   `config/sidekiq.yml` (concurrency). The **`/sidekiq` web UI** is mounted in `routes.rb` and

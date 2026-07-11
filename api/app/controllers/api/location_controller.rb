@@ -1,7 +1,8 @@
 module Api
   # Sets the current location used by the weather/Whoop widgets. A bearer-token-secured POST writes
   # the shared "location:current" Redis key (read by this app's Location service); this replaced the
-  # old Netlify build-hook ingress.
+  # old Netlify build-hook ingress. It also enqueues a LocationSyncJob to propagate the location to
+  # Intervals.icu (athlete profile + weather config) in the background.
   class LocationController < BaseController
     # The API_TOKEN bearer check is inherited from BaseController; only forgery protection
     # (this is a POST) needs handling here.
@@ -22,6 +23,10 @@ module Api
       end
 
       $redis.set(Location::LOCATION_CACHE_KEY, "#{latitude},#{longitude}")
+      # Propagate the location to Intervals.icu (athlete profile + weather config) off the
+      # request path. Redis is written first so a geocoding hiccup never blocks the location
+      # store; the sync is idempotent, so its Sidekiq retries are safe.
+      LocationSyncJob.perform_async(latitude, longitude)
       head :no_content
     end
   end

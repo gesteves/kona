@@ -30,6 +30,24 @@ RSpec.describe "Location", type: :request do
     expect(response).to have_http_status(:no_content)
   end
 
+  it "enqueues a LocationSyncJob to propagate the location to Intervals.icu" do
+    allow($redis).to receive(:set)
+
+    post "/api/location",
+      params: { latitude: 43.48, longitude: -110.76 },
+      headers: { "Authorization" => "Bearer #{token}" }
+
+    expect(LocationSyncJob).to have_enqueued_sidekiq_job(43.48, -110.76)
+  end
+
+  it "does not enqueue a sync for invalid coordinates" do
+    post "/api/location",
+      params: { latitude: 200, longitude: 0 },
+      headers: { "Authorization" => "Bearer #{token}" }
+
+    expect(LocationSyncJob.jobs).to be_empty
+  end
+
   it "rejects out-of-range coordinates" do
     post "/api/location",
       params: { latitude: 200, longitude: 0 },

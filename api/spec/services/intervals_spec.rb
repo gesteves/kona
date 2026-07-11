@@ -122,4 +122,54 @@ RSpec.describe Intervals do
       )
     end
   end
+
+  describe "location sync reads and writes" do
+    let(:ok) { instance_double(HTTParty::Response, success?: true, code: 200, body: "{}", request: nil) }
+
+    it "reads the athlete profile fresh (uncached) with basic auth" do
+      expect(service).to receive(:get_json!)
+        .with(a_string_matching(%r{/athlete/}), hash_including(basic_auth: hash_including(username: "API_KEY")))
+        .and_return({ city: "Denver", timezone: "America/Denver" })
+
+      expect(service.athlete_profile).to include(city: "Denver", timezone: "America/Denver")
+    end
+
+    it "PUTs only the present profile fields as JSON" do
+      allow(HTTParty).to receive(:put).and_return(ok)
+
+      service.update_athlete_profile(city: "Denver", timezone: "America/Denver")
+
+      expect(HTTParty).to have_received(:put).with(
+        %r{/athlete/[^/]+\z},
+        hash_including(body: { city: "Denver", timezone: "America/Denver" }.to_json, basic_auth: hash_including(username: "API_KEY"))
+      )
+    end
+
+    it "returns the weather-config forecasts array (empty when none configured)" do
+      allow(service).to receive(:get_json!).and_return({ forecasts: [{ id: 1 }] })
+      expect(service.weather_config).to eq([{ id: 1 }])
+
+      allow(service).to receive(:get_json!).and_return({})
+      expect(service.weather_config).to eq([])
+    end
+
+    it "PUTs the weather config wrapped under :forecasts" do
+      allow(HTTParty).to receive(:put).and_return(ok)
+      forecasts = [{ id: 0, provider: "OPEN_WEATHER", enabled: true }]
+
+      service.update_weather_config(forecasts)
+
+      expect(HTTParty).to have_received(:put).with(
+        %r{/athlete/[^/]+/weather-config\z},
+        hash_including(body: { forecasts: forecasts }.to_json)
+      )
+    end
+
+    it "primes the timezone cache with the same JSON encoding and 1-hour TTL athlete_timezone reads" do
+      service.cache_athlete_timezone("America/Denver")
+
+      expect($redis).to have_received(:setex)
+        .with(a_string_matching(/\Aintervals\.icu:timezone:/), 3600, "America/Denver".to_json)
+    end
+  end
 end

@@ -137,6 +137,61 @@ class Intervals < ApplicationService
     )
   end
 
+  # The athlete's profile (city/state/country/timezone and more), read fresh — deliberately
+  # uncached, since the location sync reads it to decide whether a write is needed. Raises on
+  # failure so the sync job can retry.
+  # @return [Hash]
+  # @raise [ApplicationService::HttpError]
+  def athlete_profile
+    get_json!("#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}", basic_auth: auth)
+  end
+
+  # Updates the athlete's profile location fields. Only the non-nil keys are sent, so a partial
+  # update never clears a field that wasn't resolved. Raises on failure.
+  # @raise [ApplicationService::HttpError]
+  def update_athlete_profile(city: nil, state: nil, country: nil, timezone: nil)
+    fields = { city: city, state: state, country: country, timezone: timezone }.compact
+    put_json!(
+      "#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}",
+      body: fields.to_json,
+      headers: { "Content-Type" => "application/json" },
+      basic_auth: auth
+    )
+  end
+
+  # The athlete's configured weather-forecast locations, read fresh (uncached) for the location
+  # sync's read-before-write comparison. Raises on failure.
+  # @return [Array<Hash>] The forecast locations (empty when none are configured).
+  # @raise [ApplicationService::HttpError]
+  def weather_config
+    response = get_json!("#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/weather-config", basic_auth: auth)
+    response&.dig(:forecasts) || []
+  end
+
+  # Replaces the athlete's weather-forecast locations. Raises on failure.
+  # @param forecasts [Array<Hash>]
+  # @raise [ApplicationService::HttpError]
+  def update_weather_config(forecasts)
+    put_json!(
+      "#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/weather-config",
+      body: { forecasts: forecasts }.to_json,
+      headers: { "Content-Type" => "application/json" },
+      basic_auth: auth
+    )
+  end
+
+  # Primes (overwrites) the cached athlete timezone with a known-authoritative value — used by
+  # the location sync right after it PUTs a new timezone, so athlete_timezone reflects it
+  # immediately instead of serving the stale cached value until the 1-hour TTL expires. Mirrors
+  # athlete_timezone's own storage (JSON-encoded value, 1-hour TTL) so it round-trips cleanly
+  # through cached_json. No-op in development, where cached_json bypasses the cache entirely.
+  # @param timezone [String] An IANA timezone id.
+  def cache_athlete_timezone(timezone)
+    return if Rails.env.development?
+
+    $redis.setex("intervals.icu:timezone:#{@athlete_id}", 1.hour.to_i, timezone.to_json)
+  end
+
   private
 
   # HTTP Basic credentials for every Intervals.icu call: the username is the literal
