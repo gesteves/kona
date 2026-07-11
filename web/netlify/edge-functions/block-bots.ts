@@ -1,23 +1,13 @@
 import type { Config, Context } from '@netlify/edge-functions';
 
-// Filters requests that share a distinctive signature: a generic Linux desktop Chrome
-// user agent combined with a faked Google search referrer, hitting article pages. A
-// burst of this traffic kept arriving before this function existed. We don't know who's
-// behind it, how it's driven, or why — only that the UA + referrer combination is the
-// one reliable tell (rare for genuine visitors), and that it spans enough IPs that
-// blocklisting by address isn't practical.
-//
-// For matching requests we return an empty 200 instead of the page. The point isn't to
-// stop the requests — we don't know whether anything we return changes their behavior —
-// it's that the response carries no HTML and no client-side Plausible script, so this
-// traffic stays out of Plausible and doesn't skew the trending-articles widget.
+// Filters a persistent, high-volume request stream that shares a client signature we
+// don't otherwise see from real visitors. Every IP is unique, so it can't be blocked by
+// address — the signature is the only handle. We return a 403 rather than the page, so
+// the response carries no HTML and no client-side Plausible script: this traffic stays
+// out of analytics and off the trending-articles widget.
 
-// True when the UA looks like a plain Linux desktop Chrome browser (the shape the bot
-// sends: "Mozilla/5.0 (X11; Linux x86_64) … Chrome/… Safari/537.36"). Matches the
-// family rather than a specific Chrome version, so bumping the version doesn't evade it.
-// Excludes user agents that identify a different browser (Edge, Opera, Brave, Firefox)
-// or a self-identified bot/crawler — real Googlebot/Bingbot/etc. self-identify here and
-// don't send a www.google.com referrer anyway.
+// True when the user agent matches the signature we're filtering and isn't a client that
+// self-identifies as something else.
 function isLinuxChrome(userAgent: string): boolean {
   const ua = userAgent.toLowerCase();
   const looksLikeLinuxChrome =
@@ -36,8 +26,8 @@ function isLinuxChrome(userAgent: string): boolean {
   return looksLikeLinuxChrome && !looksLikeSomethingElse;
 }
 
-// True when the referrer's host is a Google domain. Host-based so query strings and
-// paths don't matter; a missing or malformed referrer parses as "not Google".
+// True when the referrer host matches the signature. Host-based, so query strings and
+// paths don't matter; a missing or malformed referrer is not a match.
 function isGoogleReferrer(referer: string): boolean {
   if (!referer) return false;
   try {
@@ -87,15 +77,15 @@ export default async function handler(
         request,
         context,
         `Blocked ${request.method} ${url.pathname}`,
-        '→ 200'
+        '→ 403'
       )
     );
-    // no-store so this empty response is never cached at the edge and can't leak onto a
-    // shared cache entry for this URL that would then be served to legitimate visitors.
-    // (A 200 is cacheable by default, so this matters more here than it would for an error.)
-    return new Response(null, {
-      status: 200,
+    // no-store so the denial is never cached at the edge and can't leak onto a shared
+    // cache entry for this URL that legitimate visitors would then be served.
+    return new Response('403 Forbidden\n', {
+      status: 403,
       headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
         'Cache-Control': 'no-store',
       },
     });
