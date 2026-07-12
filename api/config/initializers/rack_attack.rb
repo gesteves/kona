@@ -13,7 +13,7 @@
 # So:
 #   * the blocklist matches PATH PATTERNS only (IP-agnostic) — it blocks the probe request
 #     itself, never bans an IP across paths, so it can't take down shared-IP traffic, and
-#   * the throttle keys on the real client IP (Fly-Client-IP) but applies ONLY to requests
+#   * the throttle keys on the real client IP (see client_ip below) but applies ONLY to requests
 #     outside the known route prefixes, so proxied widget traffic is never throttled.
 #
 # Enforcement is disabled in the test env (so the suite isn't rate-limited); the rules are still
@@ -59,12 +59,25 @@ rescue ArgumentError
   false
 end
 
-# Resolve the real client IP. Behind fly's proxy, Rack's own Request#ip can resolve to a shared
-# fly load-balancer address — which would make any per-IP rule effectively global — so prefer the
-# Fly-Client-IP header fly sets to the true client.
+# Resolve the real client IP, innermost proxy first.
+#
+# There can be two proxies in front of us. The zone is proxied through Cloudflare, so for any
+# request that came that way fly sees a CLOUDFLARE edge node as its client: Fly-Client-IP is the
+# PoP, not the visitor, and every distinct client collapses onto a handful of addresses — the
+# "per-IP rule is effectively global" failure the design note above warns about. Cloudflare puts
+# the true client in CF-Connecting-IP, so prefer it. Fall back to Fly-Client-IP for requests that
+# reach fly without passing through Cloudflare (and to Rack's own #ip in dev/test).
+#
+# Trust note: CF-Connecting-IP is only unspoofable on traffic that actually traversed Cloudflare;
+# a client hitting the fly origin directly could forge it. We accept that here because the only
+# thing keyed on this IP is the throttle below, which applies solely to paths OUTSIDE the known
+# route prefixes — so the worst a forged header buys is a 429 on requests that would 404 anyway.
+# It must NOT be used for anything that bans, and per the design note nothing bans by IP.
 class Rack::Attack::Request < ::Rack::Request
   def client_ip
-    @client_ip ||= get_header("HTTP_FLY_CLIENT_IP").presence || ip
+    @client_ip ||= get_header("HTTP_CF_CONNECTING_IP").presence ||
+                   get_header("HTTP_FLY_CLIENT_IP").presence ||
+                   ip
   end
 end
 

@@ -22,26 +22,45 @@ function headersToObject(
   return out;
 }
 
+// The zone is proxied through Cloudflare, so the client that connects to Netlify is a
+// Cloudflare edge node: context.ip / context.geo describe the PoP, not the visitor.
+// Cloudflare passes the real ones through in CF-* request headers. Fall back to Netlify's
+// own values when a request didn't come through Cloudflare (local dev, or a resolver still
+// pointing straight at the origin).
+function clientIp(request: Request, context: Context): string | undefined {
+  return request.headers.get('CF-Connecting-IP') ?? context.ip;
+}
+
+// CF-IPCountry is a 2-letter code present on every proxied request; CF-IPCity only exists
+// when the "Add visitor location headers" managed transform is enabled on the zone — hence
+// the country-only fallback rather than assuming a city.
+function clientGeo(request: Request, context: Context): string | undefined {
+  if (request.headers.get('CF-Connecting-IP')) {
+    const city = request.headers.get('CF-IPCity');
+    const country = request.headers.get('CF-IPCountry');
+    return [city, country].filter(Boolean).join(', ') || undefined;
+  }
+  return context.geo?.city && context.geo?.country?.name
+    ? `${context.geo.city}, ${context.geo.country.name}`
+    : context.geo?.city || context.geo?.country?.name;
+}
+
 // One pipe-separated request log line: the given lead-in parts, then the requester's
 // referrer, user agent, IP, and geo (when known). Mirrors the format of the widget proxy /
 // OG functions' requestLogLine (web/netlify/functions/lib/log.mts) — reimplemented inline
 // here rather than imported because that helper is a Node functions module and this runs in
-// the Deno edge runtime. context.ip is the visitor's origin IP address.
+// the Deno edge runtime.
 function requestLogLine(
   request: Request,
   context: Context,
   ...parts: (string | null | undefined)[]
 ): string {
-  const geo =
-    context.geo?.city && context.geo?.country?.name
-      ? `${context.geo.city}, ${context.geo.country.name}`
-      : context.geo?.city || context.geo?.country?.name;
   return [
     ...parts,
     request.headers.get('Referer'),
     request.headers.get('User-Agent'),
-    context.ip,
-    geo,
+    clientIp(request, context),
+    clientGeo(request, context),
   ]
     .filter(Boolean)
     .join(' | ');

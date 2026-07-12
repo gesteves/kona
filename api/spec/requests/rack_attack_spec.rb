@@ -90,4 +90,31 @@ RSpec.describe "Rack::Attack", type: :request do
     get "/no-such-page", headers: { "Fly-Client-IP" => "2.2.2.2" }
     expect(response).not_to have_http_status(:too_many_requests)
   end
+
+  # Behind Cloudflare, fly sees a Cloudflare edge node as its client, so Fly-Client-IP is the same
+  # PoP address for every visitor. CF-Connecting-IP carries the true client and must win, or the
+  # throttle collapses into a single global bucket keyed on the PoP.
+  it "prefers CF-Connecting-IP over Fly-Client-IP, isolating clients behind one Cloudflare PoP" do
+    21.times do
+      get "/no-such-page",
+          headers: { "CF-Connecting-IP" => "1.1.1.1", "Fly-Client-IP" => "172.70.0.1" }
+    end
+    expect(response).to have_http_status(:too_many_requests)
+
+    # A different visitor arriving through the SAME Cloudflare PoP keeps its own budget.
+    get "/no-such-page",
+        headers: { "CF-Connecting-IP" => "2.2.2.2", "Fly-Client-IP" => "172.70.0.1" }
+    expect(response).not_to have_http_status(:too_many_requests)
+  end
+
+  # Traffic that reaches fly without passing through Cloudflare has no CF-Connecting-IP; it must
+  # still be keyed on the real client. (This path is live: during DNS propagation, and via any
+  # route that bypasses the Cloudflare zone.)
+  it "falls back to Fly-Client-IP when CF-Connecting-IP is absent" do
+    21.times { get "/no-such-page", headers: { "Fly-Client-IP" => "3.3.3.3" } }
+    expect(response).to have_http_status(:too_many_requests)
+
+    get "/no-such-page", headers: { "Fly-Client-IP" => "4.4.4.4" }
+    expect(response).not_to have_http_status(:too_many_requests)
+  end
 end

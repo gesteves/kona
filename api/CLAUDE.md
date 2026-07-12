@@ -156,8 +156,12 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 - **Abuse mitigation** — `config/initializers/rack_attack.rb` (rack-attack middleware, wired
   up in `application.rb`). The origin is hit directly by vulnerability scanners, so it
   blocklists obvious probe paths (a flat 403 by **path pattern**, before routing) and throttles
-  requests **to paths outside the known route prefixes** (keyed on the real client IP via the
-  `Fly-Client-IP` header — Rack's `req.ip` resolves to a shared fly LB address behind the proxy).
+  requests **to paths outside the known route prefixes** (keyed on the real client IP via
+  `Request#client_ip`: **`CF-Connecting-IP` → `Fly-Client-IP` → `req.ip`**. There are two proxies
+  in front — the zone is proxied through **Cloudflare**, so `Fly-Client-IP` is a Cloudflare PoP,
+  not the visitor, and Rack's `req.ip` is a shared fly LB address. `CF-Connecting-IP` is only
+  trustworthy on traffic that actually traversed Cloudflare, so it must stay confined to the
+  throttle — never to anything that bans).
   ⚠️ The probe blocklist must stay **IP-agnostic** — never ban by IP. Some probe paths (e.g.
   `/widgets/.env`) are reachable through the public Netlify `/widgets/*` proxy, and all
   legitimate widget traffic shares the Netlify egress IPs, so an IP ban would 403 every
