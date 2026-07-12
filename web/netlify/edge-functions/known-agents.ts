@@ -64,7 +64,9 @@ async function trackVisit(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        request_path: url.pathname,
+        // Include the query string: referral params (utm_*, ref, etc.) are how AI-agent
+        // and LLM referral traffic is attributed.
+        request_path: url.pathname + url.search,
         request_method: request.method,
         request_headers: headersToObject(request.headers, SENSITIVE_HEADERS),
         response_status_code: response.status,
