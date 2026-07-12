@@ -45,11 +45,19 @@ function clientGeo(request: Request, context: Context): string | undefined {
     : context.geo?.city || context.geo?.country?.name;
 }
 
+// CF-Ray is set only on requests that actually traversed Cloudflare, so its presence is the
+// marker for "this came through the proxy" — the one thing the IP can no longer tell us, now
+// that we log the visitor's real IP on both paths. A line with no ray bypassed the zone (and
+// so bypassed the WAF). It's also the join key against the rayName field in Cloudflare's logs.
+function cloudflareRay(request: Request): string | undefined {
+  return request.headers.get('CF-Ray') ?? undefined;
+}
+
 // One pipe-separated request log line: the given lead-in parts, then the requester's
-// referrer, user agent, IP, and geo (when known). Mirrors the format of the widget proxy /
-// OG functions' requestLogLine (web/netlify/functions/lib/log.mts) — reimplemented inline
-// here rather than imported because that helper is a Node functions module and this runs in
-// the Deno edge runtime.
+// referrer, user agent, IP, geo, and Cloudflare ray (when known). Mirrors the format of the
+// widget proxy / OG functions' requestLogLine (web/netlify/functions/lib/log.mts) —
+// reimplemented inline here rather than imported because that helper is a Node functions
+// module and this runs in the Deno edge runtime.
 function requestLogLine(
   request: Request,
   context: Context,
@@ -61,6 +69,7 @@ function requestLogLine(
     request.headers.get('User-Agent'),
     clientIp(request, context),
     clientGeo(request, context),
+    cloudflareRay(request),
   ]
     .filter(Boolean)
     .join(' | ');

@@ -61,8 +61,17 @@ function clientGeo(request: Request, context: Context): string | undefined {
     : context.geo?.city || context.geo?.country?.name;
 }
 
+// CF-Ray is set only on requests that actually traversed Cloudflare, so its presence is the
+// marker for "this came through the proxy" — the one thing the IP can no longer tell us, now
+// that we log the visitor's real IP on both paths. A blocked line with NO ray is the one that
+// matters here: it bypassed the zone, so the upstream filter never saw it and this function is
+// the only thing that stopped it. That's the signal for whether this function is still needed.
+function cloudflareRay(request: Request): string | undefined {
+  return request.headers.get('CF-Ray') ?? undefined;
+}
+
 // One pipe-separated request log line: the given lead-in parts, then the requester's
-// referrer, user agent, IP, and geo (when known). Mirrors the format of the
+// referrer, user agent, IP, geo, and Cloudflare ray (when known). Mirrors the format of the
 // known-agents edge function (web/netlify/edge-functions/known-agents.ts) so blocked
 // requests read the same way as the rest of the edge logs.
 function requestLogLine(
@@ -76,6 +85,7 @@ function requestLogLine(
     request.headers.get('User-Agent'),
     clientIp(request, context),
     clientGeo(request, context),
+    cloudflareRay(request),
   ]
     .filter(Boolean)
     .join(' | ');

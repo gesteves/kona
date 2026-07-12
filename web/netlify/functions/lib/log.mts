@@ -23,9 +23,17 @@ export function clientGeo(req: Request, context: Context): string | undefined {
     : context.geo?.city || context.geo?.country?.name;
 }
 
+// CF-Ray is set only on requests that actually traversed Cloudflare, so its presence is the
+// marker for "this came through the proxy" — the one thing the IP can no longer tell us, now
+// that we log the visitor's real IP on both paths. A line with no ray bypassed the zone (and
+// so bypassed the WAF). It's also the join key against the rayName field in Cloudflare's logs.
+export function cloudflareRay(req: Request): string | undefined {
+  return req.headers.get('CF-Ray') ?? undefined;
+}
+
 // One pipe-separated request log line: the given lead-in parts, then the requester's
-// user agent, IP, and geo (when known). Shared by the widget proxy and the OG image
-// function. (This file isn't a function entry point — Netlify only treats
+// user agent, IP, geo, and Cloudflare ray (when known). Shared by the widget proxy and the
+// OG image function. (This file isn't a function entry point — Netlify only treats
 // <dir>/<dir>.mts or <dir>/index.mts as one — so it's import-only.)
 export function requestLogLine(
   req: Request,
@@ -37,6 +45,7 @@ export function requestLogLine(
     req.headers.get('User-Agent'),
     clientIp(req, context),
     clientGeo(req, context),
+    cloudflareRay(req),
   ]
     .filter(Boolean)
     .join(' | ');
