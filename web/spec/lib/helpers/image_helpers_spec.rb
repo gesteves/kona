@@ -113,6 +113,10 @@ RSpec.describe ImageHelpers do
       expect(contentful_image_url(original, fm: 'auto', w: 100)).to eq("#{original}?w=100")
     end
 
+    it 'drops gravity, which Contentful has no equivalent for either' do
+      expect(contentful_image_url(original, gravity: 'auto', w: 100)).to eq("#{original}?w=100")
+    end
+
     it "doesn't mutate the caller's params" do
       params = { fit: 'cover', fm: 'auto' }
       contentful_image_url(original, params)
@@ -141,9 +145,18 @@ RSpec.describe ImageHelpers do
       expect(url).to include('h=630')
     end
 
-    it 'pins the exact Contentful-branch URL, with cover translated to fill' do
+    it 'pins the exact Contentful-branch URL: cover translated to fill, gravity dropped' do
       url = open_graph_image_url('https://images.ctfassets.net/s/a/t/p.jpg')
       expect(url).to eq('https://images.ctfassets.net/s/a/t/p.jpg?w=1200&h=630&fit=fill')
+    end
+
+    it 'crops by saliency on Cloudflare, rather than taking the middle of the frame' do
+      stub_env(context: 'production', url: 'https://example.com')
+      url = open_graph_image_url('https://images.ctfassets.net/s/a/t/p.jpg')
+      expect(url).to eq(
+        'https://example.com/cdn-cgi/image/width=1200,height=630,fit=cover,gravity=auto/' \
+        'https://images.ctfassets.net/s/a/t/p.jpg'
+      )
     end
   end
 

@@ -97,7 +97,7 @@ module ImageHelpers
   end
 
   # Serializes transformation parameters into Cloudflare's comma-separated option string.
-  # @param params [Hash] The transformation parameters (:w, :h, :fm, :fit).
+  # @param params [Hash] The transformation parameters (:w, :h, :fm, :fit, :gravity).
   # @return [String] The options, in a fixed order.
   def cdn_image_options(params)
     options = []
@@ -106,6 +106,8 @@ module ImageHelpers
     options << "width=#{params[:w]}" if params[:w].present?
     options << "height=#{params[:h]}" if params[:h].present?
     options << "fit=#{params[:fit]}" if params[:fit].present?
+    # Only does anything alongside fit=cover, which is the only fit we ask for.
+    options << "gravity=#{params[:gravity]}" if params[:gravity].present?
     # Cloudflare rejects a URL with no options at all, so callers that want the image as-is
     # (the <img> fallback, animated gifs, the Open Graph logo) get anim=true — Cloudflare's
     # own default, so it transforms nothing. Emitting no format is the point: that's what
@@ -119,13 +121,16 @@ module ImageHelpers
   # to do the transforming (local builds, tests).
   # @see https://www.contentful.com/developers/docs/references/images-api/
   # @param original_url [String] The original URL of the image.
-  # @param params [Hash] (Optional) Transformation parameters (:w, :h, :fm, :fit).
+  # @param params [Hash] (Optional) Transformation parameters (:w, :h, :fm, :fit, :gravity).
   # @return [String] The Contentful image URL with the parameters merged in.
   def contentful_image_url(original_url, params = {})
     params = params.dup
     params[:fit] = 'fill' if params[:fit] == 'cover'
     # Contentful has no format=auto; drop it and let it serve the source format.
     params.delete(:fm) if params[:fm].to_s == 'auto'
+    # Nor any equivalent of gravity=auto — its focus areas are all fixed positions. Drop it and
+    # take the centered crop; this branch only ever renders local builds.
+    params.delete(:gravity)
     merge_query(original_url, params)
   end
 
@@ -156,10 +161,13 @@ module ImageHelpers
   end
 
   # Generates a CDN URL for an Open Graph image based on Facebook's size guidelines.
+  # The 1200x630 card is a hard crop out of whatever aspect ratio the original is, so it asks
+  # Cloudflare to pick the crop region by saliency (gravity: auto) rather than just taking the
+  # middle, which tends to behead people in portrait shots.
   # @param original_url [String] The original URL of the image.
   # @return [String] The CDN URL for the Open Graph image.
   def open_graph_image_url(original_url)
-    params = { w: 1200, h: 630, fit: 'cover' }
+    params = { w: 1200, h: 630, fit: 'cover', gravity: 'auto' }
     cdn_image_url(original_url, params)
   end
 
