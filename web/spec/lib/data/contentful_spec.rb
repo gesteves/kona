@@ -280,33 +280,24 @@ RSpec.describe Contentful do
     end
   end
 
-  describe '#rewrite_image_urls' do
-    def with_cloudfront(domain)
-      allow(ENV).to receive(:[]).and_call_original
-      allow(ENV).to receive(:[]).with('CLOUDFRONT_DOMAIN').and_return(domain)
-    end
-
-    it 'rewrites Contentful asset URLs to CloudFront with a cache-busting version' do
-      with_cloudfront('cdn.example.com')
-      item = transform(:rewrite_image_urls, { url: 'https://images.ctfassets.net/space/a.jpg', sys: { published_version: 3 } })
-      expect(item[:url]).to eq('https://cdn.example.com/space/a.jpg?v=3')
+  describe '#stamp_asset_versions' do
+    it 'stamps Contentful asset URLs with a cache-busting published version' do
+      item = transform(:stamp_asset_versions, { url: 'https://images.ctfassets.net/space/a.jpg', sys: { published_version: 3 } })
+      expect(item[:url]).to eq('https://images.ctfassets.net/space/a.jpg?v=3')
     end
 
     it 'appends the version to an existing query string' do
-      with_cloudfront('cdn.example.com')
-      item = transform(:rewrite_image_urls, { url: 'https://images.ctfassets.net/space/a.jpg?fm=jpg', sys: { published_version: 3 } })
-      expect(item[:url]).to eq('https://cdn.example.com/space/a.jpg?fm=jpg&v=3')
+      item = transform(:stamp_asset_versions, { url: 'https://images.ctfassets.net/space/a.jpg?fm=jpg', sys: { published_version: 3 } })
+      expect(item[:url]).to eq('https://images.ctfassets.net/space/a.jpg?fm=jpg&v=3')
     end
 
     it 'leaves non-Contentful URLs alone' do
-      with_cloudfront('cdn.example.com')
-      item = transform(:rewrite_image_urls, { url: 'https://elsewhere.example.com/a.jpg', sys: { published_version: 3 } })
+      item = transform(:stamp_asset_versions, { url: 'https://elsewhere.example.com/a.jpg', sys: { published_version: 3 } })
       expect(item[:url]).to eq('https://elsewhere.example.com/a.jpg')
     end
 
-    it 'is a no-op without a CloudFront domain' do
-      with_cloudfront(nil)
-      item = transform(:rewrite_image_urls, { url: 'https://images.ctfassets.net/space/a.jpg', sys: { published_version: 3 } })
+    it 'leaves unpublished assets alone, since there is no version to stamp' do
+      item = transform(:stamp_asset_versions, { url: 'https://images.ctfassets.net/space/a.jpg', sys: {} })
       expect(item[:url]).to eq('https://images.ctfassets.net/space/a.jpg')
     end
   end

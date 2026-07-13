@@ -26,10 +26,6 @@ entry:
     - 1258
     - 1128
     - 1014
-  formats:
-    - avif
-    - webp
-    - jpg
 full:
   sizes:
     - auto
@@ -58,10 +54,6 @@ full:
     - 320
     - 1320
     - 1206
-  formats:
-    - avif
-    - webp
-    - jpg
 avatar:
   sizes:
     - auto
@@ -75,10 +67,6 @@ avatar:
     - 126
     - 123
     - 208
-  formats:
-    - avif
-    - webp
-    - jpg
 home:
   sizes:
     - auto
@@ -98,7 +86,3 @@ home:
     - 550
     - 762
     - 194
-  formats:
-    - avif
-    - webp
-    - jpg

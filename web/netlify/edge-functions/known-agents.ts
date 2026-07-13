@@ -166,7 +166,8 @@ export const config: Config = {
     '/plsbl/*',
     '/ifttt/*',
     '/.well-known/*',
-    '/.netlify/images*',
+    // No entry for image transformations: they're served from /cdn-cgi/*, which Cloudflare
+    // answers at its own edge, so the request never reaches Netlify — or us.
     '/favicon.ico',
     '/*.png',
     '/*.jpg',

@@ -136,7 +136,7 @@ class Contentful
   # Processes assets from the fetched content.
   def process_assets
     @content[:assets].map! do |item|
-      rewrite_image_urls(item)
+      stamp_asset_versions(item)
     end
   end
 
@@ -331,25 +331,24 @@ class Contentful
     page_number == 1 ? "#{base_path}/index.html" : "#{base_path}/page/#{page_number}/index.html"
   end
 
-  # Rewrites Contentful image URLs to CloudFront URLs.
+  # Stamps Contentful asset URLs with their published version, as a cache buster. Contentful
+  # reuses an asset's URL when the file behind it is replaced, and Cloudflare keys its image
+  # transformation cache on the source URL — so without this, a republished asset would serve
+  # its old transformations forever.
   # @param item [Hash] The asset to be processed.
-  # @return [Hash] The asset with the image URLs rewritten.
-  def rewrite_image_urls(item)
-    return item if ENV['CLOUDFRONT_DOMAIN'].blank?
+  # @return [Hash] The asset with its URL stamped.
+  def stamp_asset_versions(item)
     uri = URI.parse(item[:url])
     version = item.dig(:sys, :published_version)
     domain = PublicSuffix.domain(uri.host)
 
-    if domain == 'ctfassets.net'
-      uri.host = ENV['CLOUDFRONT_DOMAIN']
-      if version.present?
-        uri.query = uri.query.to_s.empty? ? "v=#{version}" : "#{uri.query}&v=#{version}"
-      end
+    if domain == 'ctfassets.net' && version.present?
+      uri.query = uri.query.to_s.empty? ? "v=#{version}" : "#{uri.query}&v=#{version}"
       item[:url] = uri.to_s
     end
     item
   rescue => e
-    puts "Error rewriting image URL: #{e.message}"
+    puts "Error stamping asset URL: #{e.message}"
     item
   end
 

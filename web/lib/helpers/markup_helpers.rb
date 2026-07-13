@@ -21,7 +21,7 @@ module MarkupHelpers
       add_figure_elements_to_embeds(doc, base_class: 'entry')
       set_caption_credit(doc)
       wrap_figcaption_emoji(doc)
-      responsivize_images(doc, widths: srcset.widths, sizes: srcset.sizes.join(', '), formats: srcset.formats)
+      responsivize_images(doc, widths: srcset.widths, sizes: srcset.sizes.join(', '))
       resize_images(doc, width: srcset.widths.max)
       add_image_placeholders(doc)
       set_alt_text(doc)
@@ -56,7 +56,7 @@ module MarkupHelpers
       add_image_data_attributes(doc)
       add_figure_elements_to_images(doc, base_class: 'home')
       set_caption_credit(doc)
-      responsivize_images(doc, widths: data.srcsets.home.widths, sizes: data.srcsets.home.sizes.join(', '), formats: data.srcsets.entry.formats, square: true)
+      responsivize_images(doc, widths: data.srcsets.home.widths, sizes: data.srcsets.home.sizes.join(', '), square: true)
       resize_images(doc)
       add_image_placeholders(doc)
       set_alt_text(doc)
@@ -285,15 +285,17 @@ module MarkupHelpers
   end
 
   # Makes images responsive within HTML by wrapping image elements in a picture element
-  # using source elements with srcsets/sizes in various formats.
+  # using a srcset and sizes on the image itself. There's no <picture> element and no per-format
+  # source tags: the srcset asks for format=auto, so Cloudflare negotiates avif/webp/jpeg from
+  # the request's Accept header. That also keeps each candidate to a single billable
+  # transformation, where one candidate per format would be three.
   # @param html [String, Nokogiri::XML::Node] The HTML content with image elements.
   # @param widths [Array<Integer>] The widths for which to generate responsive images.
   # @param sizes [String] The sizes attribute value for the image element.
-  # @param formats [Array<String>] The image formats to include (e.g., 'avif', 'webp', 'jpg').
   # @param lazy [Boolean] Whether to enable lazy loading for images.
   # @param square [Boolean] Whether to crop images square.
-  # @return [String, Nokogiri::XML::Node] The HTML content with responsive picture elements.
-  def responsivize_images(html, widths: [100, 200, 300], sizes: '100vw', formats: ['avif', 'webp', 'jpg'], lazy: true, square: false)
+  # @return [String, Nokogiri::XML::Node] The HTML content with responsive images.
+  def responsivize_images(html, widths: [100, 200, 300], sizes: '100vw', lazy: true, square: false)
     with_nokogiri_doc(html) do |doc|
       each_asset_image(doc) do |img, asset_id, original_url|
         width, height = get_asset_dimensions(asset_id)
@@ -319,29 +321,10 @@ module MarkupHelpers
         # Skip to the next image if it's a gif.
         next if content_type == 'image/gif'
 
-        # Then wrap it in a picture element.
-        img.wrap('<picture></picture>')
-
-        # Add a source element for each image format,
-        # as a sibling of the img element in the picture tag.
-        formats.each do |format|
-          img.add_previous_sibling(source_tag(original_url, sizes: sizes, type: "image/#{format}", format: format, widths: img_widths, square: square))
-        end
+        img['sizes'] = sizes
+        img['srcset'] = srcset(url: original_url, widths: img_widths, square: square, options: { fm: 'auto' })
       end
     end
-  end
-
-  # Generates a <source> HTML tag with a srcset.
-  # @param url [String] The URL of the image.
-  # @param options [Hash] (Optional) Additional options for the <source> tag.
-  # @return [String] The HTML <source> tag.
-  def source_tag(url, options = {})
-    srcset_opts = { fm: options[:format] }.compact
-    options[:srcset] = srcset(url: url, widths: options[:widths], square: options[:square], options: srcset_opts)
-    options.delete(:widths)
-    options.delete(:format)
-    options.delete(:square)
-    tag :source, options
   end
 
   # Resizes images within HTML to a specified width.
@@ -355,7 +338,9 @@ module MarkupHelpers
         content_type = get_asset_content_type(asset_id)
 
         img['src'] = if content_type == 'image/gif'
-          # GIFs aren't resized (the Images API would drop the animation).
+          # GIFs are passed through untransformed, which is what keeps them animated: cdn_image_url
+          # emits no format for a params-less call, so Cloudflare re-encodes nothing. Give this one
+          # a width and it'll flatten to a still frame.
           cdn_image_url(original_url)
         else
           cdn_image_url(original_url, { w: [width, asset_width].compact.min })
