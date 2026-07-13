@@ -81,7 +81,7 @@ module ImageHelpers
   # production: it's slower, and it's the Contentful bandwidth drain we moved off of.
   # @see https://developers.cloudflare.com/images/transform-images/transform-via-url/
   # @param original_url [String, nil] The original URL of the image.
-  # @param params [Hash] (Optional) Transformation parameters (:w, :h, :fm, :fit, :gravity).
+  # @param params [Hash] (Optional) Transformation parameters (:w, :h, :fm, :fit).
   # @return [String, nil] The CDN image URL, or nil for a blank URL (e.g. a site entry with
   #   no logo) so callers don't crash the build.
   def cdn_image_url(original_url, params = {})
@@ -100,7 +100,7 @@ module ImageHelpers
   end
 
   # Serializes transformation parameters into Cloudflare's comma-separated option string.
-  # @param params [Hash] The transformation parameters (:w, :h, :fm, :fit, :gravity).
+  # @param params [Hash] The transformation parameters (:w, :h, :fm, :fit).
   # @return [String] The options, in a fixed order.
   def cdn_image_options(params)
     options = []
@@ -109,8 +109,6 @@ module ImageHelpers
     options << "width=#{params[:w]}" if params[:w].present?
     options << "height=#{params[:h]}" if params[:h].present?
     options << "fit=#{params[:fit]}" if params[:fit].present?
-    # Only does anything alongside fit=cover, which is the only fit we ask for.
-    options << "gravity=#{params[:gravity]}" if params[:gravity].present?
     # Cloudflare rejects a URL with no options at all, so callers that want the image as-is
     # (the <img> fallback, animated gifs, the Open Graph logo) get anim=true — Cloudflare's
     # own default, so it transforms nothing. Emitting no format is the point: that's what
@@ -123,20 +121,17 @@ module ImageHelpers
   # Generates a Contentful Images API URL. Two callers: cdn_image_url, when it has no host to
   # build a Cloudflare URL with, and encode_blurhash — which uses it deliberately, so that
   # generating a placeholder never depends on our zone being up or on Cloudflare's quota.
-  # Fidelity is lower than Cloudflare's (no auto format, no saliency crop), which is fine for
-  # both: a local preview and a 32px thumbnail nobody sees.
+  # Fidelity is lower than Cloudflare's (no auto format), which is fine for both: a local
+  # preview and a 32px thumbnail nobody sees.
   # @see https://www.contentful.com/developers/docs/references/images-api/
   # @param original_url [String] The original URL of the image.
-  # @param params [Hash] (Optional) Transformation parameters (:w, :h, :fm, :fit, :gravity).
+  # @param params [Hash] (Optional) Transformation parameters (:w, :h, :fm, :fit).
   # @return [String] The Contentful image URL with the parameters merged in.
   def contentful_image_url(original_url, params = {})
     params = params.dup
     params[:fit] = 'fill' if params[:fit] == 'cover'
     # Contentful has no format=auto; drop it and let it serve the source format.
     params.delete(:fm) if params[:fm].to_s == 'auto'
-    # Nor any equivalent of gravity=auto — its focus areas are all fixed positions. Drop it and
-    # take the centered crop; this branch only ever renders local builds.
-    params.delete(:gravity)
     merge_query(original_url, params)
   end
 
@@ -167,13 +162,12 @@ module ImageHelpers
   end
 
   # Generates a CDN URL for an Open Graph image based on Facebook's size guidelines.
-  # The 1200x630 card is a hard crop out of whatever aspect ratio the original is, so it asks
-  # Cloudflare to pick the crop region by saliency (gravity: auto) rather than just taking the
-  # middle, which tends to behead people in portrait shots.
+  # Deliberately centre-cropped: Cloudflare's gravity=auto picks the crop by saliency, but on
+  # these photos it's unpredictable, and a boring crop beats a surprising one.
   # @param original_url [String] The original URL of the image.
   # @return [String] The CDN URL for the Open Graph image.
   def open_graph_image_url(original_url)
-    params = { w: 1200, h: 630, fit: 'cover', gravity: 'auto' }
+    params = { w: 1200, h: 630, fit: 'cover' }
     cdn_image_url(original_url, params)
   end
 
