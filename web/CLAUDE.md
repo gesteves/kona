@@ -92,6 +92,13 @@ Names only — see `.env.example`; never commit values.
 - **Build credential**: `WEBAWESOME_NPM_TOKEN` — Web Awesome Pro npm registry auth, read
   by `.npmrc` at `npm install` (not in `.env`). Set it in your shell and in Netlify's
   build env, or the install fails.
+- **Images**: `IMAGES_URL` — the host Cloudflare Images serves transformations from
+  (`<host>/cdn-cgi/image/…`), i.e. the site's public host. **Set it in Netlify's env**: without it
+  `cdn_image_url` silently falls back to Contentful's resizing, which renders fine but drains
+  Contentful's asset bandwidth — the thing Cloudflare Images exists to avoid. Locally it's optional;
+  set it and `middleman server` renders what production serves (auto avif/webp, saliency-cropped OG
+  cards). Cloudflare must have Transformations enabled with `images.ctfassets.net` allowlisted as a
+  source, or every image 403s.
 - **Optional**: `DARK_VISITORS_ACCESS_TOKEN`, `FONT_AWESOME_VERSION`
   (overrides the version in `data/font_awesome.yml`, the committed default).
 

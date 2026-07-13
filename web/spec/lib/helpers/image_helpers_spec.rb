@@ -5,10 +5,11 @@ RSpec.describe ImageHelpers do
   # Shaped like data.assets; @assets is set per example before the index is built.
   def data = OpenStruct.new(assets: @assets || [])
 
-  def stub_env(context: nil, url: nil)
+  # IMAGES_URL is the host Cloudflare serves transformations from, and the only thing that decides
+  # whether an image is resized by Cloudflare or by Contentful. Nothing here reads CONTEXT or URL.
+  def stub_env(images_url: nil)
     allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with('CONTEXT').and_return(context)
-    allow(ENV).to receive(:[]).with('URL').and_return(url)
+    allow(ENV).to receive(:[]).with('IMAGES_URL').and_return(images_url)
   end
 
   before { stub_env }
@@ -78,7 +79,7 @@ RSpec.describe ImageHelpers do
     end
 
     context 'on a deployed build (Cloudflare Images)' do
-      before { stub_env(context: 'production', url: 'https://example.com') }
+      before { stub_env(images_url: 'https://example.com') }
 
       it 'routes through Cloudflare, with the options in the path and the source URL after them' do
         url = cdn_image_url(original, w: 100)
@@ -134,7 +135,7 @@ RSpec.describe ImageHelpers do
       set = srcset(url: 'https://images.ctfassets.net/s/a/t/p.jpg', widths: [100], square: true)
       expect(set).to include('w=100')
       expect(set).to include('h=100')
-      expect(set).to include('fit=fill') # cover → fill outside Netlify
+      expect(set).to include('fit=fill') # cover → fill without an images host
     end
   end
 
@@ -151,7 +152,7 @@ RSpec.describe ImageHelpers do
     end
 
     it 'crops by saliency on Cloudflare, rather than taking the middle of the frame' do
-      stub_env(context: 'production', url: 'https://example.com')
+      stub_env(images_url: 'https://example.com')
       url = open_graph_image_url('https://images.ctfassets.net/s/a/t/p.jpg')
       expect(url).to eq(
         'https://example.com/cdn-cgi/image/width=1200,height=630,fit=cover,gravity=auto/' \
@@ -185,7 +186,7 @@ RSpec.describe ImageHelpers do
   describe '#cdn_image_url exact Cloudflare output' do
     let(:source) { 'https://images.ctfassets.net/space/asset-1/token/photo.jpg' }
 
-    before { stub_env(context: 'production', url: 'https://example.com') }
+    before { stub_env(images_url: 'https://example.com') }
 
     it 'pins the option order, and renames fm=jpg to format=jpeg' do
       url = cdn_image_url(source, w: 100, h: 50, fm: 'jpg', fit: 'cover')
@@ -309,7 +310,7 @@ RSpec.describe ImageHelpers do
       # zone. Routing it through Cloudflare would make the build depend on the zone being up, and
       # would spend a transformation on an image no visitor ever sees.
       it 'downloads the thumbnail from Contentful, not through the CDN' do
-        stub_env(context: 'production', url: 'https://example.com')
+        stub_env(images_url: 'https://example.com')
         allow(MiniMagick::Image).to receive(:open).and_raise(StandardError, 'stop here')
         allow(self).to receive(:warn)
 

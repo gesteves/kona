@@ -73,12 +73,15 @@ module ImageHelpers
   end
 
   # Generates a CDN image URL with optional transformation parameters.
-  # Uses Cloudflare Images on a deployed build, and Contentful's Images API otherwise — locally
-  # there's no Cloudflare zone in front of us to do the transforming.
+  # Cloudflare serves transformations from a host it fronts, so this needs to know which one:
+  # IMAGES_URL. Set it and `middleman server` renders exactly what production does — auto
+  # avif/webp, saliency-cropped Open Graph cards — with the images fetched from the live zone.
+  # Leave it unset and there's no host to hang a transformation off, so we ask Contentful to do
+  # the resizing instead. That's a fine local fallback, but it is NOT what we want in
+  # production: it's slower, and it's the Contentful bandwidth drain we moved off of.
   # @see https://developers.cloudflare.com/images/transform-images/transform-via-url/
-  # @see https://www.contentful.com/developers/docs/references/images-api/
   # @param original_url [String, nil] The original URL of the image.
-  # @param params [Hash] (Optional) Transformation parameters (:w, :h, :fm, :fit).
+  # @param params [Hash] (Optional) Transformation parameters (:w, :h, :fm, :fit, :gravity).
   # @return [String, nil] The CDN image URL, or nil for a blank URL (e.g. a site entry with
   #   no logo) so callers don't crash the build.
   def cdn_image_url(original_url, params = {})
@@ -90,10 +93,10 @@ module ImageHelpers
     asset_id = get_asset_id(original_url)
     asset_url = get_asset_url(asset_id)
     original_url = asset_url if asset_url.present?
-    return contentful_image_url(original_url, params) unless netlify?
+    return contentful_image_url(original_url, params) if ENV['IMAGES_URL'].blank?
 
     original_url = "https:#{original_url}" if original_url.start_with?('//')
-    "#{ENV['URL']}#{CDN_IMAGE_PATH}#{cdn_image_options(params)}/#{original_url}"
+    "#{ENV['IMAGES_URL']}#{CDN_IMAGE_PATH}#{cdn_image_options(params)}/#{original_url}"
   end
 
   # Serializes transformation parameters into Cloudflare's comma-separated option string.
@@ -117,8 +120,11 @@ module ImageHelpers
     options.join(',')
   end
 
-  # Generates a Contentful Images API URL, for when there's no Cloudflare zone in front of us
-  # to do the transforming (local builds, tests).
+  # Generates a Contentful Images API URL. Two callers: cdn_image_url, when it has no host to
+  # build a Cloudflare URL with, and encode_blurhash — which uses it deliberately, so that
+  # generating a placeholder never depends on our zone being up or on Cloudflare's quota.
+  # Fidelity is lower than Cloudflare's (no auto format, no saliency crop), which is fine for
+  # both: a local preview and a 32px thumbnail nobody sees.
   # @see https://www.contentful.com/developers/docs/references/images-api/
   # @param original_url [String] The original URL of the image.
   # @param params [Hash] (Optional) Transformation parameters (:w, :h, :fm, :fit, :gravity).
