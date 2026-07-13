@@ -280,25 +280,9 @@ RSpec.describe Contentful do
     end
   end
 
-  describe '#stamp_asset_versions' do
-    it 'stamps Contentful asset URLs with a cache-busting published version' do
-      item = transform(:stamp_asset_versions, { url: 'https://images.ctfassets.net/space/a.jpg', sys: { published_version: 3 } })
-      expect(item[:url]).to eq('https://images.ctfassets.net/space/a.jpg?v=3')
-    end
-
-    it 'appends the version to an existing query string' do
-      item = transform(:stamp_asset_versions, { url: 'https://images.ctfassets.net/space/a.jpg?fm=jpg', sys: { published_version: 3 } })
-      expect(item[:url]).to eq('https://images.ctfassets.net/space/a.jpg?fm=jpg&v=3')
-    end
-
-    it 'leaves non-Contentful URLs alone' do
-      item = transform(:stamp_asset_versions, { url: 'https://elsewhere.example.com/a.jpg', sys: { published_version: 3 } })
-      expect(item[:url]).to eq('https://elsewhere.example.com/a.jpg')
-    end
-
-    it 'leaves unpublished assets alone, since there is no version to stamp' do
-      item = transform(:stamp_asset_versions, { url: 'https://images.ctfassets.net/space/a.jpg', sys: {} })
-      expect(item[:url]).to eq('https://images.ctfassets.net/space/a.jpg')
-    end
-  end
+  # Asset URLs are used exactly as Contentful returns them — no rewriting, and no cache buster.
+  # Replacing an asset's file gives it a new token segment, so the URL changes on its own; that's
+  # what invalidates Cloudflare's cached transformations of it. A query param wouldn't work
+  # anyway: Cloudflare passes the source URL to Contentful verbatim, and Contentful rejects any
+  # parameter it doesn't recognize (ParameterNotAllowed).
 end

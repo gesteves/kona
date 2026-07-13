@@ -197,11 +197,6 @@ RSpec.describe ImageHelpers do
       expect(url).to eq("https://example.com/cdn-cgi/image/width=50/#{source}")
     end
 
-    it 'keeps a version-stamped source URL intact' do
-      url = cdn_image_url("#{source}?v=15", w: 100)
-      expect(url).to eq("https://example.com/cdn-cgi/image/width=100/#{source}?v=15")
-    end
-
     # The candidates are joined with ", " — commas also separate Cloudflare's options, so the
     # space is what keeps the srcset parseable. Don't join with a bare comma.
     it 'builds a srcset whose candidates stay distinguishable from the option commas' do
