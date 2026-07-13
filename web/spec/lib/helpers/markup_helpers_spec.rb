@@ -407,57 +407,39 @@ RSpec.describe MarkupHelpers do
       allow(self).to receive(:get_asset_content_type).with('asset-1').and_return('image/jpeg')
     end
 
-    it 'wraps the image in a picture with one source per format, dropping widths larger than the asset' do
-      transformed_html = responsivize_images(tagged_img, widths: [100, 200, 300], sizes: '100vw', formats: ['webp', 'jpg'])
+    # No <picture> and no per-format <source>: one srcset asking for format=auto, which Cloudflare
+    # negotiates from the Accept header.
+    it 'puts a format=auto srcset on the image, dropping widths larger than the asset' do
+      transformed_html = responsivize_images(tagged_img, widths: [100, 200, 300], sizes: '100vw')
       expect(transformed_html).to eq(
-        %(<picture>) +
-        %(<source sizes="100vw" type="image/webp" srcset="#{image_url}?fm=webp&amp;w=100 100w, #{image_url}?fm=webp&amp;w=200 200w"></source>) +
-        %(<source sizes="100vw" type="image/jpg" srcset="#{image_url}?fm=jpg&amp;w=100 100w, #{image_url}?fm=jpg&amp;w=200 200w"></source>) +
-        %(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}" loading="lazy" width="200" height="100">) +
-        %(</picture>)
+        %(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}" loading="lazy" width="200" height="100" ) +
+        %(sizes="100vw" srcset="#{image_url}?fm=auto&amp;w=100 100w, #{image_url}?fm=auto&amp;w=200 200w">)
       )
     end
 
     it 'inserts the asset width as a srcset candidate when it falls below the largest requested width' do
       allow(self).to receive(:get_asset_dimensions).with('asset-1').and_return([150, 75])
-      transformed_html = responsivize_images(tagged_img, widths: [100, 300], sizes: '100vw', formats: ['jpg'])
-      expect(transformed_html).to include(%(srcset="#{image_url}?fm=jpg&amp;w=100 100w, #{image_url}?fm=jpg&amp;w=150 150w"))
+      transformed_html = responsivize_images(tagged_img, widths: [100, 300], sizes: '100vw')
+      expect(transformed_html).to include(%(srcset="#{image_url}?fm=auto&amp;w=100 100w, #{image_url}?fm=auto&amp;w=150 150w"))
     end
 
-    it 'crops square sources and sets the height to the width when square' do
-      transformed_html = responsivize_images(tagged_img, widths: [100], sizes: '100vw', formats: ['jpg'], square: true, lazy: false)
+    it 'crops square candidates and sets the height to the width when square' do
+      transformed_html = responsivize_images(tagged_img, widths: [100], sizes: '100vw', square: true, lazy: false)
       expect(transformed_html).to eq(
-        %(<picture>) +
-        %(<source sizes="100vw" type="image/jpg" srcset="#{image_url}?fm=jpg&amp;w=100&amp;h=100&amp;fit=cover 100w"></source>) +
-        %(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}" width="200" height="200">) +
-        %(</picture>)
+        %(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}" width="200" height="200" ) +
+        %(sizes="100vw" srcset="#{image_url}?fm=auto&amp;w=100&amp;h=100&amp;fit=cover 100w">)
       )
     end
 
-    it 'sets dimensions and lazy loading on gifs but does not wrap them in a picture' do
+    it 'sets dimensions and lazy loading on gifs but gives them no srcset' do
       allow(self).to receive(:get_asset_content_type).with('asset-1').and_return('image/gif')
-      transformed_html = responsivize_images(tagged_img, widths: [100, 200], sizes: '100vw', formats: ['webp'])
+      transformed_html = responsivize_images(tagged_img, widths: [100, 200], sizes: '100vw')
       expect(transformed_html).to eq(%(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}" loading="lazy" width="200" height="100">))
     end
 
     it 'skips images without a data-asset-id' do
       html = %(<img src="#{image_url}">)
       expect(responsivize_images(html)).to eq(html)
-    end
-  end
-
-  describe '#source_tag' do
-    let(:image_url) { 'https://images.ctfassets.net/space/asset-1/token/photo.jpg' }
-
-    before do
-      allow(self).to receive(:cdn_image_url) do |url, params = {}|
-        params.nil? || params.empty? ? url : "#{url}?#{URI.encode_www_form(params)}"
-      end
-    end
-
-    it 'renders a source element with a width-described srcset in the requested format' do
-      html = source_tag(image_url, sizes: '100vw', type: 'image/webp', format: 'webp', widths: [100, 200], square: false)
-      expect(html).to eq(%(<source sizes="100vw" type="image/webp" srcset="#{image_url}?fm=webp&amp;w=100 100w, #{image_url}?fm=webp&amp;w=200 200w" />))
     end
   end
 

@@ -5,10 +5,11 @@ RSpec.describe ImageHelpers do
   # Shaped like data.assets; @assets is set per example before the index is built.
   def data = OpenStruct.new(assets: @assets || [])
 
-  def stub_env(context: nil, url: nil)
+  # IMAGES_URL is the host Cloudflare serves transformations from, and the only thing that decides
+  # whether an image is resized by Cloudflare or by Contentful. Nothing here reads CONTEXT or URL.
+  def stub_env(images_url: nil)
     allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with('CONTEXT').and_return(context)
-    allow(ENV).to receive(:[]).with('URL').and_return(url)
+    allow(ENV).to receive(:[]).with('IMAGES_URL').and_return(images_url)
   end
 
   before { stub_env }
@@ -67,40 +68,56 @@ RSpec.describe ImageHelpers do
       expect(cdn_image_url(nil)).to be_nil
     end
 
-    context 'outside Netlify (Contentful Images API)' do
+    context 'on a local build (Contentful Images API)' do
       it 'merges the params into the URL' do
         expect(cdn_image_url(original, w: 100)).to eq("#{original}?w=100")
       end
 
-      it "translates Netlify's fit=cover to Contentful's fit=fill" do
+      it "translates Cloudflare's fit=cover to Contentful's fit=fill" do
         expect(cdn_image_url(original, fit: 'cover')).to eq("#{original}?fit=fill")
       end
     end
 
-    context 'on Netlify' do
-      before { stub_env(context: 'production', url: 'https://example.com') }
+    context 'on a deployed build (Cloudflare Images)' do
+      before { stub_env(images_url: 'https://example.com') }
 
-      it 'routes through the Netlify Image CDN with the source URL encoded' do
+      it 'routes through Cloudflare, with the options in the path and the source URL after them' do
         url = cdn_image_url(original, w: 100)
-        expect(url).to start_with('https://example.com/.netlify/images?url=')
-        expect(url).to include(URI.encode_www_form_component(original))
-        expect(url).to end_with('&w=100')
+        expect(url).to eq("https://example.com/cdn-cgi/image/width=100/#{original}")
       end
 
       it 'upgrades protocol-relative URLs to https' do
-        url = cdn_image_url('//images.ctfassets.net/space/a/t/p.jpg')
-        expect(url).to include(URI.encode_www_form_component('https://images.ctfassets.net/space/a/t/p.jpg'))
+        url = cdn_image_url('//images.ctfassets.net/space/a/t/p.jpg', w: 100)
+        expect(url).to eq('https://example.com/cdn-cgi/image/width=100/https://images.ctfassets.net/space/a/t/p.jpg')
       end
 
-      it 'merges params into a URL already on the image CDN' do
-        url = cdn_image_url('https://example.com/.netlify/images?url=x&w=50', 'w' => 100)
-        expect(url).to eq('https://example.com/.netlify/images?url=x&w=100')
+      it 'leaves an already-transformed URL alone' do
+        transformed = 'https://example.com/cdn-cgi/image/width=50/https://images.ctfassets.net/s/a/t/p.jpg'
+        expect(cdn_image_url(transformed, w: 100)).to eq(transformed)
       end
     end
 
     it "swaps in the asset's canonical URL when the id is known" do
       @assets = [OpenStruct.new(sys: OpenStruct.new(id: 'asset-1'), url: 'https://cdn.example.com/canonical.jpg')]
       expect(cdn_image_url(original, w: 10)).to eq('https://cdn.example.com/canonical.jpg?w=10')
+    end
+  end
+
+  describe '#contentful_image_url' do
+    let(:original) { 'https://images.ctfassets.net/space/asset-1/token/photo.jpg' }
+
+    it 'translates fit=cover to fit=fill' do
+      expect(contentful_image_url(original, fit: 'cover')).to eq("#{original}?fit=fill")
+    end
+
+    it 'drops fm=auto, which Contentful has no equivalent for' do
+      expect(contentful_image_url(original, fm: 'auto', w: 100)).to eq("#{original}?w=100")
+    end
+
+    it "doesn't mutate the caller's params" do
+      params = { fit: 'cover', fm: 'auto' }
+      contentful_image_url(original, params)
+      expect(params).to eq({ fit: 'cover', fm: 'auto' })
     end
   end
 
@@ -114,7 +131,7 @@ RSpec.describe ImageHelpers do
       set = srcset(url: 'https://images.ctfassets.net/s/a/t/p.jpg', widths: [100], square: true)
       expect(set).to include('w=100')
       expect(set).to include('h=100')
-      expect(set).to include('fit=fill') # cover → fill outside Netlify
+      expect(set).to include('fit=fill') # cover → fill without an images host
     end
   end
 
@@ -128,6 +145,17 @@ RSpec.describe ImageHelpers do
     it 'pins the exact Contentful-branch URL, with cover translated to fill' do
       url = open_graph_image_url('https://images.ctfassets.net/s/a/t/p.jpg')
       expect(url).to eq('https://images.ctfassets.net/s/a/t/p.jpg?w=1200&h=630&fit=fill')
+    end
+
+    # Centre-cropped on purpose. gravity=auto was tried and reverted: its saliency crops were
+    # too unpredictable on these photos.
+    it 'centre-crops on Cloudflare, asking for no gravity' do
+      stub_env(images_url: 'https://example.com')
+      url = open_graph_image_url('https://images.ctfassets.net/s/a/t/p.jpg')
+      expect(url).to eq(
+        'https://example.com/cdn-cgi/image/width=1200,height=630,fit=cover/' \
+        'https://images.ctfassets.net/s/a/t/p.jpg'
+      )
     end
   end
 
@@ -150,25 +178,45 @@ RSpec.describe ImageHelpers do
     end
   end
 
-  # Netlify branch, exact output pinned: it hand-builds the query string ("?url=…&…") rather
-  # than using merge_query, so param order (url first, then the passed params in insertion
-  # order) and the encoding of the url param must survive a refactor unchanged.
-  describe '#cdn_image_url exact Netlify output' do
-    before { stub_env(context: 'production', url: 'https://example.com') }
+  # Cloudflare branch, exact output pinned. Cloudflare puts its options in the path, so the
+  # option order, their names (width/height/format/fit, not w/h/fm), and the fact that the
+  # source URL is appended raw all have to survive a refactor unchanged.
+  describe '#cdn_image_url exact Cloudflare output' do
+    let(:source) { 'https://images.ctfassets.net/space/asset-1/token/photo.jpg' }
 
-    it 'pins the exact query string: encoded url param first, then params in order' do
-      url = cdn_image_url('https://images.ctfassets.net/space/asset-1/token/photo.jpg', w: 100, fm: 'jpg')
-      expect(url).to eq('https://example.com/.netlify/images?url=https%3A%2F%2Fimages.ctfassets.net%2Fspace%2Fasset-1%2Ftoken%2Fphoto.jpg&w=100&fm=jpg')
+    before { stub_env(images_url: 'https://example.com') }
+
+    it 'pins the option order, and renames fm=jpg to format=jpeg' do
+      url = cdn_image_url(source, w: 100, h: 50, fm: 'jpg', fit: 'cover')
+      expect(url).to eq("https://example.com/cdn-cgi/image/format=jpeg,width=100,height=50,fit=cover/#{source}")
     end
 
-    it 'omits the params separator entirely when there are no params' do
-      url = cdn_image_url('https://images.ctfassets.net/space/asset-1/token/photo.jpg')
-      expect(url).to eq('https://example.com/.netlify/images?url=https%3A%2F%2Fimages.ctfassets.net%2Fspace%2Fasset-1%2Ftoken%2Fphoto.jpg')
+    it 'passes fm=auto through as format=auto, so Cloudflare negotiates the format' do
+      url = cdn_image_url(source, fm: 'auto', w: 100)
+      expect(url).to eq("https://example.com/cdn-cgi/image/format=auto,width=100/#{source}")
+    end
+
+    # Cloudflare rejects a URL with no options, and anim=true is its default — so this is how a
+    # params-less caller asks for the image untransformed. Emitting no format here is what keeps
+    # gifs animated and preserves transparency; don't "tidy" it into format=auto.
+    it 'falls back to anim=true when there are no params, transforming nothing' do
+      url = cdn_image_url(source)
+      expect(url).to eq("https://example.com/cdn-cgi/image/anim=true/#{source}")
     end
 
     it 'pins the exact output for a protocol-relative source URL' do
       url = cdn_image_url('//images.ctfassets.net/space/asset-1/token/photo.jpg', w: 50)
-      expect(url).to eq('https://example.com/.netlify/images?url=https%3A%2F%2Fimages.ctfassets.net%2Fspace%2Fasset-1%2Ftoken%2Fphoto.jpg&w=50')
+      expect(url).to eq("https://example.com/cdn-cgi/image/width=50/#{source}")
+    end
+
+    # The candidates are joined with ", " — commas also separate Cloudflare's options, so the
+    # space is what keeps the srcset parseable. Don't join with a bare comma.
+    it 'builds a srcset whose candidates stay distinguishable from the option commas' do
+      set = srcset(url: source, widths: [100, 200], options: { fm: 'auto' })
+      expect(set).to eq(
+        "https://example.com/cdn-cgi/image/format=auto,width=100/#{source} 100w, " \
+        "https://example.com/cdn-cgi/image/format=auto,width=200/#{source} 200w"
+      )
     end
   end
 
@@ -219,7 +267,7 @@ RSpec.describe ImageHelpers do
 
       before do
         allow(self).to receive(:redis).and_return(fake_redis)
-        allow(self).to receive(:blurhash_string).with('asset-1', 32, 18).and_return('LEHV6nWB2yk8pyo0adR*.7kCMdnj')
+        allow(self).to receive(:encode_blurhash).with('asset-1', 32, 18).and_return('LEHV6nWB2yk8pyo0adR*.7kCMdnj')
         allow(Blurhash).to receive(:decode).and_return([0, 0, 0, 255])
         allow(MiniMagick::Image).to receive(:get_image_from_pixels).and_return(fake_image)
       end
@@ -250,8 +298,24 @@ RSpec.describe ImageHelpers do
       end
 
       it 'is nil when the blurhash string is invalid' do
-        allow(self).to receive(:blurhash_string).with('asset-1', 32, 18).and_return('not-a-blurhash')
+        allow(self).to receive(:encode_blurhash).with('asset-1', 32, 18).and_return('not-a-blurhash')
         expect(blurhash_jpeg_data_uri('asset-1')).to be_nil
+      end
+    end
+
+    describe '#encode_blurhash' do
+      # Even on a deployed build, the thumbnail comes straight from Contentful — not from our own
+      # zone. Routing it through Cloudflare would make the build depend on the zone being up, and
+      # would spend a transformation on an image no visitor ever sees.
+      it 'downloads the thumbnail from Contentful, not through the CDN' do
+        stub_env(images_url: 'https://example.com')
+        allow(MiniMagick::Image).to receive(:open).and_raise(StandardError, 'stop here')
+        allow(self).to receive(:warn)
+
+        encode_blurhash('asset-1', 32, 18)
+
+        expect(MiniMagick::Image).to have_received(:open)
+          .with('https://images.ctfassets.net/space/asset-1/token/photo.jpg?w=32&h=18')
       end
     end
 

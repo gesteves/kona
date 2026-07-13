@@ -1,5 +1,4 @@
 require 'active_support/all'
-require 'public_suffix'
 require 'humanize'
 require 'httparty'
 require_relative 'graphql/contentful'
@@ -48,7 +47,6 @@ class Contentful
     process_site
     process_articles
     process_pages
-    process_assets
     process_events
     generate_blog
     generate_tags
@@ -131,13 +129,6 @@ class Contentful
 
     # sort_by! parses each date once (vs. twice per comparison with sort!).
     @content[key].sort_by! { |item| DateTime.parse(item[:published_at]) }.reverse!
-  end
-
-  # Processes assets from the fetched content.
-  def process_assets
-    @content[:assets].map! do |item|
-      rewrite_image_urls(item)
-    end
   end
 
   # Sets the entry type for a content item based on its attributes.
@@ -329,28 +320,6 @@ class Contentful
   # The path for one page of a paginated collection.
   def paginated_path(base_path, page_number)
     page_number == 1 ? "#{base_path}/index.html" : "#{base_path}/page/#{page_number}/index.html"
-  end
-
-  # Rewrites Contentful image URLs to CloudFront URLs.
-  # @param item [Hash] The asset to be processed.
-  # @return [Hash] The asset with the image URLs rewritten.
-  def rewrite_image_urls(item)
-    return item if ENV['CLOUDFRONT_DOMAIN'].blank?
-    uri = URI.parse(item[:url])
-    version = item.dig(:sys, :published_version)
-    domain = PublicSuffix.domain(uri.host)
-
-    if domain == 'ctfassets.net'
-      uri.host = ENV['CLOUDFRONT_DOMAIN']
-      if version.present?
-        uri.query = uri.query.to_s.empty? ? "v=#{version}" : "#{uri.query}&v=#{version}"
-      end
-      item[:url] = uri.to_s
-    end
-    item
-  rescue => e
-    puts "Error rewriting image URL: #{e.message}"
-    item
   end
 
   # The taxonomy concepts, keyed by id, memoized for the build. GraphQL only returns concept

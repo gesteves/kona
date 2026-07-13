@@ -12,7 +12,8 @@ Copy `.env.example` to `.env` and fill in the credentials below (also add them t
 
 ### Required services
 
-- **Netlify** — hosting. Kona can run anywhere as a static site, but relies on Netlify [functions](https://docs.netlify.com/functions/overview/) (the `/widgets/*` proxy, OG images), [Image CDN](https://docs.netlify.com/image-cdn/overview/), and [build hooks](https://docs.netlify.com/configure-builds/build-hooks/).
+- **Netlify** — hosting. Kona can run anywhere as a static site, but relies on Netlify [functions](https://docs.netlify.com/functions/overview/) (the `/widgets/*` proxy, OG images) and [build hooks](https://docs.netlify.com/configure-builds/build-hooks/).
+- **Cloudflare** — the zone in front of the site. Images are resized and served through [Cloudflare Images](https://developers.cloudflare.com/images/transform-images/transform-via-url/) (`/cdn-cgi/image/…`), which fetches them from Contentful and caches the results at the edge. Requires Transformations enabled on the zone, with `images.ctfassets.net` allowlisted as a source — without that, every image 403s.
 - **Contentful** — the CMS for the site's content. Create an API key under Settings → API Keys and set `CONTENTFUL_SPACE` and `CONTENTFUL_TOKEN` (Content Preview token). You'll want a content model like this:
 
   <img width="1616" height="3182" alt="Contentful content model" src="https://github.com/user-attachments/assets/689d3caf-8b71-47a4-95e5-4630bf9c8281" />
@@ -25,7 +26,6 @@ Copy `.env.example` to `.env` and fill in the credentials below (also add them t
 ### Optional services
 
 - **Dark Visitors / Known Agents** — records bot and AI-agent page views server-side via the Known Agents edge function. Set `DARK_VISITORS_ACCESS_TOKEN`.
-- **CloudFront** — serves Contentful images via a CDN to avoid bandwidth limits. Set `CLOUDFRONT_DOMAIN`.
 
 ## Running locally
 

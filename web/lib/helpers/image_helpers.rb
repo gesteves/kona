@@ -1,10 +1,20 @@
 require 'mini_magick'
-require 'httparty'
 require 'base64'
 require 'blurhash'
 require 'erb'
 
 module ImageHelpers
+  # Cloudflare Images serves transformations from this path on our own zone. Options go in the
+  # path, not the query string.
+  # @see https://developers.cloudflare.com/images/transform-images/transform-via-url/
+  CDN_IMAGE_PATH = '/cdn-cgi/image/'
+
+  # Maps the format names our callers use (which are also Contentful's) to Cloudflare's. Note
+  # `jpeg`, not `jpg`. `auto` lets Cloudflare pick avif/webp/jpeg from the request's Accept
+  # header — which is why we don't need a <picture> element, and why one srcset candidate is
+  # billed as a single transformation no matter how many formats it ends up serving.
+  CDN_IMAGE_FORMATS = { 'avif' => 'avif', 'webp' => 'webp', 'jpg' => 'jpeg', 'auto' => 'auto' }.freeze
+
   # Extracts the asset ID from a URL.
   # @param url [String, nil] The URL from which to extract the asset ID.
   # @return [String, nil] The asset ID extracted from the URL, or nil for a blank URL.
@@ -62,29 +72,67 @@ module ImageHelpers
     asset&.sys&.published_version
   end
 
-  # Generates a CDN image URL with optional query parameters.
-  # Uses Netlify's Image CDN or Contentful's, as needed.
-  # @see https://docs.netlify.com/image-cdn/overview/
-  # @see https://www.contentful.com/developers/docs/references/images-api/
+  # Generates a CDN image URL with optional transformation parameters.
+  # Cloudflare serves transformations from a host it fronts, so this needs to know which one:
+  # IMAGES_URL. Set it and `middleman server` renders exactly what production does — auto
+  # avif/webp, saliency-cropped Open Graph cards — with the images fetched from the live zone.
+  # Leave it unset and there's no host to hang a transformation off, so we ask Contentful to do
+  # the resizing instead. That's a fine local fallback, but it is NOT what we want in
+  # production: it's slower, and it's the Contentful bandwidth drain we moved off of.
+  # @see https://developers.cloudflare.com/images/transform-images/transform-via-url/
   # @param original_url [String, nil] The original URL of the image.
-  # @param params [Hash] (Optional) Query parameters to be appended to the URL.
-  # @return [String, nil] The CDN image URL with optional query parameters, or nil for a
-  #   blank URL (e.g. a site entry with no logo) so callers don't crash the build.
+  # @param params [Hash] (Optional) Transformation parameters (:w, :h, :fm, :fit).
+  # @return [String, nil] The CDN image URL, or nil for a blank URL (e.g. a site entry with
+  #   no logo) so callers don't crash the build.
   def cdn_image_url(original_url, params = {})
     return if original_url.blank?
+    # Already transformed; don't wrap it again. This has to come before get_asset_id, which
+    # reads the id from a fixed path position that a transformed URL doesn't have.
+    return original_url if original_url.include?(CDN_IMAGE_PATH)
 
     asset_id = get_asset_id(original_url)
     asset_url = get_asset_url(asset_id)
     original_url = asset_url if asset_url.present?
-    if netlify? && original_url.match?('/.netlify/images')
-      merge_query(original_url, params)
-    elsif netlify?
-      original_url = "https:#{original_url}" if original_url.start_with?('//')
-      merge_query("#{ENV['URL']}/.netlify/images", { url: original_url }.merge(params))
-    else
-      params[:fit] = "fill" if params[:fit] == "cover"
-      merge_query(original_url, params)
-    end
+    return contentful_image_url(original_url, params) if ENV['IMAGES_URL'].blank?
+
+    original_url = "https:#{original_url}" if original_url.start_with?('//')
+    "#{ENV['IMAGES_URL']}#{CDN_IMAGE_PATH}#{cdn_image_options(params)}/#{original_url}"
+  end
+
+  # Serializes transformation parameters into Cloudflare's comma-separated option string.
+  # @param params [Hash] The transformation parameters (:w, :h, :fm, :fit).
+  # @return [String] The options, in a fixed order.
+  def cdn_image_options(params)
+    options = []
+    format = CDN_IMAGE_FORMATS[params[:fm].to_s]
+    options << "format=#{format}" if format.present?
+    options << "width=#{params[:w]}" if params[:w].present?
+    options << "height=#{params[:h]}" if params[:h].present?
+    options << "fit=#{params[:fit]}" if params[:fit].present?
+    # Cloudflare rejects a URL with no options at all, so callers that want the image as-is
+    # (the <img> fallback, animated gifs, the Open Graph logo) get anim=true — Cloudflare's
+    # own default, so it transforms nothing. Emitting no format is the point: that's what
+    # preserves the source format, its transparency, and a gif's animation.
+    return 'anim=true' if options.empty?
+
+    options.join(',')
+  end
+
+  # Generates a Contentful Images API URL. Two callers: cdn_image_url, when it has no host to
+  # build a Cloudflare URL with, and encode_blurhash — which uses it deliberately, so that
+  # generating a placeholder never depends on our zone being up or on Cloudflare's quota.
+  # Fidelity is lower than Cloudflare's (no auto format), which is fine for both: a local
+  # preview and a 32px thumbnail nobody sees.
+  # @see https://www.contentful.com/developers/docs/references/images-api/
+  # @param original_url [String] The original URL of the image.
+  # @param params [Hash] (Optional) Transformation parameters (:w, :h, :fm, :fit).
+  # @return [String] The Contentful image URL with the parameters merged in.
+  def contentful_image_url(original_url, params = {})
+    params = params.dup
+    params[:fit] = 'fill' if params[:fit] == 'cover'
+    # Contentful has no format=auto; drop it and let it serve the source format.
+    params.delete(:fm) if params[:fm].to_s == 'auto'
+    merge_query(original_url, params)
   end
 
   # Merges query parameters into a URL, preserving (and overriding) any it already carries.
@@ -114,6 +162,8 @@ module ImageHelpers
   end
 
   # Generates a CDN URL for an Open Graph image based on Facebook's size guidelines.
+  # Deliberately centre-cropped: Cloudflare's gravity=auto picks the crop by saliency, but on
+  # these photos it's unpredictable, and a boring crop beats a surprising one.
   # @param original_url [String] The original URL of the image.
   # @return [String] The CDN URL for the Open Graph image.
   def open_graph_image_url(original_url)
@@ -188,9 +238,9 @@ module ImageHelpers
     jpeg = redis.get(cache_key)
     return jpeg if jpeg.present?
 
-    # Attempt to fetch the Blurhash string
+    # Attempt to encode the Blurhash string
     height = ((original_height.to_f / original_width.to_f) * width).round
-    blurhash = blurhash_string(asset_id, width, height)
+    blurhash = encode_blurhash(asset_id, width, height)
     return unless Blurhash.valid_blurhash?(blurhash)
 
     # Generate the JPEG image from the Blurhash string
@@ -211,40 +261,18 @@ module ImageHelpers
     nil
   end
 
-  # Fetches a Blurhash for an asset based on its ID, width, and height
-  # from Netlify's image CDN.
-  # If that fails, then it tries to encode it locally.
-  # @param asset_id [String] The ID of the asset used for generating the Blurhash.
-  # @param width [Integer] The width of the Blurhash image.
-  # @param height [Integer] The height of the Blurhash image.
-  # @return [String, nil] The generated Blurhash, or nil if not generated or retrieved.
-  def blurhash_string(asset_id, width, height)
-    # Encode the Blurhash manually if we're not on Netlify
-    return encode_blurhash(asset_id, width, height) unless netlify?
-
-    # Attempt to fetch the Blurhash from Netlify's Image CDN
-    url = get_asset_url(asset_id)
-    blurhash_url = cdn_image_url(url, { fm: 'blurhash', w: width, h: height })
-    response = HTTParty.get(blurhash_url)
-    if response.ok? && response.headers['Content-Type'].include?('text/plain') && Blurhash.valid_blurhash?(response.body)
-      response.body
-    else
-      # Fall back to encoding the Blurhash manually.
-      encode_blurhash(asset_id, width, height)
-    end
-  rescue StandardError => e
-    warn "Blurhash fetch failed for asset #{asset_id}: #{e.message}"
-    nil
-  end
-
   # Encodes a Blurhash using MiniMagick for an asset based on its ID, width, and height.
+  # Downloads the thumbnail straight from Contentful rather than through our own CDN, so the
+  # build doesn't depend on the zone being up — or on Cloudflare's transformation quota, which
+  # this would otherwise spend a slot of per asset. It's cheap: the thumbnails are 32px wide,
+  # and blurhash_jpeg_data_uri caches the result in Redis per published version.
   # @param asset_id [String] The ID of the asset used for generating the Blurhash.
   # @param width [Integer] The width of the Blurhash image.
   # @param height [Integer] The height of the Blurhash image.
   # @return [String, nil] The generated Blurhash, or nil if not generated
   def encode_blurhash(asset_id, width, height)
     url = get_asset_url(asset_id)
-    image = MiniMagick::Image.open(cdn_image_url(url, { w: width, h: height }))
+    image = MiniMagick::Image.open(contentful_image_url(url, { w: width, h: height }))
     Blurhash.encode(image.width, image.height, image.get_pixels.flatten)
   rescue StandardError => e
     warn "Blurhash encoding failed for asset #{asset_id}: #{e.message}"

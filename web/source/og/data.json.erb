@@ -1,4 +1,7 @@
 <%=
+  # Don't pass a format to cdn_image_url here. The OG function renders this logo with satori,
+  # which can't decode webp or avif, and the logo's transparency has to survive. With no
+  # parameters, cdn_image_url asks Cloudflare for the image as-is, in its source format.
   {
     logoUrl: cdn_image_url(data.site.small_logo&.url),
     titles: og_page_titles
