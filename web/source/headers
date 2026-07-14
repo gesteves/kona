@@ -1,0 +1,53 @@
+# Headers for the static build. Netlify and Cloudflare Workers Static Assets share this
+# file convention (and the same semantics), so it works before and after the migration.
+#
+# ⚠️ When multiple rules match a path, BOTH platforms comma-join same-name headers rather
+# than letting the more specific rule win — so no two rules here may set the same header
+# for overlapping paths. That's why the cache policy enumerates paths instead of using a
+# /* catch-all: a catch-all Cache-Control would corrupt the fingerprinted-asset rules.
+
+/*
+  Referrer-Policy: no-referrer-when-downgrade
+
+/.well-known/site.standard.publication
+  Content-Type: text/plain; charset=utf-8
+
+# Fingerprinted by asset_hash (config.rb): new content = new URL, so these can never go
+# stale and are safe to cache forever.
+/javascripts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/stylesheets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Stable URLs whose content changes every build, with extensions Cloudflare's default
+# edge cache picks up (.xml, .json, .txt, .png, .ico). Store, but always revalidate
+# against the ETag — a deploy mints new ETags, so deploys self-invalidate with no purge.
+# (Extensionless HTML needs no rule: it isn't in Cloudflare's default-cache extension
+# list, and max-age=0 + must-revalidate is already both platforms' default for it.)
+/feed.xml
+  Cache-Control: public, max-age=0, must-revalidate
+
+/sitemap.xml
+  Cache-Control: public, max-age=0, must-revalidate
+
+/manifest.json
+  Cache-Control: public, max-age=0, must-revalidate
+
+/robots.txt
+  Cache-Control: public, max-age=0, must-revalidate
+
+/llms.txt
+  Cache-Control: public, max-age=0, must-revalidate
+
+/favicon.ico
+  Cache-Control: public, max-age=0, must-revalidate
+
+# The per-tag Atom feeds live at /tagged/**/feed.xml. This also matches the tag archive
+# HTML pages, which is harmless: this directive is exactly the default they'd get anyway.
+/tagged/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+# OG card PNGs (pre-rendered at build) and the build's og/data.json.
+/og/*
+  Cache-Control: public, max-age=0, must-revalidate

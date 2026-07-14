@@ -3,6 +3,10 @@
 <% plausible_proxy_redirects.each do |redirect| %>
 <%= redirect[:from] %> <%= redirect[:to] %> <%= redirect[:status] %>
 <% end %>
+<%# Bridgy Fed (fediverse) discovery endpoints, moved here from the root netlify.toml %>
+<%# so the generated _redirects file is the single source for every redirect rule. %>
+/.well-known/host-meta* https://fed.brid.gy/.well-known/host-meta:splat 302
+/.well-known/webfinger* https://fed.brid.gy/.well-known/webfinger 302
 <% published_articles.each do |article| %>
 /id/<%= article.sys.id %>/ <%= url_for article.path %> 301
 <% end %>

@@ -2,33 +2,11 @@
 [functions]
   node_bundler = "esbuild"
 
-[functions.og]
-  included_files = [
-    "build/og/data.json",
-    "source/fonts/IBMPlexSansCondensed-Bold.ttf"
-  ]
-  external_node_modules = ["@vercel/og"]
-
 [build]
   base = "web"
   command = "bundle exec rake build"
   publish = "build/"
 
-[[headers]]
-  for = "/*"
-  [headers.values]
-    Referrer-Policy = "no-referrer-when-downgrade"
-
-[[headers]]
-  for = "/.well-known/site.standard.publication"
-  [headers.values]
-    Content-Type = "text/plain; charset=utf-8"
-
-[[redirects]]
-  from = "/.well-known/host-meta*"
-  to = "https://fed.brid.gy/.well-known/host-meta:splat"
-  status = 302
-[[redirects]]
-  from = "/.well-known/webfinger*"
-  to = "https://fed.brid.gy/.well-known/webfinger"
-  status = 302
+# Headers live in web/source/headers and redirects in web/source/redirects.erb (both
+# renamed to their underscore forms at build) — file conventions Netlify and Cloudflare
+# Workers Static Assets both honor, so they carry over the migration unchanged.

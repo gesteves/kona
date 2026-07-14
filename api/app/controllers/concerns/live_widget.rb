@@ -44,10 +44,18 @@ module LiveWidget
   def cache_widget(ttl:, stale_while_revalidate: ttl, edge_stale_while_revalidate: DEFAULT_EDGE_STALE_WHILE_REVALIDATE)
     # max-age=0 (NOT no-cache) so stale-while-revalidate still applies in the browser.
     expires_in 0, public: true, stale_while_revalidate: stale_while_revalidate
-    response.headers["Netlify-CDN-Cache-Control"] =
-      "public, durable, max-age=#{ttl.to_i}, " \
+    # The same edge policy in both dialects, so it survives the Netlify → Cloudflare
+    # migration: Netlify's durable edge reads its own header (with the Netlify-only
+    # `durable` token), while Cloudflare honors the standard CDN-Cache-Control (RFC 9213).
+    # The Netlify header goes away when the site cuts over. ⚠️ Never express this as
+    # s-maxage: its mere presence disables stale-while-revalidate AND stale-if-error
+    # (RFC 9111 §4.2.4) — the resilience these directives exist to provide.
+    edge_policy =
+      "max-age=#{ttl.to_i}, " \
       "stale-while-revalidate=#{edge_stale_while_revalidate.to_i}, " \
       "stale-if-error=#{EDGE_STALE_IF_ERROR.to_i}"
+    response.headers["Netlify-CDN-Cache-Control"] = "public, durable, #{edge_policy}"
+    response.headers["CDN-Cache-Control"] = "public, #{edge_policy}"
   end
 
   # An empty body signals "no data" rather than real markup. The live-update controller
@@ -62,6 +70,7 @@ module LiveWidget
 
   def render_empty
     response.headers["Netlify-CDN-Cache-Control"] = "public, max-age=#{EMPTY_TTL.to_i}"
+    response.headers["CDN-Cache-Control"] = "public, max-age=#{EMPTY_TTL.to_i}"
     render plain: ""
   end
 

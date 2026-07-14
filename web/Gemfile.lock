@@ -130,8 +130,6 @@ GEM
     middleman-minify-html (3.4.1)
       htmlcompressor (~> 0.2.0)
       middleman-core (>= 3.2)
-    mini_magick (5.3.1)
-      logger
     mini_mime (1.1.5)
     minitest (6.0.2)
       drb (~> 2.0)
@@ -181,6 +179,9 @@ GEM
       diff-lcs (>= 1.2.0, < 2.0)
       rspec-support (~> 3.13.0)
     rspec-support (3.13.6)
+    ruby-vips (2.3.0)
+      ffi (~> 1.12)
+      logger
     sanitize (7.0.0)
       crass (~> 1.0.2)
       nokogiri (>= 1.16.8)
@@ -223,13 +224,13 @@ DEPENDENCIES
   middleman-autoprefixer (~> 3.0)
   middleman-dotenv
   middleman-minify-html
-  mini_magick
   nokogiri
   public_suffix
   rake
   redcarpet
   redis
   rspec
+  ruby-vips
   sanitize
   tzinfo-data
   wdm (~> 0.1)

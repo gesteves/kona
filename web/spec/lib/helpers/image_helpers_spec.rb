@@ -242,10 +242,15 @@ RSpec.describe ImageHelpers do
   end
 
   describe '#generate_open_graph_image_url' do
-    it 'points at the /og endpoint with the target URL fully percent-encoded' do
+    it 'points at the pre-rendered card PNG, mirroring the page path under /og' do
       allow(self).to receive(:root_url).and_return('https://example.com')
       url = generate_open_graph_image_url('https://example.com/articles/foo/')
-      expect(url).to eq('https://example.com/og?url=https%3A%2F%2Fexample.com%2Farticles%2Ffoo%2F')
+      expect(url).to eq('https://example.com/og/articles/foo/card.png')
+    end
+
+    it 'maps the site root to /og/card.png' do
+      allow(self).to receive(:root_url).and_return('https://example.com')
+      expect(generate_open_graph_image_url('https://example.com/')).to eq('https://example.com/og/card.png')
     end
   end
 
@@ -263,13 +268,15 @@ RSpec.describe ImageHelpers do
 
     describe '#blurhash_jpeg_data_uri' do
       let(:fake_redis) { double('redis', get: nil, set: nil) }
-      let(:fake_image) { double('image', to_blob: 'JPEGBYTES') }
+      let(:fake_image) { double('image', write_to_buffer: 'JPEGBYTES') }
 
       before do
         allow(self).to receive(:redis).and_return(fake_redis)
         allow(self).to receive(:encode_blurhash).with('asset-1', 32, 18).and_return('LEHV6nWB2yk8pyo0adR*.7kCMdnj')
         allow(Blurhash).to receive(:decode).and_return([0, 0, 0, 255])
-        allow(MiniMagick::Image).to receive(:get_image_from_pixels).and_return(fake_image)
+        allow(fake_image).to receive(:copy).and_return(fake_image)
+        allow(fake_image).to receive(:extract_band).and_return(fake_image)
+        allow(Vips::Image).to receive(:new_from_memory).and_return(fake_image)
       end
 
       it 'decodes the blurhash into a JPEG and returns it as a base64 data URI' do
@@ -284,7 +291,7 @@ RSpec.describe ImageHelpers do
       it 'returns the cached data URI without regenerating' do
         allow(fake_redis).to receive(:get).with('blurhash:jpeg:asset-1:3:32').and_return('data:image/jpeg;base64,cached')
         expect(blurhash_jpeg_data_uri('asset-1')).to eq('data:image/jpeg;base64,cached')
-        expect(MiniMagick::Image).not_to have_received(:get_image_from_pixels)
+        expect(Vips::Image).not_to have_received(:new_from_memory)
       end
 
       it 'is nil for gifs' do
@@ -309,12 +316,12 @@ RSpec.describe ImageHelpers do
       # would spend a transformation on an image no visitor ever sees.
       it 'downloads the thumbnail from Contentful, not through the CDN' do
         stub_env(images_url: 'https://example.com')
-        allow(MiniMagick::Image).to receive(:open).and_raise(StandardError, 'stop here')
+        allow(URI).to receive(:open).and_raise(StandardError, 'stop here')
         allow(self).to receive(:warn)
 
         encode_blurhash('asset-1', 32, 18)
 
-        expect(MiniMagick::Image).to have_received(:open)
+        expect(URI).to have_received(:open)
           .with('https://images.ctfassets.net/space/asset-1/token/photo.jpg?w=32&h=18')
       end
     end

@@ -1,9 +1,10 @@
 <%=
-  # Don't pass a format to cdn_image_url here. The OG function renders this logo with satori,
-  # which can't decode webp or avif, and the logo's transparency has to survive. With no
-  # parameters, cdn_image_url asks Cloudflare for the image as-is, in its source format.
+  # The logo URL is Contentful's original, NOT cdn_image_url: the build-time OG renderer
+  # (scripts/render-og.mjs) downloads it directly, so the build never depends on the zone
+  # being up or spends a transformation slot — and satori can't decode webp or avif anyway,
+  # so the source PNG (whose transparency has to survive) is exactly what it needs.
   {
-    logoUrl: cdn_image_url(data.site.small_logo&.url),
+    logoUrl: data.site.small_logo&.url,
     titles: og_page_titles
   }.to_json
 %>

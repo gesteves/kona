@@ -159,6 +159,7 @@ RSpec.describe "Weather", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty
       expect(response.headers["Netlify-CDN-Cache-Control"]).not_to include("durable")
+      expect(response.headers["CDN-Cache-Control"]).to eq("public, max-age=60")
     end
   end
 

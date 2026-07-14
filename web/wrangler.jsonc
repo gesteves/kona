@@ -1,0 +1,72 @@
+// Cloudflare Worker serving the static build plus the dynamic routes (widgets proxy,
+// Plausible proxy, contact form, Known Agents tracking). One Worker replaces Netlify's
+// hosting, functions, and edge functions — see the migration plan and root CLAUDE.md.
+//
+// ⚠️ No hostnames live in this file (or anywhere in the repo). The custom domain is
+// attached in the dashboard (Workers & Pages → this Worker → Settings → Domains & Routes),
+// and all environment-specific values are dashboard vars/secrets:
+//
+//   Secrets: API_TOKEN (must match the api/ app's API_TOKEN or every widget 401s),
+//            KNOWN_AGENTS_ACCESS_TOKEN
+//   Vars:    KONA_API_URL (the fly.io api origin), PLAUSIBLE_SCRIPT_URL,
+//            SITE_HOSTNAME (the production host — gates Known Agents tracking, since
+//            preview versions share the production Worker's secrets),
+//            CONTACT_EMAIL_FROM (an address on the Email Routing subdomain),
+//            CONTACT_EMAIL_TO (the verified destination address)
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kona-web",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-01",
+  // mimetext's dependencies use Node built-ins (path); this maps them to workerd's shims.
+  "compatibility_flags": ["nodejs_compat"],
+
+  "assets": {
+    "directory": "./build",
+    "binding": "ASSETS",
+    // Middleman's directory_indexes builds pretty URLs (/about/ → /about/index.html).
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page",
+    // Glob array, NOT `true`. Non-matching requests are served straight from the asset
+    // layer and never invoke the Worker — this replaces known-agents.ts's excludedPath.
+    // Negative patterns take precedence. Requires wrangler ≥ 4.20.
+    // No /cdn-cgi/* entry is needed or possible: Cloudflare answers image transformations
+    // at its own edge; they never reach the Worker.
+    // /widgets/*, /plsbl/*, and /contact all match /* (wrangler rejects explicit entries
+    // as redundant); the negations below carve out everything that should skip the Worker.
+    "run_worker_first": [
+      "/*",
+      "!/javascripts/*",
+      "!/stylesheets/*",
+      "!/images/*",
+      "!/fonts/*",
+      "!/og/*",
+      "!/*.js",
+      "!/*.css",
+      "!/*.map",
+      "!/*.json",
+      "!/*.xml",
+      "!/*.txt",
+      "!/*.png",
+      "!/*.jpg",
+      "!/*.jpeg",
+      "!/*.gif",
+      "!/*.svg",
+      "!/*.webp",
+      "!/*.avif",
+      "!/*.ico",
+      "!/*.woff",
+      "!/*.woff2",
+      "!/*.ttf",
+      "!/.well-known/*",
+    ],
+  },
+
+  // No workers.dev route: it would be an origin that bypasses the zone's WAF.
+  "workers_dev": false,
+
+  // Outbound mail for the contact form. Unrestricted binding: the recipient still must be
+  // a verified Email Routing destination address (enforced by Cloudflare), and comes from
+  // the CONTACT_EMAIL_TO var so no address is hardcoded here.
+  "send_email": [{ "name": "EMAIL" }],
+}

@@ -28,7 +28,9 @@ web↔api contract before touching any widget markup.
 
 ## Commands
 
-Run `nvm use` before any `npm` command.
+Run `nvm use` before any `npm` command. Native dependency: **libvips** (`brew install
+vips`) — the blurhash placeholders render through the `ruby-vips` gem (chosen over
+ImageMagick because Cloudflare Workers Builds preinstalls libvips but not ImageMagick).
 
 ```bash
 # Tests — single file (fast) then full suite
@@ -71,11 +73,23 @@ to flush the cache.
   `config.rb` requires and registers every module in that directory.
 - `source/layouts/layout.erb`, `source/partials/` (incl. `placeholders/`),
   `source/javascripts/stimulus/`, `source/stylesheets/`.
-- `netlify/functions/` — `widget-proxy.mts` (proxies `/widgets/*`; see root `CLAUDE.md`),
-  `og.mts` (OG images).
+- `netlify/functions/` — `widget-proxy.mts` (proxies `/widgets/*`; see root `CLAUDE.md`).
 - `netlify/edge-functions/` — `known-agents.ts` (records every page view server-side to
   Known Agents / Dark Visitors, capturing bot + AI-agent traffic Plausible can't see;
   production-only, reuses `DARK_VISITORS_ACCESS_TOKEN`).
+- `scripts/render-og.mjs` — pre-renders every Open Graph card PNG at build (invoked from
+  `build.rake`), one `build/og/<page path>/card.png` per entry in `og/data.json`;
+  Redis-cached per (template version, logo, title). `generate_open_graph_image_url`
+  derives the matching URL. ⚠️ The logo must stay in its source PNG format (satori can't
+  decode webp/avif) — see the tripwire comment in `source/og/data.json.erb`.
+- `source/headers` / `source/redirects.erb` — built and renamed to `_headers` /
+  `_redirects` (underscore-prefixed source files are treated as partials and skipped).
+  ⚠️ In `_headers`, no two rules may set the same header for overlapping paths — matching
+  rules comma-join same-name headers on both Netlify and Cloudflare.
+- `wrangler.jsonc` + `src/` — the Cloudflare Worker for the (paused) Netlify→Cloudflare
+  migration: serves `build/` as static assets plus routes for the widget proxy, Plausible
+  proxy, contact form (`send_email`), and Known Agents tracking. **Not deployed yet**; the
+  site still runs on Netlify. See the migration plan before touching the cutover pieces.
 - `data/font_awesome.yml` — **icon allowlist**. Any new icon must be added here (under
   the correct family/style, e.g. `classic.light`) before `icon_svg` / `rake import:icons`
   can use it.

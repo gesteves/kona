@@ -1,4 +1,5 @@
-require 'mini_magick'
+require 'vips'
+require 'open-uri'
 require 'base64'
 require 'blurhash'
 require 'erb'
@@ -171,11 +172,17 @@ module ImageHelpers
     cdn_image_url(original_url, params)
   end
 
-  # Automatically generates an Open Graph image for the given URL
-  # @param url [String] The URL to generate the Open Graph image for.
-  # @return [String] The URL of the generated Open Graph image.
+  # Returns the URL of the pre-rendered Open Graph card for the given page URL.
+  # The cards are rendered at build time (scripts/render-og.mjs) into
+  # build/og/<page path>/card.png — one per entry in og/data.json's titles, keyed on the
+  # same normalized path used here, so the URL and the file on disk can't drift. Every
+  # input is a build-time constant, which is why these are plain static assets rather
+  # than a runtime endpoint.
+  # @param url [String] The URL of the page to return the Open Graph card for.
+  # @return [String] The URL of the pre-rendered Open Graph card.
   def generate_open_graph_image_url(url)
-    "#{root_url}/og?url=#{ERB::Util.url_encode(url)}"
+    path = og_normalized_path(URI.parse(url).path)
+    "#{root_url}/og#{path}card.png"
   end
 
   # Generates a CDN URL for the site icon with the specified width.
@@ -243,15 +250,15 @@ module ImageHelpers
     blurhash = encode_blurhash(asset_id, width, height)
     return unless Blurhash.valid_blurhash?(blurhash)
 
-    # Generate the JPEG image from the Blurhash string
+    # Generate the JPEG image from the Blurhash string. Blurhash decodes to opaque RGBA,
+    # so the alpha band is dropped rather than composited.
     pixels = Blurhash.decode(width, height, blurhash)
-    depth = 8
-    dimensions = [width, height]
-    map = 'rgba'
-    image = MiniMagick::Image.get_image_from_pixels(pixels, dimensions, map, depth, 'jpg')
+    image = Vips::Image.new_from_memory(pixels.pack('C*'), width, height, 4, :uchar)
+                       .copy(interpretation: :srgb)
+                       .extract_band(0, n: 3)
 
     # Encode the JPEG image as a data URI
-    jpeg = "data:image/jpeg;base64,#{Base64.strict_encode64(image.to_blob)}"
+    jpeg = "data:image/jpeg;base64,#{Base64.strict_encode64(image.write_to_buffer('.jpg'))}"
 
     # Cache that shit for later.
     redis.set(cache_key, jpeg)
@@ -261,7 +268,7 @@ module ImageHelpers
     nil
   end
 
-  # Encodes a Blurhash using MiniMagick for an asset based on its ID, width, and height.
+  # Encodes a Blurhash using libvips for an asset based on its ID, width, and height.
   # Downloads the thumbnail straight from Contentful rather than through our own CDN, so the
   # build doesn't depend on the zone being up — or on Cloudflare's transformation quota, which
   # this would otherwise spend a slot of per asset. It's cheap: the thumbnails are 32px wide,
@@ -272,8 +279,10 @@ module ImageHelpers
   # @return [String, nil] The generated Blurhash, or nil if not generated
   def encode_blurhash(asset_id, width, height)
     url = get_asset_url(asset_id)
-    image = MiniMagick::Image.open(contentful_image_url(url, { w: width, h: height }))
-    Blurhash.encode(image.width, image.height, image.get_pixels.flatten)
+    data = URI.open(contentful_image_url(url, { w: width, h: height })).read
+    image = Vips::Image.new_from_buffer(data, '').colourspace(:srgb)
+    image = image.flatten if image.has_alpha?
+    Blurhash.encode(image.width, image.height, image.to_a.flatten)
   rescue StandardError => e
     warn "Blurhash encoding failed for asset #{asset_id}: #{e.message}"
     nil
