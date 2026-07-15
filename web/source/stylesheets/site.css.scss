@@ -7,6 +7,11 @@
 @import 'components/skeleton';
 @import 'components/toast';
 
+// Also unlayered — remaps the Pagefind modal's `--pf-*` variables for dark mode, which
+// must beat Pagefind's own unlayered `:root` defaults (layered rules always lose to
+// unlayered ones). See the partial's header for the full rationale.
+@import 'components/pagefind';
+
 @layer reset {
   @import 'vendors/reset';
 }
