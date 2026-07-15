@@ -1,4 +1,5 @@
 require 'httparty'
+require 'yaml'
 
 DATA_DIRECTORY = 'data'
 
@@ -9,7 +10,6 @@ namespace :import do
   desc 'Imports FontAwesome icons'
   task :icons => [:dotenv] do
     setup_data_directory
-    RedisConnection.connection
     measure_and_output(:import_font_awesome, "Importing icons")
   end
 
@@ -70,8 +70,64 @@ def import_contentful
   Contentful.new.save_data
 end
 
+# Number of icons requested per /api/icons call. The api resolves each cache-missed icon from
+# Font Awesome (~100ms each), and it caps total request time (rack-timeout) so one slow request
+# can't hog a Puma thread. Requesting the whole ~150-icon allowlist at once blows that budget on
+# a cold cache (e.g. right after a Font Awesome version bump), so we ask in small batches each of
+# which the api can comfortably resolve in time; warm-cache batches are near-instant.
+ICON_IMPORT_BATCH_SIZE = 25
+
+# Fetches pre-rendered icon SVGs from the api's /api/icons endpoint and writes data/icons.json
+# (the family → style → [{id, svg}] tree the icon_svg helper reads via data.icons). The web
+# build no longer talks to Font Awesome directly — the FA integration (token, GraphQL, version,
+# cache) lives only in the api. web/ still owns the allowlist (data/font_awesome.yml): its icons
+# tree is POSTed to the api in batches, which resolves each id on demand. Unlike standard.site,
+# icons are an every-page dependency, so any failure raises to fail the build loudly rather than
+# shipping a site with missing icons.
 def import_font_awesome
-  FontAwesome.new.save_data
+  base = ENV['KONA_API_URL'].to_s.chomp('/')
+  raise 'KONA_API_URL is not set; cannot fetch icons from the api' if base.blank?
+
+  allowlist = YAML.load_file('data/font_awesome.yml')['icons'] || {}
+  # Flatten to [family, style, id] triples in allowlist order; uniq collapses the few duplicate
+  # ids so a batch boundary can't make one show up twice in the merged output.
+  triples = allowlist.flat_map do |family, styles|
+    (styles || {}).flat_map { |style, ids| Array(ids).map { |id| [family, style, id] } }
+  end.uniq
+
+  icons = {}
+  triples.each_slice(ICON_IMPORT_BATCH_SIZE) do |batch|
+    tree = batch.each_with_object({}) do |(family, style, id), acc|
+      ((acc[family] ||= {})[style] ||= []) << id
+    end
+    # Merge each batch's result, appending in order so the output matches the allowlist order.
+    fetch_icons_batch(base, tree).each do |family, styles|
+      styles.each do |style, entries|
+        ((icons[family] ||= {})[style] ||= []).concat(entries)
+      end
+    end
+  end
+
+  raise 'Icon import returned no icons from the api' if icons.blank?
+
+  File.write('data/icons.json', icons.to_json)
+end
+
+# POSTs one batch (a { family => { style => [ids] } } tree) to the api and returns the parsed
+# { family => { style => [{ "id", "svg" }] } } result. Raises on a non-2xx so the build fails loud.
+def fetch_icons_batch(base, tree)
+  response = HTTParty.post(
+    "#{base}/api/icons",
+    headers: {
+      'Authorization' => "Bearer #{ENV['API_TOKEN']}",
+      'Content-Type' => 'application/json'
+    },
+    body: { icons: tree }.to_json,
+    timeout: 30
+  )
+  raise "Icon import failed: HTTP #{response.code} from #{base}/api/icons" unless response.success?
+
+  JSON.parse(response.body)
 end
 
 # Fetches the standard.site verification data (DID + publication URI) from the api and
@@ -111,6 +167,11 @@ def measure_and_output(method, description, mutex: nil)
     duration = Time.now - start_time
     log.call("❎ #{description} failed after #{format_duration(duration)}")
     log.call("   Error: #{e.message}")
+    # Re-raise so an essential import (e.g. icons, an every-page dependency) fails the build
+    # loudly here instead of surfacing later as a cryptic per-page middleman error. Imports
+    # that are meant to degrade gracefully (standard.site) swallow their own errors internally
+    # via safely_perform, so they never reach this rescue.
+    raise
   end
 end
 

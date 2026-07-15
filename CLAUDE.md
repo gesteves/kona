@@ -47,8 +47,11 @@ When an example or placeholder genuinely needs a host, use a generic stand-in li
 
 The API's routes are split by namespace: `/widgets/*` returns HTML widget fragments (proxied,
 below), `/api/*` accepts or returns structured data (`POST /api/location`,
-`GET /api/standard-site` — hit directly at `KONA_API_URL`, not proxied), and `/webhooks/*`
-receives inbound webhooks from external services (also hit directly, e.g. by Contentful).
+`GET /api/standard-site`, `POST /api/icons` — hit directly at `KONA_API_URL`, not proxied), and
+`/webhooks/*` receives inbound webhooks from external services (also hit directly, e.g. by
+Contentful). The web build reads two of these at build time: `GET /api/standard-site` for the
+verification markup, and `POST /api/icons` for its Font Awesome icons (the Font Awesome
+integration lives only in the api — web posts its allowlist and gets back pre-rendered SVGs).
 
 1. Browser requests `/widgets/*` on the main site.
 2. The Netlify Function `web/netlify/functions/widget-proxy.mts` claims that path

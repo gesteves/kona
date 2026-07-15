@@ -43,6 +43,11 @@ Rails.application.routes.draw do
     # standard.site verification data (DID + publication URI) the web build reads to emit
     # the .well-known endpoint and the <link rel="site.standard.*"> tags.
     get "standard-site" => "standard_site#show"
+
+    # Batch-resolves the web build's Font Awesome allowlist (posted as { family => { style =>
+    # [ids] } }) to pre-rendered SVGs, so the web build fetches icons from here instead of
+    # calling Font Awesome directly. Bearer-gated (a novel id triggers a paid upstream call).
+    post "icons" => "icons#create"
   end
 
   # Inbound webhooks, one controller per service.

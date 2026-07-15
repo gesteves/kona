@@ -31,6 +31,7 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 | POST | `/webhooks/contentful` | `webhooks/contentful#create` | enqueues a standard.site PDS sync job on publish/unpublish/delete (HMAC-gated); 204 | — |
 | POST | `/webhooks/whoop` | `webhooks/whoop#create` | enqueues a `WhoopWebhookJob` syncing strain/sleep/recovery to Intervals.icu wellness + regenerating the matched activity's description (HMAC-gated, user-verified); 200 `{ok: true}` | — |
 | GET | `/api/standard-site` | `api/standard_site#show` | JSON `{did, publication_uri}` for the web build's verification markup | 1 hr |
+| POST | `/api/icons` | `api/icons#create` | JSON `{family: {style: [{id, svg}]}}` — resolves the web build's posted Font Awesome allowlist to SVGs (bearer-token gated) | — |
 | GET | `/whoop/auth` | `whoop_oauth#authorize` | redirect (owner-session gated) | — |
 | GET | `/whoop/callback` | `whoop_oauth#callback` | OAuth token exchange | — |
 | GET | `/login` | `sessions#new` | owner sign-in page (Google button) | — |
@@ -54,7 +55,9 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 - **Auth** — `Widgets::BaseController` and `Api::BaseController` require the `API_TOKEN`
   bearer (`TokenAuthentication` concern) via a global `before_action`; the web app's Netlify
   proxy injects it on widget requests, so the widget origin is closed to direct/public hits
-  (cheap 401 before any work). `standard-site` skips it (public, build-time fetched directly
+  (cheap 401 before any work). `POST /api/icons` keeps the bearer (the web build sends it) —
+  a novel icon id triggers a paid upstream Font Awesome call, so scanners get a cheap 401
+  first. `standard-site` skips it (public, build-time fetched directly
   via `KONA_API_URL`). Webhook controllers don't use the bearer at all — senders can't carry
   our token, so each authenticates with its service's own scheme (Contentful: HMAC request
   verification). A new widget endpoint is gated automatically by inheriting
@@ -239,8 +242,13 @@ secrets (and Rails `config/credentials.yml.enc` + `master.key`).
 - Keep widget markup in sync with the matching `web/` placeholder (root `CLAUDE.md`).
 - Font Awesome icons are fetched on demand by family/style/id (GraphQL) and cached per
   version in Redis — `icon_svg('classic', 'solid', 'eye')`. No allowlist needed here;
-  any id a view references is fetched. (The `web/` app maintains its own separate
-  allowlist for build-time icons.)
+  any id a view references is fetched. The Font Awesome integration lives **only** here:
+  the `FONT_AWESOME_API_TOKEN` and `FONT_AWESOME_VERSION` env vars, the GraphQL client, and
+  the SVG cache are all api-side. The `web/` build no longer talks to Font Awesome directly —
+  it POSTs its own allowlist to `POST /api/icons` (`Api::IconsController`), which resolves each
+  id via the same `FontAwesome` service (so a new web icon needs no api change). That endpoint
+  requests icons in small batches, so a cold cache can't blow the per-request `rack-timeout`;
+  don't change it to resolve the whole allowlist in one request.
 
 ### Permissions
 

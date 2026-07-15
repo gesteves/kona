@@ -15,10 +15,12 @@ web↔api contract before touching any widget markup.
 ## Architecture & data flow
 
 - **Build-time data** (`rake import`): fetches external data into `data/*.json` (Redis
-  is used as a cache). Sources: Contentful content, Font Awesome icons, and the
-  standard.site verification data (DID + publication URI fetched from the `api/`
-  `/api/standard-site` endpoint — the actual AT Protocol / Bluesky PDS publishing now
-  lives in `api/`, webhook-driven).
+  is used as a cache for Contentful content). Sources: Contentful content; Font Awesome
+  icons (posted from the allowlist to the `api/` `/api/icons` endpoint, which resolves and
+  caches them — web no longer talks to Font Awesome directly); and the standard.site
+  verification data (DID + publication URI fetched from the `api/` `/api/standard-site`
+  endpoint — the actual AT Protocol / Bluesky PDS publishing now lives in `api/`,
+  webhook-driven).
   (robots.txt is a static Middleman template, `source/robots.txt.erb`, built here.)
 - **Page generation**: Middleman proxies (`config.rb`) turn `data/*.json` into static
   pages — articles, pages, tags, blog index.
@@ -57,14 +59,19 @@ npm run build:deploy             # trigger one production build now
 ### Import subtasks
 
 Only these exist: `rake import` (runs all in parallel), `import:content` (Contentful),
-`import:icons` (Font Awesome), `import:standard_site` (fetches the standard.site DID +
-publication URI from the `api/` `/api/standard-site` endpoint). Also `rake redis:clear`
-to flush the cache.
+`import:icons` (POSTs the `data/font_awesome.yml` allowlist to the `api/` `/api/icons`
+endpoint in batches and writes `data/icons.json`), `import:standard_site` (fetches the
+standard.site DID + publication URI from the `api/` `/api/standard-site` endpoint). Also
+`rake redis:clear` to flush the cache. Unlike `import:standard_site` (which degrades
+gracefully), a failed `import:icons` raises — icons are an every-page dependency, so the
+build fails loudly rather than shipping pages with missing icons.
 
 ## Key locations
 
 - `config.rb` — Middleman config + proxy setup; `Rakefile` — Redis init + task loader.
-- `lib/data/*.rb` — build-time clients: `contentful.rb`, `font_awesome.rb` (+ `graphql/`).
+- `lib/data/*.rb` — build-time clients: `contentful.rb` (+ `graphql/`). (Icons are fetched
+  from the `api/` `/api/icons` endpoint by `import:icons` in `lib/tasks/import.rake`, not a
+  `lib/data` client.)
 - `lib/tasks/*.rake` — `import`, `build`, `test`, `maps`, `redis`.
 - `lib/helpers/*.rb` — helper modules (article, markup, image, site, share, icon,
   url, text, markdown, context, cache, affiliate_links, standard_site);
@@ -78,17 +85,20 @@ to flush the cache.
   production-only, reuses `DARK_VISITORS_ACCESS_TOKEN`).
 - `data/font_awesome.yml` — **icon allowlist**. Any new icon must be added here (under
   the correct family/style, e.g. `classic.light`) before `icon_svg` / `rake import:icons`
-  can use it.
+  can use it. `import:icons` posts this tree to the `api/` `/api/icons` endpoint, which
+  resolves each id on demand — so adding an icon is a pure web-side yml edit; no api change
+  or redeploy is needed. The Font Awesome version lives in the api, not here.
 
 ## Environment variables
 
 Names only — see `.env.example`; never commit values.
 
-- **Required**: `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`, `FONT_AWESOME_API_TOKEN`,
+- **Required**: `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`,
   `REDIS_URL`, `KONA_API_URL` (base URL of the `api/` app — used by the `/widgets/*` proxy
-  and the `import:standard_site` fetch), `API_TOKEN` (shared bearer the `/widgets/*` proxy
-  injects on every upstream request; **must match the `api/` app's `API_TOKEN`**, and must be
-  set in Netlify's runtime env or every widget 401s at the origin and collapses on the site).
+  and the build-time `import:icons` / `import:standard_site` fetches), `API_TOKEN` (shared
+  bearer the `/widgets/*` proxy injects on every upstream request, and the build sends on the
+  `POST /api/icons` fetch; **must match the `api/` app's `API_TOKEN`**, and must be set in
+  Netlify's runtime env or every widget 401s at the origin and collapses on the site).
 - **Build credential**: `WEBAWESOME_NPM_TOKEN` — Web Awesome Pro npm registry auth, read
   by `.npmrc` at `npm install` (not in `.env`). Set it in your shell and in Netlify's
   build env, or the install fails.
@@ -99,8 +109,7 @@ Names only — see `.env.example`; never commit values.
   set it and `middleman server` renders what production serves (auto avif/webp, saliency-cropped OG
   cards). Cloudflare must have Transformations enabled with `images.ctfassets.net` allowlisted as a
   source, or every image 403s.
-- **Optional**: `DARK_VISITORS_ACCESS_TOKEN`, `FONT_AWESOME_VERSION`
-  (overrides the version in `data/font_awesome.yml`, the committed default).
+- **Optional**: `DARK_VISITORS_ACCESS_TOKEN`.
 
 ## Conventions & gates
 
