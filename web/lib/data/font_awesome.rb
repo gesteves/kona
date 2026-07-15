@@ -7,6 +7,9 @@ require_relative '../utils/redis_connection'
 # The FontAwesome class fetches icon SVGs from the Font Awesome GraphQL API, caches them in Redis,
 # and saves the data to a JSON file.
 class FontAwesome
+  # Number of times to retry a failed API fetch before giving up on an icon.
+  MAX_API_RETRIES = 3
+
   # Initializes the FontAwesome object by setting up the GraphQL client
   # and fetching the icons data.
   # @return [FontAwesome] instance of the FontAwesome class.
@@ -78,7 +81,10 @@ class FontAwesome
     icon_data
   end
 
-  # Fetches an SVG from the API and updates the Redis cache.
+  # Fetches an SVG from the API and updates the Redis cache. A failed request
+  # (network error, missing/expired token, GraphQL error → nil data, rate limiting)
+  # is retried with backoff; if it still fails, the icon is skipped rather than
+  # aborting the entire import, so a single flaky request can't take down the build.
   # @param version [String] The version of the icon set.
   # @param family [String] The icon family.
   # @param style [String] The icon style.
@@ -86,15 +92,31 @@ class FontAwesome
   # @see https://fontawesome.com/docs/apis/graphql/get-started
   # @return [String, nil] The SVG content for the icon, or nil if not found.
   def fetch_from_api(version, family, style, icon_id)
-    response = @client.query(FontAwesomeClient::QUERIES::Icons, variables: { version: version, query: icon_id })
-    return if response.data.search.empty?
+    attempts = 0
+    begin
+      attempts += 1
+      response = @client.query(FontAwesomeClient::QUERIES::Icons, variables: { version: version, query: icon_id })
+      # response.data is nil when the API returns top-level errors (bad/expired token,
+      # rate limiting, etc.) instead of a result set — treat that as a retryable failure.
+      raise "Font Awesome API returned no data (#{response.errors.messages})" if response.data.nil?
 
-    results = response.data.search.map(&:to_h)
-    # The search is fuzzy, so it can return results without an exact id match.
-    icon = results.find { |i| i['id'] == icon_id }
-    svg = icon&.dig('svgs')&.find { |s| s.dig('familyStyle', 'family') == family && s.dig('familyStyle', 'style') == style }&.dig('html')
-    redis.set(cache_key_for(version, family, style, icon_id), svg) if svg.present?
-    svg
+      search_results = response.data.search
+      return if search_results.empty?
+
+      results = search_results.map(&:to_h)
+      # The search is fuzzy, so it can return results without an exact id match.
+      icon = results.find { |i| i['id'] == icon_id }
+      svg = icon&.dig('svgs')&.find { |s| s.dig('familyStyle', 'family') == family && s.dig('familyStyle', 'style') == style }&.dig('html')
+      redis.set(cache_key_for(version, family, style, icon_id), svg) if svg.present?
+      svg
+    rescue StandardError => e
+      if attempts < MAX_API_RETRIES
+        sleep(attempts)
+        retry
+      end
+      warn "⚠️  Skipping icon '#{family}/#{style}/#{icon_id}' after #{attempts} attempts: #{e.message}"
+      nil
+    end
   end
 
   # Constructs a Redis cache key for an icon.

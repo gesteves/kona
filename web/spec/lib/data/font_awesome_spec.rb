@@ -211,6 +211,31 @@ RSpec.describe FontAwesome do
       expect(importer.send(:fetch_from_api, version, 'classic', 'solid', 'heart')).to be_nil
       expect(cache.store).to be_empty
     end
+
+    # response.data comes back nil when the API returns top-level errors (expired token,
+    # rate limiting, etc.). This used to raise and abort the whole import; now it retries.
+    def errored_response
+      double('response', data: nil, errors: double('errors', messages: { 'data' => ['boom'] }))
+    end
+
+    it 'retries when the API returns no data, then skips the icon without raising' do
+      instance = importer
+      allow(instance).to receive(:sleep) # don't actually wait between retries
+      expect(client).to receive(:query).exactly(FontAwesome::MAX_API_RETRIES).times.and_return(errored_response)
+
+      expect(instance.send(:fetch_from_api, version, 'classic', 'solid', 'heart')).to be_nil
+      expect(cache.store).to be_empty
+    end
+
+    it 'recovers on a retry when a transient failure is followed by a good response' do
+      instance = importer
+      allow(instance).to receive(:sleep)
+      good = api_response([api_result('heart', [['classic', 'solid', '<svg>heart</svg>']])])
+      expect(client).to receive(:query).and_return(errored_response, good)
+
+      expect(instance.send(:fetch_from_api, version, 'classic', 'solid', 'heart')).to eq('<svg>heart</svg>')
+      expect(cache.store).to eq(key_for('classic', 'solid', 'heart') => '<svg>heart</svg>')
+    end
   end
 
   describe '#get_icons' do
