@@ -9,18 +9,32 @@ export function clientIp(req: Request, context: Context): string | undefined {
   return req.headers.get('CF-Connecting-IP') ?? context.ip;
 }
 
-// CF-IPCountry is a 2-letter code present on every proxied request; CF-IPCity only exists
-// when the "Add visitor location headers" managed transform is enabled on the zone — hence
-// the country-only fallback rather than assuming a city.
+// CF-IPCountry is a 2-letter code present on every proxied request; CF-IPCity and CF-Region
+// ship together in the "Add visitor location headers" managed transform, so both are absent
+// unless it's enabled on the zone — hence joining whatever is present rather than assuming a
+// city or region. CF-Region is the spelled-out name ("Colorado"), not the CF-RegionCode
+// short form. Netlify's own equivalent of the region is geo.subdivision.
 export function clientGeo(req: Request, context: Context): string | undefined {
   if (req.headers.get('CF-Connecting-IP')) {
-    const city = req.headers.get('CF-IPCity');
-    const country = req.headers.get('CF-IPCountry');
-    return [city, country].filter(Boolean).join(', ') || undefined;
+    return (
+      [
+        req.headers.get('CF-IPCity'),
+        req.headers.get('CF-Region'),
+        req.headers.get('CF-IPCountry'),
+      ]
+        .filter(Boolean)
+        .join(', ') || undefined
+    );
   }
-  return context.geo?.city && context.geo?.country?.name
-    ? `${context.geo.city}, ${context.geo.country.name}`
-    : context.geo?.city || context.geo?.country?.name;
+  return (
+    [
+      context.geo?.city,
+      context.geo?.subdivision?.name,
+      context.geo?.country?.name,
+    ]
+      .filter(Boolean)
+      .join(', ') || undefined
+  );
 }
 
 // CF-Ray is set only on requests that actually traversed Cloudflare, so its presence is the
