@@ -109,12 +109,16 @@ Names only — see `.env.example`; never commit values.
 - **Build credential**: `WEBAWESOME_NPM_TOKEN` — Web Awesome Pro npm registry auth, read
   by `.npmrc` at `npm install` (not in `.env`). Set it in your shell and in Netlify's
   build env, or the install fails.
-- **Images**: `IMAGES_URL` — the host Cloudflare Images serves transformations from
-  (`<host>/cdn-cgi/image/…`), i.e. the site's public host. **Set it in Netlify's env**: without it
-  `cdn_image_url` silently falls back to Contentful's resizing, which renders fine but drains
-  Contentful's asset bandwidth — the thing Cloudflare Images exists to avoid. Locally it's optional;
-  set it and `middleman server` renders what production serves (auto avif/webp, saliency-cropped OG
-  cards). Cloudflare must have Transformations enabled with `images.ctfassets.net` allowlisted as a
+- **Images — `IMAGES_URL`, required everywhere including locally**: the host Cloudflare Images
+  serves transformations from (`<host>/cdn-cgi/image/…`), i.e. the site's public host. Building
+  any image without it raises `ImageHelpers::ImagesUrlMissing`, so **it must be set in Netlify's
+  env** and in your local `.env` (point it at the real zone; `middleman server` then renders what
+  production serves — auto avif/webp, cropped OG cards). It deliberately has **no fallback**: it
+  used to resize via Contentful when unset, which looked perfect in the browser while draining
+  Contentful's asset bandwidth, so the only thing the fallback reliably did was hide a broken
+  deploy. Don't reintroduce one — `contentful_image_url` survives only for `encode_blurhash`,
+  which uses it on purpose so blurhashes don't depend on the zone or spend a transformation.
+  Cloudflare must also have Transformations enabled with `images.ctfassets.net` allowlisted as a
   source, or every image 403s.
 - **Optional**: `DARK_VISITORS_ACCESS_TOKEN`.
 

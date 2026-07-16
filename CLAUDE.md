@@ -68,10 +68,15 @@ concluding something is a code problem.
   `Vary: User-Agent` entirely**, which is why per-reader responses must be `Cache-Control:
   private` (`web/netlify/edge-functions/feed-source.ts`).
 - **Bot blocking is a zone rule, not code** — the `block-bots` Netlify edge function was
-  **deleted** (`3c4e0044`). Its job — blocking scrapers that spoof a Google referral (a
+  **deleted** (`3c4e0044`). Its job — blocking a scraper that spoofs a Google referral (a
   desktop-Linux Chrome UA arriving with a `google.com` referer) — is now a **WAF BLOCK rule in
   the Cloudflare dashboard**. Don't reintroduce it as an edge function; if referral traffic
   looks wrong, read the rule before the code.
+  ⚠️ The rule is **knowingly over-broad**: those conditions also match a real person on desktop
+  Linux clicking a Google result, and blocking them is an accepted cost. The bot gets through
+  managed, non-interactive **and** interactive challenges, so UA + referer is the only thing left
+  that stops it. Don't "fix" the false positives by narrowing it to challenges — that's the
+  approach that already failed.
 - **`/cdn-cgi/*` never reaches an origin** — Cloudflare answers it at its own edge, so edge
   functions don't need to exclude it. `source/robots.txt.erb` allows `/cdn-cgi/image/` and
   disallows the rest.

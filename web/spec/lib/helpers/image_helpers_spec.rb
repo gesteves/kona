@@ -5,9 +5,10 @@ RSpec.describe ImageHelpers do
   # Shaped like data.assets; @assets is set per example before the index is built.
   def data = OpenStruct.new(assets: @assets || [])
 
-  # IMAGES_URL is the host Cloudflare serves transformations from, and the only thing that decides
-  # whether an image is resized by Cloudflare or by Contentful. Nothing here reads CONTEXT or URL.
-  def stub_env(images_url: nil)
+  # IMAGES_URL is the host Cloudflare serves transformations from, and is required everywhere —
+  # there's no Contentful-resizing fallback, so unset means raise. Nothing here reads CONTEXT or
+  # URL. Defaults to set, since that's every environment the code supports.
+  def stub_env(images_url: 'https://example.com')
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with('IMAGES_URL').and_return(images_url)
   end
@@ -68,38 +69,43 @@ RSpec.describe ImageHelpers do
       expect(cdn_image_url(nil)).to be_nil
     end
 
-    context 'on a local build (Contentful Images API)' do
-      it 'merges the params into the URL' do
-        expect(cdn_image_url(original, w: 100)).to eq("#{original}?w=100")
-      end
-
-      it "translates Cloudflare's fit=cover to Contentful's fit=fill" do
-        expect(cdn_image_url(original, fit: 'cover')).to eq("#{original}?fit=fill")
-      end
+    it 'routes through Cloudflare, with the options in the path and the source URL after them' do
+      url = cdn_image_url(original, w: 100)
+      expect(url).to eq("https://example.com/cdn-cgi/image/width=100/#{original}")
     end
 
-    context 'on a deployed build (Cloudflare Images)' do
-      before { stub_env(images_url: 'https://example.com') }
+    it 'upgrades protocol-relative URLs to https' do
+      url = cdn_image_url('//images.ctfassets.net/space/a/t/p.jpg', w: 100)
+      expect(url).to eq('https://example.com/cdn-cgi/image/width=100/https://images.ctfassets.net/space/a/t/p.jpg')
+    end
 
-      it 'routes through Cloudflare, with the options in the path and the source URL after them' do
-        url = cdn_image_url(original, w: 100)
-        expect(url).to eq("https://example.com/cdn-cgi/image/width=100/#{original}")
-      end
-
-      it 'upgrades protocol-relative URLs to https' do
-        url = cdn_image_url('//images.ctfassets.net/space/a/t/p.jpg', w: 100)
-        expect(url).to eq('https://example.com/cdn-cgi/image/width=100/https://images.ctfassets.net/space/a/t/p.jpg')
-      end
-
-      it 'leaves an already-transformed URL alone' do
-        transformed = 'https://example.com/cdn-cgi/image/width=50/https://images.ctfassets.net/s/a/t/p.jpg'
-        expect(cdn_image_url(transformed, w: 100)).to eq(transformed)
-      end
+    it 'leaves an already-transformed URL alone' do
+      transformed = 'https://example.com/cdn-cgi/image/width=50/https://images.ctfassets.net/s/a/t/p.jpg'
+      expect(cdn_image_url(transformed, w: 100)).to eq(transformed)
     end
 
     it "swaps in the asset's canonical URL when the id is known" do
       @assets = [OpenStruct.new(sys: OpenStruct.new(id: 'asset-1'), url: 'https://cdn.example.com/canonical.jpg')]
-      expect(cdn_image_url(original, w: 10)).to eq('https://cdn.example.com/canonical.jpg?w=10')
+      expect(cdn_image_url(original, w: 10)).to eq('https://example.com/cdn-cgi/image/width=10/https://cdn.example.com/canonical.jpg')
+    end
+
+    # The whole point of the hard requirement: this used to resize via Contentful instead, which
+    # looked identical in the browser and drained Contentful's bandwidth until someone noticed.
+    context 'when IMAGES_URL is unset' do
+      before { stub_env(images_url: nil) }
+
+      it 'raises rather than silently falling back to Contentful resizing' do
+        expect { cdn_image_url(original, w: 100) }.to raise_error(ImageHelpers::ImagesUrlMissing, /IMAGES_URL is unset/)
+      end
+
+      it 'still returns nil for a blank URL, so a missing logo is not a misconfiguration' do
+        expect(cdn_image_url(nil)).to be_nil
+      end
+
+      it 'still passes an already-transformed URL through without needing the host' do
+        transformed = 'https://example.com/cdn-cgi/image/width=50/https://images.ctfassets.net/s/a/t/p.jpg'
+        expect(cdn_image_url(transformed, w: 100)).to eq(transformed)
+      end
     end
   end
 
@@ -124,33 +130,30 @@ RSpec.describe ImageHelpers do
   describe '#srcset' do
     it 'renders a width-described candidate per size' do
       set = srcset(url: 'https://images.ctfassets.net/s/a/t/p.jpg', widths: [100, 200])
-      expect(set).to eq('https://images.ctfassets.net/s/a/t/p.jpg?w=100 100w, https://images.ctfassets.net/s/a/t/p.jpg?w=200 200w')
+      expect(set).to eq(
+        'https://example.com/cdn-cgi/image/width=100/https://images.ctfassets.net/s/a/t/p.jpg 100w, ' \
+        'https://example.com/cdn-cgi/image/width=200/https://images.ctfassets.net/s/a/t/p.jpg 200w'
+      )
     end
 
     it 'crops square when asked' do
       set = srcset(url: 'https://images.ctfassets.net/s/a/t/p.jpg', widths: [100], square: true)
-      expect(set).to include('w=100')
-      expect(set).to include('h=100')
-      expect(set).to include('fit=fill') # cover → fill without an images host
+      expect(set).to include('width=100')
+      expect(set).to include('height=100')
+      expect(set).to include('fit=cover')
     end
   end
 
   describe '#open_graph_image_url' do
     it "uses Facebook's card dimensions" do
       url = open_graph_image_url('https://images.ctfassets.net/s/a/t/p.jpg')
-      expect(url).to include('w=1200')
-      expect(url).to include('h=630')
-    end
-
-    it 'pins the exact Contentful-branch URL, with cover translated to fill' do
-      url = open_graph_image_url('https://images.ctfassets.net/s/a/t/p.jpg')
-      expect(url).to eq('https://images.ctfassets.net/s/a/t/p.jpg?w=1200&h=630&fit=fill')
+      expect(url).to include('width=1200')
+      expect(url).to include('height=630')
     end
 
     # Centre-cropped on purpose. gravity=auto was tried and reverted: its saliency crops were
     # too unpredictable on these photos.
     it 'centre-crops on Cloudflare, asking for no gravity' do
-      stub_env(images_url: 'https://example.com')
       url = open_graph_image_url('https://images.ctfassets.net/s/a/t/p.jpg')
       expect(url).to eq(
         'https://example.com/cdn-cgi/image/width=1200,height=630,fit=cover/' \
@@ -230,7 +233,16 @@ RSpec.describe ImageHelpers do
       end
 
       it 'returns the CDN URL for the logo at the requested width' do
-        expect(site_icon_url(w: 32)).to eq('https://images.ctfassets.net/space/logo-1/token/logo.png?w=32')
+        expect(site_icon_url(w: 32)).to eq(
+          'https://example.com/cdn-cgi/image/width=32/https://images.ctfassets.net/space/logo-1/token/logo.png'
+        )
+      end
+
+      # The rescue below exists for a site entry with no logo. It must not also swallow a
+      # misconfigured build into a silently missing icon.
+      it 'lets a missing IMAGES_URL raise through its rescue' do
+        stub_env(images_url: nil)
+        expect { site_icon_url(w: 32) }.to raise_error(ImageHelpers::ImagesUrlMissing)
       end
     end
 

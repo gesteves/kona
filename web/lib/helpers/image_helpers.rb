@@ -4,6 +4,23 @@ require 'blurhash'
 require 'erb'
 
 module ImageHelpers
+  # Raised when IMAGES_URL is unset. Every image on the site goes through Cloudflare, so there
+  # is no sensible way to build one without knowing the host to hang the transformation off.
+  class ImagesUrlMissing < StandardError
+    MESSAGE = <<~MSG.freeze
+      IMAGES_URL is unset, so there's no host to build a Cloudflare Images URL from.
+
+      It's the host Cloudflare serves transformations from (<host>/cdn-cgi/image/…), i.e. the
+      site's own public host. Set it in .env locally and in Netlify's env for deploys.
+
+      This used to fall back to Contentful's resizing, which rendered fine while quietly
+      draining Contentful's asset bandwidth — the exact thing Cloudflare Images replaced. It
+      now fails instead, so a missing var can't ship unnoticed.
+    MSG
+
+    def initialize(message = MESSAGE) = super
+  end
+
   # Cloudflare Images serves transformations from this path on our own zone. Options go in the
   # path, not the query string.
   # @see https://developers.cloudflare.com/images/transform-images/transform-via-url/
@@ -74,26 +91,27 @@ module ImageHelpers
 
   # Generates a CDN image URL with optional transformation parameters.
   # Cloudflare serves transformations from a host it fronts, so this needs to know which one:
-  # IMAGES_URL. Set it and `middleman server` renders exactly what production does — auto
-  # avif/webp, saliency-cropped Open Graph cards — with the images fetched from the live zone.
-  # Leave it unset and there's no host to hang a transformation off, so we ask Contentful to do
-  # the resizing instead. That's a fine local fallback, but it is NOT what we want in
-  # production: it's slower, and it's the Contentful bandwidth drain we moved off of.
+  # IMAGES_URL, required everywhere including locally. Set it and `middleman server` renders
+  # exactly what production does — auto avif/webp, saliency-cropped Open Graph cards — with the
+  # images fetched from the live zone. Unset, this raises rather than resizing via Contentful:
+  # that fallback rendered a perfectly good-looking site while draining Contentful's bandwidth,
+  # so its only real effect was to hide a broken deploy. See ImagesUrlMissing.
   # @see https://developers.cloudflare.com/images/transform-images/transform-via-url/
   # @param original_url [String, nil] The original URL of the image.
   # @param params [Hash] (Optional) Transformation parameters (:w, :h, :fm, :fit).
   # @return [String, nil] The CDN image URL, or nil for a blank URL (e.g. a site entry with
   #   no logo) so callers don't crash the build.
+  # @raise [ImagesUrlMissing] if IMAGES_URL is unset.
   def cdn_image_url(original_url, params = {})
     return if original_url.blank?
     # Already transformed; don't wrap it again. This has to come before get_asset_id, which
     # reads the id from a fixed path position that a transformed URL doesn't have.
     return original_url if original_url.include?(CDN_IMAGE_PATH)
+    raise ImagesUrlMissing if ENV['IMAGES_URL'].blank?
 
     asset_id = get_asset_id(original_url)
     asset_url = get_asset_url(asset_id)
     original_url = asset_url if asset_url.present?
-    return contentful_image_url(original_url, params) if ENV['IMAGES_URL'].blank?
 
     original_url = "https:#{original_url}" if original_url.start_with?('//')
     "#{ENV['IMAGES_URL']}#{CDN_IMAGE_PATH}#{cdn_image_options(params)}/#{original_url}"
@@ -118,11 +136,11 @@ module ImageHelpers
     options.join(',')
   end
 
-  # Generates a Contentful Images API URL. Two callers: cdn_image_url, when it has no host to
-  # build a Cloudflare URL with, and encode_blurhash — which uses it deliberately, so that
-  # generating a placeholder never depends on our zone being up or on Cloudflare's quota.
-  # Fidelity is lower than Cloudflare's (no auto format), which is fine for both: a local
-  # preview and a 32px thumbnail nobody sees.
+  # Generates a Contentful Images API URL. One caller: encode_blurhash, which uses it
+  # deliberately, so that generating a placeholder never depends on our zone being up or on
+  # Cloudflare's quota. Fidelity is lower than Cloudflare's (no auto format), which is fine for
+  # a 32px thumbnail nobody sees. This is NOT a fallback for cdn_image_url — resizing real
+  # images via Contentful is the bandwidth drain Cloudflare Images exists to avoid.
   # @see https://www.contentful.com/developers/docs/references/images-api/
   # @param original_url [String] The original URL of the image.
   # @param params [Hash] (Optional) Transformation parameters (:w, :h, :fm, :fit).
@@ -181,10 +199,15 @@ module ImageHelpers
   # Generates a CDN URL for the site icon with the specified width.
   # @param w [Integer] The desired width of the site icon.
   # @return [String, nil] The CDN URL for the site icon with the specified width, or nil if not found.
+  # @raise [ImagesUrlMissing] if IMAGES_URL is unset.
   def site_icon_url(w:)
     original_url = data.site.logo.url
     cdn_image_url(original_url, { w: w })
-  rescue
+  rescue ImagesUrlMissing
+    # A misconfigured build must fail, not silently lose the icon; the rescue below is only
+    # here for a site entry that has no logo at all.
+    raise
+  rescue StandardError
     nil
   end
 
