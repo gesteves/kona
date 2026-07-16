@@ -1,7 +1,9 @@
 # web/ — Kona static site
 
 Middleman 4 static site generator (Ruby 4.0.5) that builds a **Contentful**-powered
-blog and deploys to **Netlify**. esbuild bundles JavaScript (Stimulus + Turbo) and the
+blog and deploys to **Netlify**, which is itself proxied behind **Cloudflare** (images,
+client IPs, and bot blocking all depend on the zone — see the root
+[`CLAUDE.md`](../CLAUDE.md)). esbuild bundles JavaScript (Stimulus + Turbo) and the
 **Web Awesome** (Pro) component theme CSS via Middleman's external pipeline (`config.rb`):
 Middleman runs esbuild itself, into the gitignored `tmp/dist/`, during both `middleman build`
 (one-shot) and the dev server (watch mode) — there's no separate JS build step. Sass compiles
@@ -82,7 +84,12 @@ build fails loudly rather than shipping pages with missing icons.
   `og.mts` (OG images).
 - `netlify/edge-functions/` — `known-agents.ts` (records every page view server-side to
   Known Agents / Dark Visitors, capturing bot + AI-agent traffic Plausible can't see;
-  production-only, reuses `DARK_VISITORS_ACCESS_TOKEN`).
+  production-only, reuses `DARK_VISITORS_ACCESS_TOKEN`); `feed-source.ts` (per-reader feed URL
+  attribution — its `Cache-Control: private` is load-bearing because Cloudflare ignores
+  `Vary: User-Agent`). Both read the real client IP/geo from `CF-*` headers rather than
+  `context.ip`/`context.geo`, and duplicate that logic instead of importing
+  `functions/lib/log.mts` because edge functions run in Deno. There is **no** `block-bots`
+  function any more — that moved to a Cloudflare WAF rule (root [`CLAUDE.md`](../CLAUDE.md)).
 - `data/font_awesome.yml` — **icon allowlist**. Any new icon must be added here (under
   the correct family/style, e.g. `classic.light`) before `icon_svg` / `rake import:icons`
   can use it. `import:icons` posts this tree to the `api/` `/api/icons` endpoint, which

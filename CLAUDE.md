@@ -14,8 +14,8 @@ Work on one app from inside its own directory; each has its own `Gemfile`,
 
 | Path | What | Deploy |
 |---|---|---|
-| `web/` | Middleman 4 static site generator (Ruby 4.0.5). Builds the Contentful-powered blog and serves all static pages. | Netlify |
-| `api/` | Rails 8.1 API (Ruby 4.0.5). Serves small dynamic HTML fragments ("widgets") embedded into the static pages at runtime, plus a Sidekiq `worker` process for background jobs (standard.site PDS sync). | fly.io (`kona-api`: `app` + `worker`) |
+| `web/` | Middleman 4 static site generator (Ruby 4.0.5). Builds the Contentful-powered blog and serves all static pages. | Netlify (behind Cloudflare) |
+| `api/` | Rails 8.1 API (Ruby 4.0.5). Serves small dynamic HTML fragments ("widgets") embedded into the static pages at runtime, plus a Sidekiq `worker` process for background jobs (standard.site PDS sync). | fly.io (`kona-api`: `app` + `worker`) — behind Cloudflare |
 | `redis/` | Config (`fly.toml`) for the `kona-redis` fly app — the API's dedicated Redis (cache + Sidekiq queues). | fly.io (`kona-redis`) |
 | `contentful/` | One-off Contentful content migrations (Node scripts, run locally). Deliberately outside `web/` so edits don't trigger Netlify builds. | — (never deployed) |
 | `netlify.toml` (root) | Drives the Netlify build: `base = "web"`, `command = "bundle exec rake build"`, `publish = "build/"`. | — |
@@ -43,6 +43,44 @@ come from configuration:
 When an example or placeholder genuinely needs a host, use a generic stand-in like
 `https://<your-app-host>/…` — never the real domain.
 
+## Cloudflare sits in front of everything
+
+⚠️ **Both origins are proxied through Cloudflare** (orange-cloud DNS): the public site
+(→ Netlify) and the api/admin host (→ fly.io). **Nothing in this repo configures the zone** —
+it's all dashboard-side, so it's invisible to `grep` and easy to miss. Assume every production
+request traverses Cloudflare before it reaches Netlify or fly, and check the zone before
+concluding something is a code problem.
+
+- **Client IP** — `CF-Connecting-IP` is the only real visitor IP. Netlify's `context.ip` and
+  fly's `Fly-Client-IP` are both **Cloudflare PoPs**, not the visitor. Code that needs the
+  client reads `CF-Connecting-IP` first and falls back: `api/config/initializers/rack_attack.rb`,
+  `web/netlify/functions/lib/log.mts`, and both edge functions (the edge ones run in Deno and
+  can't import the Node helper, so the trio is deliberately duplicated). The header is spoofable
+  by anything hitting an origin directly, so it may key throttling and logging but must **never**
+  gate a ban.
+- **Geo / trace headers** — `CF-IPCity` / `CF-Region` / `CF-IPCountry` for geo, `CF-Ray` as both
+  the "this traversed the zone" marker and the join key into Cloudflare's logs.
+- **Images** — Cloudflare Images serves every transformation from `<IMAGES_URL>/cdn-cgi/image/…`
+  (replaced the Netlify Image CDN in PR #381). Details in [`web/CLAUDE.md`](web/CLAUDE.md).
+- **Caching** — the zone is deliberately **dynamic: Cloudflare caches almost nothing**. The
+  origin cache headers (Netlify's durable edge, the widget TTLs) still do the real work, so
+  don't reason about widget caching as if Cloudflare were in the loop. Cloudflare **ignores
+  `Vary: User-Agent` entirely**, which is why per-reader responses must be `Cache-Control:
+  private` (`web/netlify/edge-functions/feed-source.ts`).
+- **Bot blocking is a zone rule, not code** — the `block-bots` Netlify edge function was
+  **deleted** (`3c4e0044`). Its job — blocking scrapers that spoof a Google referral (a
+  desktop-Linux Chrome UA arriving with a `google.com` referer) — is now a **WAF BLOCK rule in
+  the Cloudflare dashboard**. Don't reintroduce it as an edge function; if referral traffic
+  looks wrong, read the rule before the code.
+- **`/cdn-cgi/*` never reaches an origin** — Cloudflare answers it at its own edge, so edge
+  functions don't need to exclude it. `source/robots.txt.erb` allows `/cdn-cgi/image/` and
+  disallows the rest.
+
+Zone-side settings the code hard-depends on, none of them in the repo: **Transformations**
+enabled with `images.ctfassets.net` allowlisted as a source (without it every image 403s); the
+**Add visitor location headers** managed transform (without it `CF-IPCity`/`CF-Region` are
+absent and geo logging degrades to country-only); and the bot WAF rule above.
+
 ## How the two apps connect (request path)
 
 The API's routes are split by namespace: `/widgets/*` returns HTML widget fragments (proxied,
@@ -54,9 +92,11 @@ verification markup, and `POST /api/icons` for its Font Awesome icons (the Font 
 integration lives only in the api — web posts its allowlist and gets back pre-rendered SVGs).
 
 1. Browser requests `/widgets/*` on the main site.
-2. The Netlify Function `web/netlify/functions/widget-proxy.mts` claims that path
-   (`config.path = '/widgets/*'`) and proxies to `KONA_API_URL` (the fly.io origin).
-3. The response is cached at Netlify's edge and reused by all viewers.
+2. **Cloudflare** proxies it through to Netlify (the zone caches almost nothing — see above).
+3. The Netlify Function `web/netlify/functions/widget-proxy.mts` claims that path
+   (`config.path = '/widgets/*'`) and proxies to `KONA_API_URL` (the fly.io origin, itself
+   behind Cloudflare).
+4. The response is cached at Netlify's edge and reused by all viewers.
 
 The proxy is deliberately strict:
 

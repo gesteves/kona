@@ -2,7 +2,9 @@
 
 Rails 8.1 API (Ruby 4.0.5) that serves small embeddable **HTML fragments** ("widgets")
 — plus structured-data endpoints and inbound webhooks — for the static `web/` site.
-Deployed to **fly.io** as `kona-api`. Routes are split by namespace: `/widgets/*` (HTML
+Deployed to **fly.io** as `kona-api`, with the origin proxied behind **Cloudflare** — so
+`Fly-Client-IP` is a Cloudflare PoP, not the visitor (see **Abuse mitigation** below and the
+root [`CLAUDE.md`](../CLAUDE.md)). Routes are split by namespace: `/widgets/*` (HTML
 fragments, reached through the web app's same-origin Netlify proxy), `/api/*` (structured
 data, hit directly at the origin), and `/webhooks/*` (inbound webhooks, hit directly by
 the sending service). Redis-backed caching, **no database**.
