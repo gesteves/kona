@@ -109,7 +109,7 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   metrics to Intervals.icu wellness/activity fields (see **Webhooks** above), and
   `ActivityDescriptionJob(activity_id, whoop_strain = nil)` (re)generates an activity's
   Strava description via `ActivityDescription::Generator` / `Composer` / `Llm` — emoji stat
-  lines (power, heat, Whoop strain, water temp, Last.fm top artists) plus two
+  lines (power, heat, Whoop strain, water temp) plus two
   Anthropic-generated lines (planned-workout summary matched against the TrainerRoad
   calendar, weather sentence — prompts in `app/prompts/`, skipped when `ANTHROPIC_API_KEY` is
   unset), preserving any user-written prose above the stat block, deduped per activity by a
@@ -226,8 +226,7 @@ secrets (and Rails `config/credentials.yml.enc` + `master.key`).
 - **Optional**: `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`, `TRAINERROAD_CALENDAR_URL`
   (rest-day check + planned-workout matching for generated activity descriptions),
   `ANTHROPIC_API_KEY` + `ANTHROPIC_DESCRIPTION_MODEL` (the LLM lines of generated activity
-  descriptions; the default model is `claude-sonnet-5`), `LASTFM_USERNAME` + `LASTFM_API_KEY`
-  (the 🎧 top-artists line),
+  descriptions; the default model is `claude-sonnet-5`),
   `PURPLEAIR_API_KEY`, `LOCATION`, `TIME_ZONE`, `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`,
   `BLUESKY_PDS_URL` (standard.site publishing; no-ops when the handle/password are unset),
   `BUGSNAG_API_KEY` (error reporting; **production only** — notifies only in the production

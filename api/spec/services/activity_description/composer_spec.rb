@@ -16,7 +16,6 @@ RSpec.describe ActivityDescription::Composer do
         ⚡️ Avg 200 W · NP 210 W
         🌡️ Max HSI 2.5 · Median HSI 1.7
         🔥 12.4 Whoop Strain
-        🎧 Radiohead
       TEXT
       expect(described_class.headline(description)).to eq("Big day out.")
     end
@@ -105,61 +104,6 @@ RSpec.describe ActivityDescription::Composer do
     end
   end
 
-  describe ".music_block / .pick_top_artists" do
-    def song(artist, name: "Track", played_at: Time.utc(2026, 1, 1, 10), loved: false)
-      { artist: artist, name: name, played_at: played_at, loved: loved }
-    end
-
-    it "names up to five artists with no suffix" do
-      songs = %w[A B C].map { |artist| song(artist) }
-      expect(described_class.music_block(songs)).to eq("🎧 A, B, C")
-    end
-
-    it "adds the and-N-more suffix past five unique artists" do
-      songs = ("A".."G").map { |artist| song(artist) }
-      expect(described_class.music_block(songs)).to start_with("🎧 ")
-      expect(described_class.music_block(songs)).to end_with(", and 2 more")
-    end
-
-    it "boosts artists with loved tracks" do
-      songs = [song("Bulk"), song("Bulk", name: "Other"), song("Loved", loved: true)]
-      top, = described_class.pick_top_artists(songs)
-      # Loved: 1 notable track ×2 + 1 play = 3; Bulk: 0 notable + 2 plays = 2.
-      expect(top.first).to eq("Loved")
-    end
-
-    it "treats a repeated track as notable" do
-      songs = [song("Repeat", name: "Same"), song("Repeat", name: "Same"), song("Variety", name: "One"), song("Variety", name: "Two")]
-      top, = described_class.pick_top_artists(songs)
-      # Repeat: 1 notable ×2 + 2 plays = 4; Variety: 0 notable + 2 plays = 2.
-      expect(top.first).to eq("Repeat")
-    end
-
-    it "breaks score ties by plays, then by earliest first play" do
-      songs = [
-        song("Later", played_at: Time.utc(2026, 1, 1, 11)),
-        song("Earlier", played_at: Time.utc(2026, 1, 1, 10))
-      ]
-      top, = described_class.pick_top_artists(songs)
-      expect(top).to eq(%w[Earlier Later])
-    end
-
-    it "falls back to first-seen order when everything ties" do
-      songs = [
-        song("First", played_at: Time.utc(2026, 1, 1, 10)),
-        song("Second", played_at: Time.utc(2026, 1, 1, 10))
-      ]
-      top, = described_class.pick_top_artists(songs)
-      expect(top).to eq(%w[First Second])
-    end
-
-    it "skips songs without an artist and returns nil for empty lists" do
-      expect(described_class.music_block([song("")])).to be_nil
-      expect(described_class.music_block([])).to be_nil
-      expect(described_class.music_block(nil)).to be_nil
-    end
-  end
-
   describe ".compose" do
     it "stacks the stat lines in canonical order" do
       composed = described_class.compose(
@@ -168,8 +112,7 @@ RSpec.describe ActivityDescription::Composer do
         water_temp: "💧 Water temperature 16 °C",
         power: "⚡️ Avg 200 W",
         heat: "🌡️ Max HSI 2.5 · Median HSI 1.7",
-        whoop: "🔥 12.4 Whoop Strain",
-        music: "🎧 Radiohead"
+        whoop: "🔥 12.4 Whoop Strain"
       )
 
       expect(composed).to eq(<<~TEXT.strip)
@@ -179,7 +122,6 @@ RSpec.describe ActivityDescription::Composer do
         ⚡️ Avg 200 W
         🌡️ Max HSI 2.5 · Median HSI 1.7
         🔥 12.4 Whoop Strain
-        🎧 Radiohead
       TEXT
     end
 
