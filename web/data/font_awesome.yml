@@ -1,4 +1,6 @@
-version: "7.3.0"
+# Allowlist of Font Awesome icons the build needs. web/ POSTs this `icons` tree to the api's
+# /api/icons endpoint, which resolves each id to an SVG; the Font Awesome version now lives in
+# the api (its FONT_AWESOME_VERSION), so it's intentionally not specified here.
 icons:
   classic:
     brands:

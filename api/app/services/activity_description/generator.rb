@@ -1,9 +1,9 @@
 module ActivityDescription
   # Composes a Strava-ready description for an Intervals.icu activity and PUTs it back.
-  # Orchestrates the data gathering (activity, streams, planned workout, heat adaptation,
-  # Last.fm scrobbles), the two Anthropic-backed lines, and the pure block builders in
-  # Composer. Used by the Whoop workout.updated webhook; structured so a rake task or
-  # endpoint could reuse it later.
+  # Orchestrates the data gathering (activity, streams, planned workout, heat adaptation),
+  # the two Anthropic-backed lines, and the pure block builders in Composer. Used by the
+  # Whoop workout.updated webhook; structured so a rake task or endpoint could reuse it
+  # later.
   class Generator
     # Prefix shared by every log line this generator emits, for greppability.
     LOG_PREFIX = "Description:"
@@ -20,10 +20,9 @@ module ActivityDescription
     # worker's hold; the lock is released as soon as a run finishes.
     LOCK_TTL = 10.minutes
 
-    def initialize(intervals: Intervals.new, trainer_road: nil, lastfm: Lastfm.new)
+    def initialize(intervals: Intervals.new, trainer_road: nil)
       @intervals = intervals
       @trainer_road = trainer_road
-      @lastfm = lastfm
     end
 
     # Generates and writes the description for an activity.
@@ -59,8 +58,7 @@ module ActivityDescription
         water_temp: water_temp_line(activity, swim),
         power: Composer.power_block(activity),
         heat: heat_line(activity, swim),
-        whoop: Composer.whoop_block(whoop_strain, swim: swim),
-        music: music_line(activity)
+        whoop: Composer.whoop_block(whoop_strain, swim: swim)
       )
 
       if description.blank?
@@ -165,23 +163,6 @@ module ActivityDescription
 
       positive = samples.select(&:positive?)
       [round_tenth(samples.max), round_tenth(median(positive.presence || samples) || 0)]
-    end
-
-    # The 🎧 music line, from Last.fm scrobbles during the activity's UTC time window.
-    # @return [String, nil]
-    def music_line(activity)
-      return unless @lastfm.configured?
-      return if activity[:start_date].blank?
-
-      safely("Last.fm lookup") do
-        start_time = Time.iso8601(activity[:start_date])
-        # Wall-clock (elapsed) time, not moving time: you keep listening through stops and
-        # pauses, so the music window should span the whole session, not just moving time.
-        duration = activity[:elapsed_time] || activity[:moving_time] || 0
-        songs = @lastfm.played_songs_during(start_time, start_time + duration)
-
-        Composer.music_block(songs)
-      end
     end
 
     # @return [Array<Numeric>, nil] The named stream's numeric samples.

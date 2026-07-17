@@ -2,23 +2,20 @@ module ActivityDescription
   # Pure functions that build and assemble the description's blocks. Layout: an optional
   # user-written headline (preserved verbatim — never generated) sits above a stack of
   # emoji-prefixed stat lines, in order: planned summary (🗓️) · weather · water temp (💧) ·
-  # power (⚡️) · heat (🌡️) · Whoop strain (🔥) · music (🎧). No I/O — the generator gathers
-  # the data and passes it in.
+  # power (⚡️) · heat (🌡️) · Whoop strain (🔥). No I/O — the generator gathers the data and
+  # passes it in.
   module Composer
     # Codepoint ranges covering every emoji this module emits and every weather emoji the
     # LLM is likely to pick: Misc Symbols/Dingbats plus the main emoji blocks. Headline
     # content (user prose) starts with a letter, so this only ever strips stat-shaped lines.
     EMOJI_RANGES = [0x2600..0x27BF, 0x1F300..0x1F6FF, 0x1F900..0x1F9FF, 0x1FA00..0x1FAFF].freeze
 
-    # How many artists the 🎧 line names before collapsing the rest into "and N more".
-    TOP_ARTISTS = 5
-
     module_function
 
     # Assembles the final description: the preserved headline (blank-line separated) above
     # the emoji stat lines (joined by single newlines — a stacked stat block, not paragraphs).
     # @return [String] Empty when there's nothing to say.
-    def compose(headline: nil, planned: nil, weather: nil, water_temp: nil, power: nil, heat: nil, whoop: nil, music: nil)
+    def compose(headline: nil, planned: nil, weather: nil, water_temp: nil, power: nil, heat: nil, whoop: nil)
       blocks = []
       blocks << "🗓️ #{planned}" if planned.present?
       blocks << weather if weather.present?
@@ -26,7 +23,6 @@ module ActivityDescription
       blocks << power if power.present?
       blocks << heat if heat.present?
       blocks << whoop if whoop.present?
-      blocks << music if music.present?
 
       stat_section = blocks.join("\n")
 
@@ -120,59 +116,6 @@ module ActivityDescription
         end
 
       "💧 Water temperature #{formatted.sub(/\.0(?=\s|\z)/, '')}"
-    end
-
-    # The music line, e.g. "🎧 Tracy Chapman, Radiohead, and 18 more". Names the top five
-    # artists; the "and N more" suffix appears only when more unique artists exist.
-    # @param songs [Array<Hash>] Normalized Last.fm songs.
-    # @return [String, nil]
-    def music_block(songs)
-      return if songs.blank?
-
-      top, remaining = pick_top_artists(songs)
-      return if top.empty?
-
-      suffix = remaining.positive? ? ", and #{remaining} more" : ""
-      "🎧 #{top.join(', ')}#{suffix}"
-    end
-
-    # Ranks artists deterministically: score = 2 × (notable-track count) + (total plays),
-    # where a track is notable when the athlete loved it OR played it more than once during
-    # the activity (repeating a track mid-workout is a "love"-equivalent signal). Ties break
-    # by plays desc, then earliest first-play (the artist that kicked off the playlist wins),
-    # then first appearance — Ruby's sort_by isn't stable, so insertion order is the last key.
-    # @return [Array(Array<String>, Integer)] The top artist names and how many were dropped.
-    def pick_top_artists(songs)
-      by_artist = {}
-
-      songs.each do |song|
-        artist = song[:artist].to_s.strip
-        next if artist.empty?
-
-        aggregate = by_artist[artist] ||= { plays: 0, first_played_at: song[:played_at], tracks: Hash.new { |h, k| h[k] = { plays: 0, loved: false } }, index: by_artist.size }
-        aggregate[:plays] += 1
-        aggregate[:first_played_at] = song[:played_at] if song[:played_at] < aggregate[:first_played_at]
-
-        track = aggregate[:tracks][song[:name].to_s.strip]
-        track[:plays] += 1
-        track[:loved] ||= song[:loved] ? true : false
-      end
-
-      ranked = by_artist.map do |artist, aggregate|
-        notable = aggregate[:tracks].values.count { |track| track[:loved] || track[:plays] > 1 }
-        {
-          artist: artist,
-          plays: aggregate[:plays],
-          first_played_at: aggregate[:first_played_at],
-          index: aggregate[:index],
-          score: (2 * notable) + aggregate[:plays]
-        }
-      end
-
-      ranked.sort_by! { |entry| [-entry[:score], -entry[:plays], entry[:first_played_at], entry[:index]] }
-
-      top = ranked.first(TOP_ARTISTS).map { |entry| entry[:artist] }
-      [top, [ranked.size - top.size, 0].max]
     end
 
     # Whether a line leads with a pictographic emoji (one of our stat prefixes, the

@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe ActivityDescription::Generator do
-  subject(:generator) { described_class.new(intervals: intervals, trainer_road: trainer_road, lastfm: lastfm) }
+  subject(:generator) { described_class.new(intervals: intervals, trainer_road: trainer_road) }
 
   let(:intervals) do
     instance_double(
@@ -15,7 +15,6 @@ RSpec.describe ActivityDescription::Generator do
     )
   end
   let(:trainer_road) { instance_double(TrainerRoad, planned_workouts: []) }
-  let(:lastfm) { instance_double(Lastfm, configured?: false) }
 
   let(:activity) do
     {
@@ -248,40 +247,6 @@ RSpec.describe ActivityDescription::Generator do
       generator.generate!("i1")
 
       expect(intervals).to have_received(:update_activity!).with("i1", description: a_string_including("🌡️ 72% heat adapted"))
-    end
-  end
-
-  describe "the music line" do
-    it "renders top artists from the activity's UTC window" do
-      allow(lastfm).to receive(:configured?).and_return(true)
-      start_time = Time.iso8601("2026-07-09T13:30:00Z")
-      allow(lastfm).to receive(:played_songs_during).with(start_time, start_time + 3600).and_return(
-        [{ artist: "Radiohead", name: "Weird Fishes", played_at: start_time, loved: false }]
-      )
-
-      generator.generate!("i1")
-
-      expect(intervals).to have_received(:update_activity!).with("i1", description: a_string_including("🎧 Radiohead"))
-    end
-
-    it "loses only the music line when Last.fm fails" do
-      allow(lastfm).to receive(:configured?).and_return(true)
-      allow(lastfm).to receive(:played_songs_during).and_raise("lastfm down")
-
-      generator.generate!("i1")
-
-      expect(intervals).to have_received(:update_activity!).with("i1", description: "⚡️ Avg 200 W")
-    end
-
-    it "windows on wall-clock (elapsed) time, not moving time" do
-      allow(lastfm).to receive(:configured?).and_return(true)
-      allow(intervals).to receive(:activity!).and_return(activity.merge(moving_time: 3600, elapsed_time: 5400))
-      start_time = Time.iso8601("2026-07-09T13:30:00Z")
-      allow(lastfm).to receive(:played_songs_during).with(start_time, start_time + 5400).and_return([])
-
-      generator.generate!("i1")
-
-      expect(lastfm).to have_received(:played_songs_during).with(start_time, start_time + 5400)
     end
   end
 

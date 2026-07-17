@@ -1,0 +1,77 @@
+require "rails_helper"
+
+RSpec.describe "Api::Icons", type: :request do
+  let(:token) { "test-token" }
+
+  before do
+    allow(ENV).to receive(:[]).and_call_original
+    allow(ENV).to receive(:[]).with("API_TOKEN").and_return(token)
+  end
+
+  def post_icons(body, headers: { "Authorization" => "Bearer #{token}" })
+    post "/api/icons", params: body.to_json, headers: headers.merge("Content-Type" => "application/json")
+  end
+
+  it "rejects requests without a bearer token before resolving any icon" do
+    expect_any_instance_of(FontAwesome).not_to receive(:svg)
+
+    post_icons({ icons: { "classic" => { "solid" => %w[heart] } } }, headers: {})
+
+    expect(response).to have_http_status(:unauthorized)
+  end
+
+  it "rejects requests with the wrong bearer token" do
+    post_icons({ icons: { "classic" => { "solid" => %w[heart] } } },
+      headers: { "Authorization" => "Bearer nope" })
+
+    expect(response).to have_http_status(:unauthorized)
+  end
+
+  it "resolves the posted allowlist to SVGs, preserving order and omitting misses" do
+    allow_any_instance_of(FontAwesome).to receive(:svg).and_return(nil)
+    allow_any_instance_of(FontAwesome).to receive(:svg)
+      .with("classic", "solid", "heart").and_return("<svg>heart</svg>")
+    allow_any_instance_of(FontAwesome).to receive(:svg)
+      .with("classic", "solid", "check").and_return("<svg>check</svg>")
+    # A miss (nil) — must be omitted from the response entirely.
+    allow_any_instance_of(FontAwesome).to receive(:svg)
+      .with("classic", "light", "no-such-icon").and_return(nil)
+
+    post_icons({ icons: {
+      "classic" => {
+        "solid" => %w[heart check],
+        "light" => %w[no-such-icon]
+      }
+    } })
+
+    expect(response).to have_http_status(:ok)
+    expect(JSON.parse(response.body)).to eq(
+      "classic" => {
+        "solid" => [
+          { "id" => "heart", "svg" => "<svg>heart</svg>" },
+          { "id" => "check", "svg" => "<svg>check</svg>" }
+        ]
+      }
+    )
+  end
+
+  it "emits an id repeated within a family/style only once" do
+    allow_any_instance_of(FontAwesome).to receive(:svg)
+      .with("classic", "light", "wind").and_return("<svg>wind</svg>")
+
+    post_icons({ icons: { "classic" => { "light" => %w[wind wind] } } })
+
+    expect(response).to have_http_status(:ok)
+    expect(JSON.parse(response.body)).to eq(
+      "classic" => { "light" => [{ "id" => "wind", "svg" => "<svg>wind</svg>" }] }
+    )
+  end
+
+  it "returns 422 when the body carries no icons tree" do
+    expect_any_instance_of(FontAwesome).not_to receive(:svg)
+
+    post_icons({ icons: "nope" })
+
+    expect(response).to have_http_status(:unprocessable_content)
+  end
+end

@@ -1,7 +1,9 @@
 # web/ — Kona static site
 
 Middleman 4 static site generator (Ruby 4.0.5) that builds a **Contentful**-powered
-blog and deploys to **Netlify**. esbuild bundles JavaScript (Stimulus + Turbo) and the
+blog and deploys to **Netlify**, which is itself proxied behind **Cloudflare** (images,
+client IPs, and bot blocking all depend on the zone — see the root
+[`CLAUDE.md`](../CLAUDE.md)). esbuild bundles JavaScript (Stimulus + Turbo) and the
 **Web Awesome** (Pro) component theme CSS via Middleman's external pipeline (`config.rb`):
 Middleman runs esbuild itself, into the gitignored `tmp/dist/`, during both `middleman build`
 (one-shot) and the dev server (watch mode) — there's no separate JS build step. Sass compiles
@@ -15,10 +17,12 @@ web↔api contract before touching any widget markup.
 ## Architecture & data flow
 
 - **Build-time data** (`rake import`): fetches external data into `data/*.json` (Redis
-  is used as a cache). Sources: Contentful content, Font Awesome icons, and the
-  standard.site verification data (DID + publication URI fetched from the `api/`
-  `/api/standard-site` endpoint — the actual AT Protocol / Bluesky PDS publishing now
-  lives in `api/`, webhook-driven).
+  is used as a cache for Contentful content). Sources: Contentful content; Font Awesome
+  icons (posted from the allowlist to the `api/` `/api/icons` endpoint, which resolves and
+  caches them — web no longer talks to Font Awesome directly); and the standard.site
+  verification data (DID + publication URI fetched from the `api/` `/api/standard-site`
+  endpoint — the actual AT Protocol / Bluesky PDS publishing now lives in `api/`,
+  webhook-driven).
   (robots.txt is a static Middleman template, `source/robots.txt.erb`, built here.)
 - **Page generation**: Middleman proxies (`config.rb`) turn `data/*.json` into static
   pages — articles, pages, tags, blog index.
@@ -59,14 +63,19 @@ npm run build:deploy             # trigger one production build now
 ### Import subtasks
 
 Only these exist: `rake import` (runs all in parallel), `import:content` (Contentful),
-`import:icons` (Font Awesome), `import:standard_site` (fetches the standard.site DID +
-publication URI from the `api/` `/api/standard-site` endpoint). Also `rake redis:clear`
-to flush the cache.
+`import:icons` (POSTs the `data/font_awesome.yml` allowlist to the `api/` `/api/icons`
+endpoint in batches and writes `data/icons.json`), `import:standard_site` (fetches the
+standard.site DID + publication URI from the `api/` `/api/standard-site` endpoint). Also
+`rake redis:clear` to flush the cache. Unlike `import:standard_site` (which degrades
+gracefully), a failed `import:icons` raises — icons are an every-page dependency, so the
+build fails loudly rather than shipping pages with missing icons.
 
 ## Key locations
 
 - `config.rb` — Middleman config + proxy setup; `Rakefile` — Redis init + task loader.
-- `lib/data/*.rb` — build-time clients: `contentful.rb`, `font_awesome.rb` (+ `graphql/`).
+- `lib/data/*.rb` — build-time clients: `contentful.rb` (+ `graphql/`). (Icons are fetched
+  from the `api/` `/api/icons` endpoint by `import:icons` in `lib/tasks/import.rake`, not a
+  `lib/data` client.)
 - `lib/tasks/*.rake` — `import`, `build`, `test`, `maps`, `redis`.
 - `lib/helpers/*.rb` — helper modules (article, markup, image, site, share, icon,
   url, text, markdown, context, cache, affiliate_links, standard_site);
@@ -76,7 +85,12 @@ to flush the cache.
 - `netlify/functions/` — `widget-proxy.mts` (proxies `/widgets/*`; see root `CLAUDE.md`).
 - `netlify/edge-functions/` — `known-agents.ts` (records every page view server-side to
   Known Agents / Dark Visitors, capturing bot + AI-agent traffic Plausible can't see;
-  production-only, reuses `DARK_VISITORS_ACCESS_TOKEN`).
+  production-only, reuses `DARK_VISITORS_ACCESS_TOKEN`); `feed-source.ts` (per-reader feed URL
+  attribution — its `Cache-Control: private` is load-bearing because Cloudflare ignores
+  `Vary: User-Agent`). Both read the real client IP/geo from `CF-*` headers rather than
+  `context.ip`/`context.geo`, and duplicate that logic instead of importing
+  `functions/lib/log.mts` because edge functions run in Deno. There is **no** `block-bots`
+  function any more — that moved to a Cloudflare WAF rule (root [`CLAUDE.md`](../CLAUDE.md)).
 - `scripts/render-og.mjs` — pre-renders every Open Graph card PNG at build (invoked from
   `build.rake`), one `build/og/<page path>/card.png` per entry in `og/data.json`;
   Redis-cached per (template version, logo, title). `generate_open_graph_image_url`
@@ -92,29 +106,35 @@ to flush the cache.
   site still runs on Netlify. See the migration plan before touching the cutover pieces.
 - `data/font_awesome.yml` — **icon allowlist**. Any new icon must be added here (under
   the correct family/style, e.g. `classic.light`) before `icon_svg` / `rake import:icons`
-  can use it.
+  can use it. `import:icons` posts this tree to the `api/` `/api/icons` endpoint, which
+  resolves each id on demand — so adding an icon is a pure web-side yml edit; no api change
+  or redeploy is needed. The Font Awesome version lives in the api, not here.
 
 ## Environment variables
 
 Names only — see `.env.example`; never commit values.
 
-- **Required**: `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`, `FONT_AWESOME_API_TOKEN`,
+- **Required**: `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`,
   `REDIS_URL`, `KONA_API_URL` (base URL of the `api/` app — used by the `/widgets/*` proxy
-  and the `import:standard_site` fetch), `API_TOKEN` (shared bearer the `/widgets/*` proxy
-  injects on every upstream request; **must match the `api/` app's `API_TOKEN`**, and must be
-  set in Netlify's runtime env or every widget 401s at the origin and collapses on the site).
+  and the build-time `import:icons` / `import:standard_site` fetches), `API_TOKEN` (shared
+  bearer the `/widgets/*` proxy injects on every upstream request, and the build sends on the
+  `POST /api/icons` fetch; **must match the `api/` app's `API_TOKEN`**, and must be set in
+  Netlify's runtime env or every widget 401s at the origin and collapses on the site).
 - **Build credential**: `WEBAWESOME_NPM_TOKEN` — Web Awesome Pro npm registry auth, read
   by `.npmrc` at `npm install` (not in `.env`). Set it in your shell and in Netlify's
   build env, or the install fails.
-- **Images**: `IMAGES_URL` — the host Cloudflare Images serves transformations from
-  (`<host>/cdn-cgi/image/…`), i.e. the site's public host. **Set it in Netlify's env**: without it
-  `cdn_image_url` silently falls back to Contentful's resizing, which renders fine but drains
-  Contentful's asset bandwidth — the thing Cloudflare Images exists to avoid. Locally it's optional;
-  set it and `middleman server` renders what production serves (auto avif/webp, saliency-cropped OG
-  cards). Cloudflare must have Transformations enabled with `images.ctfassets.net` allowlisted as a
+- **Images — `IMAGES_URL`, required everywhere including locally**: the host Cloudflare Images
+  serves transformations from (`<host>/cdn-cgi/image/…`), i.e. the site's public host. Building
+  any image without it raises `ImageHelpers::ImagesUrlMissing`, so **it must be set in Netlify's
+  env** and in your local `.env` (point it at the real zone; `middleman server` then renders what
+  production serves — auto avif/webp, cropped OG cards). It deliberately has **no fallback**: it
+  used to resize via Contentful when unset, which looked perfect in the browser while draining
+  Contentful's asset bandwidth, so the only thing the fallback reliably did was hide a broken
+  deploy. Don't reintroduce one — `contentful_image_url` survives only for `encode_blurhash`,
+  which uses it on purpose so blurhashes don't depend on the zone or spend a transformation.
+  Cloudflare must also have Transformations enabled with `images.ctfassets.net` allowlisted as a
   source, or every image 403s.
-- **Optional**: `DARK_VISITORS_ACCESS_TOKEN`, `FONT_AWESOME_VERSION`
-  (overrides the version in `data/font_awesome.yml`, the committed default).
+- **Optional**: `DARK_VISITORS_ACCESS_TOKEN`.
 
 ## Conventions & gates
 
