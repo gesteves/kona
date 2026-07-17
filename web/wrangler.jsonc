@@ -32,8 +32,13 @@
     // Negative patterns take precedence. Requires wrangler ≥ 4.20.
     // No /cdn-cgi/* entry is needed or possible: Cloudflare answers image transformations
     // at its own edge; they never reach the Worker.
-    // /widgets/*, /plsbl/*, and /contact all match /* (wrangler rejects explicit entries
-    // as redundant); the negations below carve out everything that should skip the Worker.
+    // /widgets/*, /plsbl/*, /contact, and the feeds all match /* (wrangler rejects explicit
+    // entries as redundant); the negations below carve out everything that should skip the
+    // Worker. Note there is NO `!/*.xml`: the feeds (`/feed.xml`, `<tag path>feed.xml`) are
+    // .xml and must reach the Worker so feed-source.ts can relabel utm_source per reader.
+    // Because negatives take precedence, a positive `/feed.xml` could not override a blanket
+    // `!/*.xml`, so instead only the one non-feed .xml asset — the sitemap — is excluded by
+    // name. Any future .xml asset would run the Worker (served unchanged via servePage).
     "run_worker_first": [
       "/*",
       "!/javascripts/*",
@@ -45,7 +50,7 @@
       "!/*.css",
       "!/*.map",
       "!/*.json",
-      "!/*.xml",
+      "!/sitemap.xml",
       "!/*.txt",
       "!/*.png",
       "!/*.jpg",
