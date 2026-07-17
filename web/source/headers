@@ -47,7 +47,3 @@
 # HTML pages, which is harmless: this directive is exactly the default they'd get anyway.
 /tagged/*
   Cache-Control: public, max-age=0, must-revalidate
-
-# OG card PNGs (pre-rendered at build) and the build's og/data.json.
-/og/*
-  Cache-Control: public, max-age=0, must-revalidate

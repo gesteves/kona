@@ -195,7 +195,7 @@ module ArticleHelpers
     else
       # No cover image (typical for Shorts): fall back to the generated Open Graph card — the
       # same 1200×630 image used for social embeds — so the BlogPosting still carries an image.
-      schema["image"] = [image_object(generate_open_graph_image_url(full_url(current_page.url)), 1200, 630)]
+      schema["image"] = [image_object(generate_open_graph_image_url(full_url(current_page.url), content.sys.published_version), 1200, 630)]
     end
     schema.to_json
   end

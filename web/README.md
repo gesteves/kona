@@ -12,7 +12,7 @@ Copy `.env.example` to `.env` and fill in the credentials below (also add them t
 
 ### Required services
 
-- **Netlify** — hosting. Kona can run anywhere as a static site, but relies on Netlify [functions](https://docs.netlify.com/functions/overview/) (the `/widgets/*` proxy, OG images) and [build hooks](https://docs.netlify.com/configure-builds/build-hooks/).
+- **Netlify** — hosting. Kona can run anywhere as a static site, but relies on Netlify [functions](https://docs.netlify.com/functions/overview/) (the `/widgets/*` proxy) and [build hooks](https://docs.netlify.com/configure-builds/build-hooks/).
 - **Cloudflare** — the zone in front of the site. Images are resized and served through [Cloudflare Images](https://developers.cloudflare.com/images/transform-images/transform-via-url/) (`/cdn-cgi/image/…`), which fetches them from Contentful and caches the results at the edge. Requires Transformations enabled on the zone, with `images.ctfassets.net` allowlisted as a source — without that, every image 403s.
 - **Contentful** — the CMS for the site's content. Create an API key under Settings → API Keys and set `CONTENTFUL_SPACE` and `CONTENTFUL_TOKEN` (Content Preview token). You'll want a content model like this:
 
@@ -22,6 +22,7 @@ Copy `.env.example` to `.env` and fill in the credentials below (also add them t
 - **Web Awesome Pro** — the web component library the UI is built on. Needs a Pro subscription; the private registry is configured in `.npmrc`, and `npm install` reads `WEBAWESOME_NPM_TOKEN` from the environment to authenticate. Set it locally (your shell) and in Netlify's build environment.
 - **Redis** — caches API responses to speed up builds. Set `REDIS_URL`.
 - **Kona API** — set `KONA_API_URL` to the deployed [`api/`](../api/README.md) app. The home-page weather/stats/Whoop widgets load from it at runtime.
+- **Kona OG** — set `OG_IMAGE_URL` to the deployed [`og/`](../og/CLAUDE.md) app. It renders the `og:image` "card" on demand for pages without a cover image.
 
 ### Optional services
 

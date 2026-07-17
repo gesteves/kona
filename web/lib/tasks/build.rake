@@ -22,8 +22,5 @@ def build_site(verbose: false)
   # redirects and headers files are authored without the prefix and renamed here.
   File.rename("#{BUILD_DIRECTORY}/redirects", "#{BUILD_DIRECTORY}/_redirects")
   File.rename("#{BUILD_DIRECTORY}/headers", "#{BUILD_DIRECTORY}/_headers")
-  # Pre-render the Open Graph card PNGs from the freshly built og/data.json. Redis-cached,
-  # so only new/changed titles actually render.
-  sh 'node scripts/render-og.mjs'
   sh 'npm run pagefind'
 end

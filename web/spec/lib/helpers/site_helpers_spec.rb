@@ -387,56 +387,6 @@ RSpec.describe SiteHelpers do
     end
   end
 
-  describe '#og_normalized_path' do
-    it 'normalizes built paths to their public trailing-slash form' do
-      expect(og_normalized_path('/2024/01/01/post/index.html')).to eq('/2024/01/01/post/')
-      expect(og_normalized_path('/index.html')).to eq('/')
-      expect(og_normalized_path('/about/')).to eq('/about/')
-    end
-
-    it 'maps nil to nil and an empty path to the root' do
-      expect(og_normalized_path(nil)).to be_nil
-      expect(og_normalized_path('')).to eq('/')
-    end
-  end
-
-  describe '#og_page_titles' do
-    def data
-      OpenStruct.new(
-        site: OpenStruct.new(meta_title: 'My Site'),
-        articles: @articles || [],
-        pages: @pages
-      )
-    end
-
-    it "maps each non-draft entry's normalized path to its rendered title, skipping drafts and entries missing a path or title" do
-      @articles = [
-        Hashie::Mash.new(title: 'A Post', path: '/2024/01/01/post/index.html', draft: false),
-        Hashie::Mash.new(title: 'Hidden', path: '/2024/02/02/hidden/index.html', draft: true)
-      ]
-      @pages = [
-        Hashie::Mash.new(title: 'About', path: '/about/index.html', draft: false),
-        Hashie::Mash.new(title: nil, path: '/untitled/index.html', draft: false),
-        Hashie::Mash.new(title: 'Homeless', path: nil, draft: false)
-      ]
-      expect(og_page_titles).to eq(
-        '/2024/01/01/post/' => 'A Post',
-        '/about/' => 'About'
-      )
-    end
-
-    it 'titles the home page with the site meta title' do
-      @pages = [Hashie::Mash.new(title: 'Home', path: '/index.html', draft: false, is_home_page: true)]
-      expect(og_page_titles).to eq('/' => 'My Site')
-    end
-
-    it 'tolerates a missing collection' do
-      @articles = [Hashie::Mash.new(title: 'A Post', path: '/post/index.html', draft: false)]
-      @pages = nil
-      expect(og_page_titles).to eq('/post/' => 'A Post')
-    end
-  end
-
   describe '#copyright_years' do
     def data = OpenStruct.new(articles: [OpenStruct.new(draft: false, published_at: '2006-06-15T00:00:00Z')])
 

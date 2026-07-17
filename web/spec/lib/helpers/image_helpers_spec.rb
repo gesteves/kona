@@ -254,15 +254,31 @@ RSpec.describe ImageHelpers do
   end
 
   describe '#generate_open_graph_image_url' do
-    it 'points at the pre-rendered card PNG, mirroring the page path under /og' do
-      allow(self).to receive(:root_url).and_return('https://example.com')
-      url = generate_open_graph_image_url('https://example.com/articles/foo/')
-      expect(url).to eq('https://example.com/og/articles/foo/card.png')
+    def stub_og(url)
+      allow(ENV).to receive(:[]).with('OG_IMAGE_URL').and_return(url)
     end
 
-    it 'maps the site root to /og/card.png' do
-      allow(self).to receive(:root_url).and_return('https://example.com')
-      expect(generate_open_graph_image_url('https://example.com/')).to eq('https://example.com/og/card.png')
+    it 'points at the kona-og service with the page url and a version cache buster' do
+      stub_og('https://og.example.com')
+      result = generate_open_graph_image_url('https://example.com/articles/foo/', 1082)
+      parsed = URI.parse(result)
+      expect("#{parsed.scheme}://#{parsed.host}#{parsed.path}").to eq('https://og.example.com/og.png')
+      expect(URI.decode_www_form(parsed.query).to_h).to eq(
+        'url' => 'https://example.com/articles/foo/',
+        'v' => 'v1-1082'
+      )
+    end
+
+    it 'trims a trailing slash on the configured base' do
+      stub_og('https://og.example.com/')
+      expect(generate_open_graph_image_url('https://example.com/', 7))
+        .to start_with('https://og.example.com/og.png?')
+    end
+
+    it 'raises when OG_IMAGE_URL is unset' do
+      stub_og(nil)
+      expect { generate_open_graph_image_url('https://example.com/', 1) }
+        .to raise_error(/OG_IMAGE_URL is not set/)
     end
   end
 

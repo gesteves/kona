@@ -1,0 +1,45 @@
+# fly.toml app configuration for kona-og — the on-demand Open Graph card renderer.
+#
+# See https://fly.io/docs/reference/configuration/ for the full reference.
+#
+# ⚠️ No hostnames live in this file (or anywhere in the repo). The custom domain is attached
+# in the dashboard, and the only runtime config is the SITE_URL origin allowlist, set as a
+# fly secret (`fly secrets set SITE_URL=…`) — the web build points at this service via its
+# own OG_IMAGE_URL env var.
+
+app = 'kona-og'
+primary_region = 'iad'
+kill_signal = 'SIGTERM'
+kill_timeout = 30
+
+[build]
+
+[env]
+  NODE_ENV = 'production'
+
+[[restart]]
+  policy = 'on-failure'
+  retries = 10
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = 'requests'
+    soft_limit = 25
+
+  [[http_service.checks]]
+    interval = '15s'
+    timeout = '10s'
+    grace_period = '30s'
+    method = 'GET'
+    path = '/up'
+
+[[vm]]
+  cpu_kind = 'shared'
+  cpus = 1
+  memory = '512mb'

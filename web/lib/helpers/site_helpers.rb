@@ -262,28 +262,6 @@ module SiteHelpers
     markdown_to_html("© #{years} #{data.site.copyright}")
   end
 
-  # The normalized path → title map consumed by the OG image function (netlify/functions/og.mts)
-  # via /og/data.json.
-  # @return [Hash] Normalized page path (trailing-slash form) → rendered page title.
-  def og_page_titles
-    titles = {}
-    [data.articles, data.pages].each do |collection|
-      (collection || []).reject(&:draft).each do |entry|
-        key = og_normalized_path(entry.path)
-        titles[key] = page_title(entry) if key && entry.title
-      end
-    end
-    titles
-  end
-
-  # Normalizes a built page path ("/foo/index.html") to its public trailing-slash form ("/foo/").
-  # @return [String, nil]
-  def og_normalized_path(path)
-    return if path.nil?
-    path = path.sub(/\/index\.html\z/, '/')
-    path.empty? ? '/' : path
-  end
-
   # First-party proxy paths for Plausible analytics. Both the inline init
   # snippet (partials/_analytics.html.erb) and the Netlify `_redirects` rewrites
   # (source/redirects.erb) read these, so the browser-facing path and the proxy

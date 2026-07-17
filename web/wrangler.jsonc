@@ -45,7 +45,6 @@
       "!/stylesheets/*",
       "!/images/*",
       "!/fonts/*",
-      "!/og/*",
       "!/*.js",
       "!/*.css",
       "!/*.map",

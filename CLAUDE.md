@@ -16,6 +16,7 @@ Work on one app from inside its own directory; each has its own `Gemfile`,
 |---|---|---|
 | `web/` | Middleman 4 static site generator (Ruby 4.0.5). Builds the Contentful-powered blog and serves all static pages. | Netlify (behind Cloudflare) |
 | `api/` | Rails 8.1 API (Ruby 4.0.5). Serves small dynamic HTML fragments ("widgets") embedded into the static pages at runtime, plus a Sidekiq `worker` process for background jobs (standard.site PDS sync). | fly.io (`kona-api`: `app` + `worker`) — behind Cloudflare |
+| `og/` | Tiny Node service that renders the Open Graph "card" (`og:image` for pages without a cover image) on demand — fetches the page, reads its `og:title`, returns a 1200×630 PNG cached a year. Replaced the build-time pre-render. | fly.io (`kona-og`) — behind Cloudflare |
 | `redis/` | Config (`fly.toml`) for the `kona-redis` fly app — the API's dedicated Redis (cache + Sidekiq queues). | fly.io (`kona-redis`) |
 | `contentful/` | One-off Contentful content migrations (Node scripts, run locally). Deliberately outside `web/` so edits don't trigger Netlify builds. | — (never deployed) |
 | `netlify.toml` (root) | Drives the Netlify build: `base = "web"`, `command = "bundle exec rake build"`, `publish = "build/"`. | — |
@@ -62,6 +63,11 @@ concluding something is a code problem.
   the "this traversed the zone" marker and the join key into Cloudflare's logs.
 - **Images** — Cloudflare Images serves every transformation from `<IMAGES_URL>/cdn-cgi/image/…`
   (replaced the Netlify Image CDN in PR #381). Details in [`web/CLAUDE.md`](web/CLAUDE.md).
+- **OG cards** — the `kona-og` fly service (repo-root `og/`) renders `og:image` cards on demand
+  and is fronted by its own Cloudflare-proxied host (`OG_IMAGE_URL` on the web side). The card
+  URL is content-addressed on the entry's `published_version`, so its year-long immutable cache
+  is self-busting on republish — it's one of the few things the zone should cache hard (a
+  Cache Rule / the `.png` extension), unlike the otherwise dynamic zone.
 - **Caching** — the zone is deliberately **dynamic: Cloudflare caches almost nothing**. The
   origin cache headers (Netlify's durable edge, the widget TTLs) still do the real work, so
   don't reason about widget caching as if Cloudflare were in the loop. Cloudflare **ignores

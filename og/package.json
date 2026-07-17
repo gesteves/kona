@@ -1,0 +1,17 @@
+{
+  "name": "kona-og",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "On-demand Open Graph card renderer for the kona site.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "@vercel/og": "^0.11.1",
+    "react": "^19.2.7"
+  }
+}

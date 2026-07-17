@@ -91,11 +91,11 @@ build fails loudly rather than shipping pages with missing icons.
   `context.ip`/`context.geo`, and duplicate that logic instead of importing
   `functions/lib/log.mts` because edge functions run in Deno. There is **no** `block-bots`
   function any more — that moved to a Cloudflare WAF rule (root [`CLAUDE.md`](../CLAUDE.md)).
-- `scripts/render-og.mjs` — pre-renders every Open Graph card PNG at build (invoked from
-  `build.rake`), one `build/og/<page path>/card.png` per entry in `og/data.json`;
-  Redis-cached per (template version, logo, title). `generate_open_graph_image_url`
-  derives the matching URL. ⚠️ The logo must stay in its source PNG format (satori can't
-  decode webp/avif) — see the tripwire comment in `source/og/data.json.erb`.
+- Open Graph "cards" (the `og:image` for pages without a cover image) are rendered **on
+  demand** by the separate `kona-og` fly service (repo-root `og/`), not at build time.
+  `generate_open_graph_image_url` (`lib/helpers/image_helpers.rb`) builds the card URL at
+  `<OG_IMAGE_URL>/og.png?url=<page>&v=<template ver>-<published_version>`; the service
+  fetches the page, reads its `og:title`, and renders. See [`og/CLAUDE.md`](../og/CLAUDE.md).
 - `source/headers` / `source/redirects.erb` — built and renamed to `_headers` /
   `_redirects` (underscore-prefixed source files are treated as partials and skipped).
   ⚠️ In `_headers`, no two rules may set the same header for overlapping paths — matching
@@ -119,7 +119,9 @@ Names only — see `.env.example`; never commit values.
   and the build-time `import:icons` / `import:standard_site` fetches), `API_TOKEN` (shared
   bearer the `/widgets/*` proxy injects on every upstream request, and the build sends on the
   `POST /api/icons` fetch; **must match the `api/` app's `API_TOKEN`**, and must be set in
-  Netlify's runtime env or every widget 401s at the origin and collapses on the site).
+  Netlify's runtime env or every widget 401s at the origin and collapses on the site),
+  `OG_IMAGE_URL` (base URL of the `og/` app — `generate_open_graph_image_url` builds the
+  `og:image` card URL from it; a card without it raises).
 - **Build credential**: `WEBAWESOME_NPM_TOKEN` — Web Awesome Pro npm registry auth, read
   by `.npmrc` at `npm install` (not in `.env`). Set it in your shell and in Netlify's
   build env, or the install fails.
@@ -127,7 +129,7 @@ Names only — see `.env.example`; never commit values.
   serves transformations from (`<host>/cdn-cgi/image/…`), i.e. the site's public host. Building
   any image without it raises `ImageHelpers::ImagesUrlMissing`, so **it must be set in Netlify's
   env** and in your local `.env` (point it at the real zone; `middleman server` then renders what
-  production serves — auto avif/webp, cropped OG cards). It deliberately has **no fallback**: it
+  production serves — auto avif/webp, cover images cropped to the OG size). It deliberately has **no fallback**: it
   used to resize via Contentful when unset, which looked perfect in the browser while draining
   Contentful's asset bandwidth, so the only thing the fallback reliably did was hide a broken
   deploy. Don't reintroduce one — `contentful_image_url` survives only for `encode_blurhash`,

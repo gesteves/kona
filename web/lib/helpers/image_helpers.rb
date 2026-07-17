@@ -190,17 +190,26 @@ module ImageHelpers
     cdn_image_url(original_url, params)
   end
 
-  # Returns the URL of the pre-rendered Open Graph card for the given page URL.
-  # The cards are rendered at build time (scripts/render-og.mjs) into
-  # build/og/<page path>/card.png — one per entry in og/data.json's titles, keyed on the
-  # same normalized path used here, so the URL and the file on disk can't drift. Every
-  # input is a build-time constant, which is why these are plain static assets rather
-  # than a runtime endpoint.
-  # @param url [String] The URL of the page to return the Open Graph card for.
-  # @return [String] The URL of the pre-rendered Open Graph card.
-  def generate_open_graph_image_url(url)
-    path = og_normalized_path(URI.parse(url).path)
-    "#{root_url}/og#{path}card.png"
+  # Bumped after a change to the card design or logo. It's folded into the `v` cache buster
+  # below, so bumping it re-mints every card URL and refreshes the year-cached images (the
+  # kona-og service and Cloudflare otherwise treat each card URL as immutable). The matching
+  # card template lives in the og/ service.
+  OG_TEMPLATE_VERSION = 'v1'
+
+  # Returns the URL of the on-demand Open Graph card for the given page. The kona-og service
+  # (the og/ app) fetches the page, reads its own og:title, and renders a 1200×630 PNG cached
+  # for a year. The card URL is content-addressed: `v` combines OG_TEMPLATE_VERSION with the
+  # entry's published_version, so a republish (which bumps published_version) mints a new URL
+  # and a title edit is picked up on the next crawl — no cache purge needed.
+  # @param url [String] The full URL of the page to render a card for.
+  # @param version [Integer, String] The entry's sys.published_version, used as a cache buster.
+  # @return [String] The kona-og URL for the page's card.
+  # @raise [RuntimeError] if OG_IMAGE_URL is unset.
+  def generate_open_graph_image_url(url, version)
+    base = ENV['OG_IMAGE_URL'].to_s.chomp('/')
+    raise 'OG_IMAGE_URL is not set; cannot build Open Graph card URLs' if base.blank?
+    query = URI.encode_www_form(url: url, v: "#{OG_TEMPLATE_VERSION}-#{version}")
+    "#{base}/og.png?#{query}"
   end
 
   # Generates a CDN URL for the site icon with the specified width.
