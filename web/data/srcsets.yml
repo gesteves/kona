@@ -54,19 +54,6 @@ full:
     - 320
     - 1320
     - 1206
-avatar:
-  sizes:
-    - auto
-    - "(min-width: 1280px) 72px"
-    - "(min-width: 768px) calc(((100vw - 4rem - (11 * 2rem))/12))"
-    - "calc((((100vw - 4rem - (11 * 2rem))/12) * 2) + 2rem)"
-  widths:
-    - 72
-    - 144
-    - 141
-    - 126
-    - 123
-    - 208
 home:
   sizes:
     - auto

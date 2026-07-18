@@ -54,8 +54,10 @@ concluding something is a code problem.
 - **Client IP** — `CF-Connecting-IP` is the only real visitor IP. Netlify's `context.ip` and
   fly's `Fly-Client-IP` are both **Cloudflare PoPs**, not the visitor. Code that needs the
   client reads `CF-Connecting-IP` first and falls back: `api/config/initializers/rack_attack.rb`,
-  `web/netlify/functions/lib/log.mts`, and both edge functions (the edge ones run in Deno and
-  can't import the Node helper, so the trio is deliberately duplicated). The header is spoofable
+  `web/netlify/functions/lib/log.mts` (Node functions), and `web/netlify/edge-functions/lib/log.ts`
+  (shared by both edge functions). The edge helper is a **separate** copy of the Node one because
+  edge functions run in Deno and can't import a Node functions module — but the two edge functions
+  share the single Deno copy, so it's one duplication (Node vs Deno), not per-function. The header is spoofable
   by anything hitting an origin directly, so it may key throttling and logging but must **never**
   gate a ban.
 - **Geo / trace headers** — `CF-IPCity` / `CF-Region` / `CF-IPCountry` for geo, `CF-Ray` as both

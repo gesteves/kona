@@ -1,4 +1,5 @@
 import type { Config, Context } from '@netlify/edge-functions';
+import { requestLogLine } from './lib/log.ts';
 
 // Records every page request server-side with Known Agents (the Dark Visitors company,
 // using the DARK_VISITORS_ACCESS_TOKEN). This captures bots, AI
@@ -20,73 +21,6 @@ function headersToObject(
     out[key] = value;
   }
   return out;
-}
-
-// The zone is proxied through Cloudflare, so the client that connects to Netlify is a
-// Cloudflare edge node: context.ip / context.geo describe the PoP, not the visitor.
-// Cloudflare passes the real ones through in CF-* request headers. Fall back to Netlify's
-// own values when a request didn't come through Cloudflare (local dev, or a resolver still
-// pointing straight at the origin).
-function clientIp(request: Request, context: Context): string | undefined {
-  return request.headers.get('CF-Connecting-IP') ?? context.ip;
-}
-
-// CF-IPCountry is a 2-letter code present on every proxied request; CF-IPCity and CF-Region
-// ship together in the "Add visitor location headers" managed transform, so both are absent
-// unless it's enabled on the zone — hence joining whatever is present rather than assuming a
-// city or region. CF-Region is the spelled-out name ("Colorado"), not the CF-RegionCode
-// short form. Netlify's own equivalent of the region is geo.subdivision.
-function clientGeo(request: Request, context: Context): string | undefined {
-  if (request.headers.get('CF-Connecting-IP')) {
-    return (
-      [
-        request.headers.get('CF-IPCity'),
-        request.headers.get('CF-Region'),
-        request.headers.get('CF-IPCountry'),
-      ]
-        .filter(Boolean)
-        .join(', ') || undefined
-    );
-  }
-  return (
-    [
-      context.geo?.city,
-      context.geo?.subdivision?.name,
-      context.geo?.country?.name,
-    ]
-      .filter(Boolean)
-      .join(', ') || undefined
-  );
-}
-
-// CF-Ray is set only on requests that actually traversed Cloudflare, so its presence is the
-// marker for "this came through the proxy" — the one thing the IP can no longer tell us, now
-// that we log the visitor's real IP on both paths. A line with no ray bypassed the zone (and
-// so bypassed the WAF). It's also the join key against the rayName field in Cloudflare's logs.
-function cloudflareRay(request: Request): string | undefined {
-  return request.headers.get('CF-Ray') ?? undefined;
-}
-
-// One pipe-separated request log line: the given lead-in parts, then the requester's
-// referrer, user agent, IP, geo, and Cloudflare ray (when known). Mirrors the format of the
-// widget proxy / OG functions' requestLogLine (web/netlify/functions/lib/log.mts) —
-// reimplemented inline here rather than imported because that helper is a Node functions
-// module and this runs in the Deno edge runtime.
-function requestLogLine(
-  request: Request,
-  context: Context,
-  ...parts: (string | null | undefined)[]
-): string {
-  return [
-    ...parts,
-    request.headers.get('Referer'),
-    request.headers.get('User-Agent'),
-    clientIp(request, context),
-    clientGeo(request, context),
-    cloudflareRay(request),
-  ]
-    .filter(Boolean)
-    .join(' | ');
 }
 
 // Never throws into the request path: any failure (network, non-2xx, bad token) is

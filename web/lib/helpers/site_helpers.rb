@@ -13,7 +13,7 @@ module SiteHelpers
 
   # Generates a formatted page title based on the provided content.
   # @param content [Hash, String] The content to generate the title from.
-  #   If a Hash, expects :title and :current_page keys for pagination.
+  #   If a Hash, expects a :title key.
   #   If a String, uses directly as the title content.
   # @param include_site_name [Boolean] Whether to append the site's title to the generated title.
   # @param separator [String] The separator used between title segments.
@@ -22,7 +22,6 @@ module SiteHelpers
     title = []
     if content.is_a?(Hash) && !content.is_home_page
       title << content.title
-      title << "Page #{content.current_page}" if content&.current_page.to_i > 1
     elsif content.is_a?(String)
       title << content
     else
@@ -339,7 +338,7 @@ module SiteHelpers
   # Generates a JSON-LD CollectionPage schema for a taxonomy archive page (`/tagged/*`),
   # declaring the page as a collection about its topic, with the concept's description as the
   # page description. References the sitewide WebSite node by @id rather than duplicating it.
-  # Its `mainEntity` is an ItemList enumerating the entries listed on this (paginated) page, so
+  # Its `mainEntity` is an ItemList enumerating the entries listed on this page, so
   # the collection's membership is explicit rather than just described.
   # @param content [Object] The proxied tag-page object (title = concept name; summary/description; items).
   # @see https://schema.org/CollectionPage
@@ -392,8 +391,8 @@ module SiteHelpers
   # Generates a JSON-LD BreadcrumbList for a taxonomy archive page (`/tagged/*`): Home › Blog ›
   # the concept's ancestor chain, ending at the concept itself. Mirrors the article breadcrumb
   # (ArticleHelpers#breadcrumb_schema) for the archive pages, whose nesting the article version
-  # can't express. Each crumb points at the concept's canonical archive path (page 1), so it's
-  # stable across paginated subpages. Returns nil when the page has no concept.
+  # can't express. Each crumb points at the concept's canonical archive path. Returns nil when
+  # the page has no concept.
   # @param content [Object] The proxied tag-page object (carries `tag_id`).
   # @return [String, nil] A JSON-LD formatted string, or nil.
   def tag_breadcrumb_schema(content)
@@ -404,7 +403,7 @@ module SiteHelpers
     breadcrumb_list_schema(chain.map { |node| [sanitize(node[:name]), full_url(node[:path])] })
   end
 
-  # Generates a JSON-LD Blog schema for the paginated blog index (`/blog`), declaring the page as
+  # Generates a JSON-LD Blog schema for the blog index (`/blog`), declaring the page as
   # the site's blog and listing the entries on this page as `blogPost` (BlogPosting) references.
   # References the sitewide WebSite/Organization/Person nodes by @id rather than duplicating them.
   # @param content [Object] The proxied blog-index page object (title = "Blog"; items).

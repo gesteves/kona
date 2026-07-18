@@ -1,0 +1,31 @@
+name: "Notify Slack"
+description: "Post a CI/deploy status message to Slack with the standard commit attachment and workflow footer."
+
+inputs:
+  webhook:
+    description: "Slack incoming webhook URL."
+    required: true
+  text:
+    description: "Top-level message text (Slack mrkdwn)."
+    required: true
+  color:
+    description: "Attachment color: good, danger, or a hex value."
+    required: true
+  fallback:
+    description: "Plain-text fallback for the attachment."
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: slackapi/slack-github-action@v3.0.5
+      with:
+        webhook: ${{ inputs.webhook }}
+        webhook-type: incoming-webhook
+        payload: |
+          text: "${{ inputs.text }}"
+          attachments:
+            - color: "${{ inputs.color }}"
+              fallback: "${{ inputs.fallback }}"
+              text: "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|`${{ env.SHORT_SHA }}`> - ${{ env.COMMIT_MESSAGE }}"
+              footer: "<${{ github.server_url }}/${{ github.repository }}|${{ github.repository }}> · <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow>"
