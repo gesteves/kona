@@ -241,10 +241,10 @@ class Contentful
       summary = description || default_tag_summary(concept[:name], tagged.size)
       # tagged is newest-first (published order), so the first is the archive's most recent entry.
       updated_at = tagged.first[:published_at]
-      # `path` carries a trailing slash (the canonical URL); paginate wants the bare base.
-      pages = paginate(tagged, base_path: concept[:path].chomp('/'), template: "/tag.html",
-                       title: concept[:name], summary: summary, description: description,
-                       updated_at: updated_at, tag_id: concept[:id])
+      # `path` carries a trailing slash (the canonical URL); listing_page wants the bare base.
+      pages = listing_page(tagged, base_path: concept[:path].chomp('/'), template: "/tag.html",
+                           title: concept[:name], summary: summary, description: description,
+                           updated_at: updated_at, tag_id: concept[:id])
       # NB: the tag-level key is `entry_count`, not `count` — `count` collides with Hash#count on
       # the Hashie::Mash (tag.count would return the number of keys). Read for the breadcrumb
       # popularity tie-break in ArticleHelpers#taxonomy_index.
@@ -272,11 +272,10 @@ class Contentful
     "Browse #{size.humanize} #{'entry'.pluralize(size)} tagged “#{name}.”"
   end
 
-  # Generates a paginated collection of blog entries.
-  # Each page includes articles for that page, and other metadata.
-  # @return [Array<Hash>] A collection of blog pages.
+  # Generates the blog index listing (all published entries, newest-first).
+  # @return [Array<Hash>] The blog's listing page.
   def generate_blog
-    @content[:blog] = paginate(published_articles, base_path: "/blog", template: "/articles.html", title: "Blog")
+    @content[:blog] = listing_page(published_articles, base_path: "/blog", template: "/articles.html", title: "Blog")
   end
 
   # The non-draft articles, in the collection's newest-first order.
@@ -285,41 +284,25 @@ class Contentful
     @content[:articles].reject { |a| a[:draft] }
   end
 
-  # Slices a list of articles into pages carrying the pagination metadata the blog/tag
-  # templates expect. Page 1 lives at "#{base_path}/index.html", later pages at
-  # "#{base_path}/page/N/index.html".
-  # @return [Array<Hash>] One hash per page.
-  def paginate(articles, base_path:, template:, title:, summary: nil, description: nil, updated_at: nil, tag_id: nil)
-    sliced = articles.each_slice(@content[:site][:entries_per_page])
-    sliced.map.with_index do |page, index|
-      current_page = index + 1
-      previous_page = index.zero? ? nil : index
-      next_page = index == sliced.size - 1 ? nil : index + 2
-      page_data = {
-        current_page: current_page,
-        previous_page: previous_page,
-        next_page: next_page,
-        template: template,
-        path: paginated_path(base_path, current_page),
-        previous_page_path: previous_page && paginated_path(base_path, previous_page),
-        next_page_path: next_page && paginated_path(base_path, next_page),
-        title: title
-      }
-      page_data[:summary] = summary if summary
-      page_data[:description] = description if description
-      # Tag-archive metadata (nil for the blog index): the concept id (for its breadcrumb chain
-      # and feed link) and its most-recent entry's date (for the "Updated" line).
-      page_data[:tag_id] = tag_id if tag_id
-      page_data[:updated_at] = updated_at if updated_at
-      page_data[:items] = page
-      page_data[:index_in_search_engines] = true
-      page_data
-    end
-  end
-
-  # The path for one page of a paginated collection.
-  def paginated_path(base_path, page_number)
-    page_number == 1 ? "#{base_path}/index.html" : "#{base_path}/page/#{page_number}/index.html"
+  # Builds the single listing page for a collection of articles — the blog index or a tag
+  # archive — living at "#{base_path}/index.html". Returned as a one-element array because the
+  # page proxies in config.rb iterate over a collection of pages.
+  # @return [Array<Hash>] One listing page.
+  def listing_page(articles, base_path:, template:, title:, summary: nil, description: nil, updated_at: nil, tag_id: nil)
+    page_data = {
+      template: template,
+      path: "#{base_path}/index.html",
+      title: title
+    }
+    page_data[:summary] = summary if summary
+    page_data[:description] = description if description
+    # Tag-archive metadata (nil for the blog index): the concept id (for its breadcrumb chain
+    # and feed link) and its most-recent entry's date (for the "Updated" line).
+    page_data[:tag_id] = tag_id if tag_id
+    page_data[:updated_at] = updated_at if updated_at
+    page_data[:items] = articles
+    page_data[:index_in_search_engines] = true
+    [page_data]
   end
 
   # The taxonomy concepts, keyed by id, memoized for the build. GraphQL only returns concept

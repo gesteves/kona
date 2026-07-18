@@ -37,31 +37,19 @@ RSpec.describe ErrorReporter do
       described_class.report_upstream(error, service: "Whoop")
     end
 
-    it "wraps a non-exception message in a per-service UpstreamError subclass" do
+    it "wraps a non-exception message in UpstreamError, prefixing the service" do
       expect(Bugsnag).to receive(:notify).with(be_a(ErrorReporter::UpstreamError)) do |exception|
-        expect(exception).to be_a(ErrorReporter::WeatherKitError)
-        expect(exception.message).to eq("HTTP 500")
+        expect(exception.message).to eq("WeatherKit: HTTP 500")
       end
       described_class.report_upstream("HTTP 500", service: "WeatherKit")
     end
 
-    it "appends the context to the wrapped message so the cause and location read off the headline" do
+    it "prefixes the service and appends the context so the cause and location read off the headline" do
       expect(Bugsnag).to receive(:notify) do |exception|
-        expect(exception).to be_a(ErrorReporter::GoogleAirQualityError)
-        expect(exception.message).to eq("HTTP 400 — Widgets::EventsController#event_weather_for")
+        expect(exception).to be_a(ErrorReporter::UpstreamError)
+        expect(exception.message).to eq("GoogleAirQuality: HTTP 400 — Widgets::EventsController#event_weather_for")
       end
       described_class.report_upstream("HTTP 400", service: "GoogleAirQuality", context: "Widgets::EventsController#event_weather_for")
-    end
-
-    it "reuses the same subclass object for a given service instead of redefining it" do
-      first = described_class.exception_class_for("GoogleMaps")
-      second = described_class.exception_class_for("GoogleMaps")
-      expect(first).to equal(second)
-      expect(first.name).to eq("ErrorReporter::GoogleMapsError")
-    end
-
-    it "falls back to the bare UpstreamError when the service name has no usable characters" do
-      expect(described_class.exception_class_for("")).to eq(ErrorReporter::UpstreamError)
     end
 
     it "omits nil metadata fields so only what's known is reported" do

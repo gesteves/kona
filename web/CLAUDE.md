@@ -88,8 +88,9 @@ build fails loudly rather than shipping pages with missing icons.
   production-only, reuses `DARK_VISITORS_ACCESS_TOKEN`); `feed-source.ts` (per-reader feed URL
   attribution — its `Cache-Control: private` is load-bearing because Cloudflare ignores
   `Vary: User-Agent`). Both read the real client IP/geo from `CF-*` headers rather than
-  `context.ip`/`context.geo`, and duplicate that logic instead of importing
-  `functions/lib/log.mts` because edge functions run in Deno. There is **no** `block-bots`
+  `context.ip`/`context.geo`, via the shared `edge-functions/lib/log.ts` — a separate Deno copy
+  of `functions/lib/log.mts` (edge functions run in Deno and can't import the Node module), shared
+  between the two edge functions rather than re-inlined in each. There is **no** `block-bots`
   function any more — that moved to a Cloudflare WAF rule (root [`CLAUDE.md`](../CLAUDE.md)).
 - Open Graph "cards" (the `og:image` for pages without a cover image) are rendered **on
   demand** by the separate `kona-og` fly service (repo-root `og/`), not at build time.

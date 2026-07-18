@@ -87,50 +87,31 @@ jobs:
     if: always()
 
     steps:
-      - name: Set short SHA
-        run: echo "SHORT_SHA=${GITHUB_SHA::8}" >> $GITHUB_ENV
+      - name: Checkout code
+        uses: actions/checkout@v7
 
-      - name: Set branch or PR info
-        run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "BRANCH_NAME=${{ github.head_ref }}" >> $GITHUB_ENV
-            echo "COMMIT_MESSAGE=$(echo "${{ github.event.pull_request.head.commit.message }}" | head -n 1 | sed 's/"/\\"/g')" >> $GITHUB_ENV
-            echo "BRANCH_URL=${{ github.server_url }}/${{ github.repository }}/pull/${{ github.event.pull_request.number }}" >> $GITHUB_ENV
-          else
-            echo "BRANCH_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
-            echo "COMMIT_MESSAGE=$(echo "${{ github.event.head_commit.message }}" | head -n 1 | sed 's/"/\\"/g')" >> $GITHUB_ENV
-            echo "BRANCH_URL=${{ github.server_url }}/${{ github.repository }}/tree/${{ github.ref_name }}" >> $GITHUB_ENV
-          fi
+      - name: CI context
+        uses: ./.github/actions/ci-context
 
       - name: Notify Slack (success)
         if: ${{ needs.ruby-tests.result == 'success' }}
         continue-on-error: true
-        uses: slackapi/slack-github-action@v3.0.5
+        uses: ./.github/actions/notify-slack
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            text: "API tests passed on <${{ env.BRANCH_URL }}|`${{ env.BRANCH_NAME }}`>"
-            attachments:
-              - color: "good"
-                fallback: "API tests passed on ${{ env.BRANCH_NAME }}"
-                text: "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|`${{ env.SHORT_SHA }}`> - ${{ env.COMMIT_MESSAGE }}"
-                footer: "<${{ github.server_url }}/${{ github.repository }}|${{ github.repository }}> · <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow>"
+          text: "API tests passed on <${{ env.BRANCH_URL }}|`${{ env.BRANCH_NAME }}`>"
+          color: "good"
+          fallback: "API tests passed on ${{ env.BRANCH_NAME }}"
 
       - name: Notify Slack (failure)
         if: ${{ needs.ruby-tests.result == 'failure' }}
         continue-on-error: true
-        uses: slackapi/slack-github-action@v3.0.5
+        uses: ./.github/actions/notify-slack
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            text: "API tests <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|failed> on <${{ env.BRANCH_URL }}|`${{ env.BRANCH_NAME }}`>"
-            attachments:
-              - color: "danger"
-                fallback: "API tests failed on ${{ env.BRANCH_NAME }}"
-                text: "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|`${{ env.SHORT_SHA }}`> - ${{ env.COMMIT_MESSAGE }}"
-                footer: "<${{ github.server_url }}/${{ github.repository }}|${{ github.repository }}> · <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow>"
+          text: "API tests <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|failed> on <${{ env.BRANCH_URL }}|`${{ env.BRANCH_NAME }}`>"
+          color: "danger"
+          fallback: "API tests failed on ${{ env.BRANCH_NAME }}"
 
   notify-security:
     name: Notify security result
@@ -139,35 +120,21 @@ jobs:
     if: always()
 
     steps:
-      - name: Set short SHA
-        run: echo "SHORT_SHA=${GITHUB_SHA::8}" >> $GITHUB_ENV
+      - name: Checkout code
+        uses: actions/checkout@v7
 
-      - name: Set branch or PR info
-        run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "BRANCH_NAME=${{ github.head_ref }}" >> $GITHUB_ENV
-            echo "COMMIT_MESSAGE=$(echo "${{ github.event.pull_request.head.commit.message }}" | head -n 1 | sed 's/"/\\"/g')" >> $GITHUB_ENV
-            echo "BRANCH_URL=${{ github.server_url }}/${{ github.repository }}/pull/${{ github.event.pull_request.number }}" >> $GITHUB_ENV
-          else
-            echo "BRANCH_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
-            echo "COMMIT_MESSAGE=$(echo "${{ github.event.head_commit.message }}" | head -n 1 | sed 's/"/\\"/g')" >> $GITHUB_ENV
-            echo "BRANCH_URL=${{ github.server_url }}/${{ github.repository }}/tree/${{ github.ref_name }}" >> $GITHUB_ENV
-          fi
+      - name: CI context
+        uses: ./.github/actions/ci-context
 
       - name: Notify Slack (failure)
         if: ${{ needs.security.result == 'failure' }}
         continue-on-error: true
-        uses: slackapi/slack-github-action@v3.0.5
+        uses: ./.github/actions/notify-slack
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            text: "API security scan <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|failed> on <${{ env.BRANCH_URL }}|`${{ env.BRANCH_NAME }}`>"
-            attachments:
-              - color: "danger"
-                fallback: "API security scan failed on ${{ env.BRANCH_NAME }}"
-                text: "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|`${{ env.SHORT_SHA }}`> - ${{ env.COMMIT_MESSAGE }}"
-                footer: "<${{ github.server_url }}/${{ github.repository }}|${{ github.repository }}> · <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow>"
+          text: "API security scan <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|failed> on <${{ env.BRANCH_URL }}|`${{ env.BRANCH_NAME }}`>"
+          color: "danger"
+          fallback: "API security scan failed on ${{ env.BRANCH_NAME }}"
 
   deploy:
     name: Deploy API
@@ -177,26 +144,21 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip deploy]') && !contains(github.event.head_commit.message, '[no deploy]')
 
     steps:
-      - name: Set short SHA and commit message
-        run: |
-          echo "SHORT_SHA=${GITHUB_SHA::8}" >> $GITHUB_ENV
-          echo "COMMIT_MESSAGE=$(echo "${{ github.event.head_commit.message }}" | head -n 1 | sed 's/"/\\"/g')" >> $GITHUB_ENV
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: CI context
+        uses: ./.github/actions/ci-context
 
       - name: Notify Slack (deploy starting)
         continue-on-error: true
-        uses: slackapi/slack-github-action@v3.0.5
+        uses: ./.github/actions/notify-slack
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            text: "API deploy <https://fly.io/apps/kona-api/monitoring|starting> :hourglass_flowing_sand:"
-            attachments:
-              - color: "#439FE0"
-                fallback: "API deploy starting: https://fly.io/apps/kona-api/monitoring"
-                text: "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|`${{ env.SHORT_SHA }}`> - ${{ env.COMMIT_MESSAGE }}"
-                footer: "<${{ github.server_url }}/${{ github.repository }}|${{ github.repository }}> · <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow>"
+          text: "API deploy <https://fly.io/apps/kona-api/monitoring|starting> :hourglass_flowing_sand:"
+          color: "#439FE0"
+          fallback: "API deploy starting: https://fly.io/apps/kona-api/monitoring"
 
-      - uses: actions/checkout@v7
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Deploy to Fly.io
@@ -209,29 +171,19 @@ jobs:
       - name: Notify Slack (deploy successful)
         if: success()
         continue-on-error: true
-        uses: slackapi/slack-github-action@v3.0.5
+        uses: ./.github/actions/notify-slack
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            text: "API deploy <${{ env.PRODUCTION_URL }}|successful> :rocket:"
-            attachments:
-              - color: "good"
-                fallback: "API deploy successful: ${{ env.PRODUCTION_URL }}"
-                text: "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|`${{ env.SHORT_SHA }}`> - ${{ env.COMMIT_MESSAGE }}"
-                footer: "<${{ github.server_url }}/${{ github.repository }}|${{ github.repository }}> · <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow>"
+          text: "API deploy <${{ env.PRODUCTION_URL }}|successful> :rocket:"
+          color: "good"
+          fallback: "API deploy successful: ${{ env.PRODUCTION_URL }}"
 
       - name: Notify Slack (deploy failed)
         if: failure()
         continue-on-error: true
-        uses: slackapi/slack-github-action@v3.0.5
+        uses: ./.github/actions/notify-slack
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            text: "API deploy <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|failed> :warning:"
-            attachments:
-              - color: "danger"
-                fallback: "API deploy failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                text: "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|`${{ env.SHORT_SHA }}`> - ${{ env.COMMIT_MESSAGE }}"
-                footer: "<${{ github.server_url }}/${{ github.repository }}|${{ github.repository }}> · <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow>"
+          text: "API deploy <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|failed> :warning:"
+          color: "danger"
+          fallback: "API deploy failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

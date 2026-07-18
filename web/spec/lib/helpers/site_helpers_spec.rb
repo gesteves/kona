@@ -286,13 +286,9 @@ RSpec.describe SiteHelpers do
   describe '#page_title' do
     def data = OpenStruct.new(site: OpenStruct.new(meta_title: 'My Site'))
 
-    it "uses a content object's title, appending the page number past page 1" do
+    it "uses a content object's title" do
       expect(page_title(Hashie::Mash.new(title: 'A Post'))).to eq('A Post')
-      expect(page_title(Hashie::Mash.new(title: 'Blog', current_page: 2))).to eq('Blog · Page 2')
-    end
-
-    it 'does not append "Page 1" on the first page of a paginated set' do
-      expect(page_title(Hashie::Mash.new(title: 'Blog', current_page: 1))).to eq('Blog')
+      expect(page_title(Hashie::Mash.new(title: 'Blog'))).to eq('Blog')
     end
 
     it 'falls back to the site meta title for the home page and when there is no content' do

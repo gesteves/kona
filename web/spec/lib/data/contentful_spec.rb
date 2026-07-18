@@ -19,7 +19,7 @@ RSpec.describe Contentful do
   # methods can be exercised against hand-built @content.
   def importer(content = {})
     described_class.allocate.tap do |instance|
-      instance.instance_variable_set(:@content, { site: { entries_per_page: 2 } }.merge(content))
+      instance.instance_variable_set(:@content, { site: {} }.merge(content))
     end
   end
 
@@ -117,39 +117,27 @@ RSpec.describe Contentful do
     end
   end
 
-  describe '#paginate' do
+  describe '#listing_page' do
     let(:articles) { (1..5).map { |n| { title: "Article #{n}" } } }
-    let(:pages) { importer.send(:paginate, articles, base_path: '/blog', template: '/articles.html', title: 'Blog') }
+    let(:pages) { importer.send(:listing_page, articles, base_path: '/blog', template: '/articles.html', title: 'Blog') }
 
-    it 'slices the collection by the site page size' do
-      expect(pages.size).to eq(3)
-      expect(pages.first[:items].size).to eq(2)
-      expect(pages.last[:items].size).to eq(1)
-    end
-
-    it 'puts page one at the base path and later pages under page/N' do
-      expect(pages.map { |p| p[:path] }).to eq([
-        '/blog/index.html', '/blog/page/2/index.html', '/blog/page/3/index.html'
-      ])
-    end
-
-    it 'links neighboring pages' do
-      expect(pages[0]).to include(current_page: 1, previous_page: nil, next_page: 2, next_page_path: '/blog/page/2/index.html')
-      expect(pages[1]).to include(current_page: 2, previous_page: 1, previous_page_path: '/blog/index.html')
-      expect(pages[2]).to include(current_page: 3, next_page: nil, next_page_path: nil)
+    it 'builds a single page at the base path listing every entry' do
+      expect(pages.size).to eq(1)
+      expect(pages.first[:path]).to eq('/blog/index.html')
+      expect(pages.first[:items].size).to eq(5)
     end
 
     it 'carries the template, title, and search-indexing flag, adding a summary only when given' do
       expect(pages.first).to include(template: '/articles.html', title: 'Blog', index_in_search_engines: true)
       expect(pages.first).not_to have_key(:summary)
 
-      with_summary = importer.send(:paginate, articles, base_path: '/t', template: '/t.html', title: 'T', summary: 'Browse')
+      with_summary = importer.send(:listing_page, articles, base_path: '/t', template: '/t.html', title: 'T', summary: 'Browse')
       expect(with_summary.first[:summary]).to eq('Browse')
     end
   end
 
   describe '#generate_blog' do
-    it 'paginates only the published articles' do
+    it 'lists only the published articles' do
       instance = importer(articles: [
         { title: 'Live', draft: false },
         { title: 'Draft', draft: true }

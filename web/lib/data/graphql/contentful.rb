@@ -38,7 +38,6 @@ module ContentfulClient
     fragment AuthorFields on Author {
       slug
       name
-      bluesky
       mastodon
     }
 
@@ -108,7 +107,6 @@ module ContentfulClient
           blurb
           copyright
           email
-          entriesPerPage
           author {
             ...AuthorFields
             profilePicture {
@@ -167,9 +165,7 @@ module ContentfulClient
           description
           location
           url
-          trackingUrl
           date
-          going
           sys {
             ...SysFields
           }

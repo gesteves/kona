@@ -1,4 +1,5 @@
 import type { Config, Context } from '@netlify/edge-functions';
+import { requestLogLine } from './lib/log.ts';
 
 // Rewrites the `utm_source` placeholder in the Atom feeds to name the feed reader that
 // fetched them, so Plausible can break feed traffic down per reader instead of lumping it
@@ -29,6 +30,11 @@ const SOURCE_ANCHOR = 'utm_source=Feed&amp;';
 // full User-Agent next to it.
 const UNMATCHED_LABEL = 'unmatched-reader';
 
+// Logged for a matched non-reader crawler (its feed fetch has the UTM cluster stripped). The
+// full User-Agent is logged next to it, so grepping this both audits the strip and surfaces
+// new crawlers worth adding to NON_READERS.
+const CRAWLER_LABEL = 'crawler';
+
 // User agents of feed readers, mapped to the Source value they should get in Plausible.
 // First match wins, so specific product tokens must come before anything broader.
 //
@@ -39,12 +45,15 @@ const UNMATCHED_LABEL = 'unmatched-reader';
 // prefix (old Inoreader, BubblesBot and Miniflux all use it) — always match the inner token.
 //
 // Deliberately absent: page-unfurl bots (Discordbot, TelegramBot, Bluesky Cardyb,
-// facebookexternalhit, Applebot) never fetch feeds, so they'd be dead patterns here — Slack
-// is listed because it has a real feed-subscription product. Readers that can't be
-// identified are also absent rather than guessed at: Stringer sends a bare `User-Agent:
-// Ruby`, RSS-Bridge impersonates Firefox with no self-identifying code path, and PolitePol
-// ships a Chrome 46 spoof. Several readers below (Miniflux, TT-RSS, FreshRSS, Newsboat,
-// Liferea, Vienna, Akregator) also let users override the UA, so some traffic is disguised.
+// facebookexternalhit) never fetch feeds, so they'd be dead patterns here — Slack is listed
+// because it has a real feed-subscription product. Search/AI crawlers DO fetch the feeds
+// (Applebot, bingbot, Amazonbot, PerplexityBot and friends all show up in the logs), but they
+// aren't readers either — they're handled separately by NON_READERS below, which strips the
+// attribution params instead of relabelling them. Readers that can't be identified are absent
+// rather than guessed at: Stringer sends a bare `User-Agent: Ruby`, RSS-Bridge impersonates
+// Firefox with no self-identifying code path, and PolitePol ships a Chrome 46 spoof. Several
+// readers below (Miniflux, TT-RSS, FreshRSS, Newsboat, Liferea, Vienna, Akregator) also let
+// users override the UA, so some traffic is disguised.
 //
 // A good reference when extending this: https://github.com/opawg/podcast-rss-useragents
 const FEED_READERS: ReadonlyArray<readonly [RegExp, string]> = [
@@ -73,6 +82,15 @@ const FEED_READERS: ReadonlyArray<readonly [RegExp, string]> = [
   [/zapier/i, 'Zapier'],
   [/granary/i, 'granary'],
   [/sismicsreaderbot/i, 'Sismics Reader'],
+  [/lighthousebot/i, 'Lighthouse'],
+  [/minifeed_net/i, 'Minifeed'],
+  [/world-rss/i, 'world-rss'],
+  // powRSS rewrites the click-through URL to its own `?ref=powrss.com`, discarding our
+  // utm_source, so Plausible already attributes those clicks to Source `powrss.com`. We label
+  // it identically (lowercase, matching their ref value) rather than `powRSS` so the two never
+  // split into separate Sources, and so it drops out of the unmatched-reader logs. Don't
+  // "correct" the casing.
+  [/powrss/i, 'powrss.com'],
 
   // Self-hosted — server-side, but roughly one user each. Don't read as N subscribers.
   [/freshrss/i, 'FreshRSS'],
@@ -99,75 +117,55 @@ const FEED_READERS: ReadonlyArray<readonly [RegExp, string]> = [
   [/applesyndication/i, 'Safari RSS'],
 ];
 
-function matchReader(userAgent: string | null): string | undefined {
-  if (!userAgent) return undefined;
-  return FEED_READERS.find(([pattern]) => pattern.test(userAgent))?.[1];
-}
+// User agents of search / AI crawlers and indexers that fetch the feeds but aren't readers:
+// they ingest the content and can resurface article URLs elsewhere (search results, AI
+// answers). Left untouched, those URLs carry the build-time `utm_source=Feed&utm_medium=feed`,
+// so any later click gets mis-attributed to "Feed" in Plausible. For these we strip the whole
+// UTM cluster from the feed body instead of relabelling it, so the URLs they propagate are
+// clean. Matched only AFTER FEED_READERS misses, so a reader token always wins. Same
+// token-not-version rule as FEED_READERS, and never a bare /bot/ pattern — it would swallow
+// half of these plus several legitimate readers.
+const NON_READERS: ReadonlyArray<RegExp> = [
+  /amazonbot/i,
+  /applebot/i,
+  /bingbot/i,
+  /googlebot/i,
+  /googleother/i,
+  /perplexitybot/i,
+  /oai-searchbot/i,
+  /bytespider/i,
+  /petalbot/i,
+  /kagibot/i,
+  /marginalia/i,
+  /bridgy fed/i,
+];
 
-// The zone is proxied through Cloudflare, so the client that connects to Netlify is a
-// Cloudflare edge node: context.ip / context.geo describe the PoP, not the visitor.
-// Cloudflare passes the real ones through in CF-* request headers. Fall back to Netlify's
-// own values when a request didn't come through Cloudflare (local dev, or a resolver still
-// pointing straight at the origin).
-function clientIp(request: Request, context: Context): string | undefined {
-  return request.headers.get('CF-Connecting-IP') ?? context.ip;
-}
+// The full attribution cluster on a feed link: `?utm_source=Feed&amp;utm_medium=feed` plus the
+// optional `&amp;utm_campaign=<tag>` that tag feeds add (see feed_url in url_helpers.rb — UTM
+// are the only query params on these URLs, so removing the cluster including its leading `?`
+// leaves a bare, clean URL). Built from SOURCE_ANCHOR so the placeholder is defined once. The
+// campaign value is URL-encoded, so it can't contain a raw quote, `<`, whitespace or `&`; the
+// character class therefore stops cleanly at the closing href quote.
+const UTM_CLUSTER = new RegExp(
+  `\\?${SOURCE_ANCHOR}utm_medium=feed(?:&amp;utm_campaign=[^"'<\\s&]*)?`,
+  'g'
+);
 
-// CF-IPCountry is a 2-letter code present on every proxied request; CF-IPCity and CF-Region
-// ship together in the "Add visitor location headers" managed transform, so both are absent
-// unless it's enabled on the zone — hence joining whatever is present rather than assuming a
-// city or region. CF-Region is the spelled-out name ("Colorado"), not the CF-RegionCode
-// short form. Netlify's own equivalent of the region is geo.subdivision.
-function clientGeo(request: Request, context: Context): string | undefined {
-  if (request.headers.get('CF-Connecting-IP')) {
-    return (
-      [
-        request.headers.get('CF-IPCity'),
-        request.headers.get('CF-Region'),
-        request.headers.get('CF-IPCountry'),
-      ]
-        .filter(Boolean)
-        .join(', ') || undefined
-    );
-  }
-  return (
-    [
-      context.geo?.city,
-      context.geo?.subdivision?.name,
-      context.geo?.country?.name,
-    ]
-      .filter(Boolean)
-      .join(', ') || undefined
-  );
-}
+type Classification =
+  | { kind: 'reader'; source: string }
+  | { kind: 'crawler' }
+  | { kind: 'unknown' };
 
-// CF-Ray is set only on requests that actually traversed Cloudflare, so its presence is the
-// marker for "this came through the proxy". It's also the join key against the rayName field
-// in Cloudflare's logs.
-function cloudflareRay(request: Request): string | undefined {
-  return request.headers.get('CF-Ray') ?? undefined;
-}
-
-// One pipe-separated request log line: the given lead-in parts, then the requester's
-// referrer, user agent, IP, geo, and Cloudflare ray (when known). Mirrors the format of the
-// widget proxy / OG functions' requestLogLine (web/netlify/functions/lib/log.mts) —
-// reimplemented inline here, as known-agents.ts does, because that helper is a Node
-// functions module and this runs in the Deno edge runtime.
-function requestLogLine(
-  request: Request,
-  context: Context,
-  ...parts: (string | null | undefined)[]
-): string {
-  return [
-    ...parts,
-    request.headers.get('Referer'),
-    request.headers.get('User-Agent'),
-    clientIp(request, context),
-    clientGeo(request, context),
-    cloudflareRay(request),
-  ]
-    .filter(Boolean)
-    .join(' | ');
+// Reader match wins over crawler, which wins over unknown. A reader we recognize gets its feed
+// relabelled; a known crawler gets the cluster stripped; everything else (browsers, generic
+// HTTP libraries, bare `Ruby`) is left as the build-time `Feed`.
+function classify(userAgent: string | null): Classification {
+  if (!userAgent) return { kind: 'unknown' };
+  const source = FEED_READERS.find(([pattern]) => pattern.test(userAgent))?.[1];
+  if (source) return { kind: 'reader', source };
+  if (NON_READERS.some((pattern) => pattern.test(userAgent)))
+    return { kind: 'crawler' };
+  return { kind: 'unknown' };
 }
 
 function isXml(response: Response): boolean {
@@ -193,18 +191,25 @@ export default async function handler(
   context: Context
 ): Promise<Response> {
   const response = await context.next();
-  const reader = matchReader(request.headers.get('User-Agent'));
+  const classification = classify(request.headers.get('User-Agent'));
   const url = new URL(request.url);
 
+  const label =
+    classification.kind === 'reader'
+      ? classification.source
+      : classification.kind === 'crawler'
+        ? CRAWLER_LABEL
+        : UNMATCHED_LABEL;
+
   // Logged for every feed request, including the 304s that make up most steady-state feed
-  // traffic, so the reader list can be maintained from real data.
+  // traffic, so the reader and crawler lists can be maintained from real data.
   console.info(
     requestLogLine(
       request,
       context,
       `${request.method} ${url.pathname}`,
       `→ ${response.status}`,
-      reader ?? UNMATCHED_LABEL
+      label
     )
   );
 
@@ -215,10 +220,10 @@ export default async function handler(
 
   const headers = withCacheGuards(new Headers(response.headers));
 
-  // Unrecognized reader: leave the body alone so the link keeps the build-time
-  // `utm_source=Feed`. Passing the encoded stream straight through keeps the inherited
-  // content-encoding/content-length headers accurate.
-  if (!reader) {
+  // Unknown agent (browser, generic HTTP library, unidentifiable reader): leave the body alone
+  // so the link keeps the build-time `utm_source=Feed`. Passing the encoded stream straight
+  // through keeps the inherited content-encoding/content-length headers accurate.
+  if (classification.kind === 'unknown') {
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
@@ -232,13 +237,21 @@ export default async function handler(
   headers.delete('content-encoding');
   headers.delete('content-length');
 
-  return new Response(
-    body.replaceAll(
-      SOURCE_ANCHOR,
-      `utm_source=${encodeURIComponent(reader)}&amp;`
-    ),
-    { status: response.status, statusText: response.statusText, headers }
-  );
+  // Reader → relabel utm_source to the reader's name. Crawler → strip the whole UTM cluster so
+  // the URLs it redistributes carry no feed attribution.
+  const rewritten =
+    classification.kind === 'reader'
+      ? body.replaceAll(
+          SOURCE_ANCHOR,
+          `utm_source=${encodeURIComponent(classification.source)}&amp;`
+        )
+      : body.replaceAll(UTM_CLUSTER, '');
+
+  return new Response(rewritten, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 export const config: Config = {
