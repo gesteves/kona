@@ -29,6 +29,13 @@ web↔api contract before touching any widget markup.
 - **Runtime dynamic content**: weather, activity stats, Whoop, per-article pageviews,
   and event weather are **not built here**. The `live-update` Stimulus controller
   fetches them client-side from `/widgets/*` into placeholder partials (root `CLAUDE.md`).
+- **Contact form**: no longer Netlify Forms (the `__forms.html` decoy is gone). The form lives
+  in the Contentful `contact` page body and posts to `POST /api/contact` through the api proxy
+  (`api/` sends the email via Resend with the correct Reply-To). It's progressively
+  enhanced — the `contact` Stimulus controller (`sendNotification` toast, no navigation) over a
+  real form that still works without JS (native POST → 303 to the Contentful `/contact/success`
+  page). To change the form's markup, edit it in Contentful (keep the field names — `name`,
+  `email`, `message`, honeypot `comment` — in sync with the api; see root `CLAUDE.md`).
 
 ## Commands
 
@@ -80,8 +87,8 @@ build fails loudly rather than shipping pages with missing icons.
   `config.rb` requires and registers every module in that directory.
 - `source/layouts/layout.erb`, `source/partials/` (incl. `placeholders/`),
   `source/javascripts/stimulus/`, `source/stylesheets/`.
-- `netlify/functions/` — `widget-proxy.mts` (proxies `/widgets/*`; see root `CLAUDE.md`),
-  `og.mts` (OG images).
+- `netlify/functions/` — `api-proxy.mts` (proxies `/widgets/*` **and** `POST /api/contact`;
+  see root `CLAUDE.md`), `og.mts` (OG images).
 - `netlify/edge-functions/` — `known-agents.ts` (records every page view server-side to
   Known Agents / Dark Visitors, capturing bot + AI-agent traffic Plausible can't see;
   production-only, reuses `DARK_VISITORS_ACCESS_TOKEN`); `feed-source.ts` (per-reader feed URL

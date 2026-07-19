@@ -40,6 +40,13 @@ Rails.application.routes.draw do
     # Sets the current location (bearer-token-secured), replacing the old Netlify build hook.
     post "location" => "location#create"
 
+    # Receives a contact-form submission from the public site (through the web app's
+    # same-origin Netlify proxy, which injects the bearer). Drops honeypot hits, then enqueues
+    # a ContactMailJob that spam-checks (Akismet) and emails the owner (Cloudflare Email) with
+    # Reply-To set to the sender. Answers JSON (fetch) with 204/422 or HTML (no-JS POST) with a
+    # 303 to the site's Thank-You page.
+    post "contact" => "contact#create"
+
     # standard.site verification data (DID + publication URI) the web build reads to emit
     # the .well-known endpoint and the <link rel="site.standard.*"> tags.
     get "standard-site" => "standard_site#show"

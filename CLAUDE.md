@@ -92,36 +92,61 @@ absent and geo logging degrades to country-only); and the bot WAF rule above.
 
 The API's routes are split by namespace: `/widgets/*` returns HTML widget fragments (proxied,
 below), `/api/*` accepts or returns structured data (`POST /api/location`,
-`GET /api/standard-site`, `POST /api/icons` — hit directly at `KONA_API_URL`, not proxied), and
-`/webhooks/*` receives inbound webhooks from external services (also hit directly, e.g. by
+`GET /api/standard-site`, `POST /api/icons` — hit directly at `KONA_API_URL`, not proxied;
+`POST /api/contact` is the exception — it's browser-reachable through the same proxy, below),
+and `/webhooks/*` receives inbound webhooks from external services (also hit directly, e.g. by
 Contentful). The web build reads two of these at build time: `GET /api/standard-site` for the
 verification markup, and `POST /api/icons` for its Font Awesome icons (the Font Awesome
 integration lives only in the api — web posts its allowlist and gets back pre-rendered SVGs).
 
-1. Browser requests `/widgets/*` on the main site.
+1. Browser requests `/widgets/*` (or `POST /api/contact`) on the main site.
 2. **Cloudflare** proxies it through to Netlify (the zone caches almost nothing — see above).
-3. The Netlify Function `web/netlify/functions/widget-proxy.mts` claims that path
-   (`config.path = '/widgets/*'`) and proxies to `KONA_API_URL` (the fly.io origin, itself
-   behind Cloudflare).
-4. The response is cached at Netlify's edge and reused by all viewers.
+3. The Netlify Function `web/netlify/functions/api-proxy.mts` claims those paths
+   (`config.path = ['/widgets/*', '/api/contact']`) and proxies to `KONA_API_URL` (the fly.io
+   origin, itself behind Cloudflare).
+4. The response is cached at Netlify's edge and reused by all viewers (widget GETs only; the
+   contact POST is never edge-cached).
+
+⚠️ The proxy claims `/api/contact` **explicitly, not `/api/*`** — the other `/api/*` endpoints
+stay origin-only (build-time / server-side callers). Don't broaden it to `/api/*`, or you'd
+expose `POST /api/location` and `POST /api/icons` to the browser with the injected bearer.
 
 The proxy is deliberately strict:
 
 - Forwards only the `accept` **request** header and **injects** a constant
   `Authorization: Bearer <API_TOKEN>` (the client's own `authorization` is dropped). The
   token is the same for every viewer, so every upstream request stays identical → one shared
-  cache entry. It authenticates to the origin (the API requires it on every widget endpoint),
-  so the widget origin is closed to the public; injecting it server-side keeps it out of the
-  browser. ⚠️ `API_TOKEN` must be set in Netlify's env and **match the API's `API_TOKEN`** or
-  every widget 401s and collapses site-wide.
+  cache entry. It authenticates to the origin (the API requires it on every widget endpoint and
+  on `/api/contact`), so the origin is closed to the public; injecting it server-side keeps it
+  out of the browser. ⚠️ `API_TOKEN` must be set in Netlify's env and **match the API's
+  `API_TOKEN`** or every widget 401s and collapses site-wide.
 - Passes the origin's `Cache-Control` through verbatim (what the browser sees).
 - Forwards `Netlify-CDN-Cache-Control` (the durable edge policy) **only on 2xx**, so
   errors/redirects are never durably pinned at the edge.
 - Keys the edge cache on **path only** — no query params, no per-user vary.
+- **Contact-only:** forwards the real visitor IP/UA (`CF-Connecting-IP` → `X-Kona-Client-IP`,
+  `user-agent` → `X-Kona-Client-UA`) so the API's Akismet check has real signal — the origin
+  can't see the visitor otherwise (the zone rewrites `CF-Connecting-IP` to the Netlify egress
+  IP, the same shared-egress trap that rules out IP throttling). The API trusts these **only**
+  for spam scoring, never for a ban. Also forwards the `Location` header so the no-JS `303` →
+  Thank-You redirect reaches the browser.
 
 ⚠️ Don't break these: keep widget inputs in the **path** (IDs are path segments, not
 query strings), only emit durable edge headers on success responses, and keep the injected
 `Authorization` constant (a per-request token would shatter the shared cache entry).
+
+### Contact form (`POST /api/contact`)
+
+The contact page's form (in the Contentful `contact` page body) posts to `/api/contact` through
+the proxy. `Api::ContactController` drops honeypot hits (the hidden `comment` field) and
+enqueues a `ContactMailJob`, which spam-checks with **Akismet** and emails the owner via
+**Resend** (an HTTPS API — fly blocks outbound SMTP) with `Reply-To` set to the sender (the
+reason this replaced Netlify Forms — Netlify set the wrong Reply-To). It's **progressively
+enhanced**: the
+`contact` Stimulus controller posts via `fetch` with `Accept: application/json` (→ `204`/`422`,
+toast, no navigation); without JS the native POST sends `Accept: text/html` (→ `303` to the
+Contentful Thank-You page at `/contact/success`). Same endpoint, same validation/honeypot/spam
+path for both.
 
 ## The cross-app HTML contract (most important)
 

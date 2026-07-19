@@ -30,6 +30,7 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 | GET | `/widgets/whoop` | `widgets/whoop#show` | HTML (sleep/recovery/strain) | 5 min |
 | GET | `/widgets/plausible/pageviews/:id` | `widgets/plausible#pageviews` | HTML (pageview count by Contentful id) | 1 hr |
 | POST | `/api/location` | `api/location#create` | sets Redis `location:current` + enqueues a `LocationSyncJob` (bearer-token gated) | — |
+| POST | `/api/contact` | `api/contact#create` | drops honeypot hits + enqueues a `ContactMailJob` (Akismet spam-check → Cloudflare email to the owner, Reply-To = sender); JSON → 204/422, HTML → 303 to `/contact/success` (bearer-token gated, browser-reachable via the web proxy) | — |
 | POST | `/webhooks/contentful` | `webhooks/contentful#create` | enqueues a standard.site PDS sync job on publish/unpublish/delete (HMAC-gated); 204 | — |
 | POST | `/webhooks/whoop` | `webhooks/whoop#create` | enqueues a `WhoopWebhookJob` syncing strain/sleep/recovery to Intervals.icu wellness + regenerating the matched activity's description (HMAC-gated, user-verified); 200 `{ok: true}` | — |
 | GET | `/api/standard-site` | `api/standard_site#show` | JSON `{did, publication_uri}` for the web build's verification markup | 1 hr |
@@ -51,7 +52,11 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
     when data is unavailable — the site's `live-update` controller removes the placeholder
     (collapsing the widget) on an empty response, so prefer it over raising.
   - `api/` — structured-data endpoints (accept or return data, not markup):
-    `Api::LocationController`, `Api::StandardSiteController` under `Api::BaseController`.
+    `Api::LocationController`, `Api::StandardSiteController`, `Api::ContactController` under
+    `Api::BaseController`. `ContactController` is the one browser-reachable write (through the
+    web proxy): it validates the submission, drops honeypot hits, and enqueues `ContactMailJob`
+    (`Akismet` spam-check → `Resend` email to the owner). It answers by `Accept` — JSON
+    (`fetch`) → 204/422, HTML (no-JS native POST) → 303 to the site's Thank-You page.
   - `webhooks/` — inbound webhooks, one controller per sending service under
     `Webhooks::BaseController` (currently `Webhooks::ContentfulController`).
 - **Auth** — `Widgets::BaseController` and `Api::BaseController` require the `API_TOKEN`
@@ -74,7 +79,9 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 - **Services** (`app/services/`, base `ApplicationService`): one per external API —
   Intervals.icu, Apple WeatherKit (ES256 JWT), Google Maps / Air Quality / Pollen,
   PurpleAir, Whoop (OAuth2), TrainerRoad (iCal), Contentful (events/articles),
-  Plausible, Font Awesome, Goodspeed (bay conditions), `StandardSite` (publishes the
+  Plausible, Font Awesome, Goodspeed (bay conditions), `Akismet` (contact-form spam check —
+  plain-text `true`/`false`, fails open), `Resend` (the contact form's email delivery — an HTTPS
+  API, so it works from fly, which blocks outbound SMTP), `StandardSite` (publishes the
   blog to the AT Protocol / Bluesky PDS as standard.site records — webhook-driven, plus
   the `standard_site:backfill` rake task in `lib/tasks/`). Read-through Redis cache via
   `cached_json(key, expires_in:)`; HTTParty with retries; `DeepOstruct` for dot-access.
@@ -123,7 +130,10 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   the coordinates (`GoogleMaps`), then updates the athlete profile (city/state/country/timezone)
   and replaces the weather config with a single current-location forecast — each write skipped
   when Intervals.icu already matches, and the just-written timezone primed into the
-  `intervals.icu:timezone:*` cache. Args are plain
+  `intervals.icu:timezone:*` cache. `ContactMailJob(name, email, message, user_ip, user_agent)`
+  (enqueued by `POST /api/contact`) runs the `Akismet` spam-check off the request path — a spam
+  verdict is logged and dropped — then emails a clean submission to `CONTACT_TO_ADDRESS` via
+  `Resend` with Reply-To set to the sender. Args are plain
   strings/numbers and every operation is idempotent, so `retry: 5` is safe; exhausted
   retries land in the Dead set. Config in `config/initializers/sidekiq.rb` (Redis = `REDIS_URL`, web UI guard) and
   `config/sidekiq.yml` (concurrency). The **`/sidekiq` web UI** is mounted in `routes.rb` and
@@ -220,12 +230,21 @@ secrets (and Rails `config/credentials.yml.enc` + `master.key`).
   `GOOGLE_OAUTH_CLIENT_SECRET`, `OWNER_EMAIL` (the three gate owner sign-in for `/whoop/auth`
   + `/sidekiq` — Google OAuth restricted to this email/its hosted domain), `GOOGLE_API_KEY`,
   `API_TOKEN` (bearer required on all `/widgets/*` endpoints — injected by the web proxy —
-  and on `POST /api/location`; must match the web app's), `WEATHERKIT_KEY_ID`,
-  `WEATHERKIT_TEAM_ID`, `WEATHERKIT_SERVICE_ID`,
+  and on `POST /api/location` + `POST /api/contact`; must match the web app's),
+  `WEATHERKIT_KEY_ID`, `WEATHERKIT_TEAM_ID`, `WEATHERKIT_SERVICE_ID`,
   `WEATHERKIT_PRIVATE_KEY` (base64 .p8), `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`,
   `CONTENTFUL_WEBHOOK_SECRET` (64-char HMAC secret for the Contentful webhook), `SITE_URL`
-  (public site root, for the standard.site publication `url`).
-- **Optional**: `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`, `TRAINERROAD_CALENDAR_URL`
+  (public site root — the standard.site publication `url`, the contact form's no-JS redirect
+  target, and Akismet's `blog` param), `RESEND_API_KEY`
+  (the contact form's email delivery — an HTTPS API, so it works from fly, which blocks outbound
+  SMTP), `CONTACT_FROM_ADDRESS` (the contact form's `from` — a sender address on a domain
+  verified in Resend; Resend needs only SPF/DKIM, so it coexists with a Google Workspace mailbox
+  on the same domain without touching the root MX; never hardcode the host), `CONTACT_TO_ADDRESS`
+  (where contact-form messages are delivered — the recipient inbox, decoupled from
+  `OWNER_EMAIL`).
+- **Optional**: `AKISMET_API_KEY` (contact-form spam check; fails open — unset means every
+  submission is treated as ham), `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`,
+  `TRAINERROAD_CALENDAR_URL`
   (rest-day check + planned-workout matching for generated activity descriptions),
   `ANTHROPIC_API_KEY` + `ANTHROPIC_DESCRIPTION_MODEL` (the LLM lines of generated activity
   descriptions; the default model is `claude-sonnet-5`),
