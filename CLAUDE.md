@@ -155,8 +155,10 @@ Defense layers: honeypot + Akismet (both paths), server-side length caps, a per-
 rack-attack throttle keyed on the forwarded `X-Kona-Client-IP` (`contact/ip`), and **Cloudflare
 Turnstile**. ⚠️ Turnstile needs JS (single-use, 300s tokens), so it's verified server-side
 (`Turnstile` siteverify) **only on the JSON path**; the no-JS path relies on the other layers.
-Turnstile + Akismet both **fail open** when unconfigured. The email carries a "Sender details"
-block (IP/geo/UA/time) from the forwarded headers.
+Turnstile and Akismet both **fail open** when *unconfigured*. When Akismet *is* configured it
+fails **closed** — an Akismet outage raises and retries the (delivery-split) intake job rather
+than delivering a message that wasn't spam-checked. The email carries a "Sender details" block
+(IP/geo/UA/time) from the forwarded headers.
 
 ## The cross-app HTML contract (most important)
 

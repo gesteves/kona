@@ -83,7 +83,8 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   Intervals.icu, Apple WeatherKit (ES256 JWT), Google Maps / Air Quality / Pollen,
   PurpleAir, Whoop (OAuth2), TrainerRoad (iCal), Contentful (events/articles),
   Plausible, Font Awesome, Goodspeed (bay conditions), `Akismet` (contact-form spam check —
-  plain-text `true`/`false`, fails open), `Resend` (the contact form's email delivery — an HTTPS
+  plain-text `true`/`false`; fails **closed** when configured — raises so the intake job retries —
+  and open only when unconfigured), `Resend` (the contact form's email delivery — an HTTPS
   API, so it works from fly, which blocks outbound SMTP), `Turnstile` (contact-form bot-challenge
   siteverify — verified in the request path since tokens are single-use/300s; fails open),
   `StandardSite` (publishes the
@@ -142,11 +143,13 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   Sender-details block from the forwarded IP/geo/UA `context`, plus a **Claude-generated subject
   line** via `ContactSubject`, a structured-output Anthropic call mirroring `ActivityDescription::Llm`
   that fails soft to a static subject) and enqueues `ContactDeliveryJob(payload)`, which is the
-  sole retryable unit — it just sends the finished email via `Resend` (Reply-To = the sender).
-  `Akismet` and `ContactSubject` both fail soft (neither raises), so intake effectively never
-  retries and each runs exactly once; only the `Resend` send re-runs on a delivery retry. Args
-  are plain strings + a string-keyed hash and every operation is idempotent, so `retry: 5` is
-  safe; exhausted retries land in the Dead set. Config in `config/initializers/sidekiq.rb` (Redis = `REDIS_URL`, web UI guard) and
+  sole retryable *delivery* unit — it just sends the finished email via `Resend` (Reply-To = the
+  sender). The split is deliberate: **`Akismet` fails closed** — when configured but unreachable
+  or without a clean verdict it **raises**, so the intake job retries (never delivering a message
+  that wasn't spam-checked; exhausted retries park it in the Dead set rather than let spam
+  through). `ContactSubject` fails soft, and `Akismet` returns ham only when unconfigured, so on a
+  normal run each runs once; only `Resend` re-runs on a delivery retry. Args are plain strings + a
+  string-keyed hash and every operation is idempotent, so `retry: 5` is safe. Config in `config/initializers/sidekiq.rb` (Redis = `REDIS_URL`, web UI guard) and
   `config/sidekiq.yml` (concurrency). The **`/sidekiq` web UI** is mounted in `routes.rb` and
   gated by the owner session (Google OAuth — see **Owner auth** above), shared with `/whoop/auth`.
   Sidekiq runs as a dedicated **`worker` fly process** (see fly.toml); a worker must be running
@@ -256,8 +259,9 @@ secrets (and Rails `config/credentials.yml.enc` + `master.key`).
   on the same domain without touching the root MX; never hardcode the host), `CONTACT_TO_ADDRESS`
   (where contact-form messages are delivered — the recipient inbox, decoupled from
   `OWNER_EMAIL`).
-- **Optional**: `AKISMET_API_KEY` (contact-form spam check; fails open — unset means every
-  submission is treated as ham), `TURNSTILE_SECRET` (contact-form Turnstile siteverify; fails open
+- **Optional**: `AKISMET_API_KEY` (contact-form spam check; unset = Akismet off, submissions
+  delivered unchecked. When set it fails **closed** — an Akismet outage retries the intake job
+  rather than delivering unchecked), `TURNSTILE_SECRET` (contact-form Turnstile siteverify; fails open
   when unset — pair it with the web app's `TURNSTILE_SITE_KEY`, set both or neither),
   `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`,
   `TRAINERROAD_CALENDAR_URL`

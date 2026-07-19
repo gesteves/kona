@@ -34,17 +34,22 @@ RSpec.describe Akismet do
     )
   end
 
-  it "fails open (ham) on an unexpected response body, e.g. an invalid key" do
+  it "raises (fails closed) on a non-success response so the job retries rather than delivering" do
+    stub_response(success: false, body: "")
+    expect { service.spam?(**check_args) }.to raise_error(ApplicationService::HttpError)
+  end
+
+  it "raises (fails closed) on an unexpected body, e.g. an invalid-key \"invalid\" response" do
     stub_response(success: true, body: "invalid")
-    expect(service.spam?(**check_args)).to be(false)
+    expect { service.spam?(**check_args) }.to raise_error(ApplicationService::HttpError)
   end
 
-  it "fails open (ham) on an upstream error" do
+  it "lets a transport error propagate so the job retries" do
     allow(HTTParty).to receive(:post).and_raise(StandardError.new("boom"))
-    expect(service.spam?(**check_args)).to be(false)
+    expect { service.spam?(**check_args) }.to raise_error(StandardError, "boom")
   end
 
-  it "does not call Akismet when unconfigured, and treats the submission as ham" do
+  it "fails open (ham) when unconfigured, without calling Akismet" do
     allow(HTTParty).to receive(:post)
     unconfigured = described_class.new(api_key: nil, blog: "https://example.test")
     expect(unconfigured.spam?(**check_args)).to be(false)

@@ -60,6 +60,14 @@ RSpec.describe ContactMailJob do
     expect(ContactDeliveryJob.jobs).to be_empty
   end
 
+  it "lets an Akismet failure propagate (so the intake retries) and does not enqueue delivery" do
+    allow(akismet).to receive(:spam?).and_raise(ApplicationService::HttpError.new(500, "down", "rest.akismet.com"))
+
+    expect { described_class.new.perform("Jane", "jane@example.com", "Hello!", context) }
+      .to raise_error(ApplicationService::HttpError)
+    expect(ContactDeliveryJob.jobs).to be_empty
+  end
+
   it "is configured to retry" do
     expect(described_class.get_sidekiq_options["retry"]).to eq(5)
   end
