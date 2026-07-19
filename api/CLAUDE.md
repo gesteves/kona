@@ -115,7 +115,9 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   descriptions" keeps working (triggered by another source) and simply loses its 🔥 line.
 - **Background jobs** — native **Sidekiq** (`Sidekiq::Job`, not ActiveJob — ActiveJob stays
   disabled in `application.rb`). Jobs live in `app/jobs/` and inherit from `ApplicationJob` (a
-  plain `Sidekiq::Job` superclass holding the shared `retry: 5`); `StandardSiteSyncJob(operation,
+  plain `Sidekiq::Job` superclass holding the shared `retry_for: 24.hours` — Sidekiq retries with
+  its normal backoff, then Dead-sets a job once 24 hours have elapsed since the first failure);
+  `StandardSiteSyncJob(operation,
   entry_id)` runs the standard.site sync (webhook- and backfill-driven), and
   `ArticleEmbeddingJob(operation, entry_id)` keeps an article's Voyage embedding (the
   `embeddings:article:<id>` Redis key) in sync for the related-articles widget — `"embed"` on
@@ -149,7 +151,7 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   that wasn't spam-checked; exhausted retries park it in the Dead set rather than let spam
   through). `ContactSubject` fails soft, and `Akismet` returns ham only when unconfigured, so on a
   normal run each runs once; only `Resend` re-runs on a delivery retry. Args are plain strings + a
-  string-keyed hash and every operation is idempotent, so `retry: 5` is safe. Config in `config/initializers/sidekiq.rb` (Redis = `REDIS_URL`, web UI guard) and
+  string-keyed hash and every operation is idempotent, so the shared 24-hour retry window is safe. Config in `config/initializers/sidekiq.rb` (Redis = `REDIS_URL`, web UI guard) and
   `config/sidekiq.yml` (concurrency). The **`/sidekiq` web UI** is mounted in `routes.rb` and
   gated by the owner session (Google OAuth — see **Owner auth** above), shared with `/whoop/auth`.
   Sidekiq runs as a dedicated **`worker` fly process** (see fly.toml); a worker must be running

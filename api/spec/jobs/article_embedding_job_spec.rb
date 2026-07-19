@@ -62,7 +62,7 @@ RSpec.describe ArticleEmbeddingJob do
     described_class.new.perform("frobnicate", "entry123")
   end
 
-  it "is configured to retry" do
-    expect(described_class.get_sidekiq_options["retry"]).to eq(5)
+  it "retries failed jobs for up to 24 hours" do
+    expect(described_class.get_sidekiq_options["retry_for"]).to eq(24.hours)
   end
 end
