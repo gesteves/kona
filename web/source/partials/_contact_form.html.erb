@@ -1,0 +1,22 @@
+<%# The contact form. It lives here (a plain-ERB partial) rather than in the Contentful `contact`
+    page body because that body is rendered through markdown_to_html → Redcarpet SmartyPants
+    (lib/helpers/markdown_helpers.rb), which curls the straight quotes in raw HTML *attributes*
+    and so corrupts the form's field names + Stimulus wiring. The intro copy above the form stays
+    editable in Contentful; this partial is appended for the contact page in
+    partials/article/_body.html.erb.
+
+    Keep the field names (name, email, message, honeypot `comment`) in sync with the api's
+    Api::ContactController — see the root CLAUDE.md contact contract. Progressive enhancement: the
+    real method/action work without JS (native POST → 303 to /contact/success); the `contact`
+    Stimulus controller intercepts submit to fetch + toast when JS is present. %>
+<form method="POST" action="/api/contact" class="form"
+      data-controller="contact" data-action="submit->contact#submit" data-turbo="false">
+  <wa-input label="Your name" type="text" name="name" autocomplete="name" with-clear required></wa-input>
+  <wa-input label="Your email" type="email" name="email" autocomplete="email" with-clear required></wa-input>
+  <label class="hp">Comment <textarea name="comment" tabindex="-1" autocomplete="off"></textarea></label>
+  <wa-textarea label="What's on your mind?" name="message" rows="6" resize="auto" with-count required></wa-textarea>
+  <wa-button type="submit" variant="brand" appearance="accent" data-contact-target="submit">
+    Send Message
+    <%= icon_svg("classic", "solid", "paper-plane")&.sub("<svg", '<svg slot="end"') %>
+  </wa-button>
+</form>

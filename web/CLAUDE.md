@@ -29,13 +29,18 @@ web↔api contract before touching any widget markup.
 - **Runtime dynamic content**: weather, activity stats, Whoop, per-article pageviews,
   and event weather are **not built here**. The `live-update` Stimulus controller
   fetches them client-side from `/widgets/*` into placeholder partials (root `CLAUDE.md`).
-- **Contact form**: no longer Netlify Forms (the `__forms.html` decoy is gone). The form lives
-  in the Contentful `contact` page body and posts to `POST /api/contact` through the api proxy
-  (`api/` sends the email via Resend with the correct Reply-To). It's progressively
-  enhanced — the `contact` Stimulus controller (`sendNotification` toast, no navigation) over a
-  real form that still works without JS (native POST → 303 to the Contentful `/contact/success`
-  page). To change the form's markup, edit it in Contentful (keep the field names — `name`,
-  `email`, `message`, honeypot `comment` — in sync with the api; see root `CLAUDE.md`).
+- **Contact form**: no longer Netlify Forms (the `__forms.html` decoy is gone). It posts to
+  `POST /api/contact` through the api proxy (`api/` sends the email via Resend with the correct
+  Reply-To). It's progressively enhanced — the `contact` Stimulus controller (`sendNotification`
+  toast, no navigation) over a real form that still works without JS (native POST → 303 to the
+  Contentful `/contact/success` page).
+  ⚠️ The `<form>` markup is a **partial** (`source/partials/_contact_form.html.erb`), rendered
+  for the contact page in `partials/article/_body.html.erb` (`article.slug == 'contact'`) — **not**
+  raw HTML in the Contentful body. It can't live in the body: `render_body` runs the body through
+  Redcarpet **SmartyPants** (`lib/helpers/markdown_helpers.rb`), which curls the straight quotes
+  in raw HTML *attributes* and corrupts the field names + Stimulus wiring. The intro copy above
+  the form stays editable in Contentful; only the form markup is in the partial. Keep the field
+  names (`name`, `email`, `message`, honeypot `comment`) in sync with the api (root `CLAUDE.md`).
 
 ## Commands
 

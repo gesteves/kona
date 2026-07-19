@@ -4,5 +4,8 @@
 <div class="entry__body"<%= ' data-pagefind-body'.html_safe if defined?(pagefind) && pagefind %>>
   <%= render_body(article.intro, image_variant: :full) %>
   <%= render_body(article.body, image_variant: :full) %>
+  <%# The contact form is a partial, not raw HTML in the Contentful body: SmartyPants (in
+      render_body) curls the quotes in raw HTML attributes and breaks it. See partials/_contact_form. %>
+  <%= partial 'partials/contact_form' if article.slug == 'contact' %>
   <%= partial 'partials/disclosure', locals: { entry: article } %>
 </div>

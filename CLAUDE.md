@@ -137,8 +137,10 @@ query strings), only emit durable edge headers on success responses, and keep th
 
 ### Contact form (`POST /api/contact`)
 
-The contact page's form (in the Contentful `contact` page body) posts to `/api/contact` through
-the proxy. `Api::ContactController` drops honeypot hits (the hidden `comment` field) and
+The contact page's form (a web partial, `source/partials/_contact_form.html.erb` — **not** raw
+HTML in the Contentful body, which SmartyPants would corrupt; the intro copy stays in Contentful)
+posts to `/api/contact` through the proxy. `Api::ContactController` drops honeypot hits (the
+hidden `comment` field) and
 enqueues a `ContactMailJob`, which spam-checks with **Akismet** and emails the owner via
 **Resend** (an HTTPS API — fly blocks outbound SMTP) with `Reply-To` set to the sender (the
 reason this replaced Netlify Forms — Netlify set the wrong Reply-To). It's **progressively
