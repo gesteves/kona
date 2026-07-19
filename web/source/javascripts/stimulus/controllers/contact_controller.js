@@ -6,9 +6,11 @@ const ERROR_MESSAGE =
   "Sorry, something went wrong and your message wasn't sent. Please try again.";
 
 // Explicit-render mode so the widget's lifecycle is driven from connect/disconnect (Turbo-safe)
-// rather than an auto-scan that wouldn't re-run on Turbo navigation.
-const TURNSTILE_SRC =
-  'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+// rather than an auto-scan that wouldn't re-run on Turbo navigation. We load api.js dynamically,
+// so we must NOT use turnstile.ready() (it throws on an async/deferred script); Turnstile's own
+// `onload` callback param is the supported way to know when it's ready.
+const TURNSTILE_ONLOAD = '__konaTurnstileOnload';
+const TURNSTILE_SRC = `https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=${TURNSTILE_ONLOAD}`;
 
 /**
  * Progressively enhances the contact form. The form is a real POST to /api/contact that works
@@ -31,19 +33,18 @@ export default class extends Controller {
     if (!this.siteKeyValue || !this.hasTurnstileTarget) return;
     this.loadTurnstile()
       .then(() => {
-        window.turnstile.ready(() => {
-          this.widgetId = window.turnstile.render(this.turnstileTarget, {
-            sitekey: this.siteKeyValue,
-            callback: (token) => {
-              this.turnstileToken = token;
-            },
-            'error-callback': () => {
-              this.turnstileToken = null;
-            },
-            'expired-callback': () => {
-              this.turnstileToken = null;
-            },
-          });
+        // Turnstile is ready here (onload fired), so render directly — no turnstile.ready().
+        this.widgetId = window.turnstile.render(this.turnstileTarget, {
+          sitekey: this.siteKeyValue,
+          callback: (token) => {
+            this.turnstileToken = token;
+          },
+          'error-callback': () => {
+            this.turnstileToken = null;
+          },
+          'expired-callback': () => {
+            this.turnstileToken = null;
+          },
         });
       })
       .catch((error) => console.error('Turnstile failed to load:', error));
@@ -114,23 +115,23 @@ export default class extends Controller {
   }
 
   /**
-   * Loads the Turnstile script once per page, shared across controller instances.
-   * @returns {Promise<void>} Resolves when window.turnstile is available.
+   * Loads the Turnstile script once per page, shared across controller instances. Resolves via
+   * Turnstile's `onload` callback (when window.turnstile is ready), not the script's load event.
+   * @returns {Promise<void>}
    */
   loadTurnstile() {
     if (window.turnstile) return Promise.resolve();
-    if (!window.__turnstileLoad) {
-      window.__turnstileLoad = new Promise((resolve, reject) => {
+    if (!window.__konaTurnstileLoad) {
+      window.__konaTurnstileLoad = new Promise((resolve, reject) => {
+        window[TURNSTILE_ONLOAD] = resolve;
         const script = document.createElement('script');
         script.src = TURNSTILE_SRC;
         script.async = true;
-        script.defer = true;
-        script.onload = () => resolve();
         script.onerror = reject;
         document.head.appendChild(script);
       });
     }
-    return window.__turnstileLoad;
+    return window.__konaTurnstileLoad;
   }
 
   /**
