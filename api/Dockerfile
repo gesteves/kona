@@ -6,7 +6,7 @@
 # and run it with:
 #   docker run -d -p 3000:3000 -e RAILS_MASTER_KEY=<value from config/master.key> --name kona-api kona-api
 
-ARG RUBY_VERSION=4.0.5
+ARG RUBY_VERSION=4.0.6
 FROM docker.io/library/ruby:$RUBY_VERSION-slim AS base
 
 # Rails app lives here

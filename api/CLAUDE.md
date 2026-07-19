@@ -1,6 +1,6 @@
 # api/ — Kona widget API
 
-Rails 8.1 API (Ruby 4.0.5) that serves small embeddable **HTML fragments** ("widgets")
+Rails 8.1 API (Ruby 4.0.6) that serves small embeddable **HTML fragments** ("widgets")
 — plus structured-data endpoints and inbound webhooks — for the static `web/` site.
 Deployed to **fly.io** as `kona-api`, with the origin proxied behind **Cloudflare** — so
 `Fly-Client-IP` is a Cloudflare PoP, not the visitor (see **Abuse mitigation** below and the

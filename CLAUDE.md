@@ -14,8 +14,8 @@ Work on one app from inside its own directory; each has its own `Gemfile`,
 
 | Path | What | Deploy |
 |---|---|---|
-| `web/` | Middleman 4 static site generator (Ruby 4.0.5). Builds the Contentful-powered blog and serves all static pages. | Netlify (behind Cloudflare) |
-| `api/` | Rails 8.1 API (Ruby 4.0.5). Serves small dynamic HTML fragments ("widgets") embedded into the static pages at runtime, plus a Sidekiq `worker` process for background jobs (standard.site PDS sync). | fly.io (`kona-api`: `app` + `worker`) — behind Cloudflare |
+| `web/` | Middleman 4 static site generator (Ruby 4.0.6). Builds the Contentful-powered blog and serves all static pages. | Netlify (behind Cloudflare) |
+| `api/` | Rails 8.1 API (Ruby 4.0.6). Serves small dynamic HTML fragments ("widgets") embedded into the static pages at runtime, plus a Sidekiq `worker` process for background jobs (standard.site PDS sync). | fly.io (`kona-api`: `app` + `worker`) — behind Cloudflare |
 | `redis/` | Config (`fly.toml`) for the `kona-redis` fly app — the API's dedicated Redis (cache + Sidekiq queues). | fly.io (`kona-redis`) |
 | `contentful/` | One-off Contentful content migrations (Node scripts, run locally). Deliberately outside `web/` so edits don't trigger Netlify builds. | — (never deployed) |
 | `netlify.toml` (root) | Drives the Netlify build: `base = "web"`, `command = "bundle exec rake build"`, `publish = "build/"`. | — |

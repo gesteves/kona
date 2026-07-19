@@ -1,6 +1,6 @@
 # web/ — Kona static site
 
-Middleman 4 static site generator (Ruby 4.0.5) that builds a **Contentful**-powered
+Middleman 4 static site generator (Ruby 4.0.6) that builds a **Contentful**-powered
 blog and deploys to **Netlify**, which is itself proxied behind **Cloudflare** (images,
 client IPs, and bot blocking all depend on the zone — see the root
 [`CLAUDE.md`](../CLAUDE.md)). esbuild bundles JavaScript (Stimulus + Turbo) and the
