@@ -135,12 +135,14 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   the coordinates (`GoogleMaps`), then updates the athlete profile (city/state/country/timezone)
   and replaces the weather config with a single current-location forecast — each write skipped
   when Intervals.icu already matches, and the just-written timezone primed into the
-  `intervals.icu:timezone:*` cache. `ContactMailJob(name, email, message, user_ip, user_agent)`
+  `intervals.icu:timezone:*` cache. `ContactMailJob(name, email, message, context)`
   (enqueued by `POST /api/contact`) runs the `Akismet` spam-check off the request path — a spam
   verdict is logged and dropped — then emails a clean submission to `CONTACT_TO_ADDRESS` via
-  `Resend` with Reply-To set to the sender. Args are plain
-  strings/numbers and every operation is idempotent, so `retry: 5` is safe; exhausted
-  retries land in the Dead set. Config in `config/initializers/sidekiq.rb` (Redis = `REDIS_URL`, web UI guard) and
+  `Resend` with Reply-To set to the sender, a Sender-details block from the forwarded IP/geo/UA
+  (`context`), and a **Claude-generated subject line** (`ContactSubject`, a structured-output
+  Anthropic call mirroring `ActivityDescription::Llm`; fails soft to a static subject). Args are
+  plain strings + a string-keyed hash and every operation is idempotent, so `retry: 5` is safe;
+  exhausted retries land in the Dead set. Config in `config/initializers/sidekiq.rb` (Redis = `REDIS_URL`, web UI guard) and
   `config/sidekiq.yml` (concurrency). The **`/sidekiq` web UI** is mounted in `routes.rb` and
   gated by the owner session (Google OAuth — see **Owner auth** above), shared with `/whoop/auth`.
   Sidekiq runs as a dedicated **`worker` fly process** (see fly.toml); a worker must be running
@@ -257,7 +259,9 @@ secrets (and Rails `config/credentials.yml.enc` + `master.key`).
   `TRAINERROAD_CALENDAR_URL`
   (rest-day check + planned-workout matching for generated activity descriptions),
   `ANTHROPIC_API_KEY` + `ANTHROPIC_DESCRIPTION_MODEL` (the LLM lines of generated activity
-  descriptions; the default model is `claude-sonnet-5`),
+  descriptions; the default model is `claude-sonnet-5`) — `ANTHROPIC_API_KEY` also powers the
+  contact form's `ContactSubject` line, with an optional `ANTHROPIC_CONTACT_SUBJECT_MODEL`
+  override (default `claude-sonnet-5`; `claude-haiku-4-5` is a cheaper fit),
   `PURPLEAIR_API_KEY`, `LOCATION`, `TIME_ZONE`, `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`,
   `BLUESKY_PDS_URL` (standard.site publishing; no-ops when the handle/password are unset),
   `BUGSNAG_API_KEY` (error reporting; **production only** — notifies only in the production

@@ -12,6 +12,9 @@ RSpec.describe "Contact", type: :request do
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with("API_TOKEN").and_return(token)
     allow(ENV).to receive(:[]).with("SITE_URL").and_return(site_url)
+    # Default Turnstile to unconfigured so these specs don't depend on a local .env having
+    # TURNSTILE_SECRET; the "Turnstile verification" block stubs Turnstile#verify directly.
+    allow(ENV).to receive(:[]).with("TURNSTILE_SECRET").and_return(nil)
   end
 
   describe "authentication" do

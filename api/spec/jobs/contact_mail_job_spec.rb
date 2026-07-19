@@ -8,6 +8,9 @@ RSpec.describe ContactMailJob do
     allow(Akismet).to receive(:new).and_return(akismet)
     allow(Resend).to receive(:new).and_return(mailer)
     allow(mailer).to receive(:send_email)
+    # Default to no generated subject so these specs don't hit the real Anthropic API when a
+    # local .env has ANTHROPIC_API_KEY; specific examples override this.
+    allow(ContactSubject).to receive(:generate).and_return(nil)
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with("CONTACT_TO_ADDRESS").and_return("owner@example.test")
   end
@@ -28,10 +31,28 @@ RSpec.describe ContactMailJob do
     expect(mailer).to have_received(:send_email).with(
       hash_including(
         to: "owner@example.test", reply_to: "jane@example.com",
-        subject: a_string_including("Jane Rider"),
         text: a_string_including("Boise, Idaho, US", "203.0.113.7", "Mozilla/5.0")
       )
     )
+  end
+
+  it "uses the Claude-generated subject when available" do
+    allow(akismet).to receive(:spam?).and_return(false)
+    allow(ContactSubject).to receive(:generate).and_return("Question about Alcatraz wetsuit rules")
+
+    described_class.new.perform("Jane Rider", "jane@example.com", "Do I need a wetsuit?", context)
+
+    expect(ContactSubject).to have_received(:generate).with(name: "Jane Rider", message: "Do I need a wetsuit?")
+    expect(mailer).to have_received(:send_email).with(hash_including(subject: "Question about Alcatraz wetsuit rules"))
+  end
+
+  it "falls back to a static subject when no subject is generated" do
+    allow(akismet).to receive(:spam?).and_return(false)
+    allow(ContactSubject).to receive(:generate).and_return(nil)
+
+    described_class.new.perform("Jane Rider", "jane@example.com", "Hello!", context)
+
+    expect(mailer).to have_received(:send_email).with(hash_including(subject: "New contact form message from Jane Rider"))
   end
 
   it "drops a submission Akismet flags as spam without emailing" do

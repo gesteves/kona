@@ -24,10 +24,14 @@ class ContactMailJob < ApplicationJob
       return
     end
 
+    # A Claude-generated subject summarizing the message, for at-a-glance inbox triage; falls
+    # back to a static subject when Anthropic is unconfigured or the call fails.
+    subject = ContactSubject.generate(name: name, message: message).presence || "New contact form message from #{name}"
+
     Resend.new.send_email(
       to: ENV["CONTACT_TO_ADDRESS"],
       reply_to: email,
-      subject: "New contact form message from #{name}",
+      subject: subject,
       text: text_body(name, email, message, context),
       html: html_body(name, email, message, context)
     )
