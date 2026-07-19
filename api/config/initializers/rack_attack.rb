@@ -95,6 +95,16 @@ Rack::Attack.throttle("unknown-paths/ip", limit: 20, period: 1.minute) do |req|
   req.client_ip unless RACK_ATTACK_KNOWN_ROUTE.call(req.path)
 end
 
+# Throttle contact-form submissions per real visitor. Keyed on the IP the web proxy forwards
+# (X-Kona-Client-IP) — NOT client_ip, which for proxied traffic is the shared Netlify egress, so
+# keying the contact form on it would throttle every visitor at once. Safe by the rules above: a
+# throttle (429), never a ban, keyed on the true per-visitor IP and scoped to this one path, so it
+# can't 403 the shared proxy IPs or touch /widgets/*. A direct origin hit (no forwarded header) is
+# not keyed here — it's already bearer-gated.
+Rack::Attack.throttle("contact/ip", limit: 5, period: 1.hour) do |req|
+  req.get_header("HTTP_X_KONA_CLIENT_IP").presence if req.post? && req.path == "/api/contact"
+end
+
 # Plain-text responses matching lib/plain_text_exceptions.rb. No durable cache headers — the
 # Netlify proxy only forwards edge headers on 2xx, so these are never pinned at the edge.
 RACK_ATTACK_PLAIN_TEXT = { "content-type" => "text/plain; charset=utf-8" }.freeze

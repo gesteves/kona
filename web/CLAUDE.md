@@ -41,6 +41,9 @@ web↔api contract before touching any widget markup.
   in raw HTML *attributes* and corrupts the field names + Stimulus wiring. The intro copy above
   the form stays editable in Contentful; only the form markup is in the partial. Keep the field
   names (`name`, `email`, `message`, honeypot `comment`) in sync with the api (root `CLAUDE.md`).
+  When `TURNSTILE_SITE_KEY` is set, the `contact` controller renders a **Cloudflare Turnstile**
+  widget (explicit render, so it survives Turbo navigation) and sends its token with the `fetch`;
+  the api verifies it server-side. No key → no widget, and the api's check fails open.
 
 ## Commands
 
@@ -133,7 +136,9 @@ Names only — see `.env.example`; never commit values.
   which uses it on purpose so blurhashes don't depend on the zone or spend a transformation.
   Cloudflare must also have Transformations enabled with `images.ctfassets.net` allowlisted as a
   source, or every image 403s.
-- **Optional**: `DARK_VISITORS_ACCESS_TOKEN`.
+- **Optional**: `DARK_VISITORS_ACCESS_TOKEN`; `TURNSTILE_SITE_KEY` (public Cloudflare Turnstile
+  sitekey for the contact form — set it in Netlify's build env; pair with the api's
+  `TURNSTILE_SECRET`, both or neither).
 
 ## Conventions & gates
 

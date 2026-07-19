@@ -30,4 +30,14 @@
   label.hp {
     display: none;
   }
+
+  // Cloudflare Turnstile mounts here. Match the field spacing when the widget is present; collapse
+  // the gap when it isn't (no sitekey configured, or before the widget renders).
+  .contact__turnstile {
+    margin: 0 0 2rem;
+
+    &:empty {
+      margin: 0;
+    }
+  }
 }

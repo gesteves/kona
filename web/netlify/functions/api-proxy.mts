@@ -17,9 +17,9 @@ const API_TOKEN = process.env.API_TOKEN;
 const FORWARD_REQUEST_HEADERS = ['accept'];
 
 // The contact-form endpoint. It's a POST (never edge-cached) that needs two things the widget
-// paths don't: the real visitor IP/UA forwarded for its Akismet check (the origin can't see
-// them — the zone rewrites CF-Connecting-IP to the Netlify egress IP), and its no-JS redirect's
-// Location header forwarded back to the browser.
+// paths don't: the real visitor IP/UA/geo forwarded for its Akismet check, rate limit, and the
+// notification email (the origin can't see them — the zone rewrites the CF-* headers to the
+// Netlify PoP), and its no-JS redirect's Location header forwarded back to the browser.
 const CONTACT_PATH = '/api/contact';
 
 function upstreamHeaders(
@@ -38,15 +38,23 @@ function upstreamHeaders(
     const contentType = incoming.get('content-type');
     if (contentType) headers.set('content-type', contentType);
   }
-  // Give the contact endpoint's Akismet check real signal. CF-Connecting-IP is the real visitor
-  // at the Netlify edge; both are passed under custom names the api reads (and that Cloudflare
-  // in front of the origin won't rewrite). The api trusts them only for spam scoring, never for
+  // Give the contact endpoint the real visitor signal it can't otherwise see: the fly origin's
+  // own CF-* headers describe the Netlify PoP, not the visitor, so forward the visitor's values
+  // (present here at the Netlify edge) under custom names the api reads and Cloudflare won't
+  // rewrite. The api trusts them only for spam scoring + the email's Sender details, never for
   // banning. Scoped to the contact path so widget upstream requests stay byte-identical.
   if (isContact) {
-    const clientIp = incoming.get('cf-connecting-ip');
-    if (clientIp) headers.set('x-kona-client-ip', clientIp);
-    const userAgent = incoming.get('user-agent');
-    if (userAgent) headers.set('x-kona-client-ua', userAgent);
+    const forward: Record<string, string> = {
+      'cf-connecting-ip': 'x-kona-client-ip', // real visitor IP (Akismet + rate limit + email)
+      'user-agent': 'x-kona-client-ua', // real visitor UA (Akismet + email)
+      'cf-ipcity': 'x-kona-client-city', // geo (email Sender details)
+      'cf-region': 'x-kona-client-region',
+      'cf-ipcountry': 'x-kona-client-country',
+    };
+    for (const [from, to] of Object.entries(forward)) {
+      const value = incoming.get(from);
+      if (value) headers.set(to, value);
+    }
   }
   if (API_TOKEN) headers.set('authorization', `Bearer ${API_TOKEN}`);
   return headers;

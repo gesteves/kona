@@ -117,4 +117,22 @@ RSpec.describe "Rack::Attack", type: :request do
     get "/no-such-page", headers: { "Fly-Client-IP" => "4.4.4.4" }
     expect(response).not_to have_http_status(:too_many_requests)
   end
+
+  # The contact form throttles per REAL visitor IP — the one the web proxy forwards as
+  # X-Kona-Client-IP — not the shared Netlify egress. It's a throttle (429), never a ban, so it
+  # can't take down the shared proxy IP the way an IP ban would.
+  it "throttles contact submissions per forwarded visitor IP, isolating distinct visitors" do
+    5.times do
+      post "/api/contact", headers: { "X-Kona-Client-IP" => "9.9.9.9" }
+      expect(response).not_to have_http_status(:too_many_requests)
+    end
+
+    post "/api/contact", headers: { "X-Kona-Client-IP" => "9.9.9.9" }
+    expect(response).to have_http_status(:too_many_requests)
+    expect(response.body).to eq("429 Too Many Requests\n")
+
+    # A different visitor (same shared egress, different forwarded IP) keeps its own budget.
+    post "/api/contact", headers: { "X-Kona-Client-IP" => "8.8.8.8" }
+    expect(response).not_to have_http_status(:too_many_requests)
+  end
 end

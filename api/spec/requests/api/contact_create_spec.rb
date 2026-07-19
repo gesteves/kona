@@ -33,7 +33,20 @@ RSpec.describe "Contact", type: :request do
 
       expect(response).to have_http_status(:no_content)
       expect(ContactMailJob).to have_enqueued_sidekiq_job(
-        "Jane Rider", "jane@example.com", "Hello there!", "203.0.113.7", "Mozilla/5.0"
+        "Jane Rider", "jane@example.com", "Hello there!",
+        { "ip" => "203.0.113.7", "user_agent" => "Mozilla/5.0" }
+      )
+    end
+
+    it "forwards the visitor geo into the job context" do
+      post "/api/contact", params: valid_params, headers: json.merge(
+        "X-Kona-Client-IP" => "203.0.113.7", "X-Kona-Client-City" => "Boise",
+        "X-Kona-Client-Region" => "Idaho", "X-Kona-Client-Country" => "US"
+      )
+
+      expect(ContactMailJob).to have_enqueued_sidekiq_job(
+        "Jane Rider", "jane@example.com", "Hello there!",
+        { "ip" => "203.0.113.7", "city" => "Boise", "region" => "Idaho", "country" => "US" }
       )
     end
 
@@ -67,7 +80,7 @@ RSpec.describe "Contact", type: :request do
 
       expect(response).to redirect_to("#{site_url}/contact/success")
       expect(response).to have_http_status(:see_other)
-      expect(ContactMailJob).to have_enqueued_sidekiq_job("Jane Rider", "jane@example.com", "Hello there!", nil, nil)
+      expect(ContactMailJob).to have_enqueued_sidekiq_job("Jane Rider", "jane@example.com", "Hello there!", {})
     end
 
     it "silently redirects to the Thank-You page and drops honeypot submissions" do
@@ -82,6 +95,47 @@ RSpec.describe "Contact", type: :request do
 
       expect(response).to redirect_to("#{site_url}/contact")
       expect(ContactMailJob.jobs).to be_empty
+    end
+  end
+
+  describe "length caps" do
+    it "rejects an over-long message" do
+      post "/api/contact", params: valid_params.merge(message: "x" * 5001), headers: json
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(ContactMailJob.jobs).to be_empty
+    end
+
+    it "rejects an over-long name" do
+      post "/api/contact", params: valid_params.merge(name: "x" * 101), headers: json
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(ContactMailJob.jobs).to be_empty
+    end
+  end
+
+  describe "Turnstile verification" do
+    it "rejects a JSON submission whose Turnstile token fails" do
+      allow_any_instance_of(Turnstile).to receive(:verify).and_return(false)
+
+      post "/api/contact", params: valid_params.merge("cf-turnstile-response" => "bad"), headers: json
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(ContactMailJob.jobs).to be_empty
+    end
+
+    it "accepts a JSON submission whose Turnstile token passes" do
+      allow_any_instance_of(Turnstile).to receive(:verify).and_return(true)
+
+      post "/api/contact", params: valid_params.merge("cf-turnstile-response" => "good"), headers: json
+
+      expect(response).to have_http_status(:no_content)
+    end
+
+    it "skips Turnstile on the no-JS HTML path" do
+      expect_any_instance_of(Turnstile).not_to receive(:verify)
+
+      post "/api/contact", params: valid_params, headers: html
+
+      expect(response).to have_http_status(:see_other)
     end
   end
 end

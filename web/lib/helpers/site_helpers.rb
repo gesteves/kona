@@ -1,6 +1,14 @@
 require 'sanitize'
 
 module SiteHelpers
+  # The public Cloudflare Turnstile sitekey for the contact form widget, from the environment.
+  # Nil/blank when unset — the widget then isn't rendered and the api skips verification (both
+  # sides no-op together). Safe to embed client-side (it's the public half of the widget).
+  # @return [String, nil]
+  def turnstile_site_key
+    ENV['TURNSTILE_SITE_KEY']
+  end
+
   # Generates an Atom-compliant tag URI from a URL and date.
   # @param url [String] The URL to be converted.
   # @param date [Date, Time] The date for the tag.

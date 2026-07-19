@@ -16,6 +16,11 @@ module Api
     # Hidden honeypot field — invisible to humans (CSS), commonly filled by bots.
     HONEYPOT_FIELD = :comment
 
+    # Server-side length caps, so nobody can post a novel or bloat the Akismet/Resend payloads.
+    MAX_NAME = 100
+    MAX_EMAIL = 254 # RFC 5321 max
+    MAX_MESSAGE = 5000
+
     def create
       no_store!
 
@@ -29,29 +34,47 @@ module Api
 
       return respond_error unless valid?(name, email, message)
 
-      ContactMailJob.perform_async(name, email, message, client_ip, client_user_agent)
+      # Turnstile guards the JS/fetch path (the widget needs JS; tokens are single-use + 300s, so
+      # verify here, not in the delayed job). The no-JS HTML path falls back to honeypot + Akismet
+      # + the rack-attack rate limit. The service fails open when TURNSTILE_SECRET is unset.
+      return respond_error if request.format.json? && !turnstile_ok?
+
+      ContactMailJob.perform_async(name, email, message, sender_context)
       respond_success
     end
 
     private
 
-    # @return [Boolean] Whether the submission has a name, a message, and a well-formed email.
+    # @return [Boolean] Whether the submission has a well-formed, in-bounds name, email, and message.
     def valid?(name, email, message)
-      name.present? && message.present? && email.match?(URI::MailTo::EMAIL_REGEXP)
+      name.present? && name.length <= MAX_NAME &&
+        message.present? && message.length <= MAX_MESSAGE &&
+        email.length <= MAX_EMAIL && email.match?(URI::MailTo::EMAIL_REGEXP)
     end
 
-    # The real visitor IP the web proxy forwards for Akismet (the origin can't see it — the
-    # zone rewrites CF-Connecting-IP to the Netlify egress IP). Trusted only for spam scoring,
-    # never for anything that bans.
-    # @return [String, nil]
-    def client_ip
-      request.headers["X-Kona-Client-IP"].presence
+    # @return [Boolean] Whether the Turnstile token passes (or Turnstile isn't configured).
+    def turnstile_ok?
+      Turnstile.new.verify(params[:"cf-turnstile-response"], remoteip: forwarded("X-Kona-Client-IP"))
     end
 
-    # The real visitor User-Agent the web proxy forwards for Akismet.
-    # @return [String, nil]
-    def client_user_agent
-      request.headers["X-Kona-Client-UA"].presence
+    # Real visitor signal the web proxy forwards under custom headers (the origin can't see it —
+    # the zone rewrites the CF-* headers to describe the Netlify PoP, not the visitor). Trusted only
+    # for Akismet + the email's Sender details, never for anything that bans. Passed to the job as a
+    # plain string-keyed hash (Sidekiq-serializable); blanks are dropped.
+    # @return [Hash]
+    def sender_context
+      {
+        "ip" => forwarded("X-Kona-Client-IP"),
+        "user_agent" => forwarded("X-Kona-Client-UA"),
+        "city" => forwarded("X-Kona-Client-City"),
+        "region" => forwarded("X-Kona-Client-Region"),
+        "country" => forwarded("X-Kona-Client-Country")
+      }.compact
+    end
+
+    # @return [String, nil] A proxy-forwarded request header, or nil when blank/absent.
+    def forwarded(name)
+      request.headers[name].presence
     end
 
     def respond_success

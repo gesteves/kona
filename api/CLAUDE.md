@@ -54,9 +54,12 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   - `api/` — structured-data endpoints (accept or return data, not markup):
     `Api::LocationController`, `Api::StandardSiteController`, `Api::ContactController` under
     `Api::BaseController`. `ContactController` is the one browser-reachable write (through the
-    web proxy): it validates the submission, drops honeypot hits, and enqueues `ContactMailJob`
-    (`Akismet` spam-check → `Resend` email to the owner). It answers by `Accept` — JSON
-    (`fetch`) → 204/422, HTML (no-JS native POST) → 303 to the site's Thank-You page.
+    web proxy): it drops honeypot hits, validates (incl. length caps), verifies **Turnstile** on
+    the JSON path (skipped for the no-JS HTML path — the widget needs JS), and enqueues
+    `ContactMailJob` (`Akismet` spam-check → `Resend` email to the owner, with a Sender-details
+    block from the forwarded IP/geo/UA). It answers by `Accept` — JSON (`fetch`) → 204/422, HTML
+    (no-JS native POST) → 303 to the site's Thank-You page. See the root `CLAUDE.md` contact
+    contract for the full defense-layer rundown.
   - `webhooks/` — inbound webhooks, one controller per sending service under
     `Webhooks::BaseController` (currently `Webhooks::ContentfulController`).
 - **Auth** — `Widgets::BaseController` and `Api::BaseController` require the `API_TOKEN`
@@ -81,7 +84,9 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   PurpleAir, Whoop (OAuth2), TrainerRoad (iCal), Contentful (events/articles),
   Plausible, Font Awesome, Goodspeed (bay conditions), `Akismet` (contact-form spam check —
   plain-text `true`/`false`, fails open), `Resend` (the contact form's email delivery — an HTTPS
-  API, so it works from fly, which blocks outbound SMTP), `StandardSite` (publishes the
+  API, so it works from fly, which blocks outbound SMTP), `Turnstile` (contact-form bot-challenge
+  siteverify — verified in the request path since tokens are single-use/300s; fails open),
+  `StandardSite` (publishes the
   blog to the AT Protocol / Bluesky PDS as standard.site records — webhook-driven, plus
   the `standard_site:backfill` rake task in `lib/tasks/`). Read-through Redis cache via
   `cached_json(key, expires_in:)`; HTTParty with retries; `DeepOstruct` for dot-access.
@@ -188,6 +193,9 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   in the list for exactly this reason) — a missing prefix fails
   `spec/routing/routes_guard_spec.rb`. Disabled in the
   test env (`Rack::Attack.enabled`); counters live in Redis (in-memory under test).
+  There's also a scoped `contact/ip` throttle (`POST /api/contact`, 5/hour) — the one place it's
+  safe to key on a per-visitor IP, because it uses the proxy-forwarded **`X-Kona-Client-IP`** (the
+  real visitor, not the shared egress) and it's a throttle (429), never a ban.
 - **Redis** — global `$redis` from `config/initializers/redis.rb`, configured via `REDIS_URL`.
   In production this is the API's own dedicated `kona-redis` fly app (`redis/fly.toml` at the
   repo root); `web/` uses a separate Upstash instance, so the keyspaces don't overlap. The same
@@ -243,7 +251,9 @@ secrets (and Rails `config/credentials.yml.enc` + `master.key`).
   (where contact-form messages are delivered — the recipient inbox, decoupled from
   `OWNER_EMAIL`).
 - **Optional**: `AKISMET_API_KEY` (contact-form spam check; fails open — unset means every
-  submission is treated as ham), `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`,
+  submission is treated as ham), `TURNSTILE_SECRET` (contact-form Turnstile siteverify; fails open
+  when unset — pair it with the web app's `TURNSTILE_SITE_KEY`, set both or neither),
+  `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`,
   `TRAINERROAD_CALENDAR_URL`
   (rest-day check + planned-workout matching for generated activity descriptions),
   `ANTHROPIC_API_KEY` + `ANTHROPIC_DESCRIPTION_MODEL` (the LLM lines of generated activity

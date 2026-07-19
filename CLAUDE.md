@@ -124,12 +124,13 @@ The proxy is deliberately strict:
 - Forwards `Netlify-CDN-Cache-Control` (the durable edge policy) **only on 2xx**, so
   errors/redirects are never durably pinned at the edge.
 - Keys the edge cache on **path only** — no query params, no per-user vary.
-- **Contact-only:** forwards the real visitor IP/UA (`CF-Connecting-IP` → `X-Kona-Client-IP`,
-  `user-agent` → `X-Kona-Client-UA`) so the API's Akismet check has real signal — the origin
-  can't see the visitor otherwise (the zone rewrites `CF-Connecting-IP` to the Netlify egress
-  IP, the same shared-egress trap that rules out IP throttling). The API trusts these **only**
-  for spam scoring, never for a ban. Also forwards the `Location` header so the no-JS `303` →
-  Thank-You redirect reaches the browser.
+- **Contact-only:** forwards the real visitor IP/UA/geo (`CF-Connecting-IP` → `X-Kona-Client-IP`,
+  `user-agent` → `X-Kona-Client-UA`, `CF-IPCity`/`CF-Region`/`CF-IPCountry` →
+  `X-Kona-Client-City`/`-Region`/`-Country`) — the origin can't see the visitor otherwise (the
+  zone rewrites the `CF-*` headers to describe the Netlify egress/PoP, the same shared-egress trap
+  that rules out IP throttling on `client_ip`). The API uses these for Akismet, the per-visitor
+  rate-limit, and the notification email — **never** for a ban. It also forwards the `Location`
+  header so the no-JS `303` → Thank-You redirect reaches the browser.
 
 ⚠️ Don't break these: keep widget inputs in the **path** (IDs are path segments, not
 query strings), only emit durable edge headers on success responses, and keep the injected
@@ -149,6 +150,13 @@ enhanced**: the
 toast, no navigation); without JS the native POST sends `Accept: text/html` (→ `303` to the
 Contentful Thank-You page at `/contact/success`). Same endpoint, same validation/honeypot/spam
 path for both.
+
+Defense layers: honeypot + Akismet (both paths), server-side length caps, a per-visitor
+rack-attack throttle keyed on the forwarded `X-Kona-Client-IP` (`contact/ip`), and **Cloudflare
+Turnstile**. ⚠️ Turnstile needs JS (single-use, 300s tokens), so it's verified server-side
+(`Turnstile` siteverify) **only on the JSON path**; the no-JS path relies on the other layers.
+Turnstile + Akismet both **fail open** when unconfigured. The email carries a "Sender details"
+block (IP/geo/UA/time) from the forwarded headers.
 
 ## The cross-app HTML contract (most important)
 
