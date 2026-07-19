@@ -126,6 +126,10 @@ export default async function handler(
   });
 }
 
+// Note: Netlify reads this `config` block via static analysis (it doesn't execute the module),
+// so `path` must be string literals — a reference to the CONTACT_PATH const above won't resolve
+// and fails bundling with "Must be a string or array of strings". Keep '/api/contact' in sync
+// with CONTACT_PATH.
 export const config: Config = {
-  path: ['/widgets/*', CONTACT_PATH],
+  path: ['/widgets/*', '/api/contact'],
 };
