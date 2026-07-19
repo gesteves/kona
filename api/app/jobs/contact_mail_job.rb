@@ -1,20 +1,19 @@
 require "erb"
 require "time"
 
-# Delivers a contact-form submission to the owner, off the request path. Enqueued by
-# Api::ContactController after it validates the input and drops honeypot hits. Runs the Akismet
-# spam check here (not in the controller) so the request returns immediately; a spam verdict is
-# logged and dropped. A clean message is emailed via Resend with Reply-To set to the sender, so
-# a reply reaches the person who wrote in. Args are plain strings/hash and delivery is effectively
-# idempotent enough for the inherited retry: 5 (a rare duplicate email on retry is preferable to
-# a lost message).
+# Contact-form intake: the spam gate + email composition, off the request path. Enqueued by
+# Api::ContactController. Runs the Akismet check (fail-open) and, for a clean submission,
+# generates the subject and composes the email, then hands the finished email to
+# ContactDeliveryJob to send. Delivery is a separate job so a Resend failure retries *only the
+# send* — Akismet and the Claude subject call each run exactly once, not once per delivery retry.
+# In practice this job never retries: Akismet fails open and ContactSubject fails soft (neither
+# raises), so nothing here fails except a Redis hiccup on the enqueue.
 class ContactMailJob < ApplicationJob
   # @param name [String] The sender's name.
   # @param email [String] The sender's email (used as Reply-To).
   # @param message [String] The message body.
   # @param context [Hash] String-keyed sender context forwarded by the web proxy: "ip",
-  #   "user_agent", "city", "region", "country". Used for the Akismet check and the email's
-  #   Sender details block. Any subset may be present.
+  #   "user_agent", "city", "region", "country". Any subset may be present.
   def perform(name, email, message, context = {})
     context ||= {}
 
@@ -28,14 +27,13 @@ class ContactMailJob < ApplicationJob
     # back to a static subject when Anthropic is unconfigured or the call fails.
     subject = ContactSubject.generate(name: name, message: message).presence || "New contact form message from #{name}"
 
-    Resend.new.send_email(
-      to: ENV["CONTACT_TO_ADDRESS"],
-      reply_to: email,
-      subject: subject,
-      text: text_body(name, email, message, context),
-      html: html_body(name, email, message, context)
+    ContactDeliveryJob.perform_async(
+      "to" => ENV["CONTACT_TO_ADDRESS"],
+      "reply_to" => email,
+      "subject" => subject,
+      "text" => text_body(name, email, message, context),
+      "html" => html_body(name, email, message, context)
     )
-    Rails.logger.info("Contact form: emailed a submission to the owner")
   end
 
   private

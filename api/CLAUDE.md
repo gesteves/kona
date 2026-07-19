@@ -135,14 +135,18 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   the coordinates (`GoogleMaps`), then updates the athlete profile (city/state/country/timezone)
   and replaces the weather config with a single current-location forecast — each write skipped
   when Intervals.icu already matches, and the just-written timezone primed into the
-  `intervals.icu:timezone:*` cache. `ContactMailJob(name, email, message, context)`
-  (enqueued by `POST /api/contact`) runs the `Akismet` spam-check off the request path — a spam
-  verdict is logged and dropped — then emails a clean submission to `CONTACT_TO_ADDRESS` via
-  `Resend` with Reply-To set to the sender, a Sender-details block from the forwarded IP/geo/UA
-  (`context`), and a **Claude-generated subject line** (`ContactSubject`, a structured-output
-  Anthropic call mirroring `ActivityDescription::Llm`; fails soft to a static subject). Args are
-  plain strings + a string-keyed hash and every operation is idempotent, so `retry: 5` is safe;
-  exhausted retries land in the Dead set. Config in `config/initializers/sidekiq.rb` (Redis = `REDIS_URL`, web UI guard) and
+  `intervals.icu:timezone:*` cache. The contact form is a **two-job pipeline** so a Resend
+  failure retries only the send: `ContactMailJob(name, email, message, context)` (enqueued by
+  `POST /api/contact`) is the intake — it runs the `Akismet` spam-check off the request path (a
+  spam verdict is logged and dropped), then for a clean submission composes the email (a
+  Sender-details block from the forwarded IP/geo/UA `context`, plus a **Claude-generated subject
+  line** via `ContactSubject`, a structured-output Anthropic call mirroring `ActivityDescription::Llm`
+  that fails soft to a static subject) and enqueues `ContactDeliveryJob(payload)`, which is the
+  sole retryable unit — it just sends the finished email via `Resend` (Reply-To = the sender).
+  `Akismet` and `ContactSubject` both fail soft (neither raises), so intake effectively never
+  retries and each runs exactly once; only the `Resend` send re-runs on a delivery retry. Args
+  are plain strings + a string-keyed hash and every operation is idempotent, so `retry: 5` is
+  safe; exhausted retries land in the Dead set. Config in `config/initializers/sidekiq.rb` (Redis = `REDIS_URL`, web UI guard) and
   `config/sidekiq.yml` (concurrency). The **`/sidekiq` web UI** is mounted in `routes.rb` and
   gated by the owner session (Google OAuth — see **Owner auth** above), shared with `/whoop/auth`.
   Sidekiq runs as a dedicated **`worker` fly process** (see fly.toml); a worker must be running
