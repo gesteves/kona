@@ -5,9 +5,9 @@ import { requestLogLine } from './lib/log.mts';
 // Functions runtime scope on Netlify.
 const API_ORIGIN = process.env.KONA_API_URL;
 
-// Shared bearer token the kona-api widget endpoints require. Injected here, server-side, so
-// the origin is closed to the public (direct hits without it get a cheap 401) while the token
-// is never exposed to the browser. It's the same for every viewer, so every upstream request
+// Shared bearer token the kona-api endpoints require. Injected here, server-side, so the origin
+// is closed to the public (direct hits without it get a cheap 401) while the token is never
+// exposed to the browser. It's the same for every viewer, so every widget upstream request
 // stays identical and the audience still shares a single edge-cache entry.
 const API_TOKEN = process.env.API_TOKEN;
 
@@ -16,7 +16,17 @@ const API_TOKEN = process.env.API_TOKEN;
 // identical and the whole audience shares a single cache entry.
 const FORWARD_REQUEST_HEADERS = ['accept'];
 
-function upstreamHeaders(incoming: Headers, hasBody: boolean): Headers {
+// The contact-form endpoint. It's a POST (never edge-cached) that needs two things the widget
+// paths don't: the real visitor IP/UA/geo forwarded for its Akismet check, rate limit, and the
+// notification email (the origin can't see them — the zone rewrites the CF-* headers to the
+// Netlify PoP), and its no-JS redirect's Location header forwarded back to the browser.
+const CONTACT_PATH = '/api/contact';
+
+function upstreamHeaders(
+  incoming: Headers,
+  hasBody: boolean,
+  isContact: boolean
+): Headers {
   const headers = new Headers();
   for (const name of FORWARD_REQUEST_HEADERS) {
     const value = incoming.get(name);
@@ -27,6 +37,24 @@ function upstreamHeaders(incoming: Headers, hasBody: boolean): Headers {
   if (hasBody) {
     const contentType = incoming.get('content-type');
     if (contentType) headers.set('content-type', contentType);
+  }
+  // Give the contact endpoint the real visitor signal it can't otherwise see: the fly origin's
+  // own CF-* headers describe the Netlify PoP, not the visitor, so forward the visitor's values
+  // (present here at the Netlify edge) under custom names the api reads and Cloudflare won't
+  // rewrite. The api trusts them only for spam scoring + the email's Sender details, never for
+  // banning. Scoped to the contact path so widget upstream requests stay byte-identical.
+  if (isContact) {
+    const forward: Record<string, string> = {
+      'cf-connecting-ip': 'x-kona-client-ip', // real visitor IP (Akismet + rate limit + email)
+      'user-agent': 'x-kona-client-ua', // real visitor UA (Akismet + email)
+      'cf-ipcity': 'x-kona-client-city', // geo (email Sender details)
+      'cf-region': 'x-kona-client-region',
+      'cf-ipcountry': 'x-kona-client-country',
+    };
+    for (const [from, to] of Object.entries(forward)) {
+      const value = incoming.get(from);
+      if (value) headers.set(to, value);
+    }
   }
   if (API_TOKEN) headers.set('authorization', `Bearer ${API_TOKEN}`);
   return headers;
@@ -39,18 +67,19 @@ export default async function handler(
   const incoming = new URL(req.url);
   const upstreamUrl = new URL(incoming.pathname + incoming.search, API_ORIGIN);
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
+  const isContact = incoming.pathname === CONTACT_PATH;
 
   let upstream: Response;
   try {
     upstream = await fetch(upstreamUrl, {
       method: req.method,
-      headers: upstreamHeaders(req.headers, hasBody),
+      headers: upstreamHeaders(req.headers, hasBody, isContact),
       body: hasBody ? await req.arrayBuffer() : undefined,
       redirect: 'manual',
     });
   } catch (error) {
     console.error(
-      'Widget proxy upstream fetch failed:',
+      'API proxy upstream fetch failed:',
       upstreamUrl.toString(),
       error
     );
@@ -90,6 +119,14 @@ export default async function handler(
   // segments, no query params), so the path-based cache key already isolates entries.
   if (edge && upstream.ok) headers.set('Netlify-CDN-Cache-Control', edge);
 
+  // The contact form's no-JS path answers a native POST with a 303 to the site's Thank-You
+  // page; forward that Location (the response headers are otherwise rebuilt from scratch here,
+  // which would drop it). Scoped to the contact redirect so widget behavior is unchanged.
+  if (isContact) {
+    const location = upstream.headers.get('location');
+    if (location) headers.set('location', location);
+  }
+
   return new Response(upstream.body, {
     status: upstream.status,
     statusText: upstream.statusText,
@@ -97,6 +134,10 @@ export default async function handler(
   });
 }
 
+// Note: Netlify reads this `config` block via static analysis (it doesn't execute the module),
+// so `path` must be string literals — a reference to the CONTACT_PATH const above won't resolve
+// and fails bundling with "Must be a string or array of strings". Keep '/api/contact' in sync
+// with CONTACT_PATH.
 export const config: Config = {
-  path: '/widgets/*',
+  path: ['/widgets/*', '/api/contact'],
 };

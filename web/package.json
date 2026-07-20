@@ -18,7 +18,6 @@
     "@netlify/functions": "^5.3.0",
     "@web.awesome.me/webawesome-pro": "^3.7.0",
     "esbuild": "^0.28.1",
-    "mimetext": "^3.0.27",
     "pagefind": "^1.5.2"
   },
   "devDependencies": {

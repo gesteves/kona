@@ -111,7 +111,7 @@ export const config: Config = {
     '/fonts/*',
     '/widgets/*',
     '/og',
-    '/plsbl/*',
+    '/pa/*',
     '/ifttt/*',
     '/.well-known/*',
     // No entry for image transformations: they're served from /cdn-cgi/*, which Cloudflare

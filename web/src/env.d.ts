@@ -4,10 +4,9 @@
 interface Env {
   // Static Assets binding (wrangler.jsonc `assets.binding`).
   ASSETS: Fetcher;
-  // send_email binding for the contact form.
-  EMAIL: SendEmailBinding;
 
-  // The kona-api origin (fly.io) and the shared bearer its widget endpoints require.
+  // The kona-api origin (fly.io) and the shared bearer its endpoints require (the /widgets/*
+  // proxy and the contact-form POST /api/contact).
   KONA_API_URL?: string;
   API_TOKEN?: string;
 
@@ -20,25 +19,10 @@ interface Env {
   // apart — the request hostname can.
   KNOWN_AGENTS_ACCESS_TOKEN?: string;
   SITE_HOSTNAME?: string;
-
-  // Contact form addresses: FROM must be on the Email Routing subdomain, TO must be
-  // a verified destination address.
-  CONTACT_EMAIL_FROM?: string;
-  CONTACT_EMAIL_TO?: string;
 }
 
 interface Fetcher {
   fetch(request: Request): Promise<Response>;
-}
-
-interface SendEmailBinding {
-  send(message: unknown): Promise<void>;
-}
-
-declare module 'cloudflare:email' {
-  export class EmailMessage {
-    constructor(from: string, to: string, raw: string);
-  }
 }
 
 interface ExecutionContext {

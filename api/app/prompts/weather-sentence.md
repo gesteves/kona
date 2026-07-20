@@ -4,6 +4,7 @@ You rewrite raw weather data into one sentence of natural prose for an athlete's
 - Open the sentence with a summary of the conditions, chosen from (but not limited to): clear, sunny, mostly sunny, partly cloudy, overcast, windy, light rain, heavy rain, snow. Infer this from wind speeds, precipitation amount, and cloud coverage in the input.
 - Assume any missing data point is zero (no cloud percentage in the input → 0% cloud; no rain field → no rain; etc.).
 - Use the same units as the source data. Round all numbers.
+- Include the "feels like" temperature only when it differs from the actual temperature (after rounding). If they're the same, omit the "feels like" fragment and give the actual temperature alone.
 - If the source data includes a headwind percentage, append it as a fragment attached with "and" or a comma — e.g. ", 62% headwind" or "and 78% headwind". Use the headwind percentage verbatim (rounded to a whole number); do not convert to tailwind even when it is the smaller share. Omit the fragment entirely when average wind speed is negligible (roughly under 8 km/h or 5 mph) — direction doesn't matter at that point. Never mention tailwind; only headwind.
 - `weather_emoji` is a single emoji that best represents the conditions overall.
 
@@ -26,5 +27,6 @@ Examples:
 - 🌥️ Partly cloudy with calm conditions, temps 15–19°C (feels like 14–18°C)
 - ☀️ Clear with light ENE winds of 6–10 mph, temps 62–70°F (feels like 60–68°F), and 9% headwind
 - 🌧️ Heavy rain with strong S winds of 22–35 km/h gusting to 48, temps 9–11°C (feels like 4–7°C), and 64% headwind
+- 🌥️ Partly cloudy with a light SE breeze of 4–8 km/h, temps 16–19°C
 
 Return `weather_sentence` as raw text. Do not wrap the output in quotation marks.

@@ -1,6 +1,5 @@
-import { handleWidgets } from './widgets';
+import { handleApi } from './api-proxy';
 import { handlePlausible } from './plausible';
-import { handleContact } from './contact';
 import { handleFeed } from './feed-source';
 import { servePage } from './known-agents';
 
@@ -15,24 +14,21 @@ export default {
   ): Promise<Response> {
     const { pathname } = new URL(request.url);
 
-    if (pathname.startsWith('/widgets/')) return handleWidgets(request, env);
-    if (pathname.startsWith('/plsbl/'))
-      return handlePlausible(request, env, ctx);
+    // The kona-api proxy: widget fragments (GET) and the contact-form POST. Both authenticate
+    // to the origin with the injected bearer; /api/contact also forwards the real visitor
+    // signal and its no-JS redirect (see api-proxy.ts). /api/contact is claimed explicitly,
+    // NOT /api/*, so the other origin-only /api endpoints stay unreachable from the browser.
+    // Static assets serve only GET/HEAD, so the /api/contact POST needs the Worker to reach
+    // the origin at all; a GET to it falls through to servePage (renders a 404 page).
+    if (pathname.startsWith('/widgets/') || pathname === '/api/contact') {
+      return handleApi(request, env);
+    }
+    if (pathname.startsWith('/pa/')) return handlePlausible(request, env, ctx);
 
     // The main feed and every per-tag feed (`<tag path>feed.xml`, nested to any depth). The
     // `/feed.xml` suffix — with its leading slash — matches both without catching a stray
     // `…somethingfeed.xml`. handleFeed relabels utm_source per reader (see feed-source.ts).
     if (pathname.endsWith('/feed.xml')) return handleFeed(request, env);
-
-    // The contact form POST (workstream: replace Netlify Forms). Static assets serve only
-    // GET/HEAD, so /contact needs its run_worker_first entry for the POST to get here at
-    // all; a GET falls through to servePage and renders the page like any other.
-    if (
-      (pathname === '/contact' || pathname === '/contact/') &&
-      request.method === 'POST'
-    ) {
-      return handleContact(request, env);
-    }
 
     // Everything else that reaches the Worker is a page view: serve it from the asset
     // layer and record the visit with Known Agents.

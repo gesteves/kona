@@ -2,7 +2,7 @@
 // Workers guide (https://plausible.io/docs/proxy/guides/cloudflare) as a route handler
 // inside this Worker instead of a standalone one.
 //
-// ⚠️ Do not "clean up" the /plsbl/ path: paths containing "plausible", "analytics",
+// ⚠️ Do not "clean up" the /pa/ path: paths containing "plausible", "analytics",
 // "tracking", or "stats" get blocked by content blockers. The obfuscated prefix is the
 // feature.
 
@@ -10,8 +10,8 @@
 // (PLAUSIBLE_SCRIPT_PATH / PLAUSIBLE_EVENT_PATH / PLAUSIBLE_EVENT_UPSTREAM) — the inline
 // init snippet is generated from those, so the browser-facing path and this proxy have to
 // agree.
-const SCRIPT_PATH = '/plsbl/script.js';
-const EVENT_PATH = '/plsbl/event';
+const SCRIPT_PATH = '/pa/script.js';
+const EVENT_PATH = '/pa/event';
 const EVENT_UPSTREAM = 'https://plausible.io/api/event';
 
 export async function handlePlausible(
@@ -55,7 +55,7 @@ async function getScript(
 
 // Forward the event POST upstream with the visitor's cookies stripped (the guide's one
 // hard requirement — Plausible is cookieless and the proxy must keep it that way).
-// Method, body, and content-type all pass through: /plsbl/event is a POST, and proxying
+// Method, body, and content-type all pass through: /pa/event is a POST, and proxying
 // it as anything else makes analytics silently stop recording while the script tag keeps
 // loading fine.
 async function postEvent(request: Request): Promise<Response> {

@@ -1,6 +1,6 @@
 # web/ — Kona static site
 
-Middleman 4 static site generator (Ruby 4.0.5) that builds a **Contentful**-powered
+Middleman 4 static site generator (Ruby 4.0.6) that builds a **Contentful**-powered
 blog and deploys to **Netlify**, which is itself proxied behind **Cloudflare** (images,
 client IPs, and bot blocking all depend on the zone — see the root
 [`CLAUDE.md`](../CLAUDE.md)). esbuild bundles JavaScript (Stimulus + Turbo) and the
@@ -29,6 +29,21 @@ web↔api contract before touching any widget markup.
 - **Runtime dynamic content**: weather, activity stats, Whoop, per-article pageviews,
   and event weather are **not built here**. The `live-update` Stimulus controller
   fetches them client-side from `/widgets/*` into placeholder partials (root `CLAUDE.md`).
+- **Contact form**: no longer Netlify Forms (the `__forms.html` decoy is gone). It posts to
+  `POST /api/contact` through the api proxy (`api/` sends the email via Resend with the correct
+  Reply-To). It's progressively enhanced — the `contact` Stimulus controller (`sendNotification`
+  toast, no navigation) over a real form that still works without JS (native POST → 303 to the
+  Contentful `/contact/success` page).
+  ⚠️ The `<form>` markup is a **partial** (`source/partials/_contact_form.html.erb`), rendered
+  for the contact page in `partials/article/_body.html.erb` (`article.slug == 'contact'`) — **not**
+  raw HTML in the Contentful body. It can't live in the body: `render_body` runs the body through
+  Redcarpet **SmartyPants** (`lib/helpers/markdown_helpers.rb`), which curls the straight quotes
+  in raw HTML *attributes* and corrupts the field names + Stimulus wiring. The intro copy above
+  the form stays editable in Contentful; only the form markup is in the partial. Keep the field
+  names (`name`, `email`, `message`, honeypot `comment`) in sync with the api (root `CLAUDE.md`).
+  When `TURNSTILE_SITE_KEY` is set, the `contact` controller renders a **Cloudflare Turnstile**
+  widget (explicit render, so it survives Turbo navigation) and sends its token with the `fetch`;
+  the api verifies it server-side. No key → no widget, and the api's check fails open.
 
 ## Commands
 
@@ -82,7 +97,8 @@ build fails loudly rather than shipping pages with missing icons.
   `config.rb` requires and registers every module in that directory.
 - `source/layouts/layout.erb`, `source/partials/` (incl. `placeholders/`),
   `source/javascripts/stimulus/`, `source/stylesheets/`.
-- `netlify/functions/` — `widget-proxy.mts` (proxies `/widgets/*`; see root `CLAUDE.md`).
+- `netlify/functions/` — `api-proxy.mts` (proxies `/widgets/*` **and** `POST /api/contact`;
+  see root `CLAUDE.md`).
 - `netlify/edge-functions/` — `known-agents.ts` (records every page view server-side to
   Known Agents / Dark Visitors, capturing bot + AI-agent traffic Plausible can't see;
   production-only, reuses `DARK_VISITORS_ACCESS_TOKEN`); `feed-source.ts` (per-reader feed URL
@@ -137,7 +153,9 @@ Names only — see `.env.example`; never commit values.
   which uses it on purpose so blurhashes don't depend on the zone or spend a transformation.
   Cloudflare must also have Transformations enabled with `images.ctfassets.net` allowlisted as a
   source, or every image 403s.
-- **Optional**: `DARK_VISITORS_ACCESS_TOKEN`.
+- **Optional**: `DARK_VISITORS_ACCESS_TOKEN`; `TURNSTILE_SITE_KEY` (public Cloudflare Turnstile
+  sitekey for the contact form — set it in Netlify's build env; pair with the api's
+  `TURNSTILE_SECRET`, both or neither).
 
 ## Conventions & gates
 

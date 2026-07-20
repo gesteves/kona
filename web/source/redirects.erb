@@ -1,4 +1,4 @@
-<%# Plausible analytics first-party proxy (/plsbl/*). Emitted first so a catch-all %>
+<%# Plausible analytics first-party proxy (/pa/*). Emitted first so a catch-all %>
 <%# redirect from Contentful (below) can't shadow these rewrites. See site_helpers.rb. %>
 <% plausible_proxy_redirects.each do |redirect| %>
 <%= redirect[:from] %> <%= redirect[:to] %> <%= redirect[:status] %>
