@@ -296,8 +296,8 @@ module SiteHelpers
   # (source/redirects.erb) read these, so the browser-facing path and the proxy
   # target stay in sync from a single source.
   # @see https://plausible.io/docs/proxy/guides/netlify
-  PLAUSIBLE_SCRIPT_PATH = '/plsbl/script.js'
-  PLAUSIBLE_EVENT_PATH = '/plsbl/event'
+  PLAUSIBLE_SCRIPT_PATH = '/pa/script.js'
+  PLAUSIBLE_EVENT_PATH = '/pa/event'
   PLAUSIBLE_EVENT_UPSTREAM = 'https://plausible.io/api/event'
 
   # The first-party path the Plausible script is proxied from.

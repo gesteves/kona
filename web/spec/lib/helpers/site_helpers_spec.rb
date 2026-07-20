@@ -542,8 +542,8 @@ RSpec.describe SiteHelpers do
     end
 
     it 'exposes the fixed first-party proxy paths' do
-      expect(plausible_script_path).to eq('/plsbl/script.js')
-      expect(plausible_event_path).to eq('/plsbl/event')
+      expect(plausible_script_path).to eq('/pa/script.js')
+      expect(plausible_event_path).to eq('/pa/event')
     end
 
     it 'is installed only when the upstream script URL is configured' do
@@ -556,8 +556,8 @@ RSpec.describe SiteHelpers do
     it 'emits proxy rewrites for the script and the event endpoint when installed' do
       ENV['PLAUSIBLE_SCRIPT_URL'] = 'https://plausible.example/js/script.js'
       expect(plausible_proxy_redirects).to eq([
-        { from: '/plsbl/script.js', to: 'https://plausible.example/js/script.js', status: 200 },
-        { from: '/plsbl/event', to: 'https://plausible.io/api/event', status: 200 }
+        { from: '/pa/script.js', to: 'https://plausible.example/js/script.js', status: 200 },
+        { from: '/pa/event', to: 'https://plausible.io/api/event', status: 200 }
       ])
     end
 
