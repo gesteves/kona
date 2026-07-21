@@ -31,8 +31,11 @@ class GoogleAirQuality < ApplicationService
 
     data = data[:hourlyForecasts].first if data[:hourlyForecasts].present?
 
+    # Only trust the requested local index (US EPA NowCast). Google's Universal AQI (uaqi) runs
+    # on an inverted 0–100 scale (0 = worst, 100 = best), the opposite of US EPA — rendering it
+    # under our EPA icon/label semantics would show a wrong-scale number. If the local index
+    # isn't returned, return nil so the widget collapses the AQI line rather than mislead.
     result = data[:indexes]&.find { |i| i[:code] == @aqi_code }
-    result ||= data[:indexes]&.find { |i| i[:code] == "uaqi" }
     return if result.blank?
 
     {
