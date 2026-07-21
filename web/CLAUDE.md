@@ -117,10 +117,20 @@ build fails loudly rather than shipping pages with missing icons.
   `_redirects` (underscore-prefixed source files are treated as partials and skipped).
   ⚠️ In `_headers`, no two rules may set the same header for overlapping paths — matching
   rules comma-join same-name headers on both Netlify and Cloudflare.
-- `wrangler.jsonc` + `src/` — the Cloudflare Worker for the (paused) Netlify→Cloudflare
-  migration: serves `build/` as static assets plus routes for the widget proxy, Plausible
-  proxy, contact form (`send_email`), and Known Agents tracking. **Not deployed yet**; the
-  site still runs on Netlify. See the migration plan before touching the cutover pieces.
+- `wrangler.jsonc` + `src/` — the Cloudflare Worker for the Netlify→Cloudflare migration:
+  serves `build/` as static assets plus routes for the widget proxy, Plausible proxy, contact
+  form, and Known Agents tracking. Its `src/*.ts` files are 1:1 ports of the `netlify/`
+  functions/edge-functions above (each file header names its counterpart); `src/plausible.ts`
+  additionally absorbs the `/pa/*` proxying Netlify does via `_redirects` rewrites.
+  ⚠️ **Dual-deploy window**: both paths ship at once. The live site still runs on Netlify;
+  the Worker deploys in parallel to Cloudflare (via Workers Builds — the reason `rake build`
+  uses libvips) so it can be exercised on a preview host before the DNS cutover. Keep the
+  `netlify/` and `src/` copies in sync until Netlify is retired. The two record Known Agents
+  visits under different token names — Netlify reads `DARK_VISITORS_ACCESS_TOKEN`, the Worker
+  reads `KNOWN_AGENTS_ACCESS_TOKEN` (same value) — and gate to production differently (Netlify
+  by deploy context, the Worker by `SITE_HOSTNAME`). Typecheck the Worker with `npm run check`
+  (`tsc --noEmit`; wrangler itself never typechecks). See the migration plan before touching
+  the cutover pieces.
 - `data/font_awesome.yml` — **icon allowlist**. Any new icon must be added here (under
   the correct family/style, e.g. `classic.light`) before `icon_svg` / `rake import:icons`
   can use it. `import:icons` posts this tree to the `api/` `/api/icons` endpoint, which

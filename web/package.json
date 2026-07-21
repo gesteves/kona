@@ -6,6 +6,7 @@
     "lint:scss:fix": "stylelint \"source/stylesheets/**/*.scss\" --fix",
     "format": "prettier --write \"**/*.{js,json,md}\"",
     "format:check": "prettier --check \"**/*.{js,json,md}\"",
+    "check": "tsc --noEmit -p tsconfig.json",
     "pagefind": "pagefind --site build",
     "build:status": "node --env-file=.env scripts/netlify-builds.js status",
     "build:stop": "node --env-file=.env scripts/netlify-builds.js stop",
@@ -26,6 +27,7 @@
     "stylelint": "^17.14.0",
     "stylelint-config-standard-scss": "^17.0.0",
     "stylelint-scss": "^7.2.0",
+    "typescript": "^5.9.0",
     "wrangler": "^4.20.0"
   }
 }

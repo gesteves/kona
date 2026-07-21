@@ -113,6 +113,15 @@ integration lives only in the api — web posts its allowlist and gets back pre-
 4. The response is cached at Netlify's edge and reused by all viewers (widget GETs only; the
    contact POST is never edge-cached).
 
+⚠️ **Migration in progress (dual-deploy).** The same contract is served two ways at once: the
+Netlify Function above, and — on the Cloudflare side — the `web/src/api-proxy.ts` route of the
+`kona-web` Worker (`web/wrangler.jsonc`), which serves the static build and claims the same
+paths. Both inject the identical bearer and key the edge cache on path only, so this section
+holds for either host. The api emits its edge-cache policy in **both** dialects
+(`Netlify-CDN-Cache-Control` with the `durable` token, and standard `CDN-Cache-Control` per
+RFC 9213 that Cloudflare honors — see `api/app/controllers/concerns/live_widget.rb`). The live
+site is still Netlify; the Worker runs in parallel until the DNS cutover. See `web/CLAUDE.md`.
+
 ⚠️ The proxy claims `/api/contact` **explicitly, not `/api/*`** — the other `/api/*` endpoints
 stay origin-only (build-time / server-side callers). Don't broaden it to `/api/*`, or you'd
 expose `POST /api/location` and `POST /api/icons` to the browser with the injected bearer.

@@ -1,0 +1,25 @@
+{
+  // Typecheck-only config for the Cloudflare Worker in src/. wrangler bundles with esbuild
+  // and never typechecks, so `npm run check` (tsc --noEmit) is the gate that validates the
+  // Worker before it ships. Scoped to src/ — the netlify/ functions are Deno/Node with their
+  // own import style and are checked by their own platforms.
+  //
+  // Deliberately NOT pulling in @cloudflare/workers-types: src/env.d.ts hand-writes the few
+  // Worker globals it needs (Env, Fetcher, ExecutionContext, caches.default) so the code
+  // typechecks against the standard lib.dom types. Adding workers-types here would collide
+  // with those shims (e.g. its ExecutionContext#waitUntil signature differs). `types: []`
+  // keeps ambient @types out so the shims stay authoritative.
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "types": [],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*.ts"]
+}
