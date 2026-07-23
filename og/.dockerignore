@@ -1,7 +1,0 @@
-.git/
-.github/
-.env*
-node_modules/
-npm-debug.log*
-*.log
-README.md
