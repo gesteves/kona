@@ -275,6 +275,15 @@ RSpec.describe ImageHelpers do
         .to start_with('https://og.example.com/og.png?')
     end
 
+    it 'busts on OG_TEMPLATE_VERSION alone when version is nil (listing pages have no sys)' do
+      stub_og('https://og.example.com')
+      result = generate_open_graph_image_url('https://example.com/blog/', nil)
+      expect(URI.decode_www_form(URI.parse(result).query).to_h).to eq(
+        'url' => 'https://example.com/blog/',
+        'v' => 'v1'
+      )
+    end
+
     it 'returns nil when OG_IMAGE_URL is unset (kona-og not wired up)' do
       stub_og(nil)
       expect(generate_open_graph_image_url('https://example.com/', 1)).to be_nil

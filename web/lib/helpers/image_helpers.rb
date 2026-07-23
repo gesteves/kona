@@ -206,12 +206,16 @@ module ImageHelpers
   # nil and callers omit the card rather than failing the build. Cover-image OG images
   # (open_graph_image_url) don't depend on it, so those pages keep their social image.
   # @param url [String] The full URL of the page to render a card for.
-  # @param version [Integer, String] The entry's sys.published_version, used as a cache buster.
+  # @param version [Integer, String, nil] The entry's sys.published_version, used as a cache
+  #   buster. Listing pages (the blog index, tag archives) aren't Contentful entries and have no
+  #   published_version, so it may be nil — the card then busts on OG_TEMPLATE_VERSION alone,
+  #   which is correct since their og:title is static.
   # @return [String, nil] The kona-og URL for the page's card, or nil if OG_IMAGE_URL is unset.
-  def generate_open_graph_image_url(url, version)
+  def generate_open_graph_image_url(url, version = nil)
     base = ENV['OG_IMAGE_URL'].to_s.chomp('/')
     return if base.blank?
-    query = URI.encode_www_form(url: url, v: "#{OG_TEMPLATE_VERSION}-#{version}")
+    v = version.present? ? "#{OG_TEMPLATE_VERSION}-#{version}" : OG_TEMPLATE_VERSION
+    query = URI.encode_www_form(url: url, v: v)
     "#{base}/og.png?#{query}"
   end
 

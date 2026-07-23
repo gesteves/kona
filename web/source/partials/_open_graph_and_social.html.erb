@@ -12,7 +12,7 @@
 <% og_image, og_image_alt = if defined?(content) && content.cover_image.present?
      [open_graph_image_url(content.cover_image.url), content.cover_image.description.to_s]
    elsif defined?(content)
-     [generate_open_graph_image_url(full_url(current_page.url), content.sys.published_version), (page_title(meta_title_source) if meta_title_source)]
+     [generate_open_graph_image_url(full_url(current_page.url), content.sys&.published_version), (page_title(meta_title_source) if meta_title_source)]
    elsif data.site.cover_image.present?
      [open_graph_image_url(data.site.cover_image.url), data.site.cover_image.description.to_s]
    end %>
