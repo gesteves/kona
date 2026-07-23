@@ -145,6 +145,16 @@ build fails loudly rather than shipping pages with missing icons.
   by deploy context, the Worker by `SITE_HOSTNAME`). Typecheck the Worker with `npm run check`
   (`tsc --noEmit`; wrangler itself never typechecks). See the migration plan before touching
   the cutover pieces.
+  ⚠️ **`run_worker_first` extension negations must never collide with a Worker route.** The
+  `assets.run_worker_first` globs in `wrangler.jsonc` decide what skips the Worker and is served
+  straight from the asset layer. Cloudflare globs **match across `/`**, and a **negative can't be
+  overridden by a positive** — so a blanket `!/*.<ext>` silently excludes *any* Worker route that
+  ends in that extension. This bit `/pa/script.js` (the Plausible proxy route): a `!/*.js` negation
+  routed it to the asset layer → 404, never reaching `src/plausible.ts`. Scope asset exclusions by
+  **directory** (`!/javascripts/*`, `!/stylesheets/*`) where the real assets live, not by a
+  catch-all extension; if a root-level asset needs excluding, name it (`!/sitemap.xml`, not
+  `!/*.xml` — which would also swallow the per-reader `/feed.xml` Worker route). Worker routes to
+  keep clear of extension negations: `/pa/script.js`, `/feed.xml` (and `<tag>/feed.xml`).
 - `data/font_awesome.yml` — **icon allowlist**. Any new icon must be added here (under
   the correct family/style, e.g. `classic.light`) before `icon_svg` / `rake import:icons`
   can use it. `import:icons` posts this tree to the `api/` `/api/icons` endpoint, which
