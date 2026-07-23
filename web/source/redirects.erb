@@ -1,15 +1,45 @@
-<%# Plausible analytics first-party proxy (/pa/*). Emitted first so a catch-all %>
-<%# redirect from Contentful (below) can't shadow these rewrites. See site_helpers.rb. %>
-<% plausible_proxy_redirects.each do |redirect| %>
-<%= redirect[:from] %> <%= redirect[:to] %> <%= redirect[:status] %>
+<%#
+  ⚠️ RULE ORDER IS LOAD-BEARING. Cloudflare's _redirects parser (workers-sdk
+  parseRedirects) allows 2,000 "static" rules but only 100 "dynamic" ones — and a rule is
+  "dynamic" if its SOURCE contains a splat (`*`) or a `:placeholder`. Crucially, the parser
+  latches: the moment the first dynamic rule appears, its `canCreateStaticRule` flag flips to
+  false and EVERY subsequent rule — even an exact-match one — is counted as dynamic. So all
+  exact-match (static) redirects must be emitted BEFORE any splat/placeholder (dynamic) rule,
+  or the exact ones get miscounted against the 100-dynamic limit and the deploy fails once the
+  file crosses ~100 lines. Static-first also gives the correct match precedence (exact wins
+  over a catch-all splat). We therefore gather every rule, then emit statics first, dynamics
+  last. See the root/web CLAUDE.md and the Cloudflare migration plan.
+%>
+<%
+  # Every redirect rule as a uniform hash. A source is "dynamic" (in Cloudflare's sense) iff it
+  # has a `*` or a `:name`; `force` (the trailing `!`) is applied to absolute-URL sources, as
+  # before. Plausible's /pa/* first-party proxy rewrites (status 200) stay first so a later
+  # catch-all can't shadow them — and being exact-match they're static anyway.
+  all_redirects =
+    plausible_proxy_redirects.map { |r| { from: r[:from], to: r[:to], status: r[:status] } } +
+    [
+      { from: '/.well-known/host-meta*', to: 'https://fed.brid.gy/.well-known/host-meta:splat', status: 302 },
+      { from: '/.well-known/webfinger*', to: 'https://fed.brid.gy/.well-known/webfinger', status: 302 }
+    ] +
+    taxonomy_synonym_redirects.map { |r| { from: r[:from], to: r[:to], status: r[:status] } } +
+    data.redirects.map { |r| { from: r.from, to: r.to, status: r.status } }
+
+  # ⚠️ Cloudflare's static-assets _redirects only accepts RELATIVE sources — an absolute-URL
+  # `from` (a cross-domain redirect, e.g. an old domain → this site) is a hard deploy failure
+  # ("Only relative URLs are allowed", code 100324). Netlify allowed them; the Worker cannot.
+  # Drop them here so the shared build deploys to Cloudflare; cross-domain redirects belong in a
+  # Cloudflare zone rule (Bulk Redirect) instead. NOTE: this also removes them from the Netlify
+  # build during the dual-deploy window.
+  all_redirects.reject! { |r| r[:from].match?(%r{\Ahttps?://}) }
+
+  dynamic_source = ->(from) { from.include?('*') || from.match?(/:[A-Za-z]/) }
+  static_rules, dynamic_rules = all_redirects.partition { |r| !dynamic_source.call(r[:from]) }
+%>
+<%# Static (exact-match) redirects — counted against Cloudflare's 2,000-rule limit. %>
+<% static_rules.each do |r| %>
+<%= r[:from] %> <%= r[:to] %> <%= r[:status] %>
 <% end %>
-<%# Bridgy Fed (fediverse) discovery endpoints, moved here from the root netlify.toml %>
-<%# so the generated _redirects file is the single source for every redirect rule. %>
-/.well-known/host-meta* https://fed.brid.gy/.well-known/host-meta:splat 302
-/.well-known/webfinger* https://fed.brid.gy/.well-known/webfinger 302
-<% taxonomy_synonym_redirects.each do |redirect| %>
-<%= redirect[:from] %> <%= redirect[:to] %> <%= redirect[:status] %>
-<% end %>
-<% data.redirects.each do |redirect| %>
-<%= redirect.from %> <%= redirect.to %> <%= redirect.status %><%= "!" if redirect.from.match? /^https?:\/\// %>
+<%# Dynamic (splat/placeholder) redirects — counted against the 100-rule limit. Emitted last. %>
+<% dynamic_rules.each do |r| %>
+<%= r[:from] %> <%= r[:to] %> <%= r[:status] %>
 <% end %>

@@ -117,6 +117,20 @@ build fails loudly rather than shipping pages with missing icons.
   `_redirects` (underscore-prefixed source files are treated as partials and skipped).
   ⚠️ In `_headers`, no two rules may set the same header for overlapping paths — matching
   rules comma-join same-name headers on both Netlify and Cloudflare.
+  ⚠️ **`_redirects` rule ORDER is load-bearing on Cloudflare.** CF's parser counts 2,000
+  "static" rules but only 100 "dynamic" ones, and its `canCreateStaticRule` flag **latches
+  off at the first rule whose source has a splat (`*`) or `:placeholder`** — every rule after
+  that, *even exact-match ones*, is counted as dynamic. So `redirects.erb` gathers all rules
+  and emits every exact-match (static) redirect **before** any splat/placeholder (dynamic)
+  one. Emit a splat rule early and the exact redirects below it get miscounted against the
+  100-limit and the deploy fails (`code: 100324`) once the file passes ~100 lines. Keep the
+  partition; don't hand-place a `*`/`:name` rule above the static block.
+  ⚠️ **Cloudflare also rejects absolute-URL *sources*.** A rule whose `from` is a full URL (a
+  cross-domain redirect, e.g. an old domain → this site) hard-fails the Worker deploy ("Only
+  relative URLs are allowed", `code: 100324`) — Netlify allowed these, the Worker does not.
+  `redirects.erb` drops any absolute-URL-source rule from the generated file (which also removes
+  it from the Netlify build during dual-deploy). Cross-domain redirects must live in a Cloudflare
+  **zone rule / Bulk Redirect**, not in `_redirects` or Contentful.
 - `wrangler.jsonc` + `src/` — the Cloudflare Worker for the Netlify→Cloudflare migration:
   serves `build/` as static assets plus routes for the widget proxy, Plausible proxy, contact
   form, and Known Agents tracking. Its `src/*.ts` files are 1:1 ports of the `netlify/`
