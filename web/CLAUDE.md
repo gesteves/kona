@@ -47,7 +47,9 @@ web↔api contract before touching any widget markup.
 
 ## Commands
 
-Run `nvm use` before any `npm` command.
+Run `nvm use` before any `npm` command. Native dependency: **libvips** (`brew install
+vips`) — the blurhash placeholders render through the `ruby-vips` gem (chosen over
+ImageMagick because Cloudflare Workers Builds preinstalls libvips but not ImageMagick).
 
 ```bash
 # Tests — single file (fast) then full suite
