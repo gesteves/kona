@@ -8,5 +8,7 @@
   publish = "build/"
 
 # Headers live in web/source/headers and redirects in web/source/redirects.erb (both
-# renamed to their underscore forms at build) — file conventions Netlify and Cloudflare
-# Workers Static Assets both honor, so they carry over the migration unchanged.
+# renamed to their underscore forms at build), so every header and redirect rule has a
+# single source — and one that isn't tied to this file's format. They're also file
+# conventions Netlify and Cloudflare Workers Static Assets both honor, so they carry
+# over the migration unchanged.
