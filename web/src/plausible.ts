@@ -30,15 +30,32 @@ export async function handlePlausible(
     return new Response(null, { status: 404 });
   } catch (error) {
     // Fail open (the guide's passThroughOnException equivalent): analytics must never
-    // break a page. The script tag and event POST both fail silently in the browser.
+    // break a page. Hand back the same silent fallbacks the handlers use so a proxy
+    // exception looks identical to an upstream outage in the browser — no console noise.
     console.error('Plausible proxy failed:', pathname, error);
-    return new Response(null, { status: 502 });
+    return pathname === EVENT_PATH ? emptyEvent() : emptyScript();
   }
 }
 
+// A no-op script served with a 200 + JS content-type: the <script src> "loads" fine and
+// defines nothing, so an upstream outage never surfaces as a failed-resource console error.
+function emptyScript(): Response {
+  return new Response('', {
+    status: 200,
+    headers: { 'content-type': 'application/javascript' },
+  });
+}
+
+// A 202 with no body: window.plausible()'s fetch resolves cleanly, so a dropped event is
+// silent rather than a console error.
+function emptyEvent(): Response {
+  return new Response(null, { status: 202 });
+}
+
 // Serve the tracking script from cache, fetching the upstream copy on a miss. Per the
-// official guide, the copy is cached in caches.default keyed on our own URL; only ok
-// responses are stored so an upstream error is never pinned.
+// official guide, the copy is cached in caches.default keyed on our own URL, honoring the
+// upstream Cache-Control rather than a hardcoded TTL; only ok responses are stored so an
+// upstream error is never pinned.
 async function getScript(
   request: Request,
   env: Env,
@@ -46,9 +63,17 @@ async function getScript(
 ): Promise<Response> {
   let response = await caches.default.match(request);
   if (!response) {
-    response = await fetch(env.PLAUSIBLE_SCRIPT_URL!);
-    if (response.ok)
-      ctx.waitUntil(caches.default.put(request, response.clone()));
+    const upstream = await fetch(env.PLAUSIBLE_SCRIPT_URL!);
+    // On an upstream error, don't cache it and don't pass the failing status to the
+    // <script src> (which would log a console error) — hand back a no-op script instead.
+    if (!upstream.ok) return emptyScript();
+    // Rebuild so we can strip Set-Cookie before caching: Plausible's script is cookieless,
+    // and caches.default.put() *throws* on a response carrying Set-Cookie — which would drop
+    // us into the catch and silently break analytics. Copying upstream as the init preserves
+    // its status and Cache-Control, so the TTL still comes from Plausible.
+    response = new Response(upstream.body, upstream);
+    response.headers.delete('set-cookie');
+    ctx.waitUntil(caches.default.put(request, response.clone()));
   }
   return response;
 }
@@ -58,8 +83,16 @@ async function getScript(
 // Method, body, and content-type all pass through: /pa/event is a POST, and proxying
 // it as anything else makes analytics silently stop recording while the script tag keeps
 // loading fine.
+//
+// Also forward the real visitor IP as X-Forwarded-For. plausible.io sits behind its own
+// Cloudflare, so without this it sees the connecting party as our Worker's egress PoP —
+// collapsing every event to one location and breaking the cookieless IP+UA daily hash that
+// dedupes unique visitors. CF-Connecting-IP is the only real client IP (root CLAUDE.md);
+// X-Forwarded-For is the header Plausible reads through a proxy.
 async function postEvent(request: Request): Promise<Response> {
   const upstream = new Request(EVENT_UPSTREAM, request);
   upstream.headers.delete('cookie');
+  const clientIp = request.headers.get('CF-Connecting-IP');
+  if (clientIp) upstream.headers.set('X-Forwarded-For', clientIp);
   return fetch(upstream);
 }
