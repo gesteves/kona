@@ -42,6 +42,11 @@
       "!/stylesheets/*",
       "!/images/*",
       "!/fonts/*",
+      // Pagefind's search index. Its shards (.pf_meta / .pf_index / .pf_fragment, and the
+      // extensionless wasm.*.pagefind) match none of the extension negations below, so
+      // without this every keystroke in the search modal would invoke the Worker — and
+      // servePage would record each shard as a Known Agents page view.
+      "!/pagefind/*",
       "!/*.js",
       "!/*.css",
       "!/*.map",
@@ -63,6 +68,14 @@
     ],
   },
 
-  // No workers.dev route: it would be an origin that bypasses the zone's WAF.
+  // No workers.dev route: it would be an origin that bypasses the zone's WAF. Preview URLs
+  // follow this setting (they default to matching workers_dev), so they're off too — testing
+  // happens on a dashboard-attached hostname, not on workers.dev.
   "workers_dev": false,
+
+  // ⚠️ Load-bearing. Every var this Worker reads carries a hostname, so none of them can live
+  // in this file — they're set in the dashboard. A deploy normally DELETES all vars absent from
+  // the config (secrets are never touched), which would silently strip KONA_API_URL,
+  // PLAUSIBLE_SCRIPT_URL and SITE_HOSTNAME on the next `wrangler deploy`. This keeps them.
+  "keep_vars": true,
 }
