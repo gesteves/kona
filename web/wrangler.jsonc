@@ -47,7 +47,12 @@
       // without this every keystroke in the search modal would invoke the Worker — and
       // servePage would record each shard as a Known Agents page view.
       "!/pagefind/*",
-      "!/*.js",
+      // NO blanket `!/*.js`: globs cross `/` and negatives can't be overridden by a positive,
+      // so `!/*.js` would also match the Plausible proxy route `/pa/script.js` and exclude it
+      // from the Worker — it would 404 at the asset layer (plausible.ts never runs). Every real
+      // JS asset lives under /javascripts (already excluded above), so scoping by directory is
+      // enough. A future root-level .js would invoke the Worker (served unchanged via servePage)
+      // — the same accepted tradeoff as the .xml feeds noted above.
       "!/*.css",
       "!/*.map",
       "!/*.json",
