@@ -22,11 +22,10 @@ Copy `.env.example` to `.env` and fill in the credentials below (also add them t
 - **Web Awesome Pro** — the web component library the UI is built on. Needs a Pro subscription; the private registry is configured in `.npmrc`, and `npm install` reads `WEBAWESOME_NPM_TOKEN` from the environment to authenticate. Set it locally (your shell) and in Netlify's build environment.
 - **Redis** — caches API responses to speed up builds. Set `REDIS_URL`.
 - **Kona API** — set `KONA_API_URL` to the deployed [`api/`](../api/README.md) app. The home-page weather/stats/Whoop widgets load from it at runtime.
-- **Kona OG** — set `OG_IMAGE_URL` to the deployed [`og/`](../og/CLAUDE.md) app. It renders the `og:image` "card" on demand for pages without a cover image.
 
 ### Optional services
 
-- **Dark Visitors / Known Agents** — records bot and AI-agent page views server-side via the Known Agents edge function. Set `DARK_VISITORS_ACCESS_TOKEN`.
+- **Kona OG** *(parked)* — the on-demand OG-card service (`og/`) is currently on the `restore-og` branch and not deployed, so `OG_IMAGE_URL` is normally unset and cover-less pages omit `og:image`. If revived, set `OG_IMAGE_URL` to the deployed service.
 
 ## Running locally
 

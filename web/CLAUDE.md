@@ -107,11 +107,14 @@ build fails loudly rather than shipping pages with missing icons.
   (moved to a Cloudflare WAF rule, root [`CLAUDE.md`](../CLAUDE.md)), and no `known-agents.ts` any
   more — server-side Known Agents / Dark Visitors tracking was removed; Cloudflare's own bot/AI
   analytics covers it.
-- Open Graph "cards" (the `og:image` for pages without a cover image) are rendered **on
-  demand** by the separate `kona-og` fly service (repo-root `og/`), not at build time.
-  `generate_open_graph_image_url` (`lib/helpers/image_helpers.rb`) builds the card URL at
-  `<OG_IMAGE_URL>/og.png?url=<page>&v=<template ver>-<published_version>`; the service
-  fetches the page, reads its `og:title`, and renders. See [`og/CLAUDE.md`](../og/CLAUDE.md).
+- Open Graph "cards" (the `og:image` for pages without a cover image) were rendered **on demand**
+  by a separate `kona-og` fly service. **That service is currently parked** (removed from `main`,
+  preserved on the `restore-og` branch — it didn't earn its own app for now), so cover-less pages
+  ship **no** `og:image`: `generate_open_graph_image_url` (`lib/helpers/image_helpers.rb`) returns
+  `nil` when `OG_IMAGE_URL` is unset. Cover-image pages are unaffected (they use
+  `open_graph_image_url` → Cloudflare Images). To revive: restore the service from `restore-og`,
+  deploy it, and set `OG_IMAGE_URL` — the helper then builds
+  `<OG_IMAGE_URL>/og.png?url=<page>&v=<template ver>-<published_version>` and no web code changes.
 - `source/headers` / `source/redirects.erb` — built and renamed to `_headers` /
   `_redirects` (underscore-prefixed source files are treated as partials and skipped).
   ⚠️ In `_headers`, no two rules may set the same header for overlapping paths — matching
@@ -176,9 +179,7 @@ Names only — see `.env.example`; never commit values.
   and the build-time `import:icons` / `import:standard_site` fetches), `API_TOKEN` (shared
   bearer the `/widgets/*` proxy injects on every upstream request, and the build sends on the
   `POST /api/icons` fetch; **must match the `api/` app's `API_TOKEN`**, and must be set in
-  Netlify's runtime env or every widget 401s at the origin and collapses on the site),
-  `OG_IMAGE_URL` (base URL of the `og/` app — `generate_open_graph_image_url` builds the
-  `og:image` card URL from it; a card without it raises).
+  Netlify's runtime env or every widget 401s at the origin and collapses on the site).
 - **Build credential**: `WEBAWESOME_NPM_TOKEN` — Web Awesome Pro npm registry auth, read
   by `.npmrc` at `npm install` (not in `.env`). Set it in your shell and in Netlify's
   build env, or the install fails.
@@ -194,7 +195,12 @@ Names only — see `.env.example`; never commit values.
   Cloudflare must also have Transformations enabled with `images.ctfassets.net` allowlisted as a
   source, or every image 403s.
 - **Optional**: `TURNSTILE_SITE_KEY` (public Cloudflare Turnstile sitekey for the contact form —
-  set it in the build env; pair with the api's `TURNSTILE_SECRET`, both or neither).
+  set it in the build env; pair with the api's `TURNSTILE_SECRET`, both or neither);
+  `OG_IMAGE_URL` (base URL of the on-demand OG-card service — `generate_open_graph_image_url`
+  builds the `og:image` card URL from it. **The `kona-og` service is currently parked** on the
+  `restore-og` branch and not deployed, so this is normally unset: `generate_open_graph_image_url`
+  then returns `nil` and cover-less pages simply omit `og:image` — cover-image pages are
+  unaffected. Set it only if you revive `kona-og`).
 
 ## Conventions & gates
 
