@@ -131,6 +131,15 @@ build fails loudly rather than shipping pages with missing icons.
   `redirects.erb` drops any absolute-URL-source rule from the generated file (which also removes
   it from the Netlify build during dual-deploy). Cross-domain redirects must live in a Cloudflare
   **zone rule / Bulk Redirect**, not in `_redirects` or Contentful.
+  ⚠️ **Cloudflare also rejects 200-status proxy rewrites to an absolute URL** ("Proxy (200)
+  redirects can only point to relative paths", `code: 100324`). This is how Netlify does the
+  Plausible `/pa/*` first-party proxy (`plausible_proxy_redirects` → `/pa/script.js` rewritten to
+  `plausible.io`), but on Cloudflare that proxying is the Worker's job (`src/plausible.ts`), so
+  those lines are invalid *and* redundant. `redirects.erb` drops any `status 200` + absolute-`to`
+  rule. The analytics `<script>` snippet is unaffected (gated on `plausible_installed?`, i.e.
+  `PLAUSIBLE_SCRIPT_URL` in the **build** env — separate from the Worker runtime var of the same
+  name that powers the `/pa/*` proxy). Rolling back to Netlify would lose the `/pa/*` proxy until
+  Netlify is retired.
 - `wrangler.jsonc` + `src/` — the Cloudflare Worker for the Netlify→Cloudflare migration:
   serves `build/` as static assets plus routes for the widget proxy, Plausible proxy, contact
   form, and Known Agents tracking. Its `src/*.ts` files are 1:1 ports of the `netlify/`
