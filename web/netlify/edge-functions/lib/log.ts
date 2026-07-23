@@ -1,7 +1,7 @@
 import type { Context } from '@netlify/edge-functions';
 
 // Shared request-logging + client-identity helpers for the Deno edge functions
-// (feed-source.ts, known-agents.ts). These mirror the *format* of the Node functions'
+// (feed-source.ts). These mirror the *format* of the Node functions'
 // requestLogLine (web/netlify/functions/lib/log.mts) but can't import it: that helper is a
 // Node functions module and these run in the Deno edge runtime. This module lives in a
 // subdirectory so Netlify doesn't register it as its own edge function — only files placed

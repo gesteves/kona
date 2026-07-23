@@ -1,17 +1,13 @@
 // Cloudflare Worker serving the static build plus the dynamic routes (kona-api proxy for
-// widgets + the contact-form POST, Plausible proxy, Known Agents tracking). One Worker
-// replaces Netlify's hosting, functions, and edge functions — see the migration plan and
-// root CLAUDE.md.
+// widgets + the contact-form POST, Plausible proxy). One Worker replaces Netlify's hosting,
+// functions, and edge functions — see the migration plan and root CLAUDE.md.
 //
 // ⚠️ No hostnames live in this file (or anywhere in the repo). The custom domain is
 // attached in the dashboard (Workers & Pages → this Worker → Settings → Domains & Routes),
 // and all environment-specific values are dashboard vars/secrets:
 //
-//   Secrets: API_TOKEN (must match the api/ app's API_TOKEN or every widget 401s),
-//            KNOWN_AGENTS_ACCESS_TOKEN
-//   Vars:    KONA_API_URL (the fly.io api origin), PLAUSIBLE_SCRIPT_URL,
-//            SITE_HOSTNAME (the production host — gates Known Agents tracking, since
-//            preview versions share the production Worker's secrets)
+//   Secrets: API_TOKEN (must match the api/ app's API_TOKEN or every widget 401s)
+//   Vars:    KONA_API_URL (the fly.io api origin), PLAUSIBLE_SCRIPT_URL
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "kona-web",
@@ -25,8 +21,8 @@
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page",
     // Glob array, NOT `true`. Non-matching requests are served straight from the asset
-    // layer and never invoke the Worker — this replaces known-agents.ts's excludedPath.
-    // Negative patterns take precedence. Requires wrangler ≥ 4.20.
+    // layer and never invoke the Worker. Negative patterns take precedence. Requires
+    // wrangler ≥ 4.20.
     // No /cdn-cgi/* entry is needed or possible: Cloudflare answers image transformations
     // at its own edge; they never reach the Worker.
     // /widgets/*, /pa/*, /api/contact, and the feeds all match /* (wrangler rejects explicit
@@ -44,8 +40,8 @@
       "!/fonts/*",
       // Pagefind's search index. Its shards (.pf_meta / .pf_index / .pf_fragment, and the
       // extensionless wasm.*.pagefind) match none of the extension negations below, so
-      // without this every keystroke in the search modal would invoke the Worker — and
-      // servePage would record each shard as a Known Agents page view.
+      // without this every keystroke in the search modal would needlessly invoke the Worker
+      // (and log a request line) for each shard.
       "!/pagefind/*",
       // NO blanket `!/*.js`: globs cross `/` and negatives can't be overridden by a positive,
       // so `!/*.js` would also match the Plausible proxy route `/pa/script.js` and exclude it
@@ -78,9 +74,9 @@
   // happens on a dashboard-attached hostname, not on workers.dev.
   "workers_dev": false,
 
-  // ⚠️ Load-bearing. Every var this Worker reads carries a hostname, so none of them can live
-  // in this file — they're set in the dashboard. A deploy normally DELETES all vars absent from
-  // the config (secrets are never touched), which would silently strip KONA_API_URL,
-  // PLAUSIBLE_SCRIPT_URL and SITE_HOSTNAME on the next `wrangler deploy`. This keeps them.
+  // ⚠️ Load-bearing. The vars this Worker reads carry a hostname, so they can't live in this
+  // file — they're set in the dashboard. A deploy normally DELETES all vars absent from the
+  // config (secrets are never touched), which would silently strip KONA_API_URL and
+  // PLAUSIBLE_SCRIPT_URL on the next `wrangler deploy`. This keeps them.
   "keep_vars": true,
 }

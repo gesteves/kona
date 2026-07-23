@@ -13,12 +13,6 @@ interface Env {
   // Upstream URL of the site-specific Plausible script; unset disables the proxy,
   // mirroring plausible_installed? on the Ruby side.
   PLAUSIBLE_SCRIPT_URL?: string;
-
-  // Known Agents tracking. SITE_HOSTNAME gates it to production traffic: preview
-  // versions share the production Worker's secrets, so an env flag can't tell them
-  // apart — the request hostname can.
-  KNOWN_AGENTS_ACCESS_TOKEN?: string;
-  SITE_HOSTNAME?: string;
 }
 
 interface Fetcher {

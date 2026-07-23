@@ -1,7 +1,7 @@
 import { handleApi } from './api-proxy';
 import { handlePlausible } from './plausible';
 import { handleFeed } from './feed-source';
-import { servePage } from './known-agents';
+import { servePage } from './serve-page';
 
 // Entry point. Only the paths listed in wrangler.jsonc's run_worker_first reach this code;
 // everything else (fingerprinted assets, feeds, images, .well-known) is served straight
@@ -30,8 +30,7 @@ export default {
     // `…somethingfeed.xml`. handleFeed relabels utm_source per reader (see feed-source.ts).
     if (pathname.endsWith('/feed.xml')) return handleFeed(request, env);
 
-    // Everything else that reaches the Worker is a page view: serve it from the asset
-    // layer and record the visit with Known Agents.
-    return servePage(request, env, ctx);
+    // Everything else that reaches the Worker is a page view: serve it from the asset layer.
+    return servePage(request, env);
   },
 };

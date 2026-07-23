@@ -99,15 +99,14 @@ build fails loudly rather than shipping pages with missing icons.
   `source/javascripts/stimulus/`, `source/stylesheets/`.
 - `netlify/functions/` — `api-proxy.mts` (proxies `/widgets/*` **and** `POST /api/contact`;
   see root `CLAUDE.md`).
-- `netlify/edge-functions/` — `known-agents.ts` (records every page view server-side to
-  Known Agents / Dark Visitors, capturing bot + AI-agent traffic Plausible can't see;
-  production-only, reuses `DARK_VISITORS_ACCESS_TOKEN`); `feed-source.ts` (per-reader feed URL
-  attribution — its `Cache-Control: private` is load-bearing because Cloudflare ignores
-  `Vary: User-Agent`). Both read the real client IP/geo from `CF-*` headers rather than
-  `context.ip`/`context.geo`, via the shared `edge-functions/lib/log.ts` — a separate Deno copy
-  of `functions/lib/log.mts` (edge functions run in Deno and can't import the Node module), shared
-  between the two edge functions rather than re-inlined in each. There is **no** `block-bots`
-  function any more — that moved to a Cloudflare WAF rule (root [`CLAUDE.md`](../CLAUDE.md)).
+- `netlify/edge-functions/` — `feed-source.ts` (per-reader feed URL attribution — its
+  `Cache-Control: private` is load-bearing because Cloudflare ignores `Vary: User-Agent`). It
+  reads the real client IP/geo from `CF-*` headers rather than `context.ip`/`context.geo`, via
+  `edge-functions/lib/log.ts` — a separate Deno copy of `functions/lib/log.mts` (edge functions
+  run in Deno and can't import the Node module). There is **no** `block-bots` function any more
+  (moved to a Cloudflare WAF rule, root [`CLAUDE.md`](../CLAUDE.md)), and no `known-agents.ts` any
+  more — server-side Known Agents / Dark Visitors tracking was removed; Cloudflare's own bot/AI
+  analytics covers it.
 - Open Graph "cards" (the `og:image` for pages without a cover image) are rendered **on
   demand** by the separate `kona-og` fly service (repo-root `og/`), not at build time.
   `generate_open_graph_image_url` (`lib/helpers/image_helpers.rb`) builds the card URL at
@@ -141,19 +140,16 @@ build fails loudly rather than shipping pages with missing icons.
   name that powers the `/pa/*` proxy). Rolling back to Netlify would lose the `/pa/*` proxy until
   Netlify is retired.
 - `wrangler.jsonc` + `src/` — the Cloudflare Worker for the Netlify→Cloudflare migration:
-  serves `build/` as static assets plus routes for the widget proxy, Plausible proxy, contact
-  form, and Known Agents tracking. Its `src/*.ts` files are 1:1 ports of the `netlify/`
-  functions/edge-functions above (each file header names its counterpart); `src/plausible.ts`
-  additionally absorbs the `/pa/*` proxying Netlify does via `_redirects` rewrites.
-  ⚠️ **Dual-deploy window**: both paths ship at once. The live site still runs on Netlify;
-  the Worker deploys in parallel to Cloudflare (via Workers Builds — the reason `rake build`
-  uses libvips) so it can be exercised on a preview host before the DNS cutover. Keep the
-  `netlify/` and `src/` copies in sync until Netlify is retired. The two record Known Agents
-  visits under different token names — Netlify reads `DARK_VISITORS_ACCESS_TOKEN`, the Worker
-  reads `KNOWN_AGENTS_ACCESS_TOKEN` (same value) — and gate to production differently (Netlify
-  by deploy context, the Worker by `SITE_HOSTNAME`). Typecheck the Worker with `npm run check`
-  (`tsc --noEmit`; wrangler itself never typechecks). See the migration plan before touching
-  the cutover pieces.
+  serves `build/` as static assets plus routes for the widget proxy, Plausible proxy, and contact
+  form. Its `src/*.ts` files are 1:1 ports of the `netlify/` functions/edge-functions above (each
+  file header names its counterpart); `src/plausible.ts` additionally absorbs the `/pa/*` proxying
+  Netlify does via `_redirects` rewrites.
+  ⚠️ **Dual-deploy window**: both paths still ship. `www` has been cut over to the Cloudflare
+  Worker; Netlify remains as a rollback until it's retired, so keep the `netlify/` and `src/`
+  copies in sync until then. (Server-side Known Agents tracking that used to live in both — the
+  Worker's `known-agents.ts` and the Netlify edge function — was removed; Cloudflare's own bot/AI
+  analytics replaces it.) Typecheck the Worker with `npm run check` (`tsc --noEmit`; wrangler
+  itself never typechecks). See the migration plan before touching the cutover pieces.
   ⚠️ **`run_worker_first` extension negations must never collide with a Worker route.** The
   `assets.run_worker_first` globs in `wrangler.jsonc` decide what skips the Worker and is served
   straight from the asset layer. Cloudflare globs **match across `/`**, and a **negative can't be
@@ -196,9 +192,8 @@ Names only — see `.env.example`; never commit values.
   which uses it on purpose so blurhashes don't depend on the zone or spend a transformation.
   Cloudflare must also have Transformations enabled with `images.ctfassets.net` allowlisted as a
   source, or every image 403s.
-- **Optional**: `DARK_VISITORS_ACCESS_TOKEN`; `TURNSTILE_SITE_KEY` (public Cloudflare Turnstile
-  sitekey for the contact form — set it in Netlify's build env; pair with the api's
-  `TURNSTILE_SECRET`, both or neither).
+- **Optional**: `TURNSTILE_SITE_KEY` (public Cloudflare Turnstile sitekey for the contact form —
+  set it in the build env; pair with the api's `TURNSTILE_SECRET`, both or neither).
 
 ## Conventions & gates
 

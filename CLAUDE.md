@@ -56,11 +56,10 @@ concluding something is a code problem.
   fly's `Fly-Client-IP` are both **Cloudflare PoPs**, not the visitor. Code that needs the
   client reads `CF-Connecting-IP` first and falls back: `api/config/initializers/rack_attack.rb`,
   `web/netlify/functions/lib/log.mts` (Node functions), and `web/netlify/edge-functions/lib/log.ts`
-  (shared by both edge functions). The edge helper is a **separate** copy of the Node one because
-  edge functions run in Deno and can't import a Node functions module — but the two edge functions
-  share the single Deno copy, so it's one duplication (Node vs Deno), not per-function. The header is spoofable
-  by anything hitting an origin directly, so it may key throttling and logging but must **never**
-  gate a ban.
+  (the `feed-source` edge function). The edge helper is a **separate** copy of the Node one because
+  edge functions run in Deno and can't import a Node functions module — one duplication (Node vs
+  Deno). The header is spoofable by anything hitting an origin directly, so it may key throttling
+  and logging but must **never** gate a ban.
 - **Geo / trace headers** — `CF-IPCity` / `CF-Region` / `CF-IPCountry` for geo, `CF-Ray` as both
   the "this traversed the zone" marker and the join key into Cloudflare's logs.
 - **Images** — Cloudflare Images serves every transformation from `<IMAGES_URL>/cdn-cgi/image/…`
