@@ -168,6 +168,9 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 - **Caching** — `app/controllers/concerns/live_widget.rb`. `cache_widget(ttl:)` sets:
   - Browser: `Cache-Control: public, max-age=0, stale-while-revalidate=86400`
   - Edge: `Netlify-CDN-Cache-Control: public, durable, max-age=<ttl>, stale-while-revalidate=3600, stale-if-error=86400`
+    plus the same policy as standard `CDN-Cache-Control` (RFC 9213, no `durable`) for the
+    planned Cloudflare edge. ⚠️ Never express the edge policy as `s-maxage` — its presence
+    disables `stale-while-revalidate` and `stale-if-error` (RFC 9111 §4.2.4).
   ⚠️ The proxy forwards the edge header **only on 2xx** — only emit durable headers on
   successful, cacheable responses. Edge `stale-while-revalidate` defaults to one hour
   (`DEFAULT_EDGE_STALE_WHILE_REVALIDATE`); the pageviews, upcoming-races, trending, and

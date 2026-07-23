@@ -39,6 +39,17 @@ RSpec.describe "Activity stats", type: :request do
     expect(edge).to include("max-age=300")
     expect(edge).to include("stale-while-revalidate=3600")
     expect(edge).to include("stale-if-error=86400")
+
+    # The same policy in the standard RFC 9213 dialect (read by Cloudflare after the
+    # migration; `durable` is Netlify-only). It must never use s-maxage — that would
+    # disable stale-while-revalidate and stale-if-error outright.
+    cdn = response.headers["CDN-Cache-Control"]
+    expect(cdn).to include("public")
+    expect(cdn).to include("max-age=300")
+    expect(cdn).to include("stale-while-revalidate=3600")
+    expect(cdn).to include("stale-if-error=86400")
+    expect(cdn).not_to include("durable")
+    expect(cdn).not_to include("s-maxage")
   end
 
   it "embeds a relative same-origin refetch URL" do
