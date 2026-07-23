@@ -20,52 +20,32 @@
     // Middleman's directory_indexes builds pretty URLs (/about/ → /about/index.html).
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page",
-    // Glob array, NOT `true`. Non-matching requests are served straight from the asset
-    // layer and never invoke the Worker. Negative patterns take precedence. Requires
-    // wrangler ≥ 4.20.
-    // No /cdn-cgi/* entry is needed or possible: Cloudflare answers image transformations
-    // at its own edge; they never reach the Worker.
-    // /widgets/*, /pa/*, /api/contact, and the feeds all match /* (wrangler rejects explicit
-    // entries as redundant); the negations below carve out everything that should skip the
-    // Worker. Note there is NO `!/*.xml`: the feeds (`/feed.xml`, `<tag path>feed.xml`) are
-    // .xml and must reach the Worker so feed-source.ts can relabel utm_source per reader.
-    // Because negatives take precedence, a positive `/feed.xml` could not override a blanket
-    // `!/*.xml`, so instead only the one non-feed .xml asset — the sitemap — is excluded by
-    // name. Any future .xml asset would run the Worker (served unchanged via servePage).
+    // ⚠️ POSITIVE ALLOWLIST — ONLY these paths invoke the Worker. Everything else (every HTML
+    // page, every fingerprinted asset, the sitemap, /.well-known/*, and any 404) is served
+    // straight from the static asset layer and never runs Worker code. Requires wrangler ≥ 4.20;
+    // globs cross `/`.
+    //
+    // We flipped from the old "/* minus ~25 asset negations" model once the page-serving
+    // fallthrough stopped doing any per-view work: server-side Known Agents tracking was removed,
+    // so running the Worker on every page view only cost an invocation + a log line. Page views
+    // now skip the Worker entirely. This form also retires the extension-negation traps the old
+    // model kept tripping on (a blanket `!/*.js` used to swallow /pa/script.js; `!/*.xml` would
+    // swallow the feeds) — there are simply no negations any more.
+    //
+    // The four dynamic routes that MUST run the Worker (see src/index.ts). Each either has no
+    // asset (so assets-first would 404 it) or has an asset the Worker must intercept:
+    //   /widgets/*, /api/contact  → kona-api proxy (no asset; must reach the origin)
+    //   /pa/*                     → Plausible first-party proxy (no asset; proxied upstream)
+    //   /feed.xml, /*/feed.xml    → the built feed IS an asset, but feed-source.ts must relabel
+    //                               utm_source per reader — the root feed plus every nested tag
+    //                               feed (`<tag path>/feed.xml`, any depth; `*` crosses `/`).
+    // No /cdn-cgi/* entry is needed: Cloudflare answers image transformations at its own edge.
     "run_worker_first": [
-      "/*",
-      "!/javascripts/*",
-      "!/stylesheets/*",
-      "!/images/*",
-      "!/fonts/*",
-      // Pagefind's search index. Its shards (.pf_meta / .pf_index / .pf_fragment, and the
-      // extensionless wasm.*.pagefind) match none of the extension negations below, so
-      // without this every keystroke in the search modal would needlessly invoke the Worker
-      // (and log a request line) for each shard.
-      "!/pagefind/*",
-      // NO blanket `!/*.js`: globs cross `/` and negatives can't be overridden by a positive,
-      // so `!/*.js` would also match the Plausible proxy route `/pa/script.js` and exclude it
-      // from the Worker — it would 404 at the asset layer (plausible.ts never runs). Every real
-      // JS asset lives under /javascripts (already excluded above), so scoping by directory is
-      // enough. A future root-level .js would invoke the Worker (served unchanged via servePage)
-      // — the same accepted tradeoff as the .xml feeds noted above.
-      "!/*.css",
-      "!/*.map",
-      "!/*.json",
-      "!/sitemap.xml",
-      "!/*.txt",
-      "!/*.png",
-      "!/*.jpg",
-      "!/*.jpeg",
-      "!/*.gif",
-      "!/*.svg",
-      "!/*.webp",
-      "!/*.avif",
-      "!/*.ico",
-      "!/*.woff",
-      "!/*.woff2",
-      "!/*.ttf",
-      "!/.well-known/*",
+      "/widgets/*",
+      "/api/contact",
+      "/pa/*",
+      "/feed.xml",
+      "/*/feed.xml",
     ],
   },
 

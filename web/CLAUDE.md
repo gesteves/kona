@@ -150,16 +150,17 @@ build fails loudly rather than shipping pages with missing icons.
   Worker's `known-agents.ts` and the Netlify edge function — was removed; Cloudflare's own bot/AI
   analytics replaces it.) Typecheck the Worker with `npm run check` (`tsc --noEmit`; wrangler
   itself never typechecks). See the migration plan before touching the cutover pieces.
-  ⚠️ **`run_worker_first` extension negations must never collide with a Worker route.** The
-  `assets.run_worker_first` globs in `wrangler.jsonc` decide what skips the Worker and is served
-  straight from the asset layer. Cloudflare globs **match across `/`**, and a **negative can't be
-  overridden by a positive** — so a blanket `!/*.<ext>` silently excludes *any* Worker route that
-  ends in that extension. This bit `/pa/script.js` (the Plausible proxy route): a `!/*.js` negation
-  routed it to the asset layer → 404, never reaching `src/plausible.ts`. Scope asset exclusions by
-  **directory** (`!/javascripts/*`, `!/stylesheets/*`) where the real assets live, not by a
-  catch-all extension; if a root-level asset needs excluding, name it (`!/sitemap.xml`, not
-  `!/*.xml` — which would also swallow the per-reader `/feed.xml` Worker route). Worker routes to
-  keep clear of extension negations: `/pa/script.js`, `/feed.xml` (and `<tag>/feed.xml`).
+  ⚠️ **`run_worker_first` is a POSITIVE allowlist — only listed paths invoke the Worker.** It
+  lists exactly the dynamic routes (`/widgets/*`, `/api/contact`, `/pa/*`, `/feed.xml`,
+  `/*/feed.xml`); everything else — every HTML page, fingerprinted asset, the sitemap,
+  `/.well-known/*`, and any 404 — is served straight from the static asset layer and never runs
+  Worker code (page views cost no Worker invocation). Each listed route needs the Worker because it
+  either has **no asset** (widgets/contact/pa would 404 at the asset layer) or has an asset the
+  Worker must **intercept** (the built `feed.xml` is relabeled per-reader by `feed-source.ts`).
+  When you add a dynamic route, add its path here too, and mind that Cloudflare globs **cross `/`**
+  (that's why `/*/feed.xml` covers tag feeds at any depth). This replaced the old "`/*` minus ~25
+  asset negations" model — which kept tripping over extension negations (a blanket `!/*.js` once
+  swallowed `/pa/script.js`); the allowlist has no negations, so that class of bug is gone.
 - `data/font_awesome.yml` — **icon allowlist**. Any new icon must be added here (under
   the correct family/style, e.g. `classic.light`) before `icon_svg` / `rake import:icons`
   can use it. `import:icons` posts this tree to the `api/` `/api/icons` endpoint, which
