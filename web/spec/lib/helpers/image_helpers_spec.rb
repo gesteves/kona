@@ -275,10 +275,9 @@ RSpec.describe ImageHelpers do
         .to start_with('https://og.example.com/og.png?')
     end
 
-    it 'raises when OG_IMAGE_URL is unset' do
+    it 'returns nil when OG_IMAGE_URL is unset (kona-og not wired up)' do
       stub_og(nil)
-      expect { generate_open_graph_image_url('https://example.com/', 1) }
-        .to raise_error(/OG_IMAGE_URL is not set/)
+      expect(generate_open_graph_image_url('https://example.com/', 1)).to be_nil
     end
   end
 

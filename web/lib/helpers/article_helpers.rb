@@ -195,7 +195,10 @@ module ArticleHelpers
     else
       # No cover image (typical for Shorts): fall back to the generated Open Graph card — the
       # same 1200×630 image used for social embeds — so the BlogPosting still carries an image.
-      schema["image"] = [image_object(generate_open_graph_image_url(full_url(current_page.url), content.sys.published_version), 1200, 630)]
+      # The card is omitted entirely when OG_IMAGE_URL is unset (kona-og not wired up), in which
+      # case the schema simply carries no image rather than one with a nil URL.
+      card_url = generate_open_graph_image_url(full_url(current_page.url), content.sys.published_version)
+      schema["image"] = [image_object(card_url, 1200, 630)] if card_url.present?
     end
     schema.to_json
   end

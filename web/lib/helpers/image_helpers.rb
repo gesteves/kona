@@ -201,13 +201,16 @@ module ImageHelpers
   # for a year. The card URL is content-addressed: `v` combines OG_TEMPLATE_VERSION with the
   # entry's published_version, so a republish (which bumps published_version) mints a new URL
   # and a title edit is picked up on the next crawl — no cache purge needed.
+  #
+  # OG_IMAGE_URL is optional: when it's unset the kona-og service isn't wired up, so this returns
+  # nil and callers omit the card rather than failing the build. Cover-image OG images
+  # (open_graph_image_url) don't depend on it, so those pages keep their social image.
   # @param url [String] The full URL of the page to render a card for.
   # @param version [Integer, String] The entry's sys.published_version, used as a cache buster.
-  # @return [String] The kona-og URL for the page's card.
-  # @raise [RuntimeError] if OG_IMAGE_URL is unset.
+  # @return [String, nil] The kona-og URL for the page's card, or nil if OG_IMAGE_URL is unset.
   def generate_open_graph_image_url(url, version)
     base = ENV['OG_IMAGE_URL'].to_s.chomp('/')
-    raise 'OG_IMAGE_URL is not set; cannot build Open Graph card URLs' if base.blank?
+    return if base.blank?
     query = URI.encode_www_form(url: url, v: "#{OG_TEMPLATE_VERSION}-#{version}")
     "#{base}/og.png?#{query}"
   end
