@@ -18,6 +18,9 @@ def build_site(verbose: false)
   # `npm run build` itself and blocks until it finishes.
   middleman_command = verbose ? 'middleman build --verbose' : 'middleman build'
   sh middleman_command
+  # Underscore-prefixed files in source/ are treated as partials and never built, so the
+  # redirects and headers files are authored without the prefix and renamed here.
   File.rename("#{BUILD_DIRECTORY}/redirects", "#{BUILD_DIRECTORY}/_redirects")
+  File.rename("#{BUILD_DIRECTORY}/headers", "#{BUILD_DIRECTORY}/_headers")
   sh 'npm run pagefind'
 end

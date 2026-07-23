@@ -106,6 +106,10 @@ build fails loudly rather than shipping pages with missing icons.
   of `functions/lib/log.mts` (edge functions run in Deno and can't import the Node module), shared
   between the two edge functions rather than re-inlined in each. There is **no** `block-bots`
   function any more — that moved to a Cloudflare WAF rule (root [`CLAUDE.md`](../CLAUDE.md)).
+- `source/headers` / `source/redirects.erb` — built and renamed to `_headers` /
+  `_redirects` (underscore-prefixed source files are treated as partials and skipped).
+  ⚠️ In `_headers`, no two rules may set the same header for overlapping paths — matching
+  rules comma-join same-name headers on both Netlify and Cloudflare.
 - `data/font_awesome.yml` — **icon allowlist**. Any new icon must be added here (under
   the correct family/style, e.g. `classic.light`) before `icon_svg` / `rake import:icons`
   can use it. `import:icons` posts this tree to the `api/` `/api/icons` endpoint, which
