@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fetchMock } from 'cloudflare:test';
 import worker from '../src/index';
 import { makeCtx, feedResponse } from './helpers';
@@ -31,6 +31,14 @@ const get = (path: string, init?: RequestInit) =>
   );
 
 describe('worker routing (src/index)', () => {
+  // The /pa/script.js route reaches getScript, which uses caches.default. Stub it so tests never
+  // touch real per-test Cache storage (avoids the miniflare isolated-storage teardown bug in CI).
+  beforeEach(() => {
+    vi.spyOn(caches.default, 'match').mockResolvedValue(undefined);
+    vi.spyOn(caches.default, 'put').mockResolvedValue(undefined);
+  });
+  afterEach(() => vi.restoreAllMocks());
+
   it('routes /widgets/* to the api proxy', async () => {
     fetchMock
       .get(ORIGIN)

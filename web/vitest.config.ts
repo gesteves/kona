@@ -15,7 +15,11 @@ export default defineWorkersConfig({
     poolOptions: {
       workers: {
         miniflare: {
-          compatibilityDate: '2026-07-01',
+          // The date the TEST runtime runs under — capped at what the pool's bundled workerd
+          // supports (it warns and falls back otherwise). Distinct from production's
+          // wrangler.jsonc compatibility_date; the tests exercise basic fetch/Response/routing,
+          // so the exact date doesn't affect them. Bump when the pool's runtime advances.
+          compatibilityDate: '2025-09-06',
         },
       },
     },

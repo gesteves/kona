@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fetchMock } from 'cloudflare:test';
 import { handlePlausible } from '../src/plausible';
 import { makeCtx } from './helpers';
@@ -13,6 +13,16 @@ const header = (c: Captured, name: string): string | undefined => {
 };
 
 describe('handlePlausible', () => {
+  // getScript reads/writes caches.default. Stub both so tests never touch real (per-test isolated)
+  // Cache storage: that write otherwise trips a miniflare isolated-storage teardown bug (a
+  // .sqlite-shm WAL file) that fails the run in CI. `match` → miss forces the upstream path;
+  // `put` → no-op. We're asserting the proxy/response behavior, not the caching itself.
+  beforeEach(() => {
+    vi.spyOn(caches.default, 'match').mockResolvedValue(undefined);
+    vi.spyOn(caches.default, 'put').mockResolvedValue(undefined);
+  });
+  afterEach(() => vi.restoreAllMocks());
+
   it('404s every path when PLAUSIBLE_SCRIPT_URL is unset (site built without analytics)', async () => {
     const res = await handlePlausible(
       new Request('https://www.example.com/pa/script.js'),
