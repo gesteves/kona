@@ -55,6 +55,29 @@ describe('handlePlausible', () => {
     expect(await res.text()).toBe('window.plausible=function(){}');
   });
 
+  it('normalizes the script cache key so a junk query cannot mint unbounded cache entries', async () => {
+    fetchMock
+      .get('https://cdn.test')
+      .intercept({ path: '/js/pa-abc.js' })
+      .reply(200, 'window.plausible=function(){}', {
+        headers: { 'content-type': 'application/javascript' },
+      });
+
+    await handlePlausible(
+      new Request('https://www.example.com/pa/script.js?x=random'),
+      env,
+      makeCtx()
+    );
+
+    // Both the lookup and the store use the bare path — not the inbound URL with its query.
+    const [matched] = vi.mocked(caches.default.match).mock.calls[0];
+    expect((matched as Request).url).toBe(
+      'https://www.example.com/pa/script.js'
+    );
+    const [stored] = vi.mocked(caches.default.put).mock.calls[0];
+    expect((stored as Request).url).toBe('https://www.example.com/pa/script.js');
+  });
+
   it('hands back a no-op 200 script when the upstream script errors (never a broken <script>)', async () => {
     fetchMock
       .get('https://cdn.test')

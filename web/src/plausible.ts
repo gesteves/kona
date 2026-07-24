@@ -60,7 +60,17 @@ async function getScript(
   env: Env,
   ctx: ExecutionContext
 ): Promise<Response> {
-  let response = await caches.default.match(request);
+  // ⚠️ Key on the bare script path, NOT the inbound request. The Cache API keys on the full URL
+  // including the query string, so caching the request as-is would let /pa/script.js?x=<random>
+  // mint an unbounded number of entries, each one a cache miss that refetches Plausible's CDN.
+  // Nothing here reads a query param, so normalizing is lossless.
+  const cacheKey = new Request(new URL(SCRIPT_PATH, request.url).toString());
+  // caches.default only serves GET, and put() *throws* on a non-GET request — a throw that would
+  // land inside the waitUntil below, where handlePlausible's fail-open catch can't see it. So skip
+  // the cache entirely for anything else (in practice only a HEAD probe) and just proxy it.
+  const cacheable = request.method === 'GET';
+
+  let response = cacheable ? await caches.default.match(cacheKey) : undefined;
   if (!response) {
     const upstream = await fetch(env.PLAUSIBLE_SCRIPT_URL!);
     // On an upstream error, don't cache it and don't pass the failing status to the
@@ -72,7 +82,7 @@ async function getScript(
     // its status and Cache-Control, so the TTL still comes from Plausible.
     response = new Response(upstream.body, upstream);
     response.headers.delete('set-cookie');
-    ctx.waitUntil(caches.default.put(request, response.clone()));
+    if (cacheable) ctx.waitUntil(caches.default.put(cacheKey, response.clone()));
   }
   return response;
 }
