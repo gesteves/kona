@@ -52,9 +52,12 @@ vips`) — the blurhash placeholders render through the `ruby-vips` gem (chosen 
 ImageMagick because Cloudflare Workers Builds preinstalls libvips but not ImageMagick).
 
 ```bash
-# Tests — single file (fast) then full suite
+# Ruby tests (Middleman helpers) — single file (fast) then full suite
 bundle exec rspec spec/lib/helpers/markup_helpers_spec.rb
 bundle exec rake test
+
+# Worker tests (src/*.ts) — Vitest in the workers runtime (test/**), see below
+npm test
 
 # Local dev
 bundle exec rake import          # fetch fresh data first
@@ -152,7 +155,14 @@ build fails loudly rather than shipping pages with missing icons.
   copies in sync until then. (Server-side Known Agents tracking that used to live in both — the
   Worker's `known-agents.ts` and the Netlify edge function — was removed; Cloudflare's own bot/AI
   analytics replaces it.) Typecheck the Worker with `npm run check` (`tsc --noEmit`; wrangler
-  itself never typechecks). See the migration plan before touching the cutover pieces.
+  itself never typechecks), and **test it with `npm test`** — Vitest via
+  `@cloudflare/vitest-pool-workers` runs `test/**` inside `workerd` (fake `env`, mocked outbound
+  `fetch`), covering the proxy header/cache contract, the per-reader feed relabeling, the Plausible
+  proxy, and routing. ⚠️ The test tooling is isolated from production types: `tsconfig.test.json`
+  (test/** only, pulls in `@cloudflare/vitest-pool-workers` types) is **separate** from
+  `tsconfig.json` (src only, `types: []` + the `env.d.ts` shims) — the two must never share a
+  compile, or the workers-types `ExecutionContext` collides with the shim. See the migration plan
+  before touching the cutover pieces.
   ⚠️ **`run_worker_first` is a POSITIVE allowlist — only listed paths invoke the Worker.** It
   lists exactly the dynamic routes (`/widgets/*`, `/api/contact`, `/pa/*`, `/feed.xml`,
   `/*/feed.xml`); everything else — every HTML page, fingerprinted asset, the sitemap,
@@ -204,9 +214,11 @@ Names only — see `.env.example`; never commit values.
 
 ## Conventions & gates
 
-- **Before committing** (non-negotiable): `bundle exec rake test` passes →
-  `npm run lint:scss` + `npm run format:check` clean → `bundle exec rake build:verbose`
-  succeeds (it builds the JS bundle via the external pipeline). Follow `.editorconfig`.
+- **Before committing** (non-negotiable): `bundle exec rake test` + `npm test` (Worker suite) +
+  `npm run check` (Worker tsc) pass → `npm run lint:scss` + `npm run format:check` clean →
+  `bundle exec rake build:verbose` succeeds (it builds the JS bundle via the external pipeline).
+  These are the same gates the `.github/workflows/web.yml` `checks` job runs on every push/PR.
+  Follow `.editorconfig`.
 - **Netlify**: build tools must be in `dependencies`, not `devDependencies` — Netlify
   installs with `NODE_ENV=production` and skips `devDependencies`.
 - **Tests** live in `spec/` and focus on helpers, text/markdown processing, and data

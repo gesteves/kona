@@ -1,0 +1,13 @@
+{
+  // Editor/type support for the Worker test suite (test/**). Kept SEPARATE from the production
+  // tsconfig.json (which stays on `types: []` + the src/env.d.ts shims, per its own note) because
+  // the vitest pool needs @cloudflare/workers-types, whose Worker globals would collide with those
+  // shims. This config pulls those types in and includes only test/** — NOT src/env.d.ts — so the
+  // two never share a compile. `npm run check` still runs on tsconfig.json (src only); vitest itself
+  // transpiles tests with esbuild and never consults this file, so it only affects the editor.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["@cloudflare/vitest-pool-workers"]
+  },
+  "include": ["test/**/*.ts", "vitest.config.ts"]
+}

@@ -47,6 +47,13 @@ module Webhooks
         ArticleEmbeddingJob.perform_async(action == "publish" ? "embed" : "delete", entry_id)
       end
 
+      # Rebuild + redeploy the static web site whenever *published* content changes (any content
+      # type or asset). The web build reads the latest published content from Contentful, so a
+      # fresh build reflects the change; SiteBuildJob fires a GitHub repository_dispatch that the
+      # "Web" workflow builds from. Only publish/unpublish/delete change the built site — draft
+      # auto-saves must not trigger a deploy.
+      SiteBuildJob.perform_async if %w[publish unpublish delete].include?(action)
+
       Rails.logger.info("Contentful webhook handled: contentType=#{content_type} entry=#{entry_id} action=#{action} operation=#{operation || 'ignored'}")
       head :no_content
     rescue StandardError => e

@@ -90,6 +90,34 @@ RSpec.describe "Webhooks::Contentful", type: :request do
       post_webhook(entry_payload("entry123", "article"), topic: "ContentManagement.Entry.publish")
       expect(response).to have_http_status(:no_content)
     end
+
+    describe "web rebuild trigger (SiteBuildJob)" do
+      it "enqueues a rebuild on publish, unpublish, and delete of any content type" do
+        %w[publish unpublish delete].each do |action|
+          SiteBuildJob.clear
+          post_webhook(entry_payload("entry123", "article"), topic: "ContentManagement.Entry.#{action}")
+          expect(response).to have_http_status(:no_content)
+          expect(SiteBuildJob).to have_enqueued_sidekiq_job
+        end
+      end
+
+      it "enqueues a rebuild for content types standard.site ignores (e.g. page)" do
+        post_webhook(entry_payload("page1", "page"), topic: "ContentManagement.Entry.publish")
+        expect(SiteBuildJob).to have_enqueued_sidekiq_job
+        expect(StandardSiteSyncJob.jobs).to be_empty
+      end
+
+      it "enqueues a rebuild on an asset publish (no contentType)" do
+        post_webhook({ "sys" => { "id" => "asset1", "type" => "Asset" } }, topic: "ContentManagement.Asset.publish")
+        expect(response).to have_http_status(:no_content)
+        expect(SiteBuildJob).to have_enqueued_sidekiq_job
+      end
+
+      it "does not enqueue a rebuild on a draft auto_save" do
+        post_webhook(entry_payload("entry123", "article"), topic: "ContentManagement.Entry.auto_save")
+        expect(SiteBuildJob.jobs).to be_empty
+      end
+    end
   end
 
   context "with a bad signature" do

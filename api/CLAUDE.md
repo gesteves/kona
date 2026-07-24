@@ -94,8 +94,12 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
 - **Webhooks**: `Webhooks::ContentfulController#create` receives Contentful publish/
   unpublish/delete events and keeps the standard.site PDS records in sync. Verified with
   Contentful's HMAC request-verification scheme (`ContentfulRequestVerification` concern,
-  `CONTENTFUL_WEBHOOK_SECRET`). The request only **enqueues a `StandardSiteSyncJob`** and
-  returns 204; the sync runs on the Sidekiq worker (Sidekiq retries on failure). Contentful
+  `CONTENTFUL_WEBHOOK_SECRET`). The request only **enqueues jobs** and returns 204; the work runs
+  on the Sidekiq worker (Sidekiq retries on failure). On every publish/unpublish/delete it also
+  enqueues **`SiteBuildJob`**, which fires a GitHub `repository_dispatch` to rebuild the web site
+  (this replaces the old Contentful→Netlify build hook — the `.github/workflows/web.yml` "Web"
+  workflow builds from it; scope the Contentful webhook to **Entry + Asset** publish/unpublish/
+  delete so image-only changes rebuild too, and **not** auto-save). Contentful
   does **not** retry deliveries, so `rake standard_site:backfill` remains the broader
   reconciliation/recovery path. Operations log at info level (`standard.site: …`).
   `Webhooks::WhoopController#create` receives Whoop v2 webhooks (`workout.updated`,
@@ -118,7 +122,11 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   plain `Sidekiq::Job` superclass holding the shared `retry_for: 24.hours` — Sidekiq retries with
   its normal backoff, then Dead-sets a job once 24 hours have elapsed since the first failure);
   `StandardSiteSyncJob(operation,
-  entry_id)` runs the standard.site sync (webhook- and backfill-driven), and
+  entry_id)` runs the standard.site sync (webhook- and backfill-driven),
+  `SiteBuildJob()` fires a GitHub `repository_dispatch` (`contentful-publish`) to rebuild + redeploy
+  the **web** site (the `.github/workflows/web.yml` "Web" workflow listens for it) — enqueued by the
+  Contentful webhook on every publish/unpublish/delete so the static build picks up the change;
+  no-ops when `GITHUB_DISPATCH_TOKEN`/`GITHUB_REPOSITORY` are unset, and
   `ArticleEmbeddingJob(operation, entry_id)` keeps an article's Voyage embedding (the
   `embeddings:article:<id>` Redis key) in sync for the related-articles widget — `"embed"` on
   publish, `"delete"` on unpublish/delete (webhook-driven, plus the `embeddings:backfill` rake
@@ -281,7 +289,10 @@ secrets (and Rails `config/credentials.yml.enc` + `master.key`).
   release stage, and is unset in development/CI, so it's a no-op there),
   `ALLOWED_HOSTS` (comma-separated `Host`-header allowlist; **production only**, enables
   host authorization. Unset = all hosts accepted, so it's safe to deploy before setting it,
-  then activate by setting the fly secret. `/up` is always exempt. Never hardcode the host).
+  then activate by setting the fly secret. `/up` is always exempt. Never hardcode the host),
+  `GITHUB_DISPATCH_TOKEN` + `GITHUB_REPOSITORY` (the `SiteBuildJob` web-rebuild trigger — a
+  fine-grained PAT with **Contents: Read and write**, or a classic PAT with `repo`, plus the
+  `owner/repo` slug; both unset = the trigger no-ops, so dev/CI stay inert).
 
 ## Conventions & gates
 
