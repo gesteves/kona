@@ -194,13 +194,12 @@ export async function handleApi(
     return badGateway();
   }
 
-  console.info(
-    requestLogLine(
-      request,
-      `${request.method} ${incoming.pathname}`,
-      `→ ${upstream.status}`
-    )
-  );
+  // Just the path — everything else about a successful request (method, status, outcome, timings,
+  // client IP/UA/geo/ray) is already in the invocation log for this same requestId, so repeating
+  // it here would only mint a duplicate record. The path is the exception: Cloudflare redacts the
+  // widget's Contentful id out of the invocation log's URL, and that id is the only thing that
+  // says *which* article's trending/related fragment this was. Join the two on requestId.
+  console.info(incoming.pathname);
 
   const headers = withFragmentSecurityHeaders(new Headers());
   const contentType = upstream.headers.get('content-type');
