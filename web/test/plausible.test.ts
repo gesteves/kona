@@ -1,16 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fetchMock } from 'cloudflare:test';
 import { handlePlausible } from '../src/plausible';
-import { makeCtx } from './helpers';
+import { makeCtx, interceptFetch } from './helpers';
 
 const SCRIPT_UPSTREAM = 'https://cdn.test/js/pa-abc.js';
 const env = { PLAUSIBLE_SCRIPT_URL: SCRIPT_UPSTREAM } as Env;
-
-type Captured = { headers: Record<string, string | string[]> };
-const header = (c: Captured, name: string): string | undefined => {
-  const v = c.headers[name.toLowerCase()];
-  return Array.isArray(v) ? v[0] : v;
-};
 
 describe('handlePlausible', () => {
   // getScript reads/writes caches.default. Stub both so tests never touch real (per-test isolated)
@@ -33,16 +26,18 @@ describe('handlePlausible', () => {
   });
 
   it('proxies the script, stripping Set-Cookie so caches.default.put cannot throw', async () => {
-    fetchMock
-      .get('https://cdn.test')
-      .intercept({ path: '/js/pa-abc.js' })
-      .reply(200, 'window.plausible=function(){}', {
-        headers: {
-          'content-type': 'application/javascript',
-          'set-cookie': 'sid=1; Path=/',
-          'cache-control': 'public, max-age=3600',
-        },
-      });
+    interceptFetch(
+      'GET',
+      SCRIPT_UPSTREAM,
+      () =>
+        new Response('window.plausible=function(){}', {
+          headers: {
+            'content-type': 'application/javascript',
+            'set-cookie': 'sid=1; Path=/',
+            'cache-control': 'public, max-age=3600',
+          },
+        })
+    );
 
     const res = await handlePlausible(
       new Request('https://www.example.com/pa/script.js'),
@@ -56,12 +51,14 @@ describe('handlePlausible', () => {
   });
 
   it('normalizes the script cache key so a junk query cannot mint unbounded cache entries', async () => {
-    fetchMock
-      .get('https://cdn.test')
-      .intercept({ path: '/js/pa-abc.js' })
-      .reply(200, 'window.plausible=function(){}', {
-        headers: { 'content-type': 'application/javascript' },
-      });
+    interceptFetch(
+      'GET',
+      SCRIPT_UPSTREAM,
+      () =>
+        new Response('window.plausible=function(){}', {
+          headers: { 'content-type': 'application/javascript' },
+        })
+    );
 
     await handlePlausible(
       new Request('https://www.example.com/pa/script.js?x=random'),
@@ -75,14 +72,17 @@ describe('handlePlausible', () => {
       'https://www.example.com/pa/script.js'
     );
     const [stored] = vi.mocked(caches.default.put).mock.calls[0];
-    expect((stored as Request).url).toBe('https://www.example.com/pa/script.js');
+    expect((stored as Request).url).toBe(
+      'https://www.example.com/pa/script.js'
+    );
   });
 
   it('hands back a no-op 200 script when the upstream script errors (never a broken <script>)', async () => {
-    fetchMock
-      .get('https://cdn.test')
-      .intercept({ path: '/js/pa-abc.js' })
-      .reply(503, 'upstream down');
+    interceptFetch(
+      'GET',
+      SCRIPT_UPSTREAM,
+      () => new Response('upstream down', { status: 503 })
+    );
 
     const res = await handlePlausible(
       new Request('https://www.example.com/pa/script.js'),
@@ -95,14 +95,11 @@ describe('handlePlausible', () => {
   });
 
   it('forwards the event POST upstream, dropping cookies and adding X-Forwarded-For', async () => {
-    let captured!: Captured;
-    fetchMock
-      .get('https://plausible.io')
-      .intercept({ path: '/api/event', method: 'POST' })
-      .reply((opts) => {
-        captured = opts as unknown as Captured;
-        return { statusCode: 202, data: '' };
-      });
+    const upstream = interceptFetch(
+      'POST',
+      'https://plausible.io/api/event',
+      () => new Response('', { status: 202 })
+    );
 
     const res = await handlePlausible(
       new Request('https://www.example.com/pa/event', {
@@ -119,8 +116,9 @@ describe('handlePlausible', () => {
     );
 
     expect(res.status).toBe(202);
-    expect(header(captured, 'cookie')).toBeUndefined();
-    expect(header(captured, 'x-forwarded-for')).toBe('203.0.113.9');
+    const sent = upstream.request!.headers;
+    expect(sent.get('cookie')).toBeNull();
+    expect(sent.get('x-forwarded-for')).toBe('203.0.113.9');
   });
 
   it('404s an unknown /pa/ path', async () => {

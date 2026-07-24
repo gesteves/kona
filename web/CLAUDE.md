@@ -143,9 +143,18 @@ build fails loudly rather than shipping pages with missing icons.
   `@cloudflare/vitest-pool-workers` runs `test/**` inside `workerd` (fake `env`, mocked outbound
   `fetch`), covering the proxy header/cache contract, the Plausible proxy, and routing. ⚠️ The test
   tooling is isolated from production types: `tsconfig.test.json`
-  (test/** only, pulls in `@cloudflare/vitest-pool-workers` types) is **separate** from
+  (test/** only, pulls in `@cloudflare/workers-types` and drops the inherited `dom` lib, since
+  lib.dom's `CacheStorage` has no `caches.default`) is **separate** from
   `tsconfig.json` (src only, `types: []` + the `env.d.ts` shims) — the two must never share a
   compile, or the workers-types `ExecutionContext` collides with the shim.
+  ⚠️ **The pool config is `vitest.config.mts`, not `.ts`** — pool 0.18 is ESM-only, and without
+  `"type": "module"` in `package.json` (which would change how every other `.js` here is read)
+  Vite loads a `.ts` config as CJS and the import fails. It's a plain `defineConfig` whose pool
+  settings are the argument to the `cloudflareTest` plugin; the old
+  `defineWorkersConfig` + `test.poolOptions.workers` shape, and the `/config` subpath it came from,
+  are both gone. **Outbound fetch mocking is hand-rolled** in `test/helpers.ts` (`interceptFetch`,
+  which swaps `globalThis.fetch`) — the pool's `fetchMock` (an undici MockAgent on
+  `cloudflare:test`) was removed in the same release, and the alternative was taking on MSW.
   ⚠️ **`run_worker_first` is a POSITIVE allowlist — only listed paths invoke the Worker.** It
   lists exactly the dynamic routes (`/widgets/*`, `/api/contact`, `/pa/*`); everything else — every
   HTML page, fingerprinted asset, the sitemap, the feeds, `/.well-known/*`, and any 404 — is served

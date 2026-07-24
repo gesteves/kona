@@ -1,41 +1,24 @@
 import { describe, it, expect } from 'vitest';
-import { fetchMock } from 'cloudflare:test';
 import { handleApi } from '../src/api-proxy';
+import { interceptFetch } from './helpers';
 
 const ORIGIN = 'https://origin.test';
 const env = { KONA_API_URL: ORIGIN, API_TOKEN: 'SERVER_TOKEN' } as Env;
 
-// undici's reply callback hands us the upstream request it received. Normalize header access
-// (fetch lowercases names) so tests can assert what the Worker actually sent to the origin.
-type Captured = {
-  headers: Record<string, string | string[]>;
-  body?: string | null;
-};
-const header = (c: Captured, name: string): string | undefined => {
-  const v = c.headers[name.toLowerCase()];
-  return Array.isArray(v) ? v[0] : v;
-};
-
 describe('handleApi — widgets (GET)', () => {
   it('injects the constant bearer, drops the client authorization and accept', async () => {
-    let captured!: Captured;
-    fetchMock
-      .get(ORIGIN)
-      .intercept({ path: '/widgets/weather/current', method: 'GET' })
-      .reply((opts) => {
-        captured = opts as unknown as Captured;
-        return {
-          statusCode: 200,
-          data: '<div>weather</div>',
-          responseOptions: {
-            headers: {
-              'content-type': 'text/html',
-              'cache-control': 'public, max-age=0, stale-while-revalidate=300',
-              'cdn-cache-control': 'public, max-age=300',
-            },
+    const upstream = interceptFetch(
+      'GET',
+      `${ORIGIN}/widgets/weather/current`,
+      () =>
+        new Response('<div>weather</div>', {
+          headers: {
+            'content-type': 'text/html',
+            'cache-control': 'public, max-age=0, stale-while-revalidate=300',
+            'cdn-cache-control': 'public, max-age=300',
           },
-        };
-      });
+        })
+    );
 
     const res = await handleApi(
       new Request('https://www.example.com/widgets/weather/current', {
@@ -58,30 +41,28 @@ describe('handleApi — widgets (GET)', () => {
     expect(await res.text()).toBe('<div>weather</div>');
 
     // Upstream request: server bearer injected (client's dropped), cookie dropped.
-    expect(header(captured, 'authorization')).toBe('Bearer SERVER_TOKEN');
-    expect(header(captured, 'cookie')).toBeUndefined();
+    const sent = upstream.request!.headers;
+    expect(sent.get('authorization')).toBe('Bearer SERVER_TOKEN');
+    expect(sent.get('cookie')).toBeNull();
     // accept is contact-only: it varies per browser and the edge cache key ignores it, so
     // forwarding it would break the "every viewer's upstream request is identical" invariant.
-    expect(header(captured, 'accept')).toBeUndefined();
+    expect(sent.get('accept')).toBeNull();
     // Widgets never forward the visitor signal — that's contact-only.
-    expect(header(captured, 'x-kona-client-ip')).toBeUndefined();
+    expect(sent.get('x-kona-client-ip')).toBeNull();
     // Fragments are built from scratch here, so they carry their own security headers.
     expect(res.headers.get('x-content-type-options')).toBe('nosniff');
     expect(res.headers.get('x-frame-options')).toBe('DENY');
   });
 
   it('strips the query string so a junk param cannot bust the path-keyed edge cache', async () => {
-    // Only the BARE path is intercepted. undici throws on an unmatched request, so if the query
-    // ever reached the origin this test fails with an unmatched-intercept error rather than
-    // silently passing.
-    let captured!: Captured;
-    fetchMock
-      .get(ORIGIN)
-      .intercept({ path: '/widgets/whoop', method: 'GET' })
-      .reply((opts) => {
-        captured = opts as unknown as Captured;
-        return { statusCode: 200, data: '<div>whoop</div>' };
-      });
+    // Only the BARE path is intercepted, and intercepts match the full URL — query included. An
+    // upstream request carrying the query would match nothing and throw, so this fails with an
+    // unmocked-fetch error rather than silently passing.
+    const upstream = interceptFetch(
+      'GET',
+      `${ORIGIN}/widgets/whoop`,
+      () => new Response('<div>whoop</div>')
+    );
 
     const res = await handleApi(
       new Request('https://www.example.com/widgets/whoop?bust=random'),
@@ -90,14 +71,11 @@ describe('handleApi — widgets (GET)', () => {
 
     expect(res.status).toBe(200);
     expect(await res.text()).toBe('<div>whoop</div>');
-    // undici reports the path it actually received — no query on it.
-    expect((captured as unknown as { path: string }).path).toBe(
-      '/widgets/whoop'
-    );
+    expect(upstream.request!.url).toBe(`${ORIGIN}/widgets/whoop`);
   });
 
   it('405s a method the route does not accept, without touching the origin', async () => {
-    // No intercept registered at all: reaching the origin would throw an unmatched-request error.
+    // No intercept registered at all: reaching the origin would throw an unmocked-fetch error.
     const res = await handleApi(
       new Request('https://www.example.com/widgets/whoop', { method: 'PUT' }),
       env
@@ -117,10 +95,9 @@ describe('handleApi — widgets (GET)', () => {
   });
 
   it('returns an empty 502 when the origin fetch fails', async () => {
-    fetchMock
-      .get(ORIGIN)
-      .intercept({ path: '/widgets/boom', method: 'GET' })
-      .replyWithError(new Error('connect ECONNREFUSED'));
+    interceptFetch('GET', `${ORIGIN}/widgets/boom`, () => {
+      throw new Error('connect ECONNREFUSED');
+    });
 
     const res = await handleApi(
       new Request('https://www.example.com/widgets/boom'),
@@ -147,20 +124,15 @@ describe('handleApi — widgets (GET)', () => {
 
 describe('handleApi — contact (POST)', () => {
   it('forwards the visitor IP/UA/geo and the redirect Location, plus the bearer', async () => {
-    let captured!: Captured;
-    fetchMock
-      .get(ORIGIN)
-      .intercept({ path: '/api/contact', method: 'POST' })
-      .reply((opts) => {
-        captured = opts as unknown as Captured;
-        return {
-          statusCode: 303,
-          data: '',
-          responseOptions: {
-            headers: { location: 'https://www.example.com/contact/success' },
-          },
-        };
-      });
+    const upstream = interceptFetch(
+      'POST',
+      `${ORIGIN}/api/contact`,
+      () =>
+        new Response('', {
+          status: 303,
+          headers: { location: 'https://www.example.com/contact/success' },
+        })
+    );
 
     const res = await handleApi(
       new Request('https://www.example.com/api/contact', {
@@ -185,18 +157,19 @@ describe('handleApi — contact (POST)', () => {
     );
 
     // The origin gets the real visitor signal it can't otherwise see, under X-Kona-Client-*.
-    expect(header(captured, 'x-kona-client-ip')).toBe('203.0.113.7');
-    expect(header(captured, 'x-kona-client-ua')).toBe('TestBrowser/1.0');
-    expect(header(captured, 'x-kona-client-city')).toBe('Portland');
-    expect(header(captured, 'x-kona-client-region')).toBe('Oregon');
-    expect(header(captured, 'x-kona-client-country')).toBe('US');
-    expect(header(captured, 'authorization')).toBe('Bearer SERVER_TOKEN');
-    expect(header(captured, 'content-type')).toContain(
+    const sent = upstream.request!.headers;
+    expect(sent.get('x-kona-client-ip')).toBe('203.0.113.7');
+    expect(sent.get('x-kona-client-ua')).toBe('TestBrowser/1.0');
+    expect(sent.get('x-kona-client-city')).toBe('Portland');
+    expect(sent.get('x-kona-client-region')).toBe('Oregon');
+    expect(sent.get('x-kona-client-country')).toBe('US');
+    expect(sent.get('authorization')).toBe('Bearer SERVER_TOKEN');
+    expect(sent.get('content-type')).toContain(
       'application/x-www-form-urlencoded'
     );
     // Contact is the one route that needs accept — it picks the JSON 204/422 vs. the no-JS 303.
-    expect(header(captured, 'accept')).toBe('text/html');
+    expect(sent.get('accept')).toBe('text/html');
     // The streamed body still arrives intact.
-    expect(captured.body).toBe('name=T&email=t@example.com&message=hi');
+    expect(upstream.body).toBe('name=T&email=t@example.com&message=hi');
   });
 });
