@@ -202,11 +202,12 @@ Names only — see `.env.example`; never commit values.
   `npm run check` (Worker tsc) pass → `npm run lint:scss` + `npm run format:check` clean →
   `bundle exec rake build:verbose` succeeds (it builds the JS bundle via the external pipeline).
   ⚠️ **`rake build` does NOT run tests** — building and testing are separate; run `rake test`
-  yourself. The `.github/workflows/web.yml` `checks` job runs these same gates on every push/PR
-  (it runs **`bundle exec rspec`** directly, not `rake test`: booting the Rakefile introspects the
-  live Contentful schema (creds/network), whereas rspec loads only the specs — `contentful_spec`
-  stubs that client — and runs credential-free), and it **gates the deploy** on code pushes.
-  Follow `.editorconfig`.
+  yourself. The `.github/workflows/web.yml` `checks` job runs these same gates on every push to
+  `main` and every PR — a branch push with no open PR runs nothing, which is what keeps a PR
+  branch from running CI twice. It runs **`bundle exec rspec`** directly, not `rake test`:
+  booting the Rakefile introspects the live Contentful schema (creds/network), whereas rspec
+  loads only the specs — `contentful_spec` stubs that client — and runs credential-free. It
+  **gates the deploy** on code pushes. Follow `.editorconfig`.
 - **`dependencies` vs `devDependencies`**: the CI deploy job installs with **`npm ci --omit=dev`**
   (it doesn't need the test/lint toolchain), so anything the **build or deploy** needs must be a
   `dependency`, not a `devDependency`: `esbuild` + the JS-bundle imports (`@hotwired/*`,

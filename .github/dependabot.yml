@@ -46,8 +46,14 @@ updates:
         patterns:
           - "*"
 
+  # `directory: "/"` covers .github/workflows only. The composite action in
+  # .github/actions/notify-slack has its own `uses:` (slackapi/slack-github-action) and needs its
+  # own entry, pointed at the folder holding action.yml, or it never gets updated.
+  # ci-context isn't listed because it uses no third-party actions — add it if that changes.
   - package-ecosystem: "github-actions"
-    directory: "/"
+    directories:
+      - "/"
+      - "/.github/actions/notify-slack"
     schedule:
       interval: "weekly"
       day: "saturday"

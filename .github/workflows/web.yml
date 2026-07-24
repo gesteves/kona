@@ -3,28 +3,44 @@ name: "Web"
 # Builds and deploys the Middleman static site to the kona-web Cloudflare Worker.
 #
 # Triggers:
-#   - push / PR touching web/**  -> item 1: only rebuild when the web app actually changed
-#     (an api/-only or og/-only change never runs this workflow).
+#   - push to main / PR touching web/**  -> item 1: only rebuild when the web app actually
+#     changed (an api/-only or contentful/-only change never runs this workflow).
+#     ⚠️ `push` is scoped to main on purpose. It used to be ["*"], which meant every push to a
+#     branch with an open PR ran `checks` twice — once for the push (refs/heads/<branch>) and
+#     once for the PR (refs/pull/N/merge). Those are different `github.ref` values, so the
+#     concurrency group below never collapsed them. Work on a branch is covered by the
+#     pull_request trigger; main is covered here.
 #   - repository_dispatch: contentful-publish -> item 2: kona-api fires this when content is
 #     published/unpublished in Contentful (see api/app/jobs/site_build_job.rb).
 #   - workflow_dispatch -> manual "Run workflow" button (from main). An on-demand rebuild:
 #     the build always pulls Contentful drafts (preview token + `preview: true`) and renders
 #     each to /id/<entry-id>/ (noindex, unlisted), but only publish/unpublish/delete fires a
 #     build — so this is how you surface an in-progress draft without publishing it.
+#
+# The composite actions are in `paths` too: they're used by the jobs below, so a change to one
+# of them needs to run this workflow — without the entry it would trigger no CI at all.
 on:
   push:
-    branches: ["*"]
+    branches: [main]
     paths:
       - 'web/**'
       - '.github/workflows/web.yml'
+      - '.github/actions/**'
   pull_request:
     branches: [main]
     paths:
       - 'web/**'
       - '.github/workflows/web.yml'
+      - '.github/actions/**'
   repository_dispatch:
     types: [contentful-publish]
   workflow_dispatch:
+
+# No job writes to the repository — the deploy and the cache purge authenticate with
+# CLOUDFLARE_API_TOKEN and Slack with its webhook, never GITHUB_TOKEN. Pin it read-only rather
+# than inheriting whatever the repo-wide default happens to be.
+permissions:
+  contents: read
 
 # Coalesce rapid pushes / content publishes: a newer run cancels the in-flight one so we only
 # build the latest. Safe mid-deploy — wrangler activates the new Worker version only at the very
@@ -58,8 +74,19 @@ jobs:
           working-directory: web
           bundler-cache: true
 
+      # The slowest step in this workflow by a wide margin — measured at 19s in `checks` and 48s
+      # in `deploy`, against ~12s for the actual site build. libvips isn't on the runner
+      # image, so the whole tree is downloaded fresh: `libvips` is a *virtual* package provided
+      # by libvips42t64, which pulls ~33 direct dependencies (ImageMagick, poppler, librsvg,
+      # heif, jxl...). libvips42t64 itself declares no Recommends, but everything underneath it
+      # does, and apt installs recommends by default — hence --no-install-recommends. Keep the
+      # virtual name rather than libvips42t64: it survives Ubuntu's package renames (the t64
+      # suffix is itself one).
+      # ⚠️ Needed in BOTH jobs. web/lib/helpers/image_helpers.rb requires 'vips' at the top
+      # level, so rspec can't even load the helper without it — the specs stubbing Vips::Image
+      # doesn't help.
       - name: Install libvips (ruby-vips / blurhashes)
-        run: sudo apt-get update && sudo apt-get install -y libvips
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -100,8 +127,12 @@ jobs:
     if: ${{ always() && github.event_name != 'repository_dispatch' && github.event_name != 'workflow_dispatch' }}
 
     steps:
+      # This job only posts to Slack; the checkout exists solely so the local composite actions
+      # below resolve. Fetch just .github rather than the whole tree.
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github
 
       - name: CI context
         uses: ./.github/actions/ci-context
@@ -165,8 +196,19 @@ jobs:
           working-directory: web
           bundler-cache: true
 
+      # The slowest step in this workflow by a wide margin — measured at 19s in `checks` and 48s
+      # in `deploy`, against ~12s for the actual site build. libvips isn't on the runner
+      # image, so the whole tree is downloaded fresh: `libvips` is a *virtual* package provided
+      # by libvips42t64, which pulls ~33 direct dependencies (ImageMagick, poppler, librsvg,
+      # heif, jxl...). libvips42t64 itself declares no Recommends, but everything underneath it
+      # does, and apt installs recommends by default — hence --no-install-recommends. Keep the
+      # virtual name rather than libvips42t64: it survives Ubuntu's package renames (the t64
+      # suffix is itself one).
+      # ⚠️ Needed in BOTH jobs. web/lib/helpers/image_helpers.rb requires 'vips' at the top
+      # level, so rspec can't even load the helper without it — the specs stubbing Vips::Image
+      # doesn't help.
       - name: Install libvips (ruby-vips / blurhashes)
-        run: sudo apt-get update && sudo apt-get install -y libvips
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips
 
       - name: Set up Node
         uses: actions/setup-node@v4

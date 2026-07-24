@@ -1,20 +1,38 @@
 name: "API"
 
+# ⚠️ `push` is scoped to main on purpose. It used to be ["*"], which meant every push to a
+# branch with an open PR ran the checks twice — once for the push (refs/heads/<branch>) and once
+# for the PR (refs/pull/N/merge). Those are different `github.ref` values, so the concurrency
+# group below never collapsed them. Branch work is covered by the pull_request trigger.
+# The composite actions are in `paths` because the notify job below uses them — without the
+# entry, editing one would trigger no CI at all.
 on:
   push:
-    branches: ["*"]
+    branches: [main]
     paths:
       - 'api/**'
       - '.github/workflows/api.yml'
+      - '.github/actions/**'
   pull_request:
     branches: [main]
     paths:
       - 'api/**'
       - '.github/workflows/api.yml'
+      - '.github/actions/**'
 
+# No job writes to the repository — the deploy authenticates to fly with FLY_API_TOKEN, not
+# GITHUB_TOKEN. Pin it read-only rather than inheriting the repo-wide default.
+permissions:
+  contents: read
+
+# ⚠️ cancel-in-progress is deliberately OFF for main, because this group covers the deploy job.
+# Cancelling `flyctl deploy` mid-run can leave the app/worker machines on mixed versions — fly
+# rolls machines one at a time, so there's no equivalent of the wrangler guarantee that the new
+# version only goes live at the very end (see the note in web.yml). On branches/PRs the group
+# only covers tests, where cancelling a superseded run is free.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   ruby-tests:
@@ -84,8 +102,12 @@ jobs:
     if: always()
 
     steps:
+      # This job only posts to Slack; the checkout exists solely so the local composite actions
+      # below resolve. Fetch just .github rather than the whole tree.
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github
 
       - name: CI context
         uses: ./.github/actions/ci-context
@@ -133,7 +155,10 @@ jobs:
           color: "#439FE0"
           fallback: "API deploy starting: https://fly.io/apps/kona-api/monitoring"
 
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # ⚠️ Pinned to a release tag, NOT @master. This runs in the job that holds FLY_API_TOKEN,
+      # so a moving branch ref means any commit pushed to that third-party repo executes here
+      # with the deploy credential. Dependabot's github-actions updater bumps this tag.
+      - uses: superfly/flyctl-actions/setup-flyctl@1.6
 
       - name: Deploy to Fly.io
         id: fly_deploy

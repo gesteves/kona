@@ -6,28 +6,59 @@ runs:
   steps:
     - name: Set short SHA and branch/PR info
       shell: bash
+      # ⚠️ Every value from the event payload arrives through `env:` and is read as "$VAR"
+      # below — never spliced into the script with `${{ }}`. A commit message and a PR title
+      # are attacker-authored text, and `${{ }}` substitutes them into the *source* of this
+      # script, so backticks or $(…) in a commit message would execute as shell in a job that
+      # also handles deploy credentials. Keep new payload values in this block.
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        PR_TITLE: ${{ github.event.pull_request.title }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        PR_HEAD_REF: ${{ github.head_ref }}
+        PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        REF_NAME: ${{ github.ref_name }}
+        SERVER_URL: ${{ github.server_url }}
+        REPOSITORY: ${{ github.repository }}
       run: |
-        SHORT_SHA="${GITHUB_SHA::8}"
-        if [ "${{ github.event_name }}" == "pull_request" ]; then
-          BRANCH_NAME="${{ github.head_ref }}"
-          COMMIT_MESSAGE="$(echo "${{ github.event.pull_request.head.commit.message }}" | head -n 1 | sed 's/"/\\"/g')"
-          BRANCH_URL="${{ github.server_url }}/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
+        if [ "$EVENT_NAME" = "pull_request" ]; then
+          # GITHUB_SHA on a pull_request is the synthetic merge commit — one nobody pushed,
+          # unreachable once the PR closes — so link the PR's head instead. And
+          # `pull_request.head` carries only label/ref/sha/user/repo: there is no commit
+          # message on it, so the PR title is the only description available. (Reading
+          # head.commit.message here is what used to leave the Slack attachment as a bare sha
+          # followed by a dangling dash — the field is always empty.)
+          SHA="$PR_HEAD_SHA"
+          BRANCH_NAME="$PR_HEAD_REF"
+          COMMIT_MESSAGE="$PR_TITLE"
+          BRANCH_URL="${SERVER_URL}/${REPOSITORY}/pull/${PR_NUMBER}"
         else
-          BRANCH_NAME="${{ github.ref_name }}"
-          COMMIT_MESSAGE="$(echo "${{ github.event.head_commit.message }}" | head -n 1 | sed 's/"/\\"/g')"
-          BRANCH_URL="${{ github.server_url }}/${{ github.repository }}/tree/${{ github.ref_name }}"
+          SHA="$GITHUB_SHA"
+          BRANCH_NAME="$REF_NAME"
+          COMMIT_MESSAGE="$HEAD_COMMIT_MESSAGE"
+          BRANCH_URL="${SERVER_URL}/${REPOSITORY}/tree/${REF_NAME}"
         fi
 
-        # COMMIT_CONTEXT is the Slack attachment's first line. Only push/PR events carry a
-        # head_commit, so for the two deploy triggers that don't, the usual "<sha> - <message>"
-        # renders as a bare hash followed by a dangling dash. Label those by what actually
-        # triggered the deploy instead:
+        SHORT_SHA="${SHA::8}"
+
+        # First line only, then escape backslashes and double quotes. COMMIT_CONTEXT is
+        # interpolated into notify-slack's YAML `payload:` block, where a raw " breaks the
+        # string — and a raw newline would break both that and the KEY=value writes to
+        # $GITHUB_ENV below. Backslashes have to be escaped first, or the rule would re-escape
+        # the ones the quote rule just added.
+        COMMIT_MESSAGE="$(printf '%s' "$COMMIT_MESSAGE" | head -n 1 | sed 's/\\/\\\\/g; s/"/\\"/g')"
+
+        # COMMIT_CONTEXT is the Slack attachment's first line. Only push/PR events describe a
+        # change; for the two deploy triggers that don't, the usual "<sha> - <message>" renders
+        # as a bare hash followed by a dangling dash. Label those by what actually triggered
+        # the deploy instead:
         #   repository_dispatch -> a Contentful publish/unpublish (the api's SiteBuildJob). The
         #     commit is just whatever main happened to be at, so the sha is noise — drop it.
         #   workflow_dispatch   -> a manual "Run workflow". The sha IS meaningful (it's what got
         #     deployed), so keep the link and say why there's no message.
-        COMMIT_LINK="<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|\`${SHORT_SHA}\`>"
-        case "${{ github.event_name }}" in
+        COMMIT_LINK="<${SERVER_URL}/${REPOSITORY}/commit/${SHA}|\`${SHORT_SHA}\`>"
+        case "$EVENT_NAME" in
           repository_dispatch) COMMIT_CONTEXT="Content update — published in Contentful" ;;
           workflow_dispatch)   COMMIT_CONTEXT="Manual rebuild of ${COMMIT_LINK}" ;;
           *)                   COMMIT_CONTEXT="${COMMIT_LINK} - ${COMMIT_MESSAGE}" ;;
