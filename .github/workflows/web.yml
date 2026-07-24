@@ -32,6 +32,10 @@ jobs:
   checks:
     name: Checks
     runs-on: ubuntu-latest
+    # Skipped on a Contentful publish (repository_dispatch): that changes content, not code, so
+    # there's nothing new to test/lint/typecheck — and the code on main already passed checks when
+    # it was pushed. Keeps content republishes off the ~1-minute test critical path.
+    if: github.event_name != 'repository_dispatch'
 
     defaults:
       run:
@@ -84,7 +88,8 @@ jobs:
     name: Notify checks result
     runs-on: ubuntu-latest
     needs: [checks]
-    if: always()
+    # always() so a checks failure still notifies; skipped on dispatch, where checks didn't run.
+    if: ${{ always() && github.event_name != 'repository_dispatch' }}
 
     steps:
       - name: Checkout code
@@ -120,11 +125,16 @@ jobs:
     concurrency: deploy-kona-web
     # Deploy on a push to main OR a Contentful publish; never on PRs or other branches. The
     # [skip deploy] / [no deploy] escape hatch only applies to pushes (a dispatch has no commit).
+    # The checks-result guard lets the deploy run when checks is *skipped* (a content dispatch,
+    # where checks doesn't run) as well as when it *succeeds* (a code push) — but not when it
+    # fails; !cancelled() is what lets this evaluate past a skipped dependency.
     if: >-
-      github.event_name == 'repository_dispatch' ||
+      !cancelled() &&
+      (needs.checks.result == 'success' || needs.checks.result == 'skipped') &&
+      (github.event_name == 'repository_dispatch' ||
       (github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       !contains(github.event.head_commit.message, '[skip deploy]') &&
-      !contains(github.event.head_commit.message, '[no deploy]'))
+      !contains(github.event.head_commit.message, '[no deploy]')))
 
     defaults:
       run:
@@ -153,8 +163,12 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
+      # --omit=dev: the deploy only needs the build/deploy tools (esbuild + its bundle imports,
+      # pagefind, wrangler — all in `dependencies`), NOT the test/lint toolchain (vitest +
+      # workerd, typescript, stylelint, prettier — all devDependencies). Skipping those cuts the
+      # install noticeably. The `checks` job still runs a full `npm ci` since it needs them.
       - name: Install npm dependencies
-        run: npm ci
+        run: npm ci --omit=dev
         env:
           WEBAWESOME_NPM_TOKEN: ${{ secrets.WEBAWESOME_NPM_TOKEN }}
 
@@ -167,10 +181,11 @@ jobs:
           color: "#439FE0"
           fallback: "Web deploy starting"
 
-      # rake build = test -> import (Contentful/icons/standard-site) -> middleman build ->
-      # rename _redirects/_headers -> pagefind. Hostnames come from repo *variables*, tokens from
-      # *secrets* (no hostnames live in this file). DEPLOY_CONTEXT=production makes it a real
-      # production build (canonicals/feeds/og from URL, the analytics snippet, etc.).
+      # rake build = import (Contentful/icons/standard-site) -> middleman build -> rename
+      # _redirects/_headers -> pagefind. It does NOT run tests (those are the `checks` job's job,
+      # which gates deploys on code pushes). Tokens come from *secrets* (no hostnames live in this
+      # file). DEPLOY_CONTEXT=production makes it a real production build (canonicals/feeds/og from
+      # URL, the analytics snippet, etc.).
       - name: Build the site
         run: bundle exec rake build
         env:

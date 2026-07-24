@@ -1,13 +1,17 @@
 BUILD_DIRECTORY = 'build'
 
+# Building and testing are separate concerns: `rake build` does NOT run the test suite. Run
+# tests with `rake test` (locally, before committing) — in CI they live in the `checks` job,
+# which gates deploys on code pushes. Keeping them out of the build means a Contentful-publish
+# rebuild (no code changed) isn't slowed by a redundant test run.
 desc 'Import content and build the site'
-task :build => [:dotenv, :test, :import] do
+task :build => [:dotenv, :import] do
   build_site
 end
 
 namespace :build do
   desc 'Import content and build the site with verbose output'
-  task :verbose => [:dotenv, :test, :import] do
+  task :verbose => [:dotenv, :import] do
     build_site(verbose: true)
   end
 end
