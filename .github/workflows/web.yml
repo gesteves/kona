@@ -62,8 +62,11 @@ jobs:
         env:
           WEBAWESOME_NPM_TOKEN: ${{ secrets.WEBAWESOME_NPM_TOKEN }}
 
+      # rspec directly, NOT `rake test`: loading the Rakefile requires the data layer, which
+      # introspects the live Contentful schema at boot (needs creds/network). rspec loads only the
+      # specs, and contentful_spec stubs that client, so the suite runs credential-free in CI.
       - name: Ruby tests
-        run: bundle exec rake test
+        run: bundle exec rspec
 
       - name: Worker tests
         run: npm test

@@ -217,8 +217,11 @@ Names only — see `.env.example`; never commit values.
 - **Before committing** (non-negotiable): `bundle exec rake test` + `npm test` (Worker suite) +
   `npm run check` (Worker tsc) pass → `npm run lint:scss` + `npm run format:check` clean →
   `bundle exec rake build:verbose` succeeds (it builds the JS bundle via the external pipeline).
-  These are the same gates the `.github/workflows/web.yml` `checks` job runs on every push/PR.
-  Follow `.editorconfig`.
+  The `.github/workflows/web.yml` `checks` job runs the same gates on every push/PR — except it
+  runs **`bundle exec rspec`** directly, not `rake test`: booting the Rakefile requires the data
+  layer, which introspects the live Contentful schema (needs creds/network), whereas rspec loads
+  only the specs (`contentful_spec` stubs that client) and runs credential-free. Follow
+  `.editorconfig`.
 - **Netlify**: build tools must be in `dependencies`, not `devDependencies` — Netlify
   installs with `NODE_ENV=production` and skips `devDependencies`.
 - **Tests** live in `spec/` and focus on helpers, text/markdown processing, and data
