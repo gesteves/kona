@@ -32,20 +32,17 @@
     // model kept tripping on (a blanket `!/*.js` used to swallow /pa/script.js; `!/*.xml` would
     // swallow the feeds) — there are simply no negations any more.
     //
-    // The four dynamic routes that MUST run the Worker (see src/index.ts). Each either has no
-    // asset (so assets-first would 404 it) or has an asset the Worker must intercept:
+    // The two dynamic routes that MUST run the Worker (see src/index.ts) — neither has a static
+    // asset, so assets-first would 404 them and they have to reach an origin:
     //   /widgets/*, /api/contact  → kona-api proxy (no asset; must reach the origin)
     //   /pa/*                     → Plausible first-party proxy (no asset; proxied upstream)
-    //   /feed.xml, /*/feed.xml    → the built feed IS an asset, but feed-source.ts must relabel
-    //                               utm_source per reader — the root feed plus every nested tag
-    //                               feed (`<tag path>/feed.xml`, any depth; `*` crosses `/`).
+    // Everything with a built asset — including the root and per-tag feeds (feed.xml) — is served
+    // straight from the asset layer and never runs Worker code.
     // No /cdn-cgi/* entry is needed: Cloudflare answers image transformations at its own edge.
     "run_worker_first": [
       "/widgets/*",
       "/api/contact",
       "/pa/*",
-      "/feed.xml",
-      "/*/feed.xml",
     ],
   },
 

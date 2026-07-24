@@ -1,25 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fetchMock } from 'cloudflare:test';
 import worker from '../src/index';
-import { makeCtx, feedResponse } from './helpers';
+import { makeCtx } from './helpers';
 
 const ORIGIN = 'https://origin.test';
 const SCRIPT_UPSTREAM = 'https://cdn.test/pa.js';
 
-// ASSETS serves the feed XML for feed paths and a plain marker for everything else, so routing to
-// handleFeed vs servePage is distinguishable by the response.
+// ASSETS returns a plain marker for every path, so a route that falls through to servePage is
+// distinguishable (body 'ASSET') from one the Worker proxies itself.
 const env = {
   KONA_API_URL: ORIGIN,
   API_TOKEN: 'T',
   PLAUSIBLE_SCRIPT_URL: SCRIPT_UPSTREAM,
   ASSETS: {
-    fetch: async (req: Request) =>
-      new URL(req.url).pathname.endsWith('/feed.xml')
-        ? feedResponse()
-        : new Response('ASSET', {
-            status: 200,
-            headers: { 'content-type': 'text/html' },
-          }),
+    fetch: async () =>
+      new Response('ASSET', {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      }),
   },
 } as unknown as Env;
 
@@ -73,19 +71,15 @@ describe('worker routing (src/index)', () => {
     expect(await res.text()).toBe('SCRIPT');
   });
 
-  it('routes /feed.xml and nested tag feeds to the feed relabeler', async () => {
-    for (const path of ['/feed.xml', '/tagged/running/feed.xml']) {
-      const res = await get(path, { headers: { 'user-agent': 'Feedly' } });
-      // The private Cache-Control is handleFeed's signature; servePage never sets it.
-      expect(res.headers.get('cache-control')).toBe(
-        'private, max-age=0, must-revalidate'
-      );
-      expect(await res.text()).toContain('utm_source=Feedly');
-    }
-  });
-
-  it('serves everything else straight from the asset layer (no feed rewriting)', async () => {
-    for (const path of ['/', '/about/', '/2026/06/26/some-post/']) {
+  it('serves everything else — including the feeds — straight from the asset layer', async () => {
+    // The feeds used to be Worker-routed for per-reader utm rewriting; they are now plain assets.
+    for (const path of [
+      '/',
+      '/about/',
+      '/2026/06/26/some-post/',
+      '/feed.xml',
+      '/tagged/running/feed.xml',
+    ]) {
       const res = await get(path);
       expect(await res.text()).toBe('ASSET');
       expect(res.headers.get('cache-control')).toBeNull();

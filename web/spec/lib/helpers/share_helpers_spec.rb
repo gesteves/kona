@@ -9,7 +9,7 @@ RSpec.describe ShareHelpers do
   describe '#share_url' do
     it 'builds a mailto URL with the title as subject and the URL as body' do
       url = share_url('Email', article)
-      expect(url).to eq('mailto:?subject=My%20Race%20Report&body=https%3A%2F%2Fexample.com%2F2026%2F06%2F15%2Fmy-race-report%2F%3Fref%3DEmail')
+      expect(url).to eq('mailto:?subject=My%20Race%20Report&body=https%3A%2F%2Fexample.com%2F2026%2F06%2F15%2Fmy-race-report%2F')
     end
 
     it 'builds an SMS URL with title and URL in one body' do
@@ -41,9 +41,10 @@ RSpec.describe ShareHelpers do
       expect(url).to start_with('https://www.threads.com/intent/post?text=My%20Race%20Report&url=')
     end
 
-    it 'tags each network share URL with its own ?ref= attribution' do
+    it 'embeds a clean article URL with no attribution query params' do
       described_class::SHARE_NETWORKS.each_key do |network|
-        expect(share_url(network, article)).to include(ERB::Util.url_encode("ref=#{network}"))
+        # The article URL is encoded into the share params; with no attribution it has no `?query`.
+        expect(share_url(network, article)).not_to include(ERB::Util.url_encode('?'))
       end
     end
 

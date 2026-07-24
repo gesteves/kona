@@ -3,8 +3,8 @@ require 'erb'
 module ShareHelpers
   # Each share network's endpoint and query params, in the order they appear in the URL.
   # A Symbol param value carries that part of the share (:title or :url); a String value is
-  # a format template combining both, encoded as one blob. The article URL always carries
-  # the network's name as its ?ref= attribution param.
+  # a format template combining both, encoded as one blob. The shared article URL is clean —
+  # no attribution query params.
   SHARE_NETWORKS = {
     'Email'    => { base: 'mailto:?',                                    params: { subject: :title, body: :url } },
     'SMS'      => { base: 'sms:?&',                                      params: { body: '%{title} %{url}' } },
@@ -21,7 +21,7 @@ module ShareHelpers
   # @return [String] The share URL.
   def share_url(network, article)
     config = SHARE_NETWORKS.fetch(network)
-    parts = { title: sanitize(article.title), url: full_url(article.path, ref: network) }
+    parts = { title: sanitize(article.title), url: full_url(article.path) }
     query = config[:params].map do |param, value|
       part = value.is_a?(Symbol) ? parts.fetch(value) : format(value, parts)
       "#{param}=#{ERB::Util.url_encode(part)}"

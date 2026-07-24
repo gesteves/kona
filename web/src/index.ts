@@ -1,12 +1,11 @@
 import { handleApi } from './api-proxy';
 import { handlePlausible } from './plausible';
-import { handleFeed } from './feed-source';
 import { servePage } from './serve-page';
 
 // Entry point. Only the paths in wrangler.jsonc's run_worker_first allowlist reach this code —
-// the widget/contact proxy, the Plausible proxy, and the feeds. Everything else (every HTML
-// page, fingerprinted assets, images, the sitemap, .well-known, 404s) is served straight from
-// the static asset layer without invoking the Worker at all.
+// the widget/contact proxy and the Plausible proxy. Everything else (every HTML page,
+// fingerprinted assets, images, the sitemap, the feeds, .well-known, 404s) is served straight
+// from the static asset layer without invoking the Worker at all.
 export default {
   async fetch(
     request: Request,
@@ -25,11 +24,6 @@ export default {
       return handleApi(request, env);
     }
     if (pathname.startsWith('/pa/')) return handlePlausible(request, env, ctx);
-
-    // The main feed and every per-tag feed (`<tag path>feed.xml`, nested to any depth). The
-    // `/feed.xml` suffix — with its leading slash — matches both without catching a stray
-    // `…somethingfeed.xml`. handleFeed relabels utm_source per reader (see feed-source.ts).
-    if (pathname.endsWith('/feed.xml')) return handleFeed(request, env);
 
     // Defensive fallthrough. With the positive run_worker_first allowlist (wrangler.jsonc), the
     // only paths that reach the Worker are the dynamic routes above — page views are served

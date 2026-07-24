@@ -102,14 +102,6 @@ build fails loudly rather than shipping pages with missing icons.
   `source/javascripts/stimulus/`, `source/stylesheets/`.
 - `netlify/functions/` — `api-proxy.mts` (proxies `/widgets/*` **and** `POST /api/contact`;
   see root `CLAUDE.md`).
-- `netlify/edge-functions/` — `feed-source.ts` (per-reader feed URL attribution — its
-  `Cache-Control: private` is load-bearing because Cloudflare ignores `Vary: User-Agent`). It
-  reads the real client IP/geo from `CF-*` headers rather than `context.ip`/`context.geo`, via
-  `edge-functions/lib/log.ts` — a separate Deno copy of `functions/lib/log.mts` (edge functions
-  run in Deno and can't import the Node module). There is **no** `block-bots` function any more
-  (moved to a Cloudflare WAF rule, root [`CLAUDE.md`](../CLAUDE.md)), and no `known-agents.ts` any
-  more — server-side Known Agents / Dark Visitors tracking was removed; Cloudflare's own bot/AI
-  analytics covers it.
 - Open Graph "cards" (the `og:image` for pages without a cover image) were rendered **on demand**
   by a separate `kona-og` fly service. **That service is currently parked** (removed from `main`,
   preserved on the `restore-og` branch — it didn't earn its own app for now), so cover-less pages
@@ -147,9 +139,9 @@ build fails loudly rather than shipping pages with missing icons.
   Netlify is retired.
 - `wrangler.jsonc` + `src/` — the Cloudflare Worker for the Netlify→Cloudflare migration:
   serves `build/` as static assets plus routes for the widget proxy, Plausible proxy, and contact
-  form. Its `src/*.ts` files are 1:1 ports of the `netlify/` functions/edge-functions above (each
-  file header names its counterpart); `src/plausible.ts` additionally absorbs the `/pa/*` proxying
-  Netlify does via `_redirects` rewrites.
+  form. Its `src/*.ts` files are 1:1 ports of the `netlify/functions` above (each file header names
+  its counterpart); `src/plausible.ts` additionally absorbs the `/pa/*` proxying Netlify does via
+  `_redirects` rewrites.
   ⚠️ **Dual-deploy window**: both paths still ship. `www` has been cut over to the Cloudflare
   Worker; Netlify remains as a rollback until it's retired, so keep the `netlify/` and `src/`
   copies in sync until then. (Server-side Known Agents tracking that used to live in both — the
@@ -157,23 +149,23 @@ build fails loudly rather than shipping pages with missing icons.
   analytics replaces it.) Typecheck the Worker with `npm run check` (`tsc --noEmit`; wrangler
   itself never typechecks), and **test it with `npm test`** — Vitest via
   `@cloudflare/vitest-pool-workers` runs `test/**` inside `workerd` (fake `env`, mocked outbound
-  `fetch`), covering the proxy header/cache contract, the per-reader feed relabeling, the Plausible
-  proxy, and routing. ⚠️ The test tooling is isolated from production types: `tsconfig.test.json`
+  `fetch`), covering the proxy header/cache contract, the Plausible proxy, and routing. ⚠️ The test
+  tooling is isolated from production types: `tsconfig.test.json`
   (test/** only, pulls in `@cloudflare/vitest-pool-workers` types) is **separate** from
   `tsconfig.json` (src only, `types: []` + the `env.d.ts` shims) — the two must never share a
   compile, or the workers-types `ExecutionContext` collides with the shim. See the migration plan
   before touching the cutover pieces.
   ⚠️ **`run_worker_first` is a POSITIVE allowlist — only listed paths invoke the Worker.** It
-  lists exactly the dynamic routes (`/widgets/*`, `/api/contact`, `/pa/*`, `/feed.xml`,
-  `/*/feed.xml`); everything else — every HTML page, fingerprinted asset, the sitemap,
-  `/.well-known/*`, and any 404 — is served straight from the static asset layer and never runs
-  Worker code (page views cost no Worker invocation). Each listed route needs the Worker because it
-  either has **no asset** (widgets/contact/pa would 404 at the asset layer) or has an asset the
-  Worker must **intercept** (the built `feed.xml` is relabeled per-reader by `feed-source.ts`).
-  When you add a dynamic route, add its path here too, and mind that Cloudflare globs **cross `/`**
-  (that's why `/*/feed.xml` covers tag feeds at any depth). This replaced the old "`/*` minus ~25
-  asset negations" model — which kept tripping over extension negations (a blanket `!/*.js` once
-  swallowed `/pa/script.js`); the allowlist has no negations, so that class of bug is gone.
+  lists exactly the dynamic routes (`/widgets/*`, `/api/contact`, `/pa/*`); everything else — every
+  HTML page, fingerprinted asset, the sitemap, the feeds, `/.well-known/*`, and any 404 — is served
+  straight from the static asset layer and never runs Worker code (page views cost no Worker
+  invocation). Each listed route needs the Worker because it has **no asset** (widgets/contact/pa
+  would 404 at the asset layer) and must reach an origin. When you add a dynamic route, add its path
+  here too, and mind that Cloudflare globs **cross `/`** (that's why `/widgets/*` matches nested
+  paths like `/widgets/weather/current`). This replaced the old "`/*` minus ~25 asset negations"
+  model — which kept tripping over extension negations (a blanket `!/*.js` once swallowed
+  `/pa/script.js`, `!/*.xml` would have swallowed the feeds); the allowlist has no negations, so
+  that class of bug is gone.
 - `data/font_awesome.yml` — **icon allowlist**. Any new icon must be added here (under
   the correct family/style, e.g. `classic.light`) before `icon_svg` / `rake import:icons`
   can use it. `import:icons` posts this tree to the `api/` `/api/icons` endpoint, which

@@ -54,11 +54,9 @@ concluding something is a code problem.
 - **Client IP** — `CF-Connecting-IP` is the only real visitor IP. Netlify's `context.ip` and
   fly's `Fly-Client-IP` are both **Cloudflare PoPs**, not the visitor. Code that needs the
   client reads `CF-Connecting-IP` first and falls back: `api/config/initializers/rack_attack.rb`,
-  `web/netlify/functions/lib/log.mts` (Node functions), and `web/netlify/edge-functions/lib/log.ts`
-  (the `feed-source` edge function). The edge helper is a **separate** copy of the Node one because
-  edge functions run in Deno and can't import a Node functions module — one duplication (Node vs
-  Deno). The header is spoofable by anything hitting an origin directly, so it may key throttling
-  and logging but must **never** gate a ban.
+  `web/src/log.ts` (the Worker), and `web/netlify/functions/lib/log.mts` (the legacy Node function,
+  pending removal). The header is spoofable by anything hitting an origin directly, so it may key
+  throttling and logging but must **never** gate a ban.
 - **Geo / trace headers** — `CF-IPCity` / `CF-Region` / `CF-IPCountry` for geo, `CF-Ray` as both
   the "this traversed the zone" marker and the join key into Cloudflare's logs.
 - **Images** — Cloudflare Images serves every transformation from `<IMAGES_URL>/cdn-cgi/image/…`
@@ -71,9 +69,7 @@ concluding something is a code problem.
   the `.png` extension), unlike the otherwise dynamic zone.
 - **Caching** — the zone is deliberately **dynamic: Cloudflare caches almost nothing**. The
   origin cache headers (Netlify's durable edge, the widget TTLs) still do the real work, so
-  don't reason about widget caching as if Cloudflare were in the loop. Cloudflare **ignores
-  `Vary: User-Agent` entirely**, which is why per-reader responses must be `Cache-Control:
-  private` (`web/netlify/edge-functions/feed-source.ts`).
+  don't reason about widget caching as if Cloudflare were in the loop.
 - **Bot blocking is a zone rule, not code** — the `block-bots` Netlify edge function was
   **deleted** (`3c4e0044`). Its job — blocking a scraper that spoofs a Google referral (a
   desktop-Linux Chrome UA arriving with a `google.com` referer) — is now a **WAF BLOCK rule in
