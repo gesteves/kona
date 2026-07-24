@@ -5,9 +5,20 @@
   // shims. This config pulls those types in and includes only test/** — NOT src/env.d.ts — so the
   // two never share a compile. `npm run check` still runs on tsconfig.json (src only); vitest itself
   // transpiles tests with esbuild and never consults this file, so it only affects the editor.
+  //
+  // ⚠️ `types` names @cloudflare/workers-types directly. It used to name the pool package, whose
+  // root type entry re-exported the Worker globals for free; pool 0.18 repointed that entry at the
+  // Node-side plugin API (`cloudflareTest` et al), which declares none of them — leaving the whole
+  // suite red in the editor with "Cannot find name 'ExecutionContext'". The `cloudflare:test`
+  // module's own types now live behind the `/types` subpath; nothing here imports it (outbound
+  // fetch mocking is hand-rolled in test/helpers.ts), so it isn't listed.
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["@cloudflare/vitest-pool-workers"]
+    "types": ["@cloudflare/workers-types/experimental"],
+    // Drops the inherited `dom` lib for this compile only. workers-types and lib.dom both declare
+    // `CacheStorage`, and the DOM one — which has no `caches.default` — wins, so every
+    // `caches.default` in the suite reads as an error while the tests themselves run fine.
+    "lib": ["es2022"]
   },
-  "include": ["test/**/*.ts", "vitest.config.ts"]
+  "include": ["test/**/*.ts", "vitest.config.mts"]
 }

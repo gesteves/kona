@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fetchMock } from 'cloudflare:test';
 import worker from '../src/index';
-import { makeCtx } from './helpers';
+import { makeCtx, interceptFetch } from './helpers';
 
 const ORIGIN = 'https://origin.test';
 const SCRIPT_UPSTREAM = 'https://cdn.test/pa.js';
@@ -38,19 +37,21 @@ describe('worker routing (src/index)', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('routes /widgets/* to the api proxy', async () => {
-    fetchMock
-      .get(ORIGIN)
-      .intercept({ path: '/widgets/weather/current', method: 'GET' })
-      .reply(200, 'WIDGET');
+    interceptFetch(
+      'GET',
+      `${ORIGIN}/widgets/weather/current`,
+      () => new Response('WIDGET')
+    );
     const res = await get('/widgets/weather/current');
     expect(await res.text()).toBe('WIDGET');
   });
 
   it('routes /api/contact to the api proxy', async () => {
-    fetchMock
-      .get(ORIGIN)
-      .intercept({ path: '/api/contact', method: 'POST' })
-      .reply(204, '');
+    interceptFetch(
+      'POST',
+      `${ORIGIN}/api/contact`,
+      () => new Response(null, { status: 204 })
+    );
     const res = await get('/api/contact', {
       method: 'POST',
       body: 'name=x',
@@ -60,12 +61,14 @@ describe('worker routing (src/index)', () => {
   });
 
   it('routes /pa/script.js to the Plausible proxy', async () => {
-    fetchMock
-      .get('https://cdn.test')
-      .intercept({ path: '/pa.js' })
-      .reply(200, 'SCRIPT', {
-        headers: { 'content-type': 'application/javascript' },
-      });
+    interceptFetch(
+      'GET',
+      SCRIPT_UPSTREAM,
+      () =>
+        new Response('SCRIPT', {
+          headers: { 'content-type': 'application/javascript' },
+        })
+    );
     const res = await get('/pa/script.js');
     expect(res.headers.get('content-type')).toBe('application/javascript');
     expect(await res.text()).toBe('SCRIPT');
