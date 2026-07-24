@@ -16,9 +16,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  PRODUCTION_URL: ${{ secrets.API_PRODUCTION_URL }}
-
 jobs:
   ruby-tests:
     name: Ruby tests
@@ -80,10 +77,10 @@ jobs:
       - name: bundler-audit (dependency CVEs)
         run: bundle exec bundle-audit check --update
 
-  notify-test:
-    name: Notify test result
+  notify-checks:
+    name: Notify checks result
     runs-on: ubuntu-latest
-    needs: [ruby-tests]
+    needs: [ruby-tests, security]
     if: always()
 
     steps:
@@ -94,47 +91,24 @@ jobs:
         uses: ./.github/actions/ci-context
 
       - name: Notify Slack (success)
-        if: ${{ needs.ruby-tests.result == 'success' }}
+        if: ${{ needs.ruby-tests.result == 'success' && needs.security.result == 'success' }}
         continue-on-error: true
         uses: ./.github/actions/notify-slack
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          text: "API tests passed on <${{ env.BRANCH_URL }}|`${{ env.BRANCH_NAME }}`>"
+          text: "API checks passed on <${{ env.BRANCH_URL }}|`${{ env.BRANCH_NAME }}`>"
           color: "good"
-          fallback: "API tests passed on ${{ env.BRANCH_NAME }}"
+          fallback: "API checks passed on ${{ env.BRANCH_NAME }}"
 
       - name: Notify Slack (failure)
-        if: ${{ needs.ruby-tests.result == 'failure' }}
+        if: ${{ needs.ruby-tests.result == 'failure' || needs.security.result == 'failure' }}
         continue-on-error: true
         uses: ./.github/actions/notify-slack
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          text: "API tests <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|failed> on <${{ env.BRANCH_URL }}|`${{ env.BRANCH_NAME }}`>"
+          text: "API checks <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|failed> on <${{ env.BRANCH_URL }}|`${{ env.BRANCH_NAME }}`>"
           color: "danger"
-          fallback: "API tests failed on ${{ env.BRANCH_NAME }}"
-
-  notify-security:
-    name: Notify security result
-    runs-on: ubuntu-latest
-    needs: [security]
-    if: always()
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: CI context
-        uses: ./.github/actions/ci-context
-
-      - name: Notify Slack (failure)
-        if: ${{ needs.security.result == 'failure' }}
-        continue-on-error: true
-        uses: ./.github/actions/notify-slack
-        with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          text: "API security scan <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|failed> on <${{ env.BRANCH_URL }}|`${{ env.BRANCH_NAME }}`>"
-          color: "danger"
-          fallback: "API security scan failed on ${{ env.BRANCH_NAME }}"
+          fallback: "API checks failed on ${{ env.BRANCH_NAME }}"
 
   deploy:
     name: Deploy API
@@ -174,9 +148,9 @@ jobs:
         uses: ./.github/actions/notify-slack
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          text: "API deploy <${{ env.PRODUCTION_URL }}|successful> :rocket:"
+          text: "API deploy <${{ secrets.KONA_API_URL }}|successful> :rocket:"
           color: "good"
-          fallback: "API deploy successful: ${{ env.PRODUCTION_URL }}"
+          fallback: "API deploy successful: ${{ secrets.KONA_API_URL }}"
 
       - name: Notify Slack (deploy failed)
         if: failure()

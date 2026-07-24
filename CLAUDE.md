@@ -35,10 +35,10 @@ comments, docs, examples, tests, and CI config.** This covers the public site ho
 API/admin host, and the fly.io origin host. They are environment-specific and must always
 come from configuration:
 
-- The API origin is read from `KONA_API_URL` (web build + `/widgets/*` proxy).
+- The API origin is read from `KONA_API_URL` (web build + `/widgets/*` proxy, and the api's own
+  CI deploy-success Slack link).
 - The site URL is read from `URL` (web).
-- The Whoop redirect URI is read from `WHOOP_REDIRECT_URI`; CI's deploy URL from the
-  `API_PRODUCTION_URL` secret.
+- The Whoop redirect URI is read from `WHOOP_REDIRECT_URI`.
 
 When an example or placeholder genuinely needs a host, use a generic stand-in like
 `https://<your-app-host>/…` — never the real domain.

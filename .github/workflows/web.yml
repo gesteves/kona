@@ -93,6 +93,16 @@ jobs:
       - name: CI context
         uses: ./.github/actions/ci-context
 
+      - name: Notify Slack (success)
+        if: ${{ needs.checks.result == 'success' }}
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          text: "Web checks passed on <${{ env.BRANCH_URL }}|`${{ env.BRANCH_NAME }}`>"
+          color: "good"
+          fallback: "Web checks passed on ${{ env.BRANCH_NAME }}"
+
       - name: Notify Slack (failure)
         if: ${{ needs.checks.result == 'failure' }}
         continue-on-error: true
