@@ -60,11 +60,6 @@
   // (an empty 502 that collapses the widget; a fail-open 200/202 for analytics) and would
   // otherwise leave no trace of *why*.
   //
-  // ⚠️ One thing invocation logs can't give back: Cloudflare redacts high-entropy path segments
-  // in the structured URL (`/widgets/articles/trending/REDACTED`), so the Contentful entry id —
-  // the only thing distinguishing one widget request from another — has to come from a custom
-  // log line. That's what the lone console.info in api-proxy.ts is for.
-  //
   // head_sampling_rate is left at its default of 1 (100%): this Worker only runs on the
   // run_worker_first routes, so the volume is nowhere near the plan's included logs, and
   // sampling would mostly hide the rare events worth having.
