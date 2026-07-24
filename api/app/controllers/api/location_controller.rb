@@ -1,7 +1,7 @@
 module Api
   # Sets the current location used by the weather/Whoop widgets. A bearer-token-secured POST writes
   # the shared "location:current" Redis key (read by this app's Location service); this replaced the
-  # old Netlify build-hook ingress. It also enqueues a LocationSyncJob to propagate the location to
+  # old build-hook ingress. It also enqueues a LocationSyncJob to propagate the location to
   # Intervals.icu (athlete profile + weather config) in the background.
   class LocationController < BaseController
     # The API_TOKEN bearer check is inherited from BaseController; only forgery protection

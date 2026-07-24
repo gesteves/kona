@@ -269,14 +269,11 @@ module SiteHelpers
     markdown_to_html("© #{years} #{data.site.copyright}")
   end
 
-  # First-party proxy paths for Plausible analytics. Both the inline init
-  # snippet (partials/_analytics.html.erb) and the Netlify `_redirects` rewrites
-  # (source/redirects.erb) read these, so the browser-facing path and the proxy
-  # target stay in sync from a single source.
-  # @see https://plausible.io/docs/proxy/guides/netlify
+  # First-party proxy paths for Plausible analytics. The inline init snippet
+  # (partials/_analytics.html.erb) renders these, and the Worker route that does the actual
+  # proxying (src/plausible.ts) mirrors them, so the browser-facing path and the proxy agree.
   PLAUSIBLE_SCRIPT_PATH = '/pa/script.js'
   PLAUSIBLE_EVENT_PATH = '/pa/event'
-  PLAUSIBLE_EVENT_UPSTREAM = 'https://plausible.io/api/event'
 
   # The first-party path the Plausible script is proxied from.
   # @return [String]
@@ -291,21 +288,10 @@ module SiteHelpers
     PLAUSIBLE_EVENT_PATH
   end
 
-  # The Plausible proxy rewrite rules to emit into the `_redirects` file. Only
-  # built when an upstream script URL is configured (see plausible_installed?),
-  # so a missing `PLAUSIBLE_SCRIPT_URL` never emits a malformed rewrite line.
-  # @return [Array<Hash>] Each rule with :from, :to, and :status keys.
-  def plausible_proxy_redirects
-    return [] unless plausible_installed?
-    [
-      { from: PLAUSIBLE_SCRIPT_PATH, to: ENV['PLAUSIBLE_SCRIPT_URL'], status: 200 },
-      { from: PLAUSIBLE_EVENT_PATH, to: PLAUSIBLE_EVENT_UPSTREAM, status: 200 }
-    ]
-  end
-
   # Checks if Plausible analytics is installed, i.e. the upstream script URL is
-  # configured so the first-party proxy can be built. Gates both the analytics
-  # script tag (partials/_analytics.html.erb) and the proxy rewrites.
+  # configured so the first-party proxy has something to proxy. Gates the analytics
+  # script tag (partials/_analytics.html.erb); the Worker checks its own copy of the
+  # variable before serving /pa/* (src/plausible.ts).
   # @return [Boolean] True when `PLAUSIBLE_SCRIPT_URL` is set.
   def plausible_installed?
     ENV['PLAUSIBLE_SCRIPT_URL'].present?
@@ -420,7 +406,7 @@ module SiteHelpers
   # Redirects from a concept's alternative labels (synonyms/altLabels) to its canonical archive
   # page — e.g. /tagged/half-ironman → /tagged/triathlon/ironman-703/. Skips a synonym whose
   # slug is blank, collides with a real tag page, or duplicates another synonym or a configured
-  # redirect. Rendered into the Netlify _redirects file (source/redirects.erb).
+  # redirect. Rendered into the `_redirects` file (source/redirects.erb).
   # @return [Array<Hash>] [{ from:, to:, status: }]
   def taxonomy_synonym_redirects
     page_paths = data.tags.map { |t| t.tag.path }.to_set

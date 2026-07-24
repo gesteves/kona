@@ -5,7 +5,7 @@ Rails 8.1 API (Ruby 4.0.6) that serves small embeddable **HTML fragments** ("wid
 Deployed to **fly.io** as `kona-api`, with the origin proxied behind **Cloudflare** — so
 `Fly-Client-IP` is a Cloudflare PoP, not the visitor (see **Abuse mitigation** below and the
 root [`CLAUDE.md`](../CLAUDE.md)). Routes are split by namespace: `/widgets/*` (HTML
-fragments, reached through the web app's same-origin Netlify proxy), `/api/*` (structured
+fragments, reached through the web app's same-origin proxy), `/api/*` (structured
 data, hit directly at the origin), and `/webhooks/*` (inbound webhooks, hit directly by
 the sending service). Redis-backed caching, **no database**.
 
@@ -16,7 +16,7 @@ ActiveRecord / ActiveJob / ActionMailer / ActionCable). See the root
 ## Endpoints
 
 All `/widgets/*` responses are HTML fragments (`layout false`) with the cache
-headers below. Edge TTL = how long Netlify serves a cached copy before revalidating.
+headers below. Edge TTL = how long the edge serves a cached copy before revalidating.
 
 | Method | Path | Action | Returns | Edge TTL |
 |---|---|---|---|---|
@@ -63,7 +63,7 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   - `webhooks/` — inbound webhooks, one controller per sending service under
     `Webhooks::BaseController` (currently `Webhooks::ContentfulController`).
 - **Auth** — `Widgets::BaseController` and `Api::BaseController` require the `API_TOKEN`
-  bearer (`TokenAuthentication` concern) via a global `before_action`; the web app's Netlify
+  bearer (`TokenAuthentication` concern) via a global `before_action`; the web app's Worker
   proxy injects it on widget requests, so the widget origin is closed to direct/public hits
   (cheap 401 before any work). `POST /api/icons` keeps the bearer (the web build sends it) —
   a novel icon id triggers a paid upstream Font Awesome call, so scanners get a cheap 401
@@ -97,7 +97,7 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   `CONTENTFUL_WEBHOOK_SECRET`). The request only **enqueues jobs** and returns 204; the work runs
   on the Sidekiq worker (Sidekiq retries on failure). On every publish/unpublish/delete it also
   enqueues **`SiteBuildJob`**, which fires a GitHub `repository_dispatch` to rebuild the web site
-  (this replaces the old Contentful→Netlify build hook — the `.github/workflows/web.yml` "Web"
+  (this replaces the old Contentful→host build hook — the `.github/workflows/web.yml` "Web"
   workflow builds from it; scope the Contentful webhook to **Entry + Asset** publish/unpublish/
   delete so image-only changes rebuild too, and **not** auto-save). Contentful
   does **not** retry deliveries, so `rake standard_site:backfill` remains the broader
@@ -175,12 +175,13 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   `include`-ing the module.
 - **Caching** — `app/controllers/concerns/live_widget.rb`. `cache_widget(ttl:)` sets:
   - Browser: `Cache-Control: public, max-age=0, stale-while-revalidate=86400`
-  - Edge: `Netlify-CDN-Cache-Control: public, durable, max-age=<ttl>, stale-while-revalidate=3600, stale-if-error=86400`
-    plus the same policy as standard `CDN-Cache-Control` (RFC 9213, no `durable`) for the
-    planned Cloudflare edge. ⚠️ Never express the edge policy as `s-maxage` — its presence
-    disables `stale-while-revalidate` and `stale-if-error` (RFC 9111 §4.2.4).
-  ⚠️ The proxy forwards the edge header **only on 2xx** — only emit durable headers on
-  successful, cacheable responses. Edge `stale-while-revalidate` defaults to one hour
+  - Edge: `CDN-Cache-Control: public, max-age=<ttl>, stale-while-revalidate=3600, stale-if-error=86400`
+    (RFC 9213 — Cloudflare honors it, browsers ignore it, which is what lets the edge TTL
+    differ from the browser's `max-age=0`). ⚠️ Never express the edge policy as `s-maxage` —
+    its presence disables `stale-while-revalidate` and `stale-if-error` (RFC 9111 §4.2.4),
+    which is what keeps widgets rendering through a fly outage.
+  ⚠️ Only emit this on successful, cacheable responses — an error must never be pinned at the
+  edge. Edge `stale-while-revalidate` defaults to one hour
   (`DEFAULT_EDGE_STALE_WHILE_REVALIDATE`); the pageviews, upcoming-races, trending, and
   related-articles widgets pass `edge_stale_while_revalidate: 1.day` since their data changes
   slowly relative to the hourly edge max-age.
@@ -205,8 +206,8 @@ headers below. Edge TTL = how long Netlify serves a cached copy before revalidat
   trustworthy on traffic that actually traversed Cloudflare, so it must stay confined to the
   throttle — never to anything that bans).
   ⚠️ The probe blocklist must stay **IP-agnostic** — never ban by IP. Some probe paths (e.g.
-  `/widgets/.env`) are reachable through the public Netlify `/widgets/*` proxy, and all
-  legitimate widget traffic shares the Netlify egress IPs, so an IP ban would 403 every
+  `/widgets/.env`) are reachable through the public `/widgets/*` proxy, and all
+  legitimate widget traffic shares that proxy's egress IPs, so an IP ban would 403 every
   visitor's widgets at once (this once took the site down). Same reason: do **not** add a
   blanket per-IP throttle.
   The throttle treats anything outside `RACK_ATTACK_KNOWN_PREFIXES` (`/up`, `/api`, `/widgets`,

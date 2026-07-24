@@ -1,7 +1,7 @@
 {
   "name": "kona-contentful-migrations",
   "private": true,
-  "description": "One-off Contentful content migrations for the Kona blog. Lives outside web/ so edits here don't trigger Netlify builds.",
+  "description": "One-off Contentful content migrations for the Kona blog. Lives outside web/ so edits here don't trigger a site build.",
   "scripts": {
     "backup": "node --env-file=.env scripts/backup.js",
     "fix:degrees": "node --env-file=.env scripts/fix-degrees.js",

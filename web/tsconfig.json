@@ -1,8 +1,7 @@
 {
   // Typecheck-only config for the Cloudflare Worker in src/. wrangler bundles with esbuild
   // and never typechecks, so `npm run check` (tsc --noEmit) is the gate that validates the
-  // Worker before it ships. Scoped to src/ — the netlify/ functions are Deno/Node with their
-  // own import style and are checked by their own platforms.
+  // Worker before it ships.
   //
   // Deliberately NOT pulling in @cloudflare/workers-types: src/env.d.ts hand-writes the few
   // Worker globals it needs (Env, Fetcher, ExecutionContext, caches.default) so the code

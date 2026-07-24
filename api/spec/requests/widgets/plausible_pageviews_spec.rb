@@ -69,8 +69,8 @@ RSpec.describe "Widgets::Plausible pageviews", type: :request do
     expect(cache_control).to include("max-age=0")
     expect(cache_control).to include("stale-while-revalidate=3600")
 
-    edge = response.headers["Netlify-CDN-Cache-Control"]
-    expect(edge).to include("durable")
+    edge = response.headers["CDN-Cache-Control"]
+    expect(edge).to include("public")
     expect(edge).to include("max-age=3600")
     expect(edge).to include("stale-while-revalidate=86400")
     expect(edge).to include("stale-if-error=86400")

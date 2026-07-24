@@ -40,15 +40,15 @@ RSpec.describe "Widgets::Articles related", type: :request do
       expect(response.body).to include('href="/2024/04/01/first/"')
     end
 
-    it "sets a one-hour durable caching header" do
+    it "sets a one-hour edge caching header" do
       get "/widgets/articles/related/abc123", headers: auth_headers
 
       cache_control = response.headers["Cache-Control"]
       expect(cache_control).to include("public")
       expect(cache_control).to include("max-age=0")
 
-      edge = response.headers["Netlify-CDN-Cache-Control"]
-      expect(edge).to include("durable")
+      edge = response.headers["CDN-Cache-Control"]
+      expect(edge).to include("public")
       expect(edge).to include("max-age=3600")
       expect(edge).to include("stale-while-revalidate=86400")
     end

@@ -22,10 +22,10 @@ activate :external_pipeline,
   source: 'tmp/dist',
   latency: 1
 
-# NOTE: `activate :gzip` is deliberately OFF. Both hosts compress responses themselves —
-# Netlify's edge on the fly, and Cloudflare likewise — so Middleman's pre-gzipped `.gz`
-# siblings are never served. They're just ~110 dead-weight files uploaded as Worker assets
-# (counting toward the asset limit and slowing the deploy). Don't re-add it.
+# NOTE: `activate :gzip` is deliberately OFF. Cloudflare compresses responses itself, so
+# Middleman's pre-gzipped `.gz` siblings are never served. They're just ~110 dead-weight
+# files uploaded as Worker assets (counting toward the asset limit and slowing the deploy).
+# Don't re-add it.
 activate :dotenv
 activate :autoprefixer do |config|
   config.browsers = ['last 1 version', 'last 3 safari versions', 'last 3 ios versions']

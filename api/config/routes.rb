@@ -37,11 +37,11 @@ Rails.application.routes.draw do
 
   # Structured-data endpoints (accept or return data rather than widget markup).
   scope "api", module: "api", as: "api" do
-    # Sets the current location (bearer-token-secured), replacing the old Netlify build hook.
+    # Sets the current location (bearer-token-secured), replacing the old build hook.
     post "location" => "location#create"
 
     # Receives a contact-form submission from the public site (through the web app's
-    # same-origin Netlify proxy, which injects the bearer). Drops honeypot hits, then enqueues
+    # same-origin proxy, which injects the bearer). Drops honeypot hits, then enqueues
     # a ContactMailJob that spam-checks (Akismet) and emails the owner (Cloudflare Email) with
     # Reply-To set to the sender. Answers JSON (fetch) with 204/422 or HTML (no-JS POST) with a
     # 303 to the site's Thank-You page.

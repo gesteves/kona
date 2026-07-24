@@ -8,9 +8,6 @@ data/*.json
 data/maps
 node_modules
 
-# Local Netlify folder
-.netlify
-
 # Local Wrangler state (created by `wrangler dev`)
 .wrangler
 tmp/

@@ -40,7 +40,7 @@ RSpec.describe "Rack::Attack", type: :request do
     expect(response).to have_http_status(:ok)
   end
 
-  # Regression: probe requests can arrive through the public Netlify proxy, where they come in
+  # Regression: probe requests can arrive through the public web proxy, where they come in
   # on a SHARED egress IP. Blocking one must never ban that IP, or every visitor's widgets
   # would 403 at once. (This is the bug that took the site down: an IP-based Fail2Ban here.)
   it "does not let a probe ban the shared proxy IP it arrives on" do
@@ -119,7 +119,7 @@ RSpec.describe "Rack::Attack", type: :request do
   end
 
   # The contact form throttles per REAL visitor IP — the one the web proxy forwards as
-  # X-Kona-Client-IP — not the shared Netlify egress. It's a throttle (429), never a ban, so it
+  # X-Kona-Client-IP — not the shared proxy egress. It's a throttle (429), never a ban, so it
   # can't take down the shared proxy IP the way an IP ban would.
   it "throttles contact submissions per forwarded visitor IP, isolating distinct visitors" do
     5.times do

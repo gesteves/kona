@@ -1,6 +1,6 @@
 // Cloudflare Worker serving the static build plus the dynamic routes (kona-api proxy for
-// widgets + the contact-form POST, Plausible proxy). One Worker replaces Netlify's hosting,
-// functions, and edge functions — see the migration plan and root CLAUDE.md.
+// widgets + the contact-form POST, Plausible proxy). This one Worker is the whole hosting
+// story for the site — see root CLAUDE.md.
 //
 // ⚠️ No hostnames live in this file (or anywhere in the repo). The custom domain is
 // attached in the dashboard (Workers & Pages → this Worker → Settings → Domains & Routes),

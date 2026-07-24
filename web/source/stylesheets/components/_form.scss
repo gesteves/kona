@@ -26,7 +26,7 @@
     }
   }
 
-  // The Netlify honeypot is the one remaining native field; keep it hidden.
+  // The honeypot field the api checks (`comment`); keep it hidden from real visitors.
   label.hp {
     display: none;
   }

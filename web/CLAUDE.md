@@ -1,8 +1,8 @@
 # web/ — Kona static site
 
 Middleman 4 static site generator (Ruby 4.0.6) that builds a **Contentful**-powered
-blog and deploys to **Netlify**, which is itself proxied behind **Cloudflare** (images,
-client IPs, and bot blocking all depend on the zone — see the root
+blog and deploys to the **`kona-web` Cloudflare Worker**, which serves the build as static
+assets (images, client IPs, and bot blocking all depend on the zone — see the root
 [`CLAUDE.md`](../CLAUDE.md)). esbuild bundles JavaScript (Stimulus + Turbo) and the
 **Web Awesome** (Pro) component theme CSS via Middleman's external pipeline (`config.rb`):
 Middleman runs esbuild itself, into the gitignored `tmp/dist/`, during both `middleman build`
@@ -29,7 +29,8 @@ web↔api contract before touching any widget markup.
 - **Runtime dynamic content**: weather, activity stats, Whoop, per-article pageviews,
   and event weather are **not built here**. The `live-update` Stimulus controller
   fetches them client-side from `/widgets/*` into placeholder partials (root `CLAUDE.md`).
-- **Contact form**: no longer Netlify Forms (the `__forms.html` decoy is gone). It posts to
+- **Contact form**: no longer the host's built-in form handling (the `__forms.html` decoy is
+  gone). It posts to
   `POST /api/contact` through the api proxy (`api/` sends the email via Resend with the correct
   Reply-To). It's progressively enhanced — the `contact` Stimulus controller (`sendNotification`
   toast, no navigation) over a real form that still works without JS (native POST → 303 to the
@@ -70,12 +71,12 @@ npm run format:check             # prettier for JS/JSON/MD (fix: npm run format)
 # Full production build: test → import → middleman build (esbuild runs inside it)
 bundle exec rake build:verbose
 
-# Netlify build control (scripts/netlify-builds.js) — e.g. a content freeze; needs
-# NETLIFY_AUTH_TOKEN + NETLIFY_SITE_ID in .env. activate does NOT deploy; use deploy for that.
-npm run build:status             # is the site's builds stopped or active?
-npm run build:stop               # stop all Netlify builds (pushes/webhooks/hooks won't deploy)
-npm run build:activate           # re-activate builds
-npm run build:deploy             # trigger one production build now
+# Deploy control (the "Web" GitHub Actions workflow) — e.g. a content freeze during a bulk
+# Contentful migration. Needs the gh CLI. Note the workflow's cancel-in-progress concurrency
+# already collapses a publish storm into roughly one build, so this is rarely necessary.
+gh workflow disable web.yml      # stop deploying (pushes and Contentful publishes won't build)
+gh workflow enable web.yml       # resume
+gh workflow run web.yml          # trigger one build now (from main)
 ```
 
 ### Import subtasks
@@ -100,8 +101,6 @@ build fails loudly rather than shipping pages with missing icons.
   `config.rb` requires and registers every module in that directory.
 - `source/layouts/layout.erb`, `source/partials/` (incl. `placeholders/`),
   `source/javascripts/stimulus/`, `source/stylesheets/`.
-- `netlify/functions/` — `api-proxy.mts` (proxies `/widgets/*` **and** `POST /api/contact`;
-  see root `CLAUDE.md`).
 - Open Graph "cards" (the `og:image` for pages without a cover image) were rendered **on demand**
   by a separate `kona-og` fly service. **That service is currently parked** (removed from `main`,
   preserved on the `restore-og` branch — it didn't earn its own app for now), so cover-less pages
@@ -113,7 +112,7 @@ build fails loudly rather than shipping pages with missing icons.
 - `source/headers` / `source/redirects.erb` — built and renamed to `_headers` /
   `_redirects` (underscore-prefixed source files are treated as partials and skipped).
   ⚠️ In `_headers`, no two rules may set the same header for overlapping paths — matching
-  rules comma-join same-name headers on both Netlify and Cloudflare.
+  rules comma-join same-name headers on Cloudflare.
   ⚠️ **`_redirects` rule ORDER is load-bearing on Cloudflare.** CF's parser counts 2,000
   "static" rules but only 100 "dynamic" ones, and its `canCreateStaticRule` flag **latches
   off at the first rule whose source has a splat (`*`) or `:placeholder`** — every rule after
@@ -124,37 +123,29 @@ build fails loudly rather than shipping pages with missing icons.
   partition; don't hand-place a `*`/`:name` rule above the static block.
   ⚠️ **Cloudflare also rejects absolute-URL *sources*.** A rule whose `from` is a full URL (a
   cross-domain redirect, e.g. an old domain → this site) hard-fails the Worker deploy ("Only
-  relative URLs are allowed", `code: 100324`) — Netlify allowed these, the Worker does not.
-  `redirects.erb` drops any absolute-URL-source rule from the generated file (which also removes
-  it from the Netlify build during dual-deploy). Cross-domain redirects must live in a Cloudflare
-  **zone rule / Bulk Redirect**, not in `_redirects` or Contentful.
+  relative URLs are allowed", `code: 100324`). `redirects.erb` drops any absolute-URL-source rule
+  from the generated file rather than letting a Contentful entry break the deploy. Cross-domain
+  redirects must live in a Cloudflare **zone rule / Bulk Redirect**, not in `_redirects` or
+  Contentful.
   ⚠️ **Cloudflare also rejects 200-status proxy rewrites to an absolute URL** ("Proxy (200)
-  redirects can only point to relative paths", `code: 100324`). This is how Netlify does the
-  Plausible `/pa/*` first-party proxy (`plausible_proxy_redirects` → `/pa/script.js` rewritten to
-  `plausible.io`), but on Cloudflare that proxying is the Worker's job (`src/plausible.ts`), so
-  those lines are invalid *and* redundant. `redirects.erb` drops any `status 200` + absolute-`to`
-  rule. The analytics `<script>` snippet is unaffected (gated on `plausible_installed?`, i.e.
+  redirects can only point to relative paths", `code: 100324`). Nothing emits one today — the
+  Plausible `/pa/*` first-party proxy that used to is now the Worker's job (`src/plausible.ts`) —
+  but `redirects.erb` still drops any `status 200` + absolute-`to` rule, since redirects are
+  authored in Contentful and a mis-entered one would otherwise fail the deploy with a bare error
+  code. The analytics `<script>` snippet is unaffected (gated on `plausible_installed?`, i.e.
   `PLAUSIBLE_SCRIPT_URL` in the **build** env — separate from the Worker runtime var of the same
-  name that powers the `/pa/*` proxy). Rolling back to Netlify would lose the `/pa/*` proxy until
-  Netlify is retired.
-- `wrangler.jsonc` + `src/` — the Cloudflare Worker for the Netlify→Cloudflare migration:
-  serves `build/` as static assets plus routes for the widget proxy, Plausible proxy, and contact
-  form. Its `src/*.ts` files are 1:1 ports of the `netlify/functions` above (each file header names
-  its counterpart); `src/plausible.ts` additionally absorbs the `/pa/*` proxying Netlify does via
-  `_redirects` rewrites.
-  ⚠️ **Dual-deploy window**: both paths still ship. `www` has been cut over to the Cloudflare
-  Worker; Netlify remains as a rollback until it's retired, so keep the `netlify/` and `src/`
-  copies in sync until then. (Server-side Known Agents tracking that used to live in both — the
-  Worker's `known-agents.ts` and the Netlify edge function — was removed; Cloudflare's own bot/AI
-  analytics replaces it.) Typecheck the Worker with `npm run check` (`tsc --noEmit`; wrangler
+  name that powers the `/pa/*` proxy).
+- `wrangler.jsonc` + `src/` — the Cloudflare Worker that **is** the site's hosting: it serves
+  `build/` as static assets plus routes for the widget proxy, Plausible proxy, and contact form
+  (`src/plausible.ts` does the `/pa/*` first-party proxying rather than `_redirects` rewrites).
+  Typecheck the Worker with `npm run check` (`tsc --noEmit`; wrangler
   itself never typechecks), and **test it with `npm test`** — Vitest via
   `@cloudflare/vitest-pool-workers` runs `test/**` inside `workerd` (fake `env`, mocked outbound
   `fetch`), covering the proxy header/cache contract, the Plausible proxy, and routing. ⚠️ The test
   tooling is isolated from production types: `tsconfig.test.json`
   (test/** only, pulls in `@cloudflare/vitest-pool-workers` types) is **separate** from
   `tsconfig.json` (src only, `types: []` + the `env.d.ts` shims) — the two must never share a
-  compile, or the workers-types `ExecutionContext` collides with the shim. See the migration plan
-  before touching the cutover pieces.
+  compile, or the workers-types `ExecutionContext` collides with the shim.
   ⚠️ **`run_worker_first` is a POSITIVE allowlist — only listed paths invoke the Worker.** It
   lists exactly the dynamic routes (`/widgets/*`, `/api/contact`, `/pa/*`); everything else — every
   HTML page, fingerprinted asset, the sitemap, the feeds, `/.well-known/*`, and any 404 — is served
@@ -180,14 +171,15 @@ Names only — see `.env.example`; never commit values.
   `REDIS_URL`, `KONA_API_URL` (base URL of the `api/` app — used by the `/widgets/*` proxy
   and the build-time `import:icons` / `import:standard_site` fetches), `API_TOKEN` (shared
   bearer the `/widgets/*` proxy injects on every upstream request, and the build sends on the
-  `POST /api/icons` fetch; **must match the `api/` app's `API_TOKEN`**, and must be set in
-  Netlify's runtime env or every widget 401s at the origin and collapses on the site).
+  `POST /api/icons` fetch; **must match the `api/` app's `API_TOKEN`**). Needed in TWO places:
+  the build env (`.github/workflows/web.yml`) for the icons fetch, and the **Worker's dashboard
+  secrets** — without the latter every widget 401s at the origin and collapses on the site.
 - **Build credential**: `WEBAWESOME_NPM_TOKEN` — Web Awesome Pro npm registry auth, read
-  by `.npmrc` at `npm install` (not in `.env`). Set it in your shell and in Netlify's
+  by `.npmrc` at `npm install` (not in `.env`). Set it in your shell and in the workflow's
   build env, or the install fails.
 - **Images — `IMAGES_URL`, required everywhere including locally**: the host Cloudflare Images
   serves transformations from (`<host>/cdn-cgi/image/…`), i.e. the site's public host. Building
-  any image without it raises `ImageHelpers::ImagesUrlMissing`, so **it must be set in Netlify's
+  any image without it raises `ImageHelpers::ImagesUrlMissing`, so **it must be set in the build
   env** and in your local `.env` (point it at the real zone; `middleman server` then renders what
   production serves — auto avif/webp, cover images cropped to the OG size). It deliberately has **no fallback**: it
   used to resize via Contentful when unset, which looked perfect in the browser while draining

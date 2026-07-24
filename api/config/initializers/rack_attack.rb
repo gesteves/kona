@@ -1,12 +1,12 @@
 # Rate limiting / abuse mitigation for the fly.io origin.
 #
-# The origin is hit directly (bypassing the Netlify edge cache) by a steady stream of
+# The origin is hit directly (bypassing the edge cache in front of it) by a steady stream of
 # vulnerability scanners probing paths like /api/.env, /api/secrets, /wp-login.php, etc.
 # This sheds that load by blocking known probe paths before they reach routing (which also
 # keeps them out of the logs).
 #
-# Design note — all LEGITIMATE /widgets/* traffic arrives through the Netlify proxy from a
-# small, shared set of egress IPs (and behind fly's proxy a single request's source IP can
+# Design note — all LEGITIMATE /widgets/* traffic arrives through the web app's Worker proxy
+# from a small, shared set of egress IPs (and behind fly's proxy a single request's source IP can
 # resolve to a shared fly load-balancer address). A per-IP BAN is therefore dangerous: one
 # scanner probing a path through the public proxy would ban a shared IP and 403 every visitor
 # at once.
@@ -96,7 +96,7 @@ Rack::Attack.throttle("unknown-paths/ip", limit: 20, period: 1.minute) do |req|
 end
 
 # Throttle contact-form submissions per real visitor. Keyed on the IP the web proxy forwards
-# (X-Kona-Client-IP) — NOT client_ip, which for proxied traffic is the shared Netlify egress, so
+# (X-Kona-Client-IP) — NOT client_ip, which for proxied traffic is the shared proxy egress, so
 # keying the contact form on it would throttle every visitor at once. Safe by the rules above: a
 # throttle (429), never a ban, keyed on the true per-visitor IP and scoped to this one path, so it
 # can't 403 the shared proxy IPs or touch /widgets/*. A direct origin hit (no forwarded header) is
@@ -105,8 +105,8 @@ Rack::Attack.throttle("contact/ip", limit: 5, period: 1.hour) do |req|
   req.get_header("HTTP_X_KONA_CLIENT_IP").presence if req.post? && req.path == "/api/contact"
 end
 
-# Plain-text responses matching lib/plain_text_exceptions.rb. No durable cache headers — the
-# Netlify proxy only forwards edge headers on 2xx, so these are never pinned at the edge.
+# Plain-text responses matching lib/plain_text_exceptions.rb. No edge cache headers — errors
+# must never be pinned at the edge.
 RACK_ATTACK_PLAIN_TEXT = { "content-type" => "text/plain; charset=utf-8" }.freeze
 
 Rack::Attack.blocklisted_responder = ->(_req) { [403, RACK_ATTACK_PLAIN_TEXT.dup, ["403 Forbidden\n"]] }

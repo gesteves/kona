@@ -112,7 +112,7 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
     expect(response.body).to include("the site")
   end
 
-  it "sets a one-hour durable caching header" do
+  it "sets a one-hour edge caching header" do
     get "/widgets/events/upcoming", headers: auth_headers
 
     cache_control = response.headers["Cache-Control"]
@@ -120,8 +120,8 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
     expect(cache_control).to include("max-age=0")
     expect(cache_control).to include("stale-while-revalidate=3600")
 
-    edge = response.headers["Netlify-CDN-Cache-Control"]
-    expect(edge).to include("durable")
+    edge = response.headers["CDN-Cache-Control"]
+    expect(edge).to include("public")
     expect(edge).to include("max-age=3600")
     expect(edge).to include("stale-while-revalidate=86400")
     expect(edge).to include("stale-if-error=86400")

@@ -17,7 +17,6 @@ namespace :build do
 end
 
 def build_site(verbose: false)
-  verbose = true if ENV['NETLIFY_BUILD_DEBUG'] == 'true'
   # The JS/CSS bundle is built by Middleman's external pipeline (config.rb), which runs
   # `npm run build` itself and blocks until it finishes.
   middleman_command = verbose ? 'middleman build --verbose' : 'middleman build'

@@ -129,8 +129,8 @@ RSpec.describe "Weather", type: :request do
     expect(cache_control).to include("max-age=0")
     expect(cache_control).to include("stale-while-revalidate=300")
 
-    edge = response.headers["Netlify-CDN-Cache-Control"]
-    expect(edge).to include("durable")
+    edge = response.headers["CDN-Cache-Control"]
+    expect(edge).to include("public")
     expect(edge).to include("max-age=300")
     expect(edge).to include("stale-while-revalidate=3600")
     expect(edge).to include("stale-if-error=86400")
@@ -153,12 +153,12 @@ RSpec.describe "Weather", type: :request do
   context "when the weather upstream raises (e.g. a network timeout)" do
     before { allow_any_instance_of(WeatherKit).to receive(:data).and_raise(Net::ReadTimeout) }
 
-    it "collapses the widget with an empty, non-durable response instead of a 500" do
+    it "collapses the widget with an empty, briefly-cached response instead of a 500" do
       get "/widgets/weather/current", headers: auth_headers
 
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty
-      expect(response.headers["Netlify-CDN-Cache-Control"]).not_to include("durable")
+      # Short, with no stale-serving directives — an empty response must never be pinned.
       expect(response.headers["CDN-Cache-Control"]).to eq("public, max-age=60")
     end
   end

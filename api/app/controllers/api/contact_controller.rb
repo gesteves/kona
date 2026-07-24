@@ -2,7 +2,7 @@ require "uri"
 
 module Api
   # Receives contact-form submissions from the public site. Reached through the web app's
-  # same-origin Netlify proxy, which injects the API_TOKEN bearer (inherited gate on
+  # same-origin proxy, which injects the API_TOKEN bearer (inherited gate on
   # BaseController), so direct/public hits get a cheap 401. Accepts either a JSON body (the
   # progressive-enhancement `fetch`) or a urlencoded/multipart body (the no-JS native form
   # POST), and answers accordingly: JSON callers get 204/422; HTML callers get a 303 redirect
@@ -58,7 +58,7 @@ module Api
     end
 
     # Real visitor signal the web proxy forwards under custom headers (the origin can't see it —
-    # the zone rewrites the CF-* headers to describe the Netlify PoP, not the visitor). Trusted only
+    # the zone rewrites the CF-* headers to describe the proxy's PoP, not the visitor). Trusted only
     # for Akismet + the email's Sender details, never for anything that bans. Passed to the job as a
     # plain string-keyed hash (Sidekiq-serializable); blanks are dropped.
     # @return [Hash]

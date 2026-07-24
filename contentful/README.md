@@ -1,7 +1,7 @@
 # Contentful content migrations
 
 One-off scripts that rewrite content **in Contentful itself**, run locally. This
-directory lives outside `web/` so editing these scripts never triggers a Netlify build.
+directory lives outside `web/` so editing these scripts never triggers a site build.
 
 ## Setup (once)
 
@@ -31,31 +31,24 @@ Without `DRY_RUN`, every script prints the migration plan and prompts before app
 All scripts skip entries that wouldn't change (no rewrite, no republish) and use
 `shouldPublish: 'preserve'` (published entries stay published, drafts stay drafts).
 
-## Pausing Netlify builds during a migration
+## Pausing deploys during a migration
 
-Publishing entries fires Contentful webhooks that each kick off a Netlify build, so a migration
-touching many entries can trigger a storm of redundant deploys. `scripts/lib/netlify-builds.js`
-avoids that: wrap the migration body in `withBuildsPaused(fn)` and it stops Netlify builds for the
-duration, then — after the migration succeeds — asks whether to trigger a single deploy that picks
-up everything at once.
+Publishing entries fires Contentful webhooks that each trigger a site rebuild, so a migration
+touching many entries can produce redundant deploys. In practice the "Web" workflow's
+`cancel-in-progress` concurrency already collapses a publish storm into roughly one build, so this
+is rarely worth doing.
 
-```js
-const { withBuildsPaused } = require('./lib/netlify-builds');
+When you do want a hard freeze — a long migration, or one you expect to interrupt — disable the
+workflow for the duration and trigger a single build at the end:
 
-await withBuildsPaused(() => runMigration({ /* … */ }));
+```bash
+gh workflow disable web.yml    # before the migration
+# … run the migration …
+gh workflow enable web.yml     # after
+gh workflow run web.yml        # one build that picks up everything at once
 ```
 
-It **always** re-activates builds — on success, on error, and on Ctrl-C — so an interrupted
-migration can never leave the site frozen. On success it prompts `Trigger a deploy now?`; declining
-leaves builds active but idle (the next push/webhook deploys as usual). Non-interactive shells
-(piped/CI) default to "no". Honors `DRY_RUN=true` (logs its intent, touches nothing).
-
-Requires two extra vars in `.env` (see `.env.example`), used **only** by wrapped migrations:
-
-| Env var | Where to find it |
-| --- | --- |
-| `NETLIFY_AUTH_TOKEN` | Netlify → User settings → Applications → New access token. |
-| `NETLIFY_SITE_ID` | Site configuration → General → Site information → Site ID. |
+⚠️ Re-enable it. A disabled workflow silently drops every publish and push until someone notices.
 
 ## Scripts
 
@@ -124,7 +117,7 @@ taxonomies can't be half-live). Iterate on the design first, then cut over with 
 concepts, `altLabels`, `description` copy, and the per-article assignment map — then
 `npm run taxonomy:preview` and repeat until happy.
 
-Run order (DRY_RUN each first; **pause Netlify builds** during 2–8):
+Run order (DRY_RUN each first; consider **pausing deploys** during 2–8, above):
 
 | Step | Command | What it does |
 | --- | --- | --- |

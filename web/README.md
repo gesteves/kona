@@ -1,25 +1,23 @@
 # kona-web
 
-[![Netlify Status](https://api.netlify.com/api/v1/badges/f87f4e00-a5a5-436d-b6df-a3628c3fb919/deploy-status)](https://app.netlify.com/sites/giventotri/deploys)
-
-The blog itself: a [Middleman](https://middlemanapp.com/) static site powered by [Contentful](https://www.contentful.com/) and hosted on [Netlify](https://www.netlify.com/). Live home-page widgets (weather, activity stats, Whoop, pageviews) are served at runtime by the [`api/`](../api/README.md) app.
+The blog itself: a [Middleman](https://middlemanapp.com/) static site powered by [Contentful](https://www.contentful.com/) and served by a [Cloudflare Worker](https://developers.cloudflare.com/workers/static-assets/). Live home-page widgets (weather, activity stats, Whoop, pageviews) are served at runtime by the [`api/`](../api/README.md) app.
 
 Kona uses Middleman [data files](https://middlemanapp.com/advanced/data-files/): it calls various services at build time, manipulates the responses, and writes them as JSON to `data/`, where they're available to templates and helpers.
 
 ## Setup
 
-Copy `.env.example` to `.env` and fill in the credentials below (also add them to the site's environment variables in Netlify). See `.env.example` for the full list and notes.
+Copy `.env.example` to `.env` and fill in the credentials below (deploys read them from the "Web" workflow's secrets, and the Worker's runtime vars come from the Cloudflare dashboard). See `.env.example` for the full list and notes.
 
 ### Required services
 
-- **Netlify** — hosting. Kona can run anywhere as a static site, but relies on Netlify [functions](https://docs.netlify.com/functions/overview/) (the `/widgets/*` proxy) and [build hooks](https://docs.netlify.com/configure-builds/build-hooks/).
+- **Cloudflare Workers** — hosting. The build is uploaded as [static assets](https://developers.cloudflare.com/workers/static-assets/) on the `kona-web` Worker (`wrangler.jsonc`), which also runs the `/widgets/*` and `POST /api/contact` proxy and the first-party analytics proxy. Kona can run anywhere as a static site, but those dynamic routes need the Worker (or an equivalent).
 - **Cloudflare** — the zone in front of the site. Images are resized and served through [Cloudflare Images](https://developers.cloudflare.com/images/transform-images/transform-via-url/) (`/cdn-cgi/image/…`), which fetches them from Contentful and caches the results at the edge. Requires Transformations enabled on the zone, with `images.ctfassets.net` allowlisted as a source — without that, every image 403s.
 - **Contentful** — the CMS for the site's content. Create an API key under Settings → API Keys and set `CONTENTFUL_SPACE` and `CONTENTFUL_TOKEN` (Content Preview token). You'll want a content model like this:
 
   <img width="1616" height="3182" alt="Contentful content model" src="https://github.com/user-attachments/assets/689d3caf-8b71-47a4-95e5-4630bf9c8281" />
 
 - **Font Awesome** — icons, pulled from the API at build time. Needs a Pro account and a token with the "Pro icons and metadata" read scope. Set `FONT_AWESOME_API_TOKEN`.
-- **Web Awesome Pro** — the web component library the UI is built on. Needs a Pro subscription; the private registry is configured in `.npmrc`, and `npm install` reads `WEBAWESOME_NPM_TOKEN` from the environment to authenticate. Set it locally (your shell) and in Netlify's build environment.
+- **Web Awesome Pro** — the web component library the UI is built on. Needs a Pro subscription; the private registry is configured in `.npmrc`, and `npm install` reads `WEBAWESOME_NPM_TOKEN` from the environment to authenticate. Set it locally (your shell) and in the build environment.
 - **Redis** — caches API responses to speed up builds. Set `REDIS_URL`.
 - **Kona API** — set `KONA_API_URL` to the deployed [`api/`](../api/README.md) app. The home-page weather/stats/Whoop widgets load from it at runtime.
 
@@ -29,13 +27,15 @@ Copy `.env.example` to `.env` and fill in the credentials below (also add them t
 
 ## Running locally
 
-Requirements: Ruby, Node, and the [Netlify CLI](https://docs.netlify.com/cli/get-started/).
+Requirements: Ruby and Node.
 
-1. Add the environment variables to `.env` (or the site config in Netlify).
+1. Add the environment variables to `.env`.
 2. Install dependencies: `bundle install` and `npm install` (the latter needs `WEBAWESOME_NPM_TOKEN` set — see Web Awesome Pro above).
-3. Build the site (runs the data import): `netlify build`.
-4. Start the local server: `netlify dev` (the Middleman dev server runs the esbuild watcher itself, so JS/CSS rebuild on change automatically).
+3. Build the site (runs the data import): `bundle exec rake build`.
+4. Start the local server: `bundle exec middleman` (it runs the esbuild watcher itself, so JS/CSS rebuild on change automatically).
 5. To refresh data without a full rebuild: `bundle exec rake import`.
+
+The dynamic routes (`/widgets/*`, `POST /api/contact`, `/pa/*`) are Worker code, so they don't run under `middleman server` — the widgets simply collapse. To exercise them locally, build first and then run `npx wrangler dev`.
 
 ## Common commands
 

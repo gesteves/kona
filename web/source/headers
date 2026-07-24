@@ -1,9 +1,10 @@
-# Headers for the static build. Netlify and Cloudflare Workers Static Assets share this
-# file convention (and the same semantics), so it works before and after the migration.
+# Headers for the static build, in the Cloudflare Workers Static Assets `_headers` format
+# (built as source/headers and renamed by lib/tasks/build.rake, since underscore-prefixed
+# source files are treated as partials).
 #
-# ⚠️ When multiple rules match a path, BOTH platforms comma-join same-name headers rather
-# than letting the more specific rule win — so no two rules here may set the same header
-# for overlapping paths. That's why the cache policy enumerates paths instead of using a
+# ⚠️ When multiple rules match a path, Cloudflare comma-joins same-name headers rather than
+# letting the more specific rule win — so no two rules here may set the same header for
+# overlapping paths. That's why the cache policy enumerates paths instead of using a
 # /* catch-all: a catch-all Cache-Control would corrupt the fingerprinted-asset rules.
 
 # ⚠️ Security headers apply ONLY to asset-layer responses. The two Worker routes

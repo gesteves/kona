@@ -11,18 +11,12 @@ module UrlHelpers
   end
 
   # Returns the root URL of the application based on the environment.
-  # In production, it uses the site URL set by Netlify.
-  # On other Netlify environments (like dev and branch previews), it uses the 'DEPLOY_URL' environment variable.
-  # Outside of Netlify, like running `middleman server`, defaults to 'http://localhost:4567'.
-  # @see https://docs.netlify.com/configure-builds/environment-variables/#deploy-urls-and-metadata
+  # On a production build it uses the site's public origin, `URL` (set in the build env).
+  # Anywhere else — `middleman server`, a local build — it defaults to
+  # 'http://localhost:4567'. There is no remote non-production build: the deploy workflow
+  # only ships from main, and the Worker has no preview URLs (`workers_dev: false`).
   # @return [String] The root URL of the application.
   def root_url
-    if production?
-      ENV['URL']
-    elsif netlify?
-      ENV['DEPLOY_URL']
-    else
-      'http://localhost:4567'
-    end
+    production? ? ENV['URL'] : 'http://localhost:4567'
   end
 end

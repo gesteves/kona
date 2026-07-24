@@ -7,9 +7,8 @@
 // feature.
 
 // These paths must match the Ruby constants in web/lib/helpers/site_helpers.rb
-// (PLAUSIBLE_SCRIPT_PATH / PLAUSIBLE_EVENT_PATH / PLAUSIBLE_EVENT_UPSTREAM) — the inline
-// init snippet is generated from those, so the browser-facing path and this proxy have to
-// agree.
+// (PLAUSIBLE_SCRIPT_PATH / PLAUSIBLE_EVENT_PATH) — the inline init snippet is generated from
+// those, so the browser-facing path and this proxy have to agree.
 const SCRIPT_PATH = '/pa/script.js';
 const EVENT_PATH = '/pa/event';
 const EVENT_UPSTREAM = 'https://plausible.io/api/event';

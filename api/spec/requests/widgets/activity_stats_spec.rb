@@ -34,21 +34,13 @@ RSpec.describe "Activity stats", type: :request do
     expect(cache_control).to include("max-age=0")
     expect(cache_control).to include("stale-while-revalidate=300")
 
-    edge = response.headers["Netlify-CDN-Cache-Control"]
-    expect(edge).to include("durable")
-    expect(edge).to include("max-age=300")
-    expect(edge).to include("stale-while-revalidate=3600")
-    expect(edge).to include("stale-if-error=86400")
-
-    # The same policy in the standard RFC 9213 dialect (read by Cloudflare after the
-    # migration; `durable` is Netlify-only). It must never use s-maxage — that would
-    # disable stale-while-revalidate and stale-if-error outright.
+    # The edge policy, in the standard RFC 9213 dialect Cloudflare reads. It must never use
+    # s-maxage — that would disable stale-while-revalidate and stale-if-error outright.
     cdn = response.headers["CDN-Cache-Control"]
     expect(cdn).to include("public")
     expect(cdn).to include("max-age=300")
     expect(cdn).to include("stale-while-revalidate=3600")
     expect(cdn).to include("stale-if-error=86400")
-    expect(cdn).not_to include("durable")
     expect(cdn).not_to include("s-maxage")
   end
 
@@ -76,12 +68,14 @@ RSpec.describe "Activity stats", type: :request do
       expect(response.body.strip).to be_empty
     end
 
-    it "downgrades the edge cache to a short, non-durable TTL so a blip doesn't pin the empty response" do
+    it "downgrades the edge cache to a short TTL so a blip doesn't pin the empty response" do
       get "/widgets/activity-stats", headers: auth_headers
 
-      edge = response.headers["Netlify-CDN-Cache-Control"]
+      edge = response.headers["CDN-Cache-Control"]
       expect(edge).to eq("public, max-age=60")
-      expect(edge).not_to include("durable")
+      # No stale-serving directives: an empty response must never be served past its minute.
+      expect(edge).not_to include("stale-while-revalidate")
+      expect(edge).not_to include("stale-if-error")
     end
   end
 end

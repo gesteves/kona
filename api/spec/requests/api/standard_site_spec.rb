@@ -13,11 +13,11 @@ RSpec.describe "Api::StandardSite", type: :request do
       expect(json["publication_uri"]).to eq("at://did:plc:abc/site.standard.publication/73k3tsvpuwib6")
     end
 
-    it "sets a durable one-hour edge cache" do
+    it "sets a one-hour edge cache" do
       get "/api/standard-site"
 
-      edge = response.headers["Netlify-CDN-Cache-Control"]
-      expect(edge).to include("durable")
+      edge = response.headers["CDN-Cache-Control"]
+      expect(edge).to include("public")
       expect(edge).to include("max-age=3600")
     end
   end
@@ -30,7 +30,9 @@ RSpec.describe "Api::StandardSite", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to eq("")
-      expect(response.headers["Netlify-CDN-Cache-Control"]).not_to include("durable")
+      # Downgraded to the short empty-response policy, so a credentials blip can't pin the
+      # missing markup at the edge for the full hour.
+      expect(response.headers["CDN-Cache-Control"]).to eq("public, max-age=60")
     end
   end
 end

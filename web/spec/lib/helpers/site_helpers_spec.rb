@@ -502,18 +502,5 @@ RSpec.describe SiteHelpers do
       ENV['PLAUSIBLE_SCRIPT_URL'] = 'https://plausible.example/js/script.js'
       expect(plausible_installed?).to be(true)
     end
-
-    it 'emits proxy rewrites for the script and the event endpoint when installed' do
-      ENV['PLAUSIBLE_SCRIPT_URL'] = 'https://plausible.example/js/script.js'
-      expect(plausible_proxy_redirects).to eq([
-        { from: '/pa/script.js', to: 'https://plausible.example/js/script.js', status: 200 },
-        { from: '/pa/event', to: 'https://plausible.io/api/event', status: 200 }
-      ])
-    end
-
-    it 'emits no rewrites when Plausible is not configured' do
-      ENV.delete('PLAUSIBLE_SCRIPT_URL')
-      expect(plausible_proxy_redirects).to eq([])
-    end
   end
 end

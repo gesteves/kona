@@ -1,9 +1,9 @@
 # contentful/ — content migrations & the taxonomy toolkit
 
 Node scripts that read and write content **in Contentful itself** (as opposed to render-time
-transforms in `web/lib/helpers/`). This directory lives outside `web/` on purpose: Netlify only
-builds when files under its `base = "web"` (or the root `netlify.toml`) change, so running or
-editing scripts here never triggers a deploy.
+transforms in `web/lib/helpers/`). This directory lives outside `web/` on purpose: the "Web"
+deploy workflow is path-filtered on `web/**`, so running or editing scripts here never triggers
+a deploy.
 
 Two kinds of things live here, and they use **different Contentful APIs**:
 
@@ -126,11 +126,6 @@ planned Locations scheme — edit this file and re-run the relevant idempotent s
 **Utility:** `backup` — wraps `space export` to a timestamped JSON (self-loads `.env`); run before
 any destructive migration.
 
-**Utility lib:** `lib/netlify-builds.js` — `withBuildsPaused(fn)` stops Netlify builds around a
-migration (so per-entry publishes don't each trigger a deploy), always re-activates them (success,
-error, or Ctrl-C), then prompts to trigger one deploy. Needs `NETLIFY_AUTH_TOKEN` + `NETLIFY_SITE_ID`
-in `.env`; honors `DRY_RUN`. Wrap large multi-entry migrations with it. See [`README.md`](README.md).
-
 **Spent one-off transforms** — already run against production; kept as **reference/templates** for
 writing new migrations, not meant to be re-run:
 
@@ -147,7 +142,8 @@ See `scripts/fix-degrees.js` and `scripts/bump-heading-levels.js` as templates.
 - **Skip unchanged entries** — return `undefined` from `transformEntryForLocale` when nothing
   changed, so untouched entries aren't rewritten or republished. Republishing bumps
   `sys.publishedAt`, which feeds the web sitemap `<lastmod>`, the Atom feed, and fires the
-  Contentful webhooks (→ api PDS re-sync, re-embedding, Netlify builds).
+  Contentful webhooks (→ api PDS re-sync, re-embedding, and a site rebuild via
+  `repository_dispatch`).
 - **`shouldPublish: 'preserve'`** — published entries stay published, drafts stay drafts.
 - Support `DRY_RUN` / `ENTRY_ID` / `CONTENTFUL_ENVIRONMENT` in every script. The taxonomy scripts
   additionally honor `DRY_RUN` for their CMA writes (`readEnv` centralizes this).

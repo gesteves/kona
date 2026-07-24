@@ -1,8 +1,7 @@
 import { requestLogLine } from './log';
 
 // Proxies /widgets/* and the contact-form POST /api/contact to the kona-api origin (fly.io).
-// Port of the Netlify function (web/netlify/functions/api-proxy.mts); the contract is
-// unchanged — see root CLAUDE.md.
+// The cross-app contract these two routes have to honor is in the root CLAUDE.md.
 
 // Only these request headers are forwarded upstream. Everything else (cookies, conditional
 // headers, the client's own authorization, etc.) is dropped so every viewer's request is

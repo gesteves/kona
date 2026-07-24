@@ -12,7 +12,7 @@ module ImageHelpers
       IMAGES_URL is unset, so there's no host to build a Cloudflare Images URL from.
 
       It's the host Cloudflare serves transformations from (<host>/cdn-cgi/image/…), i.e. the
-      site's own public host. Set it in .env locally and in Netlify's env for deploys.
+      site's own public host. Set it in .env locally and in the build env for deploys.
 
       This used to fall back to Contentful's resizing, which rendered fine while quietly
       draining Contentful's asset bandwidth — the exact thing Cloudflare Images replaced. It

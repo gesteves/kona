@@ -1,6 +1,6 @@
 # kona-api
 
-Rails app serving dynamic, embeddable markup for the otherwise-static [Kona](../README.md) site — weather, activity stats, Whoop, pageviews, etc. Deployed to fly.io; the [`web/`](../web/README.md) site reaches it through a same-origin Netlify proxy (`/widgets/*`) that caches responses on Netlify's edge.
+Rails app serving dynamic, embeddable markup for the otherwise-static [Kona](../README.md) site — weather, activity stats, Whoop, pageviews, etc. Deployed to fly.io; the [`web/`](../web/README.md) site reaches it through a same-origin proxy (`/widgets/*`) in its Cloudflare Worker, which caches responses at the edge.
 
 ## Setup
 
