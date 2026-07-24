@@ -8,5 +8,3 @@ Kona consists of two separate apps:
 - **`api/`** — a small Rails API, deployed to fly.io, that serves live, embeddable widgets (weather, activity stats, Whoop, etc.) into the otherwise-static site.
 
 Instructions for setting up each app are in their corresponding READMEs: [`web/README.md`](web/README.md) and [`api/README.md`](api/README.md).
-
-(A third app, **`og/`** — a tiny Node service that renders Open Graph card images on demand — is currently parked on the `restore-og` branch and not deployed.)
