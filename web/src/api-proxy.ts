@@ -123,6 +123,12 @@ export async function handleApi(
   const headers = new Headers();
   const contentType = upstream.headers.get('content-type');
   if (contentType) headers.set('content-type', contentType);
+  // These responses are built from scratch here, so they don't inherit the asset layer's
+  // security headers (web/source/headers, which only covers static assets). The widget
+  // fragments are real HTML that renders if navigated to directly, so set the two that
+  // matter for a fragment: no MIME sniffing, and never framable.
+  headers.set('x-content-type-options', 'nosniff');
+  headers.set('x-frame-options', 'DENY');
   // Pass the origin's Cache-Control through verbatim (this is what the browser sees).
   // CDN-Cache-Control is deliberately NOT forwarded: it's consumed by the fetch cache
   // above, and the browser has no use for the edge policy.
