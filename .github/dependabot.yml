@@ -1,5 +1,18 @@
 version: 2
 
+# @web.awesome.me/webawesome-pro comes from a private Cloudsmith registry (see web/.npmrc), so
+# Dependabot needs credentials of its own or it silently skips that package while still opening
+# PRs for the public ones. `token` here becomes the registry's `_authToken`, matching .npmrc.
+# ⚠️ `${{secrets.…}}` resolves against the *Dependabot* secret store, which is separate from the
+# Actions one — the same token has to exist in both (Settings → Secrets → Dependabot), or this
+# reads empty. The Actions copy is what `.github/workflows/web.yml` passes to `npm ci`; a
+# Dependabot-triggered run reads the Dependabot copy, and without it every `npm ci` 401s.
+registries:
+  webawesome:
+    type: npm-registry
+    url: https://npm.cloudsmith.io/fortawesome/webawesome-pro/
+    token: ${{secrets.WEBAWESOME_NPM_TOKEN}}
+
 updates:
   - package-ecosystem: "bundler"
     directory: "/web"
@@ -33,6 +46,8 @@ updates:
 
   - package-ecosystem: "npm"
     directory: "/web"
+    registries:
+      - webawesome
     schedule:
       interval: "weekly"
       day: "saturday"
