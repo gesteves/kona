@@ -222,6 +222,21 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      # wrangler deploy doesn't purge Cloudflare's edge cache, so without this the edge keeps
+      # serving pre-deploy HTML/feeds (cf-cache-status: HIT → stale 304s) until the entries age
+      # out. Every asset-layer response is tagged `Cache-Tag: site` (web/source/headers); purging
+      # just that tag evicts the site's pages/feeds while leaving image transformations
+      # (/cdn-cgi/image/*, never tagged) cached. Runs after wrangler activates the new version, so
+      # the next request re-populates the edge from it. --fail-with-body → red CI if the purge 4xxs.
+      # Reuses CLOUDFLARE_API_TOKEN, which now also carries the Zone → Cache Purge permission.
+      - name: Purge Cloudflare edge cache (tag "site")
+        run: |
+          curl -sS --fail-with-body -X POST \
+            "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            --data '{"tags":["site"]}'
+
       - name: Notify Slack (deploy successful)
         if: success()
         continue-on-error: true

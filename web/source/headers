@@ -5,9 +5,18 @@
 # than letting the more specific rule win — so no two rules here may set the same header
 # for overlapping paths. That's why the cache policy enumerates paths instead of using a
 # /* catch-all: a catch-all Cache-Control would corrupt the fingerprinted-asset rules.
+# (A /* Cache-Tag is safe — nothing else sets Cache-Tag, so there's nothing to join with.)
+#
+# EDGE-CACHE INVALIDATION: every asset-layer response is tagged `Cache-Tag: site` below. The
+# deploy purges that one tag (.github/workflows/web.yml) to evict stale HTML/feeds at
+# Cloudflare's edge after a rebuild — ETag revalidation alone did NOT (the edge served
+# cf-cache-status: HIT against its own stale copy). Cloudflare consumes and strips Cache-Tag,
+# so it never reaches clients, and image transformations (/cdn-cgi/image/*) never hit the
+# asset layer, so they're never tagged and survive the purge.
 
 /*
   Referrer-Policy: no-referrer-when-downgrade
+  Cache-Tag: site
 
 /.well-known/site.standard.publication
   Content-Type: text/plain; charset=utf-8
@@ -21,10 +30,12 @@
   Cache-Control: public, max-age=31536000, immutable
 
 # Stable URLs whose content changes every build, with extensions Cloudflare's default
-# edge cache picks up (.xml, .json, .txt, .png, .ico). Store, but always revalidate
-# against the ETag — a deploy mints new ETags, so deploys self-invalidate with no purge.
-# (Extensionless HTML needs no rule: it isn't in Cloudflare's default-cache extension
-# list, and max-age=0 + must-revalidate is already both platforms' default for it.)
+# edge cache picks up (.xml, .json, .txt, .png, .ico). Store, but always revalidate against
+# the ETag. Deploys don't self-invalidate here — the edge kept serving stale copies (HIT)
+# against its own ETag — so the deploy's Cache-Tag purge (see the top note) is what refreshes
+# them. (Extensionless HTML needs no Cache-Control rule: it isn't in Cloudflare's default-cache
+# extension list, and max-age=0 + must-revalidate is already the default for it — but it IS
+# tagged via /* above, so the purge covers it too.)
 /feed.xml
   Cache-Control: public, max-age=0, must-revalidate
 
