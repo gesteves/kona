@@ -11,13 +11,7 @@ class StaticMap
   GPX_FOLDER = File.expand_path('../../../data/maps/gpx', __FILE__)
   IMAGES_FOLDER = File.expand_path('../../../data/maps/images', __FILE__)
 
-  MAPBOX_ACCESS_TOKEN = ENV['MAPBOX_ACCESS_TOKEN'] || raise('Mapbox access token is missing!')
   MAPBOX_STYLE_URL = ENV['MAPBOX_STYLE_URL'] || "mapbox://styles/mapbox/outdoors-v12"
-
-  # The render request uses the secret token when present so it can read the
-  # private tilesets uploaded via MTS; it falls back to the public access token
-  # (e.g. the manual TILESET_ID override against a public tileset).
-  RENDER_TOKEN = ENV['MAPBOX_SECRET_TOKEN'].presence || MAPBOX_ACCESS_TOKEN
 
   # Maki icons
   # @see https://labs.mapbox.com/maki-icons/
@@ -231,6 +225,19 @@ class StaticMap
     Math.cos(latitude * Math::PI / 180)
   end
 
+  # The Mapbox token used to render the static image, resolved lazily — only here, at render
+  # time — so merely requiring this class never demands a token. (The Rakefile loads all of
+  # lib/utils/ at boot, but building the site doesn't touch Mapbox; only `rake maps:generate`
+  # does.) Prefers the secret token so it can read the private tilesets uploaded via MTS, falls
+  # back to the public access token (e.g. a manual TILESET_ID against a public tileset), and
+  # raises only when a render is actually attempted without either.
+  # @return [String] The Mapbox access token.
+  def render_token
+    ENV['MAPBOX_SECRET_TOKEN'].presence ||
+      ENV['MAPBOX_ACCESS_TOKEN'] ||
+      raise('Mapbox access token is missing!')
+  end
+
   # Generates the URL for a static map image from Mapbox.
   # @return [String] The URL for the static map image
   # @see https://docs.mapbox.com/api/maps/static-images/
@@ -243,7 +250,7 @@ class StaticMap
 
     base_params = {
       padding: @padding,
-      access_token: RENDER_TOKEN
+      access_token: render_token
     }.compact
 
     url = "https://api.mapbox.com/styles/v1/#{username}/#{style}/static/#{markers.join(',')}/#{bbox}/#{@width}x#{@height}@2x?#{base_params.to_query}"
