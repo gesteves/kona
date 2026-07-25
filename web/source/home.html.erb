@@ -16,9 +16,7 @@
   <%= render_widget 'trending', '/widgets/articles/trending' %>
   <%= render_widget 'weather', '/widgets/weather/current' %>
   <% if data.events.present? %>
-    <%# Not a placeholders/ partial, so it pairs preload + partial by hand. %>
-    <% races_url = "/widgets/events/upcoming" %>
-    <% preload_widget races_url %>
-    <%= partial 'partials/upcoming_races', locals: { url: races_url } %>
+    <%# Not a placeholders/ partial, so it's rendered directly rather than via render_widget. %>
+    <%= partial 'partials/upcoming_races', locals: { url: '/widgets/events/upcoming' } %>
   <% end %>
 </div>

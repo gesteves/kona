@@ -399,24 +399,6 @@ RSpec.describe SiteHelpers do
     end
   end
 
-  describe '#preload_widget' do
-    include Padrino::Helpers
-
-    it 'registers a crossorigin fetch preload link under the :preloads slot' do
-      preload_widget('/widgets/whoop')
-      expect(yield_content(:preloads)).to eq('<link rel="preload" as="fetch" href="/widgets/whoop" crossorigin="anonymous">')
-    end
-
-    it 'accumulates one preload per registered widget' do
-      preload_widget('/widgets/whoop')
-      preload_widget('/widgets/activity-stats')
-      expect(yield_content(:preloads)).to eq(
-        '<link rel="preload" as="fetch" href="/widgets/whoop" crossorigin="anonymous">' \
-        '<link rel="preload" as="fetch" href="/widgets/activity-stats" crossorigin="anonymous">'
-      )
-    end
-  end
-
   describe '#social_media_link' do
     include Padrino::Helpers
 

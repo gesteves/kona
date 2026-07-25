@@ -1,6 +1,5 @@
 <head>
   <%= partial 'partials/meta' %>
-  <%= yield_content :preloads %>
   <%= partial 'partials/open_graph_and_social' %>
   <%= partial 'partials/schema/article', locals: { article: content } if defined?(content) && published_post?(content) %>
   <%= partial 'partials/schema/site' %>

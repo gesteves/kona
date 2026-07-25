@@ -49,32 +49,18 @@ module SiteHelpers
     end
   end
 
-  # Registers a runtime-widget fragment to be <link rel="preload" as="fetch">ed in the <head>
-  # (rendered high up by the `yield_content :preloads` slot). The live-update controller only fetch()es
-  # these after the deferred JS bundle boots, so the browser discovers them late; preloading
-  # starts the request during HTML parse, in parallel with the bundle. crossorigin="anonymous"
-  # makes the preload's mode ("cors") and credentials mode ("same-origin") match the
-  # controller's bare same-origin fetch(), so the browser reuses the preloaded response instead
-  # of discarding it as unused (the "preload was not used within a few seconds" console warning)
-  # and issuing a second request. Call it alongside each widget placeholder, under the same
-  # condition, so a fragment is only preloaded on pages that actually fetch it.
-  # @param url [String] The same-origin widget endpoint the live-update controller will fetch.
-  # @return [void]
-  def preload_widget(url)
-    content_for :preloads do
-      # url is always an app-generated same-origin path (widget endpoint, ids are alphanumeric),
-      # never user input, so it needs no escaping here.
-      %(<link rel="preload" as="fetch" href="#{url}" crossorigin="anonymous">).html_safe
-    end
-  end
-
-  # Preloads a widget endpoint and renders its placeholder partial in one call — the
-  # standard pairing for every runtime widget (see preload_widget for why both matter).
+  # Renders a runtime widget's placeholder partial, wiring it to the endpoint the live-update
+  # controller fetches on connect.
+  #
+  # ⚠️ Don't pair these with a <link rel="preload" as="fetch"> — that's been tried and it
+  # doubles the requests instead of front-loading them. Widget fragments are served
+  # `Cache-Control: max-age=0, …` with no validator (api/app/controllers/concerns/live_widget.rb:
+  # the browser must always revalidate, the edge does the caching), so a preloaded copy is stale
+  # the moment it lands: the controller's fetch() can't reuse it and issues a second full request.
   # @param name [String] The placeholder partial's basename under partials/placeholders/.
   # @param url [String] The same-origin widget endpoint, passed to the partial as `url`.
   # @return [String] The rendered placeholder.
   def render_widget(name, url)
-    preload_widget(url)
     partial "partials/placeholders/#{name}", locals: { url: url }
   end
 

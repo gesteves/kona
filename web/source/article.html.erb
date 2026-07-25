@@ -1,6 +1,3 @@
-<%# The per-article pageviews fragment (URL matches _full.html.erb's views_url) is fetched by a
-    live-update span inside the article body; preload it here so the request starts during parse. %>
-<% preload_widget "/widgets/plausible/pageviews/#{content.sys.id}" %>
 <%= partial 'partials/article/full', locals: { article: content } %>
 <%= partial 'partials/share', locals: { article: content } %>
 <%# Show race reports from the same event when there are any; otherwise show the semantically- %>
