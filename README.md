@@ -1,6 +1,6 @@
 # Kona
 
-A massively-overengineered blogging system behind _[Given to Tri](https://www.giventotri.com/)_, built on [Middleman](https://middlemanapp.com/), powered by [Contentful](https://www.contentful.com/), and hosted on [Cloudflare Workers](https://developers.cloudflare.com/workers/).
+A massively overengineered blogging system behind _[Given to Tri](https://www.giventotri.com/)_, built on [Middleman](https://middlemanapp.com/), powered by [Contentful](https://www.contentful.com/), and hosted on [Cloudflare Workers](https://developers.cloudflare.com/workers/).
 
 Kona consists of two separate apps:
 
