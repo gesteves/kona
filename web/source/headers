@@ -69,6 +69,14 @@
 /favicon.ico
   Cache-Control: public, max-age=0, must-revalidate
 
+# The Pagefind search index and its component UI, regenerated wholesale by `npm run
+# pagefind` on every build. The top-level filenames are unhashed, so `immutable` would
+# pin a stale index. (The nested index/ and fragment/ chunks ARE content-hashed and could
+# be immutable, but globs cross `/` here — a second, more specific rule would overlap this
+# one and Cloudflare would comma-join the two Cache-Controls. One rule for the tree.)
+/pagefind/*
+  Cache-Control: public, max-age=0, must-revalidate
+
 # The per-tag Atom feeds live at /tagged/**/feed.xml. This also matches the tag archive
 # HTML pages, which is harmless: this directive is exactly the default they'd get anyway.
 /tagged/*
