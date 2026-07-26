@@ -13,6 +13,7 @@ runs:
       # also handles deploy credentials. Keep new payload values in this block.
       env:
         EVENT_NAME: ${{ github.event_name }}
+        DISPATCH_TYPE: ${{ github.event.action }}
         HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         PR_TITLE: ${{ github.event.pull_request.title }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -53,13 +54,22 @@ runs:
         # change; for the two deploy triggers that don't, the usual "<sha> - <message>" renders
         # as a bare hash followed by a dangling dash. Label those by what actually triggered
         # the deploy instead:
-        #   repository_dispatch -> a Contentful publish/unpublish (the api's SiteBuildJob). The
-        #     commit is just whatever main happened to be at, so the sha is noise — drop it.
+        #   repository_dispatch -> the api's SiteBuildJob. The commit is just whatever main
+        #     happened to be at, so the sha is noise — drop it. DISPATCH_TYPE (the event's
+        #     `event_type`, exposed as github.event.action) says which caller fired it:
+        #     contentful-publish = a Contentful publish/unpublish, api-build = a POST to
+        #     /api/build. Unknown types fall back to the Contentful wording rather than
+        #     rendering blank.
         #   workflow_dispatch   -> a manual "Run workflow". The sha IS meaningful (it's what got
         #     deployed), so keep the link and say why there's no message.
         COMMIT_LINK="<${SERVER_URL}/${REPOSITORY}/commit/${SHA}|\`${SHORT_SHA}\`>"
         case "$EVENT_NAME" in
-          repository_dispatch) COMMIT_CONTEXT="Content update — published in Contentful" ;;
+          repository_dispatch)
+            case "$DISPATCH_TYPE" in
+              api-build) COMMIT_CONTEXT="Rebuild triggered via the API" ;;
+              *)         COMMIT_CONTEXT="Content update — published in Contentful" ;;
+            esac
+            ;;
           workflow_dispatch)   COMMIT_CONTEXT="Manual rebuild of ${COMMIT_LINK}" ;;
           *)                   COMMIT_CONTEXT="${COMMIT_LINK} - ${COMMIT_MESSAGE}" ;;
         esac

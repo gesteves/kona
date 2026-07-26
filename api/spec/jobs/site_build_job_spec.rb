@@ -26,6 +26,15 @@ RSpec.describe SiteBuildJob do
     described_class.new.perform
   end
 
+  it "dispatches the event type it's given (the /api/build caller's)" do
+    expect(HTTParty).to receive(:post).with(
+      "https://api.github.com/repos/owner/kona/dispatches",
+      hash_including(body: { event_type: "api-build" }.to_json)
+    ).and_return(success)
+
+    described_class.new.perform("api-build")
+  end
+
   it "raises on a non-2xx response so Sidekiq retries" do
     allow(HTTParty).to receive(:post).and_return(instance_double(HTTParty::Response, success?: false, code: 403))
     expect { described_class.new.perform }.to raise_error(/repository_dispatch failed \(HTTP 403\)/)

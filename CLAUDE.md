@@ -111,8 +111,9 @@ Response Rule, which is why this is a hard zone dependency.) Plus the bot WAF ru
 
 The API's routes are split by namespace: `/widgets/*` returns HTML widget fragments (proxied,
 below), `/api/*` accepts or returns structured data (`POST /api/location`,
-`GET /api/standard-site`, `POST /api/icons` — hit directly at `KONA_API_URL`, not proxied;
-`POST /api/contact` is the exception — it's browser-reachable through the same proxy, below),
+`GET /api/standard-site`, `POST /api/icons`, `POST /api/build` — hit directly at `KONA_API_URL`,
+not proxied; `POST /api/contact` is the exception — it's browser-reachable through the same
+proxy, below),
 and `/webhooks/*` receives inbound webhooks from external services (also hit directly, e.g. by
 Contentful). The web build reads two of these at build time: `GET /api/standard-site` for the
 verification markup, and `POST /api/icons` for its Font Awesome icons (the Font Awesome
@@ -132,7 +133,8 @@ integration lives only in the api — web posts its allowlist and gets back pre-
 
 ⚠️ The proxy claims `/api/contact` **explicitly, not `/api/*`** — the other `/api/*` endpoints
 stay origin-only (build-time / server-side callers). Don't broaden it to `/api/*`, or you'd
-expose `POST /api/location` and `POST /api/icons` to the browser with the injected bearer.
+expose `POST /api/location`, `POST /api/icons`, and `POST /api/build` (which ships a production
+deploy) to the browser with the injected bearer.
 
 The proxy is deliberately strict:
 

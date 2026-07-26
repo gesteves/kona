@@ -35,6 +35,7 @@ headers below. Edge TTL = how long the edge serves a cached copy before revalida
 | POST | `/webhooks/whoop` | `webhooks/whoop#create` | enqueues a `WhoopWebhookJob` syncing strain/sleep/recovery to Intervals.icu wellness + regenerating the matched activity's description (HMAC-gated, user-verified); 200 `{ok: true}` | — |
 | GET | `/api/standard-site` | `api/standard_site#show` | JSON `{did, publication_uri}` for the web build's verification markup | 1 hr |
 | POST | `/api/icons` | `api/icons#create` | JSON `{family: {style: [{id, svg}]}}` — resolves the web build's posted Font Awesome allowlist to SVGs (bearer-token gated) | — |
+| POST | `/api/build` | `api/build#create` | enqueues a `SiteBuildJob` to rebuild + redeploy the web site (bearer-token gated, 60s dedupe lock); 202, or 429 inside the lock window | — |
 | GET | `/whoop/auth` | `whoop_oauth#authorize` | redirect (owner-session gated) | — |
 | GET | `/whoop/callback` | `whoop_oauth#callback` | OAuth token exchange | — |
 | GET | `/login` | `sessions#new` | owner sign-in page (Google button) | — |
@@ -52,7 +53,8 @@ headers below. Edge TTL = how long the edge serves a cached copy before revalida
     when data is unavailable — the site's `live-update` controller removes the placeholder
     (collapsing the widget) on an empty response, so prefer it over raising.
   - `api/` — structured-data endpoints (accept or return data, not markup):
-    `Api::LocationController`, `Api::StandardSiteController`, `Api::ContactController` under
+    `Api::LocationController`, `Api::StandardSiteController`, `Api::ContactController`,
+    `Api::BuildController` under
     `Api::BaseController`. `ContactController` is the one browser-reachable write (through the
     web proxy): it drops honeypot hits, validates (incl. length caps), verifies **Turnstile** on
     the JSON path (skipped for the no-JS HTML path — the widget needs JS), and enqueues
@@ -123,10 +125,18 @@ headers below. Edge TTL = how long the edge serves a cached copy before revalida
   its normal backoff, then Dead-sets a job once 24 hours have elapsed since the first failure);
   `StandardSiteSyncJob(operation,
   entry_id)` runs the standard.site sync (webhook- and backfill-driven),
-  `SiteBuildJob()` fires a GitHub `repository_dispatch` (`contentful-publish`) to rebuild + redeploy
-  the **web** site (the `.github/workflows/web.yml` "Web" workflow listens for it) — enqueued by the
-  Contentful webhook on every publish/unpublish/delete so the static build picks up the change;
-  no-ops when `GITHUB_DISPATCH_TOKEN`/`GITHUB_REPOSITORY` are unset, and
+  `SiteBuildJob(event_type = "contentful-publish")` fires a GitHub `repository_dispatch` to
+  rebuild + redeploy the **web** site (the `.github/workflows/web.yml` "Web" workflow listens for
+  it). Two callers, one event type each — both build identically, and are distinct only so the
+  deploy's Slack notification can name the trigger (`.github/actions/ci-context/action.yml`
+  branches on `github.event.action`): the Contentful webhook enqueues it with the default on every
+  publish/unpublish/delete so the static build picks up the change, and `POST /api/build`
+  (`Api::BuildController`) enqueues it with `"api-build"` for a programmatic on-demand rebuild,
+  behind a 60s Redis lock (`build:trigger_lock`) that returns 429 on repeats. ⚠️ Both event types
+  must stay listed in that workflow's `repository_dispatch.types` — GitHub accepts a dispatch for
+  an unlisted type with a 204 and silently runs nothing. The event type is always a caller-supplied
+  constant, never a request parameter. No-ops when `GITHUB_DISPATCH_TOKEN`/`GITHUB_REPOSITORY` are
+  unset, and
   `ArticleEmbeddingJob(operation, entry_id)` keeps an article's Voyage embedding (the
   `embeddings:article:<id>` Redis key) in sync for the related-articles widget — `"embed"` on
   publish, `"delete"` on unpublish/delete (webhook-driven, plus the `embeddings:backfill` rake
@@ -237,6 +247,10 @@ bundle exec brakeman -q --no-pager                   # static security scan
 bundle exec bundle-audit check --update              # dependency CVE scan
 fly deploy                                           # deploy to fly.io (app + worker processes)
 fly console                                           # production console
+
+# Trigger a rebuild + redeploy of the web site (needs a running worker to drain the job).
+# ⚠️ Against the deployed origin this ships a real deploy — see Permissions below.
+curl -i -X POST -H "Authorization: Bearer $API_TOKEN" "$KONA_API_URL/api/build"
 ```
 
 No Rubocop / linter is configured. `.rspec` requires `spec_helper`. CI (`bin/ci` and the
@@ -291,7 +305,8 @@ secrets (and Rails `config/credentials.yml.enc` + `master.key`).
   `ALLOWED_HOSTS` (comma-separated `Host`-header allowlist; **production only**, enables
   host authorization. Unset = all hosts accepted, so it's safe to deploy before setting it,
   then activate by setting the fly secret. `/up` is always exempt. Never hardcode the host),
-  `GITHUB_DISPATCH_TOKEN` + `GITHUB_REPOSITORY` (the `SiteBuildJob` web-rebuild trigger — a
+  `GITHUB_DISPATCH_TOKEN` + `GITHUB_REPOSITORY` (the `SiteBuildJob` web-rebuild trigger, behind
+  both the Contentful webhook and `POST /api/build` — a
   fine-grained PAT with **Contents: Read and write**, or a classic PAT with `repo`, plus the
   `owner/repo` slug; both unset = the trigger no-ops, so dev/CI stay inert).
 

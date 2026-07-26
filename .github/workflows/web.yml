@@ -12,6 +12,10 @@ name: "Web"
 #     pull_request trigger; main is covered here.
 #   - repository_dispatch: contentful-publish -> item 2: kona-api fires this when content is
 #     published/unpublished in Contentful (see api/app/jobs/site_build_job.rb).
+#   - repository_dispatch: api-build -> the same job, fired by a POST to the api's /api/build
+#     endpoint (bearer-gated) — a programmatic "rebuild now" for scripts and automation. Both
+#     types run identically here; they're separate only so the Slack notification can say which
+#     one triggered the deploy (see .github/actions/ci-context/action.yml).
 #   - workflow_dispatch -> manual "Run workflow" button (from main). An on-demand rebuild:
 #     the build always pulls Contentful drafts (preview token + `preview: true`) and renders
 #     each to /id/<entry-id>/ (noindex, unlisted), but only publish/unpublish/delete fires a
@@ -33,7 +37,7 @@ on:
       - '.github/workflows/web.yml'
       - '.github/actions/**'
   repository_dispatch:
-    types: [contentful-publish]
+    types: [contentful-publish, api-build]
   workflow_dispatch:
 
 # No job writes to the repository — the deploy and the cache purge authenticate with

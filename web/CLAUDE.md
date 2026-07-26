@@ -77,6 +77,11 @@ bundle exec rake build:verbose
 gh workflow disable web.yml      # stop deploying (pushes and Contentful publishes won't build)
 gh workflow enable web.yml       # resume
 gh workflow run web.yml          # trigger one build now (from main)
+
+# Programmatic equivalent of the last one, for scripts/automation: a bearer-gated POST to the
+# api, which fires the same repository_dispatch (see api/app/controllers/api/build_controller.rb).
+# Deduped by a 60s lock — repeats inside the window get a 429.
+curl -X POST -H "Authorization: Bearer $API_TOKEN" "$KONA_API_URL/api/build"
 ```
 
 ### Import subtasks

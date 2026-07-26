@@ -51,6 +51,11 @@ Rails.application.routes.draw do
     # the .well-known endpoint and the <link rel="site.standard.*"> tags.
     get "standard-site" => "standard_site#show"
 
+    # Rebuilds + redeploys the static web site on demand (bearer-token-secured): enqueues a
+    # SiteBuildJob, which fires the GitHub repository_dispatch the "Web" workflow listens for.
+    # Rate-limited by a short Redis lock in the controller, not by rack-attack.
+    post "build" => "build#create"
+
     # Batch-resolves the web build's Font Awesome allowlist (posted as { family => { style =>
     # [ids] } }) to pre-rendered SVGs, so the web build fetches icons from here instead of
     # calling Font Awesome directly. Bearer-gated (a novel id triggers a paid upstream call).
