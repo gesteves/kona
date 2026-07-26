@@ -13,6 +13,12 @@ const SCRIPT_PATH = '/pa/script.js';
 const EVENT_PATH = '/pa/event';
 const EVENT_UPSTREAM = 'https://plausible.io/api/event';
 
+// How long to wait on an upstream before giving up. Analytics must never hold a request open:
+// an aborted fetch throws into handlePlausible's catch, which hands back the same silent
+// fallback as an outage. Without this, a hung upstream would pin the request to the platform
+// limit — for the event POST that's a visitor-page fetch left dangling.
+const UPSTREAM_TIMEOUT_MS = 10_000;
+
 export async function handlePlausible(
   request: Request,
   env: Env,
@@ -60,19 +66,24 @@ async function getScript(
   env: Env,
   ctx: ExecutionContext
 ): Promise<Response> {
+  // The <script src> only ever issues GETs; a HEAD probe rides the same cache entry below.
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    return new Response(null, { status: 405, headers: { allow: 'GET, HEAD' } });
+  }
+
   // ⚠️ Key on the bare script path, NOT the inbound request. The Cache API keys on the full URL
   // including the query string, so caching the request as-is would let /pa/script.js?x=<random>
   // mint an unbounded number of entries, each one a cache miss that refetches Plausible's CDN.
-  // Nothing here reads a query param, so normalizing is lossless.
+  // Nothing here reads a query param, so normalizing is lossless. The key is a GET request, which
+  // is also what lets a HEAD share the entry: caches.default only serves GET and put() *throws*
+  // on a non-GET key, but both operations here always use this normalized GET key.
   const cacheKey = new Request(new URL(SCRIPT_PATH, request.url).toString());
-  // caches.default only serves GET, and put() *throws* on a non-GET request — a throw that would
-  // land inside the waitUntil below, where handlePlausible's fail-open catch can't see it. So skip
-  // the cache entirely for anything else (in practice only a HEAD probe) and just proxy it.
-  const cacheable = request.method === 'GET';
 
-  let response = cacheable ? await caches.default.match(cacheKey) : undefined;
+  let response = await caches.default.match(cacheKey);
   if (!response) {
-    const upstream = await fetch(env.PLAUSIBLE_SCRIPT_URL!);
+    const upstream = await fetch(env.PLAUSIBLE_SCRIPT_URL!, {
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    });
     // On an upstream error, don't cache it and don't pass the failing status to the
     // <script src> (which would log a console error) — hand back a no-op script instead.
     if (!upstream.ok) return emptyScript();
@@ -82,9 +93,11 @@ async function getScript(
     // its status and Cache-Control, so the TTL still comes from Plausible.
     response = new Response(upstream.body, upstream);
     response.headers.delete('set-cookie');
-    if (cacheable) ctx.waitUntil(caches.default.put(cacheKey, response.clone()));
+    ctx.waitUntil(caches.default.put(cacheKey, response.clone()));
   }
-  return response;
+  // A HEAD gets the same status/headers with no body (and, on a miss, still populates the
+  // cache above rather than costing an upstream fetch per probe).
+  return request.method === 'HEAD' ? new Response(null, response) : response;
 }
 
 // Forward the event POST upstream with the visitor's cookies stripped (the guide's one
@@ -99,9 +112,14 @@ async function getScript(
 // dedupes unique visitors. CF-Connecting-IP is the only real client IP (root CLAUDE.md);
 // X-Forwarded-For is the header Plausible reads through a proxy.
 async function postEvent(request: Request): Promise<Response> {
+  // The tracker only ever POSTs; anything else (scanner probes, stray GETs) is rejected here
+  // rather than forwarded upstream verbatim.
+  if (request.method !== 'POST') {
+    return new Response(null, { status: 405, headers: { allow: 'POST' } });
+  }
   const upstream = new Request(EVENT_UPSTREAM, request);
   upstream.headers.delete('cookie');
   const clientIp = request.headers.get('CF-Connecting-IP');
   if (clientIp) upstream.headers.set('X-Forwarded-For', clientIp);
-  return fetch(upstream);
+  return fetch(upstream, { signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
 }

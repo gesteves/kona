@@ -5,27 +5,23 @@ module Widgets
   # passes for itself, so trending never lists the post you're reading). All ranking lives in the
   # TrendingArticles service; the card helpers render in the view.
   class ArticlesController < BaseController
-    # Shape of a Contentful entry id (URL-safe alphanumerics). Anything else in the `:id` segment is
-    # garbage — it can never match a real article, so we ignore it rather than acting on it.
-    ID_FORMAT = /\A[A-Za-z0-9_-]{1,64}\z/
-
     def trending
       render_trending TrendingArticles.new.all(count: 4)
     end
 
     # Trending minus the `:id` article (the page passes its own id so it isn't listed as trending).
+    # A garbage id (see BaseController::CONTENTFUL_ID_FORMAT) is ignored rather than acted on.
     def trending_excluding
-      id = params[:id].to_s
-      ids = id.match?(ID_FORMAT) ? [id] : []
-      render_trending TrendingArticles.new.excluding(ids, count: 4)
+      id = contentful_id_param
+      render_trending TrendingArticles.new.excluding(id ? [id] : [], count: 4)
     end
 
     # The "You May Also Like" widget: articles semantically related to :id (its Contentful entry id),
     # ranked by embedding similarity in the RelatedArticles service.
     def related
       render_widget(:related, ttl: 1.hour, edge_stale_while_revalidate: 1.day) do
-        id = params[:id].to_s
-        @articles = id.match?(ID_FORMAT) ? RelatedArticles.new.for_article(id, count: 4) : []
+        id = contentful_id_param
+        @articles = id ? RelatedArticles.new.for_article(id, count: 4) : []
       end
     end
 

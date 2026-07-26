@@ -57,12 +57,15 @@ RSpec.describe "Rack::Attack", type: :request do
       expect(RACK_ATTACK_PROBE_PATH.call("/.env")).to be_truthy
       expect(RACK_ATTACK_PROBE_PATH.call("/wp-login.php")).to be_truthy
       expect(RACK_ATTACK_PROBE_PATH.call("/app/%2Eenv")).to be_truthy        # /app/.env
-      expect(RACK_ATTACK_PROBE_PATH.call("/%2Ewell-known/jwks%2Ejson")).to be_truthy
+      expect(RACK_ATTACK_PROBE_PATH.call("/%2Egit/config")).to be_truthy     # /.git/config
     end
 
     it "leaves legitimate paths alone" do
       expect(RACK_ATTACK_PROBE_PATH.call("/widgets/weather/current")).to be_falsey
       expect(RACK_ATTACK_PROBE_PATH.call("/up")).to be_falsey
+      # .well-known is where legitimate endpoints live (security.txt, did:web, OAuth metadata) —
+      # blocking it would silently 403 a future one, so probes there just 404 via the catch-all.
+      expect(RACK_ATTACK_PROBE_PATH.call("/.well-known/security.txt")).to be_falsey
     end
 
     it "is safe on malformed encoding (treats it as a non-probe rather than raising)" do

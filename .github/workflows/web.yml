@@ -266,18 +266,31 @@ jobs:
 
       # wrangler deploy doesn't purge Cloudflare's edge cache, so without this the edge keeps
       # serving pre-deploy HTML/feeds (cf-cache-status: HIT → stale 304s) until the entries age
-      # out. Every asset-layer response is tagged `Cache-Tag: site` (web/source/headers); purging
-      # just that tag evicts the site's pages/feeds while leaving image transformations
-      # (/cdn-cgi/image/*, never tagged) cached. Runs after wrangler activates the new version, so
+      # out. Every asset-layer response is tagged `Cache-Tag: site` (a host-scoped zone Cache
+      # Response Rule — root CLAUDE.md); purging just that tag evicts the site's pages/feeds while
+      # leaving image transformations (/cdn-cgi/image/*, never tagged) and the api-host widget
+      # cache (other host, never tagged) intact. Runs after wrangler activates the new version, so
       # the next request re-populates the edge from it. --fail-with-body → red CI if the purge 4xxs.
       # Reuses CLOUDFLARE_API_TOKEN, which now also carries the Zone → Cache Purge permission.
+      #
+      # Purged TWICE: wrangler returns at activation, but propagation across PoPs takes a few
+      # seconds, and a request served by a not-yet-updated PoP right after the first purge would
+      # re-cache OLD content — which, since deploys don't self-invalidate at the edge, would stay
+      # pinned until the NEXT deploy's purge. The second pass runs after propagation has settled
+      # and evicts anything the race re-pinned. Off the critical path: the new version is already
+      # live, so the sleep delays nothing but this job's completion.
       - name: Purge Cloudflare edge cache (tag "site")
         run: |
-          curl -sS --fail-with-body -X POST \
-            "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
-            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            --data '{"tags":["site"]}'
+          purge() {
+            curl -sS --fail-with-body -X POST \
+              "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
+              -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              --data '{"tags":["site"]}'
+          }
+          purge
+          sleep 30
+          purge
 
       - name: Notify Slack (deploy successful)
         if: success()

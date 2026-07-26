@@ -35,7 +35,11 @@ class Turnstile < ApplicationService
     body = { secret: @secret, response: token }
     body[:remoteip] = remoteip if remoteip.present?
 
-    response = HTTParty.post(SITEVERIFY_URL, body: body)
+    # The timeout is what makes the fail-open real: without it Net::HTTP waits its 60s defaults,
+    # so a *hung* (rather than refused) siteverify holds the contact request until rack-timeout
+    # kills the thread — a 500 to the visitor instead of the accept below. A timeout raises
+    # Net::OpenTimeout/ReadTimeout, which the rescue turns into the intended open failure.
+    response = HTTParty.post(SITEVERIFY_URL, body: body, timeout: 5)
     unless response.success?
       # Transport/API error: we have a token (a challenge was attempted) but can't confirm it.
       # Fail open rather than block a real user during a Cloudflare hiccup.

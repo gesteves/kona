@@ -8,7 +8,12 @@ module Widgets
       # serving a stale count while revalidating costs nothing.
       cache_widget(ttl: 1.hour, edge_stale_while_revalidate: 1.day)
 
-      article = Articles.new.find(params[:id])
+      # A malformed id can't be a real entry — collapse the widget before any lookup work
+      # (BaseController::CONTENTFUL_ID_FORMAT explains why this matters on /widgets/*).
+      id = contentful_id_param
+      return render_empty if id.nil?
+
+      article = Articles.new.find(id)
       return render_empty if article.nil?
 
       plausible = Plausible.new

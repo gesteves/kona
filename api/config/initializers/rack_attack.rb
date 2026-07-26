@@ -39,8 +39,13 @@ end
 
 # Obvious scanner targets: dotfiles/secrets, common CMS/admin probes, script extensions,
 # and framework status/config endpoints we don't expose.
+#
+# ⚠️ `.well-known` is deliberately NOT in the dotfile group: it's the standard home of
+# legitimate endpoints (security.txt, did:web, OAuth metadata), and a blanket 403 here would
+# silently break a future one in a way that looks like a Cloudflare/zone problem. Probes to it
+# just fall through to the plain-text 404 catch-all, which is equally cheap.
 RACK_ATTACK_PROBE_PATTERN = %r{
-  (^|/)\.(env|git|aws|ssh|htaccess|svn|well-known)  # dotfiles & secret stores
+  (^|/)\.(env|git|aws|ssh|htaccess|svn)  # dotfiles & secret stores
   | /wp-(login|admin|content|includes)   # WordPress
   | \.(php|asp|aspx|jsp|cgi)(/|$|\?)      # script extensions
   | /(actuator|phpmyadmin|pma|adminer)    # admin panels

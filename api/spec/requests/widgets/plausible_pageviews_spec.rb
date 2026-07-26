@@ -76,6 +76,17 @@ RSpec.describe "Widgets::Plausible pageviews", type: :request do
     expect(edge).to include("stale-if-error=86400")
   end
 
+  context "when the id is not a valid Contentful entry id" do
+    it "returns an empty body without doing any lookup work" do
+      expect_any_instance_of(Articles).not_to receive(:find)
+      expect_any_instance_of(Plausible).not_to receive(:query)
+
+      get "/widgets/plausible/pageviews/#{"a" * 65}", headers: auth_headers
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to eq("")
+    end
+  end
+
   context "when the article is not found" do
     before { allow_any_instance_of(Articles).to receive(:find).and_return(nil) }
 

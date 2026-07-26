@@ -93,6 +93,16 @@ function withFragmentSecurityHeaders(headers: Headers): Headers {
   return headers;
 }
 
+// Weak ETag comparison (RFC 9110 §8.8.3.2): validators match ignoring W/ prefixes. The
+// If-None-Match header may carry a comma-separated list or `*`.
+function etagMatches(ifNoneMatch: string, etag: string): boolean {
+  const strip = (value: string) => value.trim().replace(/^W\//, '');
+  const target = strip(etag);
+  return ifNoneMatch
+    .split(',')
+    .some((candidate) => candidate.trim() === '*' || strip(candidate) === target);
+}
+
 // Empty body, briefly cacheable, never durable: the live-update controller collapses the widget on
 // any non-2xx (it removes the placeholder), and the empty body matches the origin's render_empty
 // for any client that reads the body instead of the status — never "Bad Gateway" text. The short
@@ -202,6 +212,23 @@ export async function handleApi(
   // above, and the browser has no use for the edge policy.
   const cacheControl = upstream.headers.get('cache-control');
   if (cacheControl) headers.set('cache-control', cacheControl);
+
+  // Forward the origin's validators so the browser's stale-while-revalidate refresh can be
+  // conditional (a 304 instead of re-transferring the fragment). The conditional is answered
+  // HERE, never upstream: forwarding If-None-Match would make the upstream request vary per
+  // client and shatter the single shared edge cache entry, so the upstream fetch stays
+  // unconditional and this proxy compares validators against the (edge-cached) response itself.
+  const etag = upstream.headers.get('etag');
+  if (etag) headers.set('etag', etag);
+  const lastModified = upstream.headers.get('last-modified');
+  if (lastModified) headers.set('last-modified', lastModified);
+
+  if (!isContact && upstream.status === 200 && etag) {
+    const ifNoneMatch = request.headers.get('if-none-match');
+    if (ifNoneMatch && etagMatches(ifNoneMatch, etag)) {
+      return new Response(null, { status: 304, headers });
+    }
+  }
 
   // The contact form's no-JS path answers a native POST with a 303 to the site's Thank-You
   // page; forward that Location (the response headers are otherwise rebuilt from scratch here,

@@ -70,11 +70,12 @@ problem.
   `cf-cache-status: HIT` even with `max-age=0, must-revalidate` (the browser revalidates; the edge
   serves its own copy). Deploys do **not** self-invalidate at the edge — Cloudflare keeps serving
   the cached copy instead of revalidating against the freshly deployed asset — so invalidation is
-  **explicit**: a **Cache Response Rule** tags every non-`/cdn-cgi/` response `Cache-Tag: site`, and
-  `.github/workflows/web.yml` **purges tag `site` on every deploy** (see the zone-config note
-  below). Image transformations (`/cdn-cgi/image/*`) are cached separately and never tagged, so the
-  deploy purge leaves them intact. The **widget** fragments are a separate path — their edge policy
-  comes from the api's own `CDN-Cache-Control` (the widget TTLs), not from this.
+  **explicit**: a **Cache Response Rule** tags every non-`/cdn-cgi/` response **on the site host**
+  `Cache-Tag: site`, and `.github/workflows/web.yml` **purges tag `site` on every deploy** (see the
+  zone-config note below). Image transformations (`/cdn-cgi/image/*`) are cached separately and
+  never tagged, so the deploy purge leaves them intact. The **widget** fragments are a separate
+  path — their edge policy comes from the api's own `CDN-Cache-Control` (the widget TTLs), not from
+  this, and the rule's host scoping is what keeps them out of the deploy purge (see below).
 - **Bot blocking is a zone rule, not code** — the `block-bots` edge function that used to do this
   was **deleted** (`3c4e0044`). Its job — blocking a scraper that spoofs a Google referral (a
   desktop-Linux Chrome UA arriving with a `google.com` referer) — is now a **WAF BLOCK rule in
@@ -93,9 +94,15 @@ Zone-side settings the code hard-depends on, none of them in the repo: **Transfo
 enabled with `images.ctfassets.net` allowlisted as a source (without it every image 403s); the
 **Add visitor location headers** managed transform (without it `CF-IPCity`/`CF-Region` are
 absent and geo logging degrades to country-only); the **Cache Response Rule** that sets
-`Cache-Tag: site` on every non-`/cdn-cgi/` response (match `not
-starts_with(http.request.uri.path, "/cdn-cgi/")`) — without it the deploy's tag purge in
-`.github/workflows/web.yml` matches nothing and republished content stays stale at the edge.
+`Cache-Tag: site` on every non-`/cdn-cgi/` response **on the site host** (match `http.host eq
+"<site host>" and not starts_with(http.request.uri.path, "/cdn-cgi/")`) — without it the deploy's
+tag purge in `.github/workflows/web.yml` matches nothing and republished content stays stale at the
+edge. ⚠️ The `http.host` clause is as load-bearing as the rule itself: the api origin host lives in
+the same zone, and the widget fragments the web Worker's upstream fetch edge-caches are keyed on
+that host — a path-only match would tag them `site` too, so every deploy purge would evict the
+entire widget cache along with the `stale-while-revalidate` / `stale-if-error` copies that keep
+widgets rendering through a fly outage (worst case: a Contentful publish deploying mid-outage
+collapses every widget site-wide). Don't widen the match beyond the site host.
 (Setting the tag via the origin `_headers` `Cache-Tag` header does **not** work here — Cloudflare
 doesn't consume it, it just leaks the header to clients — so the tag must be set by a Cache
 Response Rule, which is why this is a hard zone dependency.) Plus the bot WAF rule above.

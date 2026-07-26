@@ -74,6 +74,57 @@ describe('handleApi — widgets (GET)', () => {
     expect(upstream.request!.url).toBe(`${ORIGIN}/widgets/whoop`);
   });
 
+  it('forwards the origin ETag and answers If-None-Match itself with a 304', async () => {
+    const upstream = interceptFetch(
+      'GET',
+      `${ORIGIN}/widgets/whoop`,
+      () =>
+        new Response('<div>whoop</div>', {
+          headers: {
+            'content-type': 'text/html',
+            'cache-control': 'public, max-age=0, stale-while-revalidate=300',
+            etag: 'W/"abc123"',
+          },
+        })
+    );
+
+    const res = await handleApi(
+      new Request('https://www.example.com/widgets/whoop', {
+        headers: { 'if-none-match': 'W/"abc123"' },
+      }),
+      env
+    );
+
+    expect(res.status).toBe(304);
+    expect(await res.text()).toBe('');
+    expect(res.headers.get('etag')).toBe('W/"abc123"');
+    expect(res.headers.get('cache-control')).toBe(
+      'public, max-age=0, stale-while-revalidate=300'
+    );
+    // The conditional is answered at the proxy, never forwarded upstream — a per-client
+    // If-None-Match on the upstream request would shatter the shared edge cache entry.
+    expect(upstream.request!.headers.get('if-none-match')).toBeNull();
+  });
+
+  it('returns the full 200 with the new ETag when the validator does not match', async () => {
+    interceptFetch(
+      'GET',
+      `${ORIGIN}/widgets/whoop`,
+      () => new Response('<div>whoop</div>', { headers: { etag: 'W/"new"' } })
+    );
+
+    const res = await handleApi(
+      new Request('https://www.example.com/widgets/whoop', {
+        headers: { 'if-none-match': 'W/"old"' },
+      }),
+      env
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('etag')).toBe('W/"new"');
+    expect(await res.text()).toBe('<div>whoop</div>');
+  });
+
   it('405s a method the route does not accept, without touching the origin', async () => {
     // No intercept registered at all: reaching the origin would throw an unmocked-fetch error.
     const res = await handleApi(

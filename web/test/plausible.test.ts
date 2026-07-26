@@ -121,6 +121,51 @@ describe('handlePlausible', () => {
     expect(sent.get('x-forwarded-for')).toBe('203.0.113.9');
   });
 
+  it('answers a HEAD probe for the script without a body, still going through the cache', async () => {
+    interceptFetch(
+      'GET',
+      SCRIPT_UPSTREAM,
+      () =>
+        new Response('window.plausible=function(){}', {
+          headers: { 'content-type': 'application/javascript' },
+        })
+    );
+
+    const res = await handlePlausible(
+      new Request('https://www.example.com/pa/script.js', { method: 'HEAD' }),
+      env,
+      makeCtx()
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/javascript');
+    expect(await res.text()).toBe('');
+    // The miss still populates the cache (under the normalized GET key), so a HEAD probe
+    // never costs an extra upstream fetch on the next GET.
+    expect(vi.mocked(caches.default.put)).toHaveBeenCalled();
+  });
+
+  it('405s a non-GET/HEAD to the script path without touching the upstream', async () => {
+    // No intercept registered: reaching the upstream would throw an unmocked-fetch error.
+    const res = await handlePlausible(
+      new Request('https://www.example.com/pa/script.js', { method: 'POST' }),
+      env,
+      makeCtx()
+    );
+    expect(res.status).toBe(405);
+    expect(res.headers.get('allow')).toBe('GET, HEAD');
+  });
+
+  it('405s a non-POST to the event path without touching the upstream', async () => {
+    const res = await handlePlausible(
+      new Request('https://www.example.com/pa/event'),
+      env,
+      makeCtx()
+    );
+    expect(res.status).toBe(405);
+    expect(res.headers.get('allow')).toBe('POST');
+  });
+
   it('404s an unknown /pa/ path', async () => {
     const res = await handlePlausible(
       new Request('https://www.example.com/pa/nope'),
