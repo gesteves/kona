@@ -22,9 +22,34 @@
     <link rel="apple-touch-icon" href="<%= site_icon_url(w: 180) %>">
     <link rel="manifest" href="/manifest.json">
   <% end %>
-  <link rel="stylesheet" href="/pagefind/pagefind-component-ui.css">
-  <script type="module" src="/pagefind/pagefind-component-ui.js"></script>
+  <%# The faces used above the fold. They're only discoverable once site.css has parsed,
+      so preloading them removes a round trip from the critical path. `crossorigin` is
+      mandatory even same-origin — fonts always fetch in CORS mode, and omitting it
+      silently doubles the download. Keep this list to the two or three faces that
+      actually render above the fold; more, and they start competing with the LCP image. %>
+  <% %w[
+    ibm-plex-sans-condensed-v14-latin-700.woff2
+    lato-v24-latin-300.woff2
+    ibm-plex-mono-v19-latin-300.woff2
+  ].each do |font| %>
+    <link rel="preload" as="font" type="font/woff2" href="<%= asset_path(:fonts, font) %>" crossorigin>
+  <% end %>
+  <%# Pagefind's stylesheet and component module are NOT loaded here — they're injected on
+      demand by javascripts/stimulus/lib/pagefind.js, which also documents the cascade
+      constraint on where the stylesheet lands in this head. %>
   <%= javascript_include_tag 'site', defer: 'defer', 'data-turbo-track': 'reload' %>
+  <%# The Web Awesome theme (esbuild extracts it from the one CSS import in stimulus/index.js).
+      ⚠️ This is render-blocking and it does NOT have to be — it's custom-property definitions
+      only (it pulls in layers.css and a colour palette, but neither native.css nor
+      utilities.css, so it styles no plain HTML element), and every token consumer is a WA
+      custom element that can't render styled until the deferred bundle above upgrades it.
+      But do NOT unblock it with the usual `media="print" onload="this.media='all'"` swap:
+      `data-turbo-track="reload"` folds this element's outerHTML into Turbo's tracked-element
+      signature (HeadSnapshot#trackedElementSignature), so mutating `media` at runtime makes
+      every navigation's comparison fail and Turbo full-page-reloads, taking view transitions
+      with it. That's been tried and reverted. Any fix must leave the element unmutated —
+      inline the CSS in a <style>, or drop this tag and inject the <link> from JS the way
+      lib/pagefind.js does. %>
   <%= stylesheet_link_tag '/javascripts/site', 'data-turbo-track': 'reload' %>
   <%= stylesheet_link_tag 'site', 'data-turbo-track': 'reload' %>
   <%= stylesheet_link_tag 'print', media: 'print', 'data-turbo-track': 'reload' %>

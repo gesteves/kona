@@ -101,6 +101,39 @@ build fails loudly rather than shipping pages with missing icons.
   `config.rb` requires and registers every module in that directory.
 - `source/layouts/layout.erb`, `source/partials/` (incl. `placeholders/`),
   `source/javascripts/stimulus/`, `source/stylesheets/`.
+- **Nothing but `stylesheets/site.css` may block the first render.** `_head.html.erb` is
+  deliberately arranged so it's the only blocking stylesheet:
+  - **Pagefind's `pagefind-component-ui.{css,js}` are not in the head at all** — they're
+    injected by `javascripts/stimulus/lib/pagefind.js` (idle preload after `load`, intent
+    prefetch on hover/focus of a Search trigger, awaited in `search#open`). ⚠️ The
+    stylesheet is inserted **before the first existing `<link rel="stylesheet">`**, never
+    appended: `stylesheets/components/_pagefind.scss` remaps Pagefind's `--pf-*` vars for
+    dark mode from an unlayered `:root` block that wins only by sitting later in *source*
+    order, and the cascade follows document order, not load order. Append it and the modal
+    goes permanently light at night, silently. Neither injected element carries
+    `data-turbo-track` — Turbo only strips stylesheets marked `="dynamic"`, so they survive
+    navigation.
+  - The Web Awesome theme (`/javascripts/site.css`, extracted by esbuild from the one CSS
+    import in `stimulus/index.js`) is **still render-blocking**, and needn't be: it's
+    custom-property definitions only (it pulls in `layers.css` and a colour palette but
+    neither `native.css` nor `utilities.css`, so it styles no plain HTML element), and every
+    token consumer is a WA custom element that can't render styled until the deferred bundle
+    upgrades it.
+    ⚠️ **Do not unblock it with `media="print" onload="this.media='all'"`** — that was tried
+    and reverted; it breaks Turbo site-wide. Any element carrying `data-turbo-track="reload"`
+    has its **`outerHTML`** folded into Turbo's tracked-element signature
+    (`HeadSnapshot#trackedElementSignature`), so mutating `media` at runtime makes the current
+    head's signature differ from every incoming page's, `trackedElementsAreIdentical` fails,
+    and Turbo full-page-reloads on every navigation — silently killing view transitions.
+    Dropping `data-turbo-track` doesn't rescue it either: Turbo then appends a *duplicate*
+    link per navigation, since the incoming outerHTML never matches the mutated one. The
+    constraint is general: **never mutate an attribute of a tracked head element.** Fixes that
+    work leave the element alone — inline the CSS in a `<style>` (~6.7 KB gzip/page, identical
+    across pages so Turbo ignores it), or drop the tag and inject the `<link>` from JS the way
+    `lib/pagefind.js` does.
+  - The above-the-fold woff2 faces are preloaded, since they're otherwise undiscoverable
+    until `site.css` parses. `crossorigin` is mandatory even same-origin or they download
+    twice; URLs must come from `asset_path(:fonts, …)` because fonts are asset-hashed.
 - Open Graph "cards" (the `og:image` for pages without a cover image) were rendered **on demand**
   by a separate `kona-og` fly service. **That service is currently parked** (removed from `main`,
   preserved on the `restore-og` branch — it didn't earn its own app for now), so cover-less pages
