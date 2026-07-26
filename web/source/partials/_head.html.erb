@@ -22,31 +22,10 @@
     <link rel="apple-touch-icon" href="<%= site_icon_url(w: 180) %>">
     <link rel="manifest" href="/manifest.json">
   <% end %>
-  <%# The faces used above the fold. They're only discoverable once site.css has parsed,
-      so preloading them removes a round trip from the critical path. `crossorigin` is
-      mandatory even same-origin — fonts always fetch in CORS mode, and omitting it
-      silently doubles the download. Keep this list to the two or three faces that
-      actually render above the fold; more, and they start competing with the LCP image. %>
-  <% %w[
-    ibm-plex-sans-condensed-v14-latin-700.woff2
-    lato-v24-latin-300.woff2
-    ibm-plex-mono-v19-latin-300.woff2
-  ].each do |font| %>
-    <link rel="preload" as="font" type="font/woff2" href="<%= asset_path(:fonts, font) %>" crossorigin>
-  <% end %>
-  <%# Pagefind's stylesheet and component module are NOT loaded here — they're injected on
-      demand by javascripts/stimulus/lib/pagefind.js, which also documents the cascade
-      constraint on where the stylesheet lands in this head. %>
+  <link rel="stylesheet" href="/pagefind/pagefind-component-ui.css">
+  <script type="module" src="/pagefind/pagefind-component-ui.js"></script>
   <%= javascript_include_tag 'site', defer: 'defer', 'data-turbo-track': 'reload' %>
-  <%# The Web Awesome theme: custom-property definitions only (it pulls in layers.css and a
-      colour palette, but neither native.css nor utilities.css, so it styles no plain HTML
-      element). Everything that reads those tokens is a Web Awesome custom element, which
-      can't render styled until the deferred bundle above upgrades it — so this has no
-      business blocking the first paint. Loaded as `print` and swapped to `all` on load.
-      ⚠️ Keep it in this position: the swap doesn't move the element, so the stylesheet
-      order — and with it the `@layer` declaration order — is unchanged. %>
-  <%= stylesheet_link_tag '/javascripts/site', media: 'print', onload: "this.media='all'", 'data-turbo-track': 'reload' %>
-  <noscript><%= stylesheet_link_tag '/javascripts/site' %></noscript>
+  <%= stylesheet_link_tag '/javascripts/site', 'data-turbo-track': 'reload' %>
   <%= stylesheet_link_tag 'site', 'data-turbo-track': 'reload' %>
   <%= stylesheet_link_tag 'print', media: 'print', 'data-turbo-track': 'reload' %>
   <%= yield_content :assets %>

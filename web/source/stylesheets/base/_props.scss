@@ -1,13 +1,4 @@
 :root {
-  // Own the colour scheme here rather than inheriting whatever Web Awesome's theme sets.
-  // That theme declares `color-scheme: light` on a zero-specificity `:where(:root)` and
-  // only switches to dark behind a `.wa-dark` class this app never sets — so form
-  // controls, scrollbars, and other UA-painted chrome stayed light even at night. This
-  // app drives dark mode entirely from `prefers-color-scheme` (see below), and declaring
-  // both values lets the UA follow it. It also means the first paint no longer depends on
-  // that theme stylesheet, which is loaded non-blocking (partials/_head.html.erb).
-  color-scheme: light dark;
-
   // Swatches: https://coolors.co/faf7fa-092034-bf0222-f9cb40-121216
   // Blues
   --color-alice-blue:            #EEF5FC;

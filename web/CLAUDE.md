@@ -101,28 +101,6 @@ build fails loudly rather than shipping pages with missing icons.
   `config.rb` requires and registers every module in that directory.
 - `source/layouts/layout.erb`, `source/partials/` (incl. `placeholders/`),
   `source/javascripts/stimulus/`, `source/stylesheets/`.
-- **Nothing but `stylesheets/site.css` may block the first render.** `_head.html.erb` is
-  deliberately arranged so it's the only blocking stylesheet:
-  - **Pagefind's `pagefind-component-ui.{css,js}` are not in the head at all** — they're
-    injected by `javascripts/stimulus/lib/pagefind.js` (idle preload after `load`, intent
-    prefetch on hover/focus of a Search trigger, awaited in `search#open`). ⚠️ The
-    stylesheet is inserted **before the first existing `<link rel="stylesheet">`**, never
-    appended: `stylesheets/components/_pagefind.scss` remaps Pagefind's `--pf-*` vars for
-    dark mode from an unlayered `:root` block that wins only by sitting later in *source*
-    order, and the cascade follows document order, not load order. Append it and the modal
-    goes permanently light at night, silently. Neither injected element carries
-    `data-turbo-track` — Turbo only strips stylesheets marked `="dynamic"`, so they survive
-    navigation.
-  - **The Web Awesome theme (`/javascripts/site.css`, extracted by esbuild from the one CSS
-    import in `stimulus/index.js`) loads `media="print"` and swaps to `all` on load.** It's
-    custom-property definitions only — it pulls in `layers.css` and a colour palette, but
-    neither `native.css` nor `utilities.css`, so it styles no plain HTML element, and every
-    token consumer is a WA custom element that can't render styled until the deferred bundle
-    upgrades it. Keep the tag in its current position; the swap doesn't move the element, so
-    stylesheet order (and `@layer` declaration order) is preserved.
-  - The above-the-fold woff2 faces are preloaded, since they're otherwise undiscoverable
-    until `site.css` parses. `crossorigin` is mandatory even same-origin or they download
-    twice; URLs must come from `asset_path(:fonts, …)` because fonts are asset-hashed.
 - Open Graph "cards" (the `og:image` for pages without a cover image) were rendered **on demand**
   by a separate `kona-og` fly service. **That service is currently parked** (removed from `main`,
   preserved on the `restore-og` branch — it didn't earn its own app for now), so cover-less pages
