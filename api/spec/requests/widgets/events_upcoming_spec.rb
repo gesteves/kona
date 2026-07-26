@@ -123,7 +123,7 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
     edge = response.headers["CDN-Cache-Control"]
     expect(edge).to include("public")
     expect(edge).to include("max-age=3600")
-    expect(edge).to include("stale-while-revalidate=86400")
+    expect(edge).to include("stale-while-revalidate=3600")
     expect(edge).to include("stale-if-error=86400")
   end
 

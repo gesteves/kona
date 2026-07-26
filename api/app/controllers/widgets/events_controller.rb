@@ -5,9 +5,9 @@ module Widgets
   # replacing the former standalone weather/event widget. Cached for an hour.
   class EventsController < BaseController
     def upcoming
-      # Edge SWR kept at a day (vs. the one-hour default): the upcoming-races list changes
-      # rarely, so serving a stale copy while revalidating costs nothing.
-      render_widget(:upcoming, ttl: 1.hour, edge_stale_while_revalidate: 1.day) do
+      # Edge SWR left at the one-hour default: "Today" labels and the featured-event choice
+      # turn over on the day, so a stale copy shouldn't outlive the fresh window by much.
+      render_widget(:upcoming, ttl: 1.hour) do
         # The owner's configured timezone anchors "today"/"soon" for the race list (this
         # widget doesn't track the owner's current location). The selection/featuring
         # decisions live in the presenter; the view reads everything through @races.

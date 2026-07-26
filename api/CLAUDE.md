@@ -182,9 +182,9 @@ headers below. Edge TTL = how long the edge serves a cached copy before revalida
     which is what keeps widgets rendering through a fly outage.
   ⚠️ Only emit this on successful, cacheable responses — an error must never be pinned at the
   edge. Edge `stale-while-revalidate` defaults to one hour
-  (`DEFAULT_EDGE_STALE_WHILE_REVALIDATE`); the pageviews, upcoming-races, trending, and
-  related-articles widgets pass `edge_stale_while_revalidate: 1.day` since their data changes
-  slowly relative to the hourly edge max-age.
+  (`DEFAULT_EDGE_STALE_WHILE_REVALIDATE`); the pageviews, trending, and related-articles
+  widgets pass `edge_stale_while_revalidate: 1.day` since their data changes slowly relative
+  to the hourly edge max-age.
 - **Error reporting** — `config/initializers/bugsnag.rb` wires the `bugsnag` gem; its railtie
   auto-inserts the Rack middleware and hooks ActionDispatch, so unhandled exceptions are
   reported even though errors render as plain text. `notify_release_stages` is limited to
