@@ -94,9 +94,12 @@ problem.
   **explicit**: a **Cache Response Rule** tags every non-`/cdn-cgi/` response **on the site host**
   `Cache-Tag: site`, and `.github/workflows/web.yml` **purges tag `site` on every deploy** (see the
   zone-config note below). Image transformations (`/cdn-cgi/image/*`) are cached separately and
-  never tagged, so the deploy purge leaves them intact. The **widget** fragments are a separate
-  path — their edge policy comes from the api's own `CDN-Cache-Control` (the widget TTLs), not from
-  this, and the rule's host scoping is what keeps them out of the deploy purge (see below).
+  never tagged, so the deploy purge leaves them intact. The **widget** fragments get their TTLs
+  from the api's own `CDN-Cache-Control`, not from this rule — but the ones that render
+  **Contentful** content are tagged `site` by a second branch of the same rule, scoped to the api
+  host and to those paths, so a content publish (which dispatches a deploy, which purges the tag)
+  evicts them instead of leaving them serving pre-edit content for an hour plus a day of
+  `stale-while-revalidate`. The live-data widgets stay untagged (see below).
 - **Bot blocking is a zone rule, not code** — the `block-bots` edge function that used to do this
   was **deleted** (`3c4e0044`). Its job — blocking a scraper that spoofs a Google referral (a
   desktop-Linux Chrome UA arriving with a `google.com` referer) — is now a **WAF BLOCK rule in
@@ -115,18 +118,56 @@ Zone-side settings the code hard-depends on, none of them in the repo: **Transfo
 enabled with `images.ctfassets.net` allowlisted as a source (without it every image 403s); the
 **Add visitor location headers** managed transform (without it `CF-IPCity`/`CF-Region` are
 absent and geo logging degrades to country-only); the **Cache Response Rule** that sets
-`Cache-Tag: site` on every non-`/cdn-cgi/` response **on the site host** (match `http.host eq
-"<site host>" and not starts_with(http.request.uri.path, "/cdn-cgi/")`) — without it the deploy's
-tag purge in `.github/workflows/web.yml` matches nothing and republished content stays stale at the
-edge. ⚠️ The `http.host` clause is as load-bearing as the rule itself: the api origin host lives in
-the same zone, and the widget fragments the web Worker's upstream fetch edge-caches are keyed on
-that host — a path-only match would tag them `site` too, so every deploy purge would evict the
-entire widget cache along with the `stale-while-revalidate` / `stale-if-error` copies that keep
-widgets rendering through a fly outage (worst case: a Contentful publish deploying mid-outage
-collapses every widget site-wide). Don't widen the match beyond the site host.
-(Setting the tag via the origin `_headers` `Cache-Tag` header does **not** work here — Cloudflare
-doesn't consume it, it just leaks the header to clients — so the tag must be set by a Cache
-Response Rule, which is why this is a hard zone dependency.) Plus the bot WAF rule above.
+`Cache-Tag: site`, whose expression has **two host-scoped branches** — without it the deploy's tag
+purge in `.github/workflows/web.yml` matches nothing and republished content stays stale at the
+edge:
+
+```
+(http.host eq "<site host>" and not starts_with(http.request.uri.path, "/cdn-cgi/"))
+or
+(http.host eq "<api host>" and (
+  starts_with(http.request.uri.path, "/widgets/articles/")
+  or starts_with(http.request.uri.path, "/widgets/events/")
+))
+```
+
+The **first** branch is the static build: every page, feed, and asset. The **second** is the widget
+fragments that render **Contentful** content, matched by route namespace: `/widgets/articles/*`
+(trending, trending-excluding, related) and `/widgets/events/*` (upcoming). The api origin host
+lives in the same zone, and the fragments the web Worker's upstream fetch edge-caches are keyed on
+*that* host (not the Worker's), so they're reachable by the same rule and the same purge. Contentful
+publishes dispatch a deploy, so this is what keeps those widgets from serving pre-edit content for
+their full edge TTL.
+
+Matching by namespace rather than enumerating routes is deliberate, and it's not a loose
+approximation: **articles and events are Contentful content types**, so anything served under those
+two prefixes renders Contentful data by definition. A new widget in either namespace is therefore
+tagged correctly and automatically, and the rule can't silently fall out of sync with
+`api/config/routes.rb`.
+
+⚠️ **Both the host scoping and the namespace scoping are load-bearing — never collapse this to a
+path-only or host-only match, and never widen the second branch to `/widgets/`.** Purging a widget
+drops its `stale-while-revalidate` / `stale-if-error` copies along with the fresh one, and those are
+what keep widgets rendering through a fly outage; a blanket `/widgets/*` would put **every** widget
+in the deploy purge, so a Contentful publish landing mid-outage would collapse all of them
+site-wide. The trade is worth it only where there's stale content to fix: the live-data widgets
+(`weather/current`, `activity-stats`, `whoop`, `plausible/pageviews/:id`) render nothing from
+Contentful and sit in their own namespaces, which is what keeps them out. Everything else on the api
+host — `/api/*`, `/webhooks/*` — stays out for the same reason.
+
+⚠️ **A Contentful-backed widget added under a NEW top-level namespace needs this rule edited in the
+dashboard**, and nothing in the repo will remind you — the widget will simply go stale forever,
+silently. Routes added under `articles/` or `events/` are already covered.
+
+⚠️ Both hostnames are typed by hand here and neither is validated: a rule with a misspelled host
+saves cleanly, matches nothing, and fails **silently**. Paste them from the zone's DNS records, and
+verify with Cloudflare Trace or by watching `cf-cache-status` on a widget URL across a deploy.
+
+(Setting the tag via the web `_headers` `Cache-Tag` header does **not** work — Cloudflare doesn't
+consume it, it just leaks the header to clients — so the tag must come from this rule, which is why
+it's a hard zone dependency. The rule runs in the `http_response_cache_settings` phase, i.e. after
+the origin response, and applies to Worker subrequests as well as eyeball requests — which is what
+lets one rule cover both branches.) Plus the bot WAF rule above.
 
 ## How the two apps connect (request path)
 
@@ -150,7 +191,12 @@ integration lives only in the api — web posts its allowlist and gets back pre-
    extensionless, so Cloudflare's extension-based default would cache nothing), and its TTL comes
    entirely from the origin's `CDN-Cache-Control` (RFC 9213 — see
    `api/app/controllers/concerns/live_widget.rb`). One cached copy is reused by all viewers. The
-   contact POST opts out of the cache entirely.
+   contact POST opts out of the cache entirely. ⚠️ The entry is cached under the **api** hostname,
+   not the Worker's — which is why the zone rule that tags the Contentful-backed widgets `site` is
+   scoped to that host (see the caching notes above). The proxy itself does no tagging: it neither
+   sets `cf.cacheTags` nor knows which widgets render Contentful content, and it shouldn't — that's
+   a property of the data an endpoint renders, and duplicating the path list here would mean two
+   places to keep in sync with `api/config/routes.rb`.
 
 ⚠️ The proxy claims `/api/contact` **explicitly, not `/api/*`** — the other `/api/*` endpoints
 stay origin-only (build-time / server-side callers). Don't broaden it to `/api/*`, or you'd

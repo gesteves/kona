@@ -272,8 +272,11 @@ jobs:
       # serving pre-deploy HTML/feeds (cf-cache-status: HIT → stale 304s) until the entries age
       # out. Every asset-layer response is tagged `Cache-Tag: site` (a host-scoped zone Cache
       # Response Rule — root CLAUDE.md); purging just that tag evicts the site's pages/feeds while
-      # leaving image transformations (/cdn-cgi/image/*, never tagged) and the api-host widget
-      # cache (other host, never tagged) intact. Runs after wrangler activates the new version, so
+      # leaving image transformations (/cdn-cgi/image/*, never tagged) intact. The same rule's
+      # second branch tags the Contentful-backed widget fragments on the api host, so this also
+      # evicts those — that's deliberate, since a Contentful publish dispatches this workflow and
+      # they'd otherwise serve pre-edit content; the live-data widgets are untagged and survive.
+      # Runs after wrangler activates the new version, so
       # the next request re-populates the edge from it. --fail-with-body → red CI if the purge 4xxs.
       # Reuses CLOUDFLARE_API_TOKEN, which now also carries the Zone → Cache Purge permission.
       #

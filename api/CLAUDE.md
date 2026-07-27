@@ -195,6 +195,19 @@ headers below. Edge TTL = how long the edge serves a cached copy before revalida
   (`DEFAULT_EDGE_STALE_WHILE_REVALIDATE`); the pageviews, trending, and related-articles
   widgets pass `edge_stale_while_revalidate: 1.day` since their data changes slowly relative
   to the hourly edge max-age.
+  ⚠️ **Purging is the one piece of the widget cache policy this app does *not* author.** The
+  widgets that render Contentful content are tagged `Cache-Tag: site` by a **zone Cache Response
+  Rule** matching `/widgets/articles/*` and `/widgets/events/*` on this app's host, so the web
+  deploy's tag purge evicts them when content is republished — otherwise an edited entry would
+  rebuild the site while the widgets served the pre-edit copy for an hour plus a day of
+  `stale-while-revalidate`. Nothing here or in the web proxy sets that tag; an origin `Cache-Tag`
+  header wouldn't be consumed. The namespaces match the Contentful content types, so any widget
+  serving articles or events is Contentful-backed by definition and new routes under those two
+  prefixes are covered automatically. What isn't: **moving one out of them — or adding a
+  Contentful-backed widget under a new namespace — silently stops the purge** (no code change can
+  fix it; it needs a dashboard edit, and nothing fails loudly). The live-data widgets (`weather/*`,
+  `activity-stats`, `whoop`, `plausible/*`) are deliberately outside those prefixes. Full expression
+  and reasoning: root [`CLAUDE.md`](../CLAUDE.md).
 - **Error reporting** — `config/initializers/bugsnag.rb` wires the `bugsnag` gem; its railtie
   auto-inserts the Rack middleware and hooks ActionDispatch, so unhandled exceptions are
   reported even though errors render as plain text. `notify_release_stages` is limited to
