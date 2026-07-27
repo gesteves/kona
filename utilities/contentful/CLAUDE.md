@@ -1,9 +1,10 @@
-# contentful/ — content migrations & the taxonomy toolkit
+# utilities/contentful — content migrations & the taxonomy toolkit
 
 Node scripts that read and write content **in Contentful itself** (as opposed to render-time
-transforms in `web/lib/helpers/`). This directory lives outside `web/` on purpose: the "Web"
-deploy workflow is path-filtered on `web/**`, so running or editing scripts here never triggers
-a deploy.
+transforms in `web/lib/helpers/`). This directory lives under `utilities/`, outside `web/`, on
+purpose: the "Web" deploy workflow is path-filtered on `web/**`, so running or editing scripts
+here never triggers a build, a deploy, or an edge-cache purge. (Same reason
+[`utilities/maps/`](../maps/CLAUDE.md) sits next to it.)
 
 Two kinds of things live here, and they use **different Contentful APIs**:
 
@@ -66,7 +67,7 @@ what gets created/described/assigned:
 **To change the taxonomy — add a concept, rename one, edit copy, reassign an article, or add the
 planned Locations scheme — edit this file and re-run the relevant idempotent script.** Always
 `npm run taxonomy:preview` first (read-only, no creds, cross-checks coverage vs
-`../web/data/articles.json`).
+`../../web/data/articles.json`).
 
 ### Design rules (why it's shaped this way)
 
@@ -82,7 +83,7 @@ planned Locations scheme — edit this file and re-run the relevant idempotent s
 - Descriptions are **Markdown** (rendered on the archive page, stripped to plain text in meta
   tags). They may contain inline HTML (`<span data-imperial="…">`, `<i>`) and Markdown links —
   but links must be **relative** (`/tagged/…`). Never hardcode the production host (root
-  [`CLAUDE.md`](../CLAUDE.md)).
+  [`CLAUDE.md`](../../CLAUDE.md)).
 
 ### Gotchas learned the hard way
 

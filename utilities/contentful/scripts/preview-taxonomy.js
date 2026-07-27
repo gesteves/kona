@@ -1,7 +1,7 @@
 // Read-only review of the taxonomy design in lib/taxonomy.js — writes NOTHING to Contentful.
 // Prints every concept (grouped by scheme, indented by hierarchy, with altLabels + description)
 // and every article's resolved full-path assignment, and cross-checks coverage against the
-// built web data (../web/data/articles.json) so you can see missing / stale assignments.
+// built web data (web/data/articles.json) so you can see missing / stale assignments.
 //
 // Run: `npm run taxonomy:preview`. Iterate on lib/taxonomy.js, re-run, repeat until happy.
 
@@ -60,12 +60,12 @@ function main() {
   printConcepts();
 
   let publishedSlugs = null;
-  const articlesPath = path.resolve(__dirname, '../../web/data/articles.json');
+  const articlesPath = path.resolve(__dirname, '../../../web/data/articles.json');
   try {
     const arts = JSON.parse(fs.readFileSync(articlesPath, 'utf8')).filter((a) => !a.draft);
     publishedSlugs = new Set(arts.map((a) => a.slug));
   } catch {
-    console.log('\n(could not read ../web/data/articles.json — skipping coverage check)');
+    console.log('\n(could not read web/data/articles.json — skipping coverage check)');
   }
 
   const unknownIds = printAssignments(publishedSlugs);

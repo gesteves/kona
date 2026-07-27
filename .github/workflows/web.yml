@@ -4,7 +4,7 @@ name: "Web"
 #
 # Triggers:
 #   - push to main / PR touching web/**  -> item 1: only rebuild when the web app actually
-#     changed (an api/-only or contentful/-only change never runs this workflow).
+#     changed (an api/-only or utilities/-only change never runs this workflow).
 #     ⚠️ `push` is scoped to main on purpose. It used to be ["*"], which meant every push to a
 #     branch with an open PR ran `checks` twice — once for the push (refs/heads/<branch>) and
 #     once for the PR (refs/pull/N/merge). Those are different `github.ref` values, so the

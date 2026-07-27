@@ -5,7 +5,6 @@
 build/
 .env
 data/*.json
-data/maps
 node_modules
 
 # Local Wrangler state (created by `wrangler dev`)

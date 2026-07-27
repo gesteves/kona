@@ -1,0 +1,8 @@
+require 'dotenv/tasks'
+
+# Require the map classes. `dotenv/tasks` supplies the `:environment` prerequisite the
+# tasks depend on (it's an alias for `:dotenv`, which loads this directory's `.env`).
+Dir[File.expand_path('lib/*.rb', __dir__)].each { |file| require file }
+
+# Import tasks from lib/tasks
+Dir.glob(File.expand_path('lib/tasks/**/*.rake', __dir__)).each { |r| import r }

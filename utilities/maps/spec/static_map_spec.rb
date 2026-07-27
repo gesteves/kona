@@ -1,12 +1,12 @@
 require 'spec_helper'
 
-# lib/utils/static_map.rb reads Mapbox ENV vars into constants at load time (and raises
+# lib/static_map.rb reads Mapbox ENV vars into constants at load time (and raises
 # if MAPBOX_ACCESS_TOKEN is missing), so pin deterministic values before requiring it.
 # These only affect the test process, never the shell.
 ENV['MAPBOX_ACCESS_TOKEN'] = 'pk.test-token'
 ENV['MAPBOX_SECRET_TOKEN'] = 'sk.test-token'
 ENV['MAPBOX_STYLE_URL'] = 'mapbox://styles/testuser/teststyle'
-require_relative '../../../lib/utils/static_map'
+require_relative '../lib/static_map'
 
 RSpec.describe StaticMap do
   # The initializer parses a GPX file from disk and derives everything from it; allocate

@@ -1,5 +1,5 @@
 require 'spec_helper'
-require_relative '../../../lib/utils/mapbox_tileset'
+require_relative '../lib/mapbox_tileset'
 
 RSpec.describe MapboxTileset do
   def uploader

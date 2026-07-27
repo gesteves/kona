@@ -1,0 +1,50 @@
+name: "Utilities"
+
+# Checks for the local-only tools in utilities/. Nothing here deploys — that's the whole point
+# of the directory: `web.yml` and `api.yml` are path-filtered on `web/**` / `api/**`, so a change
+# to a utility never builds the site, redeploys a Worker, or purges the edge cache.
+#
+# Only utilities/maps/ has a test suite. utilities/contentful/ is a set of one-off Node scripts
+# run by hand against Contentful; there's nothing to check.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'utilities/maps/**'
+      - '.github/workflows/utilities.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'utilities/maps/**'
+      - '.github/workflows/utilities.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  maps:
+    name: Maps tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: utilities/maps
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          working-directory: utilities/maps
+          bundler-cache: true
+
+      # The specs stub every HTTP call and pin the Mapbox env vars themselves, so this runs
+      # credential-free.
+      - name: Ruby tests
+        run: bundle exec rspec

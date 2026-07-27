@@ -1,5 +1,5 @@
 // Upserts Contentful `redirect` entries (301) for archive URLs that move in the two-scheme
-// redesign, so old /tagged/* links don't break. Old paths are read from ../web/data/tags.json
+// redesign, so old /tagged/* links don't break. Old paths are read from web/data/tags.json
 // (the CURRENT build — run this BEFORE re-importing), new paths are computed from the design.
 // Covers concepts that moved (path changed) and retired ids (ironman/ironman-703/olympic/races).
 //
@@ -20,7 +20,7 @@ const RETIRED = { ironman: 'full-distance', 'ironman-703': 'half-distance', olym
 const newPath = (id) => `/tagged/${expandAncestors(id).reverse().join('/')}/`;
 
 function buildRedirects() {
-  const tagsPath = path.resolve(__dirname, '../../web/data/tags.json');
+  const tagsPath = path.resolve(__dirname, '../../../web/data/tags.json');
   const oldPaths = new Map();
   JSON.parse(fs.readFileSync(tagsPath, 'utf8')).forEach((t) => oldPaths.set(t.tag.id, t.tag.path));
 

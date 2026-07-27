@@ -1,12 +1,13 @@
 # Contentful content migrations
 
 One-off scripts that rewrite content **in Contentful itself**, run locally. This
-directory lives outside `web/` so editing these scripts never triggers a site build.
+directory lives under `utilities/`, outside `web/`, so editing these scripts never triggers
+a site build.
 
 ## Setup (once)
 
 ```bash
-cd contentful
+cd utilities/contentful
 npm install
 cp .env.example .env   # fill in CONTENTFUL_SPACE + CONTENTFUL_MANAGEMENT_TOKEN
 ```
@@ -141,7 +142,7 @@ Every script supports `DRY_RUN` / `ENTRY_ID` / `CONTENTFUL_ENVIRONMENT` as above
 Before step 1, confirm the two things the apps depend on and take a backup. The two
 verification curls use the **delivery/preview** tokens from the `web/` and `api/` apps (CPA
 for `preview.contentful.com`, CDA for `cdn.contentful.com`) — those live in those apps'
-`.env` files, not `contentful/.env`, so set them inline; the backup runs as an npm script.
+`.env` files, not `utilities/contentful/.env`, so set them inline; the backup runs as an npm script.
 
 ```bash
 # 1. GraphQL exposes concept ids on entries (both apps read this):

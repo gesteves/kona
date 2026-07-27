@@ -5,7 +5,9 @@ app-specific commands and conventions, read the nearest `CLAUDE.md`:
 
 - [`web/CLAUDE.md`](web/CLAUDE.md) — Middleman static site (the blog).
 - [`api/CLAUDE.md`](api/CLAUDE.md) — Rails API serving dynamic widgets.
-- [`contentful/CLAUDE.md`](contentful/CLAUDE.md) — one-off Contentful content migrations.
+- [`utilities/contentful/CLAUDE.md`](utilities/contentful/CLAUDE.md) — one-off Contentful
+  content migrations.
+- [`utilities/maps/CLAUDE.md`](utilities/maps/CLAUDE.md) — static map generation from GPX tracks.
 
 Work on one app from inside its own directory; each has its own `Gemfile`,
 `.env.example`, and test suite.
@@ -17,15 +19,34 @@ Work on one app from inside its own directory; each has its own `Gemfile`,
 | `web/` | Middleman 4 static site generator (Ruby 4.0.6). Builds the Contentful-powered blog and serves all static pages. | Cloudflare Workers (`kona-web`) |
 | `api/` | Rails 8.1 API (Ruby 4.0.6). Serves small dynamic HTML fragments ("widgets") embedded into the static pages at runtime, plus a Sidekiq `worker` process for background jobs (standard.site PDS sync). | fly.io (`kona-api`: `app` + `worker`) — behind Cloudflare |
 | `redis/` | Config (`fly.toml`) for the `kona-redis` fly app — the API's dedicated Redis (cache + Sidekiq queues). | fly.io (`kona-redis`) |
-| `contentful/` | One-off Contentful content migrations (Node scripts, run locally). Deliberately outside `web/` so edits don't trigger a site rebuild (the `web.yml` workflow is path-filtered on `web/**`). | — (never deployed) |
+| `utilities/` | Local-only tools, deliberately outside `web/` and `api/` so edits never trigger a deploy (see below). | — (never deployed) |
+| `utilities/contentful/` | One-off Contentful content migrations + the taxonomy toolkit (Node scripts, run locally). | — (never deployed) |
+| `utilities/maps/` | Static map generation: renders GPX tracks as PNG cover images via Mapbox (standalone Ruby/Rake app, run locally). | — (never deployed) |
 
 Each app has its own Redis, configured via its own `REDIS_URL`: `api/` uses the dedicated
 `kona-redis` fly app (`redis/fly.toml`); `web/` uses a separate Upstash instance. The apps
 keep distinct keyspaces, so there's no cross-app data sharing to preserve.
 
-One-off **Contentful content migrations** (scripts that rewrite the content itself) live
-in `contentful/` — see [`contentful/CLAUDE.md`](contentful/CLAUDE.md) for the conventions
-(dry runs, skip-unchanged, inverses, rollout ordering).
+### `utilities/` — local-only tools
+
+⚠️ **The point of this directory is what it *isn't*: deployed.** `web.yml` and `api.yml` are
+path-filtered on `web/**` / `api/**`, so a change under `utilities/` builds nothing, deploys
+nothing, and — critically — never fires the "Web" deploy's `Cache-Tag: site` **edge purge**.
+Anything local-only belongs here rather than inside an app; conversely, **don't make `web/` or
+`api/` depend on anything in `utilities/`** at build or request time, or the isolation is gone.
+`.github/workflows/utilities.yml` runs the checks that exist here (today: `utilities/maps/`'s
+rspec suite) without deploying anything.
+
+- **`utilities/contentful/`** — one-off content migrations (scripts that rewrite the content
+  itself) plus the SKOS taxonomy toolkit. See
+  [`utilities/contentful/CLAUDE.md`](utilities/contentful/CLAUDE.md) for the conventions (dry
+  runs, skip-unchanged, inverses, rollout ordering).
+- **`utilities/maps/`** — a standalone Ruby/Rake app (its own `Gemfile`, `.env`, and specs) that
+  uploads GPX tracks to Mapbox as private vector tilesets and renders them as static PNG map
+  images for race-report cover images. It used to live in `web/` (`lib/utils/static_map.rb`,
+  `lib/tasks/maps.rake`) and was moved out for exactly the reason above. The PNGs are uploaded to
+  Contentful by hand; nothing in `web/` reads them. See
+  [`utilities/maps/CLAUDE.md`](utilities/maps/CLAUDE.md).
 
 ## Production domains — never hardcode
 

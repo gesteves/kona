@@ -8,8 +8,8 @@ require_relative 'mapbox_tileset'
 class StaticMap
   attr_accessor :tileset_id
 
-  GPX_FOLDER = File.expand_path('../../../data/maps/gpx', __FILE__)
-  IMAGES_FOLDER = File.expand_path('../../../data/maps/images', __FILE__)
+  GPX_FOLDER = File.expand_path('../../data/gpx', __FILE__)
+  IMAGES_FOLDER = File.expand_path('../../data/images', __FILE__)
 
   MAPBOX_STYLE_URL = ENV['MAPBOX_STYLE_URL'] || "mapbox://styles/mapbox/outdoors-v12"
 
@@ -227,8 +227,8 @@ class StaticMap
 
   # The Mapbox token used to render the static image, resolved lazily — only here, at render
   # time — so merely requiring this class never demands a token. (The Rakefile loads all of
-  # lib/utils/ at boot, but building the site doesn't touch Mapbox; only `rake maps:generate`
-  # does.) Prefers the secret token so it can read the private tilesets uploaded via MTS, falls
+  # lib/ at boot, including for `rake maps:help`, which touches no Mapbox API.) Prefers the
+  # secret token so it can read the private tilesets uploaded via MTS, falls
   # back to the public access token (e.g. a manual TILESET_ID against a public tileset), and
   # raises only when a render is actually attempted without either.
   # @return [String] The Mapbox access token.

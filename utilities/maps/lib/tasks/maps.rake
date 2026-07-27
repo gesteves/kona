@@ -1,6 +1,6 @@
 namespace :maps do
-  # Loops through the GPX files stored in the StaticMap::GPX_FOLDER folder (data/maps/gpx),
-  # generates a map for each as a static PNG image, and saves it to the StaticMap::IMAGES_FOLDER folder (data/maps/images).
+  # Loops through the GPX files stored in the StaticMap::GPX_FOLDER folder (data/gpx),
+  # generates a map for each as a static PNG image, and saves it to the StaticMap::IMAGES_FOLDER folder (data/images).
   # Each GPX file is uploaded to Mapbox automatically as a private vector tileset (via the
   # Mapbox Tiling Service), then rendered with the Mapbox Static API based on the bounding
   # box of the GPX file. Pass TILESET_ID to skip the upload and reuse an existing tileset.

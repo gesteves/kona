@@ -100,7 +100,10 @@ build fails loudly rather than shipping pages with missing icons.
 - `lib/data/*.rb` — build-time clients: `contentful.rb` (+ `graphql/`). (Icons are fetched
   from the `api/` `/api/icons` endpoint by `import:icons` in `lib/tasks/import.rake`, not a
   `lib/data` client.)
-- `lib/tasks/*.rake` — `import`, `build`, `test`, `maps`, `redis`.
+- `lib/tasks/*.rake` — `import`, `build`, `test`, `redis`. (Static map generation from GPX
+  tracks used to live here as `maps.rake` + `lib/utils/{static_map,mapbox_tileset}.rb`; it's
+  now the standalone [`utilities/maps/`](../utilities/maps/CLAUDE.md) tool, so editing it no
+  longer rebuilds and redeploys the site.)
 - `lib/helpers/*.rb` — helper modules (article, markup, image, site, share, icon,
   url, text, markdown, context, cache, affiliate_links, standard_site);
   `config.rb` requires and registers every module in that directory.
