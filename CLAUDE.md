@@ -109,7 +109,8 @@ problem.
   Linux clicking a Google result, and blocking them is an accepted cost. The bot gets through
   managed, non-interactive **and** interactive challenges, so UA + referer is the only thing left
   that stops it. Don't "fix" the false positives by narrowing it to challenges — that's the
-  approach that already failed.
+  approach that already failed. It's one of several custom rules — see **Zone security rules**
+  below for the full set and the order they have to be in.
 - **`/cdn-cgi/*` never reaches an origin** — Cloudflare answers it at its own edge, so edge
   functions don't need to exclude it. `source/robots.txt.erb` allows `/cdn-cgi/image/` and
   disallows the rest.
@@ -167,7 +168,126 @@ verify with Cloudflare Trace or by watching `cf-cache-status` on a widget URL ac
 consume it, it just leaks the header to clients — so the tag must come from this rule, which is why
 it's a hard zone dependency. The rule runs in the `http_response_cache_settings` phase, i.e. after
 the origin response, and applies to Worker subrequests as well as eyeball requests — which is what
-lets one rule cover both branches.) Plus the bot WAF rule above.
+lets one rule cover both branches.) Plus the WAF rules below.
+
+### Zone security rules
+
+The zone is on Cloudflare **Pro**, which unlocks WAF **Managed Rules** and **Super Bot Fight
+Mode**. Both apply **zone-wide, including to the api host** — and that's the trap: nearly all the
+traffic on the api host is machine-to-machine and looks exactly like what those features exist to
+block.
+
+⚠️ **Order matters: the skip rules have to exist *before* the features are enabled**, or every
+widget 403s site-wide the moment Super Bot Fight Mode goes on.
+
+Custom rules, evaluated top to bottom. The two BLOCK rules stay above the skips so they still fire
+first — a Skip action only ends custom-rule evaluation if it's set to skip all remaining rules,
+which these are not:
+
+| # | Rule | Expression | Action |
+|---|---|---|---|
+| 1 | Abusive Linux crawler with fake Google referrer | UA + `google.com` referer (see above) | Block |
+| 2 | Block scanner noise | `.php` and friends | Block |
+| 3 | Skip bot protection for machine traffic | `http.host eq "<api host>"` | Skip → Super Bot Fight Mode |
+| 4 | Skip managed rules for webhooks | `http.host eq "<api host>" and starts_with(http.request.uri.path, "/webhooks/")` | Skip → all managed rulesets |
+
+Why the two skips are load-bearing:
+
+- **Rule 3** — `web/src/api-proxy.ts` builds the upstream widget request with **only** an
+  `authorization` header: no `user-agent`, no `accept`, deliberately (the cache entry has to be
+  byte-identical for every viewer — see the proxy notes below). A request with no UA is the
+  textbook "definitely automated" fingerprint, so SBFM would block the proxy's own fetches and
+  collapse every widget at once. The api loses nothing: every endpoint is bearer-gated and
+  rack-attack throttles whatever gets past that. The same rule covers the build-time callers
+  (`GET /api/standard-site` and `POST /api/icons` from GitHub Actions) and `POST /api/build`.
+  If the blanket host match ever needs narrowing, `cf.worker.upstream_zone` (empty on eyeball
+  requests, the zone name on Worker subrequests) scopes it to proxy traffic specifically.
+- **Rule 4** — `/webhooks/contentful` and `/webhooks/whoop` are unattended POSTs carrying
+  arbitrary Contentful rich text, which will trip a managed injection rule sooner or later. Both
+  are HMAC-verified, so managed rules add nothing on top. ⚠️ A block here fails **silently** —
+  nothing surfaces an error, the standard.site PDS sync simply stops happening.
+
+**Managed rules** — deploy the **Cloudflare Managed Ruleset** with the ruleset action overridden to
+**Log**, read Security Events for a week, then switch to default actions. The **OWASP Core Ruleset**
+is deliberately **not** deployed: it's high-noise, aimed at apps with real query surface, and the
+main thing it would catch here is the contact form's own prose. If it's ever turned on: PL1, score
+threshold High (60), action Log — never tighter.
+
+**Super Bot Fight Mode** — definitely automated: Block; likely automated: Managed Challenge;
+verified bots: Allow (keeps Googlebot/Bingbot); JS detections: on; **static resource protection:
+off** (it would challenge the site's own CSS/JS/font requests). ⚠️ It does **not** replace custom
+rule 1 — that scraper walks through interactive challenges, which is the whole reason that rule
+blocks on UA + referer instead.
+
+**Rate limiting rules** (Pro allows 2, and unlocks the challenge actions the Free plan didn't have):
+
+- `/api/contact` — stays on **Block**. ⚠️ Never a challenge action: the no-JS native POST path
+  can't solve one by definition, so challenging it would break the progressive-enhancement
+  fallback the endpoint is built around.
+- Site-host crawler brake — `http.host eq "<site host>" and http.request.method in {"GET" "HEAD"}
+  and not starts_with(http.request.uri.path, "/cdn-cgi/")`, counted per IP, ~200 req/min →
+  Managed Challenge. ⚠️ Don't tighten much below that: Pagefind fetches a burst of index chunks
+  per search and Turbo prefetches on hover, so one real reader sits well above a naive
+  page-views-per-minute rate.
+
+**Cache Rules** — exactly one, and it is scoped far more narrowly than it looks like it needs to be.
+Every clause below is load-bearing:
+
+```
+http.host eq "<site host>"
+and not http.request.uri.path contains "."
+and not starts_with(http.request.uri.path, "/cdn-cgi/")
+and not starts_with(http.request.uri.path, "/widgets/")
+and not starts_with(http.request.uri.path, "/api/")
+and not starts_with(http.request.uri.path, "/pa/")
+```
+
+Eligible for cache; **Edge TTL: ignore cache-control, 1 day**; **Browser TTL: respect origin** (so
+the browser keeps `max-age=0, must-revalidate` and picks up a deploy purge immediately).
+
+What it's for: HTML never runs Worker code — `run_worker_first` in `web/wrangler.jsonc` is a
+positive allowlist of three routes — so page views come from the **static asset layer**, which
+Cloudflare already caches and tiers on its own. There is therefore no origin round trip, TLS
+handshake, or cold start to absorb, and the rule buys nothing on a page that's already `HIT`
+(`HIT` means the edge answered *without* contacting the origin; `REVALIDATED` is the one that
+costs a round trip). The gain is **archive residency**: most URLs here are old posts getting a
+handful of hits per PoP, so they fall out of a short edge TTL between visits and come back
+`MISS`/`EXPIRED`. A long edge TTL keeps that long tail resident. ⚠️ Don't over-extend the TTL
+chasing this — PoP caches evict under LRU regardless, so a month buys far less than 30× a day.
+
+Why each exclusion:
+
+- **`contains "."`** is what isolates HTML (the build's page URLs are extensionless). Without it the
+  rule also matches `/javascripts/*` and `/stylesheets/*` — fingerprinted by `asset_hash` and set
+  `immutable` in `source/headers` — plus `source/images` and `source/fonts`, which set no
+  `Cache-Control` at all and ride Cloudflare's extension defaults. Browser TTL "respect origin"
+  means nothing would go *stale*, but the **edge** would evict and re-fetch content-addressed
+  assets daily for no benefit. It also keeps the feeds, `sitemap.xml`, `robots.txt`, `favicon.ico`,
+  `manifest.json`, and the Pagefind chunks on their existing behavior.
+- **`/widgets/`, `/api/`, `/pa/`** — ⚠️ the three Worker routes live on the **site** host and are
+  extensionless, so they'd otherwise match. A 1-day edge TTL on `/widgets/*` at the Worker hostname
+  would pin every widget for a day, overriding the `CDN-Cache-Control` design wholesale; caching
+  `/pa/*` would corrupt analytics. **A new `run_worker_first` entry needs a matching exclusion
+  here**, and nothing in the repo will remind you.
+- **`/cdn-cgi/`** — belt and braces; Cloudflare answers it at its own edge anyway. Contentful images
+  are unaffected either way: they're served from `<IMAGES_URL>/cdn-cgi/image/…`, which never reaches
+  an origin.
+
+⚠️ **Never add a cache rule on the api host.** Widget TTLs come from the origin's own
+`CDN-Cache-Control` (`api/app/controllers/concerns/live_widget.rb`) and a cache rule would override
+them wholesale.
+
+The `Cache-Tag: site` Cache **Response** Rule runs in a different phase
+(`http_response_cache_settings`), so tagging and the deploy purge are unaffected by any of this. That
+purge is what makes the 1-day edge TTL safe: without it, a failed purge would mean stale content for
+the full TTL rather than until the next revalidation.
+
+Other zone settings, none load-bearing but all deliberate: **Smart Tiered Cache** on (fewer origin
+hits means fewer cold starts on the scale-to-zero fly machine behind the widgets); **Page Shield**
+script monitoring on (third-party script inventory, observational only); Early Hints, HTTP/3, 0-RTT,
+Crawler Hints on. **Polish and Mirage stay off** — every image already goes through
+`/cdn-cgi/image/*`, which picks format and quality; Polish only touches images served from origin,
+and Mirage can degrade quality for no gain.
 
 ## How the two apps connect (request path)
 
