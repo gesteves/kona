@@ -1,5 +1,4 @@
 import { Controller } from '@hotwired/stimulus';
-import { trackEvent } from '../lib/analytics';
 
 /**
  * Controller for toggling the navigation menu.
@@ -20,7 +19,6 @@ export default class extends Controller {
     event.preventDefault();
     document.body.classList.toggle(this.openClass);
     this.updateButtonAttributes();
-    trackEvent('Nav', { state: this.isNavOpen() ? 'Open' : 'Closed' });
   }
 
   /**
