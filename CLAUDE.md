@@ -22,6 +22,7 @@ Work on one app from inside its own directory; each has its own `Gemfile`,
 | `utilities/` | Local-only tools, deliberately outside `web/` and `api/` so edits never trigger a deploy (see below). | — (never deployed) |
 | `utilities/contentful/` | One-off Contentful content migrations + the taxonomy toolkit (Node scripts, run locally). | — (never deployed) |
 | `utilities/maps/` | Static map generation: renders GPX tracks as PNG cover images via Mapbox (standalone Ruby/Rake app, run locally). | — (never deployed) |
+| `utilities/aqi-map/` | Screenshot tool: a local fullscreen Mapbox map plotting historical PurpleAir AQI readings (standalone Sinatra app, run locally). | — (never deployed) |
 
 Each app has its own Redis, configured via its own `REDIS_URL`: `api/` uses the dedicated
 `kona-redis` fly app (`redis/fly.toml`); `web/` uses a separate Upstash instance. The apps
@@ -47,6 +48,15 @@ rspec suite) without deploying anything.
   `lib/tasks/maps.rake`) and was moved out for exactly the reason above. The PNGs are uploaded to
   Contentful by hand; nothing in `web/` reads them. See
   [`utilities/maps/CLAUDE.md`](utilities/maps/CLAUDE.md).
+- **`utilities/aqi-map/`** — a standalone Sinatra app (its own `Gemfile` and `.env`, no specs)
+  serving one local page: a fullscreen Mapbox map of what each PurpleAir sensor in view was
+  reading at a given past timestamp, panned to a frame and screenshotted for a post's cover
+  image. Built for one post and kept for the next — sketch quality, and **not deployable**: it
+  binds `127.0.0.1` and proxies a PurpleAir key with no auth of its own. It renders with the same
+  `outdoors-v12` default and the same `MAPBOX_STYLE_URL` variable as `utilities/maps/`, so its
+  screenshots match the static GPX maps. ⚠️ It **duplicates** the EPA correction and AQI
+  conversion from `api/app/services/purple_air.rb` (`utilities/` must not depend on `api/`), so
+  a fix there will not reach it. See [`utilities/aqi-map/README.md`](utilities/aqi-map/README.md).
 
 ## Production domains — never hardcode
 

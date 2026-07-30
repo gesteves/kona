@@ -1,0 +1,7 @@
+source 'https://rubygems.org'
+
+gem 'sinatra'
+gem 'puma'
+gem 'rackup' # Sinatra 4 needs this to boot in classic mode (`ruby app.rb`)
+gem 'httparty'
+gem 'dotenv'
