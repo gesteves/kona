@@ -236,8 +236,22 @@ Names only — see `.env.example`; never commit values.
   Contentful's asset bandwidth, so the only thing the fallback reliably did was hide a broken
   deploy. Don't reintroduce one — `contentful_image_url` survives only for `encode_blurhash`,
   which uses it on purpose so blurhashes don't depend on the zone or spend a transformation.
-  Cloudflare must also have Transformations enabled with `images.ctfassets.net` allowlisted as a
-  source, or every image 403s.
+  Cloudflare must also have Transformations enabled with the source host allowlisted (see
+  `IMAGE_HOST` below), or every image 403s.
+- **Optional**: `IMAGE_HOST` — bare hostname of the **R2 bucket mirroring Contentful's image
+  assets**. `Contentful#rewrite_image_urls` swaps asset URLs onto it, so Cloudflare Images fetches
+  the untransformed source from inside our own zone. That's the point: a source outside the zone
+  can't use Tiered Cache or Cache Reserve, so every PoP was pulling full-size originals from
+  Contentful and re-pulling them on eviction.
+  ⚠️ **Setting it asserts the mirror is populated** — the URLs 404 until it is. The **api** owns
+  the mirror (`AssetMirror` + `AssetSyncJob`, driven by the Contentful webhook); run its
+  `rake assets:backfill` to completion first. Unset skips the rewrite and images render straight
+  from Contentful — the normal local setup, and the rollback path. Full cross-app contract in the
+  root [`CLAUDE.md`](../CLAUDE.md).
+  ⚠️ `encode_blurhash` must keep using `get_asset_contentful_url`, **not** `get_asset_url`: it
+  resizes via Contentful's Images API query params, and the mirror serves objects verbatim and
+  ignores query strings — so pointing it at the mirror silently downloads the full-size original
+  for every asset instead of a 32px thumb.
 - **Optional**: `TURNSTILE_SITE_KEY` (public Cloudflare Turnstile sitekey for the contact form —
   set it in the build env; pair with the api's `TURNSTILE_SECRET`, both or neither);
   `OG_IMAGE_URL` (base URL of the on-demand OG-card service — `generate_open_graph_image_url`

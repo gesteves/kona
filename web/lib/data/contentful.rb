@@ -47,6 +47,7 @@ class Contentful
     process_site
     process_articles
     process_pages
+    process_assets
     process_events
     generate_blog
     generate_tags
@@ -129,6 +130,52 @@ class Contentful
 
     # sort_by! parses each date once (vs. twice per comparison with sort!).
     @content[key].sort_by! { |item| DateTime.parse(item[:published_at]) }.reverse!
+  end
+
+  # Processes assets from the fetched content.
+  def process_assets
+    @content[:assets].map! do |item|
+      rewrite_image_urls(item)
+    end
+  end
+
+  # Rewrites Contentful image URLs onto our own image hostname: an R2 bucket the api mirrors
+  # every published asset into, webhook-driven (see the api's AssetMirror / AssetSyncJob).
+  #
+  # Why: Cloudflare Images fetches the untransformed *source* from whatever host the URL names,
+  # and a source outside our zone can't use Tiered Cache or Cache Reserve — so every Cloudflare
+  # PoP pulled the full-size original from Contentful and re-pulled it on eviction. Pointing the
+  # source at a host inside the zone is what stops that.
+  #
+  # ⚠️ CROSS-APP CONTRACT: only the host changes, so Contentful's path *is* the R2 key. The api
+  # writes objects under exactly this path; neither side validates the other, and a mismatch
+  # 404s every image on the site silently. See the root CLAUDE.md.
+  # ⚠️ Setting IMAGE_HOST asserts the mirror is populated — these URLs 404 until it is. Run the
+  # api's `rake assets:backfill` first. Unset skips the rewrite entirely and images render
+  # straight from Contentful, which is the normal local-dev setup.
+  #
+  # The untouched Contentful URL is kept as :contentful_url for encode_blurhash, which must not
+  # go through the mirror (see ImageHelpers#get_asset_contentful_url).
+  # @param item [Hash] The asset to be processed.
+  # @return [Hash] The asset with its URL rewritten.
+  def rewrite_image_urls(item)
+    return item if ENV['IMAGE_HOST'].blank?
+
+    uri = URI.parse(item[:url])
+    # ⚠️ Every ctfassets host, not just images.ctfassets.net. Contentful serves some image
+    # assets from downloads.ctfassets.net (it's not an images-vs-files split — this space has
+    # 20 JPEGs there), and matching only the images host would silently leave those hitting
+    # Contentful forever. The path is identical across the hosts, so the key is too. The api's
+    # AssetMirror#object_key must keep matching the same set.
+    if uri.host.to_s.end_with?('.ctfassets.net')
+      item[:contentful_url] = item[:url]
+      uri.host = ENV['IMAGE_HOST']
+      item[:url] = uri.to_s
+    end
+    item
+  rescue => e
+    puts "Error rewriting image URL: #{e.message}"
+    item
   end
 
   # Sets the entry type for a content item based on its attributes.

@@ -47,6 +47,9 @@ gem "anthropic"
 gem "graphql-client"
 # Faster JSON parsing/serialization for the read-through Redis cache and service responses
 gem "oj"
+# S3-compatible client for Cloudflare R2, which mirrors Contentful's image assets so the
+# site's images are served from our own zone instead of Contentful. See AssetMirror.
+gem "aws-sdk-s3"
 # Caches Ruby bytecode + YAML/require lookups to speed boot (the fly machine auto-stops)
 gem "bootsnap", require: false
 

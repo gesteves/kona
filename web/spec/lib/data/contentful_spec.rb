@@ -268,9 +268,65 @@ RSpec.describe Contentful do
     end
   end
 
-  # Asset URLs are used exactly as Contentful returns them — no rewriting, and no cache buster.
-  # Replacing an asset's file gives it a new token segment, so the URL changes on its own; that's
-  # what invalidates Cloudflare's cached transformations of it. A query param wouldn't work
-  # anyway: Cloudflare passes the source URL to Contentful verbatim, and Contentful rejects any
-  # parameter it doesn't recognize (ParameterNotAllowed).
+  describe '#rewrite_image_urls' do
+    def stub_image_host(host)
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with('IMAGE_HOST').and_return(host)
+    end
+
+    before { stub_image_host('images.example.com') }
+
+    # Only the host changes: Contentful's path IS the R2 key the api writes under, so any
+    # reshaping here would 404 every image on the site.
+    it 'swaps the host and keeps the path verbatim' do
+      item = transform(:rewrite_image_urls, { url: 'https://images.ctfassets.net/space/asset-1/token/a.jpg' })
+      expect(item[:url]).to eq('https://images.example.com/space/asset-1/token/a.jpg')
+    end
+
+    it 'stashes the untouched Contentful URL for the blurhash encoder' do
+      item = transform(:rewrite_image_urls, { url: 'https://images.ctfassets.net/space/asset-1/token/a.jpg' })
+      expect(item[:contentful_url]).to eq('https://images.ctfassets.net/space/asset-1/token/a.jpg')
+    end
+
+    it 'preserves a protocol-relative URL as protocol-relative' do
+      item = transform(:rewrite_image_urls, { url: '//images.ctfassets.net/space/asset-1/token/a.jpg' })
+      expect(item[:url]).to eq('//images.example.com/space/asset-1/token/a.jpg')
+    end
+
+    # A cache buster would be worse than useless: replacing an asset's file mints a new token
+    # segment (so the URL already changes on its own), the mirror keys on the path, and
+    # Contentful rejects parameters it doesn't recognize (ParameterNotAllowed).
+    it 'adds no query string' do
+      item = transform(:rewrite_image_urls, { url: 'https://images.ctfassets.net/space/asset-1/token/a.jpg', sys: { published_version: 3 } })
+      expect(item[:url]).not_to include('?')
+    end
+
+    # ⚠️ Contentful serves some *image* assets from downloads.ctfassets.net — it isn't an
+    # images-vs-files split. Matching only images.ctfassets.net would silently leave those
+    # hitting Contentful forever, which is the whole thing the mirror exists to stop. The api's
+    # AssetMirror keys on the same path, which is identical across the hosts.
+    it 'rewrites every ctfassets host' do
+      %w[images downloads assets].each do |sub|
+        item = transform(:rewrite_image_urls, { url: "https://#{sub}.ctfassets.net/space/asset-1/token/a.jpg" })
+        expect(item[:url]).to eq('https://images.example.com/space/asset-1/token/a.jpg')
+      end
+    end
+
+    it 'leaves non-Contentful URLs alone' do
+      item = transform(:rewrite_image_urls, { url: 'https://elsewhere.example.com/a.jpg' })
+      expect(item[:url]).to eq('https://elsewhere.example.com/a.jpg')
+    end
+
+    context 'when IMAGE_HOST is unset' do
+      before { stub_image_host(nil) }
+
+      # The mirror is opt-in: unset means images render straight from Contentful, which is both
+      # the local-dev setup and the rollback path.
+      it 'leaves the URL untouched and stashes nothing' do
+        item = transform(:rewrite_image_urls, { url: 'https://images.ctfassets.net/space/asset-1/token/a.jpg' })
+        expect(item[:url]).to eq('https://images.ctfassets.net/space/asset-1/token/a.jpg')
+        expect(item).not_to have_key(:contentful_url)
+      end
+    end
+  end
 end

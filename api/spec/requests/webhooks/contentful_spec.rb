@@ -91,6 +91,38 @@ RSpec.describe "Webhooks::Contentful", type: :request do
       expect(response).to have_http_status(:no_content)
     end
 
+    describe "R2 image mirror (AssetSyncJob)" do
+      def asset_payload(id) = { "sys" => { "id" => id, "type" => "Asset" } }
+
+      # Assets carry no sys.contentType, so they're routed by the topic's entity segment.
+      it "enqueues a mirror job on an asset publish" do
+        post_webhook(asset_payload("asset1"), topic: "ContentManagement.Asset.publish")
+        expect(response).to have_http_status(:no_content)
+        expect(AssetSyncJob).to have_enqueued_sidekiq_job("asset1")
+      end
+
+      # ⚠️ Load-bearing. The web build reads Contentful with a preview token, so an unpublished
+      # asset is still referenced by built pages — removing its object would break live images.
+      it "does not touch the mirror on an asset unpublish or delete" do
+        %w[unpublish delete].each do |action|
+          AssetSyncJob.clear
+          post_webhook(asset_payload("asset1"), topic: "ContentManagement.Asset.#{action}")
+          expect(response).to have_http_status(:no_content)
+          expect(AssetSyncJob.jobs).to be_empty
+        end
+      end
+
+      it "does not enqueue a mirror job for entries" do
+        post_webhook(entry_payload("entry123", "article"), topic: "ContentManagement.Entry.publish")
+        expect(AssetSyncJob.jobs).to be_empty
+      end
+
+      it "does not enqueue a mirror job on a draft auto_save" do
+        post_webhook(asset_payload("asset1"), topic: "ContentManagement.Asset.auto_save")
+        expect(AssetSyncJob.jobs).to be_empty
+      end
+    end
+
     describe "web rebuild trigger (SiteBuildJob)" do
       it "enqueues a rebuild on publish, unpublish, and delete of any content type" do
         %w[publish unpublish delete].each do |action|

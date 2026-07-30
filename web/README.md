@@ -11,7 +11,7 @@ Copy `.env.example` to `.env` and fill in the credentials below (deploys read th
 ### Required services
 
 - **Cloudflare Workers** — hosting. The build is uploaded as [static assets](https://developers.cloudflare.com/workers/static-assets/) on the `kona-web` Worker (`wrangler.jsonc`), which also runs the `/widgets/*` and `POST /api/contact` proxy and the first-party analytics proxy. Kona can run anywhere as a static site, but those dynamic routes need the Worker (or an equivalent).
-- **Cloudflare** — the zone in front of the site. Images are resized and served through [Cloudflare Images](https://developers.cloudflare.com/images/transform-images/transform-via-url/) (`/cdn-cgi/image/…`), which fetches them from Contentful and caches the results at the edge. Requires Transformations enabled on the zone, with `images.ctfassets.net` allowlisted as a source — without that, every image 403s.
+- **Cloudflare** — the zone in front of the site. Images are resized and served through [Cloudflare Images](https://developers.cloudflare.com/images/transform-images/transform-via-url/) (`/cdn-cgi/image/…`), which fetches the untransformed source image and caches the results at the edge. Requires Transformations enabled on the zone, with the source host allowlisted — without that, every image 403s.
 - **Contentful** — the CMS for the site's content. Create an API key under Settings → API Keys and set `CONTENTFUL_SPACE` and `CONTENTFUL_TOKEN` (Content Preview token). You'll want a content model like this:
 
   <img width="1616" height="3182" alt="Contentful content model" src="https://github.com/user-attachments/assets/689d3caf-8b71-47a4-95e5-4630bf9c8281" />
@@ -23,6 +23,7 @@ Copy `.env.example` to `.env` and fill in the credentials below (deploys read th
 
 ### Optional services
 
+- **Cloudflare R2** — a bucket mirroring Contentful's image assets, so Cloudflare Images fetches its source from a hostname inside the zone rather than from Contentful. A source outside the zone can't use Tiered Cache or Cache Reserve, so every Cloudflare PoP otherwise pulls the full-size original from Contentful and re-pulls it on eviction — which is what this is for. Attach a custom domain to the bucket and set `IMAGE_HOST` to that hostname (allowlist it as a Transformations source too). ⚠️ The **api** app populates the bucket, webhook-driven; run its `rake assets:backfill` before setting `IMAGE_HOST`, or every image 404s. Leave it unset to serve images straight from Contentful.
 - **Kona OG** *(parked)* — the on-demand OG-card service (`og/`) is currently on the `restore-og` branch and not deployed, so `OG_IMAGE_URL` is normally unset and cover-less pages omit `og:image`. If revived, set `OG_IMAGE_URL` to the deployed service.
 
 ## Running locally

@@ -1,14 +1,16 @@
 module Webhooks
-  # Receives Contentful webhooks and keeps the standard.site PDS records in sync as
-  # entries are published/unpublished/deleted. The actual sync runs in the background: the
-  # request only enqueues a StandardSiteSyncJob and returns 204 immediately, so a slow CDA
-  # fetch / blob upload / putRecord can never approach Contentful's 30s webhook timeout, and
-  # a failed sync is retried by Sidekiq instead of silently dropped. Contentful does NOT
-  # retry deliveries, so the standard_site:backfill rake task remains the reconciliation net.
+  # Receives Contentful webhooks and keeps the derived copies of the content in sync as entries
+  # and assets are published/unpublished/deleted: the standard.site PDS records, article
+  # embeddings, the R2 image mirror, and the static site itself. The actual work runs in the
+  # background: the request only enqueues jobs and returns 204 immediately, so a slow CDA fetch /
+  # blob upload / putRecord can never approach Contentful's 30s webhook timeout, and a failed
+  # sync is retried by Sidekiq instead of silently dropped. Contentful does NOT retry
+  # deliveries, so the standard_site:backfill and assets:backfill rake tasks remain the
+  # reconciliation net.
   #
-  # Routing is driven by the X-Contentful-Topic header (the action) and the payload's
-  # sys.contentType.sys.id (which content type) + sys.id (which entry). The body is never
-  # trusted for entry content — the job re-fetches the resolved entry from the CDA.
+  # Routing is driven by the X-Contentful-Topic header (the entity type and the action) and the
+  # payload's sys.contentType.sys.id (which content type) + sys.id (which entry or asset). The
+  # body is never trusted for entry content — the jobs re-fetch from the CDA.
   class ContentfulController < BaseController
     include ContentfulRequestVerification
 
@@ -18,6 +20,10 @@ module Webhooks
 
     ARTICLE_TYPE = "article".freeze
     SITE_TYPE = "site".freeze
+    # The topic's entity segment for assets (ContentManagement.Asset.publish). Assets carry no
+    # sys.contentType, so they can't be routed by content type like entries are — and the topic
+    # is the only stable signal across actions, since a delete delivers a DeletedAsset payload.
+    ASSET_ENTITY = "Asset".freeze
 
     def create
       payload = JSON.parse(request.raw_post)
@@ -25,6 +31,7 @@ module Webhooks
       entry_id = payload.dig("sys", "id")
       topic = request.headers["X-Contentful-Topic"].to_s
       action = topic.split(".").last # publish | unpublish | delete
+      entity = topic.split(".")[-2]  # Entry | Asset
 
       Rails.logger.info("Contentful webhook received: topic=#{topic} contentType=#{content_type} entry=#{entry_id}")
 
@@ -46,6 +53,16 @@ module Webhooks
       if content_type == ARTICLE_TYPE && entry_id.present?
         ArticleEmbeddingJob.perform_async(action == "publish" ? "embed" : "delete", entry_id)
       end
+
+      # Mirror published image assets into R2, which the site serves every image from — the
+      # transformation source has to be a host inside our zone or Contentful gets hit by every
+      # Cloudflare PoP (see AssetMirror).
+      # ⚠️ Unpublish/delete deliberately do NOT remove the object. The web build reads Contentful
+      # with a *preview* token, so an unpublished asset is still in data/assets.json and still
+      # referenced by built pages — dropping it would break images that are live. The keys are
+      # content-addressed and immutable, so there's nothing to invalidate either; orphans are
+      # cheap, and pruned by hand if it ever matters.
+      AssetSyncJob.perform_async(entry_id) if entity == ASSET_ENTITY && action == "publish" && entry_id.present?
 
       # Rebuild + redeploy the static web site whenever *published* content changes (any content
       # type or asset). The web build reads the latest published content from Contentful, so a

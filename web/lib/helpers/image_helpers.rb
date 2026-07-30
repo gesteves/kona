@@ -82,6 +82,17 @@ module ImageHelpers
     asset&.url
   end
 
+  # Retrieves the untouched Contentful URL of an asset by its ID — the one thing that must not
+  # go through the R2 mirror. Contentful#rewrite_image_urls stashes it before swapping the host,
+  # so this falls back to :url when the rewrite is off (IMAGE_HOST unset) or the asset isn't a
+  # Contentful image.
+  # @param asset_id [String] The ID of the asset for which to retrieve the URL.
+  # @return [String, nil] The Contentful URL of the asset, or nil if the asset is not found.
+  def get_asset_contentful_url(asset_id)
+    asset = asset_index[asset_id]
+    asset&.contentful_url.presence || asset&.url
+  end
+
   # Retrieves the published version of an asset by its ID.
   # @param asset_id [String] The ID of the asset for which to retrieve the published version.
   # @return [Integer, nil] The published version of the asset, or nil if the asset is not found.
@@ -312,12 +323,15 @@ module ImageHelpers
   # build doesn't depend on the zone being up — or on Cloudflare's transformation quota, which
   # this would otherwise spend a slot of per asset. It's cheap: the thumbnails are 32px wide,
   # and blurhash_jpeg_data_uri caches the result in Redis per published version.
+  # ⚠️ get_asset_contentful_url, not get_asset_url: this resizes via Contentful's Images API
+  # (query params), and the R2 mirror ignores query strings — so pointing this at the mirrored
+  # URL would silently download the FULL-SIZE original for every asset instead of a 32px thumb.
   # @param asset_id [String] The ID of the asset used for generating the Blurhash.
   # @param width [Integer] The width of the Blurhash image.
   # @param height [Integer] The height of the Blurhash image.
   # @return [String, nil] The generated Blurhash, or nil if not generated
   def encode_blurhash(asset_id, width, height)
-    url = get_asset_url(asset_id)
+    url = get_asset_contentful_url(asset_id)
     data = URI.open(contentful_image_url(url, { w: width, h: height })).read
     image = Vips::Image.new_from_buffer(data, '').colourspace(:srgb)
     image = image.flatten if image.has_alpha?

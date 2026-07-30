@@ -19,6 +19,7 @@ Work on one app from inside its own directory; each has its own `Gemfile`,
 | `web/` | Middleman 4 static site generator (Ruby 4.0.6). Builds the Contentful-powered blog and serves all static pages. | Cloudflare Workers (`kona-web`) |
 | `api/` | Rails 8.1 API (Ruby 4.0.6). Serves small dynamic HTML fragments ("widgets") embedded into the static pages at runtime, plus a Sidekiq `worker` process for background jobs (standard.site PDS sync). | fly.io (`kona-api`: `app` + `worker`) — behind Cloudflare |
 | `redis/` | Config (`fly.toml`) for the `kona-redis` fly app — the API's dedicated Redis (cache + Sidekiq queues). | fly.io (`kona-redis`) |
+| — | A **Cloudflare R2 bucket** mirroring Contentful's image assets, served from its own custom domain in the zone. No config in the repo — dashboard-side, populated by the api. See **The image mirror** below. | — (dashboard) |
 | `utilities/` | Local-only tools, deliberately outside `web/` and `api/` so edits never trigger a deploy (see below). | — (never deployed) |
 | `utilities/contentful/` | One-off Contentful content migrations + the taxonomy toolkit (Node scripts, run locally). | — (never deployed) |
 | `utilities/maps/` | Static map generation: renders GPX tracks as PNG cover images via Mapbox (standalone Ruby/Rake app, run locally). | — (never deployed) |
@@ -90,7 +91,8 @@ problem.
 - **Geo / trace headers** — `CF-IPCity` / `CF-Region` / `CF-IPCountry` for geo, `CF-Ray` as both
   the "this traversed the zone" marker and the join key into Cloudflare's logs.
 - **Images** — Cloudflare Images serves every transformation from `<IMAGES_URL>/cdn-cgi/image/…`
-  (PR #381). Details in [`web/CLAUDE.md`](web/CLAUDE.md).
+  (PR #381), fetching the untransformed **source** from the R2 mirror rather than from Contentful
+  (see **The image mirror** below). Details in [`web/CLAUDE.md`](web/CLAUDE.md).
 - **OG cards** — **currently parked.** The on-demand `kona-og` service (which rendered `og:image`
   cards for cover-less pages) was removed from `main` and preserved on the `restore-og` branch; it
   isn't deployed. Cover-less pages ship no `og:image`; cover-image pages are unaffected. If revived,
@@ -126,7 +128,10 @@ problem.
   disallows the rest.
 
 Zone-side settings the code hard-depends on, none of them in the repo: **Transformations**
-enabled with `images.ctfassets.net` allowlisted as a source (without it every image 403s); the
+enabled with the image-mirror host allowlisted as a source — and `images.ctfassets.net` kept
+allowlisted alongside it, since that's what an unset `IMAGE_HOST` falls back to (without the
+right one, every image 403s); the R2 bucket's **custom domain** and its **bot-protection skip**
+(see **The image mirror** below); the
 **Add visitor location headers** managed transform (without it `CF-IPCity`/`CF-Region` are
 absent and geo logging degrades to country-only); the **Cache Response Rule** that sets
 `Cache-Tag: site`, whose expression has **two host-scoped branches** — without it the deploy's tag
@@ -170,6 +175,12 @@ host — `/api/*`, `/webhooks/*` — stays out for the same reason.
 dashboard**, and nothing in the repo will remind you — the widget will simply go stale forever,
 silently. Routes added under `articles/` or `events/` are already covered.
 
+⚠️ **The image-mirror host is deliberately absent from both branches, and must never be added.**
+Its objects are immutable and content-addressed (replacing an asset's file mints a new Contentful
+token, so the URL changes on its own), so there is nothing a purge could fix — while tagging them
+would dump the entire image cache on every deploy, i.e. on every content publish, sending every
+Cloudflare PoP back to R2 for images that hadn't changed.
+
 ⚠️ Both hostnames are typed by hand here and neither is validated: a rule with a misspelled host
 saves cleanly, matches nothing, and fails **silently**. Paste them from the zone's DNS records, and
 verify with Cloudflare Trace or by watching `cf-cache-status` on a widget URL across a deploy.
@@ -200,8 +211,9 @@ which these are not:
 | 2 | Block scanner noise | `.php` and friends | Block |
 | 3 | Skip bot protection for machine traffic | `http.host eq "<api host>"` | Skip → Super Bot Fight Mode |
 | 4 | Skip managed rules for webhooks | `http.host eq "<api host>" and starts_with(http.request.uri.path, "/webhooks/")` | Skip → all managed rulesets |
+| 5 | Skip bot protection for the image mirror | `http.host eq "<image host>"` | Skip → Super Bot Fight Mode |
 
-Why the two skips are load-bearing:
+Why the three skips are load-bearing:
 
 - **Rule 3** — `web/src/api-proxy.ts` builds the upstream widget request with **only** an
   `authorization` header: no `user-agent`, no `accept`, deliberately (the cache entry has to be
@@ -216,6 +228,11 @@ Why the two skips are load-bearing:
   arbitrary Contentful rich text, which will trip a managed injection rule sooner or later. Both
   are HMAC-verified, so managed rules add nothing on top. ⚠️ A block here fails **silently** —
   nothing surfaces an error, the standard.site PDS sync simply stops happening.
+- **Rule 5** — the only traffic to the image host is Cloudflare Images fetching a transformation
+  source: no browser fingerprint at all, which is the textbook "definitely automated" verdict.
+  Without the skip, SBFM can 403 the source fetches and collapse **every image on the site** at
+  once. Same failure mode as rule 3, and the same fix. The bucket serves nothing but immutable
+  public image bytes, so the skip costs nothing.
 
 **Managed rules** — deploy the **Cloudflare Managed Ruleset** with the ruleset action overridden to
 **Log**, read Security Events for a week, then switch to default actions. The **OWASP Core Ruleset**
@@ -385,6 +402,56 @@ Turnstile and Akismet both **fail open** when *unconfigured*. When Akismet *is* 
 fails **closed** — an Akismet outage raises and retries the (delivery-split) intake job rather
 than delivering a message that wasn't spam-checked. The email carries a "Sender details" block
 (IP/geo/UA/time) from the forwarded headers.
+
+## The image mirror (a cross-app contract with no code path between the apps)
+
+Every image on the site is a Cloudflare Images transformation, and Cloudflare fetches the
+untransformed **source** from whatever host the URL names. A source outside the zone can't use
+Tiered Cache or Cache Reserve, so pointing it at Contentful meant every Cloudflare PoP
+independently pulled the full-size original and re-pulled it on eviction — which is what drove
+Contentful's asset bandwidth up, and why enabling Tiered Cache and Cache Reserve changed nothing.
+
+So the assets are mirrored into a **Cloudflare R2 bucket** served from its own custom domain in
+the zone, and that hostname is the transformation source. Production never touches Contentful for
+images; only the mirror does, once per asset version.
+
+The two apps meet **only through the shape of a URL** — there is no request between them, nothing
+imports anything, and neither validates the other:
+
+| | Who | What |
+|---|---|---|
+| Writes | `api` — `AssetMirror` + `AssetSyncJob`, on the Contentful **asset publish** webhook, plus `rake assets:backfill` | An R2 object keyed on Contentful's path **verbatim**: `{space}/{asset id}/{token}/{filename}` |
+| Reads | `web` — `Contentful#rewrite_image_urls` at build time, gated on `IMAGE_HOST` | Swaps **only the host**, so the emitted path is that same key |
+
+⚠️ Both sides match **every `*.ctfassets.net` host**, and must keep matching the same set.
+Contentful is not split images-here / files-there: it serves plenty of ordinary image assets
+from `downloads.ctfassets.net` (20 JPEGs in this space at the time of writing), and that host
+doesn't support the Images API at all — which is also why `StandardSite#images_api_url` rewrites
+the host before resizing. Narrowing either side to `images.ctfassets.net` leaves those assets
+hitting Contentful forever, silently, which is the exact thing this exists to stop. Asset paths
+are identical across the hosts, so one key covers an asset whichever host named it.
+
+⚠️ **A mismatch — wrong bucket, wrong custom domain, a "tidied" key shape, `IMAGE_HOST` set before
+the backfill finished — 404s every image on the site, and nothing anywhere reports it.** Both
+sides must change together. The rollout order is: bucket + custom domain + the SBFM skip rule
+(above) → deploy the api with the `R2_*` secrets → `rake assets:backfill` to completion → *only
+then* set `IMAGE_HOST` in the web build env.
+
+Three consequences worth keeping straight:
+
+- **The mirror is publish-only; unpublish and delete are ignored on purpose.** `web` reads
+  Contentful with a **preview** token (`assetCollection(preview: true)`), so an unpublished asset
+  is still in `data/assets.json` and still referenced by built pages — removing its object would
+  break images that are live. Objects are immutable anyway, so nothing needs invalidating;
+  orphans cost cents and are pruned by hand if it ever matters.
+- **Blurhashes must bypass the mirror.** `encode_blurhash` resizes via Contentful's Images API
+  **query params**, and R2 serves objects verbatim and ignores query strings — so the rewrite
+  stashes the untouched URL as `:contentful_url` and the helper reads it through
+  `get_asset_contentful_url`. Point that at `get_asset_url` and every build silently downloads
+  full-size originals instead of 32px thumbs.
+- **Unset `IMAGE_HOST` is a supported state, not a broken one.** The rewrite no-ops and images
+  render straight from Contentful — which is the normal local-dev setup, and the one-variable
+  rollback.
 
 ## The cross-app HTML contract (most important)
 

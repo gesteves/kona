@@ -256,6 +256,10 @@ jobs:
           KONA_API_URL: ${{ secrets.KONA_API_URL }}
           URL: ${{ secrets.URL }}
           IMAGES_URL: ${{ secrets.IMAGES_URL }}
+          # ⚠️ Setting this asserts the api's R2 image mirror is populated — asset URLs get their
+          # host swapped to it and 404 until the objects exist. Unset builds render images
+          # straight from Contentful, so leaving the secret empty is the rollback.
+          IMAGE_HOST: ${{ secrets.IMAGE_HOST }}
           PLAUSIBLE_SCRIPT_URL: ${{ secrets.PLAUSIBLE_SCRIPT_URL }}
           TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
 

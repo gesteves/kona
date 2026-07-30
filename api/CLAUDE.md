@@ -31,7 +31,7 @@ headers below. Edge TTL = how long the edge serves a cached copy before revalida
 | GET | `/widgets/plausible/pageviews/:id` | `widgets/plausible#pageviews` | HTML (pageview count by Contentful id) | 1 hr |
 | POST | `/api/location` | `api/location#create` | sets Redis `location:current` + enqueues a `LocationSyncJob` (bearer-token gated) | — |
 | POST | `/api/contact` | `api/contact#create` | drops honeypot hits + enqueues a `ContactMailJob` (Akismet spam-check → Cloudflare email to the owner, Reply-To = sender); JSON → 204/422, HTML → 303 to `/contact/success` (bearer-token gated, browser-reachable via the web proxy) | — |
-| POST | `/webhooks/contentful` | `webhooks/contentful#create` | enqueues a standard.site PDS sync job on publish/unpublish/delete (HMAC-gated); 204 | — |
+| POST | `/webhooks/contentful` | `webhooks/contentful#create` | enqueues a standard.site PDS sync job on publish/unpublish/delete, plus an R2 image-mirror job on asset publish (HMAC-gated); 204 | — |
 | POST | `/webhooks/whoop` | `webhooks/whoop#create` | enqueues a `WhoopWebhookJob` syncing strain/sleep/recovery to Intervals.icu wellness + regenerating the matched activity's description (HMAC-gated, user-verified); 200 `{ok: true}` | — |
 | GET | `/api/standard-site` | `api/standard_site#show` | JSON `{did, publication_uri}` for the web build's verification markup | 1 hr |
 | POST | `/api/icons` | `api/icons#create` | JSON `{family: {style: [{id, svg}]}}` — resolves the web build's posted Font Awesome allowlist to SVGs (bearer-token gated) | — |
@@ -91,8 +91,40 @@ headers below. Edge TTL = how long the edge serves a cached copy before revalida
   siteverify — verified in the request path since tokens are single-use/300s; fails open),
   `StandardSite` (publishes the
   blog to the AT Protocol / Bluesky PDS as standard.site records — webhook-driven, plus
-  the `standard_site:backfill` rake task in `lib/tasks/`). Read-through Redis cache via
+  the `standard_site:backfill` rake task in `lib/tasks/`), `AssetMirror` (mirrors Contentful's
+  image assets into a Cloudflare R2 bucket — webhook-driven, plus `assets:backfill`; see
+  **The R2 image mirror** below). Read-through Redis cache via
   `cached_json(key, expires_in:)`; HTTParty with retries; `DeepOstruct` for dot-access.
+### The R2 image mirror
+
+`AssetMirror` copies every published Contentful **image** asset into a Cloudflare R2 bucket, and
+the `web/` build rewrites its asset URLs onto the bucket's custom domain (`IMAGE_HOST`) so
+**Cloudflare Images fetches the untransformed source from inside the zone instead of from
+Contentful**. That's the whole point: a source outside the zone can't use Tiered Cache or Cache
+Reserve, so every Cloudflare PoP was independently pulling the full-size original from Contentful
+and re-pulling it on eviction. Production now never touches Contentful for images — only this
+mirror does, once per asset version.
+
+⚠️ **This is a cross-app data contract.** `web` emits `https://<IMAGE_HOST>/<Contentful path>`;
+this writes objects keyed on that same path verbatim. **Neither side validates the other** — a
+mismatched bucket, custom domain, or key shape 404s every image on the site with nothing
+reporting it. Full write-up in the root [`CLAUDE.md`](../CLAUDE.md).
+
+- **Publish only.** ⚠️ Unpublish/delete deliberately do **not** remove the object: the web build
+  reads Contentful with a **preview** token, so an unpublished asset is still in `data/assets.json`
+  and still referenced by built pages. Dropping it would break images that are live. Keys are
+  content-addressed (replacing a file mints a new token segment), so objects are immutable and
+  nothing ever needs invalidating; orphans are cheap and pruned by hand if it ever matters.
+- **Raises, doesn't degrade.** Unlike the widget services, a failed mirror raises so Sidekiq
+  retries — a silently-skipped asset surfaces later as a broken image on a live page. Bugsnag's
+  Sidekiq instrumentation reports the raise, so `AssetMirror` doesn't also report it (that would
+  double-notify).
+- **`rake assets:backfill`** enqueues a job per asset; each skips an asset already in the bucket
+  (one HEAD, no transfer), so it's cheap to re-run and doubles as the reconciliation net for the
+  webhook deliveries Contentful never retries. `DRY_RUN=1` reports the count without enqueuing.
+  ⚠️ Run it to completion **before** `IMAGE_HOST` is set on the web side.
+- No-ops entirely when the `R2_*` vars are absent, so dev/CI stay inert.
+
 - **Webhooks**: `Webhooks::ContentfulController#create` receives Contentful publish/
   unpublish/delete events and keeps the standard.site PDS records in sync. Verified with
   Contentful's HMAC request-verification scheme (`ContentfulRequestVerification` concern,
@@ -125,6 +157,9 @@ headers below. Edge TTL = how long the edge serves a cached copy before revalida
   its normal backoff, then Dead-sets a job once 24 hours have elapsed since the first failure);
   `StandardSiteSyncJob(operation,
   entry_id)` runs the standard.site sync (webhook- and backfill-driven),
+  `AssetSyncJob(asset_id)` mirrors one Contentful image asset into R2 (webhook- and
+  backfill-driven — see **The R2 image mirror** above; ⚠️ it *raises* on failure rather than
+  degrading, since an unmirrored asset means a broken image on a live page),
   `SiteBuildJob(event_type = "contentful-publish")` fires a GitHub `repository_dispatch` to
   rebuild + redeploy the **web** site (the `.github/workflows/web.yml` "Web" workflow listens for
   it). Two callers, one event type each — both build identically, and are distinct only so the
@@ -318,6 +353,10 @@ secrets (and Rails `config/credentials.yml.enc` + `master.key`).
   `ALLOWED_HOSTS` (comma-separated `Host`-header allowlist; **production only**, enables
   host authorization. Unset = all hosts accepted, so it's safe to deploy before setting it,
   then activate by setting the fly secret. `/up` is always exempt. Never hardcode the host),
+  `R2_ACCOUNT_ID` + `R2_ACCESS_KEY_ID` + `R2_SECRET_ACCESS_KEY` + `R2_BUCKET` (the R2 image
+  mirror — an API token with object read/write on the bucket; all four unset = `AssetMirror`
+  no-ops, so dev/CI stay inert. ⚠️ The bucket must be the one behind the web app's `IMAGE_HOST`;
+  nothing validates that, and a mismatch 404s every image on the site),
   `GITHUB_DISPATCH_TOKEN` + `GITHUB_REPOSITORY` (the `SiteBuildJob` web-rebuild trigger, behind
   both the Contentful webhook and `POST /api/build` — a
   fine-grained PAT with **Contents: Read and write**, or a classic PAT with `repo`, plus the

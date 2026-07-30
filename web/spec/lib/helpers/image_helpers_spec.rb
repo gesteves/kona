@@ -45,6 +45,24 @@ RSpec.describe ImageHelpers do
       expect(get_asset_published_version('asset-1')).to eq(7)
     end
 
+    # Contentful#rewrite_image_urls only stashes :contentful_url when it rewrites, so with the
+    # mirror off (IMAGE_HOST unset) there's nothing to fall back from.
+    it 'falls back to the asset URL when nothing was rewritten' do
+      expect(get_asset_contentful_url('asset-1')).to eq('https://images.ctfassets.net/space/asset-1/token/photo.jpg')
+    end
+
+    it 'prefers the stashed Contentful URL over the mirrored one' do
+      @assets = [
+        OpenStruct.new(
+          sys: OpenStruct.new(id: 'asset-1', published_version: 7),
+          url: 'https://images.example.com/space/asset-1/token/photo.jpg',
+          contentful_url: 'https://images.ctfassets.net/space/asset-1/token/photo.jpg'
+        )
+      ]
+      expect(get_asset_contentful_url('asset-1')).to eq('https://images.ctfassets.net/space/asset-1/token/photo.jpg')
+      expect(get_asset_url('asset-1')).to eq('https://images.example.com/space/asset-1/token/photo.jpg')
+    end
+
     it 'returns nils for an unknown asset' do
       expect(get_asset_dimensions('nope')).to eq([nil, nil])
       expect(get_asset_description('nope')).to be_nil
@@ -352,6 +370,26 @@ RSpec.describe ImageHelpers do
       # would spend a transformation on an image no visitor ever sees.
       it 'downloads the thumbnail from Contentful, not through the CDN' do
         stub_env(images_url: 'https://example.com')
+        allow(URI).to receive(:open).and_raise(StandardError, 'stop here')
+        allow(self).to receive(:warn)
+
+        encode_blurhash('asset-1', 32, 18)
+
+        expect(URI).to have_received(:open)
+          .with('https://images.ctfassets.net/space/asset-1/token/photo.jpg?w=32&h=18')
+      end
+
+      # The R2 mirror serves objects verbatim and ignores query strings, so asking it for a 32px
+      # thumb would hand back the full-size original for every asset on the site.
+      it 'bypasses the R2 mirror, which would ignore the resize params' do
+        @assets = [
+          OpenStruct.new(
+            sys: OpenStruct.new(id: 'asset-1', published_version: 3),
+            url: 'https://images.example.com/space/asset-1/token/photo.jpg',
+            contentful_url: 'https://images.ctfassets.net/space/asset-1/token/photo.jpg',
+            width: 1600, height: 900, content_type: 'image/jpeg'
+          )
+        ]
         allow(URI).to receive(:open).and_raise(StandardError, 'stop here')
         allow(self).to receive(:warn)
 
