@@ -198,41 +198,77 @@ Mode**. Both apply **zone-wide, including to the api host** — and that's the t
 traffic on the api host is machine-to-machine and looks exactly like what those features exist to
 block.
 
-⚠️ **Order matters: the skip rules have to exist *before* the features are enabled**, or every
+⚠️ **Order matters: the skip rule has to exist *before* the features are enabled**, or every
 widget 403s site-wide the moment Super Bot Fight Mode goes on.
 
-Custom rules, evaluated top to bottom. The two BLOCK rules stay above the skips so they still fire
-first — a Skip action only ends custom-rule evaluation if it's set to skip all remaining rules,
-which these are not:
+Custom rules, evaluated top to bottom. The BLOCK rules stay above the skip so they still fire
+first — and the skip does **not** tick "All remaining custom rules", so it wouldn't shadow them
+even if the order slipped:
 
 | # | Rule | Expression | Action |
 |---|---|---|---|
 | 1 | Abusive Linux crawler with fake Google referrer | UA + `google.com` referer (see above) | Block |
 | 2 | Block scanner noise | `.php` and friends | Block |
-| 3 | Skip bot protection for machine traffic | `http.host eq "<api host>"` | Skip → Super Bot Fight Mode |
-| 4 | Skip managed rules for webhooks | `http.host eq "<api host>" and starts_with(http.request.uri.path, "/webhooks/")` | Skip → all managed rulesets |
-| 5 | Skip bot protection for the image mirror | `http.host eq "<image host>"` | Skip → Super Bot Fight Mode |
+| 3 | Block access to original images | `http.host eq "<image host>" and not any(http.request.headers["via"][*] contains "image-resizing")` | Block (403) |
+| 4 | Skip bot protection for public paths | `(http.host in {"<site host>" "<image host>"}) or (http.host eq "<api host>" and (starts_with(http.request.uri.path, "/api/") or starts_with(http.request.uri.path, "/widgets/") or starts_with(http.request.uri.path, "/webhooks/")))` | Skip → all managed rules **and** all Super Bot Fight Mode rules |
 
-Why the three skips are load-bearing:
+**Rule 3 — direct access to the mirrored originals.** Cloudflare marks its own transformation
+subrequests with `image-resizing` in the `Via` header, which is what lets this tell "Cloudflare
+Images fetching a source" apart from "someone typing the URL in".
 
-- **Rule 3** — `web/src/api-proxy.ts` builds the upstream widget request with **only** an
-  `authorization` header: no `user-agent`, no `accept`, deliberately (the cache entry has to be
-  byte-identical for every viewer — see the proxy notes below). A request with no UA is the
-  textbook "definitely automated" fingerprint, so SBFM would block the proxy's own fetches and
-  collapse every widget at once. The api loses nothing: every endpoint is bearer-gated and
-  rack-attack throttles whatever gets past that. The same rule covers the build-time callers
-  (`GET /api/standard-site` and `POST /api/icons` from GitHub Actions) and `POST /api/build`.
-  If the blanket host match ever needs narrowing, `cf.worker.upstream_zone` (empty on eyeball
-  requests, the zone name on Worker subrequests) scopes it to proxy traffic specifically.
-- **Rule 4** — `/webhooks/contentful` and `/webhooks/whoop` are unattended POSTs carrying
-  arbitrary Contentful rich text, which will trip a managed injection rule sooner or later. Both
-  are HMAC-verified, so managed rules add nothing on top. ⚠️ A block here fails **silently** —
-  nothing surfaces an error, the standard.site PDS sync simply stops happening.
-- **Rule 5** — the only traffic to the image host is Cloudflare Images fetching a transformation
-  source: no browser fingerprint at all, which is the textbook "definitely automated" verdict.
-  Without the skip, SBFM can 403 the source fetches and collapse **every image on the site** at
-  once. Same failure mode as rule 3, and the same fix. The bucket serves nothing but immutable
-  public image bytes, so the skip costs nothing.
+⚠️ **Never simplify this to a bare `http.host eq "<image host>"` block** — the transformation's
+fetch of the source *does* traverse the rules pipeline (Cloudflare's own docs: "Transform Rules
+run both before and after transformation requests"), so a blanket block 403s **every image on the
+site**. After editing it, always verify **both** directions: a direct `curl` of an object must
+403, *and* a page must still render its images.
+
+⚠️ **It is friction, not a boundary, and both gaps are measured, not theoretical:**
+
+- `Via` is an ordinary request header. `curl -H 'Via: 1.1 image-resizing' <object>` returns **200**.
+- The transformation endpoint on the site host takes an arbitrary width, and Cloudflare will serve
+  whatever the source supports: `/cdn-cgi/image/width=7728/<source>` returns a **3.0MB
+  full-resolution** render. Rule 3 doesn't touch that path.
+
+So it stops hotlinking, right-click-and-save, and untargeted crawlers — nothing more. The only
+thing that would actually bound the maximum obtainable resolution is **capping the stored master**
+(mirroring `?w=2560` instead of the original), since Cloudflare won't upscale past the source.
+
+**Rule 4 — one consolidated skip.** This replaces three narrower skips (api host → SBFM,
+`/webhooks/` → managed rules, image host → SBFM). What each branch is still carrying:
+
+- **The site host** — SBFM was blocking **feed readers and Open Graph scrapers**. "Verified bots:
+  Allow" covers Googlebot/Bingbot but not Slack/Mastodon/Discord unfurlers or RSS clients, and
+  those are exactly the traffic a blog wants. Managed rules are skipped alongside it because the
+  host serves a static build.
+  ⚠️ Not *purely* static, though: `run_worker_first` claims `/widgets/*`, `/api/contact`, and
+  `/pa/*`, and `POST /api/contact` is a real intake carrying arbitrary user prose. Managed rules
+  were never the layer defending it — the honeypot, Turnstile, Akismet, the length caps, and the
+  `contact/ip` throttle are (and OWASP is deliberately not deployed precisely because it would
+  flag the form's own prose). Keep it that way; don't let this skip become the excuse to thin
+  those out.
+- **The image host** — the source fetch has no browser fingerprint at all, the textbook
+  "definitely automated" verdict, so SBFM would collapse every image at once. The bucket serves
+  nothing but immutable public image bytes.
+- **The api host's machine namespaces** — `web/src/api-proxy.ts` builds the upstream widget
+  request with **only** an `authorization` header: no `user-agent`, no `accept`, deliberately (the
+  cache entry has to be byte-identical for every viewer — see the proxy notes below). No UA is the
+  same "definitely automated" fingerprint, so SBFM would collapse every widget at once. `/api/`
+  also covers the build-time callers (`GET /api/standard-site`, `POST /api/icons` from GitHub
+  Actions) and `POST /api/build`. `/webhooks/` carries unattended POSTs of arbitrary Contentful
+  rich text, which will trip a managed injection rule sooner or later; both are HMAC-verified, so
+  managed rules add nothing. ⚠️ A block there fails **silently** — nothing surfaces an error, the
+  standard.site PDS sync simply stops happening.
+  The api loses little: every endpoint is bearer-gated and rack-attack throttles what gets past.
+  If the host match ever needs narrowing, `cf.worker.upstream_zone` (empty on eyeball requests,
+  the zone name on Worker subrequests) scopes it to proxy traffic specifically.
+
+⚠️ **Rate limiting rules are deliberately NOT in the skip list** — the `/api/contact` limiter and
+the site-host crawler brake still apply to everything above. Don't add them.
+
+⚠️ **Both of these rules name hostnames typed by hand, and neither is validated.** A misspelled
+host saves cleanly, shows as Active, and matches nothing — silently. That has already happened
+once here (rule 3 shipped pointing at a nonexistent host and blocked nothing). Paste hostnames
+from the zone's DNS records, then confirm the rule's **Events** counter is non-zero.
 
 **Managed rules** — deploy the **Cloudflare Managed Ruleset** with the ruleset action overridden to
 **Log**, read Security Events for a week, then switch to default actions. The **OWASP Core Ruleset**
@@ -452,6 +488,13 @@ Three consequences worth keeping straight:
 - **Unset `IMAGE_HOST` is a supported state, not a broken one.** The rewrite no-ops and images
   render straight from Contentful — which is the normal local-dev setup, and the one-variable
   rollback.
+- **Direct access to the mirrored originals is blocked** by custom rule 3 (see **Zone security
+  rules**), which allows only requests carrying `image-resizing` in the `Via` header — i.e.
+  Cloudflare Images fetching a transformation source. ⚠️ It's hotlink protection, not a security
+  boundary: the header is spoofable, and `/cdn-cgi/image/width=<source width>/` on the site host
+  still renders at full resolution. The mirror stores **true originals** today (1.39GB, including
+  a dozen 20–38MB camera JPEGs), so that's what a determined caller can still reach. Mirroring a
+  capped master (`?w=2560`, measured at 21–49× smaller) is what would actually bound it.
 
 ## The cross-app HTML contract (most important)
 
