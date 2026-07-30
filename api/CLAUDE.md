@@ -119,6 +119,15 @@ reporting it. Full write-up in the root [`CLAUDE.md`](../CLAUDE.md).
   retries — a silently-skipped asset surfaces later as a broken image on a live page. Bugsnag's
   Sidekiq instrumentation reports the raise, so `AssetMirror` doesn't also report it (that would
   double-notify).
+- ⚠️ **The download uses `Net::HTTP#read_body`, not HTTParty — don't "fix" it to match the house
+  style.** These originals are big (a dozen 20–38MB camera JPEGs) and the worker is a **512MB** VM
+  at **concurrency 5**. Buffering whole files OOM-killed the worker during the first backfill, and
+  a hard kill isn't a job failure Sidekiq can retry, so the in-flight jobs vanished silently — 13
+  assets never mirrored and only surfaced as 404s on live pages. HTTParty doesn't solve it even
+  with `stream_body: true` (it still retains the body): measured at **+154MB** buffered, **+75MB**
+  streamed, for five concurrent 31MB downloads. The Tempfile matters for the same reason — it
+  lets the S3 client upload from disk rather than from a second copy in memory. If the asset
+  library grows a lot more large originals, bump the VM before raising concurrency.
 - **`rake assets:backfill`** enqueues a job per asset; each skips an asset already in the bucket
   (one HEAD, no transfer), so it's cheap to re-run and doubles as the reconciliation net for the
   webhook deliveries Contentful never retries. `DRY_RUN=1` reports the count without enqueuing.

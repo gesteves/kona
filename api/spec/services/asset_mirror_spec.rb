@@ -35,9 +35,22 @@ describe AssetMirror do
       .and_return(item.nil? ? [] : [item])
   end
 
+  # The download streams via Net::HTTP#read_body (see AssetMirror#download for why it can't be
+  # HTTParty), so the stub yields a real response object with a chunked body.
+  # @return [Array] collects the request URIs the code under test actually fetched.
   def stub_download(body: "IMAGEBYTES", code: 200)
-    response = instance_double(HTTParty::Response, success?: code == 200, code: code, body: body)
-    allow(HTTParty).to receive(:get).and_return(response)
+    requested = []
+    klass = code == 200 ? Net::HTTPOK : Net::HTTPForbidden
+    response = klass.new("1.1", code.to_s, "")
+    allow(response).to receive(:read_body) { |&block| block.call(body) }
+
+    http = instance_double(Net::HTTP)
+    allow(http).to receive(:request) do |request, &block|
+      requested << request.uri.to_s
+      block.call(response)
+    end
+    allow(Net::HTTP).to receive(:start) { |*_args, **_opts, &block| block.call(http) }
+    requested
   end
 
   before { stub_r2 }
@@ -76,8 +89,21 @@ describe AssetMirror do
     end
 
     it "uploads the asset under its Contentful path" do
-      expect(client).to receive(:put_object).with(hash_including(bucket: "kona-images", key: key, body: "IMAGEBYTES"))
+      expect(client).to receive(:put_object) do |args|
+        expect(args).to include(bucket: "kona-images", key: key)
+        expect(args[:body].read).to eq("IMAGEBYTES")
+      end
       expect(mirror.sync("asset1")).to eq(:mirrored)
+    end
+
+    # ⚠️ Load-bearing on a 512MB worker running at concurrency 5: these originals run to 38MB,
+    # and buffering them into Strings OOM-killed the worker mid-backfill — which loses in-flight
+    # jobs silently, because a hard kill isn't a job failure Sidekiq can retry.
+    it "streams to a file rather than buffering the body in memory" do
+      body = nil
+      allow(client).to receive(:put_object) { |args| body = args[:body] }
+      mirror.sync("asset1")
+      expect(body).to be_a(Tempfile)
     end
 
     # ⚠️ Without an explicit content type R2 serves application/octet-stream, which breaks both
@@ -93,7 +119,7 @@ describe AssetMirror do
     it "skips the download and upload when the object is already there" do
       stub_client(exists: true)
       expect(client).not_to receive(:put_object)
-      expect(HTTParty).not_to receive(:get)
+      expect(Net::HTTP).not_to receive(:start)
       expect(mirror.sync("asset1")).to eq(:present)
     end
 
@@ -106,11 +132,11 @@ describe AssetMirror do
     # The bytes come from whichever host Contentful named — downloads.ctfassets.net doesn't
     # support the Images API, but it serves the original just fine, which is all the mirror needs.
     it "downloads from the host Contentful gave, keyed on the shared path" do
+      requested = stub_download
       stub_asset(url: "//downloads.ctfassets.net/space/asset1/token/photo.jpg")
-      expect(HTTParty).to receive(:get).with("https://downloads.ctfassets.net/space/asset1/token/photo.jpg")
-        .and_return(instance_double(HTTParty::Response, success?: true, code: 200, body: "IMAGEBYTES"))
       expect(client).to receive(:put_object).with(hash_including(key: key))
       mirror.sync("asset1")
+      expect(requested).to eq(["https://downloads.ctfassets.net/space/asset1/token/photo.jpg"])
     end
 
     it "skips an asset Contentful has no published record of" do

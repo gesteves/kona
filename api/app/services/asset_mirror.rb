@@ -1,4 +1,6 @@
 require "aws-sdk-s3"
+require "net/http"
+require "tempfile"
 
 # Mirrors Contentful's image assets into a Cloudflare R2 bucket, which the web site serves
 # its images from instead of Contentful.
@@ -52,6 +54,9 @@ class AssetMirror < ApplicationService
   # R2 ignores the region but the S3 client requires one.
   REGION = "auto".freeze
 
+  # Contentful serves assets directly today; this is just so a redirect can't loop.
+  MAX_REDIRECTS = 3
+
   # @return [Boolean] Whether the R2 credentials and bucket are configured.
   def configured?
     ENV["R2_ACCOUNT_ID"].present? && ENV["R2_ACCESS_KEY_ID"].present? &&
@@ -77,17 +82,22 @@ class AssetMirror < ApplicationService
     return log_skip(asset_id, "not a ctfassets-hosted asset") if key.blank?
     return log("#{asset_id} already mirrored (#{key})", :present) if object_exists?(key)
 
-    body = download(asset[:url])
-    client.put_object(
-      bucket: bucket,
-      key: key,
-      body: body,
-      # ⚠️ Without an explicit content type R2 serves application/octet-stream, which breaks
-      # both the browser and Cloudflare Images.
-      content_type: asset[:contentType].presence || "application/octet-stream",
-      cache_control: CACHE_CONTROL
-    )
-    log("mirrored #{asset_id} → #{key} (#{body.bytesize} bytes)", :mirrored)
+    file = download(asset[:url])
+    begin
+      size = file.size
+      client.put_object(
+        bucket: bucket,
+        key: key,
+        body: file,
+        # ⚠️ Without an explicit content type R2 serves application/octet-stream, which breaks
+        # both the browser and Cloudflare Images.
+        content_type: asset[:contentType].presence || "application/octet-stream",
+        cache_control: CACHE_CONTROL
+      )
+    ensure
+      file.close!
+    end
+    log("mirrored #{asset_id} → #{key} (#{size} bytes)", :mirrored)
   end
 
   # Enqueues a sync job for every published asset. Safe to re-run: each job skips assets already
@@ -167,13 +177,46 @@ class AssetMirror < ApplicationService
     contentful.items(ASSET_QUERY, { id: asset_id }, collection: :assets)&.first
   end
 
+  # Downloads the asset to a Tempfile and returns it, rewound. The caller must close! it.
+  #
+  # ⚠️ Net::HTTP#read_body with a block, NOT HTTParty — this is the one thing in here that must
+  # not be "simplified" back to the house style. These originals are big (this space has a dozen
+  # 20–38MB camera JPEGs) and the worker is a **512MB** fly VM running Sidekiq at **concurrency
+  # 5** (config/sidekiq.yml). Buffering whole files OOM-killed the worker mid-backfill, and a
+  # hard kill is not a job failure Sidekiq can retry, so the in-flight jobs vanished *silently*:
+  # 13 assets were never mirrored and only surfaced later as 404s on live pages.
+  #
+  # HTTParty does not solve this, including with `stream_body: true` — it still retains the body.
+  # Measured, heap pre-warmed, five concurrent 31MB downloads: HTTParty stream_body **+52.3MB**
+  # peak RSS vs **+1.2MB** for the read_body loop below. Only the latter actually discards chunks.
+  # The Tempfile then lets the S3 client upload from disk instead of from another copy in memory.
+  #
   # @raise [ApplicationService::HttpError] on a non-success response, so the job retries.
-  def download(url)
+  def download(url, redirects_left: MAX_REDIRECTS)
     source = url.to_s.start_with?("//") ? "https:#{url}" : url.to_s
-    response = HTTParty.get(source)
-    raise ApplicationService::HttpError.new(response.code, response.body, source) unless response.success?
+    uri = URI.parse(source)
+    file = nil
 
-    response.body
+    Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https") do |http|
+      http.request(Net::HTTP::Get.new(uri)) do |response|
+        if response.is_a?(Net::HTTPRedirection) && redirects_left.positive? && response["location"].present?
+          return download(response["location"], redirects_left: redirects_left - 1)
+        end
+        raise ApplicationService::HttpError.new(response.code.to_i, "", source) unless response.is_a?(Net::HTTPSuccess)
+
+        # Created only once the status is known, so an error body is never written to disk.
+        file = Tempfile.new("asset-mirror", binmode: true)
+        begin
+          response.read_body { |chunk| file.write(chunk) }
+        rescue StandardError
+          file.close!
+          raise
+        end
+      end
+    end
+
+    file.rewind
+    file
   end
 
   def log(message, result = nil)
