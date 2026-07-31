@@ -45,38 +45,9 @@ RSpec.describe ImageHelpers do
       expect(get_asset_published_version('asset-1')).to eq(7)
     end
 
-    # Contentful#rewrite_image_urls only stashes :contentful_url when it rewrites, so with the
-    # mirror off (IMAGE_HOST unset) there's nothing to fall back from.
-    it 'falls back to the asset URL when nothing was rewritten' do
-      expect(get_asset_contentful_url('asset-1')).to eq('https://images.ctfassets.net/space/asset-1/token/photo.jpg')
-    end
-
-    it 'prefers the stashed Contentful URL over the mirrored one' do
-      @assets = [
-        OpenStruct.new(
-          sys: OpenStruct.new(id: 'asset-1', published_version: 7),
-          url: 'https://images.example.com/space/asset-1/token/photo.jpg',
-          contentful_url: 'https://images.ctfassets.net/space/asset-1/token/photo.jpg'
-        )
-      ]
-      expect(get_asset_contentful_url('asset-1')).to eq('https://images.ctfassets.net/space/asset-1/token/photo.jpg')
-      expect(get_asset_url('asset-1')).to eq('https://images.example.com/space/asset-1/token/photo.jpg')
-    end
-
     it 'returns nils for an unknown asset' do
       expect(get_asset_dimensions('nope')).to eq([nil, nil])
       expect(get_asset_description('nope')).to be_nil
-    end
-  end
-
-  describe '#merge_query' do
-    it 'appends params to a bare URL' do
-      expect(merge_query('https://example.com/a.jpg', w: 100)).to eq('https://example.com/a.jpg?w=100')
-    end
-
-    it 'preserves existing params and overrides duplicates' do
-      merged = merge_query('https://example.com/a.jpg?fm=jpg&w=50', 'w' => 100)
-      expect(merged).to eq('https://example.com/a.jpg?fm=jpg&w=100')
     end
   end
 
@@ -124,24 +95,6 @@ RSpec.describe ImageHelpers do
         transformed = 'https://example.com/cdn-cgi/image/width=50/https://images.ctfassets.net/s/a/t/p.jpg'
         expect(cdn_image_url(transformed, w: 100)).to eq(transformed)
       end
-    end
-  end
-
-  describe '#contentful_image_url' do
-    let(:original) { 'https://images.ctfassets.net/space/asset-1/token/photo.jpg' }
-
-    it 'translates fit=cover to fit=fill' do
-      expect(contentful_image_url(original, fit: 'cover')).to eq("#{original}?fit=fill")
-    end
-
-    it 'drops fm=auto, which Contentful has no equivalent for' do
-      expect(contentful_image_url(original, fm: 'auto', w: 100)).to eq("#{original}?w=100")
-    end
-
-    it "doesn't mutate the caller's params" do
-      params = { fit: 'cover', fm: 'auto' }
-      contentful_image_url(original, params)
-      expect(params).to eq({ fit: 'cover', fm: 'auto' })
     end
   end
 
@@ -327,7 +280,10 @@ RSpec.describe ImageHelpers do
       before do
         allow(self).to receive(:redis).and_return(fake_redis)
         allow(self).to receive(:encode_blurhash).with('asset-1', 32, 18).and_return('LEHV6nWB2yk8pyo0adR*.7kCMdnj')
-        allow(Blurhash).to receive(:decode).and_return([0, 0, 0, 255])
+        # ⚠️ Blurhash.decode is deliberately NOT stubbed. It's pure Ruby and a 32x18 decode is
+        # sub-millisecond, and a stub returning a flat array is exactly what hid the TypeError
+        # from `pixels.pack('C*')` on decode's real nested [row][col][r,g,b,a] output — every
+        # cache miss produced no placeholder for weeks. Let the real shape through.
         allow(fake_image).to receive(:copy).and_return(fake_image)
         allow(fake_image).to receive(:extract_band).and_return(fake_image)
         allow(Vips::Image).to receive(:new_from_memory).and_return(fake_image)
@@ -335,6 +291,13 @@ RSpec.describe ImageHelpers do
 
       it 'decodes the blurhash into a JPEG and returns it as a base64 data URI' do
         expect(blurhash_jpeg_data_uri('asset-1')).to eq('data:image/jpeg;base64,SlBFR0JZVEVT')
+      end
+
+      it 'flattens the decoded pixels before packing them into the vips buffer' do
+        blurhash_jpeg_data_uri('asset-1')
+        # 32x18 RGBA, one byte per band — the nested array pack raises TypeError instead.
+        expect(Vips::Image).to have_received(:new_from_memory)
+          .with(satisfy { |buffer| buffer.bytesize == 32 * 18 * 4 }, 32, 18, 4, :uchar)
       end
 
       it 'caches the data URI in Redis keyed by asset, published version, and width' do
@@ -365,38 +328,53 @@ RSpec.describe ImageHelpers do
     end
 
     describe '#encode_blurhash' do
-      # Even on a deployed build, the thumbnail comes straight from Contentful — not from our own
-      # zone. Routing it through Cloudflare would make the build depend on the zone being up, and
-      # would spend a transformation on an image no visitor ever sees.
-      it 'downloads the thumbnail from Contentful, not through the CDN' do
+      # The thumbnail is resized by Cloudflare like every other image on the site. It used to go
+      # straight to Contentful's Images API to save a transformation, but a transformation costs
+      # a fraction of a cent and Contentful's asset bandwidth is what's metered.
+      it 'resizes the thumbnail through Cloudflare Images' do
         stub_env(images_url: 'https://example.com')
         allow(URI).to receive(:open).and_raise(StandardError, 'stop here')
         allow(self).to receive(:warn)
 
         encode_blurhash('asset-1', 32, 18)
 
-        expect(URI).to have_received(:open)
-          .with('https://images.ctfassets.net/space/asset-1/token/photo.jpg?w=32&h=18')
+        expect(URI).to have_received(:open).with(
+          'https://example.com/cdn-cgi/image/format=jpeg,width=32,height=18/' \
+          'https://images.ctfassets.net/space/asset-1/token/photo.jpg'
+        )
       end
 
-      # The R2 mirror serves objects verbatim and ignores query strings, so asking it for a 32px
-      # thumb would hand back the full-size original for every asset on the site.
-      it 'bypasses the R2 mirror, which would ignore the resize params' do
+      # The mirrored URL is the right source here: Cloudflare fetches it from inside the zone,
+      # and the resize lives in the path, so nothing depends on the source honouring query
+      # strings (R2 ignores them, which is why this couldn't use the mirror before).
+      it 'sources the thumbnail from the R2 mirror when the rewrite is on' do
         @assets = [
           OpenStruct.new(
             sys: OpenStruct.new(id: 'asset-1', published_version: 3),
             url: 'https://images.example.com/space/asset-1/token/photo.jpg',
-            contentful_url: 'https://images.ctfassets.net/space/asset-1/token/photo.jpg',
             width: 1600, height: 900, content_type: 'image/jpeg'
           )
         ]
+        stub_env(images_url: 'https://example.com')
         allow(URI).to receive(:open).and_raise(StandardError, 'stop here')
         allow(self).to receive(:warn)
 
         encode_blurhash('asset-1', 32, 18)
 
-        expect(URI).to have_received(:open)
-          .with('https://images.ctfassets.net/space/asset-1/token/photo.jpg?w=32&h=18')
+        expect(URI).to have_received(:open).with(
+          'https://example.com/cdn-cgi/image/format=jpeg,width=32,height=18/' \
+          'https://images.example.com/space/asset-1/token/photo.jpg'
+        )
+      end
+
+      # Nothing renders without IMAGES_URL anyway, but the rescue here would turn that into a
+      # silent loss of placeholders rather than the loud failure cdn_image_url exists to give.
+      it 'warns and returns nil when IMAGES_URL is unset' do
+        stub_env(images_url: nil)
+        allow(self).to receive(:warn)
+
+        expect(encode_blurhash('asset-1', 32, 18)).to be_nil
+        expect(self).to have_received(:warn).with(/IMAGES_URL is unset/)
       end
     end
 

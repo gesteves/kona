@@ -4,6 +4,29 @@ require 'httparty'
 require_relative 'graphql/contentful'
 
 class Contentful
+  # Raised when IMAGE_HOST is unset. Every image on the site is a Cloudflare Images
+  # transformation, and the zone allowlists only the R2 mirror as a source — so there is no
+  # working URL to emit without it.
+  class ImageHostMissing < StandardError
+    MESSAGE = <<~MSG.freeze
+      IMAGE_HOST is unset, so asset URLs would still point at Contentful.
+
+      It's the bare hostname of the R2 bucket the api mirrors Contentful's image assets into,
+      and it's the ONLY host allowlisted as a Cloudflare Images transformation source — so
+      leaving it unset doesn't fall back to Contentful, it 403s every image on the site. Set it
+      in .env locally and in the build env for deploys.
+
+      This used to no-op instead, which shipped a build where every image was broken while the
+      build itself reported success. It now fails here, so a missing var can't ship unnoticed.
+
+      ⚠️ Don't "fix" this by allowlisting *.ctfassets.net as a transformation source. That makes
+      the misconfiguration render perfectly while draining Contentful's metered asset bandwidth
+      — the exact drain the mirror exists to stop. See the root CLAUDE.md.
+    MSG
+
+    def initialize(message = MESSAGE) = super
+  end
+
   def initialize
     @client = ContentfulClient::Client
     @content = {
@@ -151,15 +174,19 @@ class Contentful
   # writes objects under exactly this path; neither side validates the other, and a mismatch
   # 404s every image on the site silently. See the root CLAUDE.md.
   # ⚠️ Setting IMAGE_HOST asserts the mirror is populated — these URLs 404 until it is. Run the
-  # api's `rake assets:backfill` first. Unset skips the rewrite entirely and images render
-  # straight from Contentful, which is the normal local-dev setup.
+  # api's `rake assets:backfill` first. Unset raises rather than no-opping: the zone allowlists
+  # only the mirror as a transformation source, so skipping the rewrite doesn't fall back to
+  # Contentful, it 403s every image. See ImageHostMissing.
   #
-  # The untouched Contentful URL is kept as :contentful_url for encode_blurhash, which must not
-  # go through the mirror (see ImageHelpers#get_asset_contentful_url).
+  # Nothing needs the pre-rewrite URL any more: blurhash thumbnails used to be resized via
+  # Contentful's Images API (query params, which the mirror ignores) and so kept a
+  # :contentful_url stash, but encode_blurhash now resizes through Cloudflare Images like
+  # everything else, off this same rewritten URL.
   # @param item [Hash] The asset to be processed.
   # @return [Hash] The asset with its URL rewritten.
+  # @raise [ImageHostMissing] if IMAGE_HOST is unset.
   def rewrite_image_urls(item)
-    return item if ENV['IMAGE_HOST'].blank?
+    raise ImageHostMissing if ENV['IMAGE_HOST'].blank?
 
     uri = URI.parse(item[:url])
     # ⚠️ Every ctfassets host, not just images.ctfassets.net. Contentful serves some image
@@ -168,11 +195,14 @@ class Contentful
     # Contentful forever. The path is identical across the hosts, so the key is too. The api's
     # AssetMirror#object_key must keep matching the same set.
     if uri.host.to_s.end_with?('.ctfassets.net')
-      item[:contentful_url] = item[:url]
       uri.host = ENV['IMAGE_HOST']
       item[:url] = uri.to_s
     end
     item
+  rescue ImageHostMissing
+    # A misconfigured build must fail, not quietly emit URLs that 403. The rescue below is only
+    # here for a malformed URL on a single asset, which shouldn't take the whole import down.
+    raise
   rescue => e
     puts "Error rewriting image URL: #{e.message}"
     item

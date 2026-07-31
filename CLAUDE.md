@@ -127,10 +127,17 @@ problem.
   functions don't need to exclude it. `source/robots.txt.erb` allows `/cdn-cgi/image/` and
   disallows the rest.
 
+⚠️ **The Transformations source allowlist names the image-mirror host and nothing else. Never
+add `*.ctfassets.net` to it.** Contentful's absence is deliberate and load-bearing: it's what
+makes a bad or missing `IMAGE_HOST` fail *loudly*. Allowlist ctfassets and the same
+misconfiguration instead renders a perfect-looking site straight off Contentful while draining
+the metered asset bandwidth the mirror exists to protect — the same invisible regression the
+`IMAGES_URL` fallback was deleted for. This is why `IMAGE_HOST` is a **required** var and not a
+one-variable rollback (see **The image mirror** below).
+
 Zone-side settings the code hard-depends on, none of them in the repo: **Transformations**
-enabled with the image-mirror host allowlisted as a source — and `images.ctfassets.net` kept
-allowlisted alongside it, since that's what an unset `IMAGE_HOST` falls back to (without the
-right one, every image 403s); the R2 bucket's **custom domain** and its **bot-protection skip**
+enabled with the image-mirror host allowlisted as a source (and only it, per the warning above);
+the R2 bucket's **custom domain** and its **bot-protection skip**
 (see **The image mirror** below); the
 **Add visitor location headers** managed transform (without it `CF-IPCity`/`CF-Region` are
 absent and geo logging degrades to country-only); the **Cache Response Rule** that sets
@@ -470,8 +477,10 @@ are identical across the hosts, so one key covers an asset whichever host named 
 ⚠️ **A mismatch — wrong bucket, wrong custom domain, a "tidied" key shape, `IMAGE_HOST` set before
 the backfill finished — 404s every image on the site, and nothing anywhere reports it.** Both
 sides must change together. The rollout order is: bucket + custom domain + the SBFM skip rule
-(above) → deploy the api with the `R2_*` secrets → `rake assets:backfill` to completion → *only
-then* set `IMAGE_HOST` in the web build env.
+(above) + the mirror host on the **Transformations source allowlist** → deploy the api with the
+`R2_*` secrets → `rake assets:backfill` to completion → *only then* set `IMAGE_HOST` in the web
+build env. Because the allowlist names only that host, the window between the last two steps is
+the one where images are broken — so keep it short, and never "fix" it by allowlisting ctfassets.
 
 Three consequences worth keeping straight:
 
@@ -480,14 +489,25 @@ Three consequences worth keeping straight:
   is still in `data/assets.json` and still referenced by built pages — removing its object would
   break images that are live. Objects are immutable anyway, so nothing needs invalidating;
   orphans cost cents and are pruned by hand if it ever matters.
-- **Blurhashes must bypass the mirror.** `encode_blurhash` resizes via Contentful's Images API
-  **query params**, and R2 serves objects verbatim and ignores query strings — so the rewrite
-  stashes the untouched URL as `:contentful_url` and the helper reads it through
-  `get_asset_contentful_url`. Point that at `get_asset_url` and every build silently downloads
-  full-size originals instead of 32px thumbs.
-- **Unset `IMAGE_HOST` is a supported state, not a broken one.** The rewrite no-ops and images
-  render straight from Contentful — which is the normal local-dev setup, and the one-variable
-  rollback.
+- **Blurhashes go through the mirror too.** `encode_blurhash` resizes its 32px thumbnail with
+  `cdn_image_url` like every other image, so the source is the mirrored object and the resize
+  lives in the URL **path**. It used to hit Contentful's Images API directly — deliberately, to
+  avoid spending a transformation per asset — via a `:contentful_url` stash the rewrite kept and
+  a `get_asset_contentful_url` helper. All three are gone: a transformation is a fraction of a
+  cent against Contentful's metered bandwidth, and 20 of this space's assets are on
+  `downloads.ctfassets.net`, which has no Images API at all, so those silently downloaded the
+  full-size original on every cold build — the exact drain the mirror exists to stop.
+  ⚠️ It must ask for an explicit `fm:` (it uses `jpg`). With no format Cloudflare returns the
+  source format, and a libvips built without that loader fails the decode into
+  `encode_blurhash`'s `rescue` — i.e. silently no placeholder, not a build error.
+- **`IMAGE_HOST` is required — everywhere, including locally. It is not a rollback switch.**
+  The rewrite still no-ops when it's blank, but there is no longer anywhere for those URLs to
+  go: the zone's Transformations source allowlist names only the mirror host, so an unset
+  `IMAGE_HOST` leaves every image pointed at `*.ctfassets.net` and **403s the lot**. That's
+  deliberate — the alternative (allowlisting ctfassets so the unset case "works") is what would
+  let a misconfigured build render perfectly while quietly billing Contentful's asset bandwidth.
+  Rolling the mirror back means changing the allowlist in the dashboard first, not clearing one
+  variable.
 - **Direct access to the mirrored originals is blocked** by custom rule 3 (see **Zone security
   rules**), which allows only requests carrying `image-resizing` in the `Via` header — i.e.
   Cloudflare Images fetching a transformation source. ⚠️ It's hotlink protection, not a security

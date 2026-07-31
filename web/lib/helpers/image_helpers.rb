@@ -82,17 +82,6 @@ module ImageHelpers
     asset&.url
   end
 
-  # Retrieves the untouched Contentful URL of an asset by its ID — the one thing that must not
-  # go through the R2 mirror. Contentful#rewrite_image_urls stashes it before swapping the host,
-  # so this falls back to :url when the rewrite is off (IMAGE_HOST unset) or the asset isn't a
-  # Contentful image.
-  # @param asset_id [String] The ID of the asset for which to retrieve the URL.
-  # @return [String, nil] The Contentful URL of the asset, or nil if the asset is not found.
-  def get_asset_contentful_url(asset_id)
-    asset = asset_index[asset_id]
-    asset&.contentful_url.presence || asset&.url
-  end
-
   # Retrieves the published version of an asset by its ID.
   # @param asset_id [String] The ID of the asset for which to retrieve the published version.
   # @return [Integer, nil] The published version of the asset, or nil if the asset is not found.
@@ -146,34 +135,6 @@ module ImageHelpers
     return 'anim=true' if options.empty?
 
     options.join(',')
-  end
-
-  # Generates a Contentful Images API URL. One caller: encode_blurhash, which uses it
-  # deliberately, so that generating a placeholder never depends on our zone being up or on
-  # Cloudflare's quota. Fidelity is lower than Cloudflare's (no auto format), which is fine for
-  # a 32px thumbnail nobody sees. This is NOT a fallback for cdn_image_url — resizing real
-  # images via Contentful is the bandwidth drain Cloudflare Images exists to avoid.
-  # @see https://www.contentful.com/developers/docs/references/images-api/
-  # @param original_url [String] The original URL of the image.
-  # @param params [Hash] (Optional) Transformation parameters (:w, :h, :fm, :fit).
-  # @return [String] The Contentful image URL with the parameters merged in.
-  def contentful_image_url(original_url, params = {})
-    params = params.dup
-    params[:fit] = 'fill' if params[:fit] == 'cover'
-    # Contentful has no format=auto; drop it and let it serve the source format.
-    params.delete(:fm) if params[:fm].to_s == 'auto'
-    merge_query(original_url, params)
-  end
-
-  # Merges query parameters into a URL, preserving (and overriding) any it already carries.
-  # @param url [String] The URL.
-  # @param params [Hash] The parameters to merge in.
-  # @return [String] The URL with the merged query string.
-  def merge_query(url, params)
-    uri = URI.parse(url)
-    existing_params = URI.decode_www_form(uri.query || "").to_h
-    uri.query = URI.encode_www_form(existing_params.merge(params))
-    uri.to_s
   end
 
   # Generates a responsive srcset for an image URL with specified widths and optional parameters.
@@ -302,7 +263,11 @@ module ImageHelpers
 
     # Generate the JPEG image from the Blurhash string. Blurhash decodes to opaque RGBA,
     # so the alpha band is dropped rather than composited.
-    pixels = Blurhash.decode(width, height, blurhash)
+    # ⚠️ .flatten is load-bearing. Blurhash.decode returns a nested [row][col][r,g,b,a] array,
+    # and Array#pack raises TypeError on that. MiniMagick's get_image_from_pixels accepted the
+    # nested form, so the port to vips dropped the flatten and every cache miss silently
+    # produced no placeholder — the rescue below swallowed the TypeError into a warn.
+    pixels = Blurhash.decode(width, height, blurhash).flatten
     image = Vips::Image.new_from_memory(pixels.pack('C*'), width, height, 4, :uchar)
                        .copy(interpretation: :srgb)
                        .extract_band(0, n: 3)
@@ -319,20 +284,22 @@ module ImageHelpers
   end
 
   # Encodes a Blurhash using libvips for an asset based on its ID, width, and height.
-  # Downloads the thumbnail straight from Contentful rather than through our own CDN, so the
-  # build doesn't depend on the zone being up — or on Cloudflare's transformation quota, which
-  # this would otherwise spend a slot of per asset. It's cheap: the thumbnails are 32px wide,
-  # and blurhash_jpeg_data_uri caches the result in Redis per published version.
-  # ⚠️ get_asset_contentful_url, not get_asset_url: this resizes via Contentful's Images API
-  # (query params), and the R2 mirror ignores query strings — so pointing this at the mirrored
-  # URL would silently download the FULL-SIZE original for every asset instead of a 32px thumb.
+  # Resizes through Cloudflare Images like every other image on the site, which means the
+  # thumbnail's source is the R2 mirror rather than Contentful. It used to go straight to
+  # Contentful's Images API to avoid spending a transformation per asset — but a transformation
+  # is a fraction of a cent against Contentful's metered asset bandwidth, which is the thing
+  # actually in short supply, and 20 of this space's assets live on downloads.ctfassets.net,
+  # which has no Images API at all: those silently downloaded the FULL-SIZE original.
+  # ⚠️ Ask for `fm: 'jpg'` explicitly. With no format Cloudflare hands back the source format,
+  # which can be anything the mirror holds (avif included) — and a libvips built without that
+  # loader fails the decode into the rescue below, i.e. silently no placeholder.
   # @param asset_id [String] The ID of the asset used for generating the Blurhash.
   # @param width [Integer] The width of the Blurhash image.
   # @param height [Integer] The height of the Blurhash image.
   # @return [String, nil] The generated Blurhash, or nil if not generated
   def encode_blurhash(asset_id, width, height)
-    url = get_asset_contentful_url(asset_id)
-    data = URI.open(contentful_image_url(url, { w: width, h: height })).read
+    url = cdn_image_url(get_asset_url(asset_id), { w: width, h: height, fm: 'jpg' })
+    data = URI.open(url).read
     image = Vips::Image.new_from_buffer(data, '').colourspace(:srgb)
     image = image.flatten if image.has_alpha?
     Blurhash.encode(image.width, image.height, image.to_a.flatten)

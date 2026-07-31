@@ -283,9 +283,12 @@ RSpec.describe Contentful do
       expect(item[:url]).to eq('https://images.example.com/space/asset-1/token/a.jpg')
     end
 
-    it 'stashes the untouched Contentful URL for the blurhash encoder' do
+    # The rewrite used to stash the pre-rewrite URL as :contentful_url, because encode_blurhash
+    # resized via Contentful's Images API query params and the mirror ignores query strings. It
+    # now resizes through Cloudflare Images off this URL, so nothing reads the original.
+    it 'adds no key beyond the swapped URL' do
       item = transform(:rewrite_image_urls, { url: 'https://images.ctfassets.net/space/asset-1/token/a.jpg' })
-      expect(item[:contentful_url]).to eq('https://images.ctfassets.net/space/asset-1/token/a.jpg')
+      expect(item.keys).to eq([:url])
     end
 
     it 'preserves a protocol-relative URL as protocol-relative' do
@@ -317,15 +320,23 @@ RSpec.describe Contentful do
       expect(item[:url]).to eq('https://elsewhere.example.com/a.jpg')
     end
 
+    # The mirror is the ONLY host allowlisted as a Cloudflare Images transformation source, so
+    # skipping the rewrite doesn't fall back to Contentful — it 403s every image on the site.
+    # This used to no-op, which shipped a build where every image was broken while the build
+    # itself reported success.
     context 'when IMAGE_HOST is unset' do
       before { stub_image_host(nil) }
 
-      # The mirror is opt-in: unset means images render straight from Contentful, which is both
-      # the local-dev setup and the rollback path.
-      it 'leaves the URL untouched and stashes nothing' do
-        item = transform(:rewrite_image_urls, { url: 'https://images.ctfassets.net/space/asset-1/token/a.jpg' })
-        expect(item[:url]).to eq('https://images.ctfassets.net/space/asset-1/token/a.jpg')
-        expect(item).not_to have_key(:contentful_url)
+      it 'raises rather than emitting URLs that would 403' do
+        expect { transform(:rewrite_image_urls, { url: 'https://images.ctfassets.net/space/asset-1/token/a.jpg' }) }
+          .to raise_error(Contentful::ImageHostMissing, /IMAGE_HOST is unset/)
+      end
+
+      # The method-level rescue is there so one malformed asset URL can't take the import down.
+      # It must not also swallow the misconfiguration that makes the whole build worthless.
+      it 'raises past the rescue that swallows per-asset URL errors' do
+        expect { transform(:rewrite_image_urls, { url: 'not a url' }) }
+          .to raise_error(Contentful::ImageHostMissing)
       end
     end
   end
