@@ -47,6 +47,32 @@ HTTP_TIMEOUT = 30
 READING_CACHE = {}
 CACHE_MUTEX = Mutex.new
 
+# A generation counter identifying the newest sensor crawl. `/sensors` takes the next number and
+# checks it between sensors; anything that bumps the counter — `POST /stop`, or simply starting
+# another load — makes the older loop notice it's stale and stop.
+#
+# Closing the EventSource in the browser is not enough on its own: writes to a dropped connection
+# don't fail promptly, so the loop would keep working through its queue at a second a sensor,
+# spending API points on a frame you've already left. One page, one user, so a process-global
+# counter is all this needs.
+RUN_MUTEX = Mutex.new
+RUN = { id: 0 }
+
+def begin_run!
+  RUN_MUTEX.synchronize { RUN[:id] += 1 }
+end
+
+def current_run
+  RUN_MUTEX.synchronize { RUN[:id] }
+end
+
+# Cancels whatever crawl is running. Sent by the HUD's Stop button (as a beacon, so it still
+# arrives if the page is navigating away).
+post '/stop' do
+  begin_run!
+  status 204
+end
+
 get '/' do
   token = ENV['MAPBOX_ACCESS_TOKEN'].to_s
   halt 500, 'MAPBOX_ACCESS_TOKEN is not set. Copy .env.example to .env and fill it in.' if token.empty?
@@ -80,6 +106,9 @@ get '/sensors' do
   content_type 'text/event-stream'
   headers 'Cache-Control' => 'no-cache', 'X-Accel-Buffering' => 'no'
 
+  # Claim this crawl. Starting a load implicitly cancels any earlier one still running.
+  run = begin_run!
+
   stream do |out|
     begin
       found = sensors_in_bounds(bounds, timestamp)
@@ -87,6 +116,10 @@ get '/sensors' do
       out << sse(:meta, found: found.size, queued: queued.size, seconds: (queued.size * RATE_LIMIT_SLEEP).round)
 
       queued.each do |sensor|
+        # Checked before each sensor — i.e. before the request that costs a second and some API
+        # points — so Stop takes effect within one sensor rather than at the end of the queue.
+        break unless current_run == run
+
         begin
           aqi = aqi_for(sensor, timestamp)
           next if aqi.nil?
@@ -323,8 +356,15 @@ __END__
       display: flex; align-items: center; justify-content: center;
       font: 600 14px/1 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
       border: 1px solid rgba(0, 0, 0, .15);
-      user-select: none; cursor: default;
+      user-select: none; cursor: pointer;
     }
+    /* Clicked to "not part of the shot". Hidden outright once the HUD is.
+       !important is load-bearing: GL JS writes `opacity` *inline* on every marker element as
+       part of its fog/terrain occlusion fade (normally to 1), and an inline style beats a class
+       selector — so without it the badge silently never dims. It leaves `display` alone, which
+       is why hiding works and dimming didn't. Nothing here uses terrain, globe, or fog, so
+       overriding that fade costs nothing. */
+    .aqi.is-dim { opacity: .35 !important; }
   </style>
 </head>
 <body>
@@ -341,15 +381,20 @@ __END__
     <div id="utc"></div>
     <div id="status">Loading&hellip;</div>
     <button id="load" disabled>Load sensors in view</button>
+    <button id="stop" hidden>Stop loading</button>
   </div>
 
   <script>
     // The moment being rendered. Mutable: the HUD's picker changes it.
     let timestamp = <%= timestamp %>;
 
+    // Whether the HUD (and, with it, the dimmed badges) is showing. Toggled by H.
+    let chromeVisible = <%= hud.to_json %>;
+
     const hud = document.getElementById('hud');
     const status = document.getElementById('status');
     const loadButton = document.getElementById('load');
+    const stopButton = document.getElementById('stop');
     const whenInput = document.getElementById('when');
     const utcHint = document.getElementById('utc');
 
@@ -365,9 +410,31 @@ __END__
     // instead of replacing it.
     const markers = new Map();
 
+    // Badges you've clicked to dim: "not part of the shot". They fade out, and disappear
+    // entirely once the HUD is hidden, so the screenshot shows only the ones you kept.
+    const dimmed = new Set();
+
     function clearMarkers() {
       markers.forEach((marker) => marker.remove());
       markers.clear();
+      dimmed.clear();
+    }
+
+    function toggleDim(index) {
+      if (dimmed.has(index)) dimmed.delete(index); else dimmed.add(index);
+      applyBadgeState(index);
+    }
+
+    function applyBadgeState(index) {
+      const marker = markers.get(index);
+      if (!marker) return;
+
+      const element = marker.getElement();
+      const isDim = dimmed.has(index);
+      element.classList.toggle('is-dim', isDim);
+      // Not the `hidden` attribute: .aqi sets `display: flex`, and an author rule beats the UA
+      // stylesheet's `[hidden] { display: none }`, so the badge would stay visible.
+      element.style.display = isDim && !chromeVisible ? 'none' : '';
     }
 
     // The AirNow scale as a gradient rather than discrete bands, which is what PurpleAir's own
@@ -410,10 +477,14 @@ __END__
       element.style.color = sensor.aqi > 150 ? '#ffffff' : '#000000';
       element.style.zIndex = Math.max(0, Math.round(sensor.aqi));
       element.title = `Sensor ${sensor.index} · AQI ${sensor.aqi}`;
+      element.addEventListener('click', () => toggleDim(sensor.index));
 
       markers.set(sensor.index, new mapboxgl.Marker({ element })
         .setLngLat([sensor.lon, sensor.lat])
         .addTo(map));
+
+      // A sensor re-delivered by a later load keeps whatever dim state you gave it.
+      applyBadgeState(sensor.index);
     }
 
     // --- Time picker ---
@@ -442,6 +513,7 @@ __END__
     // different time — so clear them and wait for an explicit reload.
     function setTimestamp(next) {
       timestamp = next;
+      stop();
       clearMarkers();
       syncTimeUi();
       status.textContent = 'Time changed — load sensors for this view.';
@@ -466,9 +538,28 @@ __END__
     // sequential crawl at ~1 sensor/second and spend API points while you're still hunting
     // for a frame.
     loadButton.addEventListener('click', load);
+    stopButton.addEventListener('click', () => stop('Stopped. Reframe and load again.'));
+
+    // The live stream, if one is running. Kept at this scope so stop() can reach it.
+    let events = null;
+
+    // Ends the in-flight load, on both sides. Closing the EventSource alone would only stop the
+    // *page* listening — the server would keep crawling PurpleAir at a second a sensor, spending
+    // API points on a frame you've already moved away from. POST /stop cancels it at the source.
+    function stop(message) {
+      if (!events) return;
+      events.close();
+      events = null;
+      navigator.sendBeacon('/stop');
+      stopButton.hidden = true;
+      loadButton.disabled = false;
+      if (message) status.textContent = message;
+    }
 
     function load() {
+      stop();
       loadButton.disabled = true;
+      stopButton.hidden = false;
       status.textContent = 'Finding sensors…';
 
       const b = map.getBounds();
@@ -478,17 +569,20 @@ __END__
         selat: b.getSouth(), selng: b.getEast()
       });
 
-      const events = new EventSource('/sensors?' + query);
+      const stream = new EventSource('/sensors?' + query);
+      events = stream;
       let expected = 0;
       let loaded = 0;
 
       const finish = (message) => {
-        events.close();
+        stream.close();
+        if (events === stream) events = null;
         status.textContent = message;
+        stopButton.hidden = true;
         loadButton.disabled = false;
       };
 
-      events.addEventListener('meta', (e) => {
+      stream.addEventListener('meta', (e) => {
         const meta = JSON.parse(e.data);
         expected = meta.queued;
         if (expected === 0) return finish('No sensors with data here at that time.');
@@ -496,21 +590,31 @@ __END__
         status.textContent = `0 / ${expected}${capped} — about ${meta.seconds}s…`;
       });
 
-      events.addEventListener('sensor', (e) => {
+      stream.addEventListener('sensor', (e) => {
         addMarker(JSON.parse(e.data));
         loaded += 1;
         status.textContent = `${loaded} / ${expected}…`;
       });
 
-      events.addEventListener('warn', (e) => console.warn('sensor', JSON.parse(e.data)));
-      events.addEventListener('done', () => finish(`${loaded} of ${expected} sensors shown.`));
-      events.addEventListener('fatal', (e) => finish('Error: ' + JSON.parse(e.data).message));
-      events.onerror = () => finish('Connection lost. Is the server still running?');
+      stream.addEventListener('warn', (e) => console.warn('sensor', JSON.parse(e.data)));
+      stream.addEventListener('done', () => finish(`${loaded} of ${expected} sensors shown.`));
+      stream.addEventListener('fatal', (e) => finish('Error: ' + JSON.parse(e.data).message));
+      stream.onerror = () => finish('Connection lost. Is the server still running?');
+    }
+
+    // Hiding the HUD is the last step before a screenshot, so it takes the dimmed badges with
+    // it: what's left on screen is exactly what you kept.
+    function applyChrome() {
+      hud.hidden = !chromeVisible;
+      markers.forEach((_marker, index) => applyBadgeState(index));
     }
 
     // Press H to toggle the HUD out of the way for a screenshot (same as ?hud=0).
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'h' || e.key === 'H') hud.hidden = !hud.hidden;
+      if (e.key !== 'h' && e.key !== 'H') return;
+      if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+      chromeVisible = !chromeVisible;
+      applyChrome();
     });
   </script>
 </body>

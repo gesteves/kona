@@ -38,6 +38,16 @@ Sensors are loaded for the current viewport with the **"Load sensors in view"** 
 automatically on pan — see below. They accumulate across loads, so you can build up coverage by
 panning and loading a few times.
 
+A load takes about a second per sensor, so **"Stop loading"** appears while one is running. It
+cancels the crawl on the server as well as in the page, which is the point: reframe and load
+again without waiting out a queue you've already moved away from, and without spending the API
+points it would have cost. Starting a new load cancels a running one for the same reason.
+Whatever had already arrived stays on the map.
+
+**Click a badge to dim it**, click again to restore it. Dimmed badges drop to 35% opacity, and
+hiding the HUD (`H`) hides them completely — so you can weed out the readings you don't want in
+the shot and screenshot what's left.
+
 ## Picking a moment
 
 The HUD has a date/time picker plus `−1d / −1h / +1h / +1d` buttons for scrubbing around to find
@@ -90,3 +100,15 @@ URL returns to the same moment.
   (`.mapboxgl-marker` is `position: absolute` and GL JS never sets `zIndex` itself, so that
   ordering is safe.) The trade-off: badges are DOM, not canvas, so a `canvas.toDataURL()` export
   would omit them — screenshot the window instead.
+- **Which also means the badges always draw over the basemap's labels, and can't be put under
+  them.** A DOM marker is an HTML element positioned on top of the map canvas, so nothing the
+  map draws can cover it. Putting them beneath labels needs them to *be* a layer — which means
+  baking each badge into an icon image and giving up the crisp DOM text. That was tried and
+  reverted; it looked worse, and the labels are the lesser problem.
+- **Dimming and hiding each fight a different stylesheet, and both fixes are load-bearing.**
+  ⚠️ The dim rule needs `!important`: GL JS writes `opacity` *inline* on every marker element as
+  part of its fog/terrain occlusion fade (normally to `1`), and an inline style beats a class
+  selector, so without it a clicked badge silently never dims. It leaves `display` alone — which
+  is why hiding worked while dimming didn't. ⚠️ Hiding, conversely, must use
+  `style.display = 'none'` and **not** the `hidden` attribute, because `.aqi` sets
+  `display: flex` and an author rule beats the UA stylesheet's `[hidden] { display: none }`.
