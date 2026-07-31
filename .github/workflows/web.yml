@@ -78,8 +78,10 @@ jobs:
           working-directory: web
           bundler-cache: true
 
-      # The slowest step in this workflow by a wide margin — measured at 19s in `checks` and 48s
-      # in `deploy`, against ~12s for the actual site build. libvips isn't on the runner
+      # One of the slower steps here, though it moves a lot with the apt mirror: measured at 13s
+      # and at 48s in `deploy` on different runs, against ~16s for the site build itself. That
+      # ratio is why moving blurhash generation into the api to drop this install was considered
+      # and dropped — it wouldn't buy back meaningful wall-clock. libvips isn't on the runner
       # image, so the whole tree is downloaded fresh: `libvips` is a *virtual* package provided
       # by libvips42t64, which pulls ~33 direct dependencies (ImageMagick, poppler, librsvg,
       # heif, jxl...). libvips42t64 itself declares no Recommends, but everything underneath it
@@ -200,8 +202,10 @@ jobs:
           working-directory: web
           bundler-cache: true
 
-      # The slowest step in this workflow by a wide margin — measured at 19s in `checks` and 48s
-      # in `deploy`, against ~12s for the actual site build. libvips isn't on the runner
+      # One of the slower steps here, though it moves a lot with the apt mirror: measured at 13s
+      # and at 48s in `deploy` on different runs, against ~16s for the site build itself. That
+      # ratio is why moving blurhash generation into the api to drop this install was considered
+      # and dropped — it wouldn't buy back meaningful wall-clock. libvips isn't on the runner
       # image, so the whole tree is downloaded fresh: `libvips` is a *virtual* package provided
       # by libvips42t64, which pulls ~33 direct dependencies (ImageMagick, poppler, librsvg,
       # heif, jxl...). libvips42t64 itself declares no Recommends, but everything underneath it
@@ -273,6 +277,21 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      # ⚠️ Announced BEFORE the purge below, deliberately. `wrangler deploy` returns once the new
+      # version is activated, so the site is live at this point — the purge only stops the edge
+      # serving *stale* copies, and its 30s propagation sleep would otherwise pad this ping by half
+      # a minute past the thing it's reporting. Keep it here; if a step is ever added that the site
+      # genuinely isn't live without, this moves back below it.
+      - name: Notify Slack (deploy successful)
+        if: success()
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          text: "Web deploy <${{ secrets.URL }}|successful> :rocket:"
+          color: "good"
+          fallback: "Web deploy successful"
+
       # wrangler deploy doesn't purge Cloudflare's edge cache, so without this the edge keeps
       # serving pre-deploy HTML/feeds (cf-cache-status: HIT → stale 304s) until the entries age
       # out. Every asset-layer response is tagged `Cache-Tag: site` (a host-scoped zone Cache
@@ -289,9 +308,9 @@ jobs:
       # seconds, and a request served by a not-yet-updated PoP right after the first purge would
       # re-cache OLD content — which, since deploys don't self-invalidate at the edge, would stay
       # pinned until the NEXT deploy's purge. The second pass runs after propagation has settled
-      # and evicts anything the race re-pinned. Off the critical path: the new version is already
-      # live, so the sleep delays nothing but this job's completion.
+      # and evicts anything the race re-pinned.
       - name: Purge Cloudflare edge cache (tag "site")
+        id: purge
         run: |
           purge() {
             curl -sS --fail-with-body -X POST \
@@ -304,18 +323,26 @@ jobs:
           sleep 30
           purge
 
-      - name: Notify Slack (deploy successful)
-        if: success()
+      # Its own message, because the success ping has already gone out by now and a bare "deploy
+      # failed" after "deploy successful" would read as a contradiction and send you looking in
+      # the wrong place. What actually happened is narrower and worth stating: the site is live,
+      # but the edge may keep serving the previous copy — and since deploys don't self-invalidate,
+      # that stays pinned until the next deploy purges it, so it wants a manual purge.
+      - name: Notify Slack (purge failed)
+        if: failure() && steps.purge.outcome == 'failure'
         continue-on-error: true
         uses: ./.github/actions/notify-slack
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          text: "Web deploy <${{ secrets.URL }}|successful> :rocket:"
-          color: "good"
-          fallback: "Web deploy successful"
+          text: "Web deploy succeeded, but the edge cache <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|purge failed> :warning: — the site may serve stale content until it's purged by hand"
+          color: "warning"
+          fallback: "Web deploy succeeded but the cache purge failed"
 
+      # Everything up to and including the deploy. Scoped off the purge so the two can't both
+      # fire: steps.purge.outcome is '' when the step never ran, so this still covers an earlier
+      # failure.
       - name: Notify Slack (deploy failed)
-        if: failure()
+        if: failure() && steps.purge.outcome != 'failure'
         continue-on-error: true
         uses: ./.github/actions/notify-slack
         with:

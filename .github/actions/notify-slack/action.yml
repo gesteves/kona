@@ -9,7 +9,7 @@ inputs:
     description: "Top-level message text (Slack mrkdwn)."
     required: true
   color:
-    description: "Attachment color: good, danger, or a hex value."
+    description: "Attachment color: good, warning, danger, or a hex value."
     required: true
   fallback:
     description: "Plain-text fallback for the attachment."
