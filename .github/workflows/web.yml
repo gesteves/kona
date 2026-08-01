@@ -303,6 +303,16 @@ jobs:
       # --fail-with-body → red CI if the purge 4xxs. Reuses CLOUDFLARE_API_TOKEN, which now also
       # carries the Zone → Cache Purge permission.
       #
+      # --retry 3 --retry-all-errors rides out a transient blip (5xx, connection reset, DNS) rather
+      # than leaving content pinned at the edge until the next deploy over something that would
+      # have worked a second later. --retry-all-errors is the load-bearing half: plain --retry
+      # covers transport errors and a few 5xx, but NOT the 4xx/5xx that --fail-with-body turns into
+      # a non-zero exit, which is most of what we'd want to retry here. It deliberately does not
+      # paper over a bad token — a 403 retries three times, still fails the step, and still fires
+      # the "purge failed" notification below. Moving this into the api as a retrying Sidekiq job
+      # was considered; it buys the same transient resilience for a zone-scoped Cloudflare token on
+      # the api and a 24h-later Bugsnag report in place of a loud, immediate CI failure.
+      #
       # ⚠️ The sleep comes FIRST, and there is deliberately only one purge. `wrangler deploy`
       # returns at activation, but propagation across PoPs takes a few seconds — and a request
       # served by a not-yet-updated PoP right after a purge re-caches OLD content, which, since
@@ -317,7 +327,7 @@ jobs:
         id: purge
         run: |
           sleep 30
-          curl -sS --fail-with-body -X POST \
+          curl -sS --fail-with-body --retry 3 --retry-all-errors -X POST \
             "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
             -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
             -H "Content-Type: application/json" \
