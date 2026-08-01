@@ -380,45 +380,6 @@ The `Cache-Tag: site` Cache **Response** Rule runs in a different phase
 purge is what makes the 1-day edge TTL safe: without it, a failed purge would mean stale content for
 the full TTL rather than until the next revalidation.
 
-### Custom Error Pages
-
-The zone's **Error Pages** (Pro; zone-level, which takes precedence over account-level) are
-branded rather than default-Cloudflare, and they're built by `web/` like any other page — one per
-error page type, under `web/source/errors/`, rendered by `web/source/layouts/error.erb`. See
-[`web/CLAUDE.md`](web/CLAUDE.md) for the page-side constraints. What matters at the zone:
-
-| Error page type | Dashboard / API id | Page to point it at | Required token |
-|---|---|---|---|
-| 500 class errors | `500_errors` | `/errors/500/` | `::CLOUDFLARE_ERROR_500S_BOX::` |
-| 1000 class errors | `1000_errors` | `/errors/1000/` | `::CLOUDFLARE_ERROR_1000S_BOX::` |
-| Managed challenge / I'm Under Attack Mode | `managed_challenge` | `/errors/managed-challenge/` | `::CAPTCHA_BOX::` |
-| IP/Country challenge | `country_challenge` | `/errors/country-challenge/` | `::CAPTCHA_BOX::` |
-| WAF block | `waf_block` | `/errors/waf-block/` | — |
-| IP/Country block | `ip_block` | `/errors/ip-block/` | — |
-| Rate limiting block | `ratelimit_block` | `/errors/rate-limit-block/` | — |
-
-Set each one in **Rules → Error Pages** (or `PUT /zones/{zone}/custom_pages/{id}` with
-`{"state": "customized", "url": "<site URL>/errors/…/"}`). The three types with no required token
-carry `::RAY_ID::` / `::CLIENT_IP::` / `::GEO::` instead, so a reader hitting a false positive has
-something to quote — which matters most on `waf_block`, since custom rule 1 above is knowingly
-over-broad. ⚠️ **None of the block pages links to `/contact/`, on purpose**: whatever blocked the
-request blocks that page too, so an invitation to get in touch is a dead end.
-
-⚠️ **The token is what makes a challenge page passable.** `::CAPTCHA_BOX::` renders the challenge
-widget itself, not a decoration: a challenge page missing it is a dead end for every visitor it's
-served to. Same idea, lower stakes, for the two error boxes.
-
-⚠️ **Cloudflare fetches and stores a snapshot; it does not track the site.** It inlines the page's
-CSS/JS/images at fetch time and serves that frozen copy forever. So a redesign, a copy edit, or an
-`asset_hash` change reaches the stored pages only when each one is **re-fetched** in the dashboard —
-a deploy does nothing, and neither does the `Cache-Tag: site` purge. Re-fetch after any change to
-`web/source/errors/`, `layouts/error.erb`, or the stylesheets.
-
-⚠️ Error Pages **do not apply to `500`, `501`, `503`, or `505`** responses (a Cloudflare carve-out
-for APIs), and Cloudflare serves its own default page to any request without an `accept-encoding`
-header. Neither is fixable from here; Custom Error **Rules** are the escape hatch if those statuses
-ever need branding.
-
 Other zone settings, none load-bearing but all deliberate: **Smart Tiered Cache** on (fewer origin
 hits means fewer cold starts on the scale-to-zero fly machine behind the widgets); **Page Shield**
 script monitoring on (third-party script inventory, observational only); Early Hints, HTTP/3, 0-RTT,

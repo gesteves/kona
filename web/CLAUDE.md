@@ -142,26 +142,6 @@ build fails loudly rather than shipping pages with missing icons.
   - The above-the-fold woff2 faces are preloaded, since they're otherwise undiscoverable
     until `site.css` parses. `crossorigin` is mandatory even same-origin or they download
     twice; URLs must come from `asset_path(:fonts, …)` because fonts are asset-hashed.
-- `source/errors/` + `source/layouts/error.erb` + `source/partials/_error.html.erb` — the zone's
-  **Cloudflare Custom Error Pages**, one per error page type. They're ordinary built pages (at
-  `/errors/500/`, `/errors/managed-challenge/`, …) that Cloudflare fetches once and stores; the
-  root [`CLAUDE.md`](../CLAUDE.md) has the type → page → token mapping and the dashboard steps.
-  Each page is frontmatter only — `title`, `summary`, `body`, plus its Cloudflare `token` and/or
-  `details: true` — over one `partial 'partials/error'` call, so the body matches `404.html.erb`
-  minus the recent-articles module.
-  ⚠️ **`error.erb` deliberately isn't `layout.erb`**: it ships **no JavaScript** (the bundle would
-  be inlined into every stored copy, and on the challenge pages Turbo would be booting inside a
-  document whose job is to run Cloudflare's challenge widget), no analytics, no Pagefind, and no
-  `referrer` meta tag, which Cloudflare documents as breaking challenges. That's also why its
-  header and footer are trimmed to the parts that work without the bundle. `<head>`/`</head>` are
-  required by Cloudflare's fetcher, and the stored page is capped at 1.5 MB.
-  ⚠️ **The `@font-face` URLs in `stylesheets/fonts/*` are root-absolute (`/fonts/…`) for this
-  reason** — Cloudflare inlines the stylesheet into the stored page, where a `../fonts/…` would
-  resolve against `/errors/<type>/` and silently drop the site's typography everywhere on it.
-  Don't change them back.
-  ⚠️ Nothing needs excluding these pages from the sitemap, `llms.txt`, or search — the first two
-  are built from Contentful data and Pagefind only indexes `data-pagefind-body` — but the layout
-  sets `noindex`, since they are reachable URLs.
 - Open Graph "cards" (the `og:image` for pages without a cover image) were rendered **on demand**
   by a separate `kona-og` fly service. **That service is currently parked** (removed from `main`,
   preserved on the `restore-og` branch — it didn't earn its own app for now), so cover-less pages
