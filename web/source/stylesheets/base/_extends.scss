@@ -258,6 +258,11 @@
     vertical-align: super;
   }
 
+  s {
+    text-decoration: line-through;
+    text-decoration-thickness: 2px;
+  }
+
   hr {
     border: none;
     border-bottom: 1px solid var(--color-accent);
