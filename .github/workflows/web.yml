@@ -300,28 +300,28 @@ jobs:
       # second branch tags the Contentful-backed widget fragments on the api host, so this also
       # evicts those — that's deliberate, since a Contentful publish dispatches this workflow and
       # they'd otherwise serve pre-edit content; the live-data widgets are untagged and survive.
-      # Runs after wrangler activates the new version, so
-      # the next request re-populates the edge from it. --fail-with-body → red CI if the purge 4xxs.
-      # Reuses CLOUDFLARE_API_TOKEN, which now also carries the Zone → Cache Purge permission.
+      # --fail-with-body → red CI if the purge 4xxs. Reuses CLOUDFLARE_API_TOKEN, which now also
+      # carries the Zone → Cache Purge permission.
       #
-      # Purged TWICE: wrangler returns at activation, but propagation across PoPs takes a few
-      # seconds, and a request served by a not-yet-updated PoP right after the first purge would
-      # re-cache OLD content — which, since deploys don't self-invalidate at the edge, would stay
-      # pinned until the NEXT deploy's purge. The second pass runs after propagation has settled
-      # and evicts anything the race re-pinned.
+      # ⚠️ The sleep comes FIRST, and there is deliberately only one purge. `wrangler deploy`
+      # returns at activation, but propagation across PoPs takes a few seconds — and a request
+      # served by a not-yet-updated PoP right after a purge re-caches OLD content, which, since
+      # deploys don't self-invalidate at the edge, stays pinned until the NEXT deploy's purge.
+      # Purging only once propagation has settled is what makes that race impossible. This used to
+      # purge immediately and then again after the sleep; the second call was the one doing the
+      # real work, and the first bought nothing the second didn't also cover.
+      # The cost is that the edge may serve the previous copy for the length of the sleep. That's
+      # the right trade: it's bounded and self-correcting, whereas a re-pin lasts until the next
+      # deploy. Nothing waits on this — the success ping above has already gone out.
       - name: Purge Cloudflare edge cache (tag "site")
         id: purge
         run: |
-          purge() {
-            curl -sS --fail-with-body -X POST \
-              "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
-              -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
-              -H "Content-Type: application/json" \
-              --data '{"tags":["site"]}'
-          }
-          purge
           sleep 30
-          purge
+          curl -sS --fail-with-body -X POST \
+            "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            --data '{"tags":["site"]}'
 
       # Its own message, because the success ping has already gone out by now and a bare "deploy
       # failed" after "deploy successful" would read as a contradiction and send you looking in
