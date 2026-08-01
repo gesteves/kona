@@ -215,9 +215,37 @@ even if the order slipped:
 | # | Rule | Expression | Action |
 |---|---|---|---|
 | 1 | Abusive Linux crawler with fake Google referrer | UA + `google.com` referer (see above) | Block |
-| 2 | Block scanner noise | `.php` and friends | Block |
+| 2 | Block scanner noise | Path families no host in the zone serves: known-bad extensions, tool/framework prefixes, dot-segments, secret-material filenames, encoded dots, exotic methods (see below) | Block |
 | 3 | Block access to original images | `http.host eq "<image host>" and not any(http.request.headers["via"][*] contains "image-resizing")` | Block (403) |
 | 4 | Skip bot protection for public paths | `(http.host in {"<site host>" "<image host>"}) or (http.host eq "<api host>" and (starts_with(http.request.uri.path, "/api/") or starts_with(http.request.uri.path, "/widgets/") or starts_with(http.request.uri.path, "/webhooks/")))` | Skip → all managed rules **and** all Super Bot Fight Mode rules |
+
+**Rule 2 — scanner noise.** One big `or` over `lower(http.request.uri.path)`, matching by *family*
+rather than by observed URL: known-bad extensions (`.php`, `.env`, `.sql`, `.yml`, `.swp`, `.pem`,
+`.key`, …), tool/framework prefixes (`/wp-`, `/cgi-bin/`, `/actuator/`, `/phpmyadmin/`, `/k8s/`,
+`/terraform/`, `/secrets/`, `/config/`, `/deploy/`, `/flask/`, `/pki/`, `/home/`, `/analytics/`),
+secret-material filenames with no extension to key off (`credential`, `cognito`, `/id_` — which
+covers `id_rsa`/`id_dsa`/`id_ed25519`), any **dot-segment anywhere** (`contains "/."`, with
+`/.well-known/` exempted — the one dotted path the site actually serves), and anything outside
+`GET`/`HEAD`/`POST`.
+
+⚠️ **Scanners percent-encode the dots** (`/terraform/%2eenv%2estaging`, `/connection%2ephp%2eswp`)
+specifically to walk past extension matching, so the rule also blocks a bare `contains "%2e"`.
+Whether it ever fires depends on the zone's **Normalize incoming URLs** setting (Rules → Settings),
+which percent-decodes unreserved characters *before* rules evaluate; Security Events shows the raw
+path either way, so **you cannot tell which form the rule saw from the dashboard**. Every clause
+above is therefore chosen so each blocked family matches in *both* forms — don't drop the `%2e`
+clause because it looks redundant, and don't drop a decoded-form clause because `%2e` "already
+covers it". Nothing legitimate in the zone has an encoded dot: page URLs are extensionless ASCII
+slugs, R2 keys carry literal dots, and `/cdn-cgi/image/…` embeds its source URL unencoded
+(`web/lib/helpers/image_helpers.rb`).
+
+⚠️ **The prefixes are anchored with `starts_with`, and the rule is zone-wide (it sits above the
+skip).** Two things to keep in mind before adding to it: `activate :directory_indexes` means pages
+are served at `/<slug>/`, so a top-level page slugged `config`, `home`, `analytics`, or `deploy`
+would be blocked by its own prefix clause — check `data/pages.json` before adding a prefix, and
+remember this if a new page ever 403s. And every clause has to stay false for the api host
+(`/widgets/`, `/api/`, `/webhooks/`, `/whoop/`, `/auth/`, `/login`, `/sidekiq`, `/up`) and for the
+R2 key shape (`{space}/{asset id}/{token}/{filename}`), not just for the site build.
 
 **Rule 3 — direct access to the mirrored originals.** Cloudflare marks its own transformation
 subrequests with `image-resizing` in the `Via` header, which is what lets this tell "Cloudflare
