@@ -1,0 +1,75 @@
+<%#
+  Layout for the Cloudflare Custom Error Pages under source/errors/. These are NOT ordinary
+  site pages: Cloudflare fetches each one over HTTP, inlines its images/CSS/JS, and stores a
+  minified copy in its own network, then serves that copy in place of a default Cloudflare
+  error or challenge page. Constraints that follow from that, all deliberate:
+
+  - **No JavaScript.** The site bundle would be inlined into every stored copy (~300 KB
+    against Cloudflare's 1.5 MB page limit), and on the challenge pages Turbo would be
+    booting inside a document whose whole job is to run Cloudflare's challenge widget. So
+    this layout skips the bundle, analytics, Pagefind, and the notification host, and with
+    them the nav/search/back-to-top controls that only work with the bundle loaded.
+  - **No `referrer` meta tag** — Cloudflare documents it as breaking challenges.
+  - **`<head>`/`</head>` are required** by Cloudflare's fetcher; the page is rejected without
+    them. (`partials/head` isn't reusable here: it pulls in the bundle and the analytics
+    snippet, and its per-content schema/canonical/feed tags are meaningless on an error page.)
+  - **`noindex`**, since these are reachable URLs on the site. Nothing else needs excluding:
+    the sitemap and llms.txt are built from Contentful data, and Pagefind only indexes
+    `data-pagefind-body`.
+  - **Stylesheets are plain `<link>`s with no `data-turbo-track`** — Turbo isn't loaded, and
+    Cloudflare inlines them at fetch time anyway. That inlining is why the `@font-face` URLs
+    in `stylesheets/fonts/*` are root-absolute: relative ones would resolve against the
+    stored page's own URL and silently drop the site's typography.
+
+  ⚠️ Cloudflare stores what it fetched. A design change here (or an asset-hash change) does
+  NOT reach the stored pages until each one is re-fetched in the dashboard.
+%>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <%= title_tag(current_page.data.title) %>
+    <% if current_page.data.summary.present? %>
+      <meta name="description" content="<%= h current_page.data.summary %>">
+    <% end %>
+    <meta name="viewport" content="width=device-width,minimum-scale=1">
+    <meta name="theme-color" content="#BF0222">
+    <meta name="robots" content="noindex">
+    <link rel="icon" href="/favicon.ico" sizes="32x32">
+    <% %w[
+      ibm-plex-sans-condensed-v14-latin-700.woff2
+      lato-v24-latin-300.woff2
+    ].each do |font| %>
+      <link rel="preload" as="font" type="font/woff2" href="<%= asset_path(:fonts, font) %>" crossorigin>
+    <% end %>
+    <%= stylesheet_link_tag 'site' %>
+    <%= stylesheet_link_tag 'print', media: 'print' %>
+  </head>
+  <body>
+    <%= partial 'partials/skip' %>
+    <div class="content">
+      <header class="header" aria-labelledby="title" id="header">
+        <a href="/" class="header__link">
+          <p class="header__hed">
+            <span class="sr-only" id="title"><%= data.site.title %></span>
+            <%= partial 'partials/logo.svg.erb' %>
+          </p>
+        </a>
+      </header>
+      <main class="content__main" id="main-content">
+        <%= yield %>
+      </main>
+    </div>
+    <%# A trimmed footer: the socials list and the menu need the JS bundle (<wa-scroller>,
+        search, back-to-top), so only the logo and the copyright line carry over. %>
+    <footer class="footer" id="footer">
+      <div class="footer__wrapper">
+        <a href="/" class="footer__logo-link" aria-label="<%= data.site.title %>">
+          <%= partial 'partials/logo.svg.erb' %>
+        </a>
+        <hr class="footer__line">
+        <section class="footer__section"><%= footer_text %></section>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,14 @@
+---
+layout: error
+title: Just a moment.
+summary: I need to check that you’re not a robot before showing you this page.
+body: |
+  I need to check that you’re not a robot before showing you this page. It
+  should only take a few seconds.
+token: "::CAPTCHA_BOX::"
+---
+
+<%# Cloudflare Error Page type: Managed challenge / I'm Under Attack Mode (`managed_challenge`),
+    served with a 403. ⚠️ `::CAPTCHA_BOX::` is REQUIRED: it renders the challenge widget
+    itself, so without it the visitor has no way to pass and the page is a dead end. %>
+<%= partial 'partials/error' %>
