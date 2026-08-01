@@ -234,15 +234,11 @@ jobs:
         env:
           WEBAWESOME_NPM_TOKEN: ${{ secrets.WEBAWESOME_NPM_TOKEN }}
 
-      - name: Notify Slack (deploy starting)
-        continue-on-error: true
-        uses: ./.github/actions/notify-slack
-        with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          text: "Web deploy starting :hourglass_flowing_sand:"
-          color: "#439FE0"
-          fallback: "Web deploy starting"
-
+      # (There's deliberately no "deploy starting" notification here, unlike api.yml. A Contentful
+      # publish dispatches this workflow, so deploys are frequent and each one already posts on
+      # activation and again once the edge cache is purged; a third message per publish was noise.
+      # Nothing keys off it — a failure at any point still notifies below.)
+      #
       # rake build = import (Contentful/icons/standard-site) -> middleman build -> rename
       # _redirects/_headers -> pagefind. It does NOT run tests (those are the `checks` job's job,
       # which gates deploys on code pushes). Tokens come from *secrets* (no hostnames live in this
@@ -332,6 +328,21 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
             -H "Content-Type: application/json" \
             --data '{"tags":["site"]}'
+
+      # Not redundant with "deploy successful" above — it carries the half that message can't.
+      # That one fires at activation, when the edge may still be handing out the previous copy;
+      # this one means the stale copies are gone and every PoP now serves the new build. Blue
+      # rather than green, deliberately: it's a follow-up to the deploy, not a second success, and
+      # colouring it `good` would make every deploy look like it succeeded twice.
+      - name: Notify Slack (cache purged)
+        if: success()
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          text: "Web edge cache purged — <${{ secrets.URL }}|the site> is serving the new build :broom:"
+          color: "#439FE0"
+          fallback: "Web edge cache purged"
 
       # Its own message, because the success ping has already gone out by now and a bare "deploy
       # failed" after "deploy successful" would read as a contradiction and send you looking in

@@ -1,6 +1,32 @@
 name: "Notify Slack"
 description: "Post a CI/deploy status message to Slack with the standard commit attachment and workflow footer."
 
+# Every workflow posts through this action, so the conventions below are what keep the channel
+# readable — api.yml and web.yml drifted apart once already. Match them when adding a message.
+#
+#   Which messages exist. Checks post exactly one result per run, pass or fail. Deploys post on
+#   success and on failure — deliberately NOT on start: a Contentful publish dispatches a web
+#   deploy, so deploys are frequent and a third message per deploy was noise. Add a message only
+#   for an outcome the existing ones can't express (web's "edge cache purged" earns its place
+#   because "deploy successful" fires at activation, while the edge may still be serving the
+#   previous copy).
+#
+#   Colour. good = it worked. danger = it failed. warning = it partly worked and needs a human
+#   (web's purge failure: deployed, but possibly serving stale). #439FE0 = informational
+#   follow-up to something already reported — never for a second success, or every deploy looks
+#   like it succeeded twice.
+#
+#   Emoji. :rocket: deploy succeeded. :warning: failed or degraded. :broom: cache purged.
+#
+#   Text vs fallback. `text` is Slack mrkdwn with ONE link, on the words describing the outcome
+#   ("<url|successful>", "<run|failed>") — a success links to the thing that's now live, a
+#   failure links to the run. `fallback` is a plain one-line summary with NO url: it's the
+#   notification-preview text, the attachment already carries the link, and a raw url there just
+#   makes the preview unreadable.
+#
+#   Naming. "<App> <thing> <outcome>" — "Web checks passed", "API deploy failed". The app prefix
+#   is what makes a message legible in a channel carrying both.
+
 inputs:
   webhook:
     description: "Slack incoming webhook URL."

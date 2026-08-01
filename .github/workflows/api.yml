@@ -146,15 +146,11 @@ jobs:
       - name: CI context
         uses: ./.github/actions/ci-context
 
-      - name: Notify Slack (deploy starting)
-        continue-on-error: true
-        uses: ./.github/actions/notify-slack
-        with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          text: "API deploy <https://fly.io/apps/kona-api/monitoring|starting> :hourglass_flowing_sand:"
-          color: "#439FE0"
-          fallback: "API deploy starting: https://fly.io/apps/kona-api/monitoring"
-
+      # (No "deploy starting" notification, matching web.yml — a deploy already posts on success
+      # or failure, and a third message per deploy was noise. Nothing keys off it. This also
+      # dropped the only link to the fly monitoring dashboard; put it back on the failure message
+      # below if it's ever missed, rather than reinstating a whole extra notification.)
+      #
       # ⚠️ Pinned to a release tag, NOT @master. This runs in the job that holds FLY_API_TOKEN,
       # so a moving branch ref means any commit pushed to that third-party repo executes here
       # with the deploy credential. Dependabot's github-actions updater bumps this tag.
@@ -175,7 +171,7 @@ jobs:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           text: "API deploy <${{ secrets.KONA_API_URL }}|successful> :rocket:"
           color: "good"
-          fallback: "API deploy successful: ${{ secrets.KONA_API_URL }}"
+          fallback: "API deploy successful"
 
       - name: Notify Slack (deploy failed)
         if: failure()
@@ -185,4 +181,4 @@ jobs:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           text: "API deploy <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|failed> :warning:"
           color: "danger"
-          fallback: "API deploy failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fallback: "API deploy failed"
