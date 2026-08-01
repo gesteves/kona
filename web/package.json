@@ -17,11 +17,11 @@
     "@web.awesome.me/webawesome-pro": "^3.7.0",
     "esbuild": "^0.28.1",
     "pagefind": "^1.5.2",
-    "wrangler": "^4.20.0"
+    "wrangler": "^4.115.0"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.18.8",
-    "@cloudflare/workers-types": "^5.20260724.1",
+    "@cloudflare/vitest-pool-workers": "^0.19.0",
+    "@cloudflare/workers-types": "^5.20260729.1",
     "prettier": "^3.9.5",
     "stylelint": "^17.14.0",
     "stylelint-config-standard-scss": "^17.0.0",
