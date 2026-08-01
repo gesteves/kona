@@ -7,7 +7,7 @@ description: "Post a CI/deploy status message to Slack with the standard commit 
 #   Which messages exist. Checks post exactly one result per run, pass or fail. Deploys post on
 #   success and on failure — deliberately NOT on start: a Contentful publish dispatches a web
 #   deploy, so deploys are frequent and a third message per deploy was noise. Add a message only
-#   for an outcome the existing ones can't express (web's "edge cache purged" earns its place
+#   for an outcome the existing ones can't express (web's "cache purge successful" earns its place
 #   because "deploy successful" fires at activation, while the edge may still be serving the
 #   previous copy).
 #
@@ -24,8 +24,10 @@ description: "Post a CI/deploy status message to Slack with the standard commit 
 #   notification-preview text, the attachment already carries the link, and a raw url there just
 #   makes the preview unreadable.
 #
-#   Naming. "<App> <thing> <outcome>" — "Web checks passed", "API deploy failed". The app prefix
-#   is what makes a message legible in a channel carrying both.
+#   Naming. "<App> <thing> <outcome>" — "Web checks passed", "API deploy failed", "Web cache purge
+#   successful". The app prefix is what makes a message legible in a channel carrying both, and the
+#   fixed shape is what makes the whole set skimmable; resist explaining the outcome in the text
+#   (the colour and the linked run cover it).
 
 inputs:
   webhook:

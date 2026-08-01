@@ -340,24 +340,25 @@ jobs:
         uses: ./.github/actions/notify-slack
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          text: "Web edge cache purged — <${{ secrets.URL }}|the site> is serving the new build :broom:"
+          text: "Web cache purge <${{ secrets.URL }}|successful> :broom:"
           color: "#439FE0"
-          fallback: "Web edge cache purged"
+          fallback: "Web cache purge successful"
 
       # Its own message, because the success ping has already gone out by now and a bare "deploy
       # failed" after "deploy successful" would read as a contradiction and send you looking in
-      # the wrong place. What actually happened is narrower and worth stating: the site is live,
-      # but the edge may keep serving the previous copy — and since deploys don't self-invalidate,
-      # that stays pinned until the next deploy purges it, so it wants a manual purge.
+      # the wrong place. What actually happened is narrower: the site is live, but the edge may
+      # keep serving the previous copy — and since deploys don't self-invalidate, that stays
+      # pinned until the next deploy purges it, so it wants a manual purge. `warning` rather than
+      # `danger` is what carries that "partly worked" nuance now that the text is terse.
       - name: Notify Slack (purge failed)
         if: failure() && steps.purge.outcome == 'failure'
         continue-on-error: true
         uses: ./.github/actions/notify-slack
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          text: "Web deploy succeeded, but the edge cache <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|purge failed> :warning: — the site may serve stale content until it's purged by hand"
+          text: "Web cache purge <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|failed> :warning:"
           color: "warning"
-          fallback: "Web deploy succeeded but the cache purge failed"
+          fallback: "Web cache purge failed"
 
       # Everything up to and including the deploy. Scoped off the purge so the two can't both
       # fire: steps.purge.outcome is '' when the step never ran, so this still covers an earlier
