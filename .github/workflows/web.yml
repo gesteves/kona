@@ -295,7 +295,15 @@ jobs:
       # leaving image transformations (/cdn-cgi/image/*, never tagged) intact. The same rule's
       # second branch tags the Contentful-backed widget fragments on the api host, so this also
       # evicts those — that's deliberate, since a Contentful publish dispatches this workflow and
-      # they'd otherwise serve pre-edit content; the live-data widgets are untagged and survive.
+      # they'd otherwise serve pre-edit content; the live-data widgets carry no `site` tag and
+      # survive.
+      #
+      # ⚠️ Purge ONLY the `site` tag. Widget fragments also carry a `widgets` tag (a second zone
+      # Cache Response Rule) — that one is a MANUAL lever and must never be added here. A purge
+      # drops a fragment's stale-while-revalidate / stale-if-error copies along with the fresh one,
+      # and those are what keep the live-data widgets rendering through a fly outage; since a
+      # Contentful publish dispatches this workflow, adding `widgets` would mean a publish landing
+      # mid-outage collapses every widget site-wide. Root CLAUDE.md has the full reasoning.
       # --fail-with-body → red CI if the purge 4xxs. Reuses CLOUDFLARE_API_TOKEN, which now also
       # carries the Zone → Cache Purge permission.
       #

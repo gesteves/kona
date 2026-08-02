@@ -260,13 +260,20 @@ reporting it. Full write-up in the root [`CLAUDE.md`](../CLAUDE.md).
   fix it; it needs a dashboard edit, and nothing fails loudly). The live-data widgets (`weather/*`,
   `activity-stats`, `whoop`, `plausible/*`) are deliberately outside those prefixes. Full expression
   and reasoning: root [`CLAUDE.md`](../CLAUDE.md).
-  ⚠️ **Because those four are untagged, editing a `cache_widget(ttl:)` above does not reach copies
-  already at the edge — purge by hand or the change won't land.** A cached fragment keeps the
-  `CDN-Cache-Control` it was *stored* with, so PoPs go on serving the old body under the old policy
-  until it expires on its own terms. Shortening the pageviews TTL from 1 h to 5 min left copies
-  live under the previous `stale-while-revalidate=86400` — a view count up to **25 hours** stale,
-  which reads as the counter running backwards. The same applies to a markup change (the cross-app
-  HTML contract): the old fragment keeps being served for the *old* TTL, not the new one.
+  ⚠️ **Editing a `cache_widget(ttl:)` above does not reach copies already at the edge — purge, or
+  the change won't land.** A cached fragment keeps the `CDN-Cache-Control` it was *stored* with, so
+  PoPs go on serving the old body under the old policy until it expires on its own terms. Shortening
+  the pageviews TTL from 1 h to 5 min left copies live under the previous
+  `stale-while-revalidate=86400` — a view count up to **25 hours** stale, which reads as the counter
+  running backwards. The same applies to a markup change (the cross-app HTML contract): the old
+  fragment keeps being served for the *old* TTL, not the new one.
+  Every widget fragment on this host carries a `widgets` cache tag (a second zone Cache Response
+  Rule) purely so that purge is one call:
+  `POST /zones/<id>/purge_cache` with `{"tags":["widgets"]}`.
+  ⚠️ **It is a manual lever and must stay one — never wire `widgets` into the web deploy's purge.**
+  That purge is scoped to `site` precisely so a Contentful publish can't drop the live-data widgets'
+  `stale-while-revalidate` copies, which are what keep them rendering through a fly outage. Root
+  [`CLAUDE.md`](../CLAUDE.md) has the full reasoning.
 - **Error reporting** — `config/initializers/bugsnag.rb` wires the `bugsnag` gem; its railtie
   auto-inserts the Rack middleware and hooks ActionDispatch, so unhandled exceptions are
   reported even though errors render as plain text. `notify_release_stages` is limited to

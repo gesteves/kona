@@ -111,7 +111,8 @@ problem.
   **Contentful** content are tagged `site` by a second branch of the same rule, scoped to the api
   host and to those paths, so a content publish (which dispatches a deploy, which purges the tag)
   evicts them instead of leaving them serving pre-edit content for an hour plus a day of
-  `stale-while-revalidate`. The live-data widgets stay untagged (see below).
+  `stale-while-revalidate`. The live-data widgets stay out of the `site` tag (see below) — they
+  carry a separate `widgets` tag that nothing purges automatically, as a manual lever only.
 - **Bot blocking is a zone rule, not code** — the `block-bots` edge function that used to do this
   was **deleted** (`3c4e0044`). Its job — blocking a scraper that spoofs a Google referral (a
   desktop-Linux Chrome UA arriving with a `google.com` referer) — is now a **WAF BLOCK rule in
@@ -182,6 +183,43 @@ host — `/api/*`, `/webhooks/*` — stays out for the same reason.
 dashboard**, and nothing in the repo will remind you — the widget will simply go stale forever,
 silently. Routes added under `articles/` or `events/` are already covered.
 
+#### The `widgets` tag — a manual lever, deliberately never purged by CI
+
+A **second, separate** Cache Response Rule tags every widget fragment on the api host `widgets`:
+
+```
+http.host eq "<api host>" and starts_with(http.request.uri.path, "/widgets/")
+```
+
+Modify cache tags → **Specify tags manually** → `widgets` → **Add to existing tags**.
+
+Its only purpose is to make `POST /zones/<id>/purge_cache` with `{"tags":["widgets"]}` possible by
+hand. **Nothing purges it automatically, and nothing should** — that's the entire design:
+
+- ⚠️ **Never add `widgets` to the deploy purge in `.github/workflows/web.yml`.** That workflow
+  purges `{"tags":["site"]}` and must keep purging only that. Adding `widgets` would recreate, for
+  every widget at once, exactly the coupling the `site` tag is deliberately scoped to avoid: a purge
+  drops a fragment's `stale-while-revalidate` / `stale-if-error` copies along with the fresh one, so
+  a Contentful publish landing during a fly outage would collapse every widget site-wide. The
+  reasoning is in the warning above; this tag exists *because* tagging and purging are separable.
+  **A tag is inert until something purges it** — which is why adding one costs nothing and the
+  purge is what has to stay manual.
+- Reach for it when a widget's cached copy is wrong in a way that waiting won't fix: a `cache_widget`
+  TTL change (a cached fragment keeps the `CDN-Cache-Control` it was *stored* with, so PoPs go on
+  serving the old body under the old policy — this is what once left a view count 25 hours stale,
+  reading as the counter running backwards), or a markup change that has to land in step with the
+  web placeholder (the cross-app HTML contract).
+- Purge by **URL** is the tag-free alternative and needs no rule at all, but the widget URLs include
+  `/widgets/plausible/pageviews/<contentful id>` — one per article — so the tag is what makes
+  "evict every pageview count" a single call instead of ~60.
+
+⚠️ **Order it AFTER the `site` rule, never First.** Whether Cloudflare composes multiple matching
+Cache Response Rules or stops at the first match is not something the dashboard tells you — and if
+it stops at the first, a `widgets` rule placed above the `site` one would give `/widgets/articles/*`
+the tag `widgets` *instead of* `site`, silently ending the deploy purge for the Contentful-backed
+widgets. Ordering it last makes both behaviors harmless. Verify after any edit: publish an entry and
+confirm a trending or related fragment still turns over.
+
 ⚠️ **The image-mirror host is deliberately absent from both branches, and must never be added.**
 Its objects are immutable and content-addressed (replacing an asset's file mints a new Contentful
 token, so the URL changes on its own), so there is nothing a purge could fix — while tagging them
@@ -192,11 +230,18 @@ Cloudflare PoP back to R2 for images that hadn't changed.
 saves cleanly, matches nothing, and fails **silently**. Paste them from the zone's DNS records, and
 verify with Cloudflare Trace or by watching `cf-cache-status` on a widget URL across a deploy.
 
-(Setting the tag via the web `_headers` `Cache-Tag` header does **not** work — Cloudflare doesn't
-consume it, it just leaks the header to clients — so the tag must come from this rule, which is why
-it's a hard zone dependency. The rule runs in the `http_response_cache_settings` phase, i.e. after
-the origin response, and applies to Worker subrequests as well as eyeball requests — which is what
-lets one rule cover both branches.) Plus the WAF rules below.
+(Setting a tag via a `Cache-Tag` **response header** does **not** work on its own — Cloudflare
+doesn't consume it, it just leaks the header to clients — so tags must come from a Cache Response
+Rule, which is why the `site` one is a hard zone dependency and why no amount of Rails or `_headers`
+work can replace it. A rule *can* be pointed at a response header instead of a literal, via its
+Source → **Parse from response header** option, which would let the api author per-widget or
+per-article tags in `cache_widget`; both tags here deliberately use **Specify tags manually**
+instead. The finer granularity buys little — a manual purge is a deliberate act, and refilling every
+widget once is precisely what you're choosing at that moment — while the header route would split
+cache policy across two places and add a header the proxy has to keep not forwarding. These rules
+run in the `http_response_cache_settings` phase, i.e. after the origin response, and apply to Worker
+subrequests as well as eyeball requests — which is what lets one rule cover both branches, and what
+puts the widget fragments in reach at all.) Plus the WAF rules below.
 
 ### Zone security rules
 
