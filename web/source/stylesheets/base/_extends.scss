@@ -161,10 +161,13 @@
 
   abbr,
   acronym {
-    font-size: 110%;
     font-variant-caps: all-small-caps;
     font-variant-numeric: oldstyle-nums;
     text-decoration: none;
+
+    &.full-caps {
+      font-variant-caps: normal;
+    }
   }
 
 
