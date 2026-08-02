@@ -10,7 +10,7 @@ RSpec.describe "Widgets::Plausible pageviews", type: :request do
     allow(ENV).to receive(:[]).with("PLAUSIBLE_SITE_ID").and_return("example.com")
 
     allow_any_instance_of(Articles).to receive(:find).and_return(article)
-    allow_any_instance_of(Plausible).to receive(:query).and_return(results: [{ metrics: [1234], dimensions: [] }])
+    allow_any_instance_of(Plausible).to receive(:pageviews_by_path).and_return("/2026/05/01/my-race-report/" => 1234)
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
   end
 
@@ -45,41 +45,57 @@ RSpec.describe "Widgets::Plausible pageviews", type: :request do
     expect(response.body).not_to include("page,/2026/05/01/q&a-recap/")
   end
 
-  it "queries Plausible for the reconstructed article path" do
-    expect_any_instance_of(Plausible).to receive(:query)
-      .with(hash_including(filters: [["is", "event:page", ["/2026/05/01/my-race-report/"]]]))
-      .and_return(results: [{ metrics: [5] }])
+  it "looks the count up by the reconstructed article path" do
+    allow_any_instance_of(Plausible).to receive(:pageviews_by_path)
+      .and_return("/2026/05/01/my-race-report/" => 5, "/2026/05/01/some-other-post/" => 900)
 
     get "/widgets/plausible/pageviews/abc123", headers: auth_headers
     expect(response.body).to include("Viewed 5 times")
   end
 
-  it "renders 'Never viewed' for zero pageviews" do
-    allow_any_instance_of(Plausible).to receive(:query).and_return(results: [{ metrics: [0] }])
+  # One site-wide query serves every article — a per-article query would multiply the call
+  # volume by the size of the corpus and blow Plausible's 600/hour limit at this TTL.
+  it "asks for every article's counts in one all-time query, not one query per article" do
+    expect_any_instance_of(Plausible).to receive(:pageviews_by_path)
+      .with(date_range: "all").once.and_return("/2026/05/01/my-race-report/" => 5)
+
+    get "/widgets/plausible/pageviews/abc123", headers: auth_headers
+    expect(response.body).to include("Viewed 5 times")
+  end
+
+  it "renders 'Never viewed' for an article absent from the results" do
+    allow_any_instance_of(Plausible).to receive(:pageviews_by_path).and_return("/2026/05/01/another-post/" => 900)
 
     get "/widgets/plausible/pageviews/abc123", headers: auth_headers
     expect(response.body).to include("Never viewed")
   end
 
-  it "sets a one-hour caching header" do
+  it "renders 'Never viewed' for zero pageviews" do
+    allow_any_instance_of(Plausible).to receive(:pageviews_by_path).and_return("/2026/05/01/my-race-report/" => 0)
+
+    get "/widgets/plausible/pageviews/abc123", headers: auth_headers
+    expect(response.body).to include("Never viewed")
+  end
+
+  it "sets a five-minute caching header" do
     get "/widgets/plausible/pageviews/abc123", headers: auth_headers
 
     cache_control = response.headers["Cache-Control"]
     expect(cache_control).to include("public")
     expect(cache_control).to include("max-age=0")
-    expect(cache_control).to include("stale-while-revalidate=3600")
+    expect(cache_control).to include("stale-while-revalidate=300")
 
     edge = response.headers["CDN-Cache-Control"]
     expect(edge).to include("public")
-    expect(edge).to include("max-age=3600")
-    expect(edge).to include("stale-while-revalidate=86400")
+    expect(edge).to include("max-age=300")
+    expect(edge).to include("stale-while-revalidate=3600")
     expect(edge).to include("stale-if-error=86400")
   end
 
   context "when the id is not a valid Contentful entry id" do
     it "returns an empty body without doing any lookup work" do
       expect_any_instance_of(Articles).not_to receive(:find)
-      expect_any_instance_of(Plausible).not_to receive(:query)
+      expect_any_instance_of(Plausible).not_to receive(:pageviews_by_path)
 
       get "/widgets/plausible/pageviews/#{"a" * 65}", headers: auth_headers
       expect(response).to have_http_status(:ok)
@@ -98,7 +114,7 @@ RSpec.describe "Widgets::Plausible pageviews", type: :request do
   end
 
   context "when Plausible is unavailable" do
-    before { allow_any_instance_of(Plausible).to receive(:query).and_return(nil) }
+    before { allow_any_instance_of(Plausible).to receive(:pageviews_by_path).and_return(nil) }
 
     it "returns an empty body so the live-update controller collapses the placeholder" do
       get "/widgets/plausible/pageviews/abc123", headers: auth_headers
@@ -113,7 +129,7 @@ RSpec.describe "Widgets::Plausible pageviews", type: :request do
     end
 
     it "returns an empty body without querying Plausible" do
-      expect_any_instance_of(Plausible).not_to receive(:query)
+      expect_any_instance_of(Plausible).not_to receive(:pageviews_by_path)
 
       get "/widgets/plausible/pageviews/abc123", headers: auth_headers
       expect(response.body).to eq("")
@@ -127,7 +143,7 @@ RSpec.describe "Widgets::Plausible pageviews", type: :request do
     end
 
     it "returns an empty body without querying Plausible" do
-      expect_any_instance_of(Plausible).not_to receive(:query)
+      expect_any_instance_of(Plausible).not_to receive(:pageviews_by_path)
 
       get "/widgets/plausible/pageviews/abc123", headers: auth_headers
       expect(response.body).to eq("")

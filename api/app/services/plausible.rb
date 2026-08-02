@@ -2,6 +2,9 @@
 # Raw responses are cached in Redis for 5 minutes.
 class Plausible < ApplicationService
   PLAUSIBLE_API_URL = "https://plausible.io/api/v2/query"
+  # Only article pages (paths like /2026/05/24/slug/, the format ArticleAttributes.path owns),
+  # matching web's process_analytics filter.
+  ARTICLE_PATH_FILTER = [["matches", "event:page", ["^/20\\d{2}/"]]].freeze
 
   # The Plausible site id (the domain the dashboard lives under), or nil when unconfigured.
   attr_reader :site_id
@@ -23,6 +26,34 @@ class Plausible < ApplicationService
     return if @site_id.blank?
     encoded_path = ERB::Util.url_encode(path)
     "https://plausible.io/#{@site_id}?f=is,page,#{encoded_path}&period=custom&from=#{from}&to=#{to}&r=v2"
+  end
+
+  # Pageviews for every article page over `date_range`, as { path => pageviews }.
+  #
+  # ⚠️ This is deliberately ONE site-wide query rather than one query per article, and both
+  # callers (the per-article pageviews widget and TrendingArticles) share it for that reason.
+  # Plausible allows 600 calls/hour; `query` caches each distinct body for 5 minutes, so the
+  # ceiling is 12 calls/hour per *cache key*. Asking per article would mint a key per article
+  # (~60 and growing with the corpus) and put the ceiling over the limit — see the note in
+  # Widgets::PlausibleController. Keep it one query.
+  #
+  # @param date_range [String, Array] A Plausible date range ("all", or a [from, to] pair).
+  # @return [Hash, nil] { path => pageviews }, or nil when the query is unavailable — which
+  #   distinguishes "analytics are down" from "nothing has been viewed".
+  def pageviews_by_path(date_range: "all")
+    result = query(
+      metrics: ["pageviews"],
+      date_range: date_range,
+      dimensions: ["event:page"],
+      filters: ARTICLE_PATH_FILTER
+    )
+    return if result.nil?
+
+    (result[:results] || []).each_with_object(Hash.new(0)) do |row, totals|
+      path = normalize_path(row[:dimensions]&.first)
+      next if path.blank?
+      totals[path] += row[:metrics]&.first.to_i
+    end
   end
 
   # @return [Hash, nil] The parsed API response, or nil if unavailable.
@@ -55,6 +86,13 @@ class Plausible < ApplicationService
   end
 
   private
+
+  # Plausible reports clean URLs already, but normalize any trailing index.html so both forms
+  # fold into the one path (summing them, rather than one of them going unmatched).
+  def normalize_path(path)
+    return if path.blank?
+    path.to_s.sub(/index\.html\z/, "")
+  end
 
   def generate_cache_key(body)
     "plausible:query:" + body.map do |key, value|

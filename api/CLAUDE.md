@@ -28,7 +28,7 @@ headers below. Edge TTL = how long the edge serves a cached copy before revalida
 | GET | `/widgets/articles/trending/:id` | `widgets/articles#trending_excluding` | HTML (trending minus one Contentful id — an article page passes its own id so it isn't listed) | 1 hr |
 | GET | `/widgets/articles/related/:id` | `widgets/articles#related` | HTML ("You May Also Like" — articles semantically related to `:id`, ranked from precomputed Voyage embeddings) | 1 hr |
 | GET | `/widgets/whoop` | `widgets/whoop#show` | HTML (sleep/recovery/strain) | 5 min |
-| GET | `/widgets/plausible/pageviews/:id` | `widgets/plausible#pageviews` | HTML (pageview count by Contentful id) | 1 hr |
+| GET | `/widgets/plausible/pageviews/:id` | `widgets/plausible#pageviews` | HTML (pageview count by Contentful id) | 5 min |
 | POST | `/api/location` | `api/location#create` | sets Redis `location:current` + enqueues a `LocationSyncJob` (bearer-token gated) | — |
 | POST | `/api/contact` | `api/contact#create` | drops honeypot hits + enqueues a `ContactMailJob` (Akismet spam-check → Cloudflare email to the owner, Reply-To = sender); JSON → 204/422, HTML → 303 to `/contact/success` (bearer-token gated, browser-reachable via the web proxy) | — |
 | POST | `/webhooks/contentful` | `webhooks/contentful#create` | enqueues a standard.site PDS sync job on publish/unpublish/delete, plus an R2 image-mirror job on asset publish (HMAC-gated); 204 | — |
@@ -84,7 +84,15 @@ headers below. Edge TTL = how long the edge serves a cached copy before revalida
 - **Services** (`app/services/`, base `ApplicationService`): one per external API —
   Intervals.icu, Apple WeatherKit (ES256 JWT), Google Maps / Air Quality / Pollen,
   PurpleAir, Whoop (OAuth2), TrainerRoad (iCal), Contentful (events/articles),
-  Plausible, Font Awesome, Goodspeed (bay conditions), `Akismet` (contact-form spam check —
+  Plausible (⚠️ **600 calls/hour**, and `cached_json` caps each distinct query body at one call
+  per its 5-minute TTL — i.e. 12/hour *per cache key*, so what matters is the number of distinct
+  queries, not the number of requests. `Plausible#pageviews_by_path` is therefore **one site-wide
+  query** over all article pages, shared by `TrendingArticles` and the per-article pageviews
+  widget; asking per article would mint a key per article and scale the ceiling with the corpus,
+  over the limit. Don't reintroduce a per-article query, and redo the math before shortening
+  either TTL. A rate-limited query returns nil, which isn't cached — `render_empty`'s 60s edge
+  cache is what keeps that from retrying hard), Font Awesome, Goodspeed (bay conditions),
+  `Akismet` (contact-form spam check —
   plain-text `true`/`false`; fails **closed** when configured — raises so the intake job retries —
   and open only when unconfigured), `Resend` (the contact form's email delivery — an HTTPS
   API, so it works from fly, which blocks outbound SMTP), `Turnstile` (contact-form bot-challenge
@@ -236,9 +244,9 @@ reporting it. Full write-up in the root [`CLAUDE.md`](../CLAUDE.md).
     which is what keeps widgets rendering through a fly outage.
   ⚠️ Only emit this on successful, cacheable responses — an error must never be pinned at the
   edge. Edge `stale-while-revalidate` defaults to one hour
-  (`DEFAULT_EDGE_STALE_WHILE_REVALIDATE`); the pageviews, trending, and related-articles
-  widgets pass `edge_stale_while_revalidate: 1.day` since their data changes slowly relative
-  to the hourly edge max-age.
+  (`DEFAULT_EDGE_STALE_WHILE_REVALIDATE`); the trending and related-articles widgets pass
+  `edge_stale_while_revalidate: 1.day` since their data changes slowly relative to the hourly
+  edge max-age.
   ⚠️ **Purging is the one piece of the widget cache policy this app does *not* author.** The
   widgets that render Contentful content are tagged `Cache-Tag: site` by a **zone Cache Response
   Rule** matching `/widgets/articles/*` and `/widgets/events/*` on this app's host, so the web

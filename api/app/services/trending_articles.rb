@@ -31,8 +31,6 @@ class TrendingArticles < ApplicationService
   MIN_RECENT_PAGEVIEWS = 5
   # Poisson-style smoother in the surge denominator so a near-zero baseline can't explode the ratio.
   SMOOTHING = 1.0
-  # Only article pages (paths like /2026/05/24/slug/), matching web's process_analytics filter.
-  ARTICLE_PATH_FILTER = [["matches", "event:page", ["^/20\\d{2}/"]]].freeze
   # Cache and serve only the top slice of the ranking. A caller excludes at most the handful of cards
   # it shows, so this is always enough to fill `count` after exclusions, while bounding the JSON we
   # cache and the work each (potentially abusive) request does deserializing/filtering it.
@@ -105,20 +103,11 @@ class TrendingArticles < ApplicationService
   end
 
   # One Plausible call → { path => total_pageviews } over the given date range (a flat per-page count).
-  # Used for both the recent window and the baseline period.
+  # Used for both the recent window and the baseline period. An unavailable query degrades to an
+  # empty hash — every article scores zero, warn_if_no_analytics logs it, and the ranking falls
+  # back to recency order.
   def pageviews_by_path(date_range:)
-    rows = @plausible.query(
-      metrics: ["pageviews"],
-      date_range: date_range,
-      dimensions: ["event:page"],
-      filters: ARTICLE_PATH_FILTER
-    )&.dig(:results) || []
-
-    rows.each_with_object(Hash.new(0)) do |row, totals|
-      path = normalize_path(row[:dimensions]&.first)
-      next if path.blank?
-      totals[path] += row[:metrics]&.first.to_i
-    end
+    @plausible.pageviews_by_path(date_range: date_range) || {}
   end
 
   # Scores one article. Returns [score, heat] (heat is the tiebreaker). Below the recent-traffic floor
@@ -156,12 +145,6 @@ class TrendingArticles < ApplicationService
   # surge) while the surge term leads — the widget is "having a moment", not "most-read of all time".
   def absolute_weight
     @absolute_weight ||= ENV.fetch("TRENDING_SCORE_ABSOLUTE_WEIGHT", 0.5).to_f
-  end
-
-  # Plausible reports clean URLs already, but normalize any trailing index.html to match paths.
-  def normalize_path(path)
-    return if path.blank?
-    path.to_s.sub(/index\.html\z/, "")
   end
 
   # Cheap signal for "analytics unavailable or a path-format regression": candidates present but zero

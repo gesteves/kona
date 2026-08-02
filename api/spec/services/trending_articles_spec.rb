@@ -31,8 +31,8 @@ RSpec.describe TrendingArticles do
 
   # a5: 15 recent views (over the floor) on a tiny baseline → big surge.
   # a6: 72 recent views on a large baseline → high volume, but surge ≈ 1.
-  let(:recent) { rows(art_spiking.path => 15, art_steady.path => 72) }
-  let(:baseline) { rows(art_spiking.path => 30, art_steady.path => 2000) }
+  let(:recent) { { art_spiking.path => 15, art_steady.path => 72 } }
+  let(:baseline) { { art_spiking.path => 30, art_steady.path => 2000 } }
 
   let(:articles_service) { instance_double(Articles, list: corpus) }
   let(:plausible_service) { instance_double(Plausible) }
@@ -48,18 +48,13 @@ RSpec.describe TrendingArticles do
     allow($redis).to receive(:setex)
   end
 
-  # { path => total_pageviews } → event:page rows.
-  def rows(by_path)
-    by_path.map { |path, total| { dimensions: [path], metrics: [total] } }
-  end
-
-  # The recent window and the baseline are two event:page queries over different date ranges; branch on
-  # the range span (recent is short, baseline is ~a month) to answer each.
+  # The recent window and the baseline are two { path => pageviews } lookups over different date
+  # ranges; branch on the range span (recent is short, baseline is ~a month) to answer each.
   def stub_plausible(recent:, baseline:)
-    allow(plausible_service).to receive(:query) do |**kwargs|
+    allow(plausible_service).to receive(:pageviews_by_path) do |**kwargs|
       first, last = kwargs[:date_range]
       span_hours = (Time.parse(last) - Time.parse(first)) / 3600.0
-      { results: span_hours <= (described_class::RECENT_WINDOW_HOURS + 1) ? recent : baseline }
+      span_hours <= (described_class::RECENT_WINDOW_HOURS + 1) ? recent : baseline
     end
   end
 
@@ -77,8 +72,8 @@ RSpec.describe TrendingArticles do
       allow(articles_service).to receive(:list).and_return([low, high])
       # Identical recent volume, but `low` is way above its own normal while `high` is below its.
       stub_plausible(
-        recent: rows(low.path => 20, high.path => 20),
-        baseline: rows(low.path => 20, high.path => 4000)
+        recent: { low.path => 20, high.path => 20 },
+        baseline: { low.path => 20, high.path => 4000 }
       )
       expect(service.all(count: 2).map { |a| a.sys.id }).to eq(%w[l1 h1])
     end
@@ -93,13 +88,13 @@ RSpec.describe TrendingArticles do
       # the floor zeroes it, so it sinks to recency order (oldest last).
       noisy = article(id: "n1", slug: "noisy", published_at: "2023-11-01T10:00:00Z")
       allow(articles_service).to receive(:list).and_return(corpus + [noisy])
-      stub_plausible(recent: recent + rows(noisy.path => 3), baseline: baseline)
+      stub_plausible(recent: recent.merge(noisy.path => 3), baseline: baseline)
       ids = service.all(count: 10).map { |a| a.sys.id }
       expect(ids).to eq(%w[a5 a6 a1 a2 a3 a4 n1])
     end
 
     it "falls back to recency order when there's no recent traffic" do
-      stub_plausible(recent: [], baseline: [])
+      stub_plausible(recent: {}, baseline: {})
       ids = service.all(count: 10).map { |a| a.sys.id }
       expect(ids).to eq(%w[a1 a2 a3 a4 a5 a6])
     end
@@ -156,7 +151,7 @@ RSpec.describe TrendingArticles do
 
       # rank runs once for the hour: the two Plausible queries (recent + baseline) and Articles#list
       # each fire exactly once, no matter the exclusion set.
-      expect(plausible_service).to have_received(:query).twice
+      expect(plausible_service).to have_received(:pageviews_by_path).twice
       expect(articles_service).to have_received(:list).once
     end
 
@@ -170,7 +165,7 @@ RSpec.describe TrendingArticles do
       service.all(count: 4)
 
       # A fresh hour → a fresh cache key → a second compute (two more Plausible queries).
-      expect(plausible_service).to have_received(:query).exactly(4).times
+      expect(plausible_service).to have_received(:pageviews_by_path).exactly(4).times
     end
   end
 end

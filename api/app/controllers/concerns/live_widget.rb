@@ -14,7 +14,8 @@ module LiveWidget
   # people who do see a widget get served hours- or day-old data while the background
   # revalidation lags, rather than meaningfully smoothing load. One hour balances some
   # outage resilience against not serving badly stale data. Widgets whose data barely changes
-  # (pageviews, upcoming races) override this back up to a day, where freshness doesn't matter.
+  # (upcoming races, trending/related articles) override this back up to a day, where freshness
+  # doesn't matter.
   DEFAULT_EDGE_STALE_WHILE_REVALIDATE = 1.hour
   # How long the edge may keep serving a stale fragment when the origin returns an error.
   # Cloudflare honors `stale-if-error` and triggers it on a 5xx (a 404 is not an error for
