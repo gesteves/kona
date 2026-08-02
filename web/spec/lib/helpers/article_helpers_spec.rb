@@ -261,6 +261,12 @@ RSpec.describe ArticleHelpers do
       expect(result).to include('data-publish-date-target="timestamp"')
       expect(result).to include('Monday, January 1, 2024')
     end
+
+    it 'links to the directory-index URL, not the source path with index.html' do
+      a = article(slug: 'post', published_at: '2024-01-01T10:00:00Z')
+      a.path = '/2024/01/01/post/index.html'
+      expect(article_permalink_timestamp(a)).to include('href="/2024/01/01/post/"')
+    end
   end
 
   describe '#compute_article_word_count' do

@@ -80,7 +80,9 @@ module ArticleHelpers
   def article_permalink_timestamp(article)
     published = published_datetime(article)
     options = {
-      href: article.path,
+      # `article.path` is the source path (`…/slug/index.html`); `url_for` turns it into the
+      # nice URL `activate :directory_indexes` actually serves, the same as `link_to` elsewhere.
+      href: url_for(article.path),
       title: "Published at #{published.strftime('%-I:%M %p')}",
       "data-publish-date-target": "timestamp"
     }
