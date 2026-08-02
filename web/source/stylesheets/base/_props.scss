@@ -101,6 +101,7 @@
   --font-medium:  16px;
   --font-small:   12px;
   --font-x-small: 10px;
+  --font-table: 12px;
 
   // Line height
   --line-height-x-large:    1;
@@ -109,6 +110,7 @@
   --line-height-medium:     1.5;
   --line-height-small:      2;
   --line-height-x-small:    2.4;
+  --line-height-table:      2;
 
   // Fonts
   --ibm-plex-mono:           'IBM Plex Mono', ui-monospace, 'Cascadia Code', 'Source Code Pro', menlo, consolas, 'DejaVu Sans Mono', monospace;
@@ -134,6 +136,8 @@
     --font-medium:         24px;
     --font-small:          18px;
     --font-x-small:        12px;
+    --font-table:          16px;
+    --line-height-table:   2.25;
     --line-height-x-small: 3;
     --padding:             4rem;
     --picture-outdent:     calc((100vw - (var(--content-padding) * 2) - (11 * var(--column-gap))) / 12 + var(--column-gap));
