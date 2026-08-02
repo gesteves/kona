@@ -260,6 +260,13 @@ reporting it. Full write-up in the root [`CLAUDE.md`](../CLAUDE.md).
   fix it; it needs a dashboard edit, and nothing fails loudly). The live-data widgets (`weather/*`,
   `activity-stats`, `whoop`, `plausible/*`) are deliberately outside those prefixes. Full expression
   and reasoning: root [`CLAUDE.md`](../CLAUDE.md).
+  ⚠️ **Because those four are untagged, editing a `cache_widget(ttl:)` above does not reach copies
+  already at the edge — purge by hand or the change won't land.** A cached fragment keeps the
+  `CDN-Cache-Control` it was *stored* with, so PoPs go on serving the old body under the old policy
+  until it expires on its own terms. Shortening the pageviews TTL from 1 h to 5 min left copies
+  live under the previous `stale-while-revalidate=86400` — a view count up to **25 hours** stale,
+  which reads as the counter running backwards. The same applies to a markup change (the cross-app
+  HTML contract): the old fragment keeps being served for the *old* TTL, not the new one.
 - **Error reporting** — `config/initializers/bugsnag.rb` wires the `bugsnag` gem; its railtie
   auto-inserts the Rack middleware and hooks ActionDispatch, so unhandled exceptions are
   reported even though errors render as plain text. `notify_release_stages` is limited to

@@ -430,7 +430,16 @@ The proxy is deliberately strict:
   on `/api/contact`), so the origin is closed to the public; injecting it server-side keeps it
   out of the browser. ⚠️ `API_TOKEN` must be set in the Worker's dashboard secrets and
   **match the API's `API_TOKEN`** or every widget 401s and collapses site-wide.
-- Passes the origin's `Cache-Control` through verbatim (what the browser sees).
+- Passes the origin's `Cache-Control` through verbatim (what the browser sees), along with the
+  `ETag`/`Last-Modified` validators and the **`Age`** of the edge-cached copy.
+  ⚠️ **`Age` is load-bearing, not bookkeeping — don't drop it while trimming headers.** The
+  browser-facing policy is `max-age=0, stale-while-revalidate=N`, so the fragment is stale on
+  arrival and `N` is the window in which the browser may paint the stale copy while revalidating.
+  RFC 9111 has the browser measure that window from the response's **age**; without the header it
+  measures from receipt, so every viewer gets a fresh full-length window stacked on top of however
+  long the edge already held the copy, and the two staleness budgets compound instead of sharing one
+  clock. On a counter that only goes up, that reads as the number going *down*. `cf-cache-status` is
+  forwarded alongside it purely so this is observable from a `curl`.
 - Does **not** forward `CDN-Cache-Control` downstream — it's consumed by the upstream fetch
   cache above, and the browser has no use for the edge policy.
 - Keys the edge cache on **path only** — no query params, no per-user vary. Widget inputs are

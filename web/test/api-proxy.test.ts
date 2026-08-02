@@ -106,6 +106,71 @@ describe('handleApi — widgets (GET)', () => {
     expect(upstream.request!.headers.get('if-none-match')).toBeNull();
   });
 
+  // Without Age the browser measures the origin's stale-while-revalidate window from receipt
+  // rather than from the response's real age, so the edge's staleness and the browser's compound
+  // instead of sharing one clock — which is what makes a live counter appear to go backwards.
+  it('forwards Age and cf-cache-status so edge staleness is visible to the browser', async () => {
+    interceptFetch(
+      'GET',
+      `${ORIGIN}/widgets/plausible/pageviews/abc123`,
+      () =>
+        new Response('<span>Viewed 48 times</span>', {
+          headers: {
+            'content-type': 'text/html',
+            'cache-control': 'public, max-age=0, stale-while-revalidate=300',
+            age: '2400',
+            'cf-cache-status': 'HIT',
+          },
+        })
+    );
+
+    const res = await handleApi(
+      new Request('https://www.example.com/widgets/plausible/pageviews/abc123'),
+      env
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('age')).toBe('2400');
+    expect(res.headers.get('cf-cache-status')).toBe('HIT');
+  });
+
+  it('forwards Age on a 304 so the revalidation updates the stored age', async () => {
+    interceptFetch(
+      'GET',
+      `${ORIGIN}/widgets/whoop`,
+      () =>
+        new Response('<div>whoop</div>', {
+          headers: { etag: 'W/"abc123"', age: '120' },
+        })
+    );
+
+    const res = await handleApi(
+      new Request('https://www.example.com/widgets/whoop', {
+        headers: { 'if-none-match': 'W/"abc123"' },
+      }),
+      env
+    );
+
+    expect(res.status).toBe(304);
+    expect(res.headers.get('age')).toBe('120');
+  });
+
+  it('omits Age entirely when the origin response was not cached', async () => {
+    interceptFetch(
+      'GET',
+      `${ORIGIN}/widgets/whoop`,
+      () => new Response('<div>whoop</div>', { headers: { etag: 'W/"x"' } })
+    );
+
+    const res = await handleApi(
+      new Request('https://www.example.com/widgets/whoop'),
+      env
+    );
+
+    expect(res.headers.get('age')).toBeNull();
+    expect(res.headers.get('cf-cache-status')).toBeNull();
+  });
+
   it('returns the full 200 with the new ETag when the validator does not match', async () => {
     interceptFetch(
       'GET',

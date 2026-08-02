@@ -213,6 +213,23 @@ export async function handleApi(
   const cacheControl = upstream.headers.get('cache-control');
   if (cacheControl) headers.set('cache-control', cacheControl);
 
+  // ⚠️ Age is load-bearing, not bookkeeping. The response the browser gets has usually been
+  // sitting in the edge cache for a while, and the origin's Cache-Control is `max-age=0,
+  // stale-while-revalidate=N` — so the fragment is stale on arrival and N is the window in which
+  // the browser may paint the stale copy before its background revalidation lands. RFC 9111 has
+  // the browser measure that window from the response's *age*; drop the header and it measures
+  // from receipt instead, handing every viewer a fresh full-length window on top of however long
+  // the edge already held the copy. The two staleness budgets then compound instead of sharing
+  // one clock, which is how a view count visibly goes backwards. Forwarded before the 304 below
+  // so a revalidation updates the stored age too (RFC 9111 §4.3.4).
+  const age = upstream.headers.get('age');
+  if (age) headers.set('age', age);
+  // Not used by anything — forwarded purely so this is diagnosable from a browser or a curl.
+  // Every other response in the zone carries it; these are rebuilt from scratch, so without this
+  // line the widget fetch is the one request whose cache behavior you cannot see from outside.
+  const cacheStatus = upstream.headers.get('cf-cache-status');
+  if (cacheStatus) headers.set('cf-cache-status', cacheStatus);
+
   // Forward the origin's validators so the browser's stale-while-revalidate refresh can be
   // conditional (a 304 instead of re-transferring the fragment). The conditional is answered
   // HERE, never upstream: forwarding If-None-Match would make the upstream request vary per
