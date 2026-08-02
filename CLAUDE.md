@@ -618,19 +618,31 @@ Three consequences worth keeping straight:
 The API returns HTML fragments that **replace** placeholder elements in the static
 site, so their markup must stay structurally in sync across the two apps.
 
-Mechanism — `web/source/javascripts/stimulus/controllers/live_update_controller.js`:
-it reads `data-live-update-url-value`, fetches the fragment (on connect when
-`data-live-update-fetch-on-connect-value="true"`, and again on tab `visibilitychange`),
-and on a **non-empty** response replaces the entire placeholder element with the API
-fragment. Consequences:
+Mechanism — `web/source/javascripts/stimulus/controllers/live_update_controller.js`: it reads
+`data-live-update-url-value`, fetches the fragment, and on a **non-empty** response replaces the
+entire placeholder element with the API fragment. It fetches on connect when the element is a
+**placeholder** (`data-live-update-placeholder-value="true"` — a skeleton holding no real
+content), or when the content for that URL is more than a minute old; and again on tab
+`visibilitychange` under the same one-minute floor. That "how old is it" clock is module-scoped
+and **keyed by URL**, so it outlives both the placeholder→fragment swap and a Turbo back/forward
+**restoration visit** — which re-renders a cached snapshot containing the *fragment* and, unlike
+a normal visit, never revalidates it against the network (`Visit#shouldIssueRequest`). Without
+the clock a restored widget would display whatever it showed when the user last left the page,
+indefinitely: a view counter visibly going backwards. Consequences:
 
 - The API fragment's **outermost element must itself carry** the
   `data-controller="live-update"` + `data-live-update-url-value` attributes, or it stops
-  refreshing after the first swap.
+  refreshing after the first swap. ⚠️ It must **NOT** carry
+  `data-live-update-placeholder-value`: that flag means "I am an empty skeleton", and on a
+  fragment it would make a transient fetch failure **delete already-rendered content**. The two
+  behaviors the flag governs — fetch-on-connect and collapse-on-failure — both follow from that
+  one fact, which is why it's a single flag and why it belongs only on the web side.
 - Its tag, CSS class names, and DOM shape must match the placeholder.
-- An **empty** response (or any non-2xx / network error) makes the controller **remove the
-  placeholder**, collapsing the widget rather than leaving a stuck loading skeleton. So an
-  empty body is the intentional "no data" signal — don't "fix" it by returning markup.
+- An **empty** response makes the controller **remove the element**, collapsing the widget rather
+  than leaving a stuck loading skeleton. So an empty body is the intentional "no data" signal —
+  don't "fix" it by returning markup. This is unconditional (an empty body is an authoritative
+  answer, not a failure); a non-2xx or network error, by contrast, collapses **only** a
+  placeholder and leaves a rendered fragment untouched.
 
 On the web side, placeholders build the shared attribute cluster with the
 `live_update_attrs` helper (`web/lib/helpers/site_helpers.rb`); the API views build the

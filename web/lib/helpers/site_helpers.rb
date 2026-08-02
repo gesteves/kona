@@ -91,16 +91,21 @@ module SiteHelpers
     current_page.data.summary.presence
   end
 
-  # The attribute cluster every live-update placeholder's outer element carries: wires the
-  # element to the live-update Stimulus controller, pointing at the widget endpoint it fetches
-  # on connect and refetches on visibilitychange (see root CLAUDE.md for the web↔api contract).
+  # The attribute cluster every live-update PLACEHOLDER's outer element carries: wires the
+  # element to the live-update Stimulus controller, points it at the widget endpoint, and marks
+  # it a placeholder — it holds a skeleton rather than real content, so it always fetches when it
+  # connects and removes itself if that fetch fails.
+  # ⚠️ The api fragment that replaces it repeats every attribute here EXCEPT
+  # `data-live-update-placeholder-value`: it *does* hold real content, so it refetches only once
+  # that content is stale, and a transient failure must leave it alone rather than delete it.
+  # See root CLAUDE.md for the web↔api contract.
   # Interpolate inside the placeholder's outer tag.
   # @param url [String] The same-origin widget endpoint.
   # @return [String] HTML attributes.
   def live_update_attrs(url)
     # url is always an app-generated same-origin path (widget endpoint, ids are alphanumeric),
     # never user input, so it needs no escaping here.
-    %(data-controller="live-update" data-live-update-url-value="#{url}" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange").html_safe
+    %(data-controller="live-update" data-live-update-url-value="#{url}" data-live-update-placeholder-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange").html_safe
   end
 
   # Retrieves a summary of the content, falling back to the site's meta description if not present.

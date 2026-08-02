@@ -394,8 +394,16 @@ RSpec.describe SiteHelpers do
   describe '#live_update_attrs' do
     it 'pins the exact attribute cluster the web↔api live-update contract requires' do
       attrs = live_update_attrs('/widgets/weather/current')
-      expect(attrs).to eq('data-controller="live-update" data-live-update-url-value="/widgets/weather/current" data-live-update-fetch-on-connect-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange"')
+      expect(attrs).to eq('data-controller="live-update" data-live-update-url-value="/widgets/weather/current" data-live-update-placeholder-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange"')
       expect(attrs).to be_html_safe
+    end
+
+    # The placeholder flag is what tells the controller this element holds a skeleton rather than
+    # real content — so it fetches on connect, and collapses instead of sitting stuck if that
+    # fetch fails. The api fragment that replaces it must NOT carry it (a transient failure would
+    # then delete rendered content), which is why only the placeholder side emits it.
+    it 'marks the element a placeholder, since only the placeholder side of the contract does' do
+      expect(live_update_attrs('/widgets/whoop')).to include('data-live-update-placeholder-value="true"')
     end
   end
 
