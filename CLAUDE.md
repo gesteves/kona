@@ -340,7 +340,7 @@ and not starts_with(http.request.uri.path, "/api/")
 and not starts_with(http.request.uri.path, "/pa/")
 ```
 
-Eligible for cache; **Edge TTL: ignore cache-control, 1 day**; **Browser TTL: respect origin** (so
+Eligible for cache; **Edge TTL: ignore cache-control, 1 year**; **Browser TTL: respect origin** (so
 the browser keeps `max-age=0, must-revalidate` and picks up a deploy purge immediately).
 
 What it's for: HTML never runs Worker code — `run_worker_first` in `web/wrangler.jsonc` is a
@@ -350,8 +350,15 @@ handshake, or cold start to absorb, and the rule buys nothing on a page that's a
 (`HIT` means the edge answered *without* contacting the origin; `REVALIDATED` is the one that
 costs a round trip). The gain is **archive residency**: most URLs here are old posts getting a
 handful of hits per PoP, so they fall out of a short edge TTL between visits and come back
-`MISS`/`EXPIRED`. A long edge TTL keeps that long tail resident. ⚠️ Don't over-extend the TTL
-chasing this — PoP caches evict under LRU regardless, so a month buys far less than 30× a day.
+`MISS`/`EXPIRED`. A long edge TTL keeps that long tail resident, which is why this is set to the
+maximum the plan allows rather than to anything tuned.
+
+⚠️ **The 1-year TTL is a ceiling, not a promise, and the number is far less dramatic than it
+reads.** PoP caches evict under LRU no matter what the TTL says, so an archive post that nobody
+visits for a week is gone from that PoP regardless — a year does not buy 365× what a day would. It
+costs nothing either, which is the actual argument for it: the TTL only ever *stops* being the
+binding constraint, and LRU does the real work. What the long TTL does change is the blast radius
+of a failed purge — see below.
 
 Why each exclusion:
 
@@ -359,14 +366,16 @@ Why each exclusion:
   rule also matches `/javascripts/*` and `/stylesheets/*` — fingerprinted by `asset_hash` and set
   `immutable` in `source/headers` — plus `source/images` and `source/fonts`, which set no
   `Cache-Control` at all and ride Cloudflare's extension defaults. Browser TTL "respect origin"
-  means nothing would go *stale*, but the **edge** would evict and re-fetch content-addressed
-  assets daily for no benefit. It also keeps the feeds, `sitemap.xml`, `robots.txt`, `favicon.ico`,
+  means nothing would go *stale*, but the rule would override the `immutable` year those
+  fingerprinted assets already declare, replacing a policy that's correct by construction with one
+  that depends on the purge. It also keeps the feeds, `sitemap.xml`, `robots.txt`, `favicon.ico`,
   `manifest.json`, and the Pagefind chunks on their existing behavior.
 - **`/widgets/`, `/api/`, `/pa/`** — ⚠️ the three Worker routes live on the **site** host and are
-  extensionless, so they'd otherwise match. A 1-day edge TTL on `/widgets/*` at the Worker hostname
-  would pin every widget for a day, overriding the `CDN-Cache-Control` design wholesale; caching
-  `/pa/*` would corrupt analytics. **A new `run_worker_first` entry needs a matching exclusion
-  here**, and nothing in the repo will remind you.
+  extensionless, so they'd otherwise match. A 1-year edge TTL on `/widgets/*` at the Worker hostname
+  would pin every widget indefinitely, overriding the `CDN-Cache-Control` design wholesale — and
+  since the live-data widgets are deliberately untagged, no deploy purge would ever release them;
+  caching `/pa/*` would corrupt analytics. **A new `run_worker_first` entry needs a matching
+  exclusion here**, and nothing in the repo will remind you.
 - **`/cdn-cgi/`** — belt and braces; Cloudflare answers it at its own edge anyway. Contentful images
   are unaffected either way: they're served from `<IMAGES_URL>/cdn-cgi/image/…`, which never reaches
   an origin.
@@ -376,9 +385,15 @@ Why each exclusion:
 them wholesale.
 
 The `Cache-Tag: site` Cache **Response** Rule runs in a different phase
-(`http_response_cache_settings`), so tagging and the deploy purge are unaffected by any of this. That
-purge is what makes the 1-day edge TTL safe: without it, a failed purge would mean stale content for
-the full TTL rather than until the next revalidation.
+(`http_response_cache_settings`), so tagging and the deploy purge are unaffected by any of this.
+
+⚠️ **That purge is the only thing standing between a 1-year TTL and a page pinned for a year.** The
+rule ignores `Cache-Control` outright, so nothing else expires an HTML page on any sensible
+timescale: a purge that silently matches nothing — a mistyped host in the Cache Response Rule, a
+deploy that skips the purge step, a page slug that stops matching the tag expression — leaves the
+edge serving that copy essentially forever, not merely until the next revalidation. Treat a purge
+failure in `.github/workflows/web.yml` as a page-level outage, and re-verify the tag rule's Events
+counter after any edit to either rule.
 
 Other zone settings, none load-bearing but all deliberate: **Smart Tiered Cache** on (fewer origin
 hits means fewer cold starts on the scale-to-zero fly machine behind the widgets); **Page Shield**
