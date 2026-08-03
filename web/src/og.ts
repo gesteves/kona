@@ -74,13 +74,30 @@ function withSecurityHeaders(headers: Headers): Headers {
   return headers;
 }
 
-function text(status: number, body: string): Response {
-  return new Response(body, {
+// Reason phrases for the statuses this route can return.
+const STATUS_TEXT: Record<number, string> = {
+  400: 'Bad Request',
+  404: 'Not Found',
+  405: 'Method Not Allowed',
+  500: 'Internal Server Error',
+};
+
+// Every non-image response is just its own status line ("404 Not Found"). Nothing reads the body:
+// this route is fetched by crawlers and unfurlers, which act on the status, and a failed card
+// surfaces as a missing og:image either way. A bespoke message would only be a way to leak which
+// internal step failed to anyone probing the endpoint. Why a request failed belongs in the logs
+// (see the console.error on the render path), not in a public response body.
+function statusResponse(
+  status: number,
+  extraHeaders?: Record<string, string>
+): Response {
+  return new Response(`${status} ${STATUS_TEXT[status]}`, {
     status,
     headers: withSecurityHeaders(
       new Headers({
         'content-type': 'text/plain; charset=utf-8',
         'cache-control': SHORT,
+        ...extraHeaders,
       })
     ),
   });
@@ -93,12 +110,7 @@ export async function handleOg(
   render: RenderCard = lazyRender
 ): Promise<Response> {
   if (!ALLOWED_METHODS.includes(request.method)) {
-    return new Response('', {
-      status: 405,
-      headers: withSecurityHeaders(
-        new Headers({ allow: ALLOWED_METHODS.join(', ') })
-      ),
-    });
+    return statusResponse(405, { allow: ALLOWED_METHODS.join(', ') });
   }
 
   const incoming = new URL(request.url);
@@ -111,7 +123,7 @@ export async function handleOg(
   // what closes protocol-relative URLs ("//evil.com/x"), which new URL() would otherwise resolve
   // to a different host.
   if (!path || !path.startsWith('/') || path.startsWith('//')) {
-    return text(400, 'Missing or invalid path parameter');
+    return statusResponse(400);
   }
 
   // ⚠️ Rebuild the key from ONLY the two params this route reads, in a fixed order — don't reuse
@@ -147,13 +159,13 @@ export async function handleOg(
   // ⚠️ Compare against 200 rather than using page.ok: not_found_handling: "404-page" means a miss
   // returns the built 404 page's markup, and that page has an og:title of its own. Anything but a
   // clean 200 must not become a card.
-  if (page.status !== 200) return text(404, 'No page for path');
+  if (page.status !== 200) return statusResponse(404);
   if (!(page.headers.get('content-type') ?? '').includes('text/html')) {
-    return text(404, 'No page for path');
+    return statusResponse(404);
   }
 
   const title = extractOgTitle(await page.text());
-  if (!title) return text(404, 'No title for page');
+  if (!title) return statusResponse(404);
 
   let png: Uint8Array<ArrayBuffer>;
   try {
@@ -161,13 +173,14 @@ export async function handleOg(
   } catch (error) {
     // Nothing else surfaces a render failure: the card is only ever fetched by crawlers and
     // unfurlers, so a broken template would otherwise show up as social embeds quietly losing
-    // their image. Not cached — see SHORT.
+    // their image. This log line is the ONLY place the cause is recorded — the response itself is
+    // a bare status line (see statusResponse). Not cached — see SHORT.
     console.error(
       'OG render failed:',
       path,
       error instanceof Error ? error.message : String(error)
     );
-    return text(500, 'Could not render image');
+    return statusResponse(500);
   }
 
   const response = new Response(png, {

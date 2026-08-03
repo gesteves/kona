@@ -59,6 +59,23 @@ describe('handleOg', () => {
       expect(res.status).toBe(400);
     });
 
+    // Every non-image response body is just its own status line — no bespoke message describing
+    // which internal step failed, since this endpoint is public and nothing reads the body.
+    it.each([
+      [400, '400 Bad Request', '?v=v1', 'GET'],
+      [405, '405 Method Not Allowed', '', 'POST'],
+    ])('answers %i with "%s"', async (status, body, query, method) => {
+      const res = await handleOg(
+        request(query, { method }),
+        {} as Env,
+        makeCtx(),
+        renderStub()
+      );
+      expect(res.status).toBe(status);
+      expect(await res.text()).toBe(body);
+      expect(res.headers.get('cache-control')).toBe('public, max-age=300');
+    });
+
     // The old kona-og service took an absolute URL and needed a SITE_URL origin allowlist to stop
     // it rendering cards for other people's pages. Requiring a single leading slash is what
     // replaces that allowlist, so both of these shapes have to stay rejected.
@@ -151,6 +168,7 @@ describe('handleOg', () => {
         renderStub()
       );
       expect(res.status).toBe(404);
+      expect(await res.text()).toBe('404 Not Found');
     });
 
     it('renders the page’s own og:title, entity-decoded', async () => {
@@ -208,6 +226,7 @@ describe('handleOg', () => {
         render as unknown as () => Promise<Uint8Array<ArrayBuffer>>
       );
       expect(res.status).toBe(500);
+      expect(await res.text()).toBe('500 Internal Server Error');
       expect(res.headers.get('cache-control')).toBe('public, max-age=300');
       expect(caches.default.put).not.toHaveBeenCalled();
     });
