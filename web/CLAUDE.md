@@ -57,8 +57,11 @@ ImageMagick because Cloudflare Workers Builds preinstalls libvips but not ImageM
 bundle exec rspec spec/lib/helpers/markup_helpers_spec.rb
 bundle exec rake test
 
-# Worker tests (src/*.ts) — Vitest in the workers runtime (test/**), see below
-npm test
+# JS tests — Vitest, TWO projects: the Worker (workerd) and the browser bundle (jsdom).
+# See "JavaScript tests" below.
+npm test                              # both
+npx vitest run --project worker       # src/*.ts only
+npx vitest run --project browser      # source/javascripts/** only
 
 # Local dev
 bundle exec rake import          # fetch fresh data first
@@ -181,8 +184,9 @@ build fails loudly rather than shipping pages with missing icons.
   (`src/plausible.ts` does the `/pa/*` first-party proxying rather than `_redirects` rewrites).
   Typecheck the Worker with `npm run check` (`tsc --noEmit`; wrangler
   itself never typechecks), and **test it with `npm test`** — Vitest via
-  `@cloudflare/vitest-pool-workers` runs `test/**` inside `workerd` (fake `env`, mocked outbound
-  `fetch`), covering the proxy header/cache contract, the Plausible proxy, and routing. ⚠️ The test
+  `@cloudflare/vitest-pool-workers` runs `test/*.test.ts` inside `workerd` (fake `env`, mocked
+  outbound `fetch`), covering the proxy header/cache contract, the Plausible proxy, and routing.
+  (`npm test` also runs the browser-JS suite — see **JavaScript tests** below.) ⚠️ The test
   tooling is isolated from production types: `tsconfig.test.json`
   (test/** only, pulls in `@cloudflare/workers-types` and drops the inherited `dom` lib, since
   lib.dom's `CacheStorage` has no `caches.default`) is **separate** from
@@ -264,7 +268,8 @@ Names only — see `.env.example`; never commit values.
 
 ## Conventions & gates
 
-- **Before committing** (non-negotiable): `bundle exec rake test` + `npm test` (Worker suite) +
+- **Before committing** (non-negotiable): `bundle exec rake test` + `npm test` (Worker **and**
+  browser-JS suites) +
   `npm run check` (Worker tsc) pass → `npm run lint:scss` + `npm run format:check` clean →
   `bundle exec rake build:verbose` succeeds (it builds the JS bundle via the external pipeline).
   ⚠️ **`rake build` does NOT run tests** — building and testing are separate; run `rake test`
@@ -278,12 +283,60 @@ Names only — see `.env.example`; never commit values.
   (it doesn't need the test/lint toolchain), so anything the **build or deploy** needs must be a
   `dependency`, not a `devDependency`: `esbuild` + the JS-bundle imports (`@hotwired/*`,
   `@web.awesome.me/*`), `pagefind`, and `wrangler`. Test/lint tools (`vitest`,
-  `@cloudflare/vitest-pool-workers`, `typescript`, `stylelint*`, `prettier`) stay `devDependencies`
-  — the `checks` job installs those with a full `npm ci`.
-- **Tests** live in `spec/` and focus on helpers, text/markdown processing, and data
+  `@cloudflare/vitest-pool-workers`, `jsdom`, `typescript`, `stylelint*`, `prettier`) stay
+  `devDependencies` — the `checks` job installs those with a full `npm ci`.
+- **Ruby tests** live in `spec/` and focus on helpers, text/markdown processing, and data
   transformation.
 - **Widget markup**: editing a placeholder partial means editing the matching `api/`
   view too (root `CLAUDE.md`).
+
+### JavaScript tests
+
+`npm test` runs **two Vitest projects** (`test.projects` in `vitest.config.mts`), because the two
+bodies of JS need mutually incompatible runtimes:
+
+| Project | Covers | Runtime | Files |
+|---|---|---|---|
+| `worker` | `src/*.ts` — the Cloudflare Worker | `workerd`, via `@cloudflare/vitest-pool-workers` | `test/*.test.ts` |
+| `browser` | `source/javascripts/**` — Stimulus controllers + `lib/` | `jsdom` | `test/browser/**/*.test.js` |
+
+Run one with `npx vitest run --project browser`. Neither can host the other: workerd has no
+`document`, jsdom has no `caches.default` or `request.cf`.
+
+⚠️ **The two `include` globs are kept apart by FILE EXTENSION, not by directory.** A `.test.ts`
+file anywhere under `test/` — `test/browser/` included — is claimed by the **worker** project and
+run in workerd, where it dies on the first `document` reference for reasons that look nothing like
+the cause. Browser tests are `.js`, matching the sources they exercise.
+
+Conventions for `test/browser/`:
+
+- `helpers.js` — `mount(identifier, ControllerClass, html[, prepare])` writes the markup, starts a
+  Stimulus application around it and returns `{ application, element, controller }`. Because the
+  markup lands **before** `start()`, `connect()` has already run when it resolves; use the
+  `prepare` callback for state connect will read (an `<img>`'s `complete`). Elements added *after*
+  mounting arrive via MutationObserver — `await flushDom()` for those. ⚠️ `mount()` writes
+  `document.body`, so append test-only elements (a `<wa-toast>` stub, a `<pagefind-modal>`)
+  **after** it.
+- `stubProperty(navigator, 'share', …)` for the read-only getters `vi.stubGlobal` can't touch;
+  restored automatically.
+- `setup.js` polyfills what jsdom omits and this code calls (`matchMedia`,
+  `requestIdleCallback`, `Element#scrollTo`) and resets DOM, `window` and mock state per test.
+- **Module-scoped state needs `vi.resetModules()` + a dynamic import per test.** Four modules have
+  it: the live-update clock (`lastFetchAtByUrl`), pagefind's memoized `loading` / `idleScheduled`,
+  and analytics' `searchTrackingReady`. Without the reset, tests silently depend on their
+  predecessors.
+- The **custom element registry** belongs to the jsdom instance, not the module registry —
+  `vi.resetModules()` can't clear it, and re-`define()`ing a name throws. Guard with
+  `customElements.get(name)`, or order the tests so the not-yet-defined case runs first (see
+  `lib/patch_scroller_aria.test.js`).
+- `clearMocks: true` is set on the project: `vi.mock()` factories are hoisted and run once per
+  file, so their `vi.fn()`s are shared by every test in it, and `vi.restoreAllMocks()` does not
+  clear them.
+- `registration.test.js` reads `index.js` as **source** (importing it would pull in the whole Web
+  Awesome Pro theme) and asserts every controller is imported *and* registered under the kebab-case
+  of its filename — the failure mode being that a `data-controller` attribute is simply inert, with
+  nothing logged. It also fails when a controller or lib module has no test file, which is what
+  keeps this suite from quietly falling behind.
 
 ### Permissions
 

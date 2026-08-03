@@ -648,6 +648,13 @@ On the web side, placeholders build the shared attribute cluster with the
 `live_update_attrs` helper (`web/lib/helpers/site_helpers.rb`); the API views build the
 matching outer element with `live_update_url`.
 
+The **web half** of this is pinned by
+`web/test/browser/controllers/live_update.test.js` (jsdom, run by `npm test` — see
+[`web/CLAUDE.md`](web/CLAUDE.md)): the placeholder/fragment split, the loop guard, the
+staleness clock, and — the one that matters most — that a failed fetch collapses a placeholder
+but **never** a rendered fragment. Nothing tests the two sides *against each other*, though: the
+api view's markup and the web placeholder's are still only kept in sync by hand.
+
 | Widget | web placeholder | api view | endpoint |
 |---|---|---|---|
 | Activity stats | `web/source/partials/placeholders/_stats.html.erb` | `api/app/views/widgets/activity_stats/show.html.erb` | `/widgets/activity-stats` |
