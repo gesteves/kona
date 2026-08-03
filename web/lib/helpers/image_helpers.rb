@@ -162,33 +162,34 @@ module ImageHelpers
     cdn_image_url(original_url, params)
   end
 
-  # Bumped after a change to the card design or logo. It's folded into the `v` cache buster
-  # below, so bumping it re-mints every card URL and refreshes the year-cached images (the
-  # kona-og service and Cloudflare otherwise treat each card URL as immutable). The matching
-  # card template lives in the og/ service.
+  # Bumped after a change to the card design, its logo, or its font. It's folded into the `v`
+  # cache buster below, so bumping it re-mints every card URL and refreshes the year-cached
+  # images (the route and Cloudflare otherwise treat each card URL as immutable). The matching
+  # card template lives in web/src/og-render.ts.
   OG_TEMPLATE_VERSION = 'v1'
 
-  # Returns the URL of the on-demand Open Graph card for the given page. The kona-og service
-  # (the og/ app) fetches the page, reads its own og:title, and renders a 1200×630 PNG cached
-  # for a year. The card URL is content-addressed: `v` combines OG_TEMPLATE_VERSION with the
-  # entry's published_version, so a republish (which bumps published_version) mints a new URL
-  # and a title edit is picked up on the next crawl — no cache purge needed.
+  # Returns the URL of the on-demand Open Graph card for the given page. The card is rendered by
+  # the site's OWN Cloudflare Worker (web/src/og.ts, claimed via run_worker_first): it reads the
+  # page out of the deployed static assets through the ASSETS binding, takes its og:title, and
+  # renders a 1200×630 PNG cached for a year.
   #
-  # OG_IMAGE_URL is optional: when it's unset the kona-og service isn't wired up, so this returns
-  # nil and callers omit the card rather than failing the build. Cover-image OG images
-  # (open_graph_image_url) don't depend on it, so those pages keep their social image.
-  # @param url [String] The full URL of the page to render a card for.
+  # Same-origin by construction — root_url is the only host involved, so there is nothing to
+  # configure and no way to point this at another site. (It used to take an absolute URL and a
+  # separate OG_IMAGE_URL host, because the renderer was a standalone fly service.)
+  #
+  # The URL is content-addressed: `v` combines OG_TEMPLATE_VERSION with the entry's
+  # published_version, so a republish (which bumps published_version) mints a new URL and a title
+  # edit is picked up on the next crawl — no cache purge needed, ever.
+  # @param path [String] The root-relative path of the page (current_page.url).
   # @param version [Integer, String, nil] The entry's sys.published_version, used as a cache
   #   buster. Listing pages (the blog index, tag archives) aren't Contentful entries and have no
   #   published_version, so it may be nil — the card then busts on OG_TEMPLATE_VERSION alone,
   #   which is correct since their og:title is static.
-  # @return [String, nil] The kona-og URL for the page's card, or nil if OG_IMAGE_URL is unset.
-  def generate_open_graph_image_url(url, version = nil)
-    base = ENV['OG_IMAGE_URL'].to_s.chomp('/')
-    return if base.blank?
+  # @return [String] The URL of the page's card.
+  def generate_open_graph_image_url(path, version = nil)
     v = version.present? ? "#{OG_TEMPLATE_VERSION}-#{version}" : OG_TEMPLATE_VERSION
-    query = URI.encode_www_form(url: url, v: v)
-    "#{base}/og.png?#{query}"
+    query = URI.encode_www_form(path: path, v: v)
+    "#{root_url.to_s.chomp('/')}/og.png?#{query}"
   end
 
   # Generates a CDN URL for the site icon with the specified width.

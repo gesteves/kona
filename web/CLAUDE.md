@@ -145,14 +145,37 @@ build fails loudly rather than shipping pages with missing icons.
   - The above-the-fold woff2 faces are preloaded, since they're otherwise undiscoverable
     until `site.css` parses. `crossorigin` is mandatory even same-origin or they download
     twice; URLs must come from `asset_path(:fonts, …)` because fonts are asset-hashed.
-- Open Graph "cards" (the `og:image` for pages without a cover image) were rendered **on demand**
-  by a separate `kona-og` fly service. **That service is currently parked** (removed from `main`,
-  preserved on the `restore-og` branch — it didn't earn its own app for now), so cover-less pages
-  ship **no** `og:image`: `generate_open_graph_image_url` (`lib/helpers/image_helpers.rb`) returns
-  `nil` when `OG_IMAGE_URL` is unset. Cover-image pages are unaffected (they use
-  `open_graph_image_url` → Cloudflare Images). To revive: restore the service from `restore-og`,
-  deploy it, and set `OG_IMAGE_URL` — the helper then builds
-  `<OG_IMAGE_URL>/og.png?url=<page>&v=<template ver>-<published_version>` and no web code changes.
+- Open Graph "cards" (the `og:image` for pages without a cover image — about half the archive) are
+  rendered **on demand by this app's own Worker**: `src/og.ts` (route) + `src/og-render.ts` (the
+  card), claimed as `/og.png` in `run_worker_first`. `generate_open_graph_image_url`
+  (`lib/helpers/image_helpers.rb`) builds
+  `<root_url>/og.png?path=<page path>&v=<OG_TEMPLATE_VERSION>-<published_version>`. Cover-image
+  pages are unaffected (they use `open_graph_image_url` → Cloudflare Images).
+  This replaces `kona-og`, a standalone fly service (removed from `main`, parked on the
+  `restore-og` branch) — which is why there is **no env var**: the route is same-origin by
+  construction, so there is no host to configure and nothing to switch on.
+  - **The title comes from the page's own `og:title`, read through the `ASSETS` binding** — not
+    fetched over HTTP. That's what let the old service's `SITE_URL` origin allowlist, its 5s
+    timeout, and its 502 path all be deleted, and it means the renderer can only ever draw a title
+    that exists in the deployed build. There is no caller-supplied text anywhere in the path.
+  - **Article cards are content-addressed**: a republish bumps `published_version` → new URL; a
+    design change bumps `OG_TEMPLATE_VERSION` → all new URLs. ⚠️ Bump `OG_TEMPLATE_VERSION` after
+    editing `og-render.ts`, `src/assets/logo.png`, or the font, or the year-cached old cards keep
+    serving.
+  - ⚠️ **Listing-page cards are NOT self-busting, and that's the case to reason from.** The blog
+    index, tag archives, and home aren't Contentful entries, so `content.sys&.published_version` is
+    `nil`, `v` is `OG_TEMPLATE_VERSION` alone, and the URL is **fixed forever** — currently 43 of
+    the 73 card-emitting pages. Their `og:title` comes from `data.site.meta_title` or a tag name,
+    which change without any article being republished. What refreshes them is the zone's
+    `Cache-Tag: site` deploy purge, which is why `/og.png` is deliberately left tagged (root
+    `CLAUDE.md`). Don't "optimize" that by excluding the route — the re-render cost is trivial and
+    the staleness it prevents is silent.
+  - ⚠️ **Needs the Workers Paid plan.** A render is ~100 ms of CPU (satori ~30 ms, resvg ~75 ms);
+    the Free plan's limit is 10 ms per request, so on Free every card would fail with a 1102.
+  - ⚠️ **Renders are covered by `wrangler dev`, not by the test suite** — see **JavaScript tests**.
+  - `src/assets/` holds the card's font and logo, imported as Data modules (hence the `rules` entry
+    in `wrangler.jsonc`). The TTF used to sit unreferenced in `source/fonts/`, where `asset_hash`
+    fingerprinted it and shipped 109 KB publicly for nothing.
 - `source/headers` / `source/redirects.erb` — built and renamed to `_headers` /
   `_redirects` (underscore-prefixed source files are treated as partials and skipped).
   ⚠️ In `_headers`, no two rules may set the same header for overlapping paths — matching
@@ -201,13 +224,21 @@ build fails loudly rather than shipping pages with missing icons.
   which swaps `globalThis.fetch`) — the pool's `fetchMock` (an undici MockAgent on
   `cloudflare:test`) was removed in the same release, and the alternative was taking on MSW.
   ⚠️ **`run_worker_first` is a POSITIVE allowlist — only listed paths invoke the Worker.** It
-  lists exactly the dynamic routes (`/widgets/*`, `/api/contact`, `/pa/*`); everything else — every
+  lists exactly the dynamic routes (`/widgets/*`, `/api/contact`, `/pa/*`, `/og.png`); everything
+  else — every
   HTML page, fingerprinted asset, the sitemap, the feeds, `/.well-known/*`, and any 404 — is served
   straight from the static asset layer and never runs Worker code (page views cost no Worker
-  invocation). Each listed route needs the Worker because it has **no asset** (widgets/contact/pa
-  would 404 at the asset layer) and must reach an origin. When you add a dynamic route, add its path
+  invocation). Each listed route needs the Worker because it has **no asset** (widgets/contact/pa/og
+  would 404 at the asset layer) and must run Worker code. When you add a dynamic route, add its path
   here too, and mind that Cloudflare globs **cross `/`** (that's why `/widgets/*` matches nested
-  paths like `/widgets/weather/current`). This replaced the old "`/*` minus ~25 asset negations"
+  paths like `/widgets/weather/current`).
+  ⚠️ A new entry also needs a matching **exclusion in the zone's Cache Rule** — the single
+  *edge-TTL* rule, root `CLAUDE.md` — except `/og.png`, which that rule's `not path contains "."`
+  clause already excludes. That is precisely why the OG route carries an extension; don't rename it
+  to something extensionless without adding the exclusion by hand first. (Not to be confused with
+  the `Cache-Tag: site` Cache **Response** Rule, a different rule in a different phase, which
+  `/og.png` is deliberately left *matching* — see the OG bullet above.)
+  This replaced the old "`/*` minus ~25 asset negations"
   model — which kept tripping over extension negations (a blanket `!/*.js` once swallowed
   `/pa/script.js`, `!/*.xml` would have swallowed the feeds); the allowlist has no negations, so
   that class of bug is gone.
@@ -259,12 +290,13 @@ Names only — see `.env.example`; never commit values.
   `rake assets:backfill` to completion first. Full cross-app contract in the root
   [`CLAUDE.md`](../CLAUDE.md).
 - **Optional**: `TURNSTILE_SITE_KEY` (public Cloudflare Turnstile sitekey for the contact form —
-  set it in the build env; pair with the api's `TURNSTILE_SECRET`, both or neither);
-  `OG_IMAGE_URL` (base URL of the on-demand OG-card service — `generate_open_graph_image_url`
-  builds the `og:image` card URL from it. **The `kona-og` service is currently parked** on the
-  `restore-og` branch and not deployed, so this is normally unset: `generate_open_graph_image_url`
-  then returns `nil` and cover-less pages simply omit `og:image` — cover-image pages are
-  unaffected. Set it only if you revive `kona-og`).
+  set it in the build env; pair with the api's `TURNSTILE_SECRET`, both or neither).
+  (There is deliberately **no** var for the OG cards. `OG_IMAGE_URL` was retired when the renderer
+  moved into this app's own Worker: the card URL is same-origin, built from `root_url`, so there is
+  no host to configure. One consequence worth knowing — a **local** build emits
+  `http://localhost:4567/og.png?…`, which `middleman server` won't render because it doesn't run
+  the Worker. That only affects `og:image` and the JSON-LD image in locally-built HTML, which no
+  crawler ever sees; use `wrangler dev` to exercise a real card.)
 
 ## Conventions & gates
 
@@ -282,9 +314,14 @@ Names only — see `.env.example`; never commit values.
 - **`dependencies` vs `devDependencies`**: the CI deploy job installs with **`npm ci --omit=dev`**
   (it doesn't need the test/lint toolchain), so anything the **build or deploy** needs must be a
   `dependency`, not a `devDependency`: `esbuild` + the JS-bundle imports (`@hotwired/*`,
-  `@web.awesome.me/*`), `pagefind`, and `wrangler`. Test/lint tools (`vitest`,
+  `@web.awesome.me/*`), `pagefind`, `wrangler`, and the OG card renderer's `satori` +
+  `@resvg/resvg-wasm`. Test/lint tools (`vitest`,
   `@cloudflare/vitest-pool-workers`, `jsdom`, `typescript`, `stylelint*`, `prettier`) stay
   `devDependencies` — the `checks` job installs those with a full `npm ci`.
+  ⚠️ **`satori` and `@resvg/resvg-wasm` are the two dependencies CI cannot vet.** Nothing in the
+  test suite executes a render (see **JavaScript tests**), and a major bump can quietly change the
+  wasm-init contract (`init(WebAssembly.Module)` / `initWasm`) or the card's text metrics. Render a
+  card in `wrangler dev` and look at it before merging a Dependabot PR for either.
 - **Ruby tests** live in `spec/` and focus on helpers, text/markdown processing, and data
   transformation.
 - **Widget markup**: editing a placeholder partial means editing the matching `api/`
@@ -302,6 +339,17 @@ bodies of JS need mutually incompatible runtimes:
 
 Run one with `npx vitest run --project browser`. Neither can host the other: workerd has no
 `document`, jsdom has no `caches.default` or `request.cf`.
+
+⚠️ **The OG card render is deliberately NOT covered, and `src/og-render.ts` must never be imported
+from `test/`.** The pool's module-fallback loader force-types only `.wasm`
+(`mf_vitest_force=CompiledWasm`); every other extension is read as UTF-8 and parsed as JS, so the
+`.ttf` and `.png` Data modules that file imports die there with a syntax error that looks nothing
+like its cause. That is why `handleOg` takes its renderer as an injected `RenderCard` parameter and
+reaches the real one through a dynamic `import()` — `test/og.test.ts` covers the entire route
+contract (validation, the ASSETS lookup, headers, cache key, failure paths) with the render stubbed,
+and `test/index.test.ts`'s routing case is a `POST` precisely because a 405 is answered before the
+import. The render itself is verified with `npx wrangler dev` (see the OG bullet under **Key
+locations**). Don't "close the gap" by importing the module — that path has already been walked.
 
 ⚠️ **The two `include` globs are kept apart by FILE EXTENSION, not by directory.** A `.test.ts`
 file anywhere under `test/` — `test/browser/` included — is claimed by the **worker** project and

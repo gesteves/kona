@@ -19,6 +19,24 @@ export const makeCtx = (): ExecutionContext =>
 export const assetsReturning = (response: () => Response): Env['ASSETS'] =>
   ({ fetch: async () => response() }) as unknown as Env['ASSETS'];
 
+// Like assetsReturning(), but keeps the requests it was handed. The og route derives its asset
+// lookup from the incoming request's origin plus the `path` param, and that mapping is the part
+// worth asserting — assetsReturning() discards it.
+export const assetsRecording = (
+  response: () => Response
+): { requests: Request[]; binding: Env['ASSETS'] } => {
+  const requests: Request[] = [];
+  return {
+    requests,
+    binding: {
+      fetch: async (request: Request) => {
+        requests.push(request);
+        return response();
+      },
+    } as unknown as Env['ASSETS'],
+  };
+};
+
 // ── Outbound fetch mocking ────────────────────────────────────────────────────────────────────
 // Stands in for the pool's old `fetchMock` (an undici MockAgent reached through `cloudflare:test`),
 // which @cloudflare/vitest-pool-workers dropped in 0.18. The supported replacements are MSW or

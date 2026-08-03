@@ -14,9 +14,11 @@
   "dependencies": {
     "@hotwired/stimulus": "^3.2.2",
     "@hotwired/turbo": "^8.0.23",
+    "@resvg/resvg-wasm": "^2.6.2",
     "@web.awesome.me/webawesome-pro": "^3.7.0",
     "esbuild": "^0.28.1",
     "pagefind": "^1.5.2",
+    "satori": "^0.29.0",
     "wrangler": "^4.115.0"
   },
   "devDependencies": {

@@ -74,6 +74,15 @@ describe('worker routing (src/index)', () => {
     expect(await res.text()).toBe('SCRIPT');
   });
 
+  // ⚠️ Kept to a 405, which is answered before the handler reaches its dynamic import of
+  // ../src/og-render — a module the vitest pool cannot load (see test/og.test.ts). The og route's
+  // real behavior is covered there, with the render injected.
+  it('routes /og.png to the OG card renderer', async () => {
+    const res = await get('/og.png', { method: 'POST' });
+    expect(res.status).toBe(405);
+    expect(res.headers.get('allow')).toBe('GET, HEAD');
+  });
+
   it('serves everything else — including the feeds — straight from the asset layer', async () => {
     // The feeds used to be Worker-routed for per-reader utm rewriting; they are now plain assets.
     for (const path of [

@@ -225,39 +225,32 @@ RSpec.describe ImageHelpers do
   end
 
   describe '#generate_open_graph_image_url' do
-    def stub_og(url)
-      allow(ENV).to receive(:[]).with('OG_IMAGE_URL').and_return(url)
-    end
+    # root_url lives in UrlHelpers; only ImageHelpers is auto-included here. The card route is
+    # served by the site's own Worker, so this is the only host involved.
+    def root_url = @root_url || 'https://example.com'
 
-    it 'points at the kona-og service with the page url and a version cache buster' do
-      stub_og('https://og.example.com')
-      result = generate_open_graph_image_url('https://example.com/articles/foo/', 1082)
+    it 'points at the site’s own /og.png route with the page path and a version cache buster' do
+      result = generate_open_graph_image_url('/articles/foo/', 1082)
       parsed = URI.parse(result)
-      expect("#{parsed.scheme}://#{parsed.host}#{parsed.path}").to eq('https://og.example.com/og.png')
+      expect("#{parsed.scheme}://#{parsed.host}#{parsed.path}").to eq('https://example.com/og.png')
       expect(URI.decode_www_form(parsed.query).to_h).to eq(
-        'url' => 'https://example.com/articles/foo/',
+        'path' => '/articles/foo/',
         'v' => 'v1-1082'
       )
     end
 
-    it 'trims a trailing slash on the configured base' do
-      stub_og('https://og.example.com/')
-      expect(generate_open_graph_image_url('https://example.com/', 7))
-        .to start_with('https://og.example.com/og.png?')
+    it 'trims a trailing slash on root_url' do
+      @root_url = 'https://example.com/'
+      expect(generate_open_graph_image_url('/', 7))
+        .to start_with('https://example.com/og.png?')
     end
 
     it 'busts on OG_TEMPLATE_VERSION alone when version is nil (listing pages have no sys)' do
-      stub_og('https://og.example.com')
-      result = generate_open_graph_image_url('https://example.com/blog/', nil)
+      result = generate_open_graph_image_url('/blog/', nil)
       expect(URI.decode_www_form(URI.parse(result).query).to_h).to eq(
-        'url' => 'https://example.com/blog/',
+        'path' => '/blog/',
         'v' => 'v1'
       )
-    end
-
-    it 'returns nil when OG_IMAGE_URL is unset (kona-og not wired up)' do
-      stub_og(nil)
-      expect(generate_open_graph_image_url('https://example.com/', 1)).to be_nil
     end
   end
 

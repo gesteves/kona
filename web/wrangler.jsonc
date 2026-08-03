@@ -36,6 +36,15 @@
     // asset, so assets-first would 404 them and they have to reach an origin:
     //   /widgets/*, /api/contact  → kona-api proxy (no asset; must reach the origin)
     //   /pa/*                     → Plausible first-party proxy (no asset; proxied upstream)
+    //   /og.png                   → the on-demand Open Graph card renderer (src/og.ts)
+    //
+    // ⚠️ /og.png's EXTENSION is load-bearing, not cosmetic. The zone's single Cache Rule is
+    // scoped `not http.request.uri.path contains "."`, so carrying one keeps this route off the
+    // 1-year "ignore cache-control" HTML TTL automatically — which is what satisfies the rule
+    // documented in the root CLAUDE.md that every new entry here needs a matching exclusion
+    // added by hand in the dashboard. Don't "tidy" this into an extensionless path (/og, /og/*)
+    // without adding that exclusion first, or every card gets pinned at the edge for a year
+    // under a policy that ignores its own Cache-Control.
     // Everything with a built asset — including the root and per-tag feeds (feed.xml) — is served
     // straight from the asset layer and never runs Worker code.
     // No /cdn-cgi/* entry is needed: Cloudflare answers image transformations at its own edge.
@@ -43,8 +52,27 @@
       "/widgets/*",
       "/api/contact",
       "/pa/*",
+      "/og.png",
     ],
   },
+
+  // Binary modules imported by src/og-render.ts (the card's font and logo), which wrangler
+  // uploads alongside the entry point and hands to the Worker as ArrayBuffers.
+  //
+  // ⚠️ The globs are matched against the IMPORT SPECIFIER, not the file path — wrangler turns
+  // each rule into an esbuild `onResolve({ filter: globToRegExp(glob) })`, which sees
+  // `./assets/logo.png`. A path-scoped glob like "src/assets/*.png" therefore matches NOTHING,
+  // silently, and the build fails with "No loader is configured for .png files". Keep them `**/*`.
+  //
+  // ⚠️ fallthrough is required so this doesn't shadow wrangler's own default Data rule
+  // (`**/*.bin`). Without it, a second rule of the same type is marked removed and any future
+  // .bin import becomes a hard build error.
+  //
+  // No .wasm rule is needed: `{ type: "CompiledWasm", globs: ["**/*.wasm"] }` is already a
+  // wrangler default, which is what makes the satori/resvg wasm imports work.
+  "rules": [
+    { "type": "Data", "globs": ["**/*.ttf", "**/*.png"], "fallthrough": true },
+  ],
 
   // Workers Logs. Declared here rather than left to the dashboard for the same reason as
   // keep_vars below: the config file is what a deploy reconciles against, so anything only

@@ -1,11 +1,12 @@
 import { handleApi } from './api-proxy';
+import { handleOg, OG_PATH } from './og';
 import { handlePlausible } from './plausible';
 import { servePage } from './serve-page';
 
 // Entry point. Only the paths in wrangler.jsonc's run_worker_first allowlist reach this code —
-// the widget/contact proxy and the Plausible proxy. Everything else (every HTML page,
-// fingerprinted assets, images, the sitemap, the feeds, .well-known, 404s) is served straight
-// from the static asset layer without invoking the Worker at all.
+// the widget/contact proxy, the Plausible proxy, and the OG card renderer. Everything else
+// (every HTML page, fingerprinted assets, images, the sitemap, the feeds, .well-known, 404s) is
+// served straight from the static asset layer without invoking the Worker at all.
 export default {
   async fetch(
     request: Request,
@@ -24,6 +25,10 @@ export default {
       return handleApi(request, env);
     }
     if (pathname.startsWith('/pa/')) return handlePlausible(request, env, ctx);
+
+    // The on-demand Open Graph card for pages with no cover image. Reads the page out of the
+    // static assets through the ASSETS binding and renders its og:title as a PNG (see og.ts).
+    if (pathname === OG_PATH) return handleOg(request, env, ctx);
 
     // Defensive fallthrough. With the positive run_worker_first allowlist (wrangler.jsonc), the
     // only paths that reach the Worker are the dynamic routes above — page views are served
