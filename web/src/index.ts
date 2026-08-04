@@ -1,5 +1,5 @@
 import { handleApi } from './api-proxy';
-import { handleOg, OG_PATH } from './og';
+import { handleOg, isOgPath } from './og';
 import { handlePlausible } from './plausible';
 import { servePage } from './serve-page';
 
@@ -26,9 +26,10 @@ export default {
     }
     if (pathname.startsWith('/pa/')) return handlePlausible(request, env, ctx);
 
-    // The on-demand Open Graph card for pages with no cover image. Reads the page out of the
-    // static assets through the ASSETS binding and renders its og:title as a PNG (see og.ts).
-    if (pathname === OG_PATH) return handleOg(request, env, ctx);
+    // The on-demand Open Graph card for pages with no cover image, served at the page's own path
+    // (/2026/06/26/post/og.png; /og.png for the home page). Reads that page out of the static
+    // assets through the ASSETS binding and renders its og:title as a PNG (see og.ts).
+    if (isOgPath(pathname)) return handleOg(request, env, ctx);
 
     // Defensive fallthrough. With the positive run_worker_first allowlist (wrangler.jsonc), the
     // only paths that reach the Worker are the dynamic routes above — page views are served

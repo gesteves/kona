@@ -1,4 +1,6 @@
-// The on-demand Open Graph card route: /og.png?path=<page path>&v=<template ver>-<published ver>
+// The on-demand Open Graph card route: <page path>og.png?v=<template ver>-<published ver>
+// — i.e. the card for /2026/06/26/post/ is /2026/06/26/post/og.png, and the home page's is
+// /og.png. The page is named by the card's OWN path, not by a query parameter.
 //
 // Renders the `og:image` for pages that have no cover image (typically Shorts). Replaces the
 // retired kona-og fly service (parked on the `restore-og` branch), which did the same job from
@@ -26,9 +28,17 @@ export type RenderCard = (title: string) => Promise<Uint8Array<ArrayBuffer>>;
 const lazyRender: RenderCard = async (title) =>
   (await import('./og-render')).renderCard(title);
 
+// Every card path is a page path with this filename appended, so stripping the filename (and
+// KEEPING the trailing slash — see the asset lookup below) gives the page back.
 // ⚠️ The ".png" is load-bearing, not cosmetic — see the run_worker_first comment in
-// wrangler.jsonc. Keep this in sync with that entry.
-export const OG_PATH = '/og.png';
+// wrangler.jsonc. Keep this in sync with those entries (`/og.png` + `/*/og.png`).
+const OG_FILENAME = 'og.png';
+export const OG_SUFFIX = `/${OG_FILENAME}`;
+
+// True for any path this route owns — `/og.png` itself and `/<page path>og.png`. The router uses
+// it, so it and the run_worker_first globs have to agree.
+export const isOgPath = (pathname: string): boolean =>
+  pathname.endsWith(OG_SUFFIX);
 
 // Content-addressed on (path, v), so a rendered card is immutable at a given URL.
 const IMMUTABLE = 'public, max-age=31536000, immutable';
@@ -114,27 +124,30 @@ export async function handleOg(
   }
 
   const incoming = new URL(request.url);
-  const path = incoming.searchParams.get('path');
   const version = incoming.searchParams.get('v') ?? '';
 
-  // ⚠️ Root-relative only. The old service took an absolute URL and needed a SITE_URL origin
-  // allowlist to stop it rendering other people's pages; a path that must start with a single
-  // "/" can't name another origin at all, so the allowlist has no job left. The `//` clause is
-  // what closes protocol-relative URLs ("//evil.com/x"), which new URL() would otherwise resolve
-  // to a different host.
-  if (!path || !path.startsWith('/') || path.startsWith('//')) {
-    return statusResponse(400);
-  }
+  // Defensive: the router and the run_worker_first globs both key on this suffix, so a request
+  // without it can only mean the two have drifted apart.
+  if (!isOgPath(incoming.pathname)) return statusResponse(400);
 
-  // ⚠️ Rebuild the key from ONLY the two params this route reads, in a fixed order — don't reuse
-  // the inbound request. Two separate jobs:
+  // The page this card is for: the card's own path with the filename chopped off, so
+  // /2026/06/26/post/og.png → /2026/06/26/post/ and /og.png → /. ⚠️ Only the FILENAME, so the
+  // trailing slash survives — that's the form current_page.url has, and the form the asset
+  // lookup below wants. There is no caller-supplied path any more: the old `?path=` parameter
+  // needed a leading-single-slash check to stop it naming another origin (the last remnant of
+  // the retired service's SITE_URL allowlist), and a path taken from our own URL can't name one.
+  const path = incoming.pathname.slice(0, -OG_FILENAME.length);
+
+  // ⚠️ Rebuild the key from ONLY the path and the one param this route reads — don't reuse the
+  // inbound request. Two separate jobs:
   //   - `v` MUST stay in the key. It's what makes a card content-addressed; drop it and a
   //     republished page's new URL would keep serving the PNG rendered for its old title.
   //   - unknown params MUST be dropped, or ?x=<random> mints an unbounded number of entries,
   //     each one a miss that costs a full render.
   // The key is a GET request: caches.default only serves GET, and put() throws on anything else.
-  const cacheUrl = new URL(OG_PATH, incoming);
-  cacheUrl.searchParams.set('path', path);
+  const cacheUrl = new URL(incoming);
+  cacheUrl.search = '';
+  cacheUrl.hash = '';
   cacheUrl.searchParams.set('v', version);
   const cacheKey = new Request(cacheUrl.toString());
 
@@ -145,13 +158,18 @@ export async function handleOg(
   }
 
   // The page, straight from the deployed static assets — no network request, and no way to reach
-  // anything that isn't in this deployment's build. html_handling: "auto-trailing-slash"
-  // (wrangler.jsonc) resolves both /about and /about/ to /about/index.html, and callers pass
-  // current_page.url, which Middleman's directory_indexes already emits in trailing-slash form.
-  // The binding always goes to the asset layer, so run_worker_first doesn't apply and
-  // ?path=/og.png can't recurse into this handler.
-  const target = new URL(path, incoming);
-  // A `?` or `#` smuggled into the path parameter must not reach the asset lookup.
+  // anything that isn't in this deployment's build. The path keeps the trailing slash that
+  // Middleman's directory_indexes emits, which is what the built asset (/about/index.html) is
+  // addressed by: html_handling "auto-trailing-slash" (wrangler.jsonc) would answer the
+  // slashless form with a REDIRECT, and the status check below only accepts a 200. The binding
+  // always goes to the asset layer, so run_worker_first doesn't apply and this lookup can never
+  // recurse back into this handler.
+  //
+  // ⚠️ Assigning `pathname` rather than resolving `new URL(path, incoming)`: the setter can only
+  // ever change the path, so even a "//evil.example" pathname stays a path on this host instead
+  // of resolving as a protocol-relative URL to another one.
+  const target = new URL(incoming);
+  target.pathname = path;
   target.search = '';
   target.hash = '';
 

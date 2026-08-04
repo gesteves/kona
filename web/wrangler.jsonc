@@ -36,12 +36,17 @@
     // asset, so assets-first would 404 them and they have to reach an origin:
     //   /widgets/*, /api/contact  → kona-api proxy (no asset; must reach the origin)
     //   /pa/*                     → Plausible first-party proxy (no asset; proxied upstream)
-    //   /og.png                   → the on-demand Open Graph card renderer (src/og.ts)
+    //   /og.png, /*/og.png        → the on-demand Open Graph card renderer (src/og.ts)
     //
-    // ⚠️ /og.png's EXTENSION is load-bearing, not cosmetic. The zone's single Cache Rule is
-    // scoped `not http.request.uri.path contains "."`, so carrying one keeps this route off the
-    // 1-year "ignore cache-control" HTML TTL automatically — which is what satisfies the rule
-    // documented in the root CLAUDE.md that every new entry here needs a matching exclusion
+    // The card for a page lives at that page's own path (/2026/06/26/post/og.png), so it takes
+    // TWO rules: /og.png for the home page's card, and /*/og.png for every other page's. A rule
+    // is compiled to `^` + the glob with each `*` replaced by `.*` + `$`, so `/*/og.png` matches
+    // any depth of path — and, being anchored, `/og.png` alone would NOT match a nested card.
+    //
+    // ⚠️ The ".png" is load-bearing, not cosmetic. The zone's single Cache Rule is
+    // scoped `not http.request.uri.path contains "."`, so carrying one keeps these routes off
+    // the 1-year "ignore cache-control" HTML TTL automatically — which is what satisfies the
+    // rule documented in the root CLAUDE.md that every new entry here needs a matching exclusion
     // added by hand in the dashboard. Don't "tidy" this into an extensionless path (/og, /og/*)
     // without adding that exclusion first, or every card gets pinned at the edge for a year
     // under a policy that ignores its own Cache-Control.
@@ -53,6 +58,7 @@
       "/api/contact",
       "/pa/*",
       "/og.png",
+      "/*/og.png",
     ],
   },
 

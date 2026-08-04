@@ -21,8 +21,10 @@ const withTitle = (title: string) =>
 const envWith = (response: () => Response) =>
   ({ ASSETS: assetsReturning(response) }) as unknown as Env;
 
-const request = (query: string, init?: RequestInit) =>
-  new Request(`https://www.example.com/og.png${query}`, init);
+// Cards hang off the page's own path: the card for /post/ is /post/og.png, and the home page's
+// is /og.png. `v` is the only parameter left.
+const request = (path: string, init?: RequestInit) =>
+  new Request(`https://www.example.com${path}`, init);
 
 describe('handleOg', () => {
   // The handler reads and writes caches.default. Stub both so tests never touch real (per-test
@@ -39,7 +41,7 @@ describe('handleOg', () => {
     it('405s a POST before touching the assets or the renderer', async () => {
       const render = renderStub();
       const res = await handleOg(
-        request('', { method: 'POST' }),
+        request('/og.png', { method: 'POST' }),
         {} as Env,
         makeCtx(),
         render
@@ -49,9 +51,11 @@ describe('handleOg', () => {
       expect(render).not.toHaveBeenCalled();
     });
 
-    it('400s a missing path parameter', async () => {
+    // Defensive only: the router and the run_worker_first globs both key on the suffix, so this
+    // is only reachable if the two have drifted apart.
+    it('400s a path that is not a card path', async () => {
       const res = await handleOg(
-        request('?v=v1'),
+        request('/post/?v=v1'),
         {} as Env,
         makeCtx(),
         renderStub()
@@ -62,11 +66,11 @@ describe('handleOg', () => {
     // Every non-image response body is just its own status line — no bespoke message describing
     // which internal step failed, since this endpoint is public and nothing reads the body.
     it.each([
-      [400, '400 Bad Request', '?v=v1', 'GET'],
-      [405, '405 Method Not Allowed', '', 'POST'],
-    ])('answers %i with "%s"', async (status, body, query, method) => {
+      [400, '400 Bad Request', '/post/?v=v1', 'GET'],
+      [405, '405 Method Not Allowed', '/og.png', 'POST'],
+    ])('answers %i with "%s"', async (status, body, path, method) => {
       const res = await handleOg(
-        request(query, { method }),
+        request(path, { method }),
         {} as Env,
         makeCtx(),
         renderStub()
@@ -75,46 +79,35 @@ describe('handleOg', () => {
       expect(await res.text()).toBe(body);
       expect(res.headers.get('cache-control')).toBe('public, max-age=300');
     });
-
-    // The old kona-og service took an absolute URL and needed a SITE_URL origin allowlist to stop
-    // it rendering cards for other people's pages. Requiring a single leading slash is what
-    // replaces that allowlist, so both of these shapes have to stay rejected.
-    it.each([
-      ['an absolute URL', '?path=https://evil.example/x&v=v1'],
-      ['a protocol-relative URL', '?path=//evil.example/x&v=v1'],
-      ['a bare relative path', '?path=about/&v=v1'],
-    ])('400s %s', async (_label, query) => {
-      const render = renderStub();
-      const res = await handleOg(
-        request(query),
-        {} as Env,
-        makeCtx(),
-        render
-      );
-      expect(res.status).toBe(400);
-      expect(render).not.toHaveBeenCalled();
-    });
   });
 
   describe('title lookup through the ASSETS binding', () => {
-    it('asks the asset layer for the requested path on the incoming origin', async () => {
+    // The card's own path names the page: chop the filename off the end and that's what gets
+    // looked up. A bare /og.png is the home page's card. ⚠️ The trailing slash has to survive —
+    // the built asset is /post/index.html, and auto-trailing-slash answers a slashless /post
+    // with a redirect, which the 200-only check downstream would turn into a 404.
+    it.each([
+      ['/2026/06/26/post/og.png?v=v1-9#frag', '/2026/06/26/post/'],
+      ['/og.png?v=v1', '/'],
+      // ⚠️ Protocol-relative-looking paths must stay on this origin — the lookup assigns
+      // `pathname` rather than resolving the path against the incoming URL, so they do.
+      ['//evil.example/og.png?v=v1', '//evil.example/'],
+    ])('asks the asset layer for %s on the incoming origin', async (path, expected) => {
       const assets = assetsRecording(() => withTitle('Hello'));
       await handleOg(
-        request('?path=/2026/06/26/post/&v=v1-9#frag'),
+        request(path),
         { ASSETS: assets.binding } as unknown as Env,
         makeCtx(),
         renderStub()
       );
       expect(assets.requests).toHaveLength(1);
-      expect(assets.requests[0].url).toBe(
-        'https://www.example.com/2026/06/26/post/'
-      );
+      expect(assets.requests[0].url).toBe(`https://www.example.com${expected}`);
     });
 
-    it('strips a query smuggled into the path parameter', async () => {
+    it('strips the query and fragment before the asset lookup', async () => {
       const assets = assetsRecording(() => withTitle('Hello'));
       await handleOg(
-        request('?path=%2Fpost%2F%3Fa%3Db&v=v1'),
+        request('/post/og.png?v=v1&a=b#frag'),
         { ASSETS: assets.binding } as unknown as Env,
         makeCtx(),
         renderStub()
@@ -127,7 +120,7 @@ describe('handleOg', () => {
     it('404s when the asset layer does not return a clean 200', async () => {
       const render = renderStub();
       const res = await handleOg(
-        request('?path=/nope/&v=v1'),
+        request('/nope/og.png?v=v1'),
         envWith(
           () =>
             new Response('<meta property="og:title" content="Not found">', {
@@ -145,7 +138,7 @@ describe('handleOg', () => {
     it('404s a 200 that is not HTML, rather than reading it as text', async () => {
       const render = renderStub();
       const res = await handleOg(
-        request('?path=/thing.pdf&v=v1'),
+        request('/thing.pdf/og.png?v=v1'),
         envWith(
           () =>
             new Response('%PDF-1.4', {
@@ -162,7 +155,7 @@ describe('handleOg', () => {
 
     it('404s a page that carries no og:title', async () => {
       const res = await handleOg(
-        request('?path=/post/&v=v1'),
+        request('/post/og.png?v=v1'),
         envWith(() => page('<html><head><title>Bare</title></head></html>')),
         makeCtx(),
         renderStub()
@@ -174,7 +167,7 @@ describe('handleOg', () => {
     it('renders the page’s own og:title, entity-decoded', async () => {
       const render = renderStub();
       await handleOg(
-        request('?path=/post/&v=v1'),
+        request('/post/og.png?v=v1'),
         envWith(() => withTitle('Salt &amp; Vinegar')),
         makeCtx(),
         render
@@ -186,7 +179,7 @@ describe('handleOg', () => {
   describe('the rendered response', () => {
     const ok = () =>
       handleOg(
-        request('?path=/post/&v=v1-9'),
+        request('/post/og.png?v=v1-9'),
         envWith(() => withTitle('Hello')),
         makeCtx(),
         renderStub()
@@ -205,7 +198,7 @@ describe('handleOg', () => {
 
     it('answers a HEAD with the same headers and no body', async () => {
       const res = await handleOg(
-        request('?path=/post/&v=v1-9', { method: 'HEAD' }),
+        request('/post/og.png?v=v1-9', { method: 'HEAD' }),
         envWith(() => withTitle('Hello')),
         makeCtx(),
         renderStub()
@@ -220,7 +213,7 @@ describe('handleOg', () => {
         throw new Error('boom');
       });
       const res = await handleOg(
-        request('?path=/post/&v=v1'),
+        request('/post/og.png?v=v1'),
         envWith(() => withTitle('Hello')),
         makeCtx(),
         render as unknown as () => Promise<Uint8Array<ArrayBuffer>>
@@ -233,9 +226,9 @@ describe('handleOg', () => {
   });
 
   describe('caching', () => {
-    it('keys on path and v only, dropping unknown params', async () => {
+    it('keys on the card path and v only, dropping unknown params', async () => {
       await handleOg(
-        request('?path=/post/&v=v1-9&utm_source=slack&x=random'),
+        request('/post/og.png?v=v1-9&utm_source=slack&x=random'),
         envWith(() => withTitle('Hello')),
         makeCtx(),
         renderStub()
@@ -246,7 +239,7 @@ describe('handleOg', () => {
       // ?x=<random> mints an unbounded number of entries, each a miss costing a full render.
       const [matched] = vi.mocked(caches.default.match).mock.calls[0];
       const [stored] = vi.mocked(caches.default.put).mock.calls[0];
-      const expected = 'https://www.example.com/og.png?path=%2Fpost%2F&v=v1-9';
+      const expected = 'https://www.example.com/post/og.png?v=v1-9';
       expect((matched as Request).url).toBe(expected);
       expect((stored as Request).url).toBe(expected);
     });
@@ -257,7 +250,7 @@ describe('handleOg', () => {
       );
       const render = renderStub();
       const res = await handleOg(
-        request('?path=/post/&v=v1-9'),
+        request('/post/og.png?v=v1-9'),
         envWith(() => withTitle('Hello')),
         makeCtx(),
         render

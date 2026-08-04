@@ -147,10 +147,17 @@ build fails loudly rather than shipping pages with missing icons.
     twice; URLs must come from `asset_path(:fonts, …)` because fonts are asset-hashed.
 - Open Graph "cards" (the `og:image` for pages without a cover image — about half the archive) are
   rendered **on demand by this app's own Worker**: `src/og.ts` (route) + `src/og-render.ts` (the
-  card), claimed as `/og.png` in `run_worker_first`. `generate_open_graph_image_url`
-  (`lib/helpers/image_helpers.rb`) builds
-  `<root_url>/og.png?path=<page path>&v=<OG_TEMPLATE_VERSION>-<published_version>`. Cover-image
+  card), claimed as `/og.png` **and** `/*/og.png` in `run_worker_first`.
+  `generate_open_graph_image_url` (`lib/helpers/image_helpers.rb`) builds
+  `<root_url><page path>og.png?v=<OG_TEMPLATE_VERSION>-<published_version>` — the card hangs off
+  the page's own path (`/2026/06/26/post/og.png`), with the home page's at `/og.png`. Cover-image
   pages are unaffected (they use `open_graph_image_url` → Cloudflare Images).
+  - **The page is named by the card's own path**, which is why there are two `run_worker_first`
+    entries (a rule is anchored `^…$` with each `*` widened to `.*`, so `/og.png` alone would not
+    match a nested card) and why the handler has no `?path=` parameter to validate. It strips only
+    the **filename**, keeping the trailing slash: the built asset is `/post/index.html`, and
+    `html_handling: "auto-trailing-slash"` answers a slashless `/post` with a *redirect*, which
+    the handler's 200-only check would read as a missing page.
   This replaces `kona-og`, a standalone fly service (removed from `main`, parked on the
   `restore-og` branch) — which is why there is **no env var**: the route is same-origin by
   construction, so there is no host to configure and nothing to switch on.
@@ -167,7 +174,7 @@ build fails loudly rather than shipping pages with missing icons.
     `nil`, `v` is `OG_TEMPLATE_VERSION` alone, and the URL is **fixed forever** — currently 43 of
     the 73 card-emitting pages. Their `og:title` comes from `data.site.meta_title` or a tag name,
     which change without any article being republished. What refreshes them is the zone's
-    `Cache-Tag: site` deploy purge, which is why `/og.png` is deliberately left tagged (root
+    `Cache-Tag: site` deploy purge, which is why the card paths are deliberately left tagged (root
     `CLAUDE.md`). Don't "optimize" that by excluding the route — the re-render cost is trivial and
     the staleness it prevents is silent.
   - ⚠️ **Needs the Workers Paid plan.** A render is ~100 ms of CPU (satori ~30 ms, resvg ~75 ms);
@@ -224,8 +231,8 @@ build fails loudly rather than shipping pages with missing icons.
   which swaps `globalThis.fetch`) — the pool's `fetchMock` (an undici MockAgent on
   `cloudflare:test`) was removed in the same release, and the alternative was taking on MSW.
   ⚠️ **`run_worker_first` is a POSITIVE allowlist — only listed paths invoke the Worker.** It
-  lists exactly the dynamic routes (`/widgets/*`, `/api/contact`, `/pa/*`, `/og.png`); everything
-  else — every
+  lists exactly the dynamic routes (`/widgets/*`, `/api/contact`, `/pa/*`, `/og.png`,
+  `/*/og.png`); everything else — every
   HTML page, fingerprinted asset, the sitemap, the feeds, `/.well-known/*`, and any 404 — is served
   straight from the static asset layer and never runs Worker code (page views cost no Worker
   invocation). Each listed route needs the Worker because it has **no asset** (widgets/contact/pa/og
@@ -233,11 +240,11 @@ build fails loudly rather than shipping pages with missing icons.
   here too, and mind that Cloudflare globs **cross `/`** (that's why `/widgets/*` matches nested
   paths like `/widgets/weather/current`).
   ⚠️ A new entry also needs a matching **exclusion in the zone's Cache Rule** — the single
-  *edge-TTL* rule, root `CLAUDE.md` — except `/og.png`, which that rule's `not path contains "."`
+  *edge-TTL* rule, root `CLAUDE.md` — except the OG cards, which that rule's `not path contains "."`
   clause already excludes. That is precisely why the OG route carries an extension; don't rename it
   to something extensionless without adding the exclusion by hand first. (Not to be confused with
   the `Cache-Tag: site` Cache **Response** Rule, a different rule in a different phase, which
-  `/og.png` is deliberately left *matching* — see the OG bullet above.)
+  the cards are deliberately left *matching* — see the OG bullet above.)
   This replaced the old "`/*` minus ~25 asset negations"
   model — which kept tripping over extension negations (a blanket `!/*.js` once swallowed
   `/pa/script.js`, `!/*.xml` would have swallowed the feeds); the allowlist has no negations, so
@@ -294,8 +301,8 @@ Names only — see `.env.example`; never commit values.
   (There is deliberately **no** var for the OG cards. `OG_IMAGE_URL` was retired when the renderer
   moved into this app's own Worker: the card URL is same-origin, built from `root_url`, so there is
   no host to configure. One consequence worth knowing — a **local** build emits
-  `http://localhost:4567/og.png?…`, which `middleman server` won't render because it doesn't run
-  the Worker. That only affects `og:image` and the JSON-LD image in locally-built HTML, which no
+  `http://localhost:4567/<page path>og.png?…`, which `middleman server` won't render because it
+  doesn't run the Worker. That only affects `og:image` and the JSON-LD image in locally-built HTML, which no
   crawler ever sees; use `wrangler dev` to exercise a real card.)
 
 ## Conventions & gates

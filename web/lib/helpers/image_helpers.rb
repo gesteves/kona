@@ -173,6 +173,11 @@ module ImageHelpers
   # page out of the deployed static assets through the ASSETS binding, takes its og:title, and
   # renders a 1200×630 PNG cached for a year.
   #
+  # The card hangs off the page's own path — /2026/06/26/post/ → /2026/06/26/post/og.png, and the
+  # home page → /og.png — so the Worker derives the page from the request path and there is no
+  # `?path=` parameter to validate. ⚠️ The ".png" is load-bearing: it's what keeps the route out
+  # of the zone's Cache Rule (`not path contains "."`). See wrangler.jsonc.
+  #
   # Same-origin by construction — root_url is the only host involved, so there is nothing to
   # configure and no way to point this at another site. (It used to take an absolute URL and a
   # separate OG_IMAGE_URL host, because the renderer was a standalone fly service.)
@@ -188,8 +193,8 @@ module ImageHelpers
   # @return [String] The URL of the page's card.
   def generate_open_graph_image_url(path, version = nil)
     v = version.present? ? "#{OG_TEMPLATE_VERSION}-#{version}" : OG_TEMPLATE_VERSION
-    query = URI.encode_www_form(path: path, v: v)
-    "#{root_url.to_s.chomp('/')}/og.png?#{query}"
+    query = URI.encode_www_form(v: v)
+    "#{root_url.to_s.chomp('/')}#{path.to_s.chomp('/')}/og.png?#{query}"
   end
 
   # Generates a CDN URL for the site icon with the specified width.

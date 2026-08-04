@@ -229,28 +229,30 @@ RSpec.describe ImageHelpers do
     # served by the site's own Worker, so this is the only host involved.
     def root_url = @root_url || 'https://example.com'
 
-    it 'points at the site’s own /og.png route with the page path and a version cache buster' do
+    # The card hangs off the page's own path, so the Worker can derive the page from the request
+    # path instead of a ?path= parameter — see web/src/og.ts.
+    it 'hangs the card off the page’s own path, with a version cache buster' do
       result = generate_open_graph_image_url('/articles/foo/', 1082)
       parsed = URI.parse(result)
-      expect("#{parsed.scheme}://#{parsed.host}#{parsed.path}").to eq('https://example.com/og.png')
-      expect(URI.decode_www_form(parsed.query).to_h).to eq(
-        'path' => '/articles/foo/',
-        'v' => 'v1-1082'
-      )
+      expect("#{parsed.scheme}://#{parsed.host}#{parsed.path}")
+        .to eq('https://example.com/articles/foo/og.png')
+      expect(URI.decode_www_form(parsed.query).to_h).to eq('v' => 'v1-1082')
+    end
+
+    it 'serves the home page’s card from the root' do
+      expect(generate_open_graph_image_url('/', 7))
+        .to eq('https://example.com/og.png?v=v1-7')
     end
 
     it 'trims a trailing slash on root_url' do
       @root_url = 'https://example.com/'
       expect(generate_open_graph_image_url('/', 7))
-        .to start_with('https://example.com/og.png?')
+        .to eq('https://example.com/og.png?v=v1-7')
     end
 
     it 'busts on OG_TEMPLATE_VERSION alone when version is nil (listing pages have no sys)' do
       result = generate_open_graph_image_url('/blog/', nil)
-      expect(URI.decode_www_form(URI.parse(result).query).to_h).to eq(
-        'path' => '/blog/',
-        'v' => 'v1'
-      )
+      expect(result).to eq('https://example.com/blog/og.png?v=v1')
     end
   end
 

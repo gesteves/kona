@@ -94,8 +94,11 @@ problem.
   (PR #381), fetching the untransformed **source** from the R2 mirror rather than from Contentful
   (see **The image mirror** below). Details in [`web/CLAUDE.md`](web/CLAUDE.md).
 - **OG cards** — the `og:image` for pages with **no cover image** (about half the archive) is
-  rendered on demand by the `kona-web` Worker itself, at `/og.png?path=<page path>&v=<template
-  ver>-<published_version>` (`web/src/og.ts` + `og-render.ts`, satori + `@resvg/resvg-wasm`). This
+  rendered on demand by the `kona-web` Worker itself, at `<page path>og.png?v=<template
+  ver>-<published_version>` — i.e. the card for `/2026/06/26/post/` is
+  `/2026/06/26/post/og.png`, and the home page's is `/og.png`
+  (`web/src/og.ts` + `og-render.ts`, satori + `@resvg/resvg-wasm`). The page is named by the
+  card's **own path**, so there is no caller-supplied path parameter to validate. This
   used to be `kona-og`, a standalone fly service; it was removed from `main`, parked on the
   `restore-og` branch, and is now superseded. Cover-image pages are unaffected — they use
   Cloudflare Images (`open_graph_image_url`).
@@ -108,9 +111,9 @@ problem.
   orphaned. ⚠️ **Listing pages are the exception and drive the cache design**: the blog index, tag
   archives, and home aren't Contentful entries, so they have no `published_version`, their `v` is
   `OG_TEMPLATE_VERSION` alone, and their card URL never changes — while their `og:title` (from
-  `data.site.meta_title` or a tag name) can. That's why `/og.png` stays in the `Cache-Tag: site`
-  rule below rather than being excluded from it. ⚠️ Needs the **Workers Paid** plan: a render is
-  ~100 ms of CPU against Free's 10 ms limit.
+  `data.site.meta_title` or a tag name) can. That's why the card paths stay in the
+  `Cache-Tag: site` rule below rather than being excluded from it. ⚠️ Needs the **Workers Paid**
+  plan: a render is ~100 ms of CPU against Free's 10 ms limit.
 - **Caching** — the zone **edge-caches the static build**: HTML, feeds, and assets all come back
   `cf-cache-status: HIT` even with `max-age=0, must-revalidate` (the browser revalidates; the edge
   serves its own copy). Deploys do **not** self-invalidate at the edge — Cloudflare keeps serving
@@ -167,7 +170,8 @@ or
 ))
 ```
 
-⚠️ **`/og.png` is deliberately NOT excluded from the first branch, and must not be.** It's tempting
+⚠️ **The OG cards (`<page path>og.png`) are deliberately NOT excluded from the first branch, and
+must not be.** It's tempting
 to exclude it on the grounds that OG cards are content-addressed and so never need purging — but
 that's only true of the *article* cards, which carry the entry's `published_version` in `v`. The
 **listing pages** (blog index, tag archives, home) aren't Contentful entries and have no
@@ -344,9 +348,10 @@ thing that would actually bound the maximum obtainable resolution is **capping t
   Allow" covers Googlebot/Bingbot but not Slack/Mastodon/Discord unfurlers or RSS clients, and
   those are exactly the traffic a blog wants. Managed rules are skipped alongside it because the
   host serves a static build. ⚠️ This skip is now doubly load-bearing: those same unfurlers are the
-  only consumers of `/og.png`, so blocking them would silently break the OG cards too.
+  only consumers of the OG cards, so blocking them would silently break those too.
   ⚠️ Not *purely* static, though: `run_worker_first` claims `/widgets/*`, `/api/contact`, `/pa/*`,
-  and `/og.png`, and `POST /api/contact` is a real intake carrying arbitrary user prose. Managed rules
+  and the card paths (`/og.png` + `/*/og.png`), and `POST /api/contact` is a real intake carrying
+  arbitrary user prose. Managed rules
   were never the layer defending it — the honeypot, Turnstile, Akismet, the length caps, and the
   `contact/ip` throttle are (and OWASP is deliberately not deployed precisely because it would
   flag the form's own prose). Keep it that way; don't let this skip become the excuse to thin
@@ -439,20 +444,23 @@ Why each exclusion:
   means nothing would go *stale*, but the rule would override the `immutable` year those
   fingerprinted assets already declare, replacing a policy that's correct by construction with one
   that depends on the purge. It also keeps the feeds, `sitemap.xml`, `robots.txt`, `favicon.ico`,
-  `manifest.json`, and the Pagefind chunks on their existing behavior. It is also what keeps
-  **`/og.png`** out without a clause of its own — see below.
-- **`/widgets/`, `/api/`, `/pa/`** — ⚠️ three of the four Worker routes live on the **site** host and
-  are extensionless, so they'd otherwise match. A 1-year edge TTL on `/widgets/*` at the Worker
+  `manifest.json`, and the Pagefind chunks on their existing behavior. It is also what keeps the
+  **OG cards** out without a clause of its own — see below.
+- **`/widgets/`, `/api/`, `/pa/`** — ⚠️ three of the four Worker route families live on the
+  **site** host and are extensionless, so they'd otherwise match. A 1-year edge TTL on `/widgets/*` at the Worker
   hostname would pin every widget indefinitely, overriding the `CDN-Cache-Control` design wholesale —
   and since the live-data widgets are deliberately untagged, no deploy purge would ever release them;
   caching `/pa/*` would corrupt analytics. **A new `run_worker_first` entry needs a matching
   exclusion here**, and nothing in the repo will remind you.
-  ⚠️ The fourth route, **`/og.png`**, is the exception, and that is *why it carries an extension*:
-  the `contains "."` clause above already excludes it, so the OG card renderer needed no dashboard
-  edit at all. The card's own `Cache-Control: public, max-age=31536000, immutable` governs instead
-  of a rule that ignores it — which is what we want, since cards are content-addressed. **Don't
-  "tidy" that route into an extensionless path** (`/og`, `/og/*`) without adding an exclusion here
-  first, or every card gets pinned for a year under a policy that ignores its own `Cache-Control`.
+  ⚠️ The fourth, the **OG cards** (`/og.png` and `/*/og.png`), is the exception, and that is *why
+  they carry an extension*: the `contains "."` clause above already excludes them, so the card
+  renderer needed no dashboard edit at all — and none when the cards moved from
+  `/og.png?path=<page path>` onto the page's own path, since the filename (and therefore the dot)
+  is what the clause keys on. The card's own `Cache-Control: public, max-age=31536000, immutable`
+  governs instead of a rule that ignores it — which is what we want, since cards are
+  content-addressed. **Don't "tidy" the route into an extensionless path** (`/og`, `/og/*`)
+  without adding an exclusion here first, or every card gets pinned for a year under a policy that
+  ignores its own `Cache-Control`.
 - **`/cdn-cgi/`** — belt and braces; Cloudflare answers it at its own edge anyway. Contentful images
   are unaffected either way: they're served from `<IMAGES_URL>/cdn-cgi/image/…`, which never reaches
   an origin.
