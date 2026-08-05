@@ -9,6 +9,10 @@ require "time"
 # In practice this job never retries: Akismet fails open and ContactSubject fails soft (neither
 # raises), so nothing here fails except a Redis hiccup on the enqueue.
 class ContactMailJob < ApplicationJob
+  # Prefixed onto every subject — generated or fallback — so the owner can filter on it in their
+  # mail client. Keep it stable: changing it breaks any filter keyed on the old string.
+  SUBJECT_PREFIX = "[Contact form]".freeze
+
   # @param name [String] The sender's name.
   # @param email [String] The sender's email (used as Reply-To).
   # @param message [String] The message body.
@@ -24,8 +28,10 @@ class ContactMailJob < ApplicationJob
     end
 
     # A Claude-generated subject summarizing the message, for at-a-glance inbox triage; falls
-    # back to a static subject when Anthropic is unconfigured or the call fails.
-    subject = ContactSubject.generate(name: name, message: message).presence || "New contact form message from #{name}"
+    # back to a static subject when Anthropic is unconfigured or the call fails. Either way it
+    # carries SUBJECT_PREFIX, so a mail filter can match every contact-form message.
+    generated = ContactSubject.generate(name: name, message: message).presence
+    subject = "#{SUBJECT_PREFIX} #{generated || "New message from #{name}"}"
 
     ContactDeliveryJob.perform_async(
       "to" => ENV["CONTACT_TO_ADDRESS"],

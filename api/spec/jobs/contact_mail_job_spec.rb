@@ -40,7 +40,7 @@ RSpec.describe ContactMailJob do
     described_class.new.perform("Jane Rider", "jane@example.com", "Do I need a wetsuit?", context)
 
     expect(ContactSubject).to have_received(:generate).with(name: "Jane Rider", message: "Do I need a wetsuit?")
-    expect(ContactDeliveryJob).to have_enqueued_sidekiq_job(hash_including("subject" => "Question about Alcatraz wetsuit rules"))
+    expect(ContactDeliveryJob).to have_enqueued_sidekiq_job(hash_including("subject" => "[Contact form] Question about Alcatraz wetsuit rules"))
   end
 
   it "falls back to a static subject when none is generated" do
@@ -49,7 +49,7 @@ RSpec.describe ContactMailJob do
 
     described_class.new.perform("Jane Rider", "jane@example.com", "Hello!", context)
 
-    expect(ContactDeliveryJob).to have_enqueued_sidekiq_job(hash_including("subject" => "New contact form message from Jane Rider"))
+    expect(ContactDeliveryJob).to have_enqueued_sidekiq_job(hash_including("subject" => "[Contact form] New message from Jane Rider"))
   end
 
   it "drops a submission Akismet flags as spam without enqueuing delivery" do
