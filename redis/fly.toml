@@ -4,8 +4,25 @@ primary_region = 'iad'
 [build]
   image = 'redis:7-alpine'
 
+# Persistence is AOF only. `--save ""` disables RDB snapshotting, which was redundant: AOF at
+# `everysec` already covers the one thing here that isn't rederivable — the Whoop refresh token,
+# stored without an expiry (Whoop#store_tokens) — and everything else in the keyspace is either a
+# cache with a TTL or a Sidekiq queue. Keeping `save 60 1` on top meant a BGSAVE fork roughly
+# every 60 seconds forever (measured: 36,319 forks over 25 days of uptime) purely to re-persist
+# data AOF had already durably written.
+#
+# ⚠️ Dropping it is a cleanup, not a fix for the RedisClient::ReadTimeoutError alerts — those forks
+# were cheap (latest_fork_usec 3921, i.e. ~4ms, on a ~3MB dataset) and were never the stall. See
+# api/config/initializers/sidekiq.rb for what actually addresses the timeouts.
+#
+# `--no-appendfsync-on-rewrite yes` stops the main thread blocking on fsync while a rewrite child
+# is competing for the same volume — the one persistence path here that CAN stall the event loop.
+#
+# Redis accepts both `--save ""` and a bare `--save` as "snapshotting off" (verified against
+# redis-server directly), so this is safe whichever way fly's command parser treats the quotes.
+# Verify after deploy: `fly ssh console -a kona-redis -C "redis-cli config get save"` → empty.
 [processes]
-  app = "redis-server --dir /data --save 60 1 --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy noeviction"
+  app = "redis-server --dir /data --save '' --appendonly yes --appendfsync everysec --no-appendfsync-on-rewrite yes --maxmemory 256mb --maxmemory-policy noeviction"
 
 [mounts]
   source = "redis_data"
