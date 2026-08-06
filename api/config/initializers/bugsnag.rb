@@ -8,4 +8,12 @@ Bugsnag.configure do |config|
   config.api_key = ENV["BUGSNAG_API_KEY"]
   config.release_stage = Rails.env
   config.notify_release_stages = %w[production]
+
+  # Drop the reports Sidekiq's fetch loop produces when the worker VM is briefly frozen by its
+  # host — five per freeze, for an event Sidekiq already recovers from on its own. See
+  # lib/sidekiq_redis_timeout_filter.rb for the measurements and for the three conditions that
+  # keep it from swallowing a real outage. Wrapped in a lambda so the autoloaded constant
+  # resolves on first notify instead of during boot (the same reason config/application.rb wraps
+  # PlainTextExceptions).
+  config.add_on_error(->(report) { SidekiqRedisTimeoutFilter.call(report) })
 end
