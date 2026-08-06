@@ -2,9 +2,9 @@ require 'redcarpet'
 require 'sanitize'
 
 module MarkdownHelpers
-  # Converts Markdown text to HTML, with additional formatting and SmartyPants rendering.
-  # @param text [String] The Markdown text to be converted.
-  # @return [String, nil] The HTML representation of the Markdown text, or nil if the text is blank.
+  # Renders Markdown to HTML, with SmartyPants typography applied.
+  # @param text [String] The Markdown to render.
+  # @return [String, nil] The HTML, or nil for blank input.
   def markdown_to_html(text)
     return if text.blank?
     renderer = Redcarpet::Render::HTML.new(with_toc_data: true)
@@ -12,9 +12,9 @@ module MarkdownHelpers
     Redcarpet::Render::SmartyPants.render(markdown.render(text))
   end
 
-  # Applies SmartyPants rendering to the provided text for typographic improvements.
-  # @param text [String] The text to be processed with SmartyPants rendering.
-  # @return [String, nil] The text after SmartyPants rendering, or nil if the original text is blank.
+  # Applies SmartyPants typography to plain text.
+  # @param text [String] The text to process.
+  # @return [String, nil] The processed text, or nil for blank input.
   def smartypants(text)
     return if text.blank?
     Redcarpet::Render::SmartyPants.render(text)

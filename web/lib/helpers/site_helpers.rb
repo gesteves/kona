@@ -1,9 +1,8 @@
 require 'sanitize'
 
 module SiteHelpers
-  # The public Cloudflare Turnstile sitekey for the contact form widget, from the environment.
-  # Nil/blank when unset — the widget then isn't rendered and the api skips verification (both
-  # sides no-op together). Safe to embed client-side (it's the public half of the widget).
+  # The public Cloudflare Turnstile sitekey for the contact form. Blank when unset, in which
+  # case the widget isn't rendered and the api skips verification.
   # @return [String, nil]
   def turnstile_site_key
     ENV['TURNSTILE_SITE_KEY']
@@ -19,13 +18,11 @@ module SiteHelpers
     tag.join('/')
   end
 
-  # Generates a formatted page title based on the provided content.
-  # @param content [Hash, String] The content to generate the title from.
-  #   If a Hash, expects a :title key.
-  #   If a String, uses directly as the title content.
-  # @param include_site_name [Boolean] Whether to append the site's title to the generated title.
-  # @param separator [String] The separator used between title segments.
-  # @return [String] The sanitized and formatted page title.
+  # Builds the page title.
+  # @param content [Hash, String] A content object (uses its :title) or a literal title string.
+  # @param include_site_name [Boolean] Whether to append the site's title.
+  # @param separator [String] Separator between title segments.
+  # @return [String] The sanitized title.
   def page_title(content, include_site_name: false, separator: ' · ')
     title = []
     if content.is_a?(Hash) && !content.is_home_page
@@ -40,77 +37,61 @@ module SiteHelpers
     sanitize(title.reject(&:blank?).uniq.join(separator))
   end
 
-  # Wraps the generated page title within a title HTML tag.
-  # @param content [Hash, String] The content to generate the title from.
-  # @return [String] An HTML title tag with the generated page title.
+  # @param content [Hash, String] A content object or a literal title string.
+  # @return [String] A <title> tag containing the page title and the site name.
   def title_tag(content)
     content_tag :title do
       page_title(content, include_site_name: true)
     end
   end
 
-  # Renders a runtime widget's placeholder partial, wiring it to the endpoint the live-update
+  # Renders a runtime widget's placeholder partial, wired to the endpoint the live-update
   # controller fetches on connect.
-  #
-  # ⚠️ Don't pair these with a <link rel="preload" as="fetch"> — that's been tried and it
-  # doubles the requests instead of front-loading them. Widget fragments are served
-  # `Cache-Control: max-age=0, …` with no validator (api/app/controllers/concerns/live_widget.rb:
-  # the browser must always revalidate, the edge does the caching), so a preloaded copy is stale
-  # the moment it lands: the controller's fetch() can't reuse it and issues a second full request.
-  # @param name [String] The placeholder partial's basename under partials/placeholders/.
+  # Don't pair these with <link rel="preload" as="fetch">: widget fragments are served
+  # `max-age=0` with no validator, so a preloaded copy is stale on arrival and the controller's
+  # fetch issues a second full request rather than reusing it.
+  # @param name [String] The partial's basename under partials/placeholders/.
   # @param url [String] The same-origin widget endpoint, passed to the partial as `url`.
   # @return [String] The rendered placeholder.
   def render_widget(name, url)
     partial "partials/placeholders/#{name}", locals: { url: url }
   end
 
-  # The proxied `content` object for the current page, if any. Templates receive it as a
-  # local (set via `proxy … locals:` in config.rb), but helper methods can't see template
-  # locals — they read it from the page metadata instead.
+  # The proxied `content` object for the current page, read from page metadata since helpers
+  # can't see template locals.
   # @return [Object, nil]
   def page_content
     locals = current_page.metadata[:locals]
     locals && locals[:content]
   end
 
-  # The object driving the current page's <title> and og:title: the proxied `content` object
-  # when the page has one, else the page frontmatter's title string (nil when neither exists —
-  # the caller emits nothing). Collapses the content-vs-frontmatter fallback that was
-  # open-coded in partials/_meta and partials/_open_graph_and_social.
+  # The object driving the page's <title> and og:title: the proxied content object, else the
+  # frontmatter title.
   # @return [Object, String, nil]
   def meta_title_source
     page_content || current_page.data.title.presence
   end
 
-  # The current page's meta/og description: the content summary when the page has a `content`
-  # object (never blank — content_summary falls back to the site meta description), else the
-  # page frontmatter's summary (nil when neither exists).
+  # The page's meta/og description: the content summary, else the frontmatter summary.
   # @return [String, nil]
   def meta_description
     return content_summary(page_content) if page_content
     current_page.data.summary.presence
   end
 
-  # The attribute cluster every live-update PLACEHOLDER's outer element carries: wires the
-  # element to the live-update Stimulus controller, points it at the widget endpoint, and marks
-  # it a placeholder — it holds a skeleton rather than real content, so it always fetches when it
-  # connects and removes itself if that fetch fails.
-  # ⚠️ The api fragment that replaces it repeats every attribute here EXCEPT
-  # `data-live-update-placeholder-value`: it *does* hold real content, so it refetches only once
-  # that content is stale, and a transient failure must leave it alone rather than delete it.
-  # See root CLAUDE.md for the web↔api contract.
-  # Interpolate inside the placeholder's outer tag.
+  # The attributes a live-update placeholder's outer element carries. Interpolate inside its
+  # opening tag.
+  # The api fragment that replaces it repeats all of these except the placeholder flag — see the
+  # web↔api contract in the root CLAUDE.md.
   # @param url [String] The same-origin widget endpoint.
   # @return [String] HTML attributes.
   def live_update_attrs(url)
-    # url is always an app-generated same-origin path (widget endpoint, ids are alphanumeric),
-    # never user input, so it needs no escaping here.
+    # url is always an app-generated same-origin path, never user input, so it needs no escaping.
     %(data-controller="live-update" data-live-update-url-value="#{url}" data-live-update-placeholder-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange").html_safe
   end
 
-  # Retrieves a summary of the content, falling back to the site's meta description if not present.
-  # @param content [Object] The content object which may contain a summary.
-  # @return [String] The content summary or the site's meta description.
+  # @param content [Object] A content object.
+  # @return [String] Its summary, intro, or the site's meta description, whichever exists first.
   def content_summary(content)
     summary = if content.summary.present?
       content.summary
@@ -124,8 +105,7 @@ module SiteHelpers
     sanitize(summary)
   end
 
-  # Attempts to determine the time the website was most recently updated.
-  # @return [DateTime] The latest date and time at which either a page, an article, or the site was updated.
+  # @return [DateTime] The most recent publish time across pages, articles, and the site entry.
   def site_updated_at
     [
       indexable_pages.map { |p| DateTime.parse(p.sys.published_at) },
@@ -134,10 +114,9 @@ module SiteHelpers
     ].flatten.max
   end
 
-  # The year the earliest non-draft article was published — the start of the copyright range.
-  # Computed once per build (memoize_by_collection): it renders in the footer of every page,
+  # The year of the earliest non-draft article, memoized since it renders in every page's footer
   # and each computation parses every article's publish date.
-  # @return [String] e.g. "2006".
+  # @return [String] A four-digit year.
   def copyright_start_year
     memoize_by_collection(:copyright_start_year, data.articles) do
       earliest = published_articles.map { |a| published_datetime(a) }.min
@@ -145,17 +124,14 @@ module SiteHelpers
     end
   end
 
-  # Returns a range of years, from the year the earliest article was published to the current year.
-  # @return [String] A range of years, like 2006-2024.
+  # @return [String] The copyright year range, e.g. "2006–2024".
   def copyright_years
     "#{copyright_start_year}–#{Time.current.year}"
   end
 
-  # The Atom feeds to advertise in the current page's <head> via <link rel="alternate">: always
-  # the main site feed, plus per-tag feeds — the tag's own feed on a tag archive page, and every
-  # one of the article's tags' feeds on a post. Reads the page's proxied content via page_content
-  # (helpers can't see the template's `content` local). Each entry is { href:, title: }.
-  # @return [Array<Hash>]
+  # The Atom feeds to advertise in <head>: the main site feed, plus the tag's feed on an archive
+  # page or every one of the article's tags' feeds on a post.
+  # @return [Array<Hash>] Entries of { href:, title: }.
   def alternate_feed_links
     links = [{ href: full_url('/feed.xml'), title: sanitize(data.site.meta_title) }]
     pc = page_content
@@ -175,36 +151,32 @@ module SiteHelpers
     links
   end
 
-  # Returns the title for the RSS feed, based off the site's meta title.
-  # @return [String] The title for the feed.
+  # @return [String] The feed title, taken from the site's meta title.
   def feed_title
     data.site.meta_title.split(':').first.strip
   end
 
-  # Returns the subtitle for the RSS feed, based off the site's meta title.
-  # @return [String] The subtitle for the feed.
+  # @return [String, nil] The feed subtitle, or nil when the meta title has no second half.
   def feed_subtitle
     subtitle = data.site.meta_title.split(':').last.strip
     return if subtitle == feed_title
     subtitle
   end
 
-  # The clipboard-controller attribute set that makes a feed link copy its URL to the
-  # clipboard instead of navigating, with the shared confirmation message. Used by the
-  # social/shortcut link builders here and by MarkupHelpers#copy_feed_links for feed links
-  # inside rendered bodies.
+  # Attributes that make a feed link copy its URL to the clipboard instead of navigating. Also
+  # used by MarkupHelpers#copy_feed_links for feed links inside rendered bodies.
   FEED_CLIPBOARD_ATTRS = {
     "data-controller": "clipboard",
     "data-action": "click->clipboard#copy",
     "data-clipboard-success-message-value": "The link to the feed has been copied to your clipboard."
   }.freeze
 
-  # Returns the markup for a social media link.
-  # @param title [String] The title of the social media platform.
-  # @param destination [String] The URL to the social media profile.
-  # @param css_class [String] The CSS class to apply to the link.
+  # Builds a social media link. A "Feed" link copies its URL instead of navigating.
+  # @param title [String] The platform's name.
+  # @param destination [String] The profile URL.
+  # @param css_class [String] A CSS class for the link.
   # @param open_in_new_tab [Boolean] Whether to open the link in a new tab.
-  # @return [String] An anchor element with an SVG icon.
+  # @return [String] An anchor element wrapping an SVG icon.
   def social_media_link(title:, destination:, css_class: nil, open_in_new_tab: true)
     icon = if title.downcase == 'feed'
       icon_svg("classic", "solid", "rss")
@@ -236,9 +208,8 @@ module SiteHelpers
     end
   end
 
-  # A nav/footer menu link for a site shortcut item: the feed item copies its link to the
-  # clipboard instead of navigating, open_in_new_tab items get target=_blank + noopener,
-  # and everything else is a plain link.
+  # Builds a nav/footer link for a site shortcut. A "Feed" item copies its link instead of
+  # navigating.
   # @param item [Object] A menu item with title, destination, and open_in_new_tab.
   # @return [String] An anchor element.
   def shortcut_link(item)
@@ -251,61 +222,50 @@ module SiteHelpers
     end
   end
 
-  # Formats the text at the very bottom of the footer. The end year is wrapped in a span that the
-  # current-year Stimulus controller refreshes client-side, so the copyright stays correct without a
-  # rebuild (the build-time year is the no-JS fallback). Feeds keep the plain `copyright_years`.
-  # @return [String] A string of HTML.
+  # Builds the footer copyright line. The end year is wrapped for the current-year Stimulus
+  # controller to refresh client-side, so it stays correct without a rebuild.
+  # @return [String] HTML.
   def footer_text
     years = "#{copyright_start_year}–<span data-controller=\"current-year\">#{Time.current.year}</span>"
     markdown_to_html("© #{years} #{data.site.copyright}")
   end
 
-  # First-party proxy paths for Plausible analytics. The inline init snippet
-  # (partials/_analytics.html.erb) renders these, and the Worker route that does the actual
-  # proxying (src/plausible.ts) mirrors them, so the browser-facing path and the proxy agree.
+  # First-party proxy paths for Plausible analytics. Must match the constants in
+  # src/plausible.ts, which does the proxying.
   PLAUSIBLE_SCRIPT_PATH = '/pa/script.js'
   PLAUSIBLE_EVENT_PATH = '/pa/event'
 
-  # The first-party path the Plausible script is proxied from.
-  # @return [String]
+  # @return [String] The first-party path the Plausible script is proxied from.
   def plausible_script_path
     PLAUSIBLE_SCRIPT_PATH
   end
 
-  # The first-party path Plausible events are sent to (the `endpoint` passed to
-  # `plausible.init`). Proxied to the upstream Plausible event API.
-  # @return [String]
+  # @return [String] The first-party path Plausible events are posted to.
   def plausible_event_path
     PLAUSIBLE_EVENT_PATH
   end
 
-  # Checks if Plausible analytics is installed, i.e. the upstream script URL is
-  # configured so the first-party proxy has something to proxy. Gates the analytics
-  # script tag (partials/_analytics.html.erb); the Worker checks its own copy of the
-  # variable before serving /pa/* (src/plausible.ts).
-  # @return [Boolean] True when `PLAUSIBLE_SCRIPT_URL` is set.
+  # Whether analytics is configured. Gates the analytics script tag; the Worker checks its own
+  # copy of the variable before serving /pa/*.
+  # @return [Boolean] True when PLAUSIBLE_SCRIPT_URL is set.
   def plausible_installed?
     ENV['PLAUSIBLE_SCRIPT_URL'].present?
   end
 
-  # Builds a stable, URL-based @id for a sitewide schema.org entity. Anchoring the @id to a
-  # real URL + fragment makes the node a resolvable entity that other nodes (and the per-article
-  # BlogPosting schema) can reference by @id instead of duplicating it.
+  # Builds a stable URL-based @id for a sitewide schema.org entity, so other nodes can reference
+  # it rather than duplicating it.
   # @param fragment [String] The fragment naming the entity, e.g. "organization".
-  # @param path [String] The page the entity is anchored to. Defaults to the home page.
-  # @return [String] An absolute URL with a fragment, e.g. "https://example.com/#organization".
+  # @param path [String] The page the entity is anchored to.
+  # @return [String] An absolute URL with a fragment.
   def schema_entity_id(fragment, path: '/')
     "#{full_url(path)}##{fragment}"
   end
 
-  # Generates a JSON-LD CollectionPage schema for a taxonomy archive page (`/tagged/*`),
-  # declaring the page as a collection about its topic, with the concept's description as the
-  # page description. References the sitewide WebSite node by @id rather than duplicating it.
-  # Its `mainEntity` is an ItemList enumerating the entries listed on this page, so
-  # the collection's membership is explicit rather than just described.
-  # @param content [Object] The proxied tag-page object (title = concept name; summary/description; items).
+  # Builds the JSON-LD CollectionPage schema for a taxonomy archive page, with the listed
+  # entries as its mainEntity ItemList.
+  # @param content [Object] The proxied tag-page object.
   # @see https://schema.org/CollectionPage
-  # @return [String] A JSON-LD formatted string.
+  # @return [String] JSON-LD.
   def collection_page_schema(content)
     schema = {
       "@context": "https://schema.org",
@@ -332,18 +292,16 @@ module SiteHelpers
     schema.to_json
   end
 
-  # A JSON-LD ImageObject node, shared by the article schema (cover images + OG fallback) and
-  # the author Person's portrait in the sitewide entity graph.
+  # Builds a JSON-LD ImageObject node.
   # @return [Hash]
   def image_object(url, width, height)
     { "@type": "ImageObject", "url": url, "width": width, "height": height }
   end
 
-  # Builds the JSON-LD BreadcrumbList shared by article pages (ArticleHelpers#breadcrumb_schema)
-  # and taxonomy archive pages (tag_breadcrumb_schema): Home › Blog › the given crumbs.
+  # Builds a JSON-LD BreadcrumbList of Home › Blog › the given crumbs.
   # @param crumbs [Array<Array(String, String)>] [name, url] pairs appended after Home › Blog.
   # @see https://schema.org/BreadcrumbList
-  # @return [String] A JSON-LD formatted string.
+  # @return [String] JSON-LD.
   def breadcrumb_list_schema(crumbs)
     items = [['Home', full_url('/')], ['Blog', full_url('/blog')], *crumbs].map.with_index(1) do |(name, url), position|
       { "@type": "ListItem", "position": position, "name": name, "item": url }
@@ -351,13 +309,10 @@ module SiteHelpers
     { "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": items }.to_json
   end
 
-  # Generates a JSON-LD BreadcrumbList for a taxonomy archive page (`/tagged/*`): Home › Blog ›
-  # the concept's ancestor chain, ending at the concept itself. Mirrors the article breadcrumb
-  # (ArticleHelpers#breadcrumb_schema) for the archive pages, whose nesting the article version
-  # can't express. Each crumb points at the concept's canonical archive path. Returns nil when
-  # the page has no concept.
-  # @param content [Object] The proxied tag-page object (carries `tag_id`).
-  # @return [String, nil] A JSON-LD formatted string, or nil.
+  # Builds the JSON-LD BreadcrumbList for a taxonomy archive page: Home › Blog › the concept's
+  # ancestor chain, ending at the concept itself.
+  # @param content [Object] The proxied tag-page object, carrying `tag_id`.
+  # @return [String, nil] JSON-LD, or nil when the page has no concept.
   def tag_breadcrumb_schema(content)
     return unless content.tag_id
     chain = concept_chain(content.tag_id)
@@ -366,12 +321,11 @@ module SiteHelpers
     breadcrumb_list_schema(chain.map { |node| [sanitize(node[:name]), full_url(node[:path])] })
   end
 
-  # Generates a JSON-LD Blog schema for the blog index (`/blog`), declaring the page as
-  # the site's blog and listing the entries on this page as `blogPost` (BlogPosting) references.
-  # References the sitewide WebSite/Organization/Person nodes by @id rather than duplicating them.
-  # @param content [Object] The proxied blog-index page object (title = "Blog"; items).
+  # Builds the JSON-LD Blog schema for the blog index, listing this page's entries as blogPost
+  # references.
+  # @param content [Object] The proxied blog-index page object.
   # @see https://schema.org/Blog
-  # @return [String] A JSON-LD formatted string.
+  # @return [String] JSON-LD.
   def blog_schema(content)
     posts = Array(content.items).map do |item|
       {
@@ -394,11 +348,9 @@ module SiteHelpers
     }.to_json
   end
 
-  # Redirects from a concept's alternative labels (synonyms/altLabels) to its canonical archive
-  # page — e.g. /tagged/half-ironman → /tagged/triathlon/ironman-703/. Skips a synonym whose
-  # slug is blank, collides with a real tag page, or duplicates another synonym or a configured
-  # redirect. Rendered into the `_redirects` file (source/redirects.erb).
-  # @return [Array<Hash>] [{ from:, to:, status: }]
+  # Builds redirects from each concept's synonyms to its canonical archive page. Skips a synonym
+  # whose slug is blank, collides with a real tag page, or duplicates another redirect.
+  # @return [Array<Hash>] Entries of { from:, to:, status: }.
   def taxonomy_synonym_redirects
     page_paths = data.tags.map { |t| t.tag.path }.to_set
     taken = data.redirects.map(&:from).to_set
@@ -415,12 +367,10 @@ module SiteHelpers
     end
   end
 
-  # The author's areas of expertise for the Person node's schema.org `knowsAbout`: the top-level
-  # concepts of the `sports` scheme — the disciplines the blog covers (e.g. Triathlon, Running).
-  # Derived from the taxonomy, so it grows on its own as disciplines gain content (an empty branch
-  # has no tag page, so it doesn't appear until it does). Content-type/meta topics (Race Reports,
-  # News, Personal…) are deliberately excluded — they aren't subjects of expertise.
-  # @return [Array<String>] Sorted discipline names, or [] when none.
+  # The author's areas of expertise for schema.org `knowsAbout`: the top-level concepts of the
+  # `sports` scheme. Content-type and meta topics are excluded — they aren't subjects of
+  # expertise.
+  # @return [Array<String>] Sorted discipline names.
   def author_knows_about
     Array(data.tags)
       .map(&:tag)
@@ -430,9 +380,9 @@ module SiteHelpers
       .sort
   end
 
-  # The author's social-profile URLs for schema.org `sameAs` (the feed is excluded — it isn't a
-  # social profile). Shared by the Organization and Person nodes in the entity graph.
-  # @return [Array<String>] Social profile URLs, or an empty array when none are configured.
+  # The author's social-profile URLs for schema.org `sameAs`. The feed is excluded — it isn't a
+  # social profile.
+  # @return [Array<String>] Profile URLs.
   def author_same_as
     return [] if data.site.socials_collection.items.blank?
     data.site.socials_collection.items
@@ -440,12 +390,11 @@ module SiteHelpers
       .map { |s| s.destination }
   end
 
-  # Generates a JSON-LD @graph of the site's sitewide entities — the Organization (publisher),
-  # the WebSite, and the author Person — connected by @id so consumers can resolve "who runs this
-  # site / who wrote this / what site is this". Per-article BlogPosting schema references these
-  # nodes by @id rather than duplicating them. Rendered sitewide.
+  # Builds the JSON-LD @graph of the site's sitewide entities — Organization, WebSite, and the
+  # author Person — connected by @id. Per-article schema references these rather than repeating
+  # them.
   # @see https://developers.google.com/search/docs/appearance/structured-data/organization
-  # @return [String] A JSON-LD formatted string.
+  # @return [String] JSON-LD.
   def site_schema_graph
     same_as = author_same_as
 
@@ -488,10 +437,10 @@ module SiteHelpers
     }.to_json
   end
 
-  # Generates a JSON-LD ProfilePage schema for the about page, marking it as the canonical page
-  # about the author Person (referenced by @id from the sitewide entity graph).
+  # Builds the JSON-LD ProfilePage schema marking the about page as the canonical page about the
+  # author Person.
   # @see https://developers.google.com/search/docs/appearance/structured-data/profile-page
-  # @return [String] A JSON-LD formatted string.
+  # @return [String] JSON-LD.
   def profile_page_schema
     {
       "@context": "https://schema.org",

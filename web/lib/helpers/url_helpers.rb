@@ -1,8 +1,8 @@
 module UrlHelpers
-  # Constructs the full URL for a given Middleman resource, depending on the environment.
-  # @param resource [Object] The resource for which the URL is being generated.
-  # @param params [Hash] (Optional) Additional query parameters to be included in the URL.
-  # @return [String] The fully constructed URL as a string.
+  # Builds the absolute URL for a Middleman resource.
+  # @param resource [Object] The resource, path, or URL.
+  # @param params [Hash] Query parameters to append.
+  # @return [String] The absolute URL.
   def full_url(resource, params = {})
     url = URI.parse(root_url)
     url.path = url_for(resource)
@@ -10,12 +10,9 @@ module UrlHelpers
     url.to_s
   end
 
-  # Returns the root URL of the application based on the environment.
-  # On a production build it uses the site's public origin, `URL` (set in the build env).
-  # Anywhere else — `middleman server`, a local build — it defaults to
-  # 'http://localhost:4567'. There is no remote non-production build: the deploy workflow
-  # only ships from main, and the Worker has no preview URLs (`workers_dev: false`).
-  # @return [String] The root URL of the application.
+  # @return [String] The site's origin: `URL` on a production build, localhost otherwise.
+  #   There is no remote non-production build — the deploy workflow only ships from main and
+  #   the Worker has no preview URLs.
   def root_url
     production? ? ENV['URL'] : 'http://localhost:4567'
   end

@@ -1,414 +1,313 @@
 # api/ — Kona widget API
 
-Rails 8.1 API (Ruby 4.0.6) that serves small embeddable **HTML fragments** ("widgets")
-— plus structured-data endpoints and inbound webhooks — for the static `web/` site.
-Deployed to **fly.io** as `kona-api`, with the origin proxied behind **Cloudflare** — so
-`Fly-Client-IP` is a Cloudflare PoP, not the visitor (see **Abuse mitigation** below and the
-root [`CLAUDE.md`](../CLAUDE.md)). Routes are split by namespace: `/widgets/*` (HTML
-fragments, reached through the web app's same-origin proxy), `/api/*` (structured
-data, hit directly at the origin), and `/webhooks/*` (inbound webhooks, hit directly by
-the sending service). Redis-backed caching, **no database**.
+Rails 8.1 API (Ruby 4.0.6) serving small embeddable **HTML fragments** ("widgets"), plus
+structured-data endpoints and inbound webhooks, for the static `web/` site. Deployed to **fly.io**
+as `kona-api` (`app` + `worker` processes), with the origin proxied behind **Cloudflare**.
+Redis-backed caching, **no database**.
 
-Minimal Rails: only ActiveModel + ActionController + ActionView are loaded (no
-ActiveRecord / ActiveJob / ActionMailer / ActionCable). See the root
-[`CLAUDE.md`](../CLAUDE.md) for the web↔api markup contract before changing any view.
+Minimal Rails: only ActiveModel + ActionController + ActionView are loaded (no ActiveRecord /
+ActiveJob / ActionMailer / ActionCable). See the root [`CLAUDE.md`](../CLAUDE.md) for the web↔api
+markup contract before changing any view, and for the comment-style conventions this app follows.
+
+Routes split by namespace: `/widgets/*` (HTML fragments, reached through the web app's proxy),
+`/api/*` (structured data, hit directly at the origin), `/webhooks/*` (inbound, hit directly by
+the sending service).
 
 ## Endpoints
 
-All `/widgets/*` responses are HTML fragments (`layout false`) with the cache
-headers below. Edge TTL = how long the edge serves a cached copy before revalidating.
+All `/widgets/*` responses are HTML fragments (`layout false`). Edge TTL = how long the edge serves
+a cached copy before revalidating.
 
-| Method | Path | Action | Returns | Edge TTL |
-|---|---|---|---|---|
-| GET | `/up` | `rails/health#show` | health check | — |
-| GET | `/widgets/activity-stats` | `widgets/activity_stats#show` | HTML (Intervals.icu totals) | 5 min |
-| GET | `/widgets/weather/current` | `widgets/weather#current` | HTML (weather/AQI/pollen) | 5 min |
-| GET | `/widgets/events/upcoming` | `widgets/events#upcoming` | HTML (upcoming races; featured event has inline race-day weather) | 1 hr |
-| GET | `/widgets/articles/trending` | `widgets/articles#trending` | HTML ("hot today" articles — Plausible pageviews over a flat 48h window vs. each post's own baseline, recomputed hourly) | 1 hr |
-| GET | `/widgets/articles/trending/:id` | `widgets/articles#trending_excluding` | HTML (trending minus one Contentful id — an article page passes its own id so it isn't listed) | 1 hr |
-| GET | `/widgets/articles/related/:id` | `widgets/articles#related` | HTML ("You May Also Like" — articles semantically related to `:id`, ranked from precomputed Voyage embeddings) | 1 hr |
-| GET | `/widgets/whoop` | `widgets/whoop#show` | HTML (sleep/recovery/strain) | 5 min |
-| GET | `/widgets/plausible/pageviews/:id` | `widgets/plausible#pageviews` | HTML (pageview count by Contentful id) | 5 min |
-| POST | `/api/location` | `api/location#create` | sets Redis `location:current` + enqueues a `LocationSyncJob` (bearer-token gated) | — |
-| POST | `/api/contact` | `api/contact#create` | drops honeypot hits + enqueues a `ContactMailJob` (Akismet spam-check → Cloudflare email to the owner, Reply-To = sender); JSON → 204/422, HTML → 303 to `/contact/success` (bearer-token gated, browser-reachable via the web proxy) | — |
-| POST | `/webhooks/contentful` | `webhooks/contentful#create` | enqueues a standard.site PDS sync job on publish/unpublish/delete, plus an R2 image-mirror job on asset publish (HMAC-gated); 204 | — |
-| POST | `/webhooks/whoop` | `webhooks/whoop#create` | enqueues a `WhoopWebhookJob` syncing strain/sleep/recovery to Intervals.icu wellness + regenerating the matched activity's description (HMAC-gated, user-verified); 200 `{ok: true}` | — |
-| GET | `/api/standard-site` | `api/standard_site#show` | JSON `{did, publication_uri}` for the web build's verification markup | 1 hr |
-| POST | `/api/icons` | `api/icons#create` | JSON `{family: {style: [{id, svg}]}}` — resolves the web build's posted Font Awesome allowlist to SVGs (bearer-token gated) | — |
-| POST | `/api/build` | `api/build#create` | enqueues a `SiteBuildJob` to rebuild + redeploy the web site (bearer-token gated, 60s dedupe lock); 202, or 429 inside the lock window | — |
-| GET | `/whoop/auth` | `whoop_oauth#authorize` | redirect (owner-session gated) | — |
-| GET | `/whoop/callback` | `whoop_oauth#callback` | OAuth token exchange | — |
-| GET | `/login` | `sessions#new` | owner sign-in page (Google button) | — |
-| GET | `/auth/google_oauth2/callback` | `sessions#create` | Google OAuth callback → sets owner session | — |
-| POST | `/logout` | `sessions#destroy` | clears the owner session | — |
-| — | `/sidekiq` | `Sidekiq::Web` (mounted) | background-job dashboard (owner-session gated) | — |
-| GET | `/` | redirect | 301 → main site | — |
+| Method | Path | Returns | Edge TTL |
+|---|---|---|---|
+| GET | `/up` | health check | — |
+| GET | `/widgets/activity-stats` | Intervals.icu totals | 5 min |
+| GET | `/widgets/weather/current` | weather/AQI/pollen | 5 min |
+| GET | `/widgets/events/upcoming` | upcoming races; the featured event has inline race-day weather | 1 hr |
+| GET | `/widgets/articles/trending[/:id]` | "hot today" articles; `:id` excludes one Contentful id, so an article page can drop itself | 1 hr |
+| GET | `/widgets/articles/related/:id` | "You May Also Like", from precomputed Voyage embeddings | 1 hr |
+| GET | `/widgets/whoop` | sleep/recovery/strain | 5 min |
+| GET | `/widgets/plausible/pageviews/:id` | pageview count by Contentful id | 5 min |
+| POST | `/api/location` | sets Redis `location:current` + enqueues `LocationSyncJob` | — |
+| POST | `/api/contact` | drops honeypot hits + enqueues `ContactMailJob`; JSON → 204/422, HTML → 303 | — |
+| POST | `/api/build` | enqueues `SiteBuildJob`; 202, or 429 inside the 60s dedupe lock | — |
+| POST | `/api/icons` | resolves the web build's Font Awesome allowlist to SVGs | — |
+| GET | `/api/standard-site` | `{did, publication_uri}` for the build's verification markup | 1 hr |
+| POST | `/webhooks/contentful` | enqueues PDS sync, embedding, asset-mirror, and site-build jobs; 204 | — |
+| POST | `/webhooks/whoop` | enqueues `WhoopWebhookJob`; 200 `{ok: true}` | — |
+| GET | `/whoop/auth`, `/whoop/callback` | Whoop OAuth (authorize is owner-gated) | — |
+| GET | `/login`, `/auth/google_oauth2/callback`; POST `/logout` | owner session | — |
+| — | `/sidekiq` | job dashboard (owner-session gated) | — |
+| GET | `/` | 301 → main site | — |
 
 ## Architecture
 
-- **Controllers** (`app/controllers/`), one namespace per kind of endpoint:
-  - `widgets/` — HTML-only widget endpoints. `Widgets::BaseController` (`layout false`,
-    includes the `LiveWidget` concern); widget controllers fetch via a service, call
-    `cache_widget(ttl:)`, then render an ERB fragment. Use `render_empty` (blank body)
-    when data is unavailable — the site's `live-update` controller removes the placeholder
-    (collapsing the widget) on an empty response, so prefer it over raising.
-  - `api/` — structured-data endpoints (accept or return data, not markup):
-    `Api::LocationController`, `Api::StandardSiteController`, `Api::ContactController`,
-    `Api::BuildController` under
-    `Api::BaseController`. `ContactController` is the one browser-reachable write (through the
-    web proxy): it drops honeypot hits, validates (incl. length caps), verifies **Turnstile** on
-    the JSON path (skipped for the no-JS HTML path — the widget needs JS), and enqueues
-    `ContactMailJob` (`Akismet` spam-check → `Resend` email to the owner, with a Sender-details
-    block from the forwarded IP/geo/UA). It answers by `Accept` — JSON (`fetch`) → 204/422, HTML
-    (no-JS native POST) → 303 to the site's Thank-You page. See the root `CLAUDE.md` contact
-    contract for the full defense-layer rundown.
-  - `webhooks/` — inbound webhooks, one controller per sending service under
-    `Webhooks::BaseController` (currently `Webhooks::ContentfulController`).
-- **Auth** — `Widgets::BaseController` and `Api::BaseController` require the `API_TOKEN`
-  bearer (`TokenAuthentication` concern) via a global `before_action`; the web app's Worker
-  proxy injects it on widget requests, so the widget origin is closed to direct/public hits
-  (cheap 401 before any work). `POST /api/icons` keeps the bearer (the web build sends it) —
-  a novel icon id triggers a paid upstream Font Awesome call, so scanners get a cheap 401
-  first. `standard-site` skips it (public, build-time fetched directly
-  via `KONA_API_URL`). Webhook controllers don't use the bearer at all — senders can't carry
-  our token, so each authenticates with its service's own scheme (Contentful: HMAC request
-  verification). A new widget endpoint is gated automatically by inheriting
-  `Widgets::BaseController`.
-- **Owner auth** — the owner-only surfaces (`/whoop/auth` and the `/sidekiq` UI) are gated by a
-  **Google OAuth** sign-in restricted to a single identity, **not** the `API_TOKEN` bearer.
-  `SessionsController` runs the OmniAuth (`omniauth-google-oauth2`) flow and accepts a login only
-  when the verified email equals `OWNER_EMAIL` (and the provider's `hd` domain check passes),
-  then stores `owner_email` in the signed cookie session. The `Authentication` concern
-  (`require_owner!`) gates the Whoop controller; a small Rack guard in the Sidekiq initializer
-  gates the mounted `Sidekiq::Web` on the same session (unauthenticated → redirect to `/login`).
-- **Services** (`app/services/`, base `ApplicationService`): one per external API —
-  Intervals.icu, Apple WeatherKit (ES256 JWT), Google Maps / Air Quality / Pollen,
-  PurpleAir, Whoop (OAuth2), TrainerRoad (iCal), Contentful (events/articles),
-  Plausible (⚠️ **600 calls/hour**, and `cached_json` caps each distinct query body at one call
-  per its 5-minute TTL — i.e. 12/hour *per cache key*, so what matters is the number of distinct
-  queries, not the number of requests. `Plausible#pageviews_by_path` is therefore **one site-wide
-  query** over all article pages, shared by `TrendingArticles` and the per-article pageviews
-  widget; asking per article would mint a key per article and scale the ceiling with the corpus,
-  over the limit. Don't reintroduce a per-article query, and redo the math before shortening
-  either TTL. A rate-limited query returns nil, which isn't cached — `render_empty`'s 60s edge
-  cache is what keeps that from retrying hard), Font Awesome, Goodspeed (bay conditions),
-  `Akismet` (contact-form spam check —
-  plain-text `true`/`false`; fails **closed** when configured — raises so the intake job retries —
-  and open only when unconfigured), `Resend` (the contact form's email delivery — an HTTPS
-  API, so it works from fly, which blocks outbound SMTP), `Turnstile` (contact-form bot-challenge
-  siteverify — verified in the request path since tokens are single-use/300s; fails open),
-  `StandardSite` (publishes the
-  blog to the AT Protocol / Bluesky PDS as standard.site records — webhook-driven, plus
-  the `standard_site:backfill` rake task in `lib/tasks/`), `AssetMirror` (mirrors Contentful's
-  image assets into a Cloudflare R2 bucket — webhook-driven, plus `assets:backfill`; see
-  **The R2 image mirror** below). Read-through Redis cache via
-  `cached_json(key, expires_in:)`; HTTParty with retries; `DeepOstruct` for dot-access.
+### Controllers
+
+One namespace per kind of endpoint, all inheriting `ActionController::Base` directly (not
+`ApplicationController`) to skip the modern-browser gate:
+
+- `widgets/` — `Widgets::BaseController` (`layout false`, includes `LiveWidget`). Widget actions
+  fetch via a service, call `cache_widget(ttl:)`, then render an ERB fragment. Use `render_empty`
+  when data is unavailable — the site's live-update controller removes the placeholder, so prefer
+  it over raising.
+- `api/` — structured data under `Api::BaseController`. `ContactController` is the one
+  browser-reachable write (through the web proxy).
+- `webhooks/` — one controller per sending service under `Webhooks::BaseController`.
+
+**Auth** — `Widgets::BaseController` and `Api::BaseController` require the `API_TOKEN` bearer
+(`TokenAuthentication`) via a global `before_action`, so the widget origin is closed to direct hits
+(a cheap 401 before any work). A new widget endpoint is gated automatically by inheriting the base
+controller. `standard-site` skips it (public, build-time fetched). Webhook controllers don't use
+the bearer at all — senders can't carry our token, so each authenticates with its service's own
+HMAC scheme.
+
+**Owner auth** — `/whoop/auth` and `/sidekiq` are gated by a **Google OAuth** sign-in restricted to
+a single identity, not the bearer. `SessionsController` runs the OmniAuth flow and accepts a login
+only when the verified email equals `OWNER_EMAIL` (and the `hd` domain check passes), then stores
+`owner_email` in the signed cookie session. The `Authentication` concern gates the Whoop
+controller; a small Rack guard in the Sidekiq initializer gates the mounted `Sidekiq::Web`.
+
+### Services
+
+`app/services/`, base `ApplicationService`: one per external API — Intervals.icu, Apple WeatherKit
+(ES256 JWT), Google Maps / Air Quality / Pollen, PurpleAir, Whoop (OAuth2), TrainerRoad (iCal),
+Contentful, Plausible, Font Awesome, Goodspeed, Akismet, Resend, Turnstile, Voyage (`Embeddings`),
+`StandardSite`, `AssetMirror`. Read-through Redis cache via `cached_json(key, expires_in:)`;
+HTTParty with retries; `DeepOstruct` for dot-access.
+
+⚠️ **Plausible is rate-limited to 600 calls/hour**, and `cached_json` caps each distinct query body
+at one call per its 5-minute TTL — so what matters is the number of *distinct queries*, not
+requests. `Plausible#pageviews_by_path` is therefore **one site-wide query** shared by
+`TrendingArticles` and the per-article pageviews widget; asking per article would mint a key per
+article and scale the ceiling with the corpus, over the limit. **Don't reintroduce a per-article
+query, and redo the math before shortening either TTL.**
+
+**Failure modes worth knowing:**
+
+- Most services degrade — a failure collapses the widget rather than raising.
+- `Akismet` fails **closed** when configured (an outage raises so the intake job retries) and open
+  only when unconfigured. `Turnstile` fails open.
+- `AssetMirror` **raises**, so Sidekiq retries — a silently skipped asset surfaces later as a
+  broken image on a live page.
+
 ### The R2 image mirror
 
-`AssetMirror` copies every published Contentful **image** asset into a Cloudflare R2 bucket, and
-the `web/` build rewrites its asset URLs onto the bucket's custom domain (`IMAGE_HOST`) so
-**Cloudflare Images fetches the untransformed source from inside the zone instead of from
-Contentful**. That's the whole point: a source outside the zone can't use Tiered Cache or Cache
-Reserve, so every Cloudflare PoP was independently pulling the full-size original from Contentful
-and re-pulling it on eviction. Production now never touches Contentful for images — only this
-mirror does, once per asset version.
+`AssetMirror` copies every published Contentful **image** asset into an R2 bucket, and the `web/`
+build rewrites asset URLs onto that bucket's custom domain. ⚠️ **This is a cross-app data contract
+and neither side validates the other** — full write-up in the root [`CLAUDE.md`](../CLAUDE.md).
 
-⚠️ **This is a cross-app data contract.** `web` emits `https://<IMAGE_HOST>/<Contentful path>`;
-this writes objects keyed on that same path verbatim. **Neither side validates the other** — a
-mismatched bucket, custom domain, or key shape 404s every image on the site with nothing
-reporting it. Full write-up in the root [`CLAUDE.md`](../CLAUDE.md).
-
-- **Publish only.** ⚠️ Unpublish/delete deliberately do **not** remove the object: the web build
-  reads Contentful with a **preview** token, so an unpublished asset is still in `data/assets.json`
-  and still referenced by built pages. Dropping it would break images that are live. Keys are
-  content-addressed (replacing a file mints a new token segment), so objects are immutable and
-  nothing ever needs invalidating; orphans are cheap and pruned by hand if it ever matters.
-- **Raises, doesn't degrade.** Unlike the widget services, a failed mirror raises so Sidekiq
-  retries — a silently-skipped asset surfaces later as a broken image on a live page. Bugsnag's
-  Sidekiq instrumentation reports the raise, so `AssetMirror` doesn't also report it (that would
-  double-notify).
+- **Publish only.** ⚠️ Unpublish and delete deliberately don't remove the object: the web build
+  reads Contentful with a **preview** token, so an unpublished asset is still referenced by built
+  pages. Keys are content-addressed, so objects are immutable and nothing needs invalidating.
 - ⚠️ **The download uses `Net::HTTP#read_body`, not HTTParty — don't "fix" it to match the house
-  style.** These originals are big (a dozen 20–38MB camera JPEGs) and the worker is a **512MB** VM
-  at **concurrency 5**. Buffering whole files OOM-killed the worker during the first backfill, and
-  a hard kill isn't a job failure Sidekiq can retry, so the in-flight jobs vanished silently — 13
-  assets never mirrored and only surfaced as 404s on live pages. HTTParty doesn't solve it even
-  with `stream_body: true` (it still retains the body): measured at **+154MB** buffered, **+75MB**
-  streamed, for five concurrent 31MB downloads. The Tempfile matters for the same reason — it
-  lets the S3 client upload from disk rather than from a second copy in memory. If the asset
-  library grows a lot more large originals, bump the VM before raising concurrency.
-- **`rake assets:backfill`** enqueues a job per asset; each skips an asset already in the bucket
-  (one HEAD, no transfer), so it's cheap to re-run and doubles as the reconciliation net for the
-  webhook deliveries Contentful never retries. `DRY_RUN=1` reports the count without enqueuing.
-  ⚠️ Run it to completion **before** `IMAGE_HOST` is set on the web side.
+  style.** These originals reach 38MB and the worker is a **512MB** VM at **concurrency 5**.
+  Buffering whole files OOM-killed it during the first backfill, and a hard kill isn't a failure
+  Sidekiq can retry, so the in-flight jobs vanished silently — 13 assets never mirrored, surfacing
+  only as 404s on live pages. HTTParty doesn't solve it even with `stream_body: true`: measured at
+  +52.3MB peak RSS against +1.2MB for the streaming loop. The Tempfile matters for the same reason
+  — it lets the S3 client upload from disk rather than a second copy in memory. If the asset
+  library grows many more large originals, bump the VM before raising concurrency.
+- **`rake assets:backfill`** enqueues a job per asset, each skipping one already in the bucket (one
+  HEAD, no transfer), so it's cheap to re-run and doubles as the reconciliation net for webhook
+  deliveries Contentful never retries. `DRY_RUN=1` reports the count. ⚠️ Run it to completion
+  **before** `IMAGE_HOST` is set on the web side.
 - No-ops entirely when the `R2_*` vars are absent, so dev/CI stay inert.
 
-- **Webhooks**: `Webhooks::ContentfulController#create` receives Contentful publish/
-  unpublish/delete events and keeps the standard.site PDS records in sync. Verified with
-  Contentful's HMAC request-verification scheme (`ContentfulRequestVerification` concern,
-  `CONTENTFUL_WEBHOOK_SECRET`). The request only **enqueues jobs** and returns 204; the work runs
-  on the Sidekiq worker (Sidekiq retries on failure). On every publish/unpublish/delete it also
-  enqueues **`SiteBuildJob`**, which fires a GitHub `repository_dispatch` to rebuild the web site
-  (this replaces the old Contentful→host build hook — the `.github/workflows/web.yml` "Web"
-  workflow builds from it; scope the Contentful webhook to **Entry + Asset** publish/unpublish/
-  delete so image-only changes rebuild too, and **not** auto-save). Contentful
-  does **not** retry deliveries, so `rake standard_site:backfill` remains the broader
-  reconciliation/recovery path. Operations log at info level (`standard.site: …`).
-  `Webhooks::WhoopController#create` receives Whoop v2 webhooks (`workout.updated`,
-  `sleep.updated`, `recovery.updated`, …), verified with Whoop's HMAC scheme
-  (`WhoopRequestVerification` concern — signed with `WHOOP_CLIENT_SECRET`, base64 HMAC over
-  timestamp + raw body, ±5 min skew) and a payload `user_id` check against the authenticated
-  athlete (Redis-cached for a day; foreign users get 403 so Whoop stops retrying). The
-  request enqueues a `WhoopWebhookJob` and responds 200 `{ok: true}` (Whoop expects a 2xx
-  within ~1s and retries on failure). Register the webhook URL with **Model Version V2** in
-  the Whoop developer dashboard. Processing (`WhoopWebhookProcessor`) writes the custom
-  wellness fields `WhoopStrain` / `WhoopSleepPerformance` / `WhoopRecovery` and the activity
-  field `WhoopWorkoutStrain` (all four must exist in Intervals.icu → Settings → Custom
-  Fields — a 422 is logged and skipped, not retried), then enqueues a separate
-  `ActivityDescriptionJob` (below) to regenerate the matched activity's description. The
-  metric sync and the description are deliberately split: if the Whoop integration ever goes
-  away, "sync Whoop metrics to Intervals.icu" disappears entirely, while "write activity
-  descriptions" keeps working (triggered by another source) and simply loses its 🔥 line.
-- **Background jobs** — native **Sidekiq** (`Sidekiq::Job`, not ActiveJob — ActiveJob stays
-  disabled in `application.rb`). Jobs live in `app/jobs/` and inherit from `ApplicationJob` (a
-  plain `Sidekiq::Job` superclass holding the shared `retry_for: 24.hours` — Sidekiq retries with
-  its normal backoff, then Dead-sets a job once 24 hours have elapsed since the first failure);
-  `StandardSiteSyncJob(operation,
-  entry_id)` runs the standard.site sync (webhook- and backfill-driven),
-  `AssetSyncJob(asset_id)` mirrors one Contentful image asset into R2 (webhook- and
-  backfill-driven — see **The R2 image mirror** above; ⚠️ it *raises* on failure rather than
-  degrading, since an unmirrored asset means a broken image on a live page),
-  `SiteBuildJob(event_type = "contentful-publish")` fires a GitHub `repository_dispatch` to
-  rebuild + redeploy the **web** site (the `.github/workflows/web.yml` "Web" workflow listens for
-  it). Two callers, one event type each — both build identically, and are distinct only so the
-  deploy's Slack notification can name the trigger (`.github/actions/ci-context/action.yml`
-  branches on `github.event.action`): the Contentful webhook enqueues it with the default on every
-  publish/unpublish/delete so the static build picks up the change, and `POST /api/build`
-  (`Api::BuildController`) enqueues it with `"api-build"` for a programmatic on-demand rebuild,
-  behind a 60s Redis lock (`build:trigger_lock`) that returns 429 on repeats. ⚠️ Both event types
-  must stay listed in that workflow's `repository_dispatch.types` — GitHub accepts a dispatch for
-  an unlisted type with a 204 and silently runs nothing. The event type is always a caller-supplied
+### Webhooks
+
+`Webhooks::ContentfulController` receives publish/unpublish/delete events (HMAC-verified via
+`ContentfulRequestVerification`) and **only enqueues jobs**, returning 204; the work runs on the
+Sidekiq worker. On every publish it enqueues the standard.site sync, the article embedding, the R2
+asset mirror, and **`SiteBuildJob`** to rebuild the web site. Scope the Contentful webhook to
+**Entry + Asset** publish/unpublish/delete (so image-only changes rebuild too) and **not**
+auto-save. ⚠️ Contentful does **not** retry deliveries — `rake standard_site:backfill` and
+`rake assets:backfill` are the reconciliation paths.
+
+`Webhooks::WhoopController` receives Whoop v2 webhooks, verified with Whoop's HMAC scheme
+(`WhoopRequestVerification`: signed with `WHOOP_CLIENT_SECRET`, base64 HMAC over timestamp + raw
+body, ±5 min skew) plus a payload `user_id` check against the authenticated athlete (Redis-cached
+for a day; foreign users get 403 so Whoop stops retrying). It enqueues and responds 200 within
+Whoop's ~1s expectation. Register the URL with **Model Version V2** in the Whoop dashboard.
+
+Processing (`WhoopWebhookProcessor`) writes the custom wellness fields `WhoopStrain` /
+`WhoopSleepPerformance` / `WhoopRecovery` and the activity field `WhoopWorkoutStrain` — ⚠️ all four
+must exist in Intervals.icu → Settings → Custom Fields, or a 422 is logged and skipped — then
+enqueues a separate `ActivityDescriptionJob`. The split is deliberate: if the Whoop integration
+ever goes away, the metric sync disappears entirely while descriptions keep working, losing only
+the 🔥 line.
+
+### Background jobs
+
+Native **Sidekiq** (`Sidekiq::Job`, not ActiveJob), in `app/jobs/`, inheriting `ApplicationJob` —
+a plain superclass holding the shared `retry_for: 24.hours` (normal backoff, then Dead-set once 24
+hours have passed since the first failure). Every job takes plain-string args and is idempotent, so
+that shared window is safe.
+
+| Job | What |
+|---|---|
+| `StandardSiteSyncJob(operation, entry_id)` | standard.site PDS sync |
+| `AssetSyncJob(asset_id)` | mirrors one image asset into R2 (⚠️ raises rather than degrading) |
+| `ArticleEmbeddingJob(operation, entry_id)` | keeps an article's Voyage embedding in sync |
+| `SiteBuildJob(event_type)` | fires a GitHub `repository_dispatch` to rebuild the web site |
+| `WhoopWebhookJob(event_type, resource_id, trace_id)` | syncs Whoop metrics to Intervals.icu |
+| `ActivityDescriptionJob(activity_id, whoop_strain = nil)` | (re)generates an activity's Strava description |
+| `LocationSyncJob(latitude, longitude)` | propagates the current location to Intervals.icu |
+| `ContactMailJob(name, email, message, context)` | contact intake: Akismet + compose |
+| `ContactDeliveryJob(payload)` | the one retryable *delivery* unit — sends via Resend |
+
+- **`SiteBuildJob`** has two callers with one event type each — the Contentful webhook
+  (`contentful-publish`) and `POST /api/build` (`api-build`). They build identically and differ
+  only so the deploy's Slack notification can name the trigger. ⚠️ **Both event types must stay
+  listed in that workflow's `repository_dispatch.types`** — GitHub accepts a dispatch for an
+  unlisted type with a 204 and silently runs nothing. The event type is always a caller-supplied
   constant, never a request parameter. No-ops when `GITHUB_DISPATCH_TOKEN`/`GITHUB_REPOSITORY` are
-  unset, and
-  `ArticleEmbeddingJob(operation, entry_id)` keeps an article's Voyage embedding (the
-  `embeddings:article:<id>` Redis key) in sync for the related-articles widget — `"embed"` on
-  publish, `"delete"` on unpublish/delete (webhook-driven, plus the `embeddings:backfill` rake
-  task), `WhoopWebhookJob(event_type, resource_id, trace_id)` syncs a Whoop webhook's
-  metrics to Intervals.icu wellness/activity fields (see **Webhooks** above), and
-  `ActivityDescriptionJob(activity_id, whoop_strain = nil)` (re)generates an activity's
-  Strava description via `ActivityDescription::Generator` / `Composer` / `Llm` — emoji stat
-  lines (power, heat, Whoop strain, water temp) plus two
-  Anthropic-generated lines (planned-workout summary matched against the TrainerRoad
-  calendar, weather sentence — prompts in `app/prompts/`, skipped when `ANTHROPIC_API_KEY` is
-  unset), preserving any user-written prose above the stat block, deduped per activity by a
-  Redis lock (`whoop:description_lock:*`). It's **source-agnostic**: the Whoop workout path
-  enqueues it today (passing the matched workout's strain for the 🔥 line), but it's
-  re-triggerable by any future webhook with no strain, losing only that line. Finally,
-  `LocationSyncJob(latitude, longitude)` propagates the current location to Intervals.icu
-  (enqueued by `POST /api/location`): via `LocationSync` / `LocationContext` it reverse-geocodes
-  the coordinates (`GoogleMaps`), then updates the athlete profile (city/state/country/timezone)
-  and replaces the weather config with a single current-location forecast — each write skipped
-  when Intervals.icu already matches, and the just-written timezone primed into the
-  `intervals.icu:timezone:*` cache. The contact form is a **two-job pipeline** so a Resend
-  failure retries only the send: `ContactMailJob(name, email, message, context)` (enqueued by
-  `POST /api/contact`) is the intake — it runs the `Akismet` spam-check off the request path (a
-  spam verdict is logged and dropped), then for a clean submission composes the email (a
-  Sender-details block from the forwarded IP/geo/UA `context`, plus a **Claude-generated subject
-  line** via `ContactSubject`, a structured-output Anthropic call mirroring `ActivityDescription::Llm`
-  that fails soft to a static subject) and enqueues `ContactDeliveryJob(payload)`, which is the
-  sole retryable *delivery* unit — it just sends the finished email via `Resend` (Reply-To = the
-  sender). The split is deliberate: **`Akismet` fails closed** — when configured but unreachable
-  or without a clean verdict it **raises**, so the intake job retries (never delivering a message
-  that wasn't spam-checked; exhausted retries park it in the Dead set rather than let spam
-  through). `ContactSubject` fails soft, and `Akismet` returns ham only when unconfigured, so on a
-  normal run each runs once; only `Resend` re-runs on a delivery retry. Args are plain strings + a
-  string-keyed hash and every operation is idempotent, so the shared 24-hour retry window is safe. Config in `config/initializers/sidekiq.rb` (Redis = `REDIS_URL`, web UI guard) and
-  `config/sidekiq.yml` (concurrency). The **`/sidekiq` web UI** is mounted in `routes.rb` and
-  gated by the owner session (Google OAuth — see **Owner auth** above), shared with `/whoop/auth`.
-  Sidekiq runs as a dedicated **`worker` fly process** (see fly.toml); a worker must be running
-  to drain the queue (locally: `bundle exec sidekiq`).
-- **Views** (`app/views/widgets/`) render raw HTML fragments. **Helpers** (`app/helpers/`,
-  originally ported from the web app) are pure formatting/selection functions — every method
-  takes the data it works on as explicit arguments; none read controller ivars. Request state
-  lives in **presenters** (`app/presenters/`): `WeatherSummaryPresenter` (the weather widget's
-  prose + business rules; the view reads everything through `@summary`), `EventWeatherPresenter`
-  (per-event race-day weather), and `WhoopPresenter` (scores/labels/heading). Presenters take
-  their data as constructor kwargs and pass it to the helper functions they compose. When a
-  controller body needs a helper, it calls it through the `helpers` proxy rather than
-  `include`-ing the module.
-- **Caching** — `app/controllers/concerns/live_widget.rb`. `cache_widget(ttl:)` sets:
-  - Browser: `Cache-Control: public, max-age=0, stale-while-revalidate=86400`
-  - Edge: `CDN-Cache-Control: public, max-age=<ttl>, stale-while-revalidate=3600, stale-if-error=86400`
-    (RFC 9213 — Cloudflare honors it, browsers ignore it, which is what lets the edge TTL
-    differ from the browser's `max-age=0`). ⚠️ Never express the edge policy as `s-maxage` —
-    its presence disables `stale-while-revalidate` and `stale-if-error` (RFC 9111 §4.2.4),
-    which is what keeps widgets rendering through a fly outage.
-  ⚠️ Only emit this on successful, cacheable responses — an error must never be pinned at the
-  edge. Edge `stale-while-revalidate` defaults to one hour
-  (`DEFAULT_EDGE_STALE_WHILE_REVALIDATE`); the trending and related-articles widgets pass
-  `edge_stale_while_revalidate: 1.day` since their data changes slowly relative to the hourly
-  edge max-age.
-  ⚠️ **Purging is the one piece of the widget cache policy this app does *not* author.** The
-  widgets that render Contentful content are tagged `Cache-Tag: site` by a **zone Cache Response
-  Rule** matching `/widgets/articles/*` and `/widgets/events/*` on this app's host, so the web
-  deploy's tag purge evicts them when content is republished — otherwise an edited entry would
-  rebuild the site while the widgets served the pre-edit copy for an hour plus a day of
-  `stale-while-revalidate`. Nothing here or in the web proxy sets that tag; an origin `Cache-Tag`
-  header wouldn't be consumed. The namespaces match the Contentful content types, so any widget
-  serving articles or events is Contentful-backed by definition and new routes under those two
-  prefixes are covered automatically. What isn't: **moving one out of them — or adding a
-  Contentful-backed widget under a new namespace — silently stops the purge** (no code change can
-  fix it; it needs a dashboard edit, and nothing fails loudly). The live-data widgets (`weather/*`,
-  `activity-stats`, `whoop`, `plausible/*`) are deliberately outside those prefixes. Full expression
-  and reasoning: root [`CLAUDE.md`](../CLAUDE.md).
-  ⚠️ **Editing a `cache_widget(ttl:)` above does not reach copies already at the edge — purge, or
-  the change won't land.** A cached fragment keeps the `CDN-Cache-Control` it was *stored* with, so
-  PoPs go on serving the old body under the old policy until it expires on its own terms. Shortening
-  the pageviews TTL from 1 h to 5 min left copies live under the previous
-  `stale-while-revalidate=86400` — a view count up to **25 hours** stale, which reads as the counter
-  running backwards. The same applies to a markup change (the cross-app HTML contract): the old
-  fragment keeps being served for the *old* TTL, not the new one.
-  Every widget fragment on this host carries a `widgets` cache tag (a second zone Cache Response
-  Rule) purely so that purge is one call:
-  `POST /zones/<id>/purge_cache` with `{"tags":["widgets"]}`.
-  ⚠️ **It is a manual lever and must stay one — never wire `widgets` into the web deploy's purge.**
-  That purge is scoped to `site` precisely so a Contentful publish can't drop the live-data widgets'
-  `stale-while-revalidate` copies, which are what keep them rendering through a fly outage. Root
-  [`CLAUDE.md`](../CLAUDE.md) has the full reasoning.
-- **Error reporting** — `config/initializers/bugsnag.rb` wires the `bugsnag` gem; its railtie
-  auto-inserts the Rack middleware and hooks ActionDispatch, so unhandled exceptions are
-  reported even though errors render as plain text. `notify_release_stages` is limited to
-  `production` and `BUGSNAG_API_KEY` is unset locally/in CI, so it's a no-op outside production.
-- **Errors** render as plain text via `lib/plain_text_exceptions.rb`. Unmatched paths are
-  caught by the trailing `match "*unmatched"` route → `ApplicationController#route_not_found`
-  (plain-text 404), instead of raising `ActionController::RoutingError`. This is what keeps
-  scanner probes (`/api/.env`, `/wp-login.php`, …) to a single clean `status=404` lograge line
-  rather than an exception backtrace. That catch-all **must stay the last route** in
-  `routes.rb` or it will shadow everything below it — enforced by
-  `spec/routing/routes_guard_spec.rb`.
-- **Abuse mitigation** — `config/initializers/rack_attack.rb` (rack-attack middleware, wired
-  up in `application.rb`). The origin is hit directly by vulnerability scanners, so it
-  blocklists obvious probe paths (a flat 403 by **path pattern**, before routing) and throttles
-  requests **to paths outside the known route prefixes** (keyed on the real client IP via
-  `Request#client_ip`: **`CF-Connecting-IP` → `Fly-Client-IP` → `req.ip`**. There are two proxies
-  in front — the zone is proxied through **Cloudflare**, so `Fly-Client-IP` is a Cloudflare PoP,
-  not the visitor, and Rack's `req.ip` is a shared fly LB address. `CF-Connecting-IP` is only
-  trustworthy on traffic that actually traversed Cloudflare, so it must stay confined to the
-  throttle — never to anything that bans).
-  ⚠️ The probe blocklist must stay **IP-agnostic** — never ban by IP. Some probe paths (e.g.
-  `/widgets/.env`) are reachable through the public `/widgets/*` proxy, and all
-  legitimate widget traffic shares that proxy's egress IPs, so an IP ban would 403 every
-  visitor's widgets at once (this once took the site down). Same reason: do **not** add a
-  blanket per-IP throttle.
-  The throttle treats anything outside `RACK_ATTACK_KNOWN_PREFIXES` (`/up`, `/api`, `/widgets`,
-  `/webhooks`, `/whoop`, `/sidekiq`, `/login`, `/logout`, `/auth`, `/`) as a probe: **if you add a top-level route, add
-  its prefix there** or it will be rate-limited (the `/sidekiq` UI and the OAuth login routes are
-  in the list for exactly this reason) — a missing prefix fails
-  `spec/routing/routes_guard_spec.rb`. Disabled in the
-  test env (`Rack::Attack.enabled`); counters live in Redis (in-memory under test).
-  There's also a scoped `contact/ip` throttle (`POST /api/contact`, 5/hour) — the one place it's
-  safe to key on a per-visitor IP, because it uses the proxy-forwarded **`X-Kona-Client-IP`** (the
-  real visitor, not the shared egress) and it's a throttle (429), never a ban.
-- **Redis** — global `$redis` from `config/initializers/redis.rb`, configured via `REDIS_URL`.
-  In production this is the API's own dedicated `kona-redis` fly app (`redis/fly.toml` at the
-  repo root); `web/` uses a separate Upstash instance, so the keyspaces don't overlap. The same
-  Redis backs the Sidekiq queues. fly.toml runs two process groups: `app` (Puma) and `worker`
-  (Sidekiq).
+  unset.
+- **`ActivityDescriptionJob`** is **source-agnostic**: emoji stat lines (power, heat, Whoop strain,
+  water temp) plus two Anthropic-generated lines (a planned-workout summary matched against the
+  TrainerRoad calendar, and a weather sentence — prompts in `app/prompts/`, skipped without
+  `ANTHROPIC_API_KEY`), preserving any user-written prose above the stat block. Deduped per
+  activity by a Redis lock.
+- **The contact form is a two-job pipeline** so a Resend failure retries only the send. Akismet
+  fails closed, so an outage retries the *intake* job rather than delivering an unchecked message;
+  `ContactSubject` (a Claude-generated subject line) fails soft.
+
+Config in `config/initializers/sidekiq.rb` and `config/sidekiq.yml`. Sidekiq runs as a dedicated
+**`worker` fly process**; a worker must be running to drain the queue (locally: `bundle exec
+sidekiq`).
+
+### Views, helpers, presenters
+
+Views (`app/views/widgets/`) render raw HTML fragments. **Helpers** (`app/helpers/`) are pure
+formatting/selection functions — every method takes the data it works on as explicit arguments;
+none read controller ivars. Request state lives in **presenters** (`app/presenters/`):
+`WeatherSummaryPresenter` (the weather widget's prose + business rules), `EventWeatherPresenter`,
+`UpcomingRacesPresenter`, `WhoopPresenter`. Presenters take their data as constructor kwargs. When
+a controller body needs a helper, it calls it through the `helpers` proxy rather than `include`-ing
+the module.
+
+### Caching
+
+`app/controllers/concerns/live_widget.rb`. `cache_widget(ttl:)` sets:
+
+- Browser: `Cache-Control: public, max-age=0, stale-while-revalidate=86400`
+- Edge: `CDN-Cache-Control: public, max-age=<ttl>, stale-while-revalidate=3600, stale-if-error=86400`
+
+RFC 9213 — Cloudflare honors `CDN-Cache-Control`, browsers ignore it, which is what lets the edge
+TTL differ from the browser's `max-age=0`.
+
+⚠️ **Never express the edge policy as `s-maxage`** — its presence disables `stale-while-revalidate`
+and `stale-if-error` (RFC 9111 §4.2.4), which is what keeps widgets rendering through a fly outage.
+
+⚠️ **Only emit this on successful, cacheable responses.** An error must never be pinned at the edge.
+
+⚠️ **Editing a `cache_widget(ttl:)` does not reach copies already at the edge — purge, or the
+change won't land.** A cached fragment keeps the `CDN-Cache-Control` it was *stored* with, so PoPs
+serve the old body under the old policy until it expires on its own terms. Shortening the pageviews
+TTL from 1 h to 5 min once left copies live under the previous `stale-while-revalidate=86400` — a
+view count up to **25 hours** stale, which reads as the counter running backwards. Same for a
+markup change.
+
+**Purging is the one piece of this policy the app does not author.** The widgets that render
+Contentful content are tagged `Cache-Tag: site` by a **zone Cache Response Rule** matching
+`/widgets/articles/*` and `/widgets/events/*` on this host, so the web deploy's tag purge evicts
+them when content is republished. Nothing here or in the web proxy sets that tag. ⚠️ **Moving a
+widget out of those namespaces — or adding a Contentful-backed widget under a new one — silently
+stops the purge**, and no code change can fix it; it needs a dashboard edit. Full reasoning, plus
+the manual `widgets` tag, in the root [`CLAUDE.md`](../CLAUDE.md).
+
+### Errors and abuse mitigation
+
+- **Bugsnag** (`config/initializers/bugsnag.rb`) — its railtie auto-inserts the Rack middleware and
+  hooks ActionDispatch, so unhandled exceptions are reported even though errors render as plain
+  text. `notify_release_stages` is production-only and `BUGSNAG_API_KEY` is unset locally/in CI, so
+  it's a no-op outside production.
+- **Errors render as plain text** via `lib/plain_text_exceptions.rb`. Unmatched paths hit the
+  trailing `match "*unmatched"` route → `ApplicationController#route_not_found`, which keeps
+  scanner probes to a single clean `status=404` lograge line rather than an exception backtrace.
+  ⚠️ That catch-all **must stay the last route** — enforced by `spec/routing/routes_guard_spec.rb`.
+- **rack-attack** (`config/initializers/rack_attack.rb`) blocklists probe paths (a flat 403 by
+  **path pattern**, before routing) and throttles requests **to paths outside the known route
+  prefixes**, keyed on `Request#client_ip` (`CF-Connecting-IP` → `Fly-Client-IP` → `req.ip`).
+  ⚠️ **The blocklist must stay IP-agnostic — never ban by IP.** Some probe paths are reachable
+  through the public `/widgets/*` proxy, and all legitimate widget traffic shares that proxy's
+  egress IPs, so an IP ban would 403 every visitor's widgets at once (this once took the site
+  down). Same reason: no blanket per-IP throttle.
+  ⚠️ **If you add a top-level route, add its prefix to `RACK_ATTACK_KNOWN_PREFIXES`** or it will be
+  rate-limited — a missing prefix fails `spec/routing/routes_guard_spec.rb`.
+  There's also a scoped `contact/ip` throttle (5/hour), the one place a per-visitor IP is safe: it
+  uses the proxy-forwarded `X-Kona-Client-IP` (the real visitor, not the shared egress) and it's a
+  throttle, never a ban.
+- **Redis** — global `$redis` from `config/initializers/redis.rb`, via `REDIS_URL`. The same Redis
+  backs the Sidekiq queues.
 
 ## Commands
 
 ```bash
-bin/dev                                              # local server (or bin/setup)
-bundle exec sidekiq -C config/sidekiq.yml            # local worker (needed to drain jobs)
-bundle exec rspec spec/requests/widgets/activity_stats_spec.rb   # single spec (fast)
-bundle exec rspec                                    # full suite
-bin/ci                                               # setup + full suite + security scan (CI)
-bundle exec brakeman -q --no-pager                   # static security scan
-bundle exec bundle-audit check --update              # dependency CVE scan
-fly deploy                                           # deploy to fly.io (app + worker processes)
-fly console                                           # production console
+bin/dev                                                          # local server (or bin/setup)
+bundle exec sidekiq -C config/sidekiq.yml                        # local worker
+bundle exec rspec spec/requests/widgets/activity_stats_spec.rb   # single spec
+bundle exec rspec                                                # full suite
+bin/ci                                                           # setup + suite + security scan
+bundle exec brakeman -q --no-pager
+bundle exec bundle-audit check --update
+fly deploy                                                       # app + worker
+fly console
 
-# Trigger a rebuild + redeploy of the web site (needs a running worker to drain the job).
-# ⚠️ Against the deployed origin this ships a real deploy — see Permissions below.
+# Trigger a web rebuild (needs a running worker). ⚠️ Against production this ships a real deploy.
 curl -i -X POST -H "Authorization: Bearer $API_TOKEN" "$KONA_API_URL/api/build"
 ```
 
-No Rubocop / linter is configured. `.rspec` requires `spec_helper`. CI (`bin/ci` and the
-`security` job in `.github/workflows/api.yml`) runs Brakeman + bundler-audit; the deploy job
-**won't run unless both pass**. If Brakeman flags a verified false-positive, add a checked-in
+No Rubocop or linter is configured. CI runs Brakeman + bundler-audit, and the deploy job **won't
+run unless both pass**. If Brakeman flags a verified false positive, add a checked-in
 `config/brakeman.ignore` rather than weakening the code.
 
 ## Testing
 
-RSpec request specs in `spec/requests/`, plus `spec/services/` and `spec/presenters/`.
-No DB or fixtures — stub services with
-`allow_any_instance_of(SomeService).to receive(:method).and_return(...)`. Specs assert
-the rendered markup **and** the cache headers.
+RSpec request specs in `spec/requests/`, plus `spec/services/` and `spec/presenters/`. No DB or
+fixtures — stub services with
+`allow_any_instance_of(SomeService).to receive(:method).and_return(...)`. Specs assert the rendered
+markup **and** the cache headers.
 
 ## Environment variables
 
-Names only — see `.env.example`; never commit values. Production values live as fly.io
-secrets (and Rails `config/credentials.yml.enc` + `master.key`).
+Names only — see `.env.example`; never commit values. Production values are fly.io secrets (plus
+Rails `config/credentials.yml.enc` + `master.key`).
 
 - **Required**: `REDIS_URL`, `ICU_ATHLETE_ID`, `ICU_API_KEY`, `FONT_AWESOME_API_TOKEN`,
   `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET`, `WHOOP_REDIRECT_URI`, `GOOGLE_OAUTH_CLIENT_ID`,
-  `GOOGLE_OAUTH_CLIENT_SECRET`, `OWNER_EMAIL` (the three gate owner sign-in for `/whoop/auth`
-  + `/sidekiq` — Google OAuth restricted to this email/its hosted domain), `GOOGLE_API_KEY`,
-  `API_TOKEN` (bearer required on all `/widgets/*` endpoints — injected by the web proxy —
-  and on `POST /api/location` + `POST /api/contact`; must match the web app's),
-  `WEATHERKIT_KEY_ID`, `WEATHERKIT_TEAM_ID`, `WEATHERKIT_SERVICE_ID`,
+  `GOOGLE_OAUTH_CLIENT_SECRET`, `OWNER_EMAIL`, `GOOGLE_API_KEY`, `API_TOKEN` (must match the web
+  app's), `WEATHERKIT_KEY_ID`, `WEATHERKIT_TEAM_ID`, `WEATHERKIT_SERVICE_ID`,
   `WEATHERKIT_PRIVATE_KEY` (base64 .p8), `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`,
-  `CONTENTFUL_WEBHOOK_SECRET` (64-char HMAC secret for the Contentful webhook), `SITE_URL`
-  (public site root — the standard.site publication `url`, the contact form's no-JS redirect
-  target, and Akismet's `blog` param), `RESEND_API_KEY`
-  (the contact form's email delivery — an HTTPS API, so it works from fly, which blocks outbound
-  SMTP), `CONTACT_FROM_ADDRESS` (the contact form's `from` — a sender address on a domain
-  verified in Resend; Resend needs only SPF/DKIM, so it coexists with a Google Workspace mailbox
-  on the same domain without touching the root MX; never hardcode the host), `CONTACT_TO_ADDRESS`
-  (where contact-form messages are delivered — the recipient inbox, decoupled from
-  `OWNER_EMAIL`).
-- **Optional**: `AKISMET_API_KEY` (contact-form spam check; unset = Akismet off, submissions
-  delivered unchecked. When set it fails **closed** — an Akismet outage retries the intake job
-  rather than delivering unchecked), `TURNSTILE_SECRET` (contact-form Turnstile siteverify; fails open
-  when unset — pair it with the web app's `TURNSTILE_SITE_KEY`, set both or neither),
-  `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`,
-  `TRAINERROAD_CALENDAR_URL`
-  (rest-day check + planned-workout matching for generated activity descriptions),
-  `ANTHROPIC_API_KEY` + `ANTHROPIC_DESCRIPTION_MODEL` (the LLM lines of generated activity
-  descriptions; the default model is `claude-sonnet-5`) — `ANTHROPIC_API_KEY` also powers the
-  contact form's `ContactSubject` line, with an optional `ANTHROPIC_CONTACT_SUBJECT_MODEL`
-  override (default `claude-sonnet-5`; `claude-haiku-4-5` is a cheaper fit),
-  `PURPLEAIR_API_KEY`, `LOCATION`, `TIME_ZONE`, `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`,
-  `BLUESKY_PDS_URL` (standard.site publishing; no-ops when the handle/password are unset),
-  `BUGSNAG_API_KEY` (error reporting; **production only** — notifies only in the production
-  release stage, and is unset in development/CI, so it's a no-op there),
-  `ALLOWED_HOSTS` (comma-separated `Host`-header allowlist; **production only**, enables
-  host authorization. Unset = all hosts accepted, so it's safe to deploy before setting it,
-  then activate by setting the fly secret. `/up` is always exempt. Never hardcode the host),
-  `R2_ACCOUNT_ID` + `R2_ACCESS_KEY_ID` + `R2_SECRET_ACCESS_KEY` + `R2_BUCKET` (the R2 image
-  mirror — an API token with object read/write on the bucket; all four unset = `AssetMirror`
-  no-ops, so dev/CI stay inert. ⚠️ The bucket must be the one behind the web app's `IMAGE_HOST`;
-  nothing validates that, and a mismatch 404s every image on the site),
-  `GITHUB_DISPATCH_TOKEN` + `GITHUB_REPOSITORY` (the `SiteBuildJob` web-rebuild trigger, behind
-  both the Contentful webhook and `POST /api/build` — a
-  fine-grained PAT with **Contents: Read and write**, or a classic PAT with `repo`, plus the
-  `owner/repo` slug; both unset = the trigger no-ops, so dev/CI stay inert).
+  `CONTENTFUL_WEBHOOK_SECRET` (64-char HMAC secret), `SITE_URL`, `RESEND_API_KEY`,
+  `CONTACT_FROM_ADDRESS` (a sender on a domain verified in Resend — it needs only SPF/DKIM, so it
+  coexists with a Google Workspace mailbox on the same domain), `CONTACT_TO_ADDRESS`.
+- **Optional**: `AKISMET_API_KEY` (unset = off, submissions delivered unchecked; set = fails
+  closed), `TURNSTILE_SECRET` (pair with the web app's `TURNSTILE_SITE_KEY`, both or neither),
+  `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`, `TRAINERROAD_CALENDAR_URL`, `ANTHROPIC_API_KEY` +
+  `ANTHROPIC_DESCRIPTION_MODEL` / `ANTHROPIC_CONTACT_SUBJECT_MODEL` (both default
+  `claude-sonnet-5`), `PURPLEAIR_API_KEY`, `LOCATION`, `TIME_ZONE`, `BLUESKY_HANDLE`,
+  `BLUESKY_APP_PASSWORD`, `BLUESKY_PDS_URL`, `BUGSNAG_API_KEY` (production only), `ALLOWED_HOSTS`
+  (comma-separated `Host` allowlist; production only, unset = all hosts accepted, so it's safe to
+  deploy before setting it; `/up` is always exempt), `R2_ACCOUNT_ID` + `R2_ACCESS_KEY_ID` +
+  `R2_SECRET_ACCESS_KEY` + `R2_BUCKET` (⚠️ must be the bucket behind the web app's `IMAGE_HOST`;
+  nothing validates that, and a mismatch 404s every image), `GITHUB_DISPATCH_TOKEN` +
+  `GITHUB_REPOSITORY` (a fine-grained PAT with **Contents: Read and write**, plus the `owner/repo`
+  slug).
 
 ## Conventions & gates
 
 - **Before committing/deploying** (non-negotiable): `bundle exec rspec` passes.
 - Keep widget markup in sync with the matching `web/` placeholder (root `CLAUDE.md`).
-- Font Awesome icons are fetched on demand by family/style/id (GraphQL) and cached per
-  version in Redis — `icon_svg('classic', 'solid', 'eye')`. No allowlist needed here;
-  any id a view references is fetched. The Font Awesome integration lives **only** here:
-  the `FONT_AWESOME_API_TOKEN` and `FONT_AWESOME_VERSION` env vars, the GraphQL client, and
-  the SVG cache are all api-side. The `web/` build no longer talks to Font Awesome directly —
-  it POSTs its own allowlist to `POST /api/icons` (`Api::IconsController`), which resolves each
-  id via the same `FontAwesome` service (so a new web icon needs no api change). That endpoint
-  requests icons in small batches, so a cold cache can't blow the per-request `rack-timeout`;
-  don't change it to resolve the whole allowlist in one request.
+- Font Awesome icons are fetched on demand by family/style/id and cached per version in Redis —
+  `icon_svg('classic', 'solid', 'eye')`. No allowlist needed here; any id a view references is
+  fetched. The integration lives **only** in this app — `web/` POSTs its own allowlist to
+  `POST /api/icons`, so a new web icon needs no api change. ⚠️ That endpoint requests icons in
+  small batches so a cold cache can't blow the per-request `rack-timeout`; don't change it to
+  resolve the whole allowlist in one request.
 
 ### Permissions
 
 - Autonomous: read files, single-file `rspec`, local `bin/dev`.
-- Ask first: `fly deploy`, secret changes, anything that flushes Redis,
-  `git push`/commit, package installs.
+- Ask first: `fly deploy`, secret changes, anything that flushes Redis, `git push`/commit, package
+  installs.

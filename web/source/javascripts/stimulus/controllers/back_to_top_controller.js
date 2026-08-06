@@ -1,11 +1,8 @@
 import { Controller } from '@hotwired/stimulus';
 
-/**
- * Controller for going back to the top of the page.
- */
+/** Scrolls the page back to the top, honoring prefers-reduced-motion. */
 export default class extends Controller {
   /**
-   * Scrolls to the top of the page when the button is clicked.
    * @param {Event} event The click event that triggered the action.
    */
   go(event) {

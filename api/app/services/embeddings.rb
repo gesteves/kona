@@ -1,28 +1,25 @@
-# Thin wrapper over Voyage AI's text-embeddings endpoint. Turns a chunk of text into a vector
-# (a list of floats) used to find semantically-related articles. Generic on purpose: text in,
-# vector out — the article-specific text assembly lives in ArticleEmbeddingJob. Uses the shared
-# HTTParty + retry/error-handling plumbing from ApplicationService.
+# Turns text into a vector via Voyage AI's embeddings endpoint, for finding semantically related
+# articles. Generic on purpose — the article-specific text assembly lives in
+# ArticleEmbeddingJob.
 class Embeddings < ApplicationService
   VOYAGE_API_URL = "https://api.voyageai.com/v1/embeddings".freeze
-  # voyage-4-large: the best general-purpose retrieval quality in the 4 series; 1024-dim default.
-  # All 4-series embeddings are mutually compatible, but switching models means re-running
-  # embeddings:backfill so the whole corpus is ranked on one model.
+  # ⚠️ Switching models means re-running embeddings:backfill, so the whole corpus is ranked on
+  # one model.
   MODEL = "voyage-4-large".freeze
 
   def initialize
     @api_key = ENV["VOYAGE_API_KEY"]
   end
 
-  # Embeds a single document and returns its vector, or nil when the key is missing, the text is
-  # blank, or the API call fails (callers degrade gracefully — a missing vector just drops the
-  # article from related-article ranking).
-  # @param text [String] The document text to embed.
-  # @return [Array<Float>, nil]
+  # Embeds a single document.
+  # @param text [String] The text to embed.
+  # @return [Array<Float>, nil] Its vector, or nil when unconfigured, blank, or the call fails —
+  #   a missing vector just drops the article from the related-articles ranking.
   def embed(text)
     return if @api_key.blank? || text.blank?
 
-    # post_json! raises on an HTTP error, so with_retries covers Voyage 4xx/5xx responses
-    # (with backoff) as well as network-level exceptions, returning nil once exhausted.
+    # post_json! raises, so with_retries covers Voyage's 4xx/5xx responses as well as
+    # network-level exceptions.
     with_retries do
       data = post_json!(
         VOYAGE_API_URL,

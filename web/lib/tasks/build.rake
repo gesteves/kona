@@ -1,9 +1,7 @@
 BUILD_DIRECTORY = 'build'
 
-# Building and testing are separate concerns: `rake build` does NOT run the test suite. Run
-# tests with `rake test` (locally, before committing) — in CI they live in the `checks` job,
-# which gates deploys on code pushes. Keeping them out of the build means a Contentful-publish
-# rebuild (no code changed) isn't slowed by a redundant test run.
+# `rake build` does NOT run the test suite — use `rake test`. Keeping them separate means a
+# Contentful-publish rebuild isn't slowed by a redundant test run.
 desc 'Import content and build the site'
 task :build => [:dotenv, :import] do
   build_site
@@ -16,13 +14,13 @@ namespace :build do
   end
 end
 
+# Builds the site. The JS/CSS bundle comes from Middleman's external pipeline, which runs
+# `npm run build` itself and blocks until it finishes.
 def build_site(verbose: false)
-  # The JS/CSS bundle is built by Middleman's external pipeline (config.rb), which runs
-  # `npm run build` itself and blocks until it finishes.
   middleman_command = verbose ? 'middleman build --verbose' : 'middleman build'
   sh middleman_command
-  # Underscore-prefixed files in source/ are treated as partials and never built, so the
-  # redirects and headers files are authored without the prefix and renamed here.
+  # Underscore-prefixed files in source/ are treated as partials, so these are authored
+  # without the prefix and renamed here.
   File.rename("#{BUILD_DIRECTORY}/redirects", "#{BUILD_DIRECTORY}/_redirects")
   File.rename("#{BUILD_DIRECTORY}/headers", "#{BUILD_DIRECTORY}/_headers")
   sh 'npm run pagefind'

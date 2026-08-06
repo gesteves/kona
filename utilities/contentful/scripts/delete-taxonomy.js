@@ -1,12 +1,9 @@
-// Teardown: deletes EVERY concept scheme and concept currently in the org, so the new
-// two-scheme taxonomy can be rebuilt fresh (create-taxonomy) with reused ids. REFUSES while
-// any entry still links a concept — run `npm run taxonomy:unassign` first.
+// Teardown: deletes every concept scheme and concept in the org, so the taxonomy can be rebuilt
+// with reused ids. Schemes go first, then concepts deepest-first, so a parent is never removed
+// while a child still points at it. Refuses to run while any entry still links a concept.
 //
-// Deletes schemes first (they reference concepts), then concepts deepest-first (by their live
-// `broader`) so a parent is never removed while a child still points at it.
-//
-// ⚠️ This removes ALL taxonomy in the org. Fine for this single-project org; dry-run first.
-// Env: CONTENTFUL_MANAGEMENT_TOKEN, CONTENTFUL_ORGANIZATION_ID, CONTENTFUL_SPACE. DRY_RUN=true.
+// ⚠️ This removes ALL taxonomy in the org. Run `npm run taxonomy:unassign` first, and dry-run.
+// Env: CONTENTFUL_MANAGEMENT_TOKEN, CONTENTFUL_ORGANIZATION_ID, CONTENTFUL_SPACE, DRY_RUN.
 // Run: `npm run taxonomy:delete`.
 
 const { getExistingConcepts, getExistingSchemes, createPlainClient, readEnv } = require('./lib/taxonomy');

@@ -2,24 +2,18 @@ require "aws-sdk-s3"
 require "net/http"
 require "tempfile"
 
-# Mirrors Contentful's image assets into a Cloudflare R2 bucket, which the web site serves
-# its images from instead of Contentful.
+# Mirrors Contentful's image assets into a Cloudflare R2 bucket, which the site serves images
+# from instead of Contentful. Cloudflare Images fetches a transformation's source from whatever
+# host the URL names, and a source outside the zone can't use Tiered Cache or Cache Reserve —
+# so every PoP was pulling full-size originals from Contentful and re-pulling them on eviction.
 #
-# Why: every image on the site is a Cloudflare Images transformation, and Cloudflare fetches
-# the untransformed *source* from whatever host the URL names. A source outside our zone can't
-# use Tiered Cache or Cache Reserve, so every Cloudflare PoP independently pulled the full-size
-# original from Contentful and re-pulled it on eviction — which is what drove Contentful's asset
-# bandwidth up. Mirroring into R2 and pointing the source at a hostname in our own zone means
-# production never reaches Contentful at all: only this mirror does, once per asset version.
+# ⚠️ Cross-app contract: web's Contentful#rewrite_image_urls swaps only the host, keeping
+# Contentful's path verbatim, and this writes objects under exactly that path. Neither side
+# validates the other, and a mismatch 404s every image on the site with nothing reporting it.
+# See the root CLAUDE.md.
 #
-# ⚠️ CROSS-APP CONTRACT. The web build rewrites asset URLs onto IMAGE_HOST keeping Contentful's
-# path verbatim (web/lib/data/contentful.rb#rewrite_image_urls), and this writes objects under
-# exactly that path. Neither side validates the other: a mismatched bucket, custom domain, or key
-# shape produces a 404 on every image with nothing reporting it. See the root CLAUDE.md.
-#
-# Driven by Contentful webhooks (Webhooks::ContentfulController) plus the `assets:backfill` rake
-# task, mirroring how StandardSite is driven. Everything no-ops when the R2 credentials are
-# absent, so a credential-free environment simply doesn't mirror.
+# Driven by Contentful webhooks plus the `assets:backfill` rake task; no-ops without R2
+# credentials.
 class AssetMirror < ApplicationService
   include ContentfulConsumer
 
@@ -39,16 +33,14 @@ class AssetMirror < ApplicationService
     }
   GRAPHQL
 
-  # ⚠️ Every ctfassets host, not just images.ctfassets.net. Contentful serves some image assets
-  # from downloads.ctfassets.net (it's not an images-vs-files split — this space has 20 JPEGs
-  # there), and mirroring only the images host would silently leave those hitting Contentful
-  # forever. Asset paths are identical across the hosts, so one key covers an asset either way,
-  # and the bytes are fetched from whichever host Contentful named.
+  # ⚠️ Every ctfassets host, not just images.ctfassets.net: Contentful serves some image assets
+  # from downloads.ctfassets.net, and mirroring only the images host would leave those hitting
+  # Contentful forever. Paths are identical across hosts, so one key covers both.
   # web's Contentful#rewrite_image_urls must keep matching the same set.
   ASSET_HOST_SUFFIX = ".ctfassets.net".freeze
 
-  # Contentful asset URLs are content-addressed: replacing an asset's file mints a new token
-  # segment, so a key's bytes never change and nothing ever needs invalidating.
+  # Contentful asset URLs are content-addressed — replacing a file mints a new token segment —
+  # so an object's bytes never change and nothing ever needs invalidating.
   CACHE_CONTROL = "public, max-age=31536000, immutable".freeze
 
   # R2 ignores the region but the S3 client requires one.
@@ -63,13 +55,12 @@ class AssetMirror < ApplicationService
       ENV["R2_SECRET_ACCESS_KEY"].present? && bucket.present?
   end
 
-  # Mirrors one asset into R2, skipping the work when its object is already there.
+  # Mirrors one asset into R2, skipping the work when the object is already there.
   #
-  # ⚠️ Raises on failure rather than degrading, unlike most services here: this runs in
-  # AssetSyncJob, where a raise is what buys Sidekiq's retry, and a silently-skipped mirror
-  # surfaces later as a broken image on a live page. Bugsnag's Sidekiq instrumentation reports
-  # the raise, so it isn't also reported here (that would double-notify).
-  #
+  # ⚠️ Raises rather than degrading, unlike most services here: it runs in AssetSyncJob, where
+  # the raise is what buys Sidekiq's retry, and a silently-skipped mirror surfaces later as a
+  # broken image on a live page. Bugsnag's Sidekiq instrumentation reports it, so it isn't also
+  # reported here.
   # @param asset_id [String] The Contentful asset's sys.id.
   # @return [Symbol] :mirrored, :present, or :skipped.
   def sync(asset_id)
@@ -89,7 +80,7 @@ class AssetMirror < ApplicationService
         bucket: bucket,
         key: key,
         body: file,
-        # ⚠️ Without an explicit content type R2 serves application/octet-stream, which breaks
+        # Without an explicit content type R2 serves application/octet-stream, which breaks
         # both the browser and Cloudflare Images.
         content_type: asset[:contentType].presence || "application/octet-stream",
         cache_control: CACHE_CONTROL
@@ -100,18 +91,16 @@ class AssetMirror < ApplicationService
     log("mirrored #{asset_id} → #{key} (#{size} bytes)", :mirrored)
   end
 
-  # Enqueues a sync job for every published asset. Safe to re-run: each job skips assets already
-  # in the bucket, so this doubles as the reconciliation net for webhook deliveries Contentful
-  # never retries (the same role standard_site:backfill plays).
-  #
-  # @param dry_run [Boolean] Report what would be enqueued without enqueuing anything.
-  # @return [Integer, Symbol] The number of assets found, or :skipped.
+  # Enqueues a sync job for every published asset. Cheap to re-run, since each job skips assets
+  # already in the bucket, so this doubles as the reconciliation net for webhook deliveries
+  # Contentful never retries.
+  # @param dry_run [Boolean] Report what would be enqueued without enqueuing it.
+  # @return [Integer, Symbol] How many assets were found, or :skipped.
   def backfill(dry_run: false)
     return log_skip("backfill", "R2 is not configured") unless configured?
 
     log("backfill starting#{' (dry run)' if dry_run}")
-    # strict: a partial page would silently under-enqueue and leave holes in the mirror that
-    # nothing else would find.
+    # Strict, because a partial page would under-enqueue and leave holes nothing else finds.
     items = contentful.paginate(ASSETS_LIST_QUERY, collection: :assets, strict: true)
     return log_skip("backfill", "asset fetch failed") if items.nil?
 
@@ -121,14 +110,10 @@ class AssetMirror < ApplicationService
     ids.size
   end
 
-  # The R2 object key for a Contentful asset URL: its path, verbatim, minus the leading slash
-  # (`{space}/{asset id}/{token}/{filename}`). Returns nil for anything not hosted on ctfassets.
-  #
-  # ⚠️ This is the cross-app contract — web/lib/data/contentful.rb only swaps the host, so the
-  # path it emits must be exactly what's used here.
-  #
-  # @param url [String, nil] The asset URL (Contentful returns these protocol-relative).
-  # @return [String, nil]
+  # The R2 object key for an asset URL: its path verbatim, minus the leading slash. This is the
+  # cross-app contract — web only swaps the host, so the path it emits must be what's used here.
+  # @param url [String, nil] The asset URL, which Contentful returns protocol-relative.
+  # @return [String, nil] The key, or nil for anything not hosted on ctfassets.
   def object_key(url)
     return if url.blank?
 
@@ -146,8 +131,8 @@ class AssetMirror < ApplicationService
     ENV["R2_BUCKET"]
   end
 
-  # R2's S3-compatible endpoint. Path-style addressing: R2 doesn't do virtual-host style
-  # bucket subdomains.
+  # The S3 client for R2. Path-style addressing, since R2 has no virtual-host bucket
+  # subdomains.
   def client
     @client ||= Aws::S3::Client.new(
       access_key_id: ENV["R2_ACCESS_KEY_ID"],
@@ -158,8 +143,8 @@ class AssetMirror < ApplicationService
     )
   end
 
-  # @return [Boolean] Whether the key is already in the bucket. This is what makes retries and
-  #   the backfill cheap — a re-run costs one HEAD per asset and no transfer.
+  # @return [Boolean] Whether the key is already in the bucket. This is what makes a re-run
+  #   cost one HEAD per asset and no transfer.
   def object_exists?(key)
     client.head_object(bucket: bucket, key: key)
     true
@@ -167,9 +152,8 @@ class AssetMirror < ApplicationService
     false
   end
 
-  # Fetches the asset's URL and content type from Contentful. Deliberately re-fetched rather
-  # than read off the webhook payload, matching StandardSite: the payload is a management-API
-  # shape and is never trusted for content.
+  # Fetches the asset's URL and content type from Contentful. Re-fetched rather than read off
+  # the webhook payload, which is a management-API shape and isn't trusted for content.
   # @return [Hash, nil]
   def fetch_asset(asset_id)
     return if asset_id.blank?
@@ -177,20 +161,14 @@ class AssetMirror < ApplicationService
     contentful.items(ASSET_QUERY, { id: asset_id }, collection: :assets)&.first
   end
 
-  # Downloads the asset to a Tempfile and returns it, rewound. The caller must close! it.
+  # Downloads the asset to a rewound Tempfile, which the caller must close!.
   #
-  # ⚠️ Net::HTTP#read_body with a block, NOT HTTParty — this is the one thing in here that must
-  # not be "simplified" back to the house style. These originals are big (this space has a dozen
-  # 20–38MB camera JPEGs) and the worker is a **512MB** fly VM running Sidekiq at **concurrency
-  # 5** (config/sidekiq.yml). Buffering whole files OOM-killed the worker mid-backfill, and a
-  # hard kill is not a job failure Sidekiq can retry, so the in-flight jobs vanished *silently*:
-  # 13 assets were never mirrored and only surfaced later as 404s on live pages.
-  #
-  # HTTParty does not solve this, including with `stream_body: true` — it still retains the body.
-  # Measured, heap pre-warmed, five concurrent 31MB downloads: HTTParty stream_body **+52.3MB**
-  # peak RSS vs **+1.2MB** for the read_body loop below. Only the latter actually discards chunks.
-  # The Tempfile then lets the S3 client upload from disk instead of from another copy in memory.
-  #
+  # ⚠️ Net::HTTP#read_body, not HTTParty — don't "fix" this to match the house style. These
+  # originals reach 38MB and the worker is a 512MB VM at concurrency 5, so buffering whole files
+  # OOM-killed it mid-backfill; a hard kill isn't a failure Sidekiq can retry, so those jobs
+  # vanished silently and only surfaced as 404s on live pages. HTTParty doesn't solve it even
+  # with stream_body: measured at +52.3MB peak RSS against +1.2MB for the loop below. The
+  # Tempfile then lets the S3 client upload from disk rather than a second copy in memory.
   # @raise [ApplicationService::HttpError] on a non-success response, so the job retries.
   def download(url, redirects_left: MAX_REDIRECTS)
     source = url.to_s.start_with?("//") ? "https:#{url}" : url.to_s

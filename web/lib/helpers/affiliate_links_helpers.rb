@@ -2,11 +2,11 @@ require 'nokogiri'
 require 'public_suffix'
 
 module AffiliateLinksHelpers
-  # Checks if the provided content contains any Amazon Associates links. Memoized per entry —
-  # rendering + parsing the whole article is expensive, and the disclosure partial consults
-  # this several times per page.
-  # @param content [Object] The content object which may contain affiliate links in its intro or body.
-  # @return [Boolean] True if affiliate links are found, otherwise false.
+  # Whether an entry's intro or body contains Amazon Associates links. Memoized per entry,
+  # since rendering and parsing the whole article is expensive and the disclosure partial
+  # consults it several times per page.
+  # @param content [Object] The entry.
+  # @return [Boolean]
   def has_amazon_associates_links?(content)
     memoize_by_key(:@has_amazon_associates_links, content.sys&.id) do
       scan_for_amazon_associates_links(content)
@@ -23,9 +23,8 @@ module AffiliateLinksHelpers
     false
   end
 
-  # Determines if a given URL is an Amazon Associates link.
-  # @param url [String] The URL to be checked for being an affiliate link.
-  # @return [Boolean] True if the URL is an Amazon Associates link, otherwise false.
+  # @param url [String] The URL to check.
+  # @return [Boolean] Whether the URL is an Amazon Associates link.
   def amazon_associates_link?(url)
     uri = URI.parse(url)
     params = uri.query ? URI.decode_www_form(uri.query).to_h : {}
@@ -36,9 +35,9 @@ module AffiliateLinksHelpers
     false
   end
 
-  # Returns an appropriate disclosure for entries containing affliate links.
+  # Builds the affiliate-link disclosure for an entry.
   # @param entry [Object] The entry.
-  # @return [String] A disclosure message for the entry.
+  # @return [String] The disclosure as HTML, empty when none applies.
   def affiliate_links_disclosure(entry)
     disclosure = []
     disclosure << "This #{entry_type(entry)&.downcase || 'post'} contains affiliate links, which means I may earn a commission at no additional cost to you if you make a purchase through these links." if show_affiliate_links_disclosure?(entry)
@@ -46,9 +45,8 @@ module AffiliateLinksHelpers
     markdown_to_html(disclosure.join(" "))
   end
 
-  # Determines if the affiliate links disclosure should be shown for the provided entry.
   # @param entry [Object] The entry.
-  # @return [Boolean] True if the disclosure should be shown, otherwise false.
+  # @return [Boolean] Whether the general affiliate disclosure applies.
   def show_affiliate_links_disclosure?(entry)
     entry.show_affiliate_links_disclosure || has_amazon_associates_links?(entry)
   end

@@ -1,10 +1,9 @@
-# Generates a concise, descriptive email subject line for a contact-form submission, so the
-# owner can triage the inbox at a glance instead of every message reading "New contact form
-# message from …". Mirrors ActivityDescription::Llm: one structured-output Anthropic call with
-# thinking disabled (a subject line doesn't benefit from reasoning, and adaptive thinking would
-# eat into the tight token budget). Fails **soft** — returns nil when unconfigured, on a blank
-# message, or on any error — and the caller (ContactMailJob) falls back to a static subject.
-# A subject line is never worth failing or retrying the email over.
+# Generates a descriptive email subject for a contact-form submission, so the inbox can be
+# triaged at a glance. One structured-output Anthropic call with thinking disabled — a subject
+# line doesn't benefit from reasoning, and it would eat the tight token budget.
+#
+# Fails soft: returns nil on any problem, and the caller falls back to a static subject. A
+# subject line is never worth failing or retrying the email over.
 module ContactSubject
   SYSTEM_PROMPT = Rails.root.join("app/prompts/contact-subject.md").read.freeze
 
@@ -14,9 +13,9 @@ module ContactSubject
 
   module_function
 
-  # @param name [String] The sender's name (context only — not required in the subject).
-  # @param message [String] The message body to summarize.
-  # @return [String, nil] A one-line subject, or nil when unconfigured / blank / on error.
+  # @param name [String] The sender's name, as context; it needn't appear in the subject.
+  # @param message [String] The message to summarize.
+  # @return [String, nil] A one-line subject, or nil when unconfigured, blank, or on error.
   def generate(name:, message:)
     return if message.blank? || !configured?
 
@@ -47,8 +46,8 @@ module ContactSubject
     Anthropic::Client.new(api_key: ENV["ANTHROPIC_API_KEY"])
   end
 
-  # Makes a structured-output Anthropic call and parses the guaranteed-JSON text block.
-  # @return [Hash] The parsed output with symbolized keys.
+  # Makes a structured-output Anthropic call.
+  # @return [Hash] The parsed output, with symbolized keys.
   def structured_call(user:, schema:)
     message = client.messages.create(
       model: model,

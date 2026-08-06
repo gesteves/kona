@@ -1,31 +1,29 @@
 // First-party proxy for Plausible analytics, adapted from Plausible's official Cloudflare
-// Workers guide (https://plausible.io/docs/proxy/guides/cloudflare) as a route handler
-// inside this Worker instead of a standalone one.
+// Workers guide (https://plausible.io/docs/proxy/guides/cloudflare).
 //
-// ⚠️ Do not "clean up" the /pa/ path: paths containing "plausible", "analytics",
-// "tracking", or "stats" get blocked by content blockers. The obfuscated prefix is the
-// feature.
+// Do not "clean up" the /pa/ path: paths containing "plausible", "analytics", "tracking", or
+// "stats" get blocked by content blockers. The obfuscated prefix is the feature.
 
-// These paths must match the Ruby constants in web/lib/helpers/site_helpers.rb
-// (PLAUSIBLE_SCRIPT_PATH / PLAUSIBLE_EVENT_PATH) — the inline init snippet is generated from
-// those, so the browser-facing path and this proxy have to agree.
+// Must match PLAUSIBLE_SCRIPT_PATH / PLAUSIBLE_EVENT_PATH in web/lib/helpers/site_helpers.rb,
+// which generate the inline init snippet.
 const SCRIPT_PATH = '/pa/script.js';
 const EVENT_PATH = '/pa/event';
 const EVENT_UPSTREAM = 'https://plausible.io/api/event';
 
-// How long to wait on an upstream before giving up. Analytics must never hold a request open:
-// an aborted fetch throws into handlePlausible's catch, which hands back the same silent
-// fallback as an outage. Without this, a hung upstream would pin the request to the platform
-// limit — for the event POST that's a visitor-page fetch left dangling.
+/** Analytics must never hold a request open; an abort falls through to the silent fallback. */
 const UPSTREAM_TIMEOUT_MS = 10_000;
 
+/**
+ * Routes a /pa/* request to the script or event handler.
+ * @returns A 404 when analytics isn't configured, otherwise the handler's response — or a
+ *   silent fallback, since analytics must never break a page.
+ */
 export async function handlePlausible(
   request: Request,
   env: Env,
   ctx: ExecutionContext
 ): Promise<Response> {
-  // Mirrors plausible_installed? on the Ruby side: no upstream script URL configured means
-  // the site was built without analytics, so there's nothing to proxy.
+  // Mirrors plausible_installed? on the Ruby side.
   if (!env.PLAUSIBLE_SCRIPT_URL) return new Response(null, { status: 404 });
 
   const pathname = new URL(request.url).pathname;
@@ -34,16 +32,12 @@ export async function handlePlausible(
     if (pathname === EVENT_PATH) return await postEvent(request);
     return new Response(null, { status: 404 });
   } catch (error) {
-    // Fail open (the guide's passThroughOnException equivalent): analytics must never
-    // break a page. Hand back the same silent fallbacks the handlers use so a proxy
-    // exception looks identical to an upstream outage in the browser — no console noise.
     console.error('Plausible proxy failed:', pathname, error);
     return pathname === EVENT_PATH ? emptyEvent() : emptyScript();
   }
 }
 
-// A no-op script served with a 200 + JS content-type: the <script src> "loads" fine and
-// defines nothing, so an upstream outage never surfaces as a failed-resource console error.
+/** A no-op script, so an upstream outage never surfaces as a failed-resource console error. */
 function emptyScript(): Response {
   return new Response('', {
     status: 200,
@@ -51,32 +45,27 @@ function emptyScript(): Response {
   });
 }
 
-// A 202 with no body: window.plausible()'s fetch resolves cleanly, so a dropped event is
-// silent rather than a console error.
+/** An empty 202, so a dropped event resolves cleanly in window.plausible()'s fetch. */
 function emptyEvent(): Response {
   return new Response(null, { status: 202 });
 }
 
-// Serve the tracking script from cache, fetching the upstream copy on a miss. Per the
-// official guide, the copy is cached in caches.default keyed on our own URL, honoring the
-// upstream Cache-Control rather than a hardcoded TTL; only ok responses are stored so an
-// upstream error is never pinned.
+/**
+ * Serves the tracking script from caches.default, fetching upstream on a miss. Honors the
+ * upstream Cache-Control; only ok responses are stored, so an error is never pinned.
+ */
 async function getScript(
   request: Request,
   env: Env,
   ctx: ExecutionContext
 ): Promise<Response> {
-  // The <script src> only ever issues GETs; a HEAD probe rides the same cache entry below.
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return new Response(null, { status: 405, headers: { allow: 'GET, HEAD' } });
   }
 
-  // ⚠️ Key on the bare script path, NOT the inbound request. The Cache API keys on the full URL
-  // including the query string, so caching the request as-is would let /pa/script.js?x=<random>
-  // mint an unbounded number of entries, each one a cache miss that refetches Plausible's CDN.
-  // Nothing here reads a query param, so normalizing is lossless. The key is a GET request, which
-  // is also what lets a HEAD share the entry: caches.default only serves GET and put() *throws*
-  // on a non-GET key, but both operations here always use this normalized GET key.
+  // Key on the bare script path, not the inbound request: the Cache API keys on the full URL,
+  // so `?x=<random>` would mint unbounded entries that each refetch Plausible's CDN. Nothing
+  // reads a query param, so normalizing is lossless. A GET key also lets HEAD share the entry.
   const cacheKey = new Request(new URL(SCRIPT_PATH, request.url).toString());
 
   let response = await caches.default.match(cacheKey);
@@ -84,36 +73,22 @@ async function getScript(
     const upstream = await fetch(env.PLAUSIBLE_SCRIPT_URL!, {
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
-    // On an upstream error, don't cache it and don't pass the failing status to the
-    // <script src> (which would log a console error) — hand back a no-op script instead.
     if (!upstream.ok) return emptyScript();
-    // Rebuild so we can strip Set-Cookie before caching: Plausible's script is cookieless,
-    // and caches.default.put() *throws* on a response carrying Set-Cookie — which would drop
-    // us into the catch and silently break analytics. Copying upstream as the init preserves
-    // its status and Cache-Control, so the TTL still comes from Plausible.
+    // Rebuilt so Set-Cookie can be stripped: caches.default.put() throws on a response
+    // carrying one. Copying upstream as the init preserves its status and Cache-Control.
     response = new Response(upstream.body, upstream);
     response.headers.delete('set-cookie');
     ctx.waitUntil(caches.default.put(cacheKey, response.clone()));
   }
-  // A HEAD gets the same status/headers with no body (and, on a miss, still populates the
-  // cache above rather than costing an upstream fetch per probe).
   return request.method === 'HEAD' ? new Response(null, response) : response;
 }
 
-// Forward the event POST upstream with the visitor's cookies stripped (the guide's one
-// hard requirement — Plausible is cookieless and the proxy must keep it that way).
-// Method, body, and content-type all pass through: /pa/event is a POST, and proxying
-// it as anything else makes analytics silently stop recording while the script tag keeps
-// loading fine.
-//
-// Also forward the real visitor IP as X-Forwarded-For. plausible.io sits behind its own
-// Cloudflare, so without this it sees the connecting party as our Worker's egress PoP —
-// collapsing every event to one location and breaking the cookieless IP+UA daily hash that
-// dedupes unique visitors. CF-Connecting-IP is the only real client IP (root CLAUDE.md);
-// X-Forwarded-For is the header Plausible reads through a proxy.
+/**
+ * Forwards the event POST upstream with cookies stripped (Plausible is cookieless) and the
+ * real visitor IP as X-Forwarded-For — otherwise Plausible sees this Worker's egress PoP and
+ * collapses every event to one location, breaking its unique-visitor hash.
+ */
 async function postEvent(request: Request): Promise<Response> {
-  // The tracker only ever POSTs; anything else (scanner probes, stray GETs) is rejected here
-  // rather than forwarded upstream verbatim.
   if (request.method !== 'POST') {
     return new Response(null, { status: 405, headers: { allow: 'POST' } });
   }

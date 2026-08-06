@@ -1,12 +1,7 @@
 module Api
-  # Base controller for the /api/* structured-data endpoints — the ones that accept or return
-  # data (JSON, writes) rather than widget markup (those live under Widgets::BaseController).
-  # Inherits ActionController::Base directly (not ApplicationController) to skip the
-  # modern-browser gate, since these are endpoints fetched programmatically.
-  #
-  # Endpoints require the API_TOKEN bearer token by default (e.g. POST /api/location) so
-  # scanners/abusers get a cheap 401 before any controller work. Intentionally public
-  # endpoints (standard-site, build-time fetched) skip_before_action this check.
+  # Base controller for the /api/* structured-data endpoints, which accept or return data
+  # rather than the widget markup under Widgets::BaseController. Bearer-gated by default;
+  # deliberately public endpoints skip_before_action the check.
   class BaseController < TokenGatedController
   end
 end

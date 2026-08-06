@@ -1,12 +1,10 @@
-// One-off: writes the race/event concepts' `definition` (archive-page description) from the
-// CONCEPTS list in lib/taxonomy.js. Deliberately scoped to the 17 event concepts listed below,
-// and patches ONLY `/definition` — it never touches `altLabels`, and never touches any other
-// concept. So descriptions edited directly in Contentful for the topic/distance/discipline
-// concepts are left completely untouched (unlike `taxonomy:describe`, which reconciles every
-// concept). Idempotent, skip-unchanged, DRY_RUN.
+// One-off: writes the race/event concepts' archive-page descriptions from lib/taxonomy.js.
+// Deliberately scoped to the event concepts listed below, and patches only `/definition`, so
+// descriptions edited directly in Contentful for every other concept are untouched — unlike
+// `taxonomy:describe`, which reconciles them all. Idempotent and skip-unchanged.
 //
-// Env: CONTENTFUL_MANAGEMENT_TOKEN, CONTENTFUL_ORGANIZATION_ID. DRY_RUN=true = plan only.
-// Run: `npm run taxonomy:describe-events` (dry-run first: `DRY_RUN=true npm run taxonomy:describe-events`).
+// Env: CONTENTFUL_MANAGEMENT_TOKEN, CONTENTFUL_ORGANIZATION_ID, DRY_RUN.
+// Run: `npm run taxonomy:describe-events`.
 
 const { LOCALE, byId, getExistingConcepts, createPlainClient, readEnv } = require('./lib/taxonomy');
 

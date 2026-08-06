@@ -1,9 +1,7 @@
 # Keeps an article's Voyage embedding in sync with Contentful, off the webhook request path.
-# Enqueued by the Contentful webhook (publish → "embed", unpublish/delete → "delete") and by the
-# embeddings:backfill rake task. Arguments are plain strings and both operations are idempotent
-# (embed overwrites, delete is a no-op on a missing key), so the retries below are safe. The stored
-# value is a JSON `{ version:, vector: }` keyed by Contentful id; RelatedArticles reads it at request
-# time so the related-articles endpoint never has to call Voyage itself.
+# Both operations are idempotent — embed overwrites, delete no-ops on a missing key — so the
+# inherited retries are safe. The stored value is a JSON `{ version:, vector: }` keyed by
+# Contentful id, which RelatedArticles reads at request time.
 class ArticleEmbeddingJob < ApplicationJob
   include MarkdownHelper # markdown_to_plain_text, to strip the body down to plain prose before embedding
 
@@ -34,12 +32,11 @@ class ArticleEmbeddingJob < ApplicationJob
     article = Articles.new.find_for_embedding(entry_id)
     return if article.blank?
 
-    # The article's real content as plain prose: title + intro + body (body is blank for a Short,
-    # leaving intro). Intro/body are Markdown, so strip them to plain text — embed the words an
-    # author wrote, not Markdown/HTML syntax.
+    # Stripped to plain text, so the embedding covers the words an author wrote rather than
+    # Markdown syntax.
     text = [article.title, markdown_to_plain_text(article.intro), markdown_to_plain_text(article.body)].reject(&:blank?).join("\n\n")
     vector = Embeddings.new.embed(text)
-    # Leave any existing vector in place if the embed failed, rather than storing a blank one.
+    # Leaves any existing vector in place rather than storing a blank one.
     return if vector.blank?
 
     payload = { version: article.sys&.published_version, vector: vector }

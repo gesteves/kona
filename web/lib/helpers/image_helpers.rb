@@ -5,108 +5,89 @@ require 'blurhash'
 require 'erb'
 
 module ImageHelpers
-  # Raised when IMAGES_URL is unset. Every image on the site goes through Cloudflare, so there
-  # is no sensible way to build one without knowing the host to hang the transformation off.
+  # Raised when IMAGES_URL is unset. Deliberately fatal rather than falling back to Contentful
+  # resizing, which rendered fine while draining Contentful's asset bandwidth.
   class ImagesUrlMissing < StandardError
     MESSAGE = <<~MSG.freeze
       IMAGES_URL is unset, so there's no host to build a Cloudflare Images URL from.
 
       It's the host Cloudflare serves transformations from (<host>/cdn-cgi/image/…), i.e. the
       site's own public host. Set it in .env locally and in the build env for deploys.
-
-      This used to fall back to Contentful's resizing, which rendered fine while quietly
-      draining Contentful's asset bandwidth — the exact thing Cloudflare Images replaced. It
-      now fails instead, so a missing var can't ship unnoticed.
     MSG
 
     def initialize(message = MESSAGE) = super
   end
 
-  # Cloudflare Images serves transformations from this path on our own zone. Options go in the
-  # path, not the query string.
+  # Cloudflare Images transformation path. Options go in the path, not the query string.
   # @see https://developers.cloudflare.com/images/transform-images/transform-via-url/
   CDN_IMAGE_PATH = '/cdn-cgi/image/'
 
-  # Maps the format names our callers use (which are also Contentful's) to Cloudflare's. Note
-  # `jpeg`, not `jpg`. `auto` lets Cloudflare pick avif/webp/jpeg from the request's Accept
-  # header — which is why we don't need a <picture> element, and why one srcset candidate is
-  # billed as a single transformation no matter how many formats it ends up serving.
+  # Maps Contentful's format names to Cloudflare's (note `jpeg`, not `jpg`). `auto` lets
+  # Cloudflare pick avif/webp/jpeg from the Accept header, which is why no <picture> is needed.
   CDN_IMAGE_FORMATS = { 'avif' => 'avif', 'webp' => 'webp', 'jpg' => 'jpeg', 'auto' => 'auto' }.freeze
 
-  # Extracts the asset ID from a URL.
-  # @param url [String, nil] The URL from which to extract the asset ID.
-  # @return [String, nil] The asset ID extracted from the URL, or nil for a blank URL.
+  # Extracts the Contentful asset ID from an asset URL.
+  # @param url [String, nil] An asset URL.
+  # @return [String, nil] The asset ID, or nil for a blank URL.
   def get_asset_id(url)
     return if url.blank?
     url.split('/')[4]
   end
 
-  # Returns a hash of assets keyed by sys.id for O(1) lookups, built once per build
-  # (memoize_by_collection).
-  # @return [Hash] A hash mapping asset IDs to asset objects.
+  # Assets keyed by sys.id, built once per build.
+  # @return [Hash] Asset IDs mapped to asset objects.
   def asset_index
     memoize_by_collection(:asset_index, data.assets) do
       data.assets.each_with_object({}) { |a, h| h[a.sys.id] = a }
     end
   end
 
-  # Retrieves the dimensions (width and height) of an asset by its ID.
-  # @param asset_id [String] The ID of the asset for which to retrieve dimensions.
-  # @return [Integer, Integer] The width and height of the asset, or nil if the asset is not found.
+  # @param asset_id [String] The asset's ID.
+  # @return [Array<Integer, Integer>] The asset's width and height, or nils when unknown.
   def get_asset_dimensions(asset_id)
     asset = asset_index[asset_id]
     return asset&.width, asset&.height
   end
 
-  # Retrieves the description (aka alt text) of an asset by its ID.
-  # @param asset_id [String] The ID of the asset for which to retrieve the description.
-  # @return [String, nil] The description of the asset, or nil if the asset is not found or has no description.
+  # @param asset_id [String] The asset's ID.
+  # @return [String, nil] The asset's description (its alt text), or nil when it has none.
   def get_asset_description(asset_id)
     asset = asset_index[asset_id]
     asset&.description&.strip
   end
 
-  # Retrieves the content type of an asset by its ID.
-  # @param asset_id [String] The ID of the asset for which to retrieve the content type.
-  # @return [String, nil] The content type of the asset, or nil if the asset is not found.
+  # @param asset_id [String] The asset's ID.
+  # @return [String, nil] The asset's content type, or nil when it isn't found.
   def get_asset_content_type(asset_id)
     asset = asset_index[asset_id]
     asset&.content_type
   end
 
-  # Retrieves the URL of an asset by its ID.
-  # @param asset_id [String] The ID of the asset for which to retrieve the URL.
-  # @return [String, nil] The URL of the asset, or nil if the asset is not found.
+  # @param asset_id [String] The asset's ID.
+  # @return [String, nil] The asset's URL, or nil when it isn't found.
   def get_asset_url(asset_id)
     asset = asset_index[asset_id]
     asset&.url
   end
 
-  # Retrieves the published version of an asset by its ID.
-  # @param asset_id [String] The ID of the asset for which to retrieve the published version.
-  # @return [Integer, nil] The published version of the asset, or nil if the asset is not found.
+  # @param asset_id [String] The asset's ID.
+  # @return [Integer, nil] The asset's published version, or nil when it isn't found.
   def get_asset_published_version(asset_id)
     asset = asset_index[asset_id]
     asset&.sys&.published_version
   end
 
-  # Generates a CDN image URL with optional transformation parameters.
-  # Cloudflare serves transformations from a host it fronts, so this needs to know which one:
-  # IMAGES_URL, required everywhere including locally. Set it and `middleman server` renders
-  # exactly what production does — auto avif/webp, saliency-cropped Open Graph cards — with the
-  # images fetched from the live zone. Unset, this raises rather than resizing via Contentful:
-  # that fallback rendered a perfectly good-looking site while draining Contentful's bandwidth,
-  # so its only real effect was to hide a broken deploy. See ImagesUrlMissing.
+  # Builds a Cloudflare Images transformation URL, hosted on IMAGES_URL.
   # @see https://developers.cloudflare.com/images/transform-images/transform-via-url/
-  # @param original_url [String, nil] The original URL of the image.
-  # @param params [Hash] (Optional) Transformation parameters (:w, :h, :fm, :fit).
-  # @return [String, nil] The CDN image URL, or nil for a blank URL (e.g. a site entry with
-  #   no logo) so callers don't crash the build.
+  # @param original_url [String, nil] The image's source URL.
+  # @param params [Hash] Transformation parameters (:w, :h, :fm, :fit).
+  # @return [String, nil] The transformation URL, or nil for a blank URL so callers don't crash
+  #   the build.
   # @raise [ImagesUrlMissing] if IMAGES_URL is unset.
   def cdn_image_url(original_url, params = {})
     return if original_url.blank?
-    # Already transformed; don't wrap it again. This has to come before get_asset_id, which
-    # reads the id from a fixed path position that a transformed URL doesn't have.
+    # Already transformed. Must precede get_asset_id, which reads the id from a fixed path
+    # position a transformed URL doesn't have.
     return original_url if original_url.include?(CDN_IMAGE_PATH)
     raise ImagesUrlMissing if ENV['IMAGES_URL'].blank?
 
@@ -128,21 +109,20 @@ module ImageHelpers
     options << "width=#{params[:w]}" if params[:w].present?
     options << "height=#{params[:h]}" if params[:h].present?
     options << "fit=#{params[:fit]}" if params[:fit].present?
-    # Cloudflare rejects a URL with no options at all, so callers that want the image as-is
-    # (the <img> fallback, animated gifs, the Open Graph logo) get anim=true — Cloudflare's
-    # own default, so it transforms nothing. Emitting no format is the point: that's what
-    # preserves the source format, its transparency, and a gif's animation.
+    # Cloudflare rejects a URL with no options, so callers wanting the image as-is get
+    # anim=true — Cloudflare's own default, which transforms nothing and preserves the source
+    # format, transparency, and gif animation.
     return 'anim=true' if options.empty?
 
     options.join(',')
   end
 
-  # Generates a responsive srcset for an image URL with specified widths and optional parameters.
-  # @param url [String] The URL of the image.
-  # @param widths [Array<Integer>] An array of image widths for the srcset.
-  # @param square [Boolean] (Optional) Indicates if the image should be squared. Default is false.
-  # @param options [Hash] (Optional) Additional query parameters to include in the srcset.
-  # @return [String] The responsive srcset for the image.
+  # Builds a responsive srcset.
+  # @param url [String] The image's URL.
+  # @param widths [Array<Integer>] The widths to generate candidates for.
+  # @param square [Boolean] Whether to crop each candidate square.
+  # @param options [Hash] Additional transformation parameters.
+  # @return [String] The srcset attribute value.
   def srcset(url:, widths:, square: false, options: {})
     srcset = widths.map do |w|
       query = options.merge({ w: w })
@@ -152,70 +132,50 @@ module ImageHelpers
     srcset.join(', ')
   end
 
-  # Generates a CDN URL for an Open Graph image based on Facebook's size guidelines.
-  # Deliberately centre-cropped: Cloudflare's gravity=auto picks the crop by saliency, but on
-  # these photos it's unpredictable, and a boring crop beats a surprising one.
-  # @param original_url [String] The original URL of the image.
-  # @return [String] The CDN URL for the Open Graph image.
+  # Builds the Open Graph card URL for a cover image, at Facebook's recommended size.
+  # Centre-cropped on purpose — Cloudflare's saliency crop is unpredictable on these photos.
+  # @param original_url [String] The image's source URL.
+  # @return [String] The transformation URL.
   def open_graph_image_url(original_url)
     params = { w: 1200, h: 630, fit: 'cover' }
     cdn_image_url(original_url, params)
   end
 
-  # Bumped after a change to the card design, its logo, or its font. It's folded into the `v`
-  # cache buster below, so bumping it re-mints every card URL and refreshes the year-cached
-  # images (the route and Cloudflare otherwise treat each card URL as immutable). The matching
-  # card template lives in web/src/og-render.ts.
+  # Bump after changing the card design, logo, or font in web/src/og-render.ts: it's folded into
+  # the `v` cache buster below, so bumping re-mints every card URL. Cards are otherwise immutable.
   OG_TEMPLATE_VERSION = 'v1'
 
-  # Returns the URL of the on-demand Open Graph card for the given page. The card is rendered by
-  # the site's OWN Cloudflare Worker (web/src/og.ts, claimed via run_worker_first): it reads the
-  # page out of the deployed static assets through the ASSETS binding, takes its og:title, and
-  # renders a 1200×630 PNG cached for a year.
-  #
-  # The card hangs off the page's own path — /2026/06/26/post/ → /2026/06/26/post/og.png, and the
-  # home page → /og.png — so the Worker derives the page from the request path and there is no
-  # `?path=` parameter to validate. ⚠️ The ".png" is load-bearing: it's what keeps the route out
-  # of the zone's Cache Rule (`not path contains "."`). See wrangler.jsonc.
-  #
-  # Same-origin by construction — root_url is the only host involved, so there is nothing to
-  # configure and no way to point this at another site. (It used to take an absolute URL and a
-  # separate OG_IMAGE_URL host, because the renderer was a standalone fly service.)
-  #
-  # The URL is content-addressed: `v` combines OG_TEMPLATE_VERSION with the entry's
-  # published_version, so a republish (which bumps published_version) mints a new URL and a title
-  # edit is picked up on the next crawl — no cache purge needed, ever.
-  # @param path [String] The root-relative path of the page (current_page.url).
-  # @param version [Integer, String, nil] The entry's sys.published_version, used as a cache
-  #   buster. Listing pages (the blog index, tag archives) aren't Contentful entries and have no
-  #   published_version, so it may be nil — the card then busts on OG_TEMPLATE_VERSION alone,
-  #   which is correct since their og:title is static.
-  # @return [String] The URL of the page's card.
+  # Builds the URL of the on-demand Open Graph card for a page, rendered by this site's own
+  # Worker (web/src/og.ts) from the page's og:title. The card hangs off the page's own path, so
+  # there is no caller-supplied path to validate. The ".png" is load-bearing — it's what keeps
+  # the route out of the zone's Cache Rule (`not path contains "."`).
+  # @param path [String] The page's root-relative path (current_page.url).
+  # @param version [Integer, String, nil] The entry's sys.published_version, so a republish mints
+  #   a new URL. Nil for listing pages, which aren't Contentful entries.
+  # @return [String] The card's URL.
   def generate_open_graph_image_url(path, version = nil)
     v = version.present? ? "#{OG_TEMPLATE_VERSION}-#{version}" : OG_TEMPLATE_VERSION
     query = URI.encode_www_form(v: v)
     "#{root_url.to_s.chomp('/')}#{path.to_s.chomp('/')}/og.png?#{query}"
   end
 
-  # Generates a CDN URL for the site icon with the specified width.
-  # @param w [Integer] The desired width of the site icon.
-  # @return [String, nil] The CDN URL for the site icon with the specified width, or nil if not found.
+  # @param w [Integer] The desired width.
+  # @return [String, nil] The site icon's transformation URL, or nil when the site has no logo.
   # @raise [ImagesUrlMissing] if IMAGES_URL is unset.
   def site_icon_url(w:)
     original_url = data.site.logo.url
     cdn_image_url(original_url, { w: w })
   rescue ImagesUrlMissing
-    # A misconfigured build must fail, not silently lose the icon; the rescue below is only
-    # here for a site entry that has no logo at all.
+    # A misconfigured build must fail; the rescue below only covers a site entry with no logo.
     raise
   rescue StandardError
     nil
   end
 
-  # Generates a data URI containing an SVG embedded with the Blurhash for an asset ID.
+  # Builds a data URI wrapping the asset's blurhash SVG, for use as a CSS background.
   # @see https://css-tricks.com/the-blur-up-technique-for-loading-background-images/#recreating-the-blur-filter-with-svg
-  # @param asset_id [String] The ID of the asset used for generating Blurhash SVG.
-  # @return [String, nil] The data URI with SVG data for Blurhash, or nil if not found or blank.
+  # @param asset_id [String] The asset's ID.
+  # @return [String, nil] The data URI, or nil when no blurhash could be generated.
   def blurhash_svg_data_uri(asset_id)
     svg = blurhash_svg(asset_id)
     return if svg.blank?
@@ -224,9 +184,9 @@ module ImageHelpers
     "data:image/svg+xml;charset=utf-8,#{encoded_svg}"
   end
 
-  # Generates an SVG embedded with the Blurhash for an asset ID.
-  # @param asset_id [String] The ID of the asset used for generating Blurhash SVG.
-  # @return [String, nil] The SVG with Blurhash effect, or nil if not found or blank.
+  # Builds an SVG that blurs the asset's blurhash thumbnail up to the asset's aspect ratio.
+  # @param asset_id [String] The asset's ID.
+  # @return [String, nil] The SVG markup, or nil when no blurhash could be generated.
   def blurhash_svg(asset_id)
     jpeg_data_uri = blurhash_jpeg_data_uri(asset_id)
     return if jpeg_data_uri.blank?
@@ -244,44 +204,35 @@ module ImageHelpers
     </svg>"
   end
 
-  # Generates a data URI containing JPEG image data for the Blurhash for an an asset ID.
-  # @param asset_id [String] The ID of the asset used for generating Blurhash JPEG data URI.
-  # @param width [Integer] (Optional) The desired width of the JPEG image. Default is 32.
-  # @return [String, nil] The data URI with JPEG image data and Blurhash effect, or nil if not generated or valid.
+  # Decodes the asset's blurhash into a tiny JPEG data URI, cached in Redis by published
+  # version since generating one is expensive.
+  # @param asset_id [String] The asset's ID.
+  # @param width [Integer] The JPEG's width in pixels.
+  # @return [String, nil] The data URI, or nil for a GIF or when encoding fails.
   def blurhash_jpeg_data_uri(asset_id, width: 32)
     content_type = get_asset_content_type(asset_id)
-    # Blurhashes for GIFs are not supported; return.
     return if content_type == 'image/gif'
 
     original_width, original_height = get_asset_dimensions(asset_id)
     published_version = get_asset_published_version(asset_id)
     return unless original_width && original_height && published_version
 
-    # Attempt to fetch from cache—generating these things is sorta expensive
     cache_key = "blurhash:jpeg:#{asset_id}:#{published_version}:#{width}"
     jpeg = redis.get(cache_key)
     return jpeg if jpeg.present?
 
-    # Attempt to encode the Blurhash string
     height = ((original_height.to_f / original_width.to_f) * width).round
     blurhash = encode_blurhash(asset_id, width, height)
     return unless Blurhash.valid_blurhash?(blurhash)
 
-    # Generate the JPEG image from the Blurhash string. Blurhash decodes to opaque RGBA,
-    # so the alpha band is dropped rather than composited.
-    # ⚠️ .flatten is load-bearing. Blurhash.decode returns a nested [row][col][r,g,b,a] array,
-    # and Array#pack raises TypeError on that. MiniMagick's get_image_from_pixels accepted the
-    # nested form, so the port to vips dropped the flatten and every cache miss silently
-    # produced no placeholder — the rescue below swallowed the TypeError into a warn.
+    # Blurhash.decode returns a nested [row][col][r,g,b,a] array that Array#pack raises on, so
+    # the flatten is required. It decodes to opaque RGBA, so the alpha band is dropped.
     pixels = Blurhash.decode(width, height, blurhash).flatten
     image = Vips::Image.new_from_memory(pixels.pack('C*'), width, height, 4, :uchar)
                        .copy(interpretation: :srgb)
                        .extract_band(0, n: 3)
 
-    # Encode the JPEG image as a data URI
     jpeg = "data:image/jpeg;base64,#{Base64.strict_encode64(image.write_to_buffer('.jpg'))}"
-
-    # Cache that shit for later.
     redis.set(cache_key, jpeg)
     jpeg
   rescue StandardError => e
@@ -289,20 +240,14 @@ module ImageHelpers
     nil
   end
 
-  # Encodes a Blurhash using libvips for an asset based on its ID, width, and height.
-  # Resizes through Cloudflare Images like every other image on the site, which means the
-  # thumbnail's source is the R2 mirror rather than Contentful. It used to go straight to
-  # Contentful's Images API to avoid spending a transformation per asset — but a transformation
-  # is a fraction of a cent against Contentful's metered asset bandwidth, which is the thing
-  # actually in short supply, and 20 of this space's assets live on downloads.ctfassets.net,
-  # which has no Images API at all: those silently downloaded the FULL-SIZE original.
-  # ⚠️ Ask for `fm: 'jpg'` explicitly. With no format Cloudflare hands back the source format,
-  # which can be anything the mirror holds (avif included) — and a libvips built without that
-  # loader fails the decode into the rescue below, i.e. silently no placeholder.
-  # @param asset_id [String] The ID of the asset used for generating the Blurhash.
-  # @param width [Integer] The width of the Blurhash image.
-  # @param height [Integer] The height of the Blurhash image.
-  # @return [String, nil] The generated Blurhash, or nil if not generated
+  # Encodes an asset's blurhash from a thumbnail resized through Cloudflare Images, so the
+  # source is the R2 mirror like every other image.
+  # The explicit `fm: 'jpg'` matters: with no format Cloudflare returns the source format, and a
+  # libvips without that loader fails the decode into the rescue, i.e. silently no placeholder.
+  # @param asset_id [String] The asset's ID.
+  # @param width [Integer] The thumbnail's width.
+  # @param height [Integer] The thumbnail's height.
+  # @return [String, nil] The blurhash, or nil when encoding fails.
   def encode_blurhash(asset_id, width, height)
     url = cdn_image_url(get_asset_url(asset_id), { w: width, h: height, fm: 'jpg' })
     data = URI.open(url).read

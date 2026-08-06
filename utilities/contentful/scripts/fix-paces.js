@@ -1,22 +1,13 @@
-// One-off Contentful migration: fixes pace notation in article intro/body.
+// One-off Contentful migration: fixes pace notation in article intro/body, in two passes.
+//   1. Drops the redundant "min" from a M:SS pace ("5:25 min/km" → "5:25/km"), including
+//      inside data-imperial attributes.
+//   2. Spaces out per-100 swim paces to match the site's unit style ("2:16/100m" →
+//      "2:16/100 m").
+// Both are anchored on the M:SS time, so a bare "5 min/km" is deliberately left alone.
 //
-// 1. A pace like "5:25 min/km" already carries the minutes in the M:SS time, so the "min" is
-//    redundant — the correct form is "5:25/km". Drops the " min" while keeping the time and unit
-//    ("5:25 min/km" → "5:25/km"). Also fixes the imperial value inside data-imperial="… min/mi"
-//    attributes, since that's the same text pattern.
-// 2. Normalizes per-100 swim-pace spacing to the site's unit style — everywhere else a space
-//    separates number and unit ("2.4 km", "100 meters"), so "2:16/100m" → "2:16/100 m" and
-//    "1:12/100yd" → "1:12/100 yd". The 6 already-min-less paces authored without the space get
-//    fixed too, so all per-100 paces end up consistent.
-//
-// Both matches are anchored on the preceding M:SS time, so a bare "5 min/km" (a pace with no
-// seconds) is deliberately NOT touched — "5/km" would be wrong. Units covered: km, mi, 100 yd,
-// 100 m. Purely a source-content correction; there's no render-time counterpart.
-//
-// Run with `npm run fix:paces` (from contentful/), which loads contentful/.env (via
-// `node --env-file`) so CONTENTFUL_SPACE and CONTENTFUL_MANAGEMENT_TOKEN are available. Options:
-//   DRY_RUN=true                  print per-entry diffs, write nothing (skips the prompt)
-//   ENTRY_ID=<sys.id>             restrict the fix to a single entry (extra-safe trial)
+// Run: `npm run fix:paces` from contentful/. Options:
+//   DRY_RUN=true                  print per-entry diffs, write nothing
+//   ENTRY_ID=<sys.id>             restrict to a single entry
 //   CONTENTFUL_ENVIRONMENT=<env>  target a non-master environment (default: master)
 const { runMigration } = require('contentful-migration');
 
@@ -24,9 +15,8 @@ const FIELDS = ['body', 'intro'];
 
 const fixPaces = (text) =>
   text
-    // 1. Drop the redundant "min". \d{1,2}:\d{2} anchors on the time so bare "5 min/km" is safe.
+    // The M:SS anchor is what keeps a bare "5 min/km" safe.
     .replace(/(\d{1,2}:\d{2})\s?min\/(km|mi|100\s?yd|100\s?m)/g, '$1/$2')
-    // 2. Space out per-100 paces missing the space ("2:16/100m" → "2:16/100 m").
     .replace(/(\d{1,2}:\d{2}\/100)(m|yd)\b/g, '$1 $2');
 
 // Prints the changed lines of a field as a small before/after diff.

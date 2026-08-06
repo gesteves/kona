@@ -1,13 +1,12 @@
 require "httparty"
 
-# Verifies Cloudflare Turnstile tokens via the siteverify API. Used by Api::ContactController to
-# confirm a contact-form submission passed the client-side challenge. Tokens are single-use and
-# expire after 300s, so verification happens in the request path (not the delayed job).
+# Verifies Cloudflare Turnstile tokens via siteverify, confirming a contact-form submission
+# passed the client-side challenge. Tokens are single-use and expire after 300s, so this runs in
+# the request path rather than the delayed job.
 #
-# Fails OPEN when TURNSTILE_SECRET is unset (like Akismet), so dev/local and a not-yet-configured
-# deploy still work; when a secret is present, a missing or explicitly-invalid token is rejected. A
-# transport error (we have a token but can't reach siteverify) also fails open — the submission
-# already passed a challenge, and honeypot + Akismet + the rate limit still guard.
+# Fails open when unconfigured, and on a transport error — the submission already passed a
+# challenge, and the honeypot, Akismet, and the rate limit still guard. A missing or
+# explicitly-invalid token is rejected.
 #
 # @see https://developers.cloudflare.com/turnstile/get-started/server-side-validation/
 class Turnstile < ApplicationService
@@ -24,10 +23,9 @@ class Turnstile < ApplicationService
   end
 
   # Verifies a Turnstile response token.
-  # @param token [String, nil] The token from the client widget (cf-turnstile-response).
-  # @param remoteip [String, nil] The real visitor IP (optional; improves accuracy).
-  # @return [Boolean] true when the token is valid — or when unconfigured (fail open). false for a
-  #   blank or explicitly-invalid token.
+  # @param token [String, nil] The token from the client widget.
+  # @param remoteip [String, nil] The real visitor IP; improves accuracy.
+  # @return [Boolean] Whether the token is valid. True when unconfigured or unreachable.
   def verify(token, remoteip: nil)
     return true unless configured?
     return false if token.blank?
@@ -35,14 +33,11 @@ class Turnstile < ApplicationService
     body = { secret: @secret, response: token }
     body[:remoteip] = remoteip if remoteip.present?
 
-    # The timeout is what makes the fail-open real: without it Net::HTTP waits its 60s defaults,
-    # so a *hung* (rather than refused) siteverify holds the contact request until rack-timeout
-    # kills the thread — a 500 to the visitor instead of the accept below. A timeout raises
-    # Net::OpenTimeout/ReadTimeout, which the rescue turns into the intended open failure.
+    # The timeout is what makes the fail-open real: without it a hung siteverify would hold the
+    # request until rack-timeout kills the thread, 500ing the visitor instead of accepting.
     response = HTTParty.post(SITEVERIFY_URL, body: body, timeout: 5)
     unless response.success?
-      # Transport/API error: we have a token (a challenge was attempted) but can't confirm it.
-      # Fail open rather than block a real user during a Cloudflare hiccup.
+      # A challenge was attempted but can't be confirmed; don't block a real user over it.
       report_upstream_error("Turnstile HTTP #{response.code}", status: response.code)
       return true
     end

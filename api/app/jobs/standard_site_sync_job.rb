@@ -1,12 +1,10 @@
-# Runs a single standard.site PDS sync operation in the background, off the Contentful
-# webhook request path. Arguments are plain strings (JSON-serializable, per Sidekiq best
-# practices) and every operation is idempotent — putRecord is an upsert and delete is a
-# no-op on a missing record — so the automatic retries below are safe. After the retries are
-# exhausted the job lands in the Dead set (visible in the web UI); the standard_site:backfill
-# task remains the broader reconciliation path.
+# Runs one standard.site PDS sync operation off the Contentful webhook request path. Every
+# operation is idempotent — putRecord is an upsert, delete no-ops on a missing record — so the
+# inherited retries are safe. Exhausted retries land in the Dead set; standard_site:backfill is
+# the broader reconciliation path.
 class StandardSiteSyncJob < ApplicationJob
   # @param operation [String] "sync_document", "delete_document", or "sync_publication".
-  # @param entry_id [String, nil] The Contentful entry id (unused for "sync_publication").
+  # @param entry_id [String, nil] The Contentful entry id; unused for "sync_publication".
   def perform(operation, entry_id = nil)
     service = StandardSite.new
     case operation

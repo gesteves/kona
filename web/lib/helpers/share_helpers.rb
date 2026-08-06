@@ -15,9 +15,9 @@ module ShareHelpers
     'Mastodon' => { base: 'https://share.joinmastodon.org/?',            params: { text: "%{title}\n\n%{url}" } }
   }.freeze
 
-  # Generates the URL for sharing an article on a network.
+  # Builds the share URL for an article on a network.
   # @param network [String] A SHARE_NETWORKS key.
-  # @param article [Article] The article to be shared.
+  # @param article [Article] The article to share.
   # @return [String] The share URL.
   def share_url(network, article)
     config = SHARE_NETWORKS.fetch(network)
@@ -45,9 +45,8 @@ module ShareHelpers
     ]
   end
 
-  # Returns a random heading for the share section for an article.
-  # @param article [Article] The article to be shared.
-  # @return [String] A randomly selected share heading.
+  # @param article [Article] The article to share.
+  # @return [String] The share section's heading, naming the entry's kind.
   def share_heading(article)
     type = if article&.contentful_metadata&.tags&.any? { |tag| tag.name.downcase == 'race reports' }
              'race report'

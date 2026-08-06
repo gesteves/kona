@@ -1,58 +1,52 @@
 require "set"
 
-# Ranks the "Trending Articles" widget at request time as a "hot today" signal: which articles are
-# being read *more than their own normal* over roughly the last day or two. Recomputed each clock hour
-# off a short, rolling Plausible window, so the widget moves through the day (as the window rolls and
-# today's pageviews accrue) without the hour-to-hour jumpiness a "right now" signal would have on a
-# low-traffic site. The ranking is computed once per hour and shared; callers pick `all` (every hot
-# article) or `excluding(ids)` (minus a caller-supplied set of Contentful ids — how an article page
-# drops itself so it isn't listed as trending).
+# Ranks the "Trending Articles" widget: which articles are being read more than their own
+# normal over roughly the last day or two. Recomputed once per clock hour off a rolling
+# Plausible window and shared by every viewer, so the widget moves through the day without the
+# jumpiness a "right now" signal would have on a low-traffic site.
 #
-# Scoring (per article), from two Plausible queries anchored on the current clock hour:
-#   * heat    = pageviews over the last RECENT_WINDOW_HOURS (a flat window — every view in the window
-#               counts equally, so a post read this morning still counts tonight). The absolute "how
-#               much attention is it getting" term.
-#   * baseline_rate = the article's normal pageviews/hour over the BASELINE_DAYS *before* the recent
-#               window (so a surge can't inflate its own baseline), spread over the hours it existed.
-#   * surge   = heat / (baseline_rate · RECENT_WINDOW_HOURS + K) — how much hotter than normal it is
-#               (K smooths near-zero baselines). This is the "having a moment" term the widget leans on.
-#   * score   = log(surge + 1) · relative_weight + log(heat + 1) · absolute_weight
-# Articles below MIN_RECENT_PAGEVIEWS of recent traffic score 0 (noise floor) and fall to the recency
-# tail; articles too new to have a baseline rank on volume alone.
+# Scoring, per article, from two Plausible queries anchored on the current clock hour:
+#   * heat          = pageviews over the last RECENT_WINDOW_HOURS, counted flat.
+#   * baseline_rate = pageviews/hour over the BASELINE_DAYS *before* the recent window, so a
+#                     surge can't inflate its own baseline, spread over the hours it existed.
+#   * surge         = heat / (baseline_rate · RECENT_WINDOW_HOURS + SMOOTHING).
+#   * score         = log(surge + 1) · relative_weight + log(heat + 1) · absolute_weight
+#
+# Articles below MIN_RECENT_PAGEVIEWS score 0 and fall into the recency tail; articles too new
+# to have a baseline rank on volume alone.
 class TrendingArticles < ApplicationService
   include ArticleRanking # candidates + payload, shared with RelatedArticles
 
-  # The rolling recent window (hours). Short enough to be "recent/today", long enough to accumulate a
-  # usable signal on a low-traffic site. Env-overridable like the weights below.
+  # The rolling recent window, in hours: short enough to read as "today", long enough to
+  # accumulate a usable signal on a low-traffic site.
   RECENT_WINDOW_HOURS = Integer(ENV.fetch("TRENDING_RECENT_WINDOW_HOURS", 48))
-  # How far back the "normal rate" baseline reaches (days), ending where the recent window begins.
+  # How far back the baseline reaches, in days, ending where the recent window begins.
   BASELINE_DAYS = Integer(ENV.fetch("TRENDING_BASELINE_DAYS", 30))
-  # Ignore articles with essentially no recent traffic — their surge ratios are pure noise.
+  # Articles below this much recent traffic are ignored — their surge ratios are pure noise.
   MIN_RECENT_PAGEVIEWS = 5
-  # Poisson-style smoother in the surge denominator so a near-zero baseline can't explode the ratio.
+  # Smooths the surge denominator, so a near-zero baseline can't explode the ratio.
   SMOOTHING = 1.0
-  # Cache and serve only the top slice of the ranking. A caller excludes at most the handful of cards
-  # it shows, so this is always enough to fill `count` after exclusions, while bounding the JSON we
-  # cache and the work each (potentially abusive) request does deserializing/filtering it.
+  # How much of the ranking to cache and serve. A caller excludes at most the handful of cards
+  # it shows, so this always fills `count` after exclusions while bounding the cached JSON and
+  # the per-request deserializing.
   MAX_POOL = 50
-  # The ranking is identical for every viewer within a clock hour, so memoize it for the hour (the
-  # cache key carries the hour bucket, so it rolls over on its own).
+  # The cache key carries the hour bucket, so the ranking rolls over on its own.
   RESULT_TTL = 1.hour
 
-  # @param articles [Articles] corpus source (injectable for testing)
-  # @param plausible [Plausible] analytics source (injectable for testing)
+  # @param articles [Articles] The corpus source; injectable for testing.
+  # @param plausible [Plausible] The analytics source; injectable for testing.
   def initialize(articles: Articles.new, plausible: Plausible.new)
     @articles = articles
     @plausible = plausible
   end
 
-  # The top `count` hot articles. @return [Array<OpenStruct>]
+  # @return [Array<OpenStruct>] The top `count` hot articles.
   def all(count: 4)
     ranked.first(count)
   end
 
-  # The top `count` hot articles, minus any whose Contentful id is in `ids` — lets a caller drop the
-  # cards it already shows on the page (an article page drops itself) so trending doesn't repeat them.
+  # The top `count` hot articles, minus any whose Contentful id is in `ids`, so a page can drop
+  # the cards it already shows — an article page drops itself.
   # @return [Array<OpenStruct>]
   def excluding(ids, count: 4)
     excluded = Array(ids).to_set
@@ -61,9 +55,8 @@ class TrendingArticles < ApplicationService
 
   private
 
-  # The full ranked list (corpus DeepOstructs, hottest first), computed once per clock hour and shared
-  # by every variant. Cached under an hour-bucketed key so it rolls hourly and old hours expire; blank
-  # (→ render_empty) on any error rather than raising.
+  # The full ranked list, hottest first, computed once per clock hour and shared by every
+  # variant. Empty on any error, which collapses the widget rather than raising.
   def ranked
     rescue_with([], context: self.class.name) do
       t_end = Time.now.beginning_of_hour
@@ -74,7 +67,8 @@ class TrendingArticles < ApplicationService
     end
   end
 
-  # Ranks every candidate by "hot today" score (returns the corpus DeepOstructs, hottest first).
+  # Ranks every candidate, hottest first.
+  # @param t_end [Time] The clock hour the windows are anchored on.
   def rank(t_end)
     articles = candidates
     return [] if articles.blank?
@@ -85,7 +79,7 @@ class TrendingArticles < ApplicationService
 
     baseline_end = t_end - (RECENT_WINDOW_HOURS * 3600)
     baseline_start = t_end - (BASELINE_DAYS * 86_400)
-    # Parse each publish date exactly once (it's also the only thing here that can raise → rescued).
+    # Parsed once per article; also the only thing here that can raise.
     published = articles.to_h { |article| [article.path, DateTime.parse(article.published_at)] }
 
     evaluated = articles.map do |article|
@@ -93,43 +87,42 @@ class TrendingArticles < ApplicationService
       { article: article, score: score, heat: heat, published: published[article.path] }
     end
 
-    # Sort by score, then heat, then recency — the last key orders the zero-scored tail newest-first,
-    # so the widget fills to `count` with recent articles when little or nothing is hot. Keep only the
-    # top pool: enough to fill after any legitimate exclusion, without caching the whole corpus.
+    # Recency is the last sort key so the zero-scored tail runs newest-first, which is what
+    # fills the widget with recent articles when little or nothing is hot.
     evaluated
       .sort_by { |e| [-e[:score], -e[:heat], -e[:published].to_time.to_i] }
       .first(MAX_POOL)
       .map { |e| e[:article] }
   end
 
-  # One Plausible call → { path => total_pageviews } over the given date range (a flat per-page count).
-  # Used for both the recent window and the baseline period. An unavailable query degrades to an
-  # empty hash — every article scores zero, warn_if_no_analytics logs it, and the ranking falls
-  # back to recency order.
+  # One Plausible call for a date range. An unavailable query degrades to an empty hash, which
+  # scores every article zero and falls the ranking back to recency order.
+  # @return [Hash] { path => total_pageviews }.
   def pageviews_by_path(date_range:)
     @plausible.pageviews_by_path(date_range: date_range) || {}
   end
 
-  # Scores one article. Returns [score, heat] (heat is the tiebreaker). Below the recent-traffic floor
-  # → [0, 0] (sorts into the recency tail). Too new for a baseline → volume-only.
+  # Scores one article.
+  # @return [Array(Float, Float)] Its [score, heat]; heat is the tiebreaker. Below the recent
+  #   traffic floor this is [0, 0], which sorts into the recency tail.
   def evaluate(recent_pageviews, baseline_total, published, baseline_start, baseline_end)
     return [0.0, 0.0] if recent_pageviews < MIN_RECENT_PAGEVIEWS
 
     volume = Math.log(recent_pageviews + 1)
 
-    # Hours the article existed within the baseline window (before the recent window), so a young post
-    # isn't penalized for the pre-publish days it didn't exist.
+    # Hours the article existed within the baseline window, so a young post isn't penalized for
+    # the days before it was published.
     existed_from = [published.to_time, baseline_start].max
     baseline_hours = (baseline_end - existed_from) / 3600.0
 
     score =
       if baseline_hours <= 0
-        # Too new to have a trustworthy baseline → rank on recent volume alone (mirrors the old model's
-        # young-post branch), so a launch burst still surfaces without an infinite surge ratio.
+        # Too new for a trustworthy baseline, so rank on volume alone — a launch burst still
+        # surfaces, without an infinite surge ratio.
         volume * absolute_weight
       else
-        baseline_rate = baseline_total / baseline_hours                 # pageviews/hour
-        expected = baseline_rate * RECENT_WINDOW_HOURS                  # expected pageviews over the window
+        baseline_rate = baseline_total / baseline_hours
+        expected = baseline_rate * RECENT_WINDOW_HOURS
         surge = recent_pageviews / (expected + SMOOTHING)
         Math.log(surge + 1) * relative_weight + volume * absolute_weight
       end
@@ -141,14 +134,14 @@ class TrendingArticles < ApplicationService
     @relative_weight ||= ENV.fetch("TRENDING_SCORE_RELATIVE_WEIGHT", 1).to_f
   end
 
-  # Defaults below 1 so the volume term stays a guard (keeping a small blip from outranking a real
-  # surge) while the surge term leads — the widget is "having a moment", not "most-read of all time".
+  # Defaults below 1, so the volume term stays a guard against a small blip outranking a real
+  # surge while the surge term leads. The widget is "having a moment", not "most-read ever".
   def absolute_weight
     @absolute_weight ||= ENV.fetch("TRENDING_SCORE_ABSOLUTE_WEIGHT", 0.5).to_f
   end
 
-  # Cheap signal for "analytics unavailable or a path-format regression": candidates present but zero
-  # recent pageviews for all of them → trending silently collapses to recency order.
+  # Logs the one case that silently collapses trending to recency order: candidates present but
+  # zero recent pageviews across all of them, meaning Plausible is down or paths have drifted.
   def warn_if_no_analytics(articles, recent)
     return if articles.any? { |a| recent[a.path].to_i.positive? }
     Rails.logger.info("TrendingArticles: no recent pageviews for any of #{articles.size} candidates over #{RECENT_WINDOW_HOURS}h (Plausible down or path mismatch?)")

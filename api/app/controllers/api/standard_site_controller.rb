@@ -1,15 +1,12 @@
 module Api
-  # Serves the standard.site verification data the web build needs: the account DID and
-  # the publication URI. Every other URI (per-document at:// URIs) is derived
-  # deterministically from the DID on the web side, so this is all the build needs.
-  #
-  # Fetched at build time (not by browsers), so it's durably edge-cached — the DID is
-  # stable. When the Bluesky credentials are absent the DID can't be resolved; an empty
-  # response makes the web build omit the verification markup.
+  # Serves the standard.site verification data the web build needs. Every per-document at://
+  # URI is derived deterministically from the DID on the web side, so this is all it needs.
+  # Fetched at build time rather than by browsers, and durably edge-cached since the DID is
+  # stable. An empty response makes the build omit the verification markup.
   class StandardSiteController < BaseController
-    # Intentionally public: the data (DID + publication URI) is public on the AT Protocol, and
-    # this is fetched at build time directly via KONA_API_URL (not through the token-injecting
-    # proxy), so gating it would couple the web build to the shared secret.
+    # Deliberately public: the data is public on the AT Protocol, and this is fetched at build
+    # time directly rather than through the token-injecting proxy, so gating it would couple
+    # the web build to the shared secret.
     skip_before_action :authenticate_bearer_token!
 
     def show

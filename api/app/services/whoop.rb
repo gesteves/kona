@@ -1,11 +1,9 @@
 require "httparty"
 require "uri"
 
-# Interacts with the Whoop API to fetch the most recent sleep, recovery, and strain
-# data, and to run the OAuth2 flow that authorizes the app. Access and refresh tokens
-# are stored in this app's Redis (the refresh token is the only durable credential —
-# there's no DB) and the access token is refreshed as needed, handling refresh-token
-# rotation.
+# Fetches sleep, recovery, and strain data from the Whoop API, and runs the OAuth2 flow that
+# authorizes the app. Tokens live in Redis — there's no DB, so the refresh token is the only
+# durable credential — and the access token is refreshed on demand, handling rotation.
 class Whoop < ApplicationService
   WHOOP_API_URL = "https://api.prod.whoop.com/developer/v2"
   WHOOP_OAUTH_URL = "https://api.prod.whoop.com/oauth/oauth2"
@@ -19,9 +17,8 @@ class Whoop < ApplicationService
     @redirect_uri = ENV["WHOOP_REDIRECT_URI"]
   end
 
-  # Returns the most recent scored cycle, sleep, and recovery for display.
-  # @return [Hash, nil] A hash with :physiological_cycle, :sleep, and :recovery, or nil
-  #   if any of the three is missing (in which case the widget renders nothing).
+  # @return [Hash, nil] The most recent scored :physiological_cycle, :sleep, and :recovery, or
+  #   nil if any is missing, in which case the widget renders nothing.
   def stats
     cycle = get_most_recent_scored_cycle
     sleep = get_sleep_for_cycle(cycle&.dig(:id))
@@ -36,15 +33,14 @@ class Whoop < ApplicationService
     }
   end
 
-  # Validates that the required OAuth environment variables are present.
-  # @return [Boolean] true if all required variables are set.
+  # @return [Boolean] Whether the OAuth credentials are configured.
   def valid_credentials?
     @client_id.present? && @client_secret.present? && @redirect_uri.present?
   end
 
-  # The authenticated Whoop user's numeric id, used to verify webhook payloads belong to
-  # the configured athlete. The id never changes, so it's cached for a day — the webhook
-  # controller calls this in the request path and Whoop expects a 2xx within ~1s.
+  # The authenticated user's numeric id, for verifying that webhook payloads belong to the
+  # configured athlete. Cached for a day, since the webhook controller calls this in the
+  # request path and Whoop expects a 2xx within about a second.
   # @return [Integer]
   # @raise [ApplicationService::HttpError] when the profile fetch fails.
   def user_id
@@ -53,9 +49,9 @@ class Whoop < ApplicationService
     end
   end
 
-  # Fetches a single workout by UUID.
-  # @return [Hash, nil] A normalized workout hash (see #normalize_workout), or nil when the
-  #   workout doesn't exist or isn't scored yet (PENDING_SCORE/UNSCORABLE carry no strain).
+  # Fetches one workout by UUID.
+  # @return [Hash, nil] The normalized workout, or nil when it's missing or unscored — an
+  #   unscored workout carries no strain.
   def get_workout(uuid)
     workout = authed_get_or_nil("activity/workout/#{uuid}")
     return if workout.nil? || workout[:score_state] != "SCORED" || workout[:score].nil?
@@ -63,9 +59,9 @@ class Whoop < ApplicationService
     normalize_workout(workout)
   end
 
-  # Fetches a single sleep by UUID. Named get_sleep (not `sleep`) so it can't shadow
-  # Kernel#sleep, which wait_for_refreshed_token relies on.
-  # @return [Hash, nil] The raw sleep hash, or nil when missing or not SCORED.
+  # Fetches one sleep by UUID. Named get_sleep so it can't shadow Kernel#sleep, which
+  # wait_for_refreshed_token relies on.
+  # @return [Hash, nil] The raw sleep, or nil when missing or unscored.
   def get_sleep(uuid)
     sleep_data = authed_get_or_nil("activity/sleep/#{uuid}")
     return if sleep_data.nil? || sleep_data[:score_state] != "SCORED"
@@ -73,9 +69,9 @@ class Whoop < ApplicationService
     sleep_data
   end
 
-  # Fetches the recovery scored against a cycle. Whoop v2 has no GET-by-recovery-id;
-  # recoveries are keyed by their cycle.
-  # @return [Hash, nil] The raw recovery hash, or nil when missing or not SCORED.
+  # Fetches the recovery scored against a cycle. Whoop v2 has no GET-by-recovery-id — they're
+  # keyed by cycle.
+  # @return [Hash, nil] The raw recovery, or nil when missing or unscored.
   def get_recovery_for_cycle(cycle_id)
     recovery = authed_get_or_nil("cycle/#{cycle_id}/recovery")
     return if recovery.nil? || recovery[:score_state] != "SCORED"
@@ -83,13 +79,12 @@ class Whoop < ApplicationService
     recovery
   end
 
-  # Fetches all cycles whose window may touch [start_ymd, end_ymd], following pagination.
-  # The webhook's daily-strain refresh queries with a ±1-day buffer and buckets each cycle
-  # by its end time in the athlete's timezone, so callers pass the buffered range here.
-  # @param start_ymd [String] YYYY-MM-DD.
-  # @param end_ymd [String] YYYY-MM-DD.
-  # @return [Array<Hash>] Raw cycle hashes.
-  # @raise [ApplicationService::HttpError] when any page fetch fails (retryable in a job).
+  # Fetches every cycle whose window may touch the given range, following pagination. Callers
+  # pass a buffered range, since a cycle is bucketed by its end time in the athlete's timezone.
+  # @param start_ymd [String] The start date, as YYYY-MM-DD.
+  # @param end_ymd [String] The end date, as YYYY-MM-DD.
+  # @return [Array<Hash>] Raw cycles.
+  # @raise [ApplicationService::HttpError] when any page fails, so the job retries.
   def raw_cycles(start_ymd, end_ymd)
     cycles = []
     next_token = nil
@@ -111,9 +106,8 @@ class Whoop < ApplicationService
     cycles
   end
 
-  # Builds the OAuth authorization URL for the given state.
   # @param state [String] An opaque value validated when Whoop redirects back.
-  # @return [String, nil] The authorization URL, or nil if credentials are missing.
+  # @return [String, nil] The OAuth authorization URL, or nil without credentials.
   def get_authorization_url(state)
     return unless valid_credentials?
 
@@ -128,9 +122,9 @@ class Whoop < ApplicationService
     "#{WHOOP_OAUTH_URL}/auth?" + URI.encode_www_form(params)
   end
 
-  # Exchanges an authorization code for access and refresh tokens, storing them in Redis.
-  # @param authorization_code [String] The authorization code from the OAuth callback.
-  # @return [Hash, nil] Token data hash, or nil if the exchange failed.
+  # Exchanges an authorization code for tokens and stores them in Redis.
+  # @param authorization_code [String] The code from the OAuth callback.
+  # @return [Hash, nil] The token data, or nil if the exchange failed.
   def exchange_code_for_tokens(authorization_code)
     return unless valid_credentials?
 
@@ -161,8 +155,8 @@ class Whoop < ApplicationService
 
   private
 
-  # Maps Whoop sport_name values to the names ActivityMatcher's type map understands.
-  # Whoop deprecated sport_id after 2025-09-01; sport_name is the stable field.
+  # Maps Whoop sport_name values onto the names ActivityMatcher's type map understands.
+  # sport_name is the stable field — sport_id was deprecated after 2025-09-01.
   SPORT_NAME_MAP = {
     "running" => "Running",
     "cycling" => "Cycling",
@@ -175,9 +169,9 @@ class Whoop < ApplicationService
     "strength trainer" => "Strength"
   }.freeze
 
-  # Normalizes a raw SCORED workout down to the fields the webhook flow uses. start_time is
-  # kept as an instant; call sites render it as a local date in the athlete's timezone.
-  # @param workout [Hash] The raw Whoop workout.
+  # Normalizes a scored workout to the fields the webhook flow uses. start_time stays an
+  # instant; call sites render it in the athlete's timezone.
+  # @param workout [Hash] The raw workout.
   # @return [Hash]
   def normalize_workout(workout)
     sport = SPORT_NAME_MAP[workout[:sport_name].to_s.downcase] || workout[:sport_name]
@@ -190,8 +184,8 @@ class Whoop < ApplicationService
     }
   end
 
-  # GETs an authenticated Whoop API path, raising on failure (unlike the cached collection
-  # fetchers, webhook processing wants exceptions so Sidekiq can retry).
+  # GETs an authenticated API path, raising on failure so Sidekiq can retry — unlike the
+  # cached collection fetchers, which degrade.
   # @raise [RuntimeError] when no access token is available.
   # @raise [ApplicationService::HttpError] on a non-success response.
   def authed_get!(path, query = {})
@@ -205,9 +199,8 @@ class Whoop < ApplicationService
     )
   end
 
-  # Like authed_get!, but returns nil on a 404 (a missing/expired resource) instead of
-  # raising — the single-resource fetchers treat "not found" as a clean skip, while any
-  # other error still propagates so Sidekiq can retry.
+  # Like authed_get!, but treats a 404 as a clean skip. Any other error still propagates so
+  # Sidekiq can retry.
   def authed_get_or_nil(path)
     authed_get!(path)
   rescue ApplicationService::HttpError => e
@@ -215,8 +208,7 @@ class Whoop < ApplicationService
     nil
   end
 
-  # Fetches the most recent scored cycle from the Whoop API.
-  # @return [Hash, nil] The cycle data or nil if unavailable.
+  # @return [Hash, nil] The most recent scored cycle, or nil when unavailable.
   def get_most_recent_scored_cycle
     cycles = get_cycles
     return if cycles.blank?
@@ -224,9 +216,8 @@ class Whoop < ApplicationService
     cycles&.dig(:records)&.find { |cycle| cycle[:score_state] == "SCORED" }
   end
 
-  # Fetches the most recent scored non-nap sleep data for a given cycle.
-  # @param cycle_id [String] The ID of the cycle to fetch sleep data for.
-  # @return [Hash, nil] The sleep data or nil if unavailable.
+  # @param cycle_id [String] The cycle's id.
+  # @return [Hash, nil] Its most recent scored non-nap sleep, or nil when unavailable.
   def get_sleep_for_cycle(cycle_id)
     return if cycle_id.blank?
 
@@ -234,9 +225,8 @@ class Whoop < ApplicationService
     sleeps&.dig(:records)&.find { |sleep| sleep[:cycle_id] == cycle_id && sleep[:score_state] == "SCORED" && !sleep[:nap] }
   end
 
-  # Fetches the most recent scored recovery data for a given sleep.
-  # @param sleep_id [String] The ID of the sleep to fetch recovery data for.
-  # @return [Hash, nil] The recovery data or nil if unavailable.
+  # @param sleep_id [String] The sleep's id.
+  # @return [Hash, nil] Its most recent scored recovery, or nil when unavailable.
   def get_recovery_for_sleep(sleep_id)
     return if sleep_id.blank?
 
@@ -244,32 +234,29 @@ class Whoop < ApplicationService
     recoveries&.dig(:records)&.find { |recovery| recovery[:sleep_id] == sleep_id && recovery[:score_state] == "SCORED" }
   end
 
-  # Fetches most recent sleep data from the Whoop API.
   # @see https://developer.whoop.com/api#tag/Sleep/operation/getSleepCollection
-  # @return [Hash, nil] The full sleep data or nil if unavailable.
+  # @return [Hash, nil] The recent sleep collection, or nil when unavailable.
   def get_sleeps
     fetch_collection("activity/sleep", "sleeps", 5.minutes)
   end
 
-  # Fetches most recent recovery data from the Whoop API.
   # @see https://developer.whoop.com/api#tag/Recovery/operation/getRecoveryCollection
-  # @return [Hash, nil] The recovery data or nil if unavailable.
+  # @return [Hash, nil] The recent recovery collection, or nil when unavailable.
   def get_recoveries
     fetch_collection("recovery", "recoveries", 5.minutes)
   end
 
-  # Fetches most recent cycle data from the Whoop API.
   # @see https://developer.whoop.com/api/#tag/Cycle/operation/getCycleCollection
-  # @return [Hash, nil] The full cycle data or nil if unavailable.
+  # @return [Hash, nil] The recent cycle collection, or nil when unavailable.
   def get_cycles
     fetch_collection("cycle", "cycles", 1.minute)
   end
 
-  # Fetches a Whoop collection endpoint, caching the raw response body in Redis.
+  # Fetches a collection endpoint, caching the response in Redis.
   # @param path [String] The API path under WHOOP_API_URL.
-  # @param cache_name [String] The suffix used in the Redis cache key.
-  # @param ttl [ActiveSupport::Duration] How long to cache the response.
-  # @return [Hash, nil] The parsed response, or nil if unavailable.
+  # @param cache_name [String] The Redis key's suffix.
+  # @param ttl [ActiveSupport::Duration] How long to cache it.
+  # @return [Hash, nil] The parsed response, or nil when unavailable.
   def fetch_collection(path, cache_name, ttl)
     access_token = get_access_token
     return if access_token.blank?
@@ -282,10 +269,9 @@ class Whoop < ApplicationService
     end
   end
 
-  # Gets a valid access token, refreshing if necessary. Handles token rotation by
-  # storing new refresh tokens when they're returned.
+  # A valid access token, refreshing when the cached one has expired.
   # @see https://developer.whoop.com/docs/developing/oauth#access-token-expiration
-  # @return [String, nil] Access token or nil if unable to refresh.
+  # @return [String, nil] The token, or nil when it can't be refreshed.
   def get_access_token
     return unless valid_credentials?
 
@@ -295,17 +281,15 @@ class Whoop < ApplicationService
     refresh_access_token
   end
 
-  # Refreshes the access token using the stored refresh token. Whoop rotates refresh tokens —
-  # each refresh invalidates the token it was made with — so two concurrent refreshes race:
-  # the loser POSTs an already-rotated token, gets rejected, and can wedge the integration
-  # until a manual re-auth. A short Redis lock serializes refreshes; losers wait for the
-  # winner's token instead of racing it, and the winner re-checks the cache inside the lock.
-  # @return [String, nil] Access token or nil if unable to refresh.
+  # Refreshes the access token, serialized by a short Redis lock. Whoop rotates refresh tokens,
+  # so concurrent refreshes would race: the loser POSTs an already-rotated token, gets rejected,
+  # and can wedge the integration until a manual re-auth. Losers wait for the winner's token.
+  # @return [String, nil] The token, or nil when it can't be refreshed.
   def refresh_access_token
     return wait_for_refreshed_token unless $redis.set(refresh_lock_key, "1", nx: true, ex: REFRESH_LOCK_TTL.to_i)
 
     begin
-      # Another request may have finished refreshing between our cache miss and taking the lock.
+      # Another request may have finished refreshing between the cache miss and the lock.
       cached_token = $redis.get(access_token_key)
       return cached_token if cached_token.present?
 
@@ -347,8 +331,8 @@ class Whoop < ApplicationService
     nil
   end
 
-  # Briefly polls for the access token a concurrent refresh (the lock holder) is fetching.
-  # @return [String, nil] The winner's access token, or nil if it doesn't appear in time.
+  # Briefly polls for the token the lock holder is fetching.
+  # @return [String, nil] The token, or nil if it doesn't appear in time.
   def wait_for_refreshed_token(attempts: 10, interval: 0.3)
     attempts.times do
       sleep(interval)
@@ -360,18 +344,16 @@ class Whoop < ApplicationService
     nil
   end
 
-  # Stores access and refresh tokens in Redis.
-  # @param token_data [Hash] Token response from the OAuth API.
+  # Stores the tokens in Redis: the access token expiring a minute before Whoop's own expiry,
+  # the refresh token indefinitely.
+  # @param token_data [Hash] The OAuth token response.
   def store_tokens(token_data)
     access_token = token_data[:access_token]
     refresh_token = token_data[:refresh_token]
     expires_in = token_data[:expires_in].to_i
 
-    # Store the access token with a 1-minute buffer before its actual expiry.
     access_cache_duration = [expires_in - 60, 0].max
     $redis.setex(access_token_key, access_cache_duration, access_token)
-
-    # Store the refresh token without an expiry.
     $redis.set(refresh_token_key, refresh_token) if refresh_token.present?
   end
 

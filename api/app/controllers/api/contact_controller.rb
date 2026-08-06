@@ -1,22 +1,18 @@
 require "uri"
 
 module Api
-  # Receives contact-form submissions from the public site. Reached through the web app's
-  # same-origin proxy, which injects the API_TOKEN bearer (inherited gate on
-  # BaseController), so direct/public hits get a cheap 401. Accepts either a JSON body (the
-  # progressive-enhancement `fetch`) or a urlencoded/multipart body (the no-JS native form
-  # POST), and answers accordingly: JSON callers get 204/422; HTML callers get a 303 redirect
-  # to the site's Thank-You page. The actual spam-check + email happen in ContactMailJob so the
-  # request returns fast.
+  # Receives contact-form submissions from the public site, through the web app's proxy, which
+  # injects the bearer. Answers by Accept: JSON callers get 204/422, HTML callers get a 303 to
+  # the site's Thank-You page. The spam check and email run in ContactMailJob so the request
+  # returns fast.
   class ContactController < BaseController
-    # The bearer check is inherited from BaseController; only forgery protection (this is a
-    # cross-origin POST authenticated by the bearer, not a Rails session) needs skipping.
+    # This is a cross-origin POST authenticated by the inherited bearer check, not a session.
     skip_forgery_protection
 
-    # Hidden honeypot field — invisible to humans (CSS), commonly filled by bots.
+    # A hidden field, invisible to humans and commonly filled by bots.
     HONEYPOT_FIELD = :comment
 
-    # Server-side length caps, so nobody can post a novel or bloat the Akismet/Resend payloads.
+    # Length caps, so nobody can post a novel or bloat the Akismet and Resend payloads.
     MAX_NAME = 100
     MAX_EMAIL = 254 # RFC 5321 max
     MAX_MESSAGE = 5000
@@ -24,8 +20,7 @@ module Api
     def create
       no_store!
 
-      # Honeypot: a non-blank hidden field means a bot. Drop silently and answer exactly like a
-      # success so the bot gets no signal that it was caught.
+      # A filled honeypot means a bot. Answer exactly like a success, so it gets no signal.
       return respond_success if params[HONEYPOT_FIELD].present?
 
       name = params[:name].to_s.strip
@@ -34,9 +29,8 @@ module Api
 
       return respond_error unless valid?(name, email, message)
 
-      # Turnstile guards the JS/fetch path (the widget needs JS; tokens are single-use + 300s, so
-      # verify here, not in the delayed job). The no-JS HTML path falls back to honeypot + Akismet
-      # + the rack-attack rate limit. The service fails open when TURNSTILE_SECRET is unset.
+      # Turnstile only guards the fetch path, since its widget needs JS. The no-JS path falls
+      # back to the honeypot, Akismet, and the rate limit.
       return respond_error if request.format.json? && !turnstile_ok?
 
       ContactMailJob.perform_async(name, email, message, sender_context)
@@ -45,23 +39,22 @@ module Api
 
     private
 
-    # @return [Boolean] Whether the submission has a well-formed, in-bounds name, email, and message.
+    # @return [Boolean] Whether the name, email, and message are present and in bounds.
     def valid?(name, email, message)
       name.present? && name.length <= MAX_NAME &&
         message.present? && message.length <= MAX_MESSAGE &&
         email.length <= MAX_EMAIL && email.match?(URI::MailTo::EMAIL_REGEXP)
     end
 
-    # @return [Boolean] Whether the Turnstile token passes (or Turnstile isn't configured).
+    # @return [Boolean] Whether the Turnstile token passes, or Turnstile is unconfigured.
     def turnstile_ok?
       Turnstile.new.verify(params[:"cf-turnstile-response"], remoteip: forwarded("X-Kona-Client-IP"))
     end
 
-    # Real visitor signal the web proxy forwards under custom headers (the origin can't see it —
-    # the zone rewrites the CF-* headers to describe the proxy's PoP, not the visitor). Trusted only
-    # for Akismet + the email's Sender details, never for anything that bans. Passed to the job as a
-    # plain string-keyed hash (Sidekiq-serializable); blanks are dropped.
-    # @return [Hash]
+    # The real visitor signal the web proxy forwards under custom headers, since the origin
+    # can't see it otherwise. Trusted only for Akismet and the email's Sender details, never for
+    # anything that bans.
+    # @return [Hash] A string-keyed, Sidekiq-serializable hash, with blanks dropped.
     def sender_context
       {
         "ip" => forwarded("X-Kona-Client-IP"),
@@ -72,7 +65,7 @@ module Api
       }.compact
     end
 
-    # @return [String, nil] A proxy-forwarded request header, or nil when blank/absent.
+    # @return [String, nil] A proxy-forwarded request header, or nil when blank or absent.
     def forwarded(name)
       request.headers[name].presence
     end
@@ -89,8 +82,8 @@ module Api
       if request.format.json?
         render json: { error: "Please provide your name, a valid email address, and a message." }, status: :unprocessable_content
       else
-        # The no-JS path normally can't reach here (the fields are `required`), so just send them
-        # back to the form rather than rendering a bespoke error page.
+        # The no-JS path can't normally reach here, since the fields are `required`, so this
+        # just sends them back to the form rather than rendering a bespoke error page.
         redirect_to "#{site_url}/contact", status: :see_other, allow_other_host: true
       end
     end

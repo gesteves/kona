@@ -1,13 +1,8 @@
-// Upserts Contentful `redirect` entries (301) for archive URLs that move in the two-scheme
-// redesign, so old /tagged/* links don't break. Old paths are read from web/data/tags.json
-// (the CURRENT build — run this BEFORE re-importing), new paths are computed from the design.
-// Covers concepts that moved (path changed) and retired ids (ironman/ironman-703/olympic/races).
+// Upserts 301 `redirect` entries for archive URLs that move in the two-scheme redesign, so old
+// /tagged/* links don't break. Old paths come from web/data/tags.json, so ⚠️ run this BEFORE
+// re-importing. Idempotent: matches by `from`, and leaves unrelated redirects alone.
 //
-// Idempotent: matches existing redirect entries by `from` — updates `to`/`status` if changed,
-// creates the rest, and republishes. Existing unrelated redirects are left alone.
-//
-// Env: CONTENTFUL_SPACE, CONTENTFUL_MANAGEMENT_TOKEN, CONTENTFUL_ENVIRONMENT (default master).
-//   DRY_RUN=true prints the plan, writes nothing.
+// Env: CONTENTFUL_SPACE, CONTENTFUL_MANAGEMENT_TOKEN, CONTENTFUL_ENVIRONMENT, DRY_RUN.
 // Run: `npm run taxonomy:redirects`.
 
 const fs = require('fs');

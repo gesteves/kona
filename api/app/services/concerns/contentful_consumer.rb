@@ -1,5 +1,5 @@
-# Shared plumbing for services that read from Contentful (Articles, Events, StandardSite):
-# a memoized ContentfulClient plus the common "cached find-by-entry-id" query shape.
+# Shared plumbing for the services that read from Contentful: a memoized client plus the common
+# cached find-by-entry-id query shape.
 module ContentfulConsumer
   private
 
@@ -7,14 +7,13 @@ module ContentfulConsumer
     @contentful ||= ContentfulClient.new(self.class.name)
   end
 
-  # Fetches a single item by Contentful entry id through the read-through Redis cache,
-  # wrapped for dot-access. Errors are reported and return nil (via rescue_with).
+  # Fetches one item by entry id through the read-through cache, wrapped for dot-access.
   # @param id [String, nil] The Contentful entry id.
-  # @param query [String] The GraphQL query (taking an `$id` variable).
-  # @param collection [Symbol] The collection key in the query's response.
+  # @param query [String] A GraphQL query taking an `$id` variable.
+  # @param collection [Symbol] The collection key in the response.
   # @param cache_key [String] The Redis key prefix; the id is appended.
-  # @param context [String] Error-report context.
-  # @return [OpenStruct, nil]
+  # @param context [String] The error-report context.
+  # @return [OpenStruct, nil] The item, or nil on error.
   def find_cached_item(id, query:, collection:, cache_key:, context:, expires_in: 5.minutes)
     return if id.blank?
 

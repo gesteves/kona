@@ -9,18 +9,17 @@ module ActivityDescription
 
     DEFAULT_MODEL = "claude-sonnet-5".freeze
     MAX_TOKENS = 512
-    # Generous for these tight prompts (a one-sentence summary or rewrite) — anything longer
-    # is a degenerate stall. The webhook has already been acked by the time these run, so
-    # the timeout just bounds pile-up in the worker when Anthropic hiccups.
+    # Generous for these one-sentence prompts; anything longer is a degenerate stall. The
+    # webhook is already acked by the time these run, so this just bounds worker pile-up.
     TIMEOUT_SECONDS = 30
 
     module_function
 
-    # Summarizes a planned-workout description into a one-sentence stat-line phrase (no
-    # trailing period — the composer renders it as the 🗓️ line).
-    # @return [String, nil] Nil when unconfigured, the input is blank, or the model declined
-    #   to summarize a sparse description. Raises on transport failure (the generator
-    #   rescues per-call so a failure drops only this line).
+    # Summarizes a planned-workout description into a one-sentence phrase, with no trailing
+    # period — the composer renders it as the 🗓️ line.
+    # @return [String, nil] Nil when unconfigured, blank, or declined for a sparse description.
+    # @raise [StandardError] on transport failure; the generator rescues per-call, so only this
+    #   line is lost.
     def planned_summary(planned_description)
       return if planned_description.blank? || !configured?
 
@@ -37,10 +36,9 @@ module ActivityDescription
       parsed[:planned_summary].presence
     end
 
-    # Rewrites a raw weather description as one sentence plus a leading emoji.
-    # (The caller handles the indoor check — indoor activities never get a weather line.)
-    # @return [Hash, nil] { emoji:, sentence: }, or nil when unconfigured, the input is
-    #   blank, or the model declined to characterize sparse conditions.
+    # Rewrites a raw weather description as one sentence plus a leading emoji. The caller owns
+    # the indoor check — indoor activities never get a weather line.
+    # @return [Hash, nil] { emoji:, sentence: }, or nil when unconfigured, blank, or declined.
     def weather_sentence(weather_description)
       return if weather_description.blank? || !configured?
 
@@ -74,16 +72,15 @@ module ActivityDescription
       Anthropic::Client.new(api_key: ENV["ANTHROPIC_API_KEY"])
     end
 
-    # Makes a structured-output Anthropic call and parses the guaranteed-JSON text block.
-    # @return [Hash] The parsed output with symbolized keys.
+    # Makes a structured-output Anthropic call.
+    # @return [Hash] The parsed output, with symbolized keys.
     def structured_call(system:, user:, schema:)
       message = client.messages.create(
         model: model,
         max_tokens: MAX_TOKENS,
-        # Thinking is disabled: these are one-sentence structured extractions that don't
-        # benefit from reasoning, and on models where adaptive thinking is on by default
-        # (e.g. claude-sonnet-5) it would eat into the tight MAX_TOKENS budget and risk
-        # truncating the JSON output.
+        # Disabled: these one-sentence extractions don't benefit from reasoning, and where
+        # adaptive thinking is on by default it would eat the tight MAX_TOKENS budget and
+        # risk truncating the JSON.
         thinking: { type: :disabled },
         system_: system,
         messages: [{ role: "user", content: user }],

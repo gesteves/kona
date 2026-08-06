@@ -1,12 +1,10 @@
-# Sends a fully-composed contact-form email via Resend. Enqueued by ContactMailJob after the
-# spam check + composition, so this is the single retryable unit of the contact pipeline: a
-# Resend failure retries only the send and never re-runs Akismet or the Claude subject call.
-# Resend#send_email raises on a non-2xx, so the inherited time-boxed retry (retry_for: 24.hours)
-# covers transient delivery failures — Sidekiq retries for up to 24 hours, then parks it in the
-# Dead set.
+# Sends a fully-composed contact-form email via Resend. The single retryable unit of the contact
+# pipeline: a delivery failure retries only the send, never re-running Akismet or the subject
+# call. Resend#send_email raises on a non-2xx, so the inherited retries cover transient
+# failures.
 class ContactDeliveryJob < ApplicationJob
-  # @param payload [Hash] String-keyed, built by ContactMailJob: "to", "reply_to", "subject",
-  #   "text", "html".
+  # @param payload [Hash] The email, built by ContactMailJob: "to", "reply_to", "subject",
+  #   "text", and "html".
   def perform(payload)
     Resend.new.send_email(
       to: payload["to"],

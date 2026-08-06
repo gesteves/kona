@@ -1,35 +1,21 @@
 require "uri"
 
-# Central place for reporting *handled* upstream-API failures to Bugsnag. The service layer
-# deliberately degrades gracefully — non-2xx responses, expired tokens, rate limiting,
-# timeouts, and network errors are swallowed so widgets collapse instead of crashing — which
-# means none of them ever reach a controller and Bugsnag's auto-instrumentation never sees
-# them. This module makes those failures visible without changing that behavior.
-#
-# Callable from both ApplicationService subclasses (via the report_upstream_error wrapper)
-# and the FontAwesomeClient module, which is not a service object.
+# Reports *handled* upstream-API failures to Bugsnag. The service layer degrades gracefully, so
+# none of these ever reach a controller and Bugsnag's auto-instrumentation never sees them; this
+# makes them visible without changing that behavior.
 module ErrorReporter
   module_function
 
-  # Reports a handled upstream-API failure to Bugsnag at "warning" severity (kept distinct
-  # from the genuine unhandled crashes that surface as "error"). A no-op outside production,
-  # since Bugsnag's notify_release_stages is limited to production and BUGSNAG_API_KEY is
-  # unset locally/in CI. Never raises into the caller — error reporting must not break the
-  # request path.
-  #
-  # Non-2xx responses (passed as a "HTTP <code>" string) are wrapped in UpstreamError with the
-  # service name prefixed onto the message, so the failing service is visible in the
-  # Bugsnag/Slack headline at a glance instead of being buried in metadata. The service and
-  # context also drive Bugsnag's context label and grouping_hash, so distinct
-  # services/contexts/statuses form their own groups rather than all collapsing under this
-  # one notify call site.
-  #
+  # Reports a handled failure at "warning" severity, keeping it distinct from the genuine
+  # unhandled crashes that surface as "error". Never raises into the caller, and a no-op
+  # outside production. The service and context drive the grouping_hash, so distinct failures
+  # form their own Bugsnag groups rather than collapsing under this one call site.
   # @param error [Exception, String] The rescued exception, or a message for a non-2xx
-  #   response (which isn't an exception).
-  # @param service [String] The reporting service class/module name.
-  # @param context [String, nil] Optional label for what was being attempted.
-  # @param status [Integer, nil] The upstream HTTP status code, when applicable.
-  # @param url [String, nil] The upstream URL; sanitized to host+path before reporting.
+  #   response, which isn't one.
+  # @param service [String] The reporting service's name.
+  # @param context [String, nil] What was being attempted.
+  # @param status [Integer, nil] The upstream HTTP status.
+  # @param url [String, nil] The upstream URL, sanitized before reporting.
   def report_upstream(error, service:, context: nil, status: nil, url: nil)
     exception = build_exception(error, service: service, context: context)
     Bugsnag.notify(exception) do |report|
@@ -47,16 +33,13 @@ module ErrorReporter
     Rails.logger.error("ErrorReporter: failed to notify Bugsnag: #{e}")
   end
 
-  # Builds the exception handed to Bugsnag. Real rescued exceptions pass through unchanged —
-  # their actual class (Net::ReadTimeout, JSON::ParserError, …) and backtrace are more useful
-  # than a generic wrapper. A non-exception message (a non-2xx response) is wrapped in
-  # UpstreamError, with the service prefixed and the context appended so the service, cause,
-  # and where it happened all read off the headline (e.g.
-  # "GoogleAirQuality: HTTP 400 — Widgets::EventsController#event_weather_for").
-  #
-  # @param error [Exception, String]
-  # @param service [String]
-  # @param context [String, nil]
+  # Builds the exception handed to Bugsnag. Rescued exceptions pass through unchanged, since
+  # their real class and backtrace beat a generic wrapper; a non-2xx message is wrapped in
+  # UpstreamError with the service and context folded into it, so the headline reads
+  # "GoogleAirQuality: HTTP 400 — Widgets::EventsController#event_weather_for".
+  # @param error [Exception, String] The exception or message.
+  # @param service [String] The reporting service's name.
+  # @param context [String, nil] What was being attempted.
   # @return [Exception]
   def build_exception(error, service:, context:)
     return error if error.is_a?(Exception)
@@ -65,15 +48,11 @@ module ErrorReporter
     UpstreamError.new("#{service}: #{detail}")
   end
 
-  # Reduces a URL to scheme+host+path, dropping the query string.
-  #
-  # ⚠️ SECURITY: the Google APIs put their API key in the query string, so the raw URL must
-  # never be shipped to Bugsnag. Request/response bodies (which can hold OAuth secrets and
-  # tokens) are likewise never reported — the status code, sanitized URL, and service name
-  # are enough to triage.
-  #
-  # @param url [String, nil]
-  # @return [String, nil]
+  # Reduces a URL to scheme, host, and path.
+  # ⚠️ The Google APIs put their API key in the query string, so the raw URL must never reach
+  # Bugsnag. Request and response bodies aren't reported either, for the same reason.
+  # @param url [String, nil] The URL.
+  # @return [String, nil] Its sanitized form.
   def sanitize_url(url)
     return if url.blank?
 
@@ -83,8 +62,7 @@ module ErrorReporter
     nil
   end
 
-  # Stable, greppable class for the handled non-2xx-response reports so they group together in
-  # Bugsnag rather than scattering across ad-hoc RuntimeErrors. The failing service is prefixed
-  # onto the message (see build_exception) so the headline still names it.
+  # A stable class for handled non-2xx reports, so they group in Bugsnag rather than scattering
+  # across ad-hoc RuntimeErrors.
   class UpstreamError < StandardError; end
 end

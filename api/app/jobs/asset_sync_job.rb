@@ -1,13 +1,10 @@
-# Mirrors one Contentful image asset into R2, off the Contentful webhook request path.
-# Takes a plain-string argument (JSON-serializable, per Sidekiq best practices) and is
-# idempotent — AssetMirror skips an asset whose object is already in the bucket — so the
-# inherited time-boxed retry (retry_for: 24.hours) is safe.
+# Mirrors one Contentful image asset into R2, off the webhook request path. Idempotent —
+# AssetMirror skips an asset already in the bucket — so the inherited 24-hour retry is safe.
 #
-# Unlike most of this app's background work, a failure here raises rather than degrading: an
-# unmirrored asset surfaces later as a broken image on a live page, so it has to retry. After
-# the retries are exhausted the job lands in the Dead set (visible in the web UI); the
-# assets:backfill task remains the broader reconciliation path, since Contentful does not
-# retry webhook deliveries.
+# Unlike most of this app's background work, a failure raises rather than degrading: an
+# unmirrored asset surfaces later as a broken image on a live page. Exhausted retries land in
+# the Dead set; assets:backfill is the broader reconciliation path, since Contentful doesn't
+# retry deliveries.
 class AssetSyncJob < ApplicationJob
   # @param asset_id [String] The Contentful asset's sys.id.
   def perform(asset_id)

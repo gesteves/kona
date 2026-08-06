@@ -1,18 +1,14 @@
-// Single editable source of truth for the two-scheme taxonomy (Sports + Topics) and the
-// per-article assignments. `taxonomy:preview` renders everything here for review; the
-// create/describe/assign scripts all read from it, so what you preview is exactly what runs.
+// The editable source of truth for the two-scheme taxonomy and the per-article assignments.
+// `taxonomy:preview` renders everything here for review, and the create/describe/assign scripts
+// all read from it, so what you preview is exactly what runs.
 //
-// EDIT FREELY:
-//   - CONCEPTS: names, hierarchy (`broader`), `altLabels`, and `description` copy.
-//   - ASSIGNMENTS: each article's most-specific concept(s); the assign script EXPANDS each up
-//     its `broader` chain, so an article gets the full path (e.g. a race → race+distance+discipline).
-//   - altLabels start empty — add short synonyms (e.g. "70.3", "CdA") to shorten chips and
-//     auto-generate /tagged/<synonym> redirects. (Leave races' altLabels off if a short form
-//     would collide, e.g. the full and 70.3 Coeur d'Alene races.)
+// Edit freely: CONCEPTS' names, hierarchy, altLabels, and descriptions, and ASSIGNMENTS' most-
+// specific concept(s) per article — the assign script expands each up its `broader` chain, so
+// an article ends up with the full path. altLabels shorten chips and auto-generate
+// /tagged/<synonym> redirects, so leave one off where a short form would collide.
 //
-// Concepts/schemes are ORG-LEVEL. prefLabels for "Race Reports"/"Reviews" must stay exact
-// (web share_helpers matches them). Descriptions are Markdown (rendered on the archive page,
-// stripped to plain text in meta tags).
+// ⚠️ Concepts and schemes are org-level. The prefLabels "Race Reports" and "Reviews" must stay
+// exact — web's share_helpers matches on them. Descriptions are Markdown.
 
 const contentful = require('contentful-management');
 

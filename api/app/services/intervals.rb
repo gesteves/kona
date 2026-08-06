@@ -1,5 +1,5 @@
-# Interacts with the Intervals.icu API to fetch and summarize the athlete's activity
-# stats for the past month. The raw API response is cached in Redis for 5 minutes.
+# Reads and writes the athlete's Intervals.icu data: activity stats, profile and location,
+# wellness records, and activity descriptions.
 class Intervals < ApplicationService
   INTERVALS_ICU_API_URL = "https://intervals.icu/api/v1"
 
@@ -15,9 +15,8 @@ class Intervals < ApplicationService
     @api_key = ENV["ICU_API_KEY"]
   end
 
-  # Returns summarized activity stats for the past month.
-  # @return [Hash, nil] A hash with swim_distance, bike_distance, run_distance, and
-  #   total_activities, or nil if the activities couldn't be fetched.
+  # @return [Hash, nil] The past month's swim_distance, bike_distance, run_distance, and
+  #   total_activities, or nil when the activities couldn't be fetched.
   def stats
     activities = fetch_activities
     return if activities.nil?
@@ -25,8 +24,8 @@ class Intervals < ApplicationService
     summarize_activities(activities)
   end
 
-  # The athlete's IANA timezone from the (nested) profile endpoint, cached for an hour.
-  # Falls back to UTC on any error — the failure isn't cached, so the next call retries.
+  # The athlete's IANA timezone, cached for an hour. Falls back to UTC on any error; the
+  # failure isn't cached, so the next call retries.
   # @return [String]
   def athlete_timezone
     cached_json("intervals.icu:timezone:#{@athlete_id}", expires_in: 1.hour) do
@@ -37,10 +36,9 @@ class Intervals < ApplicationService
     "UTC"
   end
 
-  # The athlete's preferred temperature unit, derived from the root athlete endpoint the
-  # same way domestique's unit preferences were: an explicit fahrenheit flag wins; otherwise
-  # metric athletes (measurement_preference != "feet") get celsius. Cached for an hour.
-  # @return [Symbol] :celsius or :fahrenheit
+  # The athlete's preferred temperature unit, cached for an hour. An explicit fahrenheit flag
+  # wins; otherwise metric athletes get celsius.
+  # @return [Symbol] :celsius or :fahrenheit.
   def temperature_unit
     cached = cached_json("intervals.icu:temperature_unit:#{@athlete_id}", expires_in: 1.hour) do
       athlete = get_json!("#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}", basic_auth: auth)
@@ -56,12 +54,12 @@ class Intervals < ApplicationService
     :celsius
   end
 
-  # Fetches the raw activity list for a date range (inclusive), raising on failure so the
-  # webhook job can retry. Uncached: the caller is matching against a just-finished workout.
-  # @param oldest [Date, String]
-  # @param newest [Date, String]
+  # Fetches the raw activity list for an inclusive date range. Uncached, since the caller is
+  # matching against a just-finished workout.
+  # @param oldest [Date, String] The range's start.
+  # @param newest [Date, String] The range's end.
   # @return [Array<Hash>]
-  # @raise [ApplicationService::HttpError]
+  # @raise [ApplicationService::HttpError] on failure, so the job retries.
   def activities!(oldest:, newest:)
     get_json!(
       "#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/activities",
@@ -70,18 +68,16 @@ class Intervals < ApplicationService
     )
   end
 
-  # Fetches a single raw activity, raising on failure.
-  # @return [Hash]
-  # @raise [ApplicationService::HttpError]
+  # @return [Hash] One raw activity.
+  # @raise [ApplicationService::HttpError] on failure.
   def activity!(activity_id)
     activity = get_json!("#{INTERVALS_ICU_API_URL}/activity/#{activity_id}", basic_auth: auth)
     activity[:id] ||= activity_id
     activity
   end
 
-  # The activity's weather summary text, with Intervals.icu's own attribution prefix
-  # stripped. Any error → nil (weather isn't available for every activity).
-  # @return [String, nil]
+  # @return [String, nil] The activity's weather summary with Intervals.icu's attribution
+  #   prefix stripped, or nil — weather isn't available for every activity.
   def activity_weather_summary(activity_id)
     response = get_json!("#{INTERVALS_ICU_API_URL}/activity/#{activity_id}/weather-summary", basic_auth: auth)
     response&.dig(:description)&.sub(/\A-- Intervals icu --\n/i, "")&.strip.presence
@@ -89,11 +85,10 @@ class Intervals < ApplicationService
     nil
   end
 
-  # Fetches activity streams by type. Intervals.icu expects repeated bare `types` params
-  # (types=a&types=b), which HTTParty would render as types[]= — so the query string is
-  # built by hand. Any error → nil (streams aren't available for every activity).
-  # @param types [Array<String>] e.g. ["heat_strain_index", "time"]
-  # @return [Array<Hash>, nil] Stream objects ({type:, data: [...]}), or nil.
+  # Fetches activity streams by type. The query string is built by hand because Intervals.icu
+  # expects repeated bare `types` params, which HTTParty would render as `types[]`.
+  # @param types [Array<String>] The stream types to fetch.
+  # @return [Array<Hash>, nil] { type:, data: } objects, or nil — not every activity has them.
   def activity_streams(activity_id, types:)
     query_string = types.map { |type| "types=#{type}" }.join("&")
     get_json!("#{INTERVALS_ICU_API_URL}/activity/#{activity_id}/streams?#{query_string}", basic_auth: auth)
@@ -101,21 +96,20 @@ class Intervals < ApplicationService
     nil
   end
 
-  # The wellness record for a date. Any error → nil (used for the optional
-  # CoreHeatAdaptationScore, which must never fail description generation).
-  # Keys are NOT underscored: custom fields like CoreHeatAdaptationScore are CamelCase.
-  # @param date [Date, String] YYYY-MM-DD.
-  # @return [Hash, nil]
+  # A date's wellness record. Keys are not underscored — custom fields are CamelCase.
+  # @param date [Date, String] The date, as YYYY-MM-DD.
+  # @return [Hash, nil] The record, or nil on any error, since its only caller must never fail
+  #   description generation.
   def wellness(date)
     get_json!("#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/wellness/#{date}", basic_auth: auth)
   rescue StandardError
     nil
   end
 
-  # Partially updates the wellness record for a date (only the provided fields change).
-  # @param date [Date, String] YYYY-MM-DD (the wellness record's id).
-  # @param fields [Hash] e.g. { WhoopStrain: 14.2 }.
-  # @raise [ApplicationService::HttpError] on failure (422 = missing custom field).
+  # Partially updates a date's wellness record; only the given fields change.
+  # @param date [Date, String] The record's id, as YYYY-MM-DD.
+  # @param fields [Hash] The fields to set.
+  # @raise [ApplicationService::HttpError] on failure; a 422 means a missing custom field.
   def update_wellness!(date, fields)
     put_json!(
       "#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/wellness/#{date}",
@@ -125,9 +119,9 @@ class Intervals < ApplicationService
     )
   end
 
-  # Partially updates an activity (only the provided fields change).
-  # @param fields [Hash] e.g. { WhoopWorkoutStrain: 12.4 } or { description: "..." }.
-  # @raise [ApplicationService::HttpError] on failure (422 = missing custom field).
+  # Partially updates an activity; only the given fields change.
+  # @param fields [Hash] The fields to set.
+  # @raise [ApplicationService::HttpError] on failure; a 422 means a missing custom field.
   def update_activity!(activity_id, fields)
     put_json!(
       "#{INTERVALS_ICU_API_URL}/activity/#{activity_id}",
@@ -137,18 +131,17 @@ class Intervals < ApplicationService
     )
   end
 
-  # The athlete's profile (city/state/country/timezone and more), read fresh — deliberately
-  # uncached, since the location sync reads it to decide whether a write is needed. Raises on
-  # failure so the sync job can retry.
+  # The athlete's profile, read fresh — the location sync reads it to decide whether a write
+  # is needed, so it must not be cached.
   # @return [Hash]
-  # @raise [ApplicationService::HttpError]
+  # @raise [ApplicationService::HttpError] on failure, so the sync job retries.
   def athlete_profile
     get_json!("#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}", basic_auth: auth)
   end
 
-  # Updates the athlete's profile location fields. Only the non-nil keys are sent, so a partial
-  # update never clears a field that wasn't resolved. Raises on failure.
-  # @raise [ApplicationService::HttpError]
+  # Updates the athlete's profile location. Only non-nil fields are sent, so a partial update
+  # never clears one that wasn't resolved.
+  # @raise [ApplicationService::HttpError] on failure.
   def update_athlete_profile(city: nil, state: nil, country: nil, timezone: nil)
     fields = { city: city, state: state, country: country, timezone: timezone }.compact
     put_json!(
@@ -159,18 +152,18 @@ class Intervals < ApplicationService
     )
   end
 
-  # The athlete's configured weather-forecast locations, read fresh (uncached) for the location
-  # sync's read-before-write comparison. Raises on failure.
-  # @return [Array<Hash>] The forecast locations (empty when none are configured).
-  # @raise [ApplicationService::HttpError]
+  # The athlete's configured weather-forecast locations, read fresh for the location sync's
+  # read-before-write comparison.
+  # @return [Array<Hash>] The locations, empty when none are configured.
+  # @raise [ApplicationService::HttpError] on failure.
   def weather_config
     response = get_json!("#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/weather-config", basic_auth: auth)
     response&.dig(:forecasts) || []
   end
 
-  # Replaces the athlete's weather-forecast locations. Raises on failure.
-  # @param forecasts [Array<Hash>]
-  # @raise [ApplicationService::HttpError]
+  # Replaces the athlete's weather-forecast locations.
+  # @param forecasts [Array<Hash>] The locations to set.
+  # @raise [ApplicationService::HttpError] on failure.
   def update_weather_config(forecasts)
     put_json!(
       "#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/weather-config",
@@ -180,11 +173,9 @@ class Intervals < ApplicationService
     )
   end
 
-  # Primes (overwrites) the cached athlete timezone with a known-authoritative value — used by
-  # the location sync right after it PUTs a new timezone, so athlete_timezone reflects it
-  # immediately instead of serving the stale cached value until the 1-hour TTL expires. Mirrors
-  # athlete_timezone's own storage (JSON-encoded value, 1-hour TTL) so it round-trips cleanly
-  # through cached_json. No-op in development, where cached_json bypasses the cache entirely.
+  # Overwrites the cached athlete timezone, so a just-PUT value is reflected immediately rather
+  # than after the TTL expires. Mirrors athlete_timezone's own storage so it round-trips
+  # through cached_json. No-op in development, where the cache is bypassed.
   # @param timezone [String] An IANA timezone id.
   def cache_athlete_timezone(timezone)
     return if Rails.env.development?
@@ -194,15 +185,14 @@ class Intervals < ApplicationService
 
   private
 
-  # HTTP Basic credentials for every Intervals.icu call: the username is the literal
-  # string "API_KEY", the password is the athlete's API key.
+  # HTTP Basic credentials: the username is the literal "API_KEY", the password is the key.
   def auth
     { username: "API_KEY", password: @api_key }
   end
 
-  # Fetches activities from the Intervals.icu API for the past month, caching them in Redis
-  # for 5 minutes. Uses string keys (symbolize: false), as the summary reads a["type"] etc.
-  # @return [Array<Hash>, nil] List of activities, or nil on failure.
+  # The past month's activities, cached for 5 minutes. String-keyed, as the summary reads
+  # a["type"].
+  # @return [Array<Hash>, nil] The activities, or nil on failure.
   def fetch_activities
     cached_json("intervals.icu:stats:#{@athlete_id}", expires_in: 5.minutes, symbolize: false) do
       newest = Date.today.to_s
@@ -217,9 +207,8 @@ class Intervals < ApplicationService
     end
   end
 
-  # Summarizes activities into swim_distance, bike_distance, run_distance, and total_activities.
-  # @param activities [Array<Hash>] List of activities.
-  # @return [Hash] Summarized activity statistics.
+  # @param activities [Array<Hash>] The activities to summarize.
+  # @return [Hash] Their swim_distance, bike_distance, run_distance, and total_activities.
   def summarize_activities(activities)
     distances = Hash.new(0)
     total_activities = 0

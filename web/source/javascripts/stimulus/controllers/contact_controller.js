@@ -5,35 +5,30 @@ const SUCCESS_MESSAGE = 'Thanks! Your message is on its way.';
 const ERROR_MESSAGE =
   "Sorry, something went wrong and your message wasn't sent. Please try again.";
 
-// Explicit-render mode so the widget's lifecycle is driven from connect/disconnect (Turbo-safe)
-// rather than an auto-scan that wouldn't re-run on Turbo navigation. We load api.js dynamically,
-// so we must NOT use turnstile.ready() (it throws on an async/deferred script); Turnstile's own
-// `onload` callback param is the supported way to know when it's ready.
+// Explicit-render mode, so the widget's lifecycle is driven from connect/disconnect and survives
+// Turbo navigation. Readiness comes from Turnstile's own `onload` param — turnstile.ready()
+// throws on a dynamically loaded script.
 const TURNSTILE_ONLOAD = '__konaTurnstileOnload';
 const TURNSTILE_SRC = `https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=${TURNSTILE_ONLOAD}`;
 
 /**
- * Progressively enhances the contact form. The form is a real POST to /api/contact that works
- * without JS (native submit → server redirect to the Thank-You page). When this controller is
- * connected, it intercepts the submit, posts the same fields via fetch (asking for JSON so the
- * API answers 204/422 instead of redirecting), and reports the result with a toast — no
- * navigation. If it never loads, the native form submission still works.
+ * Progressively enhances the contact form. The underlying form is a real POST to /api/contact
+ * that works without JS (native submit → redirect to the Thank-You page); this intercepts the
+ * submit, posts the same fields via fetch asking for JSON (204/422), and reports the result
+ * with a toast instead of navigating.
  *
- * When a Turnstile sitekey is configured, it also renders a Cloudflare Turnstile widget and
- * includes its token with the submission (the API verifies it server-side on the JS path).
+ * With a sitekey configured it also renders a Cloudflare Turnstile widget and sends its token,
+ * which the API verifies server-side on the JS path.
  */
 export default class extends Controller {
   static targets = ['submit', 'turnstile'];
   static values = { siteKey: String };
 
-  /**
-   * Renders the Turnstile widget (when configured) once its script is loaded.
-   */
+  /** Renders the Turnstile widget, when configured, once its script is ready. */
   connect() {
     if (!this.siteKeyValue || !this.hasTurnstileTarget) return;
     this.loadTurnstile()
       .then(() => {
-        // Turnstile is ready here (onload fired), so render directly — no turnstile.ready().
         this.widgetId = window.turnstile.render(this.turnstileTarget, {
           sitekey: this.siteKeyValue,
           callback: (token) => {
@@ -74,8 +69,8 @@ export default class extends Controller {
     this.abortController = new AbortController();
     this.setSubmitting(true);
 
-    // Same encoding as the native no-JS POST, so the API handles both identically. The Turnstile
-    // token (explicit render → not in a hidden field) is added here when present.
+    // Same encoding as the native no-JS POST, so the API handles both identically. Explicit
+    // render means the Turnstile token isn't in a hidden field, so add it here.
     const body = new URLSearchParams(new FormData(form));
     if (this.turnstileToken) {
       body.set('cf-turnstile-response', this.turnstileToken);
@@ -95,7 +90,7 @@ export default class extends Controller {
       this.resetTurnstile();
       sendNotification(SUCCESS_MESSAGE, 'success');
     } catch (error) {
-      if (error.name === 'AbortError') return; // navigated away — not a failure
+      if (error.name === 'AbortError') return;
       console.error('Contact form submission failed:', error);
       this.resetTurnstile();
       sendNotification(ERROR_MESSAGE, 'error');
@@ -104,9 +99,7 @@ export default class extends Controller {
     }
   }
 
-  /**
-   * Resets the Turnstile widget so the next submit gets a fresh token (tokens are single-use).
-   */
+  /** Resets the widget so the next submit gets a fresh token; Turnstile tokens are single-use. */
   resetTurnstile() {
     this.turnstileToken = null;
     if (this.widgetId && window.turnstile) {

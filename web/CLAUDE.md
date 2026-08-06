@@ -1,400 +1,266 @@
 # web/ — Kona static site
 
-Middleman 4 static site generator (Ruby 4.0.6) that builds a **Contentful**-powered
-blog and deploys to the **`kona-web` Cloudflare Worker**, which serves the build as static
-assets (images, client IPs, and bot blocking all depend on the zone — see the root
-[`CLAUDE.md`](../CLAUDE.md)). esbuild bundles JavaScript (Stimulus + Turbo) and the
-**Web Awesome** (Pro) component theme CSS via Middleman's external pipeline (`config.rb`):
-Middleman runs esbuild itself, into the gitignored `tmp/dist/`, during both `middleman build`
-(one-shot) and the dev server (watch mode) — there's no separate JS build step. Sass compiles
-the rest of the stylesheets. UI components (toasts, form controls, skeletons, relative time,
-scroller) come from Web Awesome Pro, imported in `source/javascripts/stimulus/index.js`.
+Middleman 4 static site generator (Ruby 4.0.6) building a **Contentful**-powered blog, deployed to
+the **`kona-web` Cloudflare Worker**, which serves the build as static assets. esbuild bundles the
+JavaScript (Stimulus + Turbo) and the **Web Awesome Pro** theme CSS through Middleman's external
+pipeline; Sass compiles the rest. UI components come from Web Awesome Pro, imported in
+`source/javascripts/stimulus/index.js`.
 
-This app no longer fetches its own weather / activity / Whoop data — that moved to the
-`api/` app and is loaded at runtime. See the root [`CLAUDE.md`](../CLAUDE.md) for the
-web↔api contract before touching any widget markup.
-
-## Architecture & data flow
-
-- **Build-time data** (`rake import`): fetches external data into `data/*.json` (Redis
-  is used as a cache for Contentful content). Sources: Contentful content; Font Awesome
-  icons (posted from the allowlist to the `api/` `/api/icons` endpoint, which resolves and
-  caches them — web no longer talks to Font Awesome directly); and the standard.site
-  verification data (DID + publication URI fetched from the `api/` `/api/standard-site`
-  endpoint — the actual AT Protocol / Bluesky PDS publishing now lives in `api/`,
-  webhook-driven).
-  (robots.txt is a static Middleman template, `source/robots.txt.erb`, built here.)
-- **Page generation**: Middleman proxies (`config.rb`) turn `data/*.json` into static
-  pages — articles, pages, tags, blog index.
-- **Runtime dynamic content**: weather, activity stats, Whoop, per-article pageviews,
-  and event weather are **not built here**. The `live-update` Stimulus controller
-  fetches them client-side from `/widgets/*` into placeholder partials (root `CLAUDE.md`).
-- **Contact form**: no longer the host's built-in form handling (the `__forms.html` decoy is
-  gone). It posts to
-  `POST /api/contact` through the api proxy (`api/` sends the email via Resend with the correct
-  Reply-To). It's progressively enhanced — the `contact` Stimulus controller (`sendNotification`
-  toast, no navigation) over a real form that still works without JS (native POST → 303 to the
-  Contentful `/contact/success` page).
-  ⚠️ The `<form>` markup is a **partial** (`source/partials/_contact_form.html.erb`), rendered
-  for the contact page in `partials/article/_body.html.erb` (`article.slug == 'contact'`) — **not**
-  raw HTML in the Contentful body. It can't live in the body: `render_body` runs the body through
-  Redcarpet **SmartyPants** (`lib/helpers/markdown_helpers.rb`), which curls the straight quotes
-  in raw HTML *attributes* and corrupts the field names + Stimulus wiring. The intro copy above
-  the form stays editable in Contentful; only the form markup is in the partial. Keep the field
-  names (`name`, `email`, `message`, honeypot `comment`) in sync with the api (root `CLAUDE.md`).
-  When `TURNSTILE_SITE_KEY` is set, the `contact` controller renders a **Cloudflare Turnstile**
-  widget (explicit render, so it survives Turbo navigation) and sends its token with the `fetch`;
-  the api verifies it server-side. No key → no widget, and the api's check fails open.
+Weather, activity, and Whoop data live in `api/` and load at runtime. See the root
+[`CLAUDE.md`](../CLAUDE.md) for the web↔api contract before touching any widget markup, and for
+the comment-style conventions this app follows.
 
 ## Commands
 
-Run `nvm use` before any `npm` command. Native dependency: **libvips** (`brew install
-vips`) — the blurhash placeholders render through the `ruby-vips` gem (chosen over
-ImageMagick because Cloudflare Workers Builds preinstalls libvips but not ImageMagick).
+Run `nvm use` before any `npm` command. Native dependency: **libvips** (`brew install vips`) — the
+blurhash placeholders render through `ruby-vips` (chosen over ImageMagick because Cloudflare
+Workers Builds preinstalls libvips).
 
 ```bash
-# Ruby tests (Middleman helpers) — single file (fast) then full suite
-bundle exec rspec spec/lib/helpers/markup_helpers_spec.rb
-bundle exec rake test
+# Ruby tests (Middleman helpers)
+bundle exec rspec spec/lib/helpers/markup_helpers_spec.rb   # single file
+bundle exec rake test                                       # full suite
 
-# JS tests — Vitest, TWO projects: the Worker (workerd) and the browser bundle (jsdom).
-# See "JavaScript tests" below.
+# JS tests — Vitest, two projects (see "JavaScript tests")
 npm test                              # both
 npx vitest run --project worker       # src/*.ts only
 npx vitest run --project browser      # source/javascripts/** only
 
+npm run check                         # tsc --noEmit for the Worker
+
 # Local dev
-bundle exec rake import          # fetch fresh data first
-bundle exec middleman            # dev server (also runs the esbuild watcher — no separate terminal)
+bundle exec rake import               # fetch fresh data first
+bundle exec middleman                 # dev server (runs the esbuild watcher too)
 
 # Lint / format
-npm run lint:scss                # stylelint (fix: npm run lint:scss:fix)
-npm run format:check             # prettier for JS/JSON/MD (fix: npm run format)
+npm run lint:scss                     # fix: npm run lint:scss:fix
+npm run format:check                  # fix: npm run format
 
-# Full production build: test → import → middleman build (esbuild runs inside it)
-bundle exec rake build:verbose
+bundle exec rake build:verbose        # full production build
 
-# Deploy control (the "Web" GitHub Actions workflow) — e.g. a content freeze during a bulk
-# Contentful migration. Needs the gh CLI. Note the workflow's cancel-in-progress concurrency
-# already collapses a publish storm into roughly one build, so this is rarely necessary.
-gh workflow disable web.yml      # stop deploying (pushes and Contentful publishes won't build)
-gh workflow enable web.yml       # resume
-gh workflow run web.yml          # trigger one build now (from main)
-
-# Programmatic equivalent of the last one, for scripts/automation: a bearer-gated POST to the
-# api, which fires the same repository_dispatch (see api/app/controllers/api/build_controller.rb).
-# Deduped by a 60s lock — repeats inside the window get a 429.
-curl -X POST -H "Authorization: Bearer $API_TOKEN" "$KONA_API_URL/api/build"
+# Deploy control (needs the gh CLI) — e.g. a content freeze during a bulk migration
+gh workflow disable web.yml           # stop deploying
+gh workflow enable web.yml
+gh workflow run web.yml               # trigger one build from main
 ```
 
 ### Import subtasks
 
-Only these exist: `rake import` (runs all in parallel), `import:content` (Contentful),
-`import:icons` (POSTs the `data/font_awesome.yml` allowlist to the `api/` `/api/icons`
-endpoint in batches and writes `data/icons.json`), `import:standard_site` (fetches the
-standard.site DID + publication URI from the `api/` `/api/standard-site` endpoint). Also
-`rake redis:clear` to flush the cache. Unlike `import:standard_site` (which degrades
-gracefully), a failed `import:icons` raises — icons are an every-page dependency, so the
-build fails loudly rather than shipping pages with missing icons.
+`rake import` runs all three in parallel: `import:content` (Contentful), `import:icons` (POSTs the
+`data/font_awesome.yml` allowlist to the api's `/api/icons` and writes `data/icons.json`), and
+`import:standard_site` (fetches the DID + publication URI from the api). Also `rake redis:clear`.
+
+⚠️ A failed `import:icons` **raises** — icons are an every-page dependency, so the build fails
+loudly rather than shipping pages with missing icons. `import:standard_site` degrades gracefully.
 
 ## Key locations
 
-- `config.rb` — Middleman config + proxy setup; `Rakefile` — Redis init + task loader.
-- `lib/data/*.rb` — build-time clients: `contentful.rb` (+ `graphql/`). (Icons are fetched
-  from the `api/` `/api/icons` endpoint by `import:icons` in `lib/tasks/import.rake`, not a
-  `lib/data` client.)
-- `lib/tasks/*.rake` — `import`, `build`, `test`, `redis`. (Static map generation from GPX
-  tracks used to live here as `maps.rake` + `lib/utils/{static_map,mapbox_tileset}.rb`; it's
-  now the standalone [`utilities/maps/`](../utilities/maps/CLAUDE.md) tool, so editing it no
-  longer rebuilds and redeploys the site.)
-- `lib/helpers/*.rb` — helper modules (article, markup, image, site, share, icon,
-  url, text, markdown, context, cache, affiliate_links, standard_site);
-  `config.rb` requires and registers every module in that directory.
-- `source/layouts/layout.erb`, `source/partials/` (incl. `placeholders/`),
-  `source/javascripts/stimulus/`, `source/stylesheets/`.
-- **Nothing but `stylesheets/site.css` may block the first render.** `_head.html.erb` is
-  deliberately arranged so it's the only blocking stylesheet:
-  - **Pagefind's `pagefind-component-ui.{css,js}` are not in the head at all** — they're
-    injected by `javascripts/stimulus/lib/pagefind.js` (idle preload after `load`, intent
-    prefetch on hover/focus of a Search trigger, awaited in `search#open`). ⚠️ The
-    stylesheet is inserted **before the first existing `<link rel="stylesheet">`**, never
-    appended: `stylesheets/components/_pagefind.scss` remaps Pagefind's `--pf-*` vars for
-    dark mode from an unlayered `:root` block that wins only by sitting later in *source*
-    order, and the cascade follows document order, not load order. Append it and the modal
-    goes permanently light at night, silently. Neither injected element carries
-    `data-turbo-track` — Turbo only strips stylesheets marked `="dynamic"`, so they survive
-    navigation.
-  - The Web Awesome theme (`/javascripts/site.css`, extracted by esbuild from the one CSS
-    import in `stimulus/index.js`) is **still render-blocking**, and needn't be: it's
-    custom-property definitions only (it pulls in `layers.css` and a colour palette but
-    neither `native.css` nor `utilities.css`, so it styles no plain HTML element), and every
-    token consumer is a WA custom element that can't render styled until the deferred bundle
-    upgrades it.
-    ⚠️ **Do not unblock it with `media="print" onload="this.media='all'"`** — that was tried
-    and reverted; it breaks Turbo site-wide. Any element carrying `data-turbo-track="reload"`
-    has its **`outerHTML`** folded into Turbo's tracked-element signature
-    (`HeadSnapshot#trackedElementSignature`), so mutating `media` at runtime makes the current
-    head's signature differ from every incoming page's, `trackedElementsAreIdentical` fails,
-    and Turbo full-page-reloads on every navigation — silently killing view transitions.
-    Dropping `data-turbo-track` doesn't rescue it either: Turbo then appends a *duplicate*
-    link per navigation, since the incoming outerHTML never matches the mutated one. The
-    constraint is general: **never mutate an attribute of a tracked head element.** Fixes that
-    work leave the element alone — inline the CSS in a `<style>` (~6.7 KB gzip/page, identical
-    across pages so Turbo ignores it), or drop the tag and inject the `<link>` from JS the way
-    `lib/pagefind.js` does.
-  - The above-the-fold woff2 faces are preloaded, since they're otherwise undiscoverable
-    until `site.css` parses. `crossorigin` is mandatory even same-origin or they download
-    twice; URLs must come from `asset_path(:fonts, …)` because fonts are asset-hashed.
-- Open Graph "cards" (the `og:image` for pages without a cover image — about half the archive) are
-  rendered **on demand by this app's own Worker**: `src/og.ts` (route) + `src/og-render.ts` (the
-  card), claimed as `/og.png` **and** `/*/og.png` in `run_worker_first`.
-  `generate_open_graph_image_url` (`lib/helpers/image_helpers.rb`) builds
-  `<root_url><page path>og.png?v=<OG_TEMPLATE_VERSION>-<published_version>` — the card hangs off
-  the page's own path (`/2026/06/26/post/og.png`), with the home page's at `/og.png`. Cover-image
-  pages are unaffected (they use `open_graph_image_url` → Cloudflare Images).
-  - **The page is named by the card's own path**, which is why there are two `run_worker_first`
-    entries (a rule is anchored `^…$` with each `*` widened to `.*`, so `/og.png` alone would not
-    match a nested card) and why the handler has no `?path=` parameter to validate. It strips only
-    the **filename**, keeping the trailing slash: the built asset is `/post/index.html`, and
-    `html_handling: "auto-trailing-slash"` answers a slashless `/post` with a *redirect*, which
-    the handler's 200-only check would read as a missing page.
-  This replaces `kona-og`, a standalone fly service (removed from `main`, parked on the
-  `restore-og` branch) — which is why there is **no env var**: the route is same-origin by
-  construction, so there is no host to configure and nothing to switch on.
-  - **The title comes from the page's own `og:title`, read through the `ASSETS` binding** — not
-    fetched over HTTP. That's what let the old service's `SITE_URL` origin allowlist, its 5s
-    timeout, and its 502 path all be deleted, and it means the renderer can only ever draw a title
-    that exists in the deployed build. There is no caller-supplied text anywhere in the path.
-  - **Article cards are content-addressed**: a republish bumps `published_version` → new URL; a
-    design change bumps `OG_TEMPLATE_VERSION` → all new URLs. ⚠️ Bump `OG_TEMPLATE_VERSION` after
-    editing `og-render.ts`, `src/assets/logo.png`, or the font, or the year-cached old cards keep
-    serving.
-  - ⚠️ **Listing-page cards are NOT self-busting, and that's the case to reason from.** The blog
-    index, tag archives, and home aren't Contentful entries, so `content.sys&.published_version` is
-    `nil`, `v` is `OG_TEMPLATE_VERSION` alone, and the URL is **fixed forever** — currently 43 of
-    the 73 card-emitting pages. Their `og:title` comes from `data.site.meta_title` or a tag name,
-    which change without any article being republished. What refreshes them is the zone's
-    `Cache-Tag: site` deploy purge, which is why the card paths are deliberately left tagged (root
-    `CLAUDE.md`). Don't "optimize" that by excluding the route — the re-render cost is trivial and
-    the staleness it prevents is silent.
-  - ⚠️ **Needs the Workers Paid plan.** A render is ~100 ms of CPU (satori ~30 ms, resvg ~75 ms);
-    the Free plan's limit is 10 ms per request, so on Free every card would fail with a 1102.
-  - ⚠️ **Renders are covered by `wrangler dev`, not by the test suite** — see **JavaScript tests**.
-  - `src/assets/` holds the card's font and logo, imported as Data modules (hence the `rules` entry
-    in `wrangler.jsonc`). The TTF used to sit unreferenced in `source/fonts/`, where `asset_hash`
-    fingerprinted it and shipped 109 KB publicly for nothing.
-- `source/headers` / `source/redirects.erb` — built and renamed to `_headers` /
-  `_redirects` (underscore-prefixed source files are treated as partials and skipped).
-  ⚠️ In `_headers`, no two rules may set the same header for overlapping paths — matching
-  rules comma-join same-name headers on Cloudflare.
-  ⚠️ **`_redirects` rule ORDER is load-bearing on Cloudflare.** CF's parser counts 2,000
-  "static" rules but only 100 "dynamic" ones, and its `canCreateStaticRule` flag **latches
-  off at the first rule whose source has a splat (`*`) or `:placeholder`** — every rule after
-  that, *even exact-match ones*, is counted as dynamic. So `redirects.erb` gathers all rules
-  and emits every exact-match (static) redirect **before** any splat/placeholder (dynamic)
-  one. Emit a splat rule early and the exact redirects below it get miscounted against the
-  100-limit and the deploy fails (`code: 100324`) once the file passes ~100 lines. Keep the
-  partition; don't hand-place a `*`/`:name` rule above the static block.
-  ⚠️ **Cloudflare also rejects absolute-URL *sources*.** A rule whose `from` is a full URL (a
-  cross-domain redirect, e.g. an old domain → this site) hard-fails the Worker deploy ("Only
-  relative URLs are allowed", `code: 100324`). `redirects.erb` drops any absolute-URL-source rule
-  from the generated file rather than letting a Contentful entry break the deploy. Cross-domain
-  redirects must live in a Cloudflare **zone rule / Bulk Redirect**, not in `_redirects` or
-  Contentful.
-  ⚠️ **Cloudflare also rejects 200-status proxy rewrites to an absolute URL** ("Proxy (200)
-  redirects can only point to relative paths", `code: 100324`). Nothing emits one today — the
-  Plausible `/pa/*` first-party proxy that used to is now the Worker's job (`src/plausible.ts`) —
-  but `redirects.erb` still drops any `status 200` + absolute-`to` rule, since redirects are
-  authored in Contentful and a mis-entered one would otherwise fail the deploy with a bare error
-  code. The analytics `<script>` snippet is unaffected (gated on `plausible_installed?`, i.e.
-  `PLAUSIBLE_SCRIPT_URL` in the **build** env — separate from the Worker runtime var of the same
-  name that powers the `/pa/*` proxy).
-- `wrangler.jsonc` + `src/` — the Cloudflare Worker that **is** the site's hosting: it serves
-  `build/` as static assets plus routes for the widget proxy, Plausible proxy, and contact form
-  (`src/plausible.ts` does the `/pa/*` first-party proxying rather than `_redirects` rewrites).
-  Typecheck the Worker with `npm run check` (`tsc --noEmit`; wrangler
-  itself never typechecks), and **test it with `npm test`** — Vitest via
-  `@cloudflare/vitest-pool-workers` runs `test/*.test.ts` inside `workerd` (fake `env`, mocked
-  outbound `fetch`), covering the proxy header/cache contract, the Plausible proxy, and routing.
-  (`npm test` also runs the browser-JS suite — see **JavaScript tests** below.) ⚠️ The test
-  tooling is isolated from production types: `tsconfig.test.json`
-  (test/** only, pulls in `@cloudflare/workers-types` and drops the inherited `dom` lib, since
-  lib.dom's `CacheStorage` has no `caches.default`) is **separate** from
-  `tsconfig.json` (src only, `types: []` + the `env.d.ts` shims) — the two must never share a
-  compile, or the workers-types `ExecutionContext` collides with the shim.
-  ⚠️ **The pool config is `vitest.config.mts`, not `.ts`** — pool 0.18 is ESM-only, and without
-  `"type": "module"` in `package.json` (which would change how every other `.js` here is read)
-  Vite loads a `.ts` config as CJS and the import fails. It's a plain `defineConfig` whose pool
-  settings are the argument to the `cloudflareTest` plugin; the old
-  `defineWorkersConfig` + `test.poolOptions.workers` shape, and the `/config` subpath it came from,
-  are both gone. **Outbound fetch mocking is hand-rolled** in `test/helpers.ts` (`interceptFetch`,
-  which swaps `globalThis.fetch`) — the pool's `fetchMock` (an undici MockAgent on
-  `cloudflare:test`) was removed in the same release, and the alternative was taking on MSW.
-  ⚠️ **`run_worker_first` is a POSITIVE allowlist — only listed paths invoke the Worker.** It
-  lists exactly the dynamic routes (`/widgets/*`, `/api/contact`, `/pa/*`, `/og.png`,
-  `/*/og.png`); everything else — every
-  HTML page, fingerprinted asset, the sitemap, the feeds, `/.well-known/*`, and any 404 — is served
-  straight from the static asset layer and never runs Worker code (page views cost no Worker
-  invocation). Each listed route needs the Worker because it has **no asset** (widgets/contact/pa/og
-  would 404 at the asset layer) and must run Worker code. When you add a dynamic route, add its path
-  here too, and mind that Cloudflare globs **cross `/`** (that's why `/widgets/*` matches nested
-  paths like `/widgets/weather/current`).
-  ⚠️ A new entry also needs a matching **exclusion in the zone's Cache Rule** — the single
-  *edge-TTL* rule, root `CLAUDE.md` — except the OG cards, which that rule's `not path contains "."`
-  clause already excludes. That is precisely why the OG route carries an extension; don't rename it
-  to something extensionless without adding the exclusion by hand first. (Not to be confused with
-  the `Cache-Tag: site` Cache **Response** Rule, a different rule in a different phase, which
-  the cards are deliberately left *matching* — see the OG bullet above.)
-  This replaced the old "`/*` minus ~25 asset negations"
-  model — which kept tripping over extension negations (a blanket `!/*.js` once swallowed
-  `/pa/script.js`, `!/*.xml` would have swallowed the feeds); the allowlist has no negations, so
-  that class of bug is gone.
-- `data/font_awesome.yml` — **icon allowlist**. Any new icon must be added here (under
-  the correct family/style, e.g. `classic.light`) before `icon_svg` / `rake import:icons`
-  can use it. `import:icons` posts this tree to the `api/` `/api/icons` endpoint, which
-  resolves each id on demand — so adding an icon is a pure web-side yml edit; no api change
-  or redeploy is needed. The Font Awesome version lives in the api, not here.
+- `config.rb` — Middleman config + proxy setup. `Rakefile` — Redis init + task loader.
+- `lib/data/` — build-time clients: `contentful.rb` (+ `graphql/`).
+- `lib/tasks/` — `import`, `build`, `test`, `redis`.
+- `lib/helpers/` — helper modules; `config.rb` requires and registers every module in that
+  directory.
+- `source/layouts/`, `source/partials/` (incl. `placeholders/`), `source/javascripts/stimulus/`,
+  `source/stylesheets/`.
+- `src/` + `wrangler.jsonc` — the Cloudflare Worker that **is** the site's hosting.
+- `data/font_awesome.yml` — **icon allowlist**. Any new icon must be added here (under the correct
+  family/style, e.g. `classic.light`) before `icon_svg` can use it. Adding one is a pure web-side
+  yml edit; the api resolves it on demand.
+
+### Render-blocking budget
+
+**Nothing but `stylesheets/site.css` may block the first render.** `_head.html.erb` is arranged so
+it's the only blocking stylesheet.
+
+- **Pagefind's CSS/JS are not in the head at all** — `javascripts/stimulus/lib/pagefind.js` injects
+  them (idle preload after `load`, intent prefetch on hover/focus, awaited in `search#open`).
+  ⚠️ The stylesheet is inserted **before the first existing `<link rel="stylesheet">`**, never
+  appended: `stylesheets/components/_pagefind.scss` remaps Pagefind's `--pf-*` vars for dark mode
+  from an unlayered `:root` block that wins only by sitting later in *source* order. Append it and
+  the modal goes permanently light at night, silently.
+- The Web Awesome theme (`/javascripts/site.css`) is still render-blocking and needn't be — it's
+  custom-property definitions only. ⚠️ **Do not unblock it with `media="print" onload=…`.** Any
+  element with `data-turbo-track="reload"` has its **`outerHTML`** folded into Turbo's tracked-
+  element signature, so mutating an attribute at runtime makes every navigation a full page reload,
+  silently killing view transitions. Dropping `data-turbo-track` doesn't rescue it either — Turbo
+  then appends a duplicate link per navigation. **Never mutate an attribute of a tracked head
+  element.** Fixes that work: inline the CSS in a `<style>`, or inject the `<link>` from JS the way
+  `lib/pagefind.js` does.
+- Above-the-fold woff2 faces are preloaded. `crossorigin` is mandatory even same-origin or they
+  download twice; URLs must come from `asset_path(:fonts, …)` because fonts are asset-hashed.
+
+### Open Graph cards
+
+Pages without a cover image get an `og:image` rendered **on demand by this app's own Worker**:
+`src/og.ts` (route) + `src/og-render.ts` (the card), claimed as `/og.png` **and** `/*/og.png` in
+`run_worker_first`. `generate_open_graph_image_url` builds
+`<root_url><page path>og.png?v=<OG_TEMPLATE_VERSION>-<published_version>`. Cover-image pages use
+`open_graph_image_url` → Cloudflare Images instead.
+
+- **The page is named by the card's own path**, which is why there are two `run_worker_first`
+  entries (a rule is anchored `^…$` with each `*` widened to `.*`) and why the handler has no
+  `?path=` parameter to validate. It strips only the **filename**, keeping the trailing slash: the
+  built asset is `/post/index.html`, and `html_handling: "auto-trailing-slash"` answers a slashless
+  `/post` with a redirect, which the handler's 200-only check reads as a missing page.
+- **The title comes from the page's own `og:title`, read through the `ASSETS` binding** — not
+  fetched over HTTP. The renderer can only ever draw a title present in the deployed build, so
+  there is no caller-supplied text anywhere in the path.
+- **Article cards are content-addressed**: a republish bumps `published_version` → new URL.
+  ⚠️ Bump `OG_TEMPLATE_VERSION` after editing `og-render.ts`, `src/assets/logo.png`, or the font,
+  or the year-cached old cards keep serving.
+- ⚠️ **Listing-page cards are NOT self-busting.** The blog index, tag archives, and home aren't
+  Contentful entries, so `v` is `OG_TEMPLATE_VERSION` alone and the URL is fixed forever — today
+  43 of 73 card-emitting pages. Their `og:title` comes from `data.site.meta_title` or a tag name.
+  What refreshes them is the zone's `Cache-Tag: site` deploy purge, which is why the card paths are
+  deliberately left tagged (root `CLAUDE.md`).
+- ⚠️ **Needs the Workers Paid plan** (~100 ms CPU per render vs Free's 10 ms limit).
+- ⚠️ **Renders are covered by `wrangler dev`, not by the test suite** — see **JavaScript tests**.
+- `src/assets/` holds the card's font and logo, imported as Data modules (hence the `rules` entry
+  in `wrangler.jsonc`).
+
+### `_headers` and `_redirects`
+
+Built from `source/headers` / `source/redirects.erb` and renamed (underscore-prefixed source files
+are treated as partials and skipped).
+
+- ⚠️ In `_headers`, no two rules may set the same header for overlapping paths — matching rules
+  comma-join same-name headers on Cloudflare.
+- ⚠️ **`_redirects` rule ORDER is load-bearing.** Cloudflare counts 2,000 "static" rules but only
+  100 "dynamic" ones, and its `canCreateStaticRule` flag **latches off at the first rule whose
+  source has a `*` or `:placeholder`** — every rule after that, even exact-match ones, counts as
+  dynamic. So `redirects.erb` emits every exact-match redirect **before** any splat one. Emit a
+  splat early and the deploy fails (`code: 100324`) once the file passes ~100 lines. Don't
+  hand-place a `*`/`:name` rule above the static block.
+- ⚠️ **Cloudflare rejects absolute-URL *sources***, and **200-status proxy rewrites to an absolute
+  URL**. Both hard-fail the deploy with a bare `code: 100324`. `redirects.erb` drops them, since
+  redirects are authored in Contentful and a mis-entered one would otherwise break the deploy.
+  Cross-domain redirects belong in a Cloudflare zone rule / Bulk Redirect.
+
+### The Worker
+
+`wrangler.jsonc` + `src/`: serves `build/` as static assets, plus routes for the widget proxy, the
+Plausible proxy (`src/plausible.ts`, not `_redirects` rewrites), the contact form, and OG cards.
+
+⚠️ **`run_worker_first` is a POSITIVE allowlist — only listed paths invoke the Worker.** It lists
+exactly the dynamic routes (`/widgets/*`, `/api/contact`, `/pa/*`, `/og.png`, `/*/og.png`);
+everything else — every HTML page, fingerprinted asset, the sitemap, the feeds, `/.well-known/*`,
+any 404 — comes straight from the static asset layer and costs no Worker invocation. Each listed
+route needs the Worker because it has **no asset**. When you add a dynamic route, add its path
+here, and mind that Cloudflare globs **cross `/`**.
+
+⚠️ A new entry also needs a matching **exclusion in the zone's edge-TTL Cache Rule** (root
+`CLAUDE.md`) — except the OG cards, which that rule's `not path contains "."` clause already
+excludes. That is precisely why the OG route carries an extension; don't rename it to something
+extensionless without adding the exclusion first.
+
+⚠️ Test tooling is isolated from production types: `tsconfig.test.json` (test/** only, pulls in
+`@cloudflare/workers-types`, drops the inherited `dom` lib since lib.dom's `CacheStorage` has no
+`caches.default`) is **separate** from `tsconfig.json` (src only, `types: []` + the `env.d.ts`
+shims). The two must never share a compile.
+
+⚠️ **The pool config is `vitest.config.mts`, not `.ts`** — pool 0.18 is ESM-only, and without
+`"type": "module"` in `package.json` Vite loads a `.ts` config as CJS and the import fails.
+Outbound fetch mocking is hand-rolled in `test/helpers.ts` (`interceptFetch`); the pool's
+`fetchMock` was removed in the same release.
 
 ## Environment variables
 
 Names only — see `.env.example`; never commit values.
 
-- **Required**: `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`,
-  `REDIS_URL`, `KONA_API_URL` (base URL of the `api/` app — used by the `/widgets/*` proxy
-  and the build-time `import:icons` / `import:standard_site` fetches), `API_TOKEN` (shared
-  bearer the `/widgets/*` proxy injects on every upstream request, and the build sends on the
-  `POST /api/icons` fetch; **must match the `api/` app's `API_TOKEN`**). Needed in TWO places:
-  the build env (`.github/workflows/web.yml`) for the icons fetch, and the **Worker's dashboard
-  secrets** — without the latter every widget 401s at the origin and collapses on the site.
-- **Build credential**: `WEBAWESOME_NPM_TOKEN` — Web Awesome Pro npm registry auth, read
-  by `.npmrc` at `npm install` (not in `.env`). Set it in your shell and in the workflow's
-  build env, or the install fails.
-- **Images — `IMAGES_URL`, required everywhere including locally**: the host Cloudflare Images
-  serves transformations from (`<host>/cdn-cgi/image/…`), i.e. the site's public host. Building
-  any image without it raises `ImageHelpers::ImagesUrlMissing`, so **it must be set in the build
-  env** and in your local `.env` (point it at the real zone; `middleman server` then renders what
-  production serves — auto avif/webp, cover images cropped to the OG size). It deliberately has **no fallback**: it
-  used to resize via Contentful when unset, which looked perfect in the browser while draining
-  Contentful's asset bandwidth, so the only thing the fallback reliably did was hide a broken
-  deploy. Don't reintroduce one: `contentful_image_url` and `merge_query` are gone entirely now
-  that `encode_blurhash` resizes through Cloudflare like everything else.
-  Cloudflare must also have Transformations enabled with the source host allowlisted (see
-  `IMAGE_HOST` below), or every image 403s.
-- **Images — `IMAGE_HOST`, required everywhere including locally**: bare hostname of the **R2
-  bucket mirroring Contentful's image assets**. `Contentful#rewrite_image_urls` swaps asset URLs
-  onto it, so Cloudflare Images fetches the untransformed source from inside our own zone. That's
-  the point: a source outside the zone can't use Tiered Cache or Cache Reserve, so every PoP was
-  pulling full-size originals from Contentful and re-pulling them on eviction.
-  ⚠️ **It is not optional and not a rollback switch.** The zone's Transformations source
-  allowlist names **only** the mirror host — `*.ctfassets.net` is deliberately not on it and
-  must never be added — so an unset `IMAGE_HOST` leaves every image URL pointing at Contentful
-  and **403s every image on the site**, blurhash thumbnails included. Allowlisting ctfassets so
-  the unset case "works" is exactly the trap the `IMAGES_URL` fallback above was deleted for: the
-  site would look perfect while billing Contentful's metered bandwidth. Set it in the build env
-  and in your local `.env`.
-  ⚠️ **Setting it asserts the mirror is populated** — the URLs 404 until it is. The **api** owns
-  the mirror (`AssetMirror` + `AssetSyncJob`, driven by the Contentful webhook); run its
-  `rake assets:backfill` to completion first. Full cross-app contract in the root
-  [`CLAUDE.md`](../CLAUDE.md).
-- **Optional**: `TURNSTILE_SITE_KEY` (public Cloudflare Turnstile sitekey for the contact form —
-  set it in the build env; pair with the api's `TURNSTILE_SECRET`, both or neither).
-  (There is deliberately **no** var for the OG cards. `OG_IMAGE_URL` was retired when the renderer
-  moved into this app's own Worker: the card URL is same-origin, built from `root_url`, so there is
-  no host to configure. One consequence worth knowing — a **local** build emits
-  `http://localhost:4567/<page path>og.png?…`, which `middleman server` won't render because it
-  doesn't run the Worker. That only affects `og:image` and the JSON-LD image in locally-built HTML, which no
-  crawler ever sees; use `wrangler dev` to exercise a real card.)
+- **Required**: `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`, `REDIS_URL`, `KONA_API_URL`, `API_TOKEN`.
+  ⚠️ `API_TOKEN` is needed in **two** places: the build env (for the icons fetch) and the
+  **Worker's dashboard secrets** — without the latter every widget 401s and collapses on the site.
+  It must match the api's.
+- **Build credential**: `WEBAWESOME_NPM_TOKEN` — Web Awesome Pro npm auth, read by `.npmrc` at
+  install time (not in `.env`). Set it in your shell and in the workflow, or the install fails.
+- **`IMAGES_URL`, required everywhere including locally** — the host Cloudflare Images serves
+  transformations from. Building any image without it raises `ImageHelpers::ImagesUrlMissing`.
+  Point your local `.env` at the real zone and `middleman server` renders what production serves.
+  It deliberately has **no fallback**: it used to resize via Contentful when unset, which looked
+  perfect while draining Contentful's bandwidth, so the only thing the fallback reliably did was
+  hide a broken deploy. Don't reintroduce one.
+- **`IMAGE_HOST`, required everywhere including locally** — bare hostname of the R2 image mirror.
+  ⚠️ Not optional and not a rollback switch; ⚠️ setting it asserts the mirror is populated. Full
+  contract in the root [`CLAUDE.md`](../CLAUDE.md).
+- **Optional**: `TURNSTILE_SITE_KEY` (pair with the api's `TURNSTILE_SECRET`, both or neither).
+  There is deliberately **no** var for the OG cards — the card URL is same-origin, built from
+  `root_url`. One consequence: a **local** build emits `http://localhost:4567/…og.png`, which
+  `middleman server` won't render because it doesn't run the Worker. Use `wrangler dev` to
+  exercise a real card.
 
 ## Conventions & gates
 
-- **Before committing** (non-negotiable): `bundle exec rake test` + `npm test` (Worker **and**
-  browser-JS suites) +
-  `npm run check` (Worker tsc) pass → `npm run lint:scss` + `npm run format:check` clean →
-  `bundle exec rake build:verbose` succeeds (it builds the JS bundle via the external pipeline).
-  ⚠️ **`rake build` does NOT run tests** — building and testing are separate; run `rake test`
-  yourself. The `.github/workflows/web.yml` `checks` job runs these same gates on every push to
-  `main` and every PR — a branch push with no open PR runs nothing, which is what keeps a PR
-  branch from running CI twice. It runs **`bundle exec rspec`** directly, not `rake test`:
-  booting the Rakefile introspects the live Contentful schema (creds/network), whereas rspec
-  loads only the specs — `contentful_spec` stubs that client — and runs credential-free. It
-  **gates the deploy** on code pushes. Follow `.editorconfig`.
-- **`dependencies` vs `devDependencies`**: the CI deploy job installs with **`npm ci --omit=dev`**
-  (it doesn't need the test/lint toolchain), so anything the **build or deploy** needs must be a
-  `dependency`, not a `devDependency`: `esbuild` + the JS-bundle imports (`@hotwired/*`,
-  `@web.awesome.me/*`), `pagefind`, `wrangler`, and the OG card renderer's `satori` +
-  `@resvg/resvg-wasm`. Test/lint tools (`vitest`,
-  `@cloudflare/vitest-pool-workers`, `jsdom`, `typescript`, `stylelint*`, `prettier`) stay
-  `devDependencies` — the `checks` job installs those with a full `npm ci`.
-  ⚠️ **`satori` and `@resvg/resvg-wasm` are the two dependencies CI cannot vet.** Nothing in the
-  test suite executes a render (see **JavaScript tests**), and a major bump can quietly change the
-  wasm-init contract (`init(WebAssembly.Module)` / `initWasm`) or the card's text metrics. Render a
-  card in `wrangler dev` and look at it before merging a Dependabot PR for either.
-- **Ruby tests** live in `spec/` and focus on helpers, text/markdown processing, and data
-  transformation.
-- **Widget markup**: editing a placeholder partial means editing the matching `api/`
-  view too (root `CLAUDE.md`).
+**Before committing** (non-negotiable): `bundle exec rake test` + `npm test` + `npm run check`
+pass → `npm run lint:scss` + `npm run format:check` clean → `bundle exec rake build:verbose`
+succeeds. ⚠️ **`rake build` does NOT run tests.** Follow `.editorconfig`.
+
+`.github/workflows/web.yml`'s `checks` job runs these same gates on every push to `main` and every
+PR, and **gates the deploy**. It runs **`bundle exec rspec`** directly, not `rake test`: booting
+the Rakefile introspects the live Contentful schema, whereas rspec loads only the specs and runs
+credential-free.
+
+**`dependencies` vs `devDependencies`**: the CI deploy job installs with **`npm ci --omit=dev`**,
+so anything the build or deploy needs must be a `dependency` — `esbuild`, the JS-bundle imports
+(`@hotwired/*`, `@web.awesome.me/*`), `pagefind`, `wrangler`, and the card renderer's `satori` +
+`@resvg/resvg-wasm`. Test/lint tools stay `devDependencies`.
+
+⚠️ **`satori` and `@resvg/resvg-wasm` are the two dependencies CI cannot vet.** Nothing in the test
+suite executes a render, and a major bump can quietly change the wasm-init contract or the card's
+text metrics. Render a card in `wrangler dev` and look at it before merging a Dependabot PR.
+
+**Widget markup**: editing a placeholder partial means editing the matching `api/` view too (root
+`CLAUDE.md`).
 
 ### JavaScript tests
 
 `npm test` runs **two Vitest projects** (`test.projects` in `vitest.config.mts`), because the two
-bodies of JS need mutually incompatible runtimes:
+bodies of JS need mutually incompatible runtimes — workerd has no `document`, jsdom has no
+`caches.default` or `request.cf`:
 
 | Project | Covers | Runtime | Files |
 |---|---|---|---|
-| `worker` | `src/*.ts` — the Cloudflare Worker | `workerd`, via `@cloudflare/vitest-pool-workers` | `test/*.test.ts` |
-| `browser` | `source/javascripts/**` — Stimulus controllers + `lib/` | `jsdom` | `test/browser/**/*.test.js` |
-
-Run one with `npx vitest run --project browser`. Neither can host the other: workerd has no
-`document`, jsdom has no `caches.default` or `request.cf`.
-
-⚠️ **The OG card render is deliberately NOT covered, and `src/og-render.ts` must never be imported
-from `test/`.** The pool's module-fallback loader force-types only `.wasm`
-(`mf_vitest_force=CompiledWasm`); every other extension is read as UTF-8 and parsed as JS, so the
-`.ttf` and `.png` Data modules that file imports die there with a syntax error that looks nothing
-like its cause. That is why `handleOg` takes its renderer as an injected `RenderCard` parameter and
-reaches the real one through a dynamic `import()` — `test/og.test.ts` covers the entire route
-contract (validation, the ASSETS lookup, headers, cache key, failure paths) with the render stubbed,
-and `test/index.test.ts`'s routing case is a `POST` precisely because a 405 is answered before the
-import. The render itself is verified with `npx wrangler dev` (see the OG bullet under **Key
-locations**). Don't "close the gap" by importing the module — that path has already been walked.
+| `worker` | `src/*.ts` | `workerd`, via `@cloudflare/vitest-pool-workers` | `test/*.test.ts` |
+| `browser` | `source/javascripts/**` | `jsdom` | `test/browser/**/*.test.js` |
 
 ⚠️ **The two `include` globs are kept apart by FILE EXTENSION, not by directory.** A `.test.ts`
 file anywhere under `test/` — `test/browser/` included — is claimed by the **worker** project and
-run in workerd, where it dies on the first `document` reference for reasons that look nothing like
-the cause. Browser tests are `.js`, matching the sources they exercise.
+dies on the first `document` reference, for reasons that look nothing like the cause. Browser tests
+are `.js`.
+
+⚠️ **The OG card render is deliberately NOT covered, and `src/og-render.ts` must never be imported
+from `test/`.** The pool's module-fallback loader force-types only `.wasm`; every other extension
+is read as UTF-8 and parsed as JS, so that file's `.ttf` and `.png` Data modules die there with a
+syntax error that looks nothing like its cause. That's why `handleOg` takes its renderer as an
+injected `RenderCard` parameter and reaches the real one through a dynamic `import()` —
+`test/og.test.ts` covers the whole route contract with the render stubbed, and
+`test/index.test.ts`'s routing case is a `POST` precisely because a 405 is answered before the
+import. Verify renders with `npx wrangler dev`.
 
 Conventions for `test/browser/`:
 
 - `helpers.js` — `mount(identifier, ControllerClass, html[, prepare])` writes the markup, starts a
-  Stimulus application around it and returns `{ application, element, controller }`. Because the
-  markup lands **before** `start()`, `connect()` has already run when it resolves; use the
-  `prepare` callback for state connect will read (an `<img>`'s `complete`). Elements added *after*
-  mounting arrive via MutationObserver — `await flushDom()` for those. ⚠️ `mount()` writes
-  `document.body`, so append test-only elements (a `<wa-toast>` stub, a `<pagefind-modal>`)
-  **after** it.
-- `stubProperty(navigator, 'share', …)` for the read-only getters `vi.stubGlobal` can't touch;
-  restored automatically.
-- `setup.js` polyfills what jsdom omits and this code calls (`matchMedia`,
-  `requestIdleCallback`, `Element#scrollTo`) and resets DOM, `window` and mock state per test.
+  Stimulus application around it, and returns `{ application, element, controller }`. The markup
+  lands **before** `start()`, so `connect()` has already run when it resolves; use `prepare` for
+  state connect will read. Elements added *after* mounting arrive via MutationObserver — `await
+  flushDom()`. ⚠️ `mount()` writes `document.body`, so append test-only elements **after** it.
+- `stubProperty(navigator, 'share', …)` for the read-only getters `vi.stubGlobal` can't touch.
+- `setup.js` polyfills what jsdom omits (`matchMedia`, `requestIdleCallback`, `Element#scrollTo`)
+  and resets DOM, `window`, and mock state per test.
 - **Module-scoped state needs `vi.resetModules()` + a dynamic import per test.** Four modules have
-  it: the live-update clock (`lastFetchAtByUrl`), pagefind's memoized `loading` / `idleScheduled`,
-  and analytics' `searchTrackingReady`. Without the reset, tests silently depend on their
-  predecessors.
+  it: the live-update clock, pagefind's `loading` / `idleScheduled`, and analytics'
+  `searchTrackingReady`. Without the reset, tests silently depend on their predecessors.
 - The **custom element registry** belongs to the jsdom instance, not the module registry —
   `vi.resetModules()` can't clear it, and re-`define()`ing a name throws. Guard with
-  `customElements.get(name)`, or order the tests so the not-yet-defined case runs first (see
-  `lib/patch_scroller_aria.test.js`).
-- `clearMocks: true` is set on the project: `vi.mock()` factories are hoisted and run once per
-  file, so their `vi.fn()`s are shared by every test in it, and `vi.restoreAllMocks()` does not
-  clear them.
+  `customElements.get(name)`, or order the tests so the not-yet-defined case runs first.
+- `clearMocks: true` is set: `vi.mock()` factories are hoisted and run once per file, so their
+  `vi.fn()`s are shared by every test in it.
 - `registration.test.js` reads `index.js` as **source** (importing it would pull in the whole Web
-  Awesome Pro theme) and asserts every controller is imported *and* registered under the kebab-case
-  of its filename — the failure mode being that a `data-controller` attribute is simply inert, with
-  nothing logged. It also fails when a controller or lib module has no test file, which is what
-  keeps this suite from quietly falling behind.
+  Awesome theme) and asserts every controller is imported *and* registered under the kebab-case of
+  its filename — the failure mode being an inert `data-controller` attribute with nothing logged.
+  It also fails when a controller or lib module has no test file.
 
 ### Permissions
 
 - Autonomous: read files, single-file `rspec`, lint/format, local `middleman`.
-- Ask first: `git push`/commit, `rake redis:clear`, package installs, anything that
-  triggers a deploy or build hook.
+- Ask first: `git push`/commit, `rake redis:clear`, package installs, anything that triggers a
+  deploy or build hook.

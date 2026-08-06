@@ -90,19 +90,14 @@ class StaticMap
   # @return [String] The title for the activity
   def activity_title
     year = @activity_start&.strftime('%Y')
-    # squish, not strip: a mid-name year (e.g. "IM 2024 Boulder") would otherwise leave a
-    # double space behind. Note the title feeds tileset_source_id's digest, so activities
-    # named that way get a fresh tileset id (and re-upload) on their next run.
+    # squish, not strip: a mid-name year would otherwise leave a double space behind.
     title = year.present? ? "#{year} #{@activity_name.gsub(/#{year}/, '').squish}" : @activity_name
     return title if title =~ /swim|run|bike|biking|cycling|marathon|5k|10k|10-miler|ten-miler|carrera/i
     "#{title} - #{@activity_type}"
   end
 
-  # Ensures a Mapbox tileset exists for this track. When no tileset_id was
-  # provided, reuses the existing tileset if one is already published (so tweaking
-  # render-time image settings doesn't re-upload), otherwise uploads the GPX
-  # coordinates to Mapbox as a private tileset (via MTS). Pass force_upload to
-  # always re-upload (e.g. when the GPX itself changed).
+  # Ensures a Mapbox tileset exists for this track, reusing an already-published one so that
+  # tweaking render-time settings doesn't re-upload. Pass force_upload when the GPX changed.
   def ensure_tileset!
     return if @tileset_id.present?
 
@@ -129,11 +124,9 @@ class StaticMap
 
   private
 
-  # Derives a Mapbox-safe tileset/source id from the activity title: the id is
-  # capped at 32 characters and may only contain letters, numbers, `-`, and `_`.
-  # A short digest of the full title is appended so distinct activities that
-  # share a long common prefix (e.g. a race's swim/bike/run) don't collapse to
-  # the same id once truncated.
+  # Derives a Mapbox-safe tileset id from the activity title: 32 characters max, alphanumerics
+  # plus `-` and `_`. A digest of the full title is appended so activities sharing a long common
+  # prefix don't collapse to one id once truncated.
   def tileset_source_id
     slug = activity_title.parameterize.tr('-', '_').first(23).gsub(/_+$/, '')
     digest = Digest::MD5.hexdigest(activity_title).first(8)
@@ -171,22 +164,16 @@ class StaticMap
   # @param coordinates [Array<Array<Float>>] The coordinates of the track points
   # @return [Hash] The bounding box with min_lon, max_lon, min_lat, and max_lat
   def calculate_bounding_box(coordinates)
-    # Separate the longitudes and latitudes from the coordinates
     lons, lats = coordinates.transpose
     min_lon, max_lon = lons.min, lons.max
     min_lat, max_lat = lats.min, lats.max
 
-    # Calculate the average latitude (center of the bounding box in terms of latitude)
     center_lat = (min_lat + max_lat) / 2
 
-    # The cosine of the latitude adjusts the length of one degree of longitude.
-    # At the equator (latitude 0°), cos(0) = 1, so 1° of longitude is approximately KM_PER_DEGREE km.
-    # As you move toward the poles, cos(latitude) decreases, making longitude degrees shorter.
+    # A degree of longitude shortens toward the poles by the cosine of the latitude.
     cos = cos_lat(center_lat)
 
-    # Expand the bounding box outward by the per-side margins (in km), converting
-    # each km offset to degrees. 1° of latitude ≈ KM_PER_DEGREE km everywhere;
-    # 1° of longitude ≈ KM_PER_DEGREE km * cos(latitude).
+    # Expand by the per-side margins, converting each km offset to degrees.
     top_km, right_km, bottom_km, left_km = @margins_km
     max_lat += top_km / KM_PER_DEGREE
     min_lat -= bottom_km / KM_PER_DEGREE
@@ -207,12 +194,10 @@ class StaticMap
   def bounding_box_aspect_ratio(bounding_box)
     center_lat = (bounding_box[:min_lat] + bounding_box[:max_lat]) / 2
 
-    # Convert the differences in longitude and latitude to kilometers
     width_km = (bounding_box[:max_lon] - bounding_box[:min_lon]) * KM_PER_DEGREE * cos_lat(center_lat)
     height_km = (bounding_box[:max_lat] - bounding_box[:min_lat]) * KM_PER_DEGREE
 
-    # Calculate the aspect ratio as width in km divided by height in km, guarding
-    # against a zero/degenerate span so the caller can fall back to a clamped height.
+    # Guards a degenerate span, so the caller can fall back to a clamped height.
     ratio = width_km / height_km
     ratio.finite? && ratio.positive? ? ratio : 1.0
   end
@@ -225,13 +210,11 @@ class StaticMap
     Math.cos(latitude * Math::PI / 180)
   end
 
-  # The Mapbox token used to render the static image, resolved lazily — only here, at render
-  # time — so merely requiring this class never demands a token. (The Rakefile loads all of
-  # lib/ at boot, including for `rake maps:help`, which touches no Mapbox API.) Prefers the
-  # secret token so it can read the private tilesets uploaded via MTS, falls
-  # back to the public access token (e.g. a manual TILESET_ID against a public tileset), and
-  # raises only when a render is actually attempted without either.
-  # @return [String] The Mapbox access token.
+  # The Mapbox token, resolved lazily at render time so merely requiring this class never
+  # demands one — the Rakefile loads all of lib/ at boot, including for tasks that touch no
+  # Mapbox API. Prefers the secret token, which can read the private tilesets uploaded via MTS.
+  # @return [String] The access token.
+  # @raise [RuntimeError] when a render is attempted with neither token set.
   def render_token
     ENV['MAPBOX_SECRET_TOKEN'].presence ||
       ENV['MAPBOX_ACCESS_TOKEN'] ||

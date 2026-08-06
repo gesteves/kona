@@ -1,9 +1,7 @@
-# Google OAuth for owner-only surfaces (/whoop/auth and the Sidekiq UI). Restricted to a single
-# identity: `hd` makes the gem reject any login whose verified Google hosted domain isn't ours
-# (server-side, on the id_token claim — @gmail.com accounts have no `hd` and are excluded), and
-# SessionsController additionally pins the exact email. Both derive from OWNER_EMAIL so they
-# can't drift. Blank credentials (dev/CI) are fine here — the provider only fails if exercised;
-# specs use OmniAuth test mode.
+# Google OAuth for the owner-only surfaces, restricted to a single identity: `hd` rejects any
+# login whose verified hosted domain isn't ours, server-side on the id_token claim, and
+# SessionsController additionally pins the exact email. Both derive from OWNER_EMAIL, so they
+# can't drift. Blank credentials are fine in dev and CI — the provider only fails if exercised.
 OmniAuth.config.logger = Rails.logger
 
 Rails.application.config.middleware.use OmniAuth::Builder do

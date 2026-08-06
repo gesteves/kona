@@ -22,31 +22,20 @@ module Api
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 8.1
 
-    # Please, add to the `ignore` list any other `lib` subdirectories that do
-    # not contain `.rb` files, or that should not be reloaded or eager loaded.
-    # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w[assets tasks])
 
-    # Configuration for the application, engines, and railties goes here.
-    #
-    # These settings can be overridden in specific environments using the files
-    # in config/environments, which are processed later.
-    #
-    # config.time_zone = "Central Time (US & Canada)"
-    # config.eager_load_paths << Rails.root.join("extras")
-
-    # Use RSpec for generated specs (the suite lives in spec/, not test/).
+    # The suite lives in spec/, not test/.
     config.generators do |g|
       g.test_framework :rspec
     end
 
-    # Render framework-level 4xx/5xx errors as plain text instead of the default HTML pages
-    # (this is a headless, machine-only API). The lambda defers resolving the constant until
-    # request time, when lib/ autoloading is active.
+    # Framework-level errors render as plain text rather than the default HTML pages, since
+    # this is a machine-only API. The lambda defers resolving the constant until request time,
+    # when lib/ autoloading is active.
     config.exceptions_app = ->(env) { PlainTextExceptions.call(env) }
 
-    # Block/throttle abusive direct-to-origin requests before they reach routing.
-    # Configured in config/initializers/rack_attack.rb (no-op in the test env).
+    # Blocks and throttles abusive direct-to-origin requests before routing. Configured in
+    # config/initializers/rack_attack.rb, and a no-op in the test env.
     config.middleware.use Rack::Attack
   end
 end

@@ -2,9 +2,7 @@ import { Controller } from '@hotwired/stimulus';
 import { trackEvent, trackEventThen } from '../lib/analytics';
 import { canonicalUrl } from '../lib/utils';
 
-/**
- * Controller for managing social sharing functionality.
- */
+/** Handles social sharing: the native share sheet, popup share windows, and share tracking. */
 export default class extends Controller {
   static classes = ['hidden'];
   static values = {
@@ -16,10 +14,7 @@ export default class extends Controller {
     via: String,
   };
 
-  /**
-   * If the native share API is available and the `isNativeValue` is true,
-   * the element's hidden class is removed.
-   */
+  /** Reveals the element when it's the native-share trigger and the API is available. */
   connect() {
     if (navigator.share && this.isNativeValue) {
       this.element.classList.remove(this.hiddenClass);
@@ -27,18 +22,14 @@ export default class extends Controller {
   }
 
   /**
-   * Gets the URL to share. It returns the URL from the `urlValue` if available,
-   * otherwise, it checks for the canonical URL in the document or uses the current window location URL.
-   * @returns {string} The URL to share.
+   * @returns {string} `urlValue`, falling back to the document's canonical URL.
    */
   getShareUrl() {
     return this.urlValue || canonicalUrl();
   }
 
   /**
-   * Gets the text to share. It returns the text from the `textValue` if available,
-   * otherwise, it checks for the Open Graph title in the document's meta tags or uses the document title.
-   * @returns {string} The text to share.
+   * @returns {string} `textValue`, falling back to the document's og:title or title.
    */
   getShareText() {
     return (
@@ -49,9 +40,8 @@ export default class extends Controller {
   }
 
   /**
-   * Opens the native share sheet to share the current page's title and URL. It uses the `navigator.share` API
-   * and handles any potential errors silently.
-   * @param {Event} event - The event that triggered the share action (e.g., a click event).
+   * Opens the native share sheet for the page's title and URL.
+   * @param {Event} event - The event that triggered the share action.
    */
   openShareSheet(event) {
     event.preventDefault();
@@ -91,8 +81,8 @@ export default class extends Controller {
   }
 
   /**
-   * Tracks share events for regular links. Prevents default link behavior
-   * to avoid duplicate tracking, then opens the link appropriately.
+   * Tracks a share link, then follows it. mailto:/sms: navigate the current window, so the
+   * event has to be sent first; HTTP(S) links open in a new tab and can't interrupt it.
    * @param {Event} event - The event that triggered the share action.
    */
   trackShare(event) {
@@ -100,16 +90,11 @@ export default class extends Controller {
     const linkURL = this.element.href;
     const props = { url: this.getShareUrl(), via: this.viaValue };
 
-    // Handle special URL schemes (mailto:, sms:) differently than HTTP(S) URLs
     if (linkURL.startsWith('mailto:') || linkURL.startsWith('sms:')) {
-      // For mailto/sms, navigating the current window can cancel an in-flight
-      // tracking request, so wait until the event is sent before navigating.
       trackEventThen('Share', props, () => {
         window.location.href = linkURL;
       });
     } else {
-      // For HTTP(S) URLs, open in a new window/tab (the current page stays put,
-      // so the tracking request isn't interrupted).
       trackEvent('Share', props);
       window.open(linkURL, '_blank', 'noopener,noreferrer');
     }

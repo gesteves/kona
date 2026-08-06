@@ -1,8 +1,8 @@
-// One pipe-separated request log line: the given lead-in parts, then the requester's
-// referrer, user agent, IP, geo, and ray. Shared by every route in the Worker.
-//
-// No fallback path: this Worker only ever runs behind the zone, so CF-Connecting-IP and
-// CF-Ray are always present, and geo comes from request.cf (no managed transform needed).
+/**
+ * Builds a pipe-separated request log line: the given lead-in parts, then the requester's
+ * referrer, user agent, IP, geo, and ray.
+ * @param parts Lead-in fields; blank ones are dropped.
+ */
 export function requestLogLine(
   request: Request,
   ...parts: (string | null | undefined)[]

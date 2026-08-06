@@ -1,14 +1,12 @@
-# A local page: a fullscreen Mapbox map showing what each PurpleAir sensor was reading at a past
-# timestamp, so it can be panned to a good frame and screenshotted for a post's cover image.
+# A local page: a fullscreen Mapbox map of what each PurpleAir sensor was reading at a past
+# timestamp, to be panned to a good frame and screenshotted for a post's cover image.
 #
-# Local-only and bound to 127.0.0.1: it holds a PurpleAir key and proxies it unauthenticated, so
-# it is not something to expose. Nothing else in the repo uses it.
+# ⚠️ Local-only and bound to 127.0.0.1 — it proxies a PurpleAir key with no auth of its own.
 #
-# The browser can't talk to PurpleAir directly: the API key would be exposed, CORS isn't
-# guaranteed, and the history endpoint is rate-limited to one request per second per key —
-# which has to be sequenced somewhere. Hence this server, which proxies PurpleAir and streams
-# results back as Server-Sent Events so circles appear as they resolve instead of the page
-# sitting blank for a minute.
+# The browser can't call PurpleAir directly: the key would be exposed, CORS isn't guaranteed,
+# and the history endpoint is rate-limited to one request per second per key, which has to be
+# sequenced somewhere. So this proxies it and streams results back as Server-Sent Events, and
+# circles appear as they resolve rather than the page sitting blank for a minute.
 
 require 'sinatra'
 require 'httparty'
@@ -47,14 +45,10 @@ HTTP_TIMEOUT = 30
 READING_CACHE = {}
 CACHE_MUTEX = Mutex.new
 
-# A generation counter identifying the newest sensor crawl. `/sensors` takes the next number and
-# checks it between sensors; anything that bumps the counter — `POST /stop`, or simply starting
-# another load — makes the older loop notice it's stale and stop.
-#
-# Closing the EventSource in the browser is not enough on its own: writes to a dropped connection
-# don't fail promptly, so the loop would keep working through its queue at a second a sensor,
-# spending API points on a frame you've already left. One page, one user, so a process-global
-# counter is all this needs.
+# Identifies the newest sensor crawl. `/sensors` takes the next number and checks it between
+# sensors, so anything that bumps the counter makes an older loop notice it's stale and stop.
+# Closing the EventSource isn't enough on its own: writes to a dropped connection don't fail
+# promptly, so the loop would keep spending API points on a frame you've already left.
 RUN_MUTEX = Mutex.new
 RUN = { id: 0 }
 
@@ -116,8 +110,7 @@ get '/sensors' do
       out << sse(:meta, found: found.size, queued: queued.size, seconds: (queued.size * RATE_LIMIT_SLEEP).round)
 
       queued.each do |sensor|
-        # Checked before each sensor — i.e. before the request that costs a second and some API
-        # points — so Stop takes effect within one sensor rather than at the end of the queue.
+        # Checked before each sensor's request, so Stop takes effect within one sensor.
         break unless current_run == run
 
         begin
@@ -137,15 +130,12 @@ get '/sensors' do
   end
 end
 
-# Sensors whose current position falls inside the bounds and which plausibly had data at the
-# target timestamp.
+# Sensors inside the bounds that plausibly had data at the target timestamp.
 #
-# `max_age: 0` is load-bearing: the parameter defaults to 604800 (7 days), which would
-# silently drop every sensor that has gone offline since a historical timestamp.
-#
-# Note the coordinates (and `confidence`) are the sensor's *present-day* values — history
-# returns null for latitude/longitude, and there's no historical confidence field at all. A
-# sensor relocated since the timestamp is therefore plotted where it sits today.
+# `max_age: 0` is load-bearing: it defaults to 7 days, which would silently drop every sensor
+# that has gone offline since a historical timestamp. Coordinates and confidence are the
+# sensor's present-day values — history returns neither — so a relocated sensor is plotted
+# where it sits today.
 # @see https://api.purpleair.com/#api-sensors-get-sensors-data
 def sensors_in_bounds(bounds, timestamp)
   body = purple_air_get('/sensors', {
@@ -220,8 +210,8 @@ def purple_air_get(path, query)
     nil
   end
 
-  # A 200 is not proof of success here: DataInitializingError responds 200, and a truncated
-  # history response carries a top-level `error` alongside partial data. Check the body.
+  # A 200 isn't proof of success: DataInitializingError responds 200, and a truncated response
+  # carries a top-level `error` alongside partial data.
   raise "PurpleAir #{body['error']}: #{body['description'] || 'no description'}" if body.is_a?(Hash) && body['error']
   raise "PurpleAir returned status #{response.code}" unless response.success?
   raise 'PurpleAir returned an unparseable body' unless body.is_a?(Hash)
@@ -243,10 +233,8 @@ def parse_timestamp(value)
   value.to_s.match?(/\A\d+\z/) ? value.to_i : Time.now.to_i
 end
 
-# Defaults to the same style utilities/maps renders its static GPX maps with, so a screenshot
-# from here matches those. MAPBOX_STYLE_URL is honored (and named identically) for the same
-# reason: if the static maps have been pointed at a custom style, this follows.
-# Precedence: ?style= for a one-off override, then MAPBOX_STYLE_URL, then the shared default.
+# Defaults to the style utilities/maps renders its static GPX maps with, and honors the same
+# MAPBOX_STYLE_URL, so screenshots from here match those. `?style=` overrides for a one-off.
 def map_style(param)
   [param, ENV['MAPBOX_STYLE_URL']].find { |v| !v.to_s.strip.empty? } ||
     'mapbox://styles/mapbox/outdoors-v12'

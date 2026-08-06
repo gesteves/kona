@@ -1,14 +1,10 @@
 module ContextHelpers
-  # The deploy context this build runs in — "production" for the real public site,
-  # anything else (or unset) for local development. Set explicitly in the build env; see
-  # .github/workflows/web.yml.
-  # @return [String, nil] The current deploy context.
+  # @return [String, nil] The deploy context, set in the build env.
   def deploy_context
     ENV['DEPLOY_CONTEXT'].presence
   end
 
-  # Determines if this build is the real public site (as opposed to local dev).
-  # @return [Boolean] True if this is a production build.
+  # @return [Boolean] Whether this build is the real public site.
   def production?
     deploy_context == 'production'
   end

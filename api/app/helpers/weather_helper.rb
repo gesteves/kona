@@ -1,11 +1,9 @@
-# Ported from web/lib/helpers/weather_helpers.rb. Pure selection and formatting functions:
-# every method takes the data it works on (the WeatherKit payload, a timezone, a pollen
-# payload) as explicit arguments. The CONDITIONS / BEAUFORT constants come from
-# config/initializers/weather_data.rb. Condition codes (e.g. "Rain") are looked up symbolized.
+# Pure forecast-selection and formatting functions: every method takes the data it works on as
+# an explicit argument, and none read controller state. The CONDITIONS and BEAUFORT constants
+# come from config/initializers/weather_data.rb.
 #
-# This module holds the thin forecast-selection and formatting methods; the prose summary
-# and its business rules (good/bad weather, activity suggestions) live in
-# WeatherSummaryPresenter, which includes this module and passes it the request's data.
+# The prose summary and its business rules live in WeatherSummaryPresenter, which includes this
+# module and passes it the request's data.
 module WeatherHelper
   PRECIPITATION_METRIC_UNITS = {
     unit: "mm",
@@ -13,9 +11,9 @@ module WeatherHelper
     thousand: "m"
   }.freeze
 
-  # Validates the exact slices the summary consumes: rest_of_day_forecast switches to the
-  # overnight forecast in the evening, so checking todays_forecast alone would let a payload
-  # with no overnight data through and crash the evening summary.
+  # Validates the exact slices the summary consumes. Checking todays_forecast alone isn't
+  # enough: rest_of_day_forecast switches to the overnight forecast in the evening, so a payload
+  # missing overnight data would pass and then crash the evening summary.
   def weather_data_is_current?(weather, time_zone)
     current_weather(weather).present? && todays_forecast(weather).present? && rest_of_day_forecast(weather, time_zone).present?
   end
@@ -61,8 +59,8 @@ module WeatherHelper
     Time.parse(forecast.sunset).in_time_zone(time_zone)
   end
 
-  # Whether it's currently daytime: between today's sunrise and sunset when the weather
-  # payload carries them, else a 6am–6pm clock check in the given timezone.
+  # Whether it's daytime: between today's sunrise and sunset when the payload carries them,
+  # else a 6am–6pm clock check.
   def daytime?(weather, time_zone)
     now = Time.current.in_time_zone(time_zone)
     if weather.present?
@@ -75,8 +73,7 @@ module WeatherHelper
     end
   end
 
-  # Whether it's currently evening: past today's sunset when the weather payload carries it,
-  # else a 6pm clock check in the given timezone.
+  # Whether it's evening: past today's sunset when the payload carries it, else a 6pm check.
   def evening?(weather, time_zone)
     now = Time.current.in_time_zone(time_zone)
     if weather.present?

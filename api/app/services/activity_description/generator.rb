@@ -1,9 +1,7 @@
 module ActivityDescription
-  # Composes a Strava-ready description for an Intervals.icu activity and PUTs it back.
-  # Orchestrates the data gathering (activity, streams, planned workout, heat adaptation),
-  # the two Anthropic-backed lines, and the pure block builders in Composer. Used by the
-  # Whoop workout.updated webhook; structured so a rake task or endpoint could reuse it
-  # later.
+  # Composes a Strava-ready description for an Intervals.icu activity and PUTs it back,
+  # orchestrating the data gathering, the two Anthropic-backed lines, and Composer's pure
+  # block builders.
   class Generator
     # Prefix shared by every log line this generator emits, for greppability.
     LOG_PREFIX = "Description:"
@@ -14,10 +12,8 @@ module ActivityDescription
     # Sports eligible for the LLM planned-workout headline (🗓️ line).
     HEADLINE_SPORTS = %w[Cycling Running].freeze
 
-    # Rapid duplicate triggers for the same activity (e.g. two workout.updated webhooks
-    # ~100ms apart, or a retry overlapping a slow run) are deduped with a Redis lock —
-    # two runs would spend 2× LLM tokens and race the final PUT. The TTL bounds a crashed
-    # worker's hold; the lock is released as soon as a run finishes.
+    # Dedupes rapid duplicate triggers for one activity, which would otherwise spend double
+    # the LLM tokens and race the final PUT. The TTL bounds a crashed worker's hold.
     LOCK_TTL = 10.minutes
 
     def initialize(intervals: Intervals.new, trainer_road: nil)
@@ -70,9 +66,9 @@ module ActivityDescription
       log_info("activity #{activity_id}: description updated (#{description.length} chars)")
     end
 
-    # The 🗓️ planned-workout summary. The single TrainerRoad planned workout whose name
-    # appears *verbatim* (case-sensitively) in the completed activity's name is summarized
-    # by the LLM; zero or ambiguous (≥2) matches mean no headline. Cycling and running only.
+    # The 🗓️ planned-workout summary: the one TrainerRoad workout whose name appears verbatim
+    # and case-sensitively in the activity's name, summarized by the LLM. Zero or ambiguous
+    # matches mean no headline. Cycling and running only.
     # @return [String, nil]
     def planned_summary_line(activity, sport)
       return unless HEADLINE_SPORTS.include?(sport)
@@ -101,9 +97,8 @@ module ActivityDescription
       safely("planned summary") { Llm.planned_summary(description) }
     end
 
-    # @return [Array<Hash>] The TrainerRoad planned workouts for the activity's local date;
-    #   empty when no feed is configured or the fetch fails (best-effort — a broken calendar
-    #   must not lose the rest of the description).
+    # @return [Array<Hash>] The planned workouts for the activity's local date; empty when no
+    #   feed is configured or the fetch fails, so a broken calendar loses only this line.
     def planned_workouts_for(activity)
       safely("TrainerRoad planned workouts", fallback: []) do
         trainer_road = @trainer_road || TrainerRoad.new(@intervals.athlete_timezone)
@@ -137,9 +132,7 @@ module ActivityDescription
       Composer.water_temp_block(median(samples), unit: @intervals.temperature_unit)
     end
 
-    # The 🌡️ heat line: max/median heat strain index from the activity's HSI stream (median
-    # over positive samples only — CORE emits long zero runs when thermoneutral) plus the
-    # daily CoreHeatAdaptationScore from the wellness record.
+    # The 🌡️ heat line: max and median heat strain index, plus the day's heat-adaptation score.
     # @return [String, nil]
     def heat_line(activity, swim)
       return if swim
@@ -152,9 +145,9 @@ module ActivityDescription
       Composer.heat_block(max_hsi: max_hsi, median_hsi: median_hsi, heat_adaptation_score: score, swim: swim)
     end
 
-    # @return [Array(Numeric, Numeric), Array(nil, nil)] The [max, median] heat strain index
-    #   from the activity's HSI stream (median over positive samples only — CORE emits long
-    #   zero runs when thermoneutral), or [nil, nil] when the stream is absent or empty.
+    # @return [Array(Numeric, Numeric)] The [max, median] heat strain index, medianed over
+    #   positive samples only since CORE emits long zero runs when thermoneutral. [nil, nil]
+    #   when the stream is absent or empty.
     def heat_strain_values(activity)
       return [nil, nil] unless activity[:stream_types]&.include?("heat_strain_index")
 
@@ -196,9 +189,8 @@ module ActivityDescription
         activity[:source].to_s.casecmp("zwift").zero?
     end
 
-    # Runs a best-effort step (an LLM call, an external fetch), logging and swallowing any
-    # failure so one flaky source loses only its own line rather than the whole description —
-    # parity with domestique's Promise.allSettled split.
+    # Runs a best-effort step, logging and swallowing any failure so one flaky source loses
+    # only its own line rather than the whole description.
     # @param fallback [Object] Value returned when the block raises (nil for a dropped line,
     #   [] for a collection).
     def safely(label, fallback: nil)

@@ -1,14 +1,12 @@
 require "httparty"
 
-# Base class for the external-API service objects. Centralizes the read-through Redis cache,
-# the HTTParty + JSON-parse boilerplate, the camelCase→snake_case key transform, and the
-# retry/error-handling patterns that were copy-pasted across every service.
+# Base class for the external-API service objects: the read-through Redis cache, the HTTParty
+# and JSON-parse boilerplate, key transforms, and the shared retry/error handling.
 class ApplicationService
   include UpstreamIsolation
 
-  # Raised by the bang variants on a non-success response. Carries the HTTP status and body
-  # so callers can branch on the failure mode (e.g. 404 → nil, Intervals.icu's 422
-  # missing-custom-field → warn-and-continue) instead of string-matching messages.
+  # Raised by the bang variants on a non-success response. Carries the status and body so
+  # callers can branch on the failure mode instead of string-matching messages.
   class HttpError < StandardError
     attr_reader :status, :body
 
@@ -21,22 +19,15 @@ class ApplicationService
 
   private
 
-  # Read-through JSON cache. Returns the parsed cached value when the key is populated;
-  # otherwise yields, caches the block's (JSON-serializable) result, and returns it. A blank
-  # block result is returned without being cached, matching the services' "don't cache empty"
-  # behavior. In development the cache is bypassed entirely (always fetch fresh) so changes are
-  # visible immediately without waiting for a TTL to expire.
+  # Read-through JSON cache. A blank result is returned but never cached, and development
+  # bypasses the cache entirely so changes are visible without waiting out a TTL.
   #
-  # Deliberately uses the shared $redis (not Rails.cache): the keyspace predates this app and
-  # keeps explicit, greppable key names, and the semantics differ from Rails.cache.fetch —
-  # blank results are never cached, and development bypasses caching entirely.
-  #
+  # Uses the shared $redis rather than Rails.cache: the keyspace predates this app and keeps
+  # greppable key names, and the semantics differ from Rails.cache.fetch.
   # @param key [String] The Redis key.
-  # @param expires_in [ActiveSupport::Duration, Integer, nil] TTL in seconds. The result is
-  #   cached only with a positive TTL; a nil/false/zero TTL skips caching entirely (we never
-  #   want to cache indefinitely).
-  # @param symbolize [Boolean] Parse cached JSON with symbolized keys (false for the
-  #   string-keyed services, e.g. Intervals and PurpleAir).
+  # @param expires_in [ActiveSupport::Duration, Integer, nil] TTL in seconds. Only a positive
+  #   TTL caches — nothing is ever cached indefinitely.
+  # @param symbolize [Boolean] Whether to parse with symbolized keys.
   # @yieldreturn [Object] The freshly fetched, JSON-serializable value.
   # @return [Object, nil]
   def cached_json(key, expires_in: nil, symbolize: true)
@@ -53,56 +44,56 @@ class ApplicationService
     value
   end
 
-  # GETs a URL and returns the parsed JSON body, or nil on a non-success response.
-  # @param symbolize [Boolean] Parse with symbolized keys.
-  # @param options [Hash] Passed through to HTTParty (query, headers, basic_auth, …).
+  # GETs a URL.
+  # @param symbolize [Boolean] Whether to parse with symbolized keys.
+  # @param options [Hash] Passed through to HTTParty.
+  # @return [Object, nil] The parsed body, or nil on a non-success response.
   def get_json(url, symbolize: true, **options)
     parse_json(HTTParty.get(url, **options), symbolize: symbolize)
   end
 
-  # POSTs to a URL and returns the parsed JSON body, or nil on a non-success response.
-  # @param symbolize [Boolean] Parse with symbolized keys.
-  # @param options [Hash] Passed through to HTTParty (body, headers, query, …).
+  # POSTs to a URL.
+  # @param symbolize [Boolean] Whether to parse with symbolized keys.
+  # @param options [Hash] Passed through to HTTParty.
+  # @return [Object, nil] The parsed body, or nil on a non-success response.
   def post_json(url, symbolize: true, **options)
     parse_json(HTTParty.post(url, **options), symbolize: symbolize)
   end
 
-  # Like get_json, but raises on a non-success response instead of swallowing it to nil —
-  # for use inside with_retries, which only retries on raised errors. (get_json inside
-  # with_retries quietly skips HTTP-level failures; this variant makes them retryable.)
-  # @raise [RuntimeError] on a non-success response.
+  # Like get_json, but raises rather than swallowing a failure to nil — which is what makes it
+  # retryable inside with_retries.
+  # @raise [HttpError] on a non-success response.
   def get_json!(url, symbolize: true, **options)
     parse_json!(HTTParty.get(url, **options), symbolize: symbolize)
   end
 
-  # Like post_json, but raises on a non-success response instead of swallowing it to nil.
+  # Like post_json, but raises rather than swallowing a failure to nil.
   # @see #get_json!
   # @raise [HttpError] on a non-success response.
   def post_json!(url, symbolize: true, **options)
     parse_json!(HTTParty.post(url, **options), symbolize: symbolize)
   end
 
-  # PUTs to a URL and returns the parsed JSON body, raising on a non-success response.
-  # There is no swallowing variant: PUTs are writes, and callers need the failure (and its
-  # status — see HttpError) to decide between retrying and degrading.
-  # @param symbolize [Boolean] Parse with symbolized keys.
-  # @param options [Hash] Passed through to HTTParty (body, headers, basic_auth, …).
+  # PUTs to a URL. There is deliberately no swallowing variant: PUTs are writes, and callers
+  # need the failure's status to choose between retrying and degrading.
+  # @param symbolize [Boolean] Whether to parse with symbolized keys.
+  # @param options [Hash] Passed through to HTTParty.
   # @raise [HttpError] on a non-success response.
   def put_json!(url, symbolize: true, **options)
     parse_json!(HTTParty.put(url, **options), symbolize: symbolize)
   end
 
-  # @param response [HTTParty::Response]
-  # @return [Object, nil] The parsed body (nil for an empty body).
-  # @raise [HttpError] when the response was not successful.
+  # @param response [HTTParty::Response] The response to parse.
+  # @return [Object, nil] The parsed body, or nil when it's empty.
+  # @raise [HttpError] when the response wasn't successful.
   def parse_json!(response, symbolize: true)
     raise HttpError.new(response.code, response.body, response.request&.last_uri) unless response.success?
 
     JSON.parse(response.body, symbolize_names: symbolize) if response.body.present?
   end
 
-  # @param response [HTTParty::Response]
-  # @return [Object, nil] The parsed body, or nil when the response was not successful.
+  # @param response [HTTParty::Response] The response to parse.
+  # @return [Object, nil] The parsed body, or nil when the response wasn't successful.
   def parse_json(response, symbolize: true)
     unless response.success?
       report_upstream_error("HTTP #{response.code}", status: response.code, url: response.request&.last_uri&.to_s)
@@ -112,16 +103,15 @@ class ApplicationService
     JSON.parse(response.body, symbolize_names: symbolize)
   end
 
-  # Recursively rewrites camelCase string/symbol keys to snake_case symbols.
-  # @param object [Hash, Array, nil]
+  # Recursively rewrites camelCase keys to snake_case symbols.
+  # @param object [Hash, Array, nil] The object to transform.
   def underscore_keys(object)
     object&.deep_transform_keys { |key| key.to_s.underscore.to_sym }
   end
 
-  # Memoized dot-access wrapper for a service's fetched payload: runs the block once
-  # (memoizing even a nil result, so a failed fetch isn't retried within the instance)
-  # and wraps a non-nil result with DeepOstruct.
-  # @yieldreturn [Hash, Array, nil] The raw payload (snake_cased by the caller if needed).
+  # Memoized dot-access wrapper for a service's payload. Memoizes even a nil result, so a
+  # failed fetch isn't retried within the instance.
+  # @yieldreturn [Hash, Array, nil] The raw payload.
   # @return [OpenStruct, Array, nil]
   def fetch_wrapped
     return @wrapped_data if defined?(@wrapped_data)
@@ -129,15 +119,15 @@ class ApplicationService
     @wrapped_data = raw && DeepOstruct.wrap(raw)
   end
 
-  # Whether the service was initialized with usable coordinates. The geo services all
-  # no-op without them.
+  # @return [Boolean] Whether usable coordinates were supplied. The geo services no-op
+  #   without them.
   def coordinates?
     @latitude.present? && @longitude.present?
   end
 
-  # Runs the block, retrying with exponential backoff (2, 4, 8, … seconds) on any error,
-  # returning nil once the attempts are exhausted.
+  # Runs the block, retrying with exponential backoff on any error.
   # @param max [Integer] Maximum retries after the first attempt.
+  # @return [Object, nil] The block's value, or nil once attempts are exhausted.
   def with_retries(max: 3)
     attempts = 0
     begin
@@ -153,17 +143,14 @@ class ApplicationService
     end
   end
 
-  # Runs the block, logging and swallowing any error and returning the fallback instead.
-  # Sugar over UpstreamIsolation#safely with this service's class name as the upstream label.
-  # @param fallback [Object] The value to return on error (default nil).
+  # Runs the block, logging and swallowing any error. Sugar over UpstreamIsolation#safely.
+  # @param fallback [Object] The value to return on error.
   # @param context [String] A label for the log line.
   def rescue_with(fallback = nil, context: self.class.name)
     safely(self.class.name, fallback, context: context) { yield }
   end
 
-  # Reports a handled upstream-API failure to Bugsnag, tagged with this service's class name.
-  # Thin wrapper over ErrorReporter so subclasses don't repeat the service: argument. Purely
-  # additive — callers keep their existing logging and graceful-degradation return values.
+  # Reports a handled upstream failure to Bugsnag, tagged with this service's class name.
   # @see ErrorReporter.report_upstream
   def report_upstream_error(error, context: self.class.name, status: nil, url: nil)
     ErrorReporter.report_upstream(error, service: self.class.name, context: context, status: status, url: url)

@@ -1,14 +1,12 @@
 module Webhooks
-  # Receives Whoop v2 webhooks (workout/sleep/recovery updates) and syncs them to
-  # Intervals.icu. The request path only verifies and enqueues: the HMAC signature proves
-  # the payload came from Whoop, the payload's user_id is checked against the authenticated
-  # athlete (Whoop should see a 403 — and stop retrying — for foreign users), and processing
-  # runs in a WhoopWebhookJob so the response beats Whoop's ~1s ack expectation. The user_id
-  # lookup is Redis-cached for a day, keeping the warm path free of upstream calls.
+  # Receives Whoop v2 webhooks and syncs them to Intervals.icu. The request path only verifies
+  # and enqueues, so the response beats Whoop's ~1s ack expectation: the HMAC proves the payload
+  # came from Whoop, and its user_id is checked against the authenticated athlete so a foreign
+  # user gets a 403 and Whoop stops retrying. That id is Redis-cached for a day, keeping the
+  # warm path free of upstream calls.
   #
-  # Status codes and bodies mirror domestique's handler 1:1: 401 bad/missing signature or
-  # stale timestamp, 400 malformed payload, 500 identity-check failure, 403 foreign user,
-  # 200 {ok: true} on acceptance.
+  # Responds 401 for a bad signature or stale timestamp, 400 for a malformed payload, 500 when
+  # the identity check fails, 403 for a foreign user, and 200 on acceptance.
   class WhoopController < BaseController
     include WhoopRequestVerification
 
@@ -45,8 +43,8 @@ module Webhooks
       nil
     end
 
-    # The HMAC has already proven the body came from Whoop, but malformed JSON (wrong types
-    # on the four required fields) is still rejected before the user_id comparison.
+    # The HMAC has already proven the body came from Whoop, but wrong types on the required
+    # fields are still rejected before the user_id comparison.
     def valid_payload?(payload)
       payload.is_a?(Hash) &&
         payload["user_id"].is_a?(Integer) &&
@@ -55,8 +53,8 @@ module Webhooks
         payload["trace_id"].is_a?(String)
     end
 
-    # @return [Integer, nil] The authenticated Whoop user's id, or nil when it can't be
-    #   resolved (rendered as a 500 so Whoop retries the delivery later).
+    # @return [Integer, nil] The authenticated Whoop user's id, or nil when unresolvable —
+    #   which the caller renders as a 500 so Whoop retries the delivery.
     def fetch_expected_user_id
       Whoop.new.user_id
     rescue StandardError => e

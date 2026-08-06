@@ -1,17 +1,12 @@
-# Resolves Contentful taxonomy concept ids to their names. The GraphQL API exposes only
-# concept ids on an entry's contentfulMetadata, so the names/hierarchy live behind the
-# delivery taxonomy REST endpoint — fetched once and cached in Redis (the whole vocabulary is
-# tiny and changes rarely), then joined against entry concept ids by the consumer.
-#
-# Delivery API (CDA), same space + token as the GraphQL client. A 404 (taxonomy not enabled)
-# or any failure degrades to an empty map, so callers fall back to legacy metadata tags.
+# Resolves Contentful taxonomy concept ids to their names. GraphQL exposes only concept ids on
+# an entry, so the names come from the delivery taxonomy REST endpoint, fetched once and cached
+# — the vocabulary is tiny and changes rarely. Any failure degrades to an empty map.
 class TaxonomyConcepts < ApplicationService
   DELIVERY_API_URL = "https://cdn.contentful.com/spaces"
   CACHE_KEY = "contentful:taxonomy:concepts:v1"
   CACHE_TTL = 1.hour
 
-  # { concept_id => prefLabel } for every concept in the space.
-  # @return [Hash{String=>String}]
+  # @return [Hash{String=>String}] Every concept id in the space mapped to its name.
   def names
     concepts.each_with_object({}) do |concept, map|
       id = concept.dig(:sys, :id)
@@ -22,8 +17,7 @@ class TaxonomyConcepts < ApplicationService
 
   private
 
-  # The raw concept items, cached (the block runs only on a cache miss).
-  # @return [Array<Hash>]
+  # @return [Array<Hash>] The raw concept items, cached.
   def concepts
     cached_json(CACHE_KEY, expires_in: CACHE_TTL) { fetch_concepts } || []
   end
@@ -50,8 +44,7 @@ class TaxonomyConcepts < ApplicationService
     items
   end
 
-  # Resolves a localized field (a `{ "en-US" => value }` map on the delivery API) to its
-  # single value; passes plain values through.
+  # Resolves a localized field to its single value, passing plain values through.
   def localized(field)
     return field unless field.is_a?(Hash)
     field.values.first

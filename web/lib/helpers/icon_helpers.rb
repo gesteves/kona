@@ -1,42 +1,39 @@
 require 'humanize'
 
 module IconHelpers
-  # Returns the SVG for a specified icon.
-  # @param family [String] The icon's Font Awesome family (e.g., "classic", "solid", "thin").
-  # @param style [String] The icon's Font Awesome style within the family (e.g., "brands").
-  # @param icon_id [String] The unique identifier for the icon.
-  # @return [String] The SVG content for the icon.
+  # Looks up an icon's SVG, marked decorative — icons always sit beside a text label or an
+  # aria-labelled parent.
+  # @param family [String] The Font Awesome family, e.g. "classic".
+  # @param style [String] The style within the family, e.g. "solid".
+  # @param icon_id [String] The icon's id.
+  # @return [String, nil] The SVG, or nil when the icon isn't in data/icons.json.
   def icon_svg(family, style, icon_id)
     svg = data.icons.dig(family, style)&.find { |i| i.id == icon_id }&.svg
-    # Decorative icons: hide from assistive tech (they always sit next to a text label or
-    # an aria-label'd parent). focusable="false" keeps legacy Edge/IE from tab-stopping the SVG.
     svg&.sub("<svg", '<svg aria-hidden="true" focusable="false"')
   end
 
-  # Returns the SVG for the clock icon closest to the given time.
-  # @param datetime [DateTime] The time to be represented by the clock icon.
-  # @param family [String] The icon's Font Awesome family (default: "classic").
-  # @param style [String] The icon's Font Awesome style within the family (default: "light").
-  # @return [String] The SVG content for the clock icon.
+  # Looks up the clock icon nearest the given time, rounded to the closest half hour.
+  # @param datetime [DateTime] The time to represent.
+  # @param family [String] The Font Awesome family.
+  # @param style [String] The style within the family.
+  # @return [String, nil] The SVG.
   def clock_icon_svg(datetime, family = "classic", style = "light")
-    # Extract hours and minutes
-    hours = datetime.hour % 12  # Convert 24h to 12h format (12 becomes 0)
+    hours = datetime.hour % 12
     hours = 12 if hours == 0
     minutes = datetime.min
 
-    # Round to the closest time slot
     if minutes < 15
-      suffix = "" # Round down to the hour
+      suffix = ""
     elsif minutes < 45
-      suffix = "thirty" # Round to half-past
+      suffix = "thirty"
     else
-      hours = (hours + 1) % 12 # Round up to the next hour
+      hours = (hours + 1) % 12
       hours = 12 if hours == 0
       suffix = ""
     end
 
     icon_id = if hours == 4 && suffix.blank?
-      "clock" # There's no clock-four, it's just block.
+      "clock" # There is no clock-four; the plain clock icon reads four o'clock.
     else
       ["clock", hours.humanize, suffix].reject(&:blank?).join("-")
     end

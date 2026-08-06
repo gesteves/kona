@@ -1,18 +1,18 @@
 require "icalendar"
 
-# Fetches today's workouts from a TrainerRoad calendar (an iCalendar feed). Used to
-# decide whether today is a rest day, which tweaks the Whoop strain label.
+# Reads planned workouts from a TrainerRoad iCalendar feed, for the rest-day check and the
+# description generator's planned-workout headline.
 class TrainerRoad < ApplicationService
   CALENDAR_URL = ENV["TRAINERROAD_CALENDAR_URL"]
   DISCIPLINE_ORDER = { "Swim" => 1, "Bike" => 2, "Run" => 3 }
 
-  # @param timezone [String] The timezone used to determine "today".
+  # @param timezone [String] The timezone "today" is reckoned in.
   def initialize(timezone = "America/Denver")
     @timezone = timezone
   end
 
-  # Fetches today's workouts from the TrainerRoad calendar, caching them in Redis for 5 minutes.
-  # @return [Array<Hash>, nil] An array of today's workouts, or nil if no feed is configured.
+  # Today's workouts, cached for 5 minutes.
+  # @return [Array<Hash>, nil] The workouts, or nil when no feed is configured.
   def workouts
     return if CALENDAR_URL.blank?
 
@@ -37,18 +37,12 @@ class TrainerRoad < ApplicationService
     end
   end
 
-  # Fetches the planned workouts for a calendar date, for matching against completed
-  # activities (the description generator's 🗓️ headline). Mirrors domestique's
-  # getPlannedWorkouts filtering:
-  #   - All-day (DATE) events use their floating calendar date, must carry a "H:MM - Name"
-  #     duration prefix, and are excluded when they're a race leg (their stripped name
-  #     matches a same-day all-day event *without* a prefix — the race umbrella).
-  #   - Timed (DATE-TIME) events are date-filtered in the athlete's timezone and must have
-  #     a plausible duration (more than 0, less than 24 hours).
-  # @param date [Date] The calendar date to fetch.
-  # @param timezone [String] IANA timezone for interpreting timed events.
-  # @return [Array<Hash>] Hashes with :name (duration prefix stripped), :sport (normalized
-  #   activity type), and :description (cleaned), cached for 5 minutes.
+  # The planned workouts for a date, for matching against completed activities. All-day events
+  # must carry a "H:MM - Name" duration prefix and are excluded when they're a race leg; timed
+  # events must have a plausible duration. Cached for 5 minutes.
+  # @param date [Date] The calendar date.
+  # @param timezone [String] The IANA timezone timed events are interpreted in.
+  # @return [Array<Hash>] Hashes of :name, :sport, and :description.
   def planned_workouts(date, timezone: @timezone)
     return [] if CALENDAR_URL.blank?
 
@@ -57,8 +51,8 @@ class TrainerRoad < ApplicationService
       events = fetch_calendar_events
       events_on_date = events.select { |event| event_on_date?(event, date, timezone) }
 
-      # Race umbrellas: all-day events without a duration prefix. Their name marks same-day
-      # "H:MM - Name" entries as race legs, which aren't workouts.
+      # Race umbrellas are all-day events with no duration prefix. Their name is what marks
+      # same-day prefixed entries as race legs rather than workouts.
       race_names = events_on_date.select { |e| all_day?(e) && parse_duration_prefix(e.summary.to_s.strip).nil? }
                                  .map { |e| e.summary.to_s.strip }
                                  .to_set
@@ -70,10 +64,10 @@ class TrainerRoad < ApplicationService
 
   private
 
-  # Fetches and parses all VEVENTs from the calendar feed, raising on HTTP failure so the
-  # description generator's rescue can log it (a missing feed shouldn't 500 the webhook job;
-  # the caller treats errors as "no planned workouts").
+  # Fetches and parses every VEVENT in the feed.
   # @return [Array<Icalendar::Event>]
+  # @raise [ApplicationService::HttpError] on failure; the caller treats that as "no planned
+  #   workouts" rather than failing the job.
   def fetch_calendar_events
     response = HTTParty.get(CALENDAR_URL)
     unless response.success?
@@ -85,9 +79,9 @@ class TrainerRoad < ApplicationService
     calendar ? calendar.events.select { |event| event.dtstart.present? && event.summary.present? } : []
   end
 
-  # Whether the event falls on the given calendar date. All-day events carry a floating
-  # date (that day regardless of timezone); timed events are converted to the athlete's
-  # timezone first, so a 5 PM local event near midnight UTC lands on the right day.
+  # Whether an event falls on a date. All-day events carry a floating date; timed ones are
+  # converted to the athlete's timezone first, so an evening event near midnight UTC lands on
+  # the right day.
   def event_on_date?(event, date, timezone)
     if all_day?(event)
       event.dtstart.to_date == date
@@ -96,20 +90,20 @@ class TrainerRoad < ApplicationService
     end
   end
 
-  # All-day events are parsed by icalendar as DATE values (no time component).
+  # icalendar parses all-day events as DATE values, with no time component.
   def all_day?(event)
     event.dtstart.is_a?(Icalendar::Values::Date)
   end
 
-  # Whether the event is a planned workout (vs. an annotation, phase marker, or race leg).
+  # Whether an event is a planned workout, rather than an annotation, phase marker, or race
+  # leg.
   def planned_workout?(event, race_names)
     summary = event.summary.to_s.strip
 
     if all_day?(event)
       return false if parse_duration_prefix(summary).nil?
 
-      # "0:45 - Escape from Alcatraz" alongside an all-day "Escape from Alcatraz" is a race
-      # leg, not a workout.
+      # A prefixed entry alongside a same-named all-day umbrella is a race leg.
       !race_names.include?(strip_duration_prefix(summary))
     else
       return false if event.dtend.blank?
@@ -156,10 +150,9 @@ class TrainerRoad < ApplicationService
     description&.sub(/\s*Description:/i, "")&.strip.presence
   end
 
-  # Detects the workout's normalized sport, mirroring domestique's detectSport: "Endless
-  # Pool" workouts are swims, then the full name is normalized, then word-boundary keywords
-  # are scanned, then a "TSS…" description implies cycling, defaulting to Cycling
-  # (TrainerRoad is a cycling platform).
+  # Detects a workout's normalized sport, in order: "Endless Pool" means swimming, then the
+  # whole name is normalized, then keywords are scanned, then a "TSS…" description implies
+  # cycling. Defaults to cycling, since TrainerRoad is a cycling platform.
   SPORT_KEYWORDS = %w[run running swim swimming ride cycling bike hike hiking ski skiing row rowing].freeze
 
   def detect_sport(name, description)

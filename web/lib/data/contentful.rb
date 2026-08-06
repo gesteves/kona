@@ -4,24 +4,19 @@ require 'httparty'
 require_relative 'graphql/contentful'
 
 class Contentful
-  # Raised when IMAGE_HOST is unset. Every image on the site is a Cloudflare Images
-  # transformation, and the zone allowlists only the R2 mirror as a source — so there is no
-  # working URL to emit without it.
+  # Raised when IMAGE_HOST is unset. The zone allowlists only the R2 mirror as a Cloudflare
+  # Images source, so there is no working URL to emit without it.
   class ImageHostMissing < StandardError
     MESSAGE = <<~MSG.freeze
       IMAGE_HOST is unset, so asset URLs would still point at Contentful.
 
       It's the bare hostname of the R2 bucket the api mirrors Contentful's image assets into,
-      and it's the ONLY host allowlisted as a Cloudflare Images transformation source — so
-      leaving it unset doesn't fall back to Contentful, it 403s every image on the site. Set it
-      in .env locally and in the build env for deploys.
+      and the only host allowlisted as a Cloudflare Images transformation source — so leaving
+      it unset doesn't fall back to Contentful, it 403s every image on the site. Set it in .env
+      locally and in the build env for deploys.
 
-      This used to no-op instead, which shipped a build where every image was broken while the
-      build itself reported success. It now fails here, so a missing var can't ship unnoticed.
-
-      ⚠️ Don't "fix" this by allowlisting *.ctfassets.net as a transformation source. That makes
-      the misconfiguration render perfectly while draining Contentful's metered asset bandwidth
-      — the exact drain the mirror exists to stop. See the root CLAUDE.md.
+      Don't allowlist *.ctfassets.net to work around this: that renders perfectly while draining
+      Contentful's metered asset bandwidth, which is the drain the mirror exists to stop.
     MSG
 
     def initialize(message = MESSAGE) = super
@@ -43,7 +38,7 @@ class Contentful
     generate_content!
   end
 
-  # Saves all the content to JSON files.
+  # Writes every fetched collection to data/*.json.
   def save_data
     @content.each do |type, data|
       save_to_file(type, data)
@@ -52,9 +47,9 @@ class Contentful
 
   private
 
-  # Writes the given data to a JSON file, named after the type of content.
-  # @param type [Symbol] The type of content being saved (e.g., :articles, :pages).
-  # @param data [Array<Hash>, Hash] The data to be saved into a file.
+  # Writes one collection to data/<type>.json.
+  # @param type [Symbol] The collection's name.
+  # @param data [Array<Hash>, Hash] The data to write.
   def save_to_file(type, data)
     file_path = "data/#{type}.json"
     File.open(file_path, 'w') do |file|
@@ -64,7 +59,7 @@ class Contentful
     puts "Failed to save #{type}: #{e.message}"
   end
 
-  # Generates the content by fetching from Contentful and processing it.
+  # Fetches everything from Contentful and derives the collections the build reads.
   def generate_content!
     get_contentful_data
     process_site
@@ -76,7 +71,7 @@ class Contentful
     generate_tags
   end
 
-  # Fetches all content from Contentful's GraphQL API.
+  # Fetches every collection from Contentful's GraphQL API, paginating each one.
   def get_contentful_data
     skip = 0
     limit = 100
@@ -106,22 +101,20 @@ class Contentful
     end
   end
 
-  # Grabs the first site in the array.
+  # Collapses the sites collection to the single site entry.
   def process_site
     @content[:site] = @content[:sites].first
     @content.delete(:sites)
   end
 
-  # Processes articles from the fetched content.
+  # Derives each article's taxonomy, entry fields, and path.
   def process_articles
     apply_taxonomy_to_articles
     process_collection(:articles, :set_article_path)
   end
 
-  # Rewrites each article's contentful_metadata[:tags] from its assigned taxonomy concepts,
-  # joining concept ids to their name/short_name/parent/nested-path via the taxonomy lookup.
-  # The downstream feed/OG/JSON-LD/share helpers keep reading :id/:name; :short_name, :path,
-  # and :parent_id are additive.
+  # Rewrites each article's contentful_metadata[:tags] from its assigned concept ids, joining
+  # them to their name, short name, scheme, parent, path, and synonyms.
   def apply_taxonomy_to_articles
     taxo = taxonomy
     @content[:articles].each do |item|
@@ -132,13 +125,12 @@ class Contentful
     end
   end
 
-  # Processes pages from the fetched content.
+  # Derives each page's entry fields and path.
   def process_pages
     process_collection(:pages, :set_page_path, entry_type: 'Page')
   end
 
-  # The shared shape of the article/page collections: derive the entry fields, set the
-  # path via the given setter, and sort newest-first.
+  # Derives the entry fields for a collection, sets each item's path, and sorts newest-first.
   # @param key [Symbol] The @content collection to process.
   # @param path_setter [Symbol] The method that sets each item's :path.
   # @param entry_type [String, nil] A fixed entry type, or nil to derive it per item.
@@ -151,48 +143,34 @@ class Contentful
       set_template(item)
     end
 
-    # sort_by! parses each date once (vs. twice per comparison with sort!).
+    # sort_by! parses each date once, where sort! would parse twice per comparison.
     @content[key].sort_by! { |item| DateTime.parse(item[:published_at]) }.reverse!
   end
 
-  # Processes assets from the fetched content.
+  # Points every asset URL at the image mirror.
   def process_assets
     @content[:assets].map! do |item|
       rewrite_image_urls(item)
     end
   end
 
-  # Rewrites Contentful image URLs onto our own image hostname: an R2 bucket the api mirrors
-  # every published asset into, webhook-driven (see the api's AssetMirror / AssetSyncJob).
+  # Points an asset's URL at IMAGE_HOST, the R2 bucket the api mirrors published assets into,
+  # so Cloudflare Images fetches the untransformed source from inside our own zone.
   #
-  # Why: Cloudflare Images fetches the untransformed *source* from whatever host the URL names,
-  # and a source outside our zone can't use Tiered Cache or Cache Reserve — so every Cloudflare
-  # PoP pulled the full-size original from Contentful and re-pulled it on eviction. Pointing the
-  # source at a host inside the zone is what stops that.
-  #
-  # ⚠️ CROSS-APP CONTRACT: only the host changes, so Contentful's path *is* the R2 key. The api
-  # writes objects under exactly this path; neither side validates the other, and a mismatch
-  # 404s every image on the site silently. See the root CLAUDE.md.
-  # ⚠️ Setting IMAGE_HOST asserts the mirror is populated — these URLs 404 until it is. Run the
-  # api's `rake assets:backfill` first. Unset raises rather than no-opping: the zone allowlists
-  # only the mirror as a transformation source, so skipping the rewrite doesn't fall back to
-  # Contentful, it 403s every image. See ImageHostMissing.
-  #
-  # Nothing needs the pre-rewrite URL any more: blurhash thumbnails used to be resized via
-  # Contentful's Images API (query params, which the mirror ignores) and so kept a
-  # :contentful_url stash, but encode_blurhash now resizes through Cloudflare Images like
-  # everything else, off this same rewritten URL.
-  # @param item [Hash] The asset to be processed.
-  # @return [Hash] The asset with its URL rewritten.
+  # Cross-app contract: only the host changes, so Contentful's path is the R2 key. The api
+  # writes objects under exactly this path, neither side validates the other, and a mismatch
+  # 404s every image on the site silently. Setting IMAGE_HOST also asserts the mirror is
+  # populated — run the api's `rake assets:backfill` first. See the root CLAUDE.md.
+  # @param item [Hash] The asset to rewrite.
+  # @return [Hash] The asset.
   # @raise [ImageHostMissing] if IMAGE_HOST is unset.
   def rewrite_image_urls(item)
     raise ImageHostMissing if ENV['IMAGE_HOST'].blank?
 
     uri = URI.parse(item[:url])
-    # ⚠️ Every ctfassets host, not just images.ctfassets.net. Contentful serves some image
-    # assets from downloads.ctfassets.net (it's not an images-vs-files split — this space has
-    # 20 JPEGs there), and matching only the images host would silently leave those hitting
-    # Contentful forever. The path is identical across the hosts, so the key is too. The api's
+    # Every ctfassets host, not just images.ctfassets.net: Contentful serves some image assets
+    # from downloads.ctfassets.net, and matching only the images host would leave those hitting
+    # Contentful forever. Paths are identical across hosts, so one key covers both. The api's
     # AssetMirror#object_key must keep matching the same set.
     if uri.host.to_s.end_with?('.ctfassets.net')
       uri.host = ENV['IMAGE_HOST']
@@ -200,18 +178,18 @@ class Contentful
     end
     item
   rescue ImageHostMissing
-    # A misconfigured build must fail, not quietly emit URLs that 403. The rescue below is only
-    # here for a malformed URL on a single asset, which shouldn't take the whole import down.
+    # A misconfigured build must fail; the rescue below only covers one asset's malformed URL.
     raise
   rescue => e
     puts "Error rewriting image URL: #{e.message}"
     item
   end
 
-  # Sets the entry type for a content item based on its attributes.
-  # @param item [Hash] The content item to be processed.
-  # @param type [String, nil] The specified type to set, if provided.
-  # @return [Hash] The item with the entry type set.
+  # Sets an item's entry type: the given one, else Article or Short depending on whether it has
+  # a body.
+  # @param item [Hash] The item to process.
+  # @param type [String, nil] A fixed type.
+  # @return [Hash] The item.
   def set_entry_type(item, type = nil)
     item[:entry_type] = if type.present?
       type
@@ -223,10 +201,9 @@ class Contentful
     item
   end
 
-  # Sets the draft status for a content item based on its publication version,
-  # and prevents drafts from being indexed by search engines.
-  # @param item [Hash] The content item to be processed.
-  # @return [Hash] The item with the draft status set.
+  # Marks an item a draft when it has no published version, and unindexable when it's a draft.
+  # @param item [Hash] The item to process.
+  # @return [Hash] The item.
   def set_draft_status(item)
     draft = item.dig(:sys, :published_version).blank?
     item[:draft] = draft
@@ -234,41 +211,39 @@ class Contentful
     item
   end
 
-  # Sets the published and updated timestamps for a content item.
-  # @param item [Hash] The content item to be processed.
-  # @return [Hash] The item with timestamps set.
+  # Sets an item's published and updated timestamps.
+  # @param item [Hash] The item to process.
+  # @return [Hash] The item.
   def set_timestamps(item)
     item[:published_at] = item.dig(:published) || item.dig(:sys, :first_published_at) || Time.now.to_s
     item[:updated_at] = item.dig(:sys, :published_at) || Time.now.to_s
     item
   end
 
-  # The stable id-based preview path drafts live at, regardless of collection.
-  # @param item [Hash] The draft item.
-  # @return [String] The draft's path.
+  # @param item [Hash] A draft item.
+  # @return [String] The stable id-based preview path drafts live at.
   def draft_path(item)
     "/id/#{item.dig(:sys, :id)}/index.html"
   end
 
-  # Sets the path for an article based on its draft status and publication date.
-  # @param item [Hash] The article to be processed.
-  # @return [Hash] The article with the path set.
+  # Sets an article's path: its draft preview path, or its dated permalink.
+  # @param item [Hash] The article to process.
+  # @return [Hash] The article.
   def set_article_path(item)
     item[:path] = if item[:draft]
       draft_path(item)
     else
-      # The Y/M/D segments come from the timestamp's own zone (as authored in Contentful),
-      # deliberately not normalized to UTC: published permalinks must never move, and the
-      # local date is the one the editor published under.
+      # Y/M/D come from the timestamp's own zone, never normalized to UTC: published permalinks
+      # must not move, and the local date is the one the entry was published under.
       published = DateTime.parse(item[:published_at])
       "/#{published.strftime('%Y')}/#{published.strftime('%m')}/#{published.strftime('%d')}/#{item[:slug]}/index.html"
     end
     item
   end
 
-  # Sets the path for a page based on its draft status and other attributes.
-  # @param item [Hash] The page to be processed.
-  # @return [Hash] The page with the path set.
+  # Sets a page's path: its draft preview path, the site root, or its slug.
+  # @param item [Hash] The page to process.
+  # @return [Hash] The page.
   def set_page_path(item)
     item[:path] = if item[:draft]
       draft_path(item)
@@ -280,9 +255,9 @@ class Contentful
     item
   end
 
-  # Sets the Middleman template for a content item based on its entry type and other attributes.
-  # @param item [Hash] The content item to be processed.
-  # @return [Hash] The item with the template set.
+  # Sets the Middleman template an item renders through.
+  # @param item [Hash] The item to process.
+  # @return [Hash] The item.
   def set_template(item)
     item[:template] = if item[:entry_type] == 'Article'
       "/article.html"
@@ -296,12 +271,9 @@ class Contentful
     item
   end
 
-  # Generates the per-tag archive pages from the concept hierarchy: a page per concept that has
-  # articles directly or via its descendants (so e.g. Triathlon lists Ironman 70.3 reports, and
-  # the Races parent lists every race report even though it's never assigned directly), at its
-  # nested `/tagged/<ancestors…>/<id>` path, with the concept's description as the page copy.
-  # Concepts with no articles anywhere in their subtree get no page. Article order follows
-  # published_articles (newest-first).
+  # Builds the per-tag archive pages: one per concept with articles in its own subtree, so a
+  # parent lists everything its descendants are tagged with. Concepts with an empty subtree get
+  # no page.
   def generate_tags
     taxo = taxonomy
     children = Hash.new { |h, k| h[k] = [] }
@@ -316,21 +288,17 @@ class Contentful
 
       description = concept[:description].presence
       summary = description || default_tag_summary(concept[:name], tagged.size)
-      # tagged is newest-first (published order), so the first is the archive's most recent entry.
       updated_at = tagged.first[:published_at]
-      # `path` carries a trailing slash (the canonical URL); listing_page wants the bare base.
+      # `path` carries a trailing slash; listing_page wants the bare base.
       pages = listing_page(tagged, base_path: concept[:path].chomp('/'), template: "/tag.html",
                            title: concept[:name], summary: summary, description: description,
                            updated_at: updated_at, tag_id: concept[:id])
-      # NB: the tag-level key is `entry_count`, not `count` — `count` collides with Hash#count on
-      # the Hashie::Mash (tag.count would return the number of keys). Read for the breadcrumb
-      # popularity tie-break in ArticleHelpers#taxonomy_index.
+      # entry_count, not count: `count` collides with Hash#count on the Hashie::Mash.
       { tag: concept.slice(:id, :name, :path, :scheme, :parent_id, :description, :synonyms).merge(entry_count: tagged.size), pages: pages }
     end
   end
 
-  # All descendant concept ids of a concept, walking the children map depth-first.
-  # @return [Array<String>]
+  # @return [Array<String>] Every descendant concept id, walked depth-first.
   def descendant_ids(id, children)
     result = []
     stack = children[id].dup
@@ -343,27 +311,24 @@ class Contentful
     result
   end
 
-  # The default "Browse N entries tagged X" archive summary, used when a concept has no
-  # description (and for every legacy tag).
+  # The archive summary used when a concept has no description of its own.
   def default_tag_summary(name, size)
     "Browse #{size.humanize} #{'entry'.pluralize(size)} tagged “#{name}.”"
   end
 
-  # Generates the blog index listing (all published entries, newest-first).
+  # Builds the blog index listing: every published entry, newest first.
   # @return [Array<Hash>] The blog's listing page.
   def generate_blog
     @content[:blog] = listing_page(published_articles, base_path: "/blog", template: "/articles.html", title: "Blog")
   end
 
-  # The non-draft articles, in the collection's newest-first order.
-  # @return [Array<Hash>]
+  # @return [Array<Hash>] The non-draft articles, newest first.
   def published_articles
     @content[:articles].reject { |a| a[:draft] }
   end
 
-  # Builds the single listing page for a collection of articles — the blog index or a tag
-  # archive — living at "#{base_path}/index.html". Returned as a one-element array because the
-  # page proxies in config.rb iterate over a collection of pages.
+  # Builds the listing page for a collection of articles. Returned as a one-element array
+  # because the page proxies in config.rb iterate over a collection.
   # @return [Array<Hash>] One listing page.
   def listing_page(articles, base_path:, template:, title:, summary: nil, description: nil, updated_at: nil, tag_id: nil)
     page_data = {
@@ -373,8 +338,7 @@ class Contentful
     }
     page_data[:summary] = summary if summary
     page_data[:description] = description if description
-    # Tag-archive metadata (nil for the blog index): the concept id (for its breadcrumb chain
-    # and feed link) and its most-recent entry's date (for the "Updated" line).
+    # Tag-archive metadata; nil for the blog index.
     page_data[:tag_id] = tag_id if tag_id
     page_data[:updated_at] = updated_at if updated_at
     page_data[:items] = articles
@@ -382,17 +346,15 @@ class Contentful
     [page_data]
   end
 
-  # The taxonomy concepts, keyed by id, memoized for the build. GraphQL only returns concept
-  # ids on entries, so names/hierarchy/descriptions are joined from the delivery taxonomy REST
-  # endpoint here. Each value: { id:, name:, short_name:, parent_id:, path:, description:,
-  # synonyms: }.
+  # The taxonomy concepts keyed by id, memoized for the build. GraphQL returns only concept ids
+  # on entries, so the rest is joined from the delivery taxonomy REST endpoint.
   # @return [Hash{String=>Hash}]
   def taxonomy
     @taxonomy ||= build_taxonomy
   end
 
-  # Builds the taxonomy lookup from the fetched concepts: resolves localized labels, reads each
-  # concept's parent from its first `broader` link, and derives the nested `/tagged/...` path.
+  # Builds the taxonomy lookup: resolves localized labels, reads each concept's parent from its
+  # first `broader` link, and derives its nested archive path.
   def build_taxonomy
     concepts = fetch_taxonomy_concepts
     by_id = {}
@@ -415,19 +377,15 @@ class Contentful
     by_id
   end
 
-  # The most compact label for a concept's chip: the shortest of its name and its synonyms
-  # (altLabels), preferring the name on ties. So adding a short altLabel like "Coeur d'Alene"
-  # to "Ironman 70.3 Coeur d'Alene" shows the short one in chips, while the full name is still
-  # used for the archive title, breadcrumb, and JSON-LD keywords.
+  # The most compact label for a concept's chip: the shortest of its name and synonyms,
+  # preferring the name on ties. The full name is still used for titles and breadcrumbs.
   def shortest_label(name, synonyms)
     ([name].compact + Array(synonyms)).reject(&:blank?).min_by(&:length) || name
   end
 
-  # Fetches every concept from the delivery taxonomy endpoint (CPA host + preview token, same
-  # credentials as the GraphQL client). Cursor-paginated via `pages.next`. Concepts are the
-  # sole source of article categorization now, so any non-2xx raises and fails the build
-  # (matching the GraphQL error handling).
-  # @return [Array<Hash>] raw concept hashes (string keys, localized fields as locale maps).
+  # Fetches every concept from the delivery taxonomy endpoint, cursor-paginated. Concepts are
+  # the sole source of article categorization, so a non-2xx fails the build.
+  # @return [Array<Hash>] Raw concept hashes, with localized fields as locale maps.
   def fetch_taxonomy_concepts
     space = ENV['CONTENTFUL_SPACE']
     token = ENV['CONTENTFUL_TOKEN']
@@ -444,22 +402,20 @@ class Contentful
       items.concat(Array(body['items']))
       nxt = body.dig('pages', 'next')
       break if nxt.blank?
-      # `pages.next` is a full URL on the delivery API; guard in case it's ever a path.
+      # A full URL on the delivery API; guarded in case it's ever a path.
       url = nxt.start_with?('http') ? nxt : "https://preview.contentful.com#{nxt}"
     end
     items
   end
 
-  # Resolves a localized concept field (a `{ 'en-US' => value }` map on the delivery API) to
-  # its single value. Passes through plain strings/arrays and nil.
+  # Resolves a localized concept field to its single value, passing through plain values.
   def localized(field)
     return field unless field.is_a?(Hash)
     field.values.first
   end
 
-  # The nested archive URL for a concept: `/tagged/<root…>/<id>/`, following parent links up to
-  # the root (a root concept is just `/tagged/<id>/`). The trailing slash matches the built
-  # directory-index page, so links to it don't redirect. Guards against cycles.
+  # The nested archive URL for a concept, following parent links to the root. The trailing
+  # slash matches the built directory-index page, so links don't redirect. Cycle-safe.
   def concept_path(id, by_id)
     chain = []
     cur = id
@@ -472,7 +428,7 @@ class Contentful
     "/tagged/#{chain.join('/')}/"
   end
 
-  # Processes events and adds weather forecasts for upcoming races within the next 10 days.
+  # Tags events with their entry type, honoring DEBUG_EVENT_DATE to shift an event's date.
   def process_events
     @content[:events].map! do |event|
       if ENV['DEBUG_EVENT_DATE'].present?

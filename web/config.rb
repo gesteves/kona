@@ -10,22 +10,19 @@ config[:css_dir]             = 'stylesheets'
 config[:js_dir]              = 'javascripts'
 config[:images_dir]          = 'images'
 
-# esbuild bundles the Stimulus/Turbo JS (and the Web Awesome CSS it imports) into tmp/dist,
-# which Middleman ingests as if it lived in source/ — so asset_hash applies and the
-# /javascripts/site.* paths are unchanged. `middleman build` runs the one-shot build and waits
-# for it; the dev server runs the watcher (esbuild needs --watch=forever there — Middleman
-# spawns it without stdin, and plain --watch exits when stdin closes), so no separate
-# `npm run watch` terminal is needed.
+# esbuild bundles the Stimulus/Turbo JS and the Web Awesome CSS it imports into tmp/dist,
+# which Middleman ingests as if it were source/, so asset_hash applies. The dev server runs
+# the watcher itself, hence no separate `npm run watch` terminal.
+# The watcher needs --watch=forever: Middleman spawns it without stdin, and plain --watch
+# exits when stdin closes.
 activate :external_pipeline,
   name: :esbuild,
   command: build? ? 'npm run build' : 'npm run watch',
   source: 'tmp/dist',
   latency: 1
 
-# NOTE: `activate :gzip` is deliberately OFF. Cloudflare compresses responses itself, so
-# Middleman's pre-gzipped `.gz` siblings are never served. They're just ~110 dead-weight
-# files uploaded as Worker assets (counting toward the asset limit and slowing the deploy).
-# Don't re-add it.
+# `activate :gzip` is deliberately off: Cloudflare compresses responses itself, so the .gz
+# siblings are never served and only add ~110 files to the Worker asset upload.
 activate :dotenv
 activate :autoprefixer do |config|
   config.browsers = ['last 1 version', 'last 3 safari versions', 'last 3 ios versions']
@@ -61,8 +58,7 @@ end
   proxy "#{tag.tag.path}feed.xml", "/tag_feed.xml", locals: { content: tag }, ignore: true
 end
 
-# Render the standard.site publication verification endpoint as a bare, plain-text
-# file at /.well-known/site.standard.publication (no layout, no directory index).
+# The standard.site verification endpoint, served bare: no layout, no directory index.
 page "/.well-known/site.standard.publication", layout: false, directory_index: false
 
 configure :development do

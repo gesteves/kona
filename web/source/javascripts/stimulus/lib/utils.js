@@ -16,7 +16,7 @@ export function sendNotification(message, status = 'success') {
 }
 
 /**
- * Replace the given element with the given HTML
+ * Replaces an element with the nodes parsed from an HTML string.
  * @param {String} html An HTML string.
  * @param {Element} element The element to replace.
  */

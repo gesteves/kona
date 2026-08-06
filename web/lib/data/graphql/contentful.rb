@@ -5,17 +5,13 @@ require 'dotenv'
 module ContentfulClient
   Dotenv.load
 
-  # Creates the HTTP client for GraphQL
   HTTP = GraphQL::Client::HTTP.new("https://graphql.contentful.com/content/v1/spaces/#{ENV['CONTENTFUL_SPACE']}") do
     def headers(context)
       { "Authorization": "Bearer #{ENV['CONTENTFUL_TOKEN']}" }
     end
   end
 
-  # Load the GraphQL schema
   Schema = GraphQL::Client.load_schema(HTTP)
-
-  # Create the GraphQL client
   Client = GraphQL::Client.new(schema: Schema, execute: HTTP)
 
   QUERIES = Client.parse <<-'GRAPHQL'

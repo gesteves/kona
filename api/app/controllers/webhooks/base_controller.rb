@@ -1,12 +1,10 @@
 module Webhooks
-  # Base controller for the /webhooks/* endpoints: inbound webhooks from external services,
-  # one controller per service. Inherits ActionController::Base directly (not
-  # ApplicationController) to skip the modern-browser gate — these are hit by machines.
+  # Base controller for the /webhooks/* endpoints, one per sending service. Inherits
+  # ActionController::Base directly to skip the modern-browser gate, since these are hit by
+  # machines.
   #
-  # No API_TOKEN bearer here: webhook senders can't carry our token, so each service's
-  # controller authenticates with that service's own scheme (e.g. Contentful's HMAC request
-  # verification). Forgery protection is skipped for the same reason — these are
-  # cross-origin POSTs with no session.
+  # No API_TOKEN bearer: senders can't carry our token, so each controller authenticates with
+  # its own service's scheme. Forgery protection is skipped for the same reason.
   class BaseController < ActionController::Base
     layout false
 

@@ -1,34 +1,31 @@
-# Ranks the "You May Also Like" widget at request time by semantic similarity, replacing the
-# build-time tag/title heuristic the static site used. Each published article has a Voyage embedding
-# precomputed by ArticleEmbeddingJob (webhook-driven) and cached in Redis; here we load the current
-# article's vector plus every candidate's, score them by cosine similarity, and return the nearest
-# neighbors (recency breaks ties). The ranking is computed once per article and cached briefly. The
-# request path never calls Voyage — it only reads stored vectors and does the arithmetic.
+# Ranks the "You May Also Like" widget by semantic similarity: loads the current article's
+# precomputed Voyage embedding plus every candidate's, scores them by cosine similarity, and
+# returns the nearest neighbors, with recency breaking ties. The request path never calls Voyage
+# — ArticleEmbeddingJob stores the vectors, and this only reads them and does the arithmetic.
 class RelatedArticles < ApplicationService
   include ArticleRanking # candidates + payload, shared with TrendingArticles
 
-  # Cache (and serve) only the top slice of the ranking — plenty to fill the widget, while bounding
-  # the JSON we cache. Keyed per article, unlike trending's single shared ranking.
+  # How much of the ranking to cache: plenty to fill the widget, while bounding the cached JSON.
+  # Keyed per article, unlike trending's single shared ranking.
   MAX_POOL = 12
-  # The neighbors of an article change only when the corpus or its embeddings change, so memoize
-  # briefly (mirrors TrendingArticles::RESULT_TTL).
+  # Neighbors change only when the corpus or its embeddings do, so this can memoize briefly.
   RESULT_TTL = 10.minutes
 
-  # @param articles [Articles] corpus source (injectable for testing)
+  # @param articles [Articles] The corpus source; injectable for testing.
   def initialize(articles: Articles.new)
     @articles = articles
   end
 
-  # The top `count` articles most semantically related to the article with Contentful id `id`.
-  # @return [Array<OpenStruct>]
+  # @param id [String] The article's Contentful id.
+  # @return [Array<OpenStruct>] The `count` articles most semantically related to it.
   def for_article(id, count: 4)
     ranked(id).first(count)
   end
 
   private
 
-  # The ranked neighbor list (corpus DeepOstructs, nearest first), cached per article. Degrades to an
-  # empty list (→ render_empty) when the article has no stored vector or on any error.
+  # The ranked neighbors, nearest first, cached per article. Empty when the article has no
+  # stored vector or on any error, which collapses the widget.
   def ranked(id)
     return [] if id.blank?
 
@@ -40,13 +37,13 @@ class RelatedArticles < ApplicationService
     end
   end
 
-  # Scores every candidate against the current article's vector by cosine similarity. Candidates with
-  # no stored vector yet (e.g. published before their embedding job ran) are skipped, not zero-scored.
+  # Scores every candidate by cosine similarity. Candidates with no stored vector yet are
+  # skipped rather than zero-scored.
   def rank(id)
     query_vector = load_vector(id)
     return [] if query_vector.blank?
 
-    # The trending candidate set, minus the current article (the only id-based exclusion).
+    # The shared candidate set, minus the current article.
     pool = candidates.reject { |article| article.sys&.id == id }
     return [] if pool.blank?
 
@@ -69,7 +66,7 @@ class RelatedArticles < ApplicationService
     parse_vector($redis.get(ArticleEmbeddingJob.redis_key(id)))
   end
 
-  # One Redis round trip for the whole candidate pool → { id => vector|nil }.
+  # @return [Hash] { id => vector or nil } for the whole candidate pool, in one round trip.
   def load_vectors(ids)
     ids = ids.compact
     return {} if ids.empty?

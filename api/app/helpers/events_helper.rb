@@ -24,12 +24,10 @@ module EventsHelper
     todays_race(events, time_zone).present?
   end
 
-  # Whether the event is happening right now. Confirmed (going) events only. Prefers the event's
-  # own race-day weather — the sunrise..sunset window for the event's date, at the event's
-  # location — which we already fetch for the featured race; covering "now" means it's both the
-  # event's day and daytime there. Falls back to today-and-daytime in the given timezone when
-  # that weather (and thus its sun times) isn't available.
-  # @param event [OpenStruct, nil]
+  # Whether a confirmed event is happening right now. Prefers the event's own race-day daylight
+  # window, which covers both the right day and daytime at the event's location; falls back to
+  # today-and-daytime in the given timezone when those sun times aren't available.
+  # @param event [OpenStruct, nil] The event.
   # @param time_zone [String] An IANA timezone id.
   # @param event_weather [EventWeatherPresenter, nil] The featured race's weather.
   def in_progress?(event, time_zone, event_weather: nil)
@@ -39,10 +37,8 @@ module EventsHelper
     daytime?(nil, time_zone) && today?(event, time_zone)
   end
 
-  # The event-day daylight window (sunrise..sunset) drawn from the featured race's already-fetched
-  # weather, or nil when those sun times aren't available. The forecast day covers the event's
-  # date and the sun times are absolute instants, so callers compare the current time against this
-  # window without converting timezones.
+  # @return [Range, nil] The event day's sunrise..sunset window, or nil without sun times. The
+  #   sun times are absolute instants, so callers need no timezone conversion.
   def event_daylight_window(event_weather)
     sunrise = event_weather&.sunrise
     sunset = event_weather&.sunset
@@ -50,12 +46,13 @@ module EventsHelper
     Time.parse(sunrise)..Time.parse(sunset)
   end
 
-  # The daytime forecast for the event's date, used by the per-event weather view.
+  # @return [OpenStruct, nil] The daytime forecast for the event's date.
   def event_forecast(event)
     event_forecast_day(event)&.daytime_forecast
   end
 
-  # The forecast day covering the event's date (carries sunrise/sunset too).
+  # @return [OpenStruct, nil] The forecast day covering the event's date, which also carries
+  #   its sunrise and sunset.
   def event_forecast_day(event)
     return nil if event.blank? || event.weather&.forecast_daily&.days.blank?
     event_date = Date.parse(event.date)
@@ -66,11 +63,10 @@ module EventsHelper
     end
   end
 
-  # The upcoming races to show: future-or-today confirmed events, soonest first. When the next
-  # one is within 10 days it's "featured" (expanded card + race-day weather) and we show four;
-  # otherwise three. Mirrors the static site's build-time helper. The caller keeps the result —
-  # each computation re-parses and re-sorts every event.
-  # @param events [Array<OpenStruct>, nil]
+  # The upcoming races to show: confirmed events today or later, soonest first. Four when the
+  # next one is featured, three otherwise. Callers should keep the result — each call re-parses
+  # and re-sorts every event.
+  # @param events [Array<OpenStruct>, nil] Every event.
   # @param time_zone [String] An IANA timezone id.
   # @return [Array<OpenStruct>]
   def upcoming_races(events, time_zone)
@@ -102,18 +98,18 @@ module EventsHelper
     event.sys&.id == upcoming.first&.sys&.id
   end
 
-  # Whether the event gets the featured treatment (the next race, and within 10 days).
-  # @param event [OpenStruct, nil]
-  # @param upcoming [Array<OpenStruct>] The upcoming races (see #upcoming_races).
+  # Whether the event gets the featured treatment — an expanded card with race-day weather —
+  # which the next race does when it's within 10 days.
+  # @param event [OpenStruct, nil] The event.
+  # @param upcoming [Array<OpenStruct>] The upcoming races.
   # @param time_zone [String] An IANA timezone id.
   def featured?(event, upcoming, time_zone)
     return false if event.blank?
     close?(event, time_zone) && next?(event, upcoming)
   end
 
-  # The layout variant for a races collection, from the event count and whether the first is
-  # featured (e.g. the race-day "Upcoming Races" section passes the count without today's race
-  # and featured: false).
+  # @return [String] The layout variant for a races collection, from its size and whether the
+  #   first event is featured.
   def event_collection_variant(count, featured:)
     case count
     when 1 then "single"
@@ -123,26 +119,24 @@ module EventsHelper
     end
   end
 
-  # The formatted date for an event's timestamp (e.g. "January 1, 2026"). Today's race is shown
-  # in its own section whose heading already says it's today, so this is only ever rendered for
-  # upcoming events and never needs a "Today" label.
+  # @return [String] The event's date, formatted. Only ever rendered for upcoming events, so it
+  #   never needs a "Today" label — today's race has its own section.
   def event_timestamp(event)
     DateTime.parse(event.date).strftime("%B %-e, %Y")
   end
 
-  # The icon + date span shown for an upcoming event. Not rendered for today's race (its section
-  # heading already says it's today). Only confirmed, upcoming events reach here — the list
-  # excludes cancelled ones — so the icon is always a calendar check.
+  # @return [String] The icon and date span for an upcoming event. Only confirmed events reach
+  #   here, so the icon is always a calendar check.
   def event_timestamp_tag(event)
     content_tag :span, raw("#{icon_svg('classic', 'light', 'calendar-check')} #{event_timestamp(event)}")
   end
 
-  # The "Live tracking" indicator for an event with a tracking link, or nil if there's none.
-  # While the race is in progress it's highlighted and pulses; otherwise it's muted to signal
-  # tracking exists but isn't live yet.
-  # @param event [OpenStruct, nil]
+  # The "Live tracking" indicator, highlighted while the race is in progress and muted
+  # otherwise, to signal that tracking exists but isn't live yet.
+  # @param event [OpenStruct, nil] The event.
   # @param time_zone [String] An IANA timezone id.
   # @param event_weather [EventWeatherPresenter, nil] The featured race's weather.
+  # @return [String, nil] The markup, or nil when the event has no tracking link.
   def event_live_tracking_tag(event, time_zone, event_weather: nil)
     return if event.blank? || event.tracking_url.blank?
     in_progress = in_progress?(event, time_zone, event_weather: event_weather)

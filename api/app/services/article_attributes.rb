@@ -1,15 +1,13 @@
-# Derives the shared article fields (draft / published_at / entry_type / path) from raw
-# Contentful values. This is the single owner of the canonical article path format
-# (/%Y/%m/%d/slug/) on the API side — it must keep matching the web build's permalinks
-# (web's set_draft_status / set_entry_type / set_article_path), and it was previously
-# re-implemented in Articles, StandardSite, and PlausibleController.
+# Derives the shared article fields from raw Contentful values. The single owner of the
+# canonical article path format on the API side; it must keep matching the web build's
+# permalinks.
 module ArticleAttributes
   module_function
 
-  # The derived fields for a raw article item's values.
-  # @param slug [String, nil]
-  # @param published_version [Object, nil] sys.publishedVersion — blank means draft.
-  # @param published [String, nil] The optional editorial publish date.
+  # Derives the shared fields for a raw article item.
+  # @param slug [String, nil] The entry's slug.
+  # @param published_version [Object, nil] sys.publishedVersion; blank means draft.
+  # @param published [String, nil] The editorial publish date, if set.
   # @param first_published_at [String, nil] sys.firstPublishedAt.
   # @param body [String, nil] Present for a full Article, blank for a Short.
   # @return [Hash] { draft:, published_at:, entry_type:, path: }
@@ -25,8 +23,7 @@ module ArticleAttributes
     }
   end
 
-  # The canonical article path, or nil when it can't be resolved.
-  # @return [String, nil]
+  # @return [String, nil] The canonical article path, or nil when it can't be resolved.
   def path(slug:, published_at:, draft: false)
     return if draft || slug.blank? || published_at.blank?
 

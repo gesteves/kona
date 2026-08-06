@@ -32,26 +32,20 @@ export default class extends Controller {
   }
 
   /**
-   * Get the permalink from the button's href attribute.
-   * Handles both relative and absolute URLs, as well as anchor links.
-   * @return {String} Permalink URL.
+   * @return {String} The button's href resolved to an absolute permalink.
    */
   getPermalink() {
     return absoluteUrl(this.element.getAttribute('href'));
   }
 
   /**
-   * Handles successful copy event.
-   * Show the check icon and hide the link icon.
-   * Revert back after a few seconds.
+   * Swaps the link icon for a check for two seconds, toasts, and tracks the copy.
    * @param {String} permalink The URL that was copied.
    */
   successfulCopy(permalink) {
     if (this.hasLinkTarget && this.hasCheckTarget) {
-      // Hide the link icon and show the circle-check icon
       this.linkTarget.classList.add(this.hiddenClass);
       this.checkTarget.classList.remove(this.hiddenClass);
-      // Revert back after 2 seconds
       this.revertTimer = setTimeout(() => {
         this.linkTarget.classList.remove(this.hiddenClass);
         this.checkTarget.classList.add(this.hiddenClass);
@@ -62,9 +56,7 @@ export default class extends Controller {
     trackEvent('Copy to Clipboard', { url: permalink });
   }
 
-  /**
-   * Show a notification if copying fails.
-   */
+  /** Notifies the reader that copying failed. */
   unsuccessfulCopy() {
     sendNotification('Failed to copy link to clipboard.', 'error');
   }

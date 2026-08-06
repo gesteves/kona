@@ -1,9 +1,6 @@
 /**
- * Sends a call to Plausible if it's available. The queue stub and configuration
- * are set up inline in the page head (partials/_analytics.html.erb) before the
- * deferred script loads, so here we only need to guard against Plausible being
- * absent (e.g. in development, where the script isn't injected), which turns
- * every tracking call into a no-op instead of a ReferenceError.
+ * Sends a call to Plausible if it's available, so tracking is a no-op when the script isn't
+ * injected (e.g. in development) instead of a ReferenceError.
  * @param {...*} args - Arguments forwarded to `window.plausible`.
  */
 function track(...args) {
@@ -12,8 +9,7 @@ function track(...args) {
 }
 
 /**
- * Product-agnostic function to make a page view tracking call.
- * Currently supports Plausible.
+ * Tracks a page view, then strips tracking params from the URL.
  * @param {Object} additionalProps - Optional additional properties to include with the pageview.
  */
 export function trackPageView(additionalProps = {}) {
@@ -22,7 +18,6 @@ export function trackPageView(additionalProps = {}) {
 
   const params = { u: currentUrl.href };
 
-  // Combine search query with any additional props
   if (searchQuery || Object.keys(additionalProps).length > 0) {
     params.props = { ...additionalProps };
     if (searchQuery) {
@@ -35,8 +30,7 @@ export function trackPageView(additionalProps = {}) {
 }
 
 /**
- * Product-agnostic function to make an event tracking call.
- * Currently supports Plausible.
+ * Tracks an event.
  * @param {string} event - The event name to be tracked.
  * @param {Object} props - Additional properties to send with the event.
  */
@@ -45,11 +39,8 @@ export function trackEvent(event, props = {}) {
 }
 
 /**
- * Tracks an event and then runs a callback, guaranteeing the callback runs even
- * if the event can't be sent. Use this when the callback navigates the page away
- * (e.g. `window.location.href = …`), which would otherwise cancel an in-flight
- * tracking request. Relies on Plausible's `callback` option, with a short timeout
- * as a fallback in case the callback never fires (or Plausible isn't loaded).
+ * Tracks an event, then runs a callback exactly once — even if the event can't be sent. Use
+ * this when the callback navigates away, which would otherwise cancel the in-flight request.
  * @param {string} event - The event name to be tracked.
  * @param {Object} props - Additional properties to send with the event.
  * @param {Function} done - Callback to run once the event is sent (or times out).
@@ -72,12 +63,10 @@ export function trackEventThen(event, props, done) {
 let searchTrackingReady = false;
 
 /**
- * Subscribes to the Pagefind modal's shared search instance and forwards each
- * settled query to Plausible as a `Search` event. Idempotent and guarded by a
- * module-level flag, so it subscribes exactly once no matter how many "Search"
- * buttons call it or how many Turbo navigations occur. No-ops (leaving the flag
- * unset, so a later call can retry) until the Pagefind Component UI has loaded —
- * e.g. in development, where `/pagefind/` doesn't exist.
+ * Subscribes to the Pagefind modal's shared search instance and forwards each settled query to
+ * Plausible as a `Search` event. Subscribes at most once across all callers and navigations;
+ * no-ops without setting the flag until the Pagefind Component UI has loaded, so a later call
+ * can retry.
  */
 export function initSearchTracking() {
   if (searchTrackingReady) return;
@@ -93,8 +82,8 @@ export function initSearchTracking() {
     if (!term) return;
     const results =
       search?.unfilteredTotalCount ?? search?.results?.length ?? 0;
-    // Trailing-debounce so we record the query the user settled on, once —
-    // not every keystroke prefix (`z`, `zw`, `zwi`, …).
+    // Trailing-debounce, so the query the user settled on is recorded once rather than every
+    // keystroke prefix.
     clearTimeout(timer);
     timer = setTimeout(() => {
       if (term === lastTracked) return;
@@ -104,11 +93,7 @@ export function initSearchTracking() {
   });
 }
 
-/**
- * Removes specific UTM parameters and other query parameters from the page URL.
- * This function modifies the current URL by removing marketing and tracking parameters,
- * then updates the browser's history state to reflect the clean URL.
- */
+/** Strips marketing and tracking query parameters from the page URL via replaceState. */
 export function cleanUpUrl() {
   const currentUrl = new URL(window.location.href);
   const params = currentUrl.searchParams;

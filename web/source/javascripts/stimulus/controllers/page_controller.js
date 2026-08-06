@@ -1,28 +1,17 @@
 import { trackPageView } from '../lib/analytics';
 import { Controller } from '@hotwired/stimulus';
 
-/**
- * Controller class for managing page views.
- */
+/** Page-level Turbo lifecycle hooks. */
 export default class extends Controller {
-  /**
-   * Tracks a page view when the page loads.
-   * This is called on every `turbo:load` event.
-   * @see https://turbo.hotwired.dev/reference/events
-   */
+  /** Tracks a page view. Wired to `turbo:load`. */
   load() {
     trackPageView();
   }
 
   /**
-   * Clears any in-flight toast notifications before Turbo caches the page.
-   * Toasts are ephemeral per-page feedback: a `<wa-toast-item>`'s countdown
-   * timer is killed when Turbo disconnects the DOM and never restarts, so a
-   * toast carried into a cached snapshot becomes a frozen zombie that resurfaces
-   * the next time the toast stack opens. Emptying the stack here keeps toasts
-   * from leaking across navigations.
-   * This is called on every `turbo:before-cache` event.
-   * @see https://turbo.hotwired.dev/reference/events
+   * Empties the toast stack before Turbo caches the page. Wired to `turbo:before-cache`.
+   * A `<wa-toast-item>`'s countdown dies when Turbo disconnects the DOM and never restarts, so
+   * a toast carried into a snapshot resurfaces frozen the next time the stack opens.
    */
   clearNotifications() {
     document.getElementById('notifications')?.replaceChildren();

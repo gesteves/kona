@@ -1,14 +1,11 @@
-// Shared logic for the heading-level migrations (bump-heading-levels.js and its
-// inverse, revert-heading-levels.js). See those scripts for context.
+// Shared logic for bump-heading-levels.js and revert-heading-levels.js.
 //
-// Shifts every ATX Markdown heading (`### Foo`) by `delta` levels, in a single pass
-// so headings are never double-shifted, skipping fenced code blocks so `#` comment
-// lines in code are never touched. Both content types hold Markdown in plain Text
-// fields: `article` (Articles and Shorts) has `intro` + `body`; `page` has `body`.
+// Shifts every ATX Markdown heading by `delta` levels in a single pass, so headings are never
+// double-shifted, skipping fenced code blocks so `#` comment lines in code are untouched.
 //
-// Env vars (same conventions as fix-degrees.js):
+// Env vars, as elsewhere in this directory:
 //   DRY_RUN=true                  print per-entry diffs, write nothing
-//   ENTRY_ID=<sys.id>             restrict to a single entry (extra-safe trial)
+//   ENTRY_ID=<sys.id>             restrict to a single entry
 //   CONTENTFUL_ENVIRONMENT=<env>  target a non-master environment (default: master)
 const { runMigration } = require('contentful-migration');
 

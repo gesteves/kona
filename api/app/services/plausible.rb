@@ -1,12 +1,10 @@
-# Queries the Plausible Analytics API (v2). Ported from the web app's lib/data/plausible.rb.
-# Raw responses are cached in Redis for 5 minutes.
+# Queries the Plausible Analytics API (v2), caching responses in Redis for 5 minutes.
 class Plausible < ApplicationService
   PLAUSIBLE_API_URL = "https://plausible.io/api/v2/query"
-  # Only article pages (paths like /2026/05/24/slug/, the format ArticleAttributes.path owns),
-  # matching web's process_analytics filter.
+  # Matches only article pages, whose path format ArticleAttributes.path owns.
   ARTICLE_PATH_FILTER = [["matches", "event:page", ["^/20\\d{2}/"]]].freeze
 
-  # The Plausible site id (the domain the dashboard lives under), or nil when unconfigured.
+  # @return [String, nil] The Plausible site id, or nil when unconfigured.
   attr_reader :site_id
 
   def initialize
@@ -14,32 +12,29 @@ class Plausible < ApplicationService
     @site_id = ENV["PLAUSIBLE_SITE_ID"]
   end
 
-  # The public dashboard URL for one page's stats over a date range, or nil when the site id
-  # isn't configured. URL-encodes the path before interpolating it into the query string; a
-  # slug containing URL-special characters would otherwise corrupt the f=is,page filter /
-  # inject params.
-  # @param path [String] The page path (e.g. "/2026/05/01/my-race-report/").
-  # @param from [String] The range start (YYYY-MM-DD).
-  # @param to [String] The range end (YYYY-MM-DD).
-  # @return [String, nil]
+  # The public dashboard URL for one page's stats. The path is URL-encoded before
+  # interpolation, since a slug with URL-special characters would otherwise corrupt the filter.
+  # @param path [String] The page path.
+  # @param from [String] The range's start, as YYYY-MM-DD.
+  # @param to [String] The range's end, as YYYY-MM-DD.
+  # @return [String, nil] The URL, or nil when the site id isn't configured.
   def dashboard_url(path:, from:, to:)
     return if @site_id.blank?
     encoded_path = ERB::Util.url_encode(path)
     "https://plausible.io/#{@site_id}?f=is,page,#{encoded_path}&period=custom&from=#{from}&to=#{to}&r=v2"
   end
 
-  # Pageviews for every article page over `date_range`, as { path => pageviews }.
+  # Pageviews for every article page over a date range.
   #
-  # ⚠️ This is deliberately ONE site-wide query rather than one query per article, and both
-  # callers (the per-article pageviews widget and TrendingArticles) share it for that reason.
-  # Plausible allows 600 calls/hour; `query` caches each distinct body for 5 minutes, so the
-  # ceiling is 12 calls/hour per *cache key*. Asking per article would mint a key per article
-  # (~60 and growing with the corpus) and put the ceiling over the limit — see the note in
-  # Widgets::PlausibleController. Keep it one query.
+  # ⚠️ Deliberately ONE site-wide query, shared by both callers — never one query per article.
+  # Plausible allows 600 calls/hour and the 5-minute cache caps each distinct query body at 12,
+  # so one shared key costs 12 calls/hour flat while a key per article would scale with the
+  # corpus and blow the limit. Don't reintroduce a per-article query or shorten the TTL without
+  # redoing that math.
   #
-  # @param date_range [String, Array] A Plausible date range ("all", or a [from, to] pair).
-  # @return [Hash, nil] { path => pageviews }, or nil when the query is unavailable — which
-  #   distinguishes "analytics are down" from "nothing has been viewed".
+  # @param date_range [String, Array] A Plausible date range: "all", or a [from, to] pair.
+  # @return [Hash, nil] { path => pageviews }, or nil when the query is unavailable — which is
+  #   what distinguishes "analytics are down" from "nothing has been viewed".
   def pageviews_by_path(date_range: "all")
     result = query(
       metrics: ["pageviews"],
@@ -56,7 +51,8 @@ class Plausible < ApplicationService
     end
   end
 
-  # @return [Hash, nil] The parsed API response, or nil if unavailable.
+  # Runs a Plausible query, cached by request body.
+  # @return [Hash, nil] The parsed response, or nil when unavailable.
   def query(metrics: [], date_range: "all", dimensions: ["event:page"], filters: nil, order_by: nil, offset: 0, limit: 10000)
     return if @access_token.blank? || @site_id.blank?
 
@@ -87,8 +83,8 @@ class Plausible < ApplicationService
 
   private
 
-  # Plausible reports clean URLs already, but normalize any trailing index.html so both forms
-  # fold into the one path (summing them, rather than one of them going unmatched).
+  # Plausible reports clean URLs, but a trailing index.html is folded in so both forms sum into
+  # one path rather than one going unmatched.
   def normalize_path(path)
     return if path.blank?
     path.to_s.sub(/index\.html\z/, "")
