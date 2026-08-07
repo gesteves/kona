@@ -61,6 +61,43 @@ updates:
         patterns:
           - "*"
 
+  # The local-only tools in utilities/. Nothing here deploys, but all three ship tracked
+  # lockfiles that would otherwise never see a CVE bump — and utilities/maps has CI to validate
+  # the bumps against. Grouped and on the same weekly cadence as everything else.
+  - package-ecosystem: "bundler"
+    directories:
+      - "/utilities/maps"
+      - "/utilities/aqi-map"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+    labels:
+      - "dependencies"
+      - "ruby"
+      - "utilities"
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      ruby-dependencies:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "npm"
+    directory: "/utilities/contentful"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+    labels:
+      - "dependencies"
+      - "javascript"
+      - "utilities"
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      npm-dependencies:
+        patterns:
+          - "*"
+
   # `directory: "/"` covers .github/workflows only. The composite action in
   # .github/actions/notify-slack has its own `uses:` (slackapi/slack-github-action) and needs its
   # own entry, pointed at the folder holding action.yml, or it never gets updated.

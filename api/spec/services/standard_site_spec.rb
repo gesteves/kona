@@ -296,4 +296,43 @@ describe StandardSite do
       expect(StandardSiteSyncJob.jobs).to be_empty
     end
   end
+
+  describe "deleting a document record" do
+    let(:entry_id) { "6L1asJJq4umcGEvD0hfqxE" }
+    let(:rkey) { client.document_rkey(entry_id) }
+
+    before do
+      allow(client).to receive(:valid_credentials?).and_return(true)
+      allow(client).to receive(:create_session).and_return(true)
+      allow(client).to receive(:forget_fingerprint)
+    end
+
+    # Every record key in both standard.site lexicons is a TID, so a Contentful sys.id can never
+    # be one. Passing the raw id deletes a key that doesn't exist and reports success, leaving the
+    # real record live on the PDS until the next backfill prunes it.
+    it "addresses the record by its TID rkey, never the raw Contentful id" do
+      expect(client).to receive(:delete_record).with(StandardSite::DOCUMENT_COLLECTION, rkey).and_return(true)
+
+      client.delete_document(entry_id)
+    end
+
+    it "deletes by TID rkey when a published entry becomes unpublishable" do
+      allow(client).to receive(:eligible?).and_return(true)
+      allow(client).to receive(:fetch_article).and_return({ title: "Draft" })
+      allow(client).to receive(:decorate_post).and_return({ "title" => "Draft" })
+      allow(client).to receive(:publishable_posts).and_return([])
+      expect(client).to receive(:delete_record).with(StandardSite::DOCUMENT_COLLECTION, rkey).and_return(true)
+
+      expect(client.sync_document(entry_id)).to eq(:deleted)
+    end
+
+    # A swallowed failure would drop the fingerprint too, so nothing would ever re-detect the
+    # orphaned record.
+    it "raises (so Sidekiq retries) and keeps the fingerprint when the PDS rejects the delete" do
+      allow(client).to receive(:delete_record).and_return(false)
+      expect(client).not_to receive(:forget_fingerprint)
+
+      expect { client.delete_document(entry_id) }.to raise_error(/could not delete document/)
+    end
+  end
 end

@@ -31,10 +31,14 @@ class Location
   end
 
   # Splits a "latitude,longitude" string into coordinates.
+  #
+  # ⚠️ Parses with Float(), not to_f. to_f turns unparseable text into 0.0, which is a valid
+  # coordinate — so a typo'd LOCATION would silently resolve to Null Island and, because it
+  # "parses", win over the good value in Redis.
   # @param location [String] The location string.
   # @return [Array<Float>, nil] The latitude and longitude as floats, or nil if invalid.
   def split_into_coordinates(location)
-    latitude, longitude = location&.split(",")&.map(&:to_f)
+    latitude, longitude = location&.split(",")&.map { |part| Float(part.strip, exception: false) }
     return unless self.class.valid_coordinates?(latitude, longitude)
 
     [latitude, longitude]

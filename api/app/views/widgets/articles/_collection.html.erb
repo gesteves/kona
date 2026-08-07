@@ -3,7 +3,7 @@
   fragment the static site swaps in. The outer <section> carries the live-update attributes so
   it keeps refreshing after the swap (and on visibilitychange).
 %>
-<section class="collection collection--halves" id="<%= section_id %>" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= live_update_url %>" data-action="visibilitychange@document->live-update#handleVisibilityChange">
+<section class="collection collection--halves" id="<%= section_id %>" data-nosnippet <%= live_update_attrs %>>
   <h2 class="collection__heading"><%= heading %></h2>
   <ol class="collection__list">
     <% articles.each do |article| %>

@@ -101,8 +101,11 @@ module ActivityDescription
     #   feed is configured or the fetch fails, so a broken calendar loses only this line.
     def planned_workouts_for(activity)
       safely("TrainerRoad planned workouts", fallback: []) do
+        date = activity_date(activity)
+        next [] if date.nil?
+
         trainer_road = @trainer_road || TrainerRoad.new(@intervals.athlete_timezone)
-        trainer_road.planned_workouts(activity_date(activity)) || []
+        trainer_road.planned_workouts(date) || []
       end
     end
 
@@ -139,7 +142,8 @@ module ActivityDescription
 
       max_hsi, median_hsi = heat_strain_values(activity)
 
-      score = @intervals.wellness(activity_date(activity))&.dig(:CoreHeatAdaptationScore)
+      date = activity_date(activity)
+      score = date && @intervals.wellness(date)&.dig(:CoreHeatAdaptationScore)
       score = nil unless score.is_a?(Numeric)
 
       Composer.heat_block(max_hsi: max_hsi, median_hsi: median_hsi, heat_adaptation_score: score, swim: swim)
@@ -178,8 +182,18 @@ module ActivityDescription
     end
 
     # The activity's local calendar date (start_date_local is already athlete-local).
+    #
+    # ⚠️ Nil-safe on purpose. heat_line reaches this outside the `safely` wrappers its sibling
+    # steps use, so an activity missing start_date_local used to fail the whole run — and since
+    # that failure is deterministic, ApplicationJob's 24-hour window then retried it all day.
+    # @return [Date, nil]
     def activity_date(activity)
-      Date.parse(activity[:start_date_local][0, 10])
+      local = activity[:start_date_local]
+      return if local.blank?
+
+      Date.parse(local[0, 10])
+    rescue ArgumentError, TypeError
+      nil
     end
 
     # Indoor = trainer flag, a "virtual" activity type, or a Zwift source.

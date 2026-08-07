@@ -42,7 +42,35 @@ the checks that exist (today: `utilities/maps/`'s rspec suite) without deploying
   historical PurpleAir readings, screenshotted for a post's cover image. Sketch quality and
   **not deployable** — it binds `127.0.0.1` and proxies a PurpleAir key with no auth of its own.
   ⚠️ It **duplicates** the EPA correction and AQI conversion from `api/app/services/purple_air.rb`
-  (`utilities/` must not depend on `api/`), so a fix there won't reach it.
+  (`utilities/` must not depend on `api/`), so a fix there won't reach it. The copy is isolated in
+  `utilities/aqi-map/lib/epa_aqi.rb` so the two can be diffed directly, and
+  `spec/epa_aqi_check.rb` pins it with golden vectors — computed from the **published equation**,
+  not from either implementation, so a shared bug can't pass. `utilities.yml` runs it.
+
+## Duplicated across the two apps
+
+Beyond the aqi-map copy above, five helpers exist in both `api/` and `web/` because they render
+markup that ends up on the **same page** — the static build renders an article, and the api
+re-renders the same summary text into the trending/related fragments swapped into it. Drift
+changes typography or link behavior mid-page:
+
+| Logic | api | web |
+|---|---|---|
+| `markdown_to_html` + `smartypants` | `helpers/markdown_helper.rb` | `helpers/markdown_helpers.rb` |
+| `clock_icon_svg` | `helpers/icons_helper.rb` | `helpers/icon_helpers.rb` |
+| `article_permalink_timestamp` | `helpers/articles_helper.rb` | `helpers/article_helpers.rb` |
+| Canonical article path | `services/article_attributes.rb` | `lib/data/contentful.rb` |
+| `units_tag` / `add_unit_data_attributes` | `helpers/markup_helper.rb` | `helpers/markup_helpers.rb` |
+| `fix_degrees` | `helpers/text_helper.rb` | `helpers/text_helpers.rb` |
+
+⚠️ `Api::MarkupHelper#render_summary_body` is a deliberately reduced `render_body`, but the
+reductions are load-bearing in one direction: it **must** keep applying `fix_degrees` and
+`mark_affiliate_links`. Dropping the latter silently strips the `rel="sponsored nofollow noopener"`
+disclosure from an affiliate link that carries it everywhere else on the same page.
+
+⚠️ `open_external_links_in_new_tabs` genuinely **diverges**: web skips same-host links, the api
+opens every absolute link, on the assumption that card bodies only ever link off-site. Nothing
+enforces that assumption.
 
 ## Code style
 
@@ -69,6 +97,10 @@ come from configuration:
 - Whoop redirect: `WHOOP_REDIRECT_URI`.
 
 Where a placeholder is genuinely needed, use `https://<your-app-host>/…`.
+
+The **root `README.md` is the one exception**: its opening line links the site by name, which is
+what a README is for, and nothing reads it. The rule is about hostnames that *behave* — anything a
+build, a request, a test, or a workflow resolves.
 
 ## Cloudflare sits in front of everything
 
@@ -443,8 +475,16 @@ sync by hand.
 | Trending articles | `source/partials/placeholders/_trending.html.erb` | `views/widgets/articles/trending.html.erb` | `/widgets/articles/trending[/:id]` |
 | Related articles | `source/partials/placeholders/_related.html.erb` | `views/widgets/articles/related.html.erb` | `/widgets/articles/related/:id` |
 
-Shared CSS lives in `web/source/stylesheets/` (`stats`, `stats--has-four`, `stats--has-three`,
-`weather`, `event__weather`).
+Shared CSS lives in `web/source/stylesheets/components/` — the api's fragments render classes from
+`_collection.scss`, `_entry.scss`, `_event.scss`, `_stats.scss` and `_weather.scss` (around 38
+classes in total, plus `sr-only`). Treat those five files as jointly owned; an enumeration here
+would go stale on the first widget change.
+
+Both sides build the live-update attribute cluster through a helper — `live_update_attrs` in
+`web/lib/helpers/site_helpers.rb` and in `api/app/helpers/live_update_helper.rb` — rather than
+writing it out per view. The api's omits `data-live-update-placeholder-value` deliberately, and
+`api/spec/support/live_update_contract.rb` is a shared example, included by every widget request
+spec, that fails if a fragment ever grows one.
 
 ⚠️ **When you change a widget's markup, class names, or DOM shape, edit the web placeholder and
 the api view together** — and re-check the proxy constraints above.

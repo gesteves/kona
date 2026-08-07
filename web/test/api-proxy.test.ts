@@ -288,4 +288,26 @@ describe('handleApi — contact (POST)', () => {
     // The streamed body still arrives intact.
     expect(upstream.body).toBe('name=T&email=t@example.com&message=hi');
   });
+
+  // The timeout used to sit inside the non-contact branch alongside cacheEverything, so the one
+  // route a visitor actually waits on was the one with no bound at all.
+  it('bounds the upstream request with a timeout', async () => {
+    const upstream = interceptFetch(
+      'POST',
+      `${ORIGIN}/api/contact`,
+      () => new Response(null, { status: 204 })
+    );
+
+    await handleApi(
+      new Request('https://www.example.com/api/contact', {
+        method: 'POST',
+        headers: { accept: 'application/json' },
+        body: 'name=T',
+      }),
+      env
+    );
+
+    expect(upstream.request!.signal).toBeTruthy();
+    expect(upstream.request!.signal.aborted).toBe(false);
+  });
 });

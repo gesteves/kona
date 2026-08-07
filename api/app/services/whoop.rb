@@ -5,6 +5,8 @@ require "uri"
 # authorizes the app. Tokens live in Redis — there's no DB, so the refresh token is the only
 # durable credential — and the access token is refreshed on demand, handling rotation.
 class Whoop < ApplicationService
+  include ParallelUpstreams
+
   WHOOP_API_URL = "https://api.prod.whoop.com/developer/v2"
   WHOOP_OAUTH_URL = "https://api.prod.whoop.com/oauth/oauth2"
   SCOPE = "offline read:recovery read:cycles read:workout read:sleep read:profile read:body_measurement"
@@ -20,11 +22,27 @@ class Whoop < ApplicationService
   # @return [Hash, nil] The most recent scored :physiological_cycle, :sleep, and :recovery, or
   #   nil if any is missing, in which case the widget renders nothing.
   def stats
-    cycle = get_most_recent_scored_cycle
-    sleep = get_sleep_for_cycle(cycle&.dig(:id))
-    recovery = get_recovery_for_sleep(sleep&.dig(:id))
+    # Only the *filtering* below chains (a sleep is matched to a cycle, a recovery to a sleep) —
+    # the three collection fetches themselves are independent, so they run concurrently rather
+    # than as three serial round trips on a cold cache.
+    collections = in_parallel(
+      cycles: -> { rescue_with(context: "Whoop cycles") { get_cycles } },
+      sleeps: -> { rescue_with(context: "Whoop sleeps") { get_sleeps } },
+      recoveries: -> { rescue_with(context: "Whoop recoveries") { get_recoveries } }
+    )
+
+    cycle = most_recent_scored_cycle(collections[:cycles])
+    sleep = sleep_for_cycle(collections[:sleeps], cycle&.dig(:id))
+    recovery = recovery_for_sleep(collections[:recoveries], sleep&.dig(:id))
 
     return if cycle.blank? || sleep.blank? || recovery.blank?
+
+    # ⚠️ A record can be SCORED and still be missing the one sub-score the widget renders. The
+    # presenter rounds all three unconditionally, and by then the controller's render_empty is
+    # already behind us — so the check belongs here, where "no data" is still expressible.
+    return if cycle.dig(:score, :strain).nil? ||
+              sleep.dig(:score, :sleep_performance_percentage).nil? ||
+              recovery.dig(:score, :recovery_score).nil?
 
     {
       physiological_cycle: cycle,
@@ -209,28 +227,27 @@ class Whoop < ApplicationService
   end
 
   # @return [Hash, nil] The most recent scored cycle, or nil when unavailable.
-  def get_most_recent_scored_cycle
-    cycles = get_cycles
-    return if cycles.blank?
-
+  # @param cycles [Hash, nil] The cycle collection.
+  # @return [Hash, nil] The most recent scored cycle, or nil when unavailable.
+  def most_recent_scored_cycle(cycles)
     cycles&.dig(:records)&.find { |cycle| cycle[:score_state] == "SCORED" }
   end
 
-  # @param cycle_id [String] The cycle's id.
+  # @param sleeps [Hash, nil] The sleep collection.
+  # @param cycle_id [String, nil] The cycle's id.
   # @return [Hash, nil] Its most recent scored non-nap sleep, or nil when unavailable.
-  def get_sleep_for_cycle(cycle_id)
+  def sleep_for_cycle(sleeps, cycle_id)
     return if cycle_id.blank?
 
-    sleeps = get_sleeps
     sleeps&.dig(:records)&.find { |sleep| sleep[:cycle_id] == cycle_id && sleep[:score_state] == "SCORED" && !sleep[:nap] }
   end
 
-  # @param sleep_id [String] The sleep's id.
+  # @param recoveries [Hash, nil] The recovery collection.
+  # @param sleep_id [String, nil] The sleep's id.
   # @return [Hash, nil] Its most recent scored recovery, or nil when unavailable.
-  def get_recovery_for_sleep(sleep_id)
+  def recovery_for_sleep(recoveries, sleep_id)
     return if sleep_id.blank?
 
-    recoveries = get_recoveries
     recoveries&.dig(:records)&.find { |recovery| recovery[:sleep_id] == sleep_id && recovery[:score_state] == "SCORED" }
   end
 

@@ -118,8 +118,9 @@ RSpec.describe WhoopWebhookProcessor do
 
       processor.process("sleep.updated", "s1")
 
-      expect(whoop).to have_received(:raw_cycles).with((today - 1).iso8601, (today + 1).iso8601)
-      expect(whoop).to have_received(:raw_cycles).with((today - 2).iso8601, today.iso8601)
+      # One fetch spanning both days (each end padded by a day), not one per day: asking
+      # separately meant two overlapping paginated requests for a 4-day span.
+      expect(whoop).to have_received(:raw_cycles).with((today - 2).iso8601, (today + 1).iso8601).once
       # 04:30Z at -05:00 is 23:30 the previous day.
       expect(intervals).to have_received(:update_wellness!).with("2026-01-01", WhoopSleepPerformance: 88)
     end

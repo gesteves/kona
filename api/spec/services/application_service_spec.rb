@@ -155,6 +155,46 @@ RSpec.describe ApplicationService do
       result = service.retrying(max: 2) { attempts += 1; raise "boom" if attempts < 2; "ok" }
       expect(result).to eq("ok")
     end
+
+    it "backs off exponentially from base_delay" do
+      slept = []
+      allow(service).to receive(:sleep) { |seconds| slept << seconds }
+
+      service.retrying(max: 3) { raise "boom" }
+
+      expect(slept).to eq([2, 4, 8])
+    end
+
+    it "honors a smaller base_delay" do
+      slept = []
+      allow(service).to receive(:sleep) { |seconds| slept << seconds }
+
+      service.retrying(max: 2, base_delay: 0.25) { raise "boom" }
+
+      expect(slept).to eq([0.25, 0.5])
+    end
+
+    # ⚠️ The whole point of the deadline: the default backoff totals 14s, which is longer than the
+    # request budget the widget endpoints run under. Without it, a failing upstream burns the
+    # request (and its Puma thread) instead of collapsing the widget.
+    it "stops retrying once the next backoff wouldn't fit inside the deadline" do
+      slept = []
+      allow(service).to receive(:sleep) { |seconds| slept << seconds }
+      calls = 0
+
+      result = service.retrying(max: 5, base_delay: 1, deadline: 2) { calls += 1; raise "boom" }
+
+      expect(result).to be_nil
+      expect(slept).to eq([1])   # 1s fits under 2s; the next 2s backoff would not
+      expect(calls).to eq(2)
+    end
+
+    it "does not retry at all when the deadline is already spent" do
+      calls = 0
+
+      expect(service.retrying(max: 3, deadline: 0) { calls += 1; raise "boom" }).to be_nil
+      expect(calls).to eq(1)
+    end
   end
 
   describe "#rescue_with" do

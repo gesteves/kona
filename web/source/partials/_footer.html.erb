@@ -27,8 +27,11 @@
             <%= shortcut_link(i) %>
           </li>
         <% end %>
-        <li class="footer__menu-item"><a href="#" data-controller="search" data-action="click->search#open pointerenter->search#preload focus->search#preload">Search</a></li>
-        <li class="footer__menu-item"><a href="#top" data-controller="back-to-top" data-action="click->back-to-top#go">Back to top</a></li>
+        <%# A button, not an <a href="#">: search needs JS, so there's no destination to fall back
+            to. Matches the nav's own search trigger. %>
+        <li class="footer__menu-item"><button type="button" data-controller="search" data-action="click->search#open pointerenter->search#preload focus->search#preload">Search</button></li>
+        <%# #header is the real element at the top of the page, so this still works without JS. %>
+        <li class="footer__menu-item"><a href="#header" data-controller="back-to-top" data-action="click->back-to-top#go">Back to top</a></li>
       </ul>
     <% end %>
 

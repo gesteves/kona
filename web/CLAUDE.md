@@ -26,7 +26,7 @@ npm test                              # both
 npx vitest run --project worker       # src/*.ts only
 npx vitest run --project browser      # source/javascripts/** only
 
-npm run check                         # tsc --noEmit for the Worker
+npm run check                         # tsc --noEmit: src/ (tsconfig.json) then test/ (tsconfig.test.json)
 
 # Local dev
 bundle exec rake import               # fetch fresh data first
@@ -183,6 +183,12 @@ Names only — see `.env.example`; never commit values.
   ⚠️ Not optional and not a rollback switch; ⚠️ setting it asserts the mirror is populated. Full
   contract in the root [`CLAUDE.md`](../CLAUDE.md).
 - **Optional**: `TURNSTILE_SITE_KEY` (pair with the api's `TURNSTILE_SECRET`, both or neither).
+  `TIME_ZONE` — the IANA zone the publish dates are reckoned in, read by the publish-date
+  controller for "published today", the clock-vs-calendar icon and the "New" badge. ⚠️ Unset,
+  each reader gets their *own* browser timezone, so a post published at 9pm Pacific reads as "not
+  today" in Europe immediately; it must be set in the build env to reach production.
+  `READING_TIME_WPM` (default 200) and `DEBUG_EVENT_DATE` (local-only: shifts every imported
+  event's date, for exercising the race-day states).
   There is deliberately **no** var for the OG cards — the card URL is same-origin, built from
   `root_url`. One consequence: a **local** build emits `http://localhost:4567/…og.png`, which
   `middleman server` won't render because it doesn't run the Worker. Use `wrangler dev` to

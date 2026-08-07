@@ -34,6 +34,7 @@
   --color-silver-chalice: #ADADAD;
   --color-spanish-gray:   #999;
   --color-sonic-silver:   #7A7A7A;
+  --color-dim-gray:       #757575; // 4.61:1 on white — the lightest gray AA allows for body text
   --color-granite-gray:   #666;
   --color-jet:            #292929;
   --color-eerie-black:    #141414;
@@ -86,7 +87,10 @@
   --color-table-header-background:        var(--color-columbia-blue);
   --color-table-last-cell-border:         var(--color-columbia-blue);
   --color-text-secondary:                 var(--color-granite-gray);
-  --color-text-tertiary:                  var(--color-spanish-gray);
+
+  // Not spanish-gray (#999): it measures 2.85:1 on white, and this token colors the entry meta
+  // line and the light-icon fills, not just decoration.
+  --color-text-tertiary:                  var(--color-dim-gray);
   --color-text:                           var(--color-jet);
 
   // Gradients - Simplified from verbose 39-line definitions
@@ -150,6 +154,9 @@
   }
 
   @include dark-mode {
+    // ⚠️ --color-link / --color-link-hover / --color-accent are deliberately NOT remapped here.
+    // #BF0222 is the brand red and measures 3.25:1 on black; that's a knowingly accepted hit, not
+    // an oversight. Don't "fix" it by lightening the red.
     --color-aside-background:           var(--color-rich-black-darker);
     --color-aside-border:               var(--color-oxford-blue);
     --color-aside-text:                 var(--color-alice-blue);
@@ -180,6 +187,8 @@
   }
 
   @include reduced-motion {
-    --transition-duration: 0;
+    // 0s, not 0: a unitless zero is invalid as a <time>, so this only ever worked because the
+    // invalid value made the shorthands using it fall back to their initial 0s.
+    --transition-duration: 0s;
   }
 }

@@ -3,6 +3,8 @@
 # { aqi:, category:, description: } or nil when no usable sensor is nearby.
 class PurpleAir < ApplicationService
   PURPLE_AIR_API_URL = "https://api.purpleair.com/v1/sensors"
+  # Sensors below this agreement between their two laser counters are discarded as unreliable.
+  MIN_CONFIDENCE = 50
 
   def initialize(latitude, longitude)
     @latitude = latitude
@@ -35,11 +37,13 @@ class PurpleAir < ApplicationService
     return if sensors.blank? || sensors["data"].blank?
 
     fields = sensors["fields"]
-    lat_index = fields.index("latitude")
-    lon_index = fields.index("longitude")
-    confidence_index = fields.index("confidence")
+    lat_index = fields&.index("latitude")
+    lon_index = fields&.index("longitude")
+    confidence_index = fields&.index("confidence")
+    return if lat_index.nil? || lon_index.nil? || confidence_index.nil?
 
-    valid_sensors = sensors["data"].reject { |sensor| sensor[confidence_index] < 50 }
+    # A sensor can report a nil confidence; treat that as unusable rather than comparing nil.
+    valid_sensors = sensors["data"].select { |sensor| sensor[confidence_index].to_f >= MIN_CONFIDENCE }
     return if valid_sensors.blank?
 
     nearest_sensor_data = valid_sensors.min_by { |sensor| haversine_distance(@latitude, @longitude, sensor[lat_index], sensor[lon_index]) }
@@ -63,6 +67,11 @@ class PurpleAir < ApplicationService
     return if pm25.blank?
     return pm25 if humidity.blank?
 
+    # The correction is only defined for non-negative PM2.5; sensors do report slightly negative
+    # values in clean air, and without this they'd fall past every band to the high-concentration
+    # polynomial and come back "Hazardous".
+    return 0.0 if pm25.negative?
+
     case pm25
     when 0...30
       0.524 * pm25 - 0.0862 * humidity + 5.75
@@ -81,7 +90,7 @@ class PurpleAir < ApplicationService
         5.75 * (1 - w) +
         8.84e-4 * pm25**2 * w
     else
-      2.966 + 0.69 * pm25 + 8.841e-4 * pm25**2
+      2.966 + 0.69 * pm25 + 8.84e-4 * pm25**2
     end
   end
 

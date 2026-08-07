@@ -340,4 +340,78 @@ RSpec.describe Contentful do
       end
     end
   end
+
+  describe '#get_contentful_data' do
+    # One page of the GraphQL response. `items` is what Contentful actually returned, nulls and
+    # all — it returns null for any link the token can't resolve.
+    def page(items)
+      double(errors: double(present?: false), data: double(to_h: { 'articles' => { 'items' => items } }))
+    end
+
+    def fetch_with(pages)
+      client = double
+      allow(client).to receive(:query).and_return(*pages)
+
+      instance = importer(articles: [])
+      instance.instance_variable_set(:@client, client)
+      allow(instance).to receive(:collection_queries).and_return(articles: 'query')
+      instance.send(:get_contentful_data)
+      instance.instance_variable_get(:@content)[:articles]
+    end
+
+    it 'stops at the first short page' do
+      articles = fetch_with([page(Array.new(40) { |i| { 'slug' => "a#{i}" } })])
+
+      expect(articles.size).to eq(40)
+    end
+
+    # The collections are fetched on separate threads (they don't depend on each other), so this
+    # covers the merge: every collection has to land under its own key, and none may bleed into
+    # another's.
+    it 'fetches independent collections concurrently and merges them under their own keys' do
+      client = double
+      allow(client).to receive(:query) do |query, **|
+        key = query.to_s
+        double(
+          errors: double(present?: false),
+          data: double(to_h: { key => { 'items' => [{ 'slug' => "#{key}-1" }] } })
+        )
+      end
+
+      instance = importer(articles: [], pages: [], events: [])
+      instance.instance_variable_set(:@client, client)
+      allow(instance).to receive(:collection_queries)
+        .and_return(articles: 'articles', pages: 'pages', events: 'events')
+
+      instance.send(:get_contentful_data)
+      content = instance.instance_variable_get(:@content)
+
+      expect(content[:articles]).to eq([{ slug: 'articles-1' }])
+      expect(content[:pages]).to eq([{ slug: 'pages-1' }])
+      expect(content[:events]).to eq([{ slug: 'events-1' }])
+    end
+
+    it 'follows the cursor across full pages' do
+      articles = fetch_with([
+        page(Array.new(100) { |i| { 'slug' => "a#{i}" } }),
+        page(Array.new(7) { |i| { 'slug' => "b#{i}" } })
+      ])
+
+      expect(articles.size).to eq(107)
+    end
+
+    # ⚠️ The regression this exists for: a full page containing an unresolvable link compacts to
+    # 99, and comparing *that* against the limit ends pagination — silently dropping every
+    # remaining page of the collection, with a green build.
+    it 'keeps paginating when a full page contains an unresolvable link' do
+      first = Array.new(100) { |i| { 'slug' => "a#{i}" } }
+      first[42] = nil
+
+      articles = fetch_with([page(first), page([{ 'slug' => 'last' }])])
+
+      expect(articles.size).to eq(100)
+      expect(articles.last[:slug]).to eq('last')
+      expect(articles).not_to include(nil)
+    end
+  end
 end

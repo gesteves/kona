@@ -3,11 +3,10 @@
     <h2 class="collection__heading"><%= smartypants(title) %></h2>
   <% end %>
   <ol class="collection__list">
-    <% items.each do |item| %>
+    <%# Filter before the <li>, not inside it — otherwise a non-post item emits an empty one. %>
+    <% items.select { |item| blog_post?(item) }.each do |item| %>
       <li class="collection__item">
-        <% if blog_post?(item) %>
-          <%= partial 'partials/article/summary', locals: { article: item } %>
-        <% end %>
+        <%= partial 'partials/article/summary', locals: { article: item } %>
       </li>
     <% end %>
   </ol>

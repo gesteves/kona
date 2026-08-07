@@ -2,10 +2,11 @@
     and the summary card (`show_draft`/`show_tags` false). The date is parsed once here. %>
 <% render_draft = !defined?(show_draft) || show_draft %>
 <% render_tags = !defined?(show_tags) || show_tags %>
-<% published = DateTime.parse(article.published_at) %>
+<% published = published_datetime(article) %>
 <p class="entry__meta"
   data-controller="publish-date"
   data-publish-date-datetime-value="<%= published.iso8601 %>"
+  data-publish-date-time-zone-value="<%= site_time_zone %>"
   data-publish-date-entry-type-value="<%= article.entry_type %>"
   data-publish-date-draft-value="<%= article.draft %>">
   <% if render_draft && article.draft %>

@@ -5,6 +5,8 @@ module Widgets
   # (Per-event race-day weather now lives in Widgets::EventsController, rendered inline with the
   # featured upcoming race.)
   class WeatherController < BaseController
+    include ParallelUpstreams
+
     # Renders the current-weather widget markup embedded into the static site. Resolves the
     # owner's current location, fetches weather + air quality + pollen + bay + race data, and
     # renders the summary (or an empty body when weather is unavailable/stale, which tells the
@@ -25,14 +27,25 @@ module Widgets
 
       return render_empty unless helpers.weather_data_is_current?(weather, time_zone)
 
+      # The remaining six upstreams don't depend on each other, so they run concurrently: cold,
+      # this is the difference between the sum of their latencies and the slowest one.
+      fetched = in_parallel(
+        location: -> { safely("GoogleMaps") { gmaps.location } },
+        air_quality: -> { safely("AirQuality") { AirQuality.new(location.latitude, location.longitude, country).data } },
+        pollen: -> { safely("GooglePollen") { GooglePollen.new(location.latitude, location.longitude).data } },
+        events: -> { safely("Events", []) { Events.new.all } },
+        goodspeed: -> { safely("Goodspeed") { Goodspeed.new.data } },
+        workouts: -> { safely("TrainerRoad", []) { TrainerRoad.new(time_zone).workouts } }
+      )
+
       @summary = WeatherSummaryPresenter.new(
         weather: weather,
-        location: DeepOstruct.wrap(safely("GoogleMaps") { gmaps.location }),
-        air_quality: safely("AirQuality") { AirQuality.new(location.latitude, location.longitude, country).data },
-        pollen: safely("GooglePollen") { GooglePollen.new(location.latitude, location.longitude).data },
-        events: safely("Events", []) { Events.new.all },
-        goodspeed: safely("Goodspeed") { Goodspeed.new.data },
-        workouts: safely("TrainerRoad") { TrainerRoad.new(time_zone).workouts } || [],
+        location: DeepOstruct.wrap(fetched[:location]),
+        air_quality: fetched[:air_quality],
+        pollen: fetched[:pollen],
+        events: fetched[:events] || [],
+        goodspeed: fetched[:goodspeed],
+        workouts: fetched[:workouts] || [],
         time_zone: time_zone
       )
 

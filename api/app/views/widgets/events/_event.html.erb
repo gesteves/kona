@@ -20,7 +20,7 @@
         <% end %>
       </h3>
     </header>
-    <div class="entry__body event__description">
+    <div class="entry__body">
       <%= raw render_summary_body(featured ? (event.description.presence || event.summary) : event.summary) %>
     </div>
   </div>

@@ -4,8 +4,7 @@ module EventsHelper
   # @param time_zone [String] An IANA timezone id.
   def today?(event, time_zone)
     return false if event.blank?
-    event_date = Time.parse(event.date).in_time_zone(time_zone)
-    event_date.to_date == Time.current.in_time_zone(time_zone).to_date
+    parse_event_date(event, time_zone) == Time.current.in_time_zone(time_zone).to_date
   end
 
   # Today's race, if any (an event that's today and confirmed).
@@ -55,7 +54,9 @@ module EventsHelper
   #   its sunrise and sunset.
   def event_forecast_day(event)
     return nil if event.blank? || event.weather&.forecast_daily&.days.blank?
-    event_date = Date.parse(event.date)
+    event_date = parse_event_date(event)
+    return nil if event_date.nil?
+
     event.weather.forecast_daily.days.find do |day|
       day_start = Date.parse(day.forecast_start)
       day_end = Date.parse(day.forecast_end)
@@ -72,10 +73,16 @@ module EventsHelper
   def upcoming_races(events, time_zone)
     return [] if events.blank?
 
-    now = Time.current.in_time_zone(time_zone)
+    today = Time.current.in_time_zone(time_zone).to_date
+    # Parsed once per event rather than once per comparison, and an event with no usable date is
+    # dropped instead of taking the whole widget down.
     upcoming = events
-      .select { |e| e.going && Time.parse(e.date).in_time_zone(time_zone).beginning_of_day >= now.beginning_of_day }
-      .sort_by { |e| Time.parse(e.date) }
+      .filter_map do |e|
+        date = e.going ? parse_event_date(e, time_zone) : nil
+        [date, e] if date && date >= today
+      end
+      .sort_by(&:first)
+      .map(&:last)
     next_event = upcoming.first
     featured = next_event.present? && close?(next_event, time_zone)
     upcoming.take(featured ? 4 : 3)
@@ -86,8 +93,13 @@ module EventsHelper
   # @param time_zone [String] An IANA timezone id.
   def close?(event, time_zone)
     return false if event.blank?
-    event_date = Time.parse(event.date).in_time_zone(time_zone).to_date
-    event_date >= Time.current.in_time_zone(time_zone).to_date && event_date <= 10.days.from_now.to_date
+    event_date = parse_event_date(event, time_zone)
+    return false if event_date.nil?
+
+    # Both bounds are reckoned in the caller's timezone. Taking the upper one in the server's
+    # instead makes a race exactly 10 days out featured or not depending on the machine's clock.
+    today = Time.current.in_time_zone(time_zone).to_date
+    event_date >= today && event_date <= today + 10
   end
 
   # Whether the event is the first of the upcoming races.
@@ -122,7 +134,7 @@ module EventsHelper
   # @return [String] The event's date, formatted. Only ever rendered for upcoming events, so it
   #   never needs a "Today" label — today's race has its own section.
   def event_timestamp(event)
-    DateTime.parse(event.date).strftime("%B %-e, %Y")
+    parse_event_date(event)&.strftime("%B %-e, %Y")
   end
 
   # @return [String] The icon and date span for an upcoming event. Only confirmed events reach
@@ -146,5 +158,25 @@ module EventsHelper
     content_tag :span, options do
       raw("#{icon} #{content_tag(:a, 'Live tracking', href: event.tracking_url, rel: 'noopener', target: '_blank')}")
     end
+  end
+
+  private
+
+  # Parses an event's date, in `time_zone` when given.
+  #
+  # ⚠️ Contentful will happily hold an event with no date, and every caller here is on the races
+  # widget's render path — a bare Time.parse takes the whole widget down over one bad entry
+  # instead of dropping a single card.
+  # @param event [OpenStruct, nil]
+  # @param time_zone [String, nil] An IANA timezone id.
+  # @return [Date, nil]
+  def parse_event_date(event, time_zone = nil)
+    date = event&.date
+    return if date.blank?
+
+    parsed = Time.parse(date)
+    time_zone.present? ? parsed.in_time_zone(time_zone).to_date : parsed.to_date
+  rescue ArgumentError, TypeError
+    nil
   end
 end

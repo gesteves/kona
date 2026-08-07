@@ -29,21 +29,22 @@ interface CacheStorage {
   readonly default: Cache;
 }
 
-// Binary modules imported by src/og-render.ts. wrangler turns these into real Worker modules —
-// `.wasm` via its default CompiledWasm rule, `.ttf`/`.png` via the `rules` entry in
-// wrangler.jsonc — but tsc knows nothing about either, so these declarations are what make them
-// typecheck. The shapes match what `wrangler types` emits for those two module types.
-declare module '*.wasm' {
-  const value: WebAssembly.Module;
-  export default value;
+// The Workers streaming HTML parser, used by src/og.ts to pull one <meta> out of a page without
+// buffering it. Only the surface this app calls is declared.
+// ⚠️ getAttribute returns the attribute exactly as written in the source — HTMLRewriter does not
+// decode character references, which is why og.ts still runs decodeEntities over the result.
+interface HTMLRewriterElement {
+  getAttribute(name: string): string | null;
 }
 
-declare module '*.ttf' {
-  const value: ArrayBuffer;
-  export default value;
+interface HTMLRewriterElementHandlers {
+  element?(element: HTMLRewriterElement): void;
 }
 
-declare module '*.png' {
-  const value: ArrayBuffer;
-  export default value;
+declare class HTMLRewriter {
+  on(selector: string, handlers: HTMLRewriterElementHandlers): HTMLRewriter;
+  transform(response: Response): Response;
 }
+
+// The binary-module declarations (.wasm/.ttf/.png) live in src/assets.d.ts, which
+// tsconfig.test.json also includes — see the note there.

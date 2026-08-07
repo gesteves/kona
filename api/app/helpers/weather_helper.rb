@@ -90,7 +90,9 @@ module WeatherHelper
   end
 
   def format_current_condition(condition_code)
-    CONDITIONS.dig(condition_code&.to_sym, :phrases, :currently) || "it's #{condition_code.underscore.gsub('_', ' ')}"
+    return "it's out there" if condition_code.blank?
+
+    CONDITIONS.dig(condition_code.to_sym, :phrases, :currently) || "it's #{condition_code.underscore.gsub('_', ' ')}"
   end
 
   def format_forecasted_condition(condition_code)
@@ -161,7 +163,11 @@ module WeatherHelper
     units_tag(metric, imperial)
   end
 
+  # WeatherKit omits gust data for some forecast days, and the views' surrounding guards only
+  # check the wind speed and direction — so this has to hold its own against a nil.
   def show_gusts?(wind_speed, gusts_speed)
+    return false if wind_speed.blank? || gusts_speed.blank?
+
     wind_speed_knots = kph_to_knots(wind_speed)
     gusts_knots = kph_to_knots(gusts_speed)
     gusts_knots >= 16 && gusts_knots >= wind_speed_knots + 9
@@ -234,6 +240,9 @@ module WeatherHelper
   end
 
   def aqi_icon(aqi)
+    # Without this, a missing AQI falls to the `else` and renders as hazardous air.
+    return "sun-haze" if aqi.blank?
+
     case aqi
     when 0..50
       "sun-haze"

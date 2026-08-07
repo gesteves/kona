@@ -6,8 +6,8 @@ class Events < ApplicationService
   include ContentfulConsumer
 
   QUERY = <<~GRAPHQL.freeze
-    query {
-      events: eventCollection {
+    query($skip: Int, $limit: Int) {
+      events: eventCollection(skip: $skip, limit: $limit) {
         items {
           title
           summary
@@ -49,12 +49,14 @@ class Events < ApplicationService
   # @return [Array<OpenStruct>]
   def all
     items = rescue_with([], context: "Error fetching events") do
-      # Cache key carries a version suffix: the query's field set changed (the upcoming-races
-      # widget needs more than the old today's-race lookup), so a value cached under the old
-      # key would be missing fields. Cached for 5 minutes — the edge cache is the primary
-      # freshness layer; this just guards Contentful against a stampede.
-      cached_json("contentful:events:v2", expires_in: 5.minutes) do
-        (query_events(QUERY) || []).map { |event| underscore_keys(event) }
+      # The key's suffix is a digest of the query, so changing its field set invalidates the
+      # cache on its own — a value cached under an older shape would be missing fields the views
+      # read. Cached for 5 minutes: the edge cache is the primary freshness layer, and this just
+      # guards Contentful against a stampede.
+      cached_json("contentful:events:#{cache_version(QUERY)}", expires_in: 5.minutes) do
+        # Paginated and strict: an unpaginated query silently caps at Contentful's default page,
+        # and a partial corpus here drops races from the widget rather than failing visibly.
+        (contentful.paginate(QUERY, collection: :events, strict: true) || []).map { |event| underscore_keys(event) }
       end
     end
 
@@ -62,12 +64,6 @@ class Events < ApplicationService
   end
 
   private
-
-  # Runs a Contentful GraphQL query and returns its `events.items`, or nil when the API
-  # isn't configured or the request fails.
-  def query_events(query, variables = nil)
-    contentful.items(query, variables, collection: :events)
-  end
 
   def wrap(items)
     items.map { |event| DeepOstruct.wrap(event) }

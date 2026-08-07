@@ -26,12 +26,12 @@ const SHORT = 'public, max-age=300';
 
 const ALLOWED_METHODS = ['GET', 'HEAD'];
 
-const OG_TITLE_TAG = /<meta[^>]+property=["']og:title["'][^>]*>/i;
-const CONTENT_ATTR = /content=["']([^"']*)["']/i;
-
 /**
  * Decodes the HTML entities that can appear in an og:title.
  * `&amp;` is handled last: decoding it first would turn `&amp;lt;` into a second-pass `<`.
+ *
+ * ⚠️ Still needed alongside HTMLRewriter. `Element#getAttribute` hands back the attribute
+ * **as written in the source**, entities and all — it does not decode them.
  */
 export function decodeEntities(text: string): string {
   return text
@@ -47,13 +47,37 @@ export function decodeEntities(text: string): string {
 }
 
 /**
- * Reads a page's own og:title from its markup.
+ * Reads a page's own og:title out of its markup.
+ *
+ * Streamed through HTMLRewriter rather than buffered and matched with a regex: an article page
+ * runs to a few hundred KB, this route already sits near the Worker CPU budget, and the tag lives
+ * in `<head>` — so the read is cancelled as soon as it's found, usually within the first chunk.
  * @returns The decoded title, or null when the page carries no og:title.
  */
-export function extractOgTitle(html: string): string | null {
-  const tag = html.match(OG_TITLE_TAG)?.[0];
-  const content = tag?.match(CONTENT_ATTR)?.[1];
-  return content ? decodeEntities(content) : null;
+export async function readOgTitle(response: Response): Promise<string | null> {
+  let title: string | null = null;
+
+  const transformed = new HTMLRewriter()
+    .on('meta[property="og:title"]', {
+      element(element) {
+        title ??= element.getAttribute('content');
+      },
+    })
+    .transform(response);
+
+  const reader = transformed.body?.getReader();
+  if (!reader) return null;
+
+  try {
+    while (title === null) {
+      const { done } = await reader.read();
+      if (done) break;
+    }
+  } finally {
+    await reader.cancel();
+  }
+
+  return title === null ? null : decodeEntities(title);
 }
 
 function withSecurityHeaders(headers: Headers): Headers {
@@ -145,7 +169,7 @@ export async function handleOg(
     return statusResponse(404);
   }
 
-  const title = extractOgTitle(await page.text());
+  const title = await readOgTitle(page);
   if (!title) return statusResponse(404);
 
   let png: Uint8Array<ArrayBuffer>;

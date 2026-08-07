@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { handleOg, decodeEntities, extractOgTitle } from '../src/og';
+import { handleOg, readOgTitle } from '../src/og';
 import { makeCtx, assetsReturning, assetsRecording } from './helpers';
 
 // ⚠️ This suite deliberately never imports ../src/og-render, and neither does anything it loads.
@@ -16,7 +16,9 @@ const page = (body: string) =>
   new Response(body, { status: 200, headers: { 'content-type': 'text/html' } });
 
 const withTitle = (title: string) =>
-  page(`<html><head><meta property="og:title" content="${title}"></head></html>`);
+  page(
+    `<html><head><meta property="og:title" content="${title}"></head></html>`
+  );
 
 const envWith = (response: () => Response) =>
   ({ ASSETS: assetsReturning(response) }) as unknown as Env;
@@ -92,17 +94,22 @@ describe('handleOg', () => {
       // ⚠️ Protocol-relative-looking paths must stay on this origin — the lookup assigns
       // `pathname` rather than resolving the path against the incoming URL, so they do.
       ['//evil.example/og.png?v=v1', '//evil.example/'],
-    ])('asks the asset layer for %s on the incoming origin', async (path, expected) => {
-      const assets = assetsRecording(() => withTitle('Hello'));
-      await handleOg(
-        request(path),
-        { ASSETS: assets.binding } as unknown as Env,
-        makeCtx(),
-        renderStub()
-      );
-      expect(assets.requests).toHaveLength(1);
-      expect(assets.requests[0].url).toBe(`https://www.example.com${expected}`);
-    });
+    ])(
+      'asks the asset layer for %s on the incoming origin',
+      async (path, expected) => {
+        const assets = assetsRecording(() => withTitle('Hello'));
+        await handleOg(
+          request(path),
+          { ASSETS: assets.binding } as unknown as Env,
+          makeCtx(),
+          renderStub()
+        );
+        expect(assets.requests).toHaveLength(1);
+        expect(assets.requests[0].url).toBe(
+          `https://www.example.com${expected}`
+        );
+      }
+    );
 
     it('strips the query and fragment before the asset lookup', async () => {
       const assets = assetsRecording(() => withTitle('Hello'));
@@ -262,47 +269,89 @@ describe('handleOg', () => {
   });
 });
 
-describe('extractOgTitle', () => {
-  it('reads the content attribute with either quote style', () => {
-    expect(
-      extractOgTitle('<meta property="og:title" content="Double">')
-    ).toBe('Double');
-    expect(extractOgTitle("<meta property='og:title' content='Single'>")).toBe(
-      'Single'
-    );
+describe('readOgTitle', () => {
+  const page = (html: string) =>
+    new Response(html, { headers: { 'content-type': 'text/html' } });
+
+  it('reads the content attribute with either quote style', async () => {
+    await expect(
+      readOgTitle(page('<meta property="og:title" content="Double">'))
+    ).resolves.toBe('Double');
+    await expect(
+      readOgTitle(page("<meta property='og:title' content='Single'>"))
+    ).resolves.toBe('Single');
   });
 
-  it('ignores other meta tags', () => {
-    expect(
-      extractOgTitle(
-        '<meta name="description" content="Nope"><meta property="og:title" content="Yes">'
+  it('ignores other meta tags', async () => {
+    await expect(
+      readOgTitle(
+        page(
+          '<meta name="description" content="Nope"><meta property="og:title" content="Yes">'
+        )
       )
-    ).toBe('Yes');
+    ).resolves.toBe('Yes');
   });
 
-  it('returns null when there is no og:title', () => {
-    expect(extractOgTitle('<html><title>Bare</title></html>')).toBeNull();
+  it('takes the first og:title when a page carries more than one', async () => {
+    await expect(
+      readOgTitle(
+        page(
+          '<meta property="og:title" content="First"><meta property="og:title" content="Second">'
+        )
+      )
+    ).resolves.toBe('First');
   });
-});
 
-describe('decodeEntities', () => {
+  it('returns null when there is no og:title', async () => {
+    await expect(
+      readOgTitle(page('<html><title>Bare</title></html>'))
+    ).resolves.toBeNull();
+  });
+
+  // The body is enqueued but never closed, so this can only resolve if the read stops at the tag
+  // rather than draining to the end — which is the whole point on a route near the CPU budget.
+  // (Whether the cancel propagates all the way to the source stream is HTMLRewriter's business,
+  // so it isn't asserted here.)
+  it('stops reading once the tag is found instead of draining the body', async () => {
+    const body = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode(
+            '<head><meta property="og:title" content="Early"></head>'
+          )
+        );
+      },
+    });
+
+    await expect(
+      readOgTitle(
+        new Response(body, { headers: { 'content-type': 'text/html' } })
+      )
+    ).resolves.toBe('Early');
+  });
+
+  // ⚠️ HTMLRewriter's getAttribute returns the attribute exactly as written, entities included,
+  // so decodeEntities still runs on the way out.
   it.each([
     ['&amp;', '&'],
     ['&lt;tag&gt;', '<tag>'],
     ['&quot;quoted&quot;', '"quoted"'],
     ['&#39;', "'"],
-    ['&#039;', "'"],
     ['&#x27;', "'"],
     ['&apos;', "'"],
-    ['&#8217;', '’'],
-    ['&#x2019;', '’'],
-  ])('decodes %s', (input, expected) => {
-    expect(decodeEntities(input)).toBe(expected);
+    ['&#8217;', '\u2019'],
+    ['&#x2019;', '\u2019'],
+  ])('decodes %s in the title', async (input, expected) => {
+    await expect(
+      readOgTitle(page(`<meta property="og:title" content="${input}">`))
+    ).resolves.toBe(expected);
   });
 
-  // ⚠️ The regression the ordering guards: `&amp;` is the escape for the ampersand that
-  // introduces every other entity, so decoding it first would turn this into a literal "<".
-  it('does not double-decode an escaped entity', () => {
-    expect(decodeEntities('&amp;lt;')).toBe('&lt;');
+  // ⚠️ `&amp;` is the escape for the ampersand that introduces every other entity, so a decoder
+  // that ran twice would turn this into a literal "<".
+  it('does not double-decode an escaped entity', async () => {
+    await expect(
+      readOgTitle(page('<meta property="og:title" content="&amp;lt;">'))
+    ).resolves.toBe('&lt;');
   });
 });

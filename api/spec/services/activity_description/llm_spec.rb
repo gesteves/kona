@@ -6,7 +6,7 @@ RSpec.describe ActivityDescription::Llm do
   before do
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return("key")
-    allow(described_class).to receive(:client).and_return(client)
+    allow(described_class).to receive(:anthropic_client).and_return(client)
   end
 
   def message_with(json)

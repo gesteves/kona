@@ -293,7 +293,12 @@ Rails `config/credentials.yml.enc` + `master.key`).
   `R2_SECRET_ACCESS_KEY` + `R2_BUCKET` (⚠️ must be the bucket behind the web app's `IMAGE_HOST`;
   nothing validates that, and a mismatch 404s every image), `GITHUB_DISPATCH_TOKEN` +
   `GITHUB_REPOSITORY` (a fine-grained PAT with **Contents: Read and write**, plus the `owner/repo`
-  slug).
+  slug), `PLAUSIBLE_API_KEY` + `PLAUSIBLE_SITE_ID` (⚠️ with either unset the pageviews widget
+  collapses and `TrendingArticles` silently degrades to recency order — an INFO log is the only
+  sign, and the result looks exactly like "working, nothing trending"), `VOYAGE_API_KEY` (unset =
+  no embeddings, so the related-articles widget collapses), `REDIS_POOL_SIZE` (default 10; size it
+  to the widest consumer, which is Sidekiq's concurrency), and the four `TRENDING_*` ranking knobs
+  (see `.env.example`; they feed the ranking's cache key, so retuning one invalidates it).
 
 ## Conventions & gates
 

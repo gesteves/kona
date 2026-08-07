@@ -9,6 +9,17 @@ require "base64"
 class WeatherKit < ApplicationService
   WEATHERKIT_API_URL = "https://weatherkit.apple.com/api/v1/"
 
+  # ⚠️ This runs inside the weather widget's request, which has a 20s rack-timeout budget and
+  # around ten upstreams in it. Both the per-hop timeout and the total budget are deliberately far
+  # tighter than the app-wide defaults: an unbounded retry chain here (two nested with_retries,
+  # 14s of backoff each on the shared defaults) burns the whole request and 500s the widget, when
+  # collapsing to an empty fragment and letting the edge serve its stale-if-error copy is both
+  # faster and what the live-update contract asks for.
+  HTTP_TIMEOUT = 4
+  REQUEST_BUDGET = 8.0
+  # One quick retry absorbs a transient blip without threatening the budget.
+  RETRY_OPTIONS = { max: 1, base_delay: 0.25 }.freeze
+
   # @param latitude [Float]
   # @param longitude [Float]
   # @param time_zone [String] IANA timezone id
@@ -18,6 +29,7 @@ class WeatherKit < ApplicationService
     @longitude = longitude
     @time_zone = time_zone
     @country = country
+    @budget_expires_at = Process.clock_gettime(Process::CLOCK_MONOTONIC) + REQUEST_BUDGET
   end
 
   # @return [OpenStruct, nil] The weather data (snake_cased, dot-accessible), or nil.
@@ -36,7 +48,7 @@ class WeatherKit < ApplicationService
 
     cache_key = "weatherkit:weather:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
     cached_json(cache_key, expires_in: 5.minutes) do
-      with_retries do
+      with_retries(**RETRY_OPTIONS, deadline: remaining_budget) do
         datasets = availability
         next if datasets.blank?
 
@@ -49,7 +61,8 @@ class WeatherKit < ApplicationService
         get_json!(
           "#{WEATHERKIT_API_URL}weather/en/#{@latitude}/#{@longitude}",
           query: query,
-          headers: { "Authorization" => "Bearer #{token}" }
+          headers: { "Authorization" => "Bearer #{token}" },
+          timeout: HTTP_TIMEOUT
         )
       end
     end
@@ -60,14 +73,22 @@ class WeatherKit < ApplicationService
   def availability
     cache_key = "weatherkit:availability:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
     cached_json(cache_key, expires_in: 5.minutes) do
-      with_retries do
+      with_retries(**RETRY_OPTIONS, deadline: remaining_budget) do
         get_json!(
           "#{WEATHERKIT_API_URL}availability/#{@latitude}/#{@longitude}",
           query: { country: @country },
-          headers: { "Authorization" => "Bearer #{token}" }
+          headers: { "Authorization" => "Bearer #{token}" },
+          timeout: HTTP_TIMEOUT
         )
       end
     end
+  end
+
+  # Wall-clock left in this instance's budget. Shared across both calls, so a slow availability
+  # lookup eats into what the weather lookup may spend rather than doubling the worst case.
+  # @return [Float]
+  def remaining_budget
+    [@budget_expires_at - Process.clock_gettime(Process::CLOCK_MONOTONIC), 0.0].max
   end
 
   # The ES256 JWT used to authenticate with WeatherKit. It's app-global (no lat/lon) and valid

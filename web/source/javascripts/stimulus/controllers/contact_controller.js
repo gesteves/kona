@@ -29,6 +29,10 @@ export default class extends Controller {
     if (!this.siteKeyValue || !this.hasTurnstileTarget) return;
     this.loadTurnstile()
       .then(() => {
+        // A Turbo navigation away from /contact can land between the script request and its
+        // resolution. Without this, the widget renders into a detached element and widgetId is
+        // assigned after disconnect() already ran, so it's never torn down.
+        if (!this.element.isConnected) return;
         this.widgetId = window.turnstile.render(this.turnstileTarget, {
           sitekey: this.siteKeyValue,
           callback: (token) => {
@@ -120,7 +124,13 @@ export default class extends Controller {
         const script = document.createElement('script');
         script.src = TURNSTILE_SRC;
         script.async = true;
-        script.onerror = reject;
+        script.onerror = (error) => {
+          // Clear the memo so a later visit retries. Leaving a rejected promise cached would
+          // disable the challenge for the rest of the page's life after one network blip.
+          window.__konaTurnstileLoad = null;
+          script.remove();
+          reject(error);
+        };
         document.head.appendChild(script);
       });
     }

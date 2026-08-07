@@ -103,21 +103,42 @@ def import_font_awesome
   File.write('data/icons.json', icons.to_json)
 end
 
-# POSTs one { family => { style => [ids] } } batch to the api.
-# @return [Hash] { family => { style => [{ "id", "svg" }] } }; raises on a non-2xx.
-def fetch_icons_batch(base, tree)
-  response = HTTParty.post(
-    "#{base}/api/icons",
-    headers: {
-      'Authorization' => "Bearer #{ENV['API_TOKEN']}",
-      'Content-Type' => 'application/json'
-    },
-    body: { icons: tree }.to_json,
-    timeout: 30
-  )
-  raise "Icon import failed: HTTP #{response.code} from #{base}/api/icons" unless response.success?
+# How many times to retry a failed icon batch, and how long to wait before each retry.
+#
+# ⚠️ This exists because the api runs on fly machines that auto-stop. A Contentful publish
+# dispatches a build, and if it lands while the origin is cold-starting, the first request can
+# fail — and a failed icon import is deliberately fatal (icons are an every-page dependency), so
+# one cold start would fail the whole deploy. A cold start is measured in seconds, so a couple of
+# backed-off retries covers it without masking a genuinely broken origin.
+ICON_IMPORT_MAX_RETRIES = 3
+ICON_IMPORT_RETRY_DELAYS = [2, 5, 10].freeze
 
-  JSON.parse(response.body)
+# POSTs one { family => { style => [ids] } } batch to the api, retrying a failure with backoff.
+# @return [Hash] { family => { style => [{ "id", "svg" }] } }; raises once the retries are spent.
+def fetch_icons_batch(base, tree)
+  attempt = 0
+  begin
+    response = HTTParty.post(
+      "#{base}/api/icons",
+      headers: {
+        'Authorization' => "Bearer #{ENV['API_TOKEN']}",
+        'Content-Type' => 'application/json'
+      },
+      body: { icons: tree }.to_json,
+      timeout: 30
+    )
+    raise "Icon import failed: HTTP #{response.code} from #{base}/api/icons" unless response.success?
+
+    JSON.parse(response.body)
+  rescue StandardError => e
+    attempt += 1
+    raise if attempt > ICON_IMPORT_MAX_RETRIES
+
+    delay = ICON_IMPORT_RETRY_DELAYS[attempt - 1]
+    warn "Icon import attempt #{attempt} failed (#{e.message}); retrying in #{delay}s"
+    sleep delay
+    retry
+  end
 end
 
 # Fetches the standard.site DID and publication URI from the api into

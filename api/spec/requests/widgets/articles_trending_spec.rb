@@ -45,6 +45,8 @@ RSpec.describe "Widgets::Articles trending", type: :request do
     allow($redis).to receive(:setex)
   end
 
+  it_behaves_like "a live-update fragment", "/widgets/articles/trending"
+
   describe "GET /widgets/articles/trending (all)" do
     it "renders the trending-articles section as a live-update fragment" do
       get "/widgets/articles/trending", headers: auth_headers

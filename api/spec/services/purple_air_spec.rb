@@ -52,8 +52,20 @@ RSpec.describe PurpleAir do
     end
 
     it "applies the high-concentration formula at 260 µg/m³ and above" do
-      # 2.966 + 0.69 * 300 + 8.841e-4 * 300**2
-      expect(correct(300.0, humidity)).to be_within(0.001).of(289.535)
+      # 2.966 + 0.69 * 300 + 8.84e-4 * 300**2
+      expect(correct(300.0, humidity)).to be_within(0.001).of(289.526)
+    end
+
+    it "is continuous at the 260 µg/m³ boundary (blend weight 1 → high formula)" do
+      high = 2.966 + 0.69 * 260.0 + 8.84e-4 * 260.0**2
+      expect(correct(260.0, humidity)).to be_within(0.001).of(high)
+    end
+
+    # Sensors report slightly negative PM2.5 in clean air. The correction is undefined there, and
+    # without a clamp those values fall past every band to the high-concentration polynomial and
+    # come back as hazardous.
+    it "clamps a negative reading to zero rather than treating it as high-concentration" do
+      expect(correct(-2.0, humidity)).to eq(0.0)
     end
 
     it "handles integer inputs without integer-division truncation" do

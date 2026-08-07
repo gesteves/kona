@@ -297,7 +297,8 @@ RSpec.describe ImageHelpers do
 
       it 'caches the data URI in Redis keyed by asset, published version, and width' do
         blurhash_jpeg_data_uri('asset-1')
-        expect(fake_redis).to have_received(:set).with('blurhash:jpeg:asset-1:3:32', 'data:image/jpeg;base64,SlBFR0JZVEVT')
+        expect(fake_redis).to have_received(:set)
+          .with('blurhash:jpeg:asset-1:3:32', 'data:image/jpeg;base64,SlBFR0JZVEVT', ex: ImageHelpers::BLURHASH_CACHE_TTL)
       end
 
       it 'returns the cached data URI without regenerating' do
@@ -335,7 +336,9 @@ RSpec.describe ImageHelpers do
 
         expect(URI).to have_received(:open).with(
           'https://example.com/cdn-cgi/image/format=jpeg,width=32,height=18/' \
-          'https://images.ctfassets.net/space/asset-1/token/photo.jpg'
+          'https://images.ctfassets.net/space/asset-1/token/photo.jpg',
+          open_timeout: ImageHelpers::BLURHASH_OPEN_TIMEOUT,
+          read_timeout: ImageHelpers::BLURHASH_READ_TIMEOUT
         )
       end
 
@@ -358,7 +361,9 @@ RSpec.describe ImageHelpers do
 
         expect(URI).to have_received(:open).with(
           'https://example.com/cdn-cgi/image/format=jpeg,width=32,height=18/' \
-          'https://images.example.com/space/asset-1/token/photo.jpg'
+          'https://images.example.com/space/asset-1/token/photo.jpg',
+          open_timeout: ImageHelpers::BLURHASH_OPEN_TIMEOUT,
+          read_timeout: ImageHelpers::BLURHASH_READ_TIMEOUT
         )
       end
 

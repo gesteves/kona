@@ -125,6 +125,14 @@ RSpec.describe MarkupHelpers do
         transformed_html = set_caption_credit(html)
         expect(transformed_html).to eq('<figcaption>This is <a href="http://example.com" title="example | page">a link</a> <cite>Photo by Pepe</cite></figcaption>')
       end
+
+      # Splitting on an element's text content and replacing it with plain text nodes threw the
+      # element away — a whole caption written as one link lost the link.
+      it 'does not split inside an element, dropping its markup' do
+        html = '<figcaption><a href="http://example.com">Ride report | Strava</a></figcaption>'
+        transformed_html = set_caption_credit(html)
+        expect(transformed_html).to eq(html)
+      end
     end
 
     context 'when given a figcaption without a separator' do
@@ -219,6 +227,22 @@ RSpec.describe MarkupHelpers do
       anchor = doc.at_css('a.entry__heading-permalink')
       expect(anchor['aria-label']).to eq('Permalink to Q&A about "gear" <2026>')
       expect(anchor['title']).to eq('Permalink to Q&A about "gear" <2026>')
+    end
+
+    # Accessible name from content descends into the nested anchor and uses its aria-label, so
+    # without an explicit name on the heading itself every heading announced as
+    # "Permalink to First Heading First Heading".
+    it 'names the heading after its own text, not the nested permalink' do
+      html = '<h2 id="first">First Heading</h2>'
+      doc = Nokogiri::HTML::DocumentFragment.parse(add_heading_permalinks(html))
+
+      expect(doc.at_css('h2')['aria-label']).to eq('First Heading')
+    end
+
+    it 'leaves headings without an id unnamed' do
+      doc = Nokogiri::HTML::DocumentFragment.parse(add_heading_permalinks('<h2>No anchor</h2>'))
+
+      expect(doc.at_css('h2')['aria-label']).to be_nil
     end
   end
 
@@ -328,6 +352,19 @@ RSpec.describe MarkupHelpers do
         html = %(<p><img src="#{image_url}"></p>)
         transformed_html = add_figure_elements_to_images(html)
         expect(transformed_html).to eq(%(<figure><img src="#{image_url}"></figure>))
+      end
+    end
+
+    # The transform folds the rest of the parent into the caption and then replaces the parent,
+    # so a second image in the same paragraph used to end up inside the first one's <figcaption>
+    # and detached from the tree mid-iteration.
+    context 'with two images in one paragraph' do
+      it 'leaves them alone rather than swallowing the second into the first figcaption' do
+        html = %(<p><img src="#{image_url}"><img src="#{image_url}"></p>)
+        transformed_html = add_figure_elements_to_images(html, base_class: 'entry')
+
+        expect(transformed_html).to eq(html)
+        expect(transformed_html).not_to include('figcaption')
       end
     end
 

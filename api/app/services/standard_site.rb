@@ -120,7 +120,7 @@ class StandardSite < ApplicationService
     post = item && decorate_post(item)
     if post.blank? || publishable_posts([post]).empty?
       log("entry #{entry_id} is not a publishable post; removing any document record")
-      return remove_document(entry_id)
+      return remove_document!(document_rkey(entry_id))
     end
 
     publication_uri = self.class.publication_uri(@did)
@@ -135,7 +135,7 @@ class StandardSite < ApplicationService
     return log_skip("document #{entry_id}", "invalid entry id") unless eligible?(entry_id)
     return log_skip("document #{entry_id}", "could not authenticate with the PDS") unless create_session
 
-    remove_document(document_rkey(entry_id))
+    remove_document!(document_rkey(entry_id))
   end
 
   # Re-syncs the publication record from the current site entry.
@@ -366,11 +366,28 @@ class StandardSite < ApplicationService
   end
 
   # Deletes a document record by rkey and forgets its fingerprint.
-  # @return [Symbol] :deleted.
+  #
+  # ⚠️ The fingerprint is only forgotten once the delete actually succeeded. Dropping it after a
+  # failed delete leaves the record live on the PDS with nothing left to notice the drift, and the
+  # job returns as if it had worked.
+  # @return [Symbol] :deleted, or :error when the PDS rejected the delete.
   def remove_document(rkey)
-    delete_record(DOCUMENT_COLLECTION, rkey)
+    return log("document #{rkey} deleteRecord failed", :error) unless delete_record(DOCUMENT_COLLECTION, rkey)
+
     forget_fingerprint(rkey)
     log("document #{rkey} deleted", :deleted)
+  end
+
+  # remove_document, but raising on failure so Sidekiq retries the job.
+  #
+  # ⚠️ The backfill's prune path deliberately calls remove_document instead — one unreachable
+  # record must not abort a whole reconciliation run.
+  # @return [Symbol] :deleted.
+  def remove_document!(rkey)
+    result = remove_document(rkey)
+    raise "could not delete document #{rkey} from the PDS" if result == :error
+
+    result
   end
 
   # --- Contentful (delivery API) ------------------------------------------------------
@@ -561,8 +578,7 @@ class StandardSite < ApplicationService
   # @return [Integer] How many records were pruned.
   def prune_documents(current_rkeys)
     stale = rkeys_to_prune(list_record_rkeys(DOCUMENT_COLLECTION), current_rkeys)
-    stale.each { |rkey| remove_document(rkey) }
-    stale.size
+    stale.count { |rkey| remove_document(rkey) == :deleted }
   end
 
   # @param collection [String] The collection to list.
@@ -589,12 +605,18 @@ class StandardSite < ApplicationService
 
   # @param collection [String]
   # @param rkey [String]
+  # @return [Boolean] Whether it succeeded.
   def delete_record(collection, rkey)
-    HTTParty.post(
+    response = HTTParty.post(
       "#{@service_url}/xrpc/com.atproto.repo.deleteRecord",
       body: { repo: @did, collection: collection, rkey: rkey }.to_json,
       headers: auth_headers
     )
+    unless response.success?
+      Rails.logger.warn("standard.site: failed to delete #{collection}/#{rkey} (HTTP #{response.code}: #{response.body})")
+      report_upstream_error("HTTP #{response.code}", context: "standard.site deleteRecord #{collection}/#{rkey}", status: response.code)
+    end
+    response.success?
   end
 
   # Downloads a resized copy of an image and uploads it to the PDS as a blob.

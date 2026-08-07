@@ -15,6 +15,8 @@ RSpec.describe "Activity stats", type: :request do
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
   end
 
+  it_behaves_like "a live-update fragment", "/widgets/activity-stats"
+
   it "renders the stats markup" do
     get "/widgets/activity-stats", headers: auth_headers
 

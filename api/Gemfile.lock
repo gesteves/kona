@@ -393,6 +393,7 @@ DEPENDENCIES
   brakeman
   bugsnag
   bundler-audit
+  connection_pool
   debug
   dotenv-rails
   graphql-client

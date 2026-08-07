@@ -26,6 +26,15 @@ module ImageHelpers
   # Cloudflare pick avif/webp/jpeg from the Accept header, which is why no <picture> is needed.
   CDN_IMAGE_FORMATS = { 'avif' => 'avif', 'webp' => 'webp', 'jpg' => 'jpeg', 'auto' => 'auto' }.freeze
 
+  # How long a rendered blurhash placeholder stays cached. Keyed by the asset's published_version,
+  # so entries are immutable and a republish simply mints a new one — the TTL exists to reclaim
+  # the superseded ones, not for freshness.
+  BLURHASH_CACHE_TTL = 90 * 24 * 60 * 60
+
+  # Timeouts for the thumbnail fetch each blurhash is encoded from.
+  BLURHASH_OPEN_TIMEOUT = 5
+  BLURHASH_READ_TIMEOUT = 15
+
   # Extracts the Contentful asset ID from an asset URL.
   # @param url [String, nil] An asset URL.
   # @return [String, nil] The asset ID, or nil for a blank URL.
@@ -233,7 +242,10 @@ module ImageHelpers
                        .extract_band(0, n: 3)
 
     jpeg = "data:image/jpeg;base64,#{Base64.strict_encode64(image.write_to_buffer('.jpg'))}"
-    redis.set(cache_key, jpeg)
+    # The key carries the asset's published_version, so every republish mints a new one and the
+    # old entry is unreachable forever. Without a TTL the build's Redis — a metered Upstash
+    # instance — only ever grows.
+    redis.set(cache_key, jpeg, ex: BLURHASH_CACHE_TTL)
     jpeg
   rescue StandardError => e
     warn "Blurhash JPEG generation failed for asset #{asset_id}: #{e.message}"
@@ -250,7 +262,9 @@ module ImageHelpers
   # @return [String, nil] The blurhash, or nil when encoding fails.
   def encode_blurhash(asset_id, width, height)
     url = cdn_image_url(get_asset_url(asset_id), { w: width, h: height, fm: 'jpg' })
-    data = URI.open(url).read
+    # Timeouts are mandatory here: this runs once per uncached asset during the build, and the
+    # rescue below catches errors, not a hang — one stalled response would park the whole build.
+    data = URI.open(url, open_timeout: BLURHASH_OPEN_TIMEOUT, read_timeout: BLURHASH_READ_TIMEOUT).read
     image = Vips::Image.new_from_buffer(data, '').colourspace(:srgb)
     image = image.flatten if image.has_alpha?
     Blurhash.encode(image.width, image.height, image.to_a.flatten)

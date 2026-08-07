@@ -124,10 +124,54 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
+  security:
+    name: Security scan
+    runs-on: ubuntu-latest
+    # Same skip as `checks`: a content republish rebuilds code that already passed on push.
+    if: github.event_name != 'repository_dispatch' && github.event_name != 'workflow_dispatch'
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # No libvips here: bundler-audit reads the lockfile and never loads the app, so this job
+      # skips the slowest step in the workflow.
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          working-directory: web
+          bundler-cache: true
+
+      # This app parses untrusted content at build time (nokogiri, redcarpet, sanitize) and its
+      # Worker exposes a public POST, so it wants the same CVE gate the api has always had.
+      - name: bundler-audit (Ruby dependency CVEs)
+        run: bundle exec bundle-audit check --update
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: web/.nvmrc
+
+      # --omit=dev mirrors what the deploy job installs, so this scans what actually ships.
+      #
+      # ⚠️ Reports but doesn't block, unlike bundler-audit above. `wrangler` has to be a runtime
+      # dependency (the deploy runs it), which drags in miniflare and undici — its *local
+      # dev-server* tree, none of which reaches the deployed Worker. Those advisories are
+      # therefore permanently open here, and npm's own fix for them is a wrangler downgrade.
+      # Blocking on that would mean either pinning an old wrangler or training everyone to
+      # ignore a red job. Read the output on bumps; don't let it gate the deploy.
+      - name: npm audit (JS dependency CVEs, advisory)
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
+
   notify-checks:
     name: Notify checks result
     runs-on: ubuntu-latest
-    needs: [checks]
+    needs: [checks, security]
     # always() so a checks failure still notifies; skipped on the dispatch/manual triggers, where
     # checks didn't run.
     if: ${{ always() && github.event_name != 'repository_dispatch' && github.event_name != 'workflow_dispatch' }}
@@ -166,7 +210,7 @@ jobs:
   deploy:
     name: Deploy Web
     runs-on: ubuntu-latest
-    needs: [checks]
+    needs: [checks, security]
     concurrency: deploy-kona-web
     # Deploy on a push to main, a Contentful publish, or a manual rebuild; never on PRs or other
     # branches. workflow_dispatch is restricted to main so a manual run can't ship a feature branch

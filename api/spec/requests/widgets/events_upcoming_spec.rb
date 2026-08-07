@@ -82,6 +82,8 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
   end
 
+  it_behaves_like "a live-update fragment", "/widgets/events/upcoming"
+
   it "renders the upcoming-races section as a live-update fragment" do
     get "/widgets/events/upcoming", headers: auth_headers
 

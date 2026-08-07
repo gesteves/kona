@@ -27,8 +27,9 @@ class WhoopWebhookProcessor
     when "workout.updated"
       process_workout_updated(resource_id)
     when "sleep.updated"
-      refresh_daily_whoop_strain(today)
-      refresh_daily_whoop_strain(today - 1)
+      # Both days in one fetch: each refresh pulls its date ±1, so asking separately means two
+      # overlapping paginated requests covering a 4-day span between them.
+      refresh_daily_whoop_strain(today - 1, today)
       refresh_sleep_performance(resource_id)
     when "recovery.updated"
       refresh_daily_whoop_strain(today)
@@ -90,25 +91,30 @@ class WhoopWebhookProcessor
     ActivityDescriptionJob.perform_async(match[:id], workout[:strain])
   end
 
-  # Writes a day's raw 0–21 cycle strain to its Intervals.icu wellness record. Cycles are
-  # fetched with a ±1-day buffer and bucketed by their end time in the athlete's timezone; an
-  # in-progress cycle counts as today.
-  # @param date [Date] The date to refresh.
-  def refresh_daily_whoop_strain(date)
-    cycles = @whoop.raw_cycles((date - 1).iso8601, (date + 1).iso8601)
-    cycle = cycles.find do |candidate|
-      next false unless candidate[:score_state] == "SCORED"
+  # Writes each date's raw 0–21 cycle strain to its Intervals.icu wellness record. Cycles are
+  # fetched once for the whole span with a ±1-day buffer and bucketed by their end time in the
+  # athlete's timezone; an in-progress cycle counts as today.
+  # @param dates [Array<Date>] The dates to refresh.
+  def refresh_daily_whoop_strain(*dates)
+    return if dates.empty?
 
-      cycle_date = candidate[:end].present? ? Time.iso8601(candidate[:end]).in_time_zone(timezone).to_date : today
-      cycle_date == date
+    cycles = @whoop.raw_cycles((dates.min - 1).iso8601, (dates.max + 1).iso8601)
+
+    dates.each do |date|
+      cycle = cycles.find do |candidate|
+        next false unless candidate[:score_state] == "SCORED"
+
+        cycle_date = candidate[:end].present? ? Time.iso8601(candidate[:end]).in_time_zone(timezone).to_date : today
+        cycle_date == date
+      end
+
+      if cycle.nil?
+        log_info("no Whoop strain data for #{date} — leaving wellness untouched")
+        next
+      end
+
+      write_wellness(date, :WhoopStrain, cycle.dig(:score, :strain))
     end
-
-    if cycle.nil?
-      log_info("no Whoop strain data for #{date} — leaving wellness untouched")
-      return
-    end
-
-    write_wellness(date, :WhoopStrain, cycle.dig(:score, :strain))
   end
 
   # Writes a sleep's performance percentage to the wellness record for its local end date.

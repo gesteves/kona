@@ -4,9 +4,9 @@
     "watch": "esbuild source/javascripts/stimulus/index.js --bundle --target=es2020 --outfile=tmp/dist/javascripts/site.js --watch=forever",
     "lint:scss": "stylelint \"source/stylesheets/**/*.scss\"",
     "lint:scss:fix": "stylelint \"source/stylesheets/**/*.scss\" --fix",
-    "format": "prettier --write \"**/*.{js,json,md}\"",
-    "format:check": "prettier --check \"**/*.{js,json,md}\"",
-    "check": "tsc --noEmit -p tsconfig.json",
+    "format": "prettier --write \"**/*.{js,ts,mts,json,md}\"",
+    "format:check": "prettier --check \"**/*.{js,ts,mts,json,md}\"",
+    "check": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "pagefind": "pagefind --site build"

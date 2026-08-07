@@ -59,6 +59,8 @@ RSpec.describe "Weather", type: :request do
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
   end
 
+  it_behaves_like "a live-update fragment", "/widgets/weather/current"
+
   it "renders the weather markup" do
     get "/widgets/weather/current", headers: auth_headers
 

@@ -6,7 +6,7 @@
   On race day, today's race gets its own "Today's Race" section with that weather, and the
   remaining races follow under "Upcoming Races".
 %>
-<div class="collection-group" data-nosnippet data-controller="live-update" data-live-update-url-value="<%= live_update_url %>" data-action="visibilitychange@document->live-update#handleVisibilityChange">
+<div class="collection-group" data-nosnippet <%= live_update_attrs %>>
   <% if @races.todays_race %>
     <section class="collection collection--single collection--has-featured" id="todays-race">
       <h2 class="collection__heading">Today’s Race</h2>

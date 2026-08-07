@@ -142,8 +142,14 @@ module MarkupHelpers
   def add_figure_elements_to_images(html, base_class: nil)
     with_nokogiri_doc(html) do |doc|
       doc.css('img').each do |img|
-        # Pull the image out so the caption is whatever remains in the parent, then put it back.
         parent = img.parent
+        # ⚠️ This treats "everything else in the parent" as the caption and then replaces the
+        # parent outright, so two images in one paragraph would fold the second one's markup into
+        # the first one's <figcaption> and detach it while this loop is still iterating over it.
+        # A multi-image paragraph gets no figure rather than a corrupted one.
+        next if parent.css('img').size > 1
+
+        # Pull the image out so the caption is whatever remains in the parent, then put it back.
         img = img.remove
         caption = parent.inner_html
         parent.prepend_child(img)
@@ -212,7 +218,10 @@ module MarkupHelpers
             next
           end
 
-          if child.text.include?(' | ')
+          # ⚠️ Only split a bare text node. `child.text` also reports the text *inside* an
+          # element, and replacing that element with two text nodes throws its markup away — a
+          # credit written as a link would silently lose the link.
+          if child.text? && child.text.include?(' | ')
             before, after = child.text.split(' | ', 2)
             caption_nodes << Nokogiri::XML::Text.new(before, doc)
             credit_nodes << Nokogiri::XML::Text.new(after, doc)
@@ -365,7 +374,14 @@ module MarkupHelpers
       doc.css('h2, h3').each do |heading|
         heading_id = heading['id']
         next if heading_id.blank?
-        label = CGI.escapeHTML("Permalink to #{heading.text}")
+        heading_text = heading.text
+        # ⚠️ Name the heading explicitly before nesting the permalink inside it. Accessible name
+        # from content descends into the anchor and picks up *its* aria-label, so without this
+        # every heading announces as "Permalink to Foo Foo". An explicit label on the heading
+        # takes precedence over its contents, which keeps the link itself fully accessible
+        # rather than hiding it from assistive tech to stay quiet.
+        heading['aria-label'] = heading_text
+        label = CGI.escapeHTML("Permalink to #{heading_text}")
         permalink = <<~HTML
           <a href="##{heading_id}" class="entry__heading-permalink" aria-label="#{label}" title="#{label}" data-controller="clipboard" data-clipboard-hidden-class="entry__heading-permalink-icon--hidden" data-clipboard-success-message-value="A link to this section has been copied to your clipboard." data-action="click->clipboard#copy">
             <span data-clipboard-target="link" class="entry__heading-permalink-icon">

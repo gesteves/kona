@@ -4,6 +4,8 @@ module ActivityDescription
   # text block is guaranteed to be valid JSON matching the schema. When ANTHROPIC_API_KEY
   # is unset both helpers return nil, and the description is composed without their lines.
   module Llm
+    extend AnthropicStructuredOutput
+
     PLANNED_SUMMARY_PROMPT = Rails.root.join("app/prompts/planned-summary.md").read.freeze
     WEATHER_SENTENCE_PROMPT = Rails.root.join("app/prompts/weather-sentence.md").read.freeze
 
@@ -60,36 +62,7 @@ module ActivityDescription
       { emoji: parsed[:weather_emoji], sentence: parsed[:weather_sentence] }
     end
 
-    def configured?
-      ENV["ANTHROPIC_API_KEY"].present?
-    end
-
-    def model
-      ENV["ANTHROPIC_DESCRIPTION_MODEL"].presence || DEFAULT_MODEL
-    end
-
-    def client
-      Anthropic::Client.new(api_key: ENV["ANTHROPIC_API_KEY"])
-    end
-
-    # Makes a structured-output Anthropic call.
-    # @return [Hash] The parsed output, with symbolized keys.
-    def structured_call(system:, user:, schema:)
-      message = client.messages.create(
-        model: model,
-        max_tokens: MAX_TOKENS,
-        # Disabled: these one-sentence extractions don't benefit from reasoning, and where
-        # adaptive thinking is on by default it would eat the tight MAX_TOKENS budget and
-        # risk truncating the JSON.
-        thinking: { type: :disabled },
-        system_: system,
-        messages: [{ role: "user", content: user }],
-        output_config: { format: { type: :json_schema, schema: schema } },
-        request_options: { timeout: TIMEOUT_SECONDS }
-      )
-
-      text = message.content.find { |block| block.type == :text }&.text
-      JSON.parse(text.to_s, symbolize_names: true)
-    end
+    # @return [String] The env var that overrides the model for this caller.
+    def anthropic_model_env = "ANTHROPIC_DESCRIPTION_MODEL"
   end
 end

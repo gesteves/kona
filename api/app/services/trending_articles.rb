@@ -32,6 +32,9 @@ class TrendingArticles < ApplicationService
   MAX_POOL = 50
   # The cache key carries the hour bucket, so the ranking rolls over on its own.
   RESULT_TTL = 1.hour
+  # Bump when `payload` changes shape. The rest of the key derives from the tuning inputs
+  # automatically (see #ranking_version), so this only covers what a digest can't see.
+  PAYLOAD_VERSION = 4
 
   # @param articles [Articles] The corpus source; injectable for testing.
   # @param plausible [Plausible] The analytics source; injectable for testing.
@@ -55,12 +58,25 @@ class TrendingArticles < ApplicationService
 
   private
 
+  # Everything that determines the ranking's contents, digested into the cache key.
+  #
+  # ⚠️ The tuning knobs are in here deliberately. They're env-tunable, and with a hand-written
+  # version alone, retuning one of the TRENDING_* vars left the previous ranking cached for its
+  # full hour under a key that looked current — a stale ranking with no way to tell.
+  # @return [String]
+  def ranking_version
+    @ranking_version ||= cache_version(
+      PAYLOAD_VERSION, RECENT_WINDOW_HOURS, BASELINE_DAYS, MIN_RECENT_PAGEVIEWS,
+      SMOOTHING, MAX_POOL, relative_weight, absolute_weight
+    )
+  end
+
   # The full ranked list, hottest first, computed once per clock hour and shared by every
   # variant. Empty on any error, which collapses the widget rather than raising.
   def ranked
     rescue_with([], context: self.class.name) do
       t_end = Time.now.beginning_of_hour
-      items = cached_json("trending:articles:ranked:v4:#{t_end.utc.iso8601}", expires_in: RESULT_TTL) do
+      items = cached_json("trending:articles:ranked:#{ranking_version}:#{t_end.utc.iso8601}", expires_in: RESULT_TTL) do
         rank(t_end).map { |article| payload(article) }
       end
       (items || []).map { |item| DeepOstruct.wrap(item) }

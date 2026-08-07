@@ -17,6 +17,8 @@ RSpec.describe "Whoop", type: :request do
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
   end
 
+  it_behaves_like "a live-update fragment", "/widgets/whoop"
+
   it "renders the Whoop markup" do
     get "/widgets/whoop", headers: auth_headers
 

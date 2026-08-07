@@ -14,6 +14,8 @@ RSpec.describe "Widgets::Plausible pageviews", type: :request do
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
   end
 
+  it_behaves_like "a live-update fragment", "/widgets/plausible/pageviews/abc123"
+
   it "renders the view-count span (icon + linked count)" do
     get "/widgets/plausible/pageviews/abc123", headers: auth_headers
 

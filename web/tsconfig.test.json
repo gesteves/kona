@@ -20,5 +20,8 @@
     // `caches.default` in the suite reads as an error while the tests themselves run fine.
     "lib": ["es2022"]
   },
-  "include": ["test/**/*.ts", "vitest.config.mts"]
+  // src/assets.d.ts, but NOT src/env.d.ts: tsc follows test/og.test.ts's import of src/og.ts into
+  // og-render.ts's binary-module imports, which need those declarations. The Worker global shims
+  // in env.d.ts stay out — those are what would collide with @cloudflare/workers-types.
+  "include": ["test/**/*.ts", "vitest.config.mts", "src/assets.d.ts"]
 }

@@ -4,7 +4,9 @@ summary: I'm sorry, but the page you were looking for can't be found.
 body: I'm sorry, but the page you were looking for can't be found.
 ---
 
-<div class="home" aria-labelledby="hed">
+<%# No aria-labelledby: a bare <div> has no role, so the label is discarded. The <h1> inside
+    already names the page. %>
+<div class="home">
   <section class="home__intro">
     <h1 class="home__headline" id="hed">
       <%= smartypants(current_page.data.title) %>

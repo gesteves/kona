@@ -36,6 +36,9 @@ beforeEach(() => {
   window.requestIdleCallback = defaultRequestIdleCallback;
   window.cancelIdleCallback = () => {};
   document.documentElement.scrollTo = () => {};
+  // jsdom defines window.scrollTo but throws "Not implemented"; nav_controller calls it to
+  // restore the reader's position when the menu closes.
+  window.scrollTo = () => {};
 });
 
 afterEach(() => {

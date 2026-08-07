@@ -4,18 +4,22 @@ name: "Utilities"
 # of the directory: `web.yml` and `api.yml` are path-filtered on `web/**` / `api/**`, so a change
 # to a utility never builds the site, redeploys a Worker, or purges the edge cache.
 #
-# Only utilities/maps/ has a test suite. utilities/contentful/ is a set of one-off Node scripts
-# run by hand against Contentful; there's nothing to check.
+# utilities/maps/ has an rspec suite. utilities/aqi-map/ has no test framework and doesn't warrant
+# one, but its copy of the EPA AQI math is a hand-maintained duplicate of the api's, so a plain
+# Ruby check pins it to the published equation. utilities/contentful/ is a set of one-off Node
+# scripts run by hand against Contentful; there's nothing to check.
 on:
   push:
     branches: [main]
     paths:
       - 'utilities/maps/**'
+      - 'utilities/aqi-map/**'
       - '.github/workflows/utilities.yml'
   pull_request:
     branches: [main]
     paths:
       - 'utilities/maps/**'
+      - 'utilities/aqi-map/**'
       - '.github/workflows/utilities.yml'
 
 permissions:
@@ -48,3 +52,26 @@ jobs:
       # credential-free.
       - name: Ruby tests
         run: bundle exec rspec
+
+  aqi-map:
+    name: AQI math check
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: utilities/aqi-map
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: .ruby-version
+          bundler-cache: false
+
+      # No bundle install: the check requires only lib/epa_aqi.rb, which is plain Ruby with no
+      # gem dependencies, so this stays fast and can't be broken by the Sinatra app's Gemfile.
+      - name: EPA AQI golden vectors
+        run: ruby spec/epa_aqi_check.rb

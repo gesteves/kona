@@ -24,3 +24,7 @@ gem 'ostruct'
 gem 'rspec'
 gem 'htmlentities'
 gem 'humanize'
+# Scans the bundle for gems with known CVEs; run by the security job in web.yml. This app's
+# build-time dependencies parse untrusted content (nokogiri, redcarpet, sanitize), so it wants
+# the same CVE gate the api has had.
+gem 'bundler-audit', require: false

@@ -24,55 +24,56 @@
         <span class="event__weather-stat"><%= raw icon_svg("classic", "light", weather_icon(event_forecast.condition_code, :day)) %> <%= format_condition(event_forecast.condition_code) %></span>
       </div>
       <% if event_forecast.temperature_min.present? || event_forecast.temperature_max.present? %>
-      <div class="event__weather-stat-group">
-        <span class="event__weather-stat">
-          <%= raw icon_svg("classic", "light", "temperature-low") %>
-          <%= format_temperature(event_forecast.temperature_min) %>
-          low
-        </span>
-        <span class="event__weather-stat">
-          <%= raw icon_svg("classic", "light", "temperature-high") %>
-          <%= format_temperature(event_forecast.temperature_max) %>
-          high
-        </span>
-      </div>
-    <% end %>
+        <div class="event__weather-stat-group">
+          <span class="event__weather-stat">
+            <%= raw icon_svg("classic", "light", "temperature-low") %>
+            <%= format_temperature(event_forecast.temperature_min) %>
+            low
+          </span>
+          <span class="event__weather-stat">
+            <%= raw icon_svg("classic", "light", "temperature-high") %>
+            <%= format_temperature(event_forecast.temperature_max) %>
+            high
+          </span>
+        </div>
+      <% end %>
       <% if event_forecast.humidity.present? || event_forecast.precipitation_chance.present? %>
-      <div class="event__weather-stat-group">
-        <% if event_forecast.humidity.present? %>
-          <span class="event__weather-stat">
-            <%= raw icon_svg("classic", "light", "droplet-percent") %>
-            <%= number_to_percentage(event_forecast.humidity * 100, precision: 0) %>
-            humidity
-          </span>
-        <% end %>
-        <% if event_forecast.precipitation_chance.present? %>
-          <span class="event__weather-stat">
-            <%= raw icon_svg("classic", "light", "raindrops") %>
-            <%= number_to_percentage(event_forecast.precipitation_chance * 100, precision: 0) %>
-            chance of <%= event_weather.precipitation_label %>
-        <% end %>
-      </div>
-    <% end %>
+        <div class="event__weather-stat-group">
+          <% if event_forecast.humidity.present? %>
+            <span class="event__weather-stat">
+              <%= raw icon_svg("classic", "light", "droplet-percent") %>
+              <%= number_to_percentage(event_forecast.humidity * 100, precision: 0) %>
+              humidity
+            </span>
+          <% end %>
+          <% if event_forecast.precipitation_chance.present? %>
+            <span class="event__weather-stat">
+              <%= raw icon_svg("classic", "light", "raindrops") %>
+              <%= number_to_percentage(event_forecast.precipitation_chance * 100, precision: 0) %>
+              chance of <%= event_weather.precipitation_label %>
+            </span>
+          <% end %>
+        </div>
+      <% end %>
       <% if event_forecast.wind_speed.present? && event_forecast.wind_direction.present? %>
-      <div class="event__weather-stat-group">
-        <span class="event__weather-stat">
-          <span class="event__weather-wind-direction" style="--wind-direction: <%= event_forecast.wind_direction %>;" title="<%= wind_direction(event_forecast.wind_direction) %>">
-            <%= raw icon_svg("classic", "light", "arrow-down") %>
-          </span>
-          <%= format_wind_speed_range(event_forecast.wind_speed, event_forecast.wind_speed_max) %>
-          wind
-          <span class="sr-only">from the <%= wind_direction(event_forecast.wind_direction) %></span>
-        </span>
-        <% if show_gusts?(event_forecast.wind_speed, event_forecast.wind_gust_speed_max) %>
+        <div class="event__weather-stat-group">
           <span class="event__weather-stat">
-            <%= raw icon_svg("classic", "light", "wind") %>
-            <%= format_wind_speed(event_forecast.wind_gust_speed_max) %>
-            gusts
+            <span class="event__weather-wind-direction" style="--wind-direction: <%= event_forecast.wind_direction %>;" title="<%= wind_direction(event_forecast.wind_direction) %>">
+              <%= raw icon_svg("classic", "light", "arrow-down") %>
+            </span>
+            <%= format_wind_speed_range(event_forecast.wind_speed, event_forecast.wind_speed_max) %>
+            wind
+            <span class="sr-only">from the <%= wind_direction(event_forecast.wind_direction) %></span>
           </span>
-        <% end %>
-      </div>
-    <% end %>
+          <% if show_gusts?(event_forecast.wind_speed, event_forecast.wind_gust_speed_max) %>
+            <span class="event__weather-stat">
+              <%= raw icon_svg("classic", "light", "wind") %>
+              <%= format_wind_speed(event_forecast.wind_gust_speed_max) %>
+              gusts
+            </span>
+          <% end %>
+        </div>
+      <% end %>
     <% end %>
     <% bay = event_weather.bay %>
     <% if bay.present? %>

@@ -122,6 +122,9 @@ export function cleanUpUrl() {
       window.location.origin +
       window.location.pathname +
       (params.toString() ? '?' + params.toString() : '');
-    window.history.replaceState({}, document.title, cleanURL);
+    // ⚠️ Carry the existing state through. Turbo keeps its restorationIdentifier in history
+    // state, and this runs on every turbo:load — replacing it with {} on any URL carrying a
+    // utm_/ref param silently breaks scroll and snapshot restoration on back-navigation.
+    window.history.replaceState(window.history.state, '', cleanURL);
   }
 }

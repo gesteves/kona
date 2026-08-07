@@ -29,6 +29,20 @@ class WeatherSummaryPresenter
     @time_zone = time_zone.presence || TimeZoneResolver.default
   end
 
+  # Both forecast selections linear-scan the daily forecast and re-parse two timestamps per day,
+  # and several sentences ask for them. Memoized here — where the request's state already lives —
+  # rather than in WeatherHelper, which is deliberately a set of pure functions over their
+  # arguments.
+  def today
+    return @today if defined?(@today)
+    @today = todays_forecast(@weather)
+  end
+
+  def rest_of_day
+    return @rest_of_day if defined?(@rest_of_day)
+    @rest_of_day = rest_of_day_forecast(@weather, @time_zone)
+  end
+
   # The full composed summary as HTML (each sentence wrapped in a span).
   def weather_summary
     summary = []
@@ -121,8 +135,6 @@ class WeatherSummaryPresenter
   end
 
   def forecast
-    rest_of_day = rest_of_day_forecast(@weather, @time_zone)
-    today = todays_forecast(@weather)
     text = []
     text << "#{today_or_tonight(@weather, @time_zone)}'s forecast #{format_forecasted_condition(rest_of_day.condition_code).downcase}"
     if evening?(@weather, @time_zone)
@@ -134,22 +146,32 @@ class WeatherSummaryPresenter
   end
 
   def precipitation
-    rest_of_day = rest_of_day_forecast(@weather, @time_zone)
-    return if rest_of_day.precipitation_chance == 0 || rest_of_day.precipitation_type.downcase == "clear"
-    percentage_string = number_to_percentage(rest_of_day.precipitation_chance * 100, precision: 0)
+    precipitation_type = rest_of_day.precipitation_type.to_s.downcase
+    chance = rest_of_day.precipitation_chance.to_f
+    return if chance.zero? || precipitation_type.blank? || precipitation_type == "clear"
+
+    snowfall = rest_of_day.snowfall_amount.to_f
+    percentage_string = number_to_percentage(chance * 100, precision: 0)
     text = []
     text << "There's #{with_indefinite_article(percentage_string)} chance of #{format_precipitation_type(rest_of_day.precipitation_type)} later #{today_or_tonight(@weather, @time_zone).downcase}"
-    text << "with #{format_precipitation_amount(rest_of_day.snowfall_amount)} expected" if rest_of_day.precipitation_type.downcase == "snow" && rest_of_day.snowfall_amount > 0
+    text << "with #{format_precipitation_amount(snowfall)} expected" if precipitation_type == "snow" && snowfall > 0
     text.join(", ")
   end
 
+  # ⚠️ Sun times are genuinely absent above the polar circles, and weather_data_is_current? — the
+  # gate that lets the rest of the summary assume its data — doesn't check them. Drop the line
+  # rather than collapsing the whole widget over it.
   def sunrise_or_sunset
     now = Time.now
     todays_sunrise = sunrise(@weather, @time_zone)
     todays_sunset = sunset(@weather, @time_zone)
+    return if todays_sunrise.blank? || todays_sunset.blank?
+
     return "Sunrise will be at #{format_time(todays_sunrise)}" if now <= todays_sunrise.beginning_of_hour
     return "Sunset will be at #{format_time(todays_sunset)}" if now >= todays_sunrise.beginning_of_hour && now < todays_sunset.beginning_of_hour
-    return "Sunrise will be at #{format_time(tomorrows_sunrise(@weather, @time_zone))}" if now >= todays_sunset.beginning_of_hour
+
+    tomorrow = tomorrows_sunrise(@weather, @time_zone)
+    return "Sunrise will be at #{format_time(tomorrow)}" if tomorrow.present? && now >= todays_sunset.beginning_of_hour
   end
 
   def activities
@@ -182,16 +204,16 @@ class WeatherSummaryPresenter
 
   def bad_weather?
     current = current_weather(@weather)
-    today = todays_forecast(@weather)
-    rest_of_day = rest_of_day_forecast(@weather, @time_zone)
 
+    # Coerced rather than dereferenced: WeatherKit omits individual fields (snowfall on a dry
+    # day, gusts on some forecast days), and a missing one must not take the widget down.
     aqi = @air_quality&.aqi.to_i
-    current_temperature = (current.temperature_apparent || current.temperature)
-    high_temperature = today.temperature_max
-    low_temperature = today.temperature_min
-    precipitation_chance = rest_of_day.precipitation_chance
-    snowfall = rest_of_day.snowfall_amount
-    beaufort = beaufort_number(kph_to_knots(current.wind_speed))
+    current_temperature = (current.temperature_apparent || current.temperature).to_f
+    high_temperature = today.temperature_max.to_f
+    low_temperature = today.temperature_min.to_f
+    precipitation_chance = rest_of_day.precipitation_chance.to_f
+    snowfall = rest_of_day.snowfall_amount.to_f
+    beaufort = beaufort_number(kph_to_knots(current.wind_speed.to_f))
 
     return true if aqi > 100
     return true if current_temperature <= -12 || current_temperature >= 35
@@ -209,11 +231,15 @@ class WeatherSummaryPresenter
 
   def hot?
     current = current_weather(@weather)
-    current.temperature >= 30 || current.temperature_apparent >= 30
+    current.temperature.to_f >= 30 || current.temperature_apparent.to_f >= 30
   end
 
+  # With no apparent temperature there's nothing to show alongside the real one, so hide it
+  # rather than rounding a nil.
   def hide_apparent_temperature?
     current = current_weather(@weather)
+    return true if current.temperature.blank? || current.temperature_apparent.blank?
+
     celsius_temp = current.temperature.round
     celsius_apparent = current.temperature_apparent.round
     fahrenheit_temp = celsius_to_fahrenheit(current.temperature).round

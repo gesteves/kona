@@ -48,15 +48,14 @@ class Contentful
   private
 
   # Writes one collection to data/<type>.json.
+  #
+  # ⚠️ Deliberately unrescued. `rake clobber` deletes data/*.json, so a swallowed write failure
+  # leaves the file missing while the import still reports success — and the build then renders
+  # pages against data that isn't there. Fail loudly, like import:icons does.
   # @param type [Symbol] The collection's name.
   # @param data [Array<Hash>, Hash] The data to write.
   def save_to_file(type, data)
-    file_path = "data/#{type}.json"
-    File.open(file_path, 'w') do |file|
-      file << data.to_json
-    end
-  rescue => e
-    puts "Failed to save #{type}: #{e.message}"
+    File.write("data/#{type}.json", data.to_json)
   end
 
   # Fetches everything from Contentful and derives the collections the build reads.
@@ -72,10 +71,9 @@ class Contentful
   end
 
   # Fetches every collection from Contentful's GraphQL API, paginating each one.
-  def get_contentful_data
-    skip = 0
-    limit = 100
-    queries = {
+  # @return [Hash{Symbol => Object}] The paginated collections to fetch, by data key.
+  def collection_queries
+    {
       articles: ContentfulClient::QUERIES::Articles,
       pages: ContentfulClient::QUERIES::Pages,
       assets: ContentfulClient::QUERIES::Assets,
@@ -83,22 +81,43 @@ class Contentful
       events: ContentfulClient::QUERIES::Events,
       sites: ContentfulClient::QUERIES::Sites
     }
+  end
 
-    queries.each do |key, query|
-      loop do
-        response = @client.query(query, variables: { skip: skip, limit: limit })
-        raise "Error fetching #{key}: #{response.errors.messages['data'].join(' - ')}" if response.errors.present?
+  # Pages within a collection have to be sequential (each `skip` depends on the last page), but
+  # the collections don't depend on each other, so they're fetched concurrently. A raise in any
+  # thread surfaces on the join and still fails the import.
+  def get_contentful_data
+    collection_queries
+      .map { |key, query| Thread.new { [key, fetch_collection(key, query)] } }
+      .each { |thread| key, items = thread.value; @content[key] += items }
+  end
 
-        data = response.data.to_h.deep_transform_keys { |k| k.to_s.underscore.to_sym }
-        items = data.dig(key, :items).compact
-        @content[key] += items
+  # Pages through one collection.
+  # @param key [Symbol] The collection's data key.
+  # @param query [Object] The GraphQL query.
+  # @return [Array<Hash>] Every item in it.
+  def fetch_collection(key, query)
+    limit = 100
+    skip = 0
+    items = []
 
-        break if items.size < limit
+    loop do
+      response = @client.query(query, variables: { skip: skip, limit: limit })
+      raise "Error fetching #{key}: #{response.errors.messages['data'].join(' - ')}" if response.errors.present?
 
-        skip += limit
-      end
-      skip = 0
+      data = response.data.to_h.deep_transform_keys { |k| k.to_s.underscore.to_sym }
+      page = data.dig(key, :items) || []
+      items += page.compact
+
+      # ⚠️ The page's raw size decides whether there's another page, not the compacted one.
+      # Contentful returns a null item for any link it can't resolve, so comparing after
+      # `compact` ends pagination early and silently truncates the collection.
+      break if page.size < limit
+
+      skip += limit
     end
+
+    items
   end
 
   # Collapses the sites collection to the single site entry.

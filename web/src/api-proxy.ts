@@ -19,6 +19,13 @@ const CONTACT_PATH = '/api/contact';
  */
 const WIDGET_UPSTREAM_TIMEOUT_MS = 15_000;
 
+/**
+ * The same bound for the contact POST. Longer than a widget's, because a form submission is
+ * worth waiting out a cold start for, but bounded all the same — without it a stalled origin
+ * leaves the visitor watching a spinner until the platform kills the invocation.
+ */
+const CONTACT_UPSTREAM_TIMEOUT_MS = 25_000;
+
 /** Coarse visitor location from `request.cf`, forwarded on the contact path only. */
 type ClientGeo = { city?: string; region?: string; country?: string };
 
@@ -54,8 +61,10 @@ function upstreamHeaders(
     const ua = incoming.get('user-agent');
     if (ua) headers.set('x-kona-client-ua', ua);
     if (contactGeo.city) headers.set('x-kona-client-city', contactGeo.city);
-    if (contactGeo.region) headers.set('x-kona-client-region', contactGeo.region);
-    if (contactGeo.country) headers.set('x-kona-client-country', contactGeo.country);
+    if (contactGeo.region)
+      headers.set('x-kona-client-region', contactGeo.region);
+    if (contactGeo.country)
+      headers.set('x-kona-client-country', contactGeo.country);
   }
   if (apiToken) headers.set('authorization', `Bearer ${apiToken}`);
   return headers;
@@ -80,7 +89,9 @@ function etagMatches(ifNoneMatch: string, etag: string): boolean {
   const target = strip(etag);
   return ifNoneMatch
     .split(',')
-    .some((candidate) => candidate.trim() === '*' || strip(candidate) === target);
+    .some(
+      (candidate) => candidate.trim() === '*' || strip(candidate) === target
+    );
 }
 
 /**
@@ -103,10 +114,7 @@ const ALLOWED_CONTACT_METHODS = ['POST'];
  * Proxies a widget or contact-form request to the kona-api origin.
  * @returns The origin's response, a 304, a 405, or an empty 502 if the origin is unreachable.
  */
-export async function handleApi(
-  request: Request,
-  env: Env
-): Promise<Response> {
+export async function handleApi(request: Request, env: Env): Promise<Response> {
   const incoming = new URL(request.url);
   const isContact = incoming.pathname === CONTACT_PATH;
 
@@ -138,20 +146,25 @@ export async function handleApi(
 
     upstream = await fetch(upstreamUrl, {
       method: request.method,
-      headers: upstreamHeaders(request.headers, hasBody, env.API_TOKEN, contactGeo),
+      headers: upstreamHeaders(
+        request.headers,
+        hasBody,
+        env.API_TOKEN,
+        contactGeo
+      ),
       // Streamed, not buffered, so no client-supplied body is held in the isolate. A stream
       // can't be replayed, so this subrequest is never internally retried.
       body: hasBody ? request.body : undefined,
       redirect: 'manual',
-      // Widget URLs are extensionless, so Cloudflare's extension-based default caches
-      // nothing without cacheEverything. The TTL still comes from the origin's
-      // CDN-Cache-Control; nothing is re-derived here.
-      ...(isContact
-        ? {}
-        : {
-            cf: { cacheEverything: true },
-            signal: AbortSignal.timeout(WIDGET_UPSTREAM_TIMEOUT_MS),
-          }),
+      // Both paths are bounded. The timeout used to live in the widgets-only branch below,
+      // which left the contact POST — the one request a visitor actually waits on — unbounded.
+      signal: AbortSignal.timeout(
+        isContact ? CONTACT_UPSTREAM_TIMEOUT_MS : WIDGET_UPSTREAM_TIMEOUT_MS
+      ),
+      // Widget URLs are extensionless, so Cloudflare's extension-based default caches nothing
+      // without cacheEverything. The TTL still comes from the origin's CDN-Cache-Control;
+      // nothing is re-derived here. The contact POST is deliberately never cached.
+      ...(isContact ? {} : { cf: { cacheEverything: true } }),
     });
   } catch (error) {
     console.error(

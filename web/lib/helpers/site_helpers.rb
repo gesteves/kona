@@ -8,6 +8,15 @@ module SiteHelpers
     ENV['TURNSTILE_SITE_KEY']
   end
 
+  # The IANA timezone the site's dates are reckoned in — the owner's location, so "published
+  # today", the clock-vs-calendar icon and the "New" badge flip at the same instant for every
+  # reader instead of in each reader's own zone.
+  # @return [String, nil] Blank when unset, which leaves the publish-date controller on the
+  #   reader's browser timezone.
+  def site_time_zone
+    ENV['TIME_ZONE'].presence
+  end
+
   # Generates an Atom-compliant tag URI from a URL and date.
   # @param url [String] The URL to be converted.
   # @param date [Date, Time] The date for the tag.

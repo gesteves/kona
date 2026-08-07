@@ -248,6 +248,23 @@ RSpec.describe EventsHelper, type: :helper do
 
       expect(helper.upcoming_races(events.shuffle, time_zone).size).to eq(3)
     end
+
+    # Contentful will save an event with no date. Every date-reading helper is on this widget's
+    # render path, so an unguarded parse would 500 the whole fragment over one bad entry.
+    it "drops an event with a missing or unparseable date instead of raising" do
+      good = build_event(days_from_today: 2)
+      dateless = build_event(days_from_today: 0, date: nil)
+      garbage = build_event(days_from_today: 0, date: "not a date")
+
+      expect(helper.upcoming_races([dateless, good, garbage], time_zone)).to eq([good])
+    end
+
+    it "treats an event with no date as neither today nor close" do
+      dateless = build_event(days_from_today: 0, date: nil)
+
+      expect(helper.today?(dateless, time_zone)).to be(false)
+      expect(helper.close?(dateless, time_zone)).to be(false)
+    end
   end
 
   describe "#next? / #featured?" do

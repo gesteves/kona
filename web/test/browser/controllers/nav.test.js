@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import NavController from '../../../source/javascripts/stimulus/controllers/nav_controller';
 import { mount } from '../helpers';
 
@@ -67,6 +67,47 @@ describe('nav controller', () => {
     document.dispatchEvent(new CustomEvent('search:close'));
 
     expect(isOpen()).toBe(false);
+  });
+
+  // The open menu is a full-viewport overlay. Without inert, the reader can tab straight through
+  // it into page content they can't see.
+  it('makes the page behind the menu inert while it is open', async () => {
+    const { element } = await mountNav();
+    const main = document.createElement('main');
+    main.id = 'main-content';
+    document.body.appendChild(main);
+
+    element.querySelector('button').click();
+    expect(main.inert).toBe(true);
+
+    element.querySelector('button').click();
+    expect(main.inert).toBe(false);
+  });
+
+  // The open menu fixes <body>, which collapses the scroll height — so the offset has to be
+  // stashed and put back, or closing the menu silently returns the reader to the top.
+  it('restores the scroll position when the menu closes', async () => {
+    const { element } = await mountNav();
+    window.scrollY = 1200;
+    const scrollTo = vi.fn();
+    window.scrollTo = scrollTo;
+
+    element.querySelector('button').click();
+    expect(document.body.style.top).toBe('-1200px');
+
+    element.querySelector('button').click();
+    expect(document.body.style.top).toBe('');
+    expect(scrollTo).toHaveBeenCalledWith(0, 1200);
+  });
+
+  it('does not scroll when closing a menu that was never open', async () => {
+    await mountNav();
+    const scrollTo = vi.fn();
+    window.scrollTo = scrollTo;
+
+    document.dispatchEvent(new CustomEvent('search:close'));
+
+    expect(scrollTo).not.toHaveBeenCalled();
   });
 
   it('uses custom ARIA labels when supplied', async () => {

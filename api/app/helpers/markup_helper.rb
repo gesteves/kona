@@ -14,15 +14,52 @@ module MarkupHelper
   # @param text [String, nil] The Markdown.
   # @return [String, nil] The HTML, or nil for blank input.
   def render_summary_body(text)
-    html = markdown_to_html(text)
+    html = markdown_to_html(fix_degrees(text))
     return if html.blank?
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
     add_unit_data_attributes(doc)
     open_external_links_in_new_tabs(doc)
+    # ⚠️ After open_external_links_in_new_tabs, never before — both write `rel`, and the
+    # sponsored disclosure has to be the one that survives. The static site's render_body
+    # orders them the same way for the same reason.
+    mark_affiliate_links(doc)
     doc.to_html
   end
 
   private
+
+  # Flags Amazon Associates links as sponsored. Mirrors the static site's
+  # MarkupHelpers#mark_affiliate_links: an article summary rendered into a widget fragment has to
+  # carry the same disclosure it carries on the page itself.
+  def mark_affiliate_links(doc)
+    doc.css("a").each do |a|
+      next unless amazon_associates_link?(a["href"])
+      a["rel"] = "sponsored nofollow noopener"
+      a["target"] = "_blank"
+    end
+    doc
+  end
+
+  # ⚠️ Matches the registrable domain by suffix rather than through PublicSuffix, which the web
+  # app uses but this app doesn't depend on. Keep the two in agreement.
+  # @param url [String, nil]
+  # @return [Boolean] Whether the URL is an Amazon Associates link.
+  def amazon_associates_link?(url)
+    uri = URI.parse(url.to_s)
+    host = uri.host.to_s.downcase
+    return true if domain?(host, "amzn.to")
+    return false unless domain?(host, "amazon.com")
+
+    URI.decode_www_form(uri.query.to_s).to_h.key?("tag")
+  rescue StandardError
+    # Malformed author-supplied hrefs just aren't affiliate links.
+    false
+  end
+
+  # @return [Boolean] Whether host is `domain` or a subdomain of it.
+  def domain?(host, domain)
+    host == domain || host.end_with?(".#{domain}")
+  end
 
   # Rewrites the `data-imperial` shorthand authors write in Contentful into the units
   # controller's attributes.

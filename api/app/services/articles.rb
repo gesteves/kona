@@ -71,7 +71,9 @@ class Articles < ApplicationService
   # @return [Array<OpenStruct>]
   def list
     items = rescue_with([], context: "Error fetching articles") do
-      cached_json("contentful:articles:list:v1", expires_in: 5.minutes) do
+      # Suffixed with a digest of the query, so a change to its field set busts the cache rather
+      # than relying on someone remembering to bump a hand-written version.
+      cached_json("contentful:articles:list:#{cache_version(LIST_QUERY)}", expires_in: 5.minutes) do
         fetch_all.map { |item| decorate(underscore_keys(item)) }
       end
     end
@@ -84,7 +86,10 @@ class Articles < ApplicationService
   # Pages through the whole articleCollection (best-effort: a failed page keeps the pages
   # fetched so far).
   def fetch_all
-    contentful.paginate(LIST_QUERY, collection: :articles) || []
+    # strict: a failed page would otherwise return a partial corpus that `list` then caches for
+    # five minutes — and embeddings:backfill reads through it, so it would under-enqueue against
+    # a corpus that looked complete. AssetMirror and StandardSite are strict for the same reason.
+    contentful.paginate(LIST_QUERY, collection: :articles, strict: true) || []
   end
 
   # Adds the build-time-equivalent derived fields and drops the heavy `body` (fetched only to tell

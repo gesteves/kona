@@ -21,6 +21,8 @@ RSpec.describe "Widgets::Articles related", type: :request do
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
   end
 
+  it_behaves_like "a live-update fragment", "/widgets/articles/related/abc123"
+
   describe "GET /widgets/articles/related/:id" do
     it "renders the You May Also Like section as a live-update fragment" do
       get "/widgets/articles/related/abc123", headers: auth_headers

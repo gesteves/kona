@@ -23,6 +23,9 @@ gem "sanitize"
 gem "htmlentities"
 # Redis caching (uses the API's own REDIS_URL — the dedicated kona-redis instance)
 gem "redis"
+# Pools that Redis client. Declared explicitly rather than leaned on as a Sidekiq transitive
+# dependency, since config/initializers/redis.rb requires it directly.
+gem "connection_pool"
 # Background job queue (standard.site PDS sync) + its web UI. Stores queues in the same Redis.
 gem "sidekiq"
 # Owner authentication for /whoop/auth and the Sidekiq UI: Google OAuth restricted to one identity.

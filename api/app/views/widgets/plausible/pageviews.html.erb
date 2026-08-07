@@ -1,1 +1,1 @@
-<span data-controller="live-update" data-live-update-url-value="<%= live_update_url %>" data-action="visibilitychange@document->live-update#handleVisibilityChange"><%= raw icon_svg("classic", "light", "eye") %> <%= link_to pageviews_label(@pageviews), @plausible_url, rel: "noopener noreferrer nofollow", target: "_blank" %></span>
+<span <%= live_update_attrs %>><%= raw icon_svg("classic", "light", "eye") %> <%= link_to pageviews_label(@pageviews), @plausible_url, rel: "noopener noreferrer nofollow", target: "_blank" %></span>

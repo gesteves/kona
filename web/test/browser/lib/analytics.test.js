@@ -104,6 +104,19 @@ describe('cleanUpUrl', () => {
 
     expect(replaceState).not.toHaveBeenCalled();
   });
+
+  // Turbo stores its restorationIdentifier in history state, and this runs on every turbo:load.
+  // Passing a fresh {} drops it, which breaks scroll and snapshot restoration on back-navigation
+  // for any page reached with a utm_/ref param.
+  it('preserves the existing history state', () => {
+    const turboState = { turbo: { restorationIdentifier: 'abc123' } };
+    window.history.replaceState(turboState, '', '/post?utm_source=news');
+
+    analytics.cleanUpUrl();
+
+    expect(window.history.state).toEqual(turboState);
+    expect(window.location.search).toBe('');
+  });
 });
 
 describe('trackEvent', () => {
