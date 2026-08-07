@@ -307,7 +307,9 @@ class Contentful
 
       description = concept[:description].presence
       summary = description || default_tag_summary(concept[:name], tagged.size)
-      updated_at = tagged.first[:published_at]
+      # The page renders this as "Updated", and sitemap.xml derives lastmod from the same field,
+      # so it tracks the newest edit — not the newest publish.
+      updated_at = tagged.filter_map { |a| a[:updated_at] || a[:published_at] }.max
       # `path` carries a trailing slash; listing_page wants the bare base.
       pages = listing_page(tagged, base_path: concept[:path].chomp('/'), template: "/tag.html",
                            title: concept[:name], summary: summary, description: description,
@@ -408,7 +410,10 @@ class Contentful
   def fetch_taxonomy_concepts
     space = ENV['CONTENTFUL_SPACE']
     token = ENV['CONTENTFUL_TOKEN']
-    return [] if space.blank? || token.blank?
+    # ⚠️ Raise, don't return []: concepts are the only source of categorization, so an empty
+    # taxonomy is a *successful* build with no tag pages, no breadcrumbs and no article:tag
+    # metadata — the same silent-misconfiguration failure ImageHostMissing exists to prevent.
+    raise 'CONTENTFUL_SPACE and CONTENTFUL_TOKEN are required to fetch the taxonomy.' if space.blank? || token.blank?
 
     url = "https://preview.contentful.com/spaces/#{space}/environments/master/taxonomy/concepts?limit=1000"
     headers = { 'Authorization' => "Bearer #{token}" }

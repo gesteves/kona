@@ -18,12 +18,18 @@ class RaceDayWeather < ApplicationService
     lat = @event&.coordinates&.lat
     lon = @event&.coordinates&.lon
     return if lat.blank? || lon.blank?
+    # Contentful will happily hold an event with no date; degrade rather than take the widget down.
+    return if @event.date.blank?
 
     gmaps = GoogleMaps.new(lat, lon)
     time_zone = safely("GoogleMaps") { gmaps.time_zone_id } || TimeZoneResolver.default
     country = safely("GoogleMaps") { gmaps.country_code }
 
-    event_datetime = DateTime.parse(@event.date).in_time_zone(time_zone)
+    event_datetime = begin
+      DateTime.parse(@event.date).in_time_zone(time_zone)
+    rescue ArgumentError, TypeError
+      return
+    end
     days_until = (event_datetime.to_date - Time.current.in_time_zone(time_zone).to_date).to_i
 
     weather = safely("WeatherKit") { WeatherKit.new(lat, lon, time_zone, country).data } if country.present? && days_until.between?(0, 10)

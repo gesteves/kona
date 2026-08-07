@@ -76,21 +76,29 @@
       <% end %>
     <% end %>
     <% bay = event_weather.bay %>
-    <% if bay.present? %>
+    <%# ⚠️ Guarded per field, not on `bay` as a whole: Goodspeed omits individual readings, and the
+        arithmetic below turns one missing field into a NoMethodError that 500s the whole widget. %>
+    <% show_water_temp = bay.present? && bay.water_temp_c.present? %>
+    <% show_current = bay.present? && bay.current_speed_ms.present? && bay.current_bearing_deg.present? %>
+    <% if show_water_temp || show_current %>
       <div class="event__weather-stat-group">
-        <span class="event__weather-stat">
-          <%= raw icon_svg("classic", "light", "water-temperature") %>
-          <%= format_temperature(bay.water_temp_c) %>
-          water
-        </span>
-        <span class="event__weather-stat">
-          <span class="event__weather-wind-direction" style="--wind-direction: <%= (bay.current_bearing_deg + 180) % 360 %>;" title="<%= wind_direction(bay.current_bearing_deg) %>">
-            <%= raw icon_svg("classic", "light", "arrow-down") %>
+        <% if show_water_temp %>
+          <span class="event__weather-stat">
+            <%= raw icon_svg("classic", "light", "water-temperature") %>
+            <%= format_temperature(bay.water_temp_c) %>
+            water
           </span>
-          <%= format_bay_current_speed(bay.current_speed_ms) %>
-          current
-          <span class="sr-only">toward the <%= wind_direction(bay.current_bearing_deg) %></span>
-        </span>
+        <% end %>
+        <% if show_current %>
+          <span class="event__weather-stat">
+            <span class="event__weather-wind-direction" style="--wind-direction: <%= (bay.current_bearing_deg + 180) % 360 %>;" title="<%= wind_direction(bay.current_bearing_deg) %>">
+              <%= raw icon_svg("classic", "light", "arrow-down") %>
+            </span>
+            <%= format_bay_current_speed(bay.current_speed_ms) %>
+            current
+            <span class="sr-only">toward the <%= wind_direction(bay.current_bearing_deg) %></span>
+          </span>
+        <% end %>
       </div>
     <% end %>
     <% if event.aqi.present? %>

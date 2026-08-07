@@ -162,12 +162,12 @@ module SiteHelpers
 
   # @return [String] The feed title, taken from the site's meta title.
   def feed_title
-    data.site.meta_title.split(':').first.strip
+    data.site.meta_title.split(':', 2).first.strip
   end
 
   # @return [String, nil] The feed subtitle, or nil when the meta title has no second half.
   def feed_subtitle
-    subtitle = data.site.meta_title.split(':').last.strip
+    subtitle = data.site.meta_title.split(':', 2).last.strip
     return if subtitle == feed_title
     subtitle
   end

@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
-  <% updated = articles.map { |e| DateTime.parse(e.updated_at) }.max %>
-  <id><%= atom_tag(full_url(html_path), articles.map { |e| published_datetime(e) }.min) %></id>
+  <%# max/min are nil for an empty feed, which would raise on .rfc3339 / .strftime below. %>
+  <% updated = articles.map { |e| DateTime.parse(e.updated_at) }.max || DateTime.now %>
+  <id><%= atom_tag(full_url(html_path), articles.map { |e| published_datetime(e) }.min || updated) %></id>
   <title><%=h title %></title>
   <% if subtitle.present? %><subtitle><%=h subtitle %></subtitle><% end %>
   <updated><%= updated.rfc3339 %></updated>

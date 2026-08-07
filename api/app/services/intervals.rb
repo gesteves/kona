@@ -195,14 +195,16 @@ class Intervals < ApplicationService
   # @return [Array<Hash>, nil] The activities, or nil on failure.
   def fetch_activities
     cached_json("intervals.icu:stats:#{@athlete_id}", expires_in: 5.minutes, symbolize: false) do
-      newest = Date.today.to_s
-      oldest = 1.month.ago.to_date.to_s
+      # In the athlete's zone, not the server's, or the window's edges shift by a day.
+      today = Time.current.in_time_zone(athlete_timezone).to_date
+      newest = today.to_s
+      oldest = (today << 1).to_s
 
       get_json(
         "#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/activities",
         symbolize: false,
         query: { oldest: oldest, newest: newest },
-        basic_auth: { username: "API_KEY", password: @api_key }
+        basic_auth: auth
       )
     end
   end

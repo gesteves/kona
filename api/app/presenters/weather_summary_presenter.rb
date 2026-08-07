@@ -199,7 +199,8 @@ class WeatherSummaryPresenter
   end
 
   def indoor_season?
-    in_jackson_hole?(@location) && (Time.now.month <= 3 || Time.now.month >= 11)
+    month = Time.current.in_time_zone(@time_zone).month
+    in_jackson_hole?(@location) && (month <= 3 || month >= 11)
   end
 
   def bad_weather?

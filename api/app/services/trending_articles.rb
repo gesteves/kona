@@ -32,9 +32,6 @@ class TrendingArticles < ApplicationService
   MAX_POOL = 50
   # The cache key carries the hour bucket, so the ranking rolls over on its own.
   RESULT_TTL = 1.hour
-  # Bump when `payload` changes shape. The rest of the key derives from the tuning inputs
-  # automatically (see #ranking_version), so this only covers what a digest can't see.
-  PAYLOAD_VERSION = 4
 
   # @param articles [Articles] The corpus source; injectable for testing.
   # @param plausible [Plausible] The analytics source; injectable for testing.

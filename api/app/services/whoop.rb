@@ -369,8 +369,11 @@ class Whoop < ApplicationService
     refresh_token = token_data[:refresh_token]
     expires_in = token_data[:expires_in].to_i
 
-    access_cache_duration = [expires_in - 60, 0].max
-    $redis.setex(access_token_key, access_cache_duration, access_token)
+    # ⚠️ Guarded, not clamped to 0: Redis rejects a zero TTL, and the caller's rescue swallows the
+    # raise — so a missing or <60s expires_in wedged the integration silently. Storing the refresh
+    # token regardless is what lets the next attempt recover.
+    access_cache_duration = expires_in - 60
+    $redis.setex(access_token_key, access_cache_duration, access_token) if access_cache_duration.positive?
     $redis.set(refresh_token_key, refresh_token) if refresh_token.present?
   end
 

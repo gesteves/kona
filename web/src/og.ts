@@ -39,11 +39,27 @@ export function decodeEntities(text: string): string {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#0*39;|&#x0*27;|&apos;/gi, "'")
-    .replace(/&#(\d+);/g, (_, d: string) => String.fromCodePoint(Number(d)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, x: string) =>
-      String.fromCodePoint(parseInt(x, 16))
+    .replace(/&#(\d+);/g, (match, d: string) => fromCodePoint(d, 10, match))
+    .replace(/&#x([0-9a-f]+);/gi, (match, x: string) =>
+      fromCodePoint(x, 16, match)
     )
     .replace(/&amp;/g, '&');
+}
+
+/**
+ * Decodes one numeric character reference, falling back to the entity as written.
+ *
+ * ⚠️ Out-of-range code points make `String.fromCodePoint` throw, and this runs on the OG route's
+ * uncaught path — a single bad entity in an `og:title` would 500 the card instead of degrading.
+ *
+ * @param raw The digits from the entity.
+ * @param radix 10 for decimal references, 16 for hex.
+ * @param match The full entity text, returned unchanged when it can't be decoded.
+ */
+function fromCodePoint(raw: string, radix: number, match: string): string {
+  const n = parseInt(raw, radix);
+  if (!Number.isInteger(n) || n < 0 || n > 0x10ffff) return match;
+  return String.fromCodePoint(n);
 }
 
 /**

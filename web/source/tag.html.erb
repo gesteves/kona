@@ -24,7 +24,7 @@
     <p class="entry__meta">
       <% if content.tag_id %>
         <span>
-          <a href="<%= taxonomy_index[content.tag_id][:path] %>feed.xml" data-controller="clipboard" data-action="click->clipboard#copy" data-clipboard-success-message-value="A link to this section’s feed has been copied to your clipboard.">
+          <a href="<%= taxonomy_index.dig(content.tag_id, :path) %>feed.xml" data-controller="clipboard" data-action="click->clipboard#copy" data-clipboard-success-message-value="A link to this section’s feed has been copied to your clipboard.">
             <%= icon_svg("classic", "light", "rss") %> Feed
           </a>
         </span>

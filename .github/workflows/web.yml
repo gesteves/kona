@@ -307,6 +307,10 @@ jobs:
           IMAGE_HOST: ${{ secrets.IMAGE_HOST }}
           PLAUSIBLE_SCRIPT_URL: ${{ secrets.PLAUSIBLE_SCRIPT_URL }}
           TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
+          # ⚠️ Repo *variables*, not secrets. Unset fails silently: publish dates fall back to each
+          # reader's own browser timezone, so the "New" badge flips at a different instant per reader.
+          TIME_ZONE: ${{ vars.TIME_ZONE }}
+          READING_TIME_WPM: ${{ vars.READING_TIME_WPM }}
 
       # keep_vars:true + no `routes` in wrangler.jsonc means this never clobbers the dashboard
       # vars/secrets or the www custom domain. Runs non-interactively, so the drift prompt doesn't

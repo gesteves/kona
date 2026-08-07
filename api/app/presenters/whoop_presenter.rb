@@ -66,7 +66,7 @@ class WhoopPresenter
       "Moderate"
     when 14...18
       "High"
-    when 18..21
+    else
       "All Out"
     end
   end
@@ -82,7 +82,7 @@ class WhoopPresenter
       "Poor"
     when 70..84
       "Sufficient"
-    when 85..100
+    else
       "Optimal"
     end
   end
@@ -99,7 +99,7 @@ class WhoopPresenter
       "Poor"
     when 34..66
       "Adequate"
-    when 67..100
+    else
       "Sufficient"
     end
   end

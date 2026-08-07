@@ -30,7 +30,7 @@ class RelatedArticles < ApplicationService
     return [] if id.blank?
 
     rescue_with([], context: self.class.name) do
-      items = cached_json("related:articles:ranked:#{id}:v1", expires_in: RESULT_TTL) do
+      items = cached_json("related:articles:ranked:#{id}:#{cache_version(PAYLOAD_VERSION)}", expires_in: RESULT_TTL) do
         rank(id).map { |article| payload(article) }
       end
       (items || []).map { |item| DeepOstruct.wrap(item) }

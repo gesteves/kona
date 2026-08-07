@@ -33,7 +33,7 @@ class TrainerRoad < ApplicationService
 
       todays_events.map { |event| parse_workout(event) }
                    .compact
-                   .sort_by { |w| DISCIPLINE_ORDER[w[:discipline]] }
+                   .sort_by { |w| DISCIPLINE_ORDER.fetch(w[:discipline], DISCIPLINE_ORDER.size) }
     end
   end
 
