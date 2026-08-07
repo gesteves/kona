@@ -65,10 +65,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      # ⚠️ working-directory has to be an input to the action. The job-level
+      # `defaults.run.working-directory` above applies only to `run:` steps, so without this
+      # setup-ruby looks for .ruby-version at the repo root — where there isn't one — and dies
+      # with a bare ENOENT. Same reason the maps job passes it explicitly.
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: .ruby-version
+          working-directory: utilities/aqi-map
           bundler-cache: false
 
       # No bundle install: the check requires only lib/epa_aqi.rb, which is plain Ruby with no
