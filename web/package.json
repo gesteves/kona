@@ -15,14 +15,14 @@
     "@hotwired/stimulus": "^3.2.2",
     "@hotwired/turbo": "^8.0.23",
     "@resvg/resvg-wasm": "^2.6.2",
-    "@web.awesome.me/webawesome-pro": "^3.7.0",
+    "@web.awesome.me/webawesome-pro": "^3.11.0",
     "esbuild": "^0.28.1",
     "pagefind": "^1.5.2",
     "satori": "^0.29.0",
-    "wrangler": "^4.115.0"
+    "wrangler": "^4.118.0"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.19.0",
+    "@cloudflare/vitest-pool-workers": "^0.20.1",
     "@cloudflare/workers-types": "^5.20260729.1",
     "jsdom": "^30.0.1",
     "prettier": "^3.9.5",
