@@ -38,8 +38,10 @@
   }
 }
 
+// ⚠️ `screen and` is load-bearing: Chrome and Safari honour `prefers-color-scheme` when printing,
+// so without it a reader in dark mode prints light-gray text on white paper.
 @mixin dark-mode {
-  @media (prefers-color-scheme: dark) {
+  @media screen and (prefers-color-scheme: dark) {
     @content;
   }
 }
