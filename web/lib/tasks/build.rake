@@ -12,6 +12,13 @@ namespace :build do
   task verbose: [ :dotenv, :import ] do
     build_site(verbose: true)
   end
+
+  # Skips :import, so it builds whatever `rake import` last wrote to data/. For refreshing build/
+  # during a `wrangler dev` session; `rake build:verbose` is still the pre-commit gate.
+  desc "Build the site from the existing data/ without re-importing"
+  task fast: [ :dotenv ] do
+    build_site
+  end
 end
 
 # Builds the site. The JS/CSS bundle comes from Middleman's external pipeline, which runs

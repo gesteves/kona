@@ -28,9 +28,11 @@ npx vitest run --project browser      # source/javascripts/** only
 
 npm run check                         # tsc --noEmit: src/ (tsconfig.json) then test/ (tsconfig.test.json)
 
-# Local dev
+# Local dev — see "The two local loops" below
 bundle exec rake import               # fetch fresh data first
-bundle exec middleman                 # dev server (runs the esbuild watcher too)
+bundle exec middleman                 # :4567, templates/CSS/JS, no Worker routes
+bundle exec rake build:fast           # rebuild build/ from existing data/, no import
+npx wrangler dev                      # :8787, the Worker, serving build/
 
 # Lint / format
 bundle exec rubocop                   # Ruby; -a to autocorrect. Same ruleset as api/ — see api/CLAUDE.md
@@ -38,13 +40,35 @@ npm run lint:js                       # fix: npm run lint:js:fix
 npm run lint:scss                     # fix: npm run lint:scss:fix
 npm run format:check                  # fix: npm run format
 
-bundle exec rake build:verbose        # full production build
+bundle exec rake build:verbose        # full production build — the gate. build:fast is NOT.
 
 # Deploy control (needs the gh CLI) — e.g. a content freeze during a bulk migration
 gh workflow disable web.yml           # stop deploying
 gh workflow enable web.yml
 gh workflow run web.yml               # trigger one build from main
 ```
+
+### The two local loops
+
+Neither one is the whole site; pick by what you're editing.
+
+| | `middleman` (:4567) | `wrangler dev` (:8787) |
+|---|---|---|
+| Serves | `source/`, re-rendered per request | `build/`, as deployed |
+| Reflects an edit | on reload | only after a rebuild |
+| `/widgets/*`, `/api/contact`, `/pa/*`, OG cards | ✗ — no Worker, so widgets collapse | ✓ |
+
+So Worker work, widget markup, and OG cards mean `rake build:fast` → `npx wrangler dev`, and
+another `build:fast` after every source change. `build:fast` skips `import`, which `rake build`
+and `build:verbose` always run: ~2s of a ~9s warm build, but it re-clobbers `data/` and is the
+loop's only network dependency. Skipping it means the rebuild works offline and can't be killed
+by a flaky `import:icons` (which raises by design) or by the api's fly machine cold-starting
+through six sequential `/api/icons` round trips.
+
+`wrangler dev` needs no setup beyond `.env`: with no `.dev.vars` present, wrangler falls back to
+`.env`/`.env.local` in this directory, so `KONA_API_URL` and `API_TOKEN` are already bound and the
+widgets on :8787 hit whichever api that file names. Point `KONA_API_URL` at a local `api/bin/dev`
+to work against both apps at once.
 
 ### Import subtasks
 
@@ -116,7 +140,8 @@ Pages without a cover image get an `og:image` rendered **on demand by this app's
   What refreshes them is the zone's `Cache-Tag: site` deploy purge, which is why the card paths are
   deliberately left tagged (root `CLAUDE.md`).
 - ⚠️ **Needs the Workers Paid plan** (~100 ms CPU per render vs Free's 10 ms limit).
-- ⚠️ **Renders are covered by `wrangler dev`, not by the test suite** — see **JavaScript tests**.
+- ⚠️ **Renders are covered by `wrangler dev`, not by the test suite** — see **The two local loops**
+  and **JavaScript tests**.
 - `src/assets/` holds the card's font and logo, imported as Data modules (hence the `rules` entry
   in `wrangler.jsonc`).
 
@@ -228,7 +253,8 @@ so anything the build or deploy needs must be a `dependency` — `esbuild`, the 
 
 ⚠️ **`satori` and `@resvg/resvg-wasm` are the two dependencies CI cannot vet.** Nothing in the test
 suite executes a render, and a major bump can quietly change the wasm-init contract or the card's
-text metrics. Render a card in `wrangler dev` and look at it before merging a Dependabot PR.
+text metrics. Render a card in `wrangler dev` (**The two local loops**) and look at it before
+merging a Dependabot PR.
 
 **Widget markup**: editing a placeholder partial means editing the matching `api/` view too (root
 `CLAUDE.md`).
@@ -256,7 +282,7 @@ syntax error that looks nothing like its cause. That's why `handleOg` takes its 
 injected `RenderCard` parameter and reaches the real one through a dynamic `import()` —
 `test/og.test.ts` covers the whole route contract with the render stubbed, and
 `test/index.test.ts`'s routing case is a `POST` precisely because a 405 is answered before the
-import. Verify renders with `npx wrangler dev`.
+import. Verify renders with `npx wrangler dev` — see **The two local loops**.
 
 Conventions for `test/browser/`:
 

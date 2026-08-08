@@ -32,7 +32,14 @@ Requirements: Ruby and Node.
 4. Start the local server: `bundle exec middleman` (it runs the esbuild watcher itself, so JS/CSS rebuild on change automatically).
 5. To refresh data without a full rebuild: `bundle exec rake import`.
 
-The dynamic routes (`/widgets/*`, `POST /api/contact`, `/pa/*`) are Worker code, so they don't run under `middleman server` — the widgets simply collapse. To exercise them locally, build first and then run `npx wrangler dev`.
+The dynamic routes (`/widgets/*`, `POST /api/contact`, `/pa/*`) and the on-demand Open Graph cards are Worker code, so they don't run under `middleman server` — the widgets simply collapse. To exercise them, run the Worker instead:
+
+```sh
+bundle exec rake build:fast   # rebuild build/ from the data already imported
+npx wrangler dev              # http://localhost:8787
+```
+
+`wrangler dev` serves the `build/` directory rather than `source/`, so re-run `build:fast` after each change. It reads `.env` for `KONA_API_URL` and `API_TOKEN`, so the widgets hit whichever API that file names — point it at a local [`api/`](../api/README.md) to run both apps together.
 
 ## Common commands
 
@@ -44,5 +51,6 @@ The dynamic routes (`/widgets/*`, `POST /api/contact`, `/pa/*`) are Worker code,
 | `bundle exec rake import:standard_site` | Fetch standard.site verification data from the API |
 | `bundle exec rake test` | Run the test suite |
 | `bundle exec rake build:verbose` | Full build: test → import → Middleman (which runs the JS build) |
+| `bundle exec rake build:fast` | Build from the existing `data/`, skipping the import |
 | `npm run lint:scss` / `npm run format:check` | Lint SCSS / check JS, JSON, MD formatting |
 | `bundle exec rake redis:clear` | Flush the Redis cache |
