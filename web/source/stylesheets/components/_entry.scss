@@ -157,43 +157,85 @@
 .entry__table {
   --shadow-color: var(--color-background);
 
+  border-radius: var(--radius-medium);
+  border: 1px solid var(--color-border);
   display: block;
   margin: 2rem 0;
 
+  // ⚠️ Stands in for `:host` until the element upgrades — without a scroll container here the table
+  // bursts through the border and the sticky column resolves against the viewport.
+  &:not(:defined) {
+    overflow: auto hidden;
+    position: relative;
+  }
+
+  // ⚠️ The start shadow paints 2rem of gradient at z-index 2, directly over the pinned labels.
+  &::part(start-shadow) {
+    display: none;
+  }
+
+  // ⚠️ `separate`, not `collapse`: Chromium and WebKit ignore `position: sticky` on cells in
+  // collapsed-border mode.
   table {
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     font-family: var(--ibm-plex-mono);
     font-size: var(--font-table);
+    font-variant-numeric: tabular-nums;
+    font-weight: 300;
     line-height: var(--line-height-table);
     width: 100%;
   }
 
-  thead tr {
+  th,
+  td {
+    padding: 0.75rem 1rem;
+    white-space: nowrap;
+  }
+
+  // ⚠️ 300 and 600 are the only IBM Plex Mono weights loaded; anything else snaps to one of them.
+  thead th {
     background-color: var(--color-table-header-background);
-    color: var(--color-text);
-    font-weight: bold;
+    border-bottom: 2px solid var(--color-heading);
+    color: var(--color-heading);
+    font-weight: 600;
     text-align: left;
     text-transform: uppercase;
   }
 
-  th,
-  td {
-    padding: 1rem;
-    white-space: nowrap;
-  }
-
-  tbody tr {
+  // ⚠️ Cells, not rows: a row paints beneath the sticky column, so a transparent cell would let the
+  // scrolled values show through it.
+  tbody td {
     background-color: var(--color-table-cell-background);
-    border-bottom: 1px solid var(--color-table-cell-border);
-
-    &:nth-of-type(even) {
-      background-color: var(--color-table-even-cell-background);
-    }
-
-    &:last-of-type {
-      border-bottom: 2px solid var(--color-table-last-cell-border);
-    }
   }
+
+  // `tr + tr` — the header's 2px rule already separates the first row.
+  tbody tr + tr td {
+    border-top: 1px solid var(--color-table-cell-border);
+  }
+
+  // Pins the label column so the values stay labelled while they scroll. ⚠️ Labels wrap where the
+  // value cells don't: at `nowrap` a long one takes 61% of a phone's width. The `ch` floor keeps
+  // short labels on one line and tracks --font-table across the breakpoint.
+  th:first-child,
+  td:first-child {
+    border-inline-end: 1px solid var(--color-table-cell-border);
+    inset-inline-start: 0;
+    min-width: 16ch;
+    position: sticky;
+    white-space: normal;
+    z-index: 3;
+  }
+}
+
+// The trailing line of a two-line cell, split out of a <br> by
+// MarkupHelpers#split_table_cell_annotations. ⚠️ Resets the size %body-styles gives `small`, which
+// would undo the table's density.
+.entry__table-annotation {
+  color: var(--color-text-secondary);
+  display: block;
+  font-size: inherit;
+  line-height: inherit;
 }
 
 .entry--article .entry__body {

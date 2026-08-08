@@ -13,9 +13,45 @@ body,
   display: block;
 }
 
+// ⚠️ The host clips overflow, so without these a table wider than the paper silently loses its
+// right-hand columns.
 .entry__table {
+  border-color: var(--color-text-tertiary);
   margin-left: 0;
   margin-right: 0;
+  overflow: visible;
+
+  &::part(content) {
+    overflow: visible;
+  }
+
+  &::part(end-shadow) {
+    display: none;
+  }
+
+  th,
+  td {
+    white-space: normal;
+  }
+
+  th:first-child,
+  td:first-child {
+    border-inline-end-color: var(--color-text-tertiary);
+    position: static;
+    z-index: auto;
+  }
+
+  tbody tr + tr td {
+    border-top-color: var(--color-text-tertiary);
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr {
+    break-inside: avoid;
+  }
 }
 
 .entry__figure {

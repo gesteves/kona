@@ -83,9 +83,7 @@
   --color-share-button-text:              var(--color-text);
   --color-table-cell-background:          var(--color-background);
   --color-table-cell-border:              var(--color-alice-blue-darker);
-  --color-table-even-cell-background:     var(--color-alice-blue);
-  --color-table-header-background:        var(--color-columbia-blue);
-  --color-table-last-cell-border:         var(--color-columbia-blue);
+  --color-table-header-background:        var(--color-alice-blue);
   --color-text-secondary:                 var(--color-granite-gray);
 
   // Not spanish-gray (#999): it measures 2.85:1 on white, and this token colors the entry meta
@@ -114,7 +112,7 @@
   --line-height-medium:     1.5;
   --line-height-small:      2;
   --line-height-x-small:    2.4;
-  --line-height-table:      2;
+  --line-height-table:      1.5;
 
   // Fonts
   --ibm-plex-mono:           'IBM Plex Mono', ui-monospace, 'Cascadia Code', 'Source Code Pro', menlo, consolas, 'DejaVu Sans Mono', monospace;
@@ -141,7 +139,7 @@
     --font-small:          18px;
     --font-x-small:        12px;
     --font-table:          16px;
-    --line-height-table:   2.25;
+    --line-height-table:   1.6;
     --line-height-x-small: 3;
     --padding:             4rem;
     --picture-outdent:     calc((100vw - (var(--content-padding) * 2) - (11 * var(--column-gap))) / 12 + var(--column-gap));
@@ -175,10 +173,8 @@
     --color-selection-background:       var(--color-oxford-blue);
     --color-selection-text:             var(--color-sunglow);
     --color-share-button-border:        var(--color-prussian-blue);
-    --color-table-cell-border:          var(--color-rich-black);
-    --color-table-even-cell-background: var(--color-rich-black-darker);
-    --color-table-header-background:    var(--color-oxford-blue);
-    --color-table-last-cell-border:     var(--color-oxford-blue);
+    --color-table-cell-border:          var(--color-oxford-blue);
+    --color-table-header-background:    var(--color-rich-black);
     --color-text-secondary:             var(--color-silver-chalice);
     --color-text-tertiary:              var(--color-sonic-silver);
     --color-text:                       var(--color-platinum);

@@ -52,6 +52,38 @@ RSpec.describe MarkupHelpers do
     end
   end
 
+  describe '#scope_table_headers' do
+    it 'marks header cells as column headers' do
+      transformed_html = scope_table_headers('<table><thead><tr><th></th><th>Bike</th></tr></thead><tbody><tr><td>Sweat rate</td><td>1.48 L/h</td></tr></tbody></table>')
+      expect(transformed_html).to include('<th scope="col"></th>')
+      expect(transformed_html).to include('<th scope="col">Bike</th>')
+      expect(transformed_html).to include('<td>Sweat rate</td>')
+    end
+  end
+
+  describe '#split_table_cell_annotations' do
+    it 'wraps the text after a line break in an annotation' do
+      transformed_html = split_table_cell_annotations('<table><tbody><tr><td>1.48 L/h<br>62nd percentile</td></tr></tbody></table>')
+      expect(transformed_html).to include('<td>1.48 L/h<small class="entry__table-annotation">62nd percentile</small>')
+    end
+
+    it 'splits only at the first line break' do
+      transformed_html = split_table_cell_annotations('<table><tbody><tr><td>1.5 L<br>29% replaced<br>moderate</td></tr></tbody></table>')
+      expect(transformed_html).to include('<small class="entry__table-annotation">29% replaced<br>moderate</small>')
+    end
+
+    it 'preserves markup inside the annotation' do
+      transformed_html = split_table_cell_annotations('<table><tbody><tr><th>33 mmol/L<br><em>759</em> mg/L</th></tr></tbody></table>')
+      expect(transformed_html).to include('<small class="entry__table-annotation"><em>759</em> mg/L</small>')
+    end
+
+    it 'leaves cells without a line break alone' do
+      transformed_html = split_table_cell_annotations('<table><tbody><tr><td>882 mg/h</td></tr></tbody></table>')
+      expect(transformed_html).to include('<td>882 mg/h</td>')
+      expect(transformed_html).not_to include('<small')
+    end
+  end
+
   describe '#mark_affiliate_links' do
     let(:html_with_affiliate_link) { "<a href=\"#{affiliate_link}\">Affiliate</a>" }
     let(:html_without_affiliate_link) { "<a href=\"#{non_affiliate_link}\">Non-Affiliate</a>" }

@@ -32,6 +32,8 @@ module MarkupHelpers
       set_alt_text(doc)
       mark_affiliate_links(doc)
       responsivize_tables(doc)
+      scope_table_headers(doc)
+      split_table_cell_annotations(doc)
       add_heading_permalinks(doc)
       lazy_load_iframes(doc)
     end
@@ -366,6 +368,39 @@ module MarkupHelpers
   def responsivize_tables(html, css_class: "entry__table")
     with_nokogiri_doc(html) do |doc|
       doc.css("table").each { |table| table.wrap("<wa-scroller class=\"#{css_class}\" orientation=\"horizontal\"></wa-scroller>") }
+    end
+  end
+
+  # Marks table header cells as column headers.
+  # @param html [String, Nokogiri::XML::Node] The HTML to process.
+  # @return [String, Nokogiri::XML::Node] The processed HTML.
+  def scope_table_headers(html)
+    with_nokogiri_doc(html) do |doc|
+      doc.css("thead th").each { |th| th["scope"] = "col" }
+    end
+  end
+
+  # Wraps the text after a table cell's first <br> so the trailing annotation can recede behind the
+  # measurement it qualifies.
+  # @param html [String, Nokogiri::XML::Node] The HTML to process.
+  # @param css_class [String] The class applied to the annotation.
+  # @return [String, Nokogiri::XML::Node] The processed HTML.
+  def split_table_cell_annotations(html, css_class: "entry__table-annotation")
+    with_nokogiri_doc(html) do |doc|
+      doc.css("table th, table td").each do |cell|
+        line_break = cell.at_css("br")
+        next if line_break.nil?
+        annotation = Nokogiri::XML::Node.new("small", cell.document)
+        annotation["class"] = css_class
+        sibling = line_break.next_sibling
+        while sibling
+          # ⚠️ Read the next sibling first — add_child unlinks the node.
+          following = sibling.next_sibling
+          annotation.add_child(sibling)
+          sibling = following
+        end
+        line_break.replace(annotation)
+      end
     end
   end
 
