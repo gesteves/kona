@@ -1,4 +1,5 @@
-import * as Turbo from '@hotwired/turbo';
+// Side-effect import: Turbo self-installs on load and nothing here references its exports.
+import '@hotwired/turbo';
 import { Application } from '@hotwired/stimulus';
 import '@web.awesome.me/webawesome-pro/dist/styles/themes/default.css';
 import '@web.awesome.me/webawesome-pro/dist/components/skeleton/skeleton.js';
@@ -23,16 +24,19 @@ import SearchController from './controllers/search_controller';
 import ShareController from './controllers/share_controller';
 import UnitsController from './controllers/units_controller';
 
-window.Stimulus = Application.start();
-Stimulus.register('back-to-top', BackToTopController);
-Stimulus.register('clipboard', ClipboardController);
-Stimulus.register('contact', ContactController);
-Stimulus.register('current-year', CurrentYearController);
-Stimulus.register('image-placeholder', ImagePlaceholderController);
-Stimulus.register('live-update', LiveUpdateController);
-Stimulus.register('nav', NavController);
-Stimulus.register('page', PageController);
-Stimulus.register('publish-date', PublishDateController);
-Stimulus.register('search', SearchController);
-Stimulus.register('share', ShareController);
-Stimulus.register('units', UnitsController);
+// window.Stimulus stays exposed for console debugging, but registration goes through the
+// local binding — the bare global was invisible to static analysis.
+const application = Application.start();
+window.Stimulus = application;
+application.register('back-to-top', BackToTopController);
+application.register('clipboard', ClipboardController);
+application.register('contact', ContactController);
+application.register('current-year', CurrentYearController);
+application.register('image-placeholder', ImagePlaceholderController);
+application.register('live-update', LiveUpdateController);
+application.register('nav', NavController);
+application.register('page', PageController);
+application.register('publish-date', PublishDateController);
+application.register('search', SearchController);
+application.register('share', ShareController);
+application.register('units', UnitsController);

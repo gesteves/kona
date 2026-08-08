@@ -122,6 +122,11 @@ jobs:
       - name: RuboCop (style)
         run: bundle exec rubocop --no-color
 
+      # Covers source/javascripts/** and test/browser/**, which `npm run check` doesn't reach —
+      # both tsconfigs include only src/ and test/*.ts. See eslint.config.mjs.
+      - name: Lint JavaScript
+        run: npm run lint:js
+
       - name: Lint stylesheets
         run: npm run lint:scss
 

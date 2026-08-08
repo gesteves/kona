@@ -25,9 +25,13 @@ const controllerFiles = readdirSync(join(STIMULUS_DIR, 'controllers'))
 const identifierFor = (file) =>
   file.replace(/_controller\.js$/, '').replace(/_/g, '-');
 
-/** Every `Stimulus.register('id', ClassName)` in index.js, as [identifier, className]. */
+/**
+ * Every `<application>.register('id', ClassName)` in index.js, as [identifier, className].
+ * The receiver is matched loosely on purpose: this reads index.js as text, so pinning it to one
+ * variable name makes a rename look like every controller silently unregistering.
+ */
 const registrations = [
-  ...indexSource.matchAll(/Stimulus\.register\(\s*'([^']+)'\s*,\s*(\w+)\s*\)/g),
+  ...indexSource.matchAll(/\b\w+\.register\(\s*'([^']+)'\s*,\s*(\w+)\s*\)/g),
 ].map((match) => [match[1], match[2]]);
 
 /** Every `import ClassName from './controllers/file'` in index.js, as [className, file]. */

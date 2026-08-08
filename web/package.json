@@ -4,6 +4,8 @@
     "watch": "esbuild source/javascripts/stimulus/index.js --bundle --target=es2020 --outfile=tmp/dist/javascripts/site.js --watch=forever",
     "lint:scss": "stylelint \"source/stylesheets/**/*.scss\"",
     "lint:scss:fix": "stylelint \"source/stylesheets/**/*.scss\" --fix",
+    "lint:js": "eslint .",
+    "lint:js:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{js,ts,mts,json,md}\"",
     "format:check": "prettier --check \"**/*.{js,ts,mts,json,md}\"",
     "check": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
@@ -24,6 +26,9 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.20.1",
     "@cloudflare/workers-types": "^5.20260729.1",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.8.1",
+    "globals": "^17.9.0",
     "jsdom": "^30.0.1",
     "prettier": "^3.9.5",
     "stylelint": "^17.14.0",

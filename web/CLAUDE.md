@@ -34,6 +34,7 @@ bundle exec middleman                 # dev server (runs the esbuild watcher too
 
 # Lint / format
 bundle exec rubocop                   # Ruby; -a to autocorrect. Same ruleset as api/ — see api/CLAUDE.md
+npm run lint:js                       # fix: npm run lint:js:fix
 npm run lint:scss                     # fix: npm run lint:scss:fix
 npm run format:check                  # fix: npm run format
 
@@ -159,6 +160,15 @@ extensionless without adding the exclusion first.
 `caches.default`) is **separate** from `tsconfig.json` (src only, `types: []` + the `env.d.ts`
 shims). The two must never share a compile.
 
+⚠️ Between them those two tsconfigs cover `src/` and `test/*.ts` — and nothing else. **ESLint
+(`eslint.config.mjs`) exists to cover the rest**: `source/javascripts/**` and `test/browser/**`,
+which no typechecker reads. It deliberately does *not* lint `src/**/*.ts`: that needs
+typescript-eslint, which still caps its TypeScript peer at `<6.1.0` while this project is on
+TypeScript 7. Its type-aware rules call the TS compiler API, so forcing the peer would be broken,
+not merely unsupported — revisit when it catches up. ESLint enables **no formatting rules**
+(verified: 0 of 64), so Prettier keeps sole ownership of layout and `eslint-config-prettier`
+isn't needed.
+
 ⚠️ **The pool config is `vitest.config.mts`, not `.ts`** — pool 0.18 is ESM-only, and without
 `"type": "module"` in `package.json` Vite loads a `.ts` config as CJS and the import fails.
 Outbound fetch mocking is hand-rolled in `test/helpers.ts` (`interceptFetch`); the pool's
@@ -198,7 +208,8 @@ Names only — see `.env.example`; never commit values.
 ## Conventions & gates
 
 **Before committing** (non-negotiable): `bundle exec rake test` + `npm test` + `npm run check`
-pass → `bundle exec rubocop` + `npm run lint:scss` + `npm run format:check` clean →
+pass → `bundle exec rubocop` + `npm run lint:js` + `npm run lint:scss` + `npm run format:check`
+clean →
 `bundle exec rake build:verbose` succeeds. ⚠️ **`rake build` does NOT run tests**, and it is the
 only gate that exercises the templates — a broken partial passes every other check and fails the
 deploy. ⚠️ Run it with the CI env shape (`READING_TIME_WPM="" TIME_ZONE=""`): an unset GitHub
