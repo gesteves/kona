@@ -14,6 +14,6 @@ module UrlHelpers
   #   There is no remote non-production build — the deploy workflow only ships from main and
   #   the Worker has no preview URLs.
   def root_url
-    production? ? ENV['URL'] : 'http://localhost:4567'
+    production? ? ENV["URL"] : "http://localhost:4567"
   end
 end

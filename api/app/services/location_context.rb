@@ -33,7 +33,7 @@ class LocationContext
   # "city, state, country" (with the obfuscated city), falling back to the label.
   # @return [String]
   def location
-    @location ||= [city, state, country].compact_blank.join(", ").presence || label
+    @location ||= [ city, state, country ].compact_blank.join(", ").presence || label
   end
 
   # The city, using a broader lookup than the label's (locality → sublocality → the two admin

@@ -26,7 +26,7 @@ RSpec.describe Intervals do
     end
 
     it "treats a missing distance as zero" do
-      allow(service).to receive(:get_json).and_return([{ "type" => "Run" }])
+      allow(service).to receive(:get_json).and_return([ { "type" => "Run" } ])
       expect(service.stats[:run_distance]).to eq(0)
     end
 
@@ -146,8 +146,8 @@ RSpec.describe Intervals do
     end
 
     it "returns the weather-config forecasts array (empty when none configured)" do
-      allow(service).to receive(:get_json!).and_return({ forecasts: [{ id: 1 }] })
-      expect(service.weather_config).to eq([{ id: 1 }])
+      allow(service).to receive(:get_json!).and_return({ forecasts: [ { id: 1 } ] })
+      expect(service.weather_config).to eq([ { id: 1 } ])
 
       allow(service).to receive(:get_json!).and_return({})
       expect(service.weather_config).to eq([])
@@ -155,7 +155,7 @@ RSpec.describe Intervals do
 
     it "PUTs the weather config wrapped under :forecasts" do
       allow(HTTParty).to receive(:put).and_return(ok)
-      forecasts = [{ id: 0, provider: "OPEN_WEATHER", enabled: true }]
+      forecasts = [ { id: 0, provider: "OPEN_WEATHER", enabled: true } ]
 
       service.update_weather_config(forecasts)
 

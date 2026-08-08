@@ -90,5 +90,5 @@ end
 # must never be pinned at the edge.
 RACK_ATTACK_PLAIN_TEXT = { "content-type" => "text/plain; charset=utf-8" }.freeze
 
-Rack::Attack.blocklisted_responder = ->(_req) { [403, RACK_ATTACK_PLAIN_TEXT.dup, ["403 Forbidden\n"]] }
-Rack::Attack.throttled_responder   = ->(_req) { [429, RACK_ATTACK_PLAIN_TEXT.dup, ["429 Too Many Requests\n"]] }
+Rack::Attack.blocklisted_responder = ->(_req) { [ 403, RACK_ATTACK_PLAIN_TEXT.dup, [ "403 Forbidden\n" ] ] }
+Rack::Attack.throttled_responder   = ->(_req) { [ 429, RACK_ATTACK_PLAIN_TEXT.dup, [ "429 Too Many Requests\n" ] ] }

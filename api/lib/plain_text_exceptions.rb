@@ -11,8 +11,8 @@ class PlainTextExceptions
     body    = "#{status} #{message}\n"
 
     headers = { "content-type" => "text/plain; charset=utf-8" }
-    return [status, headers.merge("content-length" => "0"), []] if request.head?
+    return [ status, headers.merge("content-length" => "0"), [] ] if request.head?
 
-    [status, headers.merge("content-length" => body.bytesize.to_s), [body]]
+    [ status, headers.merge("content-length" => body.bytesize.to_s), [ body ] ]
   end
 end

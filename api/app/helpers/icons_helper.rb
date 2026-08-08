@@ -8,7 +8,7 @@ module IconsHelper
     # Memoize per request (the helper context): fragments repeat icon ids (e.g. arrow-down
     # per stat), and each un-memoized lookup is a Redis round-trip.
     @icon_svg_cache ||= {}
-    key = [family, style, icon_id]
+    key = [ family, style, icon_id ]
     @icon_svg_cache[key] = (@font_awesome ||= FontAwesome.new).svg(family, style, icon_id) unless @icon_svg_cache.key?(key)
 
     # Decorative icons: hide from assistive tech (they always sit next to a text label or
@@ -41,7 +41,7 @@ module IconsHelper
     icon_id = if hours == 4 && suffix.blank?
       "clock" # there's no clock-four icon
     else
-      ["clock", CLOCK_NUMBER_WORDS[hours], suffix].reject(&:blank?).join("-")
+      [ "clock", CLOCK_NUMBER_WORDS[hours], suffix ].reject(&:blank?).join("-")
     end
 
     icon_svg(family, style, icon_id)

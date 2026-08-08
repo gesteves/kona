@@ -6,8 +6,8 @@
 #
 # @yieldparam [Module] Each helper module.
 def each_kona_helper
-  Dir[File.expand_path('helpers/*.rb', __dir__)].sort.each do |file|
+  Dir[File.expand_path("helpers/*.rb", __dir__)].sort.each do |file|
     require file
-    yield File.basename(file, '.rb').camelcase.constantize
+    yield File.basename(file, ".rb").camelcase.constantize
   end
 end

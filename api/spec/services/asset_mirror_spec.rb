@@ -32,7 +32,7 @@ describe AssetMirror do
     item = url.nil? ? nil : { url: url, contentType: content_type }
     allow(contentful).to receive(:items)
       .with(described_class::ASSET_QUERY, { id: "asset1" }, collection: :assets)
-      .and_return(item.nil? ? [] : [item])
+      .and_return(item.nil? ? [] : [ item ])
   end
 
   # The download streams via Net::HTTP#read_body (see AssetMirror#download for why it can't be
@@ -136,7 +136,7 @@ describe AssetMirror do
       stub_asset(url: "//downloads.ctfassets.net/space/asset1/token/photo.jpg")
       expect(client).to receive(:put_object).with(hash_including(key: key))
       mirror.sync("asset1")
-      expect(requested).to eq(["https://downloads.ctfassets.net/space/asset1/token/photo.jpg"])
+      expect(requested).to eq([ "https://downloads.ctfassets.net/space/asset1/token/photo.jpg" ])
     end
 
     it "skips an asset Contentful has no published record of" do
@@ -171,14 +171,14 @@ describe AssetMirror do
     end
 
     it "enqueues a sync job per asset" do
-      stub_list([{ sys: { id: "asset1" } }, { sys: { id: "asset2" } }])
+      stub_list([ { sys: { id: "asset1" } }, { sys: { id: "asset2" } } ])
       expect(mirror.backfill).to eq(2)
       expect(AssetSyncJob).to have_enqueued_sidekiq_job("asset1")
       expect(AssetSyncJob).to have_enqueued_sidekiq_job("asset2")
     end
 
     it "counts without enqueuing on a dry run" do
-      stub_list([{ sys: { id: "asset1" } }])
+      stub_list([ { sys: { id: "asset1" } } ])
       expect(mirror.backfill(dry_run: true)).to eq(1)
       expect(AssetSyncJob.jobs).to be_empty
     end

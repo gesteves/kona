@@ -187,7 +187,7 @@ class WeatherSummaryPresenter
     return "Sunset will be at #{format_time(todays_sunset)}" if now >= todays_sunrise.beginning_of_hour && now < todays_sunset.beginning_of_hour
 
     tomorrow = tomorrows_sunrise(@weather, @time_zone)
-    return "Sunrise will be at #{format_time(tomorrow)}" if tomorrow.present? && now >= todays_sunset.beginning_of_hour
+    "Sunrise will be at #{format_time(tomorrow)}" if tomorrow.present? && now >= todays_sunset.beginning_of_hour
   end
 
   def activities

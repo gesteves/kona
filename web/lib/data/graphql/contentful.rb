@@ -1,6 +1,6 @@
-require 'graphql/client'
-require 'graphql/client/http'
-require 'dotenv'
+require "graphql/client"
+require "graphql/client/http"
+require "dotenv"
 
 module ContentfulClient
   Dotenv.load

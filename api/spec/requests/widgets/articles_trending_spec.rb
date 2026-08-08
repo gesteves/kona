@@ -18,13 +18,13 @@ RSpec.describe "Widgets::Articles trending", type: :request do
   let(:art_steady)   { article(id: "a6", title: "Steady Article",   slug: "steady",   published_at: "2023-12-01T10:00:00Z") }
   let(:art_short)    { article(id: "s1", title: "A Short Post",     slug: "short",     published_at: "2024-06-01T10:00:00Z", entry_type: "Short") }
 
-  let(:corpus) { [art_newest, art_april, art_march, art_february, art_spiking, art_steady, art_short] }
+  let(:corpus) { [ art_newest, art_april, art_march, art_february, art_spiking, art_steady, art_short ] }
 
   # a5 surges (a modest recent count on a tiny baseline); a6 is steadily popular (high traffic in line
   # with its own high baseline); everyone else has no traffic. So ranking is: a5, a6, then the rest by
   # recency.
   def rows(by_path)
-    by_path.map { |path, total| { dimensions: [path], metrics: [total] } }
+    by_path.map { |path, total| { dimensions: [ path ], metrics: [ total ] } }
   end
 
   before do

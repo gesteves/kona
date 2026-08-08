@@ -25,6 +25,6 @@ $redis ||= ConnectionPool::Wrapper.new(size: REDIS_POOL_SIZE, timeout: 5) do
     connect_timeout: 5,
     read_timeout: 3,
     write_timeout: 3,
-    reconnect_attempts: [0.1, 0.5, 1.0]
+    reconnect_attempts: [ 0.1, 0.5, 1.0 ]
   )
 end

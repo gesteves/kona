@@ -1,0 +1,14 @@
+# Rails' own ruleset, inherited verbatim — see api/.rubocop.yml for what it does and why there
+# are no rule overrides. This app isn't Rails, but the ruleset is general Ruby style and sharing
+# one config across both apps is the point.
+#
+# Only .rb files are linted: the ERB templates under source/ are markup, and RuboCop doesn't
+# read them.
+inherit_gem:
+  rubocop-rails-omakase: rubocop.yml
+
+AllCops:
+  Exclude:
+    - "build/**/*"
+    - "tmp/**/*"
+    - "node_modules/**/*"

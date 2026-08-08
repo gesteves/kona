@@ -20,8 +20,8 @@ module ErrorReporter
     exception = build_exception(error, service: service, context: context)
     Bugsnag.notify(exception) do |report|
       report.severity = "warning"
-      report.context = [service, context].compact.join(" · ").presence
-      report.grouping_hash = [service, context, status || exception.class.name].compact.join(":")
+      report.context = [ service, context ].compact.join(" · ").presence
+      report.grouping_hash = [ service, context, status || exception.class.name ].compact.join(":")
       report.add_metadata(:upstream, {
         service: service,
         context: context,

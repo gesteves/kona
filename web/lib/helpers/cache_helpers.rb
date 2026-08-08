@@ -1,4 +1,4 @@
-require_relative '../utils/redis_connection'
+require_relative "../utils/redis_connection"
 
 module CacheHelpers
   def redis

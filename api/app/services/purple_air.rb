@@ -100,19 +100,19 @@ class PurpleAir < ApplicationService
     return if pm25.blank?
     pm25 = pm25.round(1)
     aqi, category = case pm25
-                    when 0..9.0
-                      [calculate_aqi(pm25, 0, 9.0, 0, 50), "Good"]
-                    when 9.1..35.4
-                      [calculate_aqi(pm25, 9.1, 35.4, 51, 100), "Moderate"]
-                    when 35.5..55.4
-                      [calculate_aqi(pm25, 35.5, 55.4, 101, 150), "Unhealthy for sensitive groups"]
-                    when 55.5..125.4
-                      [calculate_aqi(pm25, 55.5, 125.4, 151, 200), "Unhealthy"]
-                    when 125.5..225.4
-                      [calculate_aqi(pm25, 125.5, 225.4, 201, 300), "Very unhealthy"]
-                    else
-                      [calculate_aqi(pm25, 225.5, 500.0, 301, 500), "Hazardous"]
-                    end
+    when 0..9.0
+                      [ calculate_aqi(pm25, 0, 9.0, 0, 50), "Good" ]
+    when 9.1..35.4
+                      [ calculate_aqi(pm25, 9.1, 35.4, 51, 100), "Moderate" ]
+    when 35.5..55.4
+                      [ calculate_aqi(pm25, 35.5, 55.4, 101, 150), "Unhealthy for sensitive groups" ]
+    when 55.5..125.4
+                      [ calculate_aqi(pm25, 55.5, 125.4, 151, 200), "Unhealthy" ]
+    when 125.5..225.4
+                      [ calculate_aqi(pm25, 125.5, 225.4, 201, 300), "Very unhealthy" ]
+    else
+                      [ calculate_aqi(pm25, 225.5, 500.0, 301, 500), "Hazardous" ]
+    end
 
     description = category == "Unhealthy for sensitive groups" ? "Unhealthy air quality for sensitive groups" : "#{category} air quality"
     { aqi: aqi, category: category, description: description }.compact

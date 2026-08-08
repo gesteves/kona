@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe WhoopPresenter do
-  def presenter(stats:, workouts: [double("workout")])
+  def presenter(stats:, workouts: [ double("workout") ])
     described_class.new(stats: stats, workouts: workouts, time_zone: "America/Denver")
   end
 
@@ -21,7 +21,7 @@ RSpec.describe WhoopPresenter do
   end
 
   describe "#strain_label" do
-    def label_for(strain, workouts: [double("workout")])
+    def label_for(strain, workouts: [ double("workout") ])
       presenter(stats: { physiological_cycle: { score: { strain: strain } } }, workouts: workouts).strain_label
     end
 

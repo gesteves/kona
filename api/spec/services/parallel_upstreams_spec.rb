@@ -24,7 +24,7 @@ RSpec.describe ParallelUpstreams do
     barrier = Queue.new
     started = Queue.new
     blocks = (1..3).to_h do |i|
-      [:"job#{i}", -> { started << i; 3.times { barrier.pop }; i }]
+      [ :"job#{i}", -> { started << i; 3.times { barrier.pop }; i } ]
     end
 
     thread = Thread.new { runner.run(**blocks) }

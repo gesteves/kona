@@ -33,13 +33,13 @@ RSpec.describe UpcomingRacesPresenter do
   end
 
   it "is empty (and fetches no weather) when nothing is upcoming" do
-    presenter = presenter_for([build_event(days_from_today: -5)])
+    presenter = presenter_for([ build_event(days_from_today: -5) ])
     expect(presenter.races).to eq([])
     expect(RaceDayWeather).not_to have_received(:new)
   end
 
   context "when the next race is close but not today" do
-    let(:presenter) { presenter_for([build_event(days_from_today: 3), build_event(days_from_today: 20)]) }
+    let(:presenter) { presenter_for([ build_event(days_from_today: 3), build_event(days_from_today: 20) ]) }
 
     it "features it with its race-day weather, with no today's-race section" do
       expect(presenter.featured.sys.id).to eq("evt-3")
@@ -58,7 +58,7 @@ RSpec.describe UpcomingRacesPresenter do
 
   context "on race day" do
     let(:presenter) do
-      presenter_for([build_event(days_from_today: 0), build_event(days_from_today: 5), build_event(days_from_today: 8)])
+      presenter_for([ build_event(days_from_today: 0), build_event(days_from_today: 5), build_event(days_from_today: 8) ])
     end
 
     it "splits today's race from the other upcoming races" do
@@ -75,7 +75,7 @@ RSpec.describe UpcomingRacesPresenter do
   end
 
   context "when a featured (not-today) event has no weather to show" do
-    let(:events) { [3, 5, 8, 9].map { |d| build_event(days_from_today: d) } }
+    let(:events) { [ 3, 5, 8, 9 ].map { |d| build_event(days_from_today: d) } }
 
     it "demotes it to a regular race and trims to the non-featured count" do
       allow(weather).to receive(:forecast).and_return(nil)
@@ -90,7 +90,7 @@ RSpec.describe UpcomingRacesPresenter do
 
   context "when the next race is more than 10 days out" do
     it "features nothing and fetches no weather" do
-      presenter = presenter_for([build_event(days_from_today: 15), build_event(days_from_today: 20)])
+      presenter = presenter_for([ build_event(days_from_today: 15), build_event(days_from_today: 20) ])
 
       expect(presenter.featured).to be_nil
       expect(presenter.races.size).to eq(2)

@@ -91,6 +91,10 @@ jobs:
           working-directory: api
           bundler-cache: true
 
+      # Rails' omakase ruleset, inherited verbatim — see api/.rubocop.yml.
+      - name: RuboCop (style)
+        run: bundle exec rubocop --no-color
+
       - name: Brakeman (static analysis)
         run: bundle exec brakeman -q --no-pager
 

@@ -11,7 +11,7 @@ RSpec.describe ActivityDescription::Llm do
 
   def message_with(json)
     block = instance_double(Anthropic::Models::TextBlock, type: :text, text: json.to_json)
-    instance_double(Anthropic::Models::Message, content: [block])
+    instance_double(Anthropic::Models::Message, content: [ block ])
   end
 
   describe ".planned_summary" do

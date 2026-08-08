@@ -14,7 +14,7 @@ RSpec.describe Plausible do
 
   # { path => pageviews } → the event:page rows Plausible returns.
   def rows(by_path)
-    by_path.map { |path, total| { dimensions: [path], metrics: [total] } }
+    by_path.map { |path, total| { dimensions: [ path ], metrics: [ total ] } }
   end
 
   describe "#pageviews_by_path" do
@@ -36,9 +36,9 @@ RSpec.describe Plausible do
     it "asks for every article page in a single query" do
       expect(service).to receive(:post_json).once do |_url, **options|
         body = JSON.parse(options[:body])
-        expect(body["dimensions"]).to eq(["event:page"])
+        expect(body["dimensions"]).to eq([ "event:page" ])
         expect(body["date_range"]).to eq("all")
-        expect(body["filters"]).to eq([["matches", "event:page", ["^/20\\d{2}/"]]])
+        expect(body["filters"]).to eq([ [ "matches", "event:page", [ "^/20\\d{2}/" ] ] ])
         { results: [] }
       end
 
@@ -54,7 +54,7 @@ RSpec.describe Plausible do
 
     it "skips rows with a blank path" do
       allow(service).to receive(:post_json)
-        .and_return(results: rows("/2026/05/01/a/" => 12) + [{ dimensions: [nil], metrics: [9] }])
+        .and_return(results: rows("/2026/05/01/a/" => 12) + [ { dimensions: [ nil ], metrics: [ 9 ] } ])
 
       expect(service.pageviews_by_path).to eq("/2026/05/01/a/" => 12)
     end

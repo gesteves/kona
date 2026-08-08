@@ -162,7 +162,7 @@ RSpec.describe ApplicationService do
 
       service.retrying(max: 3) { raise "boom" }
 
-      expect(slept).to eq([2, 4, 8])
+      expect(slept).to eq([ 2, 4, 8 ])
     end
 
     it "honors a smaller base_delay" do
@@ -171,7 +171,7 @@ RSpec.describe ApplicationService do
 
       service.retrying(max: 2, base_delay: 0.25) { raise "boom" }
 
-      expect(slept).to eq([0.25, 0.5])
+      expect(slept).to eq([ 0.25, 0.5 ])
     end
 
     # ⚠️ The whole point of the deadline: the default backoff totals 14s, which is longer than the
@@ -185,7 +185,7 @@ RSpec.describe ApplicationService do
       result = service.retrying(max: 5, base_delay: 1, deadline: 2) { calls += 1; raise "boom" }
 
       expect(result).to be_nil
-      expect(slept).to eq([1])   # 1s fits under 2s; the next 2s backoff would not
+      expect(slept).to eq([ 1 ])   # 1s fits under 2s; the next 2s backoff would not
       expect(calls).to eq(2)
     end
 

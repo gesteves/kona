@@ -1,36 +1,35 @@
-require 'httparty'
-require 'yaml'
+require "httparty"
+require "yaml"
 
-DATA_DIRECTORY = 'data'
+DATA_DIRECTORY = "data"
 
 # Remove all existing data files from previous imports.
-CLOBBER.include %w{ data/*.json }
+CLOBBER.include %w[ data/*.json ]
 
 namespace :import do
-  desc 'Imports FontAwesome icons'
-  task :icons => [:dotenv] do
+  desc "Imports FontAwesome icons"
+  task icons: [ :dotenv ] do
     setup_data_directory
     measure_and_output(:import_font_awesome, "Importing icons")
   end
 
-  desc 'Imports Contentful content'
-  task :content => [:dotenv] do
+  desc "Imports Contentful content"
+  task content: [ :dotenv ] do
     setup_data_directory
     RedisConnection.connection
     measure_and_output(:import_contentful, "Importing site content")
   end
 
-  desc 'Fetches standard.site verification data (DID + publication URI) from the api'
-  task :standard_site => [:dotenv] do
+  desc "Fetches standard.site verification data (DID + publication URI) from the api"
+  task standard_site: [ :dotenv ] do
     setup_data_directory
     RedisConnection.connection
     measure_and_output(:import_standard_site, "Fetching standard.site verification data")
   end
-
 end
 
-desc 'Imports all content for the site'
-task :import => [:dotenv, :clobber] do
+desc "Imports all content for the site"
+task import: [ :dotenv, :clobber ] do
   puts "=" * 60
   puts "🚀 Starting full site data import"
   puts "=" * 60
@@ -43,9 +42,9 @@ task :import => [:dotenv, :clobber] do
 
   # These three are independent, so they run in parallel.
   independent_threads = [
-    [:import_contentful, "Importing site content"],
-    [:import_font_awesome, "Importing icons"],
-    [:import_standard_site, "Fetching standard.site verification data"]
+    [ :import_contentful, "Importing site content" ],
+    [ :import_font_awesome, "Importing icons" ],
+    [ :import_standard_site, "Fetching standard.site verification data" ]
   ].map do |method, description|
     Thread.new do
       measure_and_output(method, description, mutex: output_mutex)
@@ -76,13 +75,13 @@ ICON_IMPORT_BATCH_SIZE = 25
 # family → style → [{id, svg}] tree the icon_svg helper reads. Icons are an every-page
 # dependency, so any failure raises and fails the build rather than shipping missing icons.
 def import_font_awesome
-  base = ENV['KONA_API_URL'].to_s.chomp('/')
-  raise 'KONA_API_URL is not set; cannot fetch icons from the api' if base.blank?
+  base = ENV["KONA_API_URL"].to_s.chomp("/")
+  raise "KONA_API_URL is not set; cannot fetch icons from the api" if base.blank?
 
-  allowlist = YAML.load_file('data/font_awesome.yml')['icons'] || {}
+  allowlist = YAML.load_file("data/font_awesome.yml")["icons"] || {}
   # uniq collapses duplicate ids, so a batch boundary can't emit one twice.
   triples = allowlist.flat_map do |family, styles|
-    (styles || {}).flat_map { |style, ids| Array(ids).map { |id| [family, style, id] } }
+    (styles || {}).flat_map { |style, ids| Array(ids).map { |id| [ family, style, id ] } }
   end.uniq
 
   icons = {}
@@ -98,9 +97,9 @@ def import_font_awesome
     end
   end
 
-  raise 'Icon import returned no icons from the api' if icons.blank?
+  raise "Icon import returned no icons from the api" if icons.blank?
 
-  File.write('data/icons.json', icons.to_json)
+  File.write("data/icons.json", icons.to_json)
 end
 
 # How many times to retry a failed icon batch, and how long to wait before each retry.
@@ -111,7 +110,7 @@ end
 # one cold start would fail the whole deploy. A cold start is measured in seconds, so a couple of
 # backed-off retries covers it without masking a genuinely broken origin.
 ICON_IMPORT_MAX_RETRIES = 3
-ICON_IMPORT_RETRY_DELAYS = [2, 5, 10].freeze
+ICON_IMPORT_RETRY_DELAYS = [ 2, 5, 10 ].freeze
 
 # POSTs one { family => { style => [ids] } } batch to the api, retrying a failure with backoff.
 # @return [Hash] { family => { style => [{ "id", "svg" }] } }; raises once the retries are spent.
@@ -121,8 +120,8 @@ def fetch_icons_batch(base, tree)
     response = HTTParty.post(
       "#{base}/api/icons",
       headers: {
-        'Authorization' => "Bearer #{ENV['API_TOKEN']}",
-        'Content-Type' => 'application/json'
+        "Authorization" => "Bearer #{ENV['API_TOKEN']}",
+        "Content-Type" => "application/json"
       },
       body: { icons: tree }.to_json,
       timeout: 30
@@ -146,13 +145,13 @@ end
 # Degrades silently: on any failure it writes nothing and the templates omit the markup.
 def import_standard_site
   safely_perform do
-    base = ENV['KONA_API_URL'].to_s.chomp('/')
+    base = ENV["KONA_API_URL"].to_s.chomp("/")
     next if base.blank?
     response = HTTParty.get("#{base}/api/standard-site")
     next unless response.success? && response.body.present?
     data = JSON.parse(response.body)
-    next if data['publication_uri'].blank?
-    File.write('data/standard_site.json', { did: data['did'], publication_uri: data['publication_uri'] }.to_json)
+    next if data["publication_uri"].blank?
+    File.write("data/standard_site.json", { did: data["did"], publication_uri: data["publication_uri"] }.to_json)
   end
 end
 

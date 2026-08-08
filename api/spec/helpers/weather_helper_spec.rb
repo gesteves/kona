@@ -193,7 +193,7 @@ RSpec.describe WeatherHelper, type: :helper do
     end
 
     it "treats all-zero (or missing) pollen as None" do
-      pollen = DeepOstruct.wrap(pollen_type_info: [{ index_info: { value: 0, category: "None" } }])
+      pollen = DeepOstruct.wrap(pollen_type_info: [ { index_info: { value: 0, category: "None" } } ])
 
       expect(helper.pollen_index_value(pollen)).to eq(0)
       expect(helper.pollen_index_category(pollen)).to eq("None")
@@ -319,8 +319,7 @@ RSpec.describe WeatherHelper, type: :helper do
       ])
 
       alerts = helper.weather_alerts(weather)
-      expect(alerts.map(&:description)).to eq(["Flood A", "Heat"])
+      expect(alerts.map(&:description)).to eq([ "Flood A", "Heat" ])
     end
   end
-
 end

@@ -18,7 +18,7 @@ RSpec.describe "Webhooks::Contentful", type: :request do
   # header (mirroring ContentfulRequestVerification#canonical_request).
   def post_webhook(payload, topic:, secret: webhook_secret, timestamp: now_ms, signature: nil)
     body = payload.to_json
-    canonical = ["POST", "/webhooks/contentful", "x-contentful-timestamp:#{timestamp}", body].join("\n")
+    canonical = [ "POST", "/webhooks/contentful", "x-contentful-timestamp:#{timestamp}", body ].join("\n")
     signature ||= OpenSSL::HMAC.hexdigest("SHA256", secret, canonical)
 
     post "/webhooks/contentful",

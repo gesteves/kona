@@ -19,7 +19,7 @@ RSpec.describe ArticleEmbeddingJob do
   describe "embed" do
     before do
       allow(articles).to receive(:find_for_embedding).with("entry123").and_return(article)
-      allow(embeddings).to receive(:embed).and_return([0.1, 0.2])
+      allow(embeddings).to receive(:embed).and_return([ 0.1, 0.2 ])
     end
 
     it "embeds title + intro + body and stores the vector keyed by entry id" do
@@ -28,7 +28,7 @@ RSpec.describe ArticleEmbeddingJob do
       expect(embeddings).to have_received(:embed).with("A Title\n\nAn intro.\n\nA body.")
       expect($redis).to have_received(:set).with(
         "embeddings:article:entry123",
-        { version: 7, vector: [0.1, 0.2] }.to_json
+        { version: 7, vector: [ 0.1, 0.2 ] }.to_json
       )
     end
 

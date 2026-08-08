@@ -34,11 +34,11 @@ RSpec.describe SiteHelpers do
     def data
       OpenStruct.new(
         tags: [
-          OpenStruct.new(tag: OpenStruct.new(path: '/tagged/triathlon/ironman-703/', synonyms: ['Half Ironman', '70.3'])),
+          OpenStruct.new(tag: OpenStruct.new(path: '/tagged/triathlon/ironman-703/', synonyms: [ 'Half Ironman', '70.3' ])),
           OpenStruct.new(tag: OpenStruct.new(path: '/tagged/running/', synonyms: [])),
-          OpenStruct.new(tag: OpenStruct.new(path: '/tagged/triathlon/', synonyms: ['Multisport']))
+          OpenStruct.new(tag: OpenStruct.new(path: '/tagged/triathlon/', synonyms: [ 'Multisport' ]))
         ],
-        redirects: [OpenStruct.new(from: '/tagged/multisport')] # a configured redirect already claims this
+        redirects: [ OpenStruct.new(from: '/tagged/multisport') ] # a configured redirect already claims this
       )
     end
 
@@ -97,7 +97,7 @@ RSpec.describe SiteHelpers do
 
     it 'advertises only the main site feed when the page has no content' do
       @pc = nil
-      expect(alternate_feed_links).to eq([{ href: 'https://example.com/feed.xml', title: 'My Site' }])
+      expect(alternate_feed_links).to eq([ { href: 'https://example.com/feed.xml', title: 'My Site' } ])
     end
 
     it "adds the tag's own feed on a tag archive page" do
@@ -125,7 +125,7 @@ RSpec.describe SiteHelpers do
 
     it 'advertises only the main site feed on a non-tag, non-post page' do
       @pc = OpenStruct.new(template: '/page.html', entry_type: 'Page', draft: false)
-      expect(alternate_feed_links).to eq([{ href: 'https://example.com/feed.xml', title: 'My Site' }])
+      expect(alternate_feed_links).to eq([ { href: 'https://example.com/feed.xml', title: 'My Site' } ])
     end
   end
 
@@ -200,7 +200,7 @@ RSpec.describe SiteHelpers do
     end
 
     it 'falls back to the current year when no articles are published yet' do
-      @articles = [OpenStruct.new(draft: true, published_at: '2024-01-01T00:00:00Z')]
+      @articles = [ OpenStruct.new(draft: true, published_at: '2024-01-01T00:00:00Z') ]
       expect(copyright_start_year).to eq(Time.current.year.to_s)
     end
   end
@@ -215,7 +215,7 @@ RSpec.describe SiteHelpers do
         OpenStruct.new(tag: OpenStruct.new(name: 'Running', scheme: 'sports', parent_id: nil)),
         OpenStruct.new(tag: OpenStruct.new(name: 'Race Reports', scheme: 'topics', parent_id: nil))
       ]
-      expect(author_knows_about).to eq(['Running', 'Triathlon'])
+      expect(author_knows_about).to eq([ 'Running', 'Triathlon' ])
     end
 
     it 'returns an empty array when there are no tags' do
@@ -226,8 +226,8 @@ RSpec.describe SiteHelpers do
 
   describe '#author_same_as' do
     it 'returns social destinations, excluding the feed' do
-      @site = site(socials: [['Feed', '/feed.xml'], ['Bluesky', 'https://bsky.app/x'], ['Mastodon', 'https://m.test/x']])
-      expect(author_same_as).to eq(['https://bsky.app/x', 'https://m.test/x'])
+      @site = site(socials: [ [ 'Feed', '/feed.xml' ], [ 'Bluesky', 'https://bsky.app/x' ], [ 'Mastodon', 'https://m.test/x' ] ])
+      expect(author_same_as).to eq([ 'https://bsky.app/x', 'https://m.test/x' ])
     end
 
     it 'returns an empty array when no socials are configured' do
@@ -239,14 +239,14 @@ RSpec.describe SiteHelpers do
   describe '#site_schema_graph' do
     it 'builds a connected @graph of Organization, WebSite, and Person' do
       @site = site(
-        socials: [['Feed', '/feed.xml'], ['Bluesky', 'https://bsky.app/x']],
+        socials: [ [ 'Feed', '/feed.xml' ], [ 'Bluesky', 'https://bsky.app/x' ] ],
         profile_picture: OpenStruct.new(url: '//img/me.jpg', description: 'A portrait.')
       )
       nodes = JSON.parse(site_schema_graph)['@graph'].each_with_object({}) { |n, h| h[n['@type']] = n }
 
       expect(nodes['Organization']).to include(
         '@id' => 'https://example.com/#organization',
-        'sameAs' => ['https://bsky.app/x'],
+        'sameAs' => [ 'https://bsky.app/x' ],
         'logo' => 'https://example.com/icon-180.png'
       )
       expect(nodes['WebSite']).to include(
@@ -258,7 +258,7 @@ RSpec.describe SiteHelpers do
         '@id' => 'https://example.com/about#person',
         'name' => 'Jane Doe',
         'url' => 'https://example.com/about',
-        'sameAs' => ['https://bsky.app/x']
+        'sameAs' => [ 'https://bsky.app/x' ]
       )
       expect(nodes['Person']['image']).to include('@type' => 'ImageObject', 'width' => 500, 'height' => 500, 'caption' => 'A portrait.')
     end
@@ -384,7 +384,7 @@ RSpec.describe SiteHelpers do
   end
 
   describe '#copyright_years' do
-    def data = OpenStruct.new(articles: [OpenStruct.new(draft: false, published_at: '2006-06-15T00:00:00Z')])
+    def data = OpenStruct.new(articles: [ OpenStruct.new(draft: false, published_at: '2006-06-15T00:00:00Z') ])
 
     it 'spans from the earliest publish year to the current year, joined with an en dash' do
       expect(copyright_years).to eq("2006–#{Time.current.year}")
@@ -500,7 +500,7 @@ RSpec.describe SiteHelpers do
   # a template can't be tested.
   describe '#partitioned_redirects' do
     def taxonomy_synonym_redirects
-      [{ from: '/tagged/half-ironman', to: '/tagged/triathlon/ironman-703/', status: 301 }]
+      [ { from: '/tagged/half-ironman', to: '/tagged/triathlon/ironman-703/', status: 301 } ]
     end
 
     def data
@@ -521,9 +521,9 @@ RSpec.describe SiteHelpers do
 
       static_rules, dynamic_rules = partitioned_redirects
 
-      expect(static_rules.map { |r| r[:from] }).to eq(['/tagged/half-ironman', '/exact-one', '/exact-two'])
+      expect(static_rules.map { |r| r[:from] }).to eq([ '/tagged/half-ironman', '/exact-one', '/exact-two' ])
       expect(dynamic_rules.map { |r| r[:from] })
-        .to eq(['/.well-known/host-meta*', '/.well-known/webfinger*', '/old-splat/*', '/with/:placeholder'])
+        .to eq([ '/.well-known/host-meta*', '/.well-known/webfinger*', '/old-splat/*', '/with/:placeholder' ])
     end
 
     it 'counts the taxonomy synonym redirects as static' do
@@ -534,7 +534,7 @@ RSpec.describe SiteHelpers do
 
     # Both are hard deploy failures (code 100324) that a Contentful entry could introduce.
     it 'drops an absolute-URL source' do
-      @redirects = [redirect('https://old.example.com/post', '/post')]
+      @redirects = [ redirect('https://old.example.com/post', '/post') ]
 
       expect(partitioned_redirects.flatten.map { |r| r[:from] }).not_to include('https://old.example.com/post')
     end

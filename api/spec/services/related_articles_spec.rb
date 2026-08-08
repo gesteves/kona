@@ -22,12 +22,12 @@ RSpec.describe RelatedArticles do
   # vector (cosine 1) to prove they're excluded by identity/type, not by a low score.
   let(:store) do
     {
-      "embeddings:article:q1" => vec_json([1.0, 0.0, 0.0]),
-      "embeddings:article:near" => vec_json([0.9, 0.1, 0.0]),
-      "embeddings:article:mid" => vec_json([0.5, 0.5, 0.0]),
-      "embeddings:article:far" => vec_json([0.0, 1.0, 0.0]),
-      "embeddings:article:draft" => vec_json([1.0, 0.0, 0.0]),
-      "embeddings:article:short" => vec_json([1.0, 0.0, 0.0])
+      "embeddings:article:q1" => vec_json([ 1.0, 0.0, 0.0 ]),
+      "embeddings:article:near" => vec_json([ 0.9, 0.1, 0.0 ]),
+      "embeddings:article:mid" => vec_json([ 0.5, 0.5, 0.0 ]),
+      "embeddings:article:far" => vec_json([ 0.0, 1.0, 0.0 ]),
+      "embeddings:article:draft" => vec_json([ 1.0, 0.0, 0.0 ]),
+      "embeddings:article:short" => vec_json([ 1.0, 0.0, 0.0 ])
     }
   end
 
@@ -76,9 +76,9 @@ RSpec.describe RelatedArticles do
   context "when two candidates are equally similar" do
     let(:store) do
       {
-        "embeddings:article:q1" => vec_json([1.0, 0.0, 0.0]),
-        "embeddings:article:older" => vec_json([0.5, 0.5, 0.0]),
-        "embeddings:article:newer" => vec_json([0.5, 0.5, 0.0])
+        "embeddings:article:q1" => vec_json([ 1.0, 0.0, 0.0 ]),
+        "embeddings:article:older" => vec_json([ 0.5, 0.5, 0.0 ]),
+        "embeddings:article:newer" => vec_json([ 0.5, 0.5, 0.0 ])
       }
     end
 

@@ -15,7 +15,7 @@ RSpec.describe BayHelper do
     end
 
     it "returns nil when the closest entry is outside the freshness window" do
-      goodspeed = DeepOstruct.wrap(timeseries: [{ t: (target - 2400).iso8601, current_speed_kt: 0.1 }])
+      goodspeed = DeepOstruct.wrap(timeseries: [ { t: (target - 2400).iso8601, current_speed_kt: 0.1 } ])
       expect(bay_helper.bay_conditions_at(goodspeed, target)).to be_nil
     end
 

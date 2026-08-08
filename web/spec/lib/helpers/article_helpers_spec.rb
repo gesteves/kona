@@ -176,11 +176,11 @@ RSpec.describe ArticleHelpers do
     it 'folds each concept\'s synonyms into the keywords, deduped' do
       a = schema_article
       a.contentful_metadata = OpenStruct.new(tags: [
-        OpenStruct.new(name: 'Ironman 70.3', synonyms: ['Half Ironman', '70.3']),
+        OpenStruct.new(name: 'Ironman 70.3', synonyms: [ 'Half Ironman', '70.3' ]),
         OpenStruct.new(name: 'Race Reports', synonyms: [])
       ])
       schema = JSON.parse(article_schema(a))
-      expect(schema['keywords']).to eq(['Ironman 70.3', 'Half Ironman', '70.3', 'Race Reports'])
+      expect(schema['keywords']).to eq([ 'Ironman 70.3', 'Half Ironman', '70.3', 'Race Reports' ])
       expect(schema['articleSection']).to eq('Ironman 70.3')
     end
 
@@ -188,18 +188,18 @@ RSpec.describe ArticleHelpers do
       cover = OpenStruct.new(url: '//images/cover.jpg')
       schema = JSON.parse(article_schema(schema_article(cover_image: cover)))
       expect(schema['image']).to all(include('@type' => 'ImageObject'))
-      expect(schema['image'].map { |i| [i['width'], i['height']] })
-        .to eq([[1000, 1000], [1600, 900], [1600, 1200]])
+      expect(schema['image'].map { |i| [ i['width'], i['height'] ] })
+        .to eq([ [ 1000, 1000 ], [ 1600, 900 ], [ 1600, 1200 ] ])
     end
 
     it 'falls back to the generated Open Graph card when there is no cover image (e.g. a Short)' do
       schema = JSON.parse(article_schema(schema_article(cover_image: nil)))
-      expect(schema['image']).to eq([{
+      expect(schema['image']).to eq([ {
         '@type' => 'ImageObject',
         'url' => 'https://example.com/2024/01/01/post/og.png?v=1082',
         'width' => 1200,
         'height' => 630
-      }])
+      } ])
     end
   end
 
@@ -208,7 +208,7 @@ RSpec.describe ArticleHelpers do
       %w[Article Short].each do |type|
         schema = JSON.parse(breadcrumb_schema(article(slug: 'post', title: 'A Post', entry_type: type)))
         expect(schema['@type']).to eq('BreadcrumbList')
-        expect(schema['itemListElement'].map { |i| i['name'] }).to eq(%w[Home Blog] + ['A Post'])
+        expect(schema['itemListElement'].map { |i| i['name'] }).to eq(%w[Home Blog] + [ 'A Post' ])
       end
     end
 
@@ -232,7 +232,7 @@ RSpec.describe ArticleHelpers do
 
     describe '#tag_chain_links' do
       it 'renders each chain as slash-separated listitem links, joining chains the same way' do
-        html = tag_chain_links([[['Triathlon', '/tagged/triathlon/'], ['Half Distance', '/tagged/triathlon/half-distance/']], [['Race Reports', '/tagged/race-reports/']]])
+        html = tag_chain_links([ [ [ 'Triathlon', '/tagged/triathlon/' ], [ 'Half Distance', '/tagged/triathlon/half-distance/' ] ], [ [ 'Race Reports', '/tagged/race-reports/' ] ] ])
         separator = '<span class="entry__tag-separator" aria-hidden="true">/</span>'
         expect(html).to eq(
           '<span role="listitem"><a href="/tagged/triathlon/">Triathlon</a></span>' + separator +
@@ -283,12 +283,12 @@ RSpec.describe ArticleHelpers do
 
   describe '#reading_time_minutes' do
     it 'rounds the word count up to whole minutes at the default 200 wpm' do
-      a = article(slug: 'a', intro: (['word'] * 250).join(' '))
+      a = article(slug: 'a', intro: ([ 'word' ] * 250).join(' '))
       expect(reading_time_minutes(a)).to eq(2)
     end
 
     it 'reads a custom words-per-minute rate from READING_TIME_WPM' do
-      a = article(slug: 'a', intro: (['word'] * 250).join(' '))
+      a = article(slug: 'a', intro: ([ 'word' ] * 250).join(' '))
       ENV['READING_TIME_WPM'] = '100'
       expect(reading_time_minutes(a)).to eq(3)
     ensure
@@ -304,8 +304,8 @@ RSpec.describe ArticleHelpers do
     # raised FloatDomainError on every article page. That broke a production deploy; the build
     # is the only thing that exercised it, since nothing else divides by this.
     it 'falls back to the default rate when READING_TIME_WPM is present but unusable' do
-      a = article(slug: 'a', intro: (['word'] * 250).join(' '))
-      ['', '   ', 'abc', '0', '-5'].each do |value|
+      a = article(slug: 'a', intro: ([ 'word' ] * 250).join(' '))
+      [ '', '   ', 'abc', '0', '-5' ].each do |value|
         ENV['READING_TIME_WPM'] = value
         expect(reading_time_minutes(a)).to eq(2), "expected the 200 wpm default for #{value.inspect}"
       end
@@ -317,7 +317,7 @@ RSpec.describe ArticleHelpers do
   describe '#reading_time' do
     # Exactly N minutes at the default 200 wpm.
     def article_with_minutes(minutes)
-      article(slug: "m#{minutes}", intro: (['word'] * (minutes * 200)).join(' '))
+      article(slug: "m#{minutes}", intro: ([ 'word' ] * (minutes * 200)).join(' '))
     end
 
     it 'formats the estimate as "A N-minute read"' do
@@ -454,8 +454,8 @@ RSpec.describe ArticleHelpers do
 
     describe '#taxonomy_trail' do
       it 'returns the deepest chain across schemes (the Sports race chain for a report)' do
-        art = tagged_article(slug: 'cda', concepts: [cda, race_reports])
-        expect(taxonomy_trail(art).map { |n| n[:name] }).to eq(['Triathlon', 'Half Distance', 'Ironman 70.3 Coeur d’Alene'])
+        art = tagged_article(slug: 'cda', concepts: [ cda, race_reports ])
+        expect(taxonomy_trail(art).map { |n| n[:name] }).to eq([ 'Triathlon', 'Half Distance', 'Ironman 70.3 Coeur d’Alene' ])
       end
 
       it 'breaks depth ties by archive popularity (News beats Reviews)' do
@@ -463,7 +463,7 @@ RSpec.describe ArticleHelpers do
           concept('reviews', 'Reviews', path: '/tagged/reviews/', scheme: 'topics'),
           concept('news', 'News', path: '/tagged/news/', scheme: 'topics')
         ])
-        expect(taxonomy_trail(art).map { |n| n[:name] }).to eq(['News'])
+        expect(taxonomy_trail(art).map { |n| n[:name] }).to eq([ 'News' ])
       end
 
       it 'is empty when the article has no taxonomy' do
@@ -477,33 +477,33 @@ RSpec.describe ArticleHelpers do
           concept('gear', 'Gear', path: '/tagged/tech/gear/', parent_id: 'tech', scheme: 'topics')
         ])
         schema = JSON.parse(breadcrumb_schema(art))
-        expect(schema['itemListElement'].map { |i| i['name'] }).to eq(['Home', 'Blog', 'Tech', 'Gear', 'A Post'])
-        expect(schema['itemListElement'].map { |i| i['position'] }).to eq([1, 2, 3, 4, 5])
+        expect(schema['itemListElement'].map { |i| i['name'] }).to eq([ 'Home', 'Blog', 'Tech', 'Gear', 'A Post' ])
+        expect(schema['itemListElement'].map { |i| i['position'] }).to eq([ 1, 2, 3, 4, 5 ])
         expect(schema['itemListElement'][2]['item']).to eq('https://example.com/tagged/tech/')
       end
     end
 
     describe '#race_concept_id / #related_race_reports' do
       it 'is the deepest Sports concept — a specific race (chain length ≥ 3)' do
-        expect(race_concept_id(tagged_article(slug: 'cda', concepts: [cda, race_reports]))).to eq('ironman-703-coeur-dalene')
+        expect(race_concept_id(tagged_article(slug: 'cda', concepts: [ cda, race_reports ]))).to eq('ironman-703-coeur-dalene')
         # A distance-only article (no specific race) has no race concept.
         half = concept('half-distance', 'Half Distance', path: '/tagged/triathlon/half-distance/', parent_id: 'triathlon', scheme: 'sports')
-        expect(race_concept_id(tagged_article(slug: 'general', concepts: [half]))).to be_nil
+        expect(race_concept_id(tagged_article(slug: 'general', concepts: [ half ]))).to be_nil
       end
 
       it 'groups race reports by their shared race concept, excluding non-reports and Shorts' do
-        a2025 = tagged_article(slug: 'cda-2025', concepts: [race_reports, cda], published_at: '2025-06-01T00:00:00Z')
-        a2024 = tagged_article(slug: 'cda-2024', concepts: [race_reports, cda], published_at: '2024-06-01T00:00:00Z')
-        short = tagged_article(slug: 'cda-short', concepts: [race_reports, cda], entry_type: 'Short', published_at: '2023-06-01T00:00:00Z')
-        preview = tagged_article(slug: 'cda-preview', concepts: [cda], published_at: '2023-01-01T00:00:00Z') # same race, not a report
-        other = tagged_article(slug: 'other', concepts: [concept('running', 'Running', path: '/tagged/running/', scheme: 'sports')], published_at: '2025-01-01T00:00:00Z')
-        stub_corpus([a2025, a2024, short, preview, other])
+        a2025 = tagged_article(slug: 'cda-2025', concepts: [ race_reports, cda ], published_at: '2025-06-01T00:00:00Z')
+        a2024 = tagged_article(slug: 'cda-2024', concepts: [ race_reports, cda ], published_at: '2024-06-01T00:00:00Z')
+        short = tagged_article(slug: 'cda-short', concepts: [ race_reports, cda ], entry_type: 'Short', published_at: '2023-06-01T00:00:00Z')
+        preview = tagged_article(slug: 'cda-preview', concepts: [ cda ], published_at: '2023-01-01T00:00:00Z') # same race, not a report
+        other = tagged_article(slug: 'other', concepts: [ concept('running', 'Running', path: '/tagged/running/', scheme: 'sports') ], published_at: '2025-01-01T00:00:00Z')
+        stub_corpus([ a2025, a2024, short, preview, other ])
 
-        expect(related_race_reports(a2025).map(&:slug)).to eq(['cda-2024'])
+        expect(related_race_reports(a2025).map(&:slug)).to eq([ 'cda-2024' ])
       end
 
       it 'returns nothing when the article has no race concept' do
-        stub_corpus([tagged_article(slug: 'solo', concepts: [concept('running', 'Running', path: '/tagged/running/', scheme: 'sports')])])
+        stub_corpus([ tagged_article(slug: 'solo', concepts: [ concept('running', 'Running', path: '/tagged/running/', scheme: 'sports') ]) ])
         expect(related_race_reports(article(slug: 'solo'))).to eq([])
       end
     end
@@ -513,9 +513,9 @@ RSpec.describe ArticleHelpers do
       def half = concept('half-distance', 'Half Distance', path: '/tagged/triathlon/half-distance/', parent_id: 'triathlon', scheme: 'sports')
 
       it 'builds each leaf’s root→leaf chain, deepest first' do
-        art = tagged_article(slug: 'cda', concepts: [triathlon, half, cda, race_reports])
+        art = tagged_article(slug: 'cda', concepts: [ triathlon, half, cda, race_reports ])
         chains = tag_breadcrumb_chains(art).map { |c| c.map(&:name) }
-        expect(chains).to eq([['Triathlon', 'Half Distance', 'Ironman 70.3 Coeur d’Alene'], ['Race Reports']])
+        expect(chains).to eq([ [ 'Triathlon', 'Half Distance', 'Ironman 70.3 Coeur d’Alene' ], [ 'Race Reports' ] ])
       end
 
       it 'renders multiple chains within a scheme (Sports before Topics on a depth tie)' do
@@ -526,7 +526,7 @@ RSpec.describe ArticleHelpers do
           concept('reviews', 'Reviews', path: '/tagged/reviews/', scheme: 'topics')
         ])
         chains = tag_breadcrumb_chains(art).map { |c| c.map(&:name) }
-        expect(chains).to eq([['Tech', 'Gear'], ['Running'], ['Reviews']])
+        expect(chains).to eq([ [ 'Tech', 'Gear' ], [ 'Running' ], [ 'Reviews' ] ])
       end
 
       it 'follows the full taxonomy to the root, omitting unassigned intermediates (e.g. "Other")' do
@@ -538,7 +538,7 @@ RSpec.describe ArticleHelpers do
           race_reports
         ])
         chains = tag_breadcrumb_chains(art).map { |c| c.map(&:short_name) }
-        expect(chains).to eq([['Triathlon', 'Escape from Alcatraz'], ['Race Reports']])
+        expect(chains).to eq([ [ 'Triathlon', 'Escape from Alcatraz' ], [ 'Race Reports' ] ])
       end
 
       it 'is empty when the article has no taxonomy' do
@@ -556,7 +556,7 @@ RSpec.describe ArticleHelpers do
       end
 
       it 'is a single-node chain for a root concept' do
-        expect(concept_chain('triathlon')).to eq([{ id: 'triathlon', name: 'Triathlon', path: '/tagged/triathlon/' }])
+        expect(concept_chain('triathlon')).to eq([ { id: 'triathlon', name: 'Triathlon', path: '/tagged/triathlon/' } ])
       end
 
       it 'is empty for an unknown concept id' do

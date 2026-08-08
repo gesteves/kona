@@ -69,6 +69,9 @@ group :development, :test do
   gem "brakeman", require: false
   # Scans the bundle for gems with known CVEs; run alongside Brakeman in CI.
   gem "bundler-audit", require: false
+  # Rails' own RuboCop ruleset, inherited verbatim (see .rubocop.yml). It enables 50 of RuboCop's
+  # 609 cops — layout and a few style ones, and deliberately no Metrics or Naming.
+  gem "rubocop-rails-omakase", require: false
 end
 
 group :test do

@@ -8,7 +8,7 @@ module ActivityDescription
     # Codepoint ranges covering every emoji this module emits and every weather emoji the
     # LLM is likely to pick: Misc Symbols/Dingbats plus the main emoji blocks. Headline
     # content (user prose) starts with a letter, so this only ever strips stat-shaped lines.
-    EMOJI_RANGES = [0x2600..0x27BF, 0x1F300..0x1F6FF, 0x1F900..0x1F9FF, 0x1FA00..0x1FAFF].freeze
+    EMOJI_RANGES = [ 0x2600..0x27BF, 0x1F300..0x1F6FF, 0x1F900..0x1F9FF, 0x1FA00..0x1FAFF ].freeze
 
     module_function
 

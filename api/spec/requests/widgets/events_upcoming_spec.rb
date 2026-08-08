@@ -35,9 +35,9 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
     {
       geocoded: {
         address_components: [
-          { long_name: "Boulder", short_name: "Boulder", types: ["locality", "political"] },
-          { long_name: "Colorado", short_name: "CO", types: ["administrative_area_level_1", "political"] },
-          { long_name: "United States", short_name: "US", types: ["country", "political"] }
+          { long_name: "Boulder", short_name: "Boulder", types: [ "locality", "political" ] },
+          { long_name: "Colorado", short_name: "CO", types: [ "administrative_area_level_1", "political" ] },
+          { long_name: "United States", short_name: "US", types: [ "country", "political" ] }
         ]
       },
       time_zone: { time_zone_id: "America/Denver" },
@@ -74,7 +74,7 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
   end
 
   before do
-    allow_any_instance_of(Events).to receive(:all).and_return([featured_event, later_event])
+    allow_any_instance_of(Events).to receive(:all).and_return([ featured_event, later_event ])
     allow(GoogleMaps).to receive(:new).and_return(double(time_zone_id: "America/Denver", country_code: "US", location: location_hash))
     allow_any_instance_of(WeatherKit).to receive(:data).and_return(weather)
     allow(GoogleAirQuality).to receive(:new).and_return(double(aqi: { aqi: 42, category: "Good", description: "Good air quality" }))
@@ -130,7 +130,7 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
   end
 
   context "when the next race is more than 10 days out" do
-    before { allow_any_instance_of(Events).to receive(:all).and_return([later_event]) }
+    before { allow_any_instance_of(Events).to receive(:all).and_return([ later_event ]) }
 
     it "renders the section without a featured event or race-day weather" do
       get "/widgets/events/upcoming", headers: auth_headers
@@ -184,7 +184,7 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
         coordinates: { lat: 40.01, lon: -105.27 },
         sys: { id: "featured123" }
       )
-      allow_any_instance_of(Events).to receive(:all).and_return([tracked, later_event])
+      allow_any_instance_of(Events).to receive(:all).and_return([ tracked, later_event ])
     end
 
     it "renders a muted Live tracking link without the live highlight" do
@@ -265,7 +265,7 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
     end
 
     before do
-      allow_any_instance_of(Events).to receive(:all).and_return([todays_race, featured_event, mid_event, later_event])
+      allow_any_instance_of(Events).to receive(:all).and_return([ todays_race, featured_event, mid_event, later_event ])
       allow_any_instance_of(WeatherKit).to receive(:data).and_return(today_weather)
     end
 
@@ -300,7 +300,7 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
     end
 
     context "when today's race is the only race" do
-      before { allow_any_instance_of(Events).to receive(:all).and_return([todays_race]) }
+      before { allow_any_instance_of(Events).to receive(:all).and_return([ todays_race ]) }
 
       it "renders only the Today's Race section" do
         get "/widgets/events/upcoming", headers: auth_headers

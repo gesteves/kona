@@ -33,6 +33,7 @@ bundle exec rake import               # fetch fresh data first
 bundle exec middleman                 # dev server (runs the esbuild watcher too)
 
 # Lint / format
+bundle exec rubocop                   # Ruby; -a to autocorrect. Same ruleset as api/ — see api/CLAUDE.md
 npm run lint:scss                     # fix: npm run lint:scss:fix
 npm run format:check                  # fix: npm run format
 
@@ -197,8 +198,12 @@ Names only — see `.env.example`; never commit values.
 ## Conventions & gates
 
 **Before committing** (non-negotiable): `bundle exec rake test` + `npm test` + `npm run check`
-pass → `npm run lint:scss` + `npm run format:check` clean → `bundle exec rake build:verbose`
-succeeds. ⚠️ **`rake build` does NOT run tests.** Follow `.editorconfig`.
+pass → `bundle exec rubocop` + `npm run lint:scss` + `npm run format:check` clean →
+`bundle exec rake build:verbose` succeeds. ⚠️ **`rake build` does NOT run tests**, and it is the
+only gate that exercises the templates — a broken partial passes every other check and fails the
+deploy. ⚠️ Run it with the CI env shape (`READING_TIME_WPM="" TIME_ZONE=""`): an unset GitHub
+Actions **variable** arrives as an empty string, not an absent one, so a local `.env` that simply
+omits a key tests a different code path than production. Follow `.editorconfig`.
 
 `.github/workflows/web.yml`'s `checks` job runs these same gates on every push to `main` and every
 PR, and **gates the deploy**. It runs **`bundle exec rspec`** directly, not `rake test`: booting

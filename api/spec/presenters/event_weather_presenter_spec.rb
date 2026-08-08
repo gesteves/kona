@@ -28,16 +28,16 @@ RSpec.describe EventWeatherPresenter do
 
   let(:sf_components) do
     [
-      { long_name: "San Francisco", short_name: "SF", types: ["locality", "political"] },
-      { long_name: "California", short_name: "CA", types: ["administrative_area_level_1", "political"] },
-      { long_name: "United States", short_name: "US", types: ["country", "political"] }
+      { long_name: "San Francisco", short_name: "SF", types: [ "locality", "political" ] },
+      { long_name: "California", short_name: "CA", types: [ "administrative_area_level_1", "political" ] },
+      { long_name: "United States", short_name: "US", types: [ "country", "political" ] }
     ]
   end
   let(:boulder_components) do
     [
-      { long_name: "Boulder", short_name: "Boulder", types: ["locality", "political"] },
-      { long_name: "Colorado", short_name: "CO", types: ["administrative_area_level_1", "political"] },
-      { long_name: "United States", short_name: "US", types: ["country", "political"] }
+      { long_name: "Boulder", short_name: "Boulder", types: [ "locality", "political" ] },
+      { long_name: "Colorado", short_name: "CO", types: [ "administrative_area_level_1", "political" ] },
+      { long_name: "United States", short_name: "US", types: [ "country", "political" ] }
     ]
   end
 

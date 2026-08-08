@@ -3,8 +3,8 @@ require "rails_helper"
 RSpec.describe Embeddings do
   subject(:embeddings) { described_class.new }
 
-  let(:vector) { [0.1, 0.2, 0.3] }
-  let(:success_body) { { data: [{ embedding: vector }], usage: { total_tokens: 5 } }.to_json }
+  let(:vector) { [ 0.1, 0.2, 0.3 ] }
+  let(:success_body) { { data: [ { embedding: vector } ], usage: { total_tokens: 5 } }.to_json }
 
   around do |example|
     original = ENV["VOYAGE_API_KEY"]

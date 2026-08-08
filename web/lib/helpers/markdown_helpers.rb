@@ -1,5 +1,5 @@
-require 'redcarpet'
-require 'sanitize'
+require "redcarpet"
+require "sanitize"
 
 module MarkdownHelpers
   # ⚠️ Must stay identical to the api's MarkdownHelper::EXTENSIONS. Both render the same article

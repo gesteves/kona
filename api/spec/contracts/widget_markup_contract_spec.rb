@@ -7,12 +7,12 @@ require "rails_helper"
 #
 # Pairs are [web placeholder, api view], both repo-relative.
 WIDGET_MARKUP_PAIRS = {
-  "activity stats" => ["source/partials/placeholders/_stats.html.erb", "app/views/widgets/activity_stats/show.html.erb"],
-  "whoop" => ["source/partials/placeholders/_whoop.html.erb", "app/views/widgets/whoop/show.html.erb"],
-  "current weather" => ["source/partials/placeholders/_weather.html.erb", "app/views/widgets/weather/current.html.erb"],
-  "article collections" => ["source/partials/placeholders/_article_collection.html.erb", "app/views/widgets/articles/_collection.html.erb"],
-  "upcoming races" => ["source/partials/_upcoming_races.html.erb", "app/views/widgets/events/upcoming.html.erb"],
-  "pageviews" => ["source/partials/article/_full.html.erb", "app/views/widgets/plausible/pageviews.html.erb"]
+  "activity stats" => [ "source/partials/placeholders/_stats.html.erb", "app/views/widgets/activity_stats/show.html.erb" ],
+  "whoop" => [ "source/partials/placeholders/_whoop.html.erb", "app/views/widgets/whoop/show.html.erb" ],
+  "current weather" => [ "source/partials/placeholders/_weather.html.erb", "app/views/widgets/weather/current.html.erb" ],
+  "article collections" => [ "source/partials/placeholders/_article_collection.html.erb", "app/views/widgets/articles/_collection.html.erb" ],
+  "upcoming races" => [ "source/partials/_upcoming_races.html.erb", "app/views/widgets/events/upcoming.html.erb" ],
+  "pageviews" => [ "source/partials/article/_full.html.erb", "app/views/widgets/plausible/pageviews.html.erb" ]
 }.freeze
 
 RSpec.describe "web placeholder ↔ api fragment markup contract" do

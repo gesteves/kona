@@ -86,14 +86,14 @@ class TrendingArticles < ApplicationService
     articles = candidates
     return [] if articles.blank?
 
-    recent = pageviews_by_path(date_range: [(t_end - (RECENT_WINDOW_HOURS * 3600)).iso8601, t_end.iso8601])
-    baseline = pageviews_by_path(date_range: [(t_end - (BASELINE_DAYS * 86_400)).iso8601, (t_end - (RECENT_WINDOW_HOURS * 3600)).iso8601])
+    recent = pageviews_by_path(date_range: [ (t_end - (RECENT_WINDOW_HOURS * 3600)).iso8601, t_end.iso8601 ])
+    baseline = pageviews_by_path(date_range: [ (t_end - (BASELINE_DAYS * 86_400)).iso8601, (t_end - (RECENT_WINDOW_HOURS * 3600)).iso8601 ])
     warn_if_no_analytics(articles, recent)
 
     baseline_end = t_end - (RECENT_WINDOW_HOURS * 3600)
     baseline_start = t_end - (BASELINE_DAYS * 86_400)
     # Parsed once per article; also the only thing here that can raise.
-    published = articles.to_h { |article| [article.path, DateTime.parse(article.published_at)] }
+    published = articles.to_h { |article| [ article.path, DateTime.parse(article.published_at) ] }
 
     evaluated = articles.map do |article|
       score, heat = evaluate(recent[article.path].to_i, baseline[article.path].to_f, published[article.path], baseline_start, baseline_end)
@@ -103,7 +103,7 @@ class TrendingArticles < ApplicationService
     # Recency is the last sort key so the zero-scored tail runs newest-first, which is what
     # fills the widget with recent articles when little or nothing is hot.
     evaluated
-      .sort_by { |e| [-e[:score], -e[:heat], -e[:published].to_time.to_i] }
+      .sort_by { |e| [ -e[:score], -e[:heat], -e[:published].to_time.to_i ] }
       .first(MAX_POOL)
       .map { |e| e[:article] }
   end
@@ -119,13 +119,13 @@ class TrendingArticles < ApplicationService
   # @return [Array(Float, Float)] Its [score, heat]; heat is the tiebreaker. Below the recent
   #   traffic floor this is [0, 0], which sorts into the recency tail.
   def evaluate(recent_pageviews, baseline_total, published, baseline_start, baseline_end)
-    return [0.0, 0.0] if recent_pageviews < MIN_RECENT_PAGEVIEWS
+    return [ 0.0, 0.0 ] if recent_pageviews < MIN_RECENT_PAGEVIEWS
 
     volume = Math.log(recent_pageviews + 1)
 
     # Hours the article existed within the baseline window, so a young post isn't penalized for
     # the days before it was published.
-    existed_from = [published.to_time, baseline_start].max
+    existed_from = [ published.to_time, baseline_start ].max
     baseline_hours = (baseline_end - existed_from) / 3600.0
 
     score =
@@ -140,7 +140,7 @@ class TrendingArticles < ApplicationService
         Math.log(surge + 1) * relative_weight + volume * absolute_weight
       end
 
-    [score, recent_pageviews.to_f]
+    [ score, recent_pageviews.to_f ]
   end
 
   def relative_weight

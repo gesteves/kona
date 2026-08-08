@@ -11,7 +11,7 @@ RSpec.describe PlainTextExceptions do
 
     expect(status).to eq(404)
     expect(headers["content-type"]).to eq("text/plain; charset=utf-8")
-    expect(body).to eq(["404 Not Found\n"])
+    expect(body).to eq([ "404 Not Found\n" ])
     expect(headers["content-length"]).to eq("404 Not Found\n".bytesize.to_s)
   end
 
@@ -19,14 +19,14 @@ RSpec.describe PlainTextExceptions do
     status, _headers, body = call("/500")
 
     expect(status).to eq(500)
-    expect(body).to eq(["500 Internal Server Error\n"])
+    expect(body).to eq([ "500 Internal Server Error\n" ])
   end
 
   it "falls back to 500 for a non-error status path" do
     status, _headers, body = call("/")
 
     expect(status).to eq(500)
-    expect(body).to eq(["500 Internal Server Error\n"])
+    expect(body).to eq([ "500 Internal Server Error\n" ])
   end
 
   it "returns an empty body for HEAD requests" do

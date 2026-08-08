@@ -88,7 +88,7 @@ class WeatherKit < ApplicationService
   # lookup eats into what the weather lookup may spend rather than doubling the worst case.
   # @return [Float]
   def remaining_budget
-    [@budget_expires_at - Process.clock_gettime(Process::CLOCK_MONOTONIC), 0.0].max
+    [ @budget_expires_at - Process.clock_gettime(Process::CLOCK_MONOTONIC), 0.0 ].max
   end
 
   # The ES256 JWT used to authenticate with WeatherKit. It's app-global (no lat/lon) and valid

@@ -41,6 +41,6 @@ class Location
     latitude, longitude = location&.split(",")&.map { |part| Float(part.strip, exception: false) }
     return unless self.class.valid_coordinates?(latitude, longitude)
 
-    [latitude, longitude]
+    [ latitude, longitude ]
   end
 end

@@ -44,6 +44,6 @@ module ContentfulRequestVerification
       "#{name.downcase}:#{request.headers[name]}"
     end.join(";")
 
-    [request.request_method, request.fullpath, headers, request.raw_post].join("\n")
+    [ request.request_method, request.fullpath, headers, request.raw_post ].join("\n")
   end
 end

@@ -1,5 +1,5 @@
-require 'nokogiri'
-require 'public_suffix'
+require "nokogiri"
+require "public_suffix"
 
 module AffiliateLinksHelpers
   # Whether an entry's intro or body contains Amazon Associates links. Memoized per entry,
@@ -15,10 +15,10 @@ module AffiliateLinksHelpers
 
   # @see #has_amazon_associates_links?
   def scan_for_amazon_associates_links(content)
-    text = [content.intro, content.body].compact.join("\n\n")
+    text = [ content.intro, content.body ].compact.join("\n\n")
     doc = Nokogiri::HTML::DocumentFragment.parse(markdown_to_html(text))
-    doc.css('a').each do |a|
-      return true if amazon_associates_link?(a['href'])
+    doc.css("a").each do |a|
+      return true if amazon_associates_link?(a["href"])
     end
     false
   end
@@ -29,7 +29,7 @@ module AffiliateLinksHelpers
     uri = URI.parse(url)
     params = uri.query ? URI.decode_www_form(uri.query).to_h : {}
     domain = PublicSuffix.domain(uri.host)
-    domain == 'amzn.to' || (domain == 'amazon.com' && params.key?('tag'))
+    domain == "amzn.to" || (domain == "amazon.com" && params.key?("tag"))
   rescue StandardError
     # Malformed author-supplied hrefs just aren't affiliate links.
     false

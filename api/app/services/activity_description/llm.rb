@@ -31,7 +31,7 @@ module ActivityDescription
         schema: {
           type: "object",
           properties: { planned_summary: { type: %w[string null] } },
-          required: ["planned_summary"],
+          required: [ "planned_summary" ],
           additionalProperties: false
         }
       )

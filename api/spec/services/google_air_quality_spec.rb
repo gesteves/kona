@@ -13,8 +13,8 @@ RSpec.describe GoogleAirQuality do
     }
   end
 
-  let(:current_body) { { indexes: [aqi_index] }.to_json }
-  let(:forecast_body) { { hourlyForecasts: [{ indexes: [aqi_index] }] }.to_json }
+  let(:current_body) { { indexes: [ aqi_index ] }.to_json }
+  let(:forecast_body) { { hourlyForecasts: [ { indexes: [ aqi_index ] } ] }.to_json }
 
   before do
     # Cache always misses; writes are no-ops.

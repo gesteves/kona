@@ -38,7 +38,7 @@ RSpec.describe ImageHelpers do
     end
 
     it 'looks up dimensions, description, content type, URL, and version by id' do
-      expect(get_asset_dimensions('asset-1')).to eq([1600, 900])
+      expect(get_asset_dimensions('asset-1')).to eq([ 1600, 900 ])
       expect(get_asset_description('asset-1')).to eq('A finish line')
       expect(get_asset_content_type('asset-1')).to eq('image/jpeg')
       expect(get_asset_url('asset-1')).to eq('https://images.ctfassets.net/space/asset-1/token/photo.jpg')
@@ -46,7 +46,7 @@ RSpec.describe ImageHelpers do
     end
 
     it 'returns nils for an unknown asset' do
-      expect(get_asset_dimensions('nope')).to eq([nil, nil])
+      expect(get_asset_dimensions('nope')).to eq([ nil, nil ])
       expect(get_asset_description('nope')).to be_nil
     end
   end
@@ -74,7 +74,7 @@ RSpec.describe ImageHelpers do
     end
 
     it "swaps in the asset's canonical URL when the id is known" do
-      @assets = [OpenStruct.new(sys: OpenStruct.new(id: 'asset-1'), url: 'https://cdn.example.com/canonical.jpg')]
+      @assets = [ OpenStruct.new(sys: OpenStruct.new(id: 'asset-1'), url: 'https://cdn.example.com/canonical.jpg') ]
       expect(cdn_image_url(original, w: 10)).to eq('https://example.com/cdn-cgi/image/width=10/https://cdn.example.com/canonical.jpg')
     end
 
@@ -100,7 +100,7 @@ RSpec.describe ImageHelpers do
 
   describe '#srcset' do
     it 'renders a width-described candidate per size' do
-      set = srcset(url: 'https://images.ctfassets.net/s/a/t/p.jpg', widths: [100, 200])
+      set = srcset(url: 'https://images.ctfassets.net/s/a/t/p.jpg', widths: [ 100, 200 ])
       expect(set).to eq(
         'https://example.com/cdn-cgi/image/width=100/https://images.ctfassets.net/s/a/t/p.jpg 100w, ' \
         'https://example.com/cdn-cgi/image/width=200/https://images.ctfassets.net/s/a/t/p.jpg 200w'
@@ -108,7 +108,7 @@ RSpec.describe ImageHelpers do
     end
 
     it 'crops square when asked' do
-      set = srcset(url: 'https://images.ctfassets.net/s/a/t/p.jpg', widths: [100], square: true)
+      set = srcset(url: 'https://images.ctfassets.net/s/a/t/p.jpg', widths: [ 100 ], square: true)
       expect(set).to include('width=100')
       expect(set).to include('height=100')
       expect(set).to include('fit=cover')
@@ -141,7 +141,7 @@ RSpec.describe ImageHelpers do
 
   describe 'asset lookup edge cases' do
     it 'returns nil description when the asset has none' do
-      @assets = [OpenStruct.new(sys: OpenStruct.new(id: 'asset-1'), description: nil)]
+      @assets = [ OpenStruct.new(sys: OpenStruct.new(id: 'asset-1'), description: nil) ]
       expect(get_asset_description('asset-1')).to be_nil
     end
 
@@ -186,7 +186,7 @@ RSpec.describe ImageHelpers do
     # The candidates are joined with ", " — commas also separate Cloudflare's options, so the
     # space is what keeps the srcset parseable. Don't join with a bare comma.
     it 'builds a srcset whose candidates stay distinguishable from the option commas' do
-      set = srcset(url: source, widths: [100, 200], options: { fm: 'auto' })
+      set = srcset(url: source, widths: [ 100, 200 ], options: { fm: 'auto' })
       expect(set).to eq(
         "https://example.com/cdn-cgi/image/format=auto,width=100/#{source} 100w, " \
         "https://example.com/cdn-cgi/image/format=auto,width=200/#{source} 200w"
@@ -266,7 +266,7 @@ RSpec.describe ImageHelpers do
       )
     end
 
-    before { @assets = [asset] }
+    before { @assets = [ asset ] }
 
     describe '#blurhash_jpeg_data_uri' do
       let(:fake_redis) { double('redis', get: nil, set: nil) }
@@ -308,12 +308,12 @@ RSpec.describe ImageHelpers do
       end
 
       it 'is nil for gifs' do
-        @assets = [asset(content_type: 'image/gif')]
+        @assets = [ asset(content_type: 'image/gif') ]
         expect(blurhash_jpeg_data_uri('asset-1')).to be_nil
       end
 
       it 'is nil when the asset has no published version' do
-        @assets = [asset(published_version: nil)]
+        @assets = [ asset(published_version: nil) ]
         expect(blurhash_jpeg_data_uri('asset-1')).to be_nil
       end
 

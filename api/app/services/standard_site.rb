@@ -118,7 +118,7 @@ class StandardSite < ApplicationService
       found
     end
     post = item && decorate_post(item)
-    if post.blank? || publishable_posts([post]).empty?
+    if post.blank? || publishable_posts([ post ]).empty?
       log("entry #{entry_id} is not a publishable post; removing any document record")
       return remove_document!(document_rkey(entry_id))
     end
@@ -245,7 +245,7 @@ class StandardSite < ApplicationService
     description = plain_text(post["summary"].presence || post["intro"])
     record["description"] = truncate_graphemes(description, 3000) if description.present?
 
-    text = plain_text([post["intro"], post["body"]].reject(&:blank?).join("\n\n"))
+    text = plain_text([ post["intro"], post["body"] ].reject(&:blank?).join("\n\n"))
     record["textContent"] = text if text.present?
 
     tags = Array(post.dig("contentful_metadata", "tags")).map { |t| t["name"] }.compact_blank
@@ -655,7 +655,7 @@ class StandardSite < ApplicationService
       report_upstream_error("HTTP #{response.code}", context: "standard.site image fetch", status: response.code, url: image_url)
       return
     end
-    [response.body, mime]
+    [ response.body, mime ]
   rescue StandardError => e
     report_upstream_error(e, context: "standard.site image fetch")
     nil

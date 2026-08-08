@@ -56,7 +56,7 @@ class RelatedArticles < ApplicationService
     end
 
     scored
-      .sort_by { |e| [-e[:score], -e[:published].to_time.to_i] }
+      .sort_by { |e| [ -e[:score], -e[:published].to_time.to_i ] }
       .first(MAX_POOL)
       .map { |e| e[:article] }
   end
@@ -71,7 +71,7 @@ class RelatedArticles < ApplicationService
     ids = ids.compact
     return {} if ids.empty?
     raw = $redis.mget(*ids.map { |id| ArticleEmbeddingJob.redis_key(id) })
-    ids.zip(raw).to_h { |id, json| [id, parse_vector(json)] }
+    ids.zip(raw).to_h { |id, json| [ id, parse_vector(json) ] }
   end
 
   # Pulls the vector out of a stored `{ version:, vector: }` JSON blob.
@@ -96,5 +96,4 @@ class RelatedArticles < ApplicationService
 
     dot / (Math.sqrt(norm_a) * Math.sqrt(norm_b))
   end
-
 end

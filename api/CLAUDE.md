@@ -248,7 +248,8 @@ bin/dev                                                          # local server 
 bundle exec sidekiq -C config/sidekiq.yml                        # local worker
 bundle exec rspec spec/requests/widgets/activity_stats_spec.rb   # single spec
 bundle exec rspec                                                # full suite
-bin/ci                                                           # setup + suite + security scan
+bin/ci                                                           # setup + suite + style + security
+bundle exec rubocop                                              # -a to autocorrect
 bundle exec brakeman -q --no-pager
 bundle exec bundle-audit check --update
 fly deploy                                                       # app + worker
@@ -258,9 +259,15 @@ fly console
 curl -i -X POST -H "Authorization: Bearer $API_TOKEN" "$KONA_API_URL/api/build"
 ```
 
-No Rubocop or linter is configured. CI runs Brakeman + bundler-audit, and the deploy job **won't
-run unless both pass**. If Brakeman flags a verified false positive, add a checked-in
-`config/brakeman.ignore` rather than weakening the code.
+**RuboCop** runs `rubocop-rails-omakase` — Rails' own ruleset, inherited verbatim in
+`.rubocop.yml` with no rule overrides. It enables 50 of RuboCop's 609 cops (mostly Layout; no
+Metrics, so nothing polices method or class length). ⚠️ **Keep it override-free**: taking the
+omakase config *is* the decision not to have a house style. Disable a rule inline at the one site
+that needs it rather than editing the config. `web/` uses the same ruleset.
+
+CI runs RuboCop + Brakeman + bundler-audit, and the deploy job **won't run unless all pass**. If
+Brakeman flags a verified false positive, add a checked-in `config/brakeman.ignore` rather than
+weakening the code.
 
 ## Testing
 

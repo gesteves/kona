@@ -13,12 +13,12 @@ RSpec.describe DeepOstruct do
   end
 
   it "wraps arrays of hashes" do
-    obj = described_class.wrap([{ id: 1 }, { id: 2 }])
-    expect(obj.map(&:id)).to eq([1, 2])
+    obj = described_class.wrap([ { id: 1 }, { id: 2 } ])
+    expect(obj.map(&:id)).to eq([ 1, 2 ])
   end
 
   it "wraps hashes nested inside arrays inside hashes" do
-    obj = described_class.wrap(items: [{ name: "a" }])
+    obj = described_class.wrap(items: [ { name: "a" } ])
     expect(obj.items.first.name).to eq("a")
   end
 

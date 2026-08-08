@@ -34,7 +34,7 @@ class ArticleEmbeddingJob < ApplicationJob
 
     # Stripped to plain text, so the embedding covers the words an author wrote rather than
     # Markdown syntax.
-    text = [article.title, markdown_to_plain_text(article.intro), markdown_to_plain_text(article.body)].reject(&:blank?).join("\n\n")
+    text = [ article.title, markdown_to_plain_text(article.intro), markdown_to_plain_text(article.body) ].reject(&:blank?).join("\n\n")
     vector = Embeddings.new.embed(text)
     # Leaves any existing vector in place rather than storing a blank one.
     return if vector.blank?

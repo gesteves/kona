@@ -42,7 +42,7 @@ RSpec.describe UnitsHelper do
     end
 
     it "switches to kilometers at exactly 1 km, and stays in meters just below" do
-      expect(helper.meters_to_metric_units(1000)).to eq([1.0, { unit: "kilometer" }])
+      expect(helper.meters_to_metric_units(1000)).to eq([ 1.0, { unit: "kilometer" } ])
       expect(helper.meters_to_metric_units(999).last).to eq(unit: "meters")
     end
   end

@@ -6,10 +6,10 @@ module PlausibleHelper
     return "Never viewed" if pageviews.zero?
 
     times = case pageviews
-            when 1 then "once"
-            when 2 then "twice"
-            else "#{number_to_delimited(pageviews)} times"
-            end
+    when 1 then "once"
+    when 2 then "twice"
+    else "#{number_to_delimited(pageviews)} times"
+    end
     "Viewed #{times}"
   end
 end

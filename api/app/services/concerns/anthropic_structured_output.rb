@@ -37,7 +37,7 @@ module AnthropicStructuredOutput
       # thinking is on by default it would eat the tight token budget and risk truncating the JSON.
       thinking: { type: :disabled },
       system_: system,
-      messages: [{ role: "user", content: user }],
+      messages: [ { role: "user", content: user } ],
       output_config: { format: { type: :json_schema, schema: schema } },
       request_options: { timeout: self::TIMEOUT_SECONDS }
     )

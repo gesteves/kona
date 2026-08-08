@@ -54,8 +54,8 @@ class GoogleAirQuality < ApplicationService
       body = {
         location: { latitude: @latitude, longitude: @longitude },
         languageCode: "en",
-        extraComputations: ["LOCAL_AQI"],
-        customLocalAqis: [{ regionCode: @country_code, aqi: @aqi_code }]
+        extraComputations: [ "LOCAL_AQI" ],
+        customLocalAqis: [ { regionCode: @country_code, aqi: @aqi_code } ]
       }
       post_aqi("currentConditions:lookup", body)
     end
@@ -73,8 +73,8 @@ class GoogleAirQuality < ApplicationService
         location: { latitude: @latitude, longitude: @longitude },
         dateTime: @datetime.iso8601,
         languageCode: "en",
-        extraComputations: ["LOCAL_AQI"],
-        customLocalAqis: [{ regionCode: @country_code, aqi: @aqi_code }]
+        extraComputations: [ "LOCAL_AQI" ],
+        customLocalAqis: [ { regionCode: @country_code, aqi: @aqi_code } ]
       }
       post_aqi("forecast:lookup", body)
     end

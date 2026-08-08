@@ -32,7 +32,7 @@ class SidekiqOwnerGuard
     owner = ENV["OWNER_EMAIL"].to_s
     return @app.call(env) if owner.present? && session && session["owner_email"] == owner
 
-    [302, { "location" => "/login" }, []]
+    [ 302, { "location" => "/login" }, [] ]
   end
 end
 

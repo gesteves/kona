@@ -116,21 +116,21 @@ RSpec.describe EventsHelper, type: :helper do
   describe "#todays_race / #race_day?" do
     it "returns today's confirmed race and reports a race day" do
       race = build_event(days_from_today: 0)
-      events = [build_event(days_from_today: 5), race]
+      events = [ build_event(days_from_today: 5), race ]
 
       expect(helper.todays_race(events, time_zone)).to eq(race)
       expect(helper.race_day?(events, time_zone)).to be(true)
     end
 
     it "ignores a today event that isn't confirmed" do
-      events = [build_event(days_from_today: 0, going: false)]
+      events = [ build_event(days_from_today: 0, going: false) ]
 
       expect(helper.todays_race(events, time_zone)).to be_nil
       expect(helper.race_day?(events, time_zone)).to be(false)
     end
 
     it "reports no race day when nothing is today" do
-      events = [build_event(days_from_today: 3)]
+      events = [ build_event(days_from_today: 3) ]
 
       expect(helper.race_day?(events, time_zone)).to be(false)
     end
@@ -234,17 +234,17 @@ RSpec.describe EventsHelper, type: :helper do
       today = build_event(days_from_today: 0)
       soon = build_event(days_from_today: 3)
 
-      expect(helper.upcoming_races([soon, past, cancelled, today], time_zone)).to eq([today, soon])
+      expect(helper.upcoming_races([ soon, past, cancelled, today ], time_zone)).to eq([ today, soon ])
     end
 
     it "shows up to four when the next race is featured (within 10 days)" do
-      events = [0, 3, 8, 20, 25].map { |d| build_event(days_from_today: d) }
+      events = [ 0, 3, 8, 20, 25 ].map { |d| build_event(days_from_today: d) }
 
       expect(helper.upcoming_races(events.shuffle, time_zone).size).to eq(4)
     end
 
     it "shows up to three when the next race is more than 10 days out" do
-      events = [15, 18, 22, 25].map { |d| build_event(days_from_today: d) }
+      events = [ 15, 18, 22, 25 ].map { |d| build_event(days_from_today: d) }
 
       expect(helper.upcoming_races(events.shuffle, time_zone).size).to eq(3)
     end
@@ -256,7 +256,7 @@ RSpec.describe EventsHelper, type: :helper do
       dateless = build_event(days_from_today: 0, date: nil)
       garbage = build_event(days_from_today: 0, date: "not a date")
 
-      expect(helper.upcoming_races([dateless, good, garbage], time_zone)).to eq([good])
+      expect(helper.upcoming_races([ dateless, good, garbage ], time_zone)).to eq([ good ])
     end
 
     it "treats an event with no date as neither today nor close" do
@@ -271,7 +271,7 @@ RSpec.describe EventsHelper, type: :helper do
     it "marks the soonest upcoming race as next" do
       first = build_event(days_from_today: 0)
       second = build_event(days_from_today: 5)
-      upcoming = helper.upcoming_races([second, first], time_zone)
+      upcoming = helper.upcoming_races([ second, first ], time_zone)
 
       expect(helper.next?(first, upcoming)).to be(true)
       expect(helper.next?(second, upcoming)).to be(false)
@@ -279,11 +279,11 @@ RSpec.describe EventsHelper, type: :helper do
 
     it "features the next race only when it's close" do
       near = build_event(days_from_today: 0)
-      upcoming = helper.upcoming_races([near], time_zone)
+      upcoming = helper.upcoming_races([ near ], time_zone)
       expect(helper.featured?(near, upcoming, time_zone)).to be(true)
 
       far = build_event(days_from_today: 20)
-      upcoming = helper.upcoming_races([far], time_zone)
+      upcoming = helper.upcoming_races([ far ], time_zone)
       expect(helper.featured?(far, upcoming, time_zone)).to be(false)
     end
   end
@@ -297,27 +297,27 @@ RSpec.describe EventsHelper, type: :helper do
     end
 
     it "is single for one race" do
-      expect(variant_for([0])).to eq("single")
+      expect(variant_for([ 0 ])).to eq("single")
     end
 
     it "is single for two races when the first is featured" do
-      expect(variant_for([0, 5])).to eq("single")
+      expect(variant_for([ 0, 5 ])).to eq("single")
     end
 
     it "is halves for two races when none is featured" do
-      expect(variant_for([15, 18])).to eq("halves")
+      expect(variant_for([ 15, 18 ])).to eq("halves")
     end
 
     it "is halves for three races when the first is featured" do
-      expect(variant_for([0, 5, 8])).to eq("halves")
+      expect(variant_for([ 0, 5, 8 ])).to eq("halves")
     end
 
     it "is thirds for three races when none is featured" do
-      expect(variant_for([15, 18, 22])).to eq("thirds")
+      expect(variant_for([ 15, 18, 22 ])).to eq("thirds")
     end
 
     it "is thirds for four races" do
-      expect(variant_for([0, 3, 8, 9])).to eq("thirds")
+      expect(variant_for([ 0, 3, 8, 9 ])).to eq("thirds")
     end
   end
 end

@@ -1,11 +1,11 @@
-require 'sanitize'
+require "sanitize"
 
 module SiteHelpers
   # The public Cloudflare Turnstile sitekey for the contact form. Blank when unset, in which
   # case the widget isn't rendered and the api skips verification.
   # @return [String, nil]
   def turnstile_site_key
-    ENV['TURNSTILE_SITE_KEY']
+    ENV["TURNSTILE_SITE_KEY"]
   end
 
   # The IANA timezone the site's dates are reckoned in — the owner's location, so "published
@@ -14,7 +14,7 @@ module SiteHelpers
   # @return [String, nil] Blank when unset, which leaves the publish-date controller on the
   #   reader's browser timezone.
   def site_time_zone
-    ENV['TIME_ZONE'].presence
+    ENV["TIME_ZONE"].presence
   end
 
   # Generates an Atom-compliant tag URI from a URL and date.
@@ -22,9 +22,9 @@ module SiteHelpers
   # @param date [Date, Time] The date for the tag.
   # @return [String] The Atom tag URI.
   def atom_tag(url, date)
-    tag = url.gsub(/^http(s)?:\/\//, '').gsub('#', '/').split('/')
+    tag = url.gsub(/^http(s)?:\/\//, "").gsub("#", "/").split("/")
     tag[0] = "tag:#{tag[0]},#{date.strftime('%Y-%m-%d')}:"
-    tag.join('/')
+    tag.join("/")
   end
 
   # Builds the page title.
@@ -32,7 +32,7 @@ module SiteHelpers
   # @param include_site_name [Boolean] Whether to append the site's title.
   # @param separator [String] Separator between title segments.
   # @return [String] The sanitized title.
-  def page_title(content, include_site_name: false, separator: ' · ')
+  def page_title(content, include_site_name: false, separator: " · ")
     title = []
     if content.is_a?(Hash) && !content.is_home_page
       title << content.title
@@ -107,7 +107,7 @@ module SiteHelpers
   def content_summary(content)
     summary = if content.summary.present?
       content.summary
-    elsif content.entry_type == 'Short'
+    elsif content.entry_type == "Short"
       content.intro
     elsif content.intro.present?
       content.intro&.truncate(200)
@@ -132,7 +132,7 @@ module SiteHelpers
   def copyright_start_year
     memoize_by_collection(:copyright_start_year, data.articles) do
       earliest = published_articles.map { |a| published_datetime(a) }.min
-      earliest.nil? ? Time.current.year.to_s : earliest.strftime('%Y')
+      earliest.nil? ? Time.current.year.to_s : earliest.strftime("%Y")
     end
   end
 
@@ -145,13 +145,13 @@ module SiteHelpers
   # page or every one of the article's tags' feeds on a post.
   # @return [Array<Hash>] Entries of { href:, title: }.
   def alternate_feed_links
-    links = [{ href: full_url('/feed.xml'), title: sanitize(data.site.meta_title) }]
+    links = [ { href: full_url("/feed.xml"), title: sanitize(data.site.meta_title) } ]
     pc = page_content
     tags = if pc.nil?
       []
-    elsif pc.template == '/tag.html' && pc.tag_id
+    elsif pc.template == "/tag.html" && pc.tag_id
       node = taxonomy_index[pc.tag_id] # the tag itself
-      node ? [node] : []
+      node ? [ node ] : []
     elsif published_post?(pc)
       Array(pc.contentful_metadata&.tags).map { |t| { name: t.name, path: t.path } }
     else
@@ -165,12 +165,12 @@ module SiteHelpers
 
   # @return [String] The feed title, taken from the site's meta title.
   def feed_title
-    data.site.meta_title.split(':', 2).first.strip
+    data.site.meta_title.split(":", 2).first.strip
   end
 
   # @return [String, nil] The feed subtitle, or nil when the meta title has no second half.
   def feed_subtitle
-    subtitle = data.site.meta_title.split(':', 2).last.strip
+    subtitle = data.site.meta_title.split(":", 2).last.strip
     return if subtitle == feed_title
     subtitle
   end
@@ -190,7 +190,7 @@ module SiteHelpers
   # @param open_in_new_tab [Boolean] Whether to open the link in a new tab.
   # @return [String] An anchor element wrapping an SVG icon.
   def social_media_link(title:, destination:, css_class: nil, open_in_new_tab: true)
-    icon = if title.downcase == 'feed'
+    icon = if title.downcase == "feed"
       icon_svg("classic", "solid", "rss")
     else
       icon_svg("classic", "brands", title.downcase)
@@ -198,7 +198,7 @@ module SiteHelpers
 
     icon = icon_svg("classic", "solid", "link") if icon.blank?
 
-    options = if title.downcase == 'feed'
+    options = if title.downcase == "feed"
       {
         "title": "Subscribe to the feed",
         "aria-label": "Subscribe to the feed",
@@ -225,7 +225,7 @@ module SiteHelpers
   # @param item [Object] A menu item with title, destination, and open_in_new_tab.
   # @return [String] An anchor element.
   def shortcut_link(item)
-    if item.title.downcase == 'feed'
+    if item.title.downcase == "feed"
       link_to item.title, item.destination, **FEED_CLIPBOARD_ATTRS
     elsif item.open_in_new_tab
       link_to item.title, item.destination, rel: "noopener", target: "_blank"
@@ -244,8 +244,8 @@ module SiteHelpers
 
   # First-party proxy paths for Plausible analytics. Must match the constants in
   # src/plausible.ts, which does the proxying.
-  PLAUSIBLE_SCRIPT_PATH = '/pa/script.js'
-  PLAUSIBLE_EVENT_PATH = '/pa/event'
+  PLAUSIBLE_SCRIPT_PATH = "/pa/script.js"
+  PLAUSIBLE_EVENT_PATH = "/pa/event"
 
   # @return [String] The first-party path the Plausible script is proxied from.
   def plausible_script_path
@@ -261,7 +261,7 @@ module SiteHelpers
   # copy of the variable before serving /pa/*.
   # @return [Boolean] True when PLAUSIBLE_SCRIPT_URL is set.
   def plausible_installed?
-    ENV['PLAUSIBLE_SCRIPT_URL'].present?
+    ENV["PLAUSIBLE_SCRIPT_URL"].present?
   end
 
   # Builds a stable URL-based @id for a sitewide schema.org entity, so other nodes can reference
@@ -269,7 +269,7 @@ module SiteHelpers
   # @param fragment [String] The fragment naming the entity, e.g. "organization".
   # @param path [String] The page the entity is anchored to.
   # @return [String] An absolute URL with a fragment.
-  def schema_entity_id(fragment, path: '/')
+  def schema_entity_id(fragment, path: "/")
     "#{full_url(path)}##{fragment}"
   end
 
@@ -289,7 +289,7 @@ module SiteHelpers
         "@type": "Thing",
         "name": sanitize(content.title)
       },
-      "isPartOf": { "@id": schema_entity_id('website') }
+      "isPartOf": { "@id": schema_entity_id("website") }
     }
     items = Array(content.items)
     if items.present?
@@ -315,7 +315,7 @@ module SiteHelpers
   # @see https://schema.org/BreadcrumbList
   # @return [String] JSON-LD.
   def breadcrumb_list_schema(crumbs)
-    items = [['Home', full_url('/')], ['Blog', full_url('/blog')], *crumbs].map.with_index(1) do |(name, url), position|
+    items = [ [ "Home", full_url("/") ], [ "Blog", full_url("/blog") ], *crumbs ].map.with_index(1) do |(name, url), position|
       { "@type": "ListItem", "position": position, "name": name, "item": url }
     end
     { "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": items }.to_json
@@ -330,7 +330,7 @@ module SiteHelpers
     chain = concept_chain(content.tag_id)
     return if chain.empty?
 
-    breadcrumb_list_schema(chain.map { |node| [sanitize(node[:name]), full_url(node[:path])] })
+    breadcrumb_list_schema(chain.map { |node| [ sanitize(node[:name]), full_url(node[:path]) ] })
   end
 
   # Builds the JSON-LD Blog schema for the blog index, listing this page's entries as blogPost
@@ -345,7 +345,7 @@ module SiteHelpers
         "headline": sanitize(item.title),
         "url": full_url(item.path),
         "datePublished": published_datetime(item).iso8601,
-        "author": { "@id": schema_entity_id('person', path: '/about') }
+        "author": { "@id": schema_entity_id("person", path: "/about") }
       }
     end
     {
@@ -354,8 +354,8 @@ module SiteHelpers
       "name": sanitize(content.title),
       "description": sanitize(data.site.meta_description),
       "url": canonical_url,
-      "isPartOf": { "@id": schema_entity_id('website') },
-      "publisher": { "@id": schema_entity_id('organization') },
+      "isPartOf": { "@id": schema_entity_id("website") },
+      "publisher": { "@id": schema_entity_id("organization") },
       "blogPost": posts
     }.to_json
   end
@@ -383,7 +383,7 @@ module SiteHelpers
   # @return [Boolean] Whether Cloudflare counts the rule as "dynamic" — i.e. the source carries
   #   a splat or a :placeholder.
   def dynamic_redirect_source?(from)
-    from.include?('*') || from.match?(/:[A-Za-z]/)
+    from.include?("*") || from.match?(/:[A-Za-z]/)
   end
 
   # Every redirect rule, split into the order source/redirects.erb must emit them in.
@@ -397,8 +397,8 @@ module SiteHelpers
   def partitioned_redirects
     rules =
       [
-        { from: '/.well-known/host-meta*', to: 'https://fed.brid.gy/.well-known/host-meta:splat', status: 302 },
-        { from: '/.well-known/webfinger*', to: 'https://fed.brid.gy/.well-known/webfinger', status: 302 }
+        { from: "/.well-known/host-meta*", to: "https://fed.brid.gy/.well-known/host-meta:splat", status: 302 },
+        { from: "/.well-known/webfinger*", to: "https://fed.brid.gy/.well-known/webfinger", status: 302 }
       ] +
       taxonomy_synonym_redirects.map { |r| { from: r[:from], to: r[:to], status: r[:status] } } +
       data.redirects.map { |r| { from: r.from, to: r.to, status: r.status } }
@@ -421,7 +421,7 @@ module SiteHelpers
   def author_knows_about
     Array(data.tags)
       .map(&:tag)
-      .select { |t| t.scheme == 'sports' && t.parent_id.blank? }
+      .select { |t| t.scheme == "sports" && t.parent_id.blank? }
       .map(&:name)
       .uniq
       .sort
@@ -433,7 +433,7 @@ module SiteHelpers
   def author_same_as
     return [] if data.site.socials_collection.items.blank?
     data.site.socials_collection.items
-      .reject { |s| s.title.downcase == 'feed' }
+      .reject { |s| s.title.downcase == "feed" }
       .map { |s| s.destination }
   end
 
@@ -447,40 +447,40 @@ module SiteHelpers
 
     organization = {
       "@type": "Organization",
-      "@id": schema_entity_id('organization'),
+      "@id": schema_entity_id("organization"),
       "name": sanitize(data.site.title),
-      "url": full_url('/')
+      "url": full_url("/")
     }
     organization["logo"] = site_icon_url(w: 180) if data.site.logo.present?
     organization["sameAs"] = same_as if same_as.present?
 
     website = {
       "@type": "WebSite",
-      "@id": schema_entity_id('website'),
+      "@id": schema_entity_id("website"),
       "name": sanitize(data.site.title),
-      "url": full_url('/'),
+      "url": full_url("/"),
       "inLanguage": "en-US",
-      "publisher": { "@id": schema_entity_id('organization') }
+      "publisher": { "@id": schema_entity_id("organization") }
     }
 
     person = {
       "@type": "Person",
-      "@id": schema_entity_id('person', path: '/about'),
+      "@id": schema_entity_id("person", path: "/about"),
       "name": data.site.author.name,
-      "url": full_url('/about')
+      "url": full_url("/about")
     }
     person["sameAs"] = same_as if same_as.present?
     knows_about = author_knows_about
     person["knowsAbout"] = knows_about if knows_about.present?
     if data.site.author.profile_picture&.url.present?
       picture = data.site.author.profile_picture
-      person["image"] = image_object(cdn_image_url(picture.url, { w: 500, h: 500, fit: 'cover' }), 500, 500)
+      person["image"] = image_object(cdn_image_url(picture.url, { w: 500, h: 500, fit: "cover" }), 500, 500)
       person["image"][:caption] = sanitize(picture.description) if picture.description.present?
     end
 
     {
       "@context": "https://schema.org",
-      "@graph": [organization, website, person]
+      "@graph": [ organization, website, person ]
     }.to_json
   end
 
@@ -492,7 +492,7 @@ module SiteHelpers
     {
       "@context": "https://schema.org",
       "@type": "ProfilePage",
-      "mainEntity": { "@id": schema_entity_id('person', path: '/about') }
+      "mainEntity": { "@id": schema_entity_id("person", path: "/about") }
     }.to_json
   end
 end

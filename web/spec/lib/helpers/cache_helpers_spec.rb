@@ -14,7 +14,7 @@ RSpec.describe CacheHelpers do
     it 'opens the shared connection with the build-time timeouts' do
       client = double('redis')
       expect(Redis).to receive(:new).with(
-        hash_including(connect_timeout: 5, read_timeout: 3, write_timeout: 3, reconnect_attempts: [0.1, 0.5, 1.0])
+        hash_including(connect_timeout: 5, read_timeout: 3, write_timeout: 3, reconnect_attempts: [ 0.1, 0.5, 1.0 ])
       ).once.and_return(client)
 
       expect(redis).to be(client)

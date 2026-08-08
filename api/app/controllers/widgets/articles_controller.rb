@@ -13,7 +13,7 @@ module Widgets
     # A garbage id (see BaseController::CONTENTFUL_ID_FORMAT) is ignored rather than acted on.
     def trending_excluding
       id = contentful_id_param
-      render_trending TrendingArticles.new.excluding(id ? [id] : [], count: 4)
+      render_trending TrendingArticles.new.excluding(id ? [ id ] : [], count: 4)
     end
 
     # The "You May Also Like" widget: articles semantically related to :id (its Contentful entry id),

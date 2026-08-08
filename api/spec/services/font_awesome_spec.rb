@@ -32,7 +32,7 @@ RSpec.describe FontAwesome do
     end
 
     it "fetches, caches, and returns the SVG on a cache miss" do
-      stub_api_results([{ "id" => "eye", "svgs" => [{ "familyStyle" => { "family" => "classic", "style" => "solid" }, "html" => svg_markup }] }])
+      stub_api_results([ { "id" => "eye", "svgs" => [ { "familyStyle" => { "family" => "classic", "style" => "solid" }, "html" => svg_markup } ] } ])
 
       expect(service.svg("classic", "solid", "eye")).to eq(svg_markup)
       expect($redis).to have_received(:setex).with(cache_key, FontAwesome::CACHE_TTL, svg_markup)

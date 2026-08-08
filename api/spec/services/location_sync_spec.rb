@@ -31,7 +31,7 @@ RSpec.describe LocationSync do
   # Intervals.icu already matches the resolved context.
   let(:profile) { { city: "Denver", state: "Colorado", country: "United States", timezone: "America/Denver" } }
   let(:forecasts) do
-    [{ id: 7, provider: "OPEN_WEATHER", location: "Denver, Colorado, United States", label: "Denver, Colorado", lat: 39.7, lon: -104.9, enabled: true }]
+    [ { id: 7, provider: "OPEN_WEATHER", location: "Denver, Colorado, United States", label: "Denver, Colorado", lat: 39.7, lon: -104.9, enabled: true } ]
   end
 
   before { allow(LocationContext).to receive(:new).with(39.7, -104.9).and_return(context) }
@@ -57,14 +57,14 @@ RSpec.describe LocationSync do
   end
 
   context "when the weather config differs" do
-    before { allow(intervals).to receive(:weather_config).and_return([forecasts.first.merge(label: "Old Place")]) }
+    before { allow(intervals).to receive(:weather_config).and_return([ forecasts.first.merge(label: "Old Place") ]) }
 
     it "replaces it with a single current-location forecast (id 0)" do
       sync.call(39.7, -104.9)
 
       expect(intervals).to have_received(:update_weather_config).with(
-        [hash_including(id: 0, provider: "OPEN_WEATHER", location: "Denver, Colorado, United States",
-                        label: "Denver, Colorado", lat: 39.7, lon: -104.9, enabled: true)]
+        [ hash_including(id: 0, provider: "OPEN_WEATHER", location: "Denver, Colorado, United States",
+                        label: "Denver, Colorado", lat: 39.7, lon: -104.9, enabled: true) ]
       )
     end
 
@@ -76,7 +76,7 @@ RSpec.describe LocationSync do
   end
 
   it "treats an id-only difference in the weather config as equal (no write)" do
-    allow(intervals).to receive(:weather_config).and_return([forecasts.first.merge(id: 99_999)])
+    allow(intervals).to receive(:weather_config).and_return([ forecasts.first.merge(id: 99_999) ])
 
     sync.call(39.7, -104.9)
 

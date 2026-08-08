@@ -72,8 +72,8 @@ module ArticleHelpers
   def entry_type(entry)
     return if entry.entry_type.blank?
     case entry.entry_type
-    when 'Short'
-      'Post'
+    when "Short"
+      "Post"
     else
       entry.entry_type
     end
@@ -93,7 +93,7 @@ module ArticleHelpers
       "data-publish-date-target": "timestamp"
     }
     link = content_tag :a, options do
-      published.strftime('%A, %B %-e, %Y')
+      published.strftime("%A, %B %-e, %Y")
     end
     content_tag :time, link, datetime: published.iso8601
   end
@@ -119,7 +119,7 @@ module ArticleHelpers
   def recent_articles(count: 4, exclude: nil)
     published_articles
       .reject { |a| a.path == exclude&.path }
-      .reject { |a| a.entry_type == 'Short' }
+      .reject { |a| a.entry_type == "Short" }
       .take(count)
   end
 
@@ -135,7 +135,7 @@ module ArticleHelpers
   # @return [Array<Object>]
   def llms_articles(count: 100)
     indexable_articles
-      .reject { |a| a.entry_type == 'Short' }
+      .reject { |a| a.entry_type == "Short" }
       .take(count)
   end
 
@@ -148,7 +148,7 @@ module ArticleHelpers
     sequence = published_articles
     # Indexed once per build rather than scanned per article page, which was quadratic.
     positions = memoize_by_collection(:published_article_positions, data.articles) do
-      sequence.each_with_index.to_h { |a, i| [a.path, i] }
+      sequence.each_with_index.to_h { |a, i| [ a.path, i ] }
     end
 
     index = positions[article.path]
@@ -175,9 +175,9 @@ module ArticleHelpers
       "wordCount": article_word_count(content),
       "timeRequired": "PT#{reading_time_minutes(content)}M",
       # Referenced by @id so consumers resolve to the single sitewide entity for each.
-      "author": { "@id": schema_entity_id('person', path: '/about') },
-      "publisher": { "@id": schema_entity_id('organization') },
-      "isPartOf": { "@id": schema_entity_id('website') },
+      "author": { "@id": schema_entity_id("person", path: "/about") },
+      "publisher": { "@id": schema_entity_id("organization") },
+      "isPartOf": { "@id": schema_entity_id("website") },
       "mainEntityOfPage": {
         "@type": "WebPage",
         "@id": canonical_url
@@ -185,22 +185,22 @@ module ArticleHelpers
     }
     tags = Array(content.contentful_metadata&.tags)
     if tags.present?
-      schema["keywords"] = tags.flat_map { |t| [t.name, *Array(t.synonyms)] }.uniq
+      schema["keywords"] = tags.flat_map { |t| [ t.name, *Array(t.synonyms) ] }.uniq
       # Prefer the content-type concept, then any Topics concept, then whatever's first.
       section = tags.find { |t| %w[race-reports news reviews].include?(t.id) } ||
-                tags.find { |t| t.scheme == 'topics' } || tags.first
+                tags.find { |t| t.scheme == "topics" } || tags.first
       schema["articleSection"] = section.name
     end
     if content&.cover_image&.url.present?
-      schema["image"] = ["1000x1000", "1600x900", "1600x1200"].map do |s|
-        w, h = s.split('x').map(&:to_i)
-        image_object(cdn_image_url(content.cover_image.url, { w: w, h: h, fit: 'cover' }), w, h)
+      schema["image"] = [ "1000x1000", "1600x900", "1600x1200" ].map do |s|
+        w, h = s.split("x").map(&:to_i)
+        image_object(cdn_image_url(content.cover_image.url, { w: w, h: h, fit: "cover" }), w, h)
       end
     else
       # No cover image: fall back to the generated Open Graph card, so the BlogPosting still
       # carries an image.
       card_url = generate_open_graph_image_url(current_page.url, content.sys&.published_version)
-      schema["image"] = [image_object(card_url, 1200, 630)]
+      schema["image"] = [ image_object(card_url, 1200, 630) ]
     end
     schema.to_json
   end
@@ -213,8 +213,8 @@ module ArticleHelpers
   def breadcrumb_schema(content)
     return unless published_post?(content)
 
-    crumbs = taxonomy_trail(content).map { |node| [sanitize(node[:name]), full_url(node[:path])] }
-    crumbs << [sanitize(content.title), canonical_url]
+    crumbs = taxonomy_trail(content).map { |node| [ sanitize(node[:name]), full_url(node[:path]) ] }
+    crumbs << [ sanitize(content.title), canonical_url ]
     breadcrumb_list_schema(crumbs)
   end
 
@@ -230,7 +230,7 @@ module ArticleHelpers
     chains = tags.map { |t| concept_chain(t.id) }.reject(&:empty?)
     return [] if chains.empty?
 
-    chains.max_by { |chain| [chain.length, index.dig(chain.last[:id], :count).to_i] }
+    chains.max_by { |chain| [ chain.length, index.dig(chain.last[:id], :count).to_i ] }
   end
 
   # The ancestor chain of a concept id, root-first and inclusive, resolved from data.tags.
@@ -276,7 +276,7 @@ module ArticleHelpers
   # @return [String] The joined markup.
   def tag_chain_links(chains)
     chains.map do |chain|
-      chain.map { |label, path| content_tag(:span, link_to(label, path), role: 'listitem') }.join(TAG_SEPARATOR)
+      chain.map { |label, path| content_tag(:span, link_to(label, path), role: "listitem") }.join(TAG_SEPARATOR)
     end.join(TAG_SEPARATOR)
   end
 
@@ -298,7 +298,7 @@ module ArticleHelpers
 
   # @see #article_word_count
   def compute_article_word_count(article)
-    plain_text = sanitize([article.intro, article.body].reject(&:blank?).join("\n\n"), escape_html_entities: true)
+    plain_text = sanitize([ article.intro, article.body ].reject(&:blank?).join("\n\n"), escape_html_entities: true)
     plain_text.split(/\s+/).size
   end
 
@@ -309,7 +309,7 @@ module ArticleHelpers
     # ⚠️ Not ENV.fetch with a default: that only fires when the key is ABSENT, and a CI variable
     # that isn't set interpolates to an empty string — present but blank. `''.to_i` is 0, and
     # dividing by it raises FloatDomainError on every article page.
-    wpm = ENV['READING_TIME_WPM'].to_i
+    wpm = ENV["READING_TIME_WPM"].to_i
     wpm = DEFAULT_READING_TIME_WPM unless wpm.positive?
     (article_word_count(article) / wpm.to_f).ceil
   end
@@ -319,7 +319,7 @@ module ArticleHelpers
   def reading_time(article)
     minutes = reading_time_minutes(article)
     # Numbers whose spoken form starts with a vowel sound take "An".
-    indefinite_article = minutes.humanize.match?(/^(eight|eleven)/i) ? 'An' : 'A'
+    indefinite_article = minutes.humanize.match?(/^(eight|eleven)/i) ? "An" : "A"
     "#{indefinite_article} #{minutes}-minute read"
   end
 
@@ -332,11 +332,11 @@ module ArticleHelpers
     race_id = race_concept_id(article)
     return [] if race_id.nil?
 
-    memoize_by_key(:@related_race_reports, [article.slug, count]) do
+    memoize_by_key(:@related_race_reports, [ article.slug, count ]) do
       published_articles
         .select { |a| race_report?(a) && race_concept_id(a) == race_id }
         .reject { |a| a.slug == article.slug }
-        .reject { |a| a.entry_type == 'Short' }
+        .reject { |a| a.entry_type == "Short" }
         .sort_by { |a| -published_datetime(a).to_i }
         .take(count)
     end
@@ -348,8 +348,8 @@ module ArticleHelpers
   # @return [String, nil]
   def race_concept_id(article)
     Array(article.contentful_metadata&.tags)
-      .select { |t| t.scheme == 'sports' }
-      .map { |t| [t.id, concept_chain(t.id).length] }
+      .select { |t| t.scheme == "sports" }
+      .map { |t| [ t.id, concept_chain(t.id).length ] }
       .select { |_id, depth| depth >= 3 }
       .max_by { |_id, depth| depth }
       &.first
@@ -360,7 +360,7 @@ module ArticleHelpers
   # @param article [Object] The article.
   # @return [Boolean]
   def race_report?(article)
-    Array(article.contentful_metadata&.tags).any? { |t| t.id == 'race-reports' }
+    Array(article.contentful_metadata&.tags).any? { |t| t.id == "race-reports" }
   end
 
   # The article's concepts as breadcrumb chains, one per leaf concept. Chains are walked through
@@ -373,12 +373,12 @@ module ArticleHelpers
     tags = Array(article.contentful_metadata&.tags)
     return [] if tags.empty?
 
-    by_id = tags.to_h { |t| [t.id, t] }
-    chain_ids = tags.to_h { |t| [t.id, concept_chain(t.id).map { |n| n[:id] }] }
+    by_id = tags.to_h { |t| [ t.id, t ] }
+    chain_ids = tags.to_h { |t| [ t.id, concept_chain(t.id).map { |n| n[:id] } ] }
     ancestor_ids = chain_ids.values.flat_map { |ids| ids[0...-1] }.to_set
     leaves = tags.reject { |t| ancestor_ids.include?(t.id) }
 
     chains = leaves.map { |leaf| chain_ids[leaf.id].filter_map { |id| by_id[id] } }
-    chains.sort_by { |chain| [-chain.length, chain.first.scheme == 'sports' ? 0 : 1, chain.last.short_name.to_s] }
+    chains.sort_by { |chain| [ -chain.length, chain.first.scheme == "sports" ? 0 : 1, chain.last.short_name.to_s ] }
   end
 end

@@ -20,12 +20,12 @@ module ParallelUpstreams
       thread = Thread.new { Rails.application.executor.wrap { block.call } }
       # The failure is delivered to the join below, so Ruby's own stderr report is duplicate noise.
       thread.report_on_exception = false
-      [key, thread]
+      [ key, thread ]
     end
 
     # Join everything before reading any value. Thread#value re-raises, so going straight to it
     # would abandon the remaining threads mid-flight on the first failure.
     threads.each { |(_, thread)| thread.join rescue nil }
-    threads.to_h { |key, thread| [key, thread.value] }
+    threads.to_h { |key, thread| [ key, thread.value ] }
   end
 end

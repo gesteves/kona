@@ -153,18 +153,18 @@ module ActivityDescription
     #   positive samples only since CORE emits long zero runs when thermoneutral. [nil, nil]
     #   when the stream is absent or empty.
     def heat_strain_values(activity)
-      return [nil, nil] unless activity[:stream_types]&.include?("heat_strain_index")
+      return [ nil, nil ] unless activity[:stream_types]&.include?("heat_strain_index")
 
       samples = stream_data(activity[:id], "heat_strain_index")
-      return [nil, nil] if samples.blank?
+      return [ nil, nil ] if samples.blank?
 
       positive = samples.select(&:positive?)
-      [round_tenth(samples.max), round_tenth(median(positive.presence || samples) || 0)]
+      [ round_tenth(samples.max), round_tenth(median(positive.presence || samples) || 0) ]
     end
 
     # @return [Array<Numeric>, nil] The named stream's numeric samples.
     def stream_data(activity_id, type)
-      streams = @intervals.activity_streams(activity_id, types: [type, "time"])
+      streams = @intervals.activity_streams(activity_id, types: [ type, "time" ])
       stream = Array(streams).find { |candidate| candidate[:type] == type }
       stream&.dig(:data)&.compact&.select { |value| value.is_a?(Numeric) }
     end

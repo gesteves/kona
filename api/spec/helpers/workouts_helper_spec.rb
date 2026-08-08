@@ -4,7 +4,7 @@ RSpec.describe WorkoutsHelper do
   let(:helper) { Class.new { include WorkoutsHelper }.new }
 
   it "reports a scheduled workout when workouts are present" do
-    workouts = [double("workout")]
+    workouts = [ double("workout") ]
     expect(helper.workout_scheduled?(workouts)).to be true
     expect(helper.rest_day?(workouts)).to be false
   end

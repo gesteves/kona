@@ -9,6 +9,7 @@ CI.run do
 
   step "Tests: RSpec", "bundle exec rspec"
 
+  step "Style: RuboCop", "bundle exec rubocop --no-color"
   step "Security: Brakeman", "bundle exec brakeman -q --no-pager"
   step "Audit: bundler-audit", "bundle exec bundle-audit check --update"
 end

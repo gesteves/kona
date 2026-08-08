@@ -270,7 +270,7 @@ RSpec.describe WeatherSummaryPresenter do
     end
 
     it "emits no sentence when pollen is zero/missing" do
-      presenter.instance_variable_set(:@pollen, DeepOstruct.wrap(pollen_type_info: [{ index_info: { value: 0, category: "None" } }]))
+      presenter.instance_variable_set(:@pollen, DeepOstruct.wrap(pollen_type_info: [ { index_info: { value: 0, category: "None" } } ]))
 
       expect(presenter.format_pollen_level).to be_nil
     end
@@ -425,7 +425,7 @@ RSpec.describe WeatherSummaryPresenter do
         { token: "flood", precedence: 1, description: "Flood A" }
       ])
 
-      expect(presenter.alerts.map(&:description)).to eq(["Flood A"])
+      expect(presenter.alerts.map(&:description)).to eq([ "Flood A" ])
     end
   end
 

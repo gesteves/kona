@@ -28,7 +28,7 @@ describe StandardSite do
       "published_at" => "2026-02-24T15:00:00.000-07:00",
       "updated_at" => "2026-02-24T22:07:58.616Z",
       "path" => "/2026/02/24/ironman-competition-rules-2026/",
-      "contentful_metadata" => { "tags" => [{ "id" => "ironman", "name" => "Ironman" }, { "id" => "news", "name" => "News" }] }
+      "contentful_metadata" => { "tags" => [ { "id" => "ironman", "name" => "Ironman" }, { "id" => "news", "name" => "News" } ] }
     }
   end
 
@@ -189,7 +189,7 @@ describe StandardSite do
     end
 
     it "changes when a tag changes" do
-      changed = post.merge("contentful_metadata" => { "tags" => [{ "id" => "racing", "name" => "Racing" }] })
+      changed = post.merge("contentful_metadata" => { "tags" => [ { "id" => "racing", "name" => "Racing" } ] })
       expect(fingerprint).not_to eq(client.document_fingerprint(changed, publication_uri))
     end
 
@@ -238,7 +238,7 @@ describe StandardSite do
 
     it "drops concept ids the taxonomy doesn't know" do
       allow_any_instance_of(TaxonomyConcepts).to receive(:names).and_return("known" => "Known")
-      expect(client.send(:article_tags, raw("known", "missing"))).to eq([{ "id" => "known", "name" => "Known" }])
+      expect(client.send(:article_tags, raw("known", "missing"))).to eq([ { "id" => "known", "name" => "Known" } ])
     end
 
     it "returns [] when the article has no concepts" do

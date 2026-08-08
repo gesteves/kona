@@ -5,9 +5,9 @@ RSpec.describe GoogleMaps do
 
   let(:timezone_body) { { timeZoneId: "America/Denver", status: "OK" }.to_json }
   let(:geocode_body) do
-    { results: [{ address_components: [{ types: ["country"], short_name: "US" }] }] }.to_json
+    { results: [ { address_components: [ { types: [ "country" ], short_name: "US" } ] } ] }.to_json
   end
-  let(:elevation_body) { { results: [{ elevation: 2057.0 }] }.to_json }
+  let(:elevation_body) { { results: [ { elevation: 2057.0 } ] }.to_json }
 
   before do
     # Cache always misses; writes are no-ops.
@@ -17,10 +17,10 @@ RSpec.describe GoogleMaps do
 
     allow(HTTParty).to receive(:get) do |url, **_opts|
       body = case url
-             when %r{/timezone/json} then timezone_body
-             when %r{/geocode/json} then geocode_body
-             when %r{/elevation/json} then elevation_body
-             end
+      when %r{/timezone/json} then timezone_body
+      when %r{/geocode/json} then geocode_body
+      when %r{/elevation/json} then elevation_body
+      end
       instance_double(HTTParty::Response, success?: true, body: body)
     end
   end
@@ -42,7 +42,7 @@ RSpec.describe GoogleMaps do
 
   it "assembles the full location hash (snake-cased) from all three lookups" do
     expect(maps.location).to eq(
-      geocoded: { address_components: [{ types: ["country"], short_name: "US" }] },
+      geocoded: { address_components: [ { types: [ "country" ], short_name: "US" } ] },
       time_zone: { time_zone_id: "America/Denver", status: "OK" },
       elevation: 2057.0
     )

@@ -20,7 +20,7 @@ RSpec.describe Turnstile do
   end
 
   it "returns false for a token siteverify rejects" do
-    stub_response(success: true, body: { success: false, "error-codes": ["invalid-input-response"] }.to_json)
+    stub_response(success: true, body: { success: false, "error-codes": [ "invalid-input-response" ] }.to_json)
     expect(service.verify("bad-token")).to be(false)
   end
 

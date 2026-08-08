@@ -66,7 +66,7 @@ class ContactMailJob < ApplicationJob
 
   # @return [Array<String>] The "Sender details" lines, with blanks omitted.
   def sender_details(context)
-    location = [context["city"], context["region"], context["country"]].reject(&:blank?).join(", ")
+    location = [ context["city"], context["region"], context["country"] ].reject(&:blank?).join(", ")
     lines = []
     lines << "Location: #{location}" if location.present?
     lines << "IP: #{context["ip"]}" if context["ip"].present?

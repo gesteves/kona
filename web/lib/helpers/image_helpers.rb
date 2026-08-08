@@ -1,8 +1,8 @@
-require 'vips'
-require 'open-uri'
-require 'base64'
-require 'blurhash'
-require 'erb'
+require "vips"
+require "open-uri"
+require "base64"
+require "blurhash"
+require "erb"
 
 module ImageHelpers
   # Raised when IMAGES_URL is unset. Deliberately fatal rather than falling back to Contentful
@@ -20,11 +20,11 @@ module ImageHelpers
 
   # Cloudflare Images transformation path. Options go in the path, not the query string.
   # @see https://developers.cloudflare.com/images/transform-images/transform-via-url/
-  CDN_IMAGE_PATH = '/cdn-cgi/image/'
+  CDN_IMAGE_PATH = "/cdn-cgi/image/"
 
   # Maps Contentful's format names to Cloudflare's (note `jpeg`, not `jpg`). `auto` lets
   # Cloudflare pick avif/webp/jpeg from the Accept header, which is why no <picture> is needed.
-  CDN_IMAGE_FORMATS = { 'avif' => 'avif', 'webp' => 'webp', 'jpg' => 'jpeg', 'auto' => 'auto' }.freeze
+  CDN_IMAGE_FORMATS = { "avif" => "avif", "webp" => "webp", "jpg" => "jpeg", "auto" => "auto" }.freeze
 
   # How long a rendered blurhash placeholder stays cached. Keyed by the asset's published_version,
   # so entries are immutable and a republish simply mints a new one — the TTL exists to reclaim
@@ -40,7 +40,7 @@ module ImageHelpers
   # @return [String, nil] The asset ID, or nil for a blank URL.
   def get_asset_id(url)
     return if url.blank?
-    url.split('/')[4]
+    url.split("/")[4]
   end
 
   # Assets keyed by sys.id, built once per build.
@@ -98,13 +98,13 @@ module ImageHelpers
     # Already transformed. Must precede get_asset_id, which reads the id from a fixed path
     # position a transformed URL doesn't have.
     return original_url if original_url.include?(CDN_IMAGE_PATH)
-    raise ImagesUrlMissing if ENV['IMAGES_URL'].blank?
+    raise ImagesUrlMissing if ENV["IMAGES_URL"].blank?
 
     asset_id = get_asset_id(original_url)
     asset_url = get_asset_url(asset_id)
     original_url = asset_url if asset_url.present?
 
-    original_url = "https:#{original_url}" if original_url.start_with?('//')
+    original_url = "https:#{original_url}" if original_url.start_with?("//")
     "#{ENV['IMAGES_URL']}#{CDN_IMAGE_PATH}#{cdn_image_options(params)}/#{original_url}"
   end
 
@@ -121,9 +121,9 @@ module ImageHelpers
     # Cloudflare rejects a URL with no options, so callers wanting the image as-is get
     # anim=true — Cloudflare's own default, which transforms nothing and preserves the source
     # format, transparency, and gif animation.
-    return 'anim=true' if options.empty?
+    return "anim=true" if options.empty?
 
-    options.join(',')
+    options.join(",")
   end
 
   # Builds a responsive srcset.
@@ -135,10 +135,10 @@ module ImageHelpers
   def srcset(url:, widths:, square: false, options: {})
     srcset = widths.map do |w|
       query = options.merge({ w: w })
-      query.merge!({ h: w, fit: 'cover' }) if square
+      query.merge!({ h: w, fit: "cover" }) if square
       cdn_image_url(url, query) + " #{w}w"
     end
-    srcset.join(', ')
+    srcset.join(", ")
   end
 
   # Builds the Open Graph card URL for a cover image, at Facebook's recommended size.
@@ -146,13 +146,13 @@ module ImageHelpers
   # @param original_url [String] The image's source URL.
   # @return [String] The transformation URL.
   def open_graph_image_url(original_url)
-    params = { w: 1200, h: 630, fit: 'cover' }
+    params = { w: 1200, h: 630, fit: "cover" }
     cdn_image_url(original_url, params)
   end
 
   # Bump after changing the card design, logo, or font in web/src/og-render.ts: it's folded into
   # the `v` cache buster below, so bumping re-mints every card URL. Cards are otherwise immutable.
-  OG_TEMPLATE_VERSION = 'v1'
+  OG_TEMPLATE_VERSION = "v1"
 
   # Builds the URL of the on-demand Open Graph card for a page, rendered by this site's own
   # Worker (web/src/og.ts) from the page's og:title. The card hangs off the page's own path, so
@@ -189,7 +189,7 @@ module ImageHelpers
     svg = blurhash_svg(asset_id)
     return if svg.blank?
 
-    encoded_svg = ERB::Util.url_encode(svg.gsub(/\s+/, ' '))
+    encoded_svg = ERB::Util.url_encode(svg.gsub(/\s+/, " "))
     "data:image/svg+xml;charset=utf-8,#{encoded_svg}"
   end
 
@@ -225,7 +225,7 @@ module ImageHelpers
   # @return [String, nil] The data URI, or nil for a GIF or when encoding fails.
   def blurhash_jpeg_data_uri(asset_id, width: 32)
     store = memoize_by_collection(:blurhash_jpegs, data.assets) { {} }
-    key = [asset_id, width]
+    key = [ asset_id, width ]
     return store[key] if store.key?(key)
 
     store[key] = build_blurhash_jpeg_data_uri(asset_id, width)
@@ -236,7 +236,7 @@ module ImageHelpers
   # @return [String, nil] The data URI, or nil for a GIF or when encoding fails.
   def build_blurhash_jpeg_data_uri(asset_id, width)
     content_type = get_asset_content_type(asset_id)
-    return if content_type == 'image/gif'
+    return if content_type == "image/gif"
 
     original_width, original_height = get_asset_dimensions(asset_id)
     published_version = get_asset_published_version(asset_id)
@@ -253,7 +253,7 @@ module ImageHelpers
     # Blurhash.decode returns a nested [row][col][r,g,b,a] array that Array#pack raises on, so
     # the flatten is required. It decodes to opaque RGBA, so the alpha band is dropped.
     pixels = Blurhash.decode(width, height, blurhash).flatten
-    image = Vips::Image.new_from_memory(pixels.pack('C*'), width, height, 4, :uchar)
+    image = Vips::Image.new_from_memory(pixels.pack("C*"), width, height, 4, :uchar)
                        .copy(interpretation: :srgb)
                        .extract_band(0, n: 3)
 
@@ -277,11 +277,11 @@ module ImageHelpers
   # @param height [Integer] The thumbnail's height.
   # @return [String, nil] The blurhash, or nil when encoding fails.
   def encode_blurhash(asset_id, width, height)
-    url = cdn_image_url(get_asset_url(asset_id), { w: width, h: height, fm: 'jpg' })
+    url = cdn_image_url(get_asset_url(asset_id), { w: width, h: height, fm: "jpg" })
     # Timeouts are mandatory here: this runs once per uncached asset during the build, and the
     # rescue below catches errors, not a hang — one stalled response would park the whole build.
     data = URI.open(url, open_timeout: BLURHASH_OPEN_TIMEOUT, read_timeout: BLURHASH_READ_TIMEOUT).read
-    image = Vips::Image.new_from_buffer(data, '').colourspace(:srgb)
+    image = Vips::Image.new_from_buffer(data, "").colourspace(:srgb)
     image = image.flatten if image.has_alpha?
     Blurhash.encode(image.width, image.height, image.to_a.flatten)
   rescue StandardError => e

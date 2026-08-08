@@ -2,7 +2,7 @@
 class Plausible < ApplicationService
   PLAUSIBLE_API_URL = "https://plausible.io/api/v2/query"
   # Matches only article pages, whose path format ArticleAttributes.path owns.
-  ARTICLE_PATH_FILTER = [["matches", "event:page", ["^/20\\d{2}/"]]].freeze
+  ARTICLE_PATH_FILTER = [ [ "matches", "event:page", [ "^/20\\d{2}/" ] ] ].freeze
 
   # @return [String, nil] The Plausible site id, or nil when unconfigured.
   attr_reader :site_id
@@ -37,9 +37,9 @@ class Plausible < ApplicationService
   #   what distinguishes "analytics are down" from "nothing has been viewed".
   def pageviews_by_path(date_range: "all")
     result = query(
-      metrics: ["pageviews"],
+      metrics: [ "pageviews" ],
       date_range: date_range,
-      dimensions: ["event:page"],
+      dimensions: [ "event:page" ],
       filters: ARTICLE_PATH_FILTER
     )
     return if result.nil?
@@ -53,13 +53,13 @@ class Plausible < ApplicationService
 
   # Runs a Plausible query, cached by request body.
   # @return [Hash, nil] The parsed response, or nil when unavailable.
-  def query(metrics: [], date_range: "all", dimensions: ["event:page"], filters: nil, order_by: nil, offset: 0, limit: 10000)
+  def query(metrics: [], date_range: "all", dimensions: [ "event:page" ], filters: nil, order_by: nil, offset: 0, limit: 10000)
     return if @access_token.blank? || @site_id.blank?
 
     if date_range == "1d"
       today = Time.now.beginning_of_hour
       yesterday = today - 1.day
-      date_range = [yesterday.iso8601, today.iso8601]
+      date_range = [ yesterday.iso8601, today.iso8601 ]
     end
 
     body = {

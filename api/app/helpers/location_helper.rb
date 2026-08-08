@@ -26,11 +26,11 @@ module LocationHelper
 
     case country
     when "United States"
-      [city || county, region].compact.join(", ")
+      [ city || county, region ].compact.join(", ")
     when "United Kingdom", "Canada"
-      [city, region].compact.join(", ")
+      [ city, region ].compact.join(", ")
     else
-      [city, country].compact.join(", ")
+      [ city, country ].compact.join(", ")
     end
   end
 

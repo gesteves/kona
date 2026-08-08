@@ -440,14 +440,14 @@ RSpec.describe MarkupHelpers do
       allow(self).to receive(:cdn_image_url) do |url, params = {}|
         params.nil? || params.empty? ? url : "#{url}?#{URI.encode_www_form(params)}"
       end
-      allow(self).to receive(:get_asset_dimensions).with('asset-1').and_return([200, 100])
+      allow(self).to receive(:get_asset_dimensions).with('asset-1').and_return([ 200, 100 ])
       allow(self).to receive(:get_asset_content_type).with('asset-1').and_return('image/jpeg')
     end
 
     # No <picture> and no per-format <source>: one srcset asking for format=auto, which Cloudflare
     # negotiates from the Accept header.
     it 'puts a format=auto srcset on the image, dropping widths larger than the asset' do
-      transformed_html = responsivize_images(tagged_img, widths: [100, 200, 300], sizes: '100vw')
+      transformed_html = responsivize_images(tagged_img, widths: [ 100, 200, 300 ], sizes: '100vw')
       expect(transformed_html).to eq(
         %(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}" loading="lazy" width="200" height="100" ) +
         %(sizes="100vw" srcset="#{image_url}?fm=auto&amp;w=100 100w, #{image_url}?fm=auto&amp;w=200 200w">)
@@ -455,13 +455,13 @@ RSpec.describe MarkupHelpers do
     end
 
     it 'inserts the asset width as a srcset candidate when it falls below the largest requested width' do
-      allow(self).to receive(:get_asset_dimensions).with('asset-1').and_return([150, 75])
-      transformed_html = responsivize_images(tagged_img, widths: [100, 300], sizes: '100vw')
+      allow(self).to receive(:get_asset_dimensions).with('asset-1').and_return([ 150, 75 ])
+      transformed_html = responsivize_images(tagged_img, widths: [ 100, 300 ], sizes: '100vw')
       expect(transformed_html).to include(%(srcset="#{image_url}?fm=auto&amp;w=100 100w, #{image_url}?fm=auto&amp;w=150 150w"))
     end
 
     it 'crops square candidates and sets the height to the width when square' do
-      transformed_html = responsivize_images(tagged_img, widths: [100], sizes: '100vw', square: true, lazy: false)
+      transformed_html = responsivize_images(tagged_img, widths: [ 100 ], sizes: '100vw', square: true, lazy: false)
       expect(transformed_html).to eq(
         %(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}" width="200" height="200" ) +
         %(sizes="100vw" srcset="#{image_url}?fm=auto&amp;w=100&amp;h=100&amp;fit=cover 100w">)
@@ -470,7 +470,7 @@ RSpec.describe MarkupHelpers do
 
     it 'sets dimensions and lazy loading on gifs but gives them no srcset' do
       allow(self).to receive(:get_asset_content_type).with('asset-1').and_return('image/gif')
-      transformed_html = responsivize_images(tagged_img, widths: [100, 200], sizes: '100vw')
+      transformed_html = responsivize_images(tagged_img, widths: [ 100, 200 ], sizes: '100vw')
       expect(transformed_html).to eq(%(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}" loading="lazy" width="200" height="100">))
     end
 
@@ -492,19 +492,19 @@ RSpec.describe MarkupHelpers do
     end
 
     it 'resizes to the asset width when it is smaller than the requested width' do
-      allow(self).to receive(:get_asset_dimensions).with('asset-1').and_return([200, 100])
+      allow(self).to receive(:get_asset_dimensions).with('asset-1').and_return([ 200, 100 ])
       transformed_html = resize_images(tagged_img, width: 1000)
       expect(transformed_html).to eq(%(<img src="#{image_url}?w=200" data-asset-id="asset-1" data-original-url="#{image_url}">))
     end
 
     it 'resizes to the requested width when the asset is larger' do
-      allow(self).to receive(:get_asset_dimensions).with('asset-1').and_return([2000, 1000])
+      allow(self).to receive(:get_asset_dimensions).with('asset-1').and_return([ 2000, 1000 ])
       transformed_html = resize_images(tagged_img, width: 1000)
       expect(transformed_html).to eq(%(<img src="#{image_url}?w=1000" data-asset-id="asset-1" data-original-url="#{image_url}">))
     end
 
     it 'does not resize gifs, pointing them at the CDN without params' do
-      allow(self).to receive(:get_asset_dimensions).with('asset-1').and_return([200, 100])
+      allow(self).to receive(:get_asset_dimensions).with('asset-1').and_return([ 200, 100 ])
       allow(self).to receive(:get_asset_content_type).with('asset-1').and_return('image/gif')
       transformed_html = resize_images(tagged_img, width: 1000)
       expect(transformed_html).to eq(tagged_img)

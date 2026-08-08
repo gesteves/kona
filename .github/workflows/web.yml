@@ -119,6 +119,9 @@ jobs:
       - name: Typecheck the Worker
         run: npm run check
 
+      - name: RuboCop (style)
+        run: bundle exec rubocop --no-color
+
       - name: Lint stylesheets
         run: npm run lint:scss
 

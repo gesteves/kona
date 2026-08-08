@@ -11,7 +11,7 @@ RSpec.describe ContactSubject do
 
   def message_with(json)
     block = instance_double(Anthropic::Models::TextBlock, type: :text, text: json.to_json)
-    instance_double(Anthropic::Models::Message, content: [block])
+    instance_double(Anthropic::Models::Message, content: [ block ])
   end
 
   describe ".generate" do

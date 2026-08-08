@@ -187,13 +187,13 @@ RSpec.describe Whoop do
 
     describe "#raw_cycles" do
       it "queries the buffered UTC window and follows pagination" do
-        page_one = { records: [{ id: 1 }], next_token: "page2" }
-        page_two = { records: [{ id: 2 }], next_token: nil }
+        page_one = { records: [ { id: 1 } ], next_token: "page2" }
+        page_two = { records: [ { id: 2 } ], next_token: nil }
         allow(service).to receive(:get_json!).and_return(page_one, page_two)
 
         cycles = service.raw_cycles("2026-07-08", "2026-07-10")
 
-        expect(cycles.map { |c| c[:id] }).to eq([1, 2])
+        expect(cycles.map { |c| c[:id] }).to eq([ 1, 2 ])
         expect(service).to have_received(:get_json!).with(
           "#{Whoop::WHOOP_API_URL}/cycle",
           hash_including(query: hash_including(start: "2026-07-08T00:00:00.000Z", end: "2026-07-10T23:59:59.999Z"))

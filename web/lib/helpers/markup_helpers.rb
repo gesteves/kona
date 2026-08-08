@@ -1,5 +1,5 @@
-require 'cgi'
-require 'nokogiri'
+require "cgi"
+require "nokogiri"
 
 # Renders Markdown bodies and applies the HTML transformations that can't be expressed in
 # Contentful's editor — responsive images and tables, figures, permalinks, and so on.
@@ -21,12 +21,12 @@ module MarkupHelpers
       copy_feed_links(doc)
       add_unit_data_attributes(doc)
       add_image_data_attributes(doc)
-      add_figure_elements_to_images(doc, base_class: 'entry')
-      add_figure_elements_to_iframes(doc, base_class: 'entry')
-      add_figure_elements_to_embeds(doc, base_class: 'entry')
+      add_figure_elements_to_images(doc, base_class: "entry")
+      add_figure_elements_to_iframes(doc, base_class: "entry")
+      add_figure_elements_to_embeds(doc, base_class: "entry")
       set_caption_credit(doc)
       wrap_figcaption_emoji(doc)
-      responsivize_images(doc, widths: srcset.widths, sizes: srcset.sizes.join(', '))
+      responsivize_images(doc, widths: srcset.widths, sizes: srcset.sizes.join(", "))
       resize_images(doc, width: srcset.widths.max)
       add_image_placeholders(doc)
       set_alt_text(doc)
@@ -59,9 +59,9 @@ module MarkupHelpers
   def render_home_body(text)
     render_markup(text, degrees: false) do |doc|
       add_image_data_attributes(doc)
-      add_figure_elements_to_images(doc, base_class: 'home')
+      add_figure_elements_to_images(doc, base_class: "home")
       set_caption_credit(doc)
-      responsivize_images(doc, widths: data.srcsets.home.widths, sizes: data.srcsets.home.sizes.join(', '), square: true)
+      responsivize_images(doc, widths: data.srcsets.home.widths, sizes: data.srcsets.home.sizes.join(", "), square: true)
       resize_images(doc)
       add_image_placeholders(doc)
       set_alt_text(doc)
@@ -89,14 +89,14 @@ module MarkupHelpers
   def prepend_title(title, html, hidden_from_at: false)
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
 
-    aria = hidden_from_at ? ' aria-hidden="true"' : ''
+    aria = hidden_from_at ? ' aria-hidden="true"' : ""
     if title.match?(/[a-zA-Z0-9]$/)
       formatted_title = "<b#{aria}>#{title}.</b>"
     else
       formatted_title = "<b#{aria}>#{title}</b>"
     end
 
-    if doc.children.first.name == 'p'
+    if doc.children.first.name == "p"
       first_p = doc.children.first
       first_p.inner_html = "#{formatted_title} #{first_p.inner_html}"
     else
@@ -116,8 +116,8 @@ module MarkupHelpers
   #   # => '<span data-units-imperial-value="6.21 mi" data-units-metric-value="10 km" data-controller="units">10 km</span>'
   def add_unit_data_attributes(html)
     with_nokogiri_doc(html) do |doc|
-      doc.css('[data-imperial]').each do |element|
-        imperial_value = element['data-imperial']
+      doc.css("[data-imperial]").each do |element|
+        imperial_value = element["data-imperial"]
         metric_value = element.text
         new_element = units_tag(metric_value, imperial_value, element.name.to_sym)
         element.replace(Nokogiri::HTML::DocumentFragment.parse(new_element))
@@ -131,11 +131,11 @@ module MarkupHelpers
   # @return [String, Nokogiri::XML::Node] The processed HTML.
   def add_image_data_attributes(html)
     with_nokogiri_doc(html) do |doc|
-      doc.css('img').each do |img|
-        original_url = img['src']
+      doc.css("img").each do |img|
+        original_url = img["src"]
         asset_id = get_asset_id(original_url)
-        img['data-asset-id'] = asset_id
-        img['data-original-url'] = original_url
+        img["data-asset-id"] = asset_id
+        img["data-original-url"] = original_url
       end
     end
   end
@@ -147,26 +147,26 @@ module MarkupHelpers
   # @return [String, Nokogiri::XML::Node] The processed HTML.
   def add_figure_elements_to_images(html, base_class: nil)
     with_nokogiri_doc(html) do |doc|
-      doc.css('img').each do |img|
+      doc.css("img").each do |img|
         parent = img.parent
         # ⚠️ This treats "everything else in the parent" as the caption and then replaces the
         # parent outright, so two images in one paragraph would fold the second one's markup into
         # the first one's <figcaption> and detach it while this loop is still iterating over it.
         # A multi-image paragraph gets no figure rather than a corrupted one.
-        next if parent.css('img').size > 1
+        next if parent.css("img").size > 1
 
         # Pull the image out so the caption is whatever remains in the parent, then put it back.
         img = img.remove
         caption = parent.inner_html
         parent.prepend_child(img)
 
-        asset_id = get_asset_id(img['src'])
+        asset_id = get_asset_id(img["src"])
         content_type = get_asset_content_type(asset_id)
 
         # Nil for images that aren't Contentful assets, which get no content-type modifier.
         figure = if base_class.present?
-          modifier = content_type&.split('/')&.last
-          figure_class = ["#{base_class}__figure", ("#{base_class}__figure--#{modifier}" if modifier)].compact.join(' ')
+          modifier = content_type&.split("/")&.last
+          figure_class = [ "#{base_class}__figure", ("#{base_class}__figure--#{modifier}" if modifier) ].compact.join(" ")
           "<figure class=\"#{figure_class}\"></figure>"
         else
           "<figure></figure>"
@@ -184,8 +184,8 @@ module MarkupHelpers
   # @return [String, Nokogiri::XML::Node] The processed HTML.
   def add_figure_elements_to_iframes(html, base_class: nil)
     with_nokogiri_doc(html) do |doc|
-      doc.css('iframe').each do |iframe|
-        wrap_in_figure(doc, iframe, base_class: base_class, modifier: 'iframe')
+      doc.css("iframe").each do |iframe|
+        wrap_in_figure(doc, iframe, base_class: base_class, modifier: "iframe")
       end
     end
   end
@@ -197,11 +197,11 @@ module MarkupHelpers
   # @return [String, Nokogiri::XML::Node] The processed HTML.
   def add_figure_elements_to_embeds(html, base_class: nil)
     with_nokogiri_doc(html) do |doc|
-      doc.css('blockquote + script').each do |script|
+      doc.css("blockquote + script").each do |script|
         blockquote = script.previous_element
-        next unless blockquote.name == 'blockquote'
+        next unless blockquote.name == "blockquote"
 
-        wrap_in_figure(doc, blockquote, base_class: base_class, modifier: 'embed', trailing: script)
+        wrap_in_figure(doc, blockquote, base_class: base_class, modifier: "embed", trailing: script)
       end
     end
   end
@@ -212,7 +212,7 @@ module MarkupHelpers
   # @return [String, Nokogiri::XML::Node] The processed HTML.
   def set_caption_credit(html)
     with_nokogiri_doc(html) do |doc|
-      doc.css('figcaption').each do |figcaption|
+      doc.css("figcaption").each do |figcaption|
         children = figcaption.children
         found_separator = false
         caption_nodes = []
@@ -227,8 +227,8 @@ module MarkupHelpers
           # ⚠️ Only split a bare text node. `child.text` also reports the text *inside* an
           # element, and replacing that element with two text nodes throws its markup away — a
           # credit written as a link would silently lose the link.
-          if child.text? && child.text.include?(' | ')
-            before, after = child.text.split(' | ', 2)
+          if child.text? && child.text.include?(" | ")
+            before, after = child.text.split(" | ", 2)
             caption_nodes << Nokogiri::XML::Text.new(before, doc)
             credit_nodes << Nokogiri::XML::Text.new(after, doc)
             found_separator = true
@@ -240,9 +240,9 @@ module MarkupHelpers
         if found_separator
           figcaption.children.remove
           caption_nodes.each { |node| figcaption.add_child(node) }
-          cite = Nokogiri::XML::Node.new('cite', doc)
+          cite = Nokogiri::XML::Node.new("cite", doc)
           credit_nodes.each { |node| cite.add_child(node) }
-          figcaption.add_child(Nokogiri::XML::Text.new(' ', doc)) unless credit_nodes.empty?
+          figcaption.add_child(Nokogiri::XML::Text.new(" ", doc)) unless credit_nodes.empty?
           figcaption.add_child(cite)
         end
       end
@@ -254,8 +254,8 @@ module MarkupHelpers
   # @return [String, Nokogiri::XML::Node] The processed HTML.
   def wrap_figcaption_emoji(html)
     with_nokogiri_doc(html) do |doc|
-      doc.css('figcaption').each do |figcaption|
-        figcaption.xpath('.//text()').each do |text_node|
+      doc.css("figcaption").each do |figcaption|
+        figcaption.xpath(".//text()").each do |text_node|
           text_content = text_node.content
           next if text_content.empty?
 
@@ -282,7 +282,7 @@ module MarkupHelpers
   # @param lazy [Boolean] Whether to lazy-load.
   # @param square [Boolean] Whether to crop square.
   # @return [String, Nokogiri::XML::Node] The processed HTML.
-  def responsivize_images(html, widths: [100, 200, 300], sizes: '100vw', lazy: true, square: false)
+  def responsivize_images(html, widths: [ 100, 200, 300 ], sizes: "100vw", lazy: true, square: false)
     with_nokogiri_doc(html) do |doc|
       each_asset_image(doc) do |img, asset_id, original_url|
         width, height = get_asset_dimensions(asset_id)
@@ -295,18 +295,18 @@ module MarkupHelpers
         end
         img_widths = img_widths.uniq.sort
 
-        img['loading'] = 'lazy' if lazy
+        img["loading"] = "lazy" if lazy
         if width.present? && height.present?
-          img['width'] = width
-          img['height'] = square ? width : height
+          img["width"] = width
+          img["height"] = square ? width : height
         end
 
-        img['src'] = cdn_image_url(original_url)
+        img["src"] = cdn_image_url(original_url)
 
-        next if content_type == 'image/gif'
+        next if content_type == "image/gif"
 
-        img['sizes'] = sizes
-        img['srcset'] = srcset(url: original_url, widths: img_widths, square: square, options: { fm: 'auto' })
+        img["sizes"] = sizes
+        img["srcset"] = srcset(url: original_url, widths: img_widths, square: square, options: { fm: "auto" })
       end
     end
   end
@@ -321,12 +321,12 @@ module MarkupHelpers
         asset_width, _ = get_asset_dimensions(asset_id)
         content_type = get_asset_content_type(asset_id)
 
-        img['src'] = if content_type == 'image/gif'
+        img["src"] = if content_type == "image/gif"
           # Untransformed, which is what keeps GIFs animated — give this a width and Cloudflare
           # flattens it to a still frame.
           cdn_image_url(original_url)
         else
-          cdn_image_url(original_url, { w: [width, asset_width].compact.min })
+          cdn_image_url(original_url, { w: [ width, asset_width ].compact.min })
         end
       end
     end
@@ -340,10 +340,10 @@ module MarkupHelpers
     with_nokogiri_doc(html) do |doc|
       each_asset_image(doc) do |img, asset_id, _original_url|
         blurhash_svg_data_uri = blurhash_svg_data_uri(asset_id)
-        img['style'] = "--placeholder:url('#{blurhash_svg_data_uri}');" unless blurhash_svg_data_uri.blank?
-        img['class'] = [img['class'], 'placeholder'].compact.join(' ')
-        img['data-controller'] = 'image-placeholder'
-        img['data-action'] = 'load->image-placeholder#removePlaceholder error->image-placeholder#removePlaceholder'
+        img["style"] = "--placeholder:url('#{blurhash_svg_data_uri}');" unless blurhash_svg_data_uri.blank?
+        img["class"] = [ img["class"], "placeholder" ].compact.join(" ")
+        img["data-controller"] = "image-placeholder"
+        img["data-action"] = "load->image-placeholder#removePlaceholder error->image-placeholder#removePlaceholder"
       end
     end
   end
@@ -355,7 +355,7 @@ module MarkupHelpers
     with_nokogiri_doc(html) do |doc|
       each_asset_image(doc) do |img, asset_id, _original_url|
         alt_text = get_asset_description(asset_id)
-        img['alt'] = alt_text if alt_text.present?
+        img["alt"] = alt_text if alt_text.present?
       end
     end
   end
@@ -365,7 +365,7 @@ module MarkupHelpers
   # @return [String, Nokogiri::XML::Node] The processed HTML.
   def responsivize_tables(html, css_class: "entry__table")
     with_nokogiri_doc(html) do |doc|
-      doc.css('table').each { |table| table.wrap("<wa-scroller class=\"#{css_class}\" orientation=\"horizontal\"></wa-scroller>") }
+      doc.css("table").each { |table| table.wrap("<wa-scroller class=\"#{css_class}\" orientation=\"horizontal\"></wa-scroller>") }
     end
   end
 
@@ -374,8 +374,8 @@ module MarkupHelpers
   # @return [String, Nokogiri::XML::Node] The processed HTML.
   def add_heading_permalinks(html)
     with_nokogiri_doc(html) do |doc|
-      doc.css('h2, h3').each do |heading|
-        heading_id = heading['id']
+      doc.css("h2, h3").each do |heading|
+        heading_id = heading["id"]
         next if heading_id.blank?
         heading_text = heading.text
         # ⚠️ Name the heading explicitly before nesting the permalink inside it. Accessible name
@@ -383,7 +383,7 @@ module MarkupHelpers
         # every heading announces as "Permalink to Foo Foo". An explicit label on the heading
         # takes precedence over its contents, which keeps the link itself fully accessible
         # rather than hiding it from assistive tech to stay quiet.
-        heading['aria-label'] = heading_text
+        heading["aria-label"] = heading_text
         label = CGI.escapeHTML("Permalink to #{heading_text}")
         permalink = <<~HTML
           <a href="##{heading_id}" class="entry__heading-permalink" aria-label="#{label}" title="#{label}" data-controller="clipboard" data-clipboard-hidden-class="entry__heading-permalink-icon--hidden" data-clipboard-success-message-value="A link to this section has been copied to your clipboard." data-action="click->clipboard#copy">
@@ -405,10 +405,10 @@ module MarkupHelpers
   # @return [String, Nokogiri::XML::Node] The processed HTML.
   def mark_affiliate_links(html)
     with_nokogiri_doc(html) do |doc|
-      doc.css('a').each do |a|
-        if amazon_associates_link?(a['href'])
-          a['rel'] = "sponsored nofollow noopener"
-          a['target'] = '_blank'
+      doc.css("a").each do |a|
+        if amazon_associates_link?(a["href"])
+          a["rel"] = "sponsored nofollow noopener"
+          a["target"] = "_blank"
         end
       end
     end
@@ -420,16 +420,16 @@ module MarkupHelpers
   def open_external_links_in_new_tabs(html)
     with_nokogiri_doc(html) do |doc|
       current_host = URI.parse(root_url).host
-      doc.css('a').each do |a|
-        href = a['href']
-        next unless href&.start_with?('http://', 'https://')
+      doc.css("a").each do |a|
+        href = a["href"]
+        next unless href&.start_with?("http://", "https://")
 
         # Author-supplied links can be malformed; skip them rather than failing the build.
         link_host = URI.parse(href).host rescue next
         next if link_host.blank? || link_host == current_host
 
-        a['rel'] = 'noopener'
-        a['target'] = '_blank'
+        a["rel"] = "noopener"
+        a["target"] = "_blank"
       end
     end
   end
@@ -440,7 +440,7 @@ module MarkupHelpers
   # @param tag [Symbol] The element to render.
   # @return [String] An HTML tag.
   def units_tag(metric, imperial, tag = :span)
-    content_tag tag.to_sym, 'data-controller': 'units', 'data-units-imperial-value': imperial, 'data-units-metric-value': metric, title: "#{metric} | #{imperial}" do
+    content_tag tag.to_sym, 'data-controller': "units", 'data-units-imperial-value': imperial, 'data-units-metric-value': metric, title: "#{metric} | #{imperial}" do
       metric
     end
   end
@@ -450,9 +450,9 @@ module MarkupHelpers
   # @return [String, Nokogiri::XML::Node] The processed HTML.
   def copy_feed_links(html)
     with_nokogiri_doc(html) do |doc|
-      doc.css('a').each do |link|
-        href = link['href']
-        next unless href&.end_with?('/feed.xml')
+      doc.css("a").each do |link|
+        href = link["href"]
+        next unless href&.end_with?("/feed.xml")
 
         SiteHelpers::FEED_CLIPBOARD_ATTRS.each { |name, value| link[name.to_s] = value }
       end
@@ -464,8 +464,8 @@ module MarkupHelpers
   # @return [String, Nokogiri::XML::Node] The processed HTML.
   def lazy_load_iframes(html)
     with_nokogiri_doc(html) do |doc|
-      doc.css('iframe').each do |iframe|
-        iframe['loading'] = 'lazy'
+      doc.css("iframe").each do |iframe|
+        iframe["loading"] = "lazy"
       end
     end
   end
@@ -482,15 +482,15 @@ module MarkupHelpers
   def wrap_in_figure(doc, node, base_class:, modifier:, trailing: nil)
     parent = node.parent
 
-    if parent.name != 'figure'
-      figure = Nokogiri::XML::Node.new('figure', doc)
+    if parent.name != "figure"
+      figure = Nokogiri::XML::Node.new("figure", doc)
       node.replace(figure)
       figure.add_child(node)
       figure.add_child(trailing) if trailing
       parent = figure
     end
 
-    parent['class'] = "#{base_class}__figure #{base_class}__figure--#{modifier}" if base_class.present?
+    parent["class"] = "#{base_class}__figure #{base_class}__figure--#{modifier}" if base_class.present?
   end
 
   # The shared shape of the render_*_body pipelines: render Markdown, parse once, yield the
@@ -510,11 +510,11 @@ module MarkupHelpers
   # @param doc [Nokogiri::XML::Node] The parsed body.
   # @yield [img, asset_id, original_url]
   def each_asset_image(doc)
-    doc.css('img').each do |img|
-      asset_id = img['data-asset-id']
+    doc.css("img").each do |img|
+      asset_id = img["data-asset-id"]
       next if asset_id.blank?
 
-      yield img, asset_id, img['data-original-url']
+      yield img, asset_id, img["data-original-url"]
     end
   end
 

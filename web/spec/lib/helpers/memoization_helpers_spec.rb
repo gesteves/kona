@@ -5,7 +5,7 @@ RSpec.describe MemoizationHelpers do
 
   describe '#memoize_by_collection' do
     it 'computes once per collection identity' do
-      collection = [1, 2, 3]
+      collection = [ 1, 2, 3 ]
       calls = 0
 
       2.times { memoize_by_collection(:test_value, collection) { calls += 1; collection.sum } }
@@ -15,15 +15,15 @@ RSpec.describe MemoizationHelpers do
     end
 
     it 'recomputes when the collection is a different object (a data reload)' do
-      first = memoize_by_collection(:test_value, [1]) { 'first' }
-      second = memoize_by_collection(:test_value, [1]) { 'second' }
+      first = memoize_by_collection(:test_value, [ 1 ]) { 'first' }
+      second = memoize_by_collection(:test_value, [ 1 ]) { 'second' }
 
       expect(first).to eq('first')
       expect(second).to eq('second') # equal contents, different identity
     end
 
     it 'keys memos independently by name' do
-      collection = [1]
+      collection = [ 1 ]
       expect(memoize_by_collection(:a, collection) { 'a' }).to eq('a')
       expect(memoize_by_collection(:b, collection) { 'b' }).to eq('b')
     end

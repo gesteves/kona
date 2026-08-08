@@ -51,9 +51,9 @@ module UnitsHelper
     kilometers = meters / 1000.0
 
     if kilometers < 1
-      [meters, { unit: "meter".pluralize(meters) }]
+      [ meters, { unit: "meter".pluralize(meters) } ]
     else
-      [kilometers, { unit: "kilometer".pluralize(kilometers) }]
+      [ kilometers, { unit: "kilometer".pluralize(kilometers) } ]
     end
   end
 
@@ -88,9 +88,9 @@ module UnitsHelper
     yards = meters_to_yards(meters)
 
     if miles < 1
-      [yards, { unit: "yard".pluralize(yards) }]
+      [ yards, { unit: "yard".pluralize(yards) } ]
     else
-      [miles, { unit: "mile".pluralize(miles) }]
+      [ miles, { unit: "mile".pluralize(miles) } ]
     end
   end
 

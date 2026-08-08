@@ -1,14 +1,14 @@
 namespace :redis do
-  desc 'Empties the Redis instance after confirmation'
+  desc "Empties the Redis instance after confirmation"
   task :clear do
-    puts 'WARNING: You are about to completely empty the Redis instance. This action is irreversible!'
+    puts "WARNING: You are about to completely empty the Redis instance. This action is irreversible!"
     print 'Type "execute" to proceed: '
     confirmation = STDIN.gets.strip
-    if confirmation.downcase == 'execute'
+    if confirmation.downcase == "execute"
       RedisConnection.connection.flushdb
-      puts 'Redis instance has been emptied.'
+      puts "Redis instance has been emptied."
     else
-      puts 'Redis empty action cancelled.'
+      puts "Redis empty action cancelled."
     end
   end
 end

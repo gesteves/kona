@@ -50,7 +50,7 @@ RSpec.describe TrainerRoad do
 
     def ics(events)
       body = events.map.with_index do |event, index|
-        lines = ["BEGIN:VEVENT", "UID:#{index}"]
+        lines = [ "BEGIN:VEVENT", "UID:#{index}" ]
         if event[:all_day]
           lines << "DTSTART;VALUE=DATE:#{event.fetch(:date, '20260709')}"
         else
@@ -73,15 +73,15 @@ RSpec.describe TrainerRoad do
     end
 
     it "returns all-day workouts with the duration prefix stripped and the description cleaned" do
-      stub_calendar([{ all_day: true, summary: "2:00 - Gibbs", description: "TSS 120. Description: Two hours of sweet spot." }])
+      stub_calendar([ { all_day: true, summary: "2:00 - Gibbs", description: "TSS 120. Description: Two hours of sweet spot." } ])
 
       workouts = service.planned_workouts(date)
 
-      expect(workouts).to eq([{ name: "Gibbs", sport: "Cycling", description: "TSS 120. Two hours of sweet spot." }])
+      expect(workouts).to eq([ { name: "Gibbs", sport: "Cycling", description: "TSS 120. Two hours of sweet spot." } ])
     end
 
     it "excludes all-day events without a duration prefix (annotations, races)" do
-      stub_calendar([{ all_day: true, summary: "Rest Day" }])
+      stub_calendar([ { all_day: true, summary: "Rest Day" } ])
 
       expect(service.planned_workouts(date)).to eq([])
     end
@@ -93,22 +93,22 @@ RSpec.describe TrainerRoad do
         { all_day: true, summary: "1:00 - Petit" }
       ])
 
-      expect(service.planned_workouts(date).map { |w| w[:name] }).to eq(["Petit"])
+      expect(service.planned_workouts(date).map { |w| w[:name] }).to eq([ "Petit" ])
     end
 
     it "excludes events on other dates" do
-      stub_calendar([{ all_day: true, date: "20260710", summary: "1:00 - Petit" }])
+      stub_calendar([ { all_day: true, date: "20260710", summary: "1:00 - Petit" } ])
 
       expect(service.planned_workouts(date)).to eq([])
     end
 
     it "filters timed events by their date in the athlete's timezone" do
       # 01:00Z on July 10 is 19:00 on July 9 in Denver.
-      stub_calendar([{ summary: "Evening Run Intervals", start: "20260710T010000Z", end: "20260710T020000Z" }])
+      stub_calendar([ { summary: "Evening Run Intervals", start: "20260710T010000Z", end: "20260710T020000Z" } ])
 
       workouts = service.planned_workouts(date)
 
-      expect(workouts.map { |w| w[:name] }).to eq(["Evening Run Intervals"])
+      expect(workouts.map { |w| w[:name] }).to eq([ "Evening Run Intervals" ])
       expect(workouts.first[:sport]).to eq("Running")
     end
 

@@ -89,14 +89,14 @@ RSpec.describe ShareHelpers do
     end
 
     it 'calls out race reports and reviews by their tag' do
-      expect(share_heading(article_with(tags: ['race-reports']))).to eq('Share this race report')
-      expect(share_heading(article_with(tags: ['reviews']))).to eq('Share this review')
+      expect(share_heading(article_with(tags: [ 'race-reports' ]))).to eq('Share this race report')
+      expect(share_heading(article_with(tags: [ 'reviews' ]))).to eq('Share this review')
     end
 
     it 'ignores a renamed concept whose id still matches' do
       renamed = OpenStruct.new(
         entry_type: 'Article',
-        contentful_metadata: OpenStruct.new(tags: [OpenStruct.new(id: 'race-reports', name: 'Race Recaps')])
+        contentful_metadata: OpenStruct.new(tags: [ OpenStruct.new(id: 'race-reports', name: 'Race Recaps') ])
       )
       expect(share_heading(renamed)).to eq('Share this race report')
     end

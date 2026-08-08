@@ -24,7 +24,7 @@ activate :external_pipeline,
 # siblings are never served and only add ~110 files to the Worker asset upload.
 activate :dotenv
 activate :autoprefixer do |config|
-  config.browsers = ['last 1 version', 'last 3 safari versions', 'last 3 ios versions']
+  config.browsers = [ 'last 1 version', 'last 3 safari versions', 'last 3 ios versions' ]
 end
 activate :asset_hash
 activate :directory_indexes

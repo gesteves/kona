@@ -146,7 +146,7 @@ RSpec.describe Contentful do
 
       blog = instance.instance_variable_get(:@content)[:blog]
       expect(blog.size).to eq(1)
-      expect(blog.first[:items].map { |a| a[:title] }).to eq(['Live'])
+      expect(blog.first[:items].map { |a| a[:title] }).to eq([ 'Live' ])
     end
   end
 
@@ -154,17 +154,17 @@ RSpec.describe Contentful do
     # A small Sports taxonomy: Triathlon > Ironman 70.3 (with a description + synonyms), a Races
     # branch with one race, and a childless Running topic. prefLabel/definition/altLabels are
     # locale maps and `conceptSchemes` carries scheme membership — matching the delivery API shape.
-    def sports = [{ 'sys' => { 'id' => 'sports' } }]
+    def sports = [ { 'sys' => { 'id' => 'sports' } } ]
     def concept_fixture
       [
         { 'sys' => { 'id' => 'triathlon' }, 'prefLabel' => { 'en-US' => 'Triathlon' }, 'conceptSchemes' => sports },
         { 'sys' => { 'id' => 'ironman-703' }, 'prefLabel' => { 'en-US' => 'Ironman 70.3' },
-          'broader' => [{ 'sys' => { 'id' => 'triathlon' } }], 'conceptSchemes' => sports,
+          'broader' => [ { 'sys' => { 'id' => 'triathlon' } } ], 'conceptSchemes' => sports,
           'definition' => { 'en-US' => 'The 70.3-mile distance.' },
-          'altLabels' => { 'en-US' => ['Half Ironman', '70.3'] } },
+          'altLabels' => { 'en-US' => [ 'Half Ironman', '70.3' ] } },
         { 'sys' => { 'id' => 'races' }, 'prefLabel' => { 'en-US' => 'Races' }, 'conceptSchemes' => sports },
         { 'sys' => { 'id' => 'cda' }, 'prefLabel' => { 'en-US' => 'CdA' },
-          'broader' => [{ 'sys' => { 'id' => 'races' } }], 'conceptSchemes' => sports },
+          'broader' => [ { 'sys' => { 'id' => 'races' } } ], 'conceptSchemes' => sports },
         { 'sys' => { 'id' => 'running' }, 'prefLabel' => { 'en-US' => 'Running' }, 'conceptSchemes' => sports }
       ]
     end
@@ -186,7 +186,7 @@ RSpec.describe Contentful do
         taxo = importer_with.send(:taxonomy)
         expect(taxo['ironman-703']).to include(
           name: 'Ironman 70.3', scheme: 'sports', parent_id: 'triathlon', path: '/tagged/triathlon/ironman-703/',
-          description: 'The 70.3-mile distance.', synonyms: ['Half Ironman', '70.3']
+          description: 'The 70.3-mile distance.', synonyms: [ 'Half Ironman', '70.3' ]
         )
         expect(taxo['triathlon'][:path]).to eq('/tagged/triathlon/')
         expect(taxo['cda'][:path]).to eq('/tagged/races/cda/')
@@ -205,22 +205,22 @@ RSpec.describe Contentful do
 
     describe '#apply_taxonomy_to_articles' do
       it 'rebuilds tags from concepts with names and nested paths, dropping the concepts key' do
-        instance = importer_with(articles: [article_with('ironman-703', 'cda')])
+        instance = importer_with(articles: [ article_with('ironman-703', 'cda') ])
         instance.send(:apply_taxonomy_to_articles)
         article = instance.instance_variable_get(:@content)[:articles].first
         tags = article[:contentful_metadata][:tags]
-        expect(tags.map { |t| t[:id] }).to eq(['ironman-703', 'cda'])
-        expect(tags.map { |t| t[:path] }).to eq(['/tagged/triathlon/ironman-703/', '/tagged/races/cda/'])
-        expect(tags.map { |t| t[:short_name] }).to eq(['70.3', 'CdA'])
-        expect(tags.map { |t| t[:synonyms] }).to eq([['Half Ironman', '70.3'], []])
+        expect(tags.map { |t| t[:id] }).to eq([ 'ironman-703', 'cda' ])
+        expect(tags.map { |t| t[:path] }).to eq([ '/tagged/triathlon/ironman-703/', '/tagged/races/cda/' ])
+        expect(tags.map { |t| t[:short_name] }).to eq([ '70.3', 'CdA' ])
+        expect(tags.map { |t| t[:synonyms] }).to eq([ [ 'Half Ironman', '70.3' ], [] ])
         expect(article[:contentful_metadata]).not_to have_key(:concepts)
       end
 
       it 'drops concept ids the taxonomy does not know' do
-        instance = importer_with(articles: [article_with('ironman-703', 'nope')])
+        instance = importer_with(articles: [ article_with('ironman-703', 'nope') ])
         instance.send(:apply_taxonomy_to_articles)
         tags = instance.instance_variable_get(:@content)[:articles].first[:contentful_metadata][:tags]
-        expect(tags.map { |t| t[:id] }).to eq(['ironman-703'])
+        expect(tags.map { |t| t[:id] }).to eq([ 'ironman-703' ])
       end
     end
 
@@ -233,7 +233,7 @@ RSpec.describe Contentful do
       end
 
       it 'rolls descendants up into parents and lists all races under the Races branch' do
-        tags = built_tags([article_with('ironman-703', 'cda')])
+        tags = built_tags([ article_with('ironman-703', 'cda') ])
         ids = tags.map { |t| t[:tag][:id] }
         # Triathlon (via descendant), Ironman 70.3, Races (via descendant), CdA — but not childless Running.
         expect(ids).to match_array(%w[triathlon ironman-703 races cda])
@@ -247,7 +247,7 @@ RSpec.describe Contentful do
       end
 
       it "uses a concept's description as the page copy, else the boilerplate summary" do
-        tags = built_tags([article_with('ironman-703')])
+        tags = built_tags([ article_with('ironman-703') ])
         im703 = tags.find { |t| t[:tag][:id] == 'ironman-703' }
         expect(im703[:pages].first[:summary]).to eq('The 70.3-mile distance.')
         expect(im703[:pages].first[:description]).to eq('The 70.3-mile distance.')
@@ -260,7 +260,7 @@ RSpec.describe Contentful do
       it 'carries archive metadata on each tag page: tag_id and the newest entry date' do
         newer = article_with('ironman-703').merge(published_at: '2025-06-01T00:00:00Z')
         older = article_with('ironman-703').merge(published_at: '2024-06-01T00:00:00Z')
-        tags = built_tags([newer, older]) # newest-first, as published_articles delivers them
+        tags = built_tags([ newer, older ]) # newest-first, as published_articles delivers them
         page = tags.find { |t| t[:tag][:id] == 'ironman-703' }[:pages].first
         expect(page).to include(tag_id: 'ironman-703', updated_at: '2025-06-01T00:00:00Z')
         expect(page).not_to have_key(:entry_count)
@@ -288,7 +288,7 @@ RSpec.describe Contentful do
     # now resizes through Cloudflare Images off this URL, so nothing reads the original.
     it 'adds no key beyond the swapped URL' do
       item = transform(:rewrite_image_urls, { url: 'https://images.ctfassets.net/space/asset-1/token/a.jpg' })
-      expect(item.keys).to eq([:url])
+      expect(item.keys).to eq([ :url ])
     end
 
     it 'preserves a protocol-relative URL as protocol-relative' do
@@ -360,7 +360,7 @@ RSpec.describe Contentful do
     end
 
     it 'stops at the first short page' do
-      articles = fetch_with([page(Array.new(40) { |i| { 'slug' => "a#{i}" } })])
+      articles = fetch_with([ page(Array.new(40) { |i| { 'slug' => "a#{i}" } }) ])
 
       expect(articles.size).to eq(40)
     end
@@ -374,7 +374,7 @@ RSpec.describe Contentful do
         key = query.to_s
         double(
           errors: double(present?: false),
-          data: double(to_h: { key => { 'items' => [{ 'slug' => "#{key}-1" }] } })
+          data: double(to_h: { key => { 'items' => [ { 'slug' => "#{key}-1" } ] } })
         )
       end
 
@@ -386,9 +386,9 @@ RSpec.describe Contentful do
       instance.send(:get_contentful_data)
       content = instance.instance_variable_get(:@content)
 
-      expect(content[:articles]).to eq([{ slug: 'articles-1' }])
-      expect(content[:pages]).to eq([{ slug: 'pages-1' }])
-      expect(content[:events]).to eq([{ slug: 'events-1' }])
+      expect(content[:articles]).to eq([ { slug: 'articles-1' } ])
+      expect(content[:pages]).to eq([ { slug: 'pages-1' } ])
+      expect(content[:events]).to eq([ { slug: 'events-1' } ])
     end
 
     it 'follows the cursor across full pages' do
@@ -407,7 +407,7 @@ RSpec.describe Contentful do
       first = Array.new(100) { |i| { 'slug' => "a#{i}" } }
       first[42] = nil
 
-      articles = fetch_with([page(first), page([{ 'slug' => 'last' }])])
+      articles = fetch_with([ page(first), page([ { 'slug' => 'last' } ]) ])
 
       expect(articles.size).to eq(100)
       expect(articles.last[:slug]).to eq('last')

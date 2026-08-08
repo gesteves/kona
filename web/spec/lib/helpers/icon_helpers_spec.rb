@@ -7,7 +7,7 @@ RSpec.describe IconHelpers do
     def data
       OpenStruct.new(icons: {
         'classic' => {
-          'light' => [OpenStruct.new(id: 'calendar', svg: '<svg viewBox="0 0 448 512"><path/></svg>')]
+          'light' => [ OpenStruct.new(id: 'calendar', svg: '<svg viewBox="0 0 448 512"><path/></svg>') ]
         }
       })
     end

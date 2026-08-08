@@ -113,7 +113,7 @@ RSpec.describe ActivityDescription::Generator do
     it "summarizes the single case-sensitive name match" do
       allow(intervals).to receive(:activity!).and_return(activity.merge(name: "Gibbs on the trainer"))
       allow(trainer_road).to receive(:planned_workouts).with(Date.new(2026, 7, 9))
-        .and_return([{ name: "Gibbs", sport: "Cycling", description: "2x20 @ 90%" }])
+        .and_return([ { name: "Gibbs", sport: "Cycling", description: "2x20 @ 90%" } ])
 
       generator.generate!("i1")
 
@@ -124,7 +124,7 @@ RSpec.describe ActivityDescription::Generator do
     it "is case-sensitive about the name match" do
       allow(intervals).to receive(:activity!).and_return(activity.merge(name: "gibbs on the trainer"))
       allow(trainer_road).to receive(:planned_workouts)
-        .and_return([{ name: "Gibbs", sport: "Cycling", description: "2x20 @ 90%" }])
+        .and_return([ { name: "Gibbs", sport: "Cycling", description: "2x20 @ 90%" } ])
 
       generator.generate!("i1")
 
@@ -148,7 +148,7 @@ RSpec.describe ActivityDescription::Generator do
     it "rejects sport-incompatible planned workouts" do
       allow(intervals).to receive(:activity!).and_return(activity.merge(name: "Gibbs"))
       allow(trainer_road).to receive(:planned_workouts)
-        .and_return([{ name: "Gibbs", sport: "Running", description: "tempo" }])
+        .and_return([ { name: "Gibbs", sport: "Running", description: "tempo" } ])
 
       generator.generate!("i1")
 
@@ -158,7 +158,7 @@ RSpec.describe ActivityDescription::Generator do
     it "never offers a headline for swims" do
       allow(intervals).to receive(:activity!).and_return(activity.merge(type: "OpenWaterSwim", name: "Ocean Swim", trainer: false))
       allow(trainer_road).to receive(:planned_workouts)
-        .and_return([{ name: "Ocean Swim", sport: "Swimming", description: "long swim" }])
+        .and_return([ { name: "Ocean Swim", sport: "Swimming", description: "long swim" } ])
 
       generator.generate!("i1")
 
@@ -221,7 +221,7 @@ RSpec.describe ActivityDescription::Generator do
     it "renders the heat line from the HSI stream (median over positive samples)" do
       allow(intervals).to receive(:activity!).and_return(activity.merge(stream_types: %w[time heat_strain_index]))
       allow(intervals).to receive(:activity_streams).with("i1", types: %w[heat_strain_index time]).and_return(
-        [{ type: "heat_strain_index", data: [0, 0, 1.0, 2.0, 3.0] }, { type: "time", data: [0, 1, 2, 3, 4] }]
+        [ { type: "heat_strain_index", data: [ 0, 0, 1.0, 2.0, 3.0 ] }, { type: "time", data: [ 0, 1, 2, 3, 4 ] } ]
       )
 
       generator.generate!("i1")
@@ -233,7 +233,7 @@ RSpec.describe ActivityDescription::Generator do
       swim = activity.merge(type: "OpenWaterSwim", trainer: false, stream_types: %w[time temp], icu_average_watts: nil)
       allow(intervals).to receive(:activity!).and_return(swim)
       allow(intervals).to receive(:activity_streams).with("i1", types: %w[temp time]).and_return(
-        [{ type: "temp", data: [15.0, 16.0, 17.0] }]
+        [ { type: "temp", data: [ 15.0, 16.0, 17.0 ] } ]
       )
 
       generator.generate!("i1")
@@ -255,7 +255,7 @@ RSpec.describe ActivityDescription::Generator do
       allow(intervals).to receive(:activity!).and_return(activity.merge(trainer: false, name: "Gibbs"))
       allow(intervals).to receive(:activity_weather_summary).and_return("18°C, sunny")
       allow(trainer_road).to receive(:planned_workouts)
-        .and_return([{ name: "Gibbs", sport: "Cycling", description: "2x20" }])
+        .and_return([ { name: "Gibbs", sport: "Cycling", description: "2x20" } ])
 
       generator.generate!("i1", whoop_strain: 10.0)
 

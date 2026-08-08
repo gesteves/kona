@@ -27,7 +27,7 @@ RSpec.describe TrendingArticles do
   let(:art_short)    { article(id: "s1", slug: "short",    published_at: "2024-05-01T10:00:00Z", entry_type: "Short") }
   let(:art_draft)    { article(id: "d1", slug: "draft",    published_at: "2024-05-02T10:00:00Z", draft: true) }
 
-  let(:corpus) { [art_newest, art_april, art_march, art_february, art_spiking, art_steady, art_short, art_draft] }
+  let(:corpus) { [ art_newest, art_april, art_march, art_february, art_spiking, art_steady, art_short, art_draft ] }
 
   # a5: 15 recent views (over the floor) on a tiny baseline → big surge.
   # a6: 72 recent views on a large baseline → high volume, but surge ≈ 1.
@@ -69,7 +69,7 @@ RSpec.describe TrendingArticles do
     it "ranks a small surge over its own low baseline above the same recent volume on a high baseline" do
       low  = article(id: "l1", slug: "low",  published_at: "2024-01-01T10:00:00Z")
       high = article(id: "h1", slug: "high", published_at: "2024-01-01T10:00:00Z")
-      allow(articles_service).to receive(:list).and_return([low, high])
+      allow(articles_service).to receive(:list).and_return([ low, high ])
       # Identical recent volume, but `low` is way above its own normal while `high` is below its.
       stub_plausible(
         recent: { low.path => 20, high.path => 20 },
@@ -87,7 +87,7 @@ RSpec.describe TrendingArticles do
       # 3 recent views (< MIN_RECENT_PAGEVIEWS) on a zero baseline would surge hugely without the floor;
       # the floor zeroes it, so it sinks to recency order (oldest last).
       noisy = article(id: "n1", slug: "noisy", published_at: "2023-11-01T10:00:00Z")
-      allow(articles_service).to receive(:list).and_return(corpus + [noisy])
+      allow(articles_service).to receive(:list).and_return(corpus + [ noisy ])
       stub_plausible(recent: recent.merge(noisy.path => 3), baseline: baseline)
       ids = service.all(count: 10).map { |a| a.sys.id }
       expect(ids).to eq(%w[a5 a6 a1 a2 a3 a4 n1])
@@ -111,7 +111,7 @@ RSpec.describe TrendingArticles do
     it "degrades to an empty list instead of raising on a malformed publish date" do
       bad = article(id: "x1", slug: "bad", published_at: "2024-01-01T10:00:00Z")
       allow(bad).to receive(:published_at).and_return("not-a-date")
-      allow(articles_service).to receive(:list).and_return(corpus + [bad])
+      allow(articles_service).to receive(:list).and_return(corpus + [ bad ])
       expect(service.all(count: 4)).to eq([])
     end
 

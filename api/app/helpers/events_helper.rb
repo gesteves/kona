@@ -79,7 +79,7 @@ module EventsHelper
     upcoming = events
       .filter_map do |e|
         date = e.going ? parse_event_date(e, time_zone) : nil
-        [date, e] if date && date >= today
+        [ date, e ] if date && date >= today
       end
       .sort_by(&:first)
       .map(&:last)

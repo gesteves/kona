@@ -20,7 +20,7 @@ module MemoizationHelpers
     return value if cached_collection.equal?(collection)
 
     value = yield
-    store[name] = [collection, value]
+    store[name] = [ collection, value ]
     value
   end
 

@@ -1,4 +1,4 @@
-require 'htmlentities'
+require "htmlentities"
 
 module TextHelpers
   # Replaces the masculine ordinal indicator (º), often typed by mistake, with the degree

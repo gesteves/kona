@@ -1,4 +1,4 @@
-require 'humanize'
+require "humanize"
 
 module IconHelpers
   # Looks up an icon's SVG, marked decorative — icons always sit beside a text label or an
@@ -35,7 +35,7 @@ module IconHelpers
     icon_id = if hours == 4 && suffix.blank?
       "clock" # There is no clock-four; the plain clock icon reads four o'clock.
     else
-      ["clock", hours.humanize, suffix].reject(&:blank?).join("-")
+      [ "clock", hours.humanize, suffix ].reject(&:blank?).join("-")
     end
 
     icon_svg(family, style, icon_id)

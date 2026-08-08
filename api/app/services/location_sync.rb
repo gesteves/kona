@@ -59,7 +59,7 @@ class LocationSync
   # Replaces the weather config with a single forecast at the current location, unless the
   # existing config already matches (ignoring the Intervals.icu-assigned id).
   def sync_weather_config(context)
-    next_forecasts = [{
+    next_forecasts = [ {
       id: 0,
       provider: WEATHER_PROVIDER,
       location: context.location,
@@ -67,7 +67,7 @@ class LocationSync
       lat: context.lat,
       lon: context.lon,
       enabled: true
-    }]
+    } ]
     return if forecasts_equal?(@intervals.weather_config, next_forecasts)
 
     @intervals.update_weather_config(next_forecasts)

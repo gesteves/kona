@@ -30,7 +30,7 @@ module ContactSubject
       schema: {
         type: "object",
         properties: { subject: { type: %w[string null] } },
-        required: ["subject"],
+        required: [ "subject" ],
         additionalProperties: false
       }
     )
@@ -39,5 +39,4 @@ module ContactSubject
     ErrorReporter.report_upstream(e, service: "ContactSubject", context: "contact subject generation")
     nil
   end
-
 end

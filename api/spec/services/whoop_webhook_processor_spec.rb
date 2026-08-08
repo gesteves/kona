@@ -28,8 +28,8 @@ RSpec.describe WhoopWebhookProcessor do
 
     before do
       allow(whoop).to receive(:get_workout).with("w1").and_return(whoop_workout(start_time: workout_start))
-      allow(whoop).to receive(:raw_cycles).and_return([cycle_for(Date.new(2026, 7, 9))])
-      allow(intervals).to receive(:activities!).and_return([activity])
+      allow(whoop).to receive(:raw_cycles).and_return([ cycle_for(Date.new(2026, 7, 9)) ])
+      allow(intervals).to receive(:activities!).and_return([ activity ])
     end
 
     it "refreshes the workout's local date, writes WhoopWorkoutStrain, and enqueues the description" do
@@ -47,7 +47,7 @@ RSpec.describe WhoopWebhookProcessor do
       late_workout = whoop_workout(start_time: "2026-07-09T05:30:00Z")
       allow(whoop).to receive(:get_workout).and_return(late_workout)
       allow(intervals).to receive(:activities!).and_return([])
-      allow(whoop).to receive(:raw_cycles).and_return([cycle_for(Date.new(2026, 7, 8))])
+      allow(whoop).to receive(:raw_cycles).and_return([ cycle_for(Date.new(2026, 7, 8)) ])
 
       processor.process("workout.updated", "w1")
 
@@ -65,7 +65,7 @@ RSpec.describe WhoopWebhookProcessor do
     end
 
     it "refreshes wellness but skips the activity write when nothing matches" do
-      allow(intervals).to receive(:activities!).and_return([{ id: "i2", type: "Run", start_date_local: "2026-07-09T07:31:00" }])
+      allow(intervals).to receive(:activities!).and_return([ { id: "i2", type: "Run", start_date_local: "2026-07-09T07:31:00" } ])
 
       processor.process("workout.updated", "w1")
 
@@ -77,7 +77,7 @@ RSpec.describe WhoopWebhookProcessor do
     it "writes strain but skips the description for non-swim/bike/run matches" do
       strength_workout = whoop_workout(start_time: workout_start, type: "Strength")
       allow(whoop).to receive(:get_workout).and_return(strength_workout)
-      allow(intervals).to receive(:activities!).and_return([{ id: "i3", type: "WeightTraining", start_date_local: "2026-07-09T07:31:00" }])
+      allow(intervals).to receive(:activities!).and_return([ { id: "i3", type: "WeightTraining", start_date_local: "2026-07-09T07:31:00" } ])
 
       processor.process("workout.updated", "w1")
 
@@ -195,7 +195,7 @@ RSpec.describe WhoopWebhookProcessor do
   end
 
   describe "other event types" do
-    before { allow(whoop).to receive(:raw_cycles).and_return([cycle_for(Time.find_zone!(timezone).today)]) }
+    before { allow(whoop).to receive(:raw_cycles).and_return([ cycle_for(Time.find_zone!(timezone).today) ]) }
 
     %w[workout.deleted sleep.deleted recovery.deleted].each do |event_type|
       it "refreshes only today's strain for #{event_type}" do
@@ -213,7 +213,7 @@ RSpec.describe WhoopWebhookProcessor do
     before { allow(whoop).to receive(:raw_cycles).and_return(cycles) }
 
     context "with an in-progress cycle (no end)" do
-      let(:cycles) { [{ id: 1, score_state: "SCORED", end: nil, score: { strain: 9.9 } }] }
+      let(:cycles) { [ { id: 1, score_state: "SCORED", end: nil, score: { strain: 9.9 } } ] }
 
       it "counts it as today" do
         today = Time.find_zone!(timezone).today
@@ -225,7 +225,7 @@ RSpec.describe WhoopWebhookProcessor do
     end
 
     context "with only unscored cycles" do
-      let(:cycles) { [cycle_for(Time.find_zone!(timezone).today, score_state: "PENDING_SCORE")] }
+      let(:cycles) { [ cycle_for(Time.find_zone!(timezone).today, score_state: "PENDING_SCORE") ] }
 
       it "leaves wellness untouched" do
         processor.process("recovery.deleted", "x1")
@@ -246,7 +246,7 @@ RSpec.describe WhoopWebhookProcessor do
   end
 
   describe "the missing-custom-field guard" do
-    before { allow(whoop).to receive(:raw_cycles).and_return([cycle_for(Time.find_zone!(timezone).today)]) }
+    before { allow(whoop).to receive(:raw_cycles).and_return([ cycle_for(Time.find_zone!(timezone).today) ]) }
 
     it "warns and continues on a 422" do
       allow(intervals).to receive(:update_wellness!).and_raise(ApplicationService::HttpError.new(422, "no such field", "url"))

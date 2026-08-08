@@ -7,9 +7,9 @@ RSpec.describe "Weather", type: :request do
     {
       geocoded: {
         address_components: [
-          { long_name: "San Francisco", short_name: "SF", types: ["locality", "political"] },
-          { long_name: "California", short_name: "CA", types: ["administrative_area_level_1", "political"] },
-          { long_name: "United States", short_name: "US", types: ["country", "political"] }
+          { long_name: "San Francisco", short_name: "SF", types: [ "locality", "political" ] },
+          { long_name: "California", short_name: "CA", types: [ "administrative_area_level_1", "political" ] },
+          { long_name: "United States", short_name: "US", types: [ "country", "political" ] }
         ]
       },
       time_zone: { time_zone_id: "America/Los_Angeles" },
@@ -95,7 +95,7 @@ RSpec.describe "Weather", type: :request do
       )
     end
 
-    before { allow_any_instance_of(Events).to receive(:all).and_return([race]) }
+    before { allow_any_instance_of(Events).to receive(:all).and_return([ race ]) }
 
     it "announces the race and weaves it into the summary" do
       get "/widgets/weather/current", headers: auth_headers

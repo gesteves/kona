@@ -1,7 +1,7 @@
-require 'active_support/all'
-require 'humanize'
-require 'httparty'
-require_relative 'graphql/contentful'
+require "active_support/all"
+require "humanize"
+require "httparty"
+require_relative "graphql/contentful"
 
 class Contentful
   # Raised when IMAGE_HOST is unset. The zone allowlists only the R2 mirror as a Cloudflare
@@ -88,7 +88,7 @@ class Contentful
   # thread surfaces on the join and still fails the import.
   def get_contentful_data
     collection_queries
-      .map { |key, query| Thread.new { [key, fetch_collection(key, query)] } }
+      .map { |key, query| Thread.new { [ key, fetch_collection(key, query) ] } }
       .each { |thread| key, items = thread.value; @content[key] += items }
   end
 
@@ -146,7 +146,7 @@ class Contentful
 
   # Derives each page's entry fields and path.
   def process_pages
-    process_collection(:pages, :set_page_path, entry_type: 'Page')
+    process_collection(:pages, :set_page_path, entry_type: "Page")
   end
 
   # Derives the entry fields for a collection, sets each item's path, and sorts newest-first.
@@ -184,15 +184,15 @@ class Contentful
   # @return [Hash] The asset.
   # @raise [ImageHostMissing] if IMAGE_HOST is unset.
   def rewrite_image_urls(item)
-    raise ImageHostMissing if ENV['IMAGE_HOST'].blank?
+    raise ImageHostMissing if ENV["IMAGE_HOST"].blank?
 
     uri = URI.parse(item[:url])
     # Every ctfassets host, not just images.ctfassets.net: Contentful serves some image assets
     # from downloads.ctfassets.net, and matching only the images host would leave those hitting
     # Contentful forever. Paths are identical across hosts, so one key covers both. The api's
     # AssetMirror#object_key must keep matching the same set.
-    if uri.host.to_s.end_with?('.ctfassets.net')
-      uri.host = ENV['IMAGE_HOST']
+    if uri.host.to_s.end_with?(".ctfassets.net")
+      uri.host = ENV["IMAGE_HOST"]
       item[:url] = uri.to_s
     end
     item
@@ -213,9 +213,9 @@ class Contentful
     item[:entry_type] = if type.present?
       type
     elsif item[:intro].present? && item[:body].present?
-      'Article'
+      "Article"
     elsif item[:intro].present?
-      'Short'
+      "Short"
     end
     item
   end
@@ -278,11 +278,11 @@ class Contentful
   # @param item [Hash] The item to process.
   # @return [Hash] The item.
   def set_template(item)
-    item[:template] = if item[:entry_type] == 'Article'
+    item[:template] = if item[:entry_type] == "Article"
       "/article.html"
-    elsif item[:entry_type] == 'Short'
+    elsif item[:entry_type] == "Short"
       "/short.html"
-    elsif item[:entry_type] == 'Page' && item[:is_home_page]
+    elsif item[:entry_type] == "Page" && item[:is_home_page]
       "/home.html"
     else
       "/page.html"
@@ -299,7 +299,7 @@ class Contentful
     taxo.each_value { |c| children[c[:parent_id]] << c[:id] if c[:parent_id] }
 
     @content[:tags] = taxo.values.filter_map do |concept|
-      id_set = ([concept[:id]] + descendant_ids(concept[:id], children)).to_set
+      id_set = ([ concept[:id] ] + descendant_ids(concept[:id], children)).to_set
       tagged = published_articles.select do |a|
         Array(a.dig(:contentful_metadata, :tags)).any? { |t| id_set.include?(t[:id]) }
       end
@@ -311,7 +311,7 @@ class Contentful
       # so it tracks the newest edit — not the newest publish.
       updated_at = tagged.filter_map { |a| a[:updated_at] || a[:published_at] }.max
       # `path` carries a trailing slash; listing_page wants the bare base.
-      pages = listing_page(tagged, base_path: concept[:path].chomp('/'), template: "/tag.html",
+      pages = listing_page(tagged, base_path: concept[:path].chomp("/"), template: "/tag.html",
                            title: concept[:name], summary: summary, description: description,
                            updated_at: updated_at, tag_id: concept[:id])
       # entry_count, not count: `count` collides with Hash#count on the Hashie::Mash.
@@ -366,7 +366,7 @@ class Contentful
     page_data[:updated_at] = updated_at if updated_at
     page_data[:items] = articles
     page_data[:index_in_search_engines] = true
-    [page_data]
+    [ page_data ]
   end
 
   # The taxonomy concepts keyed by id, memoized for the build. GraphQL returns only concept ids
@@ -382,17 +382,17 @@ class Contentful
     concepts = fetch_taxonomy_concepts
     by_id = {}
     concepts.each do |c|
-      id = c.dig('sys', 'id')
+      id = c.dig("sys", "id")
       next if id.blank?
-      name = localized(c['prefLabel'])
-      synonyms = Array(localized(c['altLabels']))
+      name = localized(c["prefLabel"])
+      synonyms = Array(localized(c["altLabels"]))
       by_id[id] = {
         id: id,
         name: name,
         short_name: shortest_label(name, synonyms),
-        scheme: Array(c['conceptSchemes']).first&.dig('sys', 'id'),
-        parent_id: Array(c['broader']).first&.dig('sys', 'id'),
-        description: localized(c['definition']),
+        scheme: Array(c["conceptSchemes"]).first&.dig("sys", "id"),
+        parent_id: Array(c["broader"]).first&.dig("sys", "id"),
+        description: localized(c["definition"]),
         synonyms: synonyms
       }
     end
@@ -403,33 +403,33 @@ class Contentful
   # The most compact label for a concept's chip: the shortest of its name and synonyms,
   # preferring the name on ties. The full name is still used for titles and breadcrumbs.
   def shortest_label(name, synonyms)
-    ([name].compact + Array(synonyms)).reject(&:blank?).min_by(&:length) || name
+    ([ name ].compact + Array(synonyms)).reject(&:blank?).min_by(&:length) || name
   end
 
   # Fetches every concept from the delivery taxonomy endpoint, cursor-paginated. Concepts are
   # the sole source of article categorization, so a non-2xx fails the build.
   # @return [Array<Hash>] Raw concept hashes, with localized fields as locale maps.
   def fetch_taxonomy_concepts
-    space = ENV['CONTENTFUL_SPACE']
-    token = ENV['CONTENTFUL_TOKEN']
+    space = ENV["CONTENTFUL_SPACE"]
+    token = ENV["CONTENTFUL_TOKEN"]
     # ⚠️ Raise, don't return []: concepts are the only source of categorization, so an empty
     # taxonomy is a *successful* build with no tag pages, no breadcrumbs and no article:tag
     # metadata — the same silent-misconfiguration failure ImageHostMissing exists to prevent.
-    raise 'CONTENTFUL_SPACE and CONTENTFUL_TOKEN are required to fetch the taxonomy.' if space.blank? || token.blank?
+    raise "CONTENTFUL_SPACE and CONTENTFUL_TOKEN are required to fetch the taxonomy." if space.blank? || token.blank?
 
     url = "https://preview.contentful.com/spaces/#{space}/environments/master/taxonomy/concepts?limit=1000"
-    headers = { 'Authorization' => "Bearer #{token}" }
+    headers = { "Authorization" => "Bearer #{token}" }
     items = []
     loop do
       response = HTTParty.get(url, headers: headers)
       raise "Error fetching taxonomy concepts: #{response.code} #{response.body}" unless response.code.between?(200, 299)
 
       body = response.parsed_response
-      items.concat(Array(body['items']))
-      nxt = body.dig('pages', 'next')
+      items.concat(Array(body["items"]))
+      nxt = body.dig("pages", "next")
       break if nxt.blank?
       # A full URL on the delivery API; guarded in case it's ever a path.
-      url = nxt.start_with?('http') ? nxt : "https://preview.contentful.com#{nxt}"
+      url = nxt.start_with?("http") ? nxt : "https://preview.contentful.com#{nxt}"
     end
     items
   end
@@ -457,14 +457,13 @@ class Contentful
   # Tags events with their entry type, honoring DEBUG_EVENT_DATE to shift an event's date.
   def process_events
     @content[:events].map! do |event|
-      if ENV['DEBUG_EVENT_DATE'].present?
-        days = Integer(ENV['DEBUG_EVENT_DATE'])
+      if ENV["DEBUG_EVENT_DATE"].present?
+        days = Integer(ENV["DEBUG_EVENT_DATE"])
         event[:date] = days.days.from_now.to_s
       end
 
-      event[:entry_type] = 'Event'
+      event[:entry_type] = "Event"
       event
     end
   end
 end
-
