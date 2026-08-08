@@ -166,16 +166,19 @@ jobs:
         with:
           node-version-file: web/.nvmrc
 
-      # --omit=dev mirrors what the deploy job installs, so this scans what actually ships.
+      # --omit=dev mirrors what the deploy job installs, so this scans what actually ships: Turbo,
+      # Stimulus and Web Awesome reach every visitor's browser, satori and resvg run in the Worker,
+      # and Pagefind ships wasm to anyone who searches.
       #
-      # ⚠️ Reports but doesn't block, unlike bundler-audit above. `wrangler` has to be a runtime
-      # dependency (the deploy runs it), which drags in miniflare and undici — its *local
-      # dev-server* tree, none of which reaches the deployed Worker. Those advisories are
-      # therefore permanently open here, and npm's own fix for them is a wrangler downgrade.
-      # Blocking on that would mean either pinning an old wrangler or training everyone to
-      # ignore a red job. Read the output on bumps; don't let it gate the deploy.
-      - name: npm audit (JS dependency CVEs, advisory)
-        continue-on-error: true
+      # ⚠️ Blocking, like bundler-audit above. It was `continue-on-error` while wrangler's
+      # miniflare → undici chain kept a high advisory permanently open — but that suppressed the
+      # six dependencies that DO ship along with the one that doesn't, which is the failure mode
+      # this step exists to prevent. Keeping it green is a dependency bump, not a flag.
+      #
+      # ⚠️ If it goes red over tooling again: `wrangler` and `@cloudflare/vitest-pool-workers`
+      # must be bumped **together** — the pool exact-pins wrangler and miniflare, so npm dedupes
+      # a lone `npm update wrangler` straight back to the pinned version and nothing moves.
+      - name: npm audit (JS dependency CVEs)
         run: npm audit --omit=dev --audit-level=high
 
   notify-checks:
