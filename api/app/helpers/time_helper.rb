@@ -11,9 +11,17 @@ module TimeHelper
   end
 
   # Wraps the meridiem (AM/PM) in an <abbr> tag. Shared by the time and weather formatters.
+  #
+  # ⚠️ Word-bounded, and titled. Unbounded, it mangled any prose containing "am"/"pm" —
+  # "Amsterdam", "campus" — and this is public on a helper mixed into WeatherSummaryPresenter,
+  # which composes sentences. A title-less <abbr> also gives a screen reader nothing to expand.
   # @param text [String]
   # @return [String]
   def meridiem_abbr(text)
-    text.gsub(/(am|pm)/i, "<abbr>\\1</abbr>")
+    text.gsub(/\b(am|pm)\b/i) do
+      meridiem = Regexp.last_match(1)
+      title = meridiem.downcase == "am" ? "ante meridiem" : "post meridiem"
+      %(<abbr title="#{title}">#{meridiem}</abbr>)
+    end
   end
 end

@@ -1,4 +1,5 @@
 import { handleApi } from './api-proxy';
+import { requestLogLine } from './log';
 import { handleOg, isOgPath } from './og';
 import { handlePlausible } from './plausible';
 import { servePage } from './serve-page';
@@ -13,16 +14,26 @@ export default {
   ): Promise<Response> {
     const { pathname } = new URL(request.url);
 
-    // /api/contact is claimed explicitly, not /api/*, so the other origin-only /api endpoints
-    // stay unreachable from the browser.
-    if (pathname.startsWith('/widgets/') || pathname === '/api/contact') {
-      return handleApi(request, env);
-    }
-    if (pathname.startsWith('/pa/')) return handlePlausible(request, env, ctx);
-    if (isOgPath(pathname)) return handleOg(request, env, ctx);
+    // The handlers log their own failures; this only catches what escapes them, which would
+    // otherwise be a bare platform 500 with nothing written anywhere.
+    try {
+      // /api/contact is claimed explicitly, not /api/*, so the other origin-only /api endpoints
+      // stay unreachable from the browser.
+      if (pathname.startsWith('/widgets/') || pathname === '/api/contact') {
+        return await handleApi(request, env);
+      }
+      if (pathname.startsWith('/pa/'))
+        return await handlePlausible(request, env, ctx);
+      if (isOgPath(pathname)) return await handleOg(request, env, ctx);
 
-    // Defensive fallthrough: nothing else reaches the Worker under the allowlist, but drift
-    // between it and this router should serve the page from assets rather than error.
-    return servePage(request, env);
+      // Defensive fallthrough: nothing else reaches the Worker under the allowlist, but drift
+      // between it and this router should serve the page from assets rather than error.
+      return await servePage(request, env);
+    } catch (error) {
+      console.error(
+        requestLogLine(request, 'worker error', pathname, String(error))
+      );
+      return new Response('Internal Server Error', { status: 500 });
+    }
   },
 };

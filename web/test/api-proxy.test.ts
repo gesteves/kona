@@ -190,6 +190,30 @@ describe('handleApi — widgets (GET)', () => {
     expect(await res.text()).toBe('<div>whoop</div>');
   });
 
+  // HEAD is in ALLOWED_METHODS and takes the no-body branch upstream, but every other test here
+  // drives GET or POST.
+  it('proxies a HEAD as a HEAD, with no request body', async () => {
+    const upstream = interceptFetch(
+      'HEAD',
+      `${ORIGIN}/widgets/whoop`,
+      () =>
+        new Response(null, {
+          headers: { 'content-type': 'text/html', etag: 'W/"x"' },
+        })
+    );
+
+    const res = await handleApi(
+      new Request('https://www.example.com/widgets/whoop', { method: 'HEAD' }),
+      env
+    );
+
+    expect(res.status).toBe(200);
+    expect(upstream.calls).toBe(1);
+    expect(upstream.request?.method).toBe('HEAD');
+    expect(upstream.body).toBe('');
+    expect(res.headers.get('etag')).toBe('W/"x"');
+  });
+
   it('405s a method the route does not accept, without touching the origin', async () => {
     // No intercept registered at all: reaching the origin would throw an unmocked-fetch error.
     const res = await handleApi(

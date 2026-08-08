@@ -36,13 +36,6 @@
   }
 }
 
-.home__body--fancy {
-  @extend %drop-cap;
-  @extend %lead-in;
-  @extend %end-mark;
-}
-
-
 .home__figure {
   border-radius: 100%;
   float: right;
@@ -67,26 +60,3 @@
   }
 }
 
-.home__heading {
-  font-family: var(--ibm-plex-sans-condensed);
-  font-size: var(--font-medium);
-  font-weight: 700;
-  line-height: var(--line-height-medium);
-  margin-bottom: 1.5rem;
-}
-
-.home__entries-articles {
-  grid-column: span 12;
-
-  @include bp-medium {
-    grid-column: span 6;
-  }
-}
-
-.home__entries-races {
-  grid-column: span 12;
-
-  @include bp-medium {
-    grid-column: span 4;
-  }
-}

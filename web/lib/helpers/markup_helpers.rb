@@ -4,6 +4,12 @@ require 'nokogiri'
 # Renders Markdown bodies and applies the HTML transformations that can't be expressed in
 # Contentful's editor — responsive images and tables, figures, permalinks, and so on.
 module MarkupHelpers
+  # Covers the common emoji blocks plus variation selectors and skin tone modifiers. Hoisted out
+  # of wrap_figcaption_emoji, which built both of these per text node.
+  EMOJI_REGEX = /([\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E6}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F900}-\u{1F9FF}]|[\u{1F018}-\u{1F270}])[\u{FE00}-\u{FE0F}\u{1F3FB}-\u{1F3FF}]?/
+  # A run of consecutive emoji, and the whitespace between them.
+  EMOJI_RUN_REGEX = /((?:#{EMOJI_REGEX.source}(?:\s*#{EMOJI_REGEX.source})*))/
+
   # Renders an entry's body through the full transform pipeline.
   # @param text [String] The Markdown text to render.
   # @param image_variant [Symbol] Which responsive-images config to use.
@@ -253,12 +259,9 @@ module MarkupHelpers
           text_content = text_node.content
           next if text_content.empty?
 
-          # Covers the common emoji blocks plus variation selectors and skin tone modifiers.
-          emoji_regex = /([\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E6}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F900}-\u{1F9FF}]|[\u{1F018}-\u{1F270}])[\u{FE00}-\u{FE0F}\u{1F3FB}-\u{1F3FF}]?/
-
-          if text_content.match?(emoji_regex)
+          if text_content.match?(EMOJI_REGEX)
             # Consecutive emoji, and the spaces between them, go in one span.
-            new_content = text_content.gsub(/((?:#{emoji_regex.source}(?:\s*#{emoji_regex.source})*))/) do |match|
+            new_content = text_content.gsub(EMOJI_RUN_REGEX) do |match|
               "<span class=\"emoji\">#{match}</span>"
             end
 

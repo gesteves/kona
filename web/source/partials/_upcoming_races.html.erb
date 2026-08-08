@@ -4,8 +4,11 @@
 <%# + "Upcoming Races" pair on race day — and removes it on an empty response (no upcoming %>
 <%# races). See api/app/views/widgets/events/. `url` (required local) is the API endpoint. %>
 <div class="collection-group" data-nosnippet <%= live_update_attrs(url) %>>
-  <section class="collection collection--thirds" id="upcoming-races">
-    <h2 class="collection__heading">Upcoming Races</h2>
+  <%# The api picks this modifier from the race count (and adds collection--has-featured, or a %>
+  <%# second "Today's Race" section on race day), so only the wrapper above is a fixed shape. %>
+  <%# --thirds/3 items is the common case; the grid reflows on the others. %>
+  <section class="collection collection--thirds" id="upcoming-races" aria-labelledby="hed-upcoming-races">
+    <h2 class="collection__heading" id="hed-upcoming-races">Upcoming Races</h2>
     <ol class="collection__list">
       <% 3.times do %>
         <li class="collection__item">

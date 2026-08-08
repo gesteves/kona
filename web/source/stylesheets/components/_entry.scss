@@ -34,7 +34,9 @@
     color: var(--color-link-hover);
   }
 
-  a:focus {
+  // Deliberately :focus-visible, not :focus — on :focus this also stripped the underline for
+  // mouse users, removing the affordance from every link in an entry on click.
+  a:focus-visible {
     text-decoration: none;
   }
 

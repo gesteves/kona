@@ -20,4 +20,12 @@ RSpec.shared_examples "a live-update fragment" do |path|
 
     expect(response.body).not_to include("data-live-update-placeholder-value")
   end
+
+  # The placeholder carries aria-busy="true" while its skeleton is on screen. A fragment is the
+  # finished content, so carrying it over would leave the region announced as perpetually loading.
+  it "is not marked as busy" do
+    get path, headers: auth_headers
+
+    expect(response.body).not_to include("aria-busy")
+  end
 end

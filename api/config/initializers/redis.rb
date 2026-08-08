@@ -12,7 +12,11 @@ require "connection_pool"
 # through, so every existing `$redis.get` / `$redis.setex` call site keeps working without a
 # `.with { }` block. Each call checks a connection out and back.
 #
-# Sized for the widest consumer — Sidekiq's concurrency — since both processes load this file.
+# Sized for the widest consumer, since both processes load this file. ⚠️ That is NOT Sidekiq's
+# concurrency of 5 — it's the web process: RAILS_MAX_THREADS requests, each fanning out through
+# ParallelUpstreams (up to 6 more threads in Widgets::WeatherController#current), so one weather
+# request alone can want 7 checkouts. Checkouts are short (a GET), so 10 queues rather than
+# raises under normal latency; raise REDIS_POOL_SIZE if checkout timeouts ever show up.
 REDIS_POOL_SIZE = Integer(ENV.fetch("REDIS_POOL_SIZE", 10))
 
 $redis ||= ConnectionPool::Wrapper.new(size: REDIS_POOL_SIZE, timeout: 5) do

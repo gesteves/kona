@@ -2,14 +2,17 @@
 <%# eyebrow, heading, and `lines` lines of body text — so it can stand in for any entry %>
 <%# collection. Pass `lines:` to size the body: events need 4, summaries default to 2. %>
 <% line_count = defined?(lines) ? lines : 2 %>
-<div class="entry entry--summary">
-  <div class="entry__header">
-    <span class="entry__meta"><wa-skeleton class="entry-skeleton-eyebrow" effect="sheen"></wa-skeleton></span>
+<%# Container tags mirror the api's _summary card this is swapped for, so selectors like
+    `article.entry` or `header.entry__header` in the jointly-owned _entry.scss reach both.
+    ⚠️ The heading stays a span, deliberately: an empty h3 would announce a nameless heading. %>
+<article class="entry entry--summary">
+  <header class="entry__header">
+    <p class="entry__meta"><wa-skeleton class="entry-skeleton-eyebrow" effect="sheen"></wa-skeleton></p>
     <span class="entry__hed"><wa-skeleton class="entry-skeleton-heading" effect="sheen"></wa-skeleton></span>
-  </div>
+  </header>
   <div class="entry__body">
     <% line_count.times do %>
       <wa-skeleton class="entry-skeleton-line" effect="sheen"></wa-skeleton>
     <% end %>
   </div>
-</div>
+</article>

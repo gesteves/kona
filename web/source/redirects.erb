@@ -1,43 +1,10 @@
 <%#
-  ⚠️ RULE ORDER IS LOAD-BEARING. Cloudflare's _redirects parser (workers-sdk
-  parseRedirects) allows 2,000 "static" rules but only 100 "dynamic" ones — and a rule is
-  "dynamic" if its SOURCE contains a splat (`*`) or a `:placeholder`. Crucially, the parser
-  latches: the moment the first dynamic rule appears, its `canCreateStaticRule` flag flips to
-  false and EVERY subsequent rule — even an exact-match one — is counted as dynamic. So all
-  exact-match (static) redirects must be emitted BEFORE any splat/placeholder (dynamic) rule,
-  or the exact ones get miscounted against the 100-dynamic limit and the deploy fails once the
-  file crosses ~100 lines. Static-first also gives the correct match precedence (exact wins
-  over a catch-all splat). We therefore gather every rule, then emit statics first, dynamics
-  last. See the root/web CLAUDE.md.
+  ⚠️ RULE ORDER IS LOAD-BEARING — statics must be emitted before dynamics, or the deploy fails
+  with a bare `code: 100324` once the file passes ~100 lines. The rules, the two validity filters,
+  and the partition live in SiteHelpers#partitioned_redirects, which carries the full reasoning
+  and is covered by spec/lib/helpers/site_helpers_spec.rb. This template only emits them.
 %>
-<%
-  # Every redirect rule as a uniform hash. A source is "dynamic" (in Cloudflare's sense) iff it
-  # has a `*` or a `:name`.
-  all_redirects =
-    [
-      { from: '/.well-known/host-meta*', to: 'https://fed.brid.gy/.well-known/host-meta:splat', status: 302 },
-      { from: '/.well-known/webfinger*', to: 'https://fed.brid.gy/.well-known/webfinger', status: 302 }
-    ] +
-    taxonomy_synonym_redirects.map { |r| { from: r[:from], to: r[:to], status: r[:status] } } +
-    data.redirects.map { |r| { from: r.from, to: r.to, status: r.status } }
-
-  # ⚠️ Cloudflare's static-assets _redirects only accepts RELATIVE sources — an absolute-URL
-  # `from` (a cross-domain redirect, e.g. an old domain → this site) is a hard deploy failure
-  # ("Only relative URLs are allowed", code 100324). Drop them here rather than letting a
-  # Contentful entry break the deploy; cross-domain redirects belong in a Cloudflare zone rule
-  # (Bulk Redirect) instead.
-  all_redirects.reject! { |r| r[:from].match?(%r{\Ahttps?://}) }
-
-  # ⚠️ Cloudflare also rejects 200-status PROXY rewrites that point at an absolute URL
-  # ("Proxy (200) redirects can only point to relative paths", code 100324). Nothing here emits
-  # one today — the /pa/* Plausible proxy that used to is now the Worker's job (src/plausible.ts
-  # intercepts /pa/* before the asset/redirect layer) — but redirects are authored in Contentful,
-  # so this stands between a mis-entered rule and a deploy that fails with a bare error code.
-  all_redirects.reject! { |r| r[:status].to_i == 200 && r[:to].to_s.match?(%r{\Ahttps?://}) }
-
-  dynamic_source = ->(from) { from.include?('*') || from.match?(/:[A-Za-z]/) }
-  static_rules, dynamic_rules = all_redirects.partition { |r| !dynamic_source.call(r[:from]) }
-%>
+<% static_rules, dynamic_rules = partitioned_redirects %>
 <%# Static (exact-match) redirects — counted against Cloudflare's 2,000-rule limit. %>
 <% static_rules.each do |r| %>
 <%= r[:from] %> <%= r[:to] %> <%= r[:status] %>

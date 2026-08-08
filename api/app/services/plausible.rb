@@ -90,15 +90,10 @@ class Plausible < ApplicationService
     path.to_s.sub(/index\.html\z/, "")
   end
 
+  # ⚠️ A digest of the query, not a parameterized rendering of it. Parameterizing stripped the
+  # regex characters out of filters like ARTICLE_PATH_FILTER, so two structurally different
+  # queries could collide on one key and serve each other's results.
   def generate_cache_key(body)
-    "plausible:query:" + body.map do |key, value|
-      if value.is_a?(Hash)
-        value.map { |sub_key, sub_value| "#{key}.#{sub_key}:#{sub_value.to_s.parameterize}" }.join(":")
-      elsif value.is_a?(Array)
-        "#{key}:#{value.map(&:to_s).map(&:parameterize).join('-')}"
-      else
-        "#{key}:#{value.to_s.parameterize}"
-      end
-    end.join(":")
+    "plausible:query:#{cache_version(body.to_json)}"
   end
 end

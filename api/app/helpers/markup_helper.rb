@@ -71,12 +71,17 @@ module MarkupHelper
     doc
   end
 
-  # Opens absolute links in a new tab. These bodies only ever link to external race sites, so
-  # no same-host exception is needed.
+  # Opens absolute links in a new tab. ⚠️ Deliberately without the web helper's same-host
+  # exception — these bodies only ever link to external race sites — but otherwise matched to it,
+  # malformed-href skip included.
   def open_external_links_in_new_tabs(doc)
     doc.css("a").each do |a|
       href = a["href"]
       next unless href&.start_with?("http://", "https://")
+      # Author-supplied links can be malformed; skip them rather than marking them up.
+      link_host = URI.parse(href).host rescue next
+      next if link_host.blank?
+
       a["rel"] = "noopener"
       a["target"] = "_blank"
     end

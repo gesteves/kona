@@ -1,5 +1,5 @@
 <section data-nosnippet class="stats stats--has-three" <%= live_update_attrs %> aria-labelledby="hed-whoop">
-  <h2 class="stats__heading" id="hed-whoop"><%= raw @whoop.heading %></h2>
+  <h2 class="stats__heading" id="hed-whoop"><%= @whoop.heading_label %> Metrics <i>from</i> <a href="https://www.whoop.com" target="_blank" rel="nofollow noopener">Whoop</a></h2>
   <div class="stats__container">
     <%= render "widgets/activity_stats/stat", icon: "moon",                 top: "Sleep",    value: @whoop.sleep_score,    unit: "%",   bottom: @whoop.sleep_label %>
     <%= render "widgets/activity_stats/stat", icon: @whoop.recovery_icon,   top: "Recovery", value: @whoop.recovery_score, unit: "%",   bottom: @whoop.recovery_label %>

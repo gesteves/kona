@@ -3,8 +3,8 @@
     removes when the API has nothing to show (empty response). Locals: `section_id` and
     `heading` (must match the API view's shared _collection partial so the swap is seamless),
     and `url` (the API endpoint). %>
-<section class="collection collection--halves" id="<%= section_id %>" data-nosnippet <%= live_update_attrs(url) %>>
-  <h2 class="collection__heading"><%= heading %></h2>
+<section class="collection collection--halves" id="<%= section_id %>" aria-labelledby="hed-<%= section_id %>" data-nosnippet <%= live_update_attrs(url) %>>
+  <h2 class="collection__heading" id="hed-<%= section_id %>"><%= heading %></h2>
   <ol class="collection__list">
     <% 4.times do %>
       <li class="collection__item">

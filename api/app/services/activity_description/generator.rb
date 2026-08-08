@@ -94,13 +94,13 @@ module ActivityDescription
       description = matches.first[:description]
       return if description.blank?
 
-      safely("planned summary") { Llm.planned_summary(description) }
+      swallow("planned summary") { Llm.planned_summary(description) }
     end
 
     # @return [Array<Hash>] The planned workouts for the activity's local date; empty when no
     #   feed is configured or the fetch fails, so a broken calendar loses only this line.
     def planned_workouts_for(activity)
-      safely("TrainerRoad planned workouts", fallback: []) do
+      swallow("TrainerRoad planned workouts", fallback: []) do
         date = activity_date(activity)
         next [] if date.nil?
 
@@ -117,7 +117,7 @@ module ActivityDescription
       text = @intervals.activity_weather_summary(activity[:id])
       return if text.blank?
 
-      result = safely("weather sentence") { Llm.weather_sentence(text) }
+      result = swallow("weather sentence") { Llm.weather_sentence(text) }
       return if result.nil?
 
       "#{result[:emoji]} #{result[:sentence]}"
@@ -183,7 +183,7 @@ module ActivityDescription
 
     # The activity's local calendar date (start_date_local is already athlete-local).
     #
-    # ⚠️ Nil-safe on purpose. heat_line reaches this outside the `safely` wrappers its sibling
+    # ⚠️ Nil-safe on purpose. heat_line reaches this outside the `swallow` wrappers its sibling
     # steps use, so an activity missing start_date_local used to fail the whole run — and since
     # that failure is deterministic, ApplicationJob's 24-hour window then retried it all day.
     # @return [Date, nil]
@@ -203,14 +203,18 @@ module ActivityDescription
         activity[:source].to_s.casecmp("zwift").zero?
     end
 
-    # Runs a best-effort step, logging and swallowing any failure so one flaky source loses
-    # only its own line rather than the whole description.
+    # Runs a best-effort step, swallowing any failure so one flaky source loses only its own
+    # line rather than the whole description.
+    #
+    # ⚠️ Not named `safely`: that's UpstreamIsolation's, with a different signature, and this
+    # one's failures would otherwise look like they reached Bugsnag when they didn't.
     # @param fallback [Object] Value returned when the block raises (nil for a dropped line,
     #   [] for a collection).
-    def safely(label, fallback: nil)
+    def swallow(label, fallback: nil)
       yield
     rescue StandardError => e
       log_warn("#{label} failed: #{e.message}")
+      ErrorReporter.report_upstream(e, service: "ActivityDescription", context: label)
       fallback
     end
 

@@ -1,7 +1,6 @@
-Dir["lib/helpers/*.rb"].each do |file|
-  require file
-  helpers File.basename(file, ".rb").camelcase.constantize
-end
+require_relative "lib/helpers"
+
+each_kona_helper { |helper| helpers helper }
 
 # Activate and configure extensions
 # https://middlemanapp.com/advanced/configuration/#configuring-extensions

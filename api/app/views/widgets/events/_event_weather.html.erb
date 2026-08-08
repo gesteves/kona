@@ -9,7 +9,9 @@
   event_forecast = event_weather.forecast
 %>
 <section class="event__weather" aria-labelledby="weather-hed-<%= event.sys.id.parameterize %>" data-nosnippet>
-  <h5 class="event__weather-heading" id="weather-hed-<%= event.sys.id.parameterize %>">Race Day Weather</h5>
+  <%# h4, not h5: this sits inside the event's h3 card, inside the section's h2 — skipping a level
+      is a WCAG 1.3.1 failure. Styled by class, so the level is free to be correct. %>
+  <h4 class="event__weather-heading" id="weather-hed-<%= event.sys.id.parameterize %>">Race Day Weather</h4>
   <div class="event__weather-stats">
     <% if event.location.present? %>
       <div class="event__weather-stat-group">

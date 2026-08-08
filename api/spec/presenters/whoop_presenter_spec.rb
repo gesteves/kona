@@ -73,30 +73,30 @@ RSpec.describe WhoopPresenter do
     it { expect(icon_for(80)).to eq("person-meditating") }
   end
 
-  describe "#heading" do
+  describe "#heading_label" do
     include ActiveSupport::Testing::TimeHelpers
 
     # Freeze to midday in the presenter's timezone so "today"/"yesterday" are deterministic.
     around { |example| travel_to(Time.utc(2026, 6, 15, 18, 0, 0)) { example.run } }
 
-    def heading_for(sleep_end)
-      presenter(stats: { sleep: { end: sleep_end } }).heading
+    def label_for(sleep_end)
+      presenter(stats: { sleep: { end: sleep_end } }).heading_label
     end
 
     it "labels metrics 'Latest' when there's no recorded wakeup" do
-      expect(presenter(stats: {}).heading).to include("Latest Metrics")
+      expect(presenter(stats: {}).heading_label).to eq("Latest")
     end
 
     it "labels a wakeup from today 'Today’s'" do
-      expect(heading_for(Time.current.iso8601)).to include("Today’s Metrics")
+      expect(label_for(Time.current.iso8601)).to eq("Today’s")
     end
 
     it "labels a wakeup from yesterday 'Yesterday’s'" do
-      expect(heading_for((Time.current - 1.day).iso8601)).to include("Yesterday’s Metrics")
+      expect(label_for((Time.current - 1.day).iso8601)).to eq("Yesterday’s")
     end
 
     it "falls back to 'Latest' for older wakeups" do
-      expect(heading_for((Time.current - 5.days).iso8601)).to include("Latest Metrics")
+      expect(label_for((Time.current - 5.days).iso8601)).to eq("Latest")
     end
   end
 

@@ -15,23 +15,18 @@ class WhoopPresenter
     @time_zone = time_zone.presence || TimeZoneResolver.default
   end
 
-  # The heading for the Whoop section, labeled relative to the last wakeup.
-  # @return [String] The heading HTML.
-  def heading
+  # How to label the metrics, relative to the last wakeup. The surrounding heading markup lives in
+  # the view, so it can be diffed against the web placeholder it replaces.
+  # @return [String] "Today’s", "Yesterday’s" or "Latest".
+  def heading_label
     wakeup_time = last_wakeup_time
     current_date = Time.current.in_time_zone(@time_zone).to_date
 
-    label = if wakeup_time.blank?
-      "Latest"
-    elsif wakeup_time.to_date == current_date
-      "Today’s"
-    elsif wakeup_time.to_date == current_date - 1.day
-      "Yesterday’s"
-    else
-      "Latest"
-    end
+    return "Latest" if wakeup_time.blank?
+    return "Today’s" if wakeup_time.to_date == current_date
+    return "Yesterday’s" if wakeup_time.to_date == current_date - 1.day
 
-    "#{label} Metrics <i>from</i> <a href='https://www.whoop.com' target='_blank' rel='nofollow noopener'>Whoop</a>"
+    "Latest"
   end
 
   # The rounded Whoop sleep score.

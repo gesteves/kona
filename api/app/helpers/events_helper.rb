@@ -140,7 +140,11 @@ module EventsHelper
   # @return [String] The icon and date span for an upcoming event. Only confirmed events reach
   #   here, so the icon is always a calendar check.
   def event_timestamp_tag(event)
-    content_tag :span, raw("#{icon_svg('classic', 'light', 'calendar-check')} #{event_timestamp(event)}")
+    date = parse_event_date(event)
+    # <time datetime>, matching ArticlesHelper#article_permalink_timestamp — the formatted date
+    # is otherwise not machine-readable.
+    timestamp = date ? content_tag(:time, event_timestamp(event), datetime: date.iso8601) : nil
+    content_tag :span, raw("#{icon_svg('classic', 'light', 'calendar-check')} #{timestamp}")
   end
 
   # The "Live tracking" indicator, highlighted while the race is in progress and muted

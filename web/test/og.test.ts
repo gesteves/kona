@@ -347,6 +347,22 @@ describe('readOgTitle', () => {
     ).resolves.toBe(expected);
   });
 
+  // ⚠️ String.fromCodePoint throws RangeError above 0x10FFFF, and this runs on a path handleOg
+  // does not wrap — so one bad entity in a published og:title used to 500 the card outright.
+  // Left as written rather than dropped, so the damage is a visible entity, not a silent gap.
+  it.each([
+    ['&#1114112;', '&#1114112;'],
+    ['&#x110000;', '&#x110000;'],
+    ['&#99999999999;', '&#99999999999;'],
+  ])(
+    'passes the out-of-range entity %s through instead of throwing',
+    async (input, expected) => {
+      await expect(
+        readOgTitle(page(`<meta property="og:title" content="Title ${input}">`))
+      ).resolves.toBe(`Title ${expected}`);
+    }
+  );
+
   // ⚠️ `&amp;` is the escape for the ampersand that introduces every other entity, so a decoder
   // that ran twice would turn this into a literal "<".
   it('does not double-decode an escaped entity', async () => {

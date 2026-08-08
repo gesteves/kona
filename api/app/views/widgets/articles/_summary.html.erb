@@ -3,7 +3,9 @@
   partials/article/_summary.html.erb — prose body via the minimal renderer; no cover image.
 %>
 <% published_at = DateTime.parse(article.published_at) %>
-<article class="entry entry--summary" id="entry-<%= article.sys.id.parameterize %>" aria-labelledby="hed-<%= article.sys.id.parameterize %>">
+<%# Scoped by section: one article can appear in both trending and related on the same page. %>
+<% entry_id = "#{section_id}-#{article.sys.id.parameterize}" %>
+<article class="entry entry--summary" id="entry-<%= entry_id %>" aria-labelledby="hed-<%= entry_id %>">
   <header class="entry__header">
     <p class="entry__meta"
       data-controller="publish-date"
@@ -18,7 +20,7 @@
         <%= article_permalink_timestamp(article) %>
       </span>
     </p>
-    <h3 class="entry__hed" id="hed-<%= article.sys.id.parameterize %>">
+    <h3 class="entry__hed" id="hed-<%= entry_id %>">
       <%= link_to raw(smartypants(article.title)), article.path %>
     </h3>
   </header>

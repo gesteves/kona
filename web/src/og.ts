@@ -4,6 +4,8 @@
 // is deliberately ignored here, so a card never needs purging.
 // Renders the og:image for pages with no cover image; see web/CLAUDE.md.
 
+import { withSecurityHeaders } from './headers';
+
 /** Renderer injected by the route so tests can drive the handler without importing ./og-render. */
 export type RenderCard = (title: string) => Promise<Uint8Array<ArrayBuffer>>;
 
@@ -94,11 +96,6 @@ export async function readOgTitle(response: Response): Promise<string | null> {
   }
 
   return title === null ? null : decodeEntities(title);
-}
-
-function withSecurityHeaders(headers: Headers): Headers {
-  headers.set('x-content-type-options', 'nosniff');
-  return headers;
 }
 
 const STATUS_TEXT: Record<number, string> = {
@@ -212,6 +209,10 @@ export async function handleOg(
     ),
   });
 
-  ctx.waitUntil(caches.default.put(cacheKey, response.clone()));
+  ctx.waitUntil(
+    caches.default
+      .put(cacheKey, response.clone())
+      .catch((error) => console.error('OG card cache put failed:', path, error))
+  );
   return request.method === 'HEAD' ? new Response(null, response) : response;
 }

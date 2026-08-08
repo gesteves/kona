@@ -1,6 +1,14 @@
 <% standalone = defined?(indexable) && indexable %>
 <% index_body = standalone && !article.draft %>
-<article class="entry entry--compact" id="<%= entry_dom_id(article) %>">
+<%# The landmark needs a name. Standalone borrows its own sr-only <h1>; in a list a Short has no
+    heading at all (its title is the inline run-in below), so it carries the title as a label —
+    otherwise the blog list mixes named and unnamed article landmarks. %>
+<% label_attr = if standalone
+     %(aria-labelledby="#{entry_heading_id(article)}")
+   else
+     %(aria-label="#{h sanitize(article.title)}")
+   end %>
+<article class="entry entry--compact" id="<%= entry_dom_id(article) %>" <%= label_attr.html_safe %>>
   <header class="entry__header">
     <%= partial 'partials/article/meta', locals: { article: article } %>
     <%# On its own page the short needs its title as the page's <h1>, but the visible title %>

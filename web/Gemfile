@@ -18,13 +18,18 @@ gem 'sanitize'
 gem 'public_suffix'
 gem 'httparty'
 gem 'redis'
-gem 'blurhash', git: 'https://github.com/gesteves/blurhash', branch: 'master'
+# Pinned to a ref, not a moving branch: `ref` is what makes `bundle update` reproducible, since
+# a git source is resolved fresh from the remote rather than from rubygems.
+gem 'blurhash', git: 'https://github.com/gesteves/blurhash', ref: '8c7700513460f748596a43609bae3f12a6400974'
 gem 'ruby-vips'
 gem 'ostruct'
-gem 'rspec'
 gem 'htmlentities'
 gem 'humanize'
-# Scans the bundle for gems with known CVEs; run by the security job in web.yml. This app's
-# build-time dependencies parse untrusted content (nokogiri, redcarpet, sanitize), so it wants
-# the same CVE gate the api has had.
-gem 'bundler-audit', require: false
+
+group :development, :test do
+  gem 'rspec'
+  # Scans the bundle for gems with known CVEs; run by the security job in web.yml. This app's
+  # build-time dependencies parse untrusted content (nokogiri, redcarpet, sanitize), so it wants
+  # the same CVE gate the api has had.
+  gem 'bundler-audit', require: false
+end

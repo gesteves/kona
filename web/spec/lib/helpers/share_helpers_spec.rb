@@ -77,16 +77,28 @@ RSpec.describe ShareHelpers do
   end
 
   describe '#share_heading' do
+    # Tags carry both, but the heading matches on id — a concept renamed in Contentful must not
+    # change what this says.
     def article_with(tags: [], entry_type: 'Article')
       OpenStruct.new(
         entry_type: entry_type,
-        contentful_metadata: OpenStruct.new(tags: tags.map { |t| OpenStruct.new(name: t) })
+        contentful_metadata: OpenStruct.new(
+          tags: tags.map { |id| OpenStruct.new(id: id, name: id.tr('-', ' ').capitalize) }
+        )
       )
     end
 
     it 'calls out race reports and reviews by their tag' do
-      expect(share_heading(article_with(tags: ['Race Reports']))).to eq('Share this race report')
-      expect(share_heading(article_with(tags: ['Reviews']))).to eq('Share this review')
+      expect(share_heading(article_with(tags: ['race-reports']))).to eq('Share this race report')
+      expect(share_heading(article_with(tags: ['reviews']))).to eq('Share this review')
+    end
+
+    it 'ignores a renamed concept whose id still matches' do
+      renamed = OpenStruct.new(
+        entry_type: 'Article',
+        contentful_metadata: OpenStruct.new(tags: [OpenStruct.new(id: 'race-reports', name: 'Race Recaps')])
+      )
+      expect(share_heading(renamed)).to eq('Share this race report')
     end
 
     it 'falls back to the entry type' do

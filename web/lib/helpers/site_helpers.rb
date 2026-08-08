@@ -96,7 +96,10 @@ module SiteHelpers
   # @return [String] HTML attributes.
   def live_update_attrs(url)
     # url is always an app-generated same-origin path, never user input, so it needs no escaping.
-    %(data-controller="live-update" data-live-update-url-value="#{url}" data-live-update-placeholder-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange").html_safe
+    # aria-busy marks the skeleton as still loading; the api fragment that replaces it omits it,
+    # the same way it omits the placeholder flag, so the swap reads as "finished" to a screen
+    # reader instead of silently exchanging one nameless region for another.
+    %(data-controller="live-update" data-live-update-url-value="#{url}" data-live-update-placeholder-value="true" aria-busy="true" data-action="visibilitychange@document->live-update#handleVisibilityChange").html_safe
   end
 
   # @param content [Object] A content object.
@@ -374,6 +377,41 @@ module SiteHelpers
         { from: from, to: tag.path, status: 301 }
       end
     end
+  end
+
+  # @param from [String] A redirect source.
+  # @return [Boolean] Whether Cloudflare counts the rule as "dynamic" — i.e. the source carries
+  #   a splat or a :placeholder.
+  def dynamic_redirect_source?(from)
+    from.include?('*') || from.match?(/:[A-Za-z]/)
+  end
+
+  # Every redirect rule, split into the order source/redirects.erb must emit them in.
+  #
+  # ⚠️ RULE ORDER IS LOAD-BEARING. Cloudflare's parser allows 2,000 "static" rules but only 100
+  # "dynamic" ones, and it *latches*: at the first dynamic rule, every subsequent rule — exact
+  # matches included — is counted as dynamic too. Emit statics first or the deploy fails with a
+  # bare `code: 100324` once the file passes ~100 lines. Static-first is also the correct match
+  # precedence. Extracted from the template so it can be tested; see the root/web CLAUDE.md.
+  # @return [Array(Array<Hash>, Array<Hash>)] The static rules, then the dynamic ones.
+  def partitioned_redirects
+    rules =
+      [
+        { from: '/.well-known/host-meta*', to: 'https://fed.brid.gy/.well-known/host-meta:splat', status: 302 },
+        { from: '/.well-known/webfinger*', to: 'https://fed.brid.gy/.well-known/webfinger', status: 302 }
+      ] +
+      taxonomy_synonym_redirects.map { |r| { from: r[:from], to: r[:to], status: r[:status] } } +
+      data.redirects.map { |r| { from: r.from, to: r.to, status: r.status } }
+
+    # ⚠️ Cloudflare's _redirects only accepts RELATIVE sources — an absolute-URL `from` is a hard
+    # deploy failure (code 100324). Redirects are authored in Contentful, so this stands between a
+    # mis-entered rule and a broken deploy; cross-domain redirects belong in a zone Bulk Redirect.
+    rules.reject! { |r| r[:from].match?(%r{\Ahttps?://}) }
+    # ⚠️ Same for 200-status proxy rewrites pointing at an absolute URL. Nothing emits one today
+    # (the /pa/* proxy is the Worker's job now), but the same authoring path could.
+    rules.reject! { |r| r[:status].to_i == 200 && r[:to].to_s.match?(%r{\Ahttps?://}) }
+
+    rules.partition { |r| !dynamic_redirect_source?(r[:from]) }
   end
 
   # The author's areas of expertise for schema.org `knowsAbout`: the top-level concepts of the

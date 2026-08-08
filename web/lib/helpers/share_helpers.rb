@@ -48,9 +48,13 @@ module ShareHelpers
   # @param article [Article] The article to share.
   # @return [String] The share section's heading, naming the entry's kind.
   def share_heading(article)
-    type = if article&.contentful_metadata&.tags&.any? { |tag| tag.name.downcase == 'race reports' }
+    # Matched by concept id, not display name, like every other taxonomy check in the app
+    # (article_helpers.rb's race_report?). A rename in Contentful would silently drop this to
+    # the generic "Share this post".
+    tag_ids = Array(article&.contentful_metadata&.tags).map(&:id)
+    type = if tag_ids.include?('race-reports')
              'race report'
-           elsif article&.contentful_metadata&.tags&.any? { |tag| tag.name.downcase == 'reviews' }
+           elsif tag_ids.include?('reviews')
              'review'
            else
              entry_type(article)&.downcase || 'post'

@@ -33,14 +33,30 @@ class WeatherSummaryPresenter
   # and several sentences ask for them. Memoized here — where the request's state already lives —
   # rather than in WeatherHelper, which is deliberately a set of pure functions over their
   # arguments.
-  def today
-    return @today if defined?(@today)
-    @today = todays_forecast(@weather)
+  #
+  # ⚠️ The memo goes on `todays_forecast` itself, not on a wrapper, because sunrise/sunset (and
+  # through them daytime?/evening?/rest_of_day_forecast) each call it internally — one summary
+  # asks about ten times over. Overriding the selection is what makes all of those cheap; a
+  # wrapper would only have covered the direct callers. Delegates for any other weather object.
+  def todays_forecast(weather = @weather)
+    return super unless weather.equal?(@weather)
+    return @todays_forecast if defined?(@todays_forecast)
+
+    @todays_forecast = super
   end
+  alias today todays_forecast
 
   def rest_of_day
     return @rest_of_day if defined?(@rest_of_day)
     @rest_of_day = rest_of_day_forecast(@weather, @time_zone)
+  end
+
+  # Same shape, for the events side: race_day? calls todays_race, and the summary asks five times.
+  def todays_race(events = @events, time_zone = @time_zone)
+    return super unless events.equal?(@events) && time_zone == @time_zone
+    return @todays_race if defined?(@todays_race)
+
+    @todays_race = super
   end
 
   # The full composed summary as HTML (each sentence wrapped in a span).

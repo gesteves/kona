@@ -8,8 +8,8 @@
 %>
 <div class="collection-group" data-nosnippet <%= live_update_attrs %>>
   <% if @races.todays_race %>
-    <section class="collection collection--single collection--has-featured" id="todays-race">
-      <h2 class="collection__heading">Today’s Race</h2>
+    <section class="collection collection--single collection--has-featured" id="todays-race" aria-labelledby="hed-todays-race">
+      <h2 class="collection__heading" id="hed-todays-race">Today’s Race</h2>
       <ol class="collection__list">
         <li class="collection__item">
           <%# show_timestamp: false — the "Today's Race" heading already says it's today. %>
@@ -18,8 +18,8 @@
       </ol>
     </section>
     <% if @races.other_races.present? %>
-      <section class="collection collection--<%= @races.other_races_variant %>" id="upcoming-races">
-        <h2 class="collection__heading">Upcoming Races</h2>
+      <section class="collection collection--<%= @races.other_races_variant %>" id="upcoming-races" aria-labelledby="hed-upcoming-races">
+        <h2 class="collection__heading" id="hed-upcoming-races">Upcoming Races</h2>
         <ol class="collection__list">
           <% @races.other_races.each do |event| %>
             <li class="collection__item">
@@ -30,8 +30,8 @@
       </section>
     <% end %>
   <% else %>
-    <section class="collection collection--<%= @races.variant %><%= " collection--has-featured" if @races.featured %>" id="upcoming-races">
-      <h2 class="collection__heading">Upcoming Races</h2>
+    <section class="collection collection--<%= @races.variant %><%= " collection--has-featured" if @races.featured %>" id="upcoming-races" aria-labelledby="hed-upcoming-races">
+      <h2 class="collection__heading" id="hed-upcoming-races">Upcoming Races</h2>
       <ol class="collection__list">
         <% @races.races.each do |event| %>
           <% featured = @races.featured_event?(event) %>

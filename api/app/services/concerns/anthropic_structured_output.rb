@@ -15,6 +15,9 @@ module AnthropicStructuredOutput
     ENV["ANTHROPIC_API_KEY"].present?
   end
 
+  # ⚠️ The env var is named indirectly, so ANTHROPIC_DESCRIPTION_MODEL and
+  # ANTHROPIC_CONTACT_SUBJECT_MODEL are invisible to a `grep ENV\[` audit of the app. They're in
+  # .env.example; look for `anthropic_model_env` when reconciling the two.
   # @return [String] The model to call.
   def model
     ENV[anthropic_model_env].presence || self::DEFAULT_MODEL

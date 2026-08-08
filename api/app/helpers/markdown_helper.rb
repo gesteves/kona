@@ -11,9 +11,15 @@ module MarkdownHelper
   # summary (which emits **bold** for the location and race-day note).
   def markdown_to_html(text)
     return if text.blank?
-    renderer = Redcarpet::Render::HTML.new(with_toc_data: true)
-    markdown = Redcarpet::Markdown.new(renderer, **EXTENSIONS)
-    Redcarpet::Render::SmartyPants.render(markdown.render(text))
+    Redcarpet::Render::SmartyPants.render(markdown_parser.render(text))
+  end
+
+  # ⚠️ Per-thread, not a constant: Redcarpet parsers hold render state and aren't thread-safe,
+  # and ParallelUpstreams fans widget rendering out across threads.
+  # @return [Redcarpet::Markdown] The reused parser for this thread.
+  def markdown_parser
+    Thread.current[:kona_markdown_parser] ||=
+      Redcarpet::Markdown.new(Redcarpet::Render::HTML.new(with_toc_data: true), **EXTENSIONS)
   end
 
   # Strips a Markdown string to plain text (tags removed, entities decoded) — ported from the

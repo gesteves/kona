@@ -78,7 +78,15 @@ async function getScript(
     // carrying one. Copying upstream as the init preserves its status and Cache-Control.
     response = new Response(upstream.body, upstream);
     response.headers.delete('set-cookie');
-    ctx.waitUntil(caches.default.put(cacheKey, response.clone()));
+    // Vary too: caches.default.put() rejects on `Vary: *` the same way it does on Set-Cookie.
+    response.headers.delete('vary');
+    ctx.waitUntil(
+      caches.default
+        .put(cacheKey, response.clone())
+        .catch((error) =>
+          console.error('Plausible script cache put failed:', error)
+        )
+    );
   }
   return request.method === 'HEAD' ? new Response(null, response) : response;
 }
@@ -96,5 +104,11 @@ async function postEvent(request: Request): Promise<Response> {
   upstream.headers.delete('cookie');
   const clientIp = request.headers.get('CF-Connecting-IP');
   if (clientIp) upstream.headers.set('X-Forwarded-For', clientIp);
-  return fetch(upstream, { signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+  const response = await fetch(upstream, {
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+  });
+  // Status only. Returning the upstream response verbatim would replay Plausible's own
+  // Set-Cookie and CORS headers under this origin, which is the thing the cookie strip above
+  // exists to prevent; window.plausible() reads nothing but the status.
+  return new Response(null, { status: response.status });
 }

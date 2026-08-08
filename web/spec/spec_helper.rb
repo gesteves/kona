@@ -18,12 +18,10 @@ require 'middleman-core/load_paths'
 # See https://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
 Dir[File.expand_path('../support/**/*.rb', __FILE__)].sort.each { |file| require file }
 
+require File.expand_path('../../lib/helpers', __FILE__)
+
 RSpec.configure do |config|
-  helpers_path = File.expand_path('../../lib/helpers', __FILE__)
-  Dir["#{helpers_path}/*.rb"].each do |file|
-    require file
-    config.include File.basename(file, '.rb').camelcase.constantize
-  end
+  each_kona_helper { |helper| config.include helper }
   # rspec-expectations config goes here. You can use an alternate
   # assertion/expectation library such as wrong or the stdlib/minitest
   # assertions if you prefer.

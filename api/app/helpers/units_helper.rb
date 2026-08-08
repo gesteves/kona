@@ -16,14 +16,21 @@ module UnitsHelper
     end
   end
 
+  # Splits a converted distance into its number and its unit, so a view needing both pays for
+  # one number_to_human instead of one per part.
+  # @return [Array(String, String)] The value and the unit.
+  def distance_parts(meters, units: "si")
+    distance(meters, units: units).split(/\s+/, 2)
+  end
+
   # Extracts the numerical value of the converted distance.
   def distance_value(meters, units: "si")
-    distance(meters, units: units).split(/\s+/).first
+    distance_parts(meters, units: units).first
   end
 
   # Retrieves the unit of measurement for the converted distance.
   def distance_unit(meters, units: "si")
-    distance(meters, units: units).split(/\s+/).last
+    distance_parts(meters, units: units).last
   end
 
   # Formats a distance number with specified units and precision.

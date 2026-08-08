@@ -128,7 +128,7 @@ RSpec.describe WeatherHelper, type: :helper do
   describe "#format_time" do
     it "formats the time and wraps the meridiem in an abbr" do
       time = Time.zone.parse("2026-06-15 09:05:00")
-      expect(helper.format_time(time)).to include("9:05&nbsp;<abbr>AM</abbr>")
+      expect(helper.format_time(time)).to include("9:05&nbsp;<abbr title=\"ante meridiem\">AM</abbr>")
     end
   end
 

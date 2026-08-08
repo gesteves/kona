@@ -63,8 +63,11 @@ module Webhooks
       head :no_content
     rescue StandardError => e
       # Acknowledged anyway, since Contentful won't retry either way; a transient enqueue
-      # failure is reconciled by the backfill tasks.
+      # failure is reconciled by the backfill tasks. ⚠️ Reported, not just logged: nothing here
+      # retries, so an unreported failure means no rebuild, no embedding and no PDS sync, with a
+      # log line as the only trace.
       Rails.logger.error("Contentful webhook error: #{e.message}")
+      ErrorReporter.report_upstream(e, service: "ContentfulWebhook", context: "contentType=#{content_type} entry=#{entry_id} action=#{action}")
       head :no_content
     end
   end

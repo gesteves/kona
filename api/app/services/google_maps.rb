@@ -1,7 +1,6 @@
 # Interfaces with the Google Maps API to reverse-geocode coordinates and fetch their
 # timezone and elevation. Each lookup is fetched lazily and memoized — asking only for the
-# timezone won't trigger the geocode/elevation calls — and cached in Redis (timezone for a
-# day, geocode and elevation indefinitely).
+# timezone won't trigger the geocode/elevation calls — and cached in Redis for a day.
 class GoogleMaps < ApplicationService
   include GoogleApi
 

@@ -79,10 +79,10 @@ class Intervals < ApplicationService
   # @return [String, nil] The activity's weather summary with Intervals.icu's attribution
   #   prefix stripped, or nil — weather isn't available for every activity.
   def activity_weather_summary(activity_id)
-    response = get_json!("#{INTERVALS_ICU_API_URL}/activity/#{activity_id}/weather-summary", basic_auth: auth)
-    response&.dig(:description)&.sub(/\A-- Intervals icu --\n/i, "")&.strip.presence
-  rescue StandardError
-    nil
+    safely("Intervals.icu", context: "activity_weather_summary") do
+      response = get_json!("#{INTERVALS_ICU_API_URL}/activity/#{activity_id}/weather-summary", basic_auth: auth)
+      response&.dig(:description)&.sub(/\A-- Intervals icu --\n/i, "")&.strip.presence
+    end
   end
 
   # Fetches activity streams by type. The query string is built by hand because Intervals.icu
@@ -91,9 +91,9 @@ class Intervals < ApplicationService
   # @return [Array<Hash>, nil] { type:, data: } objects, or nil — not every activity has them.
   def activity_streams(activity_id, types:)
     query_string = types.map { |type| "types=#{type}" }.join("&")
-    get_json!("#{INTERVALS_ICU_API_URL}/activity/#{activity_id}/streams?#{query_string}", basic_auth: auth)
-  rescue StandardError
-    nil
+    safely("Intervals.icu", context: "activity_streams") do
+      get_json!("#{INTERVALS_ICU_API_URL}/activity/#{activity_id}/streams?#{query_string}", basic_auth: auth)
+    end
   end
 
   # A date's wellness record. Keys are not underscored — custom fields are CamelCase.
@@ -101,9 +101,9 @@ class Intervals < ApplicationService
   # @return [Hash, nil] The record, or nil on any error, since its only caller must never fail
   #   description generation.
   def wellness(date)
-    get_json!("#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/wellness/#{date}", basic_auth: auth)
-  rescue StandardError
-    nil
+    safely("Intervals.icu", context: "wellness") do
+      get_json!("#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/wellness/#{date}", basic_auth: auth)
+    end
   end
 
   # Partially updates a date's wellness record; only the given fields change.

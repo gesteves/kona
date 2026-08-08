@@ -1,16 +1,18 @@
 <head>
   <%= partial 'partials/meta' %>
   <%= partial 'partials/open_graph_and_social' %>
-  <%= partial 'partials/schema/article', locals: { article: content } if defined?(content) && published_post?(content) %>
+  <%# page_content is the same object `content` names, without the defined? dance on every line. %>
+  <% page = page_content %>
+  <%= partial 'partials/schema/article', locals: { article: page } if page && published_post?(page) %>
   <%= partial 'partials/schema/site' %>
-  <%= partial 'partials/schema/breadcrumb' if defined?(content) && published_post?(content) %>
-  <%= partial 'partials/schema/profile' if defined?(content) && content.entry_type == 'Page' && content.slug == 'about' %>
-  <%= partial 'partials/schema/collection' if defined?(content) && content.template == '/tag.html' %>
-  <%= partial 'partials/schema/blog' if defined?(content) && content.template == '/articles.html' %>
+  <%= partial 'partials/schema/breadcrumb' if page && published_post?(page) %>
+  <%= partial 'partials/schema/profile' if page && page.entry_type == 'Page' && page.slug == 'about' %>
+  <%= partial 'partials/schema/collection' if page && page.template == '/tag.html' %>
+  <%= partial 'partials/schema/blog' if page && page.template == '/articles.html' %>
   <% if data.respond_to?(:standard_site) && data.standard_site&.publication_uri.present? %>
     <link rel="site.standard.publication" href="<%= data.standard_site.publication_uri %>">
-    <% if defined?(content) && published_post?(content) && data.standard_site.did.present? %>
-      <link rel="site.standard.document" href="at://<%= data.standard_site.did %>/site.standard.document/<%= document_rkey(content.sys.id) %>">
+    <% if page && published_post?(page) && data.standard_site.did.present? %>
+      <link rel="site.standard.document" href="at://<%= data.standard_site.did %>/site.standard.document/<%= document_rkey(page.sys.id) %>">
     <% end %>
   <% end %>
   <link rel="canonical" href="<%= canonical_url %>">

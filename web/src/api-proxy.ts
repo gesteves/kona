@@ -1,3 +1,4 @@
+import { withSecurityHeaders } from './headers';
 import { requestLogLine } from './log';
 
 // Proxies /widgets/* and POST /api/contact to the kona-api origin.
@@ -71,16 +72,6 @@ function upstreamHeaders(
 }
 
 /**
- * Adds the security headers these responses can't inherit from the static asset layer.
- * Widget fragments are real HTML that renders if navigated to directly.
- */
-function withFragmentSecurityHeaders(headers: Headers): Headers {
-  headers.set('x-content-type-options', 'nosniff');
-  headers.set('x-frame-options', 'DENY');
-  return headers;
-}
-
-/**
  * Weak ETag comparison (RFC 9110 §8.8.3.2): ignores `W/` prefixes and handles a
  * comma-separated If-None-Match list or `*`.
  */
@@ -101,7 +92,7 @@ function etagMatches(ifNoneMatch: string, etag: string): boolean {
 function badGateway(): Response {
   return new Response('', {
     status: 502,
-    headers: withFragmentSecurityHeaders(
+    headers: withSecurityHeaders(
       new Headers({ 'cache-control': 'public, max-age=10' })
     ),
   });
@@ -122,9 +113,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
   if (!allowed.includes(request.method)) {
     return new Response('', {
       status: 405,
-      headers: withFragmentSecurityHeaders(
-        new Headers({ allow: allowed.join(', ') })
-      ),
+      headers: withSecurityHeaders(new Headers({ allow: allowed.join(', ') })),
     });
   }
 
@@ -178,7 +167,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
     return badGateway();
   }
 
-  const headers = withFragmentSecurityHeaders(new Headers());
+  const headers = withSecurityHeaders(new Headers());
   const contentType = upstream.headers.get('content-type');
   if (contentType) headers.set('content-type', contentType);
   // Cache-Control passes through verbatim; CDN-Cache-Control does not — it's consumed by the

@@ -29,7 +29,12 @@
   # 'unsafe-inline' in script-src is load-bearing: the JSON-LD blocks (partials/schema/*) and the
   # Plausible init snippet (partials/_analytics.html.erb) are inline. style-src needs it for Web
   # Awesome's shadow-DOM styles and the inline style attrs on embed iframes.
-  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://images.ctfassets.net https://downloads.ctfassets.net; font-src 'self'; connect-src 'self'; frame-src https://challenges.cloudflare.com https://www.youtube-nocookie.com https://embed.podcasts.apple.com https://open.spotify.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+  # ⚠️ img-src names IMAGES_URL, the host Cloudflare Images serves transformations from — every
+  # image on the site is one. It listed *.ctfassets.net instead, which is both stale (assets are
+  # mirrored to R2 now) and the one host the zone must never treat as an image source. The mirror
+  # host itself is absent on purpose: Cloudflare fetches it server-side, the browser never does.
+  # connect-src carries Turnstile, which XHRs to challenges.cloudflare.com.
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: <%= ENV['IMAGES_URL'] %>; font-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com https://www.youtube-nocookie.com https://embed.podcasts.apple.com https://open.spotify.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
 
 /.well-known/site.standard.publication
   Content-Type: text/plain; charset=utf-8

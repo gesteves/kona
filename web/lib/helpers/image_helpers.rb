@@ -215,10 +215,26 @@ module ImageHelpers
 
   # Decodes the asset's blurhash into a tiny JPEG data URI, cached in Redis by published
   # version since generating one is expensive.
+  #
+  # ⚠️ Memoized in-process on top of the Redis cache: this runs inside render_body, which every
+  # listing page calls for every article, so the Redis GET below was a network round trip per
+  # image per page. The value is immutable (the key carries published_version), so one lookup
+  # per asset per build is enough.
   # @param asset_id [String] The asset's ID.
   # @param width [Integer] The JPEG's width in pixels.
   # @return [String, nil] The data URI, or nil for a GIF or when encoding fails.
   def blurhash_jpeg_data_uri(asset_id, width: 32)
+    store = memoize_by_collection(:blurhash_jpegs, data.assets) { {} }
+    key = [asset_id, width]
+    return store[key] if store.key?(key)
+
+    store[key] = build_blurhash_jpeg_data_uri(asset_id, width)
+  end
+
+  # @param asset_id [String] The asset's ID.
+  # @param width [Integer] The JPEG's width in pixels.
+  # @return [String, nil] The data URI, or nil for a GIF or when encoding fails.
+  def build_blurhash_jpeg_data_uri(asset_id, width)
     content_type = get_asset_content_type(asset_id)
     return if content_type == 'image/gif'
 

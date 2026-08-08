@@ -394,7 +394,7 @@ RSpec.describe SiteHelpers do
   describe '#live_update_attrs' do
     it 'pins the exact attribute cluster the web↔api live-update contract requires' do
       attrs = live_update_attrs('/widgets/weather/current')
-      expect(attrs).to eq('data-controller="live-update" data-live-update-url-value="/widgets/weather/current" data-live-update-placeholder-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange"')
+      expect(attrs).to eq('data-controller="live-update" data-live-update-url-value="/widgets/weather/current" data-live-update-placeholder-value="true" aria-busy="true" data-action="visibilitychange@document->live-update#handleVisibilityChange"')
       expect(attrs).to be_html_safe
     end
 
@@ -491,6 +491,103 @@ RSpec.describe SiteHelpers do
       expect(plausible_installed?).to be(false)
       ENV['PLAUSIBLE_SCRIPT_URL'] = 'https://plausible.example/js/script.js'
       expect(plausible_installed?).to be(true)
+    end
+  end
+
+  # ⚠️ The static/dynamic split is a deploy-breaking invariant, not a formatting preference:
+  # Cloudflare's parser latches at the first dynamic rule and counts everything after it — exact
+  # matches included — against the 100-rule dynamic limit. It used to live in redirects.erb, where
+  # a template can't be tested.
+  describe '#partitioned_redirects' do
+    def taxonomy_synonym_redirects
+      [{ from: '/tagged/half-ironman', to: '/tagged/triathlon/ironman-703/', status: 301 }]
+    end
+
+    def data
+      OpenStruct.new(redirects: @redirects || [])
+    end
+
+    def redirect(from, to, status = 301)
+      OpenStruct.new(from: from, to: to, status: status)
+    end
+
+    it 'emits every exact-match rule before any splat or placeholder rule' do
+      @redirects = [
+        redirect('/old-splat/*', '/new/:splat'),
+        redirect('/exact-one', '/new-one'),
+        redirect('/with/:placeholder', '/other/:placeholder'),
+        redirect('/exact-two', '/new-two')
+      ]
+
+      static_rules, dynamic_rules = partitioned_redirects
+
+      expect(static_rules.map { |r| r[:from] }).to eq(['/tagged/half-ironman', '/exact-one', '/exact-two'])
+      expect(dynamic_rules.map { |r| r[:from] })
+        .to eq(['/.well-known/host-meta*', '/.well-known/webfinger*', '/old-splat/*', '/with/:placeholder'])
+    end
+
+    it 'counts the taxonomy synonym redirects as static' do
+      static_rules, _ = partitioned_redirects
+
+      expect(static_rules.map { |r| r[:from] }).to include('/tagged/half-ironman')
+    end
+
+    # Both are hard deploy failures (code 100324) that a Contentful entry could introduce.
+    it 'drops an absolute-URL source' do
+      @redirects = [redirect('https://old.example.com/post', '/post')]
+
+      expect(partitioned_redirects.flatten.map { |r| r[:from] }).not_to include('https://old.example.com/post')
+    end
+
+    it 'drops a 200 proxy rewrite pointing at an absolute URL' do
+      @redirects = [
+        redirect('/proxied', 'https://upstream.example.com/thing', 200),
+        redirect('/proxied-relative', '/thing', 200)
+      ]
+
+      froms = partitioned_redirects.flatten.map { |r| r[:from] }
+      expect(froms).not_to include('/proxied')
+      expect(froms).to include('/proxied-relative')
+    end
+  end
+
+  describe '#dynamic_redirect_source?' do
+    it 'is true for a splat or a :placeholder, false for an exact path' do
+      expect(dynamic_redirect_source?('/a/*')).to be(true)
+      expect(dynamic_redirect_source?('/a/:name')).to be(true)
+      expect(dynamic_redirect_source?('/a/b')).to be(false)
+      expect(dynamic_redirect_source?('/a/b.html')).to be(false)
+    end
+
+    # Deliberately over-broad: a colon followed by a letter counts wherever it appears, so a
+    # source that merely looks like a placeholder is classified as dynamic. Misclassifying one
+    # rule as dynamic is harmless; the reverse breaks the deploy.
+    it 'treats a mid-segment colon as a placeholder' do
+      expect(dynamic_redirect_source?('/a:b')).to be(true)
+    end
+  end
+
+  # Both were uncovered, and split(':') without a limit silently dropped the middle of a title
+  # carrying more than one colon.
+  describe '#feed_title and #feed_subtitle' do
+    def data = OpenStruct.new(site: OpenStruct.new(meta_title: @meta_title))
+
+    it 'splits the meta title on the first colon' do
+      @meta_title = 'Kona: A blog about triathlon'
+      expect(feed_title).to eq('Kona')
+      expect(feed_subtitle).to eq('A blog about triathlon')
+    end
+
+    it 'keeps every later colon in the subtitle' do
+      @meta_title = 'Kona: Swim: Bike: Run'
+      expect(feed_title).to eq('Kona')
+      expect(feed_subtitle).to eq('Swim: Bike: Run')
+    end
+
+    it 'has no subtitle when the title has no colon' do
+      @meta_title = 'Kona'
+      expect(feed_title).to eq('Kona')
+      expect(feed_subtitle).to be_nil
     end
   end
 end

@@ -57,6 +57,7 @@ jobs:
   checks:
     name: Checks
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     # Skipped on a Contentful publish (repository_dispatch) and a manual rebuild
     # (workflow_dispatch): both just rebuild the code already on main against current content, so
     # there's nothing new to test/lint/typecheck — and the code on main already passed checks when
@@ -127,6 +128,7 @@ jobs:
   security:
     name: Security scan
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # Same skip as `checks`: a content republish rebuilds code that already passed on push.
     if: github.event_name != 'repository_dispatch' && github.event_name != 'workflow_dispatch'
 
@@ -171,6 +173,7 @@ jobs:
   notify-checks:
     name: Notify checks result
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: [checks, security]
     # always() so a checks failure still notifies; skipped on the dispatch/manual triggers, where
     # checks didn't run.
@@ -210,6 +213,7 @@ jobs:
   deploy:
     name: Deploy Web
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [checks, security]
     concurrency: deploy-kona-web
     # Deploy on a push to main, a Contentful publish, or a manual rebuild; never on PRs or other
@@ -245,6 +249,10 @@ jobs:
         with:
           working-directory: web
           bundler-cache: true
+        # The production build needs none of the test toolchain; the Gemfile groups it so this
+        # can skip it, mirroring `npm ci --omit=dev` below.
+        env:
+          BUNDLE_WITHOUT: development:test
 
       # One of the slower steps here, though it moves a lot with the apt mirror: measured at 13s
       # and at 48s in `deploy` on different runs, against ~16s for the site build itself. That

@@ -9,7 +9,7 @@ const BACKGROUND_SELECTORS = ['#main-content', '.footer'];
 /** Toggles the navigation menu and keeps its trigger's ARIA state in sync. */
 export default class extends Controller {
   static classes = ['open'];
-  static targets = ['button'];
+  static targets = ['button', 'menu'];
   static values = {
     openAriaLabel: { type: String, default: 'Open menu' },
     closeAriaLabel: { type: String, default: 'Close menu' },
@@ -33,6 +33,19 @@ export default class extends Controller {
     document.body.style.top = `-${this.scrollY}px`;
     this.setBackgroundInert(true);
     this.updateButtonAttributes();
+    this.focusMenu();
+  }
+
+  /**
+   * Moves focus into the menu on open, and back to the trigger on close.
+   *
+   * ⚠️ Load-bearing, not a nicety: the list precedes its own trigger in the DOM, and everything
+   * after the trigger is inert while the menu is open — so without this, Tab from the button
+   * lands nowhere and the menu is only reachable by shift-tabbing backwards.
+   */
+  focusMenu() {
+    if (!this.hasMenuTarget) return;
+    this.menuTarget.querySelector('a, button')?.focus();
   }
 
   /**
@@ -48,6 +61,12 @@ export default class extends Controller {
     if (!wasOpen) return;
     document.body.style.top = '';
     window.scrollTo(0, this.scrollY ?? 0);
+
+    // Only when focus is still inside the nav — this also runs on turbo:before-cache and
+    // search:close, where stealing focus back to the hamburger would be wrong.
+    if (this.hasButtonTarget && this.element.contains(document.activeElement)) {
+      this.buttonTarget.focus();
+    }
   }
 
   /** Leaves no inert attributes or fixed body behind when the element goes away. */

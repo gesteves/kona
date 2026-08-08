@@ -17,25 +17,29 @@ module ArticleHelpers
   # All non-draft articles, newest first (data.articles is already sorted by publish date).
   # @return [Array<Object>]
   def published_articles
-    data.articles.reject(&:draft)
+    memoize_by_collection(:published_articles, data.articles) { data.articles.reject(&:draft) }
   end
 
   # All non-draft pages.
   # @return [Array<Object>]
   def published_pages
-    data.pages.reject(&:draft)
+    memoize_by_collection(:published_pages, data.pages) { data.pages.reject(&:draft) }
   end
 
   # Non-draft articles that may be indexed by search engines.
   # @return [Array<Object>]
   def indexable_articles
-    data.articles.reject { |a| a.draft || !a.index_in_search_engines }
+    memoize_by_collection(:indexable_articles, data.articles) do
+      data.articles.reject { |a| a.draft || !a.index_in_search_engines }
+    end
   end
 
   # Non-draft pages that may be indexed by search engines.
   # @return [Array<Object>]
   def indexable_pages
-    data.pages.reject { |p| p.draft || !p.index_in_search_engines }
+    memoize_by_collection(:indexable_pages, data.pages) do
+      data.pages.reject { |p| p.draft || !p.index_in_search_engines }
+    end
   end
 
   # An entry's publish date, parsed.
@@ -138,7 +142,12 @@ module ArticleHelpers
   #   when the entry isn't in the published sequence (e.g. a draft preview).
   def adjacent_articles(article)
     sequence = published_articles
-    index = sequence.index { |a| a.path == article.path }
+    # Indexed once per build rather than scanned per article page, which was quadratic.
+    positions = memoize_by_collection(:published_article_positions, data.articles) do
+      sequence.each_with_index.to_h { |a, i| [a.path, i] }
+    end
+
+    index = positions[article.path]
     return { newer: nil, older: nil } if index.nil?
 
     { newer: index.positive? ? sequence[index - 1] : nil, older: sequence[index + 1] }

@@ -1,7 +1,7 @@
 GIT
   remote: https://github.com/gesteves/blurhash
   revision: 8c7700513460f748596a43609bae3f12a6400974
-  branch: master
+  ref: 8c7700513460f748596a43609bae3f12a6400974
   specs:
     blurhash (0.1.8)
 

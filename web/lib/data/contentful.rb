@@ -322,10 +322,12 @@ class Contentful
   # @return [Array<String>] Every descendant concept id, walked depth-first.
   def descendant_ids(id, children)
     result = []
+    # Set, not Array#include?, which made the walk quadratic in the subtree size.
+    seen = Set.new
     stack = children[id].dup
     until stack.empty?
       cid = stack.pop
-      next if result.include?(cid)
+      next unless seen.add?(cid)
       result << cid
       stack.concat(children[cid])
     end
@@ -456,7 +458,7 @@ class Contentful
   def process_events
     @content[:events].map! do |event|
       if ENV['DEBUG_EVENT_DATE'].present?
-        days = ENV['DEBUG_EVENT_DATE'].to_i
+        days = Integer(ENV['DEBUG_EVENT_DATE'])
         event[:date] = days.days.from_now.to_s
       end
 
