@@ -1,4 +1,8 @@
 module ArticleHelpers
+  # Words per minute behind the "N minute read" estimate, when READING_TIME_WPM isn't a usable
+  # number.
+  DEFAULT_READING_TIME_WPM = 200
+
   # Whether an entry is a blog post (a full Article or a Short).
   # @param entry [Object] The entry to check.
   # @return [Boolean]
@@ -302,7 +306,11 @@ module ArticleHelpers
   # @param article [Object] The article.
   # @return [Integer] Reading time in minutes.
   def reading_time_minutes(article)
-    wpm = ENV.fetch('READING_TIME_WPM', 200).to_i
+    # ⚠️ Not ENV.fetch with a default: that only fires when the key is ABSENT, and a CI variable
+    # that isn't set interpolates to an empty string — present but blank. `''.to_i` is 0, and
+    # dividing by it raises FloatDomainError on every article page.
+    wpm = ENV['READING_TIME_WPM'].to_i
+    wpm = DEFAULT_READING_TIME_WPM unless wpm.positive?
     (article_word_count(article) / wpm.to_f).ceil
   end
 

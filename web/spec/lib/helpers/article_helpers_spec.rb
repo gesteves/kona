@@ -298,6 +298,20 @@ RSpec.describe ArticleHelpers do
     it 'is a single minute for a very short post' do
       expect(reading_time_minutes(article(slug: 'a', intro: 'so short'))).to eq(1)
     end
+
+    # ⚠️ An unset GitHub Actions variable interpolates to an EMPTY STRING, so the env key is
+    # present and blank — ENV.fetch's default never fires, `''.to_i` is 0, and the division
+    # raised FloatDomainError on every article page. That broke a production deploy; the build
+    # is the only thing that exercised it, since nothing else divides by this.
+    it 'falls back to the default rate when READING_TIME_WPM is present but unusable' do
+      a = article(slug: 'a', intro: (['word'] * 250).join(' '))
+      ['', '   ', 'abc', '0', '-5'].each do |value|
+        ENV['READING_TIME_WPM'] = value
+        expect(reading_time_minutes(a)).to eq(2), "expected the 200 wpm default for #{value.inspect}"
+      end
+    ensure
+      ENV.delete('READING_TIME_WPM')
+    end
   end
 
   describe '#reading_time' do
