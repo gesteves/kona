@@ -10,7 +10,6 @@
   box-sizing: border-box;
   display: flex;
   flex-flow: column;
-  height: 100vh;
   height: 100dvh;
   opacity: 0;
   padding: calc(var(--content-padding) * 3) var(--content-padding);
@@ -18,11 +17,14 @@
   transition: opacity var(--transition-duration) ease-in-out, visibility var(--transition-duration) ease-in-out;
   visibility: hidden;
   width: 100vw;
-  z-index: 2;
+  z-index: var(--z-nav-overlay);
 
+  // ⚠️ Prefix hand-written: Safari only unprefixed `backdrop-filter` in 18, and the second arm of
+  // the condition is what lets 16–17 in. Nothing prefixes it for us — see config.rb.
   @supports (backdrop-filter: none) or (-webkit-backdrop-filter: none) {
+    // stylelint-disable-next-line property-no-vendor-prefix
+    -webkit-backdrop-filter: blur(20px);
     backdrop-filter: blur(20px);
-    background-color: var(--color-nav-background);
   }
 
   .has-nav-open & {
@@ -77,16 +79,18 @@
   a:link,
   a:visited,
   button {
-    box-shadow: 0 2px 0 var(--color-border);
     color: var(--color-text);
+
+    @include nav-underline(var(--color-border));
   }
 
   a:hover,
   a:active,
   button:hover,
   button:active {
-    box-shadow: 0 2px 0 var(--color-link-hover);
     color: var(--color-link-hover);
+
+    @include nav-underline(var(--color-link-hover));
   }
 
   a:active,
@@ -95,7 +99,7 @@
   }
 
   a.current {
-    box-shadow: 0 2px 0 var(--color-link);
+    @include nav-underline(var(--color-link));
   }
 
   @include bp-nav {
@@ -128,7 +132,7 @@
     a:active,
     button:hover,
     button:active {
-      box-shadow: 0 2px 0 var(--color-link-hover);
+      @include nav-underline(var(--color-link-hover));
     }
   }
 }
@@ -143,16 +147,13 @@
   margin: 0;
   padding: 0;
   position: relative;
-  z-index: 3;
+  z-index: var(--z-above-overlay);
 
   svg {
     height: 1.5rem;
     width: 1.5rem;
 
-    path,
-    g {
-      fill: currentcolor;
-    }
+    @include svg-fill(currentcolor);
   }
 
   @include bp-nav {

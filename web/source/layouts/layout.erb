@@ -5,7 +5,8 @@
     <%= partial 'partials/skip' %>
     <div class="content">
       <%= partial 'partials/header' %>
-      <main class="content__main" id="main-content">
+      <%# tabindex="-1" so the skip link actually moves focus here, not just the scroll position. %>
+      <main class="content__main" id="main-content" tabindex="-1">
         <%= yield %>
       </main>
     </div>

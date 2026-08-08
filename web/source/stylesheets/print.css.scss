@@ -1,8 +1,13 @@
+// The trailing recirculation sections and the chrome. ⚠️ These are live-update widgets, so printing
+// before the swap would otherwise emit rows of blank skeleton boxes. Read Next has no id of its own.
 #header,
 #nav,
 #social-sharing,
 #you-may-also-like,
+#trending-articles,
+#notifications,
 #footer,
+.collection-group,
 .entry__heading-permalink {
   display: none;
 }
@@ -17,8 +22,7 @@ body,
 // right-hand columns.
 .entry__table {
   border-color: var(--color-text-tertiary);
-  margin-left: 0;
-  margin-right: 0;
+  margin-inline: 0;
   overflow: visible;
 
   &::part(content) {
@@ -54,10 +58,15 @@ body,
   }
 }
 
+// ⚠️ The caption's inset compensates for the figure's outdent on screen; with the outdent removed
+// it would print the image edge-to-edge and the caption inset by --picture-outdent.
 .entry__figure {
   break-inside: avoid;
-  margin-left: 0;
-  margin-right: 0;
+  margin-inline: 0;
+
+  figcaption {
+    margin-inline: 0;
+  }
 }
 
 .entry__body a {

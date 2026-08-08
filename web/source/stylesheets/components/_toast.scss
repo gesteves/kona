@@ -2,8 +2,10 @@
 // (stimulus/index.js), not its font tokens, and the toast stack renders in the top layer
 // where its shadow text inherits the document default (serif) rather than the site font.
 // `<wa-toast-item>` sets no font of its own, so setting the family on the host elements
-// makes it inherit into the item's shadow DOM. Imported unlayered (see site.css.scss) so
-// it beats Web Awesome's own shadow-DOM styles, and scoped to `:root …` to clear `:host`.
+// makes it inherit into the item's shadow DOM.
+// ⚠️ The `--wa-color-*` tokens remapped below live in Web Awesome's `@layer wa-theme`, and every
+// site layer already outranks every `wa-*` layer, so the unlayered import and the `:root ` prefix
+// are belt-and-braces rather than load-bearing (see the note in _skeleton.scss).
 
 :root wa-toast,
 :root wa-toast-item {

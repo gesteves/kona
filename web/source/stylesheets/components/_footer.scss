@@ -42,20 +42,17 @@
     font-style: italic;
   }
 
+  // ⚠️ 700, not 600: Lato ships 300/300i/700 here, so 600 already snaps to the 700 face.
   b,
   strong {
-    font-weight: 600;
+    font-weight: 700;
   }
 }
 
 .footer__wrapper {
-  box-sizing: border-box;
-  display: grid;
+  @extend %page-grid;
+
   gap: 1rem var(--column-gap);
-  grid-template-columns: repeat(12, 1fr);
-  max-width: var(--max-width-container);
-  padding: var(--content-padding);
-  width: 100%;
 }
 
 .footer__logo-link {
@@ -75,26 +72,7 @@
     width: 100%;
   }
 
-  &:link,
-  &:visited {
-    g,
-    path {
-      fill: var(--color-logo);
-    }
-  }
-
-  &:hover,
-  &:active {
-    g,
-    path {
-      fill: var(--color-logo-hover);
-    }
-  }
-
-  g,
-  path {
-    transition: fill var(--transition-duration);
-  }
+  @include logo-link-fill;
 }
 
 .footer__section {
@@ -132,11 +110,10 @@
 }
 
 .footer__social-item {
-  margin-right: 0.25rem;
+  margin-inline-end: 0.25rem;
 
   @include bp-medium {
-    margin-left: 0.25rem;
-    margin-right: 0;
+    margin-inline: 0.25rem 0;
   }
 
   a {
@@ -232,8 +209,9 @@
   a:active,
   button:hover,
   button:active {
-    box-shadow: 0 2px 0 var(--color-link-hover);
     color: var(--color-link-hover);
     text-decoration: none;
+
+    @include nav-underline(var(--color-link-hover));
   }
 }

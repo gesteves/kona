@@ -1,6 +1,11 @@
 // Silent placeholders for the shared typographic treatments, @extend-ed by the components
 // (entry, blog, home, stats, weather). Placeholders emit nothing on their own, so only the
 // extending selectors reach the compiled CSS.
+// ⚠️ Unlike components/_layout.scss, these emit into `@layer base` — `@extend` merges selectors at
+// the placeholder's DEFINITION site, and this file is imported inside that layer. So roughly half
+// the base layer is component CSS, and any components-layer rule beats what's declared here
+// regardless of specificity. Relied on in places; don't "fix" the layering without re-checking
+// every same-specificity pair across the boundary.
 %entry-header {
   h1,
   h2,
@@ -12,7 +17,7 @@
     text-wrap: pretty;
 
     a {
-      padding-right: 1px;
+      padding-inline-end: 1px;
     }
 
     a:link,
@@ -28,8 +33,13 @@
       text-decoration-thickness: 2px;
 
       @media screen {
+        // ⚠️ Prefix hand-written: the second arm of the condition is true in Chrome < 120, where
+        // only the prefixed property clips. Without it that branch sets `color: transparent` with
+        // no clip and the heading turns invisible. Nothing prefixes it for us — see config.rb.
         @supports (background-clip: text) or (-webkit-background-clip: text) {
           background: var(--gradient-link);
+          // stylelint-disable-next-line property-no-vendor-prefix
+          -webkit-background-clip: text;
           background-clip: text;
           color: transparent;
           text-decoration-color: var(--color-link);
@@ -119,8 +129,10 @@
   ul {
     margin-inline: 1rem;
 
+    // ⚠️ `margin-inline`, not `margin` — the shorthand also zeroed the 1.5rem block rhythm set
+    // above. Only the indent should drop here; the ol markers move to -2rem to compensate.
     @include bp-medium {
-      margin: 0;
+      margin-inline: 0;
     }
   }
 
@@ -250,6 +262,8 @@
   }
 
   pre {
+    overflow-x: auto;
+
     code {
       font-family: var(--ibm-plex-mono);
       font-size: var(--font-x-small);
@@ -305,7 +319,9 @@
     text-decoration-color: currentcolor;
   }
 
-  a:focus {
+  // Deliberately :focus-visible — on :focus this also strips the underline for mouse users,
+  // and the underline is a body link's only affordance (the color is currentcolor).
+  a:focus-visible {
     text-decoration: none;
   }
 
@@ -401,8 +417,11 @@
   padding-bottom: 1rem;
 
   @media screen {
+    // ⚠️ Prefix hand-written — see the note on %entry-header above.
     @supports (background-clip: text) or (-webkit-background-clip: text) {
       background: var(--gradient-heading);
+      // stylelint-disable-next-line property-no-vendor-prefix
+      -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
     }
@@ -410,8 +429,8 @@
     @include text-box-trim-supported {
       margin: 1rem 0;
       padding: 1rem 0;
-      text-box-edge: cap alphabetic;
-      text-box-trim: trim-both;
+
+      @include text-box(cap alphabetic);
     }
   }
 }

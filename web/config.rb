@@ -22,10 +22,11 @@ activate :external_pipeline,
 
 # `activate :gzip` is deliberately off: Cloudflare compresses responses itself, so the .gz
 # siblings are never served and only add ~110 files to the Worker asset upload.
+# ⚠️ Autoprefixer is deliberately not activated. Its caniuse dataset is frozen at Safari 15.4, so
+# every browserslist query is either wrong (targets 2022, emitting IE 11 `-ms-grid-*` into a subgrid
+# layout) or inert (matches no known version). Only two prefixes still matter; both are hand-written
+# beside the `@supports` condition that names them — see _nav.scss and base/_extends.scss.
 activate :dotenv
-activate :autoprefixer do |config|
-  config.browsers = [ 'last 1 version', 'last 3 safari versions', 'last 3 ios versions' ]
-end
 activate :asset_hash
 activate :directory_indexes
 

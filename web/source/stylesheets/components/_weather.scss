@@ -24,10 +24,7 @@
   }
 
   svg {
-    g,
-    path {
-      fill: var(--color-heading);
-    }
+    @include svg-fill(var(--color-heading));
   }
 }
 
@@ -46,9 +43,9 @@
 
   p {
     margin: 0;
-    text-box-edge: cap text;
-    text-box-trim: trim-both;
     text-wrap: pretty;
+
+    @include text-box(cap text);
   }
 
   p > span::after {
@@ -66,43 +63,35 @@
   color: var(--color-text-secondary);
   display: inline-flex;
   flex-flow: row nowrap;
-  font-family: var(--ibm-plex-mono);
-  font-size: var(--font-x-small);
-  line-height: var(--line-height-x-small);
-  margin-right: 1rem;
-  text-transform: uppercase;
+  margin-inline-end: 1rem;
+
+  @include meta-label;
 
   &:link, &:visited {
     color: var(--color-text-secondary);
     text-decoration: none;
 
-    g,
-    path {
-      fill: var(--color-text-tertiary);
-    }
+    @include svg-fill(var(--color-text-tertiary));
   }
 
   &:hover, &:active {
     color: var(--color-link-hover);
     text-decoration: none;
 
-    g,
-    path {
-      fill: var(--color-link-hover);
-    }
+    @include svg-fill(var(--color-link-hover));
   }
 
-  &:focus {
+  &:focus-visible {
     text-decoration: none;
   }
 
   &:last-of-type {
-    margin-right: 0;
+    margin-inline-end: 0;
   }
 
   svg {
     display: inline-block;
-    margin-right: 0.25rem;
+    margin-inline-end: 0.25rem;
     vertical-align: middle;
     width: 1rem;
   }

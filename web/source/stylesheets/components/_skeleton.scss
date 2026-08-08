@@ -1,15 +1,10 @@
-// Loading skeletons for the live-update widgets (Web Awesome `<wa-skeleton>`).
-// We cherry-pick only the skeleton component (stimulus/index.js), so Web Awesome's
-// theme tokens aren't loaded: the component's `:host` rule defaults `--color` to an
-// undefined `--wa-*` token, which leaves the indicator transparent (invisible).
-// We override `--color` / `--sheen-color` with the site's placeholder colors.
-// Two cascade gotchas this file works around, so the overrides actually win:
-//   1. The component's `:host` rules have specificity (0,1,0). A bare `wa-skeleton`
-//      selector (0,0,1) loses to them, so every rule here is prefixed/scoped to reach
-//      at least (0,1,1).
-//   2. The shadow-DOM `:host` styles are unlayered; unlayered beats layered. So this
-//      partial is imported OUTSIDE the cascade layers (see site.css.scss).
-// Placeholders below stay local to this file so the generated rules remain unlayered.
+// Loading skeletons for the live-update widgets (Web Awesome `<wa-skeleton>`), remapped from
+// Web Awesome's `--wa-*` defaults to the site's placeholder colors.
+// ⚠️ These overrides win because of ENCAPSULATION CONTEXT, not specificity or layers: per CSS
+// Cascade 5 §6.1 the context is compared before both, and for normal declarations the outer
+// (document) context beats a shadow-tree `:host` rule whatever its specificity or layer. The
+// `:root ` prefixes and the unlayered import in site.css.scss are therefore belt-and-braces here —
+// they'd only matter against an `!important` in the shadow tree, which reverses the context rule.
 
 // Inline meta skeletons: a single short line at the eyebrow/footer font size, sized to
 // sit on one text line. Width is set per use; everything else is shared.
@@ -37,10 +32,22 @@
 :root wa-skeleton {
   --color: var(--color-placeholder);
   --sheen-color: color-mix(in oklab, var(--color-placeholder), var(--color-background));
+
+  // ⚠️ The component's `:host` sets `min-height: 1rem`, which floors every `height: 1cap` below and
+  // makes the placeholder taller than the text it reserves space for — the layout shift it exists
+  // to prevent.
+  min-height: 0;
 }
 
 :root wa-skeleton::part(indicator) {
   border-radius: 0.25rem;
+}
+
+// ⚠️ `effect="sheen"` animates forever and Web Awesome ships no reduced-motion handling for it.
+@include reduced-motion {
+  :root wa-skeleton::part(indicator) {
+    animation: none;
+  }
 }
 
 // Stat cards (Activity Stats, Whoop): reuse the real `.stats__stat` markup so each
@@ -50,7 +57,7 @@
   .stats__number wa-skeleton {
     display: inline-flex;
     height: 1cap;
-    vertical-align: center;
+    vertical-align: middle;
   }
 
   .stats__meta wa-skeleton {

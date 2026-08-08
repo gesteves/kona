@@ -66,15 +66,12 @@
 .stats__heading,
 .stats__footer {
   color: var(--color-text-secondary);
-  font-family: var(--ibm-plex-mono);
-  font-size: var(--font-x-small);
   font-weight: normal;
-  line-height: var(--line-height-x-small);
   text-align: center;
-  text-box-edge: text;
-  text-box-trim: trim-both;
-  text-transform: uppercase;
   white-space: nowrap;
+
+  @include meta-label;
+  @include text-box;
 
   i {
     font-style: italic;
@@ -95,10 +92,7 @@
       color: var(--color-link);
       text-decoration: none;
 
-      g,
-      path {
-        fill: var(--color-link);
-      }
+      @include svg-fill(var(--color-link));
     }
   }
 

@@ -1,7 +1,6 @@
 html {
   background-color: var(--color-background);
   color: var(--color-text);
-  min-height: 100vh;
   min-height: 100dvh;
 }
 
@@ -10,7 +9,6 @@ body {
   display: flex;
   flex-flow: column;
   justify-content: space-between;
-  min-height: 100vh;
   min-height: 100dvh;
 
   // Fixing the body is what stops the page behind the menu from scrolling. It collapses the

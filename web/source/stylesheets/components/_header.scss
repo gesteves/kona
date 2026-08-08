@@ -21,26 +21,7 @@
   text-decoration: none;
   width: 180px;
 
-  &:link,
-  &:visited {
-    g,
-    path {
-      fill: var(--color-logo);
-    }
-  }
-
-  &:hover,
-  &:active {
-    g,
-    path {
-      fill: var(--color-logo-hover);
-    }
-  }
-
-  g,
-  path {
-    transition: fill var(--transition-duration);
-  }
+  @include logo-link-fill;
 
   @include bp-nav {
     width: auto;

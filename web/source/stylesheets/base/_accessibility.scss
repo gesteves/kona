@@ -15,11 +15,18 @@
   transform: translateY(-100%);
   transition: transform var(--transition-duration);
   width: 100vw;
-  z-index: 3;
+  z-index: var(--z-above-overlay);
 
   &:focus {
     transform: translateY(0%);
   }
+}
+
+// The skip link's target is focusable only so activating it moves focus, not just the scroll
+// position. It isn't a control, so it doesn't take the focus ring — which would otherwise outline
+// the whole main region.
+.content__main:focus-visible {
+  outline: none;
 }
 
 .sr-only:not(:focus, :active) {
@@ -46,5 +53,11 @@
   ::view-transition-old(root),
   ::view-transition-new(root) {
     animation-duration: 0s;
+  }
+
+  // ⚠️ <wa-scroller> hardcodes `scroll-behavior: smooth` on its shadow scroll container and ships
+  // no reduced-motion handling. Covers the share row, the footer socials and entry tables.
+  wa-scroller::part(content) {
+    scroll-behavior: auto;
   }
 }

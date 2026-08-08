@@ -32,7 +32,6 @@
   --color-platinum:       #EBEBEB;
   --color-gainsboro:      #E0E0E0;
   --color-silver-chalice: #ADADAD;
-  --color-spanish-gray:   #999;
   --color-sonic-silver:   #7A7A7A;
   --color-dim-gray:       #757575; // 4.61:1 on white — the lightest gray AA allows for body text
   --color-granite-gray:   #666;
@@ -127,8 +126,12 @@
   // Other
   --transition-duration: 250ms;
   --picture-outdent:     var(--content-padding);
-  --avatar-size:         48px;
   --light-icon-size:     0.8rem;
+
+  // Stacking order for the two overlays that can coexist: the open nav panel, and anything that
+  // must sit above it (the hamburger that closes it, the skip link, sticky table columns).
+  --z-nav-overlay:   2;
+  --z-above-overlay: 3;
 
   @include bp-medium {
     --column-gap:          2rem;
@@ -152,9 +155,10 @@
   }
 
   @include dark-mode {
-    // ⚠️ --color-link / --color-link-hover / --color-accent are deliberately NOT remapped here.
-    // #BF0222 is the brand red and measures 3.25:1 on black; that's a knowingly accepted hit, not
-    // an oversight. Don't "fix" it by lightening the red.
+    // ⚠️ --color-link / --color-link-hover / --color-accent / --gradient-link are deliberately NOT
+    // remapped here. #BF0222 is the brand red and measures 3.25:1 on black, and the hover #DE0227
+    // measures 4.14:1; both are knowingly accepted hits, not oversights. Don't "fix" them by
+    // lightening the red.
     --color-aside-background:           var(--color-rich-black-darker);
     --color-aside-border:               var(--color-oxford-blue);
     --color-aside-text:                 var(--color-alice-blue);

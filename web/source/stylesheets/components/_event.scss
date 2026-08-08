@@ -13,8 +13,6 @@
   display: flex;
   flex-flow: column;
   grid-column: 1 / -1;
-  text-box-edge: text;
-  text-box-trim: trim-both;
   text-transform: uppercase;
 
   @include light-icon;
@@ -65,5 +63,5 @@
 }
 
 .event__weather-wind-direction svg {
-  transform: rotate(calc(var(--wind-direction) * 1deg));
+  transform: rotate(calc(var(--wind-direction, 0) * 1deg));
 }

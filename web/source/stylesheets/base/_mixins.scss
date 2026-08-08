@@ -61,6 +61,14 @@
   }
 }
 
+// Recolors an inline SVG. Both element names are needed: the icon set nests paths in groups.
+@mixin svg-fill($fill) {
+  g,
+  path {
+    fill: $fill;
+  }
+}
+
 // The inline "light icon" treatment shared by the metadata rows (entry meta, stats,
 // event weather, buttons): an SVG sized to --light-icon-size and aligned to the text.
 @mixin light-icon($fill: var(--color-text-tertiary)) {
@@ -70,9 +78,62 @@
     vertical-align: text-bottom;
     width: var(--light-icon-size);
 
-    g,
-    path {
-      fill: $fill;
+    @include svg-fill($fill);
+  }
+}
+
+// The uppercase mono voice shared by every metadata row and label.
+@mixin meta-label {
+  font-family: var(--ibm-plex-mono);
+  font-size: var(--font-x-small);
+  line-height: var(--line-height-x-small);
+  text-transform: uppercase;
+}
+
+// Optical trimming of a text block's leading/trailing half-leading.
+@mixin text-box($edge: text) {
+  text-box-edge: $edge;
+  text-box-trim: trim-both;
+}
+
+// A logo link whose SVG picks up the hover color.
+@mixin logo-link-fill {
+  &:link,
+  &:visited {
+    @include svg-fill(var(--color-logo));
+  }
+
+  &:hover,
+  &:active {
+    @include svg-fill(var(--color-logo-hover));
+  }
+
+  g,
+  path {
+    transition: fill var(--transition-duration);
+  }
+}
+
+// The underline that marks a nav/footer menu link.
+@mixin nav-underline($color) {
+  box-shadow: 0 2px 0 $color;
+}
+
+// The rule + centered-at-medium treatment shared by the section headers.
+@mixin section-rule {
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--padding);
+  padding-bottom: var(--padding);
+}
+
+@mixin section-rule-header {
+  @include section-rule;
+
+  @include bp-medium {
+    text-align: center;
+
+    .entry__meta {
+      justify-content: center;
     }
   }
 }

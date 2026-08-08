@@ -1,24 +1,12 @@
 .blog {
   @extend %centered-column;
 
-  gap: var(--row-gap) var(--column-gap);
   width: 100%;
 }
 
 .blog__header {
   @extend %entry-header;
-
-  border-bottom: 1px solid var(--color-border);
-  margin-bottom: var(--padding);
-  padding-bottom: var(--padding);
-
-  @include bp-medium {
-    text-align: center;
-
-    .entry__meta {
-      justify-content: center;
-    }
-  }
+  @include section-rule-header;
 
   .blog__hed {
     @extend %heading-gradient;
@@ -38,15 +26,10 @@
 // clearly separated from the entry list.
 .blog__description {
   @extend %body-styles;
-
-  border-bottom: 1px solid var(--color-border);
-  margin-bottom: var(--padding);
-  padding-bottom: var(--padding);
+  @include section-rule;
 }
 
 .blog__list-item {
-  grid-column: 1 / -1;
-
   &:last-of-type {
     margin-bottom: 0;
   }
