@@ -237,6 +237,14 @@ jobs:
       run:
         working-directory: web
 
+    # The production build needs none of the test toolchain; the Gemfile groups it so this can
+    # skip it, mirroring `npm ci --omit=dev` below.
+    # ⚠️ Job-level, NOT on the setup-ruby step. Scoped to that step it only skips the *install*;
+    # `bundle exec rake build` further down then materializes the full lockfile, doesn't find the
+    # gems that were never installed, and fails the deploy with Bundler::GemNotFound.
+    env:
+      BUNDLE_WITHOUT: development:test
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -249,10 +257,6 @@ jobs:
         with:
           working-directory: web
           bundler-cache: true
-        # The production build needs none of the test toolchain; the Gemfile groups it so this
-        # can skip it, mirroring `npm ci --omit=dev` below.
-        env:
-          BUNDLE_WITHOUT: development:test
 
       # One of the slower steps here, though it moves a lot with the apt mirror: measured at 13s
       # and at 48s in `deploy` on different runs, against ~16s for the site build itself. That
