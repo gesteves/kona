@@ -17,7 +17,14 @@ import globals from 'globals';
 // eslint-config-prettier isn't needed.
 export default [
   {
-    ignores: ['build/**', 'tmp/**', 'node_modules/**'],
+    // ⚠️ `vendor/**` is load-bearing in CI and invisible locally: `bundler-cache: true` installs
+    // gems into web/vendor/bundle/, and several ship .js (execjs runners, autoprefixer, Middleman's
+    // jQuery fixtures) that isn't valid modern module syntax. ESLint lints every file it walks
+    // into, including ones matching no `files:` block below, so without this the step fails on
+    // other people's code. A local rbenv install puts gems outside the repo, so `eslint .` looks
+    // clean here either way — hence the explicit paths in the `lint:js` script as well.
+    // `.prettierignore` excludes `**/vendor/**` for the same reason; keep the two in step.
+    ignores: ['build/**', 'tmp/**', 'node_modules/**', 'vendor/**'],
   },
   {
     files: ['source/javascripts/**/*.js'],
