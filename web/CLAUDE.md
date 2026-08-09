@@ -30,7 +30,8 @@ npm run check                         # tsc --noEmit: src/ (tsconfig.json) then 
 
 # Local dev — see "The two local loops" below
 bundle exec rake import               # fetch fresh data first
-bundle exec middleman                 # :4567, templates/CSS/JS, no Worker routes
+overmind start                        # from the repo root: :4567 + the api on :3000
+bundle exec middleman                 # :4567 alone, against the deployed api
 bundle exec rake build:fast           # rebuild build/ from existing data/, no import
 npx wrangler dev                      # :8787, the Worker, serving build/
 
@@ -56,7 +57,12 @@ Neither one is the whole site; pick by what you're editing.
 |---|---|---|
 | Serves | `source/`, re-rendered per request | `build/`, as deployed |
 | Reflects an edit | on reload | only after a rebuild |
-| `/widgets/*`, `/api/contact`, `/pa/*`, OG cards | ✗ — no Worker, so widgets collapse | ✓ |
+| `/widgets/*`, `POST /api/contact` | ✓ via `lib/utils/dev_api_proxy.rb` | ✓ the real Worker |
+| `/pa/*`, OG cards | ✗ | ✓ |
+
+Widget **markup** can therefore be developed on :4567; what still needs :8787 is Worker code
+itself, the Plausible proxy, and the cards. Root [`CLAUDE.md`](../CLAUDE.md) covers the proxy and
+`overmind start`.
 
 So Worker work, widget markup, and OG cards mean `rake build:fast` → `npx wrangler dev`, and
 another `build:fast` after every source change. `build:fast` skips `import`, which `rake build`

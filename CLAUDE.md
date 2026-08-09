@@ -47,6 +47,48 @@ the checks that exist (today: `utilities/maps/`'s rspec suite) without deploying
   `spec/epa_aqi_check.rb` pins it with golden vectors — computed from the **published equation**,
   not from either implementation, so a shared bug can't pass. `utilities.yml` runs it.
 
+## Local development
+
+Two commands, and **which one you run is the choice of API target** — there is deliberately no flag:
+
+```bash
+overmind start                    # web :4567 + api :3000, site → the local api
+cd web && bundle exec middleman   # web only, site → the deployed api
+```
+
+`overmind` is a prerequisite (`brew install overmind`; it pulls in tmux). It reads `Procfile.dev`
+and `.overmind.env`, and child processes inherit the latter's `KONA_API_URL`/`SITE_URL`. Since
+dotenv never overwrites an already-set variable, that's the whole mechanism — and it's why the
+plain `middleman` command still reaches production off `web/.env`. `overmind restart web` restarts
+one process; `overmind connect api` attaches a real TTY, so `binding.break` works. Sidekiq is
+opt-in (`overmind start -l web,api,worker`): no widget endpoint enqueues a job.
+
+Ports: 4567 Middleman, 3000 Rails, 8787 `wrangler dev`, 6379 Redis. The api logs to
+`api/log/development.log`, **not** to its overmind pane.
+
+Two transients that look like bugs and aren't:
+
+- `overmind kill` can leave `.overmind.sock` behind, and the next `overmind start` then refuses
+  with "it looks like Overmind is already running". Delete the socket. Ctrl-C or `overmind quit`
+  exits cleanly instead.
+- A burst of `ActionController::RoutingError`s on the api's **first** page load, self-healing on
+  refresh. `routes.rb` ends in a `*unmatched` catch-all, so once routes are loaded nothing can
+  raise this — it means the route set was momentarily empty. Rails dev has
+  `enable_reloading = true` / `eager_load = false`, so the first request redraws the routes while
+  Puma's other two threads are already serving the rest of the page's five widget fetches. It is
+  a dev-mode reload race, not the proxy.
+
+⚠️ `Procfile.dev` pins `PORT=3000` for the api. Overmind injects a Heroku-style `PORT` per process
+(5000, then +100 each) and `api/config/puma.rb` reads it, so without the pin the api comes up on
+5100 and every widget 502s against a `KONA_API_URL` that looks correct.
+
+⚠️ `/widgets/*` and `POST /api/contact` reach `middleman server` through
+`web/lib/utils/dev_api_proxy.rb`, a dev-only Rack middleware — the static site has no page behind
+those paths, so without it every widget collapses locally. It is **not** a port of
+`web/src/api-proxy.ts` and must not become one: that file's invariants exist to make one shared
+edge cache entry safe for many viewers, and there is no edge here. `/pa/*` and the OG cards are
+deliberately not proxied; they need `wrangler dev` (see [`web/CLAUDE.md`](web/CLAUDE.md)).
+
 ## Duplicated across the two apps
 
 Beyond the aqi-map copy above, five helpers exist in both `api/` and `web/` because they render

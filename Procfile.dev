@@ -1,0 +1,11 @@
+## Local development. Run with `overmind start` (see the root CLAUDE.md).
+##
+## `wrangler dev` is deliberately absent: it serves web/build/, not web/source/, so running it
+## alongside Middleman would sit a silently-stale second URL next to the live one. It stays its
+## own loop — `rake build:fast` then `npx wrangler dev` — for Worker code and OG cards.
+## ⚠️ PORT is pinned because overmind injects a Heroku-style one per process (5000, then +100
+## each), and api/config/puma.rb reads ENV["PORT"] — so without this the api silently comes up on
+## 5100 and every widget 502s against the KONA_API_URL below.
+web:    cd web && bundle exec middleman
+api:    cd api && PORT=3000 bin/dev
+worker: cd api && bundle exec sidekiq -C config/sidekiq.yml

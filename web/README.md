@@ -32,7 +32,11 @@ Requirements: Ruby and Node.
 4. Start the local server: `bundle exec middleman` (it runs the esbuild watcher itself, so JS/CSS rebuild on change automatically).
 5. To refresh data without a full rebuild: `bundle exec rake import`.
 
-The dynamic routes (`/widgets/*`, `POST /api/contact`, `/pa/*`) and the on-demand Open Graph cards are Worker code, so they don't run under `middleman server` — the widgets simply collapse. To exercise them, run the Worker instead:
+`/widgets/*` and `POST /api/contact` are Worker routes with no page behind them, so `lib/utils/dev_api_proxy.rb` — a dev-only Rack middleware — forwards them to `KONA_API_URL` with the bearer injected. Without it every widget would collapse. It runs only under `middleman server`, never in a build.
+
+To run the site against a local [`api/`](../api/README.md) instead of the deployed one, use `overmind start` from the repo root; see the root [`CLAUDE.md`](../CLAUDE.md).
+
+The remaining Worker routes — `/pa/*` and the on-demand Open Graph cards — still need the real Worker:
 
 ```sh
 bundle exec rake build:fast   # rebuild build/ from the data already imported

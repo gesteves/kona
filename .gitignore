@@ -1,1 +1,4 @@
 .DS_Store
+
+# Overmind's control socket, created by `overmind start`
+.overmind.sock

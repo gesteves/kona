@@ -63,6 +63,11 @@ page "/.well-known/site.standard.publication", layout: false, directory_index: f
 
 configure :development do
   activate :relative_assets
+
+  # /widgets/* and /api/contact are Worker routes in production, so the dev server has no page
+  # behind them and every widget collapses. This stands in for the Worker's proxy.
+  require_relative "lib/utils/dev_api_proxy"
+  use DevApiProxy
 end
 
 configure :production do
