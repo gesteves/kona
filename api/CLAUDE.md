@@ -13,6 +13,14 @@ Routes split by namespace: `/widgets/*` (HTML fragments, reached through the web
 `/api/*` (structured data, hit directly at the origin), `/webhooks/*` (inbound, hit directly by
 the sending service).
 
+The origin answers on **two hostnames**, and the split is enforced in `config/routes.rb`: `API_HOST`
+names the public one, and the owner-facing routes are drawn only off the *other* one (the admin
+host), so the public host serves nothing but `/up` and those three namespaces. ⚠️ **A new
+owner-facing route must go inside that `constraints` block** — the zone's bot-protection skip rule
+is scoped to "every host except the admin one", so a route drawn outside it is reachable on the
+public host with managed rules and Super Bot Fight Mode skipped.
+`spec/requests/host_constraints_spec.rb` pins both directions.
+
 ## Endpoints
 
 All `/widgets/*` responses are HTML fragments (`layout false`). Edge TTL = how long the edge serves
@@ -39,6 +47,9 @@ a cached copy before revalidating.
 | GET | `/login`, `/auth/google_oauth2/callback`; POST `/logout` | owner session | — |
 | — | `/sidekiq` | job dashboard (owner-session gated) | — |
 | GET | `/` | 301 → main site | — |
+
+The Whoop OAuth, owner session, and `/sidekiq` rows are **admin-host only** wherever `API_HOST` is
+set; everything else, `/` included, answers on both hostnames.
 
 ## Architecture
 
@@ -296,7 +307,9 @@ Rails `config/credentials.yml.enc` + `master.key`).
   `claude-sonnet-5`), `PURPLEAIR_API_KEY`, `LOCATION`, `TIME_ZONE`, `BLUESKY_HANDLE`,
   `BLUESKY_APP_PASSWORD`, `BLUESKY_PDS_URL`, `BUGSNAG_API_KEY` (production only), `ALLOWED_HOSTS`
   (comma-separated `Host` allowlist; production only, unset = all hosts accepted, so it's safe to
-  deploy before setting it; `/up` is always exempt), `R2_ACCOUNT_ID` + `R2_ACCESS_KEY_ID` +
+  deploy before setting it; `/up` is always exempt), `API_HOST` (the public API hostname; unset =
+  every route drawn on every host, so dev/CI are unaffected — ⚠️ move `WHOOP_REDIRECT_URI` to the
+  admin host before setting it), `R2_ACCOUNT_ID` + `R2_ACCESS_KEY_ID` +
   `R2_SECRET_ACCESS_KEY` + `R2_BUCKET` (⚠️ must be the bucket behind the web app's `IMAGE_HOST`;
   nothing validates that, and a mismatch 404s every image), `GITHUB_DISPATCH_TOKEN` +
   `GITHUB_REPOSITORY` (a fine-grained PAT with **Contents: Read and write**, plus the `owner/repo`

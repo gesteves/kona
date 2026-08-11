@@ -57,19 +57,38 @@ Rails.application.routes.draw do
     post "whoop" => "whoop#create"
   end
 
-  # Whoop OAuth flow (owner-only authorize, public callback validated by state).
-  get "/whoop/auth" => "whoop_oauth#authorize"
-  get "/whoop/callback" => "whoop_oauth#callback"
+  # Everything below is owner-facing, and is drawn only off the public API hostname. `API_HOST`
+  # names that hostname; where it's set these paths fall through to the 404 catch-all there, so
+  # the public host serves nothing but `/up` and the three machine namespaces above. Unset (dev,
+  # CI, the .fly.dev origin) draws them on every host.
+  #
+  # ⚠️ The zone's bot-protection skip rule is scoped to "every host except the admin one", which
+  # is only safe because of this constraint — a route drawn outside this block is reachable on
+  # the public host with managed rules and Super Bot Fight Mode skipped. Enforced by
+  # spec/requests/host_constraints_spec.rb.
+  admin_only = lambda do |request|
+    api_host = ENV["API_HOST"].presence
+    api_host.nil? || !request.host.casecmp?(api_host)
+  end
 
-  # Owner authentication: Google OAuth restricted to OWNER_EMAIL. The OmniAuth request phase is
-  # handled by middleware before routing, so only these four need routes.
-  get  "/login" => "sessions#new"
-  post "/logout" => "sessions#destroy"
-  get  "/auth/google_oauth2/callback" => "sessions#create"
-  get  "/auth/failure" => "sessions#failure"
+  constraints(admin_only) do
+    # Whoop OAuth flow (owner-only authorize, public callback validated by state).
+    # ⚠️ WHOOP_REDIRECT_URI and the Whoop dashboard must name the admin host, not the API host.
+    get "/whoop/auth" => "whoop_oauth#authorize"
+    get "/whoop/callback" => "whoop_oauth#callback"
 
-  # Gated by the owner session, via the Rack guard in config/initializers/sidekiq.rb.
-  mount Sidekiq::Web => "/sidekiq"
+    # Owner authentication: Google OAuth restricted to OWNER_EMAIL. The OmniAuth request phase is
+    # handled by middleware before routing, so only these four need routes — and for the same
+    # reason it stays reachable on the API host, where the callback below no longer is, so a
+    # sign-in can't complete there.
+    get  "/login" => "sessions#new"
+    post "/logout" => "sessions#destroy"
+    get  "/auth/google_oauth2/callback" => "sessions#create"
+    get  "/auth/failure" => "sessions#failure"
+
+    # Gated by the owner session, via the Rack guard in config/initializers/sidekiq.rb.
+    mount Sidekiq::Web => "/sidekiq"
+  end
 
   # Evaluated per-request, so it tracks SITE_URL rather than baking in a host.
   root to: redirect(status: 301) { "#{ENV['SITE_URL'].to_s.chomp('/')}/" }

@@ -131,12 +131,15 @@ enforces that assumption.
 ## Production domains — never hardcode
 
 ⚠️ **Never hardcode the production hostnames anywhere** — code, comments, docs, examples, tests,
-CI config. This covers the public site host, the API/admin host, and the fly.io origin host. They
-come from configuration:
+CI config. This covers the public site host, the public API host, the admin host, and the fly.io
+origin host. They come from configuration:
 
 - API origin: `KONA_API_URL` (web build, `/widgets/*` proxy, api's CI Slack link).
+- Public API host: `API_HOST` (api — the route constraint that keeps the owner-facing routes off
+  it; host only, no scheme).
 - Site URL: `URL` (web), `SITE_URL` (api).
-- Whoop redirect: `WHOOP_REDIRECT_URI`.
+- Whoop redirect: `WHOOP_REDIRECT_URI` (⚠️ must name the **admin** host — the callback route
+  doesn't exist on the public API host).
 
 Where a placeholder is genuinely needed, use `https://<your-app-host>/…`.
 
@@ -278,7 +281,7 @@ tick "All remaining custom rules":
 | 1 | Abusive Linux crawler with fake Google referrer | desktop-Linux Chrome UA + `google.com` referer | Block |
 | 2 | Block scanner noise | path families no host in the zone serves (see below) | Block |
 | 3 | Block access to original images | `http.host eq "<image host>" and not any(http.request.headers["via"][*] contains "image-resizing")` | Block |
-| 4 | Skip bot protection for public paths | `(http.host in {"<site host>" "<image host>"}) or (http.host eq "<api host>" and (starts_with(http.request.uri.path, "/api/") or starts_with(http.request.uri.path, "/widgets/") or starts_with(http.request.uri.path, "/webhooks/")))` | Skip → all managed rules **and** all SBFM rules |
+| 4 | Skip bot protection off the admin host | `http.host ne "<admin host>"` | Skip → all managed rules **and** all SBFM rules |
 
 **Rule 1** is knowingly over-broad: those conditions also match a real person on desktop Linux
 clicking a Google result, and blocking them is an accepted cost. The bot gets through managed,
@@ -318,7 +321,20 @@ site host takes an arbitrary width, so `/cdn-cgi/image/width=7728/<source>` retu
 render. The only thing that would bound the maximum obtainable resolution is **capping the stored
 master** (mirroring `?w=2560` instead of the original).
 
-**Rule 4** — what each branch carries:
+**Rule 4** is one condition rather than a per-host path allowlist because **the api app enforces
+the split itself**: `API_HOST` in `api/config/routes.rb` draws the owner-facing routes (`/login`,
+`/logout`, `/auth/*`, `/whoop/auth`, `/whoop/callback`, `/sidekiq`) only off the admin host, so the
+public api host answers nothing but `/up` and the three machine namespaces.
+
+⚠️ **That route constraint is the whole reason this rule is safe.** An owner-facing route drawn
+outside it lands on a host where managed rules and SBFM are skipped, and nothing in the zone would
+notice. `api/spec/requests/host_constraints_spec.rb` pins both directions.
+
+⚠️ **It's a denylist, so any hostname added to the zone is unprotected by default** — a staging
+subdomain, a second origin, a new service. The earlier allowlist form failed in the opposite and
+much louder direction. Name new hosts here deliberately.
+
+Why the skip is needed at all, host by host:
 
 - **Site host** — SBFM was blocking **feed readers and Open Graph scrapers**. "Verified bots:
   Allow" covers Googlebot/Bingbot but not Slack/Mastodon/Discord unfurlers or RSS clients, which
@@ -330,12 +346,17 @@ master** (mirroring `?w=2560` instead of the original).
   those out.
 - **Image host** — the source fetch has no browser fingerprint at all, the textbook "definitely
   automated" verdict, so SBFM would collapse every image at once.
-- **api host's machine namespaces** — `web/src/api-proxy.ts` sends only an `authorization` header,
+- **Public api host** — `web/src/api-proxy.ts` sends only an `authorization` header,
   deliberately (the cache entry must be byte-identical for every viewer), which is the same
   "definitely automated" fingerprint. `/api/` also covers the build-time callers. `/webhooks/`
   carries unattended POSTs of arbitrary Contentful rich text that will trip a managed injection
   rule sooner or later; both are HMAC-verified, so managed rules add nothing. ⚠️ A block there
   fails **silently** — nothing surfaces an error, the PDS sync simply stops happening.
+- **Admin host** — the one host left protected, and the only one whose traffic is a real browser
+  driven by one person: Google sign-in, the Sidekiq UI, the Whoop OAuth round-trip. A managed
+  challenge there is survivable in a way it is nowhere else. ⚠️ Point external uptime checks at
+  `/up` on the **public** host; fly's own checks reach the app on its internal host and never
+  traverse the zone at all.
 
 ⚠️ **Rate limiting rules are deliberately NOT in the skip list.** Don't add them.
 
