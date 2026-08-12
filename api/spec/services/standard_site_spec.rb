@@ -54,6 +54,28 @@ describe StandardSite do
       expect(record["description"]).to eq("A triathlon training & racing blog.")
     end
 
+    it "carries a basic theme with all four required colors" do
+      expect(record["basicTheme"]).to include("$type" => "site.standard.theme.basic")
+      expect(record["basicTheme"].keys).to contain_exactly(
+        "$type", "background", "foreground", "accent", "accentForeground"
+      )
+    end
+
+    # Pinned so a palette edit is a deliberate diff, not a silent one. These mirror web's
+    # light-mode tokens in web/source/stylesheets/base/_props.scss.
+    {
+      "background" => [ 255, 255, 255 ],
+      "foreground" => [ 41, 41, 41 ],
+      "accent" => [ 191, 2, 34 ],
+      "accentForeground" => [ 250, 250, 250 ]
+    }.each do |role, (r, g, b)|
+      it "renders #{role} as rgb(#{r}, #{g}, #{b})" do
+        expect(record.dig("basicTheme", role)).to eq(
+          "$type" => "site.standard.theme.color#rgb", "r" => r, "g" => g, "b" => b
+        )
+      end
+    end
+
     it "omits the icon when no blob is supplied" do
       expect(record).not_to have_key("icon")
     end

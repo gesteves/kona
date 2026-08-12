@@ -33,6 +33,26 @@ class StandardSite < ApplicationService
     encoded.rjust(13, TID_ALPHABET[0])
   end
 
+  # Builds a site.standard.theme.color#rgb value.
+  # @param r [Integer] Red channel, 0-255.
+  # @param g [Integer] Green channel, 0-255.
+  # @param b [Integer] Blue channel, 0-255.
+  # @return [Hash]
+  def self.rgb(r, g, b)
+    { "$type" => "site.standard.theme.color#rgb", "r" => r, "g" => g, "b" => b }
+  end
+
+  # The publication's theme, for readers that render the site's content in their own chrome.
+  # ⚠️ Mirrors web's LIGHT-mode tokens in web/source/stylesheets/base/_props.scss; the lexicon
+  # has no dark-mode counterpart. Nothing checks the two stay in step.
+  BASIC_THEME = {
+    "$type" => "site.standard.theme.basic",
+    "background" => rgb(255, 255, 255),       # white
+    "foreground" => rgb(41, 41, 41),          # --color-text / --color-jet #292929
+    "accent" => rgb(191, 2, 34),              # --color-firebrick #BF0222 (brand)
+    "accentForeground" => rgb(250, 250, 250)  # --color-button-text / --color-cultured #FAFAFA
+  }.freeze
+
   PUBLICATION_COLLECTION = "site.standard.publication"
   DOCUMENT_COLLECTION = "site.standard.document"
   # The publication is the repo's singleton, at a stable TID derived from the "self" seed.
@@ -215,6 +235,7 @@ class StandardSite < ApplicationService
       "$type" => PUBLICATION_COLLECTION,
       "url" => publication_url,
       "name" => truncate_graphemes(site["title"].to_s, 500),
+      "basicTheme" => BASIC_THEME,
       "preferences" => { "showInDiscover" => true }
     }
     description = plain_text(site["meta_description"])
