@@ -3,6 +3,31 @@ require "rails_helper"
 RSpec.describe TrainerRoad do
   subject(:service) { described_class.new("America/Denver") }
 
+  # Shared by #planned_workouts and #workouts — both parse the same feed.
+  def ics(events)
+    body = events.map.with_index do |event, index|
+      lines = [ "BEGIN:VEVENT", "UID:#{index}" ]
+      if event[:all_day]
+        lines << "DTSTART;VALUE=DATE:#{event.fetch(:date, '20260709')}"
+      else
+        lines << "DTSTART:#{event.fetch(:start, '20260709T170000Z')}"
+        lines << "DTEND:#{event.fetch(:end, '20260709T180000Z')}"
+      end
+      lines << "SUMMARY:#{event[:summary]}"
+      lines << "DESCRIPTION:#{event[:description]}" if event[:description]
+      lines << "END:VEVENT"
+      lines.join("\n")
+    end.join("\n")
+
+    "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Test//EN\n#{body}\nEND:VCALENDAR"
+  end
+
+  def stub_calendar(events)
+    allow(HTTParty).to receive(:get).and_return(
+      instance_double(HTTParty::Response, success?: true, body: ics(events))
+    )
+  end
+
   describe "#determine_discipline" do
     it { expect(service.send(:determine_discipline, "Run - Easy")).to eq("Run") }
     it { expect(service.send(:determine_discipline, "Swim Endurance")).to eq("Swim") }
@@ -46,30 +71,6 @@ RSpec.describe TrainerRoad do
       allow($redis).to receive(:get).and_return(nil)
       allow($redis).to receive(:setex)
       stub_const("TrainerRoad::CALENDAR_URL", "https://example.test/calendar.ics")
-    end
-
-    def ics(events)
-      body = events.map.with_index do |event, index|
-        lines = [ "BEGIN:VEVENT", "UID:#{index}" ]
-        if event[:all_day]
-          lines << "DTSTART;VALUE=DATE:#{event.fetch(:date, '20260709')}"
-        else
-          lines << "DTSTART:#{event.fetch(:start, '20260709T170000Z')}"
-          lines << "DTEND:#{event.fetch(:end, '20260709T180000Z')}"
-        end
-        lines << "SUMMARY:#{event[:summary]}"
-        lines << "DESCRIPTION:#{event[:description]}" if event[:description]
-        lines << "END:VEVENT"
-        lines.join("\n")
-      end.join("\n")
-
-      "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Test//EN\n#{body}\nEND:VCALENDAR"
-    end
-
-    def stub_calendar(events)
-      allow(HTTParty).to receive(:get).and_return(
-        instance_double(HTTParty::Response, success?: true, body: ics(events))
-      )
     end
 
     it "returns all-day workouts with the duration prefix stripped and the description cleaned" do
@@ -137,6 +138,68 @@ RSpec.describe TrainerRoad do
       allow(service).to receive(:report_upstream_error)
 
       expect { service.planned_workouts(date) }.to raise_error(ApplicationService::HttpError)
+    end
+  end
+
+  # The method the weather and Whoop widgets actually call, through workout_scheduled? /
+  # rest_day?. Both read only `.any?`, so anything that changes which events are selected changes
+  # what those widgets say.
+  describe "#workouts" do
+    include ActiveSupport::Testing::TimeHelpers
+
+    # 20:00 on July 9 in America/Denver (UTC-6 in July) — i.e. July 10 in UTC.
+    around { |example| travel_to(Time.utc(2026, 7, 10, 2, 0, 0)) { example.run } }
+
+    before do
+      allow($redis).to receive(:get).and_return(nil)
+      allow($redis).to receive(:setex)
+      stub_const("TrainerRoad::CALENDAR_URL", "https://example.test/calendar.ics")
+    end
+
+    it "returns nil when no feed is configured" do
+      stub_const("TrainerRoad::CALENDAR_URL", nil)
+
+      expect(service.workouts).to be_nil
+    end
+
+    it "returns today's workouts, sorted swim then bike then run" do
+      stub_calendar([
+        { all_day: true, date: "20260709", summary: "0:30 - Easy Run" },
+        { all_day: true, date: "20260709", summary: "1:00 - Petit" },
+        { all_day: true, date: "20260709", summary: "0:45 - Swim Endurance" }
+      ])
+
+      expect(service.workouts.map { |w| w[:discipline] }).to eq(%w[Swim Bike Run])
+    end
+
+    it "excludes events on other days" do
+      stub_calendar([ { all_day: true, date: "20260711", summary: "1:00 - Petit" } ])
+
+      expect(service.workouts).to eq([])
+    end
+
+    # ⚠️ The regression this method carried: `event.dtstart.to_datetime.to_date` reckons a timed
+    # event in its own stored offset, so this 02:00Z event read as July 10 and was dropped from
+    # July 9's list — leaving rest_day? true on a day with a workout on it.
+    it "counts a timed evening event on the local day, not the UTC one" do
+      stub_calendar([ { start: "20260710T020000Z", end: "20260710T030000Z", summary: "1:00 - Petit" } ])
+
+      expect(service.workouts.map { |w| w[:name] }).to eq([ "Petit" ])
+    end
+
+    it "does not count a timed event that is still tomorrow locally" do
+      stub_calendar([ { start: "20260711T020000Z", end: "20260711T030000Z", summary: "1:00 - Petit" } ])
+
+      expect(service.workouts).to eq([])
+    end
+
+    it "returns [] and reports when the calendar fetch fails" do
+      allow(HTTParty).to receive(:get).and_return(
+        instance_double(HTTParty::Response, success?: false, code: 500, body: "boom")
+      )
+      expect(service).to receive(:report_upstream_error)
+
+      expect(service.workouts).to eq([])
     end
   end
 end

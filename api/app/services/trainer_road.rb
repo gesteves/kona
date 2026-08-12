@@ -16,7 +16,7 @@ class TrainerRoad < ApplicationService
   def workouts
     return if CALENDAR_URL.blank?
 
-    cache_key = "trainerroad:workouts:#{@timezone}:#{CALENDAR_URL.parameterize}"
+    cache_key = "trainerroad:workouts:#{@timezone}:#{calendar_version}"
     cached_json(cache_key, expires_in: 5.minutes) do
       response = HTTParty.get(CALENDAR_URL)
       unless response.success?
@@ -27,8 +27,12 @@ class TrainerRoad < ApplicationService
       calendar = Icalendar::Calendar.parse(response.body).first
       today = Time.current.in_time_zone(@timezone).to_date
 
+      # ⚠️ Through event_on_date?, which converts a timed event into @timezone first. Comparing
+      # `event.dtstart.to_datetime.to_date` reckons it in the event's own stored offset instead,
+      # so an evening event lands on the next day — and since both consumers only read
+      # `workouts.any?`, that silently flips workout_scheduled? and rest_day?.
       todays_events = calendar.events.select do |event|
-        event.dtstart.to_datetime.to_date == today
+        event.dtstart.present? && event_on_date?(event, today, @timezone)
       end
 
       todays_events.map { |event| parse_workout(event) }
@@ -46,7 +50,7 @@ class TrainerRoad < ApplicationService
   def planned_workouts(date, timezone: @timezone)
     return [] if CALENDAR_URL.blank?
 
-    cache_key = "trainerroad:planned:#{date}:#{timezone}:#{CALENDAR_URL.parameterize}"
+    cache_key = "trainerroad:planned:#{date}:#{timezone}:#{calendar_version}"
     cached_json(cache_key, expires_in: 5.minutes) do
       events = fetch_calendar_events
       events_on_date = events.select { |event| event_on_date?(event, date, timezone) }
@@ -63,6 +67,15 @@ class TrainerRoad < ApplicationService
   end
 
   private
+
+  # ⚠️ A digest, not the URL itself. A TrainerRoad iCal URL ends in a GUID that *is* the
+  # credential, and `parameterize` preserves it intact — which put the whole token in key names
+  # visible to `redis-cli KEYS`, the Sidekiq UI's Redis stats, and any slowlog or error report
+  # that echoes a key. This busts the cache on a URL change just the same.
+  # @return [String] An 8-character digest of the calendar URL.
+  def calendar_version
+    cache_version(CALENDAR_URL)
+  end
 
   # Fetches and parses every VEVENT in the feed.
   # @return [Array<Icalendar::Event>]

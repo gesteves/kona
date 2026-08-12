@@ -1,4 +1,5 @@
 import { handleApi } from './api-proxy';
+import { withSecurityHeaders } from './headers';
 import { requestLogLine } from './log';
 import { handleOg, isOgPath } from './og';
 import { handlePlausible } from './plausible';
@@ -33,7 +34,14 @@ export default {
       console.error(
         requestLogLine(request, 'worker error', pathname, String(error))
       );
-      return new Response('Internal Server Error', { status: 500 });
+      // Secured like every other Worker-built response: this one is reachable as a top-level
+      // document, so it must not be the one that ships without nosniff.
+      return new Response('Internal Server Error', {
+        status: 500,
+        headers: withSecurityHeaders(
+          new Headers({ 'content-type': 'text/plain; charset=utf-8' })
+        ),
+      });
     }
   },
 };

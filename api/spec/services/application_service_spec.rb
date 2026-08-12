@@ -59,12 +59,59 @@ RSpec.describe ApplicationService do
       expect(service.cache("k", expires_in: false) { { a: 1 } }).to eq(a: 1)
     end
 
-    it "does not cache a blank value" do
+    it "does not cache a blank value when no negative TTL is given" do
       allow($redis).to receive(:get).with("k").and_return(nil)
       expect($redis).not_to receive(:setex)
       expect($redis).not_to receive(:set)
 
       expect(service.cache("k", expires_in: 5.minutes) { nil }).to be_nil
+    end
+
+    # ⚠️ This is the rate-limit backoff. `parse_json` returns nil on any non-2xx, so a caller that
+    # never caches a blank re-queries a failing upstream on every request — the 429 removing its
+    # own protection. These pin both halves of that.
+    context "when a negative TTL is given" do
+      it "stores a sentinel for a blank value" do
+        allow($redis).to receive(:get).with("k").and_return(nil)
+        expect($redis).to receive(:setex).with("k", 60, ApplicationService::EMPTY_SENTINEL)
+
+        expect(service.cache("k", expires_in: 5.minutes, empty_expires_in: 1.minute) { nil }).to be_nil
+      end
+
+      it "stores a sentinel for an empty collection too" do
+        allow($redis).to receive(:get).with("k").and_return(nil)
+        expect($redis).to receive(:setex).with("k", 60, ApplicationService::EMPTY_SENTINEL)
+
+        expect(service.cache("k", expires_in: 5.minutes, empty_expires_in: 1.minute) { [] }).to eq([])
+      end
+
+      it "returns nil from the sentinel without re-invoking the upstream" do
+        allow($redis).to receive(:get).with("k").and_return(ApplicationService::EMPTY_SENTINEL)
+
+        yielded = false
+        expect(service.cache("k", expires_in: 5.minutes, empty_expires_in: 1.minute) { yielded = true; { a: 1 } }).to be_nil
+        expect(yielded).to be(false)
+      end
+
+      it "still caches a present value under the normal TTL" do
+        allow($redis).to receive(:get).with("k").and_return(nil)
+        expect($redis).to receive(:setex).with("k", 5.minutes, '{"a":1}')
+
+        expect(service.cache("k", expires_in: 5.minutes, empty_expires_in: 1.minute) { { a: 1 } }).to eq(a: 1)
+      end
+
+      it "is a backoff, not a cache: a second call after a failure hits Redis, not the upstream" do
+        store = {}
+        allow($redis).to receive(:get) { |k| store[k] }
+        allow($redis).to receive(:setex) { |k, _ttl, v| store[k] = v }
+
+        calls = 0
+        fetch = -> { service.cache("k", expires_in: 5.minutes, empty_expires_in: 1.minute) { calls += 1; nil } }
+
+        expect(fetch.call).to be_nil
+        expect(fetch.call).to be_nil
+        expect(calls).to eq(1)
+      end
     end
 
     it "bypasses the cache entirely in development (always fetches fresh)" do
@@ -89,6 +136,20 @@ RSpec.describe ApplicationService do
     it "returns nil on a non-success response" do
       allow(HTTParty).to receive(:get).and_return(response_double(success: false, body: "nope"))
       expect(service.http_get("https://example.test")).to be_nil
+    end
+
+    # These are documented as total — "the parsed body, or nil" — and several callers have no
+    # rescue of their own, relying on the controller's `safely` wrapper. A 204 or an empty 200
+    # must not become a JSON::ParserError. parse_json! already guarded this; parse_json didn't.
+    it "returns nil for an empty success body rather than raising" do
+      allow(HTTParty).to receive(:get).and_return(response_double(success: true, body: ""))
+      expect { service.http_get("https://example.test") }.not_to raise_error
+      expect(service.http_get("https://example.test")).to be_nil
+    end
+
+    it "returns nil for a 204 with no body" do
+      allow(HTTParty).to receive(:post).and_return(response_double(success: true, body: nil, code: 204))
+      expect(service.http_post("https://example.test")).to be_nil
     end
 
     it "reports a non-success response to Bugsnag with its status code and url" do

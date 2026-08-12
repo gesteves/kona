@@ -20,7 +20,12 @@
       <author>
         <name><%=h entry.author.name %></name>
       </author>
-      <summary><%=h smartypants(entry.summary) %></summary>
+      <%# ⚠️ Goes through content_summary, not entry.summary: Shorts carry no summary field, and
+          Atom requires the element to have content. Its trailing `sanitize` is also what keeps
+          the entities single-escaped — it decodes to Unicode, so the smartypants below has no
+          straight quotes left to turn into `&rsquo;` for `h` to escape a second time. Same
+          reason the title above sanitizes first. %>
+      <summary><%=h smartypants(content_summary(entry)) %></summary>
       <content type="html">
         <%=h render_feed_body(entry.intro) %>
         <%=h render_feed_body(entry.body) %>

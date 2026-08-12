@@ -103,7 +103,11 @@ module WeatherHelper
     CONDITIONS.dig(condition_code&.to_sym, :phrases, :simplified) || condition_code.underscore.gsub("_", " ")
   end
 
+  # ⚠️ Returns nil rather than raising on a missing reading: the upstreams omit individual fields,
+  # and the arithmetic below turns one into a NoMethodError that 500s the whole widget. Callers
+  # still have to guard per field to avoid rendering a bare label with no number.
   def format_temperature(temp)
+    return if temp.blank?
     celsius = "#{number_to_human(temp, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')}°C"
     fahrenheit = "#{number_to_human(celsius_to_fahrenheit(temp), precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')}°F"
     units_tag(celsius, fahrenheit)
@@ -140,7 +144,9 @@ module WeatherHelper
     end
   end
 
+  # ⚠️ Nil-safe for the same reason as format_temperature.
   def format_wind_speed(speed)
+    return if speed.blank?
     wind_speed_metric = speed.round
     wind_speed_imperial = kilometers_to_miles(speed).round
     metric = "#{wind_speed_metric} km/h"

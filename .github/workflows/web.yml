@@ -399,15 +399,45 @@ jobs:
       # The cost is that the edge may serve the previous copy for the length of the sleep. That's
       # the right trade: it's bounded and self-correcting, whereas a re-pin lasts until the next
       # deploy. Nothing waits on this — the success ping above has already gone out.
+      #
+      # ⚠️ The verification below is the load-bearing half, because the API call above cannot fail
+      # for the thing most likely to go wrong. A purge for a tag that matches NOTHING — because the
+      # Cache Response Rule was disabled, or names a hostname that was typed by hand and never
+      # validated, which has already happened once — returns 200 success. Combined with an edge TTL
+      # that ignores Cache-Control for a year, that leaves pages pinned essentially forever while
+      # CI stays green. Nothing else in the repo would notice.
+      #
+      # `age` is the signal, not cf-cache-status. A surviving entry carries the age it accumulated
+      # since it was cached, which is at minimum the interval since the previous deploy; an evicted
+      # one comes back with no age at all, or a tiny one if another visitor repopulated it in the
+      # seconds since. That asymmetry is what makes this robust rather than racy — a repopulation
+      # can only ever produce a *small* age, which is the passing case either way. A missing header
+      # (uncached / DYNAMIC) passes too: the point is to catch a stale copy surviving, not to
+      # assert the page is cacheable.
       - name: Purge Cloudflare edge cache (tag "site")
         id: purge
         run: |
+          set -euo pipefail
           sleep 30
           curl -sS --fail-with-body --retry 3 --retry-all-errors -X POST \
             "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
             -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
             -H "Content-Type: application/json" \
             --data '{"tags":["site"]}'
+
+          # Let the eviction propagate before asking a PoP what it has.
+          sleep 10
+          # No path appended: URL may or may not carry a trailing slash (full_url overwrites the
+          # path, so the Ruby side never had to care), and "<url>//" is a different cache entry.
+          headers=$(curl -sS -D - -o /dev/null --retry 3 --retry-all-errors "${{ secrets.URL }}")
+          age=$(printf '%s' "$headers" | tr -d '\r' | awk 'tolower($1) == "age:" { print $2; exit }')
+          status=$(printf '%s' "$headers" | tr -d '\r' | awk 'tolower($1) == "cf-cache-status:" { print $2; exit }')
+          echo "After the purge: cf-cache-status=${status:-none} age=${age:-none}"
+
+          if [ -n "$age" ] && [ "$age" -gt 60 ] 2>/dev/null; then
+            echo "::error::The edge served a copy ${age}s old moments after the purge, so the purge matched nothing. Check that the zone's Cache Response Rule is enabled and that its hostnames match the DNS records exactly, then purge manually."
+            exit 1
+          fi
 
       # Not redundant with "deploy successful" above — it carries the half that message can't.
       # That one fires at activation, when the edge may still be handing out the previous copy;
@@ -430,6 +460,9 @@ jobs:
       # keep serving the previous copy — and since deploys don't self-invalidate, that stays
       # pinned until the next deploy purges it, so it wants a manual purge. `warning` rather than
       # `danger` is what carries that "partly worked" nuance now that the text is terse.
+      # Covers both halves of the step above: the API call erroring, and the verification finding
+      # the purge matched nothing. The run log says which, and the consequence is the same either
+      # way.
       - name: Notify Slack (purge failed)
         if: failure() && steps.purge.outcome == 'failure'
         continue-on-error: true

@@ -56,12 +56,6 @@ class Plausible < ApplicationService
   def query(metrics: [], date_range: "all", dimensions: [ "event:page" ], filters: nil, order_by: nil, offset: 0, limit: 10000)
     return if @access_token.blank? || @site_id.blank?
 
-    if date_range == "1d"
-      today = Time.now.beginning_of_hour
-      yesterday = today - 1.day
-      date_range = [ yesterday.iso8601, today.iso8601 ]
-    end
-
     body = {
       site_id: @site_id,
       metrics: metrics,
@@ -72,7 +66,10 @@ class Plausible < ApplicationService
       pagination: { offset: offset, limit: limit }
     }.compact
 
-    cached_json(generate_cache_key(body), expires_in: 5.minutes) do
+    # ⚠️ empty_expires_in is the rate-limit backoff, not a cache. Plausible allows 600 calls/hour
+    # and post_json returns nil on any non-2xx, so without it a 429 would leave every subsequent
+    # request re-querying unthrottled — the trip removing its own protection.
+    cached_json(generate_cache_key(body), expires_in: 5.minutes, empty_expires_in: 1.minute) do
       headers = {
         "Authorization" => "Bearer #{@access_token}",
         "Content-Type" => "application/json"

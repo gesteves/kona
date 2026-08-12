@@ -73,7 +73,10 @@ class TrendingArticles < ApplicationService
   def ranked
     rescue_with([], context: self.class.name) do
       t_end = Time.now.beginning_of_hour
-      items = cached_json("trending:articles:ranked:#{ranking_version}:#{t_end.utc.iso8601}", expires_in: RESULT_TTL) do
+      # ⚠️ An empty ranking is the failure shape as well as the "nothing trending" one, and rank()
+      # costs two Plausible queries. Without the negative TTL a Plausible outage means every
+      # request pays both of them. `(items || [])` below already absorbs the cached-blank nil.
+      items = cached_json("trending:articles:ranked:#{ranking_version}:#{t_end.utc.iso8601}", expires_in: RESULT_TTL, empty_expires_in: 1.minute) do
         rank(t_end).map { |article| payload(article) }
       end
       (items || []).map { |item| DeepOstruct.wrap(item) }

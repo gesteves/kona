@@ -117,17 +117,40 @@ describe('submitting', () => {
 
   it('reports a rejected submission without clearing what was typed', async () => {
     // A 422 means the message wasn't sent. Wiping the form would throw away prose the visitor
-    // would have to retype.
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    fetchMock.mockResolvedValue({ ok: false, status: 422 });
+    // would have to retype. It also surfaces the API's own message: "something went wrong,
+    // please try again" would be wrong (nothing went wrong) and unactionable (an identical
+    // retry fails identically).
+    const apiMessage =
+      'Please provide your name, a valid email address, and a message.';
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 422,
+      json: async () => ({ error: apiMessage }),
+    });
     await mountForm();
 
     await submitForm();
 
-    expect(lastToast().variant).toBe('danger');
+    expect(lastToast()).toEqual({ message: apiMessage, variant: 'danger' });
     expect(document.querySelector('[name="message"]').value).toBe(
       'Hello there'
     );
+  });
+
+  it('falls back to the generic message when a 422 carries no usable body', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 422,
+      json: async () => {
+        throw new SyntaxError('Unexpected end of JSON input');
+      },
+    });
+    await mountForm();
+
+    await submitForm();
+
+    expect(lastToast().message).toMatch(/something went wrong/i);
+    expect(lastToast().variant).toBe('danger');
   });
 
   it('reports a network failure the same way', async () => {

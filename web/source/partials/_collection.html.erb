@@ -1,6 +1,11 @@
-<section class="collection <%= "collection--#{variant}" if defined?(variant) %>" <% if title.present? %>id="<%= title.parameterize %>"<% end %>>
+<%# ⚠️ aria-labelledby, so a titled section is exposed as a named `region` landmark. Its
+    API-rendered counterparts (placeholders/_article_collection.html.erb and the api's
+    widgets/articles/_collection) already carry it — without it here, the page's landmark list
+    changes shape once the widgets swap in: "Recent Articles" invisible, "Trending Articles" not. %>
+<% section_id = title.present? ? title.parameterize : nil %>
+<section class="collection <%= "collection--#{variant}" if defined?(variant) %>" <% if section_id %>id="<%= section_id %>" aria-labelledby="hed-<%= section_id %>"<% end %>>
   <% if title.present? %>
-    <h2 class="collection__heading"><%= smartypants(title) %></h2>
+    <h2 class="collection__heading" <% if section_id %>id="hed-<%= section_id %>"<% end %>><%= smartypants(title) %></h2>
   <% end %>
   <ol class="collection__list">
     <%# Filter before the <li>, not inside it — otherwise a non-post item emits an empty one. %>

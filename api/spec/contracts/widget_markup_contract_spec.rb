@@ -69,4 +69,22 @@ RSpec.describe "web placeholder ↔ api fragment markup contract" do
 
     expect(rendered - covered).to be_empty
   end
+
+  # ⚠️ This spec lives in the api but reads the web app, and api.yml is path-filtered — so it only
+  # runs when a listed path changes. A placeholder outside that filter can be edited with the
+  # contract unchecked, which is the failure this whole file exists to prevent. Assert the filter
+  # actually covers every placeholder we pair.
+  it "is reachable from CI for every placeholder it pairs" do
+    workflow = File.read(Rails.root.join("../.github/workflows/api.yml"))
+    filters = workflow.scan(%r{^\s*-\s*'(web/[^']+)'$}).flatten.uniq
+    expect(filters).not_to be_empty, "api.yml lists no web/ paths — the contract can't fire"
+
+    uncovered = WIDGET_MARKUP_PAIRS.values.map(&:first).reject do |placeholder|
+      path = "web/#{placeholder}"
+      filters.any? { |filter| File.fnmatch?(filter, path, File::FNM_PATHNAME) || path.start_with?(filter.delete_suffix("**")) }
+    end
+
+    expect(uncovered).to be_empty,
+      "Not covered by api.yml's paths filter, so editing one skips this spec: #{uncovered.join(', ')}"
+  end
 end

@@ -174,4 +174,115 @@ describe('handlePlausible', () => {
     );
     expect(res.status).toBe(404);
   });
+
+  // ⚠️ /pa/* is claimed by run_worker_first, so it never gets source/headers' /* block. This
+  // route serves executable JavaScript from the site's own origin, which makes it the one that
+  // least tolerates shipping without nosniff.
+  describe('security headers', () => {
+    function expectSecured(res: Response) {
+      expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+      expect(res.headers.get('x-frame-options')).toBe('DENY');
+      expect(res.headers.get('referrer-policy')).toBe(
+        'no-referrer-when-downgrade'
+      );
+      expect(res.headers.get('strict-transport-security')).toBe(
+        'max-age=31536000; includeSubDomains'
+      );
+    }
+
+    it('sets them on the proxied script', async () => {
+      interceptFetch(
+        'GET',
+        SCRIPT_UPSTREAM,
+        () =>
+          new Response('window.plausible=function(){}', {
+            headers: {
+              'content-type': 'application/javascript',
+              'cache-control': 'public, max-age=3600',
+            },
+          })
+      );
+
+      expectSecured(
+        await handlePlausible(
+          new Request('https://www.example.com/pa/script.js'),
+          env,
+          makeCtx()
+        )
+      );
+    });
+
+    // These answer before any upstream fetch, so they register no intercept.
+    it.each([
+      [
+        'a 405 on the script path',
+        'POST',
+        'https://www.example.com/pa/script.js',
+      ],
+      ['a 405 on the event path', 'GET', 'https://www.example.com/pa/event'],
+      ['an unknown /pa/ path', 'GET', 'https://www.example.com/pa/nope'],
+      [
+        'a 404 when analytics is unconfigured',
+        'GET',
+        'https://www.example.com/pa/script.js',
+      ],
+    ])('sets them on %s', async (label, method, url) => {
+      const useEnv = label.includes('unconfigured') ? ({} as Env) : env;
+
+      expectSecured(
+        await handlePlausible(new Request(url, { method }), useEnv, makeCtx())
+      );
+    });
+
+    it('sets them on the no-op script served when the upstream fails', async () => {
+      interceptFetch(
+        'GET',
+        SCRIPT_UPSTREAM,
+        () => new Response('', { status: 502 })
+      );
+
+      const res = await handlePlausible(
+        new Request('https://www.example.com/pa/script.js'),
+        env,
+        makeCtx()
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+    });
+
+    it("re-serves only an allowlist of the upstream's headers, not whatever its CDN set", async () => {
+      interceptFetch(
+        'GET',
+        SCRIPT_UPSTREAM,
+        () =>
+          new Response('window.plausible=function(){}', {
+            headers: {
+              'content-type': 'application/javascript',
+              'cache-control': 'public, max-age=3600',
+              'set-cookie': 'sid=1; Path=/',
+              vary: '*',
+              'access-control-allow-origin': '*',
+              'x-plausible-internal': 'leaked',
+            },
+          })
+      );
+
+      const res = await handlePlausible(
+        new Request('https://www.example.com/pa/script.js'),
+        env,
+        makeCtx()
+      );
+
+      // Kept: what the browser needs to execute and cache the script.
+      expect(res.headers.get('content-type')).toBe('application/javascript');
+      expect(res.headers.get('cache-control')).toBe('public, max-age=3600');
+      // Dropped: everything else Plausible's CDN sets would otherwise be re-served under this
+      // origin and persisted in caches.default for its full TTL.
+      expect(res.headers.get('set-cookie')).toBeNull();
+      expect(res.headers.get('vary')).toBeNull();
+      expect(res.headers.get('access-control-allow-origin')).toBeNull();
+      expect(res.headers.get('x-plausible-internal')).toBeNull();
+    });
+  });
 });

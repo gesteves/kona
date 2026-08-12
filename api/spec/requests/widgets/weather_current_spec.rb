@@ -245,4 +245,61 @@ RSpec.describe "Weather", type: :request do
       expect(response.body.strip).to be_empty
     end
   end
+
+  # ⚠️ The contexts above all remove a whole *slice*, which weather_data_is_current? catches. These
+  # remove one field from a slice that's present, which it doesn't — the formatters' arithmetic is
+  # then the first thing to see the nil. Each of these 500'd before the guards moved ahead of the
+  # formatting.
+  context "when a present slice is missing an individual field" do
+    def render_with(&mutation)
+      payload = weather.dup
+      mutation.call(payload)
+      allow_any_instance_of(WeatherKit).to receive(:data).and_return(payload)
+      get "/widgets/weather/current", headers: auth_headers
+    end
+
+    it "drops the wind clause when windSpeed is absent" do
+      render_with { |w| w.current_weather.wind_speed = nil }
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("temperature of")
+      expect(response.body).not_to include("from the west")
+    end
+
+    it "drops the wind clause when windDirection is absent" do
+      render_with { |w| w.current_weather.wind_direction = nil }
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("temperature of")
+      expect(response.body).not_to include("from the")
+    end
+
+    it "drops the whole current-conditions sentence when the temperature is absent" do
+      render_with { |w| w.current_weather.temperature = nil }
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("temperature of")
+      expect(response.body).to include("forecast is clear") # the rest of the summary survives
+    end
+
+    it "reports only the low when the day carries no high" do
+      render_with { |w| w.forecast_daily.days.first.temperature_max = nil }
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("with a low of")
+      expect(response.body).not_to include("a high of")
+    end
+
+    it "omits the temperature clause entirely when the day carries neither" do
+      render_with do |w|
+        w.forecast_daily.days.first.temperature_max = nil
+        w.forecast_daily.days.first.temperature_min = nil
+      end
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("forecast is clear")
+      expect(response.body).not_to include("a high of")
+      expect(response.body).not_to include("a low of")
+    end
+  end
 end

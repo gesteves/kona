@@ -87,6 +87,15 @@ export default class extends Controller {
         body,
         signal: this.abortController.signal,
       });
+      // A 422 is the API rejecting the input, not a failure. Telling the visitor "something went
+      // wrong, please try again" would be both wrong and unactionable — an identical retry fails
+      // identically, and resetTurnstile() has already spent their challenge. The form keeps its
+      // contents so they can fix the field rather than retype the message.
+      if (response.status === 422) {
+        this.resetTurnstile();
+        sendNotification(await this.errorMessage(response), 'error');
+        return;
+      }
       if (!response.ok) {
         throw new Error(`Unexpected response status: ${response.status}`);
       }
@@ -100,6 +109,21 @@ export default class extends Controller {
       sendNotification(ERROR_MESSAGE, 'error');
     } finally {
       this.setSubmitting(false);
+    }
+  }
+
+  /**
+   * The API's own validation message, falling back to the generic one if the body isn't the
+   * JSON shape we expect.
+   * @param {Response} response A 422 response.
+   * @returns {Promise<string>}
+   */
+  async errorMessage(response) {
+    try {
+      const { error } = await response.json();
+      return typeof error === 'string' && error.trim() ? error : ERROR_MESSAGE;
+    } catch {
+      return ERROR_MESSAGE;
     }
   }
 

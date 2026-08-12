@@ -7,9 +7,10 @@
 # overlapping paths. That's why the cache policy enumerates paths instead of using a
 # /* catch-all: a catch-all Cache-Control would corrupt the fingerprinted-asset rules.
 
-# ⚠️ Security headers apply ONLY to asset-layer responses. The two Worker routes
-# (/widgets/*, /api/contact — see wrangler.jsonc's run_worker_first) rebuild their response
-# headers from scratch in src/api-proxy.ts and set their own copies there.
+# ⚠️ Security headers apply ONLY to asset-layer responses. Every path in wrangler.jsonc's
+# run_worker_first allowlist — /widgets/*, /api/contact, /pa/*, and the two OG card globs —
+# bypasses this file entirely and must re-set them itself, which they all do through
+# withSecurityHeaders in src/headers.ts. Keep that function in step with the /* block below.
 /*
   Referrer-Policy: no-referrer-when-downgrade
   X-Content-Type-Options: nosniff

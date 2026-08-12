@@ -6,6 +6,13 @@ name: "API"
 # group below never collapsed them. Branch work is covered by the pull_request trigger.
 # The composite actions are in `paths` because the notify job below uses them — without the
 # entry, editing one would trigger no CI at all.
+#
+# ⚠️ The `web/source/partials/...` entries are deliberate and must stay. They are not this app's
+# files: they're the placeholders that api/spec/contracts/widget_markup_contract_spec.rb reads
+# across the monorepo (via Rails.root.join("../web")) to check each widget fragment still matches
+# the element it replaces. Filtered on 'api/**' alone, that spec only ran when the api half
+# changed — so editing a placeholder, which is the more likely edit, silently skipped the only
+# check that compares the two. Keep this list in step with WIDGET_MARKUP_PAIRS in that spec.
 on:
   push:
     branches: [main]
@@ -13,12 +20,18 @@ on:
       - 'api/**'
       - '.github/workflows/api.yml'
       - '.github/actions/**'
+      - 'web/source/partials/placeholders/**'
+      - 'web/source/partials/_upcoming_races.html.erb'
+      - 'web/source/partials/article/_full.html.erb'
   pull_request:
     branches: [main]
     paths:
       - 'api/**'
       - '.github/workflows/api.yml'
       - '.github/actions/**'
+      - 'web/source/partials/placeholders/**'
+      - 'web/source/partials/_upcoming_races.html.erb'
+      - 'web/source/partials/article/_full.html.erb'
 
 # No job writes to the repository — the deploy authenticates to fly with FLY_API_TOKEN, not
 # GITHUB_TOKEN. Pin it read-only rather than inheriting the repo-wide default.

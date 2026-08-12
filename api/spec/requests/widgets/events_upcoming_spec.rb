@@ -334,6 +334,33 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
     end
   end
 
+  # ⚠️ The cases above fail a whole upstream. These keep the forecast day but drop one field from
+  # it — the shape the `||` guard used to admit, rendering the surviving half's label with no
+  # reading behind it (and, before format_temperature was made nil-safe, 500ing the widget).
+  context "when the race-day forecast is missing one of its temperatures" do
+    it "renders only the low when the day carries no high" do
+      weather.forecast_daily.days.first.daytime_forecast.temperature_max = nil
+
+      get "/widgets/events/upcoming", headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Race Day Weather")
+      expect(response.body).to include("low")
+      expect(response.body).not_to include("high")
+    end
+
+    it "renders only the high when the day carries no low" do
+      weather.forecast_daily.days.first.daytime_forecast.temperature_min = nil
+
+      get "/widgets/events/upcoming", headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Race Day Weather")
+      expect(response.body).to include("high")
+      expect(response.body).not_to include("low")
+    end
+  end
+
   it "requires the API_TOKEN bearer (the proxy injects it; direct hits are rejected)" do
     get "/widgets/events/upcoming"
     expect(response).to have_http_status(:unauthorized)

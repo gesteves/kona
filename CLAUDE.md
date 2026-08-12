@@ -524,9 +524,16 @@ Placeholders build the shared attributes with `live_update_attrs`
 (`web/lib/helpers/site_helpers.rb`); the API views build the matching outer element with
 `live_update_url`.
 
-The **web half** is pinned by `web/test/browser/controllers/live_update.test.js`. Nothing tests
-the two sides *against each other* — the api view's markup and the web placeholder's are kept in
-sync by hand.
+The **web half** is pinned by `web/test/browser/controllers/live_update.test.js`. The two sides are
+compared against each other by `api/spec/contracts/widget_markup_contract_spec.rb`, which reads
+both files across the monorepo and asserts the placeholder and the fragment agree on tag, classes,
+and `data-nosnippet`. It only checks the outer element — everything inside it is still kept in sync
+by hand.
+
+⚠️ That spec lives in the api but reads `web/`, and `api.yml` is path-filtered, so the placeholder
+paths it reads are listed in that workflow's `paths:` **on purpose**. Without them the contract
+would go unchecked on exactly the edits most likely to break it. The spec fails if the two lists
+drift.
 
 | Widget | web placeholder | api view | endpoint |
 |---|---|---|---|

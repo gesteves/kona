@@ -111,9 +111,15 @@ class WeatherSummaryPresenter
 
   def currently
     current = current_weather(@weather)
+    # The temperature carries the sentence; without it there's nothing to say, so drop the whole
+    # sentence rather than emitting "with a temperature of".
+    temperature = format_temperature(current&.temperature)
+    return if temperature.blank?
+
+    apparent = format_temperature(current.temperature_apparent)
     text = []
-    text << "#{format_current_condition(current.condition_code).capitalize}, with a temperature of #{format_temperature(current.temperature)}"
-    text << "which feels like #{format_temperature(current.temperature_apparent)}" unless hide_apparent_temperature?
+    text << "#{format_current_condition(current.condition_code).capitalize}, with a temperature of #{temperature}"
+    text << "which feels like #{apparent}" unless hide_apparent_temperature? || apparent.blank?
     text << "#{number_to_percentage(current.humidity * 100, precision: 0)} humidity" unless current.humidity.blank? || current.humidity.zero?
     text << wind
     comma_join_with_and(text.compact)
@@ -121,14 +127,17 @@ class WeatherSummaryPresenter
 
   def wind
     current = current_weather(@weather)
-    direction = wind_direction(current.wind_direction)
-    formatted_wind_speed = format_wind_speed(current.wind_speed)
-    wind_speed_knots = kph_to_knots(current.wind_speed)
-
-    gusts_speed = current&.wind_gust.to_f
-    formatted_gusts = format_wind_speed(gusts_speed)
-
+    direction = wind_direction(current&.wind_direction)
+    # ⚠️ Guard before formatting, not after. WeatherKit omits individual fields, and
+    # format_wind_speed's `.round` turns a missing windSpeed into a NoMethodError that 500s the
+    # widget instead of collapsing it. A nil speed coerces to 0 knots, which is Beaufort 0, so
+    # it returns here.
+    wind_speed_knots = kph_to_knots(current&.wind_speed.to_f)
     return if direction.blank? || beaufort_number(wind_speed_knots).zero?
+
+    formatted_wind_speed = format_wind_speed(current.wind_speed)
+    gusts_speed = current.wind_gust.to_f
+    formatted_gusts = format_wind_speed(gusts_speed)
 
     text = []
     text << "#{beaufort_description(wind_speed_knots)} of #{formatted_wind_speed} from the #{direction.downcase}"
@@ -153,11 +162,12 @@ class WeatherSummaryPresenter
   def forecast
     text = []
     text << "#{today_or_tonight(@weather, @time_zone)}'s forecast #{format_forecasted_condition(rest_of_day.condition_code).downcase}"
-    if evening?(@weather, @time_zone)
-      text << "with a low of #{format_temperature(today.temperature_min)}"
-    else
-      text << "with a high of #{format_temperature(today.temperature_max)} and a low of #{format_temperature(today.temperature_min)}"
-    end
+    # Composed from whichever readings are present: a day forecast missing one of the two would
+    # otherwise read "with a high of  and a low of 12°C".
+    temperatures = []
+    temperatures << "a high of #{format_temperature(today.temperature_max)}" if !evening?(@weather, @time_zone) && today.temperature_max.present?
+    temperatures << "a low of #{format_temperature(today.temperature_min)}" if today.temperature_min.present?
+    text << "with #{temperatures.join(' and ')}" if temperatures.any?
     text.join(", ")
   end
 

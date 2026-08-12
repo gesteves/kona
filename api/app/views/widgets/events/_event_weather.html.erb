@@ -26,17 +26,24 @@
         <span class="event__weather-stat"><%= raw icon_svg("classic", "light", weather_icon(event_forecast.condition_code, :day)) %> <%= format_condition(event_forecast.condition_code) %></span>
       </div>
       <% if event_forecast.temperature_min.present? || event_forecast.temperature_max.present? %>
+        <%# ⚠️ Guarded per field, like the bay readings below: the `||` above admits a forecast day
+            carrying only one of the two, and rendering the other would print a bare "low"/"high"
+            with no reading. %>
         <div class="event__weather-stat-group">
-          <span class="event__weather-stat">
-            <%= raw icon_svg("classic", "light", "temperature-low") %>
-            <%= format_temperature(event_forecast.temperature_min) %>
-            low
-          </span>
-          <span class="event__weather-stat">
-            <%= raw icon_svg("classic", "light", "temperature-high") %>
-            <%= format_temperature(event_forecast.temperature_max) %>
-            high
-          </span>
+          <% if event_forecast.temperature_min.present? %>
+            <span class="event__weather-stat">
+              <%= raw icon_svg("classic", "light", "temperature-low") %>
+              <%= format_temperature(event_forecast.temperature_min) %>
+              low
+            </span>
+          <% end %>
+          <% if event_forecast.temperature_max.present? %>
+            <span class="event__weather-stat">
+              <%= raw icon_svg("classic", "light", "temperature-high") %>
+              <%= format_temperature(event_forecast.temperature_max) %>
+              high
+            </span>
+          <% end %>
         </div>
       <% end %>
       <% if event_forecast.humidity.present? || event_forecast.precipitation_chance.present? %>

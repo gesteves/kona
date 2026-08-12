@@ -2,14 +2,19 @@
     `content` is one listing page hash from Contentful#listing_page. %>
 <% if content.items.present? %>
   <ol class="blog__list">
-    <% content.items.each do |item| %>
+    <%# ⚠️ Separator decided by index, not `item == content.items.last`. These are Hashie::Mashes,
+        so `==` is a recursive deep comparison of the whole article — body and all — run once per
+        item. It's also wrong on its own terms: two entries with identical field values would both
+        suppress their separator. %>
+    <% last_index = content.items.size - 1 %>
+    <% content.items.each_with_index do |item, index| %>
       <li class="blog__list-item">
         <% if item.entry_type == 'Short' %>
           <%= partial 'partials/article/short', locals: { article: item } %>
         <% else %>
           <%= partial 'partials/article/compact', locals: { article: item } %>
         <% end %>
-        <% unless item == content.items.last %><hr class="blog__separator"><% end %>
+        <% unless index == last_index %><hr class="blog__separator"><% end %>
       </li>
     <% end %>
   </ol>

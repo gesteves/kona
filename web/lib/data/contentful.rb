@@ -298,9 +298,13 @@ class Contentful
     children = Hash.new { |h, k| h[k] = [] }
     taxo.each_value { |c| children[c[:parent_id]] << c[:id] if c[:parent_id] }
 
+    # Hoisted: published_articles rebuilds the array on every call, and this loop runs once per
+    # concept. The set is fixed for the whole loop.
+    candidates = published_articles
+
     @content[:tags] = taxo.values.filter_map do |concept|
       id_set = ([ concept[:id] ] + descendant_ids(concept[:id], children)).to_set
-      tagged = published_articles.select do |a|
+      tagged = candidates.select do |a|
         Array(a.dig(:contentful_metadata, :tags)).any? { |t| id_set.include?(t[:id]) }
       end
       next if tagged.empty?

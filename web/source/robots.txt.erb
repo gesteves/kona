@@ -4,3 +4,6 @@ User-agent: *
 Allow: /
 Allow: /cdn-cgi/image/
 Disallow: /cdn-cgi/
+<%# Unpublished drafts render to /id/<entry id>/ so they can be previewed unlisted. They also
+    carry <meta name="robots" content="noindex">; this covers crawlers that never fetch them. %>
+Disallow: /id/

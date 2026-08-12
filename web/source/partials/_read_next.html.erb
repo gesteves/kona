@@ -9,22 +9,15 @@
 <% newer = adjacent[:newer] %>
 <% if older || newer %>
   <nav class="collection-group" aria-label="More entries">
-    <% if older %>
-      <section class="collection collection--adjacent">
-        <h2 class="collection__heading">Previous</h2>
+    <%# aria-labelledby for the same reason as partials/_collection: an unnamed <section> isn't
+        exposed as a landmark at all. %>
+    <% [ [ "previous", "Previous", older ], [ "next", "Next", newer ] ].each do |id, heading, entry| %>
+      <% next unless entry %>
+      <section class="collection collection--adjacent" aria-labelledby="hed-<%= id %>-entry">
+        <h2 class="collection__heading" id="hed-<%= id %>-entry"><%= heading %></h2>
         <ol class="collection__list">
           <li class="collection__item">
-            <%= partial 'partials/article/summary', locals: { article: older, show_body: false } %>
-          </li>
-        </ol>
-      </section>
-    <% end %>
-    <% if newer %>
-      <section class="collection collection--adjacent">
-        <h2 class="collection__heading">Next</h2>
-        <ol class="collection__list">
-          <li class="collection__item">
-            <%= partial 'partials/article/summary', locals: { article: newer, show_body: false } %>
+            <%= partial 'partials/article/summary', locals: { article: entry, show_body: false } %>
           </li>
         </ol>
       </section>

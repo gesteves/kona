@@ -98,17 +98,22 @@ module ArticleHelpers
     content_tag :time, link, datetime: published.iso8601
   end
 
+  # ⚠️ Reads `page_content`, never `defined?(content)`. `content` is a template local, so in a
+  # helper method's binding `defined?` is always nil — the guard then falls through to "don't
+  # hide" and every draft ships indexable.
   # @return [Boolean] Whether the current page should be hidden from search engines.
   def hide_from_search_engines?
     return true unless production?
-    return false unless defined?(content)
-    return true if content.draft
-    !content.index_in_search_engines
+    page = page_content
+    return false if page.nil?
+    return true if page.draft
+    !page.index_in_search_engines
   end
 
   # @return [String] The canonical URL for the current content object or page.
   def canonical_url
-    return content.canonical_url if defined?(content) && content&.canonical_url.present?
+    page = page_content
+    return page.canonical_url if page&.canonical_url.present?
     full_url(current_page.url)
   end
 

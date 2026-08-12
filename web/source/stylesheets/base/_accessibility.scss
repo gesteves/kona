@@ -25,7 +25,11 @@
 // The skip link's target is focusable only so activating it moves focus, not just the scroll
 // position. It isn't a control, so it doesn't take the focus ring — which would otherwise outline
 // the whole main region.
-.content__main:focus-visible {
+// Same for the header: "Back to top" focuses it for the same reason (back_to_top_controller adds
+// tabindex="-1" and calls .focus()), and a programmatic focus after a keyboard activation does
+// match :focus-visible — so without this the entire masthead gets outlined.
+.content__main:focus-visible,
+.header:focus-visible {
   outline: none;
 }
 

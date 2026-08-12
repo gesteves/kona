@@ -190,6 +190,9 @@
     position: relative;
   }
 
+  // ⚠️ One raise mechanism only. `position: relative` + top/bottom is the whole offset; adding
+  // `vertical-align: super` back composes with it and lifts superscripts about twice as far as
+  // either rule intends, which at font-size 50%/line-height 0 collides with the line above.
   sup {
     top: -0.5rem;
   }
@@ -269,10 +272,6 @@
       font-size: var(--font-x-small);
       line-height: var(--line-height-x-small);
     }
-  }
-
-  sup {
-    vertical-align: super;
   }
 
   s {

@@ -9,6 +9,9 @@ require "httparty"
 module FontAwesomeClient
   FONT_AWESOME_API_URL = "https://api.fontawesome.com"
 
+  # Seconds shaved off the token's stated lifetime before caching it.
+  TOKEN_EXPIRY_MARGIN = 60
+
   ICONS_QUERY = <<-'GRAPHQL'
     query Icons ($version: String!, $query: String!) {
       search(version: $version, query: $query) {
@@ -42,7 +45,13 @@ module FontAwesomeClient
       end
 
       data = JSON.parse(response.body, symbolize_names: true)
-      $redis.setex("font_awesome:access_token", data[:expires_in], data[:access_token])
+      # ⚠️ Cached short of the real expiry, like WeatherKit's JWT, leaving a buffer for clock skew
+      # and in-flight requests — caching to the exact second ships an expired bearer to a request
+      # that lands at the end of the window. The failure is silent: the GraphQL call rescues to
+      # nil and the view renders a widget with one icon missing. A missing or zero expires_in
+      # would make setex raise into that same rescue, uncaching the token entirely.
+      ttl = data[:expires_in].to_i - TOKEN_EXPIRY_MARGIN
+      $redis.setex("font_awesome:access_token", ttl, data[:access_token]) if ttl.positive?
       data[:access_token]
     rescue StandardError => e
       Rails.logger.error("Error fetching the Font Awesome access token: #{e}")

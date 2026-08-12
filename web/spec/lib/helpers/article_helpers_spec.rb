@@ -376,28 +376,62 @@ RSpec.describe ArticleHelpers do
     end
   end
 
+  # ⚠️ These two groups reach the content object the way Middleman actually supplies it — through
+  # `current_page.metadata[:locals][:content]`, via SiteHelpers' real `page_content`. Do not
+  # shortcut it with a `def content` stub: that defines a *method*, which makes `defined?(content)`
+  # true and passes against a binding Middleman never produces. That is precisely what hid these
+  # helpers reading `defined?(content)` and shipping every draft indexable.
+  def page_content = SiteHelpers.instance_method(:page_content).bind_call(self)
+  def current_page = OpenStruct.new(url: '/2024/01/01/post/', metadata: { locals: @page_locals || {} })
+
   describe '#canonical_url' do
     # The outer group pins `canonical_url` as a plain stub for the schema groups; rebind the
     # real module method here so this group exercises ArticleHelpers' implementation.
     def canonical_url = ArticleHelpers.instance_method(:canonical_url).bind_call(self)
-    def current_page = OpenStruct.new(url: '/2024/01/01/post/')
 
     it 'is the full URL of the current page when the page has no content object' do
       expect(canonical_url).to eq('https://example.com/2024/01/01/post/')
     end
 
     context 'when the page has a content object' do
-      def content = OpenStruct.new(canonical_url: @content_canonical)
-
       it "prefers the content's own canonical_url when present" do
-        @content_canonical = 'https://elsewhere.example/original/'
+        @page_locals = { content: OpenStruct.new(canonical_url: 'https://elsewhere.example/original/') }
         expect(canonical_url).to eq('https://elsewhere.example/original/')
       end
 
       it 'falls back to the current page URL when the content has none' do
-        @content_canonical = nil
+        @page_locals = { content: OpenStruct.new(canonical_url: nil) }
         expect(canonical_url).to eq('https://example.com/2024/01/01/post/')
       end
+    end
+  end
+
+  describe '#hide_from_search_engines?' do
+    def production? = @production.nil? ? true : @production
+
+    it 'hides everything outside production' do
+      @production = false
+      @page_locals = { content: article(slug: 'post') }
+      expect(hide_from_search_engines?).to be(true)
+    end
+
+    it 'hides a draft' do
+      @page_locals = { content: article(slug: 'post', draft: true) }
+      expect(hide_from_search_engines?).to be(true)
+    end
+
+    it 'hides an entry opted out of indexing' do
+      @page_locals = { content: article(slug: 'post', index_in_search_engines: false) }
+      expect(hide_from_search_engines?).to be(true)
+    end
+
+    it 'indexes a published, opted-in entry' do
+      @page_locals = { content: article(slug: 'post') }
+      expect(hide_from_search_engines?).to be(false)
+    end
+
+    it 'indexes a page with no content object, e.g. a static template' do
+      expect(hide_from_search_engines?).to be(false)
     end
   end
 
