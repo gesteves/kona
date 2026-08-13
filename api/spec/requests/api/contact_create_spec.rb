@@ -115,6 +115,28 @@ RSpec.describe "Contact", type: :request do
     end
   end
 
+  # Rails rejects these while building the params hash, so the request never reaches the action
+  # and the response is a framework 400 rather than either of the paths above. The report it
+  # would otherwise raise is dropped by ContactBadRequestFilter.
+  describe "a body that isn't valid UTF-8" do
+    let(:form) { { "CONTENT_TYPE" => "application/x-www-form-urlencoded" } }
+    let(:body) { "name=Jane+Rider&email=jane%40example.com&message=%FF%FE" }
+
+    it "rejects the submission on the JSON path without enqueuing" do
+      post "/api/contact", params: body, headers: json.merge(form)
+
+      expect(response).to have_http_status(:bad_request)
+      expect(ContactMailJob.jobs).to be_empty
+    end
+
+    it "rejects the submission on the no-JS HTML path without enqueuing" do
+      post "/api/contact", params: body, headers: html.merge(form)
+
+      expect(response).to have_http_status(:bad_request)
+      expect(ContactMailJob.jobs).to be_empty
+    end
+  end
+
   describe "Turnstile verification" do
     it "rejects a JSON submission whose Turnstile token fails" do
       allow_any_instance_of(Turnstile).to receive(:verify).and_return(false)

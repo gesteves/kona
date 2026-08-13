@@ -14,4 +14,8 @@ Bugsnag.configure do |config|
   # conditions that keep it from swallowing a real outage. Wrapped in a lambda so the autoloaded
   # constant resolves on first notify rather than during boot.
   config.add_on_error(->(report) { SidekiqRedisTimeoutFilter.call(report) })
+
+  # Drops the unactionable BadRequest a spam bot produces by posting a contact form body that
+  # isn't valid UTF-8. See the filter for why it's scoped to that one endpoint.
+  config.add_on_error(->(report) { ContactBadRequestFilter.call(report) })
 end
