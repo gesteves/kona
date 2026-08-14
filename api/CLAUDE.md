@@ -306,7 +306,9 @@ Rails `config/credentials.yml.enc` + `master.key`).
   closed), `TURNSTILE_SECRET` (pair with the web app's `TURNSTILE_SITE_KEY`, both or neither),
   `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`, `TRAINERROAD_CALENDAR_URL`, `ANTHROPIC_API_KEY` +
   `ANTHROPIC_DESCRIPTION_MODEL` / `ANTHROPIC_CONTACT_SUBJECT_MODEL` (both default
-  `claude-sonnet-5`), `PURPLEAIR_API_KEY`, `LOCATION`, `TIME_ZONE`, `BLUESKY_HANDLE`,
+  `claude-sonnet-5`), `PURPLEAIR_API_KEY`, `GOODSPEED_API_URL` (unset = the bay-conditions
+  integration is off, and the water-temperature sentence and SF race-day bay readings are
+  omitted), `LOCATION`, `TIME_ZONE`, `BLUESKY_HANDLE`,
   `BLUESKY_APP_PASSWORD`, `BLUESKY_PDS_URL`, `BUGSNAG_API_KEY` (production only), `ALLOWED_HOSTS`
   (comma-separated `Host` allowlist; production only, unset = all hosts accepted, so it's safe to
   deploy before setting it; `/up` is always exempt), `API_HOST` (the public API hostname; unset =

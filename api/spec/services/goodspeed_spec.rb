@@ -3,6 +3,13 @@ require "rails_helper"
 RSpec.describe Goodspeed do
   subject(:service) { described_class.new }
 
+  around do |example|
+    original = ENV["GOODSPEED_API_URL"]
+    ENV["GOODSPEED_API_URL"] = "https://goodspeed.test/latest.json"
+    example.run
+    ENV["GOODSPEED_API_URL"] = original
+  end
+
   before do
     allow($redis).to receive(:get).and_return(nil)
     allow($redis).to receive(:setex)
@@ -26,5 +33,16 @@ RSpec.describe Goodspeed do
   it "memoizes the result" do
     expect(service).to receive(:get_json).once.and_return(timeseries: [ { t: "2024-06-01T12:00:00Z" } ])
     2.times { service.data }
+  end
+
+  it "returns nil (and never calls the API) when the URL is unset" do
+    ENV["GOODSPEED_API_URL"] = nil
+    expect(service).not_to receive(:get_json)
+    expect(service.data).to be_nil
+  end
+
+  it "fetches the configured URL" do
+    expect(service).to receive(:get_json).with("https://goodspeed.test/latest.json").and_return(timeseries: [ { t: "2024-06-01T12:00:00Z" } ])
+    service.data
   end
 end
