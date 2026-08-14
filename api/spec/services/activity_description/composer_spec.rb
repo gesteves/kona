@@ -35,6 +35,26 @@ RSpec.describe ActivityDescription::Composer do
     end
   end
 
+  describe ".clean_name" do
+    it "fixes the case and drops the trailing date" do
+      expect(described_class.clean_name("ROUVY - Klahane Ridge - 2026-08-12")).to eq("Rouvy - Klahane Ridge")
+    end
+
+    it "fixes the case when there is no trailing date" do
+      expect(described_class.clean_name("ROUVY - Klahane Ridge")).to eq("Rouvy - Klahane Ridge")
+    end
+
+    it "leaves a name without the uppercase prefix alone, date and all" do
+      expect(described_class.clean_name("Rouvy - Klahane Ridge - 2026-08-12")).to eq("Rouvy - Klahane Ridge - 2026-08-12")
+      expect(described_class.clean_name("Big Day - 2026-08-12")).to eq("Big Day - 2026-08-12")
+    end
+
+    it "returns nil for a blank name" do
+      expect(described_class.clean_name(nil)).to be_nil
+      expect(described_class.clean_name(" ")).to be_nil
+    end
+  end
+
   describe ".power_block" do
     it "renders all fields, preferring the icu_-prefixed values" do
       activity = { type: "Ride", icu_average_watts: 200.4, icu_weighted_avg_watts: 210.6, icu_intensity: 71.4, icu_training_load: 98 }

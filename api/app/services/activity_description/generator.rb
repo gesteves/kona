@@ -1,7 +1,7 @@
 module ActivityDescription
-  # Composes a Strava-ready description for an Intervals.icu activity and PUTs it back,
-  # orchestrating the data gathering, the two Anthropic-backed lines, and Composer's pure
-  # block builders.
+  # Composes a Strava-ready description for an Intervals.icu activity — and tidies its name —
+  # then PUTs both back, orchestrating the data gathering, the two Anthropic-backed lines, and
+  # Composer's pure block builders.
   class Generator
     # Prefix shared by every log line this generator emits, for greppability.
     LOG_PREFIX = "Description:"
@@ -57,13 +57,19 @@ module ActivityDescription
         whoop: Composer.whoop_block(whoop_strain, swim: swim)
       )
 
-      if description.blank?
-        log_info("activity #{activity_id}: composed description was empty — skipping write")
+      name = Composer.clean_name(activity[:name])
+
+      fields = {}
+      fields[:name] = name if name.present? && name != activity[:name]
+      fields[:description] = description if description.present?
+
+      if fields.empty?
+        log_info("activity #{activity_id}: nothing to write — skipping")
         return
       end
 
-      @intervals.update_activity!(activity_id, description: description)
-      log_info("activity #{activity_id}: description updated (#{description.length} chars)")
+      @intervals.update_activity!(activity_id, **fields)
+      log_info("activity #{activity_id}: updated #{fields.keys.join(', ')}")
     end
 
     # The 🗓️ planned-workout summary: the one TrainerRoad workout whose name appears verbatim

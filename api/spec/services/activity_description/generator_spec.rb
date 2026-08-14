@@ -93,13 +93,34 @@ RSpec.describe ActivityDescription::Generator do
       )
     end
 
-    it "skips the write when the composed description is empty" do
+    it "skips the write when there's nothing to change" do
       bare = activity.merge(icu_average_watts: nil, name: nil)
       allow(intervals).to receive(:activity!).and_return(bare)
 
       generator.generate!("i1")
 
       expect(intervals).not_to have_received(:update_activity!)
+    end
+
+    it "tidies a Rouvy name alongside the description" do
+      allow(intervals).to receive(:activity!).and_return(activity.merge(name: "ROUVY - Klahane Ridge - 2026-08-12"))
+
+      generator.generate!("i1")
+
+      expect(intervals).to have_received(:update_activity!).with(
+        "i1",
+        name: "Rouvy - Klahane Ridge",
+        description: "⚡️ Avg 200 W"
+      )
+    end
+
+    it "writes the name alone when the composed description is empty" do
+      bare = activity.merge(icu_average_watts: nil, name: "ROUVY - Klahane Ridge - 2026-08-12")
+      allow(intervals).to receive(:activity!).and_return(bare)
+
+      generator.generate!("i1")
+
+      expect(intervals).to have_received(:update_activity!).with("i1", name: "Rouvy - Klahane Ridge")
     end
   end
 

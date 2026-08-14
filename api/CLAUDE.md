@@ -162,7 +162,7 @@ that shared window is safe.
 | `ArticleEmbeddingJob(operation, entry_id)` | keeps an article's Voyage embedding in sync |
 | `SiteBuildJob(event_type)` | fires a GitHub `repository_dispatch` to rebuild the web site |
 | `WhoopWebhookJob(event_type, resource_id, trace_id)` | syncs Whoop metrics to Intervals.icu |
-| `ActivityDescriptionJob(activity_id, whoop_strain = nil)` | (re)generates an activity's Strava description |
+| `ActivityDescriptionJob(activity_id, whoop_strain = nil)` | (re)generates an activity's Strava description and tidies its name |
 | `LocationSyncJob(latitude, longitude)` | propagates the current location to Intervals.icu |
 | `ContactMailJob(name, email, message, context)` | contact intake: Akismet + compose |
 | `ContactDeliveryJob(payload)` | the one retryable *delivery* unit — sends via Resend |
@@ -178,7 +178,9 @@ that shared window is safe.
   water temp) plus two Anthropic-generated lines (a planned-workout summary matched against the
   TrainerRoad calendar, and a weather sentence — prompts in `app/prompts/`, skipped without
   `ANTHROPIC_API_KEY`), preserving any user-written prose above the stat block. Deduped per
-  activity by a Redis lock.
+  activity by a Redis lock. The same PUT tidies a Rouvy-generated name
+  (`ROUVY - <route> - <date>` → `Rouvy - <route>`), so it can write even when the description
+  composes empty.
 - **The contact form is a two-job pipeline** so a Resend failure retries only the send. Akismet
   fails closed, so an outage retries the *intake* job rather than delivering an unchecked message;
   `ContactSubject` (a Claude-generated subject line) fails soft.

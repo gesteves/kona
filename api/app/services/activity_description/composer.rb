@@ -1,5 +1,6 @@
 module ActivityDescription
-  # Pure functions that build and assemble the description's blocks. Layout: an optional
+  # Pure functions that build and assemble the description's blocks, plus the activity name
+  # cleanup that rides along with them. Layout: an optional
   # user-written headline (preserved verbatim — never generated) sits above a stack of
   # emoji-prefixed stat lines, in order: planned summary (🗓️) · weather · water temp (💧) ·
   # power (⚡️) · heat (🌡️) · Whoop strain (🔥). No I/O — the generator gathers the data and
@@ -9,6 +10,10 @@ module ActivityDescription
     # LLM is likely to pick: Misc Symbols/Dingbats plus the main emoji blocks. Headline
     # content (user prose) starts with a letter, so this only ever strips stat-shaped lines.
     EMOJI_RANGES = [ 0x2600..0x27BF, 0x1F300..0x1F6FF, 0x1F900..0x1F9FF, 0x1FA00..0x1FAFF ].freeze
+
+    # Rouvy names its uploads "ROUVY - <route> - <YYYY-MM-DD>".
+    ROUVY_PREFIX = /\AROUVY\b/
+    ROUVY_TRAILING_DATE = /\s*[-–—]\s*\d{4}-\d{2}-\d{2}\z/
 
     module_function
 
@@ -46,6 +51,19 @@ module ActivityDescription
       end
 
       kept.join("\n").gsub(/\n{3,}/, "\n\n").strip.presence
+    end
+
+    # Tidies a Rouvy-generated activity name: "ROUVY" becomes "Rouvy", and a trailing date drops
+    # along with its hyphen when there is one. Any other name is returned unchanged.
+    #
+    # ⚠️ Gated on the uppercase prefix so a hand-written title that happens to end in a date is
+    # never truncated.
+    # @return [String, nil] nil when the name is blank.
+    def clean_name(name)
+      return if name.blank?
+      return name unless name.match?(ROUVY_PREFIX)
+
+      name.sub(ROUVY_PREFIX, "Rouvy").sub(ROUVY_TRAILING_DATE, "").strip
     end
 
     # The cycling power line, e.g. "⚡️ Avg 200 W · NP 210 W · IF 0.71 · TSS 98".
