@@ -15,6 +15,11 @@ FileUtils.chdir APP_ROOT do
   puts "== Installing dependencies =="
   system("bundle check") || system!("bundle install")
 
+  # The admin UI's bundle. ⚠️ Needs WEBAWESOME_NPM_TOKEN in the environment — Web Awesome Pro
+  # comes from a private registry and .npmrc interpolates the token at install time.
+  system! "npm ci"
+  system! "npm run build"
+
   puts "\n== Removing old logs and tempfiles =="
   system! "bin/rails log:clear tmp:clear"
 

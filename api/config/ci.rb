@@ -7,6 +7,10 @@
 CI.run do
   step "Setup", "bin/setup --skip-server"
 
+  # ⚠️ Must precede rspec: /signin renders through layouts/auth, and Propshaft raises
+  # MissingAssetError when the esbuild output isn't there. bin/setup installs the packages.
+  step "Assets: esbuild", "npm run build"
+
   step "Tests: RSpec", "bundle exec rspec"
 
   step "Style: RuboCop", "bundle exec rubocop --no-color"

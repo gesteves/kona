@@ -23,7 +23,11 @@ Rack::Attack.cache.store =
   end
 
 # Prefixes of the app's real routes. Anything outside these is, by definition, a probe.
-RACK_ATTACK_KNOWN_PREFIXES = %w[/up /api /widgets /webhooks /whoop /sidekiq /login /logout /auth].freeze
+# `/assets` is Propshaft's and isn't a drawn route, so it needs listing by hand. Both
+# ActionDispatch::Static and Propshaft::Server sit far above this middleware (positions 3 and 4 vs
+# 29 — check with `bin/rails middleware`), so an asset request shouldn't reach here at all; the
+# entry keeps a miss from being throttled as a scanner probe if one ever does.
+RACK_ATTACK_KNOWN_PREFIXES = %w[/up /api /widgets /webhooks /whoop /sidekiq /signin /signout /auth /connected-accounts /assets].freeze
 RACK_ATTACK_KNOWN_ROUTE = lambda do |path|
   path == "/" || RACK_ATTACK_KNOWN_PREFIXES.any? { |prefix| path == prefix || path.start_with?("#{prefix}/") }
 end

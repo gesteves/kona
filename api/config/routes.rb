@@ -81,17 +81,35 @@ Rails.application.routes.draw do
     # handled by middleware before routing, so only these four need routes — and for the same
     # reason it stays reachable on the API host, where the callback below no longer is, so a
     # sign-in can't complete there.
-    get  "/login" => "sessions#new"
-    post "/logout" => "sessions#destroy"
+    get  "/signin" => "sessions#new"
+    post "/signout" => "sessions#destroy"
     get  "/auth/google_oauth2/callback" => "sessions#create"
     get  "/auth/failure" => "sessions#failure"
 
     # Gated by the owner session, via the Rack guard in config/initializers/sidekiq.rb.
     mount Sidekiq::Web => "/sidekiq"
+
+    # The owner-facing admin UI, gated by the owner session in Admin::BaseController. Drawn at the
+    # ROOT, not under /admin: these routes exist only on the admin host, where the prefix would
+    # just repeat the hostname. `scope module:` keeps the controllers grouped under Admin:: without
+    # putting that in the path.
+    #
+    # ⚠️ Admin pages therefore claim top-level paths on this host. Check a new one against the
+    # zone's scanner-noise custom rule before adding it — that rule blocks whole prefix families
+    # (`/config/`, `/home/`, `/analytics/`, `/deploy/`, …) zone-wide, and would 403 a page named
+    # after one. See the root CLAUDE.md.
+    scope module: "admin" do
+      root to: "dashboard#show"
+      get    "connected-accounts"       => "connected_accounts#show",  as: :connected_accounts
+      delete "connected-accounts/whoop" => "connected_accounts#whoop", as: :whoop_connection
+    end
   end
 
-  # Evaluated per-request, so it tracks SITE_URL rather than baking in a host.
-  root to: redirect(status: 301) { "#{ENV['SITE_URL'].to_s.chomp('/')}/" }
+  # The public API host has no UI, so point a browser that lands on it at the real site. Drawn
+  # after the block above, so on the admin host the dashboard claims "/" first and this is only
+  # ever reached on the public host. Evaluated per-request, so it tracks SITE_URL rather than
+  # baking in a host.
+  get "/" => redirect(status: 301) { "#{ENV['SITE_URL'].to_s.chomp('/')}/" }
 
   # Catch-all, mostly for vulnerability scanners. Handling them in a controller rather than
   # raising a RoutingError turns a multi-line backtrace into one clean lograge 404 line.

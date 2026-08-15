@@ -1,18 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="robots" content="noindex">
-    <title>Sign in</title>
-    <style>
-      body { font: 1rem/1.5 system-ui, sans-serif; display: grid; place-items: center; min-height: 100vh; margin: 0; }
-      button { font: inherit; padding: 0.6rem 1.2rem; cursor: pointer; }
-    </style>
-  </head>
-  <body>
-    <main>
-      <%= button_to "Sign in with Google", "/auth/google_oauth2", method: :post %>
-    </main>
-  </body>
-</html>
+<% content_for :title, "Sign in" %>
+
+<%# ⚠️ `turbo: false` is load-bearing. Turbo Drive intercepts same-origin form submissions and
+    follows the response itself, but this one 302s to Google — a cross-origin redirect it can't
+    follow, so the sign-in silently does nothing. `form_with` still emits the CSRF token that
+    omniauth-rails_csrf_protection requires of the request phase. %>
+<%= form_with url: "/auth/google_oauth2", method: :post, data: { turbo: false }, class: "signin__form" do %>
+  <wa-button type="submit" variant="brand" appearance="accent" size="large">
+    <%= raw icon_svg("classic", "brands", "google")&.sub("<svg", '<svg slot="start"') %>
+    Sign in with Google
+  </wa-button>
+<% end %>

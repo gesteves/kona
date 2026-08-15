@@ -34,7 +34,10 @@ class WhoopOauthController < ActionController::Base
     $redis.del(STATE_CACHE_KEY)
 
     if params[:code].present? && Whoop.new.exchange_code_for_tokens(params[:code])
-      render plain: "Whoop connected. You can close this tab."
+      # Back to the page the owner started from, so the status badge reflects the new state.
+      # The error branches below stay plain text: they're reachable without a session (Whoop
+      # redirects here directly), and the admin layout would imply one.
+      redirect_to connected_accounts_path, notice: "Whoop connected."
     else
       render plain: "Failed to exchange the authorization code for tokens.", status: :bad_gateway
     end

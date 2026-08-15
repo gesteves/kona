@@ -11,7 +11,7 @@ RSpec.describe "Whoop OAuth", type: :request do
 
     it "redirects to the login page when not signed in" do
       get "/whoop/auth"
-      expect(response).to redirect_to("/login")
+      expect(response).to redirect_to("/signin")
     end
 
     context "when signed in as the owner" do
@@ -64,8 +64,9 @@ RSpec.describe "Whoop OAuth", type: :request do
 
       get "/whoop/callback", params: { code: "abc", state: "good-state" }
 
-      expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Whoop connected")
+      # Back to the admin page the flow started from, so its status badge reflects the new state.
+      expect(response).to redirect_to("/connected-accounts")
+      expect(flash[:notice]).to eq("Whoop connected.")
     end
 
     it "returns 502 when the code exchange fails" do

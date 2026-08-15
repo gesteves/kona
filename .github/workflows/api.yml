@@ -82,6 +82,24 @@ jobs:
           working-directory: api
           bundler-cache: true
 
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: api/.nvmrc
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      # ⚠️ Not optional. spec/requests/sessions_spec.rb renders /login through layouts/auth, which
+      # calls stylesheet_link_tag "admin" — and Propshaft raises MissingAssetError rather than
+      # degrading when the esbuild output isn't there.
+      - name: Install JavaScript dependencies
+        run: npm ci
+        env:
+          WEBAWESOME_NPM_TOKEN: ${{ secrets.WEBAWESOME_NPM_TOKEN }}
+
+      - name: Build assets
+        run: npm run build
+
       - name: Run tests
         run: bundle exec rspec
 
@@ -177,12 +195,16 @@ jobs:
       # with the deploy credential. Dependabot's github-actions updater bumps this tag.
       - uses: superfly/flyctl-actions/setup-flyctl@1.6
 
+      # ⚠️ --remote-only builds on fly's builder, not this runner, so the private-registry token
+      # has to travel with the build. --build-secret is what puts it on the BuildKit secret mount
+      # the Dockerfile reads; without it `npm ci` 401s and every deploy fails.
       - name: Deploy to Fly.io
         id: fly_deploy
         working-directory: api
-        run: flyctl deploy --remote-only
+        run: flyctl deploy --remote-only --build-secret WEBAWESOME_NPM_TOKEN="$WEBAWESOME_NPM_TOKEN"
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          WEBAWESOME_NPM_TOKEN: ${{ secrets.WEBAWESOME_NPM_TOKEN }}
 
       - name: Notify Slack (deploy successful)
         if: success()

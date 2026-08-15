@@ -1,0 +1,48 @@
+<% content_for :title, "Connected accounts" %>
+
+<h1 class="admin-main__title">Connected accounts</h1>
+
+<ul class="account-list">
+  <% @accounts.each do |account| %>
+    <li class="account-list__item">
+      <wa-card>
+        <div class="wa-stack wa-gap-m">
+          <div class="account__header">
+            <h2 class="account__name"><%= account.name %></h2>
+            <wa-badge variant="<%= account.status_variant %>" appearance="outlined">
+              <%= account.status_label %>
+            </wa-badge>
+          </div>
+
+          <p class="account__description"><%= account.description %></p>
+
+          <div class="wa-cluster wa-gap-s">
+            <% if account.connectable? %>
+              <%# ⚠️ `turbo: false` because this same-origin path 302s to Whoop, and Turbo Drive
+                  can't follow a cross-origin redirect. Event retargeting means Turbo doesn't
+                  currently see the anchor inside wa-button's shadow root anyway; this is here so
+                  the flow doesn't silently depend on that. %>
+              <wa-button href="<%= account.connect_path %>" variant="brand" appearance="accent"
+                         data-turbo="false">
+                Connect
+              </wa-button>
+            <% elsif account.disconnectable? %>
+              <%# Same-origin POST-as-DELETE, so Turbo handles it normally. form_with + a
+                  form-associated <wa-button> rather than button_to, which emits a native button. %>
+              <%= form_with url: account.disconnect_path, method: :delete do %>
+                <wa-button type="submit" variant="danger" appearance="outlined">
+                  <%= raw icon_svg("classic", "light", "link-slash")&.sub("<svg", '<svg slot="start"') %>
+                  Disconnect
+                </wa-button>
+              <% end %>
+            <% else %>
+              <p class="account__description">
+                Set its credentials in the environment to enable this integration.
+              </p>
+            <% end %>
+          </div>
+        </div>
+      </wa-card>
+    </li>
+  <% end %>
+</ul>

@@ -16,7 +16,7 @@ test suite.
 | Path | What | Deploy |
 |---|---|---|
 | `web/` | Middleman 4 static site (Ruby 4.0.6). Builds the Contentful-powered blog. | Cloudflare Workers (`kona-web`) |
-| `api/` | Rails 8.1 API (Ruby 4.0.6). Serves HTML "widget" fragments embedded into the static pages at runtime, plus a Sidekiq `worker` process. | fly.io (`kona-api`: `app` + `worker`), behind Cloudflare |
+| `api/` | Rails 8.1 API (Ruby 4.0.6). Serves HTML "widget" fragments embedded into the static pages at runtime, plus a Sidekiq `worker` process and an owner-facing admin UI at the root of the admin host. | fly.io (`kona-api`: `app` + `worker`), behind Cloudflare |
 | `redis/` | `fly.toml` for `kona-redis`, the API's Redis (cache + Sidekiq queues). | fly.io |
 | `utilities/` | Local-only tools. Never deployed — see below. | — |
 
@@ -52,7 +52,7 @@ the checks that exist (today: `utilities/maps/`'s rspec suite) without deploying
 Two commands, and **which one you run is the choice of API target** — there is deliberately no flag:
 
 ```bash
-overmind start                    # web :4567 + api :3000, site → the local api
+overmind start                    # web :4567 + api :3000 + the api's esbuild watch, site → the local api
 cd web && bundle exec middleman   # web only, site → the deployed api
 ```
 
@@ -61,7 +61,12 @@ and `.overmind.env`, and child processes inherit the latter's `KONA_API_URL`/`SI
 dotenv never overwrites an already-set variable, that's the whole mechanism — and it's why the
 plain `middleman` command still reaches production off `web/.env`. `overmind restart web` restarts
 one process; `overmind connect api` attaches a real TTY, so `binding.break` works. Sidekiq is
-opt-in (`overmind start -l web,api,worker`): no widget endpoint enqueues a job.
+opt-in (`overmind start -l web,api,js,worker`): no widget endpoint enqueues a job.
+
+The `js` process is esbuild watching the api's admin bundle. It only matters for the api's admin
+pages and `/signin`; the widgets and the site don't touch it. ⚠️ Those pages raise
+`Propshaft::MissingAssetError` if the bundle was never built, so run `npm run build` in `api/` once
+after a fresh clone (`bin/setup` does it).
 
 Ports: 4567 Middleman, 3000 Rails, 8787 `wrangler dev`, 6379 Redis. The api logs to
 `api/log/development.log`, **not** to its overmind pane.
@@ -113,6 +118,11 @@ disclosure from an affiliate link that carries it everywhere else on the same pa
 ⚠️ `open_external_links_in_new_tabs` genuinely **diverges**: web skips same-host links, the api
 opens every absolute link, on the assumption that card bodies only ever link off-site. Nothing
 enforces that assumption.
+
+The site **wordmark** is also duplicated — `web/source/partials/_logo.svg.erb` is copied verbatim to
+`api/app/views/layouts/_logo.html.erb` for the admin header. This one is benign: the two never
+appear on the same page, and drift just means a stale admin logo. Re-copy the file if the mark
+changes.
 
 ## Code style
 
@@ -305,8 +315,13 @@ forms; don't drop either as redundant.
 means pages are served at `/<slug>/`, so a top-level page slugged `config`, `home`, `analytics`, or
 `deploy` would be blocked by its own prefix clause — check `data/pages.json` before adding a prefix,
 and remember this if a new page ever 403s. Every clause must also stay false for the api host
-(`/widgets/`, `/api/`, `/webhooks/`, `/whoop/`, `/auth/`, `/login`, `/sidekiq`, `/up`) and for the
-R2 key shape (`{space}/{asset id}/{token}/{filename}`).
+(`/widgets/`, `/api/`, `/webhooks/`, `/whoop/`, `/auth/`, `/signin`, `/signout`, `/sidekiq`, `/up`)
+and for the R2 key shape (`{space}/{asset id}/{token}/{filename}`).
+
+⚠️ **The admin UI is mounted at the root of the admin host**, so its pages claim top-level paths
+(`/connected-accounts` today) and are subject to the same trap from the other direction: a new admin
+page named after one of these prefix families would 403 zone-wide. Check this rule before naming
+one.
 
 **Rule 3** tells "Cloudflare Images fetching a source" apart from "someone typing the URL in" via
 the `image-resizing` marker Cloudflare puts in `Via`.
@@ -322,8 +337,9 @@ render. The only thing that would bound the maximum obtainable resolution is **c
 master** (mirroring `?w=2560` instead of the original).
 
 **Rule 4** is one condition rather than a per-host path allowlist because **the api app enforces
-the split itself**: `API_HOST` in `api/config/routes.rb` draws the owner-facing routes (`/login`,
-`/logout`, `/auth/*`, `/whoop/auth`, `/whoop/callback`, `/sidekiq`) only off the admin host, so the
+the split itself**: `API_HOST` in `api/config/routes.rb` draws the owner-facing routes (`/signin`,
+`/signout`, `/auth/*`, `/whoop/auth`, `/whoop/callback`, `/sidekiq`, and the admin UI at `/`) only
+off the admin host, so the
 public api host answers nothing but `/up` and the three machine namespaces.
 
 ⚠️ **That route constraint is the whole reason this rule is safe.** An owner-facing route drawn
@@ -353,8 +369,10 @@ Why the skip is needed at all, host by host:
   rule sooner or later; both are HMAC-verified, so managed rules add nothing. ⚠️ A block there
   fails **silently** — nothing surfaces an error, the PDS sync simply stops happening.
 - **Admin host** — the one host left protected, and the only one whose traffic is a real browser
-  driven by one person: Google sign-in, the Sidekiq UI, the Whoop OAuth round-trip. A managed
-  challenge there is survivable in a way it is nowhere else. ⚠️ Point external uptime checks at
+  driven by one person: Google sign-in, the admin UI at the host root, the Sidekiq UI, the Whoop OAuth
+  round-trip. A managed challenge there is survivable in a way it is nowhere else. (The admin UI's
+  fingerprinted `/assets/*` ride along on this host; SBFM's **static resource protection is off**,
+  which is what keeps them from being challenged.) ⚠️ Point external uptime checks at
   `/up` on the **public** host; fly's own checks reach the app on its internal host and never
   traverse the zone at all.
 

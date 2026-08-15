@@ -44,8 +44,11 @@ updates:
         patterns:
           - "*"
 
+  # Both apps pull Web Awesome Pro from the private registry above, so both need it listed.
   - package-ecosystem: "npm"
-    directory: "/web"
+    directories:
+      - "/web"
+      - "/api"
     registries:
       - webawesome
     schedule:

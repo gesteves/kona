@@ -1,0 +1,10 @@
+// The sign-in page: one centered button, nothing else. Deliberately not a <wa-page> — that
+// component's slots and `view` state are inert outside a full app shell.
+
+.signin {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: var(--wa-space-l);
+}

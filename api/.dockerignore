@@ -17,6 +17,12 @@
 /config/master.key
 /config/credentials/*.key
 
+# Ignore npm packages and any local asset build; the image installs and builds its own.
+/node_modules/
+/app/assets/builds/*
+!/app/assets/builds/.keep
+/public/assets/
+
 # Ignore all logfiles and tempfiles.
 /log/*
 /tmp/*

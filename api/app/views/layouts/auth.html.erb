@@ -1,0 +1,15 @@
+<%# The sign-in page's layout. Deliberately not <wa-page>: this is one centered card, and that
+    component's slots and `view` state are inert outside a full app shell. %>
+<%# See layouts/admin.html.erb for why `wa-brand-red` is here. %>
+<!DOCTYPE html>
+<html lang="en" class="wa-brand-red">
+  <head>
+    <%= render "layouts/head", title: yield(:title) %>
+  </head>
+
+  <body>
+    <main class="signin wa-cloak">
+      <%= yield %>
+    </main>
+  </body>
+</html>

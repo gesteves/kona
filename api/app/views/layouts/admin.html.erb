@@ -1,0 +1,61 @@
+<%# The owner-facing admin shell, built on Web Awesome's <wa-page>.
+    ⚠️ Deliberately NOT named `application`: that's Rails' implicit default layout, and this app's
+    posture is machine-only-by-default — every widget and API controller renders `layout false`.
+    Naming it `admin` keeps them unaffected if one of those declarations is ever dropped. %>
+<%# `wa-brand-red` swaps Web Awesome's brand ramp from its default blue to the red family;
+    styles/_tokens.scss then pins the loud step to the site's exact firebrick. The dark-mode
+    script only toggles `wa-dark`, so it never disturbs this class. %>
+<!DOCTYPE html>
+<html lang="en" class="wa-brand-red">
+  <head>
+    <%= render "layouts/head", title: yield(:title) %>
+  </head>
+
+  <body>
+    <%# `disable-navigation-toggle` is set explicitly because this is server-rendered: the
+        component flips it on its own once it sees our [data-toggle-nav], but not until it
+        upgrades, and until then its built-in hamburger renders on its own unstyled row above the
+        header bar. `wa-cloak` hides the shell until the custom elements are defined. %>
+    <wa-page class="admin wa-cloak" disable-navigation-toggle>
+      <header slot="header" class="admin-header">
+        <wa-button data-toggle-nav appearance="plain" class="wa-mobile-only" aria-label="Open menu">
+          <%= raw icon_svg("classic", "light", "bars") %>
+        </wa-button>
+        <%= link_to root_path, class: "admin-header__home", aria: { label: "Dashboard" } do %>
+          <%= render "layouts/logo" %>
+        <% end %>
+      </header>
+
+      <%# Written once. <wa-page> renders this as the desktop sidebar and moves the same copy into
+          a drawer on mobile — never both at once, so don't mirror it into the header. %>
+      <nav slot="navigation" class="admin-nav" aria-label="Admin">
+        <%= render "layouts/admin_nav" %>
+      </nav>
+
+      <div slot="navigation-footer" class="admin-nav__footer">
+        <%# form_with + <wa-button type="submit"> rather than button_to, which emits a native
+            <button>. Web Awesome's button is form-associated, so it submits the surrounding form
+            like a native one. %>
+        <%= form_with url: "/signout", method: :post do %>
+          <wa-button type="submit" appearance="outlined" variant="neutral">
+            <%= raw icon_svg("classic", "light", "arrow-right-from-bracket")&.sub("<svg", '<svg slot="start"') %>
+            Sign out
+          </wa-button>
+        <% end %>
+      </div>
+
+      <main class="admin-main">
+        <% if flash.any? %>
+          <% flash.each do |type, message| %>
+            <wa-callout class="admin-flash" variant="<%= type.to_s == "alert" ? "danger" : "success" %>"
+                        data-controller="flash">
+              <%= message %>
+            </wa-callout>
+          <% end %>
+        <% end %>
+
+        <%= yield %>
+      </main>
+    </wa-page>
+  </body>
+</html>

@@ -1,0 +1,15 @@
+// Configuration for Web Awesome's <wa-page> shell. Custom properties only — the component owns
+// the grid, the sticky regions, the mobile drawer, and the toggle's visibility.
+
+wa-page {
+  // The sidebar track width. Wide enough that the longest label ("Connected accounts") stays on
+  // one line once the nav's padding, the link's padding, and the icon are taken out.
+  --menu-width: 17rem;
+}
+
+// ⚠️ Must reset to `auto` on mobile: the grid track is governed only by this variable, never by
+// whether the navigation is visible, so leaving it set reserves an empty band down the left once
+// the nav moves into the drawer.
+wa-page[view="mobile"] {
+  --menu-width: auto;
+}

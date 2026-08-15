@@ -1,0 +1,13 @@
+// The main content column.
+// ⚠️ No padding here: <wa-page> already pads the slotted `main`, and adding our own doubles it.
+// A single contained column is exactly the case its default padding is meant for.
+
+.admin-main {
+  display: block;
+  margin: 0 auto;
+  max-width: 60rem;
+
+  &__title {
+    margin-block-start: 0;
+  }
+}

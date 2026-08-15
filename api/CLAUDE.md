@@ -9,6 +9,10 @@ Minimal Rails: only ActiveModel + ActionController + ActionView are loaded (no A
 ActiveJob / ActionMailer / ActionCable). See the root [`CLAUDE.md`](../CLAUDE.md) for the web↔api
 markup contract before changing any view, and for the comment-style conventions this app follows.
 
+It also serves a small owner-facing **admin UI**, built on Web Awesome and mounted at the root of
+the admin host — the only part of the app with an asset pipeline or a layout. See **The admin UI**
+below.
+
 Routes split by namespace: `/widgets/*` (HTML fragments, reached through the web app's proxy),
 `/api/*` (structured data, hit directly at the origin), `/webhooks/*` (inbound, hit directly by
 the sending service).
@@ -44,12 +48,19 @@ a cached copy before revalidating.
 | POST | `/webhooks/contentful` | enqueues PDS sync, embedding, asset-mirror, and site-build jobs; 204 | — |
 | POST | `/webhooks/whoop` | enqueues `WhoopWebhookJob`; 200 `{ok: true}` | — |
 | GET | `/whoop/auth`, `/whoop/callback` | Whoop OAuth (authorize is owner-gated) | — |
-| GET | `/login`, `/auth/google_oauth2/callback`; POST `/logout` | owner session | — |
+| GET | `/signin`, `/auth/google_oauth2/callback`; POST `/signout` | owner session | `no-store` |
+| GET | `/`, `/connected-accounts`; DELETE `/connected-accounts/whoop` | admin UI (owner-session gated) | `no-store` |
 | — | `/sidekiq` | job dashboard (owner-session gated) | — |
-| GET | `/` | 301 → main site | — |
+| GET | `/` (public API host only) | 301 → main site | — |
 
-The Whoop OAuth, owner session, and `/sidekiq` rows are **admin-host only** wherever `API_HOST` is
-set; everything else, `/` included, answers on both hostnames.
+The Whoop OAuth, owner session, admin UI, and `/sidekiq` rows are **admin-host only** wherever
+`API_HOST` is set.
+
+⚠️ **`/` is the one path the two hosts answer differently** rather than one of them 404ing: the
+admin dashboard sits at the root of the admin host, and the public host keeps the redirect to the
+main site. Two routes are drawn for `/`, and only the `API_HOST` constraint plus **the order they
+appear in** keeps them apart — swapping them would silently hand the public host the dashboard.
+`spec/requests/root_spec.rb` and `spec/requests/host_constraints_spec.rb` pin both directions.
 
 ## Architecture
 
@@ -199,6 +210,115 @@ none read controller ivars. Request state lives in **presenters** (`app/presente
 a controller body needs a helper, it calls it through the `helpers` proxy rather than `include`-ing
 the module.
 
+### The admin UI
+
+An owner-facing UI built with **Web Awesome Pro** components. It's the only part of this app with an
+asset pipeline, a layout, or client-side JavaScript; everything else still renders `layout false`
+fragments.
+
+⚠️ **Its routes sit at the ROOT, not under `/admin`** — they're drawn only on the admin host, where
+the prefix would just repeat the hostname. `scope module: "admin"` in `config/routes.rb` keeps the
+controllers grouped under `Admin::` without putting that in the path. The consequence is that admin
+pages claim top-level paths: check any new one against the zone's scanner-noise custom rule, which
+blocks whole prefix families (`/config/`, `/home/`, `/analytics/`, `/deploy/`, …) zone-wide and
+would 403 a page named after one. Add its prefix to `RACK_ATTACK_KNOWN_PREFIXES` too.
+
+**Stack: Turbo + Stimulus + Web Awesome, server-rendered.** No SPA framework, and no separate
+front-end app — deliberately, and not for lack of ambition (a maps UI, a daily dashboard, and
+eventually a Contentful replacement are all intended to live here). Web Awesome already ships the
+admin component set those need, and keeping it as the single component layer across `web/` and
+`api/` is what stops the design system forking. When one screen turns out to need real client state,
+add it as an **island**: npm install, import in `app/javascript/admin.js`, mount from a Stimulus
+controller's `connect()`. The pipeline supports that with no changes.
+
+**Pipeline**: Propshaft (fingerprinting) + jsbundling-rails (runs `npm run build` inside
+`assets:precompile`) + esbuild, configured in `esbuild.config.mjs` rather than CLI flags (as `web/`
+uses) because the Sass plugin has to be registered in-process. `app/javascript/admin.js` is the only
+entrypoint; esbuild emits `app/assets/builds/admin.js` *and* a sibling `admin.css` from the
+stylesheet imports. Bundling exists because Web Awesome's `dist/` uses relative imports into
+`dist/chunks/*.js` and Propshaft rewrites no import specifiers.
+
+**Styles are Sass**, one BEM block per partial under `app/javascript/styles/`, pulled together by
+`admin.scss`. ⚠️ **esbuild — not Sass — is what flattens `webawesome.css`.** That file is a chain of
+`@import url(...)` statements, and Sass passes those through as plain CSS imports instead of
+inlining them, which would leave the built stylesheet pointing at paths that don't exist. So the
+vendor stylesheet stays a plain `.css` import in `admin.js`, ahead of our `.scss`.
+
+- ⚠️ **`WEBAWESOME_NPM_TOKEN` is required at every `npm ci`** — your shell, the GitHub runner, and
+  **fly's remote builder** (`flyctl deploy --build-secret`, which is why the deploy command grew a
+  flag). `.npmrc` interpolates it from the environment; it's never on disk.
+- ⚠️ **`node_modules` is deleted at the end of the Dockerfile's build stage.** The final stage does
+  `COPY --from=build /rails /rails` wholesale, so anything left behind ships to a 512MB VM.
+- ⚠️ **The import of the full `styles/webawesome.css` is load-bearing**, not a convenience.
+  `styles/layers.css` is what defines `.wa-mobile-only` and the rule hiding `[data-toggle-nav]` on
+  desktop; `styles/utilities/fouce.css` is what provides `.wa-cloak`. Cherry-picking the theme (as
+  `web/` does) silently drops both. Our Sass is imported *after* it and is unlayered, so it outranks
+  every `wa-*` layer without specificity games.
+- ⚠️ **Don't use `<wa-icon>`** — it resolves icons through a base path or FA kit code, neither
+  configured here, and the npm package ships no icon assets, so every icon silently renders blank.
+  Use `icon_svg(family, style, id)`, and **always with `raw`** — it returns a plain String, so
+  without it ERB escapes the markup into the page as visible text.
+- ⚠️ `rake assets:*` is now shared: `assets:backfill` (the R2 image mirror, above) sits alongside
+  Propshaft's `assets:precompile` / `clean` / `clobber`. No collision, but they're unrelated.
+
+**Prefer a Web Awesome component over the native element wherever one exists.** In practice that
+means **not** `button_to`, which emits a native `<button>` — use `form_with` wrapping a
+`<wa-button type="submit">`. Web Awesome's button is form-associated (`formAssociated = true`), so
+it submits the surrounding form exactly like a native one, CSRF token and `_method` included.
+A bare `<button` in the server HTML means one crept back in; two request specs assert its absence.
+
+**Brand color** — the site's firebrick (`#bf0222`, matching `--color-firebrick` in `web/`). Web
+Awesome derives every brand surface from the `--wa-color-brand-NN` ramp, so there's no single token
+to set: the layouts put **`wa-brand-red`** on `<html>` (Web Awesome's supported way to swap the whole
+ramp to the red family, keeping its contrast-checked hover/quiet steps) and `styles/_tokens.scss`
+pins `--wa-color-brand-50` — the step the *loud* surfaces paint with — to the exact firebrick. It
+also colors the Turbo progress bar and the logo's hover state. ⚠️ Don't hand-write the other ten
+ramp steps; that's what the palette exists to get right.
+
+**Layouts** — `layouts/admin.html.erb` (the `<wa-page>` shell) and `layouts/auth.html.erb` (the
+sign-in page, which is deliberately just the Google button — no heading, no copy), sharing
+`layouts/_head.html.erb`. ⚠️ **Neither is named `application`**: that's
+Rails' implicit default, and this app's posture is machine-only-by-default, so every existing
+controller must stay unaffected even if a `layout false` is ever dropped. Dark mode comes from an
+inline script mapping `prefers-color-scheme` onto Web Awesome's `.wa-dark` class — it keys off that
+class, not the media query.
+
+**`<wa-page>` rules** (the package ships its own reference at
+`dist/skills/webawesome-design/references/layouts-page.md`): write the nav **once** in
+`slot="navigation"` — the component moves that one copy between the desktop sidebar and the mobile
+drawer, so a second authored copy shows twice on desktop. `--menu-width` must reset to `auto` for
+`view='mobile'` or an empty band is reserved down the left. Nav links need `data-drawer="close"`.
+⚠️ Set `disable-navigation-toggle` explicitly because we server-render: the component flips it
+itself once it sees our `[data-toggle-nav]`, but not before it upgrades, and until then its built-in
+hamburger renders on its own unstyled row above the header.
+
+⚠️ **Two flows must opt out of Turbo** with `data-turbo="false"`: the Google sign-in form and the
+Whoop **Connect** link. Both are same-origin URLs that redirect cross-origin, which Turbo Drive
+cannot follow — it fails silently, the click appearing to do nothing.
+
+The header carries the site wordmark, `layouts/_logo.html.erb` — a **verbatim copy** of
+`web/source/partials/_logo.svg.erb`. ⚠️ Its paths hardcode `fill="#020a0a"`, which is invisible on
+the dark theme; `_admin-header.scss` overrides that to `currentColor`, which is also why it's
+inlined rather than served as an image (an `<img>` can't inherit the text color). Drift between the
+two copies costs nothing beyond a stale admin logo.
+
+The sidebar is built from `AdminHelper#admin_nav_items`, so drawer-closing, `aria-current`, and icon
+handling are written once. An item marked `external: true` (today only Sidekiq, which renders its
+own layout) opens in a new tab with `rel="noopener"` and a visually-hidden "(opens in a new tab)".
+
+**Connected accounts** (`/connected-accounts`) connects and disconnects Whoop.
+`ConnectedAccountPresenter` renders three states from `Whoop#valid_credentials?` and
+`Whoop#connected?`; `Whoop#disconnect!` clears them. ⚠️ It deletes the cached `user_id` alongside
+the tokens — `Webhooks::WhoopController` authorizes payloads against it, so a leftover copy keeps
+accepting webhooks for an account whose tokens are gone.
+
+`Admin::BaseController` requires the owner session; it and `SessionsController` both include the
+**`OwnerFacing`** concern, which sets `Cache-Control: no-store` and `X-Robots-Tag: noindex,
+nofollow`. ⚠️ Admin actions must never call `cache_widget`. ⚠️ The `X-Robots-Tag` is not redundant
+with the `<meta name="robots">` in the layout: `public/robots.txt` disallows this whole host, so a
+crawler never fetches the page to *see* that tag, while the URL can still be indexed from an
+external link.
+
 ### Caching
 
 `app/controllers/concerns/live_widget.rb`. `cache_widget(ttl:)` sets:
@@ -256,8 +376,12 @@ the manual `widgets` tag, in the root [`CLAUDE.md`](../CLAUDE.md).
 
 ## Commands
 
+Run `nvm use` before any `npm` command, as in `web/`.
+
 ```bash
 bin/dev                                                          # local server (or bin/setup)
+npm run build                                                    # admin bundle, one shot
+npm run watch                                                    # …or rebuild on change (the `js` overmind process)
 bundle exec sidekiq -C config/sidekiq.yml                        # local worker
 bundle exec rspec spec/requests/widgets/activity_stats_spec.rb   # single spec
 bundle exec rspec                                                # full suite
@@ -265,7 +389,10 @@ bin/ci                                                           # setup + suite
 bundle exec rubocop                                              # -a to autocorrect
 bundle exec brakeman -q --no-pager
 bundle exec bundle-audit check --update
-fly deploy                                                       # app + worker
+
+# ⚠️ --build-secret is not optional: --remote-only builds on fly's builder, so the private-registry
+# token has to travel with the build or `npm ci` 401s and the deploy fails.
+fly deploy --build-secret WEBAWESOME_NPM_TOKEN="$WEBAWESOME_NPM_TOKEN"   # app + worker
 fly console
 
 # Trigger a web rebuild (needs a running worker). ⚠️ Against production this ships a real deploy.
@@ -293,6 +420,10 @@ markup **and** the cache headers.
 
 Names only — see `.env.example`; never commit values. Production values are fly.io secrets (plus
 Rails `config/credentials.yml.enc` + `master.key`).
+
+- **Build credential**: `WEBAWESOME_NPM_TOKEN` — Web Awesome Pro npm auth for the admin UI, read by
+  `.npmrc` at install time (not in `.env`, and not a fly secret — it's needed at *build* time, so it
+  goes to fly via `--build-secret`).
 
 - **Required**: `REDIS_URL`, `ICU_ATHLETE_ID`, `ICU_API_KEY`, `FONT_AWESOME_API_TOKEN`,
   `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET`, `WHOOP_REDIRECT_URI`, `GOOGLE_OAUTH_CLIENT_ID`,

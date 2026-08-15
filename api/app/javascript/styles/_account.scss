@@ -1,0 +1,31 @@
+// External accounts on the Connected accounts page: a list of cards, one per integration.
+
+.account-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wa-space-m);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.account {
+  &__header {
+    align-items: center;
+    display: flex;
+    gap: var(--wa-space-s);
+  }
+
+  &__name {
+    font-size: var(--wa-font-size-l);
+    font-weight: var(--wa-font-weight-heading);
+    margin: 0;
+    // Pushes the status badge to the far edge of the card.
+    margin-inline-end: auto;
+  }
+
+  &__description {
+    color: var(--wa-color-text-quiet);
+    margin: 0;
+  }
+}

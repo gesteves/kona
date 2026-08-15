@@ -1,0 +1,16 @@
+// Brand color. The same firebrick the public site uses (`--color-firebrick` in
+// web/source/stylesheets/base/_props.scss), so the admin reads as part of the same product.
+
+:root {
+  --color-firebrick: #bf0222;
+
+  // Web Awesome derives every brand surface — accent button fills, borders, link text, focus
+  // rings — from the `--wa-color-brand-NN` ramp, so there's no single "brand color" to set. The
+  // layouts put `wa-brand-red` on <html>, which is Web Awesome's supported way to swap the whole
+  // ramp to the red family and keeps its contrast-checked hover/quiet steps. This pins the one
+  // step the *loud* surfaces paint with to our exact firebrick.
+  //
+  // ⚠️ Only override `-50`. Overriding the whole ramp by hand would mean hand-picking ten tints
+  // and shades, which is what the palette exists to get right.
+  --wa-color-brand-50: var(--color-firebrick);
+}

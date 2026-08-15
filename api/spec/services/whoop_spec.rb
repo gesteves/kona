@@ -24,6 +24,42 @@ RSpec.describe Whoop do
     service.send(:get_access_token)
   end
 
+  describe "#connected?" do
+    it "is true when a refresh token is stored" do
+      allow($redis).to receive(:exists?).with(refresh_token_key).and_return(true)
+
+      expect(service).to be_connected
+    end
+
+    it "is false when no refresh token is stored" do
+      allow($redis).to receive(:exists?).with(refresh_token_key).and_return(false)
+
+      expect(service).not_to be_connected
+    end
+
+    # Without credentials the key name isn't even well-formed (the client id is nil), so this
+    # short-circuits rather than probing Redis.
+    it "is false — without touching Redis — when the credentials are missing" do
+      allow(ENV).to receive(:[]).with("WHOOP_CLIENT_SECRET").and_return(nil)
+      expect($redis).not_to receive(:exists?)
+
+      expect(service).not_to be_connected
+    end
+  end
+
+  describe "#disconnect!" do
+    # ⚠️ The cached user_id must go with the tokens: Webhooks::WhoopController authorizes each
+    # payload against it, and a leftover copy would keep accepting webhooks for an account whose
+    # tokens we just discarded.
+    it "deletes both tokens, the cached user id, and the refresh lock" do
+      expect($redis).to receive(:del).with(
+        access_token_key, refresh_token_key, "whoop:cid:user_id", lock_key
+      )
+
+      service.disconnect!
+    end
+  end
+
   describe "#get_access_token" do
     it "returns the cached access token without refreshing" do
       allow($redis).to receive(:get).with(access_token_key).and_return("cached-token")

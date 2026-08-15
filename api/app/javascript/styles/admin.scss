@@ -1,0 +1,18 @@
+// Styles for the owner-facing admin UI. Bundled by esbuild (via esbuild-sass-plugin) into
+// app/assets/builds/admin.css, after Web Awesome's own stylesheet — see the ordering note in
+// admin.js. Everything here is unlayered, so it outranks every `wa-*` layer without specificity
+// tricks.
+//
+// One BEM block per partial. Colors, spacing, and type come from Web Awesome's `--wa-*` custom
+// properties rather than literals, so the `.wa-dark` class the layouts set from
+// `prefers-color-scheme` flips these along with the components.
+
+@use "tokens";
+@use "base";
+@use "page";
+@use "admin-header";
+@use "admin-nav";
+@use "admin-main";
+@use "admin-flash";
+@use "signin";
+@use "account";

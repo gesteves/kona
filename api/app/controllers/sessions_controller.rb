@@ -4,12 +4,18 @@
 # sign-in stores the owner email in the signed cookie session; Authentication#owner_signed_in?
 # (and the Sidekiq Rack guard) check it.
 class SessionsController < ActionController::Base
-  layout false
+  # The sign-in page is the one owner-facing page reachable without a session, so it's the one
+  # that actually needs the noindex header.
+  include OwnerFacing
+
+  # Only #new renders — #create, #failure, and #destroy all redirect or `render plain:`, and a
+  # plain render applies no layout.
+  layout "auth"
 
   # The OmniAuth request phase (POST /auth/google_oauth2) is CSRF-protected by
   # omniauth-rails_csrf_protection; the callback is a GET redirect from Google.
 
-  # GET /login
+  # GET /signin
   def new
   end
 
@@ -36,17 +42,19 @@ class SessionsController < ActionController::Base
     render plain: "Sign-in failed (#{params[:message]}).", status: :unauthorized
   end
 
-  # POST /logout
+  # POST /signout
   def destroy
     reset_session
-    redirect_to "/login"
+    # 303 so Turbo follows the redirect with a GET rather than replaying the POST.
+    redirect_to "/signin", status: :see_other
   end
 
   private
 
-  # The path stashed by Authentication#require_owner!, or the Sidekiq dashboard by default. Only
-  # accept a relative path (leading "/" but not "//") so a stale/forged value can't open-redirect.
+  # The path stashed by Authentication#require_owner!, or the admin dashboard (the root of this
+  # host) by default. Only accept a relative path (leading "/" but not "//") so a stale/forged
+  # value can't open-redirect.
   def safe_return_path(path)
-    path.present? && path.start_with?("/") && !path.start_with?("//") ? path : "/sidekiq"
+    path.present? && path.start_with?("/") && !path.start_with?("//") ? path : "/"
   end
 end

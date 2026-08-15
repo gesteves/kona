@@ -1,0 +1,28 @@
+<%# Shared <head> for the two owner-facing layouts (admin, auth). Both load the same bundle;
+    nothing here is public, hence the blanket noindex. %>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title><%= [ title.presence, "Kona admin" ].compact.join(" · ") %></title>
+<%= csrf_meta_tags %>
+
+<script>
+  // Web Awesome's dark theme is keyed on a `.wa-dark` class, not on prefers-color-scheme, so map
+  // the OS preference onto it here. Inline and before paint, so there's no flash of the light
+  // theme; Turbo replaces <body> and merges <head> but never <html>, so the class survives Drive
+  // visits and only needs setting on a full load.
+  (function () {
+    var query = window.matchMedia("(prefers-color-scheme: dark)");
+    var apply = function (event) {
+      document.documentElement.classList.toggle("wa-dark", event.matches);
+    };
+    apply(query);
+    query.addEventListener("change", apply);
+  })();
+</script>
+
+<%# ⚠️ Never mutate an attribute of a data-turbo-track element at runtime — Turbo folds its
+    outerHTML into the tracked-element signature, so a change turns every navigation into a full
+    page reload. %>
+<%= stylesheet_link_tag "admin", "data-turbo-track": "reload" %>
+<%= javascript_include_tag "admin", defer: true, "data-turbo-track": "reload" %>

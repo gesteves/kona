@@ -6,6 +6,11 @@
 ## ⚠️ PORT is pinned because overmind injects a Heroku-style one per process (5000, then +100
 ## each), and api/config/puma.rb reads ENV["PORT"] — so without this the api silently comes up on
 ## 5100 and every widget 502s against the KONA_API_URL below.
+## `js` builds the api's admin bundle. It runs esbuild through api/esbuild.config.mjs, whose
+## context.watch() holds the event loop open by itself — web/'s external pipeline still needs
+## esbuild's `--watch=forever` flag, because plain `--watch` exits when stdin closes and overmind
+## spawns processes without one.
 web:    cd web && bundle exec middleman
 api:    cd api && PORT=3000 bin/dev
+js:     cd api && npm run watch
 worker: cd api && bundle exec sidekiq -C config/sidekiq.yml

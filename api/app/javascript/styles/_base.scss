@@ -1,0 +1,31 @@
+// Element-level defaults. Not a BEM block — everything else in this directory is.
+
+// <wa-page> injects this reset itself via `:has(wa-page)`, but the documented recommendation is to
+// state it anyway: it covers the server-rendered first paint and browsers without `:has()`.
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  padding: 0;
+}
+
+body {
+  background-color: var(--wa-color-surface-default);
+  color: var(--wa-color-text-normal);
+}
+
+// Inline `icon_svg` output. Font Awesome's SVGs carry no intrinsic size, so every one needs a
+// height; `1em` keeps them proportional to whatever text they sit beside.
+svg {
+  fill: currentColor;
+  flex: none;
+  height: 1em;
+  width: auto;
+}
+
+// Turbo's navigation progress bar, in the brand color. web/ hides this outright because the
+// static site navigates instantly and the bar was pure noise; here every navigation is a real
+// server round trip, so it's worth seeing.
+.turbo-progress-bar {
+  background-color: var(--color-firebrick);
+}

@@ -1,0 +1,23 @@
+<%# The admin sidebar's links. Items come from AdminHelper#admin_nav_items so the drawer-closing,
+    active-state, and icon handling below is written once as the list grows.
+    ⚠️ `data-drawer="close"` is what dismisses the mobile drawer after a tap; without it the drawer
+    stays open over the page it just navigated to. %>
+<ul class="admin-nav__list">
+  <% admin_nav_items.each do |item| %>
+    <li class="admin-nav__item">
+      <%= link_to item[:path],
+                  class: "admin-nav__link",
+                  data: { drawer: "close" },
+                  target: (item[:external] ? "_blank" : nil),
+                  rel: (item[:external] ? "noopener" : nil),
+                  aria: { current: admin_nav_current?(item[:path]) ? "page" : nil } do %>
+        <span class="admin-nav__icon"><%= raw icon_svg(*item[:icon]) %></span>
+        <span class="admin-nav__label"><%= item[:label] %></span>
+        <% if item[:external] %>
+          <span class="admin-nav__hint"><%= raw icon_svg("classic", "light", "arrow-up-right-from-square") %></span>
+          <span class="wa-visually-hidden">(opens in a new tab)</span>
+        <% end %>
+      <% end %>
+    </li>
+  <% end %>
+</ul>

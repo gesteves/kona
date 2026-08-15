@@ -13,11 +13,13 @@ RSpec.describe "Public API host route constraints", type: :request do
   owner_paths = [
     [ :get,  "/whoop/auth" ],
     [ :get,  "/whoop/callback" ],
-    [ :get,  "/login" ],
-    [ :post, "/logout" ],
+    [ :get,  "/signin" ],
+    [ :post, "/signout" ],
     [ :get,  "/auth/google_oauth2/callback" ],
     [ :get,  "/auth/failure" ],
-    [ :get,  "/sidekiq" ]
+    [ :get,  "/sidekiq" ],
+    [ :get,  "/connected-accounts" ],
+    [ :delete, "/connected-accounts/whoop" ]
   ]
 
   # One per namespace the public host must keep answering. Most are bearer- or HMAC-gated and
@@ -68,6 +70,23 @@ RSpec.describe "Public API host route constraints", type: :request do
 
         expect(response).not_to have_http_status(:not_found)
       end
+    end
+
+    # `/` is the one path the two hosts answer differently rather than one of them 404ing: the
+    # admin UI is mounted at the root of the admin host, and the public host keeps the redirect to
+    # the main site. Both routes are drawn for "/", so only their order and the host constraint
+    # keep them apart — which is exactly the kind of thing a reorder would silently break.
+    it "serves the owner dashboard at / on the admin host" do
+      process(:get, "http://#{admin_host}/")
+
+      expect(response).to redirect_to("/signin") # owner-gated, so unauthenticated lands here
+    end
+
+    it "still redirects / to the main site on the public API host" do
+      process(:get, "http://#{api_host}/")
+
+      expect(response).to have_http_status(:moved_permanently)
+      expect(response.headers["location"]).not_to include("/signin")
     end
   end
 

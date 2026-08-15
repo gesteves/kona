@@ -1,0 +1,33 @@
+// The sticky top bar. Holds the mobile nav toggle and the site wordmark.
+
+.admin-header {
+  align-items: center;
+  background-color: var(--wa-color-surface-raised);
+  border-block-end: 1px solid var(--wa-color-surface-border);
+  display: flex;
+  gap: var(--wa-space-m);
+  padding: var(--wa-space-s) var(--wa-space-l);
+
+  // The wordmark links home. Sized by height — it's a wide lockup (~3.7:1), so a width would
+  // make its height unpredictable against the bar.
+  &__home {
+    color: var(--wa-color-text-normal);
+    display: flex;
+
+    // ⚠️ The copied SVG hardcodes `fill="#020a0a"` on every path, which is invisible against the
+    // dark theme's surface. Overriding to `currentColor` is what makes the mark follow the theme,
+    // and is why the logo is inlined rather than served as an image.
+    svg {
+      fill: currentColor;
+      height: 1.5rem;
+
+      path {
+        fill: currentColor;
+      }
+    }
+
+    &:hover {
+      color: var(--color-firebrick);
+    }
+  }
+}

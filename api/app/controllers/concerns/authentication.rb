@@ -19,6 +19,6 @@ module Authentication
     return if owner_signed_in?
 
     session[:return_to] = request.fullpath if request.get? || request.head?
-    redirect_to "/login"
+    redirect_to "/signin"
   end
 end

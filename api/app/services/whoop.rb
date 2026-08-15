@@ -62,7 +62,7 @@ class Whoop < ApplicationService
   # @return [Integer]
   # @raise [ApplicationService::HttpError] when the profile fetch fails.
   def user_id
-    cached_json("whoop:#{@client_id}:user_id", expires_in: 1.day) do
+    cached_json(user_id_key, expires_in: 1.day) do
       authed_get!("user/profile/basic")[:user_id]
     end
   end
@@ -168,6 +168,25 @@ class Whoop < ApplicationService
   rescue StandardError => e
     Rails.logger.error("Error exchanging Whoop authorization code: #{e}")
     report_upstream_error(e, context: "Whoop OAuth code exchange")
+    nil
+  end
+
+  # @return [Boolean] Whether an account is currently attached. The refresh token is the only
+  #   durable credential — there's no database — so its presence *is* the connection.
+  def connected?
+    return false unless valid_credentials?
+
+    $redis.exists?(refresh_token_key)
+  end
+
+  # Forgets the stored credentials, detaching the account.
+  #
+  # ⚠️ The cached user_id goes too. Webhooks::WhoopController checks each payload's user_id
+  # against it, so a copy left behind would keep authorizing webhooks for an account whose tokens
+  # we just threw away — accepted, then failing deeper in with no access token to fetch with.
+  # @return [void]
+  def disconnect!
+    $redis.del(access_token_key, refresh_token_key, user_id_key, refresh_lock_key)
     nil
   end
 
@@ -387,5 +406,9 @@ class Whoop < ApplicationService
 
   def refresh_lock_key
     "whoop:#{@client_id}:refresh_lock"
+  end
+
+  def user_id_key
+    "whoop:#{@client_id}:user_id"
   end
 end

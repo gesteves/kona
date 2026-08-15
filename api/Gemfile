@@ -59,6 +59,11 @@ gem "oj"
 gem "aws-sdk-s3"
 # Caches Ruby bytecode + YAML/require lookups to speed boot (the fly machine auto-stops)
 gem "bootsnap", require: false
+# Serves and fingerprints the admin UI's assets. Digest-only — no transpiling, no import-specifier
+# rewriting, which is why the JS is bundled before it gets here.
+gem "propshaft"
+# Wires `npm run build` into assets:precompile so esbuild's output is there to fingerprint.
+gem "jsbundling-rails"
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
