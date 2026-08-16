@@ -5,16 +5,25 @@
   background-color: var(--wa-color-surface-raised);
   // ⚠️ Height comes from <wa-page>'s --header-height rather than from padding, so the bar and
   // everything that has to clear it (the map editor's pinned preview) can't drift apart. Set it
-  // in _page.scss, not here.
+  // in _page.scss, not here — and note that --header-height already accounts for the block
+  // spacing, which is why the padding below is inline-only. <wa-page>'s own
+  // `::slotted([slot='header'])` sets `padding: var(--wa-space-m)` on all four sides, so the
+  // block half has to be zeroed or it double-counts and squeezes the content out of the bar.
   block-size: var(--header-height);
   border-block-end: 1px solid var(--wa-color-surface-border);
   display: flex;
   gap: var(--wa-space-m);
-  // ⚠️ Overrides <wa-page>'s own `::slotted([slot='header']) { justify-content: space-between }`.
-  // On desktop the bar holds only the wordmark, so that rule is invisible; on mobile the nav
-  // toggle appears and the two get flung to opposite edges of the screen.
-  justify-content: flex-start;
-  padding-inline: var(--wa-space-l);
+  // Inherited from `::slotted([slot='header'])`, and restated because it's load-bearing: on mobile
+  // it puts the nav toggle and the wordmark on opposite edges. With only the wordmark, as on
+  // desktop, it behaves as flex-start.
+  justify-content: space-between;
+  padding-block: 0;
+  padding-inline: var(--wa-space-m);
+
+  // Pins the tallest item, so the bar's height is a token rather than a <wa-button> default.
+  [data-toggle-nav] {
+    block-size: var(--header-content-height);
+  }
 
   // The wordmark links home. Sized by height — it's a wide lockup (~3.7:1), so a width would
   // make its height unpredictable against the bar.

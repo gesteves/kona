@@ -2,12 +2,16 @@
 // the grid, the sticky regions, the mobile drawer, and the toggle's visibility.
 
 wa-page {
+  // The header's content row. The nav toggle is the tallest thing in it, so it's pinned to this
+  // rather than left to <wa-button>'s own sizing — otherwise the bar's height, and the offset
+  // everything else uses to clear it, would depend on a component default.
+  --header-content-height: 2rem;
+
   // ⚠️ <wa-page> declares --header-height but never measures it — it stays 0px unless we set it,
   // and its own --scroll-margin-top (used for skip-link and anchor targets) is derived from it.
-  // Setting it here makes the header a fixed height, gives that calculation the right answer, and
-  // single-sources the offset for anything that has to sit below the sticky bar, like the map
-  // editor's pinned preview.
-  --header-height: 3rem;
+  // Derived, not asserted: an arbitrary height fought the padding below and pushed the wordmark
+  // past the bar's own bottom edge. Even space on every side, plus the row it wraps.
+  --header-height: calc(var(--header-content-height) + (var(--wa-space-m) * 2));
 
   // The sidebar track width. Wide enough that the longest label ("Connected accounts") stays on
   // one line once the nav's padding, the link's padding, and the icon are taken out.
