@@ -1,0 +1,66 @@
+// Quarantined contact-form submissions on the Contact page: a list of cards, one per message.
+
+.spam-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wa-space-m);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.spam {
+  &__header {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wa-space-s);
+  }
+
+  &__name {
+    font-size: var(--wa-font-size-l);
+    font-weight: var(--wa-font-weight-heading);
+    margin: 0;
+    // Keeps a sender who supplied no spaces from pushing the badge off the card.
+    overflow-wrap: anywhere;
+  }
+
+  &__age {
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-s);
+    // Pushes the timestamp to the far edge, past the badge.
+    margin-inline-start: auto;
+  }
+
+  &__email {
+    color: var(--wa-color-text-quiet);
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  // ⚠️ `pre-wrap` is what renders the sender's line breaks — the view deliberately doesn't run the
+  // body through simple_format, since this is unescaped-by-nature attacker input.
+  // `anywhere` matters too: spam routinely carries unbroken 200-character URLs.
+  &__message {
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+
+  &__details {
+    color: var(--wa-color-text-quiet);
+    display: grid;
+    font-size: var(--wa-font-size-s);
+    gap: var(--wa-space-2xs) var(--wa-space-s);
+    grid-template-columns: auto 1fr;
+    margin: 0;
+
+    dt {
+      font-weight: var(--wa-font-weight-semibold);
+    }
+
+    dd {
+      margin: 0;
+      overflow-wrap: anywhere;
+    }
+  }
+}

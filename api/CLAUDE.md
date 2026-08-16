@@ -49,7 +49,8 @@ a cached copy before revalidating.
 | POST | `/webhooks/whoop` | enqueues `WhoopWebhookJob`; 200 `{ok: true}` | — |
 | GET | `/whoop/auth`, `/whoop/callback` | Whoop OAuth (authorize is owner-gated) | — |
 | GET | `/signin`, `/auth/google_oauth2/callback`; POST `/signout` | owner session | `no-store` |
-| GET | `/`, `/connected-accounts`; DELETE `/connected-accounts/whoop` | admin UI (owner-session gated) | `no-store` |
+| GET | `/`, `/connected-accounts`, `/contact`; DELETE `/connected-accounts/whoop` | admin UI (owner-session gated) | `no-store` |
+| POST | `/contact/:id/not-spam`; DELETE `/contact/:id` | release or delete a quarantined message | `no-store` |
 | — | `/sidekiq` | job dashboard (owner-session gated) | — |
 | GET | `/` (public API host only) | 301 → main site | — |
 
@@ -95,7 +96,8 @@ controller; a small Rack guard in the Sidekiq initializer gates the mounted `Sid
 `app/services/`, base `ApplicationService`: one per external API — Intervals.icu, Apple WeatherKit
 (ES256 JWT), Google Maps / Air Quality / Pollen, PurpleAir, Whoop (OAuth2), TrainerRoad (iCal),
 Contentful, Plausible, Font Awesome, Goodspeed, Akismet, Resend, Turnstile, Voyage (`Embeddings`),
-`StandardSite`, `AssetMirror`. Read-through Redis cache via `cached_json(key, expires_in:)`;
+`StandardSite`, `AssetMirror`, plus `SpamQuarantine` (Redis-only, no HTTP — see **The spam
+quarantine**). Read-through Redis cache via `cached_json(key, expires_in:)`;
 HTTParty with retries; `DeepOstruct` for dot-access.
 
 ⚠️ **Plausible is rate-limited to 600 calls/hour**, and `cached_json` caps each distinct query body
@@ -175,7 +177,7 @@ that shared window is safe.
 | `WhoopWebhookJob(event_type, resource_id, trace_id)` | syncs Whoop metrics to Intervals.icu |
 | `ActivityDescriptionJob(activity_id, whoop_strain = nil)` | (re)generates an activity's Strava description and tidies its name |
 | `LocationSyncJob(latitude, longitude)` | propagates the current location to Intervals.icu |
-| `ContactMailJob(name, email, message, context)` | contact intake: Akismet + compose |
+| `ContactMailJob(name, email, message, context, restored_from_spam = false)` | contact intake: Akismet + compose |
 | `ContactDeliveryJob(payload)` | the one retryable *delivery* unit — sends via Resend |
 
 - **`SiteBuildJob`** has two callers with one event type each — the Contentful webhook
@@ -194,7 +196,9 @@ that shared window is safe.
   composes empty.
 - **The contact form is a two-job pipeline** so a Resend failure retries only the send. Akismet
   fails closed, so an outage retries the *intake* job rather than delivering an unchecked message;
-  `ContactSubject` (a Claude-generated subject line) fails soft.
+  `ContactSubject` (a Claude-generated subject line) fails soft. A flagged message is **quarantined,
+  not dropped** (see **The spam quarantine**); `restored_from_spam` is the owner releasing one, which
+  skips the check and reports the false positive.
 
 Config in `config/initializers/sidekiq.rb` and `config/sidekiq.yml`. Sidekiq runs as a dedicated
 **`worker` fly process**; a worker must be running to drain the queue (locally: `bundle exec
@@ -311,6 +315,37 @@ own layout) opens in a new tab with `rel="noopener"` and a visually-hidden "(ope
 `Whoop#connected?`; `Whoop#disconnect!` clears them. ⚠️ It deletes the cached `user_id` alongside
 the tokens — `Webhooks::WhoopController` authorizes payloads against it, so a leftover copy keeps
 accepting webhooks for an account whose tokens are gone.
+
+### The spam quarantine
+
+**Contact** (`/contact`) lists everything Akismet flagged, newest first, with **Not spam** and
+**Delete forever**. `ContactMailJob` stores a flagged submission via `SpamQuarantine` instead of
+dropping it; **Not spam** re-enqueues that job with `restored_from_spam`, which skips the check and
+calls `Akismet#submit_ham`.
+
+- **One Redis hash**, `contact:spam`, field = a generated id. Deliberately not a key per message:
+  nothing else here enumerates the keyspace, and this Redis also backs the Sidekiq queues, so a
+  `SCAN` would be the first of its kind. ⚠️ The trade is that the 30-day retention is enforced in
+  Ruby, so `#store` prunes as well as `#all` — **pruning on the write path is what bounds growth
+  when nobody opens the page.**
+- ⚠️ **`SpamQuarantine#take` is fetch-and-remove, and the `HDEL` return value is the guard.** Turbo,
+  a double click, or a bfcache replay can fire "Not spam" twice; releasing on the read alone would
+  send the email twice.
+- ⚠️ **`Akismet#submit_ham` fails soft, inverting the rest of that class.** `#spam?` raises so
+  nothing is delivered unchecked; the ham report is training, and must never stand between the owner
+  and a message they've already judged legitimate.
+- ⚠️ **These cards are the only unfiltered attacker input this app renders as HTML.** ERB's default
+  escaping is the whole defense — no `raw`, no `html_safe`, no `simple_format` on a message field.
+  The `raw icon_svg(...)` idiom used everywhere else in the admin must not spread to them. Line
+  breaks come from `white-space: pre-wrap`. A request spec pins it with a `<script>` payload.
+- ⚠️ **`wa-details` and `wa-dialog` are exempt from the "don't use `<wa-icon>`" rule** — their
+  chevron and close icons pass `library="system"`, which resolves to inline data URIs bundled with
+  the component, no kit code involved. The delete confirmation is fully declarative
+  (`data-dialog="open <id>"` / `data-dialog="close"`); the `dialog` Stimulus controller only closes
+  it before Turbo caches the page.
+- The card's **Delete forever** is `variant="neutral"`, not `danger`: the brand ramp here *is* red,
+  so a danger variant beside the brand-accent "Not spam" makes the safe action the loudest thing on
+  the card. Red is reserved for the confirm button inside the dialog.
 
 `Admin::BaseController` requires the owner session; it and `SessionsController` both include the
 **`OwnerFacing`** concern, which sets `Cache-Control: no-store` and `X-Robots-Tag: noindex,

@@ -21,11 +21,19 @@ import "@web.awesome.me/webawesome-pro/dist/components/page/page.js";
 import "@web.awesome.me/webawesome-pro/dist/components/card/card.js";
 import "@web.awesome.me/webawesome-pro/dist/components/callout/callout.js";
 import "@web.awesome.me/webawesome-pro/dist/components/badge/badge.js";
+// The Contact page's spam cards. wa-details and wa-dialog render their own chevron and close
+// icons through <wa-icon library="system">, which resolves to inline data URIs bundled with the
+// component — so the "don't use <wa-icon>" rule doesn't reach them. Ours still go via icon_svg.
+import "@web.awesome.me/webawesome-pro/dist/components/details/details.js";
+import "@web.awesome.me/webawesome-pro/dist/components/dialog/dialog.js";
+import "@web.awesome.me/webawesome-pro/dist/components/relative-time/relative-time.js";
 
 import FlashController from "./controllers/flash_controller";
+import DialogController from "./controllers/dialog_controller";
 
 // window.Stimulus stays exposed for console debugging, but registration goes through the local
 // binding — the bare global is invisible to static analysis.
 const application = Application.start();
 window.Stimulus = application;
 application.register("flash", FlashController);
+application.register("dialog", DialogController);

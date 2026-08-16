@@ -52,20 +52,68 @@ RSpec.describe ContactMailJob do
     expect(ContactDeliveryJob).to have_enqueued_sidekiq_job(hash_including("subject" => "[Contact form] New message from Jane Rider"))
   end
 
-  it "drops a submission Akismet flags as spam without enqueuing delivery" do
+  it "quarantines a submission Akismet flags as spam instead of enqueuing delivery" do
     allow(akismet).to receive(:spam?).and_return(true)
+    quarantine = instance_double(SpamQuarantine, store: "generated-id")
+    allow(SpamQuarantine).to receive(:new).and_return(quarantine)
 
-    described_class.new.perform("Spammer", "spam@example.com", "buy now")
+    described_class.new.perform("Spammer", "spam@example.com", "buy now", context)
 
+    expect(quarantine).to have_received(:store).with(
+      name: "Spammer", email: "spam@example.com", message: "buy now", context: context
+    )
     expect(ContactDeliveryJob.jobs).to be_empty
   end
 
-  it "lets an Akismet failure propagate (so the intake retries) and does not enqueue delivery" do
+  # ⚠️ Akismet fails closed, and the store must stay behind the check — otherwise an Akismet
+  # outage fills the quarantine with legitimate mail that was never checked.
+  it "lets an Akismet failure propagate (so the intake retries) without quarantining or delivering" do
     allow(akismet).to receive(:spam?).and_raise(ApplicationService::HttpError.new(500, "down", "rest.akismet.com"))
+    expect(SpamQuarantine).not_to receive(:new)
 
     expect { described_class.new.perform("Jane", "jane@example.com", "Hello!", context) }
       .to raise_error(ApplicationService::HttpError)
     expect(ContactDeliveryJob.jobs).to be_empty
+  end
+
+  describe "a message released from the spam quarantine" do
+    before { allow(akismet).to receive(:submit_ham).and_return(true) }
+
+    it "skips the Akismet check and delivers" do
+      allow(akismet).to receive(:spam?)
+
+      described_class.new.perform("Jane Rider", "jane@example.com", "Hello!", context, true)
+
+      expect(akismet).not_to have_received(:spam?)
+      expect(ContactDeliveryJob).to have_enqueued_sidekiq_job(hash_including("reply_to" => "jane@example.com"))
+    end
+
+    it "reports the false positive back to Akismet" do
+      described_class.new.perform("Jane Rider", "jane@example.com", "Hello!", context, true)
+
+      expect(akismet).to have_received(:submit_ham).with(
+        content: "Hello!", author: "Jane Rider", author_email: "jane@example.com",
+        user_ip: "203.0.113.7", user_agent: "Mozilla/5.0"
+      )
+    end
+
+    # Training is not worth losing the message over.
+    it "still delivers when the ham submission blows up" do
+      allow(akismet).to receive(:submit_ham).and_raise(StandardError.new("akismet down"))
+
+      described_class.new.perform("Jane Rider", "jane@example.com", "Hello!", context, true)
+
+      expect(ContactDeliveryJob).to have_enqueued_sidekiq_job(hash_including("reply_to" => "jane@example.com"))
+    end
+
+    it "reports the original submission time rather than the moment it was released" do
+      described_class.new.perform("Jane Rider", "jane@example.com", "Hello!",
+        context.merge("received_at" => "2026-08-01T12:00:00Z"), true)
+
+      expect(ContactDeliveryJob).to have_enqueued_sidekiq_job(
+        hash_including("text" => a_string_including("Submitted: 2026-08-01T12:00:00Z"))
+      )
+    end
   end
 
   it "retries failed jobs for up to 24 hours" do

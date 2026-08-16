@@ -13,13 +13,23 @@ class ContactMailJob < ApplicationJob
   # @param email [String] The sender's email, used as Reply-To.
   # @param message [String] The message body.
   # @param context [Hash] Sender context forwarded by the web proxy: any subset of "ip",
-  #   "user_agent", "city", "region", and "country".
-  def perform(name, email, message, context = {})
+  #   "user_agent", "city", "region", and "country". The spam quarantine adds "received_at".
+  # @param restored_from_spam [Boolean] True when the owner released this from the spam queue.
+  #   Skips the Akismet check — it already ran and was overruled — and reports the false positive
+  #   back so the same sender stops being flagged. Named for the situation rather than either
+  #   behavior, because it drives both and they only ever coincide.
+  def perform(name, email, message, context = {}, restored_from_spam = false)
     context ||= {}
 
-    if Akismet.new.spam?(content: message, author: name, author_email: email,
+    if restored_from_spam
+      report_false_positive(name, email, message, context)
+    elsif Akismet.new.spam?(content: message, author: name, author_email: email,
       user_ip: context["ip"], user_agent: context["user_agent"])
-      Rails.logger.info("Contact form: dropped a submission flagged as spam by Akismet")
+      # ⚠️ The Akismet call stays ahead of this. It fails closed, so an outage raises and the job
+      # retries; storing first, or rescuing around it, would fill the quarantine with unchecked
+      # legitimate mail during an Akismet outage.
+      SpamQuarantine.new.store(name: name, email: email, message: message, context: context)
+      Rails.logger.info("Contact form: quarantined a submission flagged as spam by Akismet")
       return
     end
 
@@ -37,6 +47,17 @@ class ContactMailJob < ApplicationJob
   end
 
   private
+
+  # Tells Akismet it was wrong about a message the owner released. Never raises: this is training,
+  # and the message is being delivered either way.
+  # @return [void]
+  def report_false_positive(name, email, message, context)
+    Akismet.new.submit_ham(content: message, author: name, author_email: email,
+      user_ip: context["ip"], user_agent: context["user_agent"])
+    Rails.logger.info("Contact form: reported a false positive to Akismet")
+  rescue StandardError => e
+    Rails.logger.warn("Contact form: could not report a false positive to Akismet (#{e.class}: #{e.message})")
+  end
 
   # @return [String] The plain-text email body.
   def text_body(name, email, message, context)
@@ -71,7 +92,9 @@ class ContactMailJob < ApplicationJob
     lines << "Location: #{location}" if location.present?
     lines << "IP: #{context["ip"]}" if context["ip"].present?
     lines << "User agent: #{context["user_agent"]}" if context["user_agent"].present?
-    lines << "Submitted: #{Time.now.utc.iso8601}"
+    # A released message carries the time it was actually submitted; a fresh one is composed
+    # within seconds of arriving, so "now" is close enough.
+    lines << "Submitted: #{context["received_at"].presence || Time.now.utc.iso8601}"
     lines
   end
 end

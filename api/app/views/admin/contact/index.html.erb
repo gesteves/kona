@@ -1,0 +1,88 @@
+<% content_for :title, "Contact" %>
+
+<h1 class="admin-main__title">Contact</h1>
+
+<%# ⚠️ Every field on these cards is unfiltered attacker input — the one place in this app where
+    that's true of rendered HTML. ERB's default escaping is the whole defense: no `raw`, no
+    `html_safe`, no `simple_format` on any message field. Line breaks come from
+    `white-space: pre-wrap` in _spam.scss. The `raw icon_svg(...)` idiom used elsewhere in the
+    admin must not spread to these values. %>
+
+<% if @messages.empty? %>
+  <wa-callout variant="neutral">
+    <%= raw icon_svg("classic", "light", "shield-check")&.sub("<svg", '<svg slot="icon"') %>
+    Nothing flagged. Anything Akismet catches shows up here, and is dropped after a month.
+  </wa-callout>
+<% else %>
+  <ul class="spam-list">
+    <% @messages.each do |message| %>
+      <li class="spam-list__item">
+        <wa-card>
+          <div class="wa-stack wa-gap-m">
+            <div class="spam__header">
+              <h2 class="spam__name"><%= message.name %></h2>
+              <wa-badge variant="danger" appearance="outlined">Spam</wa-badge>
+              <wa-relative-time class="spam__age" date="<%= message.received_at %>" sync></wa-relative-time>
+            </div>
+
+            <p class="spam__email"><%= message.email %></p>
+
+            <div class="spam__message"><%= message.preview %></div>
+
+            <% if message.truncated? %>
+              <wa-details summary="Show full message">
+                <div class="spam__message"><%= message.message %></div>
+              </wa-details>
+            <% end %>
+
+            <dl class="spam__details">
+              <% if message.location %>
+                <dt>Location</dt><dd><%= message.location %></dd>
+              <% end %>
+              <% if message.ip %>
+                <dt>IP</dt><dd><%= message.ip %></dd>
+              <% end %>
+              <% if message.user_agent %>
+                <dt>User agent</dt><dd><%= message.user_agent %></dd>
+              <% end %>
+              <dt>Submitted</dt><dd><%= message.received_at %></dd>
+            </dl>
+
+            <div class="wa-cluster wa-gap-s">
+              <%# form_with + a form-associated <wa-button> rather than button_to, which emits a
+                  native <button>. %>
+              <%= form_with url: message.not_spam_path, method: :post do %>
+                <wa-button type="submit" variant="brand" appearance="accent">
+                  <%= raw icon_svg("classic", "light", "inbox-in")&.sub("<svg", '<svg slot="start"') %>
+                  Not spam
+                </wa-button>
+              <% end %>
+
+              <%# The dialog opens declaratively — wa-dialog listens document-wide for
+                  [data-dialog="open <id>"] and [data-dialog="close"], so no Stimulus action is
+                  needed to work the modal. The `dialog` controller only closes it before Turbo
+                  caches the page. %>
+              <%# ⚠️ Neutral, not danger, and deliberately: the brand ramp here IS red, so a danger
+                  variant beside the brand-accent "Not spam" makes the safe action the loudest thing
+                  on the card and the destructive one indistinguishable from it. Red is reserved for
+                  the confirm button in the dialog, where the choice is actually made. %>
+              <wa-button variant="neutral" appearance="outlined" data-dialog="open <%= message.dialog_id %>">
+                <%= raw icon_svg("classic", "light", "trash")&.sub("<svg", '<svg slot="start"') %>
+                Delete forever
+              </wa-button>
+            </div>
+          </div>
+        </wa-card>
+
+        <wa-dialog id="<%= message.dialog_id %>" label="Delete this message?" data-controller="dialog">
+          <p>This deletes the message from Redis immediately. It can't be undone.</p>
+
+          <wa-button slot="footer" appearance="outlined" data-dialog="close">Cancel</wa-button>
+          <%= form_with url: message.delete_path, method: :delete, html: { slot: "footer" } do %>
+            <wa-button type="submit" variant="danger" appearance="accent">Delete forever</wa-button>
+          <% end %>
+        </wa-dialog>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

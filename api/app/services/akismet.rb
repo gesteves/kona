@@ -37,19 +37,9 @@ class Akismet < ApplicationService
   def spam?(content:, author: nil, author_email: nil, user_ip: nil, user_agent: nil)
     return false unless configured?
 
-    body = {
-      blog: @blog,
-      user_ip: user_ip,
-      user_agent: user_agent,
-      comment_type: "contact-form",
-      comment_author: author,
-      comment_author_email: author_email,
-      comment_content: content
-    }.compact
-
     response = HTTParty.post(
       "https://#{@api_key}.#{AKISMET_API_HOST}/1.1/comment-check",
-      body: body,
+      body: comment_params(content, author, author_email, user_ip, user_agent),
       headers: { "Content-Type" => "application/x-www-form-urlencoded" }
     )
 
@@ -61,5 +51,43 @@ class Akismet < ApplicationService
     end
 
     verdict == "true"
+  end
+
+  # Reports a false positive back to Akismet, so a sender the filter keeps catching stops being
+  # flagged. Called when the owner releases a message from the spam quarantine.
+  #
+  # ⚠️ Fails **soft**, inverting this class's contract on purpose. #spam? raises so a message is
+  # never delivered unchecked; this one is training, and a training failure must never block
+  # delivering a message the owner has already judged legitimate. The caller logs and moves on.
+  #
+  # @param (see #spam?)
+  # @return [Boolean] Whether Akismet accepted the submission. False when unconfigured.
+  # @see https://akismet.com/developers/submit-ham-false-positive/
+  def submit_ham(content:, author: nil, author_email: nil, user_ip: nil, user_agent: nil)
+    return false unless configured?
+
+    response = HTTParty.post(
+      "https://#{@api_key}.#{AKISMET_API_HOST}/1.1/submit-ham",
+      body: comment_params(content, author, author_email, user_ip, user_agent),
+      headers: { "Content-Type" => "application/x-www-form-urlencoded" }
+    )
+
+    response.success?
+  end
+
+  private
+
+  # The comment fields both endpoints take, blanks dropped.
+  # @return [Hash]
+  def comment_params(content, author, author_email, user_ip, user_agent)
+    {
+      blog: @blog,
+      user_ip: user_ip,
+      user_agent: user_agent,
+      comment_type: "contact-form",
+      comment_author: author,
+      comment_author_email: author_email,
+      comment_content: content
+    }.compact
   end
 end

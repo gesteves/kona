@@ -102,6 +102,12 @@ Rails.application.routes.draw do
       root to: "dashboard#show"
       get    "connected-accounts"       => "connected_accounts#show",  as: :connected_accounts
       delete "connected-accounts/whoop" => "connected_accounts#whoop", as: :whoop_connection
+
+      # The contact-form spam quarantine. Distinct from the public POST /api/contact, which is a
+      # different path on a different host.
+      get    "contact"              => "contact#index",    as: :contact
+      post   "contact/:id/not-spam" => "contact#not_spam", as: :contact_not_spam
+      delete "contact/:id"          => "contact#destroy",  as: :contact_message
     end
   end
 

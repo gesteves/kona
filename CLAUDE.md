@@ -466,6 +466,10 @@ Turnstile needs JS, so it's verified **only on the JSON path**. Turnstile and Ak
 open when *unconfigured*; when Akismet *is* configured it fails **closed** — an outage retries the
 intake job rather than delivering an unchecked message.
 
+A message Akismet flags is **quarantined, not dropped**: it's held in Redis for a month and listed
+on the admin's Contact page, where releasing it delivers the email and reports the false positive
+back to Akismet. See [`api/CLAUDE.md`](api/CLAUDE.md).
+
 ## The image mirror
 
 Every image is a Cloudflare Images transformation, and Cloudflare fetches the untransformed

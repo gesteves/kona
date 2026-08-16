@@ -19,7 +19,10 @@ RSpec.describe "Public API host route constraints", type: :request do
     [ :get,  "/auth/failure" ],
     [ :get,  "/sidekiq" ],
     [ :get,  "/connected-accounts" ],
-    [ :delete, "/connected-accounts/whoop" ]
+    [ :delete, "/connected-accounts/whoop" ],
+    [ :get,  "/contact" ],
+    [ :post, "/contact/abc123/not-spam" ],
+    [ :delete, "/contact/abc123" ]
   ]
 
   # One per namespace the public host must keep answering. Most are bearer- or HMAC-gated and

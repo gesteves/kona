@@ -9,6 +9,7 @@ module AdminHelper
   def admin_nav_items
     [
       { label: "Dashboard",          path: root_path,               icon: %w[classic light gauge] },
+      { label: "Contact",            path: contact_path,            icon: %w[classic light envelope] },
       { label: "Connected accounts", path: connected_accounts_path, icon: %w[classic light plug] },
       { label: "Sidekiq",            path: "/sidekiq",              icon: %w[classic light layer-group], external: true }
     ]

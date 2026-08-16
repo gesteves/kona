@@ -55,4 +55,31 @@ RSpec.describe Akismet do
     expect(unconfigured.spam?(**check_args)).to be(false)
     expect(HTTParty).not_to have_received(:post)
   end
+
+  describe "#submit_ham" do
+    it "posts to the key-scoped submit-ham endpoint with the same comment params" do
+      stub_response(success: true, body: "Thanks for making the web a better place.")
+
+      expect(service.submit_ham(**check_args)).to be(true)
+      expect(HTTParty).to have_received(:post).with(
+        "https://#{api_key}.rest.akismet.com/1.1/submit-ham",
+        hash_including(body: hash_including(blog: "https://example.test", user_ip: "203.0.113.7", comment_content: "Hello there!"))
+      )
+    end
+
+    # ⚠️ The opposite of #spam?, deliberately. This is training; its failure must never stand
+    # between the owner and a message they've already judged legitimate.
+    it "reports failure rather than raising, so a caller can shrug it off" do
+      stub_response(success: false, body: "")
+      expect(service.submit_ham(**check_args)).to be(false)
+    end
+
+    it "does nothing when unconfigured" do
+      allow(HTTParty).to receive(:post)
+      unconfigured = described_class.new(api_key: nil, blog: "https://example.test")
+
+      expect(unconfigured.submit_ham(**check_args)).to be(false)
+      expect(HTTParty).not_to have_received(:post)
+    end
+  end
 end
