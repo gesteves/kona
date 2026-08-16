@@ -39,6 +39,14 @@ RSpec.describe "Admin home", type: :request do
       expect(response.headers["CDN-Cache-Control"]).to be_nil
     end
 
+    # ⚠️ Without a declaration the browser keeps whatever it last saw for this origin, which is
+    # Sidekiq's own icon — Sidekiq::Web ships one and mounts on the same host.
+    it "declares its own favicon" do
+      get "/"
+
+      expect(response.body).to include('<link rel="icon" href="/favicon.ico"')
+    end
+
     it "puts the site wordmark in the header, linking home" do
       get "/"
 

@@ -4,6 +4,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title><%= [ title.presence, "Given to Tri" ].compact.join(" · ") %></title>
+<%# ⚠️ Declared explicitly, and served from public/ rather than through Propshaft. Without a
+    declaration the browser keeps whatever it last saw for this origin — which is Sidekiq's own
+    icon, since Sidekiq::Web ships one and the admin didn't. A fingerprinted /assets path wouldn't
+    fix a bookmark either: that's a bare /favicon.ico request, which only public/ answers. %>
+<link rel="icon" href="/favicon.ico" sizes="32x32">
 <%= csrf_meta_tags %>
 
 <script>

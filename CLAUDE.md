@@ -120,9 +120,10 @@ disclosure from an affiliate link that carries it everywhere else on the same pa
 opens every absolute link, on the assumption that card bodies only ever link off-site. Nothing
 enforces that assumption.
 
-The site **wordmark** is also duplicated — `web/source/partials/_logo.svg.erb` is copied verbatim to
-`api/app/views/layouts/_logo.html.erb` for the admin header. This one is benign: the two never
-appear on the same page, and drift just means a stale admin logo. Re-copy the file if the mark
+The site **wordmark** and the **favicon** are also duplicated — `web/source/partials/_logo.svg.erb`
+is copied verbatim to `api/app/views/layouts/_logo.html.erb` for the admin header, and
+`web/source/favicon.ico` to `api/public/favicon.ico`. Both are benign: the two never appear on the
+same page, and drift just means a stale admin logo or tab icon. Re-copy the files if the mark
 changes.
 
 ## Code style
