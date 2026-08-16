@@ -20,3 +20,19 @@ wa-page {
 wa-page[view="mobile"] {
   --menu-width: auto;
 }
+
+// ⚠️ <wa-page> initialises `view` to "desktop" and only corrects it once its ResizeObserver fires,
+// a frame later — so on a phone the navigation paints as a full-width sidebar before moving into
+// the drawer. `wa-cloak` doesn't cover this: it lifts as soon as the element is defined, which is
+// before that first render. Below the breakpoint there is no sidebar layout to want, whatever
+// `view` currently claims, so suppress it until the component agrees.
+// ⚠️ The width must match the `mobile-breakpoint` attribute in layouts/admin.html.erb.
+@media (width < 768px) {
+  wa-page {
+    --menu-width: auto;
+  }
+
+  wa-page:not([view="mobile"]) :is([slot="navigation"], [slot="navigation-footer"]) {
+    display: none;
+  }
+}

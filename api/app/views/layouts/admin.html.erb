@@ -16,7 +16,7 @@
         component flips it on its own once it sees our [data-toggle-nav], but not until it
         upgrades, and until then its built-in hamburger renders on its own unstyled row above the
         header bar. `wa-cloak` hides the shell until the custom elements are defined. %>
-    <wa-page class="admin wa-cloak" disable-navigation-toggle>
+    <wa-page class="admin wa-cloak" disable-navigation-toggle mobile-breakpoint="768px">
       <header slot="header" class="admin-header">
         <wa-button data-toggle-nav appearance="plain" class="wa-mobile-only" aria-label="Open menu">
           <%= raw icon_svg("classic", "light", "bars") %>
