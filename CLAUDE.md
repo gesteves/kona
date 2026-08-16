@@ -6,7 +6,6 @@ commands and conventions, read the nearest `CLAUDE.md`:
 - [`web/CLAUDE.md`](web/CLAUDE.md) — Middleman static site (the blog).
 - [`api/CLAUDE.md`](api/CLAUDE.md) — Rails API serving dynamic widgets.
 - [`utilities/contentful/CLAUDE.md`](utilities/contentful/CLAUDE.md) — Contentful migrations + taxonomy.
-- [`utilities/maps/CLAUDE.md`](utilities/maps/CLAUDE.md) — static map generation from GPX tracks.
 
 Work on one app from inside its own directory; each has its own `Gemfile`, `.env.example`, and
 test suite.
@@ -33,11 +32,9 @@ custom domain in the zone. No config in the repo — dashboard-side, populated b
 path-filtered on `web/**` / `api/**`, so a change under `utilities/` builds nothing, deploys
 nothing, and never fires the Web deploy's `Cache-Tag: site` edge purge. **Don't make `web/` or
 `api/` depend on anything here** at build or request time. `.github/workflows/utilities.yml` runs
-the checks that exist (today: `utilities/maps/`'s rspec suite) without deploying.
+the checks that exist (today: `utilities/aqi-map/`'s AQI golden vectors) without deploying.
 
 - **`utilities/contentful/`** — content migrations + the SKOS taxonomy toolkit.
-- **`utilities/maps/`** — standalone Ruby/Rake app rendering GPX tracks as static PNG cover
-  images via Mapbox. The PNGs are uploaded to Contentful by hand.
 - **`utilities/aqi-map/`** — standalone Sinatra app serving one local page: a Mapbox map of
   historical PurpleAir readings, screenshotted for a post's cover image. Sketch quality and
   **not deployable** — it binds `127.0.0.1` and proxies a PurpleAir key with no auth of its own.
@@ -60,8 +57,12 @@ cd web && bundle exec middleman   # web only, site → the deployed api
 and `.overmind.env`, and child processes inherit the latter's `KONA_API_URL`/`SITE_URL`. Since
 dotenv never overwrites an already-set variable, that's the whole mechanism — and it's why the
 plain `middleman` command still reaches production off `web/.env`. `overmind restart web` restarts
-one process; `overmind connect api` attaches a real TTY, so `binding.break` works. Sidekiq is
-opt-in (`overmind start -l web,api,js,worker`): no widget endpoint enqueues a job.
+one process; `overmind connect api` attaches a real TTY, so `binding.break` works.
+
+⚠️ **Sidekiq starts with everything else** — `overmind start` runs `web`, `api`, `js`, and
+`worker`. It used to be opt-in, since no widget endpoint enqueues a job, but the admin's Maps page
+broke that: an uploaded GPX sits on "Processing" until `MapTilesetJob` publishes it. The page says
+so when it finds an empty process set, but the point is not to need that locally.
 
 The `js` process is esbuild watching the api's admin bundle. It only matters for the api's admin
 pages and `/signin`; the widgets and the site don't touch it. ⚠️ Those pages raise

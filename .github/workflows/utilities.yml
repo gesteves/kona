@@ -4,21 +4,19 @@ name: "Utilities"
 # of the directory: `web.yml` and `api.yml` are path-filtered on `web/**` / `api/**`, so a change
 # to a utility never builds the site, redeploys a Worker, or purges the edge cache.
 #
-# utilities/maps/ has an rspec suite. utilities/aqi-map/ has no test framework and doesn't warrant
-# one, but its copy of the EPA AQI math is a hand-maintained duplicate of the api's, so a plain
-# Ruby check pins it to the published equation. utilities/contentful/ is a set of one-off Node
-# scripts run by hand against Contentful; there's nothing to check.
+# utilities/aqi-map/ has no test framework and doesn't warrant one, but its copy of the EPA AQI
+# math is a hand-maintained duplicate of the api's, so a plain Ruby check pins it to the published
+# equation. utilities/contentful/ is a set of one-off Node scripts run by hand against Contentful;
+# there's nothing to check.
 on:
   push:
     branches: [main]
     paths:
-      - 'utilities/maps/**'
       - 'utilities/aqi-map/**'
       - '.github/workflows/utilities.yml'
   pull_request:
     branches: [main]
     paths:
-      - 'utilities/maps/**'
       - 'utilities/aqi-map/**'
       - '.github/workflows/utilities.yml'
 
@@ -30,29 +28,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  maps:
-    name: Maps tests
-    runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: utilities/maps
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          working-directory: utilities/maps
-          bundler-cache: true
-
-      # The specs stub every HTTP call and pin the Mapbox env vars themselves, so this runs
-      # credential-free.
-      - name: Ruby tests
-        run: bundle exec rspec
-
   aqi-map:
     name: AQI math check
     runs-on: ubuntu-latest
@@ -68,7 +43,7 @@ jobs:
       # ⚠️ working-directory has to be an input to the action. The job-level
       # `defaults.run.working-directory` above applies only to `run:` steps, so without this
       # setup-ruby looks for .ruby-version at the repo root — where there isn't one — and dies
-      # with a bare ENOENT. Same reason the maps job passes it explicitly.
+      # with a bare ENOENT.
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:

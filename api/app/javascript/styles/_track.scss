@@ -1,0 +1,150 @@
+// The Maps page: a list of uploaded GPX tracks, and the per-track render editor.
+
+.track-upload {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--wa-space-m);
+  margin-block-end: var(--wa-space-l);
+
+  // The dropzone spans the column; the button sits under it rather than beside it, where it would
+  // line up with the control's hint text instead of the dropzone and read as unrelated to it.
+  wa-file-input {
+    align-self: stretch;
+  }
+
+  &__notice {
+    margin-block-end: var(--wa-space-m);
+  }
+}
+
+.track-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wa-space-m);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  // ⚠️ native.css indents list items with `margin-inline-start` on the <li>, so the padding reset
+  // above isn't enough — without this the cards sit indented from the page heading.
+  &__item {
+    margin: 0;
+  }
+}
+
+.track {
+  &__header {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wa-space-s);
+  }
+
+  &__name {
+    font-size: var(--wa-font-size-l);
+    font-weight: var(--wa-font-weight-heading);
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  &__age {
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-s);
+    // Pushes the timestamp to the far edge, past the badge.
+    margin-inline-start: auto;
+  }
+
+  &__summary {
+    color: var(--wa-color-text-quiet);
+    margin: 0;
+  }
+
+  &__pending {
+    align-items: center;
+    color: var(--wa-color-text-quiet);
+    display: inline-flex;
+    font-size: var(--wa-font-size-s);
+    gap: var(--wa-space-xs);
+  }
+}
+
+.map-editor {
+  align-items: start;
+  display: grid;
+  gap: var(--wa-space-l);
+  // The preview leads; the settings column is only as wide as its fields need.
+  grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+
+  @media (width < 60rem) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  &__back {
+    margin: 0 0 var(--wa-space-xs);
+  }
+
+  &__summary {
+    color: var(--wa-color-text-quiet);
+    margin: 0 0 var(--wa-space-l);
+  }
+
+  &__settings {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-2xs);
+  }
+
+  &__preview {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-m);
+    // Keeps the preview visible while working down a long settings column. ⚠️ The header is
+    // sticky too, so this has to clear it — pinning to the viewport top slides the map under it.
+    position: sticky;
+    top: calc(var(--header-height, 0px) + var(--wa-space-m));
+  }
+
+  // The border isn't decoration: a map rendered against a pale style is nearly white at its
+  // edges, so without it there's no telling where the image stops.
+  &__image {
+    background-color: var(--wa-color-surface-raised);
+    border: 1px solid var(--wa-color-surface-border);
+    border-radius: var(--wa-border-radius-m);
+    display: block;
+    height: auto;
+    max-width: 100%;
+  }
+}
+
+// A four-sided value: one field while the sides match, four when they don't.
+.sides {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wa-space-2xs);
+
+  &__grid {
+    display: grid;
+    gap: var(--wa-space-xs);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  // The controller adds the modifier once it has read the per-side labels off the markup.
+  &--linked &__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  &--linked &__field:not(&__field--primary) {
+    display: none;
+  }
+
+  &__toggle {
+    margin-block-start: var(--wa-space-2xs);
+  }
+
+  &__hint {
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-s);
+    margin: 0;
+  }
+}

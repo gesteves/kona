@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx creator="Garmin Connect" version="1.1" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>Not the track name</name>
+    <link href="connect.garmin.com"><text>Garmin Connect</text></link>
+    <time>2026-07-25T13:32:14.000Z</time>
+  </metadata>
+  <trk>
+    <name>Ironman 70.3 Boise – Bike</name>
+    <type>road_biking</type>
+    <trkseg>
+      <trkpt lat="43.52206997573375701904296875" lon="-116.0555255413055419921875">
+        <ele>934</ele>
+        <time>2026-07-25T13:32:14.000Z</time>
+      </trkpt>
+      <trkpt lat="43.55" lon="-116.10">
+        <ele>940</ele>
+        <time>2026-07-25T13:45:00.000Z</time>
+      </trkpt>
+      <trkpt lat="43.607904855161905" lon="-116.20627356693149">
+        <ele>820</ele>
+        <time>2026-07-25T16:02:31.000Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>

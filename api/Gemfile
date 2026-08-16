@@ -16,6 +16,10 @@ gem "tzinfo-data", platforms: %i[ windows jruby ]
 gem "httparty"
 # Parses the TrainerRoad calendar (iCalendar) feed
 gem "icalendar"
+# Parses uploaded GPX tracks for the admin's map renderer. Already resolved transitively (via
+# sanitize), but declared because GpxTrack requires it directly. Precompiled platform gems ship a
+# statically-linked libxml2, so this adds no system packages to the Docker image.
+gem "nokogiri"
 # Signs the ES256 JWT used to authenticate with Apple WeatherKit
 gem "jwt"
 # Renders the Markdown weather summary (bold + SmartyPants), and the standard.site

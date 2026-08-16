@@ -2,6 +2,13 @@
 // the grid, the sticky regions, the mobile drawer, and the toggle's visibility.
 
 wa-page {
+  // ⚠️ <wa-page> declares --header-height but never measures it — it stays 0px unless we set it,
+  // and its own --scroll-margin-top (used for skip-link and anchor targets) is derived from it.
+  // Setting it here makes the header a fixed height, gives that calculation the right answer, and
+  // single-sources the offset for anything that has to sit below the sticky bar, like the map
+  // editor's pinned preview.
+  --header-height: 3rem;
+
   // The sidebar track width. Wide enough that the longest label ("Connected accounts") stays on
   // one line once the nav's padding, the link's padding, and the icon are taken out.
   --menu-width: 17rem;

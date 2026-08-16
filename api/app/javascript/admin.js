@@ -27,9 +27,24 @@ import "@web.awesome.me/webawesome-pro/dist/components/badge/badge.js";
 import "@web.awesome.me/webawesome-pro/dist/components/details/details.js";
 import "@web.awesome.me/webawesome-pro/dist/components/dialog/dialog.js";
 import "@web.awesome.me/webawesome-pro/dist/components/relative-time/relative-time.js";
+// The Maps page's upload control, render-settings form, and publishing indicator. These are the
+// admin's first form inputs — every other form here is action-only. They're form-associated, so
+// they submit and appear in FormData exactly like native controls.
+import "@web.awesome.me/webawesome-pro/dist/components/file-input/file-input.js";
+import "@web.awesome.me/webawesome-pro/dist/components/input/input.js";
+import "@web.awesome.me/webawesome-pro/dist/components/number-input/number-input.js";
+import "@web.awesome.me/webawesome-pro/dist/components/slider/slider.js";
+import "@web.awesome.me/webawesome-pro/dist/components/color-picker/color-picker.js";
+import "@web.awesome.me/webawesome-pro/dist/components/select/select.js";
+import "@web.awesome.me/webawesome-pro/dist/components/option/option.js";
+import "@web.awesome.me/webawesome-pro/dist/components/switch/switch.js";
+import "@web.awesome.me/webawesome-pro/dist/components/spinner/spinner.js";
 
 import FlashController from "./controllers/flash_controller";
 import DialogController from "./controllers/dialog_controller";
+import MapStatusController from "./controllers/map_status_controller";
+import MapPreviewController from "./controllers/map_preview_controller";
+import LinkedSidesController from "./controllers/linked_sides_controller";
 
 // window.Stimulus stays exposed for console debugging, but registration goes through the local
 // binding — the bare global is invisible to static analysis.
@@ -37,3 +52,6 @@ const application = Application.start();
 window.Stimulus = application;
 application.register("flash", FlashController);
 application.register("dialog", DialogController);
+application.register("map-status", MapStatusController);
+application.register("map-preview", MapPreviewController);
+application.register("linked-sides", LinkedSidesController);

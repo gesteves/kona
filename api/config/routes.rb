@@ -108,6 +108,19 @@ Rails.application.routes.draw do
       get    "contact"              => "contact#index",    as: :contact
       post   "contact/:id/not-spam" => "contact#not_spam", as: :contact_not_spam
       delete "contact/:id"          => "contact#destroy",  as: :contact_message
+
+      # GPX tracks rendered as static map images through Mapbox. `preview` and `download` proxy
+      # the render rather than pointing the browser at Mapbox, because the Static Images API
+      # carries the secret token in a query parameter.
+      # ⚠️ `maps/status` must stay above `maps/:id`, or it's swallowed as a track id.
+      get    "maps"              => "maps#index",    as: :maps
+      post   "maps"              => "maps#create"
+      get    "maps/status"       => "maps#status",   as: :maps_status
+      get    "maps/:id"          => "maps#show",     as: :map
+      patch  "maps/:id"          => "maps#update"
+      delete "maps/:id"          => "maps#destroy"
+      get    "maps/:id/preview"  => "maps#preview",  as: :map_preview
+      get    "maps/:id/download" => "maps#download", as: :map_download
     end
   end
 

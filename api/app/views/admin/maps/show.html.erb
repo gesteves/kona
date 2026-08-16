@@ -1,0 +1,103 @@
+<% content_for :title, @track.title %>
+
+<p class="map-editor__back"><%= link_to "← All maps", maps_path %></p>
+
+<h1 class="admin-main__title"><%= @track.title %></h1>
+<p class="map-editor__summary"><%= @track.summary %></p>
+
+<%# The form never submits under normal use — the preview controller reads it and rewrites the
+    image and download URLs in place, so tweaking a value doesn't navigate and the field you're
+    editing keeps focus. It stays a real GET form so pressing Enter still works, and so the
+    settings a preview is rendered with are always expressible as a URL. %>
+<div class="map-editor" data-controller="map-preview" data-map-preview-save-url-value="<%= map_path(@track.id) %>">
+  <%= form_with url: @track.show_path, method: :get, class: "map-editor__settings",
+                data: { map_preview_target: "form", turbo_action: "replace" } do %>
+
+    <wa-details summary="Framing" open>
+      <div class="wa-stack wa-gap-l">
+        <%= render "sides", track: @track, prefix: "padding", linked_label: "Padding",
+                            max: StaticMap::MAX_PADDING, step: 1,
+                            hint: "Pixels between the track and the edge of the image." %>
+
+        <%= render "sides", track: @track, prefix: "margin", linked_label: "Extra map",
+                            max: StaticMap::MAX_MARGIN_KM, step: 0.5,
+                            hint: "Kilometers of map added around the track. Widens the view rather than the border." %>
+
+        <wa-input type="number" name="settings[height]" label="Height" value="<%= @track.setting('height') %>"
+                  min="800" max="1280" step="1" placeholder="Auto"
+                  hint="Leave blank to derive it from the track's shape. The image is always 1280 wide, and doubled on download.">
+        </wa-input>
+      </div>
+    </wa-details>
+
+    <wa-details summary="Track">
+      <div class="wa-stack wa-gap-m">
+        <wa-color-picker name="settings[track_color]" label="Line color"
+                         value="<%= @track.setting('track_color') %>" format="hex">
+        </wa-color-picker>
+        <wa-number-input name="settings[track_width]" label="Line width"
+                         value="<%= @track.setting('track_width') %>" min="1" max="20" step="0.5">
+        </wa-number-input>
+        <wa-slider name="settings[track_opacity]" label="Line opacity"
+                   value="<%= @track.setting('track_opacity') %>" min="0" max="1" step="0.05" with-tooltip>
+        </wa-slider>
+      </div>
+    </wa-details>
+
+    <wa-details summary="Markers">
+      <div class="wa-stack wa-gap-m">
+        <wa-select name="settings[start_icon]" label="Start icon" value="<%= @track.setting('start_icon') %>">
+          <% @icons.each do |id, name| %>
+            <wa-option value="<%= id %>"><%= name %></wa-option>
+          <% end %>
+        </wa-select>
+        <wa-color-picker name="settings[start_color]" label="Start color"
+                         value="<%= @track.setting('start_color') %>" format="hex">
+        </wa-color-picker>
+
+        <wa-select name="settings[end_icon]" label="Finish icon" value="<%= @track.setting('end_icon') %>">
+          <% @icons.each do |id, name| %>
+            <wa-option value="<%= id %>"><%= name %></wa-option>
+          <% end %>
+        </wa-select>
+        <wa-color-picker name="settings[end_color]" label="Finish color"
+                         value="<%= @track.setting('end_color') %>" format="hex">
+        </wa-color-picker>
+
+        <%# The hidden field is what makes "off" submit at all — an unchecked switch sends nothing.
+            Both share a name, and last-one-wins is what turns the pair into a boolean. %>
+        <input type="hidden" name="settings[finish_on_top]" value="0">
+        <wa-switch name="settings[finish_on_top]" value="1"
+                   <%= "checked" if ActiveModel::Type::Boolean.new.cast(@track.setting("finish_on_top")) %>
+                   hint="Only matters when the two pins overlap, as on an out-and-back. The start pin is on top by default.">
+          Draw the finish pin on top
+        </wa-switch>
+      </div>
+    </wa-details>
+
+    <wa-details summary="Style">
+      <div class="wa-stack wa-gap-m">
+        <wa-select name="settings[style_preset]" label="Base style" value="<%= @track.setting('style_preset') %>">
+          <% @styles.each do |url, name| %>
+            <wa-option value="<%= url %>"><%= name %></wa-option>
+          <% end %>
+        </wa-select>
+        <wa-input name="settings[style_url]" label="Custom style" value="<%= @track.setting('style_url') %>"
+                  placeholder="mapbox://styles/…"
+                  hint="A style of your own. Overrides the base style above whenever it's set.">
+        </wa-input>
+      </div>
+    </wa-details>
+  <% end %>
+
+  <div class="map-editor__preview">
+    <img class="map-editor__image" data-map-preview-target="image"
+         src="<%= @track.preview_path %>" alt="Map of <%= @track.title %>">
+
+    <wa-button data-map-preview-target="download" href="<%= @track.download_path %>" download
+               variant="brand" appearance="accent">
+      <%= raw icon_svg("classic", "light", "arrow-down-to-bracket")&.sub("<svg", '<svg slot="start"') %>
+      Download PNG
+    </wa-button>
+  </div>
+</div>

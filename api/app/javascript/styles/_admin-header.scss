@@ -3,10 +3,14 @@
 .admin-header {
   align-items: center;
   background-color: var(--wa-color-surface-raised);
+  // ⚠️ Height comes from <wa-page>'s --header-height rather than from padding, so the bar and
+  // everything that has to clear it (the map editor's pinned preview) can't drift apart. Set it
+  // in _page.scss, not here.
+  block-size: var(--header-height);
   border-block-end: 1px solid var(--wa-color-surface-border);
   display: flex;
   gap: var(--wa-space-m);
-  padding: var(--wa-space-s) var(--wa-space-l);
+  padding-inline: var(--wa-space-l);
 
   // The wordmark links home. Sized by height — it's a wide lockup (~3.7:1), so a width would
   // make its height unpredictable against the bar.

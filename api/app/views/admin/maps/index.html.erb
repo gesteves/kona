@@ -1,0 +1,101 @@
+<% content_for :title, "Maps" %>
+
+<h1 class="admin-main__title">Maps</h1>
+
+<% unless @configured %>
+  <wa-callout variant="warning" class="track-upload__notice">
+    <%= raw icon_svg("classic", "light", "triangle-exclamation")&.sub("<svg", '<svg slot="icon"') %>
+    Set <code>MAPBOX_USERNAME</code> and <code>MAPBOX_SECRET_TOKEN</code> in the environment to
+    upload tracks.
+  </wa-callout>
+<% end %>
+
+<% if @worker_running == false %>
+  <wa-callout variant="warning" class="track-upload__notice">
+    <%= raw icon_svg("classic", "light", "triangle-exclamation")&.sub("<svg", '<svg slot="icon"') %>
+    No Sidekiq worker is running, so nothing is publishing these tracks. Locally, <code>overmind
+    start</code> runs one; they'll pick up where they left off.
+  </wa-callout>
+<% end %>
+
+<%# form_with + a form-associated <wa-button> rather than button_to, which emits a native
+    <button>. <wa-file-input> is form-associated too, so the files ride along normally. %>
+<%= form_with url: maps_path, method: :post, multipart: true, class: "track-upload" do %>
+  <wa-file-input name="gpx_files[]" multiple accept=".gpx" label="GPX files"
+                 hint="Each track is published to Mapbox as a private vector tileset, which takes a minute or two.">
+  </wa-file-input>
+  <wa-button type="submit" variant="brand" appearance="accent">
+    <%= raw icon_svg("classic", "light", "arrow-up-from-bracket")&.sub("<svg", '<svg slot="start"') %>
+    Upload
+  </wa-button>
+<% end %>
+
+<% if @tracks.empty? %>
+  <wa-callout variant="neutral">
+    <%= raw icon_svg("classic", "light", "route")&.sub("<svg", '<svg slot="icon"') %>
+    No tracks yet. Upload a GPX file and it'll show up here once Mapbox has published it.
+  </wa-callout>
+<% else %>
+  <%# The list polls while anything is still publishing, then stops. Mapbox's tiling service is
+      asynchronous, so there's nothing to push from here. %>
+  <ul class="track-list" data-controller="map-status" data-map-status-url-value="<%= maps_status_path %>">
+    <% @tracks.each do |track| %>
+      <li class="track-list__item" data-map-status-id="<%= track.id %>" data-map-status-state="<%= track.status %>">
+        <wa-card>
+          <div class="wa-stack wa-gap-m">
+            <div class="track__header">
+              <h2 class="track__name"><%= track.title %></h2>
+              <wa-badge variant="<%= track.status_variant %>" appearance="outlined">
+                <%= track.status_label %>
+              </wa-badge>
+              <wa-relative-time class="track__age" date="<%= track.uploaded_at %>" sync></wa-relative-time>
+            </div>
+
+            <p class="track__summary"><%= track.summary %></p>
+
+            <% if track.failed? && track.error %>
+              <wa-callout variant="danger"><%= track.error %></wa-callout>
+            <% end %>
+
+            <div class="wa-cluster wa-gap-s">
+              <% if track.ready? %>
+                <wa-button href="<%= track.show_path %>" variant="brand" appearance="accent">
+                  <%= raw icon_svg("classic", "light", "sliders")&.sub("<svg", '<svg slot="start"') %>
+                  Open
+                </wa-button>
+              <% elsif track.processing? %>
+                <span class="track__pending">
+                  <wa-spinner></wa-spinner>
+                  Publishing to Mapbox…
+                </span>
+              <% end %>
+
+              <%# Neutral rather than danger for the same reason as the spam cards: the brand ramp
+                  here is red, so a danger variant beside a brand-accent button makes the safe
+                  action the loudest thing on the card. Red is reserved for the dialog's confirm. %>
+              <wa-button variant="neutral" appearance="outlined" data-dialog="open <%= track.dialog_id %>">
+                <%= raw icon_svg("classic", "light", "trash")&.sub("<svg", '<svg slot="start"') %>
+                Delete
+              </wa-button>
+            </div>
+          </div>
+        </wa-card>
+
+        <%# The dialog opens declaratively — wa-dialog listens document-wide for
+            [data-dialog="open <id>"] and [data-dialog="close"]. The `dialog` controller only
+            closes it before Turbo caches the page. %>
+        <wa-dialog id="<%= track.dialog_id %>" label="Delete this track?" data-controller="dialog">
+          <p>
+            This deletes <strong><%= track.title %></strong> here and removes its tileset and
+            source from Mapbox. It can't be undone.
+          </p>
+
+          <wa-button slot="footer" appearance="outlined" data-dialog="close">Cancel</wa-button>
+          <%= form_with url: track.delete_path, method: :delete, html: { slot: "footer" } do %>
+            <wa-button type="submit" variant="danger" appearance="accent">Delete forever</wa-button>
+          <% end %>
+        </wa-dialog>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

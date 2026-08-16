@@ -1,6 +1,0 @@
-.bundle
-.DS_Store
-.env
-
-# GPX inputs and the rendered PNGs are local working files, not source.
-data/

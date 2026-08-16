@@ -10,6 +10,7 @@ module AdminHelper
     [
       { label: "Dashboard",          path: root_path,               icon: %w[classic light gauge] },
       { label: "Contact",            path: contact_path,            icon: %w[classic light envelope] },
+      { label: "Maps",               path: maps_path,               icon: %w[classic light map] },
       { label: "Connected accounts", path: connected_accounts_path, icon: %w[classic light plug] },
       { label: "Sidekiq",            path: "/sidekiq",              icon: %w[classic light layer-group], external: true }
     ]

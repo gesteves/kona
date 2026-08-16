@@ -1,0 +1,28 @@
+<%# A four-sided value (padding, extra map) as one field when every side matches and four when they
+    don't — the common case is uniform, and four boxes to change one number is worse than a toggle.
+    The fields are always in the DOM and always named, so hiding three of them still submits four
+    values; the controller mirrors the first into the rest while they're linked.
+
+    The collapsed state is applied by the controller rather than rendered here, so it can read the
+    per-side label off the markup before swapping it. Nothing flashes: <wa-page> stays cloaked
+    until the custom elements upgrade. %>
+<div class="sides" data-controller="linked-sides" data-linked-sides-linked-label-value="<%= linked_label %>">
+  <div class="sides__grid">
+    <% StaticMap::SIDES.each_with_index do |side, index| %>
+      <wa-number-input class="sides__field<%= " sides__field--primary" if index.zero? %>"
+                       name="settings[<%= prefix %>_<%= side %>]"
+                       label="<%= side.capitalize %>"
+                       value="<%= track.setting("#{prefix}_#{side}") %>"
+                       min="0" max="<%= max %>" step="<%= step %>"
+                       data-linked-sides-target="<%= index.zero? ? "primary" : "extra" %>">
+      </wa-number-input>
+    <% end %>
+  </div>
+
+  <wa-switch class="sides__toggle" size="small" data-linked-sides-target="toggle"
+             <%= "checked" if StaticMap::SIDES.map { |side| track.setting("#{prefix}_#{side}") }.uniq.one? %>>
+    Same on all sides
+  </wa-switch>
+
+  <p class="sides__hint"><%= hint %></p>
+</div>

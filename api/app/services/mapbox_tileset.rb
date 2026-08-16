@@ -1,0 +1,228 @@
+require "json"
+require "tempfile"
+
+# Uploads a track to Mapbox as a private vector tileset using the Mapbox Tiling Service (MTS), so
+# the Static Images API can draw it as a layer. The recipe names the layer explicitly (LAYER_NAME),
+# so the resulting tileset's source-layer is deterministic rather than derived from a file name.
+#
+# Not an ApplicationService: nothing here is a cacheable read.
+# @see https://docs.mapbox.com/api/maps/mapbox-tiling-service/
+class MapboxTileset
+  API = "https://api.mapbox.com/tilesets/v1".freeze
+
+  # The recipe layer key, which becomes the tileset's source-layer name.
+  LAYER_NAME = "track".freeze
+
+  # Mapbox caps the human-readable tileset name at 64 characters and only allows alphanumerics,
+  # spaces, "-", "_", and ".".
+  MAX_NAME_LENGTH = 64
+
+  # MTS publish jobs are asynchronous; poll until the job finishes.
+  #
+  # ⚠️ A ~9,000-point track takes around three and a half minutes to publish, so the timeout has a
+  # lot less headroom than it looks. Giving up raises, which costs a full re-upload on the retry —
+  # so the budget is deliberately generous rather than tight. Holding a worker thread this long is
+  # affordable at concurrency 5 for a queue only the owner fills.
+  POLL_INTERVAL = 5   # seconds between job-status polls
+  POLL_TIMEOUT  = 600 # give up after this many seconds
+  HTTP_TIMEOUT  = 30  # per-request timeout
+
+  class ConfigurationError < StandardError; end
+
+  # @return [Boolean] Whether the credentials needed to upload are set. Everything no-ops without
+  #   them, so dev and CI stay inert the way the R2 mirror does.
+  def self.configured?
+    ENV["MAPBOX_USERNAME"].present? && ENV["MAPBOX_SECRET_TOKEN"].present?
+  end
+
+  def initialize
+    @username = ENV["MAPBOX_USERNAME"]
+    @token = ENV["MAPBOX_SECRET_TOKEN"]
+
+    raise ConfigurationError, "Mapbox username is missing! Set MAPBOX_USERNAME." if @username.blank?
+    raise ConfigurationError, "Mapbox secret token is missing! Set MAPBOX_SECRET_TOKEN." if @token.blank?
+  end
+
+  # Uploads the coordinates as a tileset source, creates the tileset from a recipe, publishes it,
+  # and waits for the publish job to finish.
+  #
+  # Idempotent, which the job's retry policy depends on: the source upload replaces rather than
+  # appends, an existing tileset is treated as success, and publishing just mints a new job.
+  #
+  # @param id [String] The Mapbox-safe tileset/source id (≤ 32 chars, [-_] only).
+  # @param name [String] A human-readable name for the tileset.
+  # @param coordinates [Array<Array<Float>>] Track points as [lon, lat] pairs.
+  # @return [String] The full tileset id ("username.id").
+  def create_from_coordinates!(id:, name:, coordinates:)
+    upload_source(id, coordinates)
+    create_tileset(id, name)
+    wait_for_job(id, publish(id))
+    "#{@username}.#{id}"
+  end
+
+  # Looks up an already-published tileset. Returns [full_id, source_layer] if it exists and is
+  # renderable, otherwise nil.
+  # @param id [String] The Mapbox-safe tileset id (without the username prefix).
+  # @return [Array(String, String), nil]
+  def find(id)
+    response = HTTParty.get(
+      "https://api.mapbox.com/v4/#{@username}.#{id}.json",
+      query: { access_token: @token },
+      timeout: HTTP_TIMEOUT
+    )
+    return nil unless response.success?
+
+    layer = Array(JSON.parse(response.body)["vector_layers"]).first&.dig("id")
+    return nil if layer.blank?
+
+    [ "#{@username}.#{id}", layer ]
+  rescue JSON::ParserError
+    nil
+  end
+
+  # Removes a tileset and the source it was built from.
+  #
+  # ⚠️ Both, deliberately. Deleting the tileset alone orphans its source, which still counts
+  # against the account's storage and is invisible in the tileset list.
+  #
+  # A 404 from either is success: the point is that it's gone. Anything else raises, so a failed
+  # delete doesn't silently leave the local record removed and the remote one behind.
+  #
+  # @param id [String] The Mapbox-safe tileset id (without the username prefix).
+  # @return [true]
+  def destroy!(id)
+    delete!("#{API}/#{@username}.#{id}", "delete tileset")
+    delete!("#{API}/sources/#{@username}/#{id}", "delete tileset source")
+    true
+  end
+
+  private
+
+  def delete!(url, action)
+    response = HTTParty.delete(url, query: { access_token: @token }, timeout: HTTP_TIMEOUT)
+    return if response.success? || response.code == 404
+
+    raise upload_error(action, response)
+  end
+
+  # Builds line-delimited GeoJSON (a single LineString Feature on one line) and PUTs it as a
+  # tileset source, replacing any existing source with the same id. (POST would append to an
+  # existing source, accumulating stale tracks; PUT replaces, so re-uploads reflect just this
+  # track.)
+  def upload_source(id, coordinates)
+    feature = {
+      type: "Feature",
+      properties: {},
+      geometry: { type: "LineString", coordinates: coordinates }
+    }
+
+    Tempfile.create([ id, ".geojson.ld" ]) do |file|
+      file.write("#{feature.to_json}\n")
+      file.rewind
+      response = HTTParty.put(
+        "#{API}/sources/#{@username}/#{id}",
+        query: { access_token: @token },
+        body: { file: file },
+        multipart: true,
+        timeout: HTTP_TIMEOUT
+      )
+      raise upload_error("upload tileset source", response) unless response.success?
+    end
+  end
+
+  # Creates the tileset from a recipe. The LAYER_NAME key fixes the source-layer name. Re-runs hit
+  # an "already exists" error, which is benign — the source was just refreshed above and
+  # publishing will re-tile it, so we continue.
+  def create_tileset(id, name)
+    recipe = {
+      version: 1,
+      layers: {
+        LAYER_NAME => {
+          source: "mapbox://tileset-source/#{@username}/#{id}",
+          minzoom: 0,
+          maxzoom: 16
+        }
+      }
+    }
+
+    response = HTTParty.post(
+      "#{API}/#{@username}.#{id}",
+      query: { access_token: @token },
+      headers: { "Content-Type" => "application/json" },
+      body: { recipe: recipe, name: sanitize_name(name), private: true }.to_json,
+      timeout: HTTP_TIMEOUT
+    )
+
+    return if response.success?
+    return if already_exists?(response)
+
+    raise upload_error("create tileset", response)
+  end
+
+  # Coerces a human-readable name into Mapbox's allowed set: transliterates to ASCII (so
+  # "Coeur d'Alene" loses its curly apostrophe and accents flatten), drops anything outside
+  # [alnum, space, -, _, .], collapses whitespace, and caps the result at MAX_NAME_LENGTH.
+  def sanitize_name(name)
+    ActiveSupport::Inflector.transliterate(name.to_s)
+      .gsub(/[^a-zA-Z0-9 \-_.]/, "")
+      .squish
+      .first(MAX_NAME_LENGTH)
+  end
+
+  # Triggers a publish job for the tileset and returns its job id.
+  def publish(id)
+    response = HTTParty.post(
+      "#{API}/#{@username}.#{id}/publish",
+      query: { access_token: @token },
+      timeout: HTTP_TIMEOUT
+    )
+    raise upload_error("publish tileset", response) unless response.success?
+
+    JSON.parse(response.body)["jobId"]
+  end
+
+  # Polls the publish job until it succeeds, fails, or times out.
+  def wait_for_job(id, job_id)
+    waited = 0
+    loop do
+      response = HTTParty.get(
+        "#{API}/#{@username}.#{id}/jobs/#{job_id}",
+        query: { access_token: @token },
+        timeout: HTTP_TIMEOUT
+      )
+      raise upload_error("check tileset job status", response) unless response.success?
+
+      job = JSON.parse(response.body)
+      case job["stage"]
+      when "success"
+        return
+      when "failed"
+        raise "Mapbox tileset publish failed: #{Array(job['errors']).join('; ').presence || 'unknown error'}"
+      end
+
+      raise "Mapbox tileset publish timed out after #{POLL_TIMEOUT}s" if waited >= POLL_TIMEOUT
+
+      sleep(POLL_INTERVAL)
+      waited += POLL_INTERVAL
+    end
+  end
+
+  # A tileset create against an existing id returns a 4xx whose message says it already exists;
+  # treat that as success so re-runs are idempotent.
+  def already_exists?(response)
+    parsed_message(response).to_s.match?(/already exists/i)
+  end
+
+  # Builds a human-readable error for a failed MTS request.
+  def upload_error(action, response)
+    detail = parsed_message(response).presence || "status #{response.code}"
+    "Mapbox failed to #{action}: #{detail}"
+  end
+
+  # Extracts a `message` from a JSON error body, falling back to nil.
+  def parsed_message(response)
+    JSON.parse(response.body)["message"]
+  rescue JSON::ParserError, TypeError
+    nil
+  end
+end

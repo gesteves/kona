@@ -49,8 +49,10 @@ a cached copy before revalidating.
 | POST | `/webhooks/whoop` | enqueues `WhoopWebhookJob`; 200 `{ok: true}` | — |
 | GET | `/whoop/auth`, `/whoop/callback` | Whoop OAuth (authorize is owner-gated) | — |
 | GET | `/signin`, `/auth/google_oauth2/callback`; POST `/signout` | owner session | `no-store` |
-| GET | `/`, `/connected-accounts`, `/contact`; DELETE `/connected-accounts/whoop` | admin UI (owner-session gated) | `no-store` |
-| POST | `/contact/:id/not-spam`; DELETE `/contact/:id` | release or delete a quarantined message | `no-store` |
+| GET | `/`, `/connected-accounts`, `/contact`, `/maps`, `/maps/:id` | admin UI (owner-session gated) | `no-store` |
+| POST | `/contact/:id/not-spam`; DELETE `/contact/:id`, `/connected-accounts/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
+| POST | `/maps`; PATCH/DELETE `/maps/:id`; GET `/maps/status` | upload GPX tracks, save render settings, delete a track, poll publish status | `no-store` |
+| GET | `/maps/:id/preview`, `/maps/:id/download` | the rendered PNG, proxied from Mapbox at 1x and 2x | `no-store` |
 | — | `/sidekiq` | job dashboard (owner-session gated) | — |
 | GET | `/` (public API host only) | 301 → main site | — |
 
@@ -96,8 +98,10 @@ controller; a small Rack guard in the Sidekiq initializer gates the mounted `Sid
 `app/services/`, base `ApplicationService`: one per external API — Intervals.icu, Apple WeatherKit
 (ES256 JWT), Google Maps / Air Quality / Pollen, PurpleAir, Whoop (OAuth2), TrainerRoad (iCal),
 Contentful, Plausible, Font Awesome, Goodspeed, Akismet, Resend, Turnstile, Voyage (`Embeddings`),
-`StandardSite`, `AssetMirror`, plus `SpamQuarantine` (Redis-only, no HTTP — see **The spam
-quarantine**). Read-through Redis cache via `cached_json(key, expires_in:)`;
+`StandardSite`, `AssetMirror`, plus four that aren't `ApplicationService` subclasses because they
+aren't cacheable reads: `SpamQuarantine` and `TrackLibrary` (Redis-only, no HTTP), `GpxTrack`
+(parsing only), and `MapboxTileset`/`StaticMap` (see **The map renderer**).
+Read-through Redis cache via `cached_json(key, expires_in:)`;
 HTTParty with retries; `DeepOstruct` for dot-access.
 
 ⚠️ **Plausible is rate-limited to 600 calls/hour**, and `cached_json` caps each distinct query body
@@ -179,6 +183,7 @@ that shared window is safe.
 | `LocationSyncJob(latitude, longitude)` | propagates the current location to Intervals.icu |
 | `ContactMailJob(name, email, message, context, restored_from_spam = false)` | contact intake: Akismet + compose |
 | `ContactDeliveryJob(payload)` | the one retryable *delivery* unit — sends via Resend |
+| `MapTilesetJob(id)` | publishes an uploaded GPX track to Mapbox as a vector tileset |
 
 - **`SiteBuildJob`** has two callers with one event type each — the Contentful webhook
   (`contentful-publish`) and `POST /api/build` (`api-build`). They build identically and differ
@@ -347,6 +352,88 @@ calls `Akismet#submit_ham`.
   so a danger variant beside the brand-accent "Not spam" makes the safe action the loudest thing on
   the card. Red is reserved for the confirm button inside the dialog.
 
+### The map renderer
+
+`/maps` turns GPX tracks into the static PNG cover images used on race reports. It's a front-end
+over Mapbox's Data Workbench: upload one or more GPX files, wait for each to be published as a
+private vector tileset, then open one to tune its framing and styling and download the result.
+(This replaced a standalone `utilities/maps/` Rake task, which rendered every GPX in a folder with
+one shared set of env-var options.)
+
+Four services, none of them `ApplicationService` subclasses: `GpxTrack` parses an upload,
+`TrackLibrary` is the Redis store, `MapboxTileset` talks to the Mapbox Tiling Service, and
+`StaticMap` builds and fetches the render.
+
+- ⚠️ **Nothing is composited locally.** The Static Images API draws the track (an `addlayer` over
+  the tileset) and both pins server-side and returns a finished PNG, so this needs no image library
+  and no system packages — only `nokogiri` and `httparty`. Don't "improve" it into local drawing;
+  the 512MB VM has an OOM history.
+- ⚠️ **`GpxTrack` streams with `Nokogiri::XML::Reader`, not a DOM.** Real Garmin exports run to
+  several megabytes and ~9,000 points, and this parse happens in a Puma thread against a 20-second
+  request budget. Coordinates are rounded to six decimals (~11cm) on the way in: Garmin writes 26
+  significant digits, which triples both the Redis payload and the Mapbox upload for nothing.
+- **One Redis hash**, `maps:tracks`, field = the tileset id — same reasoning as the spam
+  quarantine. A record holds the bounding box, both endpoints, the sport, and the render settings,
+  because **the GPX is thrown away after upload** and the settings page still has to place the pins
+  on a track uploaded last week. `MAX_ENTRIES` is a runaway guard, not retention: a track is only
+  gone when the owner deletes it.
+- ⚠️ **Coordinates are staged in their own key** (`maps:pending:<id>`, 1-hour TTL), not in the
+  record or the job's arguments. `app` and `worker` are separate fly machines, so a tempfile
+  written during the request isn't there for the worker to read.
+- ⚠️ **`MapTilesetJob` raises on failure rather than recording one**, so the inherited 24-hour
+  retry applies; `sidekiq_retries_exhausted` is what writes `status: "failed"`. Recording it on the
+  first exception would flicker the row failed → processing → failed on every attempt. The job is
+  idempotent (source upload replaces, an existing tileset counts as success), which is what makes
+  that safe — and necessary, since `kill_timeout` is 30s and a publish poll runs up to 300s.
+- ⚠️ **`MapboxTileset#destroy!` deletes the tileset *and* its source.** Deleting only the tileset
+  orphans the source, which still counts against the account and is invisible in the tileset list.
+  It raises on anything but success or 404, so the local record is never dropped while the remote
+  one survives.
+- ⚠️ **`preview` and `download` proxy the render; they never redirect.** The Static Images URL
+  carries `MAPBOX_SECRET_TOKEN` as a query parameter, so an `<img>` pointed at Mapbox would hand
+  the browser a `tilesets:write` credential. Preview renders at 1x, download at 2x.
+- ⚠️ **The style URL and the marker icons/colors reach an outbound URL from form fields**, so
+  `StaticMap` matches the style against Mapbox's own shape and strips everything that isn't an icon
+  id or a hex color. A bad style falls back to the default rather than being interpolated, and the
+  per-side numbers are clamped — they come from number inputs.
+- **Padding and extra map are four settings each**, not the CSS-style shorthand string the Rake
+  task took (`PADDING=60,20`). The form shows one field while the sides match and four when they
+  don't; `linked_sides_controller` mirrors the first into the rest, and all four stay named so the
+  form always submits four values. Shorthand was compact to type and miserable to edit.
+- **The map style is a dropdown plus an override.** `style_preset` holds one of `STYLE_PRESETS`,
+  `style_url` holds a custom style and wins when set. `MapTrackPresenter#settings` moves a preset
+  found in `style_url` back into the dropdown, which is also how records written before the split
+  migrate themselves.
+- **Marker icons are named for what they mark** (`MARKER_ICONS`), not by their Maki id, and the
+  sport→icon seeding in `GpxTrack::SPORT_ICONS` falls back to running rather than to a neutral
+  placeholder.
+- ⚠️ **Mapbox draws the last overlay on top**, so the default marker order is `[finish, start]` —
+  start on top, because a finish pin over the start of an out-and-back hides where you began.
+  `finish_on_top` reverses it. The setting is named for the state it produces; an earlier
+  `reverse_markers` described the mechanism and read backwards against its own label.
+- ⚠️ **The pinned preview clears the sticky header via `<wa-page>`'s `--header-height`**, which the
+  component declares but never measures — `_page.scss` sets it, `_admin-header.scss` takes the
+  bar's height from it, and `_track.scss` offsets the sticky preview by it. Setting it also fixes
+  the component's own `--scroll-margin-top` for anchor targets.
+- ⚠️ **This is the only admin page that needs the Sidekiq worker running.** A track sits on
+  "Processing" until `MapTilesetJob` publishes it. That's why `worker` is no longer opt-in in
+  `.overmind.env`. The index checks Sidekiq's process set **only while something is publishing**
+  and says so when it's empty — otherwise a stuck row looks identical to a slow one, with nothing
+  anywhere explaining it. In production an empty set means the worker machine is down.
+- **The page polls**, it doesn't push: `map_status_controller` re-checks `/maps/status` every 5s
+  while a row is publishing and stops otherwise. Action Cable's engine is commented out in
+  `application.rb` and there's no `turbo-rails`, so a websocket would be a lot of new
+  infrastructure for one signed-in user.
+- **`map_preview_controller` rewrites the image's `src` rather than submitting the form.** A submit
+  is a Turbo visit, which replaces the body — the field being edited would lose focus on every
+  keystroke and a slider would stop tracking mid-drag. The form stays a real GET form so pressing
+  Enter, or running without JavaScript, still works. Each rebuild is one billed Static Images
+  request, hence the debounce.
+- These are the admin's **first form inputs** — every other form here is action-only. Web Awesome's
+  controls are form-associated, so they submit and appear in `FormData` like native ones. The
+  marker-order switch is paired with a hidden `0` field, because an unchecked switch submits
+  nothing.
+
 `Admin::BaseController` requires the owner session; it and `SessionsController` both include the
 **`OwnerFacing`** concern, which sets `Cache-Control: no-store` and `X-Robots-Tag: noindex,
 nofollow`. ⚠️ Admin actions must never call `cache_widget`. ⚠️ The `X-Robots-Tag` is not redundant
@@ -486,7 +573,11 @@ Rails `config/credentials.yml.enc` + `master.key`).
   slug), `PLAUSIBLE_API_KEY` + `PLAUSIBLE_SITE_ID` (⚠️ with either unset the pageviews widget
   collapses and `TrendingArticles` silently degrades to recency order — an INFO log is the only
   sign, and the result looks exactly like "working, nothing trending"), `VOYAGE_API_KEY` (unset =
-  no embeddings, so the related-articles widget collapses), `REDIS_POOL_SIZE` (default 10; size it
+  no embeddings, so the related-articles widget collapses), `MAPBOX_USERNAME` +
+  `MAPBOX_SECRET_TOKEN` (a token with `tilesets:write` and `tilesets:read`; with either unset the
+  Maps page says so and refuses uploads) plus the optional `MAPBOX_ACCESS_TOKEN` (public, used for
+  rendering only when there's no secret token) and `MAPBOX_STYLE_URL` (the default style for new
+  tracks; each track can override it), `REDIS_POOL_SIZE` (default 10; size it
   to the widest consumer, which is Sidekiq's concurrency), and the four `TRENDING_*` ranking knobs
   (see `.env.example`; they feed the ranking's cache key, so retuning one invalidates it).
 
