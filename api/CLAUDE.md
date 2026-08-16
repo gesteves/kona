@@ -40,7 +40,7 @@ a cached copy before revalidating.
 | GET | `/widgets/articles/related/:id` | "You May Also Like", from precomputed Voyage embeddings | 1 hr |
 | GET | `/widgets/whoop` | sleep/recovery/strain | 5 min |
 | GET | `/widgets/plausible/pageviews/:id` | pageview count by Contentful id | 5 min |
-| POST | `/api/location` | sets Redis `location:current` + enqueues `LocationSyncJob` | — |
+| POST | `/api/location` | sets Redis `location:current` + enqueues `LocationSyncJob`, via `Location.store` | — |
 | POST | `/api/contact` | drops honeypot hits + enqueues `ContactMailJob`; JSON → 204/422, HTML → 303 | — |
 | POST | `/api/build` | enqueues `SiteBuildJob`; 202, or 429 inside the 60s dedupe lock | — |
 | POST | `/api/icons` | resolves the web build's Font Awesome allowlist to SVGs | — |
@@ -49,8 +49,9 @@ a cached copy before revalidating.
 | POST | `/webhooks/whoop` | enqueues `WhoopWebhookJob`; 200 `{ok: true}` | — |
 | GET | `/whoop/auth`, `/whoop/callback` | Whoop OAuth (authorize is owner-gated) | — |
 | GET | `/signin`, `/auth/google_oauth2/callback`; POST `/signout` | owner session | `no-store` |
-| GET | `/`, `/connected-accounts`, `/contact`, `/maps`, `/maps/:id` | admin UI (owner-session gated) | `no-store` |
+| GET | `/`, `/connected-accounts`, `/contact`, `/location`, `/maps`, `/maps/:id` | admin UI (owner-session gated) | `no-store` |
 | POST | `/contact/:id/not-spam`; DELETE `/contact/:id`, `/connected-accounts/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
+| POST | `/location` | same write as `POST /api/location`; answers with the geocoded place + time zone | `no-store` |
 | POST | `/maps`; PATCH/DELETE `/maps/:id`; GET `/maps/status` | upload GPX tracks, save render settings, delete a track, poll publish status | `no-store` |
 | GET | `/maps/:id/preview`, `/maps/:id/download` | the rendered PNG, proxied from Mapbox; same render, only the disposition differs | `no-store` |
 | — | `/sidekiq` | job dashboard (owner-session gated) | — |
@@ -352,6 +353,45 @@ calls `Akismet#submit_ham`.
   so a danger variant beside the brand-accent "Not spam" makes the safe action the loudest thing on
   the card. Red is reserved for the confirm button inside the dialog.
 
+### The location picker
+
+`/location` is a full-width Mapbox map with a draggable pin, and the pin **is** the current
+location: a click or a drag writes it, with no separate save step. Above the map sit the place
+name, the coordinates and time zone, and a Geolocation button — that line is the only confirmation
+there is, so it reports "Saving…" and then what was stored.
+
+- **It writes through `Location.store`**, the same method `POST /api/location` uses, so the two
+  can't drift on ordering (Redis first, sync second) or on validation (`Location.parse`, which is
+  `Float()` rather than `to_f` — see the Null Island ⚠️ there). This page is a front-end over that
+  endpoint's write, not a second way to store a location.
+- **The heading is `format_location`'s output** — the same helper, over the same
+  `GoogleMaps#location`, that `WeatherSummaryPresenter` renders — so the page doubles as a preview
+  of how a location will read in the weather widget. ⚠️ Not `LocationContext#label`, which adds
+  fallbacks ("Current location") the widget doesn't have; the preview would promise a name the
+  widget would never print. A geocode that resolves to nothing falls back to the coordinates.
+- ⚠️ **`POST /location` answers with that place and time zone, and the page updates the heading
+  from the response.** Re-deriving it per drop is the point: the server-rendered name describes
+  the location the page was *loaded* with, and one pin drop makes it a caption for the wrong
+  place.
+- ⚠️ **`Location` prefers `ENV["LOCATION"]` over the stored value**, so with that var set a pin
+  drop writes Redis and changes nothing any widget reads. The page renders a callout naming the
+  coordinates that actually win rather than appearing to work.
+- ⚠️ **The map's token is `MAPBOX_ACCESS_TOKEN` and only that.** It's rendered into the page, and
+  `StaticMap`'s preference for `MAPBOX_SECRET_TOKEN` is exactly the fallback that must not happen
+  here — that token carries `tilesets:write`. A request spec asserts it never appears in the body.
+  Without the public token the map is replaced by a callout and the coordinate form still works.
+- **Mapbox GL JS comes from Mapbox's CDN, loaded by the Stimulus controller**, not from npm. It's
+  several times the size of the whole admin bundle and one page wants it, and the map already
+  can't work without `api.mapbox.com`, so this adds no dependency the page didn't have.
+  ⚠️ Loaded from the controller rather than a `<head>` tag because Turbo merges a new head by
+  *appending* elements: a deferred script would land asynchronously and the controller could
+  connect before `mapboxgl` existed.
+- ⚠️ **The map is torn down on `turbo:before-cache`.** Turbo snapshots the page before Stimulus
+  disconnects, so without it the cached copy contains GL JS's canvas and a restoration visit
+  builds a second map on top of the dead one.
+- The geocode is display only and degrades to nothing, so an unset `GOOGLE_API_KEY` — or a bad day
+  at Google — leaves the coordinates and stores the location regardless.
+
 ### The map renderer
 
 `/maps` turns GPX tracks into the static PNG cover images used on race reports. It's a front-end
@@ -577,9 +617,11 @@ Rails `config/credentials.yml.enc` + `master.key`).
   sign, and the result looks exactly like "working, nothing trending"), `VOYAGE_API_KEY` (unset =
   no embeddings, so the related-articles widget collapses), `MAPBOX_USERNAME` +
   `MAPBOX_SECRET_TOKEN` (a token with `tilesets:write` and `tilesets:read`; with either unset the
-  Maps page says so and refuses uploads) plus the optional `MAPBOX_ACCESS_TOKEN` (public, used for
-  rendering only when there's no secret token) and `MAPBOX_STYLE_URL` (the default style for new
-  tracks; each track can override it), `REDIS_POOL_SIZE` (default 10; size it
+  Maps page says so and refuses uploads) plus `MAPBOX_ACCESS_TOKEN` (the ⚠️ **public** token: it
+  renders server-side when there's no secret token, and it's what the Location page's browser map
+  needs — unset, that page degrades to a coordinate form) and `MAPBOX_STYLE_URL` (the default style
+  for new tracks; each track can override it, and the Location page ignores it),
+  `REDIS_POOL_SIZE` (default 10; size it
   to the widest consumer, which is Sidekiq's concurrency), and the four `TRENDING_*` ranking knobs
   (see `.env.example`; they feed the ranking's cache key, so retuning one invalidates it).
 

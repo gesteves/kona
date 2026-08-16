@@ -3,6 +3,9 @@ module Api
   # the shared "location:current" Redis key (read by this app's Location service); this replaced the
   # old build-hook ingress. It also enqueues a LocationSyncJob to propagate the location to
   # Intervals.icu (athlete profile + weather config) in the background.
+  #
+  # The write itself lives in Location.store, shared with the admin's Location page so the two
+  # can't drift. This endpoint keeps its own error messages: they're read by external callers.
   class LocationController < BaseController
     # The API_TOKEN bearer check is inherited from BaseController; only forgery protection
     # (this is a POST) needs handling here.
@@ -13,20 +16,12 @@ module Api
         return render json: { error: "Missing coordinates" }, status: :unprocessable_content
       end
 
-      # Float() (not to_f) so non-numeric input is rejected instead of silently becoming 0.0
-      # (the Gulf of Guinea) and corrupting the stored location.
-      latitude = Float(params[:latitude], exception: false)
-      longitude = Float(params[:longitude], exception: false)
-
-      unless Location.valid_coordinates?(latitude, longitude)
+      coordinates = Location.parse(params[:latitude], params[:longitude])
+      if coordinates.nil?
         return render json: { error: "Invalid coordinates" }, status: :unprocessable_content
       end
 
-      $redis.set(Location::LOCATION_CACHE_KEY, "#{latitude},#{longitude}")
-      # Propagate the location to Intervals.icu (athlete profile + weather config) off the
-      # request path. Redis is written first so a geocoding hiccup never blocks the location
-      # store; the sync is idempotent, so its Sidekiq retries are safe.
-      LocationSyncJob.perform_async(latitude, longitude)
+      Location.store(*coordinates)
       head :no_content
     end
   end

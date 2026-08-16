@@ -1,0 +1,47 @@
+// The Location page: a full-width Mapbox map, and the coordinates it just wrote.
+
+.location {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wa-space-m);
+
+  &__notice {
+    margin-block-end: var(--wa-space-m);
+  }
+
+  &__bar {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wa-space-m);
+    justify-content: space-between;
+  }
+
+  &__summary {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-3xs);
+  }
+
+  &__place {
+    font-size: var(--wa-font-size-l);
+    font-weight: var(--wa-font-weight-heading);
+    margin: 0;
+  }
+
+  &__status {
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-s);
+    margin: 0;
+  }
+
+  // Mapbox GL JS sizes its canvas to this element, so it needs a height of its own — it has no
+  // content to take one from. The background is what's visible while the tiles load.
+  &__map {
+    background-color: var(--wa-color-neutral-fill-quiet);
+    block-size: min(70vh, 40rem);
+    border-radius: var(--wa-border-radius-m);
+    cursor: crosshair;
+    overflow: hidden;
+  }
+}

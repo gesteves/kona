@@ -20,6 +20,8 @@ RSpec.describe "Public API host route constraints", type: :request do
     [ :get,  "/sidekiq" ],
     [ :get,  "/connected-accounts" ],
     [ :delete, "/connected-accounts/whoop" ],
+    [ :get,  "/location" ],
+    [ :post, "/location" ],
     [ :get,  "/contact" ],
     [ :post, "/contact/abc123/not-spam" ],
     [ :delete, "/contact/abc123" ],

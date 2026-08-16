@@ -1,0 +1,52 @@
+<% content_for :title, "Location" %>
+
+<h1 class="admin-main__title">Location</h1>
+
+<% unless @location.configured? %>
+  <wa-callout variant="warning" class="location__notice">
+    <%= raw icon_svg("classic", "light", "triangle-exclamation")&.sub("<svg", '<svg slot="icon"') %>
+    Set <code>MAPBOX_ACCESS_TOKEN</code> in the environment to show the map.
+  </wa-callout>
+<% end %>
+
+<% if @location.overridden? %>
+  <wa-callout variant="warning" class="location__notice">
+    <%= raw icon_svg("classic", "light", "triangle-exclamation")&.sub("<svg", '<svg slot="icon"') %>
+    <code>LOCATION</code> is set to <%= @location.override_summary %> in the environment, and
+    outranks anything set here. Unset it to use this page.
+  </wa-callout>
+<% end %>
+
+<%# The pin is the location: dropping or dragging it saves, and the line above the map is the only
+    confirmation there is. %>
+<div class="location" data-controller="location-map"
+     data-location-map-token-value="<%= @location.map_token %>"
+     data-location-map-style-value="<%= @location.map_style %>"
+     data-location-map-latitude-value="<%= @location.latitude %>"
+     data-location-map-longitude-value="<%= @location.longitude %>"
+     data-location-map-center-value="<%= @location.center.to_json %>"
+     data-location-map-zoom-value="<%= @location.zoom %>"
+     data-location-map-save-url-value="<%= @location.save_path %>">
+
+  <div class="location__bar">
+    <div class="location__summary">
+      <%# The name the weather widget would print for these coordinates — the page doubles as a
+          preview of that, so it's re-derived on every drop rather than left to go stale. %>
+      <h2 class="location__place" data-location-map-target="place"><%= @location.heading %></h2>
+      <p class="location__status" data-location-map-target="status" aria-live="polite">
+        <%= @location.details %>
+      </p>
+    </div>
+
+    <%# Explicit `click->`: Stimulus infers a default event from the tag name, and wa-button isn't
+        in its map. %>
+    <wa-button appearance="outlined" data-action="click->location-map#locate">
+      <%= raw icon_svg("classic", "light", "location-crosshairs")&.sub("<svg", '<svg slot="start"') %>
+      Use my location
+    </wa-button>
+  </div>
+
+  <%# Left empty on purpose — Mapbox GL JS fills it, and anything in here would be torn out with
+      the map before Turbo caches the page. %>
+  <div class="location__map" data-location-map-target="map"></div>
+</div>

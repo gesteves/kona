@@ -79,4 +79,55 @@ RSpec.describe Location do
       expect(described_class.valid_coordinates?(43.48, nil)).to be(false)
     end
   end
+
+  describe ".parse" do
+    it "returns the pair as floats" do
+      expect(described_class.parse("43.48", "-110.76")).to eq([ 43.48, -110.76 ])
+    end
+
+    it "keeps a zero, which is a real coordinate" do
+      expect(described_class.parse("0", "0")).to eq([ 0.0, 0.0 ])
+    end
+
+    # to_f would make these 0.0 — a valid coordinate in the Gulf of Guinea — and store it.
+    it "rejects text rather than coercing it to Null Island" do
+      expect(described_class.parse("somewhere", "else")).to be_nil
+    end
+
+    it "rejects an out-of-range pair" do
+      expect(described_class.parse("91", "0")).to be_nil
+    end
+
+    it "rejects a missing component" do
+      expect(described_class.parse("43.48", nil)).to be_nil
+      expect(described_class.parse("43.48", "")).to be_nil
+    end
+  end
+
+  describe ".stored" do
+    it "reads the coordinates in Redis, ignoring the override" do
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("LOCATION").and_return("43.48,-110.76")
+      allow($redis).to receive(:get).with(described_class::LOCATION_CACHE_KEY).and_return("37.77,-122.42")
+
+      expect(described_class.stored).to eq([ 37.77, -122.42 ])
+    end
+
+    it "is nil when nothing is stored" do
+      allow($redis).to receive(:get).with(described_class::LOCATION_CACHE_KEY).and_return(nil)
+
+      expect(described_class.stored).to be_nil
+    end
+  end
+
+  describe ".store" do
+    # ⚠️ Redis first: the stored value is what the widgets read, and it must not wait on the sync.
+    it "writes the coordinates and enqueues the sync" do
+      expect($redis).to receive(:set).with(described_class::LOCATION_CACHE_KEY, "37.77,-122.42")
+
+      described_class.store(37.77, -122.42)
+
+      expect(LocationSyncJob).to have_enqueued_sidekiq_job(37.77, -122.42)
+    end
+  end
 end

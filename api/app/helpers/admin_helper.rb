@@ -13,6 +13,7 @@ module AdminHelper
   def admin_nav_items(quarantine_count: 0)
     [
       { label: "Home",               path: root_path,               icon: %w[classic light house] },
+      { label: "Location",           path: location_path,           icon: %w[classic light location-dot] },
       { label: "Contact",            path: contact_path,            icon: %w[classic light envelope],
         badge: quarantine_count.to_i.positive? ? quarantine_count.to_i : nil },
       { label: "Maps",               path: maps_path,               icon: %w[classic light map] },

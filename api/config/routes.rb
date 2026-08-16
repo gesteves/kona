@@ -103,6 +103,11 @@ Rails.application.routes.draw do
       get    "connected-accounts"       => "connected_accounts#show",  as: :connected_accounts
       delete "connected-accounts/whoop" => "connected_accounts#whoop", as: :whoop_connection
 
+      # The current location, on a map. The POST writes the same Redis key as the bearer-gated
+      # POST /api/location, through Location.store.
+      get  "location" => "location#show",   as: :location
+      post "location" => "location#create"
+
       # The contact-form spam quarantine. Distinct from the public POST /api/contact, which is a
       # different path on a different host.
       get    "contact"              => "contact#index",    as: :contact
