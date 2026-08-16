@@ -7,6 +7,12 @@
   list-style: none;
   margin: 0;
   padding: 0;
+
+  // ⚠️ native.css indents list items with `margin-inline-start` on the <li>, so the padding reset
+  // above isn't enough — without this the cards sit indented from the page heading.
+  &__item {
+    margin: 0;
+  }
 }
 
 .account {

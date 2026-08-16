@@ -15,6 +15,15 @@
     padding: 0;
   }
 
+  // ⚠️ Web Awesome's native.css indents list items with `margin-inline-start` on the <li>, not
+  // padding on the <ul> — so zeroing the list's padding above does nothing on its own, and the
+  // items sit ~18px in from the column's own padding. That reads as the nav being off-centre
+  // (a wide gap on the left, a narrow one on the right) and knocks the links out of alignment
+  // with the sign-out button below, which has no <li> to inherit it from.
+  &__item {
+    margin: 0;
+  }
+
   &__link {
     align-items: center;
     border-radius: var(--wa-border-radius-m);
@@ -34,6 +43,13 @@
       background-color: var(--wa-color-neutral-fill-quiet);
       font-weight: var(--wa-font-weight-semibold);
     }
+  }
+
+  // ⚠️ `inline-flex`, not the default inline: an inline SVG sits on its wrapper's text baseline, so
+  // the span's box grows by the descender gap below the glyph. The link centers that box, which
+  // leaves the icon riding visibly high against the label.
+  &__icon {
+    display: inline-flex;
   }
 
   &__label {
