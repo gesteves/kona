@@ -13,10 +13,8 @@ RSpec.describe StaticMap do
     }
   end
 
-  # Positional scale, not a keyword: with a keyword in the signature Ruby reads a bare
-  # string-keyed hash at the call site as keyword arguments.
-  def map(settings = {}, scale = 2)
-    described_class.new(track: record, settings: described_class.defaults_for("pitch").merge(settings), scale: scale)
+  def map(settings = {})
+    described_class.new(track: record, settings: described_class.defaults_for("pitch").merge(settings))
   end
 
   before do
@@ -40,9 +38,9 @@ RSpec.describe StaticMap do
       )
     end
 
-    it "drops the retina suffix for a preview" do
-      expect(map({}, 1)).to have_attributes(url: include("/1280x1280?"))
-      expect(map({}, 1).url).not_to include("@2x")
+    # The API bills per request, not per pixel, so there is no cheaper size to render.
+    it "always asks for the retina render" do
+      expect(map.url).to include("@2x")
     end
 
     it "omits the track layer until the tileset is published" do

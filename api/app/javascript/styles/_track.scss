@@ -105,6 +105,20 @@
     top: calc(var(--header-height, 0px) + var(--wa-space-m));
   }
 
+  // Strips <wa-button>'s own chrome so the trigger is just the image. A native <button> would be
+  // simpler, but the admin's convention is a Web Awesome component wherever one exists, and two
+  // request specs assert no bare <button> reaches the page.
+  &__zoom {
+    cursor: zoom-in;
+
+    &::part(button) {
+      block-size: auto;
+      display: block;
+      inline-size: 100%;
+      padding: 0;
+    }
+  }
+
   // The border isn't decoration: a map rendered against a pale style is nearly white at its
   // edges, so without it there's no telling where the image stops.
   &__image {
@@ -114,6 +128,25 @@
     display: block;
     height: auto;
     max-width: 100%;
+  }
+}
+
+// The zoom dialog.
+//
+// ⚠️ A wide box plus an unsized image, not `--width: fit-content`. The image carries
+// `max-inline-size: 100%`, which makes `fit-content` resolve against the container rather than the
+// render, collapsing the dialog to a few hundred pixels. Leaving the image's own width alone means
+// it draws at its natural size and the two maxima only ever shrink it — it is never upscaled into
+// blur on a large screen.
+.map-zoom {
+  --width: 95vw;
+
+  &__image {
+    block-size: auto;
+    display: block;
+    margin-inline: auto;
+    max-block-size: 75vh;
+    max-inline-size: 100%;
   }
 }
 

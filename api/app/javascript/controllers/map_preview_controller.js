@@ -35,7 +35,11 @@ export default class extends Controller {
 
   update() {
     const query = this.query();
-    this.imageTarget.src = this.withQuery(this.imageTarget.src, query);
+    // Both the inline preview and the zoom dialog's copy. They share a URL, so the browser fetches
+    // it once however many are on the page.
+    this.imageTargets.forEach((img) => {
+      img.src = this.withQuery(img.src, query);
+    });
     this.downloadTarget.href = this.withQuery(this.downloadTarget.href, query);
     this.save(query);
   }

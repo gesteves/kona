@@ -47,8 +47,8 @@ class StaticMap
   MAX_PADDING = 500
   MAX_MARGIN_KM = 500
 
-  # The image is always this wide; height is derived from the track's aspect ratio unless one is
-  # set, and clamped either way.
+  # The image is always this wide before Mapbox's @2x doubling; height is derived from the track's
+  # aspect ratio unless one is set, and clamped either way.
   WIDTH = 1280
   MIN_HEIGHT = 800
   MAX_HEIGHT = 1280
@@ -109,11 +109,9 @@ class StaticMap
   # @param track [Hash] A TrackLibrary record: "tileset_id", "source_layer", "bounds",
   #   "start_coord", "end_coord", "title".
   # @param settings [Hash] Render settings, merged over DEFAULTS.
-  # @param scale [Integer] 1 or 2 (Mapbox's `@2x`). Previews render at 1, downloads at 2.
-  def initialize(track:, settings: {}, scale: 2)
+  def initialize(track:, settings: {})
     @track = track
     @settings = self.class.defaults_for(nil).merge(settings.to_h.compact)
-    @scale = scale == 2 ? 2 : 1
   end
 
   # @return [String] The Mapbox Static Images API URL, access token included.
@@ -124,10 +122,11 @@ class StaticMap
 
     box = bounds
     bbox = "%5B#{box[:min_lon]},#{box[:min_lat]},#{box[:max_lon]},#{box[:max_lat]}%5D"
-    suffix = @scale == 2 ? "@2x" : ""
     query = { padding: padding.join(","), access_token: render_token }.to_query
 
-    url = "https://api.mapbox.com/styles/v1/#{style_path}/static/#{markers.join(',')}/#{bbox}/#{WIDTH}x#{height}#{suffix}?#{query}"
+    # Always @2x. The API bills per request rather than per pixel, so there is nothing to save by
+    # rendering the preview smaller, and it is shown at full width in the zoom dialog.
+    url = "https://api.mapbox.com/styles/v1/#{style_path}/static/#{markers.join(',')}/#{bbox}/#{WIDTH}x#{height}@2x?#{query}"
     url += "&addlayer=#{layer.to_json}&before_layer=road-label" if layer.present?
     url
   end

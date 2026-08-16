@@ -84,13 +84,18 @@ module Admin
     #
     # ⚠️ Proxied rather than linked. The Static Images API takes its token as a query parameter, so
     # an <img> pointed straight at Mapbox would hand the browser a tilesets:write credential.
+    #
+    # Rendered at 2x like the download, not at some cheaper preview size: the API bills per request
+    # rather than per pixel, so a smaller render saves nothing that matters, and the zoom dialog
+    # shows this same image at up to its full width — at 1x that is half the pixels a retina screen
+    # wants. The cost is bandwidth per tweak, which the debounce already bounds.
     def preview
-      send_render(scale: 1, disposition: "inline")
+      send_render(disposition: "inline")
     end
 
     # GET /maps/:id/download
     def download
-      send_render(scale: 2, disposition: "attachment")
+      send_render(disposition: "attachment")
     end
 
     private
@@ -186,12 +191,12 @@ module Admin
     #
     # Failures answer with a status rather than a redirect: these two actions are fetched by an
     # <img> and a download link, where a redirect to an HTML page renders as a broken image.
-    def send_render(scale:, disposition:)
+    def send_render(disposition:)
       record = library.find(params[:id])
       return head :not_found if record.nil?
       return head :conflict unless record["status"] == "ready"
 
-      map = StaticMap.new(track: record, settings: render_settings(record), scale: scale)
+      map = StaticMap.new(track: record, settings: render_settings(record))
       send_data map.render, type: "image/png", disposition: disposition, filename: map.filename
     rescue StaticMap::RenderError => e
       Rails.logger.error("Maps: render failed for #{params[:id]} (#{e.message})")

@@ -52,7 +52,7 @@ a cached copy before revalidating.
 | GET | `/`, `/connected-accounts`, `/contact`, `/maps`, `/maps/:id` | admin UI (owner-session gated) | `no-store` |
 | POST | `/contact/:id/not-spam`; DELETE `/contact/:id`, `/connected-accounts/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
 | POST | `/maps`; PATCH/DELETE `/maps/:id`; GET `/maps/status` | upload GPX tracks, save render settings, delete a track, poll publish status | `no-store` |
-| GET | `/maps/:id/preview`, `/maps/:id/download` | the rendered PNG, proxied from Mapbox at 1x and 2x | `no-store` |
+| GET | `/maps/:id/preview`, `/maps/:id/download` | the rendered PNG, proxied from Mapbox; same render, only the disposition differs | `no-store` |
 | — | `/sidekiq` | job dashboard (owner-session gated) | — |
 | GET | `/` (public API host only) | 301 → main site | — |
 
@@ -391,7 +391,9 @@ Four services, none of them `ApplicationService` subclasses: `GpxTrack` parses a
   one survives.
 - ⚠️ **`preview` and `download` proxy the render; they never redirect.** The Static Images URL
   carries `MAPBOX_SECRET_TOKEN` as a query parameter, so an `<img>` pointed at Mapbox would hand
-  the browser a `tilesets:write` credential. Preview renders at 1x, download at 2x.
+  the browser a `tilesets:write` credential. Both render at `@2x` — the API bills per request, not
+  per pixel, so a smaller preview saves nothing, and the zoom dialog shows that same image at full
+  width, where 1x would be half the pixels a retina screen wants.
 - ⚠️ **The style URL and the marker icons/colors reach an outbound URL from form fields**, so
   `StaticMap` matches the style against Mapbox's own shape and strips everything that isn't an icon
   id or a hex color. A bad style falls back to the default rather than being interpolated, and the

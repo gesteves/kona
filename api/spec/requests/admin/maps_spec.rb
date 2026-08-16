@@ -246,6 +246,24 @@ RSpec.describe "Admin maps", type: :request do
       expect(response.body).to include("settings%5Bpadding_top%5D=99")
     end
 
+    describe "the zoom dialog" do
+      it "makes the preview a trigger for a full-size dialog" do
+        get "/maps/morning_run_abc"
+
+        expect(response.body).to include('data-dialog="open map-preview-full"')
+        expect(response.body).to include('<wa-dialog id="map-preview-full"')
+      end
+
+      # ⚠️ Same URL as the inline preview, so opening the dialog reuses the browser's cached copy.
+      # A larger render here would be a second billed Mapbox request for the same map.
+      it "reuses the preview's image rather than rendering again" do
+        get "/maps/morning_run_abc"
+
+        expect(response.body.scan(%r{src="/maps/morning_run_abc/preview[^"]*"}).uniq.length).to eq(1)
+        expect(response.body.scan('data-map-preview-target="image"').length).to eq(2)
+      end
+    end
+
     it "sends you back when the track is gone" do
       allow(library).to receive(:find).with("nope").and_return(nil)
 
@@ -308,12 +326,15 @@ RSpec.describe "Admin maps", type: :request do
       expect(response.headers["Location"]).to be_nil
     end
 
-    it "renders at 1x for the preview and 2x for the download" do
-      expect(StaticMap).to receive(:new).with(hash_including(scale: 1)).and_call_original
+    # Same render for both; only the disposition differs. The zoom dialog shows the preview at full
+    # width, and a smaller render would save nothing — Mapbox bills per request, not per pixel.
+    it "renders both at the same size" do
       get "/maps/morning_run_abc/preview"
+      inline = response.body
 
-      expect(StaticMap).to receive(:new).with(hash_including(scale: 2)).and_call_original
       get "/maps/morning_run_abc/download"
+
+      expect(response.body).to eq(inline)
     end
 
     it "applies query-string settings, so the preview tracks the form" do
