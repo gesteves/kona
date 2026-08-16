@@ -71,6 +71,25 @@ RSpec.describe "Admin home", type: :request do
       expect(response.body.scan('target="_blank"').length).to eq(1)
     end
 
+    describe "the Contact badge" do
+      it "counts what's waiting in the spam quarantine" do
+        allow_any_instance_of(SpamQuarantine).to receive(:count).and_return(3)
+
+        get "/"
+
+        expect(response.body).to match(%r{<wa-badge[^>]*>\s*3\s*<span class="wa-visually-hidden">waiting</span>}m)
+      end
+
+      # A zero badge is noise, not information.
+      it "is absent when the queue is empty" do
+        allow_any_instance_of(SpamQuarantine).to receive(:count).and_return(0)
+
+        get "/"
+
+        expect(response.body).not_to include("<wa-badge")
+      end
+    end
+
     # <wa-page> moves one copy of the nav between the desktop sidebar and the mobile drawer, so a
     # second authored copy would show twice on desktop. Links need data-drawer="close" or the
     # drawer stays open over the page they navigate to.

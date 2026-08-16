@@ -9,5 +9,16 @@ module Admin
     layout "admin"
 
     before_action :require_owner!
+    before_action :load_quarantine_count
+
+    private
+
+    # How many messages are waiting in the spam quarantine, for the nav's badge.
+    #
+    # Loaded here rather than in ContactController because the nav is on every admin page. It's a
+    # single HLEN, and these pages already make several Redis round-trips apiece for their icons.
+    def load_quarantine_count
+      @quarantine_count = SpamQuarantine.new.count
+    end
   end
 end

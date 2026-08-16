@@ -4,12 +4,17 @@ module AdminHelper
   # Kept as data rather than hand-written markup so the `data-drawer="close"`, `aria-current`, and
   # icon handling in layouts/_admin_nav.html.erb is written once — this list is expected to grow.
   # `external: true` marks a destination outside the Rails admin UI, which opens in a new tab.
+  #
+  # @param quarantine_count [Integer] Messages waiting in the spam quarantine. Passed in rather
+  #   than read from an ivar, so this stays a pure function of its arguments like every other
+  #   helper here.
   # @return [Array<Hash>] Each with :label, :path, :icon (icon_svg's three arguments), and
-  #   optionally :external.
-  def admin_nav_items
+  #   optionally :badge and :external.
+  def admin_nav_items(quarantine_count: 0)
     [
       { label: "Home",               path: root_path,               icon: %w[classic light house] },
-      { label: "Contact",            path: contact_path,            icon: %w[classic light envelope] },
+      { label: "Contact",            path: contact_path,            icon: %w[classic light envelope],
+        badge: quarantine_count.to_i.positive? ? quarantine_count.to_i : nil },
       { label: "Maps",               path: maps_path,               icon: %w[classic light map] },
       { label: "Connected accounts", path: connected_accounts_path, icon: %w[classic light plug] },
       { label: "Sidekiq",            path: "/sidekiq",              icon: %w[classic light layer-group], external: true }

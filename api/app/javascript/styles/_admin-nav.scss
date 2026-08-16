@@ -56,6 +56,12 @@
     margin-inline-end: auto;
   }
 
+  // The quarantine count. `__label` carries `margin-inline-end: auto`, so this lands on the link's
+  // trailing edge without needing an alignment rule of its own.
+  &__badge {
+    flex: none;
+  }
+
   // The new-tab marker on external destinations (Sidekiq). Quiet: it annotates, it doesn't label.
   &__hint {
     color: var(--wa-color-text-quiet);

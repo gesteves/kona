@@ -20,6 +20,8 @@ RSpec.describe "Admin contact (spam quarantine)", type: :request do
     allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
     allow(SpamQuarantine).to receive(:new).and_return(quarantine)
+    # Every admin page renders the nav, which asks for the badge count.
+    allow(quarantine).to receive(:count).and_return(0)
   end
 
   def sign_in!
