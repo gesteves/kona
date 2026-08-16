@@ -62,7 +62,7 @@ RSpec.describe "Owner sessions", type: :request do
   end
 
   describe "the OAuth callback" do
-    it "signs in the owner (verified, matching email) and redirects to the admin dashboard" do
+    it "signs in the owner (verified, matching email) and redirects to the admin home page" do
       sign_in_as(email: owner_email)
       expect(response).to redirect_to("/")
     end

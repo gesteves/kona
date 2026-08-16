@@ -51,7 +51,7 @@ class SessionsController < ActionController::Base
 
   private
 
-  # The path stashed by Authentication#require_owner!, or the admin dashboard (the root of this
+  # The path stashed by Authentication#require_owner!, or the admin home page (the root of this
   # host) by default. Only accept a relative path (leading "/" but not "//") so a stale/forged
   # value can't open-redirect.
   def safe_return_path(path)

@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Admin dashboard", type: :request do
+RSpec.describe "Admin home", type: :request do
   let(:owner_email) { "owner@example.com" }
 
   before do
@@ -26,7 +26,7 @@ RSpec.describe "Admin dashboard", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("<wa-page")
-      expect(response.body).to include("Dashboard")
+      expect(response.body).to include('<h1 class="admin-main__title">Home</h1>')
     end
 
     # ⚠️ The fragment views are what carry data-live-update-*; an admin page must never grow one,

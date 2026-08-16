@@ -3,7 +3,7 @@ require "rails_helper"
 # `/` is answered by two different routes depending on the host, and which one wins is decided by
 # the `API_HOST` constraint in config/routes.rb plus the order they're drawn in:
 #
-#   * admin host (or any host when API_HOST is unset) — the admin dashboard, owner-gated
+#   * admin host (or any host when API_HOST is unset) — the admin home page, owner-gated
 #   * public API host — a 301 to the main site, since that host has no UI
 #
 # spec/requests/host_constraints_spec.rb covers the split with API_HOST set; this file covers the
@@ -16,13 +16,13 @@ RSpec.describe "Root", type: :request do
       allow(ENV).to receive(:[]).with("API_HOST").and_return(nil)
     end
 
-    it "serves the admin dashboard, sending a signed-out visitor to sign in" do
+    it "serves the admin home page, sending a signed-out visitor to sign in" do
       get "/"
 
       expect(response).to redirect_to("/signin")
     end
 
-    it "serves the dashboard itself once signed in" do
+    it "serves the home page itself once signed in" do
       allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return("owner@example.com")
       allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
       sign_in_as(email: "owner@example.com")

@@ -8,7 +8,7 @@ module AdminHelper
   #   optionally :external.
   def admin_nav_items
     [
-      { label: "Dashboard",          path: root_path,               icon: %w[classic light gauge] },
+      { label: "Home",               path: root_path,               icon: %w[classic light house] },
       { label: "Contact",            path: contact_path,            icon: %w[classic light envelope] },
       { label: "Maps",               path: maps_path,               icon: %w[classic light map] },
       { label: "Connected accounts", path: connected_accounts_path, icon: %w[classic light plug] },
@@ -18,7 +18,7 @@ module AdminHelper
 
   # Whether a nav item points at the page being rendered.
   #
-  # ⚠️ Exact match, deliberately. A prefix match would light up "Dashboard" (now `/`) on every
+  # ⚠️ Exact match, deliberately. A prefix match would light up "Home" (now `/`) on every
   # page in the admin. External items never match — they render in their own tab.
   # @param path [String]
   # @return [Boolean]

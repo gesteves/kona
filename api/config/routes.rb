@@ -99,7 +99,7 @@ Rails.application.routes.draw do
     # (`/config/`, `/home/`, `/analytics/`, `/deploy/`, …) zone-wide, and would 403 a page named
     # after one. See the root CLAUDE.md.
     scope module: "admin" do
-      root to: "dashboard#show"
+      root to: "home#show"
       get    "connected-accounts"       => "connected_accounts#show",  as: :connected_accounts
       delete "connected-accounts/whoop" => "connected_accounts#whoop", as: :whoop_connection
 
@@ -125,7 +125,7 @@ Rails.application.routes.draw do
   end
 
   # The public API host has no UI, so point a browser that lands on it at the real site. Drawn
-  # after the block above, so on the admin host the dashboard claims "/" first and this is only
+  # after the block above, so on the admin host the home page claims "/" first and this is only
   # ever reached on the public host. Evaluated per-request, so it tracks SITE_URL rather than
   # baking in a host.
   get "/" => redirect(status: 301) { "#{ENV['SITE_URL'].to_s.chomp('/')}/" }

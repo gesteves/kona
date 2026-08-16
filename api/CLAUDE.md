@@ -60,9 +60,9 @@ The Whoop OAuth, owner session, admin UI, and `/sidekiq` rows are **admin-host o
 `API_HOST` is set.
 
 ⚠️ **`/` is the one path the two hosts answer differently** rather than one of them 404ing: the
-admin dashboard sits at the root of the admin host, and the public host keeps the redirect to the
+admin home page sits at the root of the admin host, and the public host keeps the redirect to the
 main site. Two routes are drawn for `/`, and only the `API_HOST` constraint plus **the order they
-appear in** keeps them apart — swapping them would silently hand the public host the dashboard.
+appear in** keeps them apart — swapping them would silently hand the public host the admin UI.
 `spec/requests/root_spec.rb` and `spec/requests/host_constraints_spec.rb` pin both directions.
 
 ## Architecture

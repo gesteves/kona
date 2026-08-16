@@ -87,7 +87,7 @@ RSpec.describe "Public API host route constraints", type: :request do
     # admin UI is mounted at the root of the admin host, and the public host keeps the redirect to
     # the main site. Both routes are drawn for "/", so only their order and the host constraint
     # keep them apart — which is exactly the kind of thing a reorder would silently break.
-    it "serves the owner dashboard at / on the admin host" do
+    it "serves the owner home page at / on the admin host" do
       process(:get, "http://#{admin_host}/")
 
       expect(response).to redirect_to("/signin") # owner-gated, so unauthenticated lands here
