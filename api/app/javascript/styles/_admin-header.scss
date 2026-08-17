@@ -13,10 +13,13 @@
   border-block-end: 1px solid var(--wa-color-surface-border);
   display: flex;
   gap: var(--wa-space-m);
-  // ⚠️ <wa-page>'s `::slotted([slot='header'])` sets `justify-content: space-between`, which would
-  // strand the wordmark at the far end of the bar. Outer-document rules outrank ::slotted, so this
-  // wins without specificity games.
-  justify-content: flex-start;
+  // ⚠️ The arrangement is <wa-page>'s own `justify-content: space-between`, from
+  // `::slotted([slot='header'])` — don't restate it, invert it, or reach for an auto margin. Two
+  // children on mobile puts the toggle at the start and the wordmark at the end; on desktop the
+  // toggle is `display: none`, leaving one child, and space-between collapses to flush start.
+  // That holds on the FIRST painted frame only because _page.scss forces the toggle visible below
+  // the breakpoint — `view` initialises to "desktop", so without it the wordmark would paint left
+  // and slide across the bar a frame later.
   padding-block: 0;
   padding-inline: var(--wa-space-m);
 
