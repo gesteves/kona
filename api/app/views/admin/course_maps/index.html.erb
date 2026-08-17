@@ -1,6 +1,6 @@
-<% content_for :title, "Maps" %>
+<% content_for :title, "Course maps" %>
 
-<h1 class="admin-main__title">Maps</h1>
+<h1 class="admin-main__title">Course maps</h1>
 
 <% unless @configured %>
   <wa-callout variant="warning" class="track-upload__notice">
@@ -20,7 +20,7 @@
 
 <%# form_with + a form-associated <wa-button> rather than button_to, which emits a native
     <button>. <wa-file-input> is form-associated too, so the files ride along normally. %>
-<%= form_with url: maps_path, method: :post, multipart: true, class: "track-upload" do %>
+<%= form_with url: course_maps_path, method: :post, multipart: true, class: "track-upload" do %>
   <wa-file-input name="gpx_files[]" multiple accept=".gpx" label="GPX files"
                  hint="Each track is published to Mapbox as a private vector tileset, which takes a minute or two.">
   </wa-file-input>
@@ -38,7 +38,7 @@
 <% else %>
   <%# The list polls while anything is still publishing, then stops. Mapbox's tiling service is
       asynchronous, so there's nothing to push from here. %>
-  <ul class="track-list plain-list wa-grid wa-gap-m" data-controller="map-status" data-map-status-url-value="<%= maps_status_path %>">
+  <ul class="track-list plain-list wa-grid wa-gap-m" data-controller="map-status" data-map-status-url-value="<%= course_maps_status_path %>">
     <% @tracks.each do |track| %>
       <li data-map-status-id="<%= track.id %>" data-map-status-state="<%= track.status %>">
         <wa-card>

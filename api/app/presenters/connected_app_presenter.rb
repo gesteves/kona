@@ -1,9 +1,9 @@
-# Presents one external account for the Connected Accounts page.
+# Presents one external integration for the Connected apps page.
 #
 # These integrations keep their credentials in Redis rather than a database, so "connected" is a
 # live check made at render time, not a persisted flag — which is also why the two booleans are
 # passed in rather than read here: the view stays free of service calls.
-class ConnectedAccountPresenter
+class ConnectedAppPresenter
   attr_reader :name, :description, :connect_path, :disconnect_path
 
   # @param name [String] Display name, e.g. "Whoop".

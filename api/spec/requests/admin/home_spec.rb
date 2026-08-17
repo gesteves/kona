@@ -110,7 +110,7 @@ RSpec.describe "Admin home", type: :request do
       expect(response.body.scan('target="_blank"').length).to eq(1)
     end
 
-    describe "the Contact badge" do
+    describe "the Spam badge" do
       it "counts what's waiting in the spam quarantine" do
         allow_any_instance_of(SpamQuarantine).to receive(:count).and_return(3)
 
@@ -146,6 +146,26 @@ RSpec.describe "Admin home", type: :request do
 
       expect(response.body).to match(/<svg [^>]*class="stub-icon"/)
       expect(response.body).not_to include("&lt;svg")
+    end
+
+    describe "the collapsible nav groups" do
+      it "puts every grouped destination inside an accordion item" do
+        get "/"
+
+        expect(response.body.scan("<wa-accordion-item").length).to eq(3)
+        expect(response.body).to include("Tools")
+        expect(response.body).to include("Settings")
+        expect(response.body).to include("System")
+      end
+
+      # Home and Spam sit above the groups, so nothing has to be opened to reach them.
+      # ⚠️ No attribute at all, not `expanded="false"`: any present `expanded` reads as true to a
+      # Lit boolean property, so a rendered "false" would open every group.
+      it "leaves every group shut on a page that isn't in one" do
+        get "/"
+
+        expect(response.body.scan(/<wa-accordion-item\b[^>]*>/)).to all(satisfy { |item| !item.include?("expanded") })
+      end
     end
   end
 end

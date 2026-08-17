@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Admin maps", type: :request do
+RSpec.describe "Admin course maps", type: :request do
   let(:owner_email) { "owner@example.com" }
   let(:library) { instance_double(TrackLibrary) }
 
@@ -37,38 +37,49 @@ RSpec.describe "Admin maps", type: :request do
     Rack::Test::UploadedFile.new(Rails.root.join("spec/fixtures/track.gpx"), "application/gpx+xml", original_filename: name)
   end
 
-  describe "GET /maps" do
+  describe "GET /course-maps" do
     before { sign_in! }
 
     it "renders an empty state when nothing has been uploaded" do
-      get "/maps"
+      get "/course-maps"
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("No tracks yet")
     end
 
+    # The sidebar's group state is server-rendered on every Turbo visit, so exactly one group —
+    # the one holding this page — must come back open. ⚠️ Rendering `expanded="false"` on the
+    # others would open them too: any present attribute is true to a Lit boolean property.
+    it "opens the nav group this page sits in, and only that one" do
+      get "/course-maps"
+
+      items = response.body.scan(/<wa-accordion-item\b[^>]*>/)
+      expect(items.count { |item| item.include?("expanded") }).to eq(1)
+      expect(response.body).not_to include('expanded="false"')
+    end
+
     it "lists a track with its status and shape" do
       allow(library).to receive(:all).and_return([ ready_track ])
 
-      get "/maps"
+      get "/course-maps"
 
       expect(response.body).to include("2026 Morning Run", "Ready", "Running")
-      expect(response.body).to include('<wa-button href="/maps/morning_run_abc"')
+      expect(response.body).to include('<wa-button href="/course-maps/morning_run_abc"')
     end
 
     it "shows a spinner and no Open button while Mapbox is still publishing" do
       allow(library).to receive(:all).and_return([ ready_track.merge("status" => "processing") ])
 
-      get "/maps"
+      get "/course-maps"
 
       expect(response.body).to include("Processing", "<wa-spinner>")
-      expect(response.body).not_to include('<wa-button href="/maps/morning_run_abc"')
+      expect(response.body).not_to include('<wa-button href="/course-maps/morning_run_abc"')
     end
 
     it "surfaces why a track failed" do
       allow(library).to receive(:all).and_return([ ready_track.merge("status" => "failed", "error" => "bad geometry") ])
 
-      get "/maps"
+      get "/course-maps"
 
       expect(response.body).to include("Failed", "bad geometry")
     end
@@ -79,7 +90,7 @@ RSpec.describe "Admin maps", type: :request do
       allow(library).to receive(:all).and_return([ ready_track.merge("status" => "processing") ])
       allow(Sidekiq::ProcessSet).to receive(:new).and_return(instance_double(Sidekiq::ProcessSet, size: 0))
 
-      get "/maps"
+      get "/course-maps"
 
       expect(response.body).to include("No Sidekiq worker is running")
     end
@@ -88,7 +99,7 @@ RSpec.describe "Admin maps", type: :request do
       allow(library).to receive(:all).and_return([ ready_track.merge("status" => "processing") ])
       allow(Sidekiq::ProcessSet).to receive(:new).and_return(instance_double(Sidekiq::ProcessSet, size: 1))
 
-      get "/maps"
+      get "/course-maps"
 
       expect(response.body).not_to include("No Sidekiq worker is running")
     end
@@ -98,13 +109,13 @@ RSpec.describe "Admin maps", type: :request do
       allow(library).to receive(:all).and_return([ ready_track ])
       expect(Sidekiq::ProcessSet).not_to receive(:new)
 
-      get "/maps"
+      get "/course-maps"
     end
 
     it "says so when Mapbox isn't configured" do
       allow(ENV).to receive(:[]).with("MAPBOX_SECRET_TOKEN").and_return(nil)
 
-      get "/maps"
+      get "/course-maps"
 
       expect(response.body).to include("MAPBOX_SECRET_TOKEN")
     end
@@ -113,14 +124,14 @@ RSpec.describe "Admin maps", type: :request do
     it "renders actions as Web Awesome buttons, not native ones" do
       allow(library).to receive(:all).and_return([ ready_track ])
 
-      get "/maps"
+      get "/course-maps"
 
       expect(response.body).to include("<wa-button type=\"submit\"")
       expect(response.body).not_to include("<button")
     end
 
     it "never lets an admin page be stored or indexed" do
-      get "/maps"
+      get "/course-maps"
 
       expect(response.headers["Cache-Control"]).to eq("no-store")
       expect(response.headers["X-Robots-Tag"]).to eq("noindex, nofollow")
@@ -128,14 +139,14 @@ RSpec.describe "Admin maps", type: :request do
     end
   end
 
-  describe "POST /maps" do
+  describe "POST /course-maps" do
     before do
       sign_in!
       allow(library).to receive(:stage).and_return("morning_run_abc")
     end
 
     it "parses the upload, stages it, and queues the publish" do
-      post "/maps", params: { gpx_files: [ gpx_upload ] }
+      post "/course-maps", params: { gpx_files: [ gpx_upload ] }
 
       expect(library).to have_received(:stage).with(instance_of(GpxTrack))
       expect(MapTilesetJob).to have_enqueued_sidekiq_job("morning_run_abc")
@@ -144,34 +155,34 @@ RSpec.describe "Admin maps", type: :request do
     end
 
     it "takes several files at once" do
-      post "/maps", params: { gpx_files: [ gpx_upload("a.gpx"), gpx_upload("b.gpx") ] }
+      post "/course-maps", params: { gpx_files: [ gpx_upload("a.gpx"), gpx_upload("b.gpx") ] }
 
       expect(library).to have_received(:stage).twice
     end
 
     it "refuses a file that isn't a GPX" do
-      post "/maps", params: { gpx_files: [ gpx_upload("notes.txt") ] }
+      post "/course-maps", params: { gpx_files: [ gpx_upload("notes.txt") ] }
 
       expect(library).not_to have_received(:stage)
       expect(flash[:alert]).to include("isn't a GPX file")
     end
 
     it "refuses more files than it will take at once" do
-      post "/maps", params: { gpx_files: Array.new(11) { gpx_upload } }
+      post "/course-maps", params: { gpx_files: Array.new(11) { gpx_upload } }
 
       expect(library).not_to have_received(:stage)
       expect(flash[:alert]).to include("at most 10")
     end
 
     it "asks for a file when none was chosen" do
-      post "/maps", params: {}
+      post "/course-maps", params: {}
 
       expect(flash[:alert]).to include("at least one GPX file")
     end
 
     # An empty file field posts a blank string, and a hand-rolled request can post anything.
     it "ignores a value that isn't an upload at all" do
-      post "/maps", params: { gpx_files: [ "", "not-a-file" ] }
+      post "/course-maps", params: { gpx_files: [ "", "not-a-file" ] }
 
       expect(library).not_to have_received(:stage)
       expect(flash[:alert]).to include("at least one GPX file")
@@ -184,7 +195,7 @@ RSpec.describe "Admin maps", type: :request do
         ->(io, **opts) { GpxTrack.allocate.tap { |t| t.send(:initialize, io, **opts) } }
       )
 
-      post "/maps", params: { gpx_files: [ gpx_upload("bad.gpx"), gpx_upload("good.gpx") ] }
+      post "/course-maps", params: { gpx_files: [ gpx_upload("bad.gpx"), gpx_upload("good.gpx") ] }
 
       expect(library).to have_received(:stage).once
       expect(flash[:alert]).to include("bad.gpx")
@@ -192,55 +203,55 @@ RSpec.describe "Admin maps", type: :request do
     end
   end
 
-  describe "GET /maps/status" do
+  describe "GET /course-maps/status" do
     before { sign_in! }
 
     it "returns just the statuses" do
       allow(library).to receive(:statuses).and_return("morning_run_abc" => "processing")
 
-      get "/maps/status"
+      get "/course-maps/status"
 
       expect(response.parsed_body).to eq("morning_run_abc" => "processing")
     end
 
-    # ⚠️ Drawn above /maps/:id, or it's swallowed as a track id.
+    # ⚠️ Drawn above /course-maps/:id, or it's swallowed as a track id.
     it "isn't mistaken for a track" do
       allow(library).to receive(:statuses).and_return({})
 
-      get "/maps/status"
+      get "/course-maps/status"
 
       expect(response).to have_http_status(:ok)
       expect(library).not_to have_received(:find)
     end
   end
 
-  describe "GET /maps/:id" do
+  describe "GET /course-maps/:id" do
     before do
       sign_in!
       allow(library).to receive(:find).with("morning_run_abc").and_return(ready_track)
     end
 
     it "renders the settings form and the preview" do
-      get "/maps/morning_run_abc"
+      get "/course-maps/morning_run_abc"
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include('name="settings[padding_top]"', 'name="settings[padding_left]"',
         'name="settings[margin_bottom]"', 'name="settings[track_color]"',
         'name="settings[start_icon]"', 'name="settings[style_preset]"', 'name="settings[style_url]"')
-      expect(response.body).to include("/maps/morning_run_abc/preview")
-      expect(response.body).to include("/maps/morning_run_abc/download")
+      expect(response.body).to include("/course-maps/morning_run_abc/preview")
+      expect(response.body).to include("/course-maps/morning_run_abc/download")
     end
 
     # An unchecked switch submits nothing, so the pair is what makes "off" reach the server.
     it "pairs the marker-order switch with a hidden field" do
-      get "/maps/morning_run_abc"
+      get "/course-maps/morning_run_abc"
 
       expect(response.body).to include('<input type="hidden" name="settings[finish_on_top]" value="0">')
       expect(response.body).to include('<wa-switch name="settings[finish_on_top]" value="1"')
     end
 
     it "lets query-string settings override the stored ones, for the no-JS path" do
-      get "/maps/morning_run_abc", params: { settings: { padding_top: "99" } }
+      get "/course-maps/morning_run_abc", params: { settings: { padding_top: "99" } }
 
       expect(response.body).to include('value="99"')
       expect(response.body).to include("settings%5Bpadding_top%5D=99")
@@ -248,7 +259,7 @@ RSpec.describe "Admin maps", type: :request do
 
     describe "the zoom dialog" do
       it "makes the preview a trigger for a full-size dialog" do
-        get "/maps/morning_run_abc"
+        get "/course-maps/morning_run_abc"
 
         expect(response.body).to include('data-dialog="open map-preview-full"')
         expect(response.body).to include('<wa-dialog id="map-preview-full"')
@@ -257,9 +268,9 @@ RSpec.describe "Admin maps", type: :request do
       # ⚠️ Same URL as the inline preview, so opening the dialog reuses the browser's cached copy.
       # A larger render here would be a second billed Mapbox request for the same map.
       it "reuses the preview's image rather than rendering again" do
-        get "/maps/morning_run_abc"
+        get "/course-maps/morning_run_abc"
 
-        expect(response.body.scan(%r{src="/maps/morning_run_abc/preview[^"]*"}).uniq.length).to eq(1)
+        expect(response.body.scan(%r{src="/course-maps/morning_run_abc/preview[^"]*"}).uniq.length).to eq(1)
         expect(response.body.scan('data-map-preview-target="image"').length).to eq(2)
       end
     end
@@ -267,20 +278,20 @@ RSpec.describe "Admin maps", type: :request do
     it "sends you back when the track is gone" do
       allow(library).to receive(:find).with("nope").and_return(nil)
 
-      get "/maps/nope"
+      get "/course-maps/nope"
 
-      expect(response).to redirect_to("/maps")
+      expect(response).to redirect_to("/course-maps")
       expect(flash[:alert]).to include("no longer in the library")
     end
   end
 
-  describe "PATCH /maps/:id" do
+  describe "PATCH /course-maps/:id" do
     before { sign_in! }
 
     it "saves the settings" do
       allow(library).to receive(:update_settings).and_return(ready_track)
 
-      patch "/maps/morning_run_abc", params: { settings: { padding_top: "80" } }
+      patch "/course-maps/morning_run_abc", params: { settings: { padding_top: "80" } }
 
       expect(library).to have_received(:update_settings).with("morning_run_abc", hash_including("padding_top" => "80"))
       expect(response).to have_http_status(:no_content)
@@ -289,13 +300,13 @@ RSpec.describe "Admin maps", type: :request do
     it "404s a track that's gone" do
       allow(library).to receive(:update_settings).and_return(nil)
 
-      patch "/maps/nope", params: { settings: { padding_top: "80" } }
+      patch "/course-maps/nope", params: { settings: { padding_top: "80" } }
 
       expect(response).to have_http_status(:not_found)
     end
   end
 
-  describe "GET /maps/:id/preview and /download" do
+  describe "GET /course-maps/:id/preview and /download" do
     before do
       sign_in!
       allow(library).to receive(:find).with("morning_run_abc").and_return(ready_track)
@@ -303,7 +314,7 @@ RSpec.describe "Admin maps", type: :request do
     end
 
     it "streams the preview inline" do
-      get "/maps/morning_run_abc/preview"
+      get "/course-maps/morning_run_abc/preview"
 
       expect(response).to have_http_status(:ok)
       expect(response.media_type).to eq("image/png")
@@ -312,7 +323,7 @@ RSpec.describe "Admin maps", type: :request do
     end
 
     it "offers the download as an attachment named after the track" do
-      get "/maps/morning_run_abc/download"
+      get "/course-maps/morning_run_abc/download"
 
       expect(response.headers["Content-Disposition"]).to include("attachment", "2026-morning-run.png")
     end
@@ -320,7 +331,7 @@ RSpec.describe "Admin maps", type: :request do
     # ⚠️ The Static Images URL carries MAPBOX_SECRET_TOKEN in a query parameter, which is why
     # these proxy the render instead of redirecting the browser to Mapbox.
     it "never puts the Mapbox token in the response" do
-      get "/maps/morning_run_abc/preview"
+      get "/course-maps/morning_run_abc/preview"
 
       expect(response.body).not_to include("sk.test-token")
       expect(response.headers["Location"]).to be_nil
@@ -329,10 +340,10 @@ RSpec.describe "Admin maps", type: :request do
     # Same render for both; only the disposition differs. The zoom dialog shows the preview at full
     # width, and a smaller render would save nothing — Mapbox bills per request, not per pixel.
     it "renders both at the same size" do
-      get "/maps/morning_run_abc/preview"
+      get "/course-maps/morning_run_abc/preview"
       inline = response.body
 
-      get "/maps/morning_run_abc/download"
+      get "/course-maps/morning_run_abc/download"
 
       expect(response.body).to eq(inline)
     end
@@ -341,14 +352,14 @@ RSpec.describe "Admin maps", type: :request do
       expect(StaticMap).to receive(:new)
         .with(hash_including(settings: hash_including("padding_top" => "12"))).and_call_original
 
-      get "/maps/morning_run_abc/preview", params: { settings: { padding_top: "12" } }
+      get "/course-maps/morning_run_abc/preview", params: { settings: { padding_top: "12" } }
     end
 
     # A broken <img> beats a redirect to an HTML page rendered into an image slot.
     it "answers with a status rather than a redirect when the track is gone" do
       allow(library).to receive(:find).with("nope").and_return(nil)
 
-      get "/maps/nope/preview"
+      get "/course-maps/nope/preview"
 
       expect(response).to have_http_status(:not_found)
     end
@@ -356,7 +367,7 @@ RSpec.describe "Admin maps", type: :request do
     it "refuses to render a track Mapbox hasn't published yet" do
       allow(library).to receive(:find).with("morning_run_abc").and_return(ready_track.merge("status" => "processing"))
 
-      get "/maps/morning_run_abc/preview"
+      get "/course-maps/morning_run_abc/preview"
 
       expect(response).to have_http_status(:conflict)
     end
@@ -364,7 +375,7 @@ RSpec.describe "Admin maps", type: :request do
     it "reports a Mapbox failure as a bad gateway" do
       allow_any_instance_of(StaticMap).to receive(:render).and_raise(StaticMap::RenderError, "Tileset not found")
 
-      get "/maps/morning_run_abc/preview"
+      get "/course-maps/morning_run_abc/preview"
 
       expect(response).to have_http_status(:bad_gateway)
     end
@@ -377,14 +388,14 @@ RSpec.describe "Admin maps", type: :request do
       [ Net::OpenTimeout, Net::ReadTimeout, SocketError, Errno::ECONNRESET, HTTParty::Error ].each do |error|
         allow_any_instance_of(StaticMap).to receive(:render).and_raise(error)
 
-        get "/maps/morning_run_abc/preview"
+        get "/course-maps/morning_run_abc/preview"
 
         expect(response).to have_http_status(:bad_gateway), "expected #{error} to become a 502"
       end
     end
   end
 
-  describe "DELETE /maps/:id" do
+  describe "DELETE /course-maps/:id" do
     before do
       sign_in!
       allow(library).to receive(:find).with("morning_run_abc").and_return(ready_track)
@@ -394,7 +405,7 @@ RSpec.describe "Admin maps", type: :request do
     it "removes it from Mapbox and from the library" do
       expect_any_instance_of(MapboxTileset).to receive(:destroy!).with("morning_run_abc")
 
-      delete "/maps/morning_run_abc"
+      delete "/course-maps/morning_run_abc"
 
       expect(library).to have_received(:delete).with("morning_run_abc")
       expect(response).to have_http_status(:see_other)
@@ -405,7 +416,7 @@ RSpec.describe "Admin maps", type: :request do
     it "keeps the record when Mapbox refuses" do
       allow_any_instance_of(MapboxTileset).to receive(:destroy!).and_raise("Mapbox failed to delete tileset: Forbidden")
 
-      delete "/maps/morning_run_abc"
+      delete "/course-maps/morning_run_abc"
 
       expect(library).not_to have_received(:delete)
       expect(flash[:alert]).to include("Forbidden")
@@ -414,7 +425,7 @@ RSpec.describe "Admin maps", type: :request do
 
   describe "without an owner session" do
     it "redirects every page to the login screen" do
-      [ "/maps", "/maps/morning_run_abc" ].each do |path|
+      [ "/course-maps", "/course-maps/morning_run_abc" ].each do |path|
         get path
         expect(response).to redirect_to("/signin")
       end
@@ -424,13 +435,13 @@ RSpec.describe "Admin maps", type: :request do
       expect(library).not_to receive(:stage)
       expect(library).not_to receive(:delete)
 
-      post "/maps", params: { gpx_files: [ gpx_upload ] }
+      post "/course-maps", params: { gpx_files: [ gpx_upload ] }
       expect(response).to redirect_to("/signin")
 
-      get "/maps/morning_run_abc/download"
+      get "/course-maps/morning_run_abc/download"
       expect(response).to redirect_to("/signin")
 
-      delete "/maps/morning_run_abc"
+      delete "/course-maps/morning_run_abc"
       expect(response).to redirect_to("/signin")
     end
   end

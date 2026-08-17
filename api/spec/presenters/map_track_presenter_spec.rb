@@ -11,10 +11,10 @@ RSpec.describe MapTrackPresenter do
         "uploaded_at" => "2026-07-25T13:32:14Z",
         "settings" => { "padding_top" => 80 }
       }.merge(overrides),
-      show_path: "/maps/morning_run_abc",
-      preview_path: "/maps/morning_run_abc/preview",
-      download_path: "/maps/morning_run_abc/download",
-      delete_path: "/maps/morning_run_abc"
+      show_path: "/course-maps/morning_run_abc",
+      preview_path: "/course-maps/morning_run_abc/preview",
+      download_path: "/course-maps/morning_run_abc/download",
+      delete_path: "/course-maps/morning_run_abc"
     )
   end
 

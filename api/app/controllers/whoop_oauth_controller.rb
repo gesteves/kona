@@ -41,7 +41,7 @@ class WhoopOauthController < ActionController::Base
       # Back to the page the owner started from, so the status badge reflects the new state.
       # The error branches below stay plain text: they're reachable without a session (Whoop
       # redirects here directly), and the admin layout would imply one.
-      redirect_to connected_accounts_path, notice: "Whoop connected."
+      redirect_to connected_apps_path, notice: "Whoop connected."
     else
       render plain: "Failed to exchange the authorization code for tokens.", status: :bad_gateway
     end

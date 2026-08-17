@@ -3,7 +3,7 @@ require "time"
 # Presents one uploaded GPX track, both as a card on the Maps index and as the subject of the
 # render-settings page.
 #
-# Paths are passed in rather than built here, matching ConnectedAccountPresenter — the view stays
+# Paths are passed in rather than built here, matching ConnectedAppPresenter — the view stays
 # free of route helpers and the presenter free of Rails' URL machinery.
 class MapTrackPresenter
   attr_reader :id, :title, :activity_type, :error,

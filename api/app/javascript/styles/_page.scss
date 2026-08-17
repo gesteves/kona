@@ -13,7 +13,7 @@ wa-page {
   // past the bar's own bottom edge. Even space on every side, plus the row it wraps.
   --header-height: calc(var(--header-content-height) + (var(--wa-space-m) * 2));
 
-  // The sidebar track width. Wide enough that the longest label ("Connected accounts") stays on
+  // The sidebar track width. Wide enough that the longest label ("Connected apps") stays on
   // one line once the nav's padding, the link's padding, and the icon are taken out.
   --menu-width: 17rem;
 }

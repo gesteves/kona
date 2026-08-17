@@ -6,35 +6,35 @@ module Admin
   # Renders GPX tracks as static map cover images, as a front-end over Mapbox's Data Workbench:
   # upload one or more tracks, wait for Mapbox to publish each as a vector tileset, then tune the
   # framing and styling of one and download the PNG.
-  class MapsController < BaseController
+  class CourseMapsController < BaseController
     # How much of an upload we'll take at once. The GPX is parsed in-request, so these bound both
     # the memory the parse touches and the time it takes against the 20-second request budget.
     MAX_FILES = 10
     MAX_BYTES = 25.megabytes
 
-    # GET /maps
+    # GET /course-maps
     def index
       @tracks = library.all.map { |record| present(record) }
       @configured = MapboxTileset.configured?
       @worker_running = worker_running? if @tracks.any?(&:processing?)
     end
 
-    # POST /maps
+    # POST /course-maps
     def create
       # Anything that isn't an actual upload is dropped rather than inspected — an empty file field
       # posts a blank string, and a hand-rolled request can post whatever it likes.
       files = Array(params[:gpx_files]).grep(ActionDispatch::Http::UploadedFile)
-      return redirect_to(maps_path, status: :see_other, alert: "Choose at least one GPX file.") if files.empty?
+      return redirect_to(course_maps_path, status: :see_other, alert: "Choose at least one GPX file.") if files.empty?
 
       error = rejection_reason(files)
-      return redirect_to(maps_path, status: :see_other, alert: error) if error
+      return redirect_to(course_maps_path, status: :see_other, alert: error) if error
 
       accepted, failures = ingest(files)
 
-      redirect_to maps_path, status: :see_other, **upload_flash(accepted, failures)
+      redirect_to course_maps_path, status: :see_other, **upload_flash(accepted, failures)
     end
 
-    # GET /maps/status
+    # GET /course-maps/status
     #
     # Polled by the index page while an upload is in flight. Deliberately tiny — it returns
     # statuses, not records, and is hit every few seconds.
@@ -42,7 +42,7 @@ module Admin
       render json: library.statuses
     end
 
-    # GET /maps/:id
+    # GET /course-maps/:id
     #
     # Query-string settings override the stored ones, so the no-JS path (submit the form, get a
     # fresh page) shows the same render the live preview would.
@@ -55,7 +55,7 @@ module Admin
       @styles = StaticMap::STYLE_PRESETS
     end
 
-    # PATCH /maps/:id
+    # PATCH /course-maps/:id
     #
     # Saves the render settings as they're tweaked, so reopening a track picks up where the last
     # session left off. Called from the preview controller, not from a form submission.
@@ -66,7 +66,7 @@ module Admin
       head :no_content
     end
 
-    # DELETE /maps/:id
+    # DELETE /course-maps/:id
     def destroy
       record = find_track!
       return if performed?
@@ -74,13 +74,13 @@ module Admin
       MapboxTileset.new.destroy!(record["id"]) if MapboxTileset.configured?
       library.delete(record["id"])
 
-      redirect_to maps_path, status: :see_other, notice: "#{record['title']} deleted."
+      redirect_to course_maps_path, status: :see_other, notice: "#{record['title']} deleted."
     rescue StandardError => e
       Rails.logger.error("Maps: could not delete #{params[:id]} (#{e.class}: #{e.message})")
-      redirect_to maps_path, status: :see_other, alert: "Couldn't delete that track from Mapbox: #{e.message}"
+      redirect_to course_maps_path, status: :see_other, alert: "Couldn't delete that track from Mapbox: #{e.message}"
     end
 
-    # GET /maps/:id/preview
+    # GET /course-maps/:id/preview
     #
     # ⚠️ Proxied rather than linked. The Static Images API takes its token as a query parameter, so
     # an <img> pointed straight at Mapbox would hand the browser a tilesets:write credential.
@@ -93,7 +93,7 @@ module Admin
       send_render(disposition: "inline")
     end
 
-    # GET /maps/:id/download
+    # GET /course-maps/:id/download
     def download
       send_render(disposition: "attachment")
     end
@@ -123,7 +123,7 @@ module Admin
       record = library.find(params[:id])
       return record if record
 
-      redirect_to maps_path, status: :see_other, alert: "That track is no longer in the library."
+      redirect_to course_maps_path, status: :see_other, alert: "That track is no longer in the library."
       nil
     end
 
@@ -135,10 +135,10 @@ module Admin
 
       MapTrackPresenter.new(
         record: record,
-        show_path: map_path(id),
-        preview_path: map_preview_path(id, query),
-        download_path: map_download_path(id, query),
-        delete_path: map_path(id)
+        show_path: course_map_path(id),
+        preview_path: course_map_preview_path(id, query),
+        download_path: course_map_download_path(id, query),
+        delete_path: course_map_path(id)
       )
     end
 

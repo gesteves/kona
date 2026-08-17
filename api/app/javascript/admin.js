@@ -18,6 +18,10 @@ import { Application } from "@hotwired/stimulus";
 // `.wa-cloak`. Cherry-picking the theme (as web/ does) would silently drop both.
 // <wa-page> statically imports button, drawer, and icon, so those arrive with it.
 import "@web.awesome.me/webawesome-pro/dist/components/page/page.js";
+// The sidebar's collapsible groups. wa-accordion statically imports wa-accordion-item, which in
+// turn renders its chevron through <wa-icon library="system"> — an inline data URI bundled with
+// the component, so the "don't use <wa-icon>" rule doesn't reach it either.
+import "@web.awesome.me/webawesome-pro/dist/components/accordion/accordion.js";
 import "@web.awesome.me/webawesome-pro/dist/components/card/card.js";
 import "@web.awesome.me/webawesome-pro/dist/components/callout/callout.js";
 import "@web.awesome.me/webawesome-pro/dist/components/badge/badge.js";
@@ -27,7 +31,7 @@ import "@web.awesome.me/webawesome-pro/dist/components/badge/badge.js";
 import "@web.awesome.me/webawesome-pro/dist/components/details/details.js";
 import "@web.awesome.me/webawesome-pro/dist/components/dialog/dialog.js";
 import "@web.awesome.me/webawesome-pro/dist/components/relative-time/relative-time.js";
-// Form controls, for the Maps page's upload and render settings and the Location page's
+// Form controls, for the Course maps page's upload and render settings and the Location page's
 // coordinates. Every other form in the admin is action-only; these are form-associated, so they
 // submit and appear in FormData exactly like native controls.
 import "@web.awesome.me/webawesome-pro/dist/components/file-input/file-input.js";

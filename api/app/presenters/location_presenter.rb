@@ -2,7 +2,7 @@
 # is overriding it, and the values the map is initialized from.
 #
 # Both coordinate pairs are passed in rather than read here, and the place name is resolved by the
-# controller, so the view stays free of service calls — same rule as ConnectedAccountPresenter.
+# controller, so the view stays free of service calls — same rule as ConnectedAppPresenter.
 class LocationPresenter
   # Where the map looks when there's nothing to center on: the whole world, tilted north so the
   # landmasses aren't split across the bottom edge.

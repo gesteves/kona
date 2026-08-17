@@ -60,9 +60,9 @@ plain `middleman` command still reaches production off `web/.env`. `overmind res
 one process; `overmind connect api` attaches a real TTY, so `binding.break` works.
 
 ⚠️ **Sidekiq starts with everything else** — `overmind start` runs `web`, `api`, `js`, and
-`worker`. It used to be opt-in, since no widget endpoint enqueues a job, but the admin's Maps page
-broke that: an uploaded GPX sits on "Processing" until `MapTilesetJob` publishes it. The page says
-so when it finds an empty process set, but the point is not to need that locally.
+`worker`. It used to be opt-in, since no widget endpoint enqueues a job, but the admin's Course
+maps page broke that: an uploaded GPX sits on "Processing" until `MapTilesetJob` publishes it. The
+page says so when it finds an empty process set, but the point is not to need that locally.
 
 The `js` process is esbuild watching the api's admin bundle. It only matters for the api's admin
 pages and `/signin`; the widgets and the site don't touch it. ⚠️ Those pages raise
@@ -321,9 +321,9 @@ and remember this if a new page ever 403s. Every clause must also stay false for
 and for the R2 key shape (`{space}/{asset id}/{token}/{filename}`).
 
 ⚠️ **The admin UI is mounted at the root of the admin host**, so its pages claim top-level paths
-(`/connected-accounts` today) and are subject to the same trap from the other direction: a new admin
-page named after one of these prefix families would 403 zone-wide. Check this rule before naming
-one.
+(`/spam`, `/location`, `/connected-apps`, `/course-maps` today) and are subject to the same trap
+from the other direction: a new admin page named after one of these prefix families would 403
+zone-wide. Check this rule before naming one.
 
 **Rule 3** tells "Cloudflare Images fetching a source" apart from "someone typing the URL in" via
 the `image-resizing` marker Cloudflare puts in `Via`.
@@ -469,7 +469,7 @@ open when *unconfigured*; when Akismet *is* configured it fails **closed** — a
 intake job rather than delivering an unchecked message.
 
 A message Akismet flags is **quarantined, not dropped**: it's held in Redis for a month and listed
-on the admin's Contact page, where releasing it delivers the email and reports the false positive
+on the admin's Spam page, where releasing it delivers the email and reports the false positive
 back to Akismet. See [`api/CLAUDE.md`](api/CLAUDE.md).
 
 ## The image mirror

@@ -100,32 +100,33 @@ Rails.application.routes.draw do
     # after one. See the root CLAUDE.md.
     scope module: "admin" do
       root to: "home#show"
-      get    "connected-accounts"       => "connected_accounts#show",  as: :connected_accounts
-      delete "connected-accounts/whoop" => "connected_accounts#whoop", as: :whoop_connection
+      get    "connected-apps"       => "connected_apps#show",  as: :connected_apps
+      delete "connected-apps/whoop" => "connected_apps#whoop", as: :whoop_connection
 
       # The current location, on a map. The POST writes the same Redis key as the bearer-gated
       # POST /api/location, through Location.store.
       get  "location" => "location#show",   as: :location
       post "location" => "location#create"
 
-      # The contact-form spam quarantine. Distinct from the public POST /api/contact, which is a
-      # different path on a different host.
-      get    "contact"              => "contact#index",    as: :contact
-      post   "contact/:id/not-spam" => "contact#not_spam", as: :contact_not_spam
-      delete "contact/:id"          => "contact#destroy",  as: :contact_message
+      # The contact-form spam quarantine. Named for what it holds, and deliberately not `/contact`
+      # — that's the public form's own path (POST /api/contact), and nothing here receives a
+      # submission.
+      get    "spam"              => "spam#index",    as: :spam
+      post   "spam/:id/not-spam" => "spam#not_spam", as: :spam_not_spam
+      delete "spam/:id"          => "spam#destroy",  as: :spam_message
 
       # GPX tracks rendered as static map images through Mapbox. `preview` and `download` proxy
       # the render rather than pointing the browser at Mapbox, because the Static Images API
       # carries the secret token in a query parameter.
-      # ⚠️ `maps/status` must stay above `maps/:id`, or it's swallowed as a track id.
-      get    "maps"              => "maps#index",    as: :maps
-      post   "maps"              => "maps#create"
-      get    "maps/status"       => "maps#status",   as: :maps_status
-      get    "maps/:id"          => "maps#show",     as: :map
-      patch  "maps/:id"          => "maps#update"
-      delete "maps/:id"          => "maps#destroy"
-      get    "maps/:id/preview"  => "maps#preview",  as: :map_preview
-      get    "maps/:id/download" => "maps#download", as: :map_download
+      # ⚠️ `course-maps/status` must stay above `course-maps/:id`, or it's swallowed as a track id.
+      get    "course-maps"              => "course_maps#index",    as: :course_maps
+      post   "course-maps"              => "course_maps#create"
+      get    "course-maps/status"       => "course_maps#status",   as: :course_maps_status
+      get    "course-maps/:id"          => "course_maps#show",     as: :course_map
+      patch  "course-maps/:id"          => "course_maps#update"
+      delete "course-maps/:id"          => "course_maps#destroy"
+      get    "course-maps/:id/preview"  => "course_maps#preview",  as: :course_map_preview
+      get    "course-maps/:id/download" => "course_maps#download", as: :course_map_download
     end
   end
 

@@ -65,7 +65,7 @@ RSpec.describe "Whoop OAuth", type: :request do
       get "/whoop/callback", params: { code: "abc", state: "good-state" }
 
       # Back to the admin page the flow started from, so its status badge reflects the new state.
-      expect(response).to redirect_to("/connected-accounts")
+      expect(response).to redirect_to("/connected-apps")
       expect(flash[:notice]).to eq("Whoop connected.")
     end
 

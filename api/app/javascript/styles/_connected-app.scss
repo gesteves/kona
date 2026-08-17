@@ -1,8 +1,8 @@
-// External accounts on the Connected accounts page: a list of cards, one per integration.
+// External accounts on the Connected apps page: a list of cards, one per integration.
 // ⚠️ The card body is a `wa-stack` and its header a `wa-cluster`, and those zero their children's
 // margins — which is why nothing here resets one.
 
-.account {
+.connected-app {
   // Pushes the status badge to the far edge of the card.
   &__name {
     margin-inline-end: auto;

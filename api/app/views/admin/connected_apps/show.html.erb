@@ -1,42 +1,42 @@
-<% content_for :title, "Connected accounts" %>
+<% content_for :title, "Connected apps" %>
 
-<h1 class="admin-main__title">Connected accounts</h1>
+<h1 class="admin-main__title">Connected apps</h1>
 
 <ul class="plain-list wa-stack wa-gap-m">
-  <% @accounts.each do |account| %>
+  <% @apps.each do |app| %>
     <li>
       <wa-card>
         <div class="wa-stack wa-gap-m">
           <div class="wa-cluster wa-gap-s">
-            <h2 class="account__name wa-heading-l"><%= account.name %></h2>
-            <wa-badge variant="<%= account.status_variant %>" appearance="outlined">
-              <%= account.status_label %>
+            <h2 class="connected-app__name wa-heading-l"><%= app.name %></h2>
+            <wa-badge variant="<%= app.status_variant %>" appearance="outlined">
+              <%= app.status_label %>
             </wa-badge>
           </div>
 
-          <p class="account__description"><%= account.description %></p>
+          <p class="connected-app__description"><%= app.description %></p>
 
           <div class="wa-cluster wa-gap-s">
-            <% if account.connectable? %>
+            <% if app.connectable? %>
               <%# ⚠️ `turbo: false` because this same-origin path 302s to Whoop, and Turbo Drive
                   can't follow a cross-origin redirect. It is load-bearing: Turbo pierces shadow
                   roots in both directions — it finds wa-button's inner <a> through the click's
                   composed path, then finds this attribute back up through the host. %>
-              <wa-button href="<%= account.connect_path %>" variant="brand" appearance="accent"
+              <wa-button href="<%= app.connect_path %>" variant="brand" appearance="accent"
                          data-turbo="false">
                 Connect
               </wa-button>
-            <% elsif account.disconnectable? %>
+            <% elsif app.disconnectable? %>
               <%# Same-origin POST-as-DELETE, so Turbo handles it normally. form_with + a
                   form-associated <wa-button> rather than button_to, which emits a native button. %>
-              <%= form_with url: account.disconnect_path, method: :delete do %>
+              <%= form_with url: app.disconnect_path, method: :delete do %>
                 <wa-button type="submit" variant="danger" appearance="outlined">
                   <%= slotted_icon_svg("classic", "light", "link-slash") %>
                   Disconnect
                 </wa-button>
               <% end %>
             <% else %>
-              <p class="account__description">
+              <p class="connected-app__description">
                 Set its credentials in the environment to enable this integration.
               </p>
             <% end %>

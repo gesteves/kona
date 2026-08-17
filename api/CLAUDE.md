@@ -49,11 +49,11 @@ a cached copy before revalidating.
 | POST | `/webhooks/whoop` | enqueues `WhoopWebhookJob`; 200 `{ok: true}` | — |
 | GET | `/whoop/auth`, `/whoop/callback` | Whoop OAuth (authorize is owner-gated) | — |
 | GET | `/signin`, `/auth/google_oauth2/callback`; POST `/signout` | owner session | `no-store` |
-| GET | `/`, `/connected-accounts`, `/contact`, `/location`, `/maps`, `/maps/:id` | admin UI (owner-session gated) | `no-store` |
-| POST | `/contact/:id/not-spam`; DELETE `/contact/:id`, `/connected-accounts/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
+| GET | `/`, `/spam`, `/location`, `/connected-apps`, `/course-maps`, `/course-maps/:id` | admin UI (owner-session gated) | `no-store` |
+| POST | `/spam/:id/not-spam`; DELETE `/spam/:id`, `/connected-apps/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
 | POST | `/location` | same write as `POST /api/location`; answers with the geocoded place | `no-store` |
-| POST | `/maps`; PATCH/DELETE `/maps/:id`; GET `/maps/status` | upload GPX tracks, save render settings, delete a track, poll publish status | `no-store` |
-| GET | `/maps/:id/preview`, `/maps/:id/download` | the rendered PNG, proxied from Mapbox; same render, only the disposition differs | `no-store` |
+| POST | `/course-maps`; PATCH/DELETE `/course-maps/:id`; GET `/course-maps/status` | upload GPX tracks, save render settings, delete a track, poll publish status | `no-store` |
+| GET | `/course-maps/:id/preview`, `/course-maps/:id/download` | the rendered PNG, proxied from Mapbox; same render, only the disposition differs | `no-store` |
 | — | `/sidekiq` | job dashboard (owner-session gated) | — |
 | GET | `/` (public API host only) | 301 → main site | — |
 
@@ -101,7 +101,7 @@ controller; a small Rack guard in the Sidekiq initializer gates the mounted `Sid
 Contentful, Plausible, Font Awesome, Goodspeed, Akismet, Resend, Turnstile, Voyage (`Embeddings`),
 `StandardSite`, `AssetMirror`, plus four that aren't `ApplicationService` subclasses because they
 aren't cacheable reads: `SpamQuarantine` and `TrackLibrary` (Redis-only, no HTTP), `GpxTrack`
-(parsing only), and `MapboxTileset`/`StaticMap` (see **The map renderer**).
+(parsing only), and `MapboxTileset`/`StaticMap` (see **The course-map renderer**).
 Read-through Redis cache via `cached_json(key, expires_in:)`;
 HTTParty with retries; `DeepOstruct` for dot-access.
 
@@ -352,21 +352,41 @@ the dark theme; `_admin-header.scss` overrides that to `currentColor`, which is 
 inlined rather than served as an image (an `<img>` can't inherit the text color). Drift between the
 two copies costs nothing beyond a stale admin logo.
 
-The sidebar is built from `AdminHelper#admin_nav_items`, so drawer-closing, the active state, and
-icon handling are written once. Each item is a `<wa-button appearance="plain" href>`, with the
-current page's set to `filled` — the active state is a Web Awesome step, not a hand-picked
-background. An item marked `external: true` (today only Sidekiq, which renders its own layout)
-opens in a new tab with `rel="noopener"` and a visually-hidden "(opens in a new tab)".
+The sidebar comes from `AdminHelper` — `#admin_nav_items` for the two ungrouped entries (Home,
+Spam) and `#admin_nav_groups` for the collapsible ones (Tools, Settings, System) — and both render
+through `layouts/_admin_nav_item`, so drawer-closing, the active state, and icon handling are
+written once. Each item is a `<wa-button appearance="plain" href>`, with the current page's set to
+`filled` — the active state is a Web Awesome step, not a hand-picked background. An item marked
+`external: true` (today only Sidekiq, which renders its own layout) opens in a new tab with
+`rel="noopener"` and a visually-hidden "(opens in a new tab)".
 
-**Connected accounts** (`/connected-accounts`) connects and disconnects Whoop.
-`ConnectedAccountPresenter` renders three states from `Whoop#valid_credentials?` and
+The groups are one `<wa-accordion mode="single-collapsible">`, and `_admin-nav.scss` dresses each
+item's `::part(button)` in `<wa-button>`'s own metrics so a group heading and a link read as the
+same control. Three things there are easy to break:
+
+- ⚠️ **Which group is open is server-rendered, never remembered** — every Turbo visit re-renders
+  the sidebar, so the expanded one is always the group holding the current page. `System` therefore
+  never opens by itself: its only item is external, and `#admin_nav_current?` can't match a
+  destination outside the admin.
+- ⚠️ **`expanded` must be absent, not `false`.** Rails renders `expanded: false` as
+  `expanded="false"`, and any *present* attribute is true to a Lit boolean property — every group
+  would open. `_admin_nav.html.erb` passes `nil` instead; two request specs pin it.
+- ⚠️ **Only groups get an icon; their items are indented under the group's *label* instead**, by
+  the `--icon-column` constant (1em box + the 0.75em margin `<wa-button>` puts after its own
+  `start` slot). That box also has to be forced square, against the `width: auto` every inline SVG
+  gets in `_base.scss` — Font Awesome's viewBoxes aren't all square, so at auto width no two
+  labels in the column start at the same x. Adding an icon to a grouped item breaks the alignment
+  in both directions.
+
+**Connected apps** (`/connected-apps`) connects and disconnects Whoop.
+`ConnectedAppPresenter` renders three states from `Whoop#valid_credentials?` and
 `Whoop#connected?`; `Whoop#disconnect!` clears them. ⚠️ It deletes the cached `user_id` alongside
 the tokens — `Webhooks::WhoopController` authorizes payloads against it, so a leftover copy keeps
 accepting webhooks for an account whose tokens are gone.
 
 ### The spam quarantine
 
-**Contact** (`/contact`) lists everything Akismet flagged, newest first, with **Not spam** and
+**Spam** (`/spam`) lists everything Akismet flagged, newest first, with **Not spam** and
 **Delete forever**. `ContactMailJob` stores a flagged submission via `SpamQuarantine` instead of
 dropping it; **Not spam** re-enqueues that job with `restored_from_spam`, which skips the check and
 calls `Akismet#submit_ham`.
@@ -438,11 +458,12 @@ reports "Saving…" and then what was stored.
 - The geocode is display only and degrades to nothing, so an unset `GOOGLE_API_KEY` — or a bad day
   at Google — leaves the coordinates and stores the location regardless.
 
-### The map renderer
+### The course-map renderer
 
-`/maps` turns GPX tracks into the static PNG cover images used on race reports. It's a front-end
-over Mapbox's Data Workbench: upload one or more GPX files, wait for each to be published as a
-private vector tileset, then open one to tune its framing and styling and download the result.
+`/course-maps` turns GPX tracks into the static PNG cover images used on race reports. It's a
+front-end over Mapbox's Data Workbench: upload one or more GPX files, wait for each to be
+published as a private vector tileset, then open one to tune its framing and styling and download
+the result.
 (This replaced a standalone `utilities/maps/` Rake task, which rendered every GPX in a folder with
 one shared set of env-var options.)
 
@@ -508,7 +529,7 @@ Four services, none of them `ApplicationService` subclasses: `GpxTrack` parses a
   `.overmind.env`. The index checks Sidekiq's process set **only while something is publishing**
   and says so when it's empty — otherwise a stuck row looks identical to a slow one, with nothing
   anywhere explaining it. In production an empty set means the worker machine is down.
-- **The page polls**, it doesn't push: `map_status_controller` re-checks `/maps/status` every 5s
+- **The page polls**, it doesn't push: `map_status_controller` re-checks `/course-maps/status` every 5s
   while a row is publishing and stops otherwise. Action Cable's engine is commented out in
   `application.rb` and there's no `turbo-rails`, so a websocket would be a lot of new
   infrastructure for one signed-in user.

@@ -1,0 +1,42 @@
+<%# One sidebar link, as a <wa-button>. Rendered both at the top level and inside a group's panel,
+    which is the whole reason it's a partial.
+    ⚠️ `data-drawer="close"` is what dismisses the mobile drawer after a tap; without it the drawer
+    stays open over the page it just navigated to. It sits on the host, which is where both
+    <wa-drawer>'s document-level handler and its in-drawer one look — a click inside a shadow root
+    retargets to the host before either sees it. %>
+<% current = admin_nav_current?(item[:path]) %>
+<li>
+  <%# `appearance` carries the active state: filled for the current page, plain otherwise —
+      Web Awesome's own steps, rather than a hand-picked background. `aria-current` stays for
+      the semantics, but ⚠️ it is NOT what a screen reader announces: <wa-button> renders its
+      own <a> in a shadow root and forwards none of the host's ARIA to it, so the current item
+      also carries a visually-hidden marker in the label, the same idiom as the new-tab hint. %>
+  <%= tag.wa_button class: "admin-nav__link",
+                    href: item[:path],
+                    appearance: current ? "filled" : "plain",
+                    target: (item[:external] ? "_blank" : nil),
+                    rel: (item[:external] ? "noopener" : nil),
+                    data: { drawer: "close" },
+                    aria: { current: current ? "page" : nil } do %>
+    <%# Grouped items carry no icon — they're indented under their group's label instead. %>
+    <%= slotted_icon_svg(*item[:icon]) if item[:icon] %>
+    <%= item[:label] %>
+    <% if current %>
+      <span class="wa-visually-hidden">, current page</span>
+    <% end %>
+    <% if item[:badge] %>
+      <%# ⚠️ Wrapped in a span: a <wa-badge> slotted directly into a <wa-button> is styled as a
+          corner notification dot, which on a full-width nav button lands outside its bounds. %>
+      <span slot="end">
+        <wa-badge pill>
+          <%= item[:badge] %>
+          <span class="wa-visually-hidden">waiting</span>
+        </wa-badge>
+      </span>
+    <% end %>
+    <% if item[:external] %>
+      <span slot="end" class="admin-nav__hint wa-caption-s"><%= raw icon_svg("classic", "light", "arrow-up-right-from-square") %></span>
+      <span class="wa-visually-hidden">(opens in a new tab)</span>
+    <% end %>
+  <% end %>
+</li>

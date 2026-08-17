@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Admin connected accounts", type: :request do
+RSpec.describe "Admin connected apps", type: :request do
   let(:owner_email) { "owner@example.com" }
 
   before do
@@ -13,14 +13,14 @@ RSpec.describe "Admin connected accounts", type: :request do
     sign_in_as(email: owner_email)
   end
 
-  describe "GET /connected-accounts" do
+  describe "GET /connected-apps" do
     before { sign_in! }
 
     context "when Whoop is not configured" do
       before { allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(false) }
 
       it "reports it as unconfigured and offers no action" do
-        get "/connected-accounts"
+        get "/connected-apps"
 
         expect(response).to have_http_status(:ok)
         expect(response.body).to include("Not configured")
@@ -28,14 +28,14 @@ RSpec.describe "Admin connected accounts", type: :request do
       end
     end
 
-    context "when Whoop is configured but no account is attached" do
+    context "when Whoop is configured but nothing is attached" do
       before do
         allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(true)
         allow_any_instance_of(Whoop).to receive(:connected?).and_return(false)
       end
 
       it "offers a Connect link that opts out of Turbo" do
-        get "/connected-accounts"
+        get "/connected-apps"
 
         expect(response.body).to include("Not connected")
         expect(response.body).to include("/whoop/auth")
@@ -51,7 +51,7 @@ RSpec.describe "Admin connected accounts", type: :request do
       end
 
       it "offers Disconnect instead of Connect" do
-        get "/connected-accounts"
+        get "/connected-apps"
 
         expect(response.body).to include("Connected")
         expect(response.body).to include("Disconnect")
@@ -61,9 +61,9 @@ RSpec.describe "Admin connected accounts", type: :request do
       # ⚠️ Web Awesome components over native elements. A bare <button> means a `button_to` crept
       # back in — wa-button renders its own inside a shadow root.
       it "renders Disconnect as a Web Awesome button in a real form" do
-        get "/connected-accounts"
+        get "/connected-apps"
 
-        expect(response.body).to match(%r{<form[^>]*action="/connected-accounts/whoop"}m)
+        expect(response.body).to match(%r{<form[^>]*action="/connected-apps/whoop"}m)
         expect(response.body).to include('name="_method" value="delete"')
         expect(response.body).to include("<wa-button type=\"submit\"")
         expect(response.body).not_to include("<button")
@@ -72,37 +72,37 @@ RSpec.describe "Admin connected accounts", type: :request do
 
     it "never lets an admin page be stored" do
       allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(false)
-      get "/connected-accounts"
+      get "/connected-apps"
 
       expect(response.headers["Cache-Control"]).to eq("no-store")
       expect(response.headers["CDN-Cache-Control"]).to be_nil
     end
   end
 
-  describe "DELETE /connected-accounts/whoop" do
+  describe "DELETE /connected-apps/whoop" do
     before { sign_in! }
 
     it "forgets the stored credentials and returns to the page" do
       expect_any_instance_of(Whoop).to receive(:disconnect!)
 
-      delete "/connected-accounts/whoop"
+      delete "/connected-apps/whoop"
 
       expect(response).to have_http_status(:see_other)
-      expect(response).to redirect_to("/connected-accounts")
+      expect(response).to redirect_to("/connected-apps")
       expect(flash[:notice]).to eq("Whoop disconnected.")
     end
   end
 
   describe "without an owner session" do
     it "redirects the page to the login screen" do
-      get "/connected-accounts"
+      get "/connected-apps"
       expect(response).to redirect_to("/signin")
     end
 
     it "refuses the disconnect action" do
       expect_any_instance_of(Whoop).not_to receive(:disconnect!)
 
-      delete "/connected-accounts/whoop"
+      delete "/connected-apps/whoop"
 
       expect(response).to redirect_to("/signin")
     end

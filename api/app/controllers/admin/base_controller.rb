@@ -15,7 +15,7 @@ module Admin
 
     # How many messages are waiting in the spam quarantine, for the nav's badge.
     #
-    # Loaded here rather than in ContactController because the nav is on every admin page. It's a
+    # Loaded here rather than in SpamController because the nav is on every admin page. It's a
     # single HLEN, and these pages already make several Redis round-trips apiece for their icons.
     def load_quarantine_count
       @quarantine_count = SpamQuarantine.new.count

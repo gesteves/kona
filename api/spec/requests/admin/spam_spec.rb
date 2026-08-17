@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Admin contact (spam quarantine)", type: :request do
+RSpec.describe "Admin spam quarantine", type: :request do
   let(:owner_email) { "owner@example.com" }
   let(:quarantine) { instance_double(SpamQuarantine) }
 
@@ -28,14 +28,14 @@ RSpec.describe "Admin contact (spam quarantine)", type: :request do
     sign_in_as(email: owner_email)
   end
 
-  describe "GET /contact" do
+  describe "GET /spam" do
     before { sign_in! }
 
     context "with a quarantined message" do
       before { allow(quarantine).to receive(:all).and_return([ message ]) }
 
       it "renders every field the notification email carries" do
-        get "/contact"
+        get "/spam"
 
         expect(response).to have_http_status(:ok)
         expect(response.body).to include("Ivan Petrov")
@@ -48,10 +48,10 @@ RSpec.describe "Admin contact (spam quarantine)", type: :request do
       end
 
       it "offers both actions as Web Awesome buttons in real forms" do
-        get "/contact"
+        get "/spam"
 
-        expect(response.body).to match(%r{<form[^>]*action="/contact/abc123/not-spam"}m)
-        expect(response.body).to match(%r{<form[^>]*action="/contact/abc123"}m)
+        expect(response.body).to match(%r{<form[^>]*action="/spam/abc123/not-spam"}m)
+        expect(response.body).to match(%r{<form[^>]*action="/spam/abc123"}m)
         expect(response.body).to include('name="_method" value="delete"')
         expect(response.body).to include("<wa-button type=\"submit\"")
         # A bare <button> means a button_to crept back in — wa-button renders its own in a shadow root.
@@ -59,7 +59,7 @@ RSpec.describe "Admin contact (spam quarantine)", type: :request do
       end
 
       it "puts Delete forever behind a confirmation dialog" do
-        get "/contact"
+        get "/spam"
 
         expect(response.body).to include('<wa-dialog id="spam-delete-abc123"')
         expect(response.body).to include('data-dialog="open spam-delete-abc123"')
@@ -67,14 +67,14 @@ RSpec.describe "Admin contact (spam quarantine)", type: :request do
       end
 
       it "renders icons rather than escaping them into the page" do
-        get "/contact"
+        get "/spam"
 
         expect(response.body).to match(/<svg [^>]*class="stub-icon"/)
         expect(response.body).not_to include("&lt;svg")
       end
 
       it "shows a short message whole, with no disclosure" do
-        get "/contact"
+        get "/spam"
 
         expect(response.body).not_to include("<wa-details")
       end
@@ -83,7 +83,7 @@ RSpec.describe "Admin contact (spam quarantine)", type: :request do
     it "hides a long message behind a disclosure" do
       allow(quarantine).to receive(:all).and_return([ message.merge("message" => "spam " * 200) ])
 
-      get "/contact"
+      get "/spam"
 
       expect(response.body).to include('<wa-details summary="Show full message"')
     end
@@ -94,7 +94,7 @@ RSpec.describe "Admin contact (spam quarantine)", type: :request do
         message.merge("name" => "<script>alert(1)</script>", "message" => "<img src=x onerror=alert(2)>")
       ])
 
-      get "/contact"
+      get "/spam"
 
       expect(response.body).not_to include("<script>alert(1)</script>")
       expect(response.body).not_to include("<img src=x onerror=alert(2)>")
@@ -105,7 +105,7 @@ RSpec.describe "Admin contact (spam quarantine)", type: :request do
     it "says so when the queue is empty" do
       allow(quarantine).to receive(:all).and_return([])
 
-      get "/contact"
+      get "/spam"
 
       expect(response.body).to include("Nothing flagged")
       expect(response.body).not_to include("<wa-dialog")
@@ -113,7 +113,7 @@ RSpec.describe "Admin contact (spam quarantine)", type: :request do
 
     it "never lets an admin page be stored" do
       allow(quarantine).to receive(:all).and_return([])
-      get "/contact"
+      get "/spam"
 
       expect(response.headers["Cache-Control"]).to eq("no-store")
       expect(response.headers["X-Robots-Tag"]).to eq("noindex, nofollow")
@@ -121,13 +121,13 @@ RSpec.describe "Admin contact (spam quarantine)", type: :request do
     end
   end
 
-  describe "POST /contact/:id/not-spam" do
+  describe "POST /spam/:id/not-spam" do
     before { sign_in! }
 
     it "releases the message back into the delivery pipeline" do
       allow(quarantine).to receive(:take).with("abc123").and_return(message)
 
-      post "/contact/abc123/not-spam"
+      post "/spam/abc123/not-spam"
 
       expect(ContactMailJob).to have_enqueued_sidekiq_job(
         "Ivan Petrov",
@@ -138,7 +138,7 @@ RSpec.describe "Admin contact (spam quarantine)", type: :request do
         true
       )
       expect(response).to have_http_status(:see_other)
-      expect(response).to redirect_to("/contact")
+      expect(response).to redirect_to("/spam")
       expect(flash[:notice]).to include("released")
     end
 
@@ -146,7 +146,7 @@ RSpec.describe "Admin contact (spam quarantine)", type: :request do
     it "does nothing when the message is already gone" do
       allow(quarantine).to receive(:take).with("abc123").and_return(nil)
 
-      post "/contact/abc123/not-spam"
+      post "/spam/abc123/not-spam"
 
       expect(ContactMailJob.jobs).to be_empty
       expect(response).to have_http_status(:see_other)
@@ -154,31 +154,31 @@ RSpec.describe "Admin contact (spam quarantine)", type: :request do
     end
   end
 
-  describe "DELETE /contact/:id" do
+  describe "DELETE /spam/:id" do
     before { sign_in! }
 
     it "deletes the message without delivering it" do
       expect(quarantine).to receive(:delete).with("abc123")
 
-      delete "/contact/abc123"
+      delete "/spam/abc123"
 
       expect(ContactMailJob.jobs).to be_empty
       expect(response).to have_http_status(:see_other)
-      expect(response).to redirect_to("/contact")
+      expect(response).to redirect_to("/spam")
       expect(flash[:notice]).to eq("Message deleted.")
     end
   end
 
   describe "without an owner session" do
     it "redirects the page to the sign-in screen" do
-      get "/contact"
+      get "/spam"
       expect(response).to redirect_to("/signin")
     end
 
     it "refuses to release a message" do
       expect(quarantine).not_to receive(:take)
 
-      post "/contact/abc123/not-spam"
+      post "/spam/abc123/not-spam"
 
       expect(response).to redirect_to("/signin")
       expect(ContactMailJob.jobs).to be_empty
@@ -187,7 +187,7 @@ RSpec.describe "Admin contact (spam quarantine)", type: :request do
     it "refuses to delete a message" do
       expect(quarantine).not_to receive(:delete)
 
-      delete "/contact/abc123"
+      delete "/spam/abc123"
 
       expect(response).to redirect_to("/signin")
     end

@@ -1,6 +1,6 @@
 <% content_for :title, @track.title %>
 
-<p class="map-editor__back"><%= link_to "← All maps", maps_path %></p>
+<p class="map-editor__back"><%= link_to "← All course maps", course_maps_path %></p>
 
 <h1 class="admin-main__title"><%= @track.title %></h1>
 <p class="map-editor__summary"><%= @track.summary %></p>
@@ -9,7 +9,7 @@
     image and download URLs in place, so tweaking a value doesn't navigate and the field you're
     editing keeps focus. It stays a real GET form so pressing Enter still works, and so the
     settings a preview is rendered with are always expressible as a URL. %>
-<div class="map-editor" data-controller="map-preview" data-map-preview-save-url-value="<%= map_path(@track.id) %>">
+<div class="map-editor" data-controller="map-preview" data-map-preview-save-url-value="<%= course_map_path(@track.id) %>">
   <%= form_with url: @track.show_path, method: :get, class: "map-editor__settings",
                 data: { map_preview_target: "form", turbo_action: "replace" } do %>
 
