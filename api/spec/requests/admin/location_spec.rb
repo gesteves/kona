@@ -12,13 +12,13 @@ RSpec.describe "Admin location", type: :request do
     allow(ENV).to receive(:[]).with("MAPBOX_SECRET_TOKEN").and_return(secret_token)
     allow(ENV).to receive(:[]).with("LOCATION").and_return(nil)
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
-    stub_geocoding(place: "Jackson Hole, Wyoming", time_zone: "America/Denver")
+    stub_geocoding(place: "Jackson Hole, Wyoming")
     stub_stored_location("43.48,-110.76")
   end
 
   # The page previews what the weather widget would print, which means Google's geocoder. Stubbed
   # at GoogleMaps so the real format_location still runs on the way through.
-  def stub_geocoding(place:, time_zone:)
+  def stub_geocoding(place:)
     components = [
       { types: [ "administrative_area_level_2" ], long_name: "Teton County" },
       { types: [ "administrative_area_level_1" ], long_name: "Wyoming" },
@@ -28,7 +28,6 @@ RSpec.describe "Admin location", type: :request do
 
     allow_any_instance_of(GoogleMaps).to receive(:location)
       .and_return({ geocoded: geocoded, time_zone: nil, elevation: nil })
-    allow_any_instance_of(GoogleMaps).to receive(:time_zone_id).and_return(time_zone)
   end
 
   def stub_stored_location(value)
@@ -58,11 +57,10 @@ RSpec.describe "Admin location", type: :request do
       get "/location"
 
       expect(response.body).to include("Jackson Hole, Wyoming")
-      expect(response.body).to include("America/Denver")
     end
 
     it "falls back to the coordinates when the geocode resolves to nothing" do
-      stub_geocoding(place: nil, time_zone: "America/Denver")
+      stub_geocoding(place: nil)
 
       get "/location"
 
@@ -142,7 +140,7 @@ RSpec.describe "Admin location", type: :request do
 
       post "/location", params: { latitude: "37.7749", longitude: "-122.4194" }
 
-      expect(response.parsed_body).to eq("place" => "Jackson Hole, Wyoming", "time_zone" => "America/Denver")
+      expect(response.parsed_body).to eq("place" => "Jackson Hole, Wyoming")
     end
 
     it "still stores the location when the geocode fails" do
@@ -151,7 +149,7 @@ RSpec.describe "Admin location", type: :request do
 
       post "/location", params: { latitude: "37.7749", longitude: "-122.4194" }
 
-      expect(response.parsed_body).to eq("place" => nil, "time_zone" => nil)
+      expect(response.parsed_body).to eq("place" => nil)
       expect(LocationSyncJob).to have_enqueued_sidekiq_job(37.7749, -122.4194)
     end
 

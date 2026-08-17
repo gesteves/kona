@@ -12,6 +12,10 @@ const STYLESHEET_URL = `https://api.mapbox.com/mapbox-gl-js/${VERSION}/mapbox-gl
 // stored value readable.
 const PRECISION = 6;
 
+// What the line above the map shows — ~110m, matching LocationPresenter::DISPLAY_PRECISION so a
+// pin drop doesn't reformat the coordinates the server rendered. Display only; PRECISION is stored.
+const DISPLAY_PRECISION = 3;
+
 // Close enough to see which building you're in, for a reading from the Geolocation API.
 const LOCATED_ZOOM = 14;
 
@@ -113,7 +117,9 @@ export default class extends Controller {
     this.map.addControl(new mapboxgl.NavigationControl(), "top-right");
     this.map.on("click", (event) => this.moveTo(event.lngLat.lat, event.lngLat.lng));
 
-    this.marker = new mapboxgl.Marker({ draggable: true });
+    // Twice Mapbox's default size: the pin is the one thing on this page you have to be able to
+    // find and grab, and at 1x it disappears into a busy streets basemap.
+    this.marker = new mapboxgl.Marker({ draggable: true, scale: 2 });
     this.marker.on("dragend", () => {
       const { lat, lng } = this.marker.getLngLat();
       this.moveTo(lat, lng);
@@ -159,13 +165,13 @@ export default class extends Controller {
 
   /**
    * Writes the location. The action validates and stores it exactly as POST /api/location does,
-   * and answers with the place name and time zone the weather widget would use — so the heading
-   * describes the pin that's on the map now, not the one the page was loaded with.
+   * and answers with the place name the weather widget would use — so the heading describes the
+   * pin that's on the map now, not the one the page was loaded with.
    * @param {number} latitude
    * @param {number} longitude
    */
   async save(latitude, longitude) {
-    const coordinates = `${latitude}, ${longitude}`;
+    const coordinates = this.format(latitude, longitude);
     this.report("Saving…");
 
     try {
@@ -181,9 +187,9 @@ export default class extends Controller {
 
       if (!response.ok) return this.report("Those coordinates were refused.");
 
-      const { place, time_zone: timeZone } = await response.json();
+      const { place } = await response.json();
       this.describe(place || coordinates);
-      this.report(["Saved", coordinates, timeZone].filter(Boolean).join(" · "));
+      this.report(`Saved · ${coordinates}`);
     } catch {
       this.report("Couldn't reach the server. Nothing was saved.");
     }
@@ -199,5 +205,15 @@ export default class extends Controller {
 
   round(value) {
     return Number(Number(value).toFixed(PRECISION));
+  }
+
+  /**
+   * The pair as a human reads it, rounded for display only — what was saved keeps PRECISION.
+   * @returns {string}
+   */
+  format(latitude, longitude) {
+    return [latitude, longitude]
+      .map((value) => Number(Number(value).toFixed(DISPLAY_PRECISION)))
+      .join(", ");
   }
 }

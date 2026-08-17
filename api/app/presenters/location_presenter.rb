@@ -8,23 +8,25 @@ class LocationPresenter
   # landmasses aren't split across the bottom edge.
   WORLD_CENTER = [ 0, 20 ].freeze
 
-  attr_reader :place, :time_zone, :map_token, :map_style, :save_path
+  # Displayed coordinates are rounded to this many decimals — ~110m, which is as fine as a "where
+  # am I" reading needs to read. What gets stored is whatever was dropped; this is display only.
+  DISPLAY_PRECISION = 3
+
+  attr_reader :place, :map_token, :map_style, :save_path
 
   # @param stored [Array(Float, Float), nil] The coordinates in Redis.
   # @param override [Array(Float, Float), nil] The LOCATION env var, which outranks them.
   # @param place [String, nil] The name the weather widget would print for this location.
-  # @param time_zone [String, nil] The time zone the widgets would use.
   # @param map_token [String, nil] The **public** Mapbox token.
   # @param map_style [String] The basemap style URL.
   # @param location_zoom [Integer] Zoom to use when there's a location.
   # @param world_zoom [Integer] Zoom to use when there isn't.
   # @param save_path [String] Where a pin drop posts.
-  def initialize(stored:, override:, place:, time_zone:, map_token:, map_style:,
+  def initialize(stored:, override:, place:, map_token:, map_style:,
                  location_zoom:, world_zoom:, save_path:)
     @stored = stored
     @override = override
     @place = place
-    @time_zone = time_zone
     @map_token = map_token
     @map_style = map_style
     @location_zoom = location_zoom
@@ -50,7 +52,7 @@ class LocationPresenter
 
   # @return [String, nil] Both coordinates, for display.
   def summary
-    coordinates&.join(", ")
+    coordinates&.map { |value| value.round(DISPLAY_PRECISION) }&.join(", ")
   end
 
   # The headline: the name the weather widget would print. Falls back to the coordinates rather
@@ -61,13 +63,15 @@ class LocationPresenter
     @place.presence || summary || "Nowhere yet"
   end
 
-  # @return [String] The line under the heading: where it is, and which clock the widgets keep.
+  # @return [String] The line under the heading: where it is.
   def details
     return "Drop a pin on the map to set your location." unless set?
 
-    [ summary, @time_zone ].compact_blank.join(" · ")
+    summary
   end
 
+  # ⚠️ Deliberately NOT rounded, unlike `summary`: this echoes the value configured in the
+  # environment so it can be read against what's actually in there.
   # @return [String, nil] The overriding coordinates, for the callout that names them.
   def override_summary
     @override&.join(", ")

@@ -47,25 +47,21 @@ module Admin
       )
     end
 
-    # The place name and time zone as the **weather widget** derives them, which is what makes this
-    # page a preview of how a location will read there.
+    # The place name as the **weather widget** derives it, which is what makes this page a preview
+    # of how a location will read there.
     #
-    # ⚠️ Same path as Widgets::WeatherController: format_location over GoogleMaps#location, plus
-    # TimeZoneResolver's default. Don't reach for LocationContext#label instead — it adds fallbacks
-    # ("Current location") the widget doesn't have, so the preview would promise a name the widget
-    # would never print. Degrades to nothing, so an unset GOOGLE_API_KEY leaves coordinates alone.
-    # @return [Hash] :place and :time_zone, both possibly nil.
+    # ⚠️ Same path as Widgets::WeatherController: format_location over GoogleMaps#location. Don't
+    # reach for LocationContext#label instead — it adds fallbacks ("Current location") the widget
+    # doesn't have, so the preview would promise a name the widget would never print. Degrades to
+    # nothing, so an unset GOOGLE_API_KEY leaves coordinates alone.
+    # @return [Hash] :place, possibly nil.
     def described(coordinates)
-      return { place: nil, time_zone: nil } if coordinates.nil?
+      return { place: nil } if coordinates.nil?
 
-      gmaps = GoogleMaps.new(*coordinates)
-      {
-        place: helpers.format_location(DeepOstruct.wrap(gmaps.location)).presence,
-        time_zone: gmaps.time_zone_id || TimeZoneResolver.default
-      }
+      { place: helpers.format_location(DeepOstruct.wrap(GoogleMaps.new(*coordinates).location)).presence }
     rescue StandardError => e
       Rails.logger.warn("Location: could not describe #{coordinates.inspect} (#{e.class}: #{e.message})")
-      { place: nil, time_zone: nil }
+      { place: nil }
     end
   end
 end

@@ -1,13 +1,11 @@
 require "rails_helper"
 
 RSpec.describe LocationPresenter do
-  def presenter(stored: nil, override: nil, map_token: "pk.token", place: "Jackson Hole, Wyoming",
-                time_zone: "America/Denver")
+  def presenter(stored: nil, override: nil, map_token: "pk.token", place: "Jackson Hole, Wyoming")
     described_class.new(
       stored: stored,
       override: override,
       place: place,
-      time_zone: time_zone,
       map_token: map_token,
       map_style: "mapbox://styles/mapbox/streets-v12",
       location_zoom: 11,
@@ -24,6 +22,23 @@ RSpec.describe LocationPresenter do
       expect(subject.longitude).to eq(-110.76)
       expect(subject.summary).to eq("43.48, -110.76")
       expect(subject).to be_set
+    end
+
+    # Display only — what's stored, and what #latitude/#longitude hand the map, is the full value.
+    it "rounds the displayed pair to three decimals" do
+      subject = presenter(stored: [ 43.478123, -110.762987 ])
+
+      expect(subject.summary).to eq("43.478, -110.763")
+      expect(subject.latitude).to eq(43.478123)
+      expect(subject.center).to eq([ -110.762987, 43.478123 ])
+    end
+
+    # ⚠️ The one place that isn't rounded: it echoes what's in the environment, so it has to match
+    # what was typed there.
+    it "leaves the override callout's coordinates exact" do
+      subject = presenter(override: [ 37.774929, -122.419418 ])
+
+      expect(subject.override_summary).to eq("37.774929, -122.419418")
     end
 
     # Location reads the env var first, so the page has to show what actually wins.
@@ -49,20 +64,20 @@ RSpec.describe LocationPresenter do
       subject = presenter(stored: [ 43.48, -110.76 ])
 
       expect(subject.heading).to eq("Jackson Hole, Wyoming")
-      expect(subject.details).to eq("43.48, -110.76 · America/Denver")
+      expect(subject.details).to eq("43.48, -110.76")
     end
 
     # A geocode that resolves to nothing is what the widget would render as a blank; the
     # coordinates are more use than a placeholder.
     it "falls back to the coordinates when nothing geocoded" do
-      subject = presenter(stored: [ 43.48, -110.76 ], place: nil, time_zone: nil)
+      subject = presenter(stored: [ 43.48, -110.76 ], place: nil)
 
       expect(subject.heading).to eq("43.48, -110.76")
       expect(subject.details).to eq("43.48, -110.76")
     end
 
     it "asks for a first pin when there's no location at all" do
-      subject = presenter(place: nil, time_zone: nil)
+      subject = presenter(place: nil)
 
       expect(subject.heading).to eq("Nowhere yet")
       expect(subject.details).to include("Drop a pin")

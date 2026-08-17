@@ -51,7 +51,7 @@ a cached copy before revalidating.
 | GET | `/signin`, `/auth/google_oauth2/callback`; POST `/signout` | owner session | `no-store` |
 | GET | `/`, `/connected-accounts`, `/contact`, `/location`, `/maps`, `/maps/:id` | admin UI (owner-session gated) | `no-store` |
 | POST | `/contact/:id/not-spam`; DELETE `/contact/:id`, `/connected-accounts/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
-| POST | `/location` | same write as `POST /api/location`; answers with the geocoded place + time zone | `no-store` |
+| POST | `/location` | same write as `POST /api/location`; answers with the geocoded place | `no-store` |
 | POST | `/maps`; PATCH/DELETE `/maps/:id`; GET `/maps/status` | upload GPX tracks, save render settings, delete a track, poll publish status | `no-store` |
 | GET | `/maps/:id/preview`, `/maps/:id/download` | the rendered PNG, proxied from Mapbox; same render, only the disposition differs | `no-store` |
 | — | `/sidekiq` | job dashboard (owner-session gated) | — |
@@ -398,9 +398,9 @@ calls `Akismet#submit_ham`.
 ### The location picker
 
 `/location` is a full-width Mapbox map with a draggable pin, and the pin **is** the current
-location: a click or a drag writes it, with no separate save step. Above the map sit the place
-name, the coordinates and time zone, and a Geolocation button — that line is the only confirmation
-there is, so it reports "Saving…" and then what was stored.
+location: a click or a drag writes it, with no separate save step. Above the map sit the place name,
+the coordinates and a Geolocation button — that line is the only confirmation there is, so it
+reports "Saving…" and then what was stored.
 
 - **It writes through `Location.store`**, the same method `POST /api/location` uses, so the two
   can't drift on ordering (Redis first, sync second) or on validation (`Location.parse`, which is
@@ -411,10 +411,14 @@ there is, so it reports "Saving…" and then what was stored.
   of how a location will read in the weather widget. ⚠️ Not `LocationContext#label`, which adds
   fallbacks ("Current location") the widget doesn't have; the preview would promise a name the
   widget would never print. A geocode that resolves to nothing falls back to the coordinates.
-- ⚠️ **`POST /location` answers with that place and time zone, and the page updates the heading
-  from the response.** Re-deriving it per drop is the point: the server-rendered name describes
-  the location the page was *loaded* with, and one pin drop makes it a caption for the wrong
-  place.
+- ⚠️ **`POST /location` answers with that place, and the page updates the heading from the
+  response.** Re-deriving it per drop is the point: the server-rendered name describes the location
+  the page was *loaded* with, and one pin drop makes it a caption for the wrong place.
+- ⚠️ **The displayed coordinates are rounded, and the rounding is written twice** —
+  `LocationPresenter::DISPLAY_PRECISION` for the server-rendered line and `DISPLAY_PRECISION` in
+  `location_map_controller.js` for the one a pin drop rewrites. They must match, or dropping a pin
+  visibly reformats the numbers. Storage is unaffected: the controller still saves at its own
+  `PRECISION`, and the override callout deliberately prints the env var's value verbatim.
 - ⚠️ **`Location` prefers `ENV["LOCATION"]` over the stored value**, so with that var set a pin
   drop writes Redis and changes nothing any widget reads. The page renders a callout naming the
   coordinates that actually win rather than appearing to work.
