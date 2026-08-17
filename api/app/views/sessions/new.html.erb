@@ -6,7 +6,7 @@
     omniauth-rails_csrf_protection requires of the request phase. %>
 <%= form_with url: "/auth/google_oauth2", method: :post, data: { turbo: false }, class: "signin__form" do %>
   <wa-button type="submit" variant="brand" appearance="accent" size="large">
-    <%= raw icon_svg("classic", "brands", "google")&.sub("<svg", '<svg slot="start"') %>
+    <%= slotted_icon_svg("classic", "brands", "google") %>
     Sign in with Google
   </wa-button>
 <% end %>

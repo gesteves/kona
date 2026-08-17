@@ -1,37 +1,14 @@
 // External accounts on the Connected accounts page: a list of cards, one per integration.
-
-.account-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--wa-space-m);
-  list-style: none;
-  margin: 0;
-  padding: 0;
-
-  // ⚠️ native.css indents list items with `margin-inline-start` on the <li>, so the padding reset
-  // above isn't enough — without this the cards sit indented from the page heading.
-  &__item {
-    margin: 0;
-  }
-}
+// ⚠️ The card body is a `wa-stack` and its header a `wa-cluster`, and those zero their children's
+// margins — which is why nothing here resets one.
 
 .account {
-  &__header {
-    align-items: center;
-    display: flex;
-    gap: var(--wa-space-s);
-  }
-
+  // Pushes the status badge to the far edge of the card.
   &__name {
-    font-size: var(--wa-font-size-l);
-    font-weight: var(--wa-font-weight-heading);
-    margin: 0;
-    // Pushes the status badge to the far edge of the card.
     margin-inline-end: auto;
   }
 
   &__description {
     color: var(--wa-color-text-quiet);
-    margin: 0;
   }
 }

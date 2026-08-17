@@ -274,15 +274,48 @@ vendor stylesheet stays a plain `.css` import in `admin.js`, ahead of our `.scss
 - ⚠️ **Don't use `<wa-icon>`** — it resolves icons through a base path or FA kit code, neither
   configured here, and the npm package ships no icon assets, so every icon silently renders blank.
   Use `icon_svg(family, style, id)`, and **always with `raw`** — it returns a plain String, so
-  without it ERB escapes the markup into the page as visible text.
+  without it ERB escapes the markup into the page as visible text. For an icon that goes into a
+  component slot (`start`/`end` on `<wa-button>`, `icon` on `<wa-callout>`), use
+  `slotted_icon_svg(family, style, id, slot:)`, which returns a safe buffer and needs no `raw`.
+- ⚠️ **ARIA on a `wa-*` host does not reach the element inside its shadow root.** `<wa-button>`
+  renders its own `<button>`/`<a>` and forwards `href`/`target`/`rel`/`type` but no ARIA, and
+  `icon_svg` marks every SVG `aria-hidden` — so an `aria-label` or `aria-current` on the host is
+  inert to a screen reader. Put the name or state in the **slotted content**, as a
+  `wa-visually-hidden` span (the header toggle and the nav's current item both do). Turbo, by
+  contrast, *does* pierce shadow roots in both directions — it finds a `wa-button`'s inner anchor
+  through the click's composed path, and `data-turbo="false"` on the host from there — so
+  `<wa-button href>` navigates with Drive like a plain link.
 - ⚠️ `rake assets:*` is now shared: `assets:backfill` (the R2 image mirror, above) sits alongside
   Propshaft's `assets:precompile` / `clean` / `clobber`. No collision, but they're unrelated.
 
-**Prefer a Web Awesome component over the native element wherever one exists.** In practice that
+**Prefer a Web Awesome component over the native element wherever one exists**, and its layout
+utilities (`wa-stack`, `wa-cluster`, `wa-grid`, `wa-gap-*`, `wa-visually-hidden`) and design tokens
+(`--wa-space-*`, `--wa-color-*`, `--wa-form-control-*`) over hand-written CSS. In practice that
 means **not** `button_to`, which emits a native `<button>` — use `form_with` wrapping a
 `<wa-button type="submit">`. Web Awesome's button is form-associated (`formAssociated = true`), so
 it submits the surrounding form exactly like a native one, CSRF token and `_method` included.
 A bare `<button` in the server HTML means one crept back in; two request specs assert its absence.
+
+Sass here is for what's genuinely ours — page-specific layout, the brand pins, a border the
+component doesn't draw. A rule that restates a component's own look (its radius, hover fill, focus
+ring, control height) means the component's API was skipped: reach for `appearance` / `variant` /
+`size` first, then its CSS custom properties, then `::part()`, and write a rule of your own last.
+Same for markup: when a `wa-*` element seems to be missing a capability, check its docs before
+working around it — several of the sharp edges here (`<wa-page>`'s navigation slot,
+form-association, `::part(base)`) are documented behavior.
+
+⚠️ **The package ships its own docs — read them rather than recalling an API.** They're the source
+the vendor's examples come from, and they're versioned with the installed release:
+
+- The **`webawesome` skill** is registered in this environment; invoke it for component APIs
+  (attributes, slots, parts, events) and the utility/token reference.
+- Both skills are on disk at `node_modules/@web.awesome.me/webawesome-pro/dist/skills/` —
+  `webawesome/references/components/<name>.md` per component, plus `webawesome-design/` for layout
+  and theming. The `<wa-page>` rules further down come from
+  `webawesome-design/references/layouts-page.md`.
+- When neither answers it, the component's own source and styles do
+  (`dist/components/<name>/`, `dist/chunks/*.js`) — that's the only place the shadow-DOM behavior
+  flagged above is written down.
 
 **Brand color** — the site's firebrick (`#bf0222`, matching `--color-firebrick` in `web/`). Web
 Awesome derives every brand surface from the `--wa-color-brand-NN` ramp, so there's no single token
@@ -319,9 +352,11 @@ the dark theme; `_admin-header.scss` overrides that to `currentColor`, which is 
 inlined rather than served as an image (an `<img>` can't inherit the text color). Drift between the
 two copies costs nothing beyond a stale admin logo.
 
-The sidebar is built from `AdminHelper#admin_nav_items`, so drawer-closing, `aria-current`, and icon
-handling are written once. An item marked `external: true` (today only Sidekiq, which renders its
-own layout) opens in a new tab with `rel="noopener"` and a visually-hidden "(opens in a new tab)".
+The sidebar is built from `AdminHelper#admin_nav_items`, so drawer-closing, the active state, and
+icon handling are written once. Each item is a `<wa-button appearance="plain" href>`, with the
+current page's set to `filled` — the active state is a Web Awesome step, not a hand-picked
+background. An item marked `external: true` (today only Sidekiq, which renders its own layout)
+opens in a new tab with `rel="noopener"` and a visually-hidden "(opens in a new tab)".
 
 **Connected accounts** (`/connected-accounts`) connects and disconnects Whoop.
 `ConnectedAccountPresenter` renders three states from `Whoop#valid_credentials?` and

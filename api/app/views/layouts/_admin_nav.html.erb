@@ -1,26 +1,42 @@
 <%# The admin sidebar's links. Items come from AdminHelper#admin_nav_items so the drawer-closing,
     active-state, and icon handling below is written once as the list grows.
     ⚠️ `data-drawer="close"` is what dismisses the mobile drawer after a tap; without it the drawer
-    stays open over the page it just navigated to. %>
-<ul class="admin-nav__list">
+    stays open over the page it just navigated to. It sits on the host, which is where both
+    <wa-drawer>'s document-level handler and its in-drawer one look — a click inside a shadow root
+    retargets to the host before either sees it. %>
+<ul class="plain-list wa-stack wa-gap-3xs">
   <% admin_nav_items(quarantine_count: @quarantine_count).each do |item| %>
-    <li class="admin-nav__item">
-      <%= link_to item[:path],
-                  class: "admin-nav__link",
-                  data: { drawer: "close" },
-                  target: (item[:external] ? "_blank" : nil),
-                  rel: (item[:external] ? "noopener" : nil),
-                  aria: { current: admin_nav_current?(item[:path]) ? "page" : nil } do %>
-        <span class="admin-nav__icon"><%= raw icon_svg(*item[:icon]) %></span>
-        <span class="admin-nav__label"><%= item[:label] %></span>
+    <% current = admin_nav_current?(item[:path]) %>
+    <li>
+      <%# `appearance` carries the active state: filled for the current page, plain otherwise —
+          Web Awesome's own steps, rather than a hand-picked background. `aria-current` stays for
+          the semantics, but ⚠️ it is NOT what a screen reader announces: <wa-button> renders its
+          own <a> in a shadow root and forwards none of the host's ARIA to it, so the current item
+          also carries a visually-hidden marker in the label, the same idiom as the new-tab hint. %>
+      <%= tag.wa_button class: "admin-nav__link",
+                        href: item[:path],
+                        appearance: current ? "filled" : "plain",
+                        target: (item[:external] ? "_blank" : nil),
+                        rel: (item[:external] ? "noopener" : nil),
+                        data: { drawer: "close" },
+                        aria: { current: current ? "page" : nil } do %>
+        <%= slotted_icon_svg(*item[:icon]) %>
+        <%= item[:label] %>
+        <% if current %>
+          <span class="wa-visually-hidden">, current page</span>
+        <% end %>
         <% if item[:badge] %>
-          <wa-badge class="admin-nav__badge" pill>
-            <%= item[:badge] %>
-            <span class="wa-visually-hidden">waiting</span>
-          </wa-badge>
+          <%# ⚠️ Wrapped in a span: a <wa-badge> slotted directly into a <wa-button> is styled as a
+              corner notification dot, which on a full-width nav button lands outside its bounds. %>
+          <span slot="end">
+            <wa-badge pill>
+              <%= item[:badge] %>
+              <span class="wa-visually-hidden">waiting</span>
+            </wa-badge>
+          </span>
         <% end %>
         <% if item[:external] %>
-          <span class="admin-nav__hint"><%= raw icon_svg("classic", "light", "arrow-up-right-from-square") %></span>
+          <span slot="end" class="admin-nav__hint wa-caption-s"><%= raw icon_svg("classic", "light", "arrow-up-right-from-square") %></span>
           <span class="wa-visually-hidden">(opens in a new tab)</span>
         <% end %>
       <% end %>

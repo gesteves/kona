@@ -4,7 +4,7 @@
 
 <% unless @configured %>
   <wa-callout variant="warning" class="track-upload__notice">
-    <%= raw icon_svg("classic", "light", "triangle-exclamation")&.sub("<svg", '<svg slot="icon"') %>
+    <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
     Set <code>MAPBOX_USERNAME</code> and <code>MAPBOX_SECRET_TOKEN</code> in the environment to
     upload tracks.
   </wa-callout>
@@ -12,7 +12,7 @@
 
 <% if @worker_running == false %>
   <wa-callout variant="warning" class="track-upload__notice">
-    <%= raw icon_svg("classic", "light", "triangle-exclamation")&.sub("<svg", '<svg slot="icon"') %>
+    <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
     No Sidekiq worker is running, so nothing is publishing these tracks. Locally, <code>overmind
     start</code> runs one; they'll pick up where they left off.
   </wa-callout>
@@ -25,30 +25,30 @@
                  hint="Each track is published to Mapbox as a private vector tileset, which takes a minute or two.">
   </wa-file-input>
   <wa-button type="submit" variant="brand" appearance="accent">
-    <%= raw icon_svg("classic", "light", "arrow-up-from-bracket")&.sub("<svg", '<svg slot="start"') %>
+    <%= slotted_icon_svg("classic", "light", "arrow-up-from-bracket") %>
     Upload
   </wa-button>
 <% end %>
 
 <% if @tracks.empty? %>
   <wa-callout variant="neutral">
-    <%= raw icon_svg("classic", "light", "route")&.sub("<svg", '<svg slot="icon"') %>
+    <%= slotted_icon_svg("classic", "light", "route", slot: "icon") %>
     No tracks yet. Upload a GPX file and it'll show up here once Mapbox has published it.
   </wa-callout>
 <% else %>
   <%# The list polls while anything is still publishing, then stops. Mapbox's tiling service is
       asynchronous, so there's nothing to push from here. %>
-  <ul class="track-list" data-controller="map-status" data-map-status-url-value="<%= maps_status_path %>">
+  <ul class="track-list plain-list wa-grid wa-gap-m" data-controller="map-status" data-map-status-url-value="<%= maps_status_path %>">
     <% @tracks.each do |track| %>
-      <li class="track-list__item" data-map-status-id="<%= track.id %>" data-map-status-state="<%= track.status %>">
+      <li data-map-status-id="<%= track.id %>" data-map-status-state="<%= track.status %>">
         <wa-card>
           <div class="wa-stack wa-gap-m">
-            <div class="track__header">
-              <h2 class="track__name"><%= track.title %></h2>
+            <div class="wa-cluster wa-gap-s">
+              <h2 class="track__name wa-heading-l"><%= track.title %></h2>
               <wa-badge variant="<%= track.status_variant %>" appearance="outlined">
                 <%= track.status_label %>
               </wa-badge>
-              <wa-relative-time class="track__age" date="<%= track.uploaded_at %>" sync></wa-relative-time>
+              <wa-relative-time class="track__age wa-caption-s" date="<%= track.uploaded_at %>" sync></wa-relative-time>
             </div>
 
             <p class="track__summary"><%= track.summary %></p>
@@ -60,11 +60,11 @@
             <div class="wa-cluster wa-gap-s">
               <% if track.ready? %>
                 <wa-button href="<%= track.show_path %>" variant="brand" appearance="accent">
-                  <%= raw icon_svg("classic", "light", "sliders")&.sub("<svg", '<svg slot="start"') %>
+                  <%= slotted_icon_svg("classic", "light", "sliders") %>
                   Open
                 </wa-button>
               <% elsif track.processing? %>
-                <span class="track__pending">
+                <span class="wa-cluster wa-gap-xs wa-caption-s">
                   <wa-spinner></wa-spinner>
                   Publishing to Mapbox…
                 </span>
@@ -74,7 +74,7 @@
                   here is red, so a danger variant beside a brand-accent button makes the safe
                   action the loudest thing on the card. Red is reserved for the dialog's confirm. %>
               <wa-button variant="neutral" appearance="outlined" data-dialog="open <%= track.dialog_id %>">
-                <%= raw icon_svg("classic", "light", "trash")&.sub("<svg", '<svg slot="start"') %>
+                <%= slotted_icon_svg("classic", "light", "trash") %>
                 Delete
               </wa-button>
             </div>

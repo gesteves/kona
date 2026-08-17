@@ -18,8 +18,16 @@
         header bar. `wa-cloak` hides the shell until the custom elements are defined. %>
     <wa-page class="admin wa-cloak" disable-navigation-toggle mobile-breakpoint="768px">
       <header slot="header" class="admin-header">
-        <wa-button data-toggle-nav appearance="plain" class="wa-mobile-only" aria-label="Open menu">
+        <%# ⚠️ The name is a visually-hidden span, not `aria-label`: <wa-button> renders its own
+            <button> in a shadow root and forwards none of the host's ARIA to it, and `icon_svg`
+            marks every SVG `aria-hidden`, so an aria-label here would leave the toggle unnamed. %>
+        <%# ⚠️ No `wa-mobile-only`: `wa-base` already hides `[data-toggle-nav]` on desktop, and it
+            does so *without* `!important`, which is what lets _page.scss show the toggle through
+            the first painted frame. Adding the class back restores an `!important` no unlayered
+            rule can beat, and with it a wordmark that jumps sideways on load. %>
+        <wa-button data-toggle-nav appearance="plain">
           <%= raw icon_svg("classic", "light", "bars") %>
+          <span class="wa-visually-hidden">Open menu</span>
         </wa-button>
         <%= link_to root_path, class: "admin-header__home", aria: { label: "Home" } do %>
           <%= render "layouts/logo" %>
@@ -38,7 +46,7 @@
             like a native one. %>
         <%= form_with url: "/signout", method: :post do %>
           <wa-button type="submit" appearance="outlined" variant="neutral">
-            <%= raw icon_svg("classic", "light", "arrow-right-from-bracket")&.sub("<svg", '<svg slot="start"') %>
+            <%= slotted_icon_svg("classic", "light", "arrow-right-from-bracket") %>
             Sign out
           </wa-button>
         <% end %>

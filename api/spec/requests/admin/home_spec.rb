@@ -101,7 +101,7 @@ RSpec.describe "Admin home", type: :request do
 
       # Matched attribute-by-attribute rather than with one regex, since Rails' attribute order
       # isn't part of the contract.
-      sidekiq_link = response.body.scan(/<a\b[^>]*>/).find { |tag| tag.include?('href="/sidekiq"') }
+      sidekiq_link = response.body.scan(/<wa-button\b[^>]*>/).find { |tag| tag.include?('href="/sidekiq"') }
 
       expect(sidekiq_link).to include('target="_blank"')
       expect(sidekiq_link).to include('rel="noopener"')

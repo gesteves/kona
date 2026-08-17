@@ -6,67 +6,23 @@
   height: 100%;
   padding: var(--wa-space-m);
 
-  &__list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--wa-space-3xs);
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-
-  // ⚠️ Web Awesome's native.css indents list items with `margin-inline-start` on the <li>, not
-  // padding on the <ul> — so zeroing the list's padding above does nothing on its own, and the
-  // items sit ~18px in from the column's own padding. That reads as the nav being off-centre
-  // (a wide gap on the left, a narrow one on the right) and knocks the links out of alignment
-  // with the sign-out button below, which has no <li> to inherit it from.
-  &__item {
-    margin: 0;
-  }
-
+  // The links are <wa-button>s, so hover, active, focus ring, radius and spacing all come from the
+  // component. ⚠️ Only two things are ours: the host is `inline-block`, so it shrink-wraps inside
+  // the <li> without a width; and the button centers its content, which reads as ragged in a
+  // column of links of different lengths.
   &__link {
-    align-items: center;
-    border-radius: var(--wa-border-radius-m);
-    color: var(--wa-color-text-normal);
-    display: flex;
-    gap: var(--wa-space-s);
-    padding: var(--wa-space-xs) var(--wa-space-s);
-    text-decoration: none;
+    width: 100%;
 
-    &:hover {
-      background-color: var(--wa-color-neutral-fill-quiet);
-    }
-
-    // `aria-current` is the source of truth for the active item — styling it directly keeps the
-    // visual state and the accessible one from drifting apart.
-    &[aria-current="page"] {
-      background-color: var(--wa-color-neutral-fill-quiet);
-      font-weight: var(--wa-font-weight-semibold);
+    &::part(base) {
+      justify-content: start;
     }
   }
 
-  // ⚠️ `inline-flex`, not the default inline: an inline SVG sits on its wrapper's text baseline, so
-  // the span's box grows by the descender gap below the glyph. The link centers that box, which
-  // leaves the icon riding visibly high against the label.
-  &__icon {
-    display: inline-flex;
-  }
-
-  &__label {
-    margin-inline-end: auto;
-  }
-
-  // The quarantine count. `__label` carries `margin-inline-end: auto`, so this lands on the link's
-  // trailing edge without needing an alignment rule of its own.
-  &__badge {
-    flex: none;
-  }
-
-  // The new-tab marker on external destinations (Sidekiq). Quiet: it annotates, it doesn't label.
+  // The new-tab marker on external destinations (Sidekiq). ⚠️ `inline-flex`, not the default
+  // inline: an inline SVG sits on its wrapper's text baseline, so the span's box grows by the
+  // descender gap and the icon rides visibly high against the label.
   &__hint {
-    color: var(--wa-color-text-quiet);
     display: inline-flex;
-    font-size: var(--wa-font-size-s);
   }
 
   // The footer is a sibling slot below the nav rather than a child, so it needs the column's right

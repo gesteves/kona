@@ -10,32 +10,32 @@
 
 <% if @messages.empty? %>
   <wa-callout variant="neutral">
-    <%= raw icon_svg("classic", "light", "shield-check")&.sub("<svg", '<svg slot="icon"') %>
+    <%= slotted_icon_svg("classic", "light", "shield-check", slot: "icon") %>
     Nothing flagged. Anything Akismet catches shows up here, and is dropped after a month.
   </wa-callout>
 <% else %>
-  <ul class="spam-list">
+  <ul class="spam-list plain-list wa-grid wa-gap-m">
     <% @messages.each do |message| %>
-      <li class="spam-list__item">
+      <li>
         <wa-card>
           <div class="wa-stack wa-gap-m">
-            <div class="spam__header">
-              <h2 class="spam__name"><%= message.name %></h2>
+            <div class="wa-cluster wa-gap-s">
+              <h2 class="spam__name wa-heading-l"><%= message.name %></h2>
               <wa-badge variant="danger" appearance="outlined">Spam</wa-badge>
-              <wa-relative-time class="spam__age" date="<%= message.received_at %>" sync></wa-relative-time>
+              <wa-relative-time class="spam__age wa-caption-s" date="<%= message.received_at %>" sync></wa-relative-time>
             </div>
 
             <p class="spam__email"><%= message.email %></p>
 
-            <div class="spam__message"><%= message.preview %></div>
+            <div class="spam__message wa-prose"><%= message.preview %></div>
 
             <% if message.truncated? %>
               <wa-details summary="Show full message">
-                <div class="spam__message"><%= message.message %></div>
+                <div class="spam__message wa-prose"><%= message.message %></div>
               </wa-details>
             <% end %>
 
-            <dl class="spam__details">
+            <dl class="spam__details wa-caption-s">
               <% if message.location %>
                 <dt>Location</dt><dd><%= message.location %></dd>
               <% end %>
@@ -53,7 +53,7 @@
                   native <button>. %>
               <%= form_with url: message.not_spam_path, method: :post do %>
                 <wa-button type="submit" variant="brand" appearance="accent">
-                  <%= raw icon_svg("classic", "light", "inbox-in")&.sub("<svg", '<svg slot="start"') %>
+                  <%= slotted_icon_svg("classic", "light", "inbox-in") %>
                   Not spam
                 </wa-button>
               <% end %>
@@ -67,7 +67,7 @@
                   on the card and the destructive one indistinguishable from it. Red is reserved for
                   the confirm button in the dialog, where the choice is actually made. %>
               <wa-button variant="neutral" appearance="outlined" data-dialog="open <%= message.dialog_id %>">
-                <%= raw icon_svg("classic", "light", "trash")&.sub("<svg", '<svg slot="start"') %>
+                <%= slotted_icon_svg("classic", "light", "trash") %>
                 Delete forever
               </wa-button>
             </div>

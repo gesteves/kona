@@ -102,7 +102,7 @@
 
     <wa-button data-map-preview-target="download" href="<%= @track.download_path %>" download
                variant="brand" appearance="accent">
-      <%= raw icon_svg("classic", "light", "arrow-down-to-bracket")&.sub("<svg", '<svg slot="start"') %>
+      <%= slotted_icon_svg("classic", "light", "arrow-down-to-bracket") %>
       Download PNG
     </wa-button>
   </div>

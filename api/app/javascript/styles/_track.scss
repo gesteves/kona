@@ -18,54 +18,26 @@
   }
 }
 
+// The list is a `wa-grid`, so this is the whole layout: cards flow into as many columns as fit,
+// one per track, and drop back to one on a narrow window.
 .track-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--wa-space-m);
-  list-style: none;
-  margin: 0;
-  padding: 0;
-
-  // ⚠️ native.css indents list items with `margin-inline-start` on the <li>, so the padding reset
-  // above isn't enough — without this the cards sit indented from the page heading.
-  &__item {
-    margin: 0;
-  }
+  --min-column-size: 24rem;
 }
 
+// ⚠️ The card body is a `wa-stack` and its header a `wa-cluster`, and those zero their children's
+// margins — which is why nothing here resets one.
 .track {
-  &__header {
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--wa-space-s);
-  }
-
   &__name {
-    font-size: var(--wa-font-size-l);
-    font-weight: var(--wa-font-weight-heading);
-    margin: 0;
     overflow-wrap: anywhere;
   }
 
+  // Pushes the timestamp to the far edge, past the badge.
   &__age {
-    color: var(--wa-color-text-quiet);
-    font-size: var(--wa-font-size-s);
-    // Pushes the timestamp to the far edge, past the badge.
     margin-inline-start: auto;
   }
 
   &__summary {
     color: var(--wa-color-text-quiet);
-    margin: 0;
-  }
-
-  &__pending {
-    align-items: center;
-    color: var(--wa-color-text-quiet);
-    display: inline-flex;
-    font-size: var(--wa-font-size-s);
-    gap: var(--wa-space-xs);
   }
 }
 
@@ -95,10 +67,13 @@
     gap: var(--wa-space-2xs);
   }
 
+  // ⚠️ The 80rem ceiling is the render's own width (1280px, @2x on the wire). Without it a wide
+  // window upscales the preview into blur, since the column itself has no width cap.
   &__preview {
     display: flex;
     flex-direction: column;
     gap: var(--wa-space-m);
+    max-inline-size: 80rem;
     // Keeps the preview visible while working down a long settings column. ⚠️ The header is
     // sticky too, so this has to clear it — pinning to the viewport top slides the map under it.
     position: sticky;
@@ -125,9 +100,9 @@
     background-color: var(--wa-color-surface-raised);
     border: 1px solid var(--wa-color-surface-border);
     border-radius: var(--wa-border-radius-m);
+    block-size: auto;
     display: block;
-    height: auto;
-    max-width: 100%;
+    max-inline-size: 100%;
   }
 }
 
@@ -176,8 +151,6 @@
   }
 
   &__hint {
-    color: var(--wa-color-text-quiet);
-    font-size: var(--wa-font-size-s);
     margin: 0;
   }
 }

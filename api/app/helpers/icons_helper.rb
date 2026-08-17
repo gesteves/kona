@@ -16,6 +16,20 @@ module IconsHelper
     @icon_svg_cache[key]&.sub("<svg", '<svg aria-hidden="true" focusable="false"')
   end
 
+  # Returns a Font Awesome icon's SVG markup with a `slot` attribute, for the Web Awesome
+  # components that take their icon through a named slot (`start`/`end` on <wa-button>, `icon` on
+  # <wa-callout>). Returns a safe buffer, so views don't need `raw` — forgetting it renders the
+  # markup as visible text.
+  # @param family [String] The icon's family (e.g., "classic").
+  # @param style [String] The icon's style within the family (e.g., "light").
+  # @param icon_id [String] The icon's identifier (e.g., "trash").
+  # @param slot [String] The component slot to place it in.
+  # @return [ActiveSupport::SafeBuffer, nil] The SVG markup, or nil if the icon isn't found.
+  def slotted_icon_svg(family, style, icon_id, slot: "start")
+    svg = icon_svg(family, style, icon_id)
+    raw svg.sub("<svg", %(<svg slot="#{ERB::Util.h(slot)}")) if svg
+  end
+
   # Integer hour (1–12) → word, for the clock-face icon ids (clock-three, clock-three-thirty, …).
   CLOCK_NUMBER_WORDS = %w[zero one two three four five six seven eight nine ten eleven twelve].freeze
 

@@ -39,4 +39,13 @@ wa-page[view="mobile"] {
   wa-page:not([view="mobile"]) :is([slot="navigation"], [slot="navigation-footer"]) {
     display: none;
   }
+
+  // The same frame, from the other side: the header's nav toggle is wanted below the breakpoint
+  // whatever `view` claims, or it appears late and shoves the wordmark beside it sideways.
+  // ⚠️ Works only because the toggle carries no `wa-mobile-only` class — `wa-base` hides
+  // `[data-toggle-nav]` on desktop without `!important`, while that class's rule uses one, which
+  // no unlayered rule of ours can beat.
+  wa-page:not([view="mobile"]) [data-toggle-nav] {
+    display: inline-block;
+  }
 }
