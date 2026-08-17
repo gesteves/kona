@@ -3,6 +3,10 @@
 # Overmind's control socket, created by `overmind start`
 .overmind.sock
 
+# Redis snapshots. Unanchored: `redis-server` writes this into whatever directory it was launched
+# from, so it lands wherever you happened to be — the repo root, api/, web/.
+dump.rdb
+
 # ⚠️ Env files, ignored repo-wide rather than per app. Each app has its own .gitignore covering
 # its own .env, which leaves anything outside them unguarded — deleting a directory's .gitignore
 # silently un-ignores the .env sitting next to it, which is exactly how a Mapbox secret nearly
