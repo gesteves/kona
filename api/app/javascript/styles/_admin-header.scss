@@ -13,10 +13,6 @@
   border-block-end: 1px solid var(--wa-color-surface-border);
   display: flex;
   gap: var(--wa-space-m);
-  // Inherited from `::slotted([slot='header'])`, and restated because it's load-bearing: on mobile
-  // it puts the nav toggle and the wordmark on opposite edges. With only the wordmark, as on
-  // desktop, it behaves as flex-start.
-  justify-content: space-between;
   padding-block: 0;
   padding-inline: var(--wa-space-m);
 
@@ -30,6 +26,14 @@
   &__home {
     color: var(--wa-color-text-normal);
     display: flex;
+
+    // ⚠️ Pushed right by its own auto margin, NOT by the `justify-content: space-between` that
+    // <wa-page>'s `::slotted([slot='header'])` sets. space-between collapses to flex-start with a
+    // single child, and on mobile there IS a single child for the first painted frame: <wa-page>'s
+    // `view` initialises to "desktop", which hides [data-toggle-nav] until a rAF'd ResizeObserver
+    // corrects it — so the wordmark painted flush left and then slid across the bar as the
+    // hamburger appeared. An auto margin doesn't care whether the toggle is there yet.
+    margin-inline-start: auto;
 
     // ⚠️ The copied SVG hardcodes `fill="#020a0a"` on every path, which is invisible against the
     // dark theme's surface. Overriding to `currentColor` is what makes the mark follow the theme,
