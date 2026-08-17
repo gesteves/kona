@@ -10,12 +10,17 @@
     fix a bookmark either: that's a bare /favicon.ico request, which only public/ answers. %>
 <link rel="icon" href="/favicon.ico" sizes="32x32">
 <%= csrf_meta_tags %>
+<%# Turbo re-applies this nonce to any script it inserts, and refreshes the tag on every visit —
+    which is why the nonce can be per-request without breaking a Drive navigation. %>
+<%= csp_meta_tag %>
 
-<script>
+<script nonce="<%= content_security_policy_nonce %>">
   // Web Awesome's dark theme is keyed on a `.wa-dark` class, not on prefers-color-scheme, so map
   // the OS preference onto it here. Inline and before paint, so there's no flash of the light
   // theme; Turbo replaces <body> and merges <head> but never <html>, so the class survives Drive
   // visits and only needs setting on a full load.
+  // ⚠️ The nonce is what lets this run under the CSP in OwnerFacing. Don't drop it, and don't move
+  // this into the bundle — it has to execute before paint.
   (function () {
     var query = window.matchMedia("(prefers-color-scheme: dark)");
     var apply = function (event) {

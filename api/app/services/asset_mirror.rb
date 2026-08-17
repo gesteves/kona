@@ -170,15 +170,20 @@ class AssetMirror < ApplicationService
   # with stream_body: measured at +52.3MB peak RSS against +1.2MB for the loop below. The
   # Tempfile then lets the S3 client upload from disk rather than a second copy in memory.
   # @raise [ApplicationService::HttpError] on a non-success response, so the job retries.
-  def download(url, redirects_left: MAX_REDIRECTS)
-    source = url.to_s.start_with?("//") ? "https:#{url}" : url.to_s
-    uri = URI.parse(source)
+  # @raise [ArgumentError] when a hop leaves ctfassets — see #fetch_uri.
+  def download(url, redirects_left: MAX_REDIRECTS, base: nil)
+    uri = fetch_uri(url, base: base)
+    source = uri.to_s
     file = nil
 
     Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https") do |http|
       http.request(Net::HTTP::Get.new(uri)) do |response|
         if response.is_a?(Net::HTTPRedirection) && redirects_left.positive? && response["location"].present?
-          return download(response["location"], redirects_left: redirects_left - 1)
+          # ⚠️ Resolved and re-validated against the same allowlist, not followed as given. Whatever
+          # this returns is written to R2 under the ORIGINAL ctfassets-derived key and served from
+          # the public image host, so an unchecked hop would publish whatever the redirect named —
+          # including something only this VM can reach.
+          return download(response["location"], redirects_left: redirects_left - 1, base: uri)
         end
         raise ApplicationService::HttpError.new(response.code.to_i, "", source) unless response.is_a?(Net::HTTPSuccess)
 
@@ -195,6 +200,29 @@ class AssetMirror < ApplicationService
 
     file.rewind
     file
+  end
+
+  # Resolves one hop of #download and asserts it's still a ctfassets fetch over HTTPS.
+  #
+  # ⚠️ Raising rather than returning nil is deliberate: AssetSyncJob's whole posture is that a
+  # skipped asset surfaces later as a broken image on a live page, so a hop that fails this check
+  # must fail the job loudly instead of mirroring nothing.
+  #
+  # @param url [String] The asset URL, or a redirect's Location (which may be relative).
+  # @param base [URI, nil] The URI the redirect came from, for resolving a relative Location.
+  # @return [URI::HTTPS]
+  # @raise [ArgumentError] When the target isn't HTTPS on a ctfassets host.
+  def fetch_uri(url, base: nil)
+    normalized = url.to_s.start_with?("//") ? "https:#{url}" : url.to_s
+    uri = base ? URI.join(base, normalized) : URI.parse(normalized)
+
+    unless uri.scheme == "https" && uri.host.to_s.end_with?(ASSET_HOST_SUFFIX)
+      raise ArgumentError, "Refusing to mirror from #{uri.scheme}://#{uri.host}"
+    end
+
+    uri
+  rescue URI::InvalidURIError, URI::BadURIError => e
+    raise ArgumentError, "Refusing to mirror from an unparseable URL (#{e.message})"
   end
 
   def log(message, result = nil)

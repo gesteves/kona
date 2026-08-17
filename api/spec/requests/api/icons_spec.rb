@@ -74,4 +74,34 @@ RSpec.describe "Api::Icons", type: :request do
 
     expect(response).to have_http_status(:unprocessable_content)
   end
+
+  # ⚠️ Every miss here is a billed upstream call and a Redis key that lives for a year. The web
+  # build posts in batches of 25, but that's the caller's convention — this is the ceiling.
+  it "refuses an oversized tree before making a single upstream call" do
+    expect_any_instance_of(FontAwesome).not_to receive(:svg)
+
+    ids = Array.new(Api::IconsController::MAX_ICONS + 1) { |i| "icon-#{i}" }
+    post_icons({ icons: { "classic" => { "solid" => ids } } })
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(JSON.parse(response.body)["error"]).to include("Too many icons")
+  end
+
+  # A family, style, or id outside Font Awesome's identifier shape can't name a real icon, so it
+  # must never reach the upstream — or mint a cache key built by interpolating it.
+  it "drops segments that can't name a real icon, without asking upstream about them" do
+    allow_any_instance_of(FontAwesome).to receive(:svg)
+      .with("classic", "solid", "heart").and_return("<svg>heart</svg>")
+    expect_any_instance_of(FontAwesome).not_to receive(:svg).with("classic", "solid", "../../etc")
+
+    post_icons({ icons: {
+      "classic" => { "solid" => [ "heart", "../../etc", "with space", "" ] },
+      "Bad Family" => { "solid" => %w[heart] }
+    } })
+
+    expect(response).to have_http_status(:ok)
+    expect(JSON.parse(response.body)).to eq(
+      "classic" => { "solid" => [ { "id" => "heart", "svg" => "<svg>heart</svg>" } ] }
+    )
+  end
 end

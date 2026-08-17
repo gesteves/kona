@@ -131,7 +131,18 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
     // key includes the query, so passing one through would let `?x=random` mint a fresh
     // origin render on every request. Built inside the try so a bad KONA_API_URL degrades to
     // the empty 502 below rather than throwing.
-    upstreamUrl = new URL(incoming.pathname, env.KONA_API_URL).toString();
+    //
+    // ⚠️ Assigning `pathname` onto the base rather than resolving a relative URL against it —
+    // the same reason og.ts does. `new URL('//evil.example/x', base)` resolves to a different
+    // ORIGIN, and this request carries the injected API_TOKEN. Today the router's prefixes make
+    // that unreachable; this makes it unreachable regardless of what the router grows.
+    // `?? ''` only to satisfy the optional type: an empty base throws here exactly as an
+    // unparseable one does, which is the degradation the try block is for.
+    const upstreamBase = new URL(env.KONA_API_URL ?? '');
+    upstreamBase.pathname = incoming.pathname;
+    upstreamBase.search = '';
+    upstreamBase.hash = '';
+    upstreamUrl = upstreamBase.toString();
 
     upstream = await fetch(upstreamUrl, {
       method: request.method,

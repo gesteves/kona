@@ -82,6 +82,17 @@ Rack::Attack.throttle("unknown-paths/ip", limit: 20, period: 1.minute) do |req|
   req.client_ip unless RACK_ATTACK_KNOWN_ROUTE.call(req.path)
 end
 
+# Throttles the sign-in surface. The admin host is the one host where keying on client_ip is safe:
+# nothing reaches it through the widget proxy, so there's no shared egress to throttle everyone at
+# once. Both paths are in RACK_ATTACK_KNOWN_PREFIXES, which is exactly what exempts them from the
+# throttle above, so without this the login surface has no origin-side limit at all.
+#
+# ⚠️ A throttle, never a blocklist — the rule at the top of this file. Generous, because the real
+# authentication is Google's and a 429 on your own sign-in is worse than a slow attacker.
+Rack::Attack.throttle("signin/ip", limit: 30, period: 5.minutes) do |req|
+  req.client_ip if req.path == "/signin" || req.path.start_with?("/auth/")
+end
+
 # Throttles contact-form submissions per visitor, keyed on the IP the web proxy forwards rather
 # than client_ip — which for proxied traffic is the shared egress, and would throttle everyone
 # at once. A direct origin hit carries no forwarded header and isn't keyed here; it's already

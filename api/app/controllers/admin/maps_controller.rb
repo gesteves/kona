@@ -198,8 +198,13 @@ module Admin
 
       map = StaticMap.new(track: record, settings: render_settings(record))
       send_data map.render, type: "image/png", disposition: disposition, filename: map.filename
-    rescue StaticMap::RenderError => e
-      Rails.logger.error("Maps: render failed for #{params[:id]} (#{e.message})")
+    # ⚠️ The same tuple StaticMap#get_with_retries catches, because it re-raises the original
+    # exception once attempts are exhausted rather than wrapping it. Rescuing only RenderError left
+    # a Mapbox timeout escaping as an unhandled 500 — reported to Bugsnag as a crash, and rendered
+    # into an <img> that these two actions exist to keep as a clean status code.
+    rescue StaticMap::RenderError, Net::OpenTimeout, Net::ReadTimeout, SocketError,
+           Errno::ECONNRESET, HTTParty::Error => e
+      Rails.logger.error("Maps: render failed for #{params[:id]} (#{e.class}: #{e.message})")
       head :bad_gateway
     end
 

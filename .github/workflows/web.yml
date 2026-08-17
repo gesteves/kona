@@ -71,10 +71,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
         with:
           working-directory: web
           bundler-cache: true
@@ -96,7 +96,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version-file: web/.nvmrc
           cache: npm
@@ -146,12 +146,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # No libvips here: bundler-audit reads the lockfile and never loads the app, so this job
       # skips the slowest step in the workflow.
       - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
         with:
           working-directory: web
           bundler-cache: true
@@ -162,7 +162,7 @@ jobs:
         run: bundle exec bundle-audit check --update
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version-file: web/.nvmrc
 
@@ -194,7 +194,7 @@ jobs:
       # This job only posts to Slack; the checkout exists solely so the local composite actions
       # below resolve. Fetch just .github rather than the whole tree.
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           sparse-checkout: .github
 
@@ -231,13 +231,18 @@ jobs:
     # branches. workflow_dispatch is restricted to main so a manual run can't ship a feature branch
     # to the single production Worker (run it from another branch and it's a harmless no-op: checks
     # are skipped and this guard blocks the deploy). The [skip deploy] / [no deploy] escape hatch
-    # only applies to pushes (a dispatch/manual run has no commit). The checks-result guard lets the
-    # deploy run when checks is *skipped* (a content dispatch or manual run, where checks doesn't
-    # run) as well as when it *succeeds* (a code push) — but not when it fails; !cancelled() is what
-    # lets this evaluate past a skipped dependency.
+    # only applies to pushes (a dispatch/manual run has no commit). The result guards let the deploy
+    # run when a dependency is *skipped* (a content dispatch or manual run, where neither checks nor
+    # security runs) as well as when it *succeeds* (a code push) — but not when it fails;
+    # !cancelled() is what lets this evaluate past a skipped dependency.
+    #
+    # ⚠️ Both `needs` must be named here. `!cancelled()` replaces the implicit "all needs succeeded"
+    # gate, so a dependency this expression doesn't mention isn't gating anything — `security` was
+    # unlisted, which silently made the CVE scan non-blocking for the deploy it exists to block.
     if: >-
       !cancelled() &&
       (needs.checks.result == 'success' || needs.checks.result == 'skipped') &&
+      (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       (github.event_name == 'repository_dispatch' ||
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'push' && github.ref == 'refs/heads/main' &&
@@ -258,13 +263,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: CI context
         uses: ./.github/actions/ci-context
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
         with:
           working-directory: web
           bundler-cache: true
@@ -286,7 +291,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version-file: web/.nvmrc
           cache: npm
@@ -414,14 +419,23 @@ jobs:
       # can only ever produce a *small* age, which is the passing case either way. A missing header
       # (uncached / DYNAMIC) passes too: the point is to catch a stale copy surviving, not to
       # assert the page is cacheable.
+      #
+      # ⚠️ The three values arrive through `env:`, not `${{ }}` inside the script. `${{ }}` splices
+      # into the script's *source*, which puts the token in the runner's process argv and would let
+      # a secret containing shell metacharacters run as code — the same hazard
+      # .github/actions/ci-context avoids for commit messages.
       - name: Purge Cloudflare edge cache (tag "site")
         id: purge
+        env:
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          SITE_URL: ${{ secrets.URL }}
         run: |
           set -euo pipefail
           sleep 30
           curl -sS --fail-with-body --retry 3 --retry-all-errors -X POST \
-            "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
-            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             -H "Content-Type: application/json" \
             --data '{"tags":["site"]}'
 
@@ -429,7 +443,7 @@ jobs:
           sleep 10
           # No path appended: URL may or may not carry a trailing slash (full_url overwrites the
           # path, so the Ruby side never had to care), and "<url>//" is a different cache entry.
-          headers=$(curl -sS -D - -o /dev/null --retry 3 --retry-all-errors "${{ secrets.URL }}")
+          headers=$(curl -sS -D - -o /dev/null --retry 3 --retry-all-errors "$SITE_URL")
           age=$(printf '%s' "$headers" | tr -d '\r' | awk 'tolower($1) == "age:" { print $2; exit }')
           status=$(printf '%s' "$headers" | tr -d '\r' | awk 'tolower($1) == "cf-cache-status:" { print $2; exit }')
           echo "After the purge: cf-cache-status=${status:-none} age=${age:-none}"

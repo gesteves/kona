@@ -1,10 +1,14 @@
 require "securerandom"
 
-# Drives the Whoop OAuth2 authorization flow. The authorize endpoint is gated by HTTP
-# Basic Auth so only the owner can attach an account; the callback is additionally
-# guarded by a one-time state validated against Redis.
+# Drives the Whoop OAuth2 authorization flow. The authorize endpoint is gated by the owner session
+# so only the owner can attach an account; the callback is reachable without one — Whoop redirects
+# straight to it — and is guarded instead by a one-time state validated against Redis.
+#
+# ⚠️ OwnerFacing for the `no-store`: the callback carries the authorization `code` and the `state`
+# in its query string, so it must not be stored by a browser or an intermediary.
 class WhoopOauthController < ActionController::Base
   include Authentication
+  include OwnerFacing
 
   STATE_CACHE_KEY = "whoop:oauth:state"
 

@@ -38,14 +38,14 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # ⚠️ working-directory has to be an input to the action. The job-level
       # `defaults.run.working-directory` above applies only to `run:` steps, so without this
       # setup-ruby looks for .ruby-version at the repo root — where there isn't one — and dies
       # with a bare ENOENT.
       - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
         with:
           working-directory: utilities/aqi-map
           bundler-cache: false

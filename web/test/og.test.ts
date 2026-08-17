@@ -251,6 +251,45 @@ describe('handleOg', () => {
       expect((stored as Request).url).toBe(expected);
     });
 
+    // ⚠️ `v` is caller-supplied, so it is a cache key an attacker writes. Without normalisation
+    // every distinct value is a miss costing a full satori + resvg render and a stored PNG —
+    // dropping the *other* params is not enough on its own.
+    it.each([
+      ['?v=' + 'a'.repeat(200), 'a long junk value'],
+      ['?v=v1-9-extra', 'a value that only looks like a version'],
+      ['?v=../../etc', 'a traversal-shaped value'],
+      ['', 'no v at all'],
+    ])('collapses %s onto the unversioned key (%s)', async (query) => {
+      await handleOg(
+        request(`/post/og.png${query}`),
+        envWith(() => withTitle('Hello')),
+        makeCtx(),
+        renderStub()
+      );
+
+      const [matched] = vi.mocked(caches.default.match).mock.calls[0];
+      expect((matched as Request).url).toBe(
+        'https://www.example.com/post/og.png?v='
+      );
+    });
+
+    it.each(['v1', 'v1-9', 'v12-345'])(
+      'keeps a real version (%s)',
+      async (v) => {
+        await handleOg(
+          request(`/post/og.png?v=${v}`),
+          envWith(() => withTitle('Hello')),
+          makeCtx(),
+          renderStub()
+        );
+
+        const [matched] = vi.mocked(caches.default.match).mock.calls[0];
+        expect((matched as Request).url).toBe(
+          `https://www.example.com/post/og.png?v=${v}`
+        );
+      }
+    );
+
     it('serves a cache hit without rendering', async () => {
       vi.mocked(caches.default.match).mockResolvedValue(
         new Response(PNG, { headers: { 'content-type': 'image/png' } })

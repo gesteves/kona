@@ -74,16 +74,16 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
         with:
           working-directory: api
           bundler-cache: true
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version-file: api/.nvmrc
           cache: npm
@@ -114,10 +114,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
         with:
           working-directory: api
           bundler-cache: true
@@ -143,7 +143,7 @@ jobs:
       # This job only posts to Slack; the checkout exists solely so the local composite actions
       # below resolve. Fetch just .github rather than the whole tree.
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           sparse-checkout: .github
 
@@ -180,7 +180,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: CI context
         uses: ./.github/actions/ci-context
@@ -190,10 +190,12 @@ jobs:
       # dropped the only link to the fly monitoring dashboard; put it back on the failure message
       # below if it's ever missed, rather than reinstating a whole extra notification.)
       #
-      # ⚠️ Pinned to a release tag, NOT @master. This runs in the job that holds FLY_API_TOKEN,
-      # so a moving branch ref means any commit pushed to that third-party repo executes here
-      # with the deploy credential. Dependabot's github-actions updater bumps this tag.
-      - uses: superfly/flyctl-actions/setup-flyctl@1.6
+      # ⚠️ Pinned to a commit SHA, NOT @master and not the `1.6` tag. This runs in the job that
+      # holds FLY_API_TOKEN, so any ref that can be *moved* means whatever that third-party repo
+      # points it at later executes here with the deploy credential — and a tag is movable, not
+      # just a branch. A SHA is a content hash, so the code can't change under us. The trailing
+      # comment is the human-readable version; Dependabot's github-actions updater bumps both.
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
 
       # ⚠️ --remote-only builds on fly's builder, not this runner, so the private-registry token
       # has to travel with the build. --build-secret is what puts it on the BuildKit secret mount

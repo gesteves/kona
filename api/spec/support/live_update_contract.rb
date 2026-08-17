@@ -28,4 +28,14 @@ RSpec.shared_examples "a live-update fragment" do |path|
 
     expect(response.body).not_to include("aria-busy")
   end
+
+  # ⚠️ The CSP belongs to the OwnerFacing pages and must stay there. A fragment isn't a document —
+  # it's spliced into one the web app already governs — and this header would be stored in the edge
+  # cache alongside the body. Declaring a global default policy is what would break this.
+  it "carries no Content-Security-Policy" do
+    get path, headers: auth_headers
+
+    expect(response.headers["Content-Security-Policy"]).to be_nil
+    expect(response.headers["Content-Security-Policy-Report-Only"]).to be_nil
+  end
 end

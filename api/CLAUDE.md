@@ -200,6 +200,13 @@ that shared window is safe.
   activity by a Redis lock. The same PUT tidies a Rouvy-generated name
   (`ROUVY - <route> - <date>` → `Rouvy - <route>`), so it can write even when the description
   composes empty.
+- ⚠️ **Turnstile guards only the JSON path** (`request.format.json?`), so a scripted POST that
+  omits `Accept: application/json` skips it entirely. Reviewed and **accepted**: the widget needs
+  JS, and enforcing it on both paths would break the no-JS fallback by definition. What actually
+  stops automated abuse is the honeypot, Akismet (which fails *closed* when configured), the
+  length caps, and the 5/hour `X-Kona-Client-IP` throttle — don't thin those out on the assumption
+  Turnstile is carrying them. Closing the gap properly means a second factor the no-JS path can
+  also present, e.g. a signed expiring token minted into the form.
 - **The contact form is a two-job pipeline** so a Resend failure retries only the send. Akismet
   fails closed, so an outage retries the *intake* job rather than delivering an unchecked message;
   `ContactSubject` (a Claude-generated subject line) fails soft. A flagged message is **quarantined,
@@ -476,12 +483,33 @@ Four services, none of them `ApplicationService` subclasses: `GpxTrack` parses a
   marker-order switch is paired with a hidden `0` field, because an unchecked switch submits
   nothing.
 
-`Admin::BaseController` requires the owner session; it and `SessionsController` both include the
-**`OwnerFacing`** concern, which sets `Cache-Control: no-store` and `X-Robots-Tag: noindex,
-nofollow`. ⚠️ Admin actions must never call `cache_widget`. ⚠️ The `X-Robots-Tag` is not redundant
-with the `<meta name="robots">` in the layout: `public/robots.txt` disallows this whole host, so a
-crawler never fetches the page to *see* that tag, while the URL can still be indexed from an
-external link.
+`Admin::BaseController` requires the owner session; it, `SessionsController`, and
+`WhoopOauthController` all include the **`OwnerFacing`** concern, which sets `Cache-Control:
+no-store`, `X-Robots-Tag: noindex, nofollow`, and the **CSP** below. ⚠️ Admin actions must never
+call `cache_widget`. ⚠️ The `X-Robots-Tag` is not redundant with the `<meta name="robots">` in the
+layout: `public/robots.txt` disallows this whole host, so a crawler never fetches the page to *see*
+that tag, while the URL can still be indexed from an external link. ⚠️ `WhoopOauthController` is in
+that list for the `no-store` specifically — its callback carries the OAuth `code` and `state` in
+the query string, and it renders no admin layout that could carry the signal instead.
+
+**Content-Security-Policy** — declared in `OwnerFacing`, so it lands on these three and nowhere
+else. ⚠️ `config/initializers/content_security_policy.rb` sets **only** the nonce generator and
+`nonce_directives`, and deliberately declares **no default policy**: a global one would put the
+header on every widget fragment, which isn't a document and whose response is stored in the edge
+cache. `spec/support/live_update_contract.rb` fails if a fragment ever grows one.
+
+- Sent as **Report-Only** unless `CSP_ENFORCE` is set, so a forgotten source is a console report
+  rather than a blank admin page — and flipping it is a fly secret rather than a deploy.
+- ⚠️ The nonce is scoped to `script-src` **only**. A nonce in a directive makes browsers ignore
+  `unsafe-inline` in that same directive, and `style-src` needs `unsafe-inline` for the styles Web
+  Awesome and Mapbox GL JS write at runtime. Adding `style-src` back to `nonce_directives` would
+  silently break every component.
+- The inline dark-mode script in `layouts/_head.html.erb` carries that nonce. It has to stay
+  inline and before paint, so the nonce is what keeps it running.
+- `MAPBOX_ORIGINS` is the location picker: GL JS and its stylesheet come from `api.mapbox.com` at
+  runtime, and the map then reaches the tile and telemetry hosts directly. GL JS also runs its
+  renderer in a Worker built from a blob URL, hence `worker-src blob:`.
+- ⚠️ `Sidekiq::Web` renders its own layout with its own `csp_nonce` and is not covered by this.
 
 ### Caching
 
@@ -534,7 +562,15 @@ the manual `widgets` tag, in the root [`CLAUDE.md`](../CLAUDE.md).
   rate-limited — a missing prefix fails `spec/routing/routes_guard_spec.rb`.
   There's also a scoped `contact/ip` throttle (5/hour), the one place a per-visitor IP is safe: it
   uses the proxy-forwarded `X-Kona-Client-IP` (the real visitor, not the shared egress) and it's a
-  throttle, never a ban.
+  throttle, never a ban. And a `signin/ip` throttle (30 per 5 min) over `/signin` + `/auth/` —
+  ⚠️ those prefixes are in `RACK_ATTACK_KNOWN_PREFIXES`, which is exactly what exempts them from
+  the `unknown-paths` throttle, so without a rule of their own the login surface had no
+  origin-side limit at all. Keying on `client_ip` is safe *there* because those paths live on the
+  admin host, which nothing reaches through the shared widget-proxy egress.
+- **The owner session** is Rails' cookie store, declared in `config/initializers/session_store.rb`
+  only to add `expire_after`. ⚠️ A cookie session has no server-side record, so there is nothing to
+  revoke — short of rotating `secret_key_base`, a stolen cookie is valid until the browser drops
+  it. The expiry is the ceiling.
 - **Redis** — global `$redis` from `config/initializers/redis.rb`, via `REDIS_URL`. The same Redis
   backs the Sidekiq queues.
 
@@ -599,6 +635,7 @@ Rails `config/credentials.yml.enc` + `master.key`).
   coexists with a Google Workspace mailbox on the same domain), `CONTACT_TO_ADDRESS`.
 - **Optional**: `AKISMET_API_KEY` (unset = off, submissions delivered unchecked; set = fails
   closed), `TURNSTILE_SECRET` (pair with the web app's `TURNSTILE_SITE_KEY`, both or neither),
+  `CSP_ENFORCE` (any value enforces the owner-facing CSP; unset = Report-Only),
   `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`, `TRAINERROAD_CALENDAR_URL`, `ANTHROPIC_API_KEY` +
   `ANTHROPIC_DESCRIPTION_MODEL` / `ANTHROPIC_CONTACT_SUBJECT_MODEL` (both default
   `claude-sonnet-5`), `PURPLEAIR_API_KEY`, `GOODSPEED_API_URL` (unset = the bay-conditions

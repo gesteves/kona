@@ -368,6 +368,20 @@ RSpec.describe "Admin maps", type: :request do
 
       expect(response).to have_http_status(:bad_gateway)
     end
+
+    # ⚠️ StaticMap#get_with_retries re-raises the ORIGINAL transport exception once its attempts are
+    # exhausted rather than wrapping it in a RenderError, so rescuing only RenderError let a Mapbox
+    # timeout escape as an unhandled 500 — reported to Bugsnag as a crash, and rendered into the
+    # <img> these actions exist to keep as a clean status.
+    it "reports a transport failure as a bad gateway too, not an unhandled 500" do
+      [ Net::OpenTimeout, Net::ReadTimeout, SocketError, Errno::ECONNRESET, HTTParty::Error ].each do |error|
+        allow_any_instance_of(StaticMap).to receive(:render).and_raise(error)
+
+        get "/maps/morning_run_abc/preview"
+
+        expect(response).to have_http_status(:bad_gateway), "expected #{error} to become a 502"
+      end
+    end
   end
 
   describe "DELETE /maps/:id" do

@@ -152,6 +152,11 @@ module ImageHelpers
 
   # Bump after changing the card design, logo, or font in web/src/og-render.ts: it's folded into
   # the `v` cache buster below, so bumping re-mints every card URL. Cards are otherwise immutable.
+  #
+  # ⚠️ Keep the `v<number>` shape. `v` is caller-supplied at the edge, so src/og.ts validates it
+  # against /^v\d+(-\d+)?$/ before keying the cache — that check is what stops `?v=<random>` from
+  # minting an unbounded number of full satori+resvg renders. A value outside that shape still
+  # renders, but every card collapses onto one cache entry, silently.
   OG_TEMPLATE_VERSION = "v1"
 
   # Builds the URL of the on-demand Open Graph card for a page, rendered by this site's own

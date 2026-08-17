@@ -53,6 +53,27 @@ describe AssetMirror do
     requested
   end
 
+  # Like stub_download, but the FIRST request answers with a 302 to `location` and every one after
+  # it succeeds — so the collected URIs show whether the hop was followed or refused.
+  # @return [Array] the request URIs actually fetched, in order.
+  def stub_redirect(location, body: "IMAGEBYTES")
+    requested = []
+
+    redirect = Net::HTTPFound.new("1.1", "302", "")
+    redirect["location"] = location
+
+    ok = Net::HTTPOK.new("1.1", "200", "")
+    allow(ok).to receive(:read_body) { |&block| block.call(body) }
+
+    http = instance_double(Net::HTTP)
+    allow(http).to receive(:request) do |request, &block|
+      requested << request.uri.to_s
+      block.call(requested.size == 1 ? redirect : ok)
+    end
+    allow(Net::HTTP).to receive(:start) { |*_args, **_opts, &block| block.call(http) }
+    requested
+  end
+
   before { stub_r2 }
 
   describe "#object_key" do
@@ -155,6 +176,36 @@ describe AssetMirror do
     it "raises when the download fails" do
       stub_download(code: 503, body: "nope")
       expect { mirror.sync("asset1") }.to raise_error(ApplicationService::HttpError)
+    end
+
+    # ⚠️ Whatever this fetches is written to R2 under the ctfassets-derived key and served from the
+    # public image host, so a hop off ctfassets would publish it. Checking only the first URL isn't
+    # enough — the redirect target has to clear the same allowlist.
+    it "refuses a redirect that leaves ctfassets rather than following it" do
+      stub_redirect("http://169.254.169.254/latest/meta-data/")
+      expect(client).not_to receive(:put_object)
+
+      expect { mirror.sync("asset1") }
+        .to raise_error(ArgumentError, /Refusing to mirror from http:\/\/169\.254\.169\.254/)
+    end
+
+    # A scheme downgrade is the quieter half of the same problem: an https source redirecting to
+    # plain http on a host that merely ends in ctfassets.net.
+    it "refuses a redirect that downgrades to plain http" do
+      stub_redirect("http://images.ctfassets.net/space/asset1/token/photo.jpg")
+      expect(client).not_to receive(:put_object)
+
+      expect { mirror.sync("asset1") }.to raise_error(ArgumentError, /Refusing to mirror from http:/)
+    end
+
+    it "still follows a redirect that stays on ctfassets" do
+      target = "https://downloads.ctfassets.net/space/asset1/token/photo.jpg"
+      requested = stub_redirect(target)
+      expect(client).to receive(:put_object).with(hash_including(key: key))
+
+      mirror.sync("asset1")
+
+      expect(requested.last).to eq(target)
     end
   end
 

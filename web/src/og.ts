@@ -98,6 +98,28 @@ export async function readOgTitle(response: Response): Promise<string | null> {
   return title === null ? null : decodeEntities(title);
 }
 
+/**
+ * The only shape `v` is ever generated in — `image_helpers.rb` emits `OG_TEMPLATE_VERSION` alone
+ * for a listing page, or `<template>-<published_version>` for an article.
+ */
+const VERSION_FORMAT = /^v\d+(-\d+)?$/;
+
+/**
+ * Normalises `v` before it becomes part of the cache key.
+ *
+ * ⚠️ This is what bounds the route. Dropping *unknown* params isn't enough on its own: `v` is
+ * caller-supplied, and every distinct value is a cache miss costing a full satori + resvg render —
+ * the most expensive path in this Worker — plus a 1200×630 PNG stored at the edge. Collapsing
+ * anything unrecognised onto one key means a junk or hand-edited URL still renders, but renders
+ * once.
+ *
+ * @param raw The `v` search param, or null when absent.
+ * @returns The value to key the cache on.
+ */
+function cacheVersion(raw: string | null): string {
+  return raw !== null && VERSION_FORMAT.test(raw) ? raw : '';
+}
+
 const STATUS_TEXT: Record<number, string> = {
   400: 'Bad Request',
   404: 'Not Found',
@@ -141,7 +163,7 @@ export async function handleOg(
   }
 
   const incoming = new URL(request.url);
-  const version = incoming.searchParams.get('v') ?? '';
+  const version = cacheVersion(incoming.searchParams.get('v'));
 
   // Defensive: the router and the run_worker_first globs key on this suffix, so a request
   // without it means the two have drifted apart.

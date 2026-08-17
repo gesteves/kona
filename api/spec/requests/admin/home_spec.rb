@@ -39,6 +39,37 @@ RSpec.describe "Admin home", type: :request do
       expect(response.headers["CDN-Cache-Control"]).to be_nil
     end
 
+    # ERB escaping is the only thing standing between a hostile contact submission and script
+    # execution on the quarantine page, which sits one click from actions that delete data. The CSP
+    # is the second layer.
+    it "carries a Content-Security-Policy" do
+      get "/"
+
+      policy = response.headers["Content-Security-Policy-Report-Only"]
+      expect(policy).to be_present
+      expect(policy).to include("default-src 'self'")
+      expect(policy).to include("frame-ancestors 'none'")
+      expect(policy).to include("base-uri 'none'")
+      # The location picker loads Mapbox GL JS from Mapbox's own CDN at runtime.
+      expect(policy).to include("https://api.mapbox.com")
+    end
+
+    # ⚠️ The nonce is what lets the inline dark-mode script run. Without it the admin renders in the
+    # light theme until the bundle loads, on every page, and the CSP is what would be blamed last.
+    it "nonces the inline theme script rather than allowing inline script wholesale" do
+      get "/"
+
+      policy = response.headers["Content-Security-Policy-Report-Only"]
+      nonce = policy[/'nonce-([^']+)'/, 1]
+      expect(nonce).to be_present
+      expect(response.body).to include(%(<script nonce="#{nonce}">))
+
+      # ⚠️ script-src must not fall back to unsafe-inline. style-src still needs it — Web Awesome
+      # and Mapbox both write styles at runtime — which is why the nonce is scoped to script-src.
+      expect(policy[/script-src [^;]+/]).not_to include("'unsafe-inline'")
+      expect(policy[/style-src [^;]+/]).to include("'unsafe-inline'")
+    end
+
     # ⚠️ Without a declaration the browser keeps whatever it last saw for this origin, which is
     # Sidekiq's own icon — Sidekiq::Web ships one and mounts on the same host.
     it "declares its own favicon" do

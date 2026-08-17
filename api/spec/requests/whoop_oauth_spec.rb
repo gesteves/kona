@@ -79,5 +79,15 @@ RSpec.describe "Whoop OAuth", type: :request do
       expect(response).to have_http_status(:bad_gateway)
       expect(response.body).to include("Failed to exchange")
     end
+
+    # ⚠️ The callback's query string carries the authorization `code` and the one-time `state`, so
+    # neither a browser nor an intermediary may store it. This is what OwnerFacing is on this
+    # controller for — it has no admin layout of its own to carry the signal.
+    it "is never stored or indexed, even on the error paths" do
+      get "/whoop/callback", params: { error: "access_denied", state: "anything" }
+
+      expect(response.headers["Cache-Control"]).to eq("no-store")
+      expect(response.headers["X-Robots-Tag"]).to eq("noindex, nofollow")
+    end
   end
 end

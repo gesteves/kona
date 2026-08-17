@@ -138,4 +138,32 @@ RSpec.describe "Rack::Attack", type: :request do
     post "/api/contact", headers: { "X-Kona-Client-IP" => "8.8.8.8" }
     expect(response).not_to have_http_status(:too_many_requests)
   end
+
+  # /signin and /auth are in RACK_ATTACK_KNOWN_PREFIXES, which is exactly what exempts them from
+  # the unknown-paths throttle — so without a rule of their own the sign-in surface has no
+  # origin-side limit at all. Safe to key on client_ip here and nowhere else: these paths live on
+  # the admin host, which nothing reaches through the shared widget-proxy egress.
+  it "throttles the sign-in surface per client IP, isolating distinct clients" do
+    30.times do
+      get "/signin", headers: { "CF-Connecting-IP" => "5.5.5.5" }
+      expect(response).not_to have_http_status(:too_many_requests)
+    end
+
+    get "/signin", headers: { "CF-Connecting-IP" => "5.5.5.5" }
+    expect(response).to have_http_status(:too_many_requests)
+
+    # ⚠️ A throttle, never a ban: the same client's other traffic is untouched.
+    get "/up", headers: { "CF-Connecting-IP" => "5.5.5.5" }
+    expect(response).to have_http_status(:ok)
+
+    # And a different client keeps its own budget.
+    get "/signin", headers: { "CF-Connecting-IP" => "6.6.6.6" }
+    expect(response).not_to have_http_status(:too_many_requests)
+  end
+
+  it "covers the OAuth callback under the same throttle as the sign-in page" do
+    31.times { get "/auth/google_oauth2/callback", headers: { "CF-Connecting-IP" => "7.7.7.7" } }
+
+    expect(response).to have_http_status(:too_many_requests)
+  end
 end

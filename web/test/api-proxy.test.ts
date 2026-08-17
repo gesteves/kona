@@ -74,6 +74,25 @@ describe('handleApi — widgets (GET)', () => {
     expect(upstream.request!.url).toBe(`${ORIGIN}/widgets/whoop`);
   });
 
+  // ⚠️ This request carries the injected API_TOKEN, so the upstream ORIGIN must never be
+  // negotiable by the path. `new URL(path, base)` would resolve a protocol-relative path to a
+  // different host and ship the bearer there; assigning `pathname` onto the base cannot.
+  it('keeps a protocol-relative path on the configured origin', async () => {
+    const upstream = interceptFetch(
+      'GET',
+      `${ORIGIN}//evil.example/widgets/whoop`,
+      () => new Response('<div>whoop</div>')
+    );
+
+    const res = await handleApi(
+      new Request('https://www.example.com//evil.example/widgets/whoop'),
+      env
+    );
+
+    expect(res.status).toBe(200);
+    expect(new URL(upstream.request!.url).origin).toBe(new URL(ORIGIN).origin);
+  });
+
   it('forwards the origin ETag and answers If-None-Match itself with a 304', async () => {
     const upstream = interceptFetch(
       'GET',
