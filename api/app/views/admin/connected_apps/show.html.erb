@@ -16,6 +16,14 @@
 
           <p class="connected-app__description"><%= app.description %></p>
 
+          <%# The badge alone is easy to skim past, and this is the one state that needs acting on. %>
+          <% if app.error.present? %>
+            <wa-callout variant="danger">
+              <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
+              <%= app.error %>
+            </wa-callout>
+          <% end %>
+
           <div class="wa-cluster wa-gap-s">
             <% if app.connectable? %>
               <%# ⚠️ `turbo: false` because Whoop's connect path is a same-origin URL that 302s
@@ -26,9 +34,13 @@
                   ordinary admin page (Bluesky's form) is a full page load. %>
               <wa-button href="<%= app.connect_path %>" variant="brand" appearance="accent"
                          data-turbo="false">
-                Connect
+                <%= app.connect_label %>
               </wa-button>
-            <% elsif app.disconnectable? %>
+            <% end %>
+
+            <%# Not an `elsif`: an errored app offers both, since reconnecting is the fix and
+                disconnecting is the way out. %>
+            <% if app.disconnectable? %>
               <%# Same-origin POST-as-DELETE, so Turbo handles it normally. form_with + a
                   form-associated <wa-button> rather than button_to, which emits a native button. %>
               <%= form_with url: app.disconnect_path, method: :delete do %>
@@ -37,7 +49,9 @@
                   Disconnect
                 </wa-button>
               <% end %>
-            <% else %>
+            <% end %>
+
+            <% if app.unconfigured? %>
               <p class="connected-app__description">
                 Set its credentials in the environment to enable this integration.
               </p>

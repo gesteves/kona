@@ -6,6 +6,7 @@ RSpec.describe Whoop do
   let(:access_token_key) { "whoop:cid:access_token" }
   let(:refresh_token_key) { "whoop:cid:refresh_token" }
   let(:lock_key) { "whoop:cid:refresh_lock" }
+  let(:error_key) { "whoop:cid:refresh_error" }
 
   before do
     allow(ENV).to receive(:[]).and_call_original
@@ -51,9 +52,9 @@ RSpec.describe Whoop do
     # ⚠️ The cached user_id must go with the tokens: Webhooks::WhoopController authorizes each
     # payload against it, and a leftover copy would keep accepting webhooks for an account whose
     # tokens we just discarded.
-    it "deletes both tokens, the cached user id, and the refresh lock" do
+    it "deletes both tokens, the cached user id, the refresh lock, and the recorded failure" do
       expect($redis).to receive(:del).with(
-        access_token_key, refresh_token_key, "whoop:cid:user_id", lock_key
+        access_token_key, refresh_token_key, "whoop:cid:user_id", lock_key, error_key
       )
 
       service.disconnect!
@@ -126,6 +127,111 @@ RSpec.describe Whoop do
         expect(HTTParty).not_to have_received(:post)
         expect($redis).not_to have_received(:del) # never held the lock, must not clear it
       end
+    end
+  end
+
+  describe "#refresh_tokens!" do
+    let(:token_response) do
+      instance_double(
+        HTTParty::Response,
+        success?: true,
+        body: { access_token: "fresh-token", refresh_token: "rotated-refresh", expires_in: 3600 }.to_json
+      )
+    end
+
+    before do
+      allow($redis).to receive(:get).with(refresh_token_key).and_return("current-refresh")
+      allow(HTTParty).to receive(:post).and_return(token_response)
+    end
+
+    # The whole point of the scheduled refresh: the access token is still warm on a normal tick,
+    # so honoring the cache would mean the refresh token never rotates.
+    it "refreshes even when the cached access token is still valid" do
+      allow($redis).to receive(:get).with(access_token_key).and_return("cached-token")
+
+      expect(service.refresh_tokens!).to eq("fresh-token")
+      expect(HTTParty).to have_received(:post)
+      expect($redis).to have_received(:set).with(refresh_token_key, "rotated-refresh")
+      expect($redis).to have_received(:del).with(lock_key)
+    end
+
+    # ⚠️ force: skips the cache check, never the lock — refreshing alongside an in-request refresh
+    # is the rotation race the lock exists to prevent.
+    it "still waits for the lock holder rather than racing an in-request refresh" do
+      allow($redis).to receive(:set).with(lock_key, "1", nx: true, ex: kind_of(Integer)).and_return(false)
+      allow($redis).to receive(:get).with(access_token_key).and_return(nil, "winner-token")
+      allow(service).to receive(:sleep)
+
+      expect(service.refresh_tokens!).to eq("winner-token")
+      expect(HTTParty).not_to have_received(:post)
+    end
+  end
+
+  describe "recording a rejected refresh" do
+    let(:code) { 401 }
+    let(:refresh_failure) { instance_double(HTTParty::Response, success?: false, code: code, body: "") }
+
+    before do
+      allow($redis).to receive(:get).with(refresh_token_key).and_return("current-refresh")
+      allow(HTTParty).to receive(:post).and_return(refresh_failure)
+    end
+
+    context "when Whoop rejects the refresh token" do
+      let(:code) { 401 }
+
+      it "records the failure so the admin page can surface it" do
+        expect(get_access_token).to be_nil
+        expect($redis).to have_received(:set).with(error_key, a_string_including('"code":401'))
+      end
+    end
+
+    # ⚠️ A 5xx is Whoop being down, not a dead token — flagging it would send the owner off to
+    # re-authorize while the stored credentials are fine.
+    context "when Whoop itself is failing" do
+      let(:code) { 503 }
+
+      it "does not record a failure" do
+        expect(get_access_token).to be_nil
+        expect($redis).not_to have_received(:set).with(error_key, anything)
+      end
+    end
+
+    context "when the refresh raises instead of returning a response" do
+      let(:code) { 500 }
+
+      it "does not record a failure" do
+        allow(HTTParty).to receive(:post).and_raise(Errno::ECONNREFUSED)
+
+        expect(get_access_token).to be_nil
+        expect($redis).not_to have_received(:set).with(error_key, anything)
+      end
+    end
+
+    it "clears a recorded failure once a refresh succeeds" do
+      allow(HTTParty).to receive(:post).and_return(
+        instance_double(
+          HTTParty::Response,
+          success?: true,
+          body: { access_token: "fresh-token", refresh_token: "rotated-refresh", expires_in: 3600 }.to_json
+        )
+      )
+
+      expect(get_access_token).to eq("fresh-token")
+      expect($redis).to have_received(:del).with(error_key)
+    end
+  end
+
+  describe "#refresh_error" do
+    it "returns the recorded failure" do
+      allow($redis).to receive(:get).with(error_key).and_return({ code: 401, at: "2026-08-18T22:00:00Z" }.to_json)
+
+      expect(service.refresh_error).to eq(code: 401, at: "2026-08-18T22:00:00Z")
+    end
+
+    it "is nil when the last refresh succeeded" do
+      allow($redis).to receive(:get).with(error_key).and_return(nil)
+
+      expect(service.refresh_error).to be_nil
     end
   end
 

@@ -53,6 +53,7 @@ RSpec.describe "Admin connected apps", type: :request do
       before do
         allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(true)
         allow_any_instance_of(Whoop).to receive(:connected?).and_return(true)
+        allow_any_instance_of(Whoop).to receive(:refresh_error).and_return(nil)
       end
 
       it "offers Disconnect instead of Connect" do
@@ -72,6 +73,34 @@ RSpec.describe "Admin connected apps", type: :request do
         expect(response.body).to include('name="_method" value="delete"')
         expect(response.body).to include("<wa-button type=\"submit\"")
         expect(response.body).not_to include("<button")
+      end
+    end
+
+    # ⚠️ Whoop leaves its tokens in Redis after rejecting them, so this state is identical to the
+    # one above as far as connected? can tell. Without the recorded failure it shows a green badge
+    # while the widget and the Intervals.icu sync are dead.
+    context "when Whoop is connected but its refresh token has been rejected" do
+      before do
+        allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(true)
+        allow_any_instance_of(Whoop).to receive(:connected?).and_return(true)
+        allow_any_instance_of(Whoop).to receive(:refresh_error)
+          .and_return(code: 401, at: "2026-08-18T22:00:00Z")
+      end
+
+      it "flags it and says what went wrong" do
+        get "/connected-apps"
+
+        expect(response.body).to include("Needs attention")
+        expect(response.body).to include("HTTP 401")
+        expect(response.body).to include("August 18, 2026")
+      end
+
+      it "offers Reconnect alongside Disconnect, so the fix doesn't need a disconnect first" do
+        get "/connected-apps"
+
+        expect(response.body).to include("Reconnect")
+        expect(response.body).to include("/whoop/auth")
+        expect(response.body).to include("Disconnect")
       end
     end
 

@@ -1,4 +1,8 @@
 require "sidekiq/web"
+# Adds sidekiq-scheduler's "Recurring Jobs" tab to that dashboard — the schedule, each job's last
+# run, and a manual enqueue button. Must come after sidekiq/web, and rides along on the same
+# SidekiqOwnerGuard below.
+require "sidekiq-scheduler/web"
 
 # Sidekiq's queues live in the API's own Redis, the same REDIS_URL the cache uses. Pinned
 # explicitly, though Sidekiq would default to it, to mirror config/initializers/redis.rb.

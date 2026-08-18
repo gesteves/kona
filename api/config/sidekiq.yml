@@ -4,3 +4,18 @@
 :concurrency: 5
 :queues:
   - default
+
+# Recurring jobs, run by sidekiq-scheduler inside this same worker process (the fly `worker`
+# machine has no HTTP service, so it's always-on and never auto-stopped).
+#
+# ⚠️ `cron:`, not `every:` — rufus-scheduler measures an `every` interval from process start, so a
+# 6-hour one would reset on every deploy and could go indefinitely without firing. Cron fires at
+# wall-clock times regardless of restarts. The zone is pinned because fly runs UTC and a dev
+# machine doesn't.
+:scheduler:
+  :schedule:
+    whoop_token_refresh:
+      cron: '0 */6 * * * UTC'
+      class: WhoopTokenRefreshJob
+      queue: default
+      description: 'Forces a Whoop token refresh so the rotating refresh token stays alive'

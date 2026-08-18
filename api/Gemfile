@@ -36,6 +36,9 @@ gem "redis"
 gem "connection_pool"
 # Background job queue (standard.site PDS sync) + its web UI. Stores queues in the same Redis.
 gem "sidekiq"
+# Runs the recurring Whoop token refresh inside the same Sidekiq worker process. Requires
+# sidekiq >= 7.3; rufus-scheduler is its only runtime dependency and is pure Ruby.
+gem "sidekiq-scheduler"
 # Owner authentication for /whoop/auth and the Sidekiq UI: Google OAuth restricted to one identity.
 # omniauth-rails_csrf_protection forces the OmniAuth request phase to be a CSRF-protected POST.
 gem "omniauth-google-oauth2"

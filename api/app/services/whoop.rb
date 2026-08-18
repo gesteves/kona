@@ -179,6 +179,26 @@ class Whoop < ApplicationService
     $redis.exists?(refresh_token_key)
   end
 
+  # Details of the last rejected token refresh, when the integration is wedged.
+  #
+  # ⚠️ A rejected refresh does NOT clear the stored tokens, so `connected?` keeps reporting true
+  # while nothing works — this is the only thing that tells the two apart.
+  # @return [Hash, nil] `{ code:, at: }`, or nil when the last refresh succeeded.
+  def refresh_error
+    raw = $redis.get(refresh_error_key)
+    return if raw.blank?
+
+    JSON.parse(raw, symbolize_names: true)
+  end
+
+  # Forces a token refresh even when the cached access token is still valid, so the rotating
+  # refresh token keeps being exercised. Whoop only ever refreshes on demand otherwise, and an
+  # idle refresh token eventually expires. Called by WhoopTokenRefreshJob.
+  # @return [String, nil] The new access token, or nil when the refresh failed.
+  def refresh_tokens!
+    refresh_access_token(force: true)
+  end
+
   # Forgets the stored credentials, detaching the account.
   #
   # ⚠️ The cached user_id goes too. Webhooks::WhoopController checks each payload's user_id
@@ -186,7 +206,7 @@ class Whoop < ApplicationService
   # we just threw away — accepted, then failing deeper in with no access token to fetch with.
   # @return [void]
   def disconnect!
-    $redis.del(access_token_key, refresh_token_key, user_id_key, refresh_lock_key)
+    $redis.del(access_token_key, refresh_token_key, user_id_key, refresh_lock_key, refresh_error_key)
     nil
   end
 
@@ -320,14 +340,20 @@ class Whoop < ApplicationService
   # Refreshes the access token, serialized by a short Redis lock. Whoop rotates refresh tokens,
   # so concurrent refreshes would race: the loser POSTs an already-rotated token, gets rejected,
   # and can wedge the integration until a manual re-auth. Losers wait for the winner's token.
+  #
+  # ⚠️ force: skips only the in-lock cache re-check, never the lock itself — a forced refresh
+  # racing an in-request one is exactly the rotation race the lock exists to prevent.
+  # @param force [Boolean] Whether to refresh even when a cached access token is still valid.
   # @return [String, nil] The token, or nil when it can't be refreshed.
-  def refresh_access_token
+  def refresh_access_token(force: false)
     return wait_for_refreshed_token unless $redis.set(refresh_lock_key, "1", nx: true, ex: REFRESH_LOCK_TTL.to_i)
 
     begin
-      # Another request may have finished refreshing between the cache miss and the lock.
-      cached_token = $redis.get(access_token_key)
-      return cached_token if cached_token.present?
+      unless force
+        # Another request may have finished refreshing between the cache miss and the lock.
+        cached_token = $redis.get(access_token_key)
+        return cached_token if cached_token.present?
+      end
 
       refresh_token = $redis.get(refresh_token_key)
       if refresh_token.blank?
@@ -352,6 +378,7 @@ class Whoop < ApplicationService
       unless response.success?
         Rails.logger.warn("Failed to refresh Whoop access token (HTTP #{response.code}). Visit /whoop/auth to re-authorize.")
         report_upstream_error("HTTP #{response.code}", context: "Whoop token refresh", status: response.code)
+        record_refresh_error(response.code)
         return
       end
 
@@ -394,6 +421,23 @@ class Whoop < ApplicationService
     access_cache_duration = expires_in - 60
     $redis.setex(access_token_key, access_cache_duration, access_token) if access_cache_duration.positive?
     $redis.set(refresh_token_key, refresh_token) if refresh_token.present?
+
+    # Covers the re-auth path too, since exchange_code_for_tokens lands here as well.
+    $redis.del(refresh_error_key)
+  end
+
+  # Records a rejected refresh so the admin's Connected apps page can say the integration needs
+  # re-authorizing, rather than showing it as healthy forever.
+  #
+  # ⚠️ 4xx only. A 5xx or a timeout is Whoop being unavailable, not a dead refresh token, and
+  # flagging those would tell the owner to re-authorize while the stored token is fine — the next
+  # scheduled refresh recovers on its own. Stored without a TTL: only a successful refresh
+  # (store_tokens) or disconnect! clears it, because until one of those happens the wedge is real.
+  # @param code [Integer, String] The HTTP status Whoop's token endpoint returned.
+  def record_refresh_error(code)
+    return unless code.to_i.between?(400, 499)
+
+    $redis.set(refresh_error_key, { code: code.to_i, at: Time.current.utc.iso8601 }.to_json)
   end
 
   def access_token_key
@@ -406,6 +450,10 @@ class Whoop < ApplicationService
 
   def refresh_lock_key
     "whoop:#{@client_id}:refresh_lock"
+  end
+
+  def refresh_error_key
+    "whoop:#{@client_id}:refresh_error"
   end
 
   def user_id_key

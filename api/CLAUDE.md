@@ -187,6 +187,7 @@ that shared window is safe.
 | `ContactMailJob(name, email, message, context, restored_from_spam = false)` | contact intake: Akismet + compose |
 | `ContactDeliveryJob(payload)` | the one retryable *delivery* unit — sends via Resend |
 | `MapTilesetJob(id)` | publishes an uploaded GPX track to Mapbox as a vector tileset |
+| `WhoopTokenRefreshJob()` | forces a Whoop token refresh on a schedule (see below) |
 
 - **`SiteBuildJob`** has two callers with one event type each — the Contentful webhook
   (`contentful-publish`) and `POST /api/build` (`api-build`). They build identically and differ
@@ -218,6 +219,19 @@ that shared window is safe.
 Config in `config/initializers/sidekiq.rb` and `config/sidekiq.yml`. Sidekiq runs as a dedicated
 **`worker` fly process**; a worker must be running to drain the queue (locally: `bundle exec
 sidekiq`).
+
+**Recurring jobs** come from `sidekiq-scheduler`, whose schedule lives under `:scheduler:` in
+`config/sidekiq.yml` and which only starts inside the Sidekiq **server** — Puma loads the gem and
+schedules nothing, so there's no double-firing across the two fly machines. Its "Recurring Jobs"
+tab rides along on the owner-gated `/sidekiq` dashboard. Only `WhoopTokenRefreshJob` is scheduled
+today (every 6 hours): Whoop rotates its refresh token on every refresh and expires an idle one,
+but tokens are otherwise refreshed **only on demand**, so a quiet stretch with no widget traffic
+and no webhooks would leave the integration needing a manual re-auth at `/whoop/auth`. The job
+goes through `Whoop#refresh_tokens!`, which forces past the access-token cache but still takes the
+same refresh lock. When Whoop rejects the token anyway, the failure surfaces on the Connected apps
+page rather than only in Bugsnag — see below. ⚠️ **Schedule entries must use `cron:`, not `every:`** — rufus measures an
+`every` interval from process start, so a 6-hour one would reset on every deploy and could go
+indefinitely without firing.
 
 ### Views, helpers, presenters
 
@@ -383,11 +397,20 @@ same control. Three things there are easy to break:
   in both directions.
 
 **Connected apps** (`/connected-apps`) connects and disconnects Whoop and Bluesky.
-`ConnectedAppPresenter` renders three states from a `valid_credentials?` / `connected?` pair.
+`ConnectedAppPresenter` renders four states from a `valid_credentials?` / `connected?` pair plus an
+optional `error:` string. The fourth, `:error`, is attached-but-broken, and it offers **both**
+Reconnect and Disconnect — re-authorizing is the fix, and requiring a disconnect first would throw
+away the only thing separating it from a fresh setup.
 
 - **Whoop** is OAuth: `Whoop#disconnect!` clears the tokens. ⚠️ It deletes the cached `user_id`
   alongside them — `Webhooks::WhoopController` authorizes payloads against it, so a leftover copy
   keeps accepting webhooks for an account whose tokens are gone.
+  - ⚠️ **A rejected refresh leaves the tokens in place**, so `connected?` — which is just "is there
+    a refresh token" — keeps reporting true while nothing works. `Whoop#record_refresh_error`
+    writes `whoop:<client id>:refresh_error` on a **4xx** from the token endpoint, and
+    `#refresh_error` is what makes the card say so. **4xx only**: a 5xx or a timeout is Whoop being
+    down, and flagging those would send the owner off to re-authorize working credentials. Cleared
+    by `store_tokens` (so any successful refresh *or* re-auth clears it) and by `disconnect!`.
 - **Bluesky** has no OAuth round trip, so it connects by form at `/connected-apps/bluesky`
   (`Admin::BlueskyController`, which owns all three of its actions rather than splitting the
   disconnect onto `connected_apps#`). `BlueskyCredentials` holds the handle and app password in
