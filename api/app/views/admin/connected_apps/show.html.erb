@@ -16,12 +16,18 @@
 
           <p class="connected-app__description"><%= app.description %></p>
 
+          <% if app.note.present? %>
+            <p class="connected-app__note"><%= app.note %></p>
+          <% end %>
+
           <div class="wa-cluster wa-gap-s">
             <% if app.connectable? %>
-              <%# ⚠️ `turbo: false` because this same-origin path 302s to Whoop, and Turbo Drive
-                  can't follow a cross-origin redirect. It is load-bearing: Turbo pierces shadow
-                  roots in both directions — it finds wa-button's inner <a> through the click's
-                  composed path, then finds this attribute back up through the host. %>
+              <%# ⚠️ `turbo: false` because Whoop's connect path is a same-origin URL that 302s
+                  cross-origin, which Turbo Drive can't follow. It is load-bearing: Turbo pierces
+                  shadow roots in both directions — it finds wa-button's inner <a> through the
+                  click's composed path, then finds this attribute back up through the host. It
+                  stays unconditional because the only cost to an app whose connect path is an
+                  ordinary admin page (Bluesky's form) is a full page load. %>
               <wa-button href="<%= app.connect_path %>" variant="brand" appearance="accent"
                          data-turbo="false">
                 Connect

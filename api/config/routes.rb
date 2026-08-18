@@ -103,6 +103,12 @@ Rails.application.routes.draw do
       get    "connected-apps"       => "connected_apps#show",  as: :connected_apps
       delete "connected-apps/whoop" => "connected_apps#whoop", as: :whoop_connection
 
+      # Bluesky attaches by form rather than by OAuth redirect, so it needs a page of its own;
+      # all three of its actions live on that controller instead of on connected_apps#.
+      get    "connected-apps/bluesky" => "bluesky#show",    as: :bluesky_connection
+      post   "connected-apps/bluesky" => "bluesky#create",  as: nil
+      delete "connected-apps/bluesky" => "bluesky#destroy", as: nil
+
       # The current location, on a map. The POST writes the same Redis key as the bearer-gated
       # POST /api/location, through Location.store.
       get  "location" => "location#show",   as: :location

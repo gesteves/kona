@@ -11,4 +11,14 @@
   &__description {
     color: var(--wa-color-text-quiet);
   }
+
+  // Which of several credential sources an integration is actually using.
+  &__note {
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-s);
+  }
+
+  &__back {
+    font-size: var(--wa-font-size-s);
+  }
 }

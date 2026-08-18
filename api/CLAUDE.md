@@ -51,6 +51,7 @@ a cached copy before revalidating.
 | GET | `/signin`, `/auth/google_oauth2/callback`; POST `/signout` | owner session | `no-store` |
 | GET | `/`, `/spam`, `/location`, `/connected-apps`, `/course-maps`, `/course-maps/:id` | admin UI (owner-session gated) | `no-store` |
 | POST | `/spam/:id/not-spam`; DELETE `/spam/:id`, `/connected-apps/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
+| GET/POST/DELETE | `/connected-apps/bluesky` | the Bluesky handle + app password form, and disconnect | `no-store` |
 | POST | `/location` | same write as `POST /api/location`; answers with the geocoded place | `no-store` |
 | POST | `/course-maps`; PATCH/DELETE `/course-maps/:id`; GET `/course-maps/status` | upload GPX tracks, save render settings, delete a track, poll publish status | `no-store` |
 | GET | `/course-maps/:id/preview`, `/course-maps/:id/download` | the rendered PNG, proxied from Mapbox; same render, only the disposition differs | `no-store` |
@@ -99,9 +100,10 @@ controller; a small Rack guard in the Sidekiq initializer gates the mounted `Sid
 `app/services/`, base `ApplicationService`: one per external API — Intervals.icu, Apple WeatherKit
 (ES256 JWT), Google Maps / Air Quality / Pollen, PurpleAir, Whoop (OAuth2), TrainerRoad (iCal),
 Contentful, Plausible, Font Awesome, Goodspeed, Akismet, Resend, Turnstile, Voyage (`Embeddings`),
-`StandardSite`, `AssetMirror`, plus four that aren't `ApplicationService` subclasses because they
-aren't cacheable reads: `SpamQuarantine` and `TrackLibrary` (Redis-only, no HTTP), `GpxTrack`
-(parsing only), and `MapboxTileset`/`StaticMap` (see **The course-map renderer**).
+`StandardSite`, `AssetMirror`, plus five that aren't `ApplicationService` subclasses because they
+aren't cacheable reads: `SpamQuarantine`, `TrackLibrary`, and `BlueskyCredentials` (Redis-only, no
+HTTP), `GpxTrack` (parsing only), and `MapboxTileset`/`StaticMap` (see
+**The course-map renderer**).
 Read-through Redis cache via `cached_json(key, expires_in:)`;
 HTTParty with retries; `DeepOstruct` for dot-access.
 
@@ -344,7 +346,9 @@ hamburger renders on its own unstyled row above the header.
 
 ⚠️ **Two flows must opt out of Turbo** with `data-turbo="false"`: the Google sign-in form and the
 Whoop **Connect** link. Both are same-origin URLs that redirect cross-origin, which Turbo Drive
-cannot follow — it fails silently, the click appearing to do nothing.
+cannot follow — it fails silently, the click appearing to do nothing. The Connected apps view
+applies the attribute to every card's Connect button unconditionally; the only cost to one whose
+path is an ordinary admin page (Bluesky's form) is a full page load.
 
 The header carries the site wordmark, `layouts/_logo.html.erb` — a **verbatim copy** of
 `web/source/partials/_logo.svg.erb`. ⚠️ Its paths hardcode `fill="#020a0a"`, which is invisible on
@@ -378,11 +382,37 @@ same control. Three things there are easy to break:
   labels in the column start at the same x. Adding an icon to a grouped item breaks the alignment
   in both directions.
 
-**Connected apps** (`/connected-apps`) connects and disconnects Whoop.
-`ConnectedAppPresenter` renders three states from `Whoop#valid_credentials?` and
-`Whoop#connected?`; `Whoop#disconnect!` clears them. ⚠️ It deletes the cached `user_id` alongside
-the tokens — `Webhooks::WhoopController` authorizes payloads against it, so a leftover copy keeps
-accepting webhooks for an account whose tokens are gone.
+**Connected apps** (`/connected-apps`) connects and disconnects Whoop and Bluesky.
+`ConnectedAppPresenter` renders three states from a `valid_credentials?` / `connected?` pair;
+its optional `note:` carries anything those two booleans can't say.
+
+- **Whoop** is OAuth: `Whoop#disconnect!` clears the tokens. ⚠️ It deletes the cached `user_id`
+  alongside them — `Webhooks::WhoopController` authorizes payloads against it, so a leftover copy
+  keeps accepting webhooks for an account whose tokens are gone.
+- **Bluesky** has no OAuth round trip, so it connects by form at `/connected-apps/bluesky`
+  (`Admin::BlueskyController`, which owns all three of its actions rather than splitting the
+  disconnect onto `connected_apps#`). `BlueskyCredentials` holds the handle and app password in
+  the Redis hash `bluesky:credentials`, and `BLUESKY_HANDLE`/`BLUESKY_APP_PASSWORD` are the
+  **fallback** — a stored pair outranks them.
+  - ⚠️ **The card names which pair is in use.** Two credential sources with a silent precedence
+    rule means changing a superseded fly secret looks like it did nothing.
+  - ⚠️ **The app password is encrypted at rest** (`ActiveSupport::MessageEncryptor` off
+    `secret_key_base`) — it's an account-level credential that works from anywhere with no client
+    binding, and this Redis also backs the Sidekiq queues. It's the only encrypted value in the
+    app. A decrypt failure returns nil rather than raising, so a rotated `RAILS_MASTER_KEY`
+    degrades to "not connected" instead of erroring every page that renders the status.
+  - ⚠️ **`StandardSite#connect!` validates before storing**, by opening a real PDS session. A
+    typo'd app password stored blind fails silently on the next publish.
+  - ⚠️ **`disconnect!` deliberately leaves `standard_site:did` alone.** The DID is public data, not
+    a credential, and `GET /api/standard-site` feeds the verification `<link>` tags on every page
+    of the static site — clearing it would strip them site-wide at the next build, under a 60s
+    cache that never looks like an edge anomaly.
+  - ⚠️ **A DID change drops the publication record's fingerprint.** Document fingerprints cover
+    the publication's `at://` URI, which carries the DID, so they invalidate themselves when the
+    account changes; the publication record's doesn't, and a stale one would report `:unchanged`
+    forever and never sync to the new repo.
+  - ⚠️ **Flushing Redis now costs a reconnect** once the fly secrets are gone — the credentials
+    live only there.
 
 ### The spam quarantine
 
@@ -700,8 +730,9 @@ Rails `config/credentials.yml.enc` + `master.key`).
   `ANTHROPIC_DESCRIPTION_MODEL` / `ANTHROPIC_CONTACT_SUBJECT_MODEL` (both default
   `claude-sonnet-5`), `PURPLEAIR_API_KEY`, `GOODSPEED_API_URL` (unset = the bay-conditions
   integration is off, and the water-temperature sentence and SF race-day bay readings are
-  omitted), `LOCATION`, `TIME_ZONE`, `BLUESKY_HANDLE`,
-  `BLUESKY_APP_PASSWORD`, `BLUESKY_PDS_URL`, `BUGSNAG_API_KEY` (production only), `ALLOWED_HOSTS`
+  omitted), `LOCATION`, `TIME_ZONE`, `BLUESKY_HANDLE` +
+  `BLUESKY_APP_PASSWORD` (⚠️ the **fallback** — a pair stored from the admin's Connected apps page
+  outranks these, and the card says which is in use), `BLUESKY_PDS_URL`, `BUGSNAG_API_KEY` (production only), `ALLOWED_HOSTS`
   (comma-separated `Host` allowlist; production only, unset = all hosts accepted, so it's safe to
   deploy before setting it; `/up` is always exempt), `API_HOST` (the public API hostname; unset =
   every route drawn on every host, so dev/CI are unaffected — ⚠️ move `WHOOP_REDIRECT_URI` to the

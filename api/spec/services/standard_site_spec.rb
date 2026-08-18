@@ -319,6 +319,88 @@ describe StandardSite do
     end
   end
 
+  describe "#connect!" do
+    let(:client) do
+      described_class.new(credentials: BlueskyCredentials::Credentials.new(handle: "me.bsky.social", app_password: "pw", source: :admin))
+    end
+    let(:publication_fingerprint_key) do
+      "standard_site:fingerprint:#{StandardSite::PUBLICATION_COLLECTION}:#{StandardSite::PUBLICATION_RKEY}"
+    end
+
+    def reset_keys = $redis.del(StandardSite::DID_CACHE_KEY, publication_fingerprint_key, BlueskyCredentials::REDIS_KEY)
+
+    before { reset_keys }
+    after { reset_keys }
+
+    it "stores the credentials once a session opens" do
+      allow(client).to receive(:create_session).and_return(true)
+
+      expect(client.connect!).to be(true)
+      expect(BlueskyCredentials.fetch.handle).to eq("me.bsky.social")
+    end
+
+    it "stores nothing when the session fails" do
+      allow(client).to receive(:create_session).and_return(false)
+
+      expect(client.connect!).to be(false)
+      expect(BlueskyCredentials.stored?).to be(false)
+    end
+
+    it "stores nothing without both halves of a pair" do
+      blank = described_class.new(
+        credentials: BlueskyCredentials::Credentials.new(handle: "me.bsky.social", app_password: nil, source: :admin)
+      )
+
+      expect(blank.connect!).to be(false)
+      expect(BlueskyCredentials.stored?).to be(false)
+    end
+
+    # ⚠️ Document fingerprints cover the publication's at:// URI, which carries the DID, so they
+    # invalidate themselves when the account changes. The publication record's doesn't — a stale
+    # one would report :unchanged forever and never sync to the new repo.
+    it "drops the publication fingerprint when the account changed" do
+      $redis.set(StandardSite::DID_CACHE_KEY, "did:plc:old")
+      $redis.set(publication_fingerprint_key, "stale")
+      allow(client).to receive(:create_session) do
+        client.instance_variable_set(:@did, "did:plc:new")
+        true
+      end
+
+      client.connect!
+
+      expect($redis.get(publication_fingerprint_key)).to be_nil
+    end
+
+    it "keeps the publication fingerprint when reconnecting the same account" do
+      $redis.set(StandardSite::DID_CACHE_KEY, "did:plc:same")
+      $redis.set(publication_fingerprint_key, "current")
+      allow(client).to receive(:create_session) do
+        client.instance_variable_set(:@did, "did:plc:same")
+        true
+      end
+
+      client.connect!
+
+      expect($redis.get(publication_fingerprint_key)).to eq("current")
+    end
+  end
+
+  describe "#disconnect!" do
+    # ⚠️ The DID is public data, not a credential, and GET /api/standard-site feeds the
+    # verification <link> tags on every page of the static site.
+    it "forgets the credentials but leaves the cached DID alone" do
+      BlueskyCredentials.store(handle: "me.bsky.social", app_password: "pw")
+      $redis.set(StandardSite::DID_CACHE_KEY, "did:plc:abc")
+
+      described_class.new.disconnect!
+
+      expect(BlueskyCredentials.stored?).to be(false)
+      expect($redis.get(StandardSite::DID_CACHE_KEY)).to eq("did:plc:abc")
+    ensure
+      $redis.del(StandardSite::DID_CACHE_KEY, BlueskyCredentials::REDIS_KEY)
+    end
+  end
+
   describe "deleting a document record" do
     let(:entry_id) { "6L1asJJq4umcGEvD0hfqxE" }
     let(:rkey) { client.document_rkey(entry_id) }

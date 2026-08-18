@@ -115,9 +115,12 @@ class StandardSite < ApplicationService
     }
   GRAPHQL
 
-  def initialize
-    @handle = ENV["BLUESKY_HANDLE"]
-    @app_password = ENV["BLUESKY_APP_PASSWORD"]
+  # @param credentials [BlueskyCredentials::Credentials] The pair to authenticate with. Injected
+  #   so the admin can validate a pair the owner just typed, before it's stored.
+  def initialize(credentials: BlueskyCredentials.fetch)
+    @credentials = credentials
+    @handle = credentials.handle
+    @app_password = credentials.app_password
     @pds_url = (ENV["BLUESKY_PDS_URL"].presence || DEFAULT_PDS_URL).chomp("/")
   end
 
@@ -214,6 +217,46 @@ class StandardSite < ApplicationService
   # @return [Boolean] true if both Bluesky credentials are present.
   def valid_credentials?
     @handle.present? && @app_password.present?
+  end
+
+  # Whether an account is attached, for the Connected apps page. Deliberately not a live
+  # createSession: the page renders this on every load, and a PDS round trip there would put an
+  # upstream outage in the path of the admin's own navigation.
+  # @return [Boolean]
+  def connected? = valid_credentials?
+
+  # Where the credentials in use came from.
+  # @return [Symbol, nil] :admin, :environment, or nil.
+  def credentials_source = @credentials.source
+
+  # Validates a credential pair by opening a session with it, and stores it on success. The DID
+  # the session resolves is cached in the same step.
+  #
+  # ⚠️ On a DID change the publication record's fingerprint has to go. Document fingerprints
+  # cover the publication's at:// URI, which carries the DID, so they invalidate themselves when
+  # the account changes; the publication record's doesn't, and a stale one would report
+  # :unchanged forever and never sync to the new repo.
+  # @return [Boolean] Whether the credentials opened a session and were stored.
+  def connect!
+    return false unless valid_credentials?
+
+    previous_did = $redis.get(DID_CACHE_KEY)
+    return false unless create_session
+
+    $redis.del(fingerprint_key(PUBLICATION_COLLECTION, PUBLICATION_RKEY)) if previous_did.present? && previous_did != @did
+    BlueskyCredentials.store(handle: @handle, app_password: @app_password)
+    true
+  end
+
+  # Forgets the stored credentials.
+  #
+  # ⚠️ Leaves DID_CACHE_KEY alone. The DID is public data, not a credential, and the records it
+  # addresses still exist — GET /api/standard-site feeds the verification <link> tags on every
+  # page of the static site, so clearing it here would silently strip them site-wide at the next
+  # build.
+  # @return [void]
+  def disconnect!
+    BlueskyCredentials.clear
   end
 
   # Selects the posts that should have a document record: published Articles and Shorts.

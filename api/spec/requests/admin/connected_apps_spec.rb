@@ -7,7 +7,14 @@ RSpec.describe "Admin connected apps", type: :request do
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
+    # Bluesky renders a card of its own on this page; pin it so the Whoop cases don't depend on
+    # whatever credentials happen to be around.
+    allow(ENV).to receive(:[]).with("BLUESKY_HANDLE").and_return(nil)
+    allow(ENV).to receive(:[]).with("BLUESKY_APP_PASSWORD").and_return(nil)
+    $redis.del(BlueskyCredentials::REDIS_KEY)
   end
+
+  after { $redis.del(BlueskyCredentials::REDIS_KEY) }
 
   def sign_in!
     sign_in_as(email: owner_email)
@@ -76,6 +83,45 @@ RSpec.describe "Admin connected apps", type: :request do
 
       expect(response.headers["Cache-Control"]).to eq("no-store")
       expect(response.headers["CDN-Cache-Control"]).to be_nil
+    end
+  end
+
+  describe "the Bluesky card" do
+    before do
+      sign_in!
+      allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(false)
+    end
+
+    it "offers a link to the credentials form when nothing is attached" do
+      get "/connected-apps"
+
+      expect(response.body).to include("Bluesky")
+      expect(response.body).to include("/connected-apps/bluesky")
+    end
+
+    context "when credentials are stored" do
+      before { BlueskyCredentials.store(handle: "me.bsky.social", app_password: "abcd-efgh") }
+
+      it "names the admin as the source" do
+        get "/connected-apps"
+
+        expect(response.body).to include("entered here")
+      end
+    end
+
+    # ⚠️ Stored credentials outrank the environment, so which pair is live has to be visible —
+    # otherwise changing a superseded fly secret looks like it did nothing.
+    context "when the environment pair is in use" do
+      before do
+        allow(ENV).to receive(:[]).with("BLUESKY_HANDLE").and_return("env.bsky.social")
+        allow(ENV).to receive(:[]).with("BLUESKY_APP_PASSWORD").and_return("env-password")
+      end
+
+      it "names the environment as the source" do
+        get "/connected-apps"
+
+        expect(response.body).to include("BLUESKY_HANDLE and BLUESKY_APP_PASSWORD")
+      end
     end
   end
 

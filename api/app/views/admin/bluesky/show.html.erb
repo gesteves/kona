@@ -1,0 +1,35 @@
+<% content_for :title, "Bluesky" %>
+
+<p class="connected-app__back"><%= link_to "← Connected apps", connected_apps_path %></p>
+
+<h1 class="admin-main__title">Bluesky</h1>
+
+<p class="connected-app__description">
+  Publishes the blog to the AT Protocol as standard.site records. Create an app password in
+  Bluesky's settings — never the account password.
+</p>
+
+<%= form_with url: bluesky_connection_path, method: :post, class: "wa-stack wa-gap-l" do %>
+  <wa-input name="handle" label="Handle" value="<%= @handle %>" autocomplete="off"
+            placeholder="you.bsky.social" required>
+  </wa-input>
+
+  <%# ⚠️ The stored password is never rendered back into the field — only whether one exists. It
+      keys on `stored?`, not on any password being resolvable: the environment fallback would
+      otherwise claim a password had been saved here when none had. %>
+  <wa-input type="password" name="app_password" label="App password" autocomplete="off"
+            password-toggle required
+            hint="<%= @stored ? 'A password is saved. Entering one replaces it.' : 'xxxx-xxxx-xxxx-xxxx' %>">
+  </wa-input>
+
+  <div class="wa-cluster wa-gap-s">
+    <wa-button type="submit" variant="brand" appearance="accent">Connect</wa-button>
+  </div>
+<% end %>
+
+<% if @credentials.source == :environment %>
+  <p class="connected-app__description">
+    Currently using the handle and app password from the environment. Saving a pair here
+    supersedes them.
+  </p>
+<% end %>
