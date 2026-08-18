@@ -6,9 +6,9 @@ module Admin
   class BlueskyController < BaseController
     # GET /connected-apps/bluesky
     def show
-      @credentials = BlueskyCredentials.fetch
-      @handle = @credentials.handle
-      @stored = BlueskyCredentials.stored?
+      credentials = BlueskyCredentials.fetch
+      @handle = credentials.handle
+      @stored = credentials.usable?
     end
 
     # POST /connected-apps/bluesky
@@ -19,14 +19,12 @@ module Admin
     def create
       submitted = BlueskyCredentials::Credentials.new(
         handle: params[:handle].to_s.strip.delete_prefix("@").presence,
-        app_password: params[:app_password].presence,
-        source: :admin
+        app_password: params[:app_password].presence
       )
 
       if StandardSite.new(credentials: submitted).connect!
         redirect_to connected_apps_path, status: :see_other, notice: "Bluesky connected."
       else
-        @credentials = BlueskyCredentials.fetch
         @stored = BlueskyCredentials.stored?
         @handle = submitted.handle
         flash.now[:alert] = "Those credentials didn't open a Bluesky session. Check the handle and app password."

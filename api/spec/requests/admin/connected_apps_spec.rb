@@ -7,10 +7,8 @@ RSpec.describe "Admin connected apps", type: :request do
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
-    # Bluesky renders a card of its own on this page; pin it so the Whoop cases don't depend on
+    # Bluesky renders a card of its own on this page; clear it so the Whoop cases don't depend on
     # whatever credentials happen to be around.
-    allow(ENV).to receive(:[]).with("BLUESKY_HANDLE").and_return(nil)
-    allow(ENV).to receive(:[]).with("BLUESKY_APP_PASSWORD").and_return(nil)
     $redis.del(BlueskyCredentials::REDIS_KEY)
   end
 
@@ -102,25 +100,18 @@ RSpec.describe "Admin connected apps", type: :request do
     context "when credentials are stored" do
       before { BlueskyCredentials.store(handle: "me.bsky.social", app_password: "abcd-efgh") }
 
-      it "names the admin as the source" do
+      it "reports it as connected and offers Disconnect" do
         get "/connected-apps"
 
-        expect(response.body).to include("entered here")
-      end
-    end
-
-    # ⚠️ Stored credentials outrank the environment, so which pair is live has to be visible —
-    # otherwise changing a superseded fly secret looks like it did nothing.
-    context "when the environment pair is in use" do
-      before do
-        allow(ENV).to receive(:[]).with("BLUESKY_HANDLE").and_return("env.bsky.social")
-        allow(ENV).to receive(:[]).with("BLUESKY_APP_PASSWORD").and_return("env-password")
+        expect(response.body).to include("Connected")
+        expect(response.body).to match(%r{<form[^>]*action="/connected-apps/bluesky"}m)
+        expect(response.body).to include('name="_method" value="delete"')
       end
 
-      it "names the environment as the source" do
+      it "never renders the stored password" do
         get "/connected-apps"
 
-        expect(response.body).to include("BLUESKY_HANDLE and BLUESKY_APP_PASSWORD")
+        expect(response.body).not_to include("abcd-efgh")
       end
     end
   end

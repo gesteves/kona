@@ -26,19 +26,9 @@ module Admin
         # never has an :unconfigured state.
         configured: true,
         connected: service.connected?,
-        note: credentials_note(service.credentials_source),
         connect_path: bluesky_connection_path,
         disconnect_path: bluesky_connection_path
       )
-    end
-
-    # ⚠️ Stored credentials outrank the environment, so which pair is live has to be visible —
-    # otherwise changing a fly secret that's been superseded looks like it did nothing.
-    def credentials_note(source)
-      case source
-      when :admin then "Using the handle and app password entered here."
-      when :environment then "Using BLUESKY_HANDLE and BLUESKY_APP_PASSWORD from the environment."
-      end
     end
 
     def whoop_app

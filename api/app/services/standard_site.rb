@@ -118,7 +118,6 @@ class StandardSite < ApplicationService
   # @param credentials [BlueskyCredentials::Credentials] The pair to authenticate with. Injected
   #   so the admin can validate a pair the owner just typed, before it's stored.
   def initialize(credentials: BlueskyCredentials.fetch)
-    @credentials = credentials
     @handle = credentials.handle
     @app_password = credentials.app_password
     @pds_url = (ENV["BLUESKY_PDS_URL"].presence || DEFAULT_PDS_URL).chomp("/")
@@ -224,10 +223,6 @@ class StandardSite < ApplicationService
   # upstream outage in the path of the admin's own navigation.
   # @return [Boolean]
   def connected? = valid_credentials?
-
-  # Where the credentials in use came from.
-  # @return [Symbol, nil] :admin, :environment, or nil.
-  def credentials_source = @credentials.source
 
   # Validates a credential pair by opening a session with it, and stores it on success. The DID
   # the session resolves is cached in the same step.

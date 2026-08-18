@@ -383,8 +383,7 @@ same control. Three things there are easy to break:
   in both directions.
 
 **Connected apps** (`/connected-apps`) connects and disconnects Whoop and Bluesky.
-`ConnectedAppPresenter` renders three states from a `valid_credentials?` / `connected?` pair;
-its optional `note:` carries anything those two booleans can't say.
+`ConnectedAppPresenter` renders three states from a `valid_credentials?` / `connected?` pair.
 
 - **Whoop** is OAuth: `Whoop#disconnect!` clears the tokens. ⚠️ It deletes the cached `user_id`
   alongside them — `Webhooks::WhoopController` authorizes payloads against it, so a leftover copy
@@ -392,10 +391,8 @@ its optional `note:` carries anything those two booleans can't say.
 - **Bluesky** has no OAuth round trip, so it connects by form at `/connected-apps/bluesky`
   (`Admin::BlueskyController`, which owns all three of its actions rather than splitting the
   disconnect onto `connected_apps#`). `BlueskyCredentials` holds the handle and app password in
-  the Redis hash `bluesky:credentials`, and `BLUESKY_HANDLE`/`BLUESKY_APP_PASSWORD` are the
-  **fallback** — a stored pair outranks them.
-  - ⚠️ **The card names which pair is in use.** Two credential sources with a silent precedence
-    rule means changing a superseded fly secret looks like it did nothing.
+  the Redis hash `bluesky:credentials`. ⚠️ **That page is the only way to set them — there is no
+  env var**, so the integration is inert on a fresh environment until someone connects.
   - ⚠️ **The app password is encrypted at rest** (`ActiveSupport::MessageEncryptor` off
     `secret_key_base`) — it's an account-level credential that works from anywhere with no client
     binding, and this Redis also backs the Sidekiq queues. It's the only encrypted value in the
@@ -411,8 +408,8 @@ its optional `note:` carries anything those two booleans can't say.
     the publication's `at://` URI, which carries the DID, so they invalidate themselves when the
     account changes; the publication record's doesn't, and a stale one would report `:unchanged`
     forever and never sync to the new repo.
-  - ⚠️ **Flushing Redis now costs a reconnect** once the fly secrets are gone — the credentials
-    live only there.
+  - ⚠️ **Flushing Redis costs a reconnect** — the credentials live only there, and nothing else
+    can re-derive them.
 
 ### The spam quarantine
 
@@ -730,9 +727,9 @@ Rails `config/credentials.yml.enc` + `master.key`).
   `ANTHROPIC_DESCRIPTION_MODEL` / `ANTHROPIC_CONTACT_SUBJECT_MODEL` (both default
   `claude-sonnet-5`), `PURPLEAIR_API_KEY`, `GOODSPEED_API_URL` (unset = the bay-conditions
   integration is off, and the water-temperature sentence and SF race-day bay readings are
-  omitted), `LOCATION`, `TIME_ZONE`, `BLUESKY_HANDLE` +
-  `BLUESKY_APP_PASSWORD` (⚠️ the **fallback** — a pair stored from the admin's Connected apps page
-  outranks these, and the card says which is in use), `BLUESKY_PDS_URL`, `BUGSNAG_API_KEY` (production only), `ALLOWED_HOSTS`
+  omitted), `LOCATION`, `TIME_ZONE`, `BLUESKY_PDS_URL` (⚠️ the
+  Bluesky handle and app password are **not** env vars — they're set on the admin's Connected apps
+  page and stored in Redis), `BUGSNAG_API_KEY` (production only), `ALLOWED_HOSTS`
   (comma-separated `Host` allowlist; production only, unset = all hosts accepted, so it's safe to
   deploy before setting it; `/up` is always exempt), `API_HOST` (the public API hostname; unset =
   every route drawn on every host, so dev/CI are unaffected — ⚠️ move `WHOOP_REDIRECT_URI` to the

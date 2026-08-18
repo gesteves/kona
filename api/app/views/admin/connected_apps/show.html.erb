@@ -16,10 +16,6 @@
 
           <p class="connected-app__description"><%= app.description %></p>
 
-          <% if app.note.present? %>
-            <p class="connected-app__note"><%= app.note %></p>
-          <% end %>
-
           <div class="wa-cluster wa-gap-s">
             <% if app.connectable? %>
               <%# ⚠️ `turbo: false` because Whoop's connect path is a same-origin URL that 302s

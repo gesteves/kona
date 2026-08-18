@@ -14,9 +14,7 @@
             placeholder="you.bsky.social" required>
   </wa-input>
 
-  <%# ⚠️ The stored password is never rendered back into the field — only whether one exists. It
-      keys on `stored?`, not on any password being resolvable: the environment fallback would
-      otherwise claim a password had been saved here when none had. %>
+  <%# ⚠️ The stored password is never rendered back into the field — only whether one exists. %>
   <wa-input type="password" name="app_password" label="App password" autocomplete="off"
             password-toggle required
             hint="<%= @stored ? 'A password is saved. Entering one replaces it.' : 'xxxx-xxxx-xxxx-xxxx' %>">
@@ -25,11 +23,4 @@
   <div class="wa-cluster wa-gap-s">
     <wa-button type="submit" variant="brand" appearance="accent">Connect</wa-button>
   </div>
-<% end %>
-
-<% if @credentials.source == :environment %>
-  <p class="connected-app__description">
-    Currently using the handle and app password from the environment. Saving a pair here
-    supersedes them.
-  </p>
 <% end %>

@@ -6,8 +6,6 @@ RSpec.describe "Admin Bluesky connection", type: :request do
   before do
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
-    allow(ENV).to receive(:[]).with("BLUESKY_HANDLE").and_return(nil)
-    allow(ENV).to receive(:[]).with("BLUESKY_APP_PASSWORD").and_return(nil)
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
     $redis.del(BlueskyCredentials::REDIS_KEY)
   end
@@ -59,21 +57,8 @@ RSpec.describe "Admin Bluesky connection", type: :request do
       end
     end
 
-    context "when the environment pair is in use" do
-      before do
-        allow(ENV).to receive(:[]).with("BLUESKY_HANDLE").and_return("env.bsky.social")
-        allow(ENV).to receive(:[]).with("BLUESKY_APP_PASSWORD").and_return("env-password")
-      end
-
-      it "says so, so a superseded fly secret can't look like it's live" do
-        get "/connected-apps/bluesky"
-
-        expect(response.body).to include("from the environment")
-        expect(response.body).not_to include("env-password")
-      end
-
-      # ⚠️ The environment pair resolves a password without one ever having been saved here.
-      it "does not claim a password has been saved on this page" do
+    context "when nothing is stored" do
+      it "does not claim a password is saved" do
         get "/connected-apps/bluesky"
 
         expect(response.body).not_to include("A password is saved")

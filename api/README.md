@@ -33,7 +33,7 @@ Copy `.env.example` to `.env` for local development; in production set these as 
   ```
 
   A successful POST returns `204 No Content`. The api uses the stored location for its weather, AQI, and pollen lookups.
-- **standard.site / Bluesky** — publishes posts to the AT Protocol PDS, webhook-driven (no-ops when unset). Set `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`, `BLUESKY_PDS_URL`.
+- **standard.site / Bluesky** — publishes posts to the AT Protocol PDS, webhook-driven (no-ops until connected). Connect an account on the admin's Connected apps page; `BLUESKY_PDS_URL` optionally overrides the default PDS host.
 - **Other**: `TIME_ZONE` (fallback timezone), `FONT_AWESOME_VERSION` (defaults to `7.2.0`), `WHOOP_REFERRAL_URL` (shown under the Whoop widget).
 
 ## Running locally

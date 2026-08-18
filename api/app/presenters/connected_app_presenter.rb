@@ -4,7 +4,7 @@
 # live check made at render time, not a persisted flag — which is also why the two booleans are
 # passed in rather than read here: the view stays free of service calls.
 class ConnectedAppPresenter
-  attr_reader :name, :description, :note, :connect_path, :disconnect_path
+  attr_reader :name, :description, :connect_path, :disconnect_path
 
   # @param name [String] Display name, e.g. "Whoop".
   # @param description [String] One line on what the integration does.
@@ -12,12 +12,9 @@ class ConnectedAppPresenter
   # @param connected [Boolean] Whether an account is currently attached.
   # @param connect_path [String] Where the "Connect" link points.
   # @param disconnect_path [String] Where the "Disconnect" button posts.
-  # @param note [String, nil] An extra line under the description, for anything the two booleans
-  #   can't say — e.g. which of several credential sources is actually in use.
-  def initialize(name:, description:, configured:, connected:, connect_path:, disconnect_path:, note: nil)
+  def initialize(name:, description:, configured:, connected:, connect_path:, disconnect_path:)
     @name = name
     @description = description
-    @note = note
     @configured = configured
     @connected = connected
     @connect_path = connect_path

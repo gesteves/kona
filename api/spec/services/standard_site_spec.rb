@@ -321,7 +321,7 @@ describe StandardSite do
 
   describe "#connect!" do
     let(:client) do
-      described_class.new(credentials: BlueskyCredentials::Credentials.new(handle: "me.bsky.social", app_password: "pw", source: :admin))
+      described_class.new(credentials: BlueskyCredentials::Credentials.new(handle: "me.bsky.social", app_password: "pw"))
     end
     let(:publication_fingerprint_key) do
       "standard_site:fingerprint:#{StandardSite::PUBLICATION_COLLECTION}:#{StandardSite::PUBLICATION_RKEY}"
@@ -348,7 +348,7 @@ describe StandardSite do
 
     it "stores nothing without both halves of a pair" do
       blank = described_class.new(
-        credentials: BlueskyCredentials::Credentials.new(handle: "me.bsky.social", app_password: nil, source: :admin)
+        credentials: BlueskyCredentials::Credentials.new(handle: "me.bsky.social", app_password: nil)
       )
 
       expect(blank.connect!).to be(false)
