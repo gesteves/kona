@@ -371,30 +371,21 @@ inlined rather than served as an image (an `<img>` can't inherit the text color)
 two copies costs nothing beyond a stale admin logo.
 
 The sidebar comes from `AdminHelper` — `#admin_nav_items` for the two ungrouped entries (Home,
-Spam) and `#admin_nav_groups` for the collapsible ones (Tools, Settings, System) — and both render
+Spam) and `#admin_nav_groups` for the labelled groups (Tools, Settings, More) — and both render
 through `layouts/_admin_nav_item`, so drawer-closing, the active state, and icon handling are
-written once. Each item is a `<wa-button appearance="plain" href>`, with the current page's set to
-`filled` — the active state is a Web Awesome step, not a hand-picked background. An item marked
-`external: true` (today only Sidekiq, which renders its own layout) opens in a new tab with
-`rel="noopener"` and a visually-hidden "(opens in a new tab)".
+written once. Each item is a `<wa-button appearance="plain" href>` with a leading icon, and the
+current page's is set to `filled` — the active state is a Web Awesome step, not a hand-picked
+background. An item marked `external: true` (today only Sidekiq, which renders its own layout)
+opens in a new tab with `rel="noopener"` and a visually-hidden "(opens in a new tab)".
 
-The groups are one `<wa-accordion mode="single-collapsible">`, and `_admin-nav.scss` dresses each
-item's `::part(button)` in `<wa-button>`'s own metrics so a group heading and a link read as the
-same control. Three things there are easy to break:
+A group is nothing but a caption above its own `<ul>` of those same links:
 
-- ⚠️ **Which group is open is server-rendered, never remembered** — every Turbo visit re-renders
-  the sidebar, so the expanded one is always the group holding the current page. `System` therefore
-  never opens by itself: its only item is external, and `#admin_nav_current?` can't match a
-  destination outside the admin.
-- ⚠️ **`expanded` must be absent, not `false`.** Rails renders `expanded: false` as
-  `expanded="false"`, and any *present* attribute is true to a Lit boolean property — every group
-  would open. `_admin_nav.html.erb` passes `nil` instead; two request specs pin it.
-- ⚠️ **Only groups get an icon; their items are indented under the group's *label* instead**, by
-  the `--icon-column` constant (1em box + the 0.75em margin `<wa-button>` puts after its own
-  `start` slot). That box also has to be forced square, against the `width: auto` every inline SVG
-  gets in `_base.scss` — Font Awesome's viewBoxes aren't all square, so at auto width no two
-  labels in the column start at the same x. Adding an icon to a grouped item breaks the alignment
-  in both directions.
+- ⚠️ **The caption is a `<div>`, not a heading element** — it sits above the page's own `<h1>`, so a
+  real heading would land ahead of it in the document outline. The `<ul>` carries
+  `aria-labelledby` pointing at it, which is what associates the two for a screen reader.
+- ⚠️ **Every item's icon box is forced square** in `_admin-nav.scss`, against the `width: auto`
+  every inline SVG gets in `_base.scss` — Font Awesome's viewBoxes aren't all square, so at auto
+  width no two labels in the column start at the same x.
 
 **Connected apps** (`/connected-apps`) connects and disconnects Whoop and Bluesky.
 `ConnectedAppPresenter` renders four states from a `valid_credentials?` / `connected?` pair plus an

@@ -10,7 +10,7 @@ module AdminHelper
   #   than read from an ivar, so this stays a pure function of its arguments like every other
   #   helper here.
   # @return [Array<Hash>] Each with :label, :path, and :icon (icon_svg's three arguments), plus
-  #   optionally :badge and :external. Grouped items omit :icon; see #admin_nav_groups.
+  #   optionally :badge and :external.
   def admin_nav_items(quarantine_count: 0)
     [
       { label: "Home", path: root_path, icon: %w[classic light house] },
@@ -19,27 +19,26 @@ module AdminHelper
     ]
   end
 
-  # The sidebar's collapsible groups, in display order. Same item shape as #admin_nav_items.
+  # The sidebar's labelled groups, in display order. Same item shape as #admin_nav_items.
   #
   # A group holding one item still earns its place: the split is by *what the page is for* —
   # something you make (Tools), something you configure (Settings), something you operate
-  # (System) — so a new page has an obvious home rather than lengthening one flat list.
+  # (More) — so a new page has an obvious home rather than lengthening one flat list.
   #
-  # ⚠️ Only the group carries an :icon; its items deliberately don't. One icon column per level
-  # would read as two ragged columns, so a group's items are indented to sit under their group's
-  # *label* instead — see `.admin-nav__groups` in _admin-nav.scss, which hardcodes that indent.
-  # @return [Array<Hash>] Each with :label, :icon, and :items.
+  # ⚠️ The group is a caption, not a link, so it carries no :icon of its own; its items each do,
+  # in the same column as the ungrouped ones above.
+  # @return [Array<Hash>] Each with :label and :items.
   def admin_nav_groups
     [
-      { label: "Tools", icon: %w[classic light wrench], items: [
-        { label: "Course maps", path: course_maps_path }
+      { label: "Tools", items: [
+        { label: "Course maps", path: course_maps_path, icon: %w[classic light map] }
       ] },
-      { label: "Settings", icon: %w[classic light gear], items: [
-        { label: "Location",       path: location_path },
-        { label: "Connected apps", path: connected_apps_path }
+      { label: "Settings", items: [
+        { label: "Location",       path: location_path,       icon: %w[classic light location-dot] },
+        { label: "Connected apps", path: connected_apps_path, icon: %w[classic light plug] }
       ] },
-      { label: "System", icon: %w[classic light server], items: [
-        { label: "Sidekiq", path: "/sidekiq", external: true }
+      { label: "More", items: [
+        { label: "Sidekiq", path: "/sidekiq", icon: %w[classic light layer-group], external: true }
       ] }
     ]
   end
@@ -52,17 +51,5 @@ module AdminHelper
   # @return [Boolean]
   def admin_nav_current?(path)
     request.path == path
-  end
-
-  # Whether a group should render expanded.
-  #
-  # ⚠️ Server-rendered rather than remembered: every Turbo visit re-renders the sidebar, so the
-  # expanded group is always the one holding the current page. A group whose only item is
-  # external (System, today) therefore never opens on its own, since #admin_nav_current? can't
-  # match a destination outside the admin.
-  # @param group [Hash] One entry from #admin_nav_groups.
-  # @return [Boolean]
-  def admin_nav_group_expanded?(group)
-    group[:items].any? { |item| admin_nav_current?(item[:path]) }
   end
 end

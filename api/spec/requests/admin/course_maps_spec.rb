@@ -47,15 +47,13 @@ RSpec.describe "Admin course maps", type: :request do
       expect(response.body).to include("No tracks yet")
     end
 
-    # The sidebar's group state is server-rendered on every Turbo visit, so exactly one group —
-    # the one holding this page — must come back open. ⚠️ Rendering `expanded="false"` on the
-    # others would open them too: any present attribute is true to a Lit boolean property.
-    it "opens the nav group this page sits in, and only that one" do
+    # A grouped page marks itself in the sidebar the same way an ungrouped one does: the group is a
+    # caption, not a control, so nothing else distinguishes the two.
+    it "marks its own nav link as the current page" do
       get "/course-maps"
 
-      items = response.body.scan(/<wa-accordion-item\b[^>]*>/)
-      expect(items.count { |item| item.include?("expanded") }).to eq(1)
-      expect(response.body).not_to include('expanded="false"')
+      expect(response.body).to match(/<wa-button[^>]*href="\/course-maps"[^>]*appearance="filled"/)
+      expect(response.body).to include('aria-current="page"')
     end
 
     it "lists a track with its status and shape" do

@@ -1,4 +1,4 @@
-<%# The admin sidebar's links: a short ungrouped list, then the rest under collapsible groups.
+<%# The admin sidebar's links: a short ungrouped list, then the rest under labelled groups.
     Both come from AdminHelper, and both render through layouts/_admin_nav_item. %>
 <div class="wa-stack wa-gap-m">
   <ul class="plain-list wa-stack wa-gap-3xs">
@@ -6,25 +6,17 @@
                collection: admin_nav_items(quarantine_count: @quarantine_count), as: :item %>
   </ul>
 
-  <%# One <wa-accordion> around all the groups, not one per group: `single-collapsible` is what
-      keeps the sidebar from growing past the fold, and it can only collapse siblings it owns.
-      ⚠️ `heading-level="none"` — the trigger is a button with aria-expanded, which is the whole
-      semantic here; a heading would inject an <h3> ahead of the page's own <h1>. %>
-  <wa-accordion class="admin-nav__groups" appearance="plain" mode="single-collapsible" heading-level="none">
-    <% admin_nav_groups.each do |group| %>
-      <%# ⚠️ `nil`, never `false`: Rails renders a false attribute as `expanded="false"`, and to a
-          Lit boolean property any present attribute reads as true — every group would open. %>
-      <%= tag.wa_accordion_item expanded: (true if admin_nav_group_expanded?(group)) do %>
-        <%# The label slot, not the `label` attribute, because it carries an icon. %>
-        <span slot="label" class="admin-nav__group-label">
-          <span class="admin-nav__group-icon"><%= raw icon_svg(*group[:icon]) %></span>
-          <%= group[:label] %>
-        </span>
+  <% admin_nav_groups.each do |group| %>
+    <% label_id = "admin-nav-#{group[:label].parameterize}" %>
+    <div class="wa-stack wa-gap-3xs">
+      <%# ⚠️ A <div>, not a heading element: this labels a list of links, and a real heading here
+          would land ahead of the page's own <h1>. `aria-labelledby` carries the association to
+          assistive tech instead, which is the part a heading was doing. %>
+      <div class="admin-nav__group-label wa-caption-s" id="<%= label_id %>"><%= group[:label] %></div>
 
-        <ul class="plain-list wa-stack wa-gap-3xs">
-          <%= render partial: "layouts/admin_nav_item", collection: group[:items], as: :item %>
-        </ul>
-      <% end %>
-    <% end %>
-  </wa-accordion>
+      <ul class="plain-list wa-stack wa-gap-3xs" aria-labelledby="<%= label_id %>">
+        <%= render partial: "layouts/admin_nav_item", collection: group[:items], as: :item %>
+      </ul>
+    </div>
+  <% end %>
 </div>

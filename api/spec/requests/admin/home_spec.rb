@@ -148,23 +148,15 @@ RSpec.describe "Admin home", type: :request do
       expect(response.body).not_to include("&lt;svg")
     end
 
-    describe "the collapsible nav groups" do
-      it "puts every grouped destination inside an accordion item" do
+    describe "the nav groups" do
+      it "labels each group and points its list at that label" do
         get "/"
 
-        expect(response.body.scan("<wa-accordion-item").length).to eq(3)
-        expect(response.body).to include("Tools")
-        expect(response.body).to include("Settings")
-        expect(response.body).to include("System")
-      end
-
-      # Home and Spam sit above the groups, so nothing has to be opened to reach them.
-      # ⚠️ No attribute at all, not `expanded="false"`: any present `expanded` reads as true to a
-      # Lit boolean property, so a rendered "false" would open every group.
-      it "leaves every group shut on a page that isn't in one" do
-        get "/"
-
-        expect(response.body.scan(/<wa-accordion-item\b[^>]*>/)).to all(satisfy { |item| !item.include?("expanded") })
+        %w[Tools Settings More].each do |label|
+          id = "admin-nav-#{label.downcase}"
+          expect(response.body).to include(%(<div class="admin-nav__group-label wa-caption-s" id="#{id}">#{label}</div>))
+          expect(response.body).to include(%(aria-labelledby="#{id}"))
+        end
       end
     end
   end

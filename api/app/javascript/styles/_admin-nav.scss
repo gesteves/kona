@@ -6,11 +6,6 @@
   height: 100%;
   padding: var(--wa-space-m);
 
-  // The width one leading icon occupies in the column: the square box below, plus the margin
-  // <wa-button> puts after its own `start` slot. A group's items have no icon of their own and are
-  // indented by exactly this, so their labels line up under their group's label.
-  --icon-column: 1.75em;
-
   // The links are <wa-button>s, so hover, active, focus ring, radius and spacing all come from the
   // component. ⚠️ Only two things are ours: the host is `inline-block`, so it shrink-wraps inside
   // the <li> without a width; and the button centers its content, which reads as ragged in a
@@ -24,76 +19,22 @@
   }
 
   // ⚠️ A fixed square box, overriding the `width: auto` every inline SVG gets in _base.scss. Font
-  // Awesome's viewBoxes are not all square — `wrench` is 576×512 and `server` 448×512 — so at auto
+  // Awesome's viewBoxes are not all square — `house` is 576×512 and `location-dot` 384×512 — so at auto
   // width no two labels in the column start at the same x. `preserveAspectRatio` defaults to
   // fitting the glyph inside the box undistorted, which is what <wa-icon> does with the same 1em.
-  &__link svg[slot="start"],
-  &__group-icon svg {
+  &__link svg[slot="start"] {
     height: 1em;
     width: 1em;
   }
 
-  // The collapsible groups. Everything below dresses <wa-accordion-item>'s trigger as one more
-  // nav button, so a group heading and a link read as the same control — the same approach Web
-  // Awesome's own navigation pattern takes.
+  // Each group's caption. It labels the links below it rather than acting as one, so it's the only
+  // thing in the sidebar that isn't a <wa-button>.
   //
-  // ⚠️ `--spacing: 0` is what makes that work: it's both the trigger's padding *and* the panel's,
-  // so zeroing it lets the trigger take the button's own metrics below and drops the indent that
-  // would otherwise push a group's links out of line with the ungrouped ones.
-  &__groups {
-    // A group's items sit under its label, not under its icon, so they take the trigger's own
-    // inline padding plus the icon column. Padding rather than a margin on the <li>: the current
-    // page's `filled` background should still span the full width of the sidebar, as it does at
-    // the top level.
-    .admin-nav__link::part(base) {
-      padding-inline-start: calc(var(--wa-form-control-padding-inline) + var(--icon-column));
-    }
-
-    wa-accordion-item {
-      --spacing: 0;
-
-      // ⚠️ `appearance="plain"` clears the accordion's own border but not the dividers between its
-      // items, which sit on the item host and would rule off every group.
-      border-block-start: none;
-
-      &::part(button) {
-        border-radius: var(--wa-form-control-border-radius);
-        color: var(--wa-color-on-quiet, var(--wa-color-neutral-on-quiet));
-        font-weight: var(--wa-font-weight-action);
-        height: var(--wa-form-control-height);
-        padding-inline: var(--wa-form-control-padding-inline);
-      }
-
-      &::part(button):hover {
-        background-color: var(--wa-color-fill-quiet, var(--wa-color-neutral-fill-quiet));
-      }
-
-      &::part(button):active {
-        background-color: color-mix(
-          in oklab,
-          var(--wa-color-fill-quiet, var(--wa-color-neutral-fill-quiet)),
-          var(--wa-color-mix-active)
-        );
-      }
-
-      // The chevron is set beside a label, not beside body text.
-      &::part(icon) {
-        font-size: var(--wa-font-size-s);
-      }
-    }
-  }
-
-  // The label reproduces what <wa-button> does for a `start` slot, since the accordion trigger
-  // has no such slot. ⚠️ 0.75em is not a guess — it's the exact margin wa-button gives its own
-  // start slot, and with the 1em box above it's what `--icon-column` adds up to.
+  // ⚠️ The inline padding is <wa-button>'s own, not a chosen value: it's what lines the caption up
+  // with the icons of the links beneath it.
   &__group-label {
-    align-items: center;
-    display: flex;
-  }
-
-  &__group-icon {
-    display: inline-flex;
-    margin-inline-end: 0.75em;
+    color: var(--wa-color-text-quiet);
+    padding-inline-start: var(--wa-form-control-padding-inline);
   }
 
   // The new-tab marker on external destinations (Sidekiq). ⚠️ `inline-flex`, not the default

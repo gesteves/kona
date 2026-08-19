@@ -18,8 +18,7 @@
                     rel: (item[:external] ? "noopener" : nil),
                     data: { drawer: "close" },
                     aria: { current: current ? "page" : nil } do %>
-    <%# Grouped items carry no icon — they're indented under their group's label instead. %>
-    <%= slotted_icon_svg(*item[:icon]) if item[:icon] %>
+    <%= slotted_icon_svg(*item[:icon]) %>
     <%= item[:label] %>
     <% if current %>
       <span class="wa-visually-hidden">, current page</span>
