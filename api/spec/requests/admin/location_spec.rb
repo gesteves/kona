@@ -62,6 +62,7 @@ RSpec.describe "Admin location", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("43.48, -110.76")
+      expect(response.body).to match(/<wa-badge[^>]*variant="success"[^>]*>Saved</m)
       # ⚠️ Mapbox takes longitude first; a latitude-first center puts the pin in the sea.
       expect(response.body).to include('data-location-map-center-value="[-110.76,43.48]"')
     end
@@ -117,7 +118,17 @@ RSpec.describe "Admin location", type: :request do
       get "/location"
 
       expect(response.body).to include("Drop a pin on the map")
+      expect(response.body).to match(/<wa-badge[^>]*variant="neutral"[^>]*>Not set</m)
       expect(response.body).to include("data-location-map-center-value=\"#{LocationPresenter::WORLD_CENTER.to_json}\"")
+    end
+
+    # Nothing is staged on arrival, so there is nothing to write.
+    it "renders Save changes disabled, and the lookup it stages through" do
+      get "/location"
+
+      expect(response.body).to include("Save changes")
+      expect(response.body).to match(/<wa-button[^>]*\sdisabled/m)
+      expect(response.body).to include('data-location-map-lookup-url-value="/location/lookup"')
     end
 
     # ⚠️ Web Awesome components over native elements, as everywhere else in the admin.
@@ -233,44 +244,81 @@ RSpec.describe "Admin location", type: :request do
       expect(response).to have_http_status(:unprocessable_content)
     end
 
-    context "with an address" do
-      before { allow($redis).to receive(:set) }
+    # ⚠️ Coordinates only. An address is resolved by the lookup first, so there's one shape of
+    # thing this stores and one place that decides what a valid location is.
+    it "ignores an address, which is the lookup's job" do
+      expect_any_instance_of(GoogleGeocoder).not_to receive(:coordinates)
+      expect($redis).not_to receive(:set)
 
-      it "geocodes it, stores the result, and answers with where it landed" do
-        allow_any_instance_of(GoogleGeocoder).to receive(:coordinates).and_return([ 37.7749, -122.4194 ])
+      post "/location", params: { address: "1 Ferry Building, San Francisco" }
 
-        post "/location", params: { address: "1 Ferry Building, San Francisco" }
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(LocationSyncJob.jobs).to be_empty
+    end
+  end
 
-        expect(response.parsed_body).to eq(
-          "latitude" => 37.7749, "longitude" => -122.4194, "place" => "Jackson Hole, Wyoming"
-        )
-        expect(LocationSyncJob).to have_enqueued_sidekiq_job(37.7749, -122.4194)
-      end
+  describe "GET /location/lookup" do
+    before do
+      sign_in!
+      # Nothing here may write. Every example runs with the store wired to fail loudly.
+      allow($redis).to receive(:set).and_raise("the lookup must not write")
+    end
 
-      it "refuses an address that resolves to nothing" do
-        allow_any_instance_of(GoogleGeocoder).to receive(:coordinates).and_return(nil)
+    it "geocodes an address and names where it landed, without storing it" do
+      allow_any_instance_of(GoogleGeocoder).to receive(:coordinates).and_return([ 37.7749, -122.4194 ])
 
-        post "/location", params: { address: "asdfgh" }
+      get "/location/lookup", params: { address: "1 Ferry Building, San Francisco" }
 
-        expect(response).to have_http_status(:unprocessable_content)
-        expect(LocationSyncJob.jobs).to be_empty
-      end
+      expect(response.parsed_body).to eq(
+        "latitude" => 37.7749, "longitude" => -122.4194, "place" => "Jackson Hole, Wyoming"
+      )
+      expect(LocationSyncJob.jobs).to be_empty
+    end
 
-      # ⚠️ Falling through to the address on an unusable pair would save a place the caller never
-      # asked for.
-      it "never falls back to it when a coordinate was sent too" do
-        expect_any_instance_of(GoogleGeocoder).not_to receive(:coordinates)
+    # What the page previews a pin drop with, before Save changes is pressed.
+    it "names a coordinate pair, without storing it" do
+      get "/location/lookup", params: { latitude: "37.7749", longitude: "-122.4194" }
 
-        post "/location", params: { latitude: "somewhere", longitude: "else", address: "Kona" }
+      expect(response.parsed_body).to eq(
+        "latitude" => 37.7749, "longitude" => -122.4194, "place" => "Jackson Hole, Wyoming"
+      )
+      expect(LocationSyncJob.jobs).to be_empty
+    end
 
-        expect(response).to have_http_status(:unprocessable_content)
-      end
+    it "refuses an address that resolves to nothing" do
+      allow_any_instance_of(GoogleGeocoder).to receive(:coordinates).and_return(nil)
+
+      get "/location/lookup", params: { address: "asdfgh" }
+
+      expect(response).to have_http_status(:unprocessable_content)
+    end
+
+    it "refuses coordinates that aren't usable" do
+      get "/location/lookup", params: { latitude: "91", longitude: "0" }
+
+      expect(response).to have_http_status(:unprocessable_content)
+    end
+
+    # ⚠️ Falling through to the address on an unusable pair would resolve a place the caller never
+    # asked about — and the page would stage it.
+    it "never falls back to the address when a coordinate was sent too" do
+      expect_any_instance_of(GoogleGeocoder).not_to receive(:coordinates)
+
+      get "/location/lookup", params: { latitude: "somewhere", longitude: "else", address: "Kona" }
+
+      expect(response).to have_http_status(:unprocessable_content)
     end
   end
 
   describe "without an owner session" do
     it "redirects the page to the login screen" do
       get "/location"
+
+      expect(response).to redirect_to("/signin")
+    end
+
+    it "refuses to resolve a location" do
+      get "/location/lookup", params: { latitude: "37.7749", longitude: "-122.4194" }
 
       expect(response).to redirect_to("/signin")
     end

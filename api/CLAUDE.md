@@ -52,7 +52,8 @@ a cached copy before revalidating.
 | GET | `/`, `/spam`, `/location`, `/connected-apps`, `/course-maps`, `/course-maps/:id` | admin UI (owner-session gated) | `no-store` |
 | POST | `/spam/:id/not-spam`; DELETE `/spam/:id`, `/connected-apps/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
 | GET/POST/DELETE | `/connected-apps/bluesky` | the Bluesky handle + app password form, and disconnect | `no-store` |
-| POST | `/location` | same write as `POST /api/location`, from a coordinate pair or an `address` to geocode; answers with the coordinates and the geocoded place | `no-store` |
+| GET | `/location/lookup` | resolves an `address` or a coordinate pair to `{latitude, longitude, place}`. ⚠️ **Never writes** | `no-store` |
+| POST | `/location` | same write as `POST /api/location`, coordinates only; answers with the coordinates and the geocoded place | `no-store` |
 | POST | `/course-maps`; PATCH/DELETE `/course-maps/:id`; GET `/course-maps/status` | upload GPX tracks, save render settings, delete a track, poll publish status | `no-store` |
 | GET | `/course-maps/:id/preview`, `/course-maps/:id/download` | the rendered PNG, proxied from Mapbox; same render, only the disposition differs | `no-store` |
 | — | `/sidekiq` | job dashboard (owner-session gated) | — |
@@ -460,10 +461,14 @@ calls `Akismet#submit_ham`.
 ### The location picker
 
 `/location` is two columns — the ways in on the left, a Mapbox map on the right, one column under
-60rem — and every one of them writes immediately, with no separate save step: the pin **is** the
-current location, and so is an address typed into the box, a reading from the map's Geolocation
-button, or a race picked from the shortcut list. The place name and coordinates above the controls
-are the only confirmation there is, so that line reports "Saving…" and then what was stored.
+60rem. Four of them **stage** a location and none of them writes: dropping or dragging the pin, an
+address typed into the box, a reading from the map's Geolocation button, and a race picked from the
+shortcut list. **Save changes**, under the place name and coordinates, is the only control that
+writes, and it's disabled whenever the staged pair equals the stored one. A `wa-badge` beside the
+coordinates names that state — Saved / Unsaved, or "Not set" before there's ever been a location,
+in the same outlined form Connected apps and Course maps use for theirs.
+⚠️ Its initial state is rendered by `LocationPresenter#state_label` / `#state_variant` and every
+change after that by `STATES` in `location_map_controller.js`; the two vocabularies have to agree.
 
 - **It writes through `Location.store`**, the same method `POST /api/location` uses, so the two
   can't drift on ordering (Redis first, sync second) or on validation (`Location.parse`, which is
@@ -474,9 +479,17 @@ are the only confirmation there is, so that line reports "Saving…" and then wh
   of how a location will read in the weather widget. ⚠️ Not `LocationContext#label`, which adds
   fallbacks ("Current location") the widget doesn't have; the preview would promise a name the
   widget would never print. A geocode that resolves to nothing falls back to the coordinates.
-- ⚠️ **`POST /location` answers with that place, and the page updates the heading from the
-  response.** Re-deriving it per drop is the point: the server-rendered name describes the location
-  the page was *loaded* with, and one pin drop makes it a caption for the wrong place.
+- ⚠️ **`GET /location/lookup` must never write.** It's what stages a location — geocoding an
+  address, or naming a coordinate pair so the heading previews it — and the entire value of the
+  Save button is that nothing before it changes what the widgets read. A request spec runs every
+  lookup example with `$redis.set` wired to raise.
+- **`POST /location` takes coordinates only.** An address is resolved by the lookup first, so
+  there's one shape of thing this stores and one place that decides what a valid location is.
+- ⚠️ **Both answer with the place, and the page re-derives the heading from that.** The
+  server-rendered name describes the location the page was *loaded* with; one pin drop makes it a
+  caption for the wrong place. ⚠️ The save path marks the pair it *sent* as stored, not whatever is
+  staged when the response lands — the pin may have moved again, and marking that pair stored would
+  disable Save over an unsaved change.
 - ⚠️ **The displayed coordinates are rounded, and the rounding is written twice** —
   `LocationPresenter::DISPLAY_PRECISION` for the server-rendered line and `DISPLAY_PRECISION` in
   `location_map_controller.js` for the one a pin drop rewrites. They must match, or dropping a pin
@@ -488,8 +501,8 @@ are the only confirmation there is, so that line reports "Saving…" and then wh
 - ⚠️ **The map's token is `MAPBOX_ACCESS_TOKEN` and only that.** It's rendered into the page, and
   `StaticMap`'s preference for `MAPBOX_SECRET_TOKEN` is exactly the fallback that must not happen
   here — that token carries `tilesets:write`. A request spec asserts it never appears in the body.
-  Without the public token the map is replaced by a callout; the address box and the race shortcuts
-  still work, and geolocation doesn't, since its button belongs to the map.
+  Without the public token the map is replaced by a callout; the address box, the race shortcuts and
+  Save all still work, and geolocation doesn't, since its button belongs to the map.
 - **Geolocation is Mapbox's `GeolocateControl`**, on the map beside the zoom control, not a button
   of ours: it flies to the reading, draws the accuracy circle, and disables itself where the
   browser can't geolocate — which a button of ours could only discover by being pressed. Its

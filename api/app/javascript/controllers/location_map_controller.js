@@ -29,6 +29,13 @@ const MARKER_OFFSET = [ 0, -14 * MARKER_SCALE ];
 // the reading itself, at a zoom it derives from the reported accuracy.
 const LOCATED_ZOOM = 14;
 
+// The saved/unsaved badge. ⚠️ Its "saved" half is also rendered server-side by
+// LocationPresenter#state_label / #state_variant; the two have to agree.
+const STATES = {
+  saved: { label: "Saved", variant: "success" },
+  unsaved: { label: "Unsaved", variant: "warning" }
+};
+
 const GEOLOCATION_ERRORS = {
   1: "Location permission was denied.",
   2: "Your location isn't available right now.",
@@ -65,18 +72,18 @@ function loadMapbox() {
 }
 
 /**
- * The admin's location picker: a Mapbox map whose pin is the current location.
+ * The admin's location picker: a Mapbox map whose pin is the location about to be saved.
  *
  * Clicking the map, dragging the pin, the Geolocation button, the address box and the race
- * shortcuts all do the same thing — post to the same action the bearer-gated POST /api/location
- * uses. There is no separate save step, so a stray click is undone by clicking where you meant to,
- * and the line above the controls is the only confirmation there is.
+ * shortcuts all do the same thing — **stage** a coordinate pair. Nothing reaches Redis until Save
+ * changes is pressed; that button is disabled whenever the staged pair matches the stored one, and
+ * the badge beside the coordinates says which of the two states you're in.
  *
- * ⚠️ Only the map itself needs `token`. The address box and the race shortcuts save through the
- * server and are useful with no map at all, so nothing here may bail out early on a missing one.
+ * ⚠️ Only the map itself needs `token`. The address box, the race shortcuts and Save all go through
+ * the server and are useful with no map at all, so nothing here may bail out early on a missing one.
  */
 export default class extends Controller {
-  static targets = ["map", "place", "status", "address"];
+  static targets = ["map", "place", "status", "state", "address", "save"];
   static values = {
     token: String,
     style: String,
@@ -84,7 +91,8 @@ export default class extends Controller {
     longitude: String,
     center: Array,
     zoom: Number,
-    saveUrl: String
+    saveUrl: String,
+    lookupUrl: String
   };
 
   connect() {
@@ -92,6 +100,11 @@ export default class extends Controller {
     // canvas and a restoration visit would build a second map on top of the dead one.
     this.teardown = this.teardown.bind(this);
     document.addEventListener("turbo:before-cache", this.teardown);
+
+    // What's in Redis, and what the page would write. Equal on arrival, which is what leaves the
+    // server-rendered Save button correctly disabled.
+    this.stored = this.pair(this.latitudeValue, this.longitudeValue);
+    this.staged = this.stored;
 
     if (this.tokenValue) this.start();
   }
@@ -129,7 +142,7 @@ export default class extends Controller {
     });
     this.map.addControl(new mapboxgl.NavigationControl(), "top-right");
     this.map.addControl(this.geolocation(mapboxgl), "top-right");
-    this.map.on("click", (event) => this.moveTo(event.lngLat.lat, event.lngLat.lng));
+    this.map.on("click", (event) => this.stage(event.lngLat.lat, event.lngLat.lng));
 
     this.marker = new mapboxgl.Marker({
       draggable: true,
@@ -138,14 +151,14 @@ export default class extends Controller {
     });
     this.marker.on("dragend", () => {
       const { lat, lng } = this.marker.getLngLat();
-      this.moveTo(lat, lng);
+      this.stage(lat, lng);
     });
 
-    this.pin(this.latitudeValue, this.longitudeValue);
+    this.pin(this.staged);
   }
 
   /**
-   * Mapbox's own Geolocation button, which saves whatever it finds.
+   * Mapbox's own Geolocation button, which stages whatever it finds.
    *
    * On the map rather than beside it because the control already does the parts a button of ours
    * had to fake: it flies to the reading, draws its accuracy circle, and **disables itself** where
@@ -161,9 +174,9 @@ export default class extends Controller {
       trackUserLocation: false
     });
 
-    // ⚠️ moveTo, not goTo: the control has already flown the map there, and flying again from our
-    // side fights its animation.
-    control.on("geolocate", ({ coords }) => this.moveTo(coords.latitude, coords.longitude));
+    // ⚠️ No `fly`: the control has already flown the map there, and flying again from our side
+    // fights its animation.
+    control.on("geolocate", ({ coords }) => this.stage(coords.latitude, coords.longitude));
     control.on("error", (error) =>
       this.report(GEOLOCATION_ERRORS[error.code] ?? "Your location couldn't be read.")
     );
@@ -172,8 +185,8 @@ export default class extends Controller {
   }
 
   /**
-   * Geocodes whatever is in the address box, then goes there. The server geocodes *and* stores in
-   * one call, so the coordinates come back already saved and there is nothing to post twice.
+   * Geocodes whatever is in the address box and stages the result. The lookup writes nothing, so
+   * hunting for a place costs no more than moving the pin around does.
    * @param {SubmitEvent} event
    */
   async search(event) {
@@ -184,71 +197,133 @@ export default class extends Controller {
     if (!address) return this.report("Type an address first.");
 
     this.report("Looking that up…");
-    const result = await this.write({ address }, "That address couldn't be found.");
+    const result = await this.read({ address }, "That address couldn't be found.");
     if (!result) return;
 
-    this.settle(result.latitude, result.longitude, result.place, { fly: true });
+    this.stage(result.latitude, result.longitude, { fly: true, place: result.place });
   }
 
   /**
-   * A race shortcut. The coordinates are Contentful's own, carried on the button, so this is an
-   * ordinary save with the map flown along to it.
+   * A race shortcut. The coordinates are Contentful's own, carried on the button.
    * @param {PointerEvent} event
    */
   useRace(event) {
     const { latitude, longitude } = event.currentTarget.dataset;
-    this.goTo(Number(latitude), Number(longitude));
+    this.stage(Number(latitude), Number(longitude), { fly: true });
   }
 
-  /** Flies the map to a point and saves it. */
-  goTo(latitude, longitude) {
-    this.map?.flyTo({ center: [longitude, latitude], zoom: LOCATED_ZOOM });
-    this.moveTo(latitude, longitude);
+  /**
+   * Stages a location: the pin moves there, the heading previews the name it resolves to, and Save
+   * changes wakes up. Nothing is written.
+   * @param {boolean} [options.fly] Whether to move the map too, for a stage that didn't start on it.
+   * @param {string} [options.place] A name already resolved by the caller, saving a second lookup.
+   */
+  stage(latitude, longitude, { fly = false, place } = {}) {
+    const staged = this.pair(latitude, longitude);
+    if (!staged) return;
+
+    this.staged = staged;
+    this.pin(staged);
+    if (fly) this.map?.flyTo({ center: [ staged[1], staged[0] ], zoom: LOCATED_ZOOM });
+
+    this.settle();
+    if (place === undefined) this.preview(staged); else this.describe(place || this.format(staged));
   }
 
-  /** Moves the pin to a new position and saves it. */
-  moveTo(latitude, longitude) {
-    const rounded = [this.round(latitude), this.round(longitude)];
+  /**
+   * Writes the staged location. The action validates and stores it exactly as POST /api/location
+   * does, and answers with the place name the weather widget would use.
+   */
+  async save() {
+    if (!this.staged || !this.changed) return;
 
-    this.pin(...rounded);
-    this.save(...rounded);
+    const staged = this.staged;
+    this.report("Saving…");
+
+    const result = await this.write(staged, "Those coordinates were refused.");
+    if (!result) return;
+
+    // ⚠️ Against `staged`, not `this.staged`: the pin may have moved again while the request was in
+    // flight, and marking *that* pair stored would disable Save over an unsaved change.
+    this.stored = staged;
+    this.describe(result.place || this.format(staged));
+    this.settle();
+  }
+
+  /**
+   * Names the staged location under the heading — the same name the weather widget would print, so
+   * the page previews it before it's committed. A failed lookup leaves the last name alone rather
+   * than blanking the heading.
+   */
+  async preview(staged) {
+    const result = await this.read({ latitude: staged[0], longitude: staged[1] });
+    // The pin may have moved on while this was in flight; a late answer must not caption a place
+    // that's no longer staged.
+    if (!result || this.key(this.staged) !== this.key(staged)) return;
+
+    this.describe(result.place || this.format(staged));
+  }
+
+  /** Puts the badge, the Save button and the coordinates in step with what's staged. */
+  settle() {
+    if (this.hasSaveTarget) this.saveTarget.disabled = !this.changed;
+    this.flag(this.changed ? STATES.unsaved : STATES.saved);
+    this.report(this.format(this.staged));
+  }
+
+  /** @param {object} state One of STATES. */
+  flag(state) {
+    if (!this.hasStateTarget) return;
+
+    this.stateTarget.textContent = state.label;
+    this.stateTarget.variant = state.variant;
+  }
+
+  /** @returns {boolean} Whether the staged location differs from the stored one. */
+  get changed() {
+    return this.key(this.staged) !== this.key(this.stored);
+  }
+
+  /** Compares pairs by value — they're rounded, so this is exact. */
+  key(pair) {
+    return pair ? pair.join(",") : "";
   }
 
   /** Puts the marker on the map, adding it the first time. */
-  pin(latitude, longitude) {
-    const [lat, lng] = [Number(latitude), Number(longitude)];
-    // ⚠️ Tested for finiteness, not truthiness: 0 is a real coordinate, and the values arrive as
-    // strings that are empty when nothing is stored yet.
-    if (latitude === "" || longitude === "" || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-      return;
+  pin(pair) {
+    if (pair) this.marker?.setLngLat([ pair[1], pair[0] ]).addTo(this.map);
+  }
+
+  /**
+   * GETs the lookup action, which resolves a location without storing it.
+   * @param {object} query Either an address, or a coordinate pair.
+   * @param {string} [refusal] What to report when the server can't resolve it. Omitted for the
+   *   background preview, which has nothing worth interrupting the status line for.
+   * @returns {Promise<object|null>}
+   */
+  async read(query, refusal) {
+    try {
+      const response = await fetch(`${this.lookupUrlValue}?${new URLSearchParams(query)}`, {
+        headers: { Accept: "application/json" }
+      });
+
+      if (!response.ok) {
+        if (refusal) this.report(refusal);
+        return null;
+      }
+
+      return await response.json();
+    } catch {
+      if (refusal) this.report("Couldn't reach the server.");
+      return null;
     }
-
-    this.marker?.setLngLat([lng, lat]).addTo(this.map);
   }
 
   /**
-   * Writes the location. The action validates and stores it exactly as POST /api/location does,
-   * and answers with the place name the weather widget would use — so the heading describes the
-   * pin that's on the map now, not the one the page was loaded with.
-   * @param {number} latitude
-   * @param {number} longitude
+   * POSTs the save action, the one call here that writes.
+   * @returns {Promise<object|null>} The stored location, or null if nothing was saved.
    */
-  async save(latitude, longitude) {
-    this.report("Saving…");
-    const result = await this.write({ latitude, longitude }, "Those coordinates were refused.");
-    if (!result) return;
-
-    this.settle(latitude, longitude, result.place);
-  }
-
-  /**
-   * Posts to the save action, which both validates and stores. The one place that talks to the
-   * server, so an address and a coordinate pair fail the same way.
-   * @param {object} body The form fields to send — a coordinate pair, or an address.
-   * @param {string} refusal What to report when the server rejects the request.
-   * @returns {Promise<object|null>} The saved location, or null if nothing was saved.
-   */
-  async write(body, refusal) {
+  async write(pair, refusal) {
     try {
       const response = await fetch(this.saveUrlValue, {
         method: "POST",
@@ -257,7 +332,7 @@ export default class extends Controller {
           Accept: "application/json",
           "X-CSRF-Token": document.querySelector("meta[name=csrf-token]")?.content ?? ""
         },
-        body: new URLSearchParams(body)
+        body: new URLSearchParams({ latitude: pair[0], longitude: pair[1] })
       });
 
       if (!response.ok) {
@@ -272,23 +347,6 @@ export default class extends Controller {
     }
   }
 
-  /**
-   * Reflects a saved location in the heading and the status line.
-   * @param {boolean} [options.fly] Whether to move the map and the pin as well. Only the address
-   *   path needs it — every other save starts by moving the pin itself.
-   */
-  settle(latitude, longitude, place, { fly = false } = {}) {
-    const coordinates = this.format(latitude, longitude);
-
-    if (fly) {
-      this.pin(latitude, longitude);
-      this.map?.flyTo({ center: [Number(longitude), Number(latitude)], zoom: LOCATED_ZOOM });
-    }
-
-    this.describe(place || coordinates);
-    this.report(`Saved · ${coordinates}`);
-  }
-
   describe(place) {
     if (this.hasPlaceTarget) this.placeTarget.textContent = place;
   }
@@ -297,17 +355,29 @@ export default class extends Controller {
     if (this.hasStatusTarget) this.statusTarget.textContent = message;
   }
 
+  /**
+   * Parses and rounds a coordinate pair.
+   * ⚠️ Tested for finiteness, not truthiness: 0 is a real coordinate, and the values arrive as
+   * strings that are empty when nothing is stored yet.
+   * @returns {number[]|null} The rounded pair, or null if either half is unusable.
+   */
+  pair(latitude, longitude) {
+    const [ lat, lng ] = [ Number(latitude), Number(longitude) ];
+    if (latitude === "" || longitude === "") return null;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+    return [ this.round(lat), this.round(lng) ];
+  }
+
   round(value) {
     return Number(Number(value).toFixed(PRECISION));
   }
 
   /**
-   * The pair as a human reads it, rounded for display only — what was saved keeps PRECISION.
+   * The pair as a human reads it, rounded for display only — what gets saved keeps PRECISION.
    * @returns {string}
    */
-  format(latitude, longitude) {
-    return [latitude, longitude]
-      .map((value) => Number(Number(value).toFixed(DISPLAY_PRECISION)))
-      .join(", ");
+  format(pair) {
+    return pair.map((value) => Number(value.toFixed(DISPLAY_PRECISION))).join(", ");
   }
 }

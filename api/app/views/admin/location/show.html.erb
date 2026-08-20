@@ -17,8 +17,9 @@
   </wa-callout>
 <% end %>
 
-<%# Three ways in — an address, a race, or the pin itself — and all three save on the spot. The
-    line above the controls is the only confirmation there is. %>
+<%# Three ways in — an address, a race, or the pin itself — and all three only **stage** a
+    location. Save changes is the one control that writes, and it stays disabled until what's
+    staged differs from what's stored. %>
 <div class="location" data-controller="location-map"
      data-location-map-token-value="<%= @location.map_token %>"
      data-location-map-style-value="<%= @location.map_style %>"
@@ -26,16 +27,32 @@
      data-location-map-longitude-value="<%= @location.longitude %>"
      data-location-map-center-value="<%= @location.center.to_json %>"
      data-location-map-zoom-value="<%= @location.zoom %>"
-     data-location-map-save-url-value="<%= @location.save_path %>">
+     data-location-map-save-url-value="<%= @location.save_path %>"
+     data-location-map-lookup-url-value="<%= @location.lookup_path %>">
 
   <div class="location__controls">
     <div class="location__summary">
       <%# The name the weather widget would print for these coordinates — the page doubles as a
-          preview of that, so it's re-derived on every save rather than left to go stale. %>
+          preview of that, so it's re-derived whenever a location is staged rather than left to go
+          stale. The status line below is what says whether that location is stored yet. %>
       <h2 class="location__place wa-heading-l" data-location-map-target="place"><%= @location.heading %></h2>
-      <p class="location__status wa-caption-s" data-location-map-target="status" aria-live="polite">
-        <%= @location.details %>
+      <%# The badge is the page's whole answer to "is this written down yet?", so it sits with the
+          coordinates rather than in the button's label. `aria-live` is on the line, not the badge:
+          the pair of them is the announcement. %>
+      <p class="location__status wa-caption-s" aria-live="polite">
+        <wa-badge class="location__state" variant="<%= @location.state_variant %>" appearance="outlined"
+                  data-location-map-target="state"><%= @location.state_label %></wa-badge>
+        <span data-location-map-target="status"><%= @location.details %></span>
       </p>
+
+      <%# Disabled on arrival, and correctly so: nothing is staged yet, so there is nothing to
+          write. The controller enables it the moment the staged pair differs from the stored one,
+          and disables it again on a successful save — or if the pin comes back to where it was. %>
+      <wa-button class="location__save" variant="brand" appearance="accent" disabled
+                 data-location-map-target="save" data-action="click->location-map#save">
+        <%= slotted_icon_svg("classic", "light", "floppy-disk") %>
+        Save changes
+      </wa-button>
     </div>
 
     <wa-divider></wa-divider>
@@ -48,7 +65,9 @@
                 autocomplete="off" enterkeyhint="go" data-location-map-target="address">
       </wa-input>
 
-      <wa-button class="location__go" type="submit" variant="brand" appearance="accent">
+      <%# Outlined, not accent: it stages a location like every other control here, and the one
+          accent button on the page should be the one that writes. %>
+      <wa-button class="location__go" type="submit" appearance="outlined">
         <%= slotted_icon_svg("classic", "light", "magnifying-glass") %>
         Go there
       </wa-button>

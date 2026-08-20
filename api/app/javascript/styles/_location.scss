@@ -28,8 +28,11 @@
   }
 
   &__summary {
+    align-items: flex-start;
     display: flex;
     flex-direction: column;
+    // Tight between the name and the coordinates, which read as one block; the Save button takes
+    // its own space below.
     gap: var(--wa-space-3xs);
   }
 
@@ -37,7 +40,12 @@
     margin: 0;
   }
 
+  // The tag and the coordinates read as one line, and wrap to two on a narrow column.
   &__status {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wa-space-xs);
     margin: 0;
   }
 
@@ -47,10 +55,15 @@
     gap: var(--wa-space-s);
   }
 
-  // The column stretches its children to the address field's width; the button under it opts back
-  // out to its own.
+  // The search column stretches its children to the address field's width; the button under it
+  // opts back out to its own. (The summary's own `align-items` already does this for Save.)
   &__go {
     align-self: flex-start;
+  }
+
+  // Its own space under the coordinates, which sit tight against the name above them.
+  &__save {
+    margin-block-start: var(--wa-space-s);
   }
 
   &__races {

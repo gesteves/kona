@@ -25,7 +25,7 @@ class LocationPresenter
     end
   end
 
-  attr_reader :place, :map_token, :map_style, :save_path
+  attr_reader :place, :map_token, :map_style, :save_path, :lookup_path
 
   # @param stored [Array(Float, Float), nil] The coordinates in Redis.
   # @param override [Array(Float, Float), nil] The LOCATION env var, which outranks them.
@@ -36,9 +36,10 @@ class LocationPresenter
   # @param map_style [String] The basemap style URL.
   # @param location_zoom [Integer] Zoom to use when there's a location.
   # @param world_zoom [Integer] Zoom to use when there isn't.
-  # @param save_path [String] Where a pin drop posts.
+  # @param save_path [String] Where Save changes posts.
+  # @param lookup_path [String] Where the page resolves a staged location, without saving it.
   def initialize(stored:, override:, place:, events:, time_zone:, map_token:, map_style:,
-                 location_zoom:, world_zoom:, save_path:)
+                 location_zoom:, world_zoom:, save_path:, lookup_path:)
     @stored = stored
     @override = override
     @place = place
@@ -49,6 +50,7 @@ class LocationPresenter
     @location_zoom = location_zoom
     @world_zoom = world_zoom
     @save_path = save_path
+    @lookup_path = lookup_path
   end
 
   # The coordinates in effect, which is the override where there is one.
@@ -80,11 +82,28 @@ class LocationPresenter
     @place.presence || summary || "Nowhere yet"
   end
 
-  # @return [String] The line under the heading: where it is.
+  # @return [String] The line under the heading: where it is. The tag beside it says whether that
+  #   location is stored yet.
   def details
     return "Drop a pin on the map to set your location." unless set?
 
     summary
+  end
+
+  # The tag's state on arrival, which is always "saved" where there's a location — nothing can be
+  # staged before the page has loaded.
+  #
+  # ⚠️ Its counterpart is STATES in location_map_controller.js, which owns every change after that.
+  # The two vocabularies have to stay in step.
+  # @return [String]
+  def state_label
+    set? ? "Saved" : "Not set"
+  end
+
+  # @return [String] The wa-badge variant matching {#state_label}, as on Connected apps and
+  #   Course maps.
+  def state_variant
+    set? ? "success" : "neutral"
   end
 
   # ⚠️ Deliberately NOT rounded, unlike `summary`: this echoes the value configured in the

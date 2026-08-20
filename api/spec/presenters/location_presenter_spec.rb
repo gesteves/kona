@@ -19,7 +19,8 @@ RSpec.describe LocationPresenter do
       map_style: "mapbox://styles/mapbox/streets-v12",
       location_zoom: 11,
       world_zoom: 1,
-      save_path: "/location"
+      save_path: "/location",
+      lookup_path: "/location/lookup"
     )
   end
 
@@ -90,6 +91,15 @@ RSpec.describe LocationPresenter do
 
       expect(subject.heading).to eq("Nowhere yet")
       expect(subject.details).to include("Drop a pin")
+    end
+
+    # The badge says whether the coordinates beside it are written down. Nothing can be staged before
+    # the page loads, so a stored location is always "Saved" here.
+    it "tags a stored location as saved, and no location as unset" do
+      expect(presenter(stored: [ 43.48, -110.76 ]).state_label).to eq("Saved")
+      expect(presenter(stored: [ 43.48, -110.76 ]).state_variant).to eq("success")
+      expect(presenter.state_label).to eq("Not set")
+      expect(presenter.state_variant).to eq("neutral")
     end
   end
 

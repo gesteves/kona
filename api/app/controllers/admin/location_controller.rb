@@ -1,8 +1,9 @@
 module Admin
   # The current location: a map you drop a pin on, an address box, and a shortcut per upcoming
-  # race. Every one of them writes the same Redis key as the bearer-gated POST /api/location —
-  # through the same Location.store — so this is a front-end over the write that already existed,
-  # not a second way to store a location.
+  # race. All three only **stage** a location; `create` is the one thing that writes, and it writes
+  # the same Redis key as the bearer-gated POST /api/location, through the same Location.store —
+  # so this is a front-end over the write that already existed, not a second way to store a
+  # location.
   class LocationController < BaseController
     # The basemap for picking a place.
     #
@@ -21,23 +22,43 @@ module Admin
       @location = present
     end
 
-    # POST /location
+    # GET /location/lookup
     #
-    # Takes either a coordinate pair — a pin drop, a race shortcut, the browser's geolocation — or
-    # an `address` to geocode first.
+    # Resolves what the page is *about to* save without saving it: an `address` to geocode, or a
+    # coordinate pair to name. This is what lets a pin drop, a race shortcut or a search preview
+    # itself under the heading while the Save button is still waiting to be pressed.
     #
-    # Answers with the newly geocoded place rather than a redirect: the only caller is the page's
-    # fetch, and it updates the heading in place instead of reloading. The coordinates come back
-    # too, since on the address path they're the only way the map learns where it was sent.
-    def create
+    # ⚠️ Must never write. It's the half of this page that can be exercised freely, and the whole
+    # point of the Save button is that nothing before it changes what the widgets read.
+    def lookup
       coordinates = requested_coordinates
       return head :unprocessable_content if coordinates.nil?
 
+      render json: located(coordinates)
+    end
+
+    # POST /location
+    #
+    # Saves a staged coordinate pair. Deliberately **coordinates only** — an address is resolved by
+    # `lookup` first, so there's exactly one shape of thing this stores and one place that decides
+    # what a valid location is.
+    #
+    # Answers with the place rather than a redirect: the only caller is the page's fetch, and it
+    # updates the heading in place instead of reloading.
+    def create
+      coordinates = Location.parse(params[:latitude], params[:longitude])
+      return head :unprocessable_content if coordinates.nil?
+
       Location.store(*coordinates)
-      render json: { latitude: coordinates.first, longitude: coordinates.last, **described(coordinates) }
+      render json: located(coordinates)
     end
 
     private
+
+    # @return [Hash] The pair the page works in, plus the name it resolves to.
+    def located(coordinates)
+      { latitude: coordinates.first, longitude: coordinates.last, **described(coordinates) }
+    end
 
     # ⚠️ A coordinate pair wins whenever either half is present, even when the pair is unusable.
     # Falling through to the address on a bad pair would save a place the caller never asked for.
@@ -61,6 +82,7 @@ module Admin
         location_zoom: LOCATION_ZOOM,
         world_zoom: WORLD_ZOOM,
         save_path: location_path,
+        lookup_path: location_lookup_path,
         **described(Location.override || Location.stored)
       )
     end

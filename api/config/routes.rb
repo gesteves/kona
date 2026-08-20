@@ -110,9 +110,12 @@ Rails.application.routes.draw do
       delete "connected-apps/bluesky" => "bluesky#destroy", as: nil
 
       # The current location, on a map. The POST writes the same Redis key as the bearer-gated
-      # POST /api/location, through Location.store.
-      get  "location" => "location#show",   as: :location
-      post "location" => "location#create"
+      # POST /api/location, through Location.store; the lookup resolves an address or names a
+      # coordinate pair **without** writing anything, which is what lets the page stage a change
+      # before it's saved.
+      get  "location"        => "location#show",   as: :location
+      get  "location/lookup" => "location#lookup", as: :location_lookup
+      post "location"        => "location#create"
 
       # The contact-form spam quarantine. Named for what it holds, and deliberately not `/contact`
       # — that's the public form's own path (POST /api/contact), and nothing here receives a

@@ -24,6 +24,7 @@ RSpec.describe "Public API host route constraints", type: :request do
     [ :post, "/connected-apps/bluesky" ],
     [ :delete, "/connected-apps/bluesky" ],
     [ :get,  "/location" ],
+    [ :get,  "/location/lookup" ],
     [ :post, "/location" ],
     [ :get,  "/spam" ],
     [ :post, "/spam/abc123/not-spam" ],
