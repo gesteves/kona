@@ -463,11 +463,11 @@ calls `Akismet#submit_ham`.
 `/location` is two columns — the ways in on the left, a Mapbox map on the right, one column under
 60rem. Four of them **stage** a location and none of them writes: dropping or dragging the pin, an
 address typed into the box, a reading from the map's Geolocation button, and a race picked from the
-shortcut list. **Save changes**, under the place name and coordinates, is the only control that
-writes; **Undo** beside it throws the staging away, putting the pin, the map and the heading back
-to what's stored. Both are disabled whenever the staged pair equals the stored one. A `wa-badge` beside the
-coordinates names that state — Saved / Unsaved, or "Not set" before there's ever been a location,
-in the same outlined form Connected apps and Course maps use for theirs.
+shortcut list. **Save**, under the place name and coordinates, is the only control that writes;
+**Undo** beside it throws the staging away, putting the pin, the map and the heading back to
+what's stored. Both are disabled whenever the staged pair equals the stored one. A `wa-badge`
+beside the coordinates names that state — Saved / Unsaved, or "Not set" before there's ever been a
+location, in the same outlined form Connected apps and Course maps use for theirs.
 ⚠️ Its initial state is rendered by `LocationPresenter#state_label` / `#state_variant` and every
 change after that by `STATES` in `location_map_controller.js`; the two vocabularies have to agree.
 

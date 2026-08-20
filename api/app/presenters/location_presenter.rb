@@ -36,7 +36,7 @@ class LocationPresenter
   # @param map_style [String] The basemap style URL.
   # @param location_zoom [Integer] Zoom to use when there's a location.
   # @param world_zoom [Integer] Zoom to use when there isn't.
-  # @param save_path [String] Where Save changes posts.
+  # @param save_path [String] Where Save posts.
   # @param lookup_path [String] Where the page resolves a staged location, without saving it.
   def initialize(stored:, override:, place:, events:, time_zone:, map_token:, map_style:,
                  location_zoom:, world_zoom:, save_path:, lookup_path:)

@@ -18,8 +18,8 @@
 <% end %>
 
 <%# Three ways in — an address, a race, or the pin itself — and all three only **stage** a
-    location. Save changes is the one control that writes, and it stays disabled until what's
-    staged differs from what's stored. %>
+    location. Save is the one control that writes, and it stays disabled until what's staged
+    differs from what's stored. %>
 <div class="location" data-controller="location-map"
      data-location-map-token-value="<%= @location.map_token %>"
      data-location-map-style-value="<%= @location.map_style %>"
@@ -48,12 +48,13 @@
       <%# Both disabled on arrival, and correctly so: nothing is staged yet, so there is nothing to
           write and nothing to throw away. The controller enables the pair the moment the staged
           location differs from the stored one, and disables them again on a successful save — or
-          when Undo puts the pin back where it was. %>
+          when Undo puts the pin back where it was. Paired labels, both one word, so neither reads
+          as the bigger commitment. %>
       <div class="location__actions">
         <wa-button class="location__save" variant="brand" appearance="accent" disabled
                    data-location-map-target="save" data-action="click->location-map#save">
           <%= slotted_icon_svg("classic", "light", "floppy-disk") %>
-          Save changes
+          Save
         </wa-button>
 
         <wa-button appearance="outlined" disabled

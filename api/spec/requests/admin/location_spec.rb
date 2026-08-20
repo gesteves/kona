@@ -123,10 +123,10 @@ RSpec.describe "Admin location", type: :request do
     end
 
     # Nothing is staged on arrival, so there is nothing to write and nothing to throw away.
-    it "renders Save changes and Undo disabled, and the lookup it stages through" do
+    it "renders Save and Undo disabled, and the lookup it stages through" do
       get "/location"
 
-      expect(response.body).to include("Save changes")
+      expect(response.body).to include("Save")
       expect(response.body).to include("Undo")
       expect(response.body.scan(/<wa-button[^>]*\sdisabled/m).size).to eq(2)
       expect(response.body).to include('data-location-map-lookup-url-value="/location/lookup"')
@@ -276,7 +276,7 @@ RSpec.describe "Admin location", type: :request do
       expect(LocationSyncJob.jobs).to be_empty
     end
 
-    # What the page previews a pin drop with, before Save changes is pressed.
+    # What the page previews a pin drop with, before Save is pressed.
     it "names a coordinate pair, without storing it" do
       get "/location/lookup", params: { latitude: "37.7749", longitude: "-122.4194" }
 
