@@ -16,6 +16,14 @@ const PRECISION = 6;
 // pin drop doesn't reformat the coordinates the server rendered. Display only; PRECISION is stored.
 const DISPLAY_PRECISION = 3;
 
+// Mapbox's own default size for the pin.
+const MARKER_SCALE = 1;
+
+// ⚠️ Mapbox does **not** scale its default marker offset ([0, -14]) along with `scale`, so at any
+// scale but 1 the pin's tip drifts off the coordinate — ~15px below it at 2x. Deriving it here
+// keeps the two in step, which is what makes the scale above safe to change.
+const MARKER_OFFSET = [ 0, -14 * MARKER_SCALE ];
+
 // Where the map lands when a save didn't start on it — an address, a race shortcut. Close enough
 // to see which building you're in. Geolocation isn't in that list: Mapbox's own control flies to
 // the reading itself, at a zoom it derives from the reported accuracy.
@@ -123,9 +131,11 @@ export default class extends Controller {
     this.map.addControl(this.geolocation(mapboxgl), "top-right");
     this.map.on("click", (event) => this.moveTo(event.lngLat.lat, event.lngLat.lng));
 
-    // Twice Mapbox's default size: the pin is the one thing on this page you have to be able to
-    // find and grab, and at 1x it disappears into a busy streets basemap.
-    this.marker = new mapboxgl.Marker({ draggable: true, scale: 2 });
+    this.marker = new mapboxgl.Marker({
+      draggable: true,
+      scale: MARKER_SCALE,
+      offset: MARKER_OFFSET
+    });
     this.marker.on("dragend", () => {
       const { lat, lng } = this.marker.getLngLat();
       this.moveTo(lat, lng);

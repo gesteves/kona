@@ -14,9 +14,16 @@ body {
   color: var(--wa-color-text-normal);
 }
 
-// Inline `icon_svg` output. Font Awesome's SVGs carry no intrinsic size, so every one needs a
-// height; `1em` keeps them proportional to whatever text they sit beside.
-svg {
+// Inline `icon_svg` output. Font Awesome's SVGs carry no intrinsic size — a `viewBox` and nothing
+// else — so every one needs a height; `1em` keeps them proportional to whatever text they sit
+// beside.
+//
+// ⚠️ `:not([height])` is what keeps this off an SVG that states its own size, which today means
+// Mapbox GL's map marker. That size is a **presentation attribute**, and any CSS rule outranks one,
+// so an unguarded `height: 1em` shrinks the pin to the map's 12px font — while GL JS goes on
+// offsetting it as though it were full height, floating the tip above the coordinate. That reads as
+// dead-on when zoomed in and kilometres out when zoomed out, which is a maddening thing to debug.
+svg:not([height]) {
   fill: currentColor;
   flex: none;
   height: 1em;
