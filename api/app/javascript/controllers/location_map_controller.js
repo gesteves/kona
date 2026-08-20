@@ -76,14 +76,15 @@ function loadMapbox() {
  *
  * Clicking the map, dragging the pin, the Geolocation button, the address box and the race
  * shortcuts all do the same thing — **stage** a coordinate pair. Nothing reaches Redis until Save
- * changes is pressed; that button is disabled whenever the staged pair matches the stored one, and
- * the badge beside the coordinates says which of the two states you're in.
+ * changes is pressed; that button — and Undo beside it, which throws the staging away — is
+ * disabled whenever the staged pair matches the stored one, and the badge beside the coordinates
+ * says which of the two states you're in.
  *
  * ⚠️ Only the map itself needs `token`. The address box, the race shortcuts and Save all go through
  * the server and are useful with no map at all, so nothing here may bail out early on a missing one.
  */
 export default class extends Controller {
-  static targets = ["map", "place", "status", "state", "address", "save"];
+  static targets = ["map", "place", "status", "state", "address", "save", "undo"];
   static values = {
     token: String,
     style: String,
@@ -102,9 +103,21 @@ export default class extends Controller {
     document.addEventListener("turbo:before-cache", this.teardown);
 
     // What's in Redis, and what the page would write. Equal on arrival, which is what leaves the
-    // server-rendered Save button correctly disabled.
+    // server-rendered Save and Undo buttons correctly disabled.
     this.stored = this.pair(this.latitudeValue, this.longitudeValue);
     this.staged = this.stored;
+
+    // What the server rendered, so Undo can put the page back when there's nothing stored to return
+    // to — rather than restating the presenter's copy here.
+    this.initial = {
+      place: this.hasPlaceTarget ? this.placeTarget.textContent.trim() : "",
+      status: this.hasStatusTarget ? this.statusTarget.textContent.trim() : "",
+      label: this.hasStateTarget ? this.stateTarget.textContent.trim() : "",
+      variant: this.hasStateTarget ? this.stateTarget.variant : ""
+    };
+
+    // The stored location's name, kept so Undo can restore the heading without a second lookup.
+    this.storedPlace = this.initial.place;
 
     if (this.tokenValue) this.start();
   }
@@ -246,7 +259,27 @@ export default class extends Controller {
     // ⚠️ Against `staged`, not `this.staged`: the pin may have moved again while the request was in
     // flight, and marking *that* pair stored would disable Save over an unsaved change.
     this.stored = staged;
-    this.describe(result.place || this.format(staged));
+    this.storedPlace = result.place || this.format(staged);
+    this.describe(this.storedPlace);
+    this.settle();
+  }
+
+  /**
+   * Throws the staged location away. The pin, the map and the heading go back to what's stored —
+   * or, where nothing is stored yet, to the empty page the server rendered.
+   */
+  undo() {
+    if (!this.changed) return;
+
+    if (this.stored) {
+      return this.stage(this.stored[0], this.stored[1], { fly: true, place: this.storedPlace });
+    }
+
+    this.staged = null;
+    this.marker?.remove();
+    this.describe(this.initial.place);
+    this.report(this.initial.status);
+    this.flag(this.initial);
     this.settle();
   }
 
@@ -264,10 +297,17 @@ export default class extends Controller {
     this.describe(result.place || this.format(staged));
   }
 
-  /** Puts the badge, the Save button and the coordinates in step with what's staged. */
+  /** Puts the badge, the two buttons and the coordinates in step with what's staged. */
   settle() {
-    if (this.hasSaveTarget) this.saveTarget.disabled = !this.changed;
-    this.flag(this.changed ? STATES.unsaved : STATES.saved);
+    const pending = this.changed;
+    if (this.hasSaveTarget) this.saveTarget.disabled = !pending;
+    if (this.hasUndoTarget) this.undoTarget.disabled = !pending;
+
+    // Undone back to nothing: the caller has already restored the line the server rendered, and
+    // there are no coordinates to print over it.
+    if (!this.staged) return;
+
+    this.flag(pending ? STATES.unsaved : STATES.saved);
     this.report(this.format(this.staged));
   }
 

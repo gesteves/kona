@@ -45,14 +45,23 @@
         <span data-location-map-target="status"><%= @location.details %></span>
       </p>
 
-      <%# Disabled on arrival, and correctly so: nothing is staged yet, so there is nothing to
-          write. The controller enables it the moment the staged pair differs from the stored one,
-          and disables it again on a successful save — or if the pin comes back to where it was. %>
-      <wa-button class="location__save" variant="brand" appearance="accent" disabled
-                 data-location-map-target="save" data-action="click->location-map#save">
-        <%= slotted_icon_svg("classic", "light", "floppy-disk") %>
-        Save changes
-      </wa-button>
+      <%# Both disabled on arrival, and correctly so: nothing is staged yet, so there is nothing to
+          write and nothing to throw away. The controller enables the pair the moment the staged
+          location differs from the stored one, and disables them again on a successful save — or
+          when Undo puts the pin back where it was. %>
+      <div class="location__actions">
+        <wa-button class="location__save" variant="brand" appearance="accent" disabled
+                   data-location-map-target="save" data-action="click->location-map#save">
+          <%= slotted_icon_svg("classic", "light", "floppy-disk") %>
+          Save changes
+        </wa-button>
+
+        <wa-button appearance="outlined" disabled
+                   data-location-map-target="undo" data-action="click->location-map#undo">
+          <%= slotted_icon_svg("classic", "light", "arrow-rotate-left") %>
+          Undo
+        </wa-button>
+      </div>
     </div>
 
     <wa-divider></wa-divider>

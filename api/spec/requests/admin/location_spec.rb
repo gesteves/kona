@@ -122,12 +122,13 @@ RSpec.describe "Admin location", type: :request do
       expect(response.body).to include("data-location-map-center-value=\"#{LocationPresenter::WORLD_CENTER.to_json}\"")
     end
 
-    # Nothing is staged on arrival, so there is nothing to write.
-    it "renders Save changes disabled, and the lookup it stages through" do
+    # Nothing is staged on arrival, so there is nothing to write and nothing to throw away.
+    it "renders Save changes and Undo disabled, and the lookup it stages through" do
       get "/location"
 
       expect(response.body).to include("Save changes")
-      expect(response.body).to match(/<wa-button[^>]*\sdisabled/m)
+      expect(response.body).to include("Undo")
+      expect(response.body.scan(/<wa-button[^>]*\sdisabled/m).size).to eq(2)
       expect(response.body).to include('data-location-map-lookup-url-value="/location/lookup"')
     end
 

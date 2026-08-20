@@ -464,7 +464,8 @@ calls `Akismet#submit_ham`.
 60rem. Four of them **stage** a location and none of them writes: dropping or dragging the pin, an
 address typed into the box, a reading from the map's Geolocation button, and a race picked from the
 shortcut list. **Save changes**, under the place name and coordinates, is the only control that
-writes, and it's disabled whenever the staged pair equals the stored one. A `wa-badge` beside the
+writes; **Undo** beside it throws the staging away, putting the pin, the map and the heading back
+to what's stored. Both are disabled whenever the staged pair equals the stored one. A `wa-badge` beside the
 coordinates names that state — Saved / Unsaved, or "Not set" before there's ever been a location,
 in the same outlined form Connected apps and Course maps use for theirs.
 ⚠️ Its initial state is rendered by `LocationPresenter#state_label` / `#state_variant` and every
@@ -483,6 +484,10 @@ change after that by `STATES` in `location_map_controller.js`; the two vocabular
   address, or naming a coordinate pair so the heading previews it — and the entire value of the
   Save button is that nothing before it changes what the widgets read. A request spec runs every
   lookup example with `$redis.set` wired to raise.
+- **Undo restores from memory, not from the server**: the controller keeps the stored pair's place
+  name from whichever response last set it, so throwing a change away costs no lookup. ⚠️ Where
+  nothing is stored at all it instead puts back the line the *server* rendered, captured on connect
+  — restating "Drop a pin on the map…" and "Not set" in JS is exactly the copy that would drift.
 - **`POST /location` takes coordinates only.** An address is resolved by the lookup first, so
   there's one shape of thing this stores and one place that decides what a valid location is.
 - ⚠️ **Both answer with the place, and the page re-derives the heading from that.** The
