@@ -3,8 +3,12 @@ require "rails_helper"
 RSpec.describe LocationPresenter do
   include ActiveSupport::Testing::TimeHelpers
 
+  # The zone the presenter reckons "upcoming" in, and the one the fixtures below date themselves
+  # in — one source of truth, since a race's calendar day depends on both agreeing.
+  def time_zone = "America/Denver"
+
   def presenter(stored: nil, override: nil, map_token: "pk.token", place: "Jackson Hole, Wyoming",
-                events: [], time_zone: "America/Denver")
+                events: [])
     described_class.new(
       stored: stored,
       override: override,
@@ -108,20 +112,25 @@ RSpec.describe LocationPresenter do
   end
 
   describe "the race shortcuts" do
-    def event(title:, date:, going: true, location: "Kona, Hawaii", lat: 19.64, lon: -155.99)
+    # 2026-08-20 18:00 UTC == 12:00 MDT, so "today" in America/Denver is August 20, 2026.
+    around { |example| travel_to(Time.utc(2026, 8, 20, 18, 0, 0)) { example.run } }
+
+    # ⚠️ `on:` becomes a **zoned** 9am timestamp, like Contentful's own dates. `Time.parse` reads a
+    # bare "2026-10-10" in the *machine's* zone, so a UTC CI box resolves it to the day before in
+    # America/Denver and every date here slides back one.
+    def event(title:, on: nil, date: nil, going: true, location: "Kona, Hawaii",
+              lat: 19.64, lon: -155.99)
+      date ||= ActiveSupport::TimeZone[time_zone].parse("#{on} 09:00").iso8601
       coordinates = lat && lon ? { lat: lat, lon: lon } : nil
       DeepOstruct.wrap(title: title, date: date, going: going, location: location,
                        coordinates: coordinates)
     end
 
-    # 2026-08-20 18:00 UTC == 12:00 MDT, so "today" in America/Denver is August 20, 2026.
-    around { |example| travel_to(Time.utc(2026, 8, 20, 18, 0, 0)) { example.run } }
-
     it "lists the confirmed races still ahead, soonest first" do
       subject = presenter(events: [
-        event(title: "Kona", date: "2026-10-10"),
-        event(title: "Boulder", date: "2026-09-01"),
-        event(title: "Last year's", date: "2025-10-10")
+        event(title: "Kona", on: "2026-10-10"),
+        event(title: "Boulder", on: "2026-09-01"),
+        event(title: "Last year's", on: "2025-10-10")
       ])
 
       expect(subject.races.map(&:title)).to eq([ "Boulder", "Kona" ])
@@ -130,26 +139,26 @@ RSpec.describe LocationPresenter do
     # ⚠️ Not EventsHelper#upcoming_races: that caps the widget's list at three or four. Every race
     # ahead is a place you might be.
     it "lists more than the widget would" do
-      events = (1..6).map { |n| event(title: "Race #{n}", date: "2026-09-0#{n}") }
+      events = (1..6).map { |n| event(title: "Race #{n}", on: "2026-09-0#{n}") }
 
       expect(presenter(events: events).races.size).to eq(6)
     end
 
     it "keeps a race happening today" do
-      subject = presenter(events: [ event(title: "Today", date: "2026-08-20") ])
+      subject = presenter(events: [ event(title: "Today", on: "2026-08-20") ])
 
       expect(subject.races.map(&:title)).to eq([ "Today" ])
     end
 
     it "drops races that aren't confirmed" do
-      subject = presenter(events: [ event(title: "Maybe", date: "2026-09-01", going: false) ])
+      subject = presenter(events: [ event(title: "Maybe", on: "2026-09-01", going: false) ])
 
       expect(subject.races).to be_empty
     end
 
     # A button with nowhere to send the map isn't a shortcut.
     it "drops races without coordinates" do
-      subject = presenter(events: [ event(title: "Unplaced", date: "2026-09-01", lat: nil, lon: nil) ])
+      subject = presenter(events: [ event(title: "Unplaced", on: "2026-09-01", lat: nil, lon: nil) ])
 
       expect(subject.races).to be_empty
     end
@@ -161,7 +170,7 @@ RSpec.describe LocationPresenter do
     end
 
     it "carries the coordinates and a formatted date for the button" do
-      subject = presenter(events: [ event(title: "Kona", date: "2026-10-10") ])
+      subject = presenter(events: [ event(title: "Kona", on: "2026-10-10") ])
       race = subject.races.first
 
       expect(race.latitude).to eq(19.64)

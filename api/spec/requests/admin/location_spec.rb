@@ -23,7 +23,11 @@ RSpec.describe "Admin location", type: :request do
     allow_any_instance_of(Events).to receive(:all).and_return(DeepOstruct.wrap(events))
   end
 
-  def event(title:, date:, going: true, location: "Kona, Hawaii", lat: 19.64, lon: -155.99)
+  # ⚠️ `on:` becomes a **zoned** 9am timestamp, like Contentful's own dates. `Time.parse` reads a
+  # bare "2026-10-10" in the *machine's* zone, so a UTC CI box resolves it to the day before in the
+  # zone the page reckons in, sliding every date here back one.
+  def event(title:, on:, going: true, location: "Kona, Hawaii", lat: 19.64, lon: -155.99)
+    date = ActiveSupport::TimeZone[TimeZoneResolver.default].parse("#{on} 09:00").iso8601
     { title: title, date: date, going: going, location: location, coordinates: { lat: lat, lon: lon } }
   end
 
@@ -138,9 +142,9 @@ RSpec.describe "Admin location", type: :request do
     it "lists the confirmed races ahead, with the coordinates their buttons post" do
       travel_to(Time.utc(2026, 8, 20, 18, 0, 0)) do
         stub_events([
-          event(title: "Kona", date: "2026-10-10"),
-          event(title: "Boulder", date: "2026-09-01", location: "Boulder, Colorado", lat: 40.01, lon: -105.27),
-          event(title: "Last year’s", date: "2025-10-10")
+          event(title: "Kona", on: "2026-10-10"),
+          event(title: "Boulder", on: "2026-09-01", location: "Boulder, Colorado", lat: 40.01, lon: -105.27),
+          event(title: "Last year’s", on: "2025-10-10")
         ])
 
         get "/location"
