@@ -1,20 +1,30 @@
-// The Location page: a full-width Mapbox map, and the coordinates it just wrote.
+// The Location page: the controls that set a location on the left, the map they move on the right.
 
 .location {
-  display: flex;
-  flex-direction: column;
-  gap: var(--wa-space-m);
+  align-items: start;
+  display: grid;
+  gap: var(--wa-space-l);
+  // The map leads; the controls column is only as wide as its fields and race buttons need.
+  grid-template-columns: minmax(0, 22rem) minmax(0, 1fr);
+
+  @media (width < 60rem) {
+    grid-template-columns: minmax(0, 1fr);
+  }
 
   &__notice {
     margin-block-end: var(--wa-space-m);
   }
 
-  &__bar {
-    align-items: center;
+  &__controls {
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--wa-space-m);
-    justify-content: space-between;
+    flex-direction: column;
+    gap: var(--wa-space-l);
+
+    // The column already spaces its children, so the divider's own block margin would stack on
+    // top of that gap and leave the rule floating in the middle of a gutter twice as wide.
+    wa-divider {
+      --spacing: 0;
+    }
   }
 
   &__summary {
@@ -29,6 +39,80 @@
 
   &__status {
     margin: 0;
+  }
+
+  &__search {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-s);
+  }
+
+  // The column stretches its children to the address field's width; the button under it opts back
+  // out to its own.
+  &__go {
+    align-self: flex-start;
+  }
+
+  &__races {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-s);
+  }
+
+  &__races-heading {
+    margin: 0;
+  }
+
+  // ⚠️ The list is a `plain-list wa-stack` in the markup rather than a flex column here: the stack
+  // utility is what zeroes the `margin-inline-start` native.css puts on every <li>, which nothing
+  // set on the <ul> can reach.
+  //
+  // The whole row is the button: a race is one target, and a separate "use this" control beside
+  // the name would be a second thing to aim at for the same click.
+  &__race {
+    inline-size: 100%;
+
+    &::part(button) {
+      block-size: auto;
+      justify-content: flex-start;
+      padding-block: var(--wa-space-s);
+      text-align: start;
+    }
+
+    // ⚠️ The label is a slot, and slots are inline by default — without this the two lines run
+    // together on one.
+    &::part(label) {
+      display: flex;
+      flex-direction: column;
+      gap: var(--wa-space-3xs);
+      min-inline-size: 0;
+    }
+  }
+
+  &__race-title {
+    font-weight: var(--wa-font-weight-semibold);
+    overflow-wrap: anywhere;
+  }
+
+  &__race-detail {
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-s);
+    font-weight: var(--wa-font-weight-normal);
+    overflow-wrap: anywhere;
+  }
+
+  // The map stays in view while working down a long list of races. It has to clear the sticky
+  // header — pinning to the viewport top slides the map under it — same as the course-map editor's
+  // preview.
+  //
+  // ⚠️ A wrapper rather than the map element itself. Mapbox GL JS adds `mapboxgl-map` to its
+  // container and appends its own stylesheet to the head at runtime, i.e. after ours, so
+  // `.mapboxgl-map { position: relative }` beats an equally specific `position: sticky` here on
+  // source order — and `top` then resolves as a plain relative offset that pushes the map down the
+  // page by that much, at every scroll position.
+  &__view {
+    position: sticky;
+    top: calc(var(--header-height, 0px) + var(--wa-space-m));
   }
 
   // Mapbox GL JS sizes its canvas to this element, so it needs a height of its own — it has no

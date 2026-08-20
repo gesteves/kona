@@ -17,8 +17,8 @@
   </wa-callout>
 <% end %>
 
-<%# The pin is the location: dropping or dragging it saves, and the line above the map is the only
-    confirmation there is. %>
+<%# Three ways in — an address, a race, or the pin itself — and all three save on the spot. The
+    line above the controls is the only confirmation there is. %>
 <div class="location" data-controller="location-map"
      data-location-map-token-value="<%= @location.map_token %>"
      data-location-map-style-value="<%= @location.map_style %>"
@@ -28,25 +28,67 @@
      data-location-map-zoom-value="<%= @location.zoom %>"
      data-location-map-save-url-value="<%= @location.save_path %>">
 
-  <div class="location__bar">
+  <div class="location__controls">
     <div class="location__summary">
       <%# The name the weather widget would print for these coordinates — the page doubles as a
-          preview of that, so it's re-derived on every drop rather than left to go stale. %>
+          preview of that, so it's re-derived on every save rather than left to go stale. %>
       <h2 class="location__place wa-heading-l" data-location-map-target="place"><%= @location.heading %></h2>
       <p class="location__status wa-caption-s" data-location-map-target="status" aria-live="polite">
         <%= @location.details %>
       </p>
     </div>
 
-    <%# Explicit `click->`: Stimulus infers a default event from the tag name, and wa-button isn't
-        in its map. %>
-    <wa-button appearance="outlined" data-action="click->location-map#locate">
-      <%= slotted_icon_svg("classic", "light", "location-crosshairs") %>
-      Use my location
-    </wa-button>
+    <wa-divider></wa-divider>
+
+    <%# A real <form> so Enter in the field submits it, but it never reaches the network on its own:
+        the controller cancels the submit and posts the address to the same action a pin drop uses.
+        There's no no-JS fallback to preserve — without JS this page has no map either. %>
+    <form class="location__search" data-action="submit->location-map#search">
+      <wa-input name="address" label="Address" placeholder="An address, or the name of a place"
+                autocomplete="off" enterkeyhint="go" data-location-map-target="address">
+      </wa-input>
+
+      <wa-button class="location__go" type="submit" variant="brand" appearance="accent">
+        <%= slotted_icon_svg("classic", "light", "magnifying-glass") %>
+        Go there
+      </wa-button>
+    </form>
+
+    <% if @location.races.any? %>
+      <%# Inside the conditional: with no races ahead there are no two things to separate. %>
+      <wa-divider></wa-divider>
+
+      <section class="location__races" aria-labelledby="hed-races">
+        <h2 class="location__races-heading wa-heading-s" id="hed-races">Upcoming races</h2>
+
+        <%# The coordinates ride on the button rather than being re-derived: they're Contentful's
+            own, so a shortcut puts the pin exactly where the race card says the race is. %>
+        <ul class="plain-list wa-stack wa-gap-2xs">
+          <% @location.races.each do |race| %>
+            <li>
+              <wa-button class="location__race" appearance="outlined"
+                         data-action="click->location-map#useRace"
+                         data-latitude="<%= race.latitude %>"
+                         data-longitude="<%= race.longitude %>">
+                <span class="location__race-title"><%= race.title %></span>
+                <span class="location__race-detail">
+                  <%= race.on %><% if race.place.present? %> · <%= race.place %><% end %>
+                </span>
+              </wa-button>
+            </li>
+          <% end %>
+        </ul>
+      </section>
+    <% end %>
   </div>
 
-  <%# Left empty on purpose — Mapbox GL JS fills it, and anything in here would be torn out with
-      the map before Turbo caches the page. %>
-  <div class="location__map" data-location-map-target="map"></div>
+  <%# The wrapper is what's pinned, and it has to be: ⚠️ Mapbox GL JS adds `mapboxgl-map` to the
+      element below and loads its stylesheet at runtime, *after* ours, so its
+      `.mapboxgl-map { position: relative }` beats an equally specific `position: sticky` on source
+      order — leaving our `top` to apply as a plain relative offset that shoves the map down. %>
+  <div class="location__view">
+    <%# Left empty on purpose — Mapbox GL JS fills it, including the Geolocation button, and
+        anything in here would be torn out with the map before Turbo caches the page. %>
+    <div class="location__map" data-location-map-target="map"></div>
+  </div>
 </div>

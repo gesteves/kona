@@ -52,7 +52,7 @@ a cached copy before revalidating.
 | GET | `/`, `/spam`, `/location`, `/connected-apps`, `/course-maps`, `/course-maps/:id` | admin UI (owner-session gated) | `no-store` |
 | POST | `/spam/:id/not-spam`; DELETE `/spam/:id`, `/connected-apps/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
 | GET/POST/DELETE | `/connected-apps/bluesky` | the Bluesky handle + app password form, and disconnect | `no-store` |
-| POST | `/location` | same write as `POST /api/location`; answers with the geocoded place | `no-store` |
+| POST | `/location` | same write as `POST /api/location`, from a coordinate pair or an `address` to geocode; answers with the coordinates and the geocoded place | `no-store` |
 | POST | `/course-maps`; PATCH/DELETE `/course-maps/:id`; GET `/course-maps/status` | upload GPX tracks, save render settings, delete a track, poll publish status | `no-store` |
 | GET | `/course-maps/:id/preview`, `/course-maps/:id/download` | the rendered PNG, proxied from Mapbox; same render, only the disposition differs | `no-store` |
 | — | `/sidekiq` | job dashboard (owner-session gated) | — |
@@ -98,8 +98,9 @@ controller; a small Rack guard in the Sidekiq initializer gates the mounted `Sid
 ### Services
 
 `app/services/`, base `ApplicationService`: one per external API — Intervals.icu, Apple WeatherKit
-(ES256 JWT), Google Maps / Air Quality / Pollen, PurpleAir, Whoop (OAuth2), TrainerRoad (iCal),
-Contentful, Plausible, Font Awesome, Goodspeed, Akismet, Resend, Turnstile, Voyage (`Embeddings`),
+(ES256 JWT), Google Maps (`GoogleMaps` reverse-geocodes, `GoogleGeocoder` forward) / Air Quality /
+Pollen, PurpleAir, Whoop (OAuth2), TrainerRoad (iCal), Contentful, Plausible, Font Awesome,
+Goodspeed, Akismet, Resend, Turnstile, Voyage (`Embeddings`),
 `StandardSite`, `AssetMirror`, plus five that aren't `ApplicationService` subclasses because they
 aren't cacheable reads: `SpamQuarantine`, `TrackLibrary`, and `BlueskyCredentials` (Redis-only, no
 HTTP), `GpxTrack` (parsing only), and `MapboxTileset`/`StaticMap` (see
@@ -458,10 +459,11 @@ calls `Akismet#submit_ham`.
 
 ### The location picker
 
-`/location` is a full-width Mapbox map with a draggable pin, and the pin **is** the current
-location: a click or a drag writes it, with no separate save step. Above the map sit the place name,
-the coordinates and a Geolocation button — that line is the only confirmation there is, so it
-reports "Saving…" and then what was stored.
+`/location` is two columns — the ways in on the left, a Mapbox map on the right, one column under
+60rem — and every one of them writes immediately, with no separate save step: the pin **is** the
+current location, and so is an address typed into the box, a reading from the map's Geolocation
+button, or a race picked from the shortcut list. The place name and coordinates above the controls
+are the only confirmation there is, so that line reports "Saving…" and then what was stored.
 
 - **It writes through `Location.store`**, the same method `POST /api/location` uses, so the two
   can't drift on ordering (Redis first, sync second) or on validation (`Location.parse`, which is
@@ -486,7 +488,14 @@ reports "Saving…" and then what was stored.
 - ⚠️ **The map's token is `MAPBOX_ACCESS_TOKEN` and only that.** It's rendered into the page, and
   `StaticMap`'s preference for `MAPBOX_SECRET_TOKEN` is exactly the fallback that must not happen
   here — that token carries `tilesets:write`. A request spec asserts it never appears in the body.
-  Without the public token the map is replaced by a callout and the coordinate form still works.
+  Without the public token the map is replaced by a callout; the address box and the race shortcuts
+  still work, and geolocation doesn't, since its button belongs to the map.
+- **Geolocation is Mapbox's `GeolocateControl`**, on the map beside the zoom control, not a button
+  of ours: it flies to the reading, draws the accuracy circle, and disables itself where the
+  browser can't geolocate — which a button of ours could only discover by being pressed. Its
+  `geolocate` event saves through the same path a pin drop does. ⚠️ **Never `trackUserLocation`**:
+  in active lock it re-fires on every position update, and each one here is a Redis write plus a
+  `LocationSyncJob`, so a phone left on this page would sync itself to Intervals.icu on GPS jitter.
 - **Mapbox GL JS comes from Mapbox's CDN, loaded by the Stimulus controller**, not from npm. It's
   several times the size of the whole admin bundle and one page wants it, and the map already
   can't work without `api.mapbox.com`, so this adds no dependency the page didn't have.
@@ -496,8 +505,16 @@ reports "Saving…" and then what was stored.
 - ⚠️ **The map is torn down on `turbo:before-cache`.** Turbo snapshots the page before Stimulus
   disconnects, so without it the cached copy contains GL JS's canvas and a restoration visit
   builds a second map on top of the dead one.
-- The geocode is display only and degrades to nothing, so an unset `GOOGLE_API_KEY` — or a bad day
-  at Google — leaves the coordinates and stores the location regardless.
+- The heading's geocode is display only and degrades to nothing, so an unset `GOOGLE_API_KEY` — or
+  a bad day at Google — leaves the coordinates and stores the location regardless. ⚠️ **The address
+  box is the exception**: `GoogleGeocoder` is the *same* key forward, and without it every address
+  is refused. That's the only control here with a hard upstream dependency; the pin, the shortcuts
+  and Geolocation all carry their own coordinates.
+- **The race shortcuts are every confirmed race still ahead**, from the same Contentful events the
+  upcoming-races widget reads, soonest first. ⚠️ Deliberately not `EventsHelper#upcoming_races` —
+  that's the widget's *selection*, capped at three or four, and any race ahead is a place you might
+  be. A race without coordinates is dropped rather than listed as a button that couldn't move the
+  map. Contentful being down costs the shortcuts and nothing else.
 
 ### The course-map renderer
 

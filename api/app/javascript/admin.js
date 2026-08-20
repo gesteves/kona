@@ -20,6 +20,8 @@ import { Application } from "@hotwired/stimulus";
 import "@web.awesome.me/webawesome-pro/dist/components/page/page.js";
 import "@web.awesome.me/webawesome-pro/dist/components/card/card.js";
 import "@web.awesome.me/webawesome-pro/dist/components/callout/callout.js";
+// The Location page's rule between the address search and the race shortcuts.
+import "@web.awesome.me/webawesome-pro/dist/components/divider/divider.js";
 import "@web.awesome.me/webawesome-pro/dist/components/badge/badge.js";
 // The Contact page's spam cards. wa-details and wa-dialog render their own chevron and close
 // icons through <wa-icon library="system">, which resolves to inline data URIs bundled with the

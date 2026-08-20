@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe "Admin location", type: :request do
+  include ActiveSupport::Testing::TimeHelpers
+
   let(:owner_email) { "owner@example.com" }
   let(:public_token) { "pk.test-token" }
   let(:secret_token) { "sk.secret-token" }
@@ -14,6 +16,15 @@ RSpec.describe "Admin location", type: :request do
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
     stub_geocoding(place: "Jackson Hole, Wyoming")
     stub_stored_location("43.48,-110.76")
+    stub_events([])
+  end
+
+  def stub_events(events)
+    allow_any_instance_of(Events).to receive(:all).and_return(DeepOstruct.wrap(events))
+  end
+
+  def event(title:, date:, going: true, location: "Kona, Hawaii", lat: 19.64, lon: -155.99)
+    { title: title, date: date, going: going, location: location, coordinates: { lat: lat, lon: lon } }
   end
 
   # The page previews what the weather widget would print, which means Google's geocoder. Stubbed
@@ -121,6 +132,46 @@ RSpec.describe "Admin location", type: :request do
     end
   end
 
+  describe "the race shortcuts" do
+    before { sign_in! }
+
+    it "lists the confirmed races ahead, with the coordinates their buttons post" do
+      travel_to(Time.utc(2026, 8, 20, 18, 0, 0)) do
+        stub_events([
+          event(title: "Kona", date: "2026-10-10"),
+          event(title: "Boulder", date: "2026-09-01", location: "Boulder, Colorado", lat: 40.01, lon: -105.27),
+          event(title: "Last year’s", date: "2025-10-10")
+        ])
+
+        get "/location"
+
+        expect(response.body).to include("Boulder, Colorado")
+        expect(response.body).to include('data-latitude="19.64"')
+        expect(response.body).to include('data-longitude="-155.99"')
+        expect(response.body).not_to include("Last year’s")
+        # Soonest first.
+        expect(response.body.index("Boulder")).to be < response.body.index("Kona")
+      end
+    end
+
+    it "leaves the section out when there's nothing ahead" do
+      get "/location"
+
+      expect(response.body).not_to include("Upcoming races")
+    end
+
+    # Contentful is one more upstream this page doesn't need to work.
+    it "still renders the map when the events can't be fetched" do
+      allow_any_instance_of(Events).to receive(:all).and_call_original
+      allow(HTTParty).to receive(:post).and_raise(StandardError, "Contentful is down")
+
+      get "/location"
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("data-controller=\"location-map\"")
+    end
+  end
+
   describe "POST /location" do
     before { sign_in! }
 
@@ -140,7 +191,9 @@ RSpec.describe "Admin location", type: :request do
 
       post "/location", params: { latitude: "37.7749", longitude: "-122.4194" }
 
-      expect(response.parsed_body).to eq("place" => "Jackson Hole, Wyoming")
+      expect(response.parsed_body).to eq(
+        "latitude" => 37.7749, "longitude" => -122.4194, "place" => "Jackson Hole, Wyoming"
+      )
     end
 
     it "still stores the location when the geocode fails" do
@@ -149,7 +202,7 @@ RSpec.describe "Admin location", type: :request do
 
       post "/location", params: { latitude: "37.7749", longitude: "-122.4194" }
 
-      expect(response.parsed_body).to eq("place" => nil)
+      expect(response.parsed_body["place"]).to be_nil
       expect(LocationSyncJob).to have_enqueued_sidekiq_job(37.7749, -122.4194)
     end
 
@@ -174,6 +227,40 @@ RSpec.describe "Admin location", type: :request do
       post "/location", params: {}
 
       expect(response).to have_http_status(:unprocessable_content)
+    end
+
+    context "with an address" do
+      before { allow($redis).to receive(:set) }
+
+      it "geocodes it, stores the result, and answers with where it landed" do
+        allow_any_instance_of(GoogleGeocoder).to receive(:coordinates).and_return([ 37.7749, -122.4194 ])
+
+        post "/location", params: { address: "1 Ferry Building, San Francisco" }
+
+        expect(response.parsed_body).to eq(
+          "latitude" => 37.7749, "longitude" => -122.4194, "place" => "Jackson Hole, Wyoming"
+        )
+        expect(LocationSyncJob).to have_enqueued_sidekiq_job(37.7749, -122.4194)
+      end
+
+      it "refuses an address that resolves to nothing" do
+        allow_any_instance_of(GoogleGeocoder).to receive(:coordinates).and_return(nil)
+
+        post "/location", params: { address: "asdfgh" }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(LocationSyncJob.jobs).to be_empty
+      end
+
+      # ⚠️ Falling through to the address on an unusable pair would save a place the caller never
+      # asked for.
+      it "never falls back to it when a coordinate was sent too" do
+        expect_any_instance_of(GoogleGeocoder).not_to receive(:coordinates)
+
+        post "/location", params: { latitude: "somewhere", longitude: "else", address: "Kona" }
+
+        expect(response).to have_http_status(:unprocessable_content)
+      end
     end
   end
 

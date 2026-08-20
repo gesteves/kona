@@ -16,7 +16,9 @@ const PRECISION = 6;
 // pin drop doesn't reformat the coordinates the server rendered. Display only; PRECISION is stored.
 const DISPLAY_PRECISION = 3;
 
-// Close enough to see which building you're in, for a reading from the Geolocation API.
+// Where the map lands when a save didn't start on it — an address, a race shortcut. Close enough
+// to see which building you're in. Geolocation isn't in that list: Mapbox's own control flies to
+// the reading itself, at a zoom it derives from the reported accuracy.
 const LOCATED_ZOOM = 14;
 
 const GEOLOCATION_ERRORS = {
@@ -57,13 +59,16 @@ function loadMapbox() {
 /**
  * The admin's location picker: a Mapbox map whose pin is the current location.
  *
- * Clicking the map, dragging the pin, and the Geolocation button all do the same thing — post to
- * the same action the bearer-gated POST /api/location uses. There is no separate save step, so a
- * stray click is undone by clicking where you meant to, and the line above the map is the only
- * confirmation there is.
+ * Clicking the map, dragging the pin, the Geolocation button, the address box and the race
+ * shortcuts all do the same thing — post to the same action the bearer-gated POST /api/location
+ * uses. There is no separate save step, so a stray click is undone by clicking where you meant to,
+ * and the line above the controls is the only confirmation there is.
+ *
+ * ⚠️ Only the map itself needs `token`. The address box and the race shortcuts save through the
+ * server and are useful with no map at all, so nothing here may bail out early on a missing one.
  */
 export default class extends Controller {
-  static targets = ["map", "place", "status"];
+  static targets = ["map", "place", "status", "address"];
   static values = {
     token: String,
     style: String,
@@ -115,6 +120,7 @@ export default class extends Controller {
       zoom: this.zoomValue
     });
     this.map.addControl(new mapboxgl.NavigationControl(), "top-right");
+    this.map.addControl(this.geolocation(mapboxgl), "top-right");
     this.map.on("click", (event) => this.moveTo(event.lngLat.lat, event.lngLat.lng));
 
     // Twice Mapbox's default size: the pin is the one thing on this page you have to be able to
@@ -128,19 +134,66 @@ export default class extends Controller {
     this.pin(this.latitudeValue, this.longitudeValue);
   }
 
-  /** Asks the browser where it is, then saves that. */
-  locate() {
-    if (!navigator.geolocation) return this.report("This browser can't share a location.");
+  /**
+   * Mapbox's own Geolocation button, which saves whatever it finds.
+   *
+   * On the map rather than beside it because the control already does the parts a button of ours
+   * had to fake: it flies to the reading, draws its accuracy circle, and **disables itself** where
+   * the browser can't geolocate at all — which ours could only discover by being pressed.
+   * @returns {object} The control, for addControl.
+   */
+  geolocation(mapboxgl) {
+    const control = new mapboxgl.GeolocateControl({
+      positionOptions: { enableHighAccuracy: true, timeout: 10000 },
+      // ⚠️ Not `trackUserLocation`. In its active-lock mode the control re-fires on every position
+      // update, and every one of those here is a Redis write plus a LocationSyncJob — so a phone
+      // left on this page would sync itself to Intervals.icu on GPS jitter. One press, one reading.
+      trackUserLocation: false
+    });
 
-    this.report("Finding you…");
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
-        this.map?.flyTo({ center: [coords.longitude, coords.latitude], zoom: LOCATED_ZOOM });
-        this.moveTo(coords.latitude, coords.longitude);
-      },
-      (error) => this.report(GEOLOCATION_ERRORS[error.code] ?? "Your location couldn't be read."),
-      { enableHighAccuracy: true, timeout: 10000 }
+    // ⚠️ moveTo, not goTo: the control has already flown the map there, and flying again from our
+    // side fights its animation.
+    control.on("geolocate", ({ coords }) => this.moveTo(coords.latitude, coords.longitude));
+    control.on("error", (error) =>
+      this.report(GEOLOCATION_ERRORS[error.code] ?? "Your location couldn't be read.")
     );
+
+    return control;
+  }
+
+  /**
+   * Geocodes whatever is in the address box, then goes there. The server geocodes *and* stores in
+   * one call, so the coordinates come back already saved and there is nothing to post twice.
+   * @param {SubmitEvent} event
+   */
+  async search(event) {
+    // ⚠️ The form has no action, so without this Enter reloads the page.
+    event.preventDefault();
+
+    const address = this.hasAddressTarget ? this.addressTarget.value.trim() : "";
+    if (!address) return this.report("Type an address first.");
+
+    this.report("Looking that up…");
+    const result = await this.write({ address }, "That address couldn't be found.");
+    if (!result) return;
+
+    this.settle(result.latitude, result.longitude, result.place, { fly: true });
+  }
+
+  /**
+   * A race shortcut. The coordinates are Contentful's own, carried on the button, so this is an
+   * ordinary save with the map flown along to it.
+   * @param {PointerEvent} event
+   */
+  useRace(event) {
+    const { latitude, longitude } = event.currentTarget.dataset;
+    this.goTo(Number(latitude), Number(longitude));
+  }
+
+  /** Flies the map to a point and saves it. */
+  goTo(latitude, longitude) {
+    this.map?.flyTo({ center: [longitude, latitude], zoom: LOCATED_ZOOM });
+    this.moveTo(latitude, longitude);
   }
 
   /** Moves the pin to a new position and saves it. */
@@ -171,9 +224,21 @@ export default class extends Controller {
    * @param {number} longitude
    */
   async save(latitude, longitude) {
-    const coordinates = this.format(latitude, longitude);
     this.report("Saving…");
+    const result = await this.write({ latitude, longitude }, "Those coordinates were refused.");
+    if (!result) return;
 
+    this.settle(latitude, longitude, result.place);
+  }
+
+  /**
+   * Posts to the save action, which both validates and stores. The one place that talks to the
+   * server, so an address and a coordinate pair fail the same way.
+   * @param {object} body The form fields to send — a coordinate pair, or an address.
+   * @param {string} refusal What to report when the server rejects the request.
+   * @returns {Promise<object|null>} The saved location, or null if nothing was saved.
+   */
+  async write(body, refusal) {
     try {
       const response = await fetch(this.saveUrlValue, {
         method: "POST",
@@ -182,17 +247,36 @@ export default class extends Controller {
           Accept: "application/json",
           "X-CSRF-Token": document.querySelector("meta[name=csrf-token]")?.content ?? ""
         },
-        body: new URLSearchParams({ latitude, longitude })
+        body: new URLSearchParams(body)
       });
 
-      if (!response.ok) return this.report("Those coordinates were refused.");
+      if (!response.ok) {
+        this.report(refusal);
+        return null;
+      }
 
-      const { place } = await response.json();
-      this.describe(place || coordinates);
-      this.report(`Saved · ${coordinates}`);
+      return await response.json();
     } catch {
       this.report("Couldn't reach the server. Nothing was saved.");
+      return null;
     }
+  }
+
+  /**
+   * Reflects a saved location in the heading and the status line.
+   * @param {boolean} [options.fly] Whether to move the map and the pin as well. Only the address
+   *   path needs it — every other save starts by moving the pin itself.
+   */
+  settle(latitude, longitude, place, { fly = false } = {}) {
+    const coordinates = this.format(latitude, longitude);
+
+    if (fly) {
+      this.pin(latitude, longitude);
+      this.map?.flyTo({ center: [Number(longitude), Number(latitude)], zoom: LOCATED_ZOOM });
+    }
+
+    this.describe(place || coordinates);
+    this.report(`Saved · ${coordinates}`);
   }
 
   describe(place) {

@@ -1,11 +1,16 @@
 require "rails_helper"
 
 RSpec.describe LocationPresenter do
-  def presenter(stored: nil, override: nil, map_token: "pk.token", place: "Jackson Hole, Wyoming")
+  include ActiveSupport::Testing::TimeHelpers
+
+  def presenter(stored: nil, override: nil, map_token: "pk.token", place: "Jackson Hole, Wyoming",
+                events: [], time_zone: "America/Denver")
     described_class.new(
       stored: stored,
       override: override,
       place: place,
+      events: events,
+      time_zone: time_zone,
       map_token: map_token,
       map_style: "mapbox://styles/mapbox/streets-v12",
       location_zoom: 11,
@@ -99,6 +104,70 @@ RSpec.describe LocationPresenter do
     it "is unconfigured without a token" do
       expect(presenter(map_token: nil)).not_to be_configured
       expect(presenter).to be_configured
+    end
+  end
+
+  describe "the race shortcuts" do
+    def event(title:, date:, going: true, location: "Kona, Hawaii", lat: 19.64, lon: -155.99)
+      coordinates = lat && lon ? { lat: lat, lon: lon } : nil
+      DeepOstruct.wrap(title: title, date: date, going: going, location: location,
+                       coordinates: coordinates)
+    end
+
+    # 2026-08-20 18:00 UTC == 12:00 MDT, so "today" in America/Denver is August 20, 2026.
+    around { |example| travel_to(Time.utc(2026, 8, 20, 18, 0, 0)) { example.run } }
+
+    it "lists the confirmed races still ahead, soonest first" do
+      subject = presenter(events: [
+        event(title: "Kona", date: "2026-10-10"),
+        event(title: "Boulder", date: "2026-09-01"),
+        event(title: "Last year's", date: "2025-10-10")
+      ])
+
+      expect(subject.races.map(&:title)).to eq([ "Boulder", "Kona" ])
+    end
+
+    # ⚠️ Not EventsHelper#upcoming_races: that caps the widget's list at three or four. Every race
+    # ahead is a place you might be.
+    it "lists more than the widget would" do
+      events = (1..6).map { |n| event(title: "Race #{n}", date: "2026-09-0#{n}") }
+
+      expect(presenter(events: events).races.size).to eq(6)
+    end
+
+    it "keeps a race happening today" do
+      subject = presenter(events: [ event(title: "Today", date: "2026-08-20") ])
+
+      expect(subject.races.map(&:title)).to eq([ "Today" ])
+    end
+
+    it "drops races that aren't confirmed" do
+      subject = presenter(events: [ event(title: "Maybe", date: "2026-09-01", going: false) ])
+
+      expect(subject.races).to be_empty
+    end
+
+    # A button with nowhere to send the map isn't a shortcut.
+    it "drops races without coordinates" do
+      subject = presenter(events: [ event(title: "Unplaced", date: "2026-09-01", lat: nil, lon: nil) ])
+
+      expect(subject.races).to be_empty
+    end
+
+    it "drops races with a date it can't read" do
+      subject = presenter(events: [ event(title: "Someday", date: "whenever") ])
+
+      expect(subject.races).to be_empty
+    end
+
+    it "carries the coordinates and a formatted date for the button" do
+      subject = presenter(events: [ event(title: "Kona", date: "2026-10-10") ])
+      race = subject.races.first
+
+      expect(race.latitude).to eq(19.64)
+      expect(race.longitude).to eq(-155.99)
+      expect(race.place).to eq("Kona, Hawaii")
+      expect(race.on).to eq("October 10, 2026")
     end
   end
 end

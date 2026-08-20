@@ -1,7 +1,8 @@
 module Admin
-  # The current location, as a map you drop a pin on. Writes the same Redis key as the
-  # bearer-gated POST /api/location — through the same Location.store — so this is a front-end
-  # over the write that already existed, not a second way to store a location.
+  # The current location: a map you drop a pin on, an address box, and a shortcut per upcoming
+  # race. Every one of them writes the same Redis key as the bearer-gated POST /api/location —
+  # through the same Location.store — so this is a front-end over the write that already existed,
+  # not a second way to store a location.
   class LocationController < BaseController
     # The basemap for picking a place.
     #
@@ -22,22 +23,39 @@ module Admin
 
     # POST /location
     #
-    # Answers with the newly geocoded place rather than a redirect: the only caller is the map's
-    # fetch, and the page updates its heading in place instead of reloading.
+    # Takes either a coordinate pair — a pin drop, a race shortcut, the browser's geolocation — or
+    # an `address` to geocode first.
+    #
+    # Answers with the newly geocoded place rather than a redirect: the only caller is the page's
+    # fetch, and it updates the heading in place instead of reloading. The coordinates come back
+    # too, since on the address path they're the only way the map learns where it was sent.
     def create
-      coordinates = Location.parse(params[:latitude], params[:longitude])
+      coordinates = requested_coordinates
       return head :unprocessable_content if coordinates.nil?
 
       Location.store(*coordinates)
-      render json: described(coordinates)
+      render json: { latitude: coordinates.first, longitude: coordinates.last, **described(coordinates) }
     end
 
     private
+
+    # ⚠️ A coordinate pair wins whenever either half is present, even when the pair is unusable.
+    # Falling through to the address on a bad pair would save a place the caller never asked for.
+    # @return [Array(Float, Float), nil]
+    def requested_coordinates
+      if params[:latitude].present? || params[:longitude].present?
+        Location.parse(params[:latitude], params[:longitude])
+      elsif params[:address].present?
+        GoogleGeocoder.new(params[:address]).coordinates
+      end
+    end
 
     def present
       LocationPresenter.new(
         stored: Location.stored,
         override: Location.override,
+        events: Events.new.all,
+        time_zone: TimeZoneResolver.default,
         map_token: ENV["MAPBOX_ACCESS_TOKEN"],
         map_style: MAP_STYLE,
         location_zoom: LOCATION_ZOOM,
