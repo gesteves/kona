@@ -14,7 +14,7 @@ RSpec.describe ActivityDescription::Composer do
         🗓️ 2 hours of sweet spot
         🌤️ Mild and sunny with a light breeze
         ⚡️ Avg 200 W · NP 210 W
-        🌡️ Max HSI 2.5 · Median HSI 1.7
+        🌡️ 72% heat adapted
         🔥 12.4 Whoop Strain
       TEXT
       expect(described_class.headline(description)).to eq("Big day out.")
@@ -73,24 +73,18 @@ RSpec.describe ActivityDescription::Composer do
   end
 
   describe ".heat_block" do
-    it "renders HSI and adaptation together" do
-      block = described_class.heat_block(max_hsi: 2.5, median_hsi: 1.7, heat_adaptation_score: 72.4, swim: false)
-      expect(block).to eq("🌡️ Max HSI 2.5 · Median HSI 1.7 · 72% heat adapted")
+    it "rounds the adaptation score to a whole percentage" do
+      expect(described_class.heat_block(heat_adaptation_score: 72.4, swim: false)).to eq("🌡️ 72% heat adapted")
     end
 
-    it "requires both HSI values for the HSI part" do
-      block = described_class.heat_block(max_hsi: 2.5, median_hsi: nil, heat_adaptation_score: 72, swim: false)
-      expect(block).to eq("🌡️ 72% heat adapted")
-    end
-
-    it "suppresses a zero or nil adaptation score" do
-      expect(described_class.heat_block(max_hsi: nil, median_hsi: nil, heat_adaptation_score: 0, swim: false)).to be_nil
-      block = described_class.heat_block(max_hsi: 2.0, median_hsi: 1.0, heat_adaptation_score: nil, swim: false)
-      expect(block).to eq("🌡️ Max HSI 2.0 · Median HSI 1.0")
+    it "suppresses a zero, sub-1% or nil adaptation score" do
+      expect(described_class.heat_block(heat_adaptation_score: 0, swim: false)).to be_nil
+      expect(described_class.heat_block(heat_adaptation_score: 0.4, swim: false)).to be_nil
+      expect(described_class.heat_block(heat_adaptation_score: nil, swim: false)).to be_nil
     end
 
     it "is suppressed entirely for swims" do
-      expect(described_class.heat_block(max_hsi: 2.5, median_hsi: 1.7, heat_adaptation_score: 72, swim: true)).to be_nil
+      expect(described_class.heat_block(heat_adaptation_score: 72, swim: true)).to be_nil
     end
   end
 
@@ -131,7 +125,7 @@ RSpec.describe ActivityDescription::Composer do
         weather: "🌤️ Mild and sunny",
         water_temp: "💧 Water temperature 16 °C",
         power: "⚡️ Avg 200 W",
-        heat: "🌡️ Max HSI 2.5 · Median HSI 1.7",
+        heat: "🌡️ 72% heat adapted",
         whoop: "🔥 12.4 Whoop Strain"
       )
 
@@ -140,7 +134,7 @@ RSpec.describe ActivityDescription::Composer do
         🌤️ Mild and sunny
         💧 Water temperature 16 °C
         ⚡️ Avg 200 W
-        🌡️ Max HSI 2.5 · Median HSI 1.7
+        🌡️ 72% heat adapted
         🔥 12.4 Whoop Strain
       TEXT
     end

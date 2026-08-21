@@ -141,31 +141,15 @@ module ActivityDescription
       Composer.water_temp_block(median(samples), unit: @intervals.temperature_unit)
     end
 
-    # The 🌡️ heat line: max and median heat strain index, plus the day's heat-adaptation score.
+    # The 🌡️ heat line: the day's heat-adaptation score.
     # @return [String, nil]
     def heat_line(activity, swim)
       return if swim
 
-      max_hsi, median_hsi = heat_strain_values(activity)
-
       date = activity_date(activity)
       score = date && @intervals.wellness(date)&.dig(:CoreHeatAdaptationScore)
-      score = nil unless score.is_a?(Numeric)
 
-      Composer.heat_block(max_hsi: max_hsi, median_hsi: median_hsi, heat_adaptation_score: score, swim: swim)
-    end
-
-    # @return [Array(Numeric, Numeric)] The [max, median] heat strain index, medianed over
-    #   positive samples only since CORE emits long zero runs when thermoneutral. [nil, nil]
-    #   when the stream is absent or empty.
-    def heat_strain_values(activity)
-      return [ nil, nil ] unless activity[:stream_types]&.include?("heat_strain_index")
-
-      samples = stream_data(activity[:id], "heat_strain_index")
-      return [ nil, nil ] if samples.blank?
-
-      positive = samples.select(&:positive?)
-      [ round_tenth(samples.max), round_tenth(median(positive.presence || samples) || 0) ]
+      Composer.heat_block(heat_adaptation_score: score, swim: swim)
     end
 
     # @return [Array<Numeric>, nil] The named stream's numeric samples.
@@ -181,10 +165,6 @@ module ActivityDescription
       sorted = values.sort
       middle = sorted.length / 2
       sorted.length.odd? ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2.0
-    end
-
-    def round_tenth(value)
-      (value * 10).round / 10.0
     end
 
     # The activity's local calendar date (start_date_local is already athlete-local).

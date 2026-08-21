@@ -239,17 +239,6 @@ RSpec.describe ActivityDescription::Generator do
   end
 
   describe "streams" do
-    it "renders the heat line from the HSI stream (median over positive samples)" do
-      allow(intervals).to receive(:activity!).and_return(activity.merge(stream_types: %w[time heat_strain_index]))
-      allow(intervals).to receive(:activity_streams).with("i1", types: %w[heat_strain_index time]).and_return(
-        [ { type: "heat_strain_index", data: [ 0, 0, 1.0, 2.0, 3.0 ] }, { type: "time", data: [ 0, 1, 2, 3, 4 ] } ]
-      )
-
-      generator.generate!("i1")
-
-      expect(intervals).to have_received(:update_activity!).with("i1", description: a_string_including("🌡️ Max HSI 3.0 · Median HSI 2.0"))
-    end
-
     it "renders the water-temperature line for open-water swims" do
       swim = activity.merge(type: "OpenWaterSwim", trainer: false, stream_types: %w[time temp], icu_average_watts: nil)
       allow(intervals).to receive(:activity!).and_return(swim)

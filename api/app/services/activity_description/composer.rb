@@ -89,25 +89,15 @@ module ActivityDescription
       "⚡️ #{parts.join(' · ')}"
     end
 
-    # The CORE heat line, combining the per-activity HSI (requires both max and median) with
-    # the daily heat-adaptation score (when positive). Suppressed for swims — the CORE
-    # sensor is inaccurate in water. E.g. "🌡️ Max HSI 2.5 · Median HSI 1.7 · 72% heat adapted".
+    # The CORE heat line: the daily heat-adaptation score, when positive. Suppressed for swims —
+    # the CORE sensor is inaccurate in water. E.g. "🌡️ 72% heat adapted".
     # @return [String, nil]
-    def heat_block(max_hsi:, median_hsi:, heat_adaptation_score:, swim:)
+    def heat_block(heat_adaptation_score:, swim:)
       return if swim
+      return unless heat_adaptation_score.is_a?(Numeric) && heat_adaptation_score.finite?
+      return unless heat_adaptation_score.round.positive?
 
-      has_hsi = max_hsi.present? && median_hsi.present?
-      has_adaptation = heat_adaptation_score.is_a?(Numeric) && heat_adaptation_score.finite? && heat_adaptation_score.positive?
-      return unless has_hsi || has_adaptation
-
-      parts = []
-      if has_hsi
-        parts << "Max HSI #{format('%.1f', max_hsi)}"
-        parts << "Median HSI #{format('%.1f', median_hsi)}"
-      end
-      parts << "#{heat_adaptation_score.round}% heat adapted" if has_adaptation
-
-      "🌡️ #{parts.join(' · ')}"
+      "🌡️ #{heat_adaptation_score.round}% heat adapted"
     end
 
     # The Whoop strain line, e.g. "🔥 12.4 Whoop Strain". Suppressed for swims.
