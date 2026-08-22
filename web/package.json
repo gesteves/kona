@@ -20,7 +20,7 @@
     "@web.awesome.me/webawesome-pro": "^3.11.0",
     "esbuild": "^0.28.2",
     "pagefind": "^1.5.2",
-    "satori": "^0.29.0",
+    "satori": "^0.29.1",
     "wrangler": "^4.124.0"
   },
   "devDependencies": {
