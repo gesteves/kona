@@ -20,7 +20,7 @@ describe('units controller', () => {
   });
 
   it('renders imperial for en-LR', async () => {
-    // Liberia is the other imperial holdout the controller allows for.
+    // Liberia is the other country with the imperial units that the controller accepts.
     stubProperty(navigator, 'language', 'en-LR');
 
     const { element } = await mountUnits();
@@ -45,8 +45,8 @@ describe('units controller', () => {
   });
 
   it('renders metric for a bare language with no region', async () => {
-    // 'en' is not 'en-us', so a region-less English locale gets metric. Deliberate: the region is
-    // the only thing that carries the answer.
+    // 'en' is not 'en-us', thus an English locale with no region gets the metric units. That is
+    // correct: only the region gives the answer.
     stubProperty(navigator, 'language', 'en');
 
     const { element } = await mountUnits();

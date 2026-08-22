@@ -2,7 +2,8 @@ import { Controller } from '@hotwired/stimulus';
 import { trackEvent, trackEventThen } from '../lib/analytics';
 import { canonicalUrl } from '../lib/utils';
 
-/** Handles social sharing: the native share sheet, popup share windows, and share tracking. */
+/** Does the social sharing: the native share sheet, the popup share windows, and the share
+ * records. */
 export default class extends Controller {
   static classes = ['hidden'];
   static values = {
@@ -14,7 +15,7 @@ export default class extends Controller {
     via: String,
   };
 
-  /** Reveals the element when it's the native-share trigger and the API is available. */
+  /** Shows the element when it is the native-share button and the API is available. */
   connect() {
     if (navigator.share && this.isNativeValue) {
       this.element.classList.remove(this.hiddenClass);
@@ -22,14 +23,14 @@ export default class extends Controller {
   }
 
   /**
-   * @returns {string} `urlValue`, falling back to the document's canonical URL.
+   * @returns {string} `urlValue`, or the canonical URL of the document.
    */
   getShareUrl() {
     return this.urlValue || canonicalUrl();
   }
 
   /**
-   * @returns {string} `textValue`, falling back to the document's og:title or title.
+   * @returns {string} `textValue`, or the og:title of the document, or its title.
    */
   getShareText() {
     return (
@@ -40,8 +41,8 @@ export default class extends Controller {
   }
 
   /**
-   * Opens the native share sheet for the page's title and URL.
-   * @param {Event} event - The event that triggered the share action.
+   * Opens the native share sheet with the title and the URL of the page.
+   * @param {Event} event - The event that started the share action.
    */
   openShareSheet(event) {
     event.preventDefault();
@@ -60,8 +61,8 @@ export default class extends Controller {
   }
 
   /**
-   * Opens a popup window for sharing the linked URL.
-   * @param {Event} event - The event that triggered the popup window (e.g., a click event).
+   * Opens a popup window to share the URL of the link.
+   * @param {Event} event - The event that started the popup window, for example a click.
    */
   openPopup(event) {
     event.preventDefault();
@@ -72,7 +73,8 @@ export default class extends Controller {
     const width = this.popupWidthValue || 400;
     const height = this.popupHeightValue || 300;
 
-    // `noopener` so the popup can't reach back to `window.opener` (reverse tabnabbing).
+    // `noopener` stops the popup from a change to `window.opener`, which is reverse
+    // tabnabbing.
     window.open(
       linkURL,
       'share',
@@ -81,9 +83,10 @@ export default class extends Controller {
   }
 
   /**
-   * Tracks a share link, then follows it. mailto:/sms: navigate the current window, so the
-   * event has to be sent first; HTTP(S) links open in a new tab and can't interrupt it.
-   * @param {Event} event - The event that triggered the share action.
+   * Records a share link, then goes to it. A mailto: link and an sms: link navigate the current
+   * window, thus the code must send the event first. An HTTP or HTTPS link opens in a new tab and
+   * cannot stop the event.
+   * @param {Event} event - The event that started the share action.
    */
   trackShare(event) {
     event.preventDefault();

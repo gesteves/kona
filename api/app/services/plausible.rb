@@ -1,10 +1,10 @@
-# Queries the Plausible Analytics API (v2), caching responses in Redis for 5 minutes.
+# Queries the Plausible Analytics API (v2). Redis caches each response for 5 minutes.
 class Plausible < ApplicationService
   PLAUSIBLE_API_URL = "https://plausible.io/api/v2/query"
-  # Matches only article pages, whose path format ArticleAttributes.path owns.
+  # This matches an article page only. ArticleAttributes.path decides the format of that path.
   ARTICLE_PATH_FILTER = [ [ "matches", "event:page", [ "^/20\\d{2}/" ] ] ].freeze
 
-  # @return [String, nil] The Plausible site id, or nil when unconfigured.
+  # @return [String, nil] The Plausible site id, or nil if there is no configuration.
   attr_reader :site_id
 
   def initialize
@@ -12,29 +12,30 @@ class Plausible < ApplicationService
     @site_id = ENV["PLAUSIBLE_SITE_ID"]
   end
 
-  # The public dashboard URL for one page's stats. The path is URL-encoded before
-  # interpolation, since a slug with URL-special characters would otherwise corrupt the filter.
-  # @param path [String] The page path.
-  # @param from [String] The range's start, as YYYY-MM-DD.
-  # @param to [String] The range's end, as YYYY-MM-DD.
-  # @return [String, nil] The URL, or nil when the site id isn't configured.
+  # The public dashboard URL for the stats of one page. The code changes the path into a URL-safe
+  # form first, because a slug with a character that has a meaning in a URL would break the filter.
+  # @param path [String] The path of the page.
+  # @param from [String] The start of the range, as YYYY-MM-DD.
+  # @param to [String] The end of the range, as YYYY-MM-DD.
+  # @return [String, nil] The URL, or nil if there is no site id in the configuration.
   def dashboard_url(path:, from:, to:)
     return if @site_id.blank?
     encoded_path = ERB::Util.url_encode(path)
     "https://plausible.io/#{@site_id}?f=is,page,#{encoded_path}&period=custom&from=#{from}&to=#{to}&r=v2"
   end
 
-  # Pageviews for every article page over a date range.
+  # The pageviews of each article page over a date range.
   #
-  # ⚠️ Deliberately ONE site-wide query, shared by both callers — never one query per article.
-  # Plausible allows 600 calls/hour and the 5-minute cache caps each distinct query body at 12,
-  # so one shared key costs 12 calls/hour flat while a key per article would scale with the
-  # corpus and blow the limit. Don't reintroduce a per-article query or shorten the TTL without
-  # redoing that math.
+  # ⚠️ This is ONE query for the full site, and both callers share it, on purpose. It is never one
+  # query for each article. Plausible permits 600 calls each hour, and the 5-minute cache limits
+  # each different query body to 12 calls each hour. Thus one shared key costs 12 calls each hour,
+  # and a key for each article would grow with the number of articles and go past the limit. Do not
+  # add a query for each article, and do not make the TTL shorter, until you do that calculation
+  # again.
   #
   # @param date_range [String, Array] A Plausible date range: "all", or a [from, to] pair.
-  # @return [Hash, nil] { path => pageviews }, or nil when the query is unavailable — which is
-  #   what distinguishes "analytics are down" from "nothing has been viewed".
+  # @return [Hash, nil] { path => pageviews }, or nil if the query is not available. That is what
+  #   shows the difference between "the analytics are down" and "nobody read the page".
   def pageviews_by_path(date_range: "all")
     result = query(
       metrics: [ "pageviews" ],
@@ -51,8 +52,8 @@ class Plausible < ApplicationService
     end
   end
 
-  # Runs a Plausible query, cached by request body.
-  # @return [Hash, nil] The parsed response, or nil when unavailable.
+  # Does a Plausible query. The request body is the cache key.
+  # @return [Hash, nil] The parsed response, or nil if it is not available.
   def query(metrics: [], date_range: "all", dimensions: [ "event:page" ], filters: nil, order_by: nil, offset: 0, limit: 10000)
     return if @access_token.blank? || @site_id.blank?
 
@@ -66,9 +67,10 @@ class Plausible < ApplicationService
       pagination: { offset: offset, limit: limit }
     }.compact
 
-    # ⚠️ empty_expires_in is the rate-limit backoff, not a cache. Plausible allows 600 calls/hour
-    # and post_json returns nil on any non-2xx, so without it a 429 would leave every subsequent
-    # request re-querying unthrottled — the trip removing its own protection.
+    # ⚠️ empty_expires_in is the wait for the rate limit, and not a cache. Plausible permits 600
+    # calls each hour, and post_json returns nil for each non-2xx. Thus without it, each subsequent
+    # request after a 429 would query again with no limit. The rate-limit failure would then remove
+    # its own protection.
     cached_json(generate_cache_key(body), expires_in: 5.minutes, empty_expires_in: 1.minute) do
       headers = {
         "Authorization" => "Bearer #{@access_token}",
@@ -80,16 +82,16 @@ class Plausible < ApplicationService
 
   private
 
-  # Plausible reports clean URLs, but a trailing index.html is folded in so both forms sum into
-  # one path rather than one going unmatched.
+  # Plausible gives clean URLs, but the code adds an index.html at the end to the same path. Thus
+  # the two forms give one total, and one of them does not go unused.
   def normalize_path(path)
     return if path.blank?
     path.to_s.sub(/index\.html\z/, "")
   end
 
-  # ⚠️ A digest of the query, not a parameterized rendering of it. Parameterizing stripped the
-  # regex characters out of filters like ARTICLE_PATH_FILTER, so two structurally different
-  # queries could collide on one key and serve each other's results.
+  # ⚠️ This is a digest of the query, and not the query in a URL-safe form. That form removed the
+  # regex characters from a filter such as ARTICLE_PATH_FILTER. Thus two different queries could
+  # give the same key and each one could get the result of the other.
   def generate_cache_key(body)
     "plausible:query:#{cache_version(body.to_json)}"
   end

@@ -16,8 +16,8 @@ const MARKUP = `
 
 describe('page controller', () => {
   it('tracks a page view on every turbo:load, not just the first', async () => {
-    // Turbo navigations don't reload the document, so `turbo:load` is the only pageview signal
-    // after the first render.
+    // A Turbo navigation does not load the document again, thus `turbo:load` is the only page-view
+    // event after the first render.
     await mount('page', PageController, MARKUP);
 
     document.dispatchEvent(new CustomEvent('turbo:load'));
@@ -27,9 +27,9 @@ describe('page controller', () => {
   });
 
   it('empties the toast stack before Turbo caches the page', async () => {
-    // A <wa-toast-item>'s countdown dies when Turbo disconnects the DOM and never restarts, so a
-    // toast carried into a cached snapshot comes back as a frozen zombie the next time the stack
-    // opens.
+    // The countdown of a <wa-toast-item> stops when Turbo disconnects the DOM, and it never starts
+    // again. Thus a toast in a snapshot in the cache comes back, and it does not move, the next time
+    // that the stack opens.
     await mount('page', PageController, MARKUP);
 
     document.dispatchEvent(new CustomEvent('turbo:before-cache'));

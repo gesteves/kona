@@ -1,9 +1,10 @@
-# Fetches air quality from the nearest PurpleAir sensor (US-centric), applying the EPA
-# humidity correction and converting PM2.5 to an AQI. `aqi` returns
-# { aqi:, category:, description: } or nil when no usable sensor is nearby.
+# Gets the air quality from the nearest PurpleAir sensor. Most of those sensors are in the USA. It
+# applies the EPA humidity correction and changes the PM2.5 value into an AQI value. `aqi` returns
+# { aqi:, category:, description: }, or nil when there is no correct sensor near the location.
 class PurpleAir < ApplicationService
   PURPLE_AIR_API_URL = "https://api.purpleair.com/v1/sensors"
-  # Sensors below this agreement between their two laser counters are discarded as unreliable.
+  # The code does not use a sensor whose two laser counters agree less than this value, because
+  # such a sensor is not dependable.
   MIN_CONFIDENCE = 50
 
   def initialize(latitude, longitude)
@@ -42,7 +43,8 @@ class PurpleAir < ApplicationService
     confidence_index = fields&.index("confidence")
     return if lat_index.nil? || lon_index.nil? || confidence_index.nil?
 
-    # A sensor can report a nil confidence; treat that as unusable rather than comparing nil.
+    # A sensor can give a nil confidence. Count such a sensor as incorrect, and do not compare a
+    # nil.
     valid_sensors = sensors["data"].select { |sensor| sensor[confidence_index].to_f >= MIN_CONFIDENCE }
     return if valid_sensors.blank?
 
@@ -61,28 +63,30 @@ class PurpleAir < ApplicationService
     end
   end
 
-  # Applies the EPA humidity correction to raw PM2.5.
+  # Applies the EPA humidity correction to a raw PM2.5 value.
   # @see https://cfpub.epa.gov/si/si_public_record_report.cfm?dirEntryId=353088&Lab=CEMM
   def apply_epa_correction(pm25, humidity)
     return if pm25.blank?
     return pm25 if humidity.blank?
 
-    # The correction is only defined for non-negative PM2.5; sensors do report slightly negative
-    # values in clean air, and without this they'd fall past every band to the high-concentration
-    # polynomial and come back "Hazardous".
+    # The correction applies only to a PM2.5 value of zero or more. A sensor gives a small negative
+    # value in clean air, and without this check that value would go past each band to the
+    # polynomial for a high concentration and give "Hazardous".
     return 0.0 if pm25.negative?
 
     case pm25
     when 0...30
       0.524 * pm25 - 0.0862 * humidity + 5.75
     when 30...50
-      # Transition band: blend the low and mid corrections by w = pm25/20 - 1.5 (0→1 across the band).
+      # The transition band: mix the low correction and the middle correction with
+      # w = pm25/20 - 1.5, which goes from 0 to 1 across the band.
       w = pm25 / 20.0 - 1.5
       ((0.786 * w + 0.524 * (1 - w)) * pm25) - 0.0862 * humidity + 5.75
     when 50...210
       0.786 * pm25 - 0.0862 * humidity + 5.75
     when 210...260
-      # Transition band: blend the mid and high corrections by w = pm25/50 - 4.2 (0→1 across the band).
+      # The transition band: mix the middle correction and the high correction with
+      # w = pm25/50 - 4.2, which goes from 0 to 1 across the band.
       w = pm25 / 50.0 - 4.2
       ((0.69 * w + 0.786 * (1 - w)) * pm25) -
         0.0862 * humidity * (1 - w) +
@@ -94,7 +98,7 @@ class PurpleAir < ApplicationService
     end
   end
 
-  # Converts PM2.5 to an AQI value and category.
+  # Changes a PM2.5 value into an AQI value and a category.
   # @see https://www.epa.gov/system/files/documents/2024-02/pm-naaqs-air-quality-index-fact-sheet.pdf
   def format_aqi(pm25)
     return if pm25.blank?

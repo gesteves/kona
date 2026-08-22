@@ -1,9 +1,12 @@
-// Writes each concept's `definition` (archive-page description) and `altLabels` (synonyms)
-// from the CONCEPTS list in lib/taxonomy.js. Idempotent, skip-unchanged, DRY_RUN. Patches only
-// definition/altLabels, so it never disturbs prefLabel/broader (create-taxonomy owns those).
+// Writes the `definition` of each concept, which is its archive-page description, and its
+// `altLabels`, which are its synonyms, from the CONCEPTS list in lib/taxonomy.js. You can run it
+// more than one time, it does nothing for a concept with no change, and it obeys DRY_RUN. It changes
+// definition and altLabels only, thus it never changes prefLabel or broader, which create-taxonomy
+// controls.
 //
-// Env: CONTENTFUL_MANAGEMENT_TOKEN, CONTENTFUL_ORGANIZATION_ID. DRY_RUN=true = plan only.
-// Run: `npm run taxonomy:describe`.
+// The env vars: CONTENTFUL_MANAGEMENT_TOKEN and CONTENTFUL_ORGANIZATION_ID. DRY_RUN=true shows the
+// plan only.
+// To run it: `npm run taxonomy:describe`.
 
 const { LOCALE, CONCEPTS, getExistingConcepts, createPlainClient, readEnv } = require('./lib/taxonomy');
 

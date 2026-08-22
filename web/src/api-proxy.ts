@@ -2,40 +2,42 @@ import { withSecurityHeaders } from './headers';
 import { requestLogLine } from './log';
 
 // Proxies /widgets/* and POST /api/contact to the kona-api origin.
-// See the root CLAUDE.md for the cross-app contract these routes honor.
+// Refer to the root CLAUDE.md for the contract between the two apps that these routes obey.
 
 /**
- * Request headers forwarded upstream on the contact path only. Never forwarded on widget
- * paths: those share one URL-keyed edge cache entry, so every upstream request must be
- * byte-identical.
+ * The request headers that go upstream on the contact path only. They never go on a widget path,
+ * because the widget paths share one edge cache entry with the URL as its key. Thus each upstream
+ * request must have the same bytes.
  */
 const FORWARD_REQUEST_HEADERS = ['accept'];
 
-/** The contact-form endpoint: a POST that is never cached and forwards visitor IP/UA/geo. */
+/** The contact-form endpoint: a POST that no cache holds. It sends the visitor IP, UA, and geo. */
 const CONTACT_PATH = '/api/contact';
 
 /**
- * How long to wait on the origin before collapsing a widget. Generous on purpose — the
- * origin is a single fly machine that may be cold-starting from zero.
+ * The time to wait for the origin before the code removes a widget. It is long, on purpose,
+ * because the origin is one fly machine that can start from zero.
  */
 const WIDGET_UPSTREAM_TIMEOUT_MS = 15_000;
 
 /**
- * The same bound for the contact POST. Longer than a widget's, because a form submission is
- * worth waiting out a cold start for, but bounded all the same — without it a stalled origin
- * leaves the visitor watching a spinner until the platform kills the invocation.
+ * The same limit for the contact POST. It is longer than the limit for a widget, because a form
+ * submission is important and a cold start is acceptable. But there is still a limit: without one,
+ * an origin that stops leaves the visitor with a spinner until the platform stops the
+ * invocation.
  */
 const CONTACT_UPSTREAM_TIMEOUT_MS = 25_000;
 
-/** Coarse visitor location from `request.cf`, forwarded on the contact path only. */
+/** The approximate visitor location from `request.cf`. It goes on the contact path only. */
 type ClientGeo = { city?: string; region?: string; country?: string };
 
 /**
- * Builds the upstream request headers.
- * @param incoming Headers from the client request.
- * @param hasBody Whether the request body is forwarded.
- * @param apiToken Shared bearer injected server-side; constant so viewers share one cache entry.
- * @param contactGeo Set only on the contact path; also enables client header forwarding.
+ * Makes the upstream request headers.
+ * @param incoming The headers from the client request.
+ * @param hasBody True if the request body goes upstream.
+ * @param apiToken The shared bearer token that the server adds. It is constant, thus all the
+ *   viewers share one cache entry.
+ * @param contactGeo Set on the contact path only. It also lets the client headers go upstream.
  */
 function upstreamHeaders(
   incoming: Headers,
@@ -54,8 +56,8 @@ function upstreamHeaders(
     const contentType = incoming.get('content-type');
     if (contentType) headers.set('content-type', contentType);
   }
-  // The origin sits behind Cloudflare and can't see the visitor, so pass the real signal
-  // under X-Kona-Client-* names. Used for spam scoring and the notification email only.
+  // Cloudflare is in front of the origin, thus the origin cannot see the visitor. Send the true
+  // data with the X-Kona-Client-* names. It is only for the spam score and the notification email.
   if (contactGeo) {
     const ip = incoming.get('cf-connecting-ip');
     if (ip) headers.set('x-kona-client-ip', ip);
@@ -72,8 +74,8 @@ function upstreamHeaders(
 }
 
 /**
- * Weak ETag comparison (RFC 9110 §8.8.3.2): ignores `W/` prefixes and handles a
- * comma-separated If-None-Match list or `*`.
+ * A weak ETag comparison (RFC 9110 §8.8.3.2). It ignores a `W/` prefix, and it accepts an
+ * If-None-Match list with a comma between the items, or `*`.
  */
 function etagMatches(ifNoneMatch: string, etag: string): boolean {
   const strip = (value: string) => value.trim().replace(/^W\//, '');
@@ -86,8 +88,8 @@ function etagMatches(ifNoneMatch: string, etag: string): boolean {
 }
 
 /**
- * Empty-bodied 502 with a short cache. The live-update controller collapses the widget on a
- * non-2xx, and the empty body matches the origin's own "no data" signal.
+ * A 502 with an empty body and a short cache time. The live-update controller removes the widget
+ * on a non-2xx, and the empty body is the same as the "no data" answer from the origin.
  */
 function badGateway(): Response {
   return new Response('', {
@@ -102,8 +104,9 @@ const ALLOWED_METHODS = ['GET', 'HEAD'];
 const ALLOWED_CONTACT_METHODS = ['POST'];
 
 /**
- * Proxies a widget or contact-form request to the kona-api origin.
- * @returns The origin's response, a 304, a 405, or an empty 502 if the origin is unreachable.
+ * Proxies a widget request or a contact-form request to the kona-api origin.
+ * @returns The response from the origin, a 304, a 405, or an empty 502 if the code cannot reach
+ *   the origin.
  */
 export async function handleApi(request: Request, env: Env): Promise<Response> {
   const incoming = new URL(request.url);
@@ -127,17 +130,17 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
   let upstream: Response;
   let upstreamUrl = incoming.pathname;
   try {
-    // The query string is stripped: widget inputs are path segments, but Cloudflare's cache
-    // key includes the query, so passing one through would let `?x=random` mint a fresh
-    // origin render on every request. Built inside the try so a bad KONA_API_URL degrades to
-    // the empty 502 below rather than throwing.
+    // The code removes the query string. The widget inputs are path segments, but the Cloudflare
+    // cache key includes the query. Thus a query that goes through would let `?x=random` make a
+    // new origin render for each request. This is in the try block, thus a bad KONA_API_URL gives
+    // the empty 502 below and does not raise.
     //
-    // ⚠️ Assigning `pathname` onto the base rather than resolving a relative URL against it —
-    // the same reason og.ts does. `new URL('//evil.example/x', base)` resolves to a different
-    // ORIGIN, and this request carries the injected API_TOKEN. Today the router's prefixes make
-    // that unreachable; this makes it unreachable regardless of what the router grows.
-    // `?? ''` only to satisfy the optional type: an empty base throws here exactly as an
-    // unparseable one does, which is the degradation the try block is for.
+    // ⚠️ The code sets `pathname` on the base URL. It does not make a relative URL against the
+    // base, for the same reason as og.ts. `new URL('//evil.example/x', base)` gives a different
+    // ORIGIN, and this request has the API_TOKEN that the code adds. Today the prefixes of the
+    // router prevent that, and this code prevents it for each future router.
+    // `?? ''` is only for the optional type: an empty base raises here, as a base that the code
+    // cannot parse does, and the try block is for that condition.
     const upstreamBase = new URL(env.KONA_API_URL ?? '');
     upstreamBase.pathname = incoming.pathname;
     upstreamBase.search = '';
@@ -152,18 +155,18 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
         env.API_TOKEN,
         contactGeo
       ),
-      // Streamed, not buffered, so no client-supplied body is held in the isolate. A stream
-      // can't be replayed, so this subrequest is never internally retried.
+      // This is a stream, not a buffer, thus the isolate holds no body from the client. The code
+      // cannot send a stream again, thus it never does this subrequest a second time.
       body: hasBody ? request.body : undefined,
       redirect: 'manual',
-      // Both paths are bounded. The timeout used to live in the widgets-only branch below,
-      // which left the contact POST — the one request a visitor actually waits on — unbounded.
+      // Both paths have a limit. With the timeout in the widgets-only branch below, the contact
+      // POST had no limit, and that is the one request that a visitor waits for.
       signal: AbortSignal.timeout(
         isContact ? CONTACT_UPSTREAM_TIMEOUT_MS : WIDGET_UPSTREAM_TIMEOUT_MS
       ),
-      // Widget URLs are extensionless, so Cloudflare's extension-based default caches nothing
-      // without cacheEverything. The TTL still comes from the origin's CDN-Cache-Control;
-      // nothing is re-derived here. The contact POST is deliberately never cached.
+      // A widget URL has no extension, thus the Cloudflare default, which uses the extension,
+      // caches nothing without cacheEverything. The TTL still comes from the CDN-Cache-Control of
+      // the origin, and this code calculates nothing. No cache holds the contact POST, on purpose.
       ...(isContact ? {} : { cf: { cacheEverything: true } }),
     });
   } catch (error) {
@@ -181,24 +184,25 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
   const headers = withSecurityHeaders(new Headers());
   const contentType = upstream.headers.get('content-type');
   if (contentType) headers.set('content-type', contentType);
-  // Cache-Control passes through verbatim; CDN-Cache-Control does not — it's consumed by the
-  // fetch cache above and the browser has no use for the edge policy.
+  // Cache-Control goes through with no change. CDN-Cache-Control does not: the fetch cache above
+  // reads it, and the browser has no use for the edge policy.
   const cacheControl = upstream.headers.get('cache-control');
   if (cacheControl) headers.set('cache-control', cacheControl);
 
-  // Age is load-bearing: the browser policy is `max-age=0, stale-while-revalidate=N`, and
-  // RFC 9111 has the browser measure that window from the response's age. Without it every
-  // viewer gets a full-length window on top of however long the edge held the copy, which
-  // reads as a view counter going backwards. Set before the 304 so revalidation updates it.
+  // Age is important: the browser policy is `max-age=0, stale-while-revalidate=N`, and RFC 9111
+  // makes the browser measure that window from the age of the response. Without Age, each viewer
+  // gets a full window in addition to the time that the edge held the copy, and a view counter
+  // then looks like it goes down. Set it before the 304, thus a revalidation updates it.
   const age = upstream.headers.get('age');
   if (age) headers.set('age', age);
-  // Forwarded only so cache behavior is visible from a curl.
+  // This goes through only to make the cache behavior visible in a curl.
   const cacheStatus = upstream.headers.get('cf-cache-status');
   if (cacheStatus) headers.set('cf-cache-status', cacheStatus);
 
-  // Forward the validators so the browser's background revalidation can be conditional. The
-  // conditional is answered here, never upstream: forwarding If-None-Match would vary the
-  // upstream request per client and shatter the shared edge cache entry.
+  // Send the validators, thus the background revalidation of the browser can be conditional.
+  // This code answers the conditional request, and never the origin: an If-None-Match that goes
+  // upstream would make the upstream request different for each client and would break the one
+  // shared edge cache entry.
   const etag = upstream.headers.get('etag');
   if (etag) headers.set('etag', etag);
   const lastModified = upstream.headers.get('last-modified');
@@ -211,8 +215,8 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
     }
   }
 
-  // The no-JS contact path answers with a 303; response headers are rebuilt from scratch
-  // here, so Location has to be copied explicitly.
+  // The contact path with no JavaScript answers with a 303. This code makes new response
+  // headers, thus it must copy Location.
   if (isContact) {
     const location = upstream.headers.get('location');
     if (location) headers.set('location', location);

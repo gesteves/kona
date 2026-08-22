@@ -1,10 +1,10 @@
 require "erb"
 
 module ShareHelpers
-  # Each share network's endpoint and query params, in the order they appear in the URL.
-  # A Symbol param value carries that part of the share (:title or :url); a String value is
-  # a format template combining both, encoded as one blob. The shared article URL is clean —
-  # no attribution query params.
+  # The endpoint and the query parameters of each share network, in the order that they have in the
+  # URL. A parameter value that is a Symbol gives that part of the share: :title or :url. A value
+  # that is a String is a template that joins the two into one encoded value. The article URL that
+  # the app shares is clean: it has no attribution query parameters.
   SHARE_NETWORKS = {
     "Email"    => { base: "mailto:?",                                    params: { subject: :title, body: :url } },
     "SMS"      => { base: "sms:?&",                                      params: { body: "%{title} %{url}" } },
@@ -15,8 +15,8 @@ module ShareHelpers
     "Mastodon" => { base: "https://share.joinmastodon.org/?",            params: { text: "%{title}\n\n%{url}" } }
   }.freeze
 
-  # Builds the share URL for an article on a network.
-  # @param network [String] A SHARE_NETWORKS key.
+  # Makes the share URL of an article for one network.
+  # @param network [String] A key of SHARE_NETWORKS.
   # @param article [Article] The article to share.
   # @return [String] The share URL.
   def share_url(network, article)
@@ -29,9 +29,9 @@ module ShareHelpers
     "#{config[:base]}#{query.join('&')}"
   end
 
-  # The share buttons rendered by partials/_share.html.erb, in display order. Defaults the
-  # loop fills in: `via` falls back to the network name, `action` to "trackShare", and
-  # `new_tab` to true.
+  # The share buttons that partials/_share.html.erb renders, in the order that they appear. The loop
+  # adds these default values: `via` becomes the name of the network, `action` becomes "trackShare",
+  # and `new_tab` becomes true.
   # @return [Array<Hash>]
   def share_buttons
     [
@@ -46,11 +46,11 @@ module ShareHelpers
   end
 
   # @param article [Article] The article to share.
-  # @return [String] The share section's heading, naming the entry's kind.
+  # @return [String] The heading of the share section, with the type of the entry in it.
   def share_heading(article)
-    # Matched by concept id, not display name, like every other taxonomy check in the app
-    # (article_helpers.rb's race_report?). A rename in Contentful would silently drop this to
-    # the generic "Share this post".
+    # The match uses the concept id and not the name on the screen, as each other taxonomy check in
+    # the app does (refer to race_report? in article_helpers.rb). A new name in Contentful would
+    # change this to the general "Share this post", with no message.
     tag_ids = Array(article&.contentful_metadata&.tags).map(&:id)
     type = if tag_ids.include?("race-reports")
              "race report"

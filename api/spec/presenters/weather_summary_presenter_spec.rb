@@ -1,24 +1,24 @@
 require "rails_helper"
 
-# Coverage for the weather-summary prose: the sentence builders, the good-vs-bad weather
-# call, and the activity suggestions (moved here from WeatherHelper — the thin selection/
-# formatting methods stay covered in weather_helper_spec).
+# The tests for the text of the weather summary: the methods that make each sentence, the choice
+# between good weather and bad weather, and the activity suggestions. These moved here from
+# WeatherHelper, and weather_helper_spec still covers the small selection and format methods.
 #
-# Most tests build a `@weather` fixture whose forecast window and sunrise/sunset are expressed
-# as offsets from the current time, so they're self-consistent without freezing the clock. The
-# indoor-season month check uses `travel_to(Time.now.change(...))` so the month is
-# deterministic regardless of where the suite runs.
+# Most of the tests make a `@weather` object whose forecast window, sunrise, and sunset are times
+# from the current time. Thus they agree with each other and the test does not stop the clock. The
+# test for the indoor season uses `travel_to(Time.now.change(...))`, thus the month is always the
+# same, at each place where the suite runs.
 #
-# Cross-domain predicates the summary leans on (`race_day?`, `todays_race`, `format_location`,
-# `format_elevation`, `workout_scheduled?`, …) come from the included helpers with their own
-# specs, so they're stubbed here to keep these tests about the prose logic.
+# The summary uses methods from other areas (`race_day?`, `todays_race`, `format_location`,
+# `format_elevation`, `workout_scheduled?`, and more). Those come from the helpers, which have their
+# own specs. Thus this file stubs them and these tests are about the text only.
 RSpec.describe WeatherSummaryPresenter do
   include ActiveSupport::Testing::TimeHelpers
 
   subject(:presenter) { described_class.new(time_zone: "America/Denver") }
 
-  # Builds and assigns a @weather fixture. `current`, `today`, `rest_of_day`, and `overnight`
-  # are merged into the respective sub-hashes; `sunrise`/`sunset` override today's sun times.
+  # Makes a @weather object and sets it. `current`, `today`, `rest_of_day`, and `overnight` go into
+  # their own sub-hashes. `sunrise` and `sunset` replace the sun times of today.
   def build_weather(current: {}, today: {}, rest_of_day: {}, overnight: {}, sunrise: nil, sunset: nil, alerts: [])
     now = Time.current
     weather = DeepOstruct.wrap(
@@ -63,7 +63,7 @@ RSpec.describe WeatherSummaryPresenter do
   end
 
   # ---------------------------------------------------------------------------
-  # Weather quality
+  # The quality of the weather
   # ---------------------------------------------------------------------------
   describe "#hot?" do
     it "is hot at or above 30° for either actual or apparent temperature" do
@@ -134,7 +134,7 @@ RSpec.describe WeatherSummaryPresenter do
   end
 
   # ---------------------------------------------------------------------------
-  # Race-day sentences
+  # The sentences for a race day
   # ---------------------------------------------------------------------------
   describe "#race_day" do
     it "announces race day during the day" do
@@ -206,7 +206,7 @@ RSpec.describe WeatherSummaryPresenter do
   end
 
   # ---------------------------------------------------------------------------
-  # Current conditions / wind / AQI / pollen / forecast / precipitation
+  # The current conditions, the wind, the AQI, the pollen, the forecast, and the precipitation
   # ---------------------------------------------------------------------------
   describe "#currently" do
     it "summarizes condition, temperature, humidity and wind, hiding a matching feels-like" do
@@ -335,7 +335,7 @@ RSpec.describe WeatherSummaryPresenter do
   end
 
   # ---------------------------------------------------------------------------
-  # Activity suggestions
+  # The activity suggestions
   # ---------------------------------------------------------------------------
   describe "#activities" do
     before do
@@ -406,7 +406,7 @@ RSpec.describe WeatherSummaryPresenter do
   end
 
   # ---------------------------------------------------------------------------
-  # Icon + alerts (the view reads both through the presenter)
+  # The icon and the alerts. The view reads both through the presenter.
   # ---------------------------------------------------------------------------
   describe "#icon / #alerts" do
     it "picks the current condition's icon, day/night-aware" do
@@ -430,7 +430,7 @@ RSpec.describe WeatherSummaryPresenter do
   end
 
   # ---------------------------------------------------------------------------
-  # Full summary (integration of the pieces above)
+  # The full summary, which puts the parts above together
   # ---------------------------------------------------------------------------
   describe "#weather_summary" do
     before do

@@ -1,10 +1,11 @@
-<%# The owner-facing admin shell, built on Web Awesome's <wa-page>.
-    ⚠️ Deliberately NOT named `application`: that's Rails' implicit default layout, and this app's
-    posture is machine-only-by-default — every widget and API controller renders `layout false`.
-    Naming it `admin` keeps them unaffected if one of those declarations is ever dropped. %>
-<%# `wa-brand-red` swaps Web Awesome's brand ramp from its default blue to the red family;
-    styles/_tokens.scss then pins the loud step to the site's exact firebrick. The dark-mode
-    script only toggles `wa-dark`, so it never disturbs this class. %>
+<%# The admin shell for the owner, on the <wa-page> of Web Awesome.
+    ⚠️ The name is NOT `application`, on purpose. That is the default layout of Rails, and this app
+    is for machines by default: each widget controller and each API controller renders with
+    `layout false`. The name `admin` keeps them the same if a person removes one of those
+    declarations. %>
+<%# `wa-brand-red` changes the brand colors of Web Awesome from its default blue to the red
+    family. styles/_tokens.scss then sets the loud step to the exact firebrick of the site. The
+    dark-mode script changes only `wa-dark`, thus it never changes this class. %>
 <!DOCTYPE html>
 <html lang="en" class="wa-brand-red">
   <head>
@@ -12,19 +13,20 @@
   </head>
 
   <body>
-    <%# `disable-navigation-toggle` is set explicitly because this is server-rendered: the
-        component flips it on its own once it sees our [data-toggle-nav], but not until it
-        upgrades, and until then its built-in hamburger renders on its own unstyled row above the
-        header bar. `wa-cloak` hides the shell until the custom elements are defined. %>
+    <%# `disable-navigation-toggle` is here because the server renders this page. The component
+        sets it by itself after it sees our [data-toggle-nav], but only after the browser upgrades
+        the component. Until then, its own menu button renders on a row with no styles, above the
+        header bar. `wa-cloak` hides the shell until each custom element has a definition. %>
     <wa-page class="admin wa-cloak" disable-navigation-toggle mobile-breakpoint="768px">
       <header slot="header" class="admin-header">
-        <%# ⚠️ The name is a visually-hidden span, not `aria-label`: <wa-button> renders its own
-            <button> in a shadow root and forwards none of the host's ARIA to it, and `icon_svg`
-            marks every SVG `aria-hidden`, so an aria-label here would leave the toggle unnamed. %>
-        <%# ⚠️ No `wa-mobile-only`: `wa-base` already hides `[data-toggle-nav]` on desktop, and it
-            does so *without* `!important`, which is what lets _page.scss show the toggle through
-            the first painted frame. Adding the class back restores an `!important` no unlayered
-            rule can beat, and with it a wordmark that jumps sideways on load. %>
+        <%# ⚠️ The name is a visually-hidden span, and not an `aria-label`. <wa-button> renders its
+            own <button> in a shadow root and it sends no ARIA of the host to that button, and
+            `icon_svg` marks each SVG `aria-hidden`. Thus an aria-label here would leave the button
+            with no name. %>
+        <%# ⚠️ Do not add `wa-mobile-only`. `wa-base` already hides `[data-toggle-nav]` on the
+            desktop, and it does that *without* `!important`. That is what lets _page.scss show the
+            button on the first frame. The class adds an `!important` that no unlayered rule can
+            win against, and the wordmark then moves to the side at the load. %>
         <wa-button data-toggle-nav appearance="plain">
           <%= raw icon_svg("classic", "light", "bars") %>
           <span class="wa-visually-hidden">Open menu</span>
@@ -34,16 +36,17 @@
         <% end %>
       </header>
 
-      <%# Written once. <wa-page> renders this as the desktop sidebar and moves the same copy into
-          a drawer on mobile — never both at once, so don't mirror it into the header. %>
+      <%# This markup is here one time. <wa-page> renders it as the desktop sidebar and moves the
+          same copy into a drawer on a mobile screen. It never shows both at the same time, thus do
+          not put a copy in the header. %>
       <nav slot="navigation" class="admin-nav" aria-label="Admin">
         <%= render "layouts/admin_nav" %>
       </nav>
 
       <div slot="navigation-footer" class="admin-nav__footer">
-        <%# form_with + <wa-button type="submit"> rather than button_to, which emits a native
-            <button>. Web Awesome's button is form-associated, so it submits the surrounding form
-            like a native one. %>
+        <%# This uses form_with with a <wa-button type="submit">, and not button_to, which writes a
+            native <button>. The button of Web Awesome is part of its form, thus it submits that
+            form as a native button does. %>
         <%= form_with url: "/signout", method: :post do %>
           <wa-button type="submit" appearance="outlined" variant="neutral">
             <%= slotted_icon_svg("classic", "light", "arrow-right-from-bracket") %>

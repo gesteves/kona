@@ -1,7 +1,8 @@
 <head>
   <%= partial 'partials/meta' %>
   <%= partial 'partials/open_graph_and_social' %>
-  <%# page_content is the same object `content` names, without the defined? dance on every line. %>
+  <%# page_content is the same object that `content` names, and it needs no defined? test on each %>
+  <%# line. %>
   <% page = page_content %>
   <%= partial 'partials/schema/article', locals: { article: page } if page && published_post?(page) %>
   <%= partial 'partials/schema/site' %>
@@ -24,7 +25,7 @@
     <link rel="apple-touch-icon" href="<%= site_icon_url(w: 180) %>">
     <link rel="manifest" href="/manifest.json">
   <% end %>
-  <%# The faces used above the fold. They're only discoverable once site.css has parsed,
+  <%# The font faces above the fold. A browser finds them only after it parses site.css,
       so preloading them removes a round trip from the critical path. `crossorigin` is
       mandatory even same-origin — fonts always fetch in CORS mode, and omitting it
       silently doubles the download. Keep this list to the two or three faces that
@@ -36,11 +37,11 @@
   ].each do |font| %>
     <link rel="preload" as="font" type="font/woff2" href="<%= asset_path(:fonts, font) %>" crossorigin>
   <% end %>
-  <%# Pagefind's stylesheet and component module are NOT loaded here — they're injected on
+  <%# This page does NOT load the stylesheet and the component module of Pagefind. The code adds
       demand by javascripts/stimulus/lib/pagefind.js, which also documents the cascade
       constraint on where the stylesheet lands in this head. %>
   <%= javascript_include_tag 'site', defer: 'defer', 'data-turbo-track': 'reload' %>
-  <%# The Web Awesome theme (esbuild extracts it from the one CSS import in stimulus/index.js).
+  <%# The Web Awesome theme. esbuild takes it from the one CSS import in stimulus/index.js.
       ⚠️ This is render-blocking and it does NOT have to be — it's custom-property definitions
       only (it pulls in layers.css and a colour palette, but neither native.css nor
       utilities.css, so it styles no plain HTML element), and every token consumer is a WA

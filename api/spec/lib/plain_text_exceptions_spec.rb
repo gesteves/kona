@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe PlainTextExceptions do
-  # ActionDispatch::ShowExceptions rewrites PATH_INFO to "/<status>" before calling the app.
+  # ActionDispatch::ShowExceptions changes PATH_INFO to "/<status>" before it calls the app.
   def call(path, method: "GET")
     described_class.call(Rack::MockRequest.env_for(path, method: method))
   end

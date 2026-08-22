@@ -1,16 +1,17 @@
-<%# Sequential archive navigation, split into two halves that sit side by side at the larger
-    breakpoints: the chronologically older entry on the left ("Previous") and the newer entry on
-    the right ("Next"), each a body-less summary card, so the reader can step backward or
-    forward through the archive. Each side is its own collection so it carries its own heading;
-    at an end of the archive only one side renders (and centers itself — see .collection--adjacent).
-    Renders nothing when the entry has no neighbors (e.g. a draft preview). %>
+<%# The navigation through the archive in order. It has two halves, and at a larger breakpoint they
+    are beside each other: the older entry at the left ("Previous") and the newer entry at the right
+    ("Next"). Each one is a summary card with no body, thus the reader can go back or forward
+    through the archive. Each half is its own collection, thus each one has its own heading. At an
+    end of the archive, only one half renders, and it moves to the center. Refer to
+    .collection--adjacent. It renders nothing when the entry has no neighbor, for example a draft
+    preview. %>
 <% adjacent = adjacent_articles(article) %>
 <% older = adjacent[:older] %>
 <% newer = adjacent[:newer] %>
 <% if older || newer %>
   <nav class="collection-group" aria-label="More entries">
-    <%# aria-labelledby for the same reason as partials/_collection: an unnamed <section> isn't
-        exposed as a landmark at all. %>
+    <%# This uses aria-labelledby for the same reason as partials/_collection: a <section> with no
+        name is not a landmark. %>
     <% [ [ "previous", "Previous", older ], [ "next", "Next", newer ] ].each do |id, heading, entry| %>
       <% next unless entry %>
       <section class="collection collection--adjacent" aria-labelledby="hed-<%= id %>-entry">

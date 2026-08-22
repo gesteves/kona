@@ -1,8 +1,10 @@
-<%# Loading skeleton mirroring the real weather layout (icon + text). The live-update %>
-<%# controller swaps in the real markup on connect, or removes this shell when there's %>
-<%# no current weather (empty response). `url` (required local) is the API endpoint. %>
+<%# The loading skeleton, with the same layout as the true weather markup: an icon and text. The %>
+<%# live-update controller puts the true markup here on connect, and it removes this element when %>
+<%# there is no current weather, that is, an empty response. `url`, which is a necessary local, %>
+<%# is the API endpoint. %>
 <div class="weather" data-nosnippet <%= live_update_attrs(url) %>>
-  <%# aria-hidden matches the api fragment that replaces this — see widgets/weather/current. %>
+  <%# The api fragment that replaces this element also has aria-hidden. Refer to %>
+  <%# widgets/weather/current. %>
   <div class="weather__icon" aria-hidden="true"><wa-skeleton class="weather-skeleton-icon" effect="sheen"></wa-skeleton></div>
   <div class="weather__text">
     <wa-skeleton class="weather-skeleton-text" effect="sheen"></wa-skeleton>

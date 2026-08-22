@@ -1,10 +1,11 @@
-// How long a toast stays on screen before auto-dismissing, in milliseconds.
+// The time that a toast stays on the screen before it goes away, in milliseconds.
 const TOAST_DURATION_MS = 3000;
 
 /**
- * Shows a toast notification via the Web Awesome <wa-toast> stack.
- * @param {string} message The text for the notification
- * @param {string} status The type of notification ('success' or anything else → 'danger')
+ * Shows a toast message in the Web Awesome <wa-toast> stack.
+ * @param {string} message The text of the message.
+ * @param {string} status The type of the message: 'success', or each other value, which gives
+ *   'danger'.
  */
 export function sendNotification(message, status = 'success') {
   const toast = document.querySelector('wa-toast');
@@ -16,7 +17,7 @@ export function sendNotification(message, status = 'success') {
 }
 
 /**
- * Replaces an element with the nodes parsed from an HTML string.
+ * Puts the nodes from an HTML string in place of an element.
  * @param {String} html An HTML string.
  * @param {Element} element The element to replace.
  */
@@ -27,8 +28,8 @@ export function replaceElement(html, element) {
 }
 
 /**
- * The canonical URL for the current page: the <link rel="canonical"> href when present,
- * falling back to the window location.
+ * The canonical URL of the current page: the href of the <link rel="canonical"> if the page has
+ * one, or the window location.
  * @returns {String} The canonical URL.
  */
 export function canonicalUrl() {
@@ -39,10 +40,11 @@ export function canonicalUrl() {
 }
 
 /**
- * Resolves an anchor's href to an absolute URL. Handles missing, anchor-only (#…),
- * protocol-relative (//…), root-relative (/…), and already-absolute hrefs.
- * @param {String|null} href An href attribute value.
- * @returns {String} The absolute URL (the current page for a missing href).
+ * Changes the href of an anchor into an absolute URL. It accepts an href that is absent, one with
+ * a fragment only (#…), one with no protocol (//…), one that starts at the root (/…), and one that
+ * is already absolute.
+ * @param {String|null} href The value of an href attribute.
+ * @returns {String} The absolute URL. For an href that is absent, it gives the current page.
  */
 export function absoluteUrl(href) {
   if (!href) {

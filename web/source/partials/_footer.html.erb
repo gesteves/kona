@@ -28,7 +28,8 @@
           </li>
         <% end %>
         <%= partial 'partials/search_trigger', locals: { wrapper_class: 'footer__menu-item' } %>
-        <%# #header is the real element at the top of the page, so this still works without JS. %>
+        <%# #header is the true element at the top of the page, thus this link also works with no %>
+        <%# JavaScript. %>
         <li class="footer__menu-item"><a href="#header" data-controller="back-to-top" data-action="click->back-to-top#go">Back to top</a></li>
       </ul>
     <% end %>

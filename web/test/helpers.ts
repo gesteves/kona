@@ -1,10 +1,12 @@
-// Shared test helpers: a no-op ExecutionContext and env builders. Handlers take (request, env[,
-// ctx]) and only touch the bindings they need, so tests pass hand-built envs and control every
-// dependency (ASSETS is a stub; KONA_API_URL / PLAUSIBLE_SCRIPT_URL point at mocked origins).
+// The shared test helpers: an ExecutionContext that does nothing, and functions that make an env.
+// A handler takes (request, env[, ctx]) and uses only the bindings that it needs. Thus a test gives
+// an env that it makes and controls each dependency. ASSETS is a stub, and KONA_API_URL and
+// PLAUSIBLE_SCRIPT_URL point at test origins.
 
-// Background work handlers pass to ctx.waitUntil() (e.g. the Plausible script cache write) is
-// collected here so setup.ts can drain it after each test — otherwise an in-flight caches.default
-// write races the pool's per-test storage teardown and logs a spurious abort.
+// This collects the background work that a handler gives to ctx.waitUntil(), for example the cache
+// write of the Plausible script. Thus setup.ts can complete that work after each test. Without it,
+// a caches.default write in progress races the storage teardown of the pool for that test, and the
+// log gets an abort message that means nothing.
 export const pendingWaits: Promise<unknown>[] = [];
 
 export const makeCtx = (): ExecutionContext =>
@@ -15,13 +17,13 @@ export const makeCtx = (): ExecutionContext =>
     passThroughOnException() {},
   }) as unknown as ExecutionContext;
 
-// An ASSETS binding stub that returns a fixed Response for any request.
+// An ASSETS binding stub that returns the same Response for each request.
 export const assetsReturning = (response: () => Response): Env['ASSETS'] =>
   ({ fetch: async () => response() }) as unknown as Env['ASSETS'];
 
-// Like assetsReturning(), but keeps the requests it was handed. The og route derives its asset
-// lookup from the incoming request's origin plus the `path` param, and that mapping is the part
-// worth asserting — assetsReturning() discards it.
+// The same as assetsReturning(), but it keeps each request that it gets. The og route makes its
+// asset lookup from the origin of the request that comes in and from the `path` parameter, and a
+// test must check that. assetsReturning() removes it.
 export const assetsRecording = (
   response: () => Response
 ): { requests: Request[]; binding: Env['ASSETS'] } => {
@@ -38,28 +40,29 @@ export const assetsRecording = (
 };
 
 // ── Outbound fetch mocking ────────────────────────────────────────────────────────────────────
-// Stands in for the pool's old `fetchMock` (an undici MockAgent reached through `cloudflare:test`),
-// which @cloudflare/vitest-pool-workers dropped in 0.18. The supported replacements are MSW or
-// stubbing `globalThis.fetch`; this is the latter, kept to the same contract the tests relied on:
+// This replaces the old `fetchMock` of the pool, which was an undici MockAgent through
+// `cloudflare:test`. @cloudflare/vitest-pool-workers removed it in 0.18. The two supported
+// replacements are MSW and a stub of `globalThis.fetch`. This is the stub, with the same rules that
+// the tests need:
 //
-//   - a test registers exactly the upstream calls it expects (method + absolute URL, query
-//     included — a stray query param is a *different* route, which is what lets the proxy's
-//     cache-key tests assert the query never reaches the origin),
-//   - anything else throws instead of reaching the network (the old `disableNetConnect()`),
-//   - an intercept that's registered but never called fails the test (the old
-//     `assertNoPendingInterceptors()`),
-//   - and the handle each intercept returns exposes the request the Worker actually sent, so
-//     assertions read real `Headers` rather than undici's raw options blob.
+//   - a test registers each upstream call that it expects: the method and the absolute URL, with
+//     the query. A query parameter that a test does not expect makes a *different* route, and that
+//     is what lets the cache-key tests of the proxy check that the query never reaches the origin.
+//   - each other call raises and does not reach the network, as the old `disableNetConnect()` did.
+//   - an intercept that a test registers but never calls makes the test fail, as the old
+//     `assertNoPendingInterceptors()` did.
+//   - the handle from each intercept gives the request that the Worker sent. Thus a test reads a
+//     true `Headers` object, and not the raw options object of undici.
 //
-// Handlers run in the Worker's own isolate, so throwing from one is how you simulate an origin
-// that's down.
+// A handler runs in the isolate of the Worker. Thus a raise in a handler shows an origin that is
+// down.
 
 type FetchHandler = (request: Request) => Response | Promise<Response>;
 
 export type FetchIntercept = {
-  /** The upstream request the code under test made — undefined until it makes it. */
+  /** The upstream request from the code under test. It is undefined until that code sends it. */
   request?: Request;
-  /** Its body, read on arrival: by assertion time the request's own stream is spent. */
+  /** The body, which the code reads on arrival. At the time of the test, the stream is empty. */
   body?: string;
   calls: number;
 };
@@ -70,7 +73,7 @@ const routes: Route[] = [];
 const routeKey = (method: string, url: string) =>
   `${method.toUpperCase()} ${url}`;
 
-// Register one expected upstream call. `url` is absolute and matched exactly.
+// Registers one upstream call that a test expects. `url` is absolute and must match exactly.
 export const interceptFetch = (
   method: string,
   url: string,
@@ -91,15 +94,15 @@ const dispatch = async (request: Request): Promise<Response> => {
   }
   route.calls += 1;
   route.request = request;
-  // Buffered as bytes, not .text(): workerd warns when .text() is called on a body whose
-  // Content-Type isn't texty (the contact form posts x-www-form-urlencoded), and the decode is
-  // the same either way.
+  // The code holds the bytes and does not call .text(). workerd gives a warning when .text() reads
+  // a body whose Content-Type is not text, and the contact form posts x-www-form-urlencoded. The
+  // decode gives the same result.
   route.body = new TextDecoder().decode(await request.clone().arrayBuffer());
   return route.handler(request);
 };
 
-// Plain assignment rather than vi.spyOn: two suites call vi.restoreAllMocks() in their own
-// afterEach (to undo their caches.default spies), which would tear a spy here down mid-run.
+// This is an assignment and not vi.spyOn. Two suites call vi.restoreAllMocks() in their own
+// afterEach, to remove their caches.default spies, and that would remove a spy here during a run.
 export const installFetchMock = (): (() => void) => {
   const original = globalThis.fetch;
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) =>
@@ -109,8 +112,8 @@ export const installFetchMock = (): (() => void) => {
   };
 };
 
-// Clears the registry and fails the test if it left an intercept unused — a stale expectation
-// otherwise looks exactly like a passing test.
+// Empties the registry and makes the test fail if an intercept stays unused. Without this check,
+// an old expectation looks the same as a test that passes.
 export const resetFetchMock = (): void => {
   const unused = routes.filter((r) => r.calls === 0).map((r) => r.key);
   routes.length = 0;

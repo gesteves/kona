@@ -1,25 +1,26 @@
 require "httparty"
 
-# Rebuilds and redeploys the web site by firing a GitHub `repository_dispatch`, which
-# .github/workflows/web.yml listens for. Two callers, one event type each — the Contentful
-# webhook and POST /api/build. They build identically and differ only so the deploy's Slack
-# notification can name the trigger.
+# Builds the web site again and deploys it. It sends a GitHub `repository_dispatch`, and
+# .github/workflows/web.yml waits for that event. There are two callers, and each one has its own
+# event type: the Contentful webhook and POST /api/build. They build in the same way, and they are
+# different only to let the Slack notification of the deploy name the cause.
 #
-# ⚠️ Both event types must be listed in that workflow's `repository_dispatch.types`, or GitHub
-# accepts the dispatch with a 204 and silently runs nothing. The event type is always a
-# caller-supplied constant, never a request parameter.
+# ⚠️ The `repository_dispatch.types` of that workflow must contain both event types. If not, GitHub
+# accepts the event with a 204 and runs nothing, and it gives no message. The event type is always a
+# constant from the caller, and never a request parameter.
 #
-# A bulk publish fires several dispatches; the workflow's cancel-in-progress concurrency
-# collapses them into one build. No-ops when unconfigured, and raises on a non-2xx so Sidekiq
-# retries.
+# A publish of many entries sends more than one event, and the cancel-in-progress concurrency of the
+# workflow makes them one build. This job does nothing when there is no configuration, and it raises
+# on a non-2xx, thus Sidekiq does it again.
 class SiteBuildJob < ApplicationJob
   DISPATCH_URL = "https://api.github.com/repos/%<repo>s/dispatches".freeze
-  # Both match `repository_dispatch.types` in .github/workflows/web.yml.
+  # Both of these are in `repository_dispatch.types` in .github/workflows/web.yml.
   CONTENTFUL_EVENT_TYPE = "contentful-publish".freeze
   MANUAL_EVENT_TYPE = "api-build".freeze
 
-  # Defaulted rather than required, so the Contentful caller stays a bare `perform_async` and a
-  # job enqueued with no args before a deploy still runs after it.
+  # This has a default value and it is not necessary. Thus the Contentful caller stays a plain
+  # `perform_async`, and a job that goes into the queue with no arguments before a deploy still runs
+  # after that deploy.
   def perform(event_type = CONTENTFUL_EVENT_TYPE)
     token = ENV["GITHUB_DISPATCH_TOKEN"]
     repo = ENV["GITHUB_REPOSITORY"]

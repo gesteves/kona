@@ -5,8 +5,8 @@ describe StandardSite do
 
   let(:publication_uri) { "at://did:plc:abc123/site.standard.publication/self" }
 
-  # A new instance has no session, so the pure record builders never hit the
-  # network (upload_image_blob short-circuits when there's no access token).
+  # A new instance has no session, thus the record builders never use the network.
+  # upload_image_blob returns early when there is no access token.
   let(:site) do
     {
       "title" => "Given to Tri",
@@ -61,8 +61,9 @@ describe StandardSite do
       )
     end
 
-    # Pinned so a palette edit is a deliberate diff, not a silent one. These mirror web's
-    # light-mode tokens in web/source/stylesheets/base/_props.scss.
+    # These values are in the test, thus a change to the palette is a change that you see in the
+    # diff. They are the same as the light-mode tokens of web in
+    # web/source/stylesheets/base/_props.scss.
     {
       "background" => [ 255, 255, 255 ],
       "foreground" => [ 41, 41, 41 ],
@@ -160,8 +161,9 @@ describe StandardSite do
   end
 
   describe "#document_rkey" do
-    # The exact TID for the fixture sys.id is asserted here (and in web's matching spec)
-    # so the two apps can never drift: the <link> AT URI must equal the published record.
+    # This test has the exact TID for the sys.id of the example, and the matching spec of web has it
+    # too. Thus the two apps always agree: the AT URI in the <link> must be the same as the record
+    # that the app publishes.
     it "derives a valid 13-character TID from the Contentful sys.id" do
       rkey = client.document_rkey("6L1asJJq4umcGEvD0hfqxE")
       expect(rkey).to eq("3446ygrm3x4bk")
@@ -274,8 +276,9 @@ describe StandardSite do
   end
 
   describe "#backfill" do
-    # A raw (symbol-keyed) CDA article item, as fetch_all_articles returns it.
-    # publishedVersion present ⇒ not a draft; body present ⇒ Article ⇒ publishable.
+    # A raw CDA article item with symbol keys, as fetch_all_articles returns it.
+    # A publishedVersion means that it is not a draft. A body means that it is an Article, thus the
+    # app can publish it.
     def raw_article(id, published_version: 3)
       {
         sys: { id: id, publishedVersion: published_version, publishedAt: "2026-02-24T22:07:58.616Z",
@@ -286,7 +289,8 @@ describe StandardSite do
     end
 
     before do
-      # Stub the network boundary; backfill's orchestration + enqueuing is what's under test.
+      # This stubs the network. The test covers the control code of the backfill and the jobs that
+      # it adds to the queue.
       allow(client).to receive(:valid_credentials?).and_return(true)
       allow(client).to receive(:create_session).and_return(true)
       allow(client).to receive(:fetch_site).and_return(site)
@@ -355,9 +359,10 @@ describe StandardSite do
       expect(BlueskyCredentials.stored?).to be(false)
     end
 
-    # ⚠️ Document fingerprints cover the publication's at:// URI, which carries the DID, so they
-    # invalidate themselves when the account changes. The publication record's doesn't — a stale
-    # one would report :unchanged forever and never sync to the new repo.
+    # ⚠️ A document fingerprint includes the at:// URI of the publication, which has the DID. Thus
+    # each document fingerprint becomes invalid by itself when the account changes. The fingerprint
+    # of the publication record does not. An old one would report :unchanged for all time and never
+    # sync to the new repo.
     it "drops the publication fingerprint when the account changed" do
       $redis.set(StandardSite::DID_CACHE_KEY, "did:plc:old")
       $redis.set(publication_fingerprint_key, "stale")
@@ -386,8 +391,8 @@ describe StandardSite do
   end
 
   describe "#disconnect!" do
-    # ⚠️ The DID is public data, not a credential, and GET /api/standard-site feeds the
-    # verification <link> tags on every page of the static site.
+    # ⚠️ The DID is public data and not a credential, and GET /api/standard-site supplies the
+    # verification <link> tags on each page of the static site.
     it "forgets the credentials but leaves the cached DID alone" do
       BlueskyCredentials.store(handle: "me.bsky.social", app_password: "pw")
       $redis.set(StandardSite::DID_CACHE_KEY, "did:plc:abc")
@@ -411,9 +416,9 @@ describe StandardSite do
       allow(client).to receive(:forget_fingerprint)
     end
 
-    # Every record key in both standard.site lexicons is a TID, so a Contentful sys.id can never
-    # be one. Passing the raw id deletes a key that doesn't exist and reports success, leaving the
-    # real record live on the PDS until the next backfill prunes it.
+    # Each record key in the two standard.site lexicons is a TID, thus a Contentful sys.id can never
+    # be one. With the raw id, the code deletes a key that does not exist and reports a success, and
+    # the true record stays on the PDS until the next backfill removes it.
     it "addresses the record by its TID rkey, never the raw Contentful id" do
       expect(client).to receive(:delete_record).with(StandardSite::DOCUMENT_COLLECTION, rkey).and_return(true)
 
@@ -430,8 +435,8 @@ describe StandardSite do
       expect(client.sync_document(entry_id)).to eq(:deleted)
     end
 
-    # A swallowed failure would drop the fingerprint too, so nothing would ever re-detect the
-    # orphaned record.
+    # A failure that the code catches would also remove the fingerprint, thus nothing would find the
+    # record that stays on the PDS.
     it "raises (so Sidekiq retries) and keeps the fingerprint when the PDS rejects the delete" do
       allow(client).to receive(:delete_record).and_return(false)
       expect(client).not_to receive(:forget_fingerprint)

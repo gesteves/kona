@@ -1,34 +1,39 @@
 # api/ — Kona widget API
 
-Rails 8.1 API (Ruby 4.0.6) serving small embeddable **HTML fragments** ("widgets"), plus
-structured-data endpoints and inbound webhooks, for the static `web/` site. Deployed to **fly.io**
-as `kona-api` (`app` + `worker` processes), with the origin proxied behind **Cloudflare**.
-Redis-backed caching, **no database**.
+The Rails 8.1 API (Ruby 4.0.6). It serves small **HTML fragments** ("widgets") for the static `web/`
+site, and it also has the structured-data endpoints and the inbound webhooks. It deploys to
+**fly.io** as `kona-api`, with an `app` process and a `worker` process, and **Cloudflare** is in
+front of the origin. Redis holds the cache, and there is **no database**.
 
-Minimal Rails: only ActiveModel + ActionController + ActionView are loaded (no ActiveRecord /
-ActiveJob / ActionMailer / ActionCable). See the root [`CLAUDE.md`](../CLAUDE.md) for the web↔api
-markup contract before changing any view, and for the comment-style conventions this app follows.
+This is a small Rails: it loads ActiveModel, ActionController, and ActionView only. It does not load
+ActiveRecord, ActiveJob, ActionMailer, or ActionCable. Refer to the root
+[`CLAUDE.md`](../CLAUDE.md) for the markup contract between web and api before you change a view,
+and for the rules for a comment that this app obeys.
 
-It also serves a small owner-facing **admin UI**, built on Web Awesome and mounted at the root of
-the admin host — the only part of the app with an asset pipeline or a layout. See **The admin UI**
-below.
+⚠️ **Write each comment, all the inline documentation, and each change to a `CLAUDE.md` file in
+ASD-STE100 Simplified Technical English, and keep it short.** The root
+[`CLAUDE.md`](../CLAUDE.md) has the full rule.
 
-Routes split by namespace: `/widgets/*` (HTML fragments, reached through the web app's proxy),
-`/api/*` (structured data, hit directly at the origin), `/webhooks/*` (inbound, hit directly by
-the sending service).
+It also serves a small **admin UI** for the owner. That UI uses Web Awesome and it is at the root of
+the admin host. It is the one part of the app with an asset pipeline and with a layout. Refer to
+**The admin UI** below.
 
-The origin answers on **two hostnames**, and the split is enforced in `config/routes.rb`: `API_HOST`
-names the public one, and the owner-facing routes are drawn only off the *other* one (the admin
-host), so the public host serves nothing but `/up` and those three namespaces. ⚠️ **A new
-owner-facing route must go inside that `constraints` block** — the zone's bot-protection skip rule
-is scoped to "every host except the admin one", so a route drawn outside it is reachable on the
-public host with managed rules and Super Bot Fight Mode skipped.
-`spec/requests/host_constraints_spec.rb` pins both directions.
+The routes are in three namespaces. `/widgets/*` gives HTML fragments, and a browser reaches them
+through the proxy of the web app. `/api/*` gives structured data, and a caller reaches it directly
+at the origin. `/webhooks/*` takes an inbound request, and the sending service reaches it directly.
+
+The origin answers on **two host names**, and `config/routes.rb` keeps them apart. `API_HOST` names
+the public host, and Rails draws each route for the owner off the *other* host, which is the admin
+host. Thus the public host serves only `/up` and those three namespaces. ⚠️ **Put each new route for
+the owner in that `constraints` block.** The bot-protection skip rule of the zone applies to "each
+host but the admin one". Thus a route outside that block is available on the public host, with the
+managed rules and Super Bot Fight Mode off.
+`spec/requests/host_constraints_spec.rb` tests both directions.
 
 ## Endpoints
 
-All `/widgets/*` responses are HTML fragments (`layout false`). Edge TTL = how long the edge serves
-a cached copy before revalidating.
+Each `/widgets/*` response is an HTML fragment (`layout false`). The edge TTL is the time that the
+edge serves a cached copy before it gets a new one.
 
 | Method | Path | Returns | Edge TTL |
 |---|---|---|---|
@@ -59,128 +64,143 @@ a cached copy before revalidating.
 | — | `/sidekiq` | job dashboard (owner-session gated) | — |
 | GET | `/` (public API host only) | 301 → main site | — |
 
-The Whoop OAuth, owner session, admin UI, and `/sidekiq` rows are **admin-host only** wherever
-`API_HOST` is set.
+The Whoop OAuth rows, the owner session rows, the admin UI rows, and the `/sidekiq` row are on the
+**admin host only**, wherever `API_HOST` has a value.
 
-⚠️ **`/` is the one path the two hosts answer differently** rather than one of them 404ing: the
-admin home page sits at the root of the admin host, and the public host keeps the redirect to the
-main site. Two routes are drawn for `/`, and only the `API_HOST` constraint plus **the order they
-appear in** keeps them apart — swapping them would silently hand the public host the admin UI.
-`spec/requests/root_spec.rb` and `spec/requests/host_constraints_spec.rb` pin both directions.
+⚠️ **`/` is the one path where the two hosts give a different answer**, and where neither one gives a
+404. The admin home page is at the root of the admin host, and the public host keeps the redirect to
+the main site. Rails draws two routes for `/`, and only the `API_HOST` constraint and **their
+order** keep them apart. A change to that order would give the admin UI to the public host, with no
+message. `spec/requests/root_spec.rb` and `spec/requests/host_constraints_spec.rb` test both
+directions.
 
 ## Architecture
 
 ### Controllers
 
-One namespace per kind of endpoint, all inheriting `ActionController::Base` directly (not
-`ApplicationController`) to skip the modern-browser gate:
+There is one namespace for each type of endpoint. Each controller inherits from
+`ActionController::Base` directly, and not from `ApplicationController`, thus it does not use the
+modern-browser check:
 
-- `widgets/` — `Widgets::BaseController` (`layout false`, includes `LiveWidget`). Widget actions
-  fetch via a service, call `cache_widget(ttl:)`, then render an ERB fragment. Use `render_empty`
-  when data is unavailable — the site's live-update controller removes the placeholder, so prefer
-  it over raising.
-- `api/` — structured data under `Api::BaseController`. `ContactController` is the one
-  browser-reachable write (through the web proxy).
-- `webhooks/` — one controller per sending service under `Webhooks::BaseController`.
+- `widgets/` — `Widgets::BaseController`, with `layout false`, and it includes `LiveWidget`. A widget
+  action gets its data from a service, calls `cache_widget(ttl:)`, and then renders an ERB fragment.
+  Use `render_empty` when the data is not available: the live-update controller of the site then
+  removes the placeholder. Use it and do not raise.
+- `api/` — the structured data, below `Api::BaseController`. `ContactController` is the one write
+  that a browser can reach, through the web proxy.
+- `webhooks/` — one controller for each sending service, below `Webhooks::BaseController`.
 
-**Auth** — `Widgets::BaseController` and `Api::BaseController` require the `API_TOKEN` bearer
-(`TokenAuthentication`) via a global `before_action`, so the widget origin is closed to direct hits
-(a cheap 401 before any work). A new widget endpoint is gated automatically by inheriting the base
-controller. `standard-site` skips it (public, build-time fetched). Webhook controllers don't use
-the bearer at all — senders can't carry our token, so each authenticates with its service's own
-HMAC scheme.
+**The authentication.** `Widgets::BaseController` and `Api::BaseController` need the `API_TOKEN`
+bearer token (`TokenAuthentication`), through a `before_action` for each action. Thus a direct
+request to the widget origin fails, with a fast 401 before any work. A new widget endpoint gets that
+check when it inherits from the base controller. `standard-site` does not use it: it is public and
+the build gets it. A webhook controller does not use the bearer token at all: a sender cannot have
+our token, thus each one uses the HMAC method of its own service.
 
-**Owner auth** — `/whoop/auth` and `/sidekiq` are gated by a **Google OAuth** sign-in restricted to
-a single identity, not the bearer. `SessionsController` runs the OmniAuth flow and accepts a login
-only when the verified email equals `OWNER_EMAIL` (and the `hd` domain check passes), then stores
-`owner_email` in the signed cookie session. The `Authentication` concern gates the Whoop
-controller; a small Rack guard in the Sidekiq initializer gates the mounted `Sidekiq::Web`.
+**The owner authentication.** A **Google OAuth** sign-in for one identity controls `/whoop/auth` and
+`/sidekiq`, and the bearer token does not. `SessionsController` does the OmniAuth flow and accepts a
+login only when the verified email address is `OWNER_EMAIL` and the `hd` domain check passes. It
+then puts `owner_email` in the signed cookie session. The `Authentication` concern controls the
+Whoop controller, and a small Rack guard in the Sidekiq initializer controls the `Sidekiq::Web`
+mount.
 
 ### Services
 
-`app/services/`, base `ApplicationService`: one per external API — Intervals.icu, Apple WeatherKit
-(ES256 JWT), Google Maps (`GoogleMaps` reverse-geocodes, `GoogleGeocoder` forward) / Air Quality /
+`app/services/`, with `ApplicationService` as the base class. There is one service for each external
+API: Intervals.icu, Apple WeatherKit (with an ES256 JWT), Google Maps (`GoogleMaps` finds an address
+from coordinates, and `GoogleGeocoder` finds coordinates from an address), Google Air Quality, Google
 Pollen, PurpleAir, Whoop (OAuth2), TrainerRoad (iCal), Contentful, Plausible, Font Awesome,
-Goodspeed, Akismet, Resend, Turnstile, Voyage (`Embeddings`),
-`StandardSite`, `AssetMirror`, plus five that aren't `ApplicationService` subclasses because they
-aren't cacheable reads: `SpamQuarantine`, `TrackLibrary`, and `BlueskyCredentials` (Redis-only, no
-HTTP), `GpxTrack` (parsing only), and `MapboxTileset`/`StaticMap` (see
-**The course-map renderer**).
-Read-through Redis cache via `cached_json(key, expires_in:)`;
-HTTParty with retries; `DeepOstruct` for dot-access.
+Goodspeed, Akismet, Resend, Turnstile, Voyage (`Embeddings`), `StandardSite`, and `AssetMirror`.
+Five more are not subclasses of `ApplicationService`, because they are not cacheable reads:
+`SpamQuarantine`, `TrackLibrary`, and `BlueskyCredentials` use Redis only and no HTTP; `GpxTrack`
+parses only; and `MapboxTileset` and `StaticMap` are different (refer to **The course-map
+renderer**).
+`cached_json(key, expires_in:)` gives the read-through Redis cache. HTTParty makes each request, and
+it tries again after a failure. `DeepOstruct` gives dot access.
 
-⚠️ **Plausible is rate-limited to 600 calls/hour**, and `cached_json` caps each distinct query body
-at one call per its 5-minute TTL — so what matters is the number of *distinct queries*, not
-requests. `Plausible#pageviews_by_path` is therefore **one site-wide query** shared by
-`TrendingArticles` and the per-article pageviews widget; asking per article would mint a key per
-article and scale the ceiling with the corpus, over the limit. **Don't reintroduce a per-article
-query, and redo the math before shortening either TTL.**
+⚠️ **Plausible permits 600 calls each hour**, and `cached_json` limits each different query body to
+one call for its 5-minute TTL. Thus the number of *different queries* is important, and the number of
+requests is not. For that reason `Plausible#pageviews_by_path` is **one query for the full site**,
+and `TrendingArticles` and the pageviews widget of each article share it. A query for each article
+would make one key for each article, and the number of calls would then grow with the number of
+articles and go past the limit. **Do not add a query for each article, and do the calculation again
+before you make either TTL shorter.**
 
-**Failure modes worth knowing:**
+**The types of failure that you must know:**
 
-- Most services degrade — a failure collapses the widget rather than raising.
-- `Akismet` fails **closed** when configured (an outage raises so the intake job retries) and open
-  only when unconfigured. `Turnstile` fails open.
-- `AssetMirror` **raises**, so Sidekiq retries — a silently skipped asset surfaces later as a
-  broken image on a live page.
+- Most services give a smaller result on a failure: the widget goes away and the code does not raise.
+- `Akismet` fails **closed** when it has a configuration: a failure of the service raises, thus the
+  intake job runs again. It permits the message only when it has no configuration. `Turnstile`
+  permits the message on a failure.
+- `AssetMirror` **raises**, thus Sidekiq does the job again. An asset that the code does not copy,
+  with no message, becomes a broken image on a live page later.
 
 ### The R2 image mirror
 
-`AssetMirror` copies every published Contentful **image** asset into an R2 bucket, and the `web/`
-build rewrites asset URLs onto that bucket's custom domain. ⚠️ **This is a cross-app data contract
-and neither side validates the other** — full write-up in the root [`CLAUDE.md`](../CLAUDE.md).
+`AssetMirror` copies each published Contentful **image** asset into an R2 bucket, and the `web/`
+build changes each asset URL to the custom domain of that bucket. ⚠️ **This is a data contract
+between the two apps, and neither side checks the other.** The full text is in the root
+[`CLAUDE.md`](../CLAUDE.md).
 
-- **Publish only.** ⚠️ Unpublish and delete deliberately don't remove the object: the web build
-  reads Contentful with a **preview** token, so an unpublished asset is still referenced by built
-  pages. Keys are content-addressed, so objects are immutable and nothing needs invalidating.
-- ⚠️ **The download uses `Net::HTTP#read_body`, not HTTParty — don't "fix" it to match the house
-  style.** These originals reach 38MB and the worker is a **512MB** VM at **concurrency 5**.
-  Buffering whole files OOM-killed it during the first backfill, and a hard kill isn't a failure
-  Sidekiq can retry, so the in-flight jobs vanished silently — 13 assets never mirrored, surfacing
-  only as 404s on live pages. HTTParty doesn't solve it even with `stream_body: true`: measured at
-  +52.3MB peak RSS against +1.2MB for the streaming loop. The Tempfile matters for the same reason
-  — it lets the S3 client upload from disk rather than a second copy in memory. If the asset
-  library grows many more large originals, bump the VM before raising concurrency.
-- **`rake assets:backfill`** enqueues a job per asset, each skipping one already in the bucket (one
-  HEAD, no transfer), so it's cheap to re-run and doubles as the reconciliation net for webhook
-  deliveries Contentful never retries. `DRY_RUN=1` reports the count. ⚠️ Run it to completion
-  **before** `IMAGE_HOST` is set on the web side.
-- No-ops entirely when the `R2_*` vars are absent, so dev/CI stay inert.
+- **It copies a publish only.** ⚠️ An unpublish and a delete do not remove the object, on purpose:
+  the web build reads Contentful with a **preview** token, thus a page from the build still points
+  at an unpublished asset. The content gives the key of each object, thus each object is immutable
+  and nothing needs an invalidation.
+- ⚠️ **The download uses `Net::HTTP#read_body`, and not HTTParty. Do not change it to the usual
+  style.** These originals are as large as 38MB, and the worker is a **512MB** VM at **concurrency
+  5**. Full files in memory caused an OOM kill during the first backfill, and a hard kill is not a
+  failure that Sidekiq can do again. Thus the jobs in progress went away with no message: nothing
+  copied 13 assets, and those assets showed only as a 404 on a live page. HTTParty does not correct
+  this, even with `stream_body: true`: a measurement gave +52.3MB peak RSS against +1.2MB for the
+  stream loop. The Tempfile is necessary for the same reason: it lets the S3 client upload from the
+  disk and not from a second copy in memory. If the asset library gets many more large originals,
+  make the VM larger before you increase the concurrency.
+- **`rake assets:backfill`** adds one job for each asset, and each job does nothing for an asset that
+  is already in the bucket: one HEAD, and no data transfer. Thus it is cheap to run again, and it is
+  also the reconciliation net for the webhook deliveries that Contentful never sends again.
+  `DRY_RUN=1` gives the count. ⚠️ Run it to its end **before** `IMAGE_HOST` gets a value on the web
+  side.
+- It does nothing when the `R2_*` vars are absent, thus it stays inactive in development and in
+  CI.
 
 ### Webhooks
 
-`Webhooks::ContentfulController` receives publish/unpublish/delete events (HMAC-verified via
-`ContentfulRequestVerification`) and **only enqueues jobs**, returning 204; the work runs on the
-Sidekiq worker. On every publish it enqueues the standard.site sync, the article embedding, the R2
-asset mirror, and **`SiteBuildJob`** to rebuild the web site. Scope the Contentful webhook to
-**Entry + Asset** publish/unpublish/delete (so image-only changes rebuild too) and **not**
-auto-save. ⚠️ Contentful does **not** retry deliveries — `rake standard_site:backfill` and
-`rake assets:backfill` are the reconciliation paths.
+`Webhooks::ContentfulController` takes each publish, unpublish, and delete event, and
+`ContentfulRequestVerification` checks its HMAC. That controller **only adds jobs to the queue** and
+returns a 204, and the Sidekiq worker does the work. At each publish it adds the standard.site sync,
+the article embedding, the R2 asset copy, and **`SiteBuildJob`**, which builds the web site again.
+Set the Contentful webhook to a publish, an unpublish, and a delete of an **Entry and an Asset**,
+thus a change to an image also starts a build. Do **not** include an automatic save. ⚠️ Contentful
+does **not** send a delivery again. `rake standard_site:backfill` and `rake assets:backfill` are the
+reconciliation paths.
 
-`Webhooks::WhoopController` receives Whoop v2 webhooks, verified with Whoop's HMAC scheme
-(`WhoopRequestVerification`: signed with `WHOOP_CLIENT_SECRET`, base64 HMAC over timestamp + raw
-body, ±5 min skew) plus a payload `user_id` check against the authenticated athlete (Redis-cached
-for a day; foreign users get 403 so Whoop stops retrying). It enqueues and responds 200 within
-Whoop's ~1s expectation. Register the URL with **Model Version V2** in the Whoop dashboard.
+`Webhooks::WhoopController` takes the Whoop v2 webhooks. `WhoopRequestVerification` checks them with
+the HMAC method of Whoop: `WHOOP_CLIENT_SECRET` signs a base64 HMAC over the timestamp and the raw
+body, and the timestamp can be 5 minutes before or after the current time. The controller also
+compares the `user_id` in the payload with the authenticated athlete. Redis holds that id for a day,
+and a different user gets a 403, thus Whoop stops. The controller adds a job to the queue and
+answers with a 200, in the approximately 1 second that Whoop needs. Register the URL with **Model
+Version V2** in the Whoop dashboard.
 
-Processing (`WhoopWebhookProcessor`) writes the custom wellness fields `WhoopStrain` /
-`WhoopSleepPerformance` / `WhoopRecovery` and the activity field `WhoopWorkoutStrain` — ⚠️ all four
-must exist in Intervals.icu → Settings → Custom Fields, or a 422 is logged and skipped — then
-enqueues a separate `ActivityDescriptionJob`. The split is deliberate: if the Whoop integration
-ever goes away, the metric sync disappears entirely while descriptions keep working, losing only
-the 🔥 line.
+`WhoopWebhookProcessor` writes the custom wellness fields `WhoopStrain`, `WhoopSleepPerformance`, and
+`WhoopRecovery`, and the activity field `WhoopWorkoutStrain`. ⚠️ All four must exist in Intervals.icu
+at Settings → Custom Fields. Without one of them, the code writes a 422 to the log and does no more.
+The processor then adds a separate `ActivityDescriptionJob` to the queue. The two jobs are separate,
+on purpose: if the Whoop integration goes away, the metric sync stops but the descriptions continue
+to work, and only the 🔥 line is absent.
 
 ### Background jobs
 
-Native **Sidekiq** (`Sidekiq::Job`, not ActiveJob), in `app/jobs/`, inheriting `ApplicationJob` —
-a plain superclass holding the shared `retry_for: 24.hours` (normal backoff, then Dead-set once 24
-hours have passed since the first failure). Every job takes plain-string args and is idempotent, so
-that shared window is safe.
+**Sidekiq** directly (`Sidekiq::Job`, and not ActiveJob), in `app/jobs/`. Each job inherits from
+`ApplicationJob`, a plain parent class that holds the shared `retry_for: 24.hours`: Sidekiq waits
+the usual time between two attempts, then puts the job in the Dead set 24 hours after its first
+failure. Each job takes plain strings as its arguments, and you can do each job more than one time.
+Thus that shared window is safe.
 
 | Job | What |
 |---|---|
 | `StandardSiteSyncJob(operation, entry_id)` | standard.site PDS sync |
-| `AssetSyncJob(asset_id)` | mirrors one image asset into R2 (⚠️ raises rather than degrading) |
+| `AssetSyncJob(asset_id)` | Copies one image asset into R2. ⚠️ It raises and does not give a smaller result. |
 | `ArticleEmbeddingJob(operation, entry_id)` | keeps an article's Voyage embedding in sync |
 | `SiteBuildJob(event_type)` | fires a GitHub `repository_dispatch` to rebuild the web site |
 | `WhoopWebhookJob(event_type, resource_id, trace_id)` | syncs Whoop metrics to Intervals.icu |
@@ -191,628 +211,678 @@ that shared window is safe.
 | `MapTilesetJob(id)` | publishes an uploaded GPX track to Mapbox as a vector tileset |
 | `WhoopTokenRefreshJob()` | forces a Whoop token refresh on a schedule (see below) |
 
-- **`SiteBuildJob`** has two callers with one event type each — the Contentful webhook
-  (`contentful-publish`) and `POST /api/build` (`api-build`). They build identically and differ
-  only so the deploy's Slack notification can name the trigger. ⚠️ **Both event types must stay
-  listed in that workflow's `repository_dispatch.types`** — GitHub accepts a dispatch for an
-  unlisted type with a 204 and silently runs nothing. The event type is always a caller-supplied
-  constant, never a request parameter. No-ops when `GITHUB_DISPATCH_TOKEN`/`GITHUB_REPOSITORY` are
-  unset.
-- **`ActivityDescriptionJob`** is **source-agnostic**: emoji stat lines (power, heat, Whoop strain,
-  water temp) plus two Anthropic-generated lines (a planned-workout summary matched against the
-  TrainerRoad calendar, and a weather sentence — prompts in `app/prompts/`, skipped without
-  `ANTHROPIC_API_KEY`), preserving any user-written prose above the stat block. Deduped per
-  activity by a Redis lock. The same PUT tidies a Rouvy-generated name
-  (`ROUVY - <route> - <date>` → `Rouvy - <route>`), so it can write even when the description
-  composes empty.
-- ⚠️ **Turnstile guards only the JSON path** (`request.format.json?`), so a scripted POST that
-  omits `Accept: application/json` skips it entirely. Reviewed and **accepted**: the widget needs
-  JS, and enforcing it on both paths would break the no-JS fallback by definition. What actually
-  stops automated abuse is the honeypot, Akismet (which fails *closed* when configured), the
-  length caps, and the 5/hour `X-Kona-Client-IP` throttle — don't thin those out on the assumption
-  Turnstile is carrying them. Closing the gap properly means a second factor the no-JS path can
-  also present, e.g. a signed expiring token minted into the form.
-- **The contact form is a two-job pipeline** so a Resend failure retries only the send. Akismet
-  fails closed, so an outage retries the *intake* job rather than delivering an unchecked message;
-  `ContactSubject` (a Claude-generated subject line) fails soft. A flagged message is **quarantined,
-  not dropped** (see **The spam quarantine**); `restored_from_spam` is the owner releasing one, which
-  skips the check and reports the false positive.
+- **`SiteBuildJob`** has two callers, and each one has its own event type: the Contentful webhook
+  sends `contentful-publish`, and `POST /api/build` sends `api-build`. The two builds are the same,
+  and the two types exist only to let the Slack notification of the deploy name the cause. ⚠️ **The
+  `repository_dispatch.types` of that workflow must keep both types.** GitHub accepts an event with
+  a type that is not in that list, answers with a 204, and runs nothing, and it gives no message.
+  The event type is always a constant from the caller, and never a request parameter. The job does
+  nothing when `GITHUB_DISPATCH_TOKEN` or `GITHUB_REPOSITORY` has no value.
+- **`ActivityDescriptionJob`** does not know its source. It writes the stat lines with an emoji: the
+  power, the heat, the Whoop strain, and the water temperature. It also writes two lines that
+  Anthropic makes: a summary of the planned workout, which the code matches against the TrainerRoad
+  calendar, and a weather sentence. The prompts are in `app/prompts/`, and the job omits those two
+  lines with no `ANTHROPIC_API_KEY`. It keeps the text that the user wrote above the stat block. A
+  Redis lock stops a second job for the same activity. The same PUT also corrects a name from Rouvy
+  (`ROUVY - <route> - <date>` becomes `Rouvy - <route>`), thus it can write even when the
+  description is empty.
+- ⚠️ **Turnstile protects the JSON path only** (`request.format.json?`). Thus a POST from a script
+  with no `Accept: application/json` does not do that check. We read this and **accepted** it: the
+  widget needs JavaScript, and a check on both paths would stop the path with no JavaScript. The
+  things that truly stop an attack are the honeypot, Akismet, which fails *closed* when it has a
+  configuration, the length limits, and the throttle of 5 each hour on `X-Kona-Client-IP`. Do not
+  remove one of those, and do not assume that Turnstile does that work. To close this gap, the path
+  with no JavaScript needs a second factor also, for example a signed token with an expiry time that
+  the server puts in the form.
+- **The contact form uses two jobs**, thus a Resend failure repeats the send only. Akismet fails
+  closed, thus a failure of that service makes the *intake* job run again and the app does not
+  deliver a message with no check. `ContactSubject`, which makes a subject line with Claude, fails
+  soft. A message that Akismet marks goes to the **quarantine, and the app does not remove it**
+  (refer to **The spam quarantine**). `restored_from_spam` means that the owner sends such a
+  message: the code then does no check and tells Akismet that the mark was incorrect.
 
-Config in `config/initializers/sidekiq.rb` and `config/sidekiq.yml`. Sidekiq runs as a dedicated
-**`worker` fly process**; a worker must be running to drain the queue (locally: `bundle exec
-sidekiq`).
+The configuration is in `config/initializers/sidekiq.rb` and in `config/sidekiq.yml`. Sidekiq runs
+as its own **`worker` fly process**. A worker must run, or nothing does the queued jobs. On your own
+machine, use `bundle exec sidekiq`.
 
-**Recurring jobs** come from `sidekiq-scheduler`, whose schedule lives under `:scheduler:` in
-`config/sidekiq.yml` and which only starts inside the Sidekiq **server** — Puma loads the gem and
-schedules nothing, so there's no double-firing across the two fly machines. Its "Recurring Jobs"
-tab rides along on the owner-gated `/sidekiq` dashboard. Only `WhoopTokenRefreshJob` is scheduled
-today (every 6 hours): Whoop rotates its refresh token on every refresh and expires an idle one,
-but tokens are otherwise refreshed **only on demand**, so a quiet stretch with no widget traffic
-and no webhooks would leave the integration needing a manual re-auth at `/whoop/auth`. The job
-goes through `Whoop#refresh_tokens!`, which forces past the access-token cache but still takes the
-same refresh lock. When Whoop rejects the token anyway, the failure surfaces on the Connected apps
-page rather than only in Bugsnag — see below. ⚠️ **Schedule entries must use `cron:`, not `every:`** — rufus measures an
-`every` interval from process start, so a 6-hour one would reset on every deploy and could go
-indefinitely without firing.
+**The recurring jobs** come from `sidekiq-scheduler`. Its schedule is below `:scheduler:` in
+`config/sidekiq.yml`, and it starts in the Sidekiq **server** only. Puma loads the gem and schedules
+nothing, thus no job runs two times across the two fly machines. Its "Recurring Jobs" tab is on the
+`/sidekiq` dashboard, which the owner session controls. Today there is one scheduled job,
+`WhoopTokenRefreshJob`, each 6 hours. Whoop rotates its refresh token at each refresh, and it makes
+a token with no use expire. In all other conditions the app refreshes a token **only when it is
+necessary**. Thus a quiet period, with no widget traffic and no webhook, would leave the integration
+in a state that needs a manual authorization at `/whoop/auth`. The job calls
+`Whoop#refresh_tokens!`, which does not use the access-token cache but which still takes the same
+refresh lock. When Whoop refuses the token, the Connected apps page shows the failure, and Bugsnag
+is not the only record. Refer to the text below. ⚠️ **Each schedule entry must use `cron:`, and not
+`every:`.** rufus measures an `every` interval from the start of the process, thus a 6-hour interval
+starts again at each deploy and can go for a long time with no run.
 
 ### Views, helpers, presenters
 
-Views (`app/views/widgets/`) render raw HTML fragments. **Helpers** (`app/helpers/`) are pure
-formatting/selection functions — every method takes the data it works on as explicit arguments;
-none read controller ivars. Request state lives in **presenters** (`app/presenters/`):
-`WeatherSummaryPresenter` (the weather widget's prose + business rules), `EventWeatherPresenter`,
-`UpcomingRacesPresenter`, `WhoopPresenter`. Presenters take their data as constructor kwargs. When
-a controller body needs a helper, it calls it through the `helpers` proxy rather than `include`-ing
-the module.
+A view in `app/views/widgets/` renders a plain HTML fragment. Each **helper** in `app/helpers/` is a
+format function or a selection function: each method takes its data as an argument, and no method
+reads an instance variable of a controller. The state of a request is in a **presenter**
+(`app/presenters/`): `WeatherSummaryPresenter` has the text and the rules of the weather widget, and
+there are also `EventWeatherPresenter`, `UpcomingRacesPresenter`, and `WhoopPresenter`. Each
+presenter takes its data as constructor keyword arguments. When the body of a controller needs a
+helper, it calls that helper through the `helpers` object and it does not `include` the module.
 
 ### The admin UI
 
-An owner-facing UI built with **Web Awesome Pro** components. It's the only part of this app with an
-asset pipeline, a layout, or client-side JavaScript; everything else still renders `layout false`
-fragments.
+An admin UI for the owner, with **Web Awesome Pro** components. It is the one part of this app with
+an asset pipeline, a layout, and JavaScript in the browser. Each other part still renders a
+`layout false` fragment.
 
-⚠️ **Its routes sit at the ROOT, not under `/admin`** — they're drawn only on the admin host, where
-the prefix would just repeat the hostname. `scope module: "admin"` in `config/routes.rb` keeps the
-controllers grouped under `Admin::` without putting that in the path. The consequence is that admin
-pages claim top-level paths: check any new one against the zone's scanner-noise custom rule, which
-blocks whole prefix families (`/config/`, `/home/`, `/analytics/`, `/deploy/`, …) zone-wide and
-would 403 a page named after one. Add its prefix to `RACK_ATTACK_KNOWN_PREFIXES` too.
+⚠️ **Its routes are at the ROOT, and not below `/admin`.** Rails draws them on the admin host only,
+where that prefix would repeat the host name. `scope module: "admin"` in `config/routes.rb` keeps the
+controllers together below `Admin::` and does not put that word in the path. The result is that each
+admin page uses a top-level path. Read each new page against the scanner-noise custom rule of the
+zone: that rule blocks full prefix families (`/config/`, `/home/`, `/analytics/`, `/deploy/`, and
+more) in the full zone, and it would give a 403 to a page with one of those names. Add the prefix of
+each new page to `RACK_ATTACK_KNOWN_PREFIXES` also.
 
-**Stack: Turbo + Stimulus + Web Awesome, server-rendered.** No SPA framework, and no separate
-front-end app — deliberately, and not for lack of ambition (a maps UI, a daily dashboard, and
-eventually a Contentful replacement are all intended to live here). Web Awesome already ships the
-admin component set those need, and keeping it as the single component layer across `web/` and
-`api/` is what stops the design system forking. When one screen turns out to need real client state,
-add it as an **island**: npm install, import in `app/javascript/admin.js`, mount from a Stimulus
-controller's `connect()`. The pipeline supports that with no changes.
+**The stack: Turbo, Stimulus, and Web Awesome, and the server renders each page.** There is no SPA
+framework and no separate front-end app, on purpose, and not because the plans are small: a maps UI,
+a daily dashboard, and, later, a replacement for Contentful all belong here. Web Awesome already has
+the admin components that those need, and one set of components across `web/` and `api/` is what
+keeps the design system as one. When one screen truly needs state in the browser, add it as an
+**island**: install the npm package, import it in `app/javascript/admin.js`, and start it from the
+`connect()` of a Stimulus controller. The pipeline accepts that with no change.
 
-**Pipeline**: Propshaft (fingerprinting) + jsbundling-rails (runs `npm run build` inside
-`assets:precompile`) + esbuild, configured in `esbuild.config.mjs` rather than CLI flags (as `web/`
-uses) because the Sass plugin has to be registered in-process. `app/javascript/admin.js` is the only
-entrypoint; esbuild emits `app/assets/builds/admin.js` *and* a sibling `admin.css` from the
-stylesheet imports. Bundling exists because Web Awesome's `dist/` uses relative imports into
-`dist/chunks/*.js` and Propshaft rewrites no import specifiers.
+**The pipeline**: Propshaft adds the fingerprint, jsbundling-rails runs `npm run build` in
+`assets:precompile`, and esbuild makes the bundle. The esbuild configuration is in
+`esbuild.config.mjs` and not in CLI flags, and `web/` uses flags. The reason is that the code must
+register the Sass plugin in the same process. `app/javascript/admin.js` is the one entry point.
+esbuild writes `app/assets/builds/admin.js` *and* an `admin.css` beside it, from the stylesheet
+imports. The bundle is necessary because the `dist/` of Web Awesome imports `dist/chunks/*.js` with
+a relative path, and Propshaft changes no import path.
 
-**Styles are Sass**, one BEM block per partial under `app/javascript/styles/`, pulled together by
-`admin.scss`. ⚠️ **esbuild — not Sass — is what flattens `webawesome.css`.** That file is a chain of
-`@import url(...)` statements, and Sass passes those through as plain CSS imports instead of
-inlining them, which would leave the built stylesheet pointing at paths that don't exist. So the
-vendor stylesheet stays a plain `.css` import in `admin.js`, ahead of our `.scss`.
+**The styles are Sass**, with one BEM block in each partial below `app/javascript/styles/`, and
+`admin.scss` imports them. ⚠️ **esbuild makes `webawesome.css` into one file, and Sass does not.**
+That file is a group of `@import url(...)` statements, and Sass keeps each one as a plain CSS
+import. Thus the stylesheet from the build would point at paths that do not exist. For that reason
+the vendor stylesheet stays a plain `.css` import in `admin.js`, before our `.scss`.
 
-- ⚠️ **`WEBAWESOME_NPM_TOKEN` is required at every `npm ci`** — your shell, the GitHub runner, and
-  **fly's remote builder** (`flyctl deploy --build-secret`, which is why the deploy command grew a
-  flag). `.npmrc` interpolates it from the environment; it's never on disk.
-- ⚠️ **`node_modules` is deleted at the end of the Dockerfile's build stage.** The final stage does
-  `COPY --from=build /rails /rails` wholesale, so anything left behind ships to a 512MB VM.
-- ⚠️ **The import of the full `styles/webawesome.css` is load-bearing**, not a convenience.
-  `styles/layers.css` is what defines `.wa-mobile-only` and the rule hiding `[data-toggle-nav]` on
-  desktop; `styles/utilities/fouce.css` is what provides `.wa-cloak`. Cherry-picking the theme (as
-  `web/` does) silently drops both. Our Sass is imported *after* it and is unlayered, so it outranks
-  every `wa-*` layer without specificity games.
-- ⚠️ **Don't use `<wa-icon>`** — it resolves icons through a base path or FA kit code, neither
-  configured here, and the npm package ships no icon assets, so every icon silently renders blank.
-  Use `icon_svg(family, style, id)`, and **always with `raw`** — it returns a plain String, so
-  without it ERB escapes the markup into the page as visible text. For an icon that goes into a
-  component slot (`start`/`end` on `<wa-button>`, `icon` on `<wa-callout>`), use
-  `slotted_icon_svg(family, style, id, slot:)`, which returns a safe buffer and needs no `raw`.
-- ⚠️ **ARIA on a `wa-*` host does not reach the element inside its shadow root.** `<wa-button>`
-  renders its own `<button>`/`<a>` and forwards `href`/`target`/`rel`/`type` but no ARIA, and
-  `icon_svg` marks every SVG `aria-hidden` — so an `aria-label` or `aria-current` on the host is
-  inert to a screen reader. Put the name or state in the **slotted content**, as a
-  `wa-visually-hidden` span (the header toggle and the nav's current item both do). Turbo, by
-  contrast, *does* pierce shadow roots in both directions — it finds a `wa-button`'s inner anchor
-  through the click's composed path, and `data-turbo="false"` on the host from there — so
-  `<wa-button href>` navigates with Drive like a plain link.
-- ⚠️ `rake assets:*` is now shared: `assets:backfill` (the R2 image mirror, above) sits alongside
-  Propshaft's `assets:precompile` / `clean` / `clobber`. No collision, but they're unrelated.
+- ⚠️ **Each `npm ci` needs `WEBAWESOME_NPM_TOKEN`**: your shell, the GitHub runner, and the **remote
+  builder of fly** (`flyctl deploy --build-secret`, and that is the reason for the flag in the
+  deploy command). `.npmrc` reads it from the environment, and it is never on the disk.
+- ⚠️ **The build stage of the Dockerfile deletes `node_modules` at its end.** The final stage does
+  `COPY --from=build /rails /rails` for the full directory, thus each file that stays goes to a
+  512MB VM.
+- ⚠️ **The import of the full `styles/webawesome.css` is necessary**, and it is not for convenience.
+  `styles/layers.css` defines `.wa-mobile-only` and the rule that hides `[data-toggle-nav]` on the
+  desktop, and `styles/utilities/fouce.css` gives `.wa-cloak`. A selection of the theme only, as
+  `web/` does, removes both, and it gives no message. The code imports our Sass *after* it, and our
+  Sass has no layer. Thus our Sass wins over each `wa-*` layer, and it needs no change to its
+  specificity.
+- ⚠️ **Do not use `<wa-icon>`.** It finds each icon through a base path or a Font Awesome kit code,
+  and neither one is in this configuration. The npm package has no icon file, thus each icon is
+  empty and it gives no message. Use `icon_svg(family, style, id)`, and **always with `raw`**: it
+  returns a plain String, and without `raw` ERB escapes the markup and the page shows it as text.
+  For an icon in a slot of a component (`start` or `end` on `<wa-button>`, and `icon` on
+  `<wa-callout>`), use `slotted_icon_svg(family, style, id, slot:)`, which returns a safe buffer and
+  needs no `raw`.
+- ⚠️ **ARIA on a `wa-*` host does not reach the element in its shadow root.** `<wa-button>` renders
+  its own `<button>` or `<a>`, and it sends `href`, `target`, `rel`, and `type` to that element but
+  no ARIA. `icon_svg` also marks each SVG `aria-hidden`. Thus an `aria-label` or an `aria-current`
+  on the host does nothing for a screen reader. Put the name or the state in the **content of the
+  slot**, in a `wa-visually-hidden` span. The button in the header and the current item of the nav
+  both do that. Turbo is different: it *does* go into a shadow root and out of it. It finds the
+  anchor in a `wa-button` through the composed path of the click, and it then finds
+  `data-turbo="false"` on the host. Thus a `<wa-button href>` navigates with Drive, as a plain link
+  does.
+- ⚠️ `rake assets:*` now has two groups: `assets:backfill`, which is the R2 image mirror above, and
+  the `assets:precompile`, `assets:clean`, and `assets:clobber` of Propshaft. There is no conflict,
+  but the two groups have no relation.
 
-**Prefer a Web Awesome component over the native element wherever one exists**, and its layout
-utilities (`wa-stack`, `wa-cluster`, `wa-grid`, `wa-gap-*`, `wa-visually-hidden`) and design tokens
-(`--wa-space-*`, `--wa-color-*`, `--wa-form-control-*`) over hand-written CSS. In practice that
-means **not** `button_to`, which emits a native `<button>` — use `form_with` wrapping a
-`<wa-button type="submit">`. Web Awesome's button is form-associated (`formAssociated = true`), so
-it submits the surrounding form exactly like a native one, CSRF token and `_method` included.
-A bare `<button` in the server HTML means one crept back in; two request specs assert its absence.
+**Use a Web Awesome component in place of a native element wherever one exists.** Use its layout
+utilities (`wa-stack`, `wa-cluster`, `wa-grid`, `wa-gap-*`, and `wa-visually-hidden`) and its design
+tokens (`--wa-space-*`, `--wa-color-*`, and `--wa-form-control-*`) in place of CSS that a person
+writes. In practice that means **no** `button_to`, which writes a native `<button>`. Use `form_with`
+around a `<wa-button type="submit">`. The button of Web Awesome is part of its form
+(`formAssociated = true`), thus it submits that form as a native button does, and this includes the
+CSRF token and `_method`. A plain `<button` in the server HTML means that one came back into the
+code, and two request specs check that there is none.
 
-Sass here is for what's genuinely ours — page-specific layout, the brand pins, a border the
-component doesn't draw. A rule that restates a component's own look (its radius, hover fill, focus
-ring, control height) means the component's API was skipped: reach for `appearance` / `variant` /
-`size` first, then its CSS custom properties, then `::part()`, and write a rule of your own last.
-Same for markup: when a `wa-*` element seems to be missing a capability, check its docs before
-working around it — several of the sharp edges here (`<wa-page>`'s navigation slot,
-form-association, `::part(base)`) are documented behavior.
+Use Sass here for what is truly ours: the layout of one page, the brand colors, and a border that
+the component does not draw. A rule that repeats the appearance of a component — its corner radius,
+its hover color, its focus ring, or the height of a control — means that a person did not use the
+API of that component. Use `appearance`, `variant`, or `size` first, then its CSS custom properties,
+then `::part()`, and write your own rule last. The same applies to the markup: when a `wa-*` element
+appears to have no method for something, read its documentation before you make your own code. More
+than one difficult part here is documented behavior: the navigation slot of `<wa-page>`, the form
+association, and `::part(base)`.
 
-⚠️ **The package ships its own docs — read them rather than recalling an API.** They're the source
-the vendor's examples come from, and they're versioned with the installed release:
+⚠️ **The package has its own documentation. Read it, and do not use an API from memory.** That
+documentation is the source of the examples of the vendor, and its version is the version that you
+installed:
 
-- The **`webawesome` skill** is registered in this environment; invoke it for component APIs
-  (attributes, slots, parts, events) and the utility/token reference.
-- Both skills are on disk at `node_modules/@web.awesome.me/webawesome-pro/dist/skills/` —
-  `webawesome/references/components/<name>.md` per component, plus `webawesome-design/` for layout
-  and theming. The `<wa-page>` rules further down come from
+- The **`webawesome` skill** is available in this environment. Use it for the API of a component,
+  that is, its attributes, its slots, its parts, and its events, and for the list of the utilities
+  and the tokens.
+- Both skills are on the disk at `node_modules/@web.awesome.me/webawesome-pro/dist/skills/`. There is
+  one `webawesome/references/components/<name>.md` for each component, and `webawesome-design/`
+  covers the layout and the theme. The `<wa-page>` rules below come from
   `webawesome-design/references/layouts-page.md`.
-- When neither answers it, the component's own source and styles do
-  (`dist/components/<name>/`, `dist/chunks/*.js`) — that's the only place the shadow-DOM behavior
-  flagged above is written down.
+- When neither one has the answer, read the source and the styles of the component
+  (`dist/components/<name>/` and `dist/chunks/*.js`). That is the only place with the shadow-DOM
+  behavior above.
 
-**Brand color** — the site's firebrick (`#bf0222`, matching `--color-firebrick` in `web/`). Web
-Awesome derives every brand surface from the `--wa-color-brand-NN` ramp, so there's no single token
-to set: the layouts put **`wa-brand-red`** on `<html>` (Web Awesome's supported way to swap the whole
-ramp to the red family, keeping its contrast-checked hover/quiet steps) and `styles/_tokens.scss`
-pins `--wa-color-brand-50` — the step the *loud* surfaces paint with — to the exact firebrick. It
-also colors the Turbo progress bar and the logo's hover state. ⚠️ Don't hand-write the other ten
-ramp steps; that's what the palette exists to get right.
+**The brand color** is the firebrick of the site (`#bf0222`, the same as `--color-firebrick` in
+`web/`). Web Awesome makes each brand surface from the `--wa-color-brand-NN` ramp, thus there is no
+single token to set. The layouts put **`wa-brand-red`** on `<html>`, which is the supported method of
+Web Awesome to change the full ramp to the red family and to keep its hover step and its quiet step
+at a good contrast. `styles/_tokens.scss` then sets `--wa-color-brand-50`, the step of the *loud*
+surfaces, to the exact firebrick. That color is also the color of the Turbo progress bar and of the
+logo on hover. ⚠️ Do not write the other ten steps of the ramp by hand, because the palette gives
+the correct values.
 
-**Layouts** — `layouts/admin.html.erb` (the `<wa-page>` shell) and `layouts/auth.html.erb` (the
-sign-in page, which is deliberately just the Google button — no heading, no copy), sharing
-`layouts/_head.html.erb`. ⚠️ **Neither is named `application`**: that's
-Rails' implicit default, and this app's posture is machine-only-by-default, so every existing
-controller must stay unaffected even if a `layout false` is ever dropped. Dark mode comes from an
-inline script mapping `prefers-color-scheme` onto Web Awesome's `.wa-dark` class — it keys off that
-class, not the media query.
+**The layouts** are `layouts/admin.html.erb`, which is the `<wa-page>` shell, and
+`layouts/auth.html.erb`, which is the sign-in page and has the Google button only, with no heading
+and no text. Both use `layouts/_head.html.erb`. ⚠️ **Neither one has the name `application`**,
+because that is the implicit default of Rails. This app is for machines by default, thus each
+controller that exists must stay the same even if a person removes a `layout false`. The dark mode
+comes from an inline script that changes `prefers-color-scheme` into the `.wa-dark` class of Web
+Awesome. The styles use that class, and not the media query.
 
-**`<wa-page>` rules** (the package ships its own reference at
-`dist/skills/webawesome-design/references/layouts-page.md`): write the nav **once** in
-`slot="navigation"` — the component moves that one copy between the desktop sidebar and the mobile
-drawer, so a second authored copy shows twice on desktop. `--menu-width` must reset to `auto` for
-`view='mobile'` or an empty band is reserved down the left. Nav links need `data-drawer="close"`.
-⚠️ Set `disable-navigation-toggle` explicitly because we server-render: the component flips it
-itself once it sees our `[data-toggle-nav]`, but not before it upgrades, and until then its built-in
-hamburger renders on its own unstyled row above the header.
+**The `<wa-page>` rules** (the package has its own reference at
+`dist/skills/webawesome-design/references/layouts-page.md`): write the nav **one time** in
+`slot="navigation"`. The component moves that one copy between the sidebar of the desktop and the
+drawer of the mobile, thus a second copy shows two times on the desktop. `--menu-width` must go back
+to `auto` for `view='mobile'`, or an empty band stays at the left. Each nav link needs
+`data-drawer="close"`. ⚠️ Set `disable-navigation-toggle` in the markup, because the server renders
+the page: the component sets it when it sees our `[data-toggle-nav]`, but not before it upgrades.
+Until then its own hamburger button shows on a row with no style above the header.
 
-⚠️ **Two flows must opt out of Turbo** with `data-turbo="false"`: the Google sign-in form and the
-Whoop **Connect** link. Both are same-origin URLs that redirect cross-origin, which Turbo Drive
-cannot follow — it fails silently, the click appearing to do nothing. The Connected apps view
-applies the attribute to every card's Connect button unconditionally; the only cost to one whose
-path is an ordinary admin page (Bluesky's form) is a full page load.
+⚠️ **Two flows must refuse Turbo** with `data-turbo="false"`: the Google sign-in form and the
+**Connect** link of Whoop. Both are same-origin URLs that redirect to a different origin, and Turbo
+Drive cannot follow that. It fails with no message, and the click appears to do nothing. The
+Connected apps view puts the attribute on the Connect button of each card. For a card whose path is
+an ordinary admin page, which is the form of Bluesky, the only cost is a full page load.
 
-The header carries the site wordmark, `layouts/_logo.html.erb` — a **verbatim copy** of
-`web/source/partials/_logo.svg.erb`. ⚠️ Its paths hardcode `fill="#020a0a"`, which is invisible on
-the dark theme; `_admin-header.scss` overrides that to `currentColor`, which is also why it's
-inlined rather than served as an image (an `<img>` can't inherit the text color). Drift between the
-two copies costs nothing beyond a stale admin logo.
+The header has the wordmark of the site, `layouts/_logo.html.erb`, which is a **copy word for word**
+of `web/source/partials/_logo.svg.erb`. ⚠️ Its paths contain `fill="#020a0a"`, which you cannot see
+on the dark theme. `_admin-header.scss` changes that to `currentColor`, and that is also the reason
+for the inline SVG in place of an image: an `<img>` cannot take the color of the text. A difference
+between the two copies costs no more than an old admin logo.
 
-The sidebar comes from `AdminHelper` — `#admin_nav_items` for the two ungrouped entries (Home,
-Spam) and `#admin_nav_groups` for the labelled groups (Tools, Settings, More) — and both render
-through `layouts/_admin_nav_item`, so drawer-closing, the active state, and icon handling are
-written once. Each item is a `<wa-button appearance="plain" href>` with a leading icon, and the
-current page's is set to `filled` — the active state is a Web Awesome step, not a hand-picked
-background. An item marked `external: true` (today only Sidekiq, which renders its own layout)
-opens in a new tab with `rel="noopener"` and a visually-hidden "(opens in a new tab)".
+The sidebar comes from `AdminHelper`: `#admin_nav_items` gives the two items with no group, which
+are Home and Spam, and `#admin_nav_groups` gives the groups with a caption, which are Tools,
+Settings, and More. Both render through `layouts/_admin_nav_item`, thus the code for the drawer, the
+active state, and the icons is written one time. Each item is a `<wa-button appearance="plain" href>`
+with an icon at its start, and the item of the current page is `filled`. Thus the active state is a
+step of Web Awesome, and not a background color that a person selected. An item with
+`external: true`, which is Sidekiq only today because it renders its own layout, opens in a new tab
+with `rel="noopener"` and a hidden "(opens in a new tab)".
 
-A group is nothing but a caption above its own `<ul>` of those same links:
+A group is only a caption above its own `<ul>` of those same links:
 
-- ⚠️ **The caption is a `<div>`, not a heading element** — it sits above the page's own `<h1>`, so a
-  real heading would land ahead of it in the document outline. The `<ul>` carries
-  `aria-labelledby` pointing at it, which is what associates the two for a screen reader.
-- ⚠️ **Every item's icon box is forced square** in `_admin-nav.scss`, against the `width: auto`
-  every inline SVG gets in `_base.scss` — Font Awesome's viewBoxes aren't all square, so at auto
-  width no two labels in the column start at the same x.
+- ⚠️ **The caption is a `<div>`, and not a heading element.** It is above the `<h1>` of the page,
+  thus a true heading would come before that `<h1>` in the outline of the document. The `<ul>` has
+  an `aria-labelledby` that points at the caption, and that is what joins the two for a screen
+  reader.
+- ⚠️ **`_admin-nav.scss` makes the icon box of each item square**, against the `width: auto` that
+  `_base.scss` gives to each inline SVG. The viewBox of a Font Awesome icon is not always square,
+  thus at an automatic width no two labels in the column start at the same x.
 
-**Connected apps** (`/connected-apps`) connects and disconnects Whoop and Bluesky.
-`ConnectedAppPresenter` renders four states from a `valid_credentials?` / `connected?` pair plus an
-optional `error:` string. The fourth, `:error`, is attached-but-broken, and it offers **both**
-Reconnect and Disconnect — re-authorizing is the fix, and requiring a disconnect first would throw
-away the only thing separating it from a fresh setup.
+**Connected apps** (`/connected-apps`) connects Whoop and Bluesky and disconnects them.
+`ConnectedAppPresenter` renders four states from a `valid_credentials?` and `connected?` pair and an
+optional `error:` string. The fourth state, `:error`, means connected but broken, and it gives
+**both** Reconnect and Disconnect. A new authorization is the correction, and a rule to disconnect
+first would remove the one thing that makes this state different from a new setup.
 
-- **Whoop** is OAuth: `Whoop#disconnect!` clears the tokens. ⚠️ It deletes the cached `user_id`
-  alongside them — `Webhooks::WhoopController` authorizes payloads against it, so a leftover copy
-  keeps accepting webhooks for an account whose tokens are gone.
-  - ⚠️ **A rejected refresh leaves the tokens in place**, so `connected?` — which is just "is there
-    a refresh token" — keeps reporting true while nothing works. `Whoop#record_refresh_error`
-    writes `whoop:<client id>:refresh_error` on a **4xx** from the token endpoint, and
-    `#refresh_error` is what makes the card say so. **4xx only**: a 5xx or a timeout is Whoop being
-    down, and flagging those would send the owner off to re-authorize working credentials. Cleared
-    by `store_tokens` (so any successful refresh *or* re-auth clears it) and by `disconnect!`.
-- **Bluesky** has no OAuth round trip, so it connects by form at `/connected-apps/bluesky`
-  (`Admin::BlueskyController`, which owns all three of its actions rather than splitting the
-  disconnect onto `connected_apps#`). `BlueskyCredentials` holds the handle and app password in
-  the Redis hash `bluesky:credentials`. ⚠️ **That page is the only way to set them — there is no
-  env var**, so the integration is inert on a fresh environment until someone connects.
-  - ⚠️ **The app password is encrypted at rest** (`ActiveSupport::MessageEncryptor` off
-    `secret_key_base`) — it's an account-level credential that works from anywhere with no client
-    binding, and this Redis also backs the Sidekiq queues. It's the only encrypted value in the
-    app. A decrypt failure returns nil rather than raising, so a rotated `RAILS_MASTER_KEY`
-    degrades to "not connected" instead of erroring every page that renders the status.
-  - ⚠️ **`StandardSite#connect!` validates before storing**, by opening a real PDS session. A
-    typo'd app password stored blind fails silently on the next publish.
-  - ⚠️ **`disconnect!` deliberately leaves `standard_site:did` alone.** The DID is public data, not
-    a credential, and `GET /api/standard-site` feeds the verification `<link>` tags on every page
-    of the static site — clearing it would strip them site-wide at the next build, under a 60s
-    cache that never looks like an edge anomaly.
-  - ⚠️ **A DID change drops the publication record's fingerprint.** Document fingerprints cover
-    the publication's `at://` URI, which carries the DID, so they invalidate themselves when the
-    account changes; the publication record's doesn't, and a stale one would report `:unchanged`
-    forever and never sync to the new repo.
-  - ⚠️ **Flushing Redis costs a reconnect** — the credentials live only there, and nothing else
-    can re-derive them.
+- **Whoop** uses OAuth, and `Whoop#disconnect!` removes the tokens. ⚠️ It also deletes the cached
+  `user_id`, because `Webhooks::WhoopController` authorizes each payload against it. A copy that
+  stays continues to accept a webhook for an account with no tokens.
+  - ⚠️ **A refused refresh keeps the tokens.** Thus `connected?`, which asks only if a refresh token
+    exists, continues to say true while nothing operates. `Whoop#record_refresh_error` writes
+    `whoop:<client id>:refresh_error` for a **4xx** from the token endpoint, and `#refresh_error`
+    makes the card show that. **A 4xx only**: a 5xx or a timeout means that Whoop is down, and a
+    message for those sends the owner to authorize credentials that are correct. `store_tokens`
+    clears it, thus a refresh or a new authorization that is successful clears it, and `disconnect!`
+    clears it also.
+- **Bluesky** has no OAuth round trip, thus it connects with a form at `/connected-apps/bluesky`.
+  `Admin::BlueskyController` has all three of its actions and does not put the disconnect on
+  `connected_apps#`. `BlueskyCredentials` keeps the handle and the app password in the Redis hash
+  `bluesky:credentials`. ⚠️ **That page is the only method to set them, and there is no environment
+  variable.** Thus the integration does nothing in a new environment until a person connects it.
+  - ⚠️ **The code encrypts the app password at rest** with `ActiveSupport::MessageEncryptor` and
+    `secret_key_base`. That password is a credential for the full account, it operates from any
+    client, and this Redis also holds the Sidekiq queues. It is the only encrypted value in the
+    app. A failure to decrypt returns nil and does not raise, thus a new `RAILS_MASTER_KEY` gives
+    "not connected" in place of an error on each page that shows the status.
+  - ⚠️ **`StandardSite#connect!` checks the credentials before it stores them**, and it opens a true
+    PDS session. An app password with a mistake, stored with no check, fails with no message at the
+    next publish.
+  - ⚠️ **`disconnect!` keeps `standard_site:did`, on purpose.** The DID is public data and not a
+    credential, and `GET /api/standard-site` gives the verification `<link>` tags of each page of
+    the static site. To clear it removes those tags from the full site at the next build, below a
+    60s cache, and that never looks like a problem at the edge.
+  - ⚠️ **A change of the DID makes the fingerprint of the publication record incorrect.** The
+    fingerprint of a document covers the `at://` URI of the publication, which contains the DID,
+    thus each document fingerprint becomes invalid by itself when the account changes. The
+    fingerprint of the publication record does not, and an old one reports `:unchanged` for ever and
+    never syncs to the new repo.
+  - ⚠️ **To flush Redis costs a new connection**, because the credentials are only there and no
+    other code can make them again.
 
 ### The spam quarantine
 
-**Spam** (`/spam`) lists everything Akismet flagged, newest first, with **Not spam** and
-**Delete forever**. `ContactMailJob` stores a flagged submission via `SpamQuarantine` instead of
-dropping it; **Not spam** re-enqueues that job with `restored_from_spam`, which skips the check and
-calls `Akismet#submit_ham`.
+**Spam** (`/spam`) lists each message that Akismet flagged, the newest first, with **Not spam** and
+**Delete forever**. `ContactMailJob` does not drop a flagged message: it stores it with
+`SpamQuarantine`. **Not spam** enqueues that job again with `restored_from_spam`, which does not do
+the check and which calls `Akismet#submit_ham`.
 
-- **One Redis hash**, `contact:spam`, field = a generated id. Deliberately not a key per message:
-  nothing else here enumerates the keyspace, and this Redis also backs the Sidekiq queues, so a
-  `SCAN` would be the first of its kind. ⚠️ The trade is that the 30-day retention is enforced in
-  Ruby, so `#store` prunes as well as `#all` — **pruning on the write path is what bounds growth
-  when nobody opens the page.**
-- ⚠️ **`SpamQuarantine#take` is fetch-and-remove, and the `HDEL` return value is the guard.** Turbo,
-  a double click, or a bfcache replay can fire "Not spam" twice; releasing on the read alone would
-  send the email twice.
-- ⚠️ **`Akismet#submit_ham` fails soft, inverting the rest of that class.** `#spam?` raises so
-  nothing is delivered unchecked; the ham report is training, and must never stand between the owner
-  and a message they've already judged legitimate.
-- ⚠️ **These cards are the only unfiltered attacker input this app renders as HTML.** ERB's default
-  escaping is the whole defense — no `raw`, no `html_safe`, no `simple_format` on a message field.
-  The `raw icon_svg(...)` idiom used everywhere else in the admin must not spread to them. Line
-  breaks come from `white-space: pre-wrap`. A request spec pins it with a `<script>` payload.
-- ⚠️ **`wa-details` and `wa-dialog` are exempt from the "don't use `<wa-icon>`" rule** — their
-  chevron and close icons pass `library="system"`, which resolves to inline data URIs bundled with
-  the component, no kit code involved. The delete confirmation is fully declarative
-  (`data-dialog="open <id>"` / `data-dialog="close"`); the `dialog` Stimulus controller only closes
-  it before Turbo caches the page.
-- The card's **Delete forever** is `variant="neutral"`, not `danger`: the brand ramp here *is* red,
-  so a danger variant beside the brand-accent "Not spam" makes the safe action the loudest thing on
-  the card. Red is reserved for the confirm button inside the dialog.
+- **There is one Redis hash**, `contact:spam`, and each field name is an id that the code makes.
+  There is no key for each message, on purpose: no other code here reads the full keyspace, and this
+  Redis also holds the Sidekiq queues, thus a `SCAN` would be the first one. ⚠️ The result is that
+  Ruby applies the 30-day retention. Thus `#store` removes old messages, and `#all` also does.
+  **The removal on the write path is what keeps the size small when nobody opens the page.**
+- ⚠️ **`SpamQuarantine#take` reads and removes, and the return value of `HDEL` is the guard.** Turbo,
+  a double click, or a replay from the bfcache can start "Not spam" two times. To release on the
+  read alone sends the email two times.
+- ⚠️ **`Akismet#submit_ham` fails soft, which is the opposite of the rest of that class.** `#spam?`
+  raises, thus no message goes out with no check. The ham report is training only, and it must never
+  stop a message that the owner already judged to be good.
+- ⚠️ **These cards are the only input from an attacker that this app renders as HTML with no
+  filter.** The default escape of ERB is the full defense: use no `raw`, no `html_safe`, and no
+  `simple_format` on a message field. The `raw icon_svg(...)` pattern of each other admin page must
+  not come here. `white-space: pre-wrap` gives the line breaks. A request spec pins this with a
+  `<script>` payload.
+- ⚠️ **The "do not use `<wa-icon>`" rule does not apply to `wa-details` and `wa-dialog`.** Their
+  chevron icon and close icon use `library="system"`, which gives inline data URIs from the
+  component itself, and no kit code. The delete confirmation is fully declarative
+  (`data-dialog="open <id>"` and `data-dialog="close"`), and the `dialog` Stimulus controller only
+  closes the dialog before Turbo caches the page.
+- The **Delete forever** button of the card is `variant="neutral"` and not `danger`, because the
+  brand ramp here *is* red. A danger variant beside the "Not spam" button in the brand color makes
+  the safe action the loudest part of the card. Red is for the confirm button in the dialog only.
 
 ### The location picker
 
-`/location` is two columns — the ways in on the left, a Mapbox map on the right, one column under
-60rem. Four of them **stage** a location and none of them writes: dropping or dragging the pin, an
-address typed into the box, a reading from the map's Geolocation button, and a race picked from the
-shortcut list. **Save**, under the place name and coordinates, is the only control that writes;
-**Undo** beside it throws the staging away, putting the pin, the map and the heading back to
-what's stored. Both are disabled whenever the staged pair equals the stored one. A `wa-badge`
-beside the coordinates names that state — Saved / Unsaved, or "Not set" before there's ever been a
-location, in the same outlined form Connected apps and Course maps use for theirs.
-⚠️ Its initial state is rendered by `LocationPresenter#state_label` / `#state_variant` and every
-change after that by `STATES` in `location_map_controller.js`; the two vocabularies have to agree.
+`/location` has two columns: the controls at the left and a Mapbox map at the right, and one column
+below 60rem. Four controls **stage** a location and none of them writes: a drop or a drag of the
+pin, an address in the box, a reading from the Geolocation button of the map, and a race from the
+shortcut list. **Save**, below the place name and the coordinates, is the only control that writes.
+**Undo**, beside it, removes the staged pair and puts the pin, the map, and the heading back to the
+stored values. Both controls are disabled when the staged pair is equal to the stored pair. A
+`wa-badge` beside the coordinates gives that state — Saved, Unsaved, or "Not set" before a location
+exists — in the same outlined form that Connected apps and Course maps use.
+⚠️ `LocationPresenter#state_label` and `#state_variant` render the first state, and `STATES` in
+`location_map_controller.js` renders each state after that. The two lists of words must agree.
 
-- **It writes through `Location.store`**, the same method `POST /api/location` uses, so the two
-  can't drift on ordering (Redis first, sync second) or on validation (`Location.parse`, which is
-  `Float()` rather than `to_f` — see the Null Island ⚠️ there). This page is a front-end over that
-  endpoint's write, not a second way to store a location.
-- **The heading is `format_location`'s output** — the same helper, over the same
-  `GoogleMaps#location`, that `WeatherSummaryPresenter` renders — so the page doubles as a preview
-  of how a location will read in the weather widget. ⚠️ Not `LocationContext#label`, which adds
-  fallbacks ("Current location") the widget doesn't have; the preview would promise a name the
-  widget would never print. A geocode that resolves to nothing falls back to the coordinates.
-- ⚠️ **`GET /location/lookup` must never write.** It's what stages a location — geocoding an
-  address, or naming a coordinate pair so the heading previews it — and the entire value of the
-  Save button is that nothing before it changes what the widgets read. A request spec runs every
-  lookup example with `$redis.set` wired to raise.
-- **Undo restores from memory, not from the server**: the controller keeps the stored pair's place
-  name from whichever response last set it, so throwing a change away costs no lookup. ⚠️ Where
-  nothing is stored at all it instead puts back the line the *server* rendered, captured on connect
-  — restating "Drop a pin on the map…" and "Not set" in JS is exactly the copy that would drift.
-- **`POST /location` takes coordinates only.** An address is resolved by the lookup first, so
-  there's one shape of thing this stores and one place that decides what a valid location is.
-- ⚠️ **Both answer with the place, and the page re-derives the heading from that.** The
-  server-rendered name describes the location the page was *loaded* with; one pin drop makes it a
-  caption for the wrong place. ⚠️ The save path marks the pair it *sent* as stored, not whatever is
-  staged when the response lands — the pin may have moved again, and marking that pair stored would
-  disable Save over an unsaved change.
-- ⚠️ **The displayed coordinates are rounded, and the rounding is written twice** —
-  `LocationPresenter::DISPLAY_PRECISION` for the server-rendered line and `DISPLAY_PRECISION` in
-  `location_map_controller.js` for the one a pin drop rewrites. They must match, or dropping a pin
-  visibly reformats the numbers. Storage is unaffected: the controller still saves at its own
-  `PRECISION`, and the override callout deliberately prints the env var's value verbatim.
-- ⚠️ **`Location` prefers `ENV["LOCATION"]` over the stored value**, so with that var set a pin
-  drop writes Redis and changes nothing any widget reads. The page renders a callout naming the
-  coordinates that actually win rather than appearing to work.
-- ⚠️ **The map's token is `MAPBOX_ACCESS_TOKEN` and only that.** It's rendered into the page, and
-  `StaticMap`'s preference for `MAPBOX_SECRET_TOKEN` is exactly the fallback that must not happen
-  here — that token carries `tilesets:write`. A request spec asserts it never appears in the body.
-  Without the public token the map is replaced by a callout; the address box, the race shortcuts and
-  Save all still work, and geolocation doesn't, since its button belongs to the map.
-- **Geolocation is Mapbox's `GeolocateControl`**, on the map beside the zoom control, not a button
-  of ours: it flies to the reading, draws the accuracy circle, and disables itself where the
-  browser can't geolocate — which a button of ours could only discover by being pressed. Its
-  `geolocate` event saves through the same path a pin drop does. ⚠️ **Never `trackUserLocation`**:
-  in active lock it re-fires on every position update, and each one here is a Redis write plus a
-  `LocationSyncJob`, so a phone left on this page would sync itself to Intervals.icu on GPS jitter.
-- **Mapbox GL JS comes from Mapbox's CDN, loaded by the Stimulus controller**, not from npm. It's
-  several times the size of the whole admin bundle and one page wants it, and the map already
-  can't work without `api.mapbox.com`, so this adds no dependency the page didn't have.
-  ⚠️ Loaded from the controller rather than a `<head>` tag because Turbo merges a new head by
-  *appending* elements: a deferred script would land asynchronously and the controller could
-  connect before `mapboxgl` existed.
-- ⚠️ **The map is torn down on `turbo:before-cache`.** Turbo snapshots the page before Stimulus
-  disconnects, so without it the cached copy contains GL JS's canvas and a restoration visit
-  builds a second map on top of the dead one.
-- The heading's geocode is display only and degrades to nothing, so an unset `GOOGLE_API_KEY` — or
-  a bad day at Google — leaves the coordinates and stores the location regardless. ⚠️ **The address
-  box is the exception**: `GoogleGeocoder` is the *same* key forward, and without it every address
-  is refused. That's the only control here with a hard upstream dependency; the pin, the shortcuts
-  and Geolocation all carry their own coordinates.
-- **The race shortcuts are every confirmed race still ahead**, from the same Contentful events the
-  upcoming-races widget reads, soonest first. ⚠️ Deliberately not `EventsHelper#upcoming_races` —
-  that's the widget's *selection*, capped at three or four, and any race ahead is a place you might
-  be. A race without coordinates is dropped rather than listed as a button that couldn't move the
-  map. Contentful being down costs the shortcuts and nothing else.
+- **The page writes through `Location.store`**, which is the method that `POST /api/location` uses.
+  Thus the two cannot become different in their order (Redis first, then the sync) or in their check
+  (`Location.parse`, which uses `Float()` and not `to_f` — read the Null Island ⚠️ there). This page
+  is a front end over the write of that endpoint, and not a second method to store a location.
+- **The heading is the output of `format_location`**, which is the same helper over the same
+  `GoogleMaps#location` that `WeatherSummaryPresenter` renders. Thus the page is also a preview of
+  the name in the weather widget. ⚠️ It is not `LocationContext#label`, which adds a fallback
+  ("Current location") that the widget does not have. Such a preview would show a name that the
+  widget never prints. When the geocode gives no result, the page shows the coordinates.
+- ⚠️ **`GET /location/lookup` must never write.** It stages a location: it geocodes an address, or
+  it names a pair of coordinates for the preview in the heading. The full value of the Save button
+  is that no step before it changes what the widgets read. A request spec runs each lookup example
+  with a `$redis.set` that raises.
+- **Undo restores from memory, and not from the server.** The controller keeps the place name of
+  the stored pair from the last response that set it, thus to remove a change costs no lookup.
+  ⚠️ When nothing is stored, Undo puts back the line that the *server* rendered, which the
+  controller captured at connect. To write "Drop a pin on the map…" and "Not set" again in JS is
+  exactly the text that would become different.
+- **`POST /location` accepts coordinates only.** The lookup resolves an address first, thus this
+  code stores one shape of data and one place decides what a correct location is.
+- ⚠️ **Both responses contain the place, and the page makes the heading again from that.** The name
+  that the server rendered describes the location at the *load* of the page, and one drop of the pin
+  makes it a caption for a different place. ⚠️ The save path marks the pair that it *sent* as
+  stored, and not the pair that is staged when the response comes back. The pin can move again, and
+  to mark that pair as stored disables Save while a change is not saved.
+- ⚠️ **The page rounds the coordinates that it shows, and the code for that is in two places**:
+  `LocationPresenter::DISPLAY_PRECISION` for the line that the server renders, and
+  `DISPLAY_PRECISION` in `location_map_controller.js` for the line that a pin drop writes. The two
+  must be equal, or a pin drop changes the format of the numbers where the user can see it. This
+  does not change what the code stores: the controller saves at its own `PRECISION`, and the
+  override callout prints the value of the environment variable word for word, on purpose.
+- ⚠️ **`Location` uses `ENV["LOCATION"]` in place of the stored value.** Thus, with that variable
+  set, a pin drop writes to Redis and changes nothing that a widget reads. The page renders a
+  callout with the coordinates that win, and it does not appear to operate.
+- ⚠️ **The token of the map is `MAPBOX_ACCESS_TOKEN`, and no other one.** The page contains that
+  token, and the preference of `StaticMap` for `MAPBOX_SECRET_TOKEN` is exactly the fallback that
+  must not occur here, because that token has `tilesets:write`. A request spec asserts that it is
+  never in the body. With no public token, a callout replaces the map. The address box, the race
+  shortcuts, and Save continue to operate, and geolocation does not, because its button is part of
+  the map.
+- **Geolocation is the `GeolocateControl` of Mapbox**, on the map beside the zoom control, and it is
+  not a button of ours. It moves to the reading, it draws the accuracy circle, and it disables
+  itself where the browser cannot geolocate. A button of ours could find that only after a press.
+  Its `geolocate` event saves through the same path as a pin drop. ⚠️ **Never use
+  `trackUserLocation`.** In active lock it fires again at each position update, and each one here is
+  a write to Redis and a `LocationSyncJob`. Thus a phone that stays on this page syncs itself to
+  Intervals.icu at each small GPS change.
+- **Mapbox GL JS comes from the CDN of Mapbox, and the Stimulus controller loads it.** It does not
+  come from npm. It is some times larger than the full admin bundle, one page needs it, and the map
+  cannot operate without `api.mapbox.com`. Thus this adds no dependency that the page did not have.
+  ⚠️ The controller loads it, and a `<head>` tag does not, because Turbo merges a new head and
+  *adds* the elements. A deferred script arrives at an unknown moment, and the controller can
+  connect before `mapboxgl` exists.
+- ⚠️ **The code removes the map at `turbo:before-cache`.** Turbo makes the snapshot of the page
+  before Stimulus disconnects. Without that step the cached copy contains the canvas of GL JS, and a
+  restoration visit makes a second map above the dead one.
+- The geocode of the heading is for display only and it degrades to nothing. Thus an unset
+  `GOOGLE_API_KEY`, or a bad day at Google, leaves the coordinates and stores the location. ⚠️ **The
+  address box is the exception**: `GoogleGeocoder` uses the *same* key, and without it the page
+  refuses each address. That is the only control here with a hard dependency on another service, and
+  the pin, the shortcuts, and Geolocation each have their own coordinates.
+- **The race shortcuts are each confirmed race in the future**, from the same Contentful events that
+  the upcoming-races widget reads, and the soonest one is first. ⚠️ This is not
+  `EventsHelper#upcoming_races`, on purpose: that is the *selection* of the widget, with a maximum
+  of three or four, and any race in the future is a place where you can be. The page drops a race
+  with no coordinates in place of a button that cannot move the map. When Contentful is down, the
+  page loses the shortcuts and nothing more.
 
 ### The course-map renderer
 
-`/course-maps` turns GPX tracks into the static PNG cover images used on race reports. It's a
-front-end over Mapbox's Data Workbench: upload one or more GPX files, wait for each to be
-published as a private vector tileset, then open one to tune its framing and styling and download
-the result.
-(This replaced a standalone `utilities/maps/` Rake task, which rendered every GPX in a folder with
-one shared set of env-var options.)
+`/course-maps` makes a static PNG cover image for a race report from a GPX track. It is a front end
+over the Data Workbench of Mapbox: upload one or more GPX files, wait while Mapbox publishes each
+one as a private vector tileset, then open one to set its frame and its style and to download the
+result.
+(This replaced a `utilities/maps/` Rake task, which rendered each GPX in a folder with one shared
+set of options from environment variables.)
 
-Four services, none of them `ApplicationService` subclasses: `GpxTrack` parses an upload,
-`TrackLibrary` is the Redis store, `MapboxTileset` talks to the Mapbox Tiling Service, and
-`StaticMap` builds and fetches the render.
+There are four services, and none of them is a subclass of `ApplicationService`: `GpxTrack` parses
+an upload, `TrackLibrary` is the Redis store, `MapboxTileset` speaks to the Mapbox Tiling Service,
+and `StaticMap` makes the render URL and gets the image.
 
-- ⚠️ **Nothing is composited locally.** The Static Images API draws the track (an `addlayer` over
-  the tileset) and both pins server-side and returns a finished PNG, so this needs no image library
-  and no system packages — only `nokogiri` and `httparty`. Don't "improve" it into local drawing;
-  the 512MB VM has an OOM history.
-- ⚠️ **`GpxTrack` streams with `Nokogiri::XML::Reader`, not a DOM.** Real Garmin exports run to
-  several megabytes and ~9,000 points, and this parse happens in a Puma thread against a 20-second
-  request budget. Coordinates are rounded to six decimals (~11cm) on the way in: Garmin writes 26
-  significant digits, which triples both the Redis payload and the Mapbox upload for nothing.
-- **One Redis hash**, `maps:tracks`, field = the tileset id — same reasoning as the spam
-  quarantine. A record holds the bounding box, both endpoints, the sport, and the render settings,
-  because **the GPX is thrown away after upload** and the settings page still has to place the pins
-  on a track uploaded last week. `MAX_ENTRIES` is a runaway guard, not retention: a track is only
-  gone when the owner deletes it.
-- ⚠️ **Coordinates are staged in their own key** (`maps:pending:<id>`, 1-hour TTL), not in the
-  record or the job's arguments. `app` and `worker` are separate fly machines, so a tempfile
-  written during the request isn't there for the worker to read.
-- ⚠️ **`MapTilesetJob` raises on failure rather than recording one**, so the inherited 24-hour
-  retry applies; `sidekiq_retries_exhausted` is what writes `status: "failed"`. Recording it on the
-  first exception would flicker the row failed → processing → failed on every attempt. The job is
-  idempotent (source upload replaces, an existing tileset counts as success), which is what makes
-  that safe — and necessary, since `kill_timeout` is 30s and a publish poll runs up to 300s.
-- ⚠️ **`MapboxTileset#destroy!` deletes the tileset *and* its source.** Deleting only the tileset
-  orphans the source, which still counts against the account and is invisible in the tileset list.
-  It raises on anything but success or 404, so the local record is never dropped while the remote
-  one survives.
-- ⚠️ **`preview` and `download` proxy the render; they never redirect.** The Static Images URL
-  carries `MAPBOX_SECRET_TOKEN` as a query parameter, so an `<img>` pointed at Mapbox would hand
-  the browser a `tilesets:write` credential. Both render at `@2x` — the API bills per request, not
-  per pixel, so a smaller preview saves nothing, and the zoom dialog shows that same image at full
-  width, where 1x would be half the pixels a retina screen wants.
-- ⚠️ **The style URL and the marker icons/colors reach an outbound URL from form fields**, so
-  `StaticMap` matches the style against Mapbox's own shape and strips everything that isn't an icon
-  id or a hex color. A bad style falls back to the default rather than being interpolated, and the
-  per-side numbers are clamped — they come from number inputs.
-- **Padding and extra map are four settings each**, not the CSS-style shorthand string the Rake
-  task took (`PADDING=60,20`). The form shows one field while the sides match and four when they
-  don't; `linked_sides_controller` mirrors the first into the rest, and all four stay named so the
-  form always submits four values. Shorthand was compact to type and miserable to edit.
-- **The map style is a dropdown plus an override.** `style_preset` holds one of `STYLE_PRESETS`,
-  `style_url` holds a custom style and wins when set. `MapTrackPresenter#settings` moves a preset
-  found in `style_url` back into the dropdown, which is also how records written before the split
-  migrate themselves.
-- **Marker icons are named for what they mark** (`MARKER_ICONS`), not by their Maki id, and the
-  sport→icon seeding in `GpxTrack::SPORT_ICONS` falls back to running rather than to a neutral
-  placeholder.
-- ⚠️ **Mapbox draws the last overlay on top**, so the default marker order is `[finish, start]` —
-  start on top, because a finish pin over the start of an out-and-back hides where you began.
-  `finish_on_top` reverses it. The setting is named for the state it produces; an earlier
-  `reverse_markers` described the mechanism and read backwards against its own label.
-- ⚠️ **The pinned preview clears the sticky header via `<wa-page>`'s `--header-height`**, which the
-  component declares but never measures — `_page.scss` sets it, `_admin-header.scss` takes the
-  bar's height from it, and `_track.scss` offsets the sticky preview by it. Setting it also fixes
-  the component's own `--scroll-margin-top` for anchor targets.
-- ⚠️ **This is the only admin page that needs the Sidekiq worker running.** A track sits on
-  "Processing" until `MapTilesetJob` publishes it. That's why `worker` is no longer opt-in in
-  `.overmind.env`. The index checks Sidekiq's process set **only while something is publishing**
-  and says so when it's empty — otherwise a stuck row looks identical to a slow one, with nothing
-  anywhere explaining it. In production an empty set means the worker machine is down.
-- **The page polls**, it doesn't push: `map_status_controller` re-checks `/course-maps/status` every 5s
-  while a row is publishing and stops otherwise. Action Cable's engine is commented out in
-  `application.rb` and there's no `turbo-rails`, so a websocket would be a lot of new
-  infrastructure for one signed-in user.
-- **`map_preview_controller` rewrites the image's `src` rather than submitting the form.** A submit
-  is a Turbo visit, which replaces the body — the field being edited would lose focus on every
-  keystroke and a slider would stop tracking mid-drag. The form stays a real GET form so pressing
-  Enter, or running without JavaScript, still works. Each rebuild is one billed Static Images
-  request, hence the debounce.
-- These are the admin's **first form inputs** — every other form here is action-only. Web Awesome's
-  controls are form-associated, so they submit and appear in `FormData` like native ones. The
-  marker-order switch is paired with a hidden `0` field, because an unchecked switch submits
-  nothing.
+- ⚠️ **This code makes no composite image on the server.** The Static Images API draws the track,
+  which is an `addlayer` over the tileset, and both pins, and it returns a complete PNG. Thus this
+  page needs no image library and no system package, and it uses `nokogiri` and `httparty` only. Do
+  not "improve" it into a local drawing: the 512MB VM ran out of memory in the past.
+- ⚠️ **`GpxTrack` reads the file as a stream with `Nokogiri::XML::Reader`, and not as a DOM.** A
+  true Garmin export is some megabytes and has approximately 9,000 points, and this parse operates
+  in a Puma thread with a budget of 20 seconds for the request. The code rounds each coordinate to
+  six decimals, which is approximately 11cm, at the input. Garmin writes 26 significant digits,
+  which makes the Redis data and the Mapbox upload three times larger for no result.
+- **There is one Redis hash**, `maps:tracks`, and each field name is the tileset id. The reason is
+  the same as for the spam quarantine. A record holds the bounding box, both end points, the sport,
+  and the render settings, because **the code discards the GPX after the upload**, and the settings
+  page must still put the pins on a track from last week. `MAX_ENTRIES` is a guard against a runaway
+  loop and it is not a retention rule: a track goes away only when the owner deletes it.
+- ⚠️ **The coordinates go into their own key** (`maps:pending:<id>`, with a TTL of one hour), and
+  not into the record and not into the arguments of the job. `app` and `worker` are different fly
+  machines, thus a temporary file that the request writes is not there for the worker to read.
+- ⚠️ **`MapTilesetJob` raises at a failure and does not record one.** Thus the 24-hour retry that it
+  inherits applies, and `sidekiq_retries_exhausted` writes `status: "failed"`. To record the failure
+  at the first exception makes the row change between failed, processing, and failed at each
+  attempt. The job is idempotent, because an upload of the source replaces it and a tileset that
+  exists counts as a success. That is what makes the retry safe, and the retry is necessary, because
+  `kill_timeout` is 30s and a poll for the publish can continue for 300s.
+- ⚠️ **`MapboxTileset#destroy!` deletes the tileset *and* its source.** To delete the tileset only
+  leaves the source with no owner. That source still counts against the account, and the tileset
+  list does not show it. The method raises for each result that is not a success and is not a 404,
+  thus the code never deletes the local record while the remote one continues to exist.
+- ⚠️ **`preview` and `download` proxy the render, and they never redirect.** The Static Images URL
+  has `MAPBOX_SECRET_TOKEN` in a query parameter, thus an `<img>` that points at Mapbox gives the
+  browser a credential with `tilesets:write`. Both render at `@2x`: the API bills for each request
+  and not for each pixel, thus a smaller preview saves nothing. The zoom dialog also shows that same
+  image at the full width, where 1x is one half of the pixels that a retina screen needs.
+- ⚠️ **The style URL and the icons and the colors of the markers go into an outbound URL from form
+  fields.** Thus `StaticMap` matches the style against the shape that Mapbox uses and removes each
+  value that is not an icon id and not a hex color. For a bad style the code uses the default and
+  does not put the value into the URL. The code also limits the number for each side, because those
+  values come from number inputs.
+- **The padding and the extra map are four settings each**, and not the shorthand string in the CSS
+  style that the Rake task accepted (`PADDING=60,20`). The form shows one field while the four sides
+  are equal, and four fields when they are not. `linked_sides_controller` copies the first value
+  into the other three, and all four fields keep their name, thus the form always submits four
+  values. The shorthand was short to type and very difficult to edit.
+- **The map style is a dropdown and an override.** `style_preset` holds one of `STYLE_PRESETS`, and
+  `style_url` holds a custom style and wins when it has a value. `MapTrackPresenter#settings` moves
+  a preset that it finds in `style_url` back into the dropdown, and that is also how a record from
+  before this split corrects itself.
+- **The name of a marker icon says what it marks** (`MARKER_ICONS`), and it is not the Maki id. The
+  first icon for a sport comes from `GpxTrack::SPORT_ICONS`, whose fallback is running and not a
+  neutral icon.
+- ⚠️ **Mapbox draws the last overlay on top**, thus the default order of the markers is
+  `[finish, start]`, which puts the start on top. A finish pin above the start of an out-and-back
+  course hides the start point. `finish_on_top` changes the order. The name of the setting says
+  which state it makes. An earlier `reverse_markers` said how it operates, and its value read
+  against its own label.
+- ⚠️ **The preview stays below the sticky header with the `--header-height` of `<wa-page>`**, which
+  the component declares but never measures. `_page.scss` sets it, `_admin-header.scss` takes the
+  height of the bar from it, and `_track.scss` moves the sticky preview by it. To set it also
+  corrects the `--scroll-margin-top` of the component for an anchor target.
+- ⚠️ **This is the only admin page that needs the Sidekiq worker.** A track stays at "Processing"
+  until `MapTilesetJob` publishes it. That is the reason that `worker` is no longer optional in
+  `.overmind.env`. The index reads the process set of Sidekiq **only while a track is publishing**,
+  and it says so when that set is empty. Without that message a row that is stuck looks the same as
+  a row that is slow, and no page gives the reason. In production an empty set means that the worker
+  machine is down.
+- **The page polls, and the server does not push.** `map_status_controller` reads
+  `/course-maps/status` again each 5s while a row is publishing, and it stops at each other moment.
+  The engine of Action Cable is commented out in `application.rb`, and there is no `turbo-rails`.
+  Thus a websocket is much new infrastructure for one user who is signed in.
+- **`map_preview_controller` changes the `src` of the image and does not submit the form.** A submit
+  is a Turbo visit, which replaces the body. Thus the field in use loses the focus at each keystroke,
+  and a slider stops during a drag. The form is still a true GET form, thus the Enter key, and a
+  browser with no JavaScript, both continue to operate. Each new render is one billed Static Images
+  request, and that is the reason for the debounce.
+- These are the **first form inputs** of the admin, and each other form here has an action only. The
+  controls of Web Awesome are part of their form, thus they submit and appear in `FormData` as a
+  native control does. The switch for the marker order has a hidden `0` field with it, because a
+  switch that is off submits nothing.
 
-`Admin::BaseController` requires the owner session; it, `SessionsController`, and
-`WhoopOauthController` all include the **`OwnerFacing`** concern, which sets `Cache-Control:
-no-store`, `X-Robots-Tag: noindex, nofollow`, and the **CSP** below. ⚠️ Admin actions must never
-call `cache_widget`. ⚠️ The `X-Robots-Tag` is not redundant with the `<meta name="robots">` in the
-layout: `public/robots.txt` disallows this whole host, so a crawler never fetches the page to *see*
-that tag, while the URL can still be indexed from an external link. ⚠️ `WhoopOauthController` is in
-that list for the `no-store` specifically — its callback carries the OAuth `code` and `state` in
-the query string, and it renders no admin layout that could carry the signal instead.
+`Admin::BaseController` needs the session of the owner. That controller, `SessionsController`, and
+`WhoopOauthController` each include the **`OwnerFacing`** concern, which sets `Cache-Control:
+no-store`, `X-Robots-Tag: noindex, nofollow`, and the **CSP** below. ⚠️ An admin action must never
+call `cache_widget`. ⚠️ The `X-Robots-Tag` does more than the `<meta name="robots">` of the layout:
+`public/robots.txt` refuses the full host, thus a crawler never gets the page and never *sees* that
+meta tag, and a link from another site can still put the URL in an index.
+⚠️ `WhoopOauthController` is in that list for the `no-store` specifically. Its callback carries the
+OAuth `code` and `state` in the query string, and it renders no admin layout that can give that
+signal.
 
-**Content-Security-Policy** — declared in `OwnerFacing`, so it lands on these three and nowhere
-else. ⚠️ `config/initializers/content_security_policy.rb` sets **only** the nonce generator and
-`nonce_directives`, and deliberately declares **no default policy**: a global one would put the
-header on every widget fragment, which isn't a document and whose response is stored in the edge
-cache. `spec/support/live_update_contract.rb` fails if a fragment ever grows one.
+**The Content-Security-Policy** is in `OwnerFacing`, thus it goes on those three controllers and on
+no other one. ⚠️ `config/initializers/content_security_policy.rb` sets the nonce generator and
+`nonce_directives` **only**, and it declares **no default policy**, on purpose. A default policy
+puts the header on each widget fragment, and a fragment is not a document and the edge cache stores
+its response. `spec/support/live_update_contract.rb` fails if a fragment gets such a header.
 
-- Sent as **Report-Only** unless `CSP_ENFORCE` is set, so a forgotten source is a console report
-  rather than a blank admin page — and flipping it is a fly secret rather than a deploy.
-- ⚠️ The nonce is scoped to `script-src` **only**. A nonce in a directive makes browsers ignore
-  `unsafe-inline` in that same directive, and `style-src` needs `unsafe-inline` for the styles Web
-  Awesome and Mapbox GL JS write at runtime. Adding `style-src` back to `nonce_directives` would
-  silently break every component.
-- The inline dark-mode script in `layouts/_head.html.erb` carries that nonce. It has to stay
-  inline and before paint, so the nonce is what keeps it running.
-- `MAPBOX_ORIGINS` is the location picker: GL JS and its stylesheet come from `api.mapbox.com` at
-  runtime, and the map then reaches the tile and telemetry hosts directly. GL JS also runs its
-  renderer in a Worker built from a blob URL, hence `worker-src blob:`.
-- ⚠️ `Sidekiq::Web` renders its own layout with its own `csp_nonce` and is not covered by this.
+- The header is **Report-Only** unless `CSP_ENFORCE` has a value. Thus a source that a person forgot
+  gives a report in the console and not an empty admin page, and to change that is a fly secret and
+  not a deploy.
+- ⚠️ The nonce applies to `script-src` **only**. A nonce in a directive makes a browser ignore
+  `unsafe-inline` in that same directive, and `style-src` needs `unsafe-inline` for the styles that
+  Web Awesome and Mapbox GL JS write at run time. To add `style-src` to `nonce_directives` again
+  breaks each component, with no message.
+- The inline dark-mode script in `layouts/_head.html.erb` has that nonce. It must stay inline and
+  must run before the paint, thus the nonce is what keeps it in operation.
+- `MAPBOX_ORIGINS` is for the location picker: GL JS and its stylesheet come from `api.mapbox.com`
+  at run time, and the map then speaks to the tile hosts and the telemetry hosts directly. GL JS
+  also runs its renderer in a Worker from a blob URL, and that is the reason for
+  `worker-src blob:`.
+- ⚠️ `Sidekiq::Web` renders its own layout with its own `csp_nonce`, and this policy does not cover
+  it.
 
 ### Caching
 
-`app/controllers/concerns/live_widget.rb`. `cache_widget(ttl:)` sets:
+The code is in `app/controllers/concerns/live_widget.rb`. `cache_widget(ttl:)` sets:
 
-- Browser: `Cache-Control: public, max-age=0, stale-while-revalidate=86400`
-- Edge: `CDN-Cache-Control: public, max-age=<ttl>, stale-while-revalidate=3600, stale-if-error=86400`
+- For the browser: `Cache-Control: public, max-age=0, stale-while-revalidate=86400`
+- For the edge:
+  `CDN-Cache-Control: public, max-age=<ttl>, stale-while-revalidate=3600, stale-if-error=86400`
 
-RFC 9213 — Cloudflare honors `CDN-Cache-Control`, browsers ignore it, which is what lets the edge
-TTL differ from the browser's `max-age=0`.
+This is RFC 9213: Cloudflare obeys `CDN-Cache-Control` and a browser ignores it. That is what
+permits an edge TTL that is different from the `max-age=0` of the browser.
 
-⚠️ **Never express the edge policy as `s-maxage`** — its presence disables `stale-while-revalidate`
-and `stale-if-error` (RFC 9111 §4.2.4), which is what keeps widgets rendering through a fly outage.
+⚠️ **Never write the edge policy as `s-maxage`.** Its presence stops `stale-while-revalidate` and
+`stale-if-error` (RFC 9111 §4.2.4), and those two keep each widget in operation through an outage
+at fly.
 
-⚠️ **Only emit this on successful, cacheable responses.** An error must never be pinned at the edge.
+⚠️ **Send these headers on a successful and cacheable response only.** The edge must never keep an
+error.
 
-⚠️ **Editing a `cache_widget(ttl:)` does not reach copies already at the edge — purge, or the
-change won't land.** A cached fragment keeps the `CDN-Cache-Control` it was *stored* with, so PoPs
-serve the old body under the old policy until it expires on its own terms. Shortening the pageviews
-TTL from 1 h to 5 min once left copies live under the previous `stale-while-revalidate=86400` — a
-view count up to **25 hours** stale, which reads as the counter running backwards. Same for a
-markup change.
+⚠️ **A change to a `cache_widget(ttl:)` does not reach a copy that is already at the edge. Purge, or
+the change does not arrive.** A cached fragment keeps the `CDN-Cache-Control` that it had at the
+moment of the *store*. Thus each PoP serves the old body below the old policy until that policy
+expires. One change of the pageviews TTL from 1 h to 5 min left copies below the earlier
+`stale-while-revalidate=86400`. Thus a view count was as much as **25 hours** old, and it read as a
+counter that goes down. A change to the markup has the same result.
 
-**Purging is the one piece of this policy the app does not author.** The widgets that render
-Contentful content are tagged `Cache-Tag: site` by a **zone Cache Response Rule** matching
-`/widgets/articles/*` and `/widgets/events/*` on this host, so the web deploy's tag purge evicts
-them when content is republished. Nothing here or in the web proxy sets that tag. ⚠️ **Moving a
-widget out of those namespaces — or adding a Contentful-backed widget under a new one — silently
-stops the purge**, and no code change can fix it; it needs a dashboard edit. Full reasoning, plus
-the manual `widgets` tag, in the root [`CLAUDE.md`](../CLAUDE.md).
+**The purge is the one part of this policy that the app does not write.** A **zone Cache Response
+Rule** puts `Cache-Tag: site` on each widget that renders Contentful content, and it matches
+`/widgets/articles/*` and `/widgets/events/*` on this host. Thus the tag purge of the web deploy
+removes them when a person publishes the content again. No code here and no code in the web proxy
+sets that tag. ⚠️ **To move a widget out of those namespaces, or to add a Contentful-backed widget
+below a new namespace, stops the purge with no message**, and no change to the code can correct it:
+it needs an edit in the dashboard. The full reason, and the manual `widgets` tag, are in the root
+[`CLAUDE.md`](../CLAUDE.md).
 
 ### Errors and abuse mitigation
 
-- **Bugsnag** (`config/initializers/bugsnag.rb`) — its railtie auto-inserts the Rack middleware and
-  hooks ActionDispatch, so unhandled exceptions are reported even though errors render as plain
-  text. `notify_release_stages` is production-only and `BUGSNAG_API_KEY` is unset locally/in CI, so
-  it's a no-op outside production.
-- **Errors render as plain text** via `lib/plain_text_exceptions.rb`. Unmatched paths hit the
-  trailing `match "*unmatched"` route → `ApplicationController#route_not_found`, which keeps
-  scanner probes to a single clean `status=404` lograge line rather than an exception backtrace.
-  ⚠️ That catch-all **must stay the last route** — enforced by `spec/routing/routes_guard_spec.rb`.
-- **rack-attack** (`config/initializers/rack_attack.rb`) blocklists probe paths (a flat 403 by
-  **path pattern**, before routing) and throttles requests **to paths outside the known route
-  prefixes**, keyed on `Request#client_ip` (`CF-Connecting-IP` → `Fly-Client-IP` → `req.ip`).
-  ⚠️ **The blocklist must stay IP-agnostic — never ban by IP.** Some probe paths are reachable
-  through the public `/widgets/*` proxy, and all legitimate widget traffic shares that proxy's
-  egress IPs, so an IP ban would 403 every visitor's widgets at once (this once took the site
-  down). Same reason: no blanket per-IP throttle.
-  ⚠️ **If you add a top-level route, add its prefix to `RACK_ATTACK_KNOWN_PREFIXES`** or it will be
-  rate-limited — a missing prefix fails `spec/routing/routes_guard_spec.rb`.
-  There's also a scoped `contact/ip` throttle (5/hour), the one place a per-visitor IP is safe: it
-  uses the proxy-forwarded `X-Kona-Client-IP` (the real visitor, not the shared egress) and it's a
-  throttle, never a ban. And a `signin/ip` throttle (30 per 5 min) over `/signin` + `/auth/` —
-  ⚠️ those prefixes are in `RACK_ATTACK_KNOWN_PREFIXES`, which is exactly what exempts them from
-  the `unknown-paths` throttle, so without a rule of their own the login surface had no
-  origin-side limit at all. Keying on `client_ip` is safe *there* because those paths live on the
-  admin host, which nothing reaches through the shared widget-proxy egress.
-- **The owner session** is Rails' cookie store, declared in `config/initializers/session_store.rb`
-  only to add `expire_after`. ⚠️ A cookie session has no server-side record, so there is nothing to
-  revoke — short of rotating `secret_key_base`, a stolen cookie is valid until the browser drops
-  it. The expiry is the ceiling.
-- **Redis** — global `$redis` from `config/initializers/redis.rb`, via `REDIS_URL`. The same Redis
-  backs the Sidekiq queues.
+- **Bugsnag** (`config/initializers/bugsnag.rb`) — its railtie adds the Rack middleware by itself
+  and connects to ActionDispatch. Thus it reports each exception that no code catches, and the app
+  still renders an error as plain text. `notify_release_stages` names production only, and
+  `BUGSNAG_API_KEY` has no value on your machine and in CI. Thus Bugsnag does nothing outside
+  production.
+- **An error renders as plain text**, through `lib/plain_text_exceptions.rb`. A path with no route
+  goes to the `match "*unmatched"` route at the end and then to
+  `ApplicationController#route_not_found`. Thus a probe from a scanner gives one clean
+  `status=404` lograge line and not a backtrace. ⚠️ That catch-all **must stay the last route**, and
+  `spec/routing/routes_guard_spec.rb` checks that.
+- **rack-attack** (`config/initializers/rack_attack.rb`) blocks each probe path with a flat 403 by
+  **path pattern**, before the routing, and it throttles a request **to a path outside the known
+  route prefixes**. The key is `Request#client_ip`, which is `CF-Connecting-IP`, then
+  `Fly-Client-IP`, then `req.ip`.
+  ⚠️ **The blocklist must not use an IP. Never ban by IP.** Some probe paths are available through
+  the public `/widgets/*` proxy, and each correct widget request shares the egress IPs of that
+  proxy. Thus a ban by IP gives a 403 to the widgets of each visitor at the same moment, and that
+  made the site fail one time. For the same reason, use no throttle for each IP.
+  ⚠️ **When you add a top-level route, add its prefix to `RACK_ATTACK_KNOWN_PREFIXES`**, or the code
+  limits its rate. A prefix that is not there fails `spec/routing/routes_guard_spec.rb`.
+  There is also a `contact/ip` throttle with a small scope (5 each hour). That is the one place
+  where an IP for each visitor is safe: it uses the `X-Kona-Client-IP` that the proxy forwards,
+  which is the true visitor and not the shared egress, and it is a throttle and never a ban. There
+  is also a `signin/ip` throttle (30 each 5 min) over `/signin` and `/auth/`. ⚠️ Those two prefixes
+  are in `RACK_ATTACK_KNOWN_PREFIXES`, and that is exactly what removes them from the
+  `unknown-paths` throttle. Thus, without a rule of their own, the login pages had no limit at the
+  origin. To use `client_ip` is safe *there*, because those paths are on the admin host, which no
+  request reaches through the shared egress of the widget proxy.
+- **The session of the owner** is the cookie store of Rails, and
+  `config/initializers/session_store.rb` declares it to add `expire_after` only. ⚠️ A cookie session
+  has no record on the server, thus there is nothing to revoke. Except for a new `secret_key_base`,
+  a stolen cookie stays valid until the browser removes it. The expiry is the maximum.
+- **Redis** — the global `$redis` comes from `config/initializers/redis.rb` and from `REDIS_URL`.
+  The same Redis holds the Sidekiq queues.
 
 ## Commands
 
-Run `nvm use` before any `npm` command, as in `web/`.
+Run `nvm use` before each `npm` command, as you do in `web/`.
 
 ```bash
-bin/dev                                                          # local server (or bin/setup)
-npm run build                                                    # admin bundle, one shot
-npm run watch                                                    # …or rebuild on change (the `js` overmind process)
-bundle exec sidekiq -C config/sidekiq.yml                        # local worker
-bundle exec rspec spec/requests/widgets/activity_stats_spec.rb   # single spec
-bundle exec rspec                                                # full suite
-bin/ci                                                           # setup + suite + style + security
-bundle exec rubocop                                              # -a to autocorrect
+bin/dev                                                          # the server here (or bin/setup)
+npm run build                                                    # the admin bundle, one time
+npm run watch                                                    # …or a new build at each change (the `js` overmind process)
+bundle exec sidekiq -C config/sidekiq.yml                        # the worker here
+bundle exec rspec spec/requests/widgets/activity_stats_spec.rb   # one spec
+bundle exec rspec                                                # each spec
+bin/ci                                                           # setup, the specs, the style, and the security
+bundle exec rubocop                                              # add -a to correct each offense
 bundle exec brakeman -q --no-pager
 bundle exec bundle-audit check --update
 
-# ⚠️ --build-secret is not optional: --remote-only builds on fly's builder, so the private-registry
-# token has to travel with the build or `npm ci` 401s and the deploy fails.
-fly deploy --build-secret WEBAWESOME_NPM_TOKEN="$WEBAWESOME_NPM_TOKEN"   # app + worker
+# ⚠️ --build-secret is necessary: --remote-only makes the build on the builder of fly. Thus the
+# token for the private registry must go with the build, or `npm ci` gets a 401 and the deploy fails.
+fly deploy --build-secret WEBAWESOME_NPM_TOKEN="$WEBAWESOME_NPM_TOKEN"   # the app and the worker
 fly console
 
-# Trigger a web rebuild (needs a running worker). ⚠️ Against production this ships a real deploy.
+# Start a new build of web. It needs a worker in operation. ⚠️ Against production this makes a true deploy.
 curl -i -X POST -H "Authorization: Bearer $API_TOKEN" "$KONA_API_URL/api/build"
 ```
 
-**RuboCop** runs `rubocop-rails-omakase` — Rails' own ruleset, inherited verbatim in
-`.rubocop.yml` with no rule overrides. It enables 50 of RuboCop's 609 cops (mostly Layout; no
-Metrics, so nothing polices method or class length). ⚠️ **Keep it override-free**: taking the
-omakase config *is* the decision not to have a house style. Disable a rule inline at the one site
-that needs it rather than editing the config. `web/` uses the same ruleset.
+**RuboCop** uses `rubocop-rails-omakase`, which is the ruleset of Rails. `.rubocop.yml` inherits it
+word for word and changes no rule. It turns on 50 of the 609 cops of RuboCop, and most of them are
+Layout cops. There are no Metrics cops, thus no cop limits the length of a method or of a class.
+⚠️ **Change no rule.** To take the omakase configuration *is* the decision to have no house style.
+Turn a rule off in the code at the one place that needs that, and do not edit the configuration.
+`web/` uses the same ruleset.
 
-CI runs RuboCop + Brakeman + bundler-audit, and the deploy job **won't run unless all pass**. If
-Brakeman flags a verified false positive, add a checked-in `config/brakeman.ignore` rather than
-weakening the code.
+CI runs RuboCop, Brakeman, and bundler-audit, and the deploy job **operates only if all three
+pass**. When Brakeman reports a problem that you checked and that is not true, add a
+`config/brakeman.ignore` file to the repository and do not make the code weaker.
 
 ## Testing
 
-RSpec request specs in `spec/requests/`, plus `spec/services/` and `spec/presenters/`. No DB or
-fixtures — stub services with
-`allow_any_instance_of(SomeService).to receive(:method).and_return(...)`. Specs assert the rendered
-markup **and** the cache headers.
+The RSpec request specs are in `spec/requests/`, and there are also `spec/services/` and
+`spec/presenters/`. There is no database and there are no fixtures. Stub a service with
+`allow_any_instance_of(SomeService).to receive(:method).and_return(...)`. A spec asserts the markup
+that the app rendered **and** the cache headers.
 
 ## Environment variables
 
-Names only — see `.env.example`; never commit values. Production values are fly.io secrets (plus
-Rails `config/credentials.yml.enc` + `master.key`).
+This section gives the names only. Read `.env.example`, and never commit a value. Each production
+value is a secret of fly.io, and Rails also uses `config/credentials.yml.enc` and `master.key`.
 
-- **Build credential**: `WEBAWESOME_NPM_TOKEN` — Web Awesome Pro npm auth for the admin UI, read by
-  `.npmrc` at install time (not in `.env`, and not a fly secret — it's needed at *build* time, so it
-  goes to fly via `--build-secret`).
+- **A credential for the build**: `WEBAWESOME_NPM_TOKEN` is the npm authorization for Web Awesome
+  Pro, which the admin UI needs. `.npmrc` reads it at the install. It is not in `.env` and it is not
+  a secret of fly, because the *build* needs it. Thus it goes to fly with `--build-secret`.
 
 - **Required**: `REDIS_URL`, `ICU_ATHLETE_ID`, `ICU_API_KEY`, `FONT_AWESOME_API_TOKEN`,
   `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET`, `WHOOP_REDIRECT_URI`, `GOOGLE_OAUTH_CLIENT_ID`,
-  `GOOGLE_OAUTH_CLIENT_SECRET`, `OWNER_EMAIL`, `GOOGLE_API_KEY`, `API_TOKEN` (must match the web
-  app's), `WEATHERKIT_KEY_ID`, `WEATHERKIT_TEAM_ID`, `WEATHERKIT_SERVICE_ID`,
-  `WEATHERKIT_PRIVATE_KEY` (base64 .p8), `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`,
-  `CONTENTFUL_WEBHOOK_SECRET` (64-char HMAC secret), `SITE_URL`, `RESEND_API_KEY`,
-  `CONTACT_FROM_ADDRESS` (a sender on a domain verified in Resend — it needs only SPF/DKIM, so it
-  coexists with a Google Workspace mailbox on the same domain), `CONTACT_TO_ADDRESS`.
-- **Optional**: `AKISMET_API_KEY` (unset = off, submissions delivered unchecked; set = fails
-  closed), `TURNSTILE_SECRET` (pair with the web app's `TURNSTILE_SITE_KEY`, both or neither),
-  `CSP_ENFORCE` (any value enforces the owner-facing CSP; unset = Report-Only),
-  `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`, `TRAINERROAD_CALENDAR_URL`, `ANTHROPIC_API_KEY` +
-  `ANTHROPIC_DESCRIPTION_MODEL` / `ANTHROPIC_CONTACT_SUBJECT_MODEL` (both default
-  `claude-sonnet-5`), `PURPLEAIR_API_KEY`, `GOODSPEED_API_URL` (unset = the bay-conditions
-  integration is off, and the water-temperature sentence and SF race-day bay readings are
-  omitted), `LOCATION`, `TIME_ZONE`, `BLUESKY_PDS_URL` (⚠️ the
-  Bluesky handle and app password are **not** env vars — they're set on the admin's Connected apps
-  page and stored in Redis), `BUGSNAG_API_KEY` (production only), `ALLOWED_HOSTS`
-  (comma-separated `Host` allowlist; production only, unset = all hosts accepted, so it's safe to
-  deploy before setting it; `/up` is always exempt), `API_HOST` (the public API hostname; unset =
-  every route drawn on every host, so dev/CI are unaffected — ⚠️ move `WHOOP_REDIRECT_URI` to the
-  admin host before setting it), `R2_ACCOUNT_ID` + `R2_ACCESS_KEY_ID` +
-  `R2_SECRET_ACCESS_KEY` + `R2_BUCKET` (⚠️ must be the bucket behind the web app's `IMAGE_HOST`;
-  nothing validates that, and a mismatch 404s every image), `GITHUB_DISPATCH_TOKEN` +
-  `GITHUB_REPOSITORY` (a fine-grained PAT with **Contents: Read and write**, plus the `owner/repo`
-  slug), `PLAUSIBLE_API_KEY` + `PLAUSIBLE_SITE_ID` (⚠️ with either unset the pageviews widget
-  collapses and `TrendingArticles` silently degrades to recency order — an INFO log is the only
-  sign, and the result looks exactly like "working, nothing trending"), `VOYAGE_API_KEY` (unset =
-  no embeddings, so `GET /api/related` returns `{}` and the build omits every "You May Also Like"
-  section), `MAPBOX_USERNAME` +
-  `MAPBOX_SECRET_TOKEN` (a token with `tilesets:write` and `tilesets:read`; with either unset the
-  Maps page says so and refuses uploads) plus `MAPBOX_ACCESS_TOKEN` (the ⚠️ **public** token: it
-  renders server-side when there's no secret token, and it's what the Location page's browser map
-  needs — unset, that page degrades to a coordinate form) and `MAPBOX_STYLE_URL` (the default style
-  for new tracks; each track can override it, and the Location page ignores it),
-  `REDIS_POOL_SIZE` (default 10; size it
-  to the widest consumer, which is Sidekiq's concurrency), and the four `TRENDING_*` ranking knobs
-  (see `.env.example`; they feed the ranking's cache key, so retuning one invalidates it).
+  `GOOGLE_OAUTH_CLIENT_SECRET`, `OWNER_EMAIL`, `GOOGLE_API_KEY`, `API_TOKEN` (it must be equal to
+  the token of the web app), `WEATHERKIT_KEY_ID`, `WEATHERKIT_TEAM_ID`, `WEATHERKIT_SERVICE_ID`,
+  `WEATHERKIT_PRIVATE_KEY` (a .p8 file in base64), `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`,
+  `CONTENTFUL_WEBHOOK_SECRET` (an HMAC secret of 64 characters), `SITE_URL`, `RESEND_API_KEY`,
+  `CONTACT_FROM_ADDRESS` (a sender on a domain that Resend verified — it needs SPF and DKIM only,
+  thus it can share a domain with a Google Workspace mailbox), `CONTACT_TO_ADDRESS`.
+- **Optional**: `AKISMET_API_KEY` (with no value the check is off and each message goes out with no
+  check; with a value the check fails closed), `TURNSTILE_SECRET` (use it with the
+  `TURNSTILE_SITE_KEY` of the web app; set both or set neither),
+  `CSP_ENFORCE` (any value enforces the CSP for the owner; with no value the CSP is Report-Only),
+  `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`, `TRAINERROAD_CALENDAR_URL`, `ANTHROPIC_API_KEY` with
+  `ANTHROPIC_DESCRIPTION_MODEL` and `ANTHROPIC_CONTACT_SUBJECT_MODEL` (the default of both is
+  `claude-sonnet-5`), `PURPLEAIR_API_KEY`, `GOODSPEED_API_URL` (with no value the bay-conditions
+  integration is off, and the app omits the sentence about the water temperature and the bay
+  readings for a race day in SF), `LOCATION`, `TIME_ZONE`, `BLUESKY_PDS_URL` (⚠️ the handle and the
+  app password of Bluesky are **not** environment variables: a person sets them on the Connected
+  apps page of the admin, and the app stores them in Redis), `BUGSNAG_API_KEY` (for production
+  only), `ALLOWED_HOSTS` (a list of permitted `Host` values, separated by a comma; for production
+  only. With no value the app accepts each host, thus it is safe to deploy before you set it, and
+  `/up` is always exempt), `API_HOST` (the public API host name. With no value the app draws each
+  route on each host, thus this changes nothing in dev and in CI. ⚠️ Move `WHOOP_REDIRECT_URI` to
+  the admin host before you set it), `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,
+  and `R2_BUCKET` (⚠️ this must be the bucket behind the `IMAGE_HOST` of the web app. No code checks
+  that, and a difference gives a 404 for each image), `GITHUB_DISPATCH_TOKEN` and
+  `GITHUB_REPOSITORY` (a fine-grained PAT with **Contents: Read and write**, and the `owner/repo`
+  slug), `PLAUSIBLE_API_KEY` and `PLAUSIBLE_SITE_ID` (⚠️ if one of the two has no value, the
+  pageviews widget collapses and `TrendingArticles` changes to the order by date with no message.
+  An INFO log is the only sign, and the result looks exactly like "it operates, and nothing is
+  trending"), `VOYAGE_API_KEY` (with no value there are no embeddings, thus `GET /api/related`
+  returns `{}` and the build omits each "You May Also Like" section), `MAPBOX_USERNAME` and
+  `MAPBOX_SECRET_TOKEN` (a token with `tilesets:write` and `tilesets:read`. If one of the two has no
+  value, the Maps page says so and refuses each upload), `MAPBOX_ACCESS_TOKEN` (the ⚠️ **public**
+  token: the server uses it to render when there is no secret token, and the map in the browser on
+  the Location page needs it. With no value that page changes to a form for the coordinates),
+  `MAPBOX_STYLE_URL` (the default style for a new track. Each track can use a different style, and
+  the Location page ignores this value), `REDIS_POOL_SIZE` (the default is 10. Make it as large as
+  the largest consumer, which is the concurrency of Sidekiq), and the four `TRENDING_*` values for
+  the ranking (read `.env.example`. They are part of the cache key of the ranking, thus a change to
+  one makes that cache invalid).
 
 ## Conventions & gates
 
-- **Before committing/deploying** (non-negotiable): `bundle exec rspec` passes.
-- Keep widget markup in sync with the matching `web/` placeholder (root `CLAUDE.md`).
-- Font Awesome icons are fetched on demand by family/style/id and cached per version in Redis —
-  `icon_svg('classic', 'solid', 'eye')`. No allowlist needed here; any id a view references is
-  fetched. The integration lives **only** in this app — `web/` POSTs its own allowlist to
-  `POST /api/icons`, so a new web icon needs no api change. ⚠️ That endpoint requests icons in
-  small batches so a cold cache can't blow the per-request `rack-timeout`; don't change it to
-  resolve the whole allowlist in one request.
+- **Before a commit and before a deploy** (this rule has no exception): `bundle exec rspec` passes.
+- Keep the markup of a widget the same as the markup of its `web/` placeholder (root `CLAUDE.md`).
+- The app gets a Font Awesome icon on demand by its family, its style, and its id, and it caches the
+  icon in Redis for each version: `icon_svg('classic', 'solid', 'eye')`. There is no allowlist here,
+  and the app gets each id that a view names. The integration is in this app **only**: `web/` sends
+  its own allowlist to `POST /api/icons`, thus a new icon in web needs no change in the api.
+  ⚠️ That endpoint asks for the icons in small groups, thus a cold cache cannot go past the
+  `rack-timeout` of the request. Do not change it to resolve the full allowlist in one request.
 
 ### Permissions
 
-- Autonomous: read files, single-file `rspec`, local `bin/dev`.
-- Ask first: `fly deploy`, secret changes, anything that flushes Redis, `git push`/commit, package
-  installs.
+- Permitted with no question: read a file, run `rspec` on one file, and run `bin/dev` on this
+  machine.
+- Ask first: `fly deploy`, a change to a secret, each command that flushes Redis, `git push`, a
+  commit, and the installation of a package.

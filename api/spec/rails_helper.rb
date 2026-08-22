@@ -1,21 +1,22 @@
-# This file is copied to spec/ when you run 'rails generate rspec:install'
+# The command 'rails generate rspec:install' copies this file into spec/.
 require 'spec_helper'
 ENV['RAILS_ENV'] ||= 'test'
 require_relative '../config/environment'
-# Prevent database truncation if the environment is production
+# Stop a delete of the database data if the environment is production.
 abort("The Rails environment is running in production mode!") if Rails.env.production?
 require 'rspec/rails'
-# rspec-sidekiq (loaded via the :test bundler group) puts Sidekiq in fake mode: perform_async
-# pushes to an in-memory array (no Redis) and specs assert with have_enqueued_sidekiq_job.
-# Add additional requires below this line. Rails is not loaded until this point!
+# rspec-sidekiq, which the :test bundler group loads, puts Sidekiq in fake mode: perform_async
+# adds the job to an array in memory, with no Redis, and a spec reads it with
+# have_enqueued_sidekiq_job.
+# Put each additional require below this line. Ruby loads Rails only at this point.
 
-# Shared examples and custom matchers. Don't name anything in here *_spec.rb — it would be both
-# required and run as a spec.
+# The shared examples and the custom matchers. Do not give a file here a name that ends with
+# _spec.rb, because RSpec would require it and also run it as a spec.
 Rails.root.glob('spec/support/**/*.rb').sort_by(&:to_s).each { |f| require f }
 
-# The /api/* widget endpoints require the API_TOKEN bearer (injected by the web proxy in
-# production). Request specs set a deterministic token and pass `headers: auth_headers` on
-# requests to gated endpoints.
+# The /api/* widget endpoints need the API_TOKEN bearer token, which the web proxy adds in
+# production. A request spec sets a constant token and gives `headers: auth_headers` on each
+# request to an endpoint that needs it.
 module ApiAuthHelper
   API_TEST_TOKEN = "test-api-token".freeze
 
@@ -24,9 +25,9 @@ module ApiAuthHelper
   end
 end
 
-# Owner-only surfaces (/whoop/auth, /sidekiq) are gated by a Google OAuth sign-in. OmniAuth test
-# mode short-circuits the provider, so `sign_in_as` just mocks the auth hash and drives the
-# callback, leaving the owner session set for subsequent requests in the same example.
+# A Google OAuth sign-in controls the pages for the owner only (/whoop/auth and /sidekiq). The
+# OmniAuth test mode replaces the provider. Thus `sign_in_as` only makes the auth hash and calls
+# the callback, and the owner session then stays set for each subsequent request in the example.
 OmniAuth.config.test_mode = true
 OmniAuth.config.logger = Rails.logger
 
@@ -40,8 +41,8 @@ module OwnerAuthHelper
     )
   end
 
-  # Completes a Google sign-in as the given email (defaults to the test owner) and returns once
-  # the owner session cookie is set.
+  # Completes a Google sign-in with the given email. The default is the test owner. It returns
+  # after the app sets the owner session cookie.
   def sign_in_as(email: "owner@example.com", verified: true)
     mock_owner_auth(email: email, verified: verified)
     get "/auth/google_oauth2/callback"
@@ -49,7 +50,7 @@ module OwnerAuthHelper
 end
 
 RSpec.configure do |config|
-  # Remove this line to enable support for ActiveRecord
+  # Remove this line to let the app use ActiveRecord.
   config.use_active_record = false
 
   config.include ApiAuthHelper, type: :request
@@ -68,34 +69,34 @@ RSpec.configure do |config|
     ENV["API_TOKEN"] = @original_api_token
   end
 
-  # If you enable ActiveRecord support you should uncomment these lines,
-  # note if you'd prefer not to run each example within a transaction, you
-  # should set use_transactional_fixtures to false.
+  # If you let the app use ActiveRecord, make these lines active. If you do not
+  # want each example in a transaction, set use_transactional_fixtures to
+  # false.
   #
   # config.fixture_paths = [
   #   Rails.root.join('spec/fixtures')
   # ]
   # config.use_transactional_fixtures = true
 
-  # RSpec Rails uses metadata to mix in different behaviours to your tests,
-  # for example enabling you to call `get` and `post` in request specs. e.g.:
+  # RSpec Rails uses the metadata to add different behavior to your tests. For
+  # example, it lets you call `get` and `post` in a request spec:
   #
   #     RSpec.describe UsersController, type: :request do
   #       # ...
   #     end
   #
-  # The different available types are documented in the features, such as in
+  # The features documentation gives the available types, for example at
   # https://rspec.info/features/8-0/rspec-rails
   #
-  # You can also infer these behaviours automatically by location, e.g.
-  # /spec/models would pull in the same behaviour as `type: :model` but this
-  # behaviour is considered legacy and will be removed in a future version.
+  # RSpec can also find this behavior from the location. For example,
+  # /spec/models would give the same behavior as `type: :model`. But that
+  # behavior is old and a future version will remove it.
   #
-  # To enable this behaviour uncomment the line below.
+  # To use that behavior, make the line below active.
   # config.infer_spec_type_from_file_location!
 
-  # Filter lines from Rails gems in backtraces.
+  # Remove the lines of the Rails gems from a backtrace.
   config.filter_rails_from_backtrace!
-  # arbitrary gems may also be filtered via:
+  # You can also remove the lines of another gem:
   # config.filter_gems_from_backtrace("gem name")
 end

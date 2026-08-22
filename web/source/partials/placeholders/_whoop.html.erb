@@ -1,17 +1,18 @@
-<%# Loading skeleton for the /whoop markup. The live-update controller swaps in the %>
-<%# real markup on connect (or removes this section if there's no Whoop data). %>
-<%# `url` (required local) is the API endpoint. %>
+<%# The loading skeleton of the /whoop markup. The live-update controller puts the true markup %>
+<%# here on connect, and it removes this section when there is no Whoop data. %>
+<%# `url`, which is a necessary local, is the API endpoint. %>
 <section data-nosnippet class="stats stats--has-three" <%= live_update_attrs(url) %> aria-labelledby="hed-whoop">
-  <%# "Today’s" matches the api view's usual output (it labels relative to the last wakeup), so the %>
-  <%# swap doesn't flip the text — same rule as the stats placeholder. %>
+  <%# "Today’s" is the usual output of the api view, which uses the time of the last wakeup for its %>
+  <%# label. Thus the swap does not change the text. The stats placeholder has the same rule. %>
   <h2 class="stats__heading" id="hed-whoop">Today’s Metrics <i>from</i> <a href="https://www.whoop.com" target="_blank" rel="nofollow noopener">Whoop</a></h2>
   <div class="stats__container">
     <%= partial 'partials/placeholders/stat_skeleton', locals: { icon: 'moon',              top: 'Sleep' } %>
     <%= partial 'partials/placeholders/stat_skeleton', locals: { icon: 'person-meditating', top: 'Recovery' } %>
     <%= partial 'partials/placeholders/stat_skeleton', locals: { icon: 'fire-flame-curved', top: 'Strain' } %>
   </div>
-  <%# ⚠️ Assumes the api's WHOOP_REFERRAL_URL is set — it renders this row only when it is, so with %>
-  <%# it unset the swap removes a row this reserved, which is the shift skeletons exist to prevent. %>
+  <%# ⚠️ This assumes that the WHOOP_REFERRAL_URL of the api has a value: the api renders this row %>
+  <%# only then. With no value, the swap removes a row that this skeleton kept space for, and a %>
+  <%# skeleton exists to prevent that change to the layout. %>
   <p class="stats__footer">
     <wa-skeleton class="stats-footer-skeleton" effect="sheen"></wa-skeleton>
   </p>

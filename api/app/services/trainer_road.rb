@@ -1,18 +1,18 @@
 require "icalendar"
 
-# Reads planned workouts from a TrainerRoad iCalendar feed, for the rest-day check and the
-# description generator's planned-workout headline.
+# Reads the planned workouts from a TrainerRoad iCalendar feed, for the rest-day check and for the
+# planned-workout line that the description generator writes.
 class TrainerRoad < ApplicationService
   CALENDAR_URL = ENV["TRAINERROAD_CALENDAR_URL"]
   DISCIPLINE_ORDER = { "Swim" => 1, "Bike" => 2, "Run" => 3 }
 
-  # @param timezone [String] The timezone "today" is reckoned in.
+  # @param timezone [String] The timezone for "today".
   def initialize(timezone = "America/Denver")
     @timezone = timezone
   end
 
-  # Today's workouts, cached for 5 minutes.
-  # @return [Array<Hash>, nil] The workouts, or nil when no feed is configured.
+  # The workouts of today. The cache holds them for 5 minutes.
+  # @return [Array<Hash>, nil] The workouts, or nil if there is no feed in the configuration.
   def workouts
     return if CALENDAR_URL.blank?
 
@@ -27,10 +27,10 @@ class TrainerRoad < ApplicationService
       calendar = Icalendar::Calendar.parse(response.body).first
       today = Time.current.in_time_zone(@timezone).to_date
 
-      # ⚠️ Through event_on_date?, which converts a timed event into @timezone first. Comparing
-      # `event.dtstart.to_datetime.to_date` reckons it in the event's own stored offset instead,
-      # so an evening event lands on the next day — and since both consumers only read
-      # `workouts.any?`, that silently flips workout_scheduled? and rest_day?.
+      # ⚠️ This goes through event_on_date?, which changes a timed event into @timezone first. A
+      # comparison of `event.dtstart.to_datetime.to_date` uses the stored offset of the event, thus
+      # an event in the evening goes to the next day. Both consumers read only `workouts.any?`,
+      # thus that changes workout_scheduled? and rest_day? with no message.
       todays_events = calendar.events.select do |event|
         event.dtstart.present? && event_on_date?(event, today, @timezone)
       end
@@ -41,12 +41,12 @@ class TrainerRoad < ApplicationService
     end
   end
 
-  # The planned workouts for a date, for matching against completed activities. All-day events
-  # must carry a "H:MM - Name" duration prefix and are excluded when they're a race leg; timed
-  # events must have a plausible duration. Cached for 5 minutes.
+  # The planned workouts for a date, to compare with the completed activities. An all-day event
+  # must have a "H:MM - Name" duration at the start, and the code removes it if it is part of a
+  # race. A timed event must have a duration that is possible. The cache holds this for 5 minutes.
   # @param date [Date] The calendar date.
-  # @param timezone [String] The IANA timezone timed events are interpreted in.
-  # @return [Array<Hash>] Hashes of :name, :sport, and :description.
+  # @param timezone [String] The IANA timezone for a timed event.
+  # @return [Array<Hash>] Hashes with :name, :sport, and :description.
   def planned_workouts(date, timezone: @timezone)
     return [] if CALENDAR_URL.blank?
 
@@ -55,8 +55,8 @@ class TrainerRoad < ApplicationService
       events = fetch_calendar_events
       events_on_date = events.select { |event| event_on_date?(event, date, timezone) }
 
-      # Race umbrellas are all-day events with no duration prefix. Their name is what marks
-      # same-day prefixed entries as race legs rather than workouts.
+      # A race is an all-day event with no duration at the start. Its name is what marks the
+      # entries with a duration on the same day as parts of the race, and not as workouts.
       race_names = events_on_date.select { |e| all_day?(e) && parse_duration_prefix(e.summary.to_s.strip).nil? }
                                  .map { |e| e.summary.to_s.strip }
                                  .to_set
@@ -68,19 +68,19 @@ class TrainerRoad < ApplicationService
 
   private
 
-  # ⚠️ A digest, not the URL itself. A TrainerRoad iCal URL ends in a GUID that *is* the
-  # credential, and `parameterize` preserves it intact — which put the whole token in key names
-  # visible to `redis-cli KEYS`, the Sidekiq UI's Redis stats, and any slowlog or error report
-  # that echoes a key. This busts the cache on a URL change just the same.
+  # ⚠️ This is a digest, and not the URL. A TrainerRoad iCal URL ends with a GUID that *is* the
+  # credential, and `parameterize` keeps it. That put the full token in key names that
+  # `redis-cli KEYS`, the Redis stats of the Sidekiq UI, and each slowlog or error report with a
+  # key can show. A digest also changes the cache when the URL changes.
   # @return [String] An 8-character digest of the calendar URL.
   def calendar_version
     cache_version(CALENDAR_URL)
   end
 
-  # Fetches and parses every VEVENT in the feed.
+  # Gets and parses each VEVENT in the feed.
   # @return [Array<Icalendar::Event>]
-  # @raise [ApplicationService::HttpError] on failure; the caller treats that as "no planned
-  #   workouts" rather than failing the job.
+  # @raise [ApplicationService::HttpError] If it fails. The caller counts that as "no planned
+  #   workouts" and does not stop the job.
   def fetch_calendar_events
     response = HTTParty.get(CALENDAR_URL)
     unless response.success?
@@ -92,9 +92,9 @@ class TrainerRoad < ApplicationService
     calendar ? calendar.events.select { |event| event.dtstart.present? && event.summary.present? } : []
   end
 
-  # Whether an event falls on a date. All-day events carry a floating date; timed ones are
-  # converted to the athlete's timezone first, so an evening event near midnight UTC lands on
-  # the right day.
+  # Tells if an event is on a date. An all-day event has a date with no zone. The code changes a
+  # timed event into the timezone of the athlete first, thus an event in the evening near midnight
+  # UTC goes to the correct day.
   def event_on_date?(event, date, timezone)
     if all_day?(event)
       event.dtstart.to_date == date
@@ -103,20 +103,19 @@ class TrainerRoad < ApplicationService
     end
   end
 
-  # icalendar parses all-day events as DATE values, with no time component.
+  # icalendar parses an all-day event as a DATE value, with no time.
   def all_day?(event)
     event.dtstart.is_a?(Icalendar::Values::Date)
   end
 
-  # Whether an event is a planned workout, rather than an annotation, phase marker, or race
-  # leg.
+  # Tells if an event is a planned workout, and not a note, a phase marker, or part of a race.
   def planned_workout?(event, race_names)
     summary = event.summary.to_s.strip
 
     if all_day?(event)
       return false if parse_duration_prefix(summary).nil?
 
-      # A prefixed entry alongside a same-named all-day umbrella is a race leg.
+      # An entry with a duration beside an all-day event with the same name is part of a race.
       !race_names.include?(strip_duration_prefix(summary))
     else
       return false if event.dtend.blank?
@@ -126,7 +125,7 @@ class TrainerRoad < ApplicationService
     end
   end
 
-  # @return [Hash] The planned workout's :name, :sport, and :description.
+  # @return [Hash] The :name, the :sport, and the :description of the planned workout.
   def normalize_planned_workout(event)
     summary = event.summary.to_s.strip
 
@@ -137,13 +136,14 @@ class TrainerRoad < ApplicationService
     }
   end
 
-  # @return [String, nil] The event's description, tolerating icalendar's array values.
+  # @return [String, nil] The description of the event. It accepts the array values of
+  #   icalendar.
   def raw_description(event)
     description = event.description.is_a?(Array) ? event.description.first : event.description
     description&.to_s
   end
 
-  # Parses the "H:MM - " duration prefix into minutes, or nil when absent.
+  # Changes the "H:MM - " duration at the start into minutes, or gives nil if it is absent.
   def parse_duration_prefix(name)
     match = name.match(/\A(\d{1,2}):(\d{2})\s*[-–—]/)
     return if match.nil?
@@ -151,21 +151,22 @@ class TrainerRoad < ApplicationService
     (match[1].to_i * 60) + match[2].to_i
   end
 
-  # Strips the "H:MM - " duration prefix from a workout name (e.g. "2:00 - Gibbs" → "Gibbs").
+  # Removes the "H:MM - " duration from the start of a workout name. For example, "2:00 - Gibbs"
+  # becomes "Gibbs".
   def strip_duration_prefix(name)
     match = name.match(/\A(\d{1,2}):(\d{2})\s*[-–—]\s*(.+)\z/m)
     match ? match[3] : name
   end
 
-  # Removes TrainerRoad's "Description:" label from an event description.
+  # Removes the TrainerRoad "Description:" label from an event description.
   # @return [String, nil]
   def clean_description(description)
     description&.sub(/\s*Description:/i, "")&.strip.presence
   end
 
-  # Detects a workout's normalized sport, in order: "Endless Pool" means swimming, then the
-  # whole name is normalized, then keywords are scanned, then a "TSS…" description implies
-  # cycling. Defaults to cycling, since TrainerRoad is a cycling platform.
+  # Finds the sport of a workout, in this order: "Endless Pool" means swimming, then the code
+  # corrects the full name, then it looks for keywords, then a description with "TSS…" means
+  # cycling. The default is cycling, because TrainerRoad is a cycling platform.
   SPORT_KEYWORDS = %w[run running swim swimming ride cycling bike hike hiking ski skiing row rowing].freeze
 
   def detect_sport(name, description)
@@ -187,10 +188,10 @@ class TrainerRoad < ApplicationService
     "Cycling"
   end
 
-  # Parses a workout event to extract relevant details.
-  # @param event [Icalendar::Event] The calendar event representing a workout.
-  # @return [Hash, nil] A hash with the workout's details, or nil if the event summary
-  #   does not match the expected format.
+  # Parses a workout event and gets the necessary data.
+  # @param event [Icalendar::Event] The calendar event for a workout.
+  # @return [Hash, nil] A hash with the data of the workout, or nil if the summary of the event
+  #   does not have the correct format.
   def parse_workout(event)
     match_data = /(\d+:\d+) - (.+)/.match(event.summary)
     return nil if match_data.blank?
@@ -212,10 +213,10 @@ class TrainerRoad < ApplicationService
     }
   end
 
-  # Converts workout duration and discipline into a human-readable summary.
+  # Changes the duration and the discipline of a workout into a readable summary.
   # @param duration [String] The duration of the workout.
-  # @param discipline [String] The discipline of the workout (e.g., Bike, Run, Swim).
-  # @return [String] A human-readable summary of the workout.
+  # @param discipline [String] The discipline of the workout, for example Bike, Run, or Swim.
+  # @return [String] A readable summary of the workout.
   def human_readable_summary(duration, discipline)
     hours, minutes = duration.split(":").map(&:to_i)
     total_minutes = (hours * 60) + minutes
@@ -226,9 +227,9 @@ class TrainerRoad < ApplicationService
     "#{description_duration} #{suffix}"
   end
 
-  # Determines the discipline of the workout based on its name.
+  # Finds the discipline of the workout from its name.
   # @param name [String] The name of the workout.
-  # @return [String] The determined discipline ('Bike', 'Run', or 'Swim').
+  # @return [String] The discipline: 'Bike', 'Run', or 'Swim'.
   def determine_discipline(name)
     return if name.blank?
     return "Run" if name.include?("Run")

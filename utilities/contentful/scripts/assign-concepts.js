@@ -1,13 +1,16 @@
-// Assigns each `article` entry's `metadata.concepts` from the ASSIGNMENTS map in lib/taxonomy.js.
-// The map holds the most-specific concept(s) per scheme; this expands each up its `broader`
-// chain (via resolveAssignment) and writes the full path (discipline+distance+race + topics).
+// Sets the `metadata.concepts` of each `article` entry from the ASSIGNMENTS map in lib/taxonomy.js.
+// That map holds the most specific concepts of each scheme. This script adds each parent from the
+// `broader` chain, with resolveAssignment, and writes the full path: the discipline, the distance,
+// the race, and the topics.
 //
-// Idempotent (skip-unchanged, order-insensitive) + publish-state preserving. Articles with no
-// entry in ASSIGNMENTS, or with unknown concept ids, are reported and skipped.
+// You can run it more than one time: it does nothing for an entry with no change, and the order of
+// the concepts does not matter. It also keeps the publish state. It reports each article with no
+// entry in ASSIGNMENTS, and each article with an unknown concept id, and it changes neither.
 //
-// Env: CONTENTFUL_SPACE, CONTENTFUL_MANAGEMENT_TOKEN, CONTENTFUL_ENVIRONMENT (default master).
-//   DRY_RUN=true prints per-entry plans; ENTRY_ID=<id> restricts to one entry.
-// Run: `npm run taxonomy:assign`.
+// The env vars: CONTENTFUL_SPACE, CONTENTFUL_MANAGEMENT_TOKEN, and CONTENTFUL_ENVIRONMENT, whose
+// default is master.
+//   DRY_RUN=true shows the plan for each entry. ENTRY_ID=<id> uses one entry only.
+// To run it: `npm run taxonomy:assign`.
 
 const { LOCALE, resolveAssignment, conceptLink, paginateAll, createPlainClient, readEnv } = require('./lib/taxonomy');
 

@@ -1,12 +1,13 @@
 module Api
-  # Serves the standard.site verification data the web build needs. Every per-document at://
-  # URI is derived deterministically from the DID on the web side, so this is all it needs.
-  # Fetched at build time rather than by browsers, and durably edge-cached since the DID is
-  # stable. An empty response makes the build omit the verification markup.
+  # Gives the standard.site verification data that the web build needs. The web side makes the at://
+  # URI of each document from the DID, and it always gets the same result. Thus this data is
+  # sufficient. The build gets it, and a browser does not, and the edge keeps it for a long time
+  # because the DID does not change. An empty response makes the build omit the verification
+  # markup.
   class StandardSiteController < BaseController
-    # Deliberately public: the data is public on the AT Protocol, and this is fetched at build
-    # time directly rather than through the token-injecting proxy, so gating it would couple
-    # the web build to the shared secret.
+    # This is public, on purpose: the data is public on the AT Protocol, and the build gets it
+    # directly and not through the proxy that adds the token. Thus a check here would make the web
+    # build depend on the shared secret.
     skip_before_action :authenticate_bearer_token!
 
     def show

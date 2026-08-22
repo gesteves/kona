@@ -43,7 +43,8 @@ RSpec.describe ShareHelpers do
 
     it 'embeds a clean article URL with no attribution query params' do
       described_class::SHARE_NETWORKS.each_key do |network|
-        # The article URL is encoded into the share params; with no attribution it has no `?query`.
+        # The article URL goes into the share parameters in an encoded form. It has no attribution,
+        # thus it has no `?query`.
         expect(share_url(network, article)).not_to include(ERB::Util.url_encode('?'))
       end
     end
@@ -77,8 +78,8 @@ RSpec.describe ShareHelpers do
   end
 
   describe '#share_heading' do
-    # Tags carry both, but the heading matches on id — a concept renamed in Contentful must not
-    # change what this says.
+    # A tag has both values, but the heading matches on the id. A new name for a concept in
+    # Contentful must not change this text.
     def article_with(tags: [], entry_type: 'Article')
       OpenStruct.new(
         entry_type: entry_type,

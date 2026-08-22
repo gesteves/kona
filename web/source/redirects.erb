@@ -1,15 +1,18 @@
 <%#
-  ⚠️ RULE ORDER IS LOAD-BEARING — statics must be emitted before dynamics, or the deploy fails
-  with a bare `code: 100324` once the file passes ~100 lines. The rules, the two validity filters,
-  and the partition live in SiteHelpers#partitioned_redirects, which carries the full reasoning
-  and is covered by spec/lib/helpers/site_helpers_spec.rb. This template only emits them.
+  ⚠️ THE ORDER OF THE RULES IS IMPORTANT. The static rules must come before the dynamic rules, or
+  the deploy fails with only `code: 100324` when the file becomes longer than approximately 100
+  lines. The rules, the two checks, and the division into two groups are in
+  SiteHelpers#partitioned_redirects, which has the full explanation, and
+  spec/lib/helpers/site_helpers_spec.rb tests it. This template only writes them.
 %>
 <% static_rules, dynamic_rules = partitioned_redirects %>
-<%# Static (exact-match) redirects — counted against Cloudflare's 2,000-rule limit. %>
+<%# The static redirects, which match exactly. They count against the Cloudflare limit of 2,000
+<%# rules. %>
 <% static_rules.each do |r| %>
 <%= r[:from] %> <%= r[:to] %> <%= r[:status] %>
 <% end %>
-<%# Dynamic (splat/placeholder) redirects — counted against the 100-rule limit. Emitted last. %>
+<%# The dynamic redirects, which have a splat or a placeholder. They count against the limit of
+<%# 100 rules, and they come last. %>
 <% dynamic_rules.each do |r| %>
 <%= r[:from] %> <%= r[:to] %> <%= r[:status] %>
 <% end %>

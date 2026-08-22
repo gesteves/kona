@@ -17,9 +17,9 @@ export default class extends Controller {
   }
 
   /**
-   * Copies the permalink to the clipboard via the native Clipboard API, stopping the link
-   * from navigating. Runs inside the click gesture, so writeText is allowed.
-   * @param  {Event} event Click event from the button.
+   * Copies the permalink to the clipboard with the native Clipboard API, and stops the navigation
+   * of the link. It runs in the click, thus the browser permits writeText.
+   * @param  {Event} event The click event from the button.
    */
   copy(event) {
     event.preventDefault();
@@ -32,15 +32,15 @@ export default class extends Controller {
   }
 
   /**
-   * @return {String} The button's href resolved to an absolute permalink.
+   * @return {String} The href of the button, as an absolute permalink.
    */
   getPermalink() {
     return absoluteUrl(this.element.getAttribute('href'));
   }
 
   /**
-   * Swaps the link icon for a check for two seconds, toasts, and tracks the copy.
-   * @param {String} permalink The URL that was copied.
+   * Puts a check in place of the link icon for two seconds, shows a toast, and records the copy.
+   * @param {String} permalink The URL that the code copied.
    */
   successfulCopy(permalink) {
     if (this.hasLinkTarget && this.hasCheckTarget) {
@@ -56,7 +56,7 @@ export default class extends Controller {
     trackEvent('Copy to Clipboard', { url: permalink });
   }
 
-  /** Notifies the reader that copying failed. */
+  /** Tells the reader that the copy failed. */
   unsuccessfulCopy() {
     sendNotification('Failed to copy link to clipboard.', 'error');
   }

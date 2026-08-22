@@ -1,11 +1,11 @@
-# The web↔api markup contract (root CLAUDE.md). Every /widgets/* fragment replaces a placeholder
-# element in the static site, so its outermost element must carry the live-update wiring itself —
-# otherwise it stops refreshing after the first swap.
+# The markup contract between web and api (refer to the root CLAUDE.md). Each /widgets/* fragment
+# replaces a placeholder element in the static site, thus its outermost element must have the
+# live-update attributes. Without them it gets no new content after the first swap.
 #
 # ⚠️ The placeholder flag is the dangerous half. It means "I am an empty skeleton", and the web
-# controller reads it to decide whether a failed fetch should remove the element. On a rendered
-# fragment it would turn a transient network blip into deleted content, so no api response may
-# ever carry it. Nothing else in either app enforces this.
+# controller reads it to decide if a failed fetch must remove the element. On a rendered fragment,
+# it would make a short network problem into a loss of content. Thus no api response can have it.
+# Nothing else in either app enforces this rule.
 RSpec.shared_examples "a live-update fragment" do |path|
   it "carries the live-update wiring so it keeps refreshing after the first swap" do
     get path, headers: auth_headers
@@ -21,17 +21,18 @@ RSpec.shared_examples "a live-update fragment" do |path|
     expect(response.body).not_to include("data-live-update-placeholder-value")
   end
 
-  # The placeholder carries aria-busy="true" while its skeleton is on screen. A fragment is the
-  # finished content, so carrying it over would leave the region announced as perpetually loading.
+  # The placeholder has aria-busy="true" while its skeleton is on the screen. A fragment is the
+  # complete content, thus that attribute on a fragment would make a screen reader say that the area
+  # loads for all time.
   it "is not marked as busy" do
     get path, headers: auth_headers
 
     expect(response.body).not_to include("aria-busy")
   end
 
-  # ⚠️ The CSP belongs to the OwnerFacing pages and must stay there. A fragment isn't a document —
-  # it's spliced into one the web app already governs — and this header would be stored in the edge
-  # cache alongside the body. Declaring a global default policy is what would break this.
+  # ⚠️ The CSP belongs to the OwnerFacing pages and must stay there. A fragment is not a document:
+  # the code puts it into a document that the web app already controls, and the edge cache would
+  # hold this header with the body. A global default policy is what would break this rule.
   it "carries no Content-Security-Policy" do
     get path, headers: auth_headers
 

@@ -1,23 +1,25 @@
 import { Controller } from '@hotwired/stimulus';
 import { replaceElement } from '../lib/utils';
 
-/** Minimum gap between fetches of the same widget URL. Placeholders ignore it. */
+/** The minimum time between two fetches of the same widget URL. A placeholder ignores it. */
 const MIN_REFETCH_MS = 60_000;
 
-// When each widget URL was last fetched. Module-scoped because the clock has to outlive both
-// the element (the fetched fragment replaces the placeholder, disconnecting the controller
-// that fetched it) and the page render (a Turbo restoration visit re-renders a cached snapshot
-// containing the already-swapped fragment and never revalidates it). Keying by URL also makes
-// a refetch loop impossible: an inserted fragment always finds its own timestamp recorded.
+// The time of the last fetch of each widget URL. This is at the module level, because the clock
+// must stay after the element goes away and after the page renders again. The fragment from the
+// fetch replaces the placeholder and disconnects the controller that did the fetch. A Turbo
+// restoration visit renders a cached snapshot that contains the fragment, and it never gets that
+// fragment again. The URL as the key also makes a loop of fetches impossible: a fragment that the
+// code adds always finds its own time here.
 const lastFetchAtByUrl = new Map();
 
 /**
- * Fetches a server-rendered HTML fragment from the api and swaps it into the page.
+ * Gets an HTML fragment that the api renders, and puts it in the page.
  *
- * The `placeholder` value distinguishes the two kinds of element that run this controller: the
- * web-side skeleton sets it (no real content, so it always fetches and collapses on failure);
- * the api fragment that replaces it does not (refetches only when stale, keeps its content on
- * failure). See the root CLAUDE.md cross-app HTML contract.
+ * The `placeholder` value shows which of the two types of element runs this controller. The
+ * skeleton on the web side sets it: that element has no real content, thus it always fetches and
+ * it goes away on a failure. The api fragment that replaces it does not set the value: it fetches
+ * again only when its content is old, and it keeps its content on a failure. Refer to the HTML
+ * contract between the two apps in the root CLAUDE.md.
  */
 export default class extends Controller {
   static values = {
@@ -25,21 +27,22 @@ export default class extends Controller {
     placeholder: Boolean,
   };
 
-  /** Fetches immediately for a placeholder, or when rendered content has gone stale. */
+  /** Fetches immediately for a placeholder, or when the content on the page is old. */
   connect() {
     if (this.placeholderValue || this.isStale) {
       this.fetchAndUpdateContent();
     }
   }
 
-  /** Cancels any in-flight request so a late response can't mutate a detached element. */
+  /** Stops each request in progress, thus a late response cannot change an element that is gone. */
   disconnect() {
     this.abortController?.abort();
   }
 
   /**
-   * Refetches stale content when the page becomes visible. Also covers a bfcache restore, which
-   * has no Stimulus connect/disconnect cycle but does transition the document hidden → visible.
+   * Gets old content again when the page becomes visible. This also covers a bfcache restore,
+   * which has no Stimulus connect and disconnect, but which does change the document from hidden
+   * to visible.
    */
   handleVisibilityChange() {
     if (document.visibilityState !== 'visible') return;
@@ -48,8 +51,9 @@ export default class extends Controller {
   }
 
   /**
-   * Whether this widget's content is old enough to refetch. Never-fetched counts as stale.
-   * @returns {Boolean} True when the last fetch attempt was at least MIN_REFETCH_MS ago.
+   * Tells if the content of this widget is old enough for a new fetch. A URL with no fetch counts
+   * as old.
+   * @returns {Boolean} True when the last fetch was MIN_REFETCH_MS ago or more.
    */
   get isStale() {
     const lastFetchAt = lastFetchAtByUrl.get(this.urlValue);
@@ -57,14 +61,16 @@ export default class extends Controller {
   }
 
   /**
-   * Fetches the fragment from the configured URL and swaps it into the element.
-   * @returns {Promise<void>} Resolves when the content is updated, or on a handled failure.
+   * Gets the fragment from the URL in the configuration and puts it in the element.
+   * @returns {Promise<void>} It resolves after the content changes, or after a failure that the
+   *   code catches.
    */
   async fetchAndUpdateContent() {
     if (!this.hasUrlValue) return;
 
-    // Records the attempt, not the outcome, so a down endpoint isn't retried on every refocus
-    // and the fragment about to be inserted doesn't immediately refetch itself.
+    // The code records the attempt, and not the result. Thus it does not get an endpoint that is
+    // down again at each focus, and the fragment that it is about to add does not do a fetch
+    // immediately.
     lastFetchAtByUrl.set(this.urlValue, Date.now());
 
     this.abortController?.abort();
@@ -82,8 +88,8 @@ export default class extends Controller {
       if (markup.length > 0) {
         replaceElement(markup, this.element);
       } else {
-        // An empty body is the API's authoritative "no data" answer, so the widget collapses
-        // whether or not it's still a placeholder.
+        // An empty body is the "no data" answer from the API. Thus the widget goes away for a
+        // placeholder and for a fragment.
         this.element.remove();
       }
     } catch (error) {
@@ -94,8 +100,8 @@ export default class extends Controller {
   }
 
   /**
-   * Handles a non-2xx or network error: collapses a placeholder so it isn't stuck as a
-   * skeleton, but leaves already-rendered content alone.
+   * Acts on a non-2xx status or a network error: it removes a placeholder, thus the page does not
+   * keep a skeleton, but it does not change content that the page already shows.
    */
   handleUnavailable() {
     if (this.placeholderValue) {

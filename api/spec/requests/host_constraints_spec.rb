@@ -1,11 +1,11 @@
 require "rails_helper"
 
-# The public API hostname serves only /up and the three machine namespaces; everything
-# owner-facing is drawn behind the `API_HOST` constraint in config/routes.rb.
+# The public API hostname serves only /up and the three machine namespaces. Rails draws each route
+# for the owner behind the `API_HOST` constraint in config/routes.rb.
 #
-# ⚠️ This is what makes the zone's bot-protection skip rule ("skip every host except the admin
-# one") safe. An owner-facing route reachable on the public host would sit there with managed
-# rules and Super Bot Fight Mode skipped, and nothing in the zone would catch it.
+# ⚠️ That constraint is what makes the bot-protection skip rule of the zone ("skip each host but the
+# admin one") safe. A route for the owner that a visitor can reach on the public host would be there
+# with the managed rules and Super Bot Fight Mode off, and nothing in the zone would find it.
 RSpec.describe "Public API host route constraints", type: :request do
   api_host = "api.example.test"
   admin_host = "admin.example.test"
@@ -39,8 +39,9 @@ RSpec.describe "Public API host route constraints", type: :request do
     [ :get,  "/course-maps/abc123/download" ]
   ]
 
-  # One per namespace the public host must keep answering. Most are bearer- or HMAC-gated and
-  # answer 401 here, which is the point: any status but 404 proves the route still exists.
+  # One path for each namespace that the public host must continue to answer. Most of them need a
+  # bearer token or an HMAC and give a 401 here, and that is correct: each status but a 404 shows
+  # that the route still exists.
   public_paths = [
     [ :get,  "/up" ],
     [ :get,  "/widgets/whoop" ],
@@ -51,9 +52,9 @@ RSpec.describe "Public API host route constraints", type: :request do
     [ :get,  "/" ]
   ]
 
-  # The two paths that reach a controller body rather than a gate: the OmniAuth callback needs a
-  # mocked auth hash, and the Whoop callback reads its state from Redis, which isn't running in
-  # CI. Both stubs only get the request far enough to prove the route matched.
+  # The two paths that reach the body of a controller and not a check: the OmniAuth callback needs a
+  # test auth hash, and the Whoop callback reads its state from Redis, which does not run in CI. Each
+  # stub takes the request only far enough to show that the route matched.
   before do
     mock_owner_auth(email: "owner@example.com")
     allow($redis).to receive(:get).and_return(nil)
@@ -89,10 +90,10 @@ RSpec.describe "Public API host route constraints", type: :request do
       end
     end
 
-    # `/` is the one path the two hosts answer differently rather than one of them 404ing: the
-    # admin UI is mounted at the root of the admin host, and the public host keeps the redirect to
-    # the main site. Both routes are drawn for "/", so only their order and the host constraint
-    # keep them apart — which is exactly the kind of thing a reorder would silently break.
+    # `/` is the one path where the two hosts give a different answer, and where neither one gives a
+    # 404. The admin UI is at the root of the admin host, and the public host keeps the redirect to
+    # the main site. Rails draws two routes for "/", thus only their order and the host constraint
+    # keep them apart, and a change to the order would break that with no message.
     it "serves the owner home page at / on the admin host" do
       process(:get, "http://#{admin_host}/")
 
@@ -107,7 +108,8 @@ RSpec.describe "Public API host route constraints", type: :request do
     end
   end
 
-  # Unset is the dev, CI, and .fly.dev-origin case: every route is drawn on every host.
+  # With no value, which is the condition in development, in CI, and on the .fly.dev origin, Rails
+  # draws each route on each host.
   context "with API_HOST unset" do
     around do |example|
       original = ENV["API_HOST"]

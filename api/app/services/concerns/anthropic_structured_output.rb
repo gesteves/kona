@@ -1,40 +1,43 @@
 require "anthropic"
 
-# One structured-output Anthropic call, shared by the two services that make them: the activity
-# description's generated lines and the contact form's subject line. They differed only in which
-# env var names their model and in their token/timeout budgets, so everything else lived twice.
+# One Anthropic call with a structured output. The two services that make such a call share it: the
+# lines of the activity description, and the subject line of the contact form. They were different
+# only in the env var that names their model and in their token and timeout limits, thus each other
+# part was in the code two times.
 #
-# ⚠️ `extend` this, don't `include` it. Both callers are `module_function` modules, so their own
-# methods are singleton methods — an included module's instance methods would be invisible to them.
+# ⚠️ Use `extend` for this module, and not `include`. Both callers are `module_function` modules,
+# thus their own methods are singleton methods, and they could not see the instance methods of a
+# module that they include.
 #
-# The including module supplies `DEFAULT_MODEL`, `MAX_TOKENS` and `TIMEOUT_SECONDS`, plus
-# `anthropic_model_env` naming the env var that overrides the model.
+# The module that uses this supplies `DEFAULT_MODEL`, `MAX_TOKENS`, and `TIMEOUT_SECONDS`, and also
+# `anthropic_model_env`, which names the env var that replaces the model.
 module AnthropicStructuredOutput
-  # @return [Boolean] Whether an API key is configured. Every caller degrades to nil without one.
+  # @return [Boolean] True if an API key is available. Each caller gives nil without one.
   def configured?
     ENV["ANTHROPIC_API_KEY"].present?
   end
 
-  # ⚠️ The env var is named indirectly, so ANTHROPIC_DESCRIPTION_MODEL and
-  # ANTHROPIC_CONTACT_SUBJECT_MODEL are invisible to a `grep ENV\[` audit of the app. They're in
-  # .env.example; look for `anthropic_model_env` when reconciling the two.
+  # ⚠️ The code does not write the name of the env var here. Thus a `grep ENV\[` of the app does not
+  # find ANTHROPIC_DESCRIPTION_MODEL and ANTHROPIC_CONTACT_SUBJECT_MODEL. They are in .env.example.
+  # Look for `anthropic_model_env` when you compare the two.
   # @return [String] The model to call.
   def model
     ENV[anthropic_model_env].presence || self::DEFAULT_MODEL
   end
 
-  # Makes a structured-output Anthropic call. Structured outputs guarantee the first text block is
-  # valid JSON matching the schema, so callers can parse without defending against prose.
+  # Makes an Anthropic call with a structured output. Such an output is always correct JSON that
+  # agrees with the schema in its first text block. Thus a caller can parse it and does not need a
+  # check for plain text.
   # @param system [String] The system prompt.
   # @param user [String] The user message.
-  # @param schema [Hash] The JSON schema the response must match.
-  # @return [Hash] The parsed output, with symbolized keys.
+  # @param schema [Hash] The JSON schema that the response must agree with.
+  # @return [Hash] The parsed output, with symbol keys.
   def structured_call(system:, user:, schema:)
     message = anthropic_client.messages.create(
       model: model,
       max_tokens: self::MAX_TOKENS,
-      # Disabled: these one-sentence extractions don't benefit from reasoning, and where adaptive
-      # thinking is on by default it would eat the tight token budget and risk truncating the JSON.
+      # This is off. These one-sentence tasks do not need reasoning, and where adaptive thinking is
+      # on by default it would use the small token budget and could cut the JSON.
       thinking: { type: :disabled },
       system_: system,
       messages: [ { role: "user", content: user } ],
@@ -48,8 +51,8 @@ module AnthropicStructuredOutput
 
   private
 
-  # Memoized: both callers built a fresh client per call, which re-reads the key and rebuilds the
-  # connection config for nothing.
+  # The code keeps this value. Both callers made a new client for each call, and that read the key
+  # again and made the connection configuration again for no purpose.
   def anthropic_client
     @anthropic_client ||= Anthropic::Client.new(api_key: ENV["ANTHROPIC_API_KEY"])
   end

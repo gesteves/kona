@@ -1,20 +1,20 @@
-# Owner-session gating shared by the controllers and views that must be restricted to the site
-# owner. A successful Google sign-in (SessionsController) stores the owner's email in the signed
-# cookie session; everything here just checks it against OWNER_EMAIL. The Sidekiq UI is gated
-# separately by a Rack guard (config/initializers/sidekiq.rb) since it isn't a Rails controller.
+# The owner-session check that each controller and each view for the site owner shares. A successful
+# Google sign-in, in SessionsController, puts the email address of the owner in the signed cookie
+# session. Each method here compares that value with OWNER_EMAIL. A separate Rack guard controls the
+# Sidekiq UI (refer to config/initializers/sidekiq.rb), because that UI is not a Rails controller.
 module Authentication
   extend ActiveSupport::Concern
 
   private
 
-  # @return [Boolean] true when the session belongs to the configured owner.
+  # @return [Boolean] True when the session belongs to the owner in the configuration.
   def owner_signed_in?
     owner = ENV["OWNER_EMAIL"].to_s
     owner.present? && session[:owner_email].present? && session[:owner_email] == owner
   end
 
-  # Redirects to the login page unless the owner is signed in, remembering where they were
-  # headed (GET requests only) so the callback can send them back.
+  # Redirects to the login page when the owner is not signed in. It keeps the path that they wanted,
+  # for a GET request only, thus the callback can send them there.
   def require_owner!
     return if owner_signed_in?
 

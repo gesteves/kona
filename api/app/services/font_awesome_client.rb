@@ -2,14 +2,15 @@ require "graphql/client"
 require "graphql/client/http"
 require "httparty"
 
-# GraphQL client for the Font Awesome API, mirroring the web app's
-# lib/data/graphql/font_awesome.rb. The HTTP client and schema are built lazily on
-# first use so booting the app (and running tests with FontAwesome stubbed) never
-# hits the network.
+# The GraphQL client of the Font Awesome API. It is the same as
+# lib/data/graphql/font_awesome.rb of the web app. The code makes the HTTP client and the schema at
+# the first use. Thus the start of the app, and a test run with a stub for FontAwesome, never use
+# the network.
 module FontAwesomeClient
   FONT_AWESOME_API_URL = "https://api.fontawesome.com"
 
-  # Seconds shaved off the token's stated lifetime before caching it.
+  # The seconds that the code subtracts from the life of the token before it puts it in the
+  # cache.
   TOKEN_EXPIRY_MARGIN = 60
 
   ICONS_QUERY = <<-'GRAPHQL'
@@ -28,7 +29,7 @@ module FontAwesomeClient
   GRAPHQL
 
   class << self
-    # Fetches (and caches in Redis) a short-lived API access token.
+    # Gets an API access token with a short life, and puts it in Redis.
     def get_access_token(api_token)
       access_token = $redis.get("font_awesome:access_token")
       return access_token if access_token.present?
@@ -45,11 +46,12 @@ module FontAwesomeClient
       end
 
       data = JSON.parse(response.body, symbolize_names: true)
-      # ⚠️ Cached short of the real expiry, like WeatherKit's JWT, leaving a buffer for clock skew
-      # and in-flight requests — caching to the exact second ships an expired bearer to a request
-      # that lands at the end of the window. The failure is silent: the GraphQL call rescues to
-      # nil and the view renders a widget with one icon missing. A missing or zero expires_in
-      # would make setex raise into that same rescue, uncaching the token entirely.
+      # ⚠️ The cache holds the token for less than its true life, as it does for the JWT of
+      # WeatherKit. The extra time is for a clock difference and for a request in progress. With
+      # the exact time, a request at the end of the window would get a token that expired. That
+      # failure has no message: the GraphQL call gives nil and the view renders a widget with one
+      # icon absent. An expires_in that is absent or zero would make setex raise into that same
+      # rescue, and the token would then stay out of the cache.
       ttl = data[:expires_in].to_i - TOKEN_EXPIRY_MARGIN
       $redis.setex("font_awesome:access_token", ttl, data[:access_token]) if ttl.positive?
       data[:access_token]
@@ -74,10 +76,10 @@ module FontAwesomeClient
     end
 
     def icons_query
-      # client.parse returns a Module whose named operations are nested constants
-      # (this query is `query Icons`). It must be assigned to a *named* constant:
-      # graphql-client derives the wire operation name from the module's name, so an
-      # anonymous module produces invalid GraphQL ("query #<Module:0x..>__Icons").
+      # client.parse returns a Module, and each named operation in it is a constant. This query is
+      # `query Icons`. The code must give that module a *name*: graphql-client makes the operation
+      # name that it sends from the name of the module, thus a module with no name gives incorrect
+      # GraphQL ("query #<Module:0x..>__Icons").
       const_set(:Queries, client.parse(ICONS_QUERY)) unless const_defined?(:Queries, false)
       self::Queries::Icons
     end

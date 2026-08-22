@@ -10,7 +10,7 @@ RSpec.describe GoogleMaps do
   let(:elevation_body) { { results: [ { elevation: 2057.0 } ] }.to_json }
 
   before do
-    # Cache always misses; writes are no-ops.
+    # The cache always gives a miss, and each write does nothing.
     allow($redis).to receive(:get).and_return(nil)
     allow($redis).to receive(:set)
     allow($redis).to receive(:setex)

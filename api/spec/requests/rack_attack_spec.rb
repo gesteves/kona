@@ -1,8 +1,9 @@
 require "rails_helper"
 
-# Rack::Attack is disabled in the test env so the rest of the suite isn't rate-limited; these
-# examples flip it on and use the in-memory store configured for test, resetting counters
-# around each example so they don't leak across the shared 127.0.0.1 client IP.
+# Rack::Attack is off in the test environment, thus the other tests in the suite have no rate
+# limit. These examples set it on and use the memory store for the test environment. They set the
+# counters to zero around each example, thus one example does not change another one through the
+# shared client IP of 127.0.0.1.
 RSpec.describe "Rack::Attack", type: :request do
   before do
     Rack::Attack.enabled = true
@@ -35,19 +36,20 @@ RSpec.describe "Rack::Attack", type: :request do
       expect(response).to have_http_status(:forbidden)
     end
 
-    # The block is path-scoped, not an IP ban: legitimate traffic from the same IP still works.
+    # The block applies to a path, and it is not an IP ban: correct traffic from the same IP still
+    # works.
     get "/up"
     expect(response).to have_http_status(:ok)
   end
 
-  # Regression: probe requests can arrive through the public web proxy, where they come in
-  # on a SHARED egress IP. Blocking one must never ban that IP, or every visitor's widgets
-  # would 403 at once. (This is the bug that took the site down: an IP-based Fail2Ban here.)
+  # A probe request can come through the public web proxy, on a SHARED egress IP. A block of one
+  # such request must never ban that IP. If it did, the widgets of each visitor would 403 at the
+  # same time. An IP-based Fail2Ban here is the problem that stopped the site.
   it "does not let a probe ban the shared proxy IP it arrives on" do
     get "/api/status" # matches the probe pattern
     expect(response).to have_http_status(:forbidden)
 
-    # Same IP, a legitimate request — must be unaffected.
+    # The same IP, with a correct request. It must not change.
     get "/up"
     expect(response).to have_http_status(:ok)
   end
@@ -63,8 +65,9 @@ RSpec.describe "Rack::Attack", type: :request do
     it "leaves legitimate paths alone" do
       expect(RACK_ATTACK_PROBE_PATH.call("/widgets/weather/current")).to be_falsey
       expect(RACK_ATTACK_PROBE_PATH.call("/up")).to be_falsey
-      # .well-known is where legitimate endpoints live (security.txt, did:web, OAuth metadata) —
-      # blocking it would silently 403 a future one, so probes there just 404 via the catch-all.
+      # .well-known holds correct endpoints: security.txt, did:web, and OAuth metadata. A block
+      # would 403 a future endpoint with no message. Thus a probe there gets a 404 from the
+      # catch-all.
       expect(RACK_ATTACK_PROBE_PATH.call("/.well-known/security.txt")).to be_falsey
     end
 
@@ -83,20 +86,22 @@ RSpec.describe "Rack::Attack", type: :request do
     expect(response.body).to eq("429 Too Many Requests\n")
   end
 
-  # The throttle must key on the real client (Fly-Client-IP), not the shared transport IP — so one
-  # abusive client can't exhaust the budget for everyone behind the same fly proxy address.
+  # The key of the throttle must be the true client (Fly-Client-IP), and not the shared transport
+  # IP. Thus one client that sends too many requests cannot use the full budget of each person
+  # behind the same fly proxy address.
   it "throttles per real client IP from Fly-Client-IP, isolating distinct clients" do
     21.times { get "/no-such-page", headers: { "Fly-Client-IP" => "1.1.1.1" } }
     expect(response).to have_http_status(:too_many_requests)
 
-    # A different client (same transport, different Fly-Client-IP) keeps its own budget.
+    # A different client, with the same transport but a different Fly-Client-IP, keeps its own
+    # budget.
     get "/no-such-page", headers: { "Fly-Client-IP" => "2.2.2.2" }
     expect(response).not_to have_http_status(:too_many_requests)
   end
 
-  # Behind Cloudflare, fly sees a Cloudflare edge node as its client, so Fly-Client-IP is the same
-  # PoP address for every visitor. CF-Connecting-IP carries the true client and must win, or the
-  # throttle collapses into a single global bucket keyed on the PoP.
+  # Behind Cloudflare, fly sees a Cloudflare edge node as its client. Thus Fly-Client-IP is the same
+  # PoP address for each visitor. CF-Connecting-IP has the true client and must have the highest
+  # importance. Without that, the throttle becomes one global counter with the PoP as its key.
   it "prefers CF-Connecting-IP over Fly-Client-IP, isolating clients behind one Cloudflare PoP" do
     21.times do
       get "/no-such-page",
@@ -104,15 +109,15 @@ RSpec.describe "Rack::Attack", type: :request do
     end
     expect(response).to have_http_status(:too_many_requests)
 
-    # A different visitor arriving through the SAME Cloudflare PoP keeps its own budget.
+    # A different visitor through the SAME Cloudflare PoP keeps its own budget.
     get "/no-such-page",
         headers: { "CF-Connecting-IP" => "2.2.2.2", "Fly-Client-IP" => "172.70.0.1" }
     expect(response).not_to have_http_status(:too_many_requests)
   end
 
-  # Traffic that reaches fly without passing through Cloudflare has no CF-Connecting-IP; it must
-  # still be keyed on the real client. (This path is live: during DNS propagation, and via any
-  # route that bypasses the Cloudflare zone.)
+  # Traffic that reaches fly and does not go through Cloudflare has no CF-Connecting-IP. The key
+  # must still be the true client. This path is in use during a DNS propagation, and on each route
+  # that does not go through the Cloudflare zone.
   it "falls back to Fly-Client-IP when CF-Connecting-IP is absent" do
     21.times { get "/no-such-page", headers: { "Fly-Client-IP" => "3.3.3.3" } }
     expect(response).to have_http_status(:too_many_requests)
@@ -121,9 +126,9 @@ RSpec.describe "Rack::Attack", type: :request do
     expect(response).not_to have_http_status(:too_many_requests)
   end
 
-  # The contact form throttles per REAL visitor IP — the one the web proxy forwards as
-  # X-Kona-Client-IP — not the shared proxy egress. It's a throttle (429), never a ban, so it
-  # can't take down the shared proxy IP the way an IP ban would.
+  # The contact form has a throttle for each TRUE visitor IP, which the web proxy sends as
+  # X-Kona-Client-IP. It is not the shared proxy egress. It is a throttle, which gives a 429, and
+  # never a ban. Thus it cannot stop the shared proxy IP, and an IP ban would.
   it "throttles contact submissions per forwarded visitor IP, isolating distinct visitors" do
     5.times do
       post "/api/contact", headers: { "X-Kona-Client-IP" => "9.9.9.9" }
@@ -134,15 +139,16 @@ RSpec.describe "Rack::Attack", type: :request do
     expect(response).to have_http_status(:too_many_requests)
     expect(response.body).to eq("429 Too Many Requests\n")
 
-    # A different visitor (same shared egress, different forwarded IP) keeps its own budget.
+    # A different visitor, with the same shared egress but a different forwarded IP, keeps its own
+    # budget.
     post "/api/contact", headers: { "X-Kona-Client-IP" => "8.8.8.8" }
     expect(response).not_to have_http_status(:too_many_requests)
   end
 
-  # /signin and /auth are in RACK_ATTACK_KNOWN_PREFIXES, which is exactly what exempts them from
-  # the unknown-paths throttle — so without a rule of their own the sign-in surface has no
-  # origin-side limit at all. Safe to key on client_ip here and nowhere else: these paths live on
-  # the admin host, which nothing reaches through the shared widget-proxy egress.
+  # /signin and /auth are in RACK_ATTACK_KNOWN_PREFIXES, and that is what keeps them out of the
+  # throttle for unknown paths. Thus without a rule of their own, the sign-in pages have no limit at
+  # the origin. client_ip is a safe key here and at no other place: these paths are on the admin
+  # host, and nothing reaches that host through the shared widget-proxy egress.
   it "throttles the sign-in surface per client IP, isolating distinct clients" do
     30.times do
       get "/signin", headers: { "CF-Connecting-IP" => "5.5.5.5" }
@@ -152,11 +158,12 @@ RSpec.describe "Rack::Attack", type: :request do
     get "/signin", headers: { "CF-Connecting-IP" => "5.5.5.5" }
     expect(response).to have_http_status(:too_many_requests)
 
-    # ⚠️ A throttle, never a ban: the same client's other traffic is untouched.
+    # ⚠️ This is a throttle, and never a ban: the other traffic of the same client does not
+    # change.
     get "/up", headers: { "CF-Connecting-IP" => "5.5.5.5" }
     expect(response).to have_http_status(:ok)
 
-    # And a different client keeps its own budget.
+    # A different client keeps its own budget.
     get "/signin", headers: { "CF-Connecting-IP" => "6.6.6.6" }
     expect(response).not_to have_http_status(:too_many_requests)
   end

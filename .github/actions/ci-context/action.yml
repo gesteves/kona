@@ -6,11 +6,11 @@ runs:
   steps:
     - name: Set short SHA and branch/PR info
       shell: bash
-      # ⚠️ Every value from the event payload arrives through `env:` and is read as "$VAR"
-      # below — never spliced into the script with `${{ }}`. A commit message and a PR title
-      # are attacker-authored text, and `${{ }}` substitutes them into the *source* of this
-      # script, so backticks or $(…) in a commit message would execute as shell in a job that
-      # also handles deploy credentials. Keep new payload values in this block.
+      # ⚠️ Each value from the event payload comes through `env:` and the script below reads it as
+      # "$VAR". Never put such a value in the script with `${{ }}`. A commit message and a PR title
+      # are text that an attacker can write, and `${{ }}` puts them into the *source* of this
+      # script. Thus a backtick or a $(…) in a commit message would run as shell in a job that also
+      # holds the deploy credentials. Put each new payload value in this block.
       env:
         EVENT_NAME: ${{ github.event_name }}
         DISPATCH_TYPE: ${{ github.event.action }}
@@ -24,12 +24,12 @@ runs:
         REPOSITORY: ${{ github.repository }}
       run: |
         if [ "$EVENT_NAME" = "pull_request" ]; then
-          # GITHUB_SHA on a pull_request is the synthetic merge commit — one nobody pushed,
-          # unreachable once the PR closes — so link the PR's head instead. And
-          # `pull_request.head` carries only label/ref/sha/user/repo: there is no commit
-          # message on it, so the PR title is the only description available. (Reading
-          # head.commit.message here is what used to leave the Slack attachment as a bare sha
-          # followed by a dangling dash — the field is always empty.)
+          # On a pull_request, GITHUB_SHA is the merge commit that GitHub makes. Nobody pushed it,
+          # and nothing can reach it after the PR closes. Thus the link points at the head of the
+          # PR. `pull_request.head` has only label, ref, sha, user, and repo: it has no commit
+          # message. Thus the title of the PR is the only description. A read of head.commit.message
+          # here gave a Slack attachment with only a sha and a hyphen, because that field is always
+          # empty.
           SHA="$PR_HEAD_SHA"
           BRANCH_NAME="$PR_HEAD_REF"
           COMMIT_MESSAGE="$PR_TITLE"
@@ -43,25 +43,25 @@ runs:
 
         SHORT_SHA="${SHA::8}"
 
-        # First line only, then escape backslashes and double quotes. COMMIT_CONTEXT is
-        # interpolated into notify-slack's YAML `payload:` block, where a raw " breaks the
-        # string — and a raw newline would break both that and the KEY=value writes to
-        # $GITHUB_ENV below. Backslashes have to be escaped first, or the rule would re-escape
-        # the ones the quote rule just added.
+        # Take the first line only, then escape each backslash and each double quote.
+        # COMMIT_CONTEXT goes into the YAML `payload:` block of notify-slack, where a plain " breaks
+        # the string. A plain newline would break that block and also the KEY=value writes to
+        # $GITHUB_ENV below. Escape the backslashes first, or the rule would escape again each
+        # backslash that the quote rule just added.
         COMMIT_MESSAGE="$(printf '%s' "$COMMIT_MESSAGE" | head -n 1 | sed 's/\\/\\\\/g; s/"/\\"/g')"
 
-        # COMMIT_CONTEXT is the Slack attachment's first line. Only push/PR events describe a
-        # change; for the two deploy triggers that don't, the usual "<sha> - <message>" renders
-        # as a bare hash followed by a dangling dash. Label those by what actually triggered
-        # the deploy instead:
-        #   repository_dispatch -> the api's SiteBuildJob. The commit is just whatever main
-        #     happened to be at, so the sha is noise — drop it. DISPATCH_TYPE (the event's
-        #     `event_type`, exposed as github.event.action) says which caller fired it:
-        #     contentful-publish = a Contentful publish/unpublish, api-build = a POST to
-        #     /api/build. Unknown types fall back to the Contentful wording rather than
-        #     rendering blank.
-        #   workflow_dispatch   -> a manual "Run workflow". The sha IS meaningful (it's what got
-        #     deployed), so keep the link and say why there's no message.
+        # COMMIT_CONTEXT is the first line of the Slack attachment. Only a push event and a PR
+        # event describe a change. For the two deploy triggers that do not, the usual
+        # "<sha> - <message>" gives only a hash and a hyphen. Give those a label that names the
+        # cause of the deploy:
+        #   repository_dispatch -> the SiteBuildJob of the api. The commit is the current state of
+        #     main, thus the sha has no meaning. Remove it. DISPATCH_TYPE, which is the `event_type`
+        #     of the event and which github.event.action gives, says which caller sent it:
+        #     contentful-publish is a Contentful publish or unpublish, and api-build is a POST to
+        #     /api/build. For a type that this code does not know, it uses the Contentful text and
+        #     does not write a blank line.
+        #   workflow_dispatch   -> a manual "Run workflow". The sha DOES have a meaning, because it
+        #     is what the deploy sent. Keep the link and say why there is no message.
         COMMIT_LINK="<${SERVER_URL}/${REPOSITORY}/commit/${SHA}|\`${SHORT_SHA}\`>"
         case "$EVENT_NAME" in
           repository_dispatch)

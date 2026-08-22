@@ -6,10 +6,11 @@ const SCRIPT_UPSTREAM = 'https://cdn.test/js/pa-abc.js';
 const env = { PLAUSIBLE_SCRIPT_URL: SCRIPT_UPSTREAM } as Env;
 
 describe('handlePlausible', () => {
-  // getScript reads/writes caches.default. Stub both so tests never touch real (per-test isolated)
-  // Cache storage: that write otherwise trips a miniflare isolated-storage teardown bug (a
-  // .sqlite-shm WAL file) that fails the run in CI. `match` → miss forces the upstream path;
-  // `put` → no-op. We're asserting the proxy/response behavior, not the caching itself.
+  // getScript reads caches.default and writes to it. Replace both, thus a test never uses the true
+  // Cache storage, which the pool keeps separate for each test. Without this, the write causes a
+  // miniflare storage teardown problem with a .sqlite-shm WAL file, and the run fails in CI.
+  // `match` gives a miss, which makes the code call the upstream service. `put` does nothing. These
+  // tests check the proxy and the response, and not the cache.
   beforeEach(() => {
     vi.spyOn(caches.default, 'match').mockResolvedValue(undefined);
     vi.spyOn(caches.default, 'put').mockResolvedValue(undefined);
@@ -66,7 +67,7 @@ describe('handlePlausible', () => {
       makeCtx()
     );
 
-    // Both the lookup and the store use the bare path — not the inbound URL with its query.
+    // The read and the write both use the path with no query, and not the URL that comes in.
     const [matched] = vi.mocked(caches.default.match).mock.calls[0];
     expect((matched as Request).url).toBe(
       'https://www.example.com/pa/script.js'
@@ -140,13 +141,14 @@ describe('handlePlausible', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('application/javascript');
     expect(await res.text()).toBe('');
-    // The miss still populates the cache (under the normalized GET key), so a HEAD probe
-    // never costs an extra upstream fetch on the next GET.
+    // The miss still puts the value in the cache, under the corrected GET key. Thus a HEAD request
+    // does not cause a second upstream fetch at the next GET.
     expect(vi.mocked(caches.default.put)).toHaveBeenCalled();
   });
 
   it('405s a non-GET/HEAD to the script path without touching the upstream', async () => {
-    // No intercept registered: reaching the upstream would throw an unmocked-fetch error.
+    // There is no intercept. A request to the upstream service would raise an unmocked-fetch
+    // error.
     const res = await handlePlausible(
       new Request('https://www.example.com/pa/script.js', { method: 'POST' }),
       env,
@@ -175,9 +177,9 @@ describe('handlePlausible', () => {
     expect(res.status).toBe(404);
   });
 
-  // ⚠️ /pa/* is claimed by run_worker_first, so it never gets source/headers' /* block. This
-  // route serves executable JavaScript from the site's own origin, which makes it the one that
-  // least tolerates shipping without nosniff.
+  // ⚠️ run_worker_first takes /pa/*, thus it never gets the /* block of source/headers. This route
+  // serves JavaScript that runs, from the origin of the site. Thus it is the route that needs
+  // nosniff the most.
   describe('security headers', () => {
     function expectSecured(res: Response) {
       expect(res.headers.get('x-content-type-options')).toBe('nosniff');
@@ -212,7 +214,7 @@ describe('handlePlausible', () => {
       );
     });
 
-    // These answer before any upstream fetch, so they register no intercept.
+    // These answer before an upstream fetch, thus they register no intercept.
     it.each([
       [
         'a 405 on the script path',
@@ -274,11 +276,11 @@ describe('handlePlausible', () => {
         makeCtx()
       );
 
-      // Kept: what the browser needs to execute and cache the script.
+            // The code keeps these: the browser needs them to run the script and to cache it.
       expect(res.headers.get('content-type')).toBe('application/javascript');
       expect(res.headers.get('cache-control')).toBe('public, max-age=3600');
-      // Dropped: everything else Plausible's CDN sets would otherwise be re-served under this
-      // origin and persisted in caches.default for its full TTL.
+      // The code removes these: each other header from the CDN of Plausible would go to the browser
+      // under this origin and would stay in caches.default for its full TTL.
       expect(res.headers.get('set-cookie')).toBeNull();
       expect(res.headers.get('vary')).toBeNull();
       expect(res.headers.get('access-control-allow-origin')).toBeNull();

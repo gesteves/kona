@@ -1,10 +1,11 @@
 module UnitsHelper
   include ActiveSupport::NumberHelper
 
-  # Converts a distance in meters to either metric or imperial units.
-  # @param meters [Float] The distance in meters to be converted.
-  # @param units [String] (Optional) The unit system: 'si', 'metric', or 'imperial'. Default is 'si'.
-  # @return [String] The distance formatted as a string in the specified unit system.
+  # Changes a distance in meters into metric units or imperial units.
+  # @param meters [Float] The distance in meters.
+  # @param units [String] The unit system: 'si', 'metric', or 'imperial'. It is optional, and the
+  #   default is 'si'.
+  # @return [String] The distance as a string, in the given unit system.
   def distance(meters, units: "si")
     case units
     when "si", "metric"
@@ -16,37 +17,37 @@ module UnitsHelper
     end
   end
 
-  # Splits a converted distance into its number and its unit, so a view needing both pays for
-  # one number_to_human instead of one per part.
+  # Divides a distance into its number and its unit. Thus a view that needs both does one
+  # number_to_human, and not one for each part.
   # @return [Array(String, String)] The value and the unit.
   def distance_parts(meters, units: "si")
     distance(meters, units: units).split(/\s+/, 2)
   end
 
-  # Extracts the numerical value of the converted distance.
+  # Gets the number from the distance after the conversion.
   def distance_value(meters, units: "si")
     distance_parts(meters, units: units).first
   end
 
-  # Retrieves the unit of measurement for the converted distance.
+  # Gets the unit of the distance after the conversion.
   def distance_unit(meters, units: "si")
     distance_parts(meters, units: units).last
   end
 
-  # Formats a distance number with specified units and precision.
+  # Formats a distance number with the given unit and the given number of decimals.
   def formatted_distance(distance, units, precision)
     number_to_human(distance, units: units, precision: precision,
                     strip_insignificant_zeros: true, significant: false, delimiter: ",")
   end
 
-  # Determines the precision for formatting a number based on significant digits.
+  # Finds the number of decimals for a number, from its significant digits.
   def determine_precision(number, max_digits: 4, max_decimals: 1)
     significant_digits = number.to_i.digits.count
     precision = max_digits - significant_digits
     precision.clamp(0, max_decimals)
   end
 
-  # Converts meters to kilometers or meters based on magnitude.
+  # Changes meters into kilometers or keeps meters, from the size of the value.
   def meters_to_metric_units(meters)
     kilometers = meters / 1000.0
 
@@ -57,32 +58,32 @@ module UnitsHelper
     end
   end
 
-  # Converts a temperature from Celsius to Fahrenheit.
+  # Changes a temperature from Celsius into Fahrenheit.
   def celsius_to_fahrenheit(celsius)
     (celsius * (9.0 / 5.0)) + 32
   end
 
-  # Converts kilometers to miles.
+  # Changes kilometers into miles.
   def kilometers_to_miles(km)
     km * 0.621371
   end
 
-  # Converts a speed from kilometers per hour to knots.
+  # Changes a speed from kilometers each hour into knots.
   def kph_to_knots(kph)
     kph * 0.539957
   end
 
-  # Converts meters to feet.
+  # Changes meters into feet.
   def meters_to_feet(meters)
     meters * 3.28084
   end
 
-  # Converts millimeters to inches.
+  # Changes millimeters into inches.
   def millimeters_to_inches(millimeters)
     millimeters / 25.4
   end
 
-  # Converts meters to miles or yards based on magnitude.
+  # Changes meters into miles or yards, from the size of the value.
   def meters_to_imperial_units(meters)
     miles = meters_to_miles(meters)
     yards = meters_to_yards(meters)

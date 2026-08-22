@@ -1,7 +1,7 @@
-// The one shared class here, and the one that isn't a BEM block: it undoes the native list styling
-// so a <ul> can carry Web Awesome's layout utilities. Pair it with `wa-stack` and a `wa-gap-*` in
-// the markup — ⚠️ `wa-stack` is also what zeroes the `margin-inline-start` native.css puts on every
-// <li>, which a padding reset on the list can't reach.
+// The one shared class here, and the one class that is not a BEM block. It removes the native list
+// appearance, thus a <ul> can use the layout utilities of Web Awesome. Use it with `wa-stack` and a
+// `wa-gap-*` in the markup. ⚠️ `wa-stack` is also what makes the `margin-inline-start` zero, which
+// native.css puts on each <li>, and a padding rule on the list cannot reach that margin.
 
 .plain-list {
   list-style: none;

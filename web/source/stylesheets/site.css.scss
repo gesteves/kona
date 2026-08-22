@@ -2,14 +2,15 @@
 @import 'base/variables';
 @import 'base/mixins';
 
-// Imported unlayered (and with specificity above `:host`) so these overrides beat
-// Web Awesome's own unlayered shadow-DOM styles for `<wa-skeleton>` / `<wa-toast>`.
+// The code imports these with no layer, and with a specificity above `:host`. Thus these rules win
+// over the unlayered shadow-DOM styles of Web Awesome for `<wa-skeleton>` and `<wa-toast>`.
 @import 'components/skeleton';
 @import 'components/toast';
 
-// Also unlayered — remaps the Pagefind modal's `--pf-*` variables for dark mode, which
-// must beat Pagefind's own unlayered `:root` defaults (layered rules always lose to
-// unlayered ones). See the partial's header for the full rationale.
+// This also has no layer. It changes the `--pf-*` variables of the Pagefind modal for the dark mode,
+// and those rules must win over the unlayered `:root` defaults of Pagefind, because a rule in a
+// layer always loses to an unlayered rule. Refer to the top of that partial for the full
+// explanation.
 @import 'components/pagefind';
 
 @layer reset {
@@ -29,7 +30,7 @@
 }
 
 @layer components {
-  // First on purpose: the layout placeholders' shared declarations are emitted here.
+  // This is first, on purpose: the shared declarations of the layout placeholders go here.
   @import 'components/layout';
   @import 'components/blog';
   @import 'components/collection';

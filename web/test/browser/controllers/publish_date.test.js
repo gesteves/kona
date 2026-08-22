@@ -2,16 +2,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PublishDateController from '../../../source/javascripts/stimulus/controllers/publish_date_controller';
 import { flushDom, mount } from '../helpers';
 
-// Renders the publish-date-dependent parts of an article's meta line on the client, so a site
-// built weeks ago still shows the right thing: the "New" badge, the clock-vs-calendar icon, and a
-// relative-vs-absolute timestamp.
+// This renders in the browser the parts of the meta line of an article that depend on the publish
+// date. Thus a site from some weeks ago still shows the correct content: the "New" badge, the clock
+// icon or the calendar icon, and a relative time or an absolute time.
 //
-// The server renders EVERY state — calendar icon and absolute date visible (the no-JS fallback),
-// clock and badge present but hidden — and the controller reveals the right ones. So each test
-// below is really asserting which of four pre-rendered elements ends up visible.
+// The server renders EACH state: the calendar icon and the absolute date are visible, which is the
+// result with no JavaScript, and the clock and the badge are in the page but hidden. The controller
+// then shows the correct ones. Thus each test below checks which of four elements from the server
+// is visible.
 //
-// Dates are reckoned in the SITE's timezone, not the viewer's: "published today" has to mean the
-// same thing for a reader in Tokyo as for the author.
+// The code uses the timezone of the SITE for each date, and not the timezone of the viewer:
+// "published today" must have the same meaning for a reader in Tokyo and for the author.
 const TIME_ZONE = 'America/New_York';
 const ABSOLUTE = 'August 1, 2026';
 
@@ -46,7 +47,7 @@ afterEach(() => {
 });
 
 describe('an article published today', () => {
-  // 2026-08-01 12:00 EDT, viewed at 2026-08-01 18:00 EDT.
+  // 2026-08-01 12:00 EDT, and the reader opens the page at 2026-08-01 18:00 EDT.
   const published = '2026-08-01T16:00:00Z';
   const now = '2026-08-01T22:00:00Z';
 
@@ -76,8 +77,8 @@ describe('an article published today', () => {
 
 describe('the New badge window', () => {
   it('stays on for a full Article a few days old', async () => {
-    // Note the asymmetry: still "new", but no longer "today" — so the badge shows while the
-    // timestamp has already reverted to the absolute date. Two different questions.
+    // Note the difference: the article is still "new", but it is no longer from "today". Thus the
+    // badge appears and the timestamp is already the absolute date. These are two questions.
     await mountAt('2026-08-04T22:00:00Z', {
       datetime: '2026-08-01T16:00:00Z',
     });
@@ -131,8 +132,8 @@ describe('the New badge window', () => {
   });
 
   it('still treats a draft as recent, so it reads as a live preview', async () => {
-    // A draft is always shown with the clock and a relative time, however old it is — you're
-    // looking at something you're still working on.
+    // A draft always has the clock and a relative time, at each age, because you look at something
+    // that you still work on.
     await mountAt('2026-09-01T22:00:00Z', {
       datetime: '2026-08-01T16:00:00Z',
       draft: true,
@@ -148,8 +149,9 @@ describe('the New badge window', () => {
 
 describe('timezone handling', () => {
   it('reckons the date in the site timezone, not UTC', async () => {
-    // 2026-08-02T02:00Z is already the 2nd in UTC, but still 22:00 on the 1st in New York — and
-    // "today" has to mean the site owner's today. Viewed at 2026-08-01 23:00 EDT.
+    // 2026-08-02T02:00Z is the 2nd day in UTC, but it is 22:00 on the 1st day in New York, and
+    // "today" must mean the today of the site owner. The reader opens the page at
+    // 2026-08-01 23:00 EDT.
     await mountAt('2026-08-02T03:00:00Z', {
       datetime: '2026-08-02T02:00:00Z',
     });
@@ -178,8 +180,9 @@ describe('timezone handling', () => {
 
 describe('re-rendering', () => {
   it('flips to the absolute date once the article stops being today', async () => {
-    // The relative time is self-syncing, but nothing in it knows the article is about to stop
-    // being "today" — hence the minute timer. Mounted at 23:59:30 EDT.
+    // The relative time updates itself, but no code in it knows that the article is near the end of
+    // "today". That is the purpose of the timer for each minute. The mount occurs at
+    // 23:59:30 EDT.
     await mountAt('2026-08-02T03:59:30Z', {
       datetime: '2026-08-01T16:00:00Z',
     });
@@ -195,7 +198,7 @@ describe('re-rendering', () => {
   });
 
   it('reuses the existing relative-time element rather than recreating it each minute', async () => {
-    // Recreating it would restart the element's own sync and make the text visibly stutter.
+    // A new element would start its own updates again and the text would move.
     await mountAt('2026-08-01T22:00:00Z', {
       datetime: '2026-08-01T16:00:00Z',
     });
@@ -234,8 +237,8 @@ describe('re-rendering', () => {
 
 describe('without a datetime', () => {
   it('leaves the server-rendered fallback exactly as it is', async () => {
-    // No datetime means nothing to reckon from, so the no-JS rendering stands: calendar icon,
-    // absolute date, no badge.
+    // With no datetime there is no value to calculate from. Thus the render with no JavaScript
+    // stays: the calendar icon, the absolute date, and no badge.
     await mountAt('2026-08-01T22:00:00Z', { datetime: null });
 
     expect(visible('badge')).toBe(false);

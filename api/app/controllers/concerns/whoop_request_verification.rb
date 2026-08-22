@@ -1,14 +1,15 @@
 require "openssl"
 require "base64"
 
-# Verifies Whoop webhook requests: X-WHOOP-Signature is a base64 HMAC-SHA256 of the timestamp
-# plus the raw body, keyed on the OAuth client secret, and the accompanying timestamp is bounded
-# to limit replay.
+# Checks each Whoop webhook request. X-WHOOP-Signature is a base64 HMAC-SHA256 of the timestamp and
+# the raw body, with the OAuth client secret as its key. The timestamp beside it has a limit, which
+# stops a replay.
 # @see https://developer.whoop.com/docs/developing/webhooks/
 module WhoopRequestVerification
   extend ActiveSupport::Concern
 
-  # Clock skew tolerated in either direction — Whoop's docs promise no clock discipline.
+  # The clock difference that the code accepts, before the time and after it. The Whoop
+  # documentation says nothing about its clocks.
   MAX_TIMESTAMP_SKEW = 5.minutes
 
   private
@@ -26,8 +27,8 @@ module WhoopRequestVerification
     head(:unauthorized) unless ActiveSupport::SecurityUtils.secure_compare(signature, expected)
   end
 
-  # @param timestamp [String] Milliseconds since the epoch.
-  # @return [Boolean] Whether it's numeric and within the skew window.
+  # @param timestamp [String] The milliseconds after the epoch.
+  # @return [Boolean] True if it is a number and it is in the window.
   def fresh_timestamp?(timestamp)
     ms = Float(timestamp)
     (Time.now.to_f * 1000 - ms).abs <= MAX_TIMESTAMP_SKEW.in_milliseconds

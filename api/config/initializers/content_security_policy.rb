@@ -1,12 +1,13 @@
-# Nonce plumbing for the owner-facing pages' Content-Security-Policy.
+# The nonce code for the Content-Security-Policy of the pages of the owner.
 #
-# ⚠️ No default policy is declared here, deliberately. The policy itself lives in the OwnerFacing
-# concern, so it lands on the admin UI and the sign-in page and nowhere else. A global default would
-# put a CSP header on every widget fragment — machine-read markup that no browser treats as a
-# document — and that header would then be stored in the edge cache alongside the fragment.
+# ⚠️ There is no default policy here, on purpose. The policy is in the OwnerFacing concern, thus it
+# applies to the admin UI and to the sign-in page, and to nothing else. A global default would put a
+# CSP header on each widget fragment. A fragment is markup for a machine and no browser reads it as
+# a document, and the edge cache would then hold that header with the fragment.
 #
-# ⚠️ script-src only. A nonce in a directive makes browsers ignore `unsafe-inline` in that same
-# directive (CSP3), and OwnerFacing's style-src needs `unsafe-inline` for the styles Web Awesome and
-# Mapbox GL JS inject at runtime. Adding style-src back here would silently break every component.
+# ⚠️ The nonce applies to script-src only. A nonce in a directive makes a browser ignore
+# `unsafe-inline` in that same directive (CSP3), and the style-src of OwnerFacing needs
+# `unsafe-inline` for the styles that Web Awesome and Mapbox GL JS write at run time. style-src here
+# would stop each component, and give no message.
 Rails.application.config.content_security_policy_nonce_generator = ->(_request) { SecureRandom.base64(16) }
 Rails.application.config.content_security_policy_nonce_directives = %w[script-src]

@@ -1,29 +1,31 @@
 module Api
-  # Resolves the web build's posted Font Awesome allowlist to pre-rendered SVGs, returned in
-  # the same { family => { style => [{ id, svg }] } } tree shape data/icons.json expects. This
-  # is what keeps the Font Awesome integration entirely in this app.
+  # Changes the Font Awesome list that the web build posts into rendered SVGs. It returns them in
+  # the same { family => { style => [{ id, svg }] } } tree that data/icons.json needs. This is what
+  # keeps the Font Awesome integration in this app only.
   #
-  # Bearer-gated, since a novel id triggers a paid upstream call. Not edge-cached: it's fetched
-  # at build time, and FontAwesome already caches each SVG durably in Redis.
+  # It needs a bearer token, because a new id causes an upstream call that costs money. The edge
+  # does not cache it: the build gets it, and FontAwesome already keeps each SVG in Redis.
   class IconsController < BaseController
     skip_forgery_protection
 
-    # ⚠️ A ceiling on the work one request can ask for. Every miss is a billed Font Awesome call
-    # plus a Redis key that lives for a year, and the "web posts small batches" convention is the
-    # caller's, not something this endpoint enforced. The real allowlist is an order of magnitude
-    # under this, so the cap only ever catches a runaway.
+    # ⚠️ This is the maximum work for one request. Each icon that is not in the cache is a Font
+    # Awesome call that costs money and a Redis key that stays for a year. The rule that web posts
+    # small groups belongs to the caller, and this endpoint did not enforce it. The true list is ten
+    # times smaller than this limit, thus the limit catches only a request that is much too
+    # large.
     MAX_ICONS = 250
 
-    # Font Awesome's own identifier shape. Anything else can't name a real icon, so it's rejected
-    # before it reaches the upstream or mints a cache key.
+    # The identifier shape of Font Awesome. Each other value can name no true icon, thus the code
+    # refuses it before it reaches the upstream service or makes a cache key.
     SEGMENT_FORMAT = /\A[a-z0-9-]{1,64}\z/
 
     def create
       requested = params.to_unsafe_h[:icons]
       return render json: {}, status: :unprocessable_content unless requested.is_a?(Hash)
 
-      # Flattened and bounded before a single upstream call, so an oversized request costs nothing
-      # rather than being charged for up to the point it's refused.
+      # The code makes one list and applies the limit before the first upstream call. Thus a request
+      # that is too large costs nothing, and the code does not pay for the icons before the
+      # refusal.
       triples = wanted_triples(requested)
       if triples.size > MAX_ICONS
         return render json: { error: "Too many icons; the limit is #{MAX_ICONS} per request." },
@@ -43,9 +45,10 @@ module Api
 
     private
 
-    # Flattens the posted tree into [family, style, id] triples, dropping anything that can't name a
-    # real icon. The allowlist has a few duplicates, so an id repeated within a style is one icon.
-    # @param requested [Hash] The posted { family => { style => [ids] } } tree.
+    # Changes the tree from the request into [family, style, id] items, and removes each item that
+    # can name no true icon. The list has some copies, thus an id that appears more than one time in
+    # a style is one icon.
+    # @param requested [Hash] The { family => { style => [ids] } } tree from the request.
     # @return [Array<Array(String, String, String)>]
     def wanted_triples(requested)
       requested.flat_map do |family, styles|
@@ -59,7 +62,8 @@ module Api
       end
     end
 
-    # @return [Boolean] Whether a family, style, or icon id can name a real Font Awesome icon.
+    # @return [Boolean] True if a family, a style, or an icon id can name a true Font Awesome
+    #   icon.
     def segment?(value)
       value.to_s.match?(SEGMENT_FORMAT)
     end

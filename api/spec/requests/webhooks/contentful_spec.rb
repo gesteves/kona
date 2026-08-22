@@ -7,15 +7,16 @@ RSpec.describe "Webhooks::Contentful", type: :request do
   before do
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with("CONTENTFUL_WEBHOOK_SECRET").and_return(webhook_secret)
-    # The webhook only enqueues; jobs run in fake mode, so nothing touches the PDS here.
+    # The webhook only adds a job to the queue. Each job runs in the fake mode, thus no code here
+    # uses the PDS.
   end
 
   def now_ms
     (Time.now.to_f * 1000).to_i
   end
 
-  # Posts a signed Contentful webhook. The canonical request signs only the timestamp
-  # header (mirroring ContentfulRequestVerification#canonical_request).
+  # Posts a Contentful webhook with a signature. The canonical request contains the timestamp header
+  # only, as ContentfulRequestVerification#canonical_request does.
   def post_webhook(payload, topic:, secret: webhook_secret, timestamp: now_ms, signature: nil)
     body = payload.to_json
     canonical = [ "POST", "/webhooks/contentful", "x-contentful-timestamp:#{timestamp}", body ].join("\n")
@@ -94,15 +95,16 @@ RSpec.describe "Webhooks::Contentful", type: :request do
     describe "R2 image mirror (AssetSyncJob)" do
       def asset_payload(id) = { "sys" => { "id" => id, "type" => "Asset" } }
 
-      # Assets carry no sys.contentType, so they're routed by the topic's entity segment.
+      # An asset has no sys.contentType, thus the entity part of the topic decides its route.
       it "enqueues a mirror job on an asset publish" do
         post_webhook(asset_payload("asset1"), topic: "ContentManagement.Asset.publish")
         expect(response).to have_http_status(:no_content)
         expect(AssetSyncJob).to have_enqueued_sidekiq_job("asset1")
       end
 
-      # ⚠️ Load-bearing. The web build reads Contentful with a preview token, so an unpublished
-      # asset is still referenced by built pages — removing its object would break live images.
+      # ⚠️ This is necessary. The web build reads Contentful with a preview token, thus a page from
+      # the build still points at an unpublished asset. A delete of its object would break a live
+      # image.
       it "does not touch the mirror on an asset unpublish or delete" do
         %w[unpublish delete].each do |action|
           AssetSyncJob.clear

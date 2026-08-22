@@ -1,14 +1,14 @@
-# Sidekiq::ProcessSet, for the "is anything draining the queue?" check below. It arrives anyway via
-# the initializer's `require "sidekiq/web"`, but nothing here should depend on that.
+# Sidekiq::ProcessSet, for the "does a process do the queued jobs?" check below. The
+# `require "sidekiq/web"` in the initializer also loads it, but no code here must depend on that.
 require "sidekiq/api"
 
 module Admin
-  # Renders GPX tracks as static map cover images, as a front-end over Mapbox's Data Workbench:
-  # upload one or more tracks, wait for Mapbox to publish each as a vector tileset, then tune the
-  # framing and styling of one and download the PNG.
+  # Renders the GPX tracks as static map cover images. It is a front end for the Mapbox Data
+  # Workbench: upload one or more tracks, wait for Mapbox to publish each one as a vector tileset,
+  # then set the frame and the style of one track and download the PNG.
   class CourseMapsController < BaseController
-    # How much of an upload we'll take at once. The GPX is parsed in-request, so these bound both
-    # the memory the parse touches and the time it takes against the 20-second request budget.
+    # The maximum size of one upload. The parse of the GPX occurs in the request, thus these
+    # values limit the memory of the parse and its time against the 20-second request budget.
     MAX_FILES = 10
     MAX_BYTES = 25.megabytes
 
@@ -21,8 +21,8 @@ module Admin
 
     # POST /course-maps
     def create
-      # Anything that isn't an actual upload is dropped rather than inspected — an empty file field
-      # posts a blank string, and a hand-rolled request can post whatever it likes.
+      # The code removes each item that is not an upload and does not examine it. An empty file
+      # field posts a blank string, and a request that a person makes can post any content.
       files = Array(params[:gpx_files]).grep(ActionDispatch::Http::UploadedFile)
       return redirect_to(course_maps_path, status: :see_other, alert: "Choose at least one GPX file.") if files.empty?
 
@@ -36,16 +36,17 @@ module Admin
 
     # GET /course-maps/status
     #
-    # Polled by the index page while an upload is in flight. Deliberately tiny — it returns
-    # statuses, not records, and is hit every few seconds.
+    # The index page reads this during an upload. It is small, on purpose: it returns the
+    # statuses, not the records, and the page reads it each few seconds.
     def status
       render json: library.statuses
     end
 
     # GET /course-maps/:id
     #
-    # Query-string settings override the stored ones, so the no-JS path (submit the form, get a
-    # fresh page) shows the same render the live preview would.
+    # The settings in the query string replace the stored settings. Thus the path with no
+    # JavaScript, where you submit the form and get a new page, shows the same render as the live
+    # preview.
     def show
       record = find_track!
       return if performed?
@@ -57,8 +58,8 @@ module Admin
 
     # PATCH /course-maps/:id
     #
-    # Saves the render settings as they're tweaked, so reopening a track picks up where the last
-    # session left off. Called from the preview controller, not from a form submission.
+    # Saves each change to the render settings. Thus a track that you open again has the settings
+    # from the last session. The preview controller calls this, and not a form submission.
     def update
       record = library.update_settings(params[:id], settings_params)
       return head :not_found if record.nil?
@@ -82,13 +83,15 @@ module Admin
 
     # GET /course-maps/:id/preview
     #
-    # ⚠️ Proxied rather than linked. The Static Images API takes its token as a query parameter, so
-    # an <img> pointed straight at Mapbox would hand the browser a tilesets:write credential.
+    # ⚠️ This is a proxy, and not a link. The Static Images API takes its token as a query
+    # parameter. Thus an <img> that points at Mapbox would give a tilesets:write credential to the
+    # browser.
     #
-    # Rendered at 2x like the download, not at some cheaper preview size: the API bills per request
-    # rather than per pixel, so a smaller render saves nothing that matters, and the zoom dialog
-    # shows this same image at up to its full width — at 1x that is half the pixels a retina screen
-    # wants. The cost is bandwidth per tweak, which the debounce already bounds.
+    # This renders at 2x, as the download does, and not at a smaller preview size. The API bills
+    # for each request and not for each pixel, thus a smaller render saves nothing important. The
+    # zoom dialog also shows this same image at its full width, and at 1x that is half the pixels
+    # that a retina screen needs. The cost is the bandwidth for each change, and the debounce
+    # already limits that.
     def preview
       send_render(disposition: "inline")
     end
@@ -104,12 +107,13 @@ module Admin
       @library ||= TrackLibrary.new
     end
 
-    # Whether any Sidekiq process is alive to drain the queue.
+    # Tells if a Sidekiq process runs and can do the queued jobs.
     #
-    # ⚠️ Checked only when something is publishing, and only to explain a stuck row. This is the
-    # one admin page whose core function needs the worker, so without this a track spins on
-    # "Processing" forever with nothing anywhere saying why — which is also why `worker` is no
-    # longer opt-in in .overmind.env. In production an empty set means the worker machine is down.
+    # ⚠️ The code reads this only during a publish, and only to give the cause of a row that does
+    # not change. This is the one admin page whose main function needs the worker. Without this
+    # check, a track stays at "Processing" for all time and nothing says why. That is also why
+    # `worker` is not optional in .overmind.env. In production an empty set means that the worker
+    # machine is down.
     def worker_running?
       Sidekiq::ProcessSet.new.size.positive?
     rescue StandardError => e
@@ -117,8 +121,8 @@ module Admin
       true # Don't cry wolf if the check itself is what's broken.
     end
 
-    # Loads the track named in the URL, redirecting if it's gone.
-    # @return [Hash, nil] The record, or nil once a redirect has been performed.
+    # Loads the track that the URL names. If the track is gone, it redirects.
+    # @return [Hash, nil] The record, or nil after a redirect.
     def find_track!
       record = library.find(params[:id])
       return record if record
@@ -127,8 +131,8 @@ module Admin
       nil
     end
 
-    # The image URLs carry the settings the page is rendering with, so a no-JS page and the live
-    # preview agree. The preview controller rewrites both once it takes over.
+    # The image URLs contain the settings that the page renders with. Thus a page with no
+    # JavaScript and the live preview agree. The preview controller changes both when it starts.
     def present(record)
       id = record["id"]
       query = settings_params.any? ? { settings: settings_params } : {}
@@ -142,7 +146,7 @@ module Admin
       )
     end
 
-    # @return [String, nil] Why the batch was refused, or nil if it's fine.
+    # @return [String, nil] The cause of a refusal of the batch, or nil if the batch is correct.
     def rejection_reason(files)
       return "Upload at most #{MAX_FILES} files at a time." if files.length > MAX_FILES
 
@@ -155,9 +159,9 @@ module Admin
       nil
     end
 
-    # Parses each upload and queues it. A file that won't parse is reported rather than raising, so
-    # one bad track in a batch doesn't lose the good ones.
-    # @return [Array(Array<String>, Array<String>)] Accepted titles and rejection messages.
+    # Parses each upload and adds it to the queue. A file that the code cannot parse gives a
+    # message and does not raise. Thus one bad track in a batch does not remove the good tracks.
+    # @return [Array(Array<String>, Array<String>)] The accepted titles and the refusal messages.
     def ingest(files)
       accepted = []
       failures = []
@@ -187,10 +191,10 @@ module Admin
       raw.permit(*TrackLibrary.setting_keys).to_h
     end
 
-    # Renders through Mapbox and streams the PNG back.
+    # Renders with Mapbox and sends the PNG back as a stream.
     #
-    # Failures answer with a status rather than a redirect: these two actions are fetched by an
-    # <img> and a download link, where a redirect to an HTML page renders as a broken image.
+    # A failure gives a status and not a redirect: an <img> and a download link get these two
+    # actions, and a redirect to an HTML page becomes a broken image.
     def send_render(disposition:)
       record = library.find(params[:id])
       return head :not_found if record.nil?
@@ -198,18 +202,19 @@ module Admin
 
       map = StaticMap.new(track: record, settings: render_settings(record))
       send_data map.render, type: "image/png", disposition: disposition, filename: map.filename
-    # ⚠️ The same tuple StaticMap#get_with_retries catches, because it re-raises the original
-    # exception once attempts are exhausted rather than wrapping it. Rescuing only RenderError left
-    # a Mapbox timeout escaping as an unhandled 500 — reported to Bugsnag as a crash, and rendered
-    # into an <img> that these two actions exist to keep as a clean status code.
+    # ⚠️ This is the same group of errors that StaticMap#get_with_retries catches, because that
+    # method raises the original exception again after the last attempt and does not put it in
+    # another error. A rescue of RenderError alone let a Mapbox timeout become a 500 that nothing
+    # caught. Bugsnag then reported a crash, and an <img> got that 500. These two actions exist to
+    # give a clean status code instead.
     rescue StaticMap::RenderError, Net::OpenTimeout, Net::ReadTimeout, SocketError,
            Errno::ECONNRESET, HTTParty::Error => e
       Rails.logger.error("Maps: render failed for #{params[:id]} (#{e.class}: #{e.message})")
       head :bad_gateway
     end
 
-    # Query parameters win over the stored settings, so the preview can update as the form changes
-    # without saving first.
+    # The query parameters replace the stored settings. Thus the preview can change with the form
+    # and does not need a save first.
     def render_settings(record)
       (record["settings"] || {}).merge(settings_params)
     end

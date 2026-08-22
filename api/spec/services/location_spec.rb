@@ -23,8 +23,9 @@ RSpec.describe Location do
       expect(location.longitude).to eq(-122.42)
     end
 
-    # to_f coerces unparseable text to 0.0, which is a valid coordinate — so a typo'd LOCATION
-    # would resolve to Null Island *and* outrank the good value in Redis, with nothing logged.
+    # to_f changes text that it cannot parse into 0.0, which is a correct coordinate. Thus a LOCATION
+    # with a typing error would give the point at 0, 0, *and* it would replace the correct value in
+    # Redis, and nothing would go into the log.
     it "falls back to Redis when LOCATION is not a coordinate pair" do
       location = with_location(env: "somewhere,else", redis: "37.77,-122.42")
 
@@ -89,7 +90,8 @@ RSpec.describe Location do
       expect(described_class.parse("0", "0")).to eq([ 0.0, 0.0 ])
     end
 
-    # to_f would make these 0.0 — a valid coordinate in the Gulf of Guinea — and store it.
+    # to_f would make each of these 0.0, which is a correct coordinate in the Gulf of Guinea, and
+    # the app would store it.
     it "rejects text rather than coercing it to Null Island" do
       expect(described_class.parse("somewhere", "else")).to be_nil
     end
@@ -121,7 +123,8 @@ RSpec.describe Location do
   end
 
   describe ".store" do
-    # ⚠️ Redis first: the stored value is what the widgets read, and it must not wait on the sync.
+    # ⚠️ Write to Redis first: the widgets read the stored value, and it must not wait for the
+    # sync.
     it "writes the coordinates and enqueues the sync" do
       expect($redis).to receive(:set).with(described_class::LOCATION_CACHE_KEY, "37.77,-122.42")
 

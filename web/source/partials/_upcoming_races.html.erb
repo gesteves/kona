@@ -1,14 +1,15 @@
-<%# The upcoming-races section, rendered from data/events.json at build time and enhanced by the
-    api at runtime: the live-update controller swaps in a fragment that adds the featured race's
-    race-day weather, live-tracking link, and a separate "Today's Race" section.
+<%# The upcoming-races section. The build renders it from data/events.json, and the api adds to it
+    at run time: the live-update controller puts a fragment here that adds the race-day weather of
+    the featured race, its live-tracking link, and a separate "Today's Race" section.
 
-    ⚠️ It carries live_update_attrs with `placeholder: false`, so a failed fetch leaves this
-    content standing instead of deleting it. Don't add the placeholder flag back — it means
-    "I am an empty skeleton". An EMPTY response still removes the section, which is correct:
-    that's the api saying there are no upcoming races at all.
+    ⚠️ It has live_update_attrs with `placeholder: false`, thus a fetch that fails keeps this
+    content and does not delete it. Do not add the placeholder flag: that flag means "I am an empty
+    skeleton". An EMPTY response still removes the section, and that is correct: it is the api
+    saying that there is no upcoming race.
 
-    ⚠️ Structurally paired with api/app/views/widgets/events/upcoming.html.erb; the outer element
-    is pinned by api/spec/contracts/widget_markup_contract_spec.rb. `url` is a required local. %>
+    ⚠️ This element and api/app/views/widgets/events/upcoming.html.erb are a pair, and
+    api/spec/contracts/widget_markup_contract_spec.rb tests the outer element of both. `url` is a
+    necessary local. %>
 <% races = upcoming_races %>
 <% if races.present? %>
   <div class="collection-group" data-nosnippet <%= live_update_attrs(url, placeholder: false) %>>

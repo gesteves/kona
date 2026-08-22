@@ -1,6 +1,6 @@
 <% standalone = defined?(indexable) && indexable %>
 <% index_body = standalone && !article.draft %>
-<%# The landmark needs a name. Standalone borrows its own sr-only <h1>; in a list a Short has no
+<%# The landmark needs a name. On its own page, it uses its sr-only <h1>. In a list, a Short has no
     heading at all (its title is the inline run-in below), so it carries the title as a label —
     otherwise the blog list mixes named and unnamed article landmarks. %>
 <% label_attr = if standalone
@@ -11,10 +11,10 @@
 <article class="entry entry--compact" id="<%= entry_dom_id(article) %>" <%= label_attr.html_safe %>>
   <header class="entry__header">
     <%= partial 'partials/article/meta', locals: { article: article } %>
-    <%# On its own page the short needs its title as the page's <h1>, but the visible title %>
-    <%# is the inline run-in below — so the heading is screen-reader-only, and the run-in is %>
-    <%# aria-hidden to avoid announcing the title twice. In lists there's no <h1>, so the %>
-    <%# run-in stays audible. %>
+    <%# On its own page, the Short needs its title as the <h1> of the page, but the visible title %>
+    <%# is the run-in below. Thus the heading is for a screen reader only, and the run-in is %>
+    <%# aria-hidden, and a screen reader then speaks the title one time. In a list there is no %>
+    <%# <h1>, thus a screen reader speaks the run-in. %>
     <% if standalone %><h1 class="sr-only" id="<%= entry_heading_id(article) %>"><%= smartypants(article.title) %></h1><% end %>
     <% if index_body %><span hidden data-pagefind-meta="title"><%= smartypants(article.title) %></span><% end %>
   </header>

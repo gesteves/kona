@@ -1,4 +1,5 @@
-// The Maps page: a list of uploaded GPX tracks, and the per-track render editor.
+// The Maps page: a list of the GPX tracks that a user uploaded, and the render editor for one
+// track.
 
 .track-upload {
   align-items: flex-start;
@@ -7,8 +8,9 @@
   gap: var(--wa-space-m);
   margin-block-end: var(--wa-space-l);
 
-  // The dropzone spans the column; the button sits under it rather than beside it, where it would
-  // line up with the control's hint text instead of the dropzone and read as unrelated to it.
+  // The drop area is as wide as the column. The button is below it, and not beside it. Beside it,
+  // the button would align with the hint text of the control and not with the drop area, and it
+  // would look like a different control.
   wa-file-input {
     align-self: stretch;
   }
@@ -18,20 +20,20 @@
   }
 }
 
-// The list is a `wa-grid`, so this is the whole layout: cards flow into as many columns as fit,
-// one per track, and drop back to one on a narrow window.
+// The list is a `wa-grid`, thus this is the full layout: the cards go into as many columns as the
+// width permits, with one card for each track, and into one column in a narrow window.
 .track-list {
   --min-column-size: 24rem;
 }
 
-// ⚠️ The card body is a `wa-stack` and its header a `wa-cluster`, and those zero their children's
-// margins — which is why nothing here resets one.
+// ⚠️ The body of the card is a `wa-stack` and its header is a `wa-cluster`, and those two make the
+// margins of their children zero. That is why no rule here sets a margin to zero.
 .track {
   &__name {
     overflow-wrap: anywhere;
   }
 
-  // Pushes the timestamp to the far edge, past the badge.
+  // Moves the timestamp to the far edge, past the badge.
   &__age {
     margin-inline-start: auto;
   }
@@ -45,7 +47,7 @@
   align-items: start;
   display: grid;
   gap: var(--wa-space-l);
-  // The preview leads; the settings column is only as wide as its fields need.
+  // The preview is the largest part. The settings column is only as wide as its fields need.
   grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
 
   @media (width < 60rem) {
@@ -67,22 +69,24 @@
     gap: var(--wa-space-2xs);
   }
 
-  // ⚠️ The 80rem ceiling is the render's own width (1280px, @2x on the wire). Without it a wide
-  // window upscales the preview into blur, since the column itself has no width cap.
+  // ⚠️ The maximum of 80rem is the width of the render, which is 1280px and @2x in the file.
+  // Without it, a wide window makes the preview larger and it becomes unclear, because the column
+  // has no maximum width.
   &__preview {
     display: flex;
     flex-direction: column;
     gap: var(--wa-space-m);
     max-inline-size: 80rem;
-    // Keeps the preview visible while working down a long settings column. ⚠️ The header is
-    // sticky too, so this has to clear it — pinning to the viewport top slides the map under it.
+    // Keeps the preview visible while you go down a long settings column. ⚠️ The header is also
+    // sticky, thus this must be below it. At the top of the viewport, the map goes under the
+    // header.
     position: sticky;
     top: calc(var(--header-height, 0px) + var(--wa-space-m));
   }
 
-  // Strips <wa-button>'s own chrome so the trigger is just the image. A native <button> would be
-  // simpler, but the admin's convention is a Web Awesome component wherever one exists, and two
-  // request specs assert no bare <button> reaches the page.
+  // Removes the appearance of <wa-button>, thus the control is the image only. A native <button>
+  // would be simpler, but the rule in the admin is a Web Awesome component wherever one exists, and
+  // two request specs check that no plain <button> goes to the page.
   &__zoom {
     cursor: zoom-in;
 
@@ -94,8 +98,8 @@
     }
   }
 
-  // The border isn't decoration: a map rendered against a pale style is nearly white at its
-  // edges, so without it there's no telling where the image stops.
+  // The border is not decoration: a map with a light style is almost white at its edges, thus
+  // without the border you cannot see where the image ends.
   &__image {
     background-color: var(--wa-color-surface-raised);
     border: 1px solid var(--wa-color-surface-border);
@@ -108,11 +112,11 @@
 
 // The zoom dialog.
 //
-// ⚠️ A wide box plus an unsized image, not `--width: fit-content`. The image carries
-// `max-inline-size: 100%`, which makes `fit-content` resolve against the container rather than the
-// render, collapsing the dialog to a few hundred pixels. Leaving the image's own width alone means
-// it draws at its natural size and the two maxima only ever shrink it — it is never upscaled into
-// blur on a large screen.
+// ⚠️ Use a wide box and an image with no width, and not `--width: fit-content`. The image has
+// `max-inline-size: 100%`, thus `fit-content` uses the container and not the render, and the dialog
+// becomes a few hundred pixels wide. With no width on the image, the image draws at its true size
+// and the two maximum values only make it smaller. It never becomes larger and unclear on a large
+// screen.
 .map-zoom {
   --width: 95vw;
 
@@ -125,7 +129,8 @@
   }
 }
 
-// A four-sided value: one field while the sides match, four when they don't.
+// A value for four sides: one field while the four values are the same, and four fields when they
+// are different.
 .sides {
   display: flex;
   flex-direction: column;
@@ -137,7 +142,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  // The controller adds the modifier once it has read the per-side labels off the markup.
+  // The controller adds the modifier after it reads the label of each side from the markup.
   &--linked &__grid {
     grid-template-columns: minmax(0, 1fr);
   }

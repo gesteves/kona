@@ -1,19 +1,19 @@
 # Presents one external integration for the Connected apps page.
 #
-# These integrations keep their credentials in Redis rather than a database, so "connected" is a
-# live check made at render time, not a persisted flag — which is also why the state is passed in
-# rather than read here: the view stays free of service calls.
+# Each of these integrations holds its credentials in Redis, and not in a database. Thus
+# "connected" is a live check at render time, and not a stored flag. That is also why the caller
+# gives the state and this class does not read it: the view then makes no service call.
 class ConnectedAppPresenter
   attr_reader :name, :description, :connect_path, :disconnect_path, :error
 
-  # @param name [String] Display name, e.g. "Whoop".
-  # @param description [String] One line on what the integration does.
-  # @param configured [Boolean] Whether its credentials are set in the environment.
-  # @param connected [Boolean] Whether an account is currently attached.
-  # @param connect_path [String] Where the "Connect" link points.
-  # @param disconnect_path [String] Where the "Disconnect" button posts.
-  # @param error [String, nil] Why an attached account no longer works, e.g. credentials the
-  #   service has since rejected. nil when it's healthy.
+  # @param name [String] The name on the screen, for example "Whoop".
+  # @param description [String] One line that says what the integration does.
+  # @param configured [Boolean] True if the environment has its credentials.
+  # @param connected [Boolean] True if an account is connected now.
+  # @param connect_path [String] The path of the "Connect" link.
+  # @param disconnect_path [String] The path that the "Disconnect" button posts to.
+  # @param error [String, nil] The cause of a failure of a connected account, for example
+  #   credentials that the service now refuses. It is nil when the account works.
   def initialize(name:, description:, configured:, connected:, connect_path:, disconnect_path:, error: nil)
     @name = name
     @description = description
@@ -24,10 +24,11 @@ class ConnectedAppPresenter
     @error = error
   end
 
-  # Unconfigured is distinct from disconnected on purpose: the first is a deployment problem
-  # (missing env vars) and offers no action, the second is a one-click fix. :error is the third
-  # distinction — credentials are attached but the service has rejected them, which is
-  # indistinguishable from :connected in Redis and would otherwise show as healthy forever.
+  # :unconfigured is different from :disconnected, on purpose. The first is a problem with the
+  # deploy, because the env vars are absent, and it offers no action. The second needs one click.
+  # :error is the third state: the credentials are there but the service refuses them. Redis cannot
+  # show the difference between that state and :connected, thus without :error the page would show
+  # the integration as good for all time.
   # @return [Symbol] :unconfigured, :disconnected, :connected, or :error.
   def state
     return :unconfigured unless @configured
@@ -36,7 +37,7 @@ class ConnectedAppPresenter
     @error.present? ? :error : :connected
   end
 
-  # @return [String] The badge label for the current state.
+  # @return [String] The label of the badge for the current state.
   def status_label
     {
       unconfigured: "Not configured", disconnected: "Not connected",
@@ -52,24 +53,24 @@ class ConnectedAppPresenter
     }.fetch(state)
   end
 
-  # @return [Boolean] Whether the credentials are missing outright, leaving nothing to act on.
+  # @return [Boolean] True if the credentials are absent, thus there is no action to do.
   def unconfigured?
     state == :unconfigured
   end
 
-  # An errored app offers connect as well — re-authorizing *is* the fix, and requiring a
-  # disconnect first would throw away the only thing distinguishing it from a fresh setup.
-  # @return [Boolean] Whether to offer the connect action.
+  # An app in the error state also offers connect. A new authorization *is* the correction, and a
+  # disconnect first would remove the one thing that makes it different from a new setup.
+  # @return [Boolean] True to offer the connect action.
   def connectable?
     state == :disconnected || state == :error
   end
 
-  # @return [Boolean] Whether to offer the disconnect action.
+  # @return [Boolean] True to offer the disconnect action.
   def disconnectable?
     state == :connected || state == :error
   end
 
-  # @return [String] The label for the connect action.
+  # @return [String] The label of the connect action.
   def connect_label
     state == :error ? "Reconnect" : "Connect"
   end

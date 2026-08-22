@@ -160,7 +160,8 @@ RSpec.describe "Weather", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.body.strip).to be_empty
-      # Short, with no stale-serving directives — an empty response must never be pinned.
+      # This time is short and it has no directive for an old copy: the edge must never keep an
+      # empty response.
       expect(response.headers["CDN-Cache-Control"]).to eq("public, max-age=60")
     end
   end
@@ -246,10 +247,10 @@ RSpec.describe "Weather", type: :request do
     end
   end
 
-  # ⚠️ The contexts above all remove a whole *slice*, which weather_data_is_current? catches. These
-  # remove one field from a slice that's present, which it doesn't — the formatters' arithmetic is
-  # then the first thing to see the nil. Each of these 500'd before the guards moved ahead of the
-  # formatting.
+  # ⚠️ Each group above removes a full *part* of the data, and weather_data_is_current? finds that.
+  # These examples remove one field from a part that is available, and that method does not find it.
+  # Thus the arithmetic of the format methods is the first code that gets the nil. Each of these gave
+  # a 500 before the checks moved before the format code.
   context "when a present slice is missing an individual field" do
     def render_with(&mutation)
       payload = weather.dup

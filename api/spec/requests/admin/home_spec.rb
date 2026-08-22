@@ -29,8 +29,8 @@ RSpec.describe "Admin home", type: :request do
       expect(response.body).to include('<h1 class="admin-main__title">Home</h1>')
     end
 
-    # ⚠️ The fragment views are what carry data-live-update-*; an admin page must never grow one,
-    # and must never be cacheable.
+    # ⚠️ The fragment views have the data-live-update-* attributes. An admin page must never have
+    # one, and no cache must hold an admin page.
     it "is never stored, never indexed, and carries no widget cache policy" do
       get "/"
 
@@ -39,9 +39,9 @@ RSpec.describe "Admin home", type: :request do
       expect(response.headers["CDN-Cache-Control"]).to be_nil
     end
 
-    # ERB escaping is the only thing standing between a hostile contact submission and script
-    # execution on the quarantine page, which sits one click from actions that delete data. The CSP
-    # is the second layer.
+    # The escape of ERB is the only thing between an attack in a contact submission and a script
+    # that runs on the quarantine page, and that page is one click from an action that deletes data.
+    # The CSP is the second layer.
     it "carries a Content-Security-Policy" do
       get "/"
 
@@ -50,12 +50,12 @@ RSpec.describe "Admin home", type: :request do
       expect(policy).to include("default-src 'self'")
       expect(policy).to include("frame-ancestors 'none'")
       expect(policy).to include("base-uri 'none'")
-      # The location picker loads Mapbox GL JS from Mapbox's own CDN at runtime.
+      # The location picker loads Mapbox GL JS from the CDN of Mapbox at run time.
       expect(policy).to include("https://api.mapbox.com")
     end
 
-    # ⚠️ The nonce is what lets the inline dark-mode script run. Without it the admin renders in the
-    # light theme until the bundle loads, on every page, and the CSP is what would be blamed last.
+    # ⚠️ The nonce is what lets the inline dark-mode script run. Without it, the admin renders in the
+    # light theme until the bundle loads, on each page, and a person would examine the CSP last.
     it "nonces the inline theme script rather than allowing inline script wholesale" do
       get "/"
 
@@ -64,14 +64,14 @@ RSpec.describe "Admin home", type: :request do
       expect(nonce).to be_present
       expect(response.body).to include(%(<script nonce="#{nonce}">))
 
-      # ⚠️ script-src must not fall back to unsafe-inline. style-src still needs it — Web Awesome
-      # and Mapbox both write styles at runtime — which is why the nonce is scoped to script-src.
+      # ⚠️ script-src must not use unsafe-inline. style-src still needs it, because Web Awesome and
+      # Mapbox both write styles at run time. That is why the nonce applies to script-src only.
       expect(policy[/script-src [^;]+/]).not_to include("'unsafe-inline'")
       expect(policy[/style-src [^;]+/]).to include("'unsafe-inline'")
     end
 
-    # ⚠️ Without a declaration the browser keeps whatever it last saw for this origin, which is
-    # Sidekiq's own icon — Sidekiq::Web ships one and mounts on the same host.
+    # ⚠️ With no declaration, the browser keeps the last icon that it saw for this origin, which is
+    # the icon of Sidekiq. Sidekiq::Web has one and it is on the same host.
     it "declares its own favicon" do
       get "/"
 
@@ -86,10 +86,10 @@ RSpec.describe "Admin home", type: :request do
       expect(response.body).not_to include("admin-header__title")
     end
 
-    # ⚠️ Web Awesome components over native elements wherever one exists. `button_to` would emit a
-    # native <button>; form_with + a form-associated <wa-button> keeps the admin on one component
-    # vocabulary. A bare <button> in the server HTML means one slipped back in — wa-button renders
-    # its own inside a shadow root, so nothing here should have one.
+    # ⚠️ Use a Web Awesome component in place of a native element wherever one exists. `button_to`
+    # would write a native <button>. form_with with a <wa-button> that is part of the form keeps the
+    # admin on one set of components. A plain <button> in the server HTML means that one came back:
+    # wa-button renders its own button in a shadow root, thus no code here must have one.
     it "renders actions as Web Awesome buttons, not native ones" do
       get "/"
 
@@ -99,14 +99,14 @@ RSpec.describe "Admin home", type: :request do
     it "opens Sidekiq in a new tab, and only Sidekiq" do
       get "/"
 
-      # Matched attribute-by-attribute rather than with one regex, since Rails' attribute order
-      # isn't part of the contract.
+      # The test matches one attribute at a time, and not with one regex, because the order of the
+      # attributes from Rails is not part of the contract.
       sidekiq_link = response.body.scan(/<wa-button\b[^>]*>/).find { |tag| tag.include?('href="/sidekiq"') }
 
       expect(sidekiq_link).to include('target="_blank"')
       expect(sidekiq_link).to include('rel="noopener"')
       expect(response.body).to include("(opens in a new tab)")
-      # The in-app links must not be marked external.
+      # A link in the app must not have the external mark.
       expect(response.body.scan('target="_blank"').length).to eq(1)
     end
 
@@ -119,7 +119,7 @@ RSpec.describe "Admin home", type: :request do
         expect(response.body).to match(%r{<wa-badge[^>]*>\s*3\s*<span class="wa-visually-hidden">waiting</span>}m)
       end
 
-      # A zero badge is noise, not information.
+      # A badge with a zero gives no information.
       it "is absent when the queue is empty" do
         allow_any_instance_of(SpamQuarantine).to receive(:count).and_return(0)
 
@@ -129,9 +129,9 @@ RSpec.describe "Admin home", type: :request do
       end
     end
 
-    # <wa-page> moves one copy of the nav between the desktop sidebar and the mobile drawer, so a
-    # second authored copy would show twice on desktop. Links need data-drawer="close" or the
-    # drawer stays open over the page they navigate to.
+    # <wa-page> moves one copy of the nav between the desktop sidebar and the mobile drawer. Thus a
+    # second copy in the markup would appear two times on the desktop. Each link needs
+    # data-drawer="close", or the drawer stays open over the page that the link goes to.
     it "writes the navigation once, with drawer-closing links" do
       get "/"
 
@@ -139,8 +139,8 @@ RSpec.describe "Admin home", type: :request do
       expect(response.body).to include('data-drawer="close"')
     end
 
-    # ⚠️ icon_svg returns a plain String, so ERB escapes it without `raw` — the nav and the
-    # hamburger then render their SVG source as visible text.
+    # ⚠️ icon_svg returns a plain String, thus ERB escapes it without `raw`. The nav and the menu
+    # button then show their SVG source as text.
     it "renders the nav and toggle icons as markup rather than escaped text" do
       get "/"
 

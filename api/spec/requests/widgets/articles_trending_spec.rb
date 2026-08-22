@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "Widgets::Articles trending", type: :request do
-  # Builds a decorated article the way Articles#list would return it.
+  # Makes an article with the fields that Articles#list gives.
   def article(id:, title:, slug:, published_at:, summary: "A short summary.", entry_type: "Article", draft: false)
     path = "/#{DateTime.parse(published_at).strftime('%Y/%m/%d')}/#{slug}/"
     DeepOstruct.wrap(
@@ -20,9 +20,9 @@ RSpec.describe "Widgets::Articles trending", type: :request do
 
   let(:corpus) { [ art_newest, art_april, art_march, art_february, art_spiking, art_steady, art_short ] }
 
-  # a5 surges (a modest recent count on a tiny baseline); a6 is steadily popular (high traffic in line
-  # with its own high baseline); everyone else has no traffic. So ranking is: a5, a6, then the rest by
-  # recency.
+  # a5 has a surge: a small recent count on a very small baseline. a6 is always popular: it has much
+  # traffic, and that traffic agrees with its own high baseline. Each other article has no traffic.
+  # Thus the order is a5, then a6, then the other articles by date.
   def rows(by_path)
     by_path.map { |path, total| { dimensions: [ path ], metrics: [ total ] } }
   end
@@ -31,16 +31,17 @@ RSpec.describe "Widgets::Articles trending", type: :request do
     allow_any_instance_of(Articles).to receive(:list).and_return(corpus)
     recent = rows(art_spiking.path => 15, art_steady.path => 72)
     baseline = rows(art_spiking.path => 30, art_steady.path => 2000)
-    # The recent window and the baseline are two event:page queries over different ranges; branch on
-    # the range span (recent is short, baseline is ~a month) to answer each.
+    # The recent window and the baseline are two event:page queries over two ranges. The length of
+    # the range selects the answer: the recent range is short, and the baseline range is
+    # approximately one month.
     allow_any_instance_of(Plausible).to receive(:query) do |**kwargs|
       first, last = kwargs[:date_range]
       span_hours = (Time.parse(last) - Time.parse(first)) / 3600.0
       { results: span_hours <= (TrendingArticles::RECENT_WINDOW_HOURS + 1) ? recent : baseline }
     end
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
-    # The ranking is cached via cached_json; stub Redis so the suite stays Redis-free and examples
-    # don't leak cached results into each other.
+    # cached_json puts the order in the cache. This stubs Redis, thus the suite needs no Redis and no
+    # example gives its cached result to another one.
     allow($redis).to receive(:get).and_return(nil)
     allow($redis).to receive(:setex)
   end

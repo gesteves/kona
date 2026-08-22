@@ -1,10 +1,11 @@
 <%#
-  The races widget, served as a live-update fragment the static site swaps in. The outer
-  wrapper carries the live-update attributes; it's display:contents, so the inner <section>s
-  lay out directly in the page grid. Off race day it holds a single "Upcoming Races" section
-  (the first event featured — expanded card + inline race-day weather — when within 10 days).
-  On race day, today's race gets its own "Today's Race" section with that weather, and the
-  remaining races follow under "Upcoming Races".
+  The races widget. The api serves it as a live-update fragment, and the static site puts it in the
+  page. The outer element has the live-update attributes. It is display:contents, thus each
+  <section> in it uses the page grid directly. On a day that is not a race day, it has one "Upcoming
+  Races" section, and the first event is a featured event, with a large card and the race-day
+  weather, when that race is in the next 10 days.
+  On a race day, the race of today has its own "Today's Race" section with that weather, and the
+  other races follow, below "Upcoming Races".
 %>
 <div class="collection-group" data-nosnippet <%= live_update_attrs %>>
   <% if @races.todays_race %>
@@ -12,7 +13,7 @@
       <h2 class="collection__heading" id="hed-todays-race">Today’s Race</h2>
       <ol class="collection__list">
         <li class="collection__item">
-          <%# show_timestamp: false — the "Today's Race" heading already says it's today. %>
+          <%# show_timestamp: false, because the "Today's Race" heading already says the day. %>
           <%= render "event", event: @races.todays_race, featured: true, event_weather: @races.event_weather, time_zone: @races.time_zone, show_timestamp: false %>
         </li>
       </ol>

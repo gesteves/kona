@@ -17,9 +17,9 @@
   </wa-callout>
 <% end %>
 
-<%# Three ways in — an address, a race, or the pin itself — and all three only **stage** a
-    location. Save is the one control that writes, and it stays disabled until what's staged
-    differs from what's stored. %>
+<%# There are three ways to set a location: an address, a race, or the pin. All three only **stage**
+    a location. Save is the one control that writes, and it stays off until the staged location is
+    different from the stored one. %>
 <div class="location" data-controller="location-map"
      data-location-map-token-value="<%= @location.map_token %>"
      data-location-map-style-value="<%= @location.map_style %>"
@@ -32,24 +32,24 @@
 
   <div class="location__controls">
     <div class="location__summary">
-      <%# The name the weather widget would print for these coordinates — the page doubles as a
-          preview of that, so it's re-derived whenever a location is staged rather than left to go
-          stale. The status line below is what says whether that location is stored yet. %>
+      <%# The name that the weather widget would show for these coordinates. This page is a preview
+          of that name, thus the code makes it again at each new staged location and it does not
+          become old. The status line below says if the app stored that location. %>
       <h2 class="location__place wa-heading-l" data-location-map-target="place"><%= @location.heading %></h2>
-      <%# The badge is the page's whole answer to "is this written down yet?", so it sits with the
-          coordinates rather than in the button's label. `aria-live` is on the line, not the badge:
-          the pair of them is the announcement. %>
+      <%# The badge is the answer of the page to "did the app store this?". Thus it is with the
+          coordinates, and not in the label of the button. `aria-live` is on the line and not on the
+          badge, because the two together are the message. %>
       <p class="location__status wa-caption-s" aria-live="polite">
         <wa-badge class="location__state" variant="<%= @location.state_variant %>" appearance="outlined"
                   data-location-map-target="state"><%= @location.state_label %></wa-badge>
         <span data-location-map-target="status"><%= @location.details %></span>
       </p>
 
-      <%# Both disabled on arrival, and correctly so: nothing is staged yet, so there is nothing to
-          write and nothing to throw away. The controller enables the pair the moment the staged
-          location differs from the stored one, and disables them again on a successful save — or
-          when Undo puts the pin back where it was. Paired labels, both one word, so neither reads
-          as the bigger commitment. %>
+      <%# Both are off at the first render, and that is correct: nothing is staged, thus there is
+          nothing to write and nothing to remove. The controller sets both on when the staged
+          location becomes different from the stored one, and it sets them off again after a
+          successful save, and after Undo puts the pin back. Each label is one word, thus neither
+          one looks like the larger action. %>
       <div class="location__actions">
         <wa-button class="location__save" variant="brand" appearance="accent" disabled
                    data-location-map-target="save" data-action="click->location-map#save">
@@ -67,16 +67,17 @@
 
     <wa-divider></wa-divider>
 
-    <%# A real <form> so Enter in the field submits it, but it never reaches the network on its own:
-        the controller cancels the submit and posts the address to the same action a pin drop uses.
-        There's no no-JS fallback to preserve — without JS this page has no map either. %>
+    <%# This is a true <form>, thus Enter in the field submits it. But it never reaches the network by
+        itself: the controller stops the submit and posts the address to the same action that a pin
+        uses. There is no path with no JavaScript to keep, because without JavaScript this page has
+        no map. %>
     <form class="location__search" data-action="submit->location-map#search">
       <wa-input name="address" label="Address" placeholder="An address, or the name of a place"
                 autocomplete="off" enterkeyhint="go" data-location-map-target="address">
       </wa-input>
 
-      <%# Outlined, not accent: it stages a location like every other control here, and the one
-          accent button on the page should be the one that writes. %>
+      <%# This is outlined and not accent: it stages a location, as each other control here does,
+          and the one accent button on the page must be the button that writes. %>
       <wa-button class="location__go" type="submit" appearance="outlined">
         <%= slotted_icon_svg("classic", "light", "magnifying-glass") %>
         Go there
@@ -84,14 +85,14 @@
     </form>
 
     <% if @location.races.any? %>
-      <%# Inside the conditional: with no races ahead there are no two things to separate. %>
+      <%# This is in the condition: with no race ahead, there are no two parts to separate. %>
       <wa-divider></wa-divider>
 
       <section class="location__races" aria-labelledby="hed-races">
         <h2 class="location__races-heading wa-heading-s" id="hed-races">Upcoming races</h2>
 
-        <%# The coordinates ride on the button rather than being re-derived: they're Contentful's
-            own, so a shortcut puts the pin exactly where the race card says the race is. %>
+        <%# The coordinates are on the button, and the code does not make them again: they come from
+            Contentful, thus a shortcut puts the pin at the exact place that the race card gives. %>
         <ul class="plain-list wa-stack wa-gap-2xs">
           <% @location.races.each do |race| %>
             <li>
@@ -111,13 +112,14 @@
     <% end %>
   </div>
 
-  <%# The wrapper is what's pinned, and it has to be: ⚠️ Mapbox GL JS adds `mapboxgl-map` to the
-      element below and loads its stylesheet at runtime, *after* ours, so its
-      `.mapboxgl-map { position: relative }` beats an equally specific `position: sticky` on source
-      order — leaving our `top` to apply as a plain relative offset that shoves the map down. %>
+  <%# The parent element is the sticky one, and it must be. ⚠️ Mapbox GL JS adds `mapboxgl-map` to
+      the element below and loads its stylesheet at run time, *after* ours. Thus its
+      `.mapboxgl-map { position: relative }` wins over a `position: sticky` with the same
+      specificity, because of the order. Our `top` then becomes a plain relative offset that moves
+      the map down. %>
   <div class="location__view">
-    <%# Left empty on purpose — Mapbox GL JS fills it, including the Geolocation button, and
-        anything in here would be torn out with the map before Turbo caches the page. %>
+    <%# This is empty, on purpose. Mapbox GL JS fills it, and that includes the Geolocation button.
+        The code removes each element in it with the map, before Turbo caches the page. %>
     <div class="location__map" data-location-map-target="map"></div>
   </div>
 </div>

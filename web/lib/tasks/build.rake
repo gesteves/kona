@@ -1,7 +1,7 @@
 BUILD_DIRECTORY = "build"
 
-# `rake build` does NOT run the test suite — use `rake test`. Keeping them separate means a
-# Contentful-publish rebuild isn't slowed by a redundant test run.
+# `rake build` does NOT run the test suite. Use `rake test` for that. The two are separate, thus a
+# build from a Contentful publish is not slower because of a test run that it does not need.
 desc "Import content and build the site"
 task build: [ :dotenv, :import ] do
   build_site
@@ -13,21 +13,22 @@ namespace :build do
     build_site(verbose: true)
   end
 
-  # Skips :import, so it builds whatever `rake import` last wrote to data/. For refreshing build/
-  # during a `wrangler dev` session; `rake build:verbose` is still the pre-commit gate.
+  # This does not run :import, thus it builds the data that `rake import` last wrote to data/. Use it
+  # to make build/ again during a `wrangler dev` session. `rake build:verbose` is still the check
+  # before a commit.
   desc "Build the site from the existing data/ without re-importing"
   task fast: [ :dotenv ] do
     build_site
   end
 end
 
-# Builds the site. The JS/CSS bundle comes from Middleman's external pipeline, which runs
-# `npm run build` itself and blocks until it finishes.
+# Builds the site. The external pipeline of Middleman makes the JavaScript and CSS bundle: it runs
+# `npm run build` itself and it waits for the end of that command.
 def build_site(verbose: false)
   middleman_command = verbose ? "middleman build --verbose" : "middleman build"
   sh middleman_command
-  # Underscore-prefixed files in source/ are treated as partials, so these are authored
-  # without the prefix and renamed here.
+  # A file in source/ with an underscore at the start of its name is a partial. Thus these files have
+  # no underscore, and this code renames them.
   File.rename("#{BUILD_DIRECTORY}/redirects", "#{BUILD_DIRECTORY}/_redirects")
   File.rename("#{BUILD_DIRECTORY}/headers", "#{BUILD_DIRECTORY}/_headers")
   sh "npm run pagefind"

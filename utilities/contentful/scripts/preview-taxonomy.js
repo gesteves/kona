@@ -1,9 +1,11 @@
-// Read-only review of the taxonomy design in lib/taxonomy.js — writes NOTHING to Contentful.
-// Prints every concept (grouped by scheme, indented by hierarchy, with altLabels + description)
-// and every article's resolved full-path assignment, and cross-checks coverage against the
-// built web data (web/data/articles.json) so you can see missing / stale assignments.
+// A read-only review of the taxonomy in lib/taxonomy.js. It writes NOTHING to Contentful.
+// It shows each concept, in a group for each scheme, with an indent for each level, and with its
+// altLabels and its description. It also shows the full path of the concepts of each article, and it
+// compares that with the web data from the build (web/data/articles.json). Thus you can see each
+// article with no concepts and each concept that is old.
 //
-// Run: `npm run taxonomy:preview`. Iterate on lib/taxonomy.js, re-run, repeat until happy.
+// To run it: `npm run taxonomy:preview`. Change lib/taxonomy.js, run it again, and continue until
+// the result is correct.
 
 const fs = require('fs');
 const path = require('path');

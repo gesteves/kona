@@ -1,23 +1,23 @@
 Rails.application.routes.draw do
-  # Two structural constraints here are enforced by spec/routing/routes_guard_spec.rb:
-  # the *unmatched catch-all must stay the last route, and every top-level prefix must be
-  # listed in RACK_ATTACK_KNOWN_PREFIXES (config/initializers/rack_attack.rb).
+  # spec/routing/routes_guard_spec.rb enforces two rules here: the *unmatched catch-all must stay
+  # the last route, and RACK_ATTACK_KNOWN_PREFIXES (config/initializers/rack_attack.rb) must
+  # contain each top-level prefix.
 
-  # Health check: 200 when the app boots cleanly, 500 otherwise.
+  # The health check: 200 if the app starts correctly, and 500 if it does not.
   get "up" => "rails/health#show", as: :rails_health_check
 
-  # Widget fragments (HTML) embedded into the static site.
+  # The widget fragments (HTML) that go into the static site.
   scope "widgets", module: "widgets", as: "widgets" do
     get "activity-stats" => "activity_stats#show"
 
     get "weather/current" => "weather#current"
 
-    # The featured event includes inline race-day weather.
+    # The featured event contains the weather for the day of the race.
     get "events/upcoming" => "events#upcoming"
 
-    # Ranked from Plausible analytics at request time. The bare path returns every trending
-    # article; /:id drops one Contentful id, so an article page can exclude itself. The id is a
-    # path segment because the edge cache is keyed on path only.
+    # The Plausible analytics give the order at request time. The path with no id returns each
+    # trending article. /:id removes one Contentful id, thus an article page can omit itself. The
+    # id is a path segment, because the path alone is the edge cache key.
     get "articles/trending" => "articles#trending"
     get "articles/trending/:id" => "articles#trending_excluding", as: "articles_trending_excluding"
 
@@ -25,110 +25,114 @@ Rails.application.routes.draw do
     get "whoop" => "whoop#show"
   end
 
-  # Structured-data endpoints (accept or return data rather than widget markup).
+  # The structured-data endpoints. They take or give data, and not widget markup.
   scope "api", module: "api", as: "api" do
-    # Sets the current location and syncs it to Intervals.icu.
+    # Sets the current location and sends it to Intervals.icu.
     post "location" => "location#create"
 
-    # The public site's contact form, reached through the web proxy. Browser-reachable, unlike
-    # the rest of /api/*.
+    # The contact form of the public site, through the web proxy. A browser can reach it, and it
+    # cannot reach the other /api/* paths.
     post "contact" => "contact#create"
 
-    # The standard.site DID and publication URI the web build reads. Public.
+    # The standard.site DID and publication URI that the web build reads. This is public.
     get "standard-site" => "standard_site#show"
 
-    # Rebuilds and redeploys the static web site. Rate-limited by a Redis lock in the
-    # controller, not by rack-attack.
+    # Builds and deploys the static web site again. A Redis lock in the controller limits the
+    # rate, and rack-attack does not.
     post "build" => "build#create"
 
-    # Resolves the web build's posted Font Awesome allowlist to pre-rendered SVGs.
+    # Changes the Font Awesome list that the web build posts into rendered SVGs.
     post "icons" => "icons#create"
 
-    # Every entry's nearest neighbors by embedding similarity, which the web build renders as
-    # each article's static "You May Also Like" section.
+    # The nearest neighbors of each entry, by the similarity of the embeddings. The web build
+    # renders them as the static "You May Also Like" section of each article.
     get "related" => "related#show"
   end
 
-  # Inbound webhooks, one controller per service.
+  # The inbound webhooks, with one controller for each service.
   scope "webhooks", module: "webhooks", as: "webhooks" do
-    # Keeps the PDS records, embeddings, image mirror, and static site in sync. HMAC-gated.
+    # Syncs the PDS records, the embeddings, the image mirror, and the static site. It needs an
+    # HMAC.
     post "contentful" => "contentful#create"
 
-    # Syncs strain, sleep, and recovery to Intervals.icu. HMAC-gated.
+    # Syncs the strain, the sleep, and the recovery to Intervals.icu. It needs an HMAC.
     post "whoop" => "whoop#create"
   end
 
-  # Everything below is owner-facing, and is drawn only off the public API hostname. `API_HOST`
-  # names that hostname; where it's set these paths fall through to the 404 catch-all there, so
-  # the public host serves nothing but `/up` and the three machine namespaces above. Unset (dev,
-  # CI, the .fly.dev origin) draws them on every host.
+  # Each route below is for the owner, and Rails draws it only off the public API hostname.
+  # `API_HOST` names that hostname. Where it has a value, these paths go to the 404 catch-all
+  # there, thus the public host serves only `/up` and the three machine namespaces above. With no
+  # value (dev, CI, and the .fly.dev origin), Rails draws them on each host.
   #
-  # ⚠️ The zone's bot-protection skip rule is scoped to "every host except the admin one", which
-  # is only safe because of this constraint — a route drawn outside this block is reachable on
-  # the public host with managed rules and Super Bot Fight Mode skipped. Enforced by
-  # spec/requests/host_constraints_spec.rb.
+  # ⚠️ The bot-protection skip rule of the zone applies to "each host but the admin one". This
+  # constraint is what makes that rule safe: a route outside this block is available on the public
+  # host, with the managed rules and Super Bot Fight Mode off.
+  # spec/requests/host_constraints_spec.rb enforces this.
   admin_only = lambda do |request|
     api_host = ENV["API_HOST"].presence
     api_host.nil? || !request.host.casecmp?(api_host)
   end
 
   constraints(admin_only) do
-    # Whoop OAuth flow (owner-only authorize, public callback validated by state).
+    # The Whoop OAuth flow. Only the owner can authorize, and the state value checks the public
+    # callback.
     # ⚠️ WHOOP_REDIRECT_URI and the Whoop dashboard must name the admin host, not the API host.
     get "/whoop/auth" => "whoop_oauth#authorize"
     get "/whoop/callback" => "whoop_oauth#callback"
 
-    # Owner authentication: Google OAuth restricted to OWNER_EMAIL. The OmniAuth request phase is
-    # handled by middleware before routing, so only these four need routes — and for the same
-    # reason it stays reachable on the API host, where the callback below no longer is, so a
-    # sign-in can't complete there.
+    # The owner authentication: Google OAuth for OWNER_EMAIL only. Middleware does the OmniAuth
+    # request phase before the routing, thus only these four paths need routes. For the same
+    # reason that phase stays available on the API host. The callback below is not available
+    # there, thus a sign-in cannot complete there.
     get  "/signin" => "sessions#new"
     post "/signout" => "sessions#destroy"
     get  "/auth/google_oauth2/callback" => "sessions#create"
     get  "/auth/failure" => "sessions#failure"
 
-    # Gated by the owner session, via the Rack guard in config/initializers/sidekiq.rb.
+    # The owner session controls this, through the Rack guard in
+    # config/initializers/sidekiq.rb.
     mount Sidekiq::Web => "/sidekiq"
 
-    # The owner-facing admin UI, gated by the owner session in Admin::BaseController. Drawn at the
-    # ROOT, not under /admin: these routes exist only on the admin host, where the prefix would
-    # just repeat the hostname. `scope module:` keeps the controllers grouped under Admin:: without
-    # putting that in the path.
+    # The admin UI for the owner. The owner session in Admin::BaseController controls it. Rails
+    # draws it at the ROOT, and not below /admin: these routes exist only on the admin host, where
+    # the prefix would repeat the hostname. `scope module:` keeps the controllers together below
+    # Admin:: and does not put that name in the path.
     #
-    # ⚠️ Admin pages therefore claim top-level paths on this host. Check a new one against the
-    # zone's scanner-noise custom rule before adding it — that rule blocks whole prefix families
-    # (`/config/`, `/home/`, `/analytics/`, `/deploy/`, …) zone-wide, and would 403 a page named
-    # after one. See the root CLAUDE.md.
+    # ⚠️ Thus the admin pages use top-level paths on this host. Check a new page against the
+    # scanner-noise custom rule of the zone before you add it. That rule blocks full prefix
+    # families (`/config/`, `/home/`, `/analytics/`, `/deploy/`, and more) in the full zone, and
+    # it would 403 a page with one of those names. Refer to the root CLAUDE.md.
     scope module: "admin" do
       root to: "home#show"
       get    "connected-apps"       => "connected_apps#show",  as: :connected_apps
       delete "connected-apps/whoop" => "connected_apps#whoop", as: :whoop_connection
 
-      # Bluesky attaches by form rather than by OAuth redirect, so it needs a page of its own;
-      # all three of its actions live on that controller instead of on connected_apps#.
+      # Bluesky connects with a form, and not with an OAuth redirect. Thus it needs its own page,
+      # and all three of its actions are on that controller, and not on connected_apps#.
       get    "connected-apps/bluesky" => "bluesky#show",    as: :bluesky_connection
       post   "connected-apps/bluesky" => "bluesky#create",  as: nil
       delete "connected-apps/bluesky" => "bluesky#destroy", as: nil
 
-      # The current location, on a map. The POST writes the same Redis key as the bearer-gated
-      # POST /api/location, through Location.store; the lookup resolves an address or names a
-      # coordinate pair **without** writing anything, which is what lets the page stage a change
-      # before it's saved.
+      # The current location, on a map. The POST writes the same Redis key as the
+      # POST /api/location that needs a bearer token, through Location.store. The lookup finds an
+      # address or names a pair of coordinates and writes **nothing**, which is what lets the page
+      # hold a change before the save.
       get  "location"        => "location#show",   as: :location
       get  "location/lookup" => "location#lookup", as: :location_lookup
       post "location"        => "location#create"
 
-      # The contact-form spam quarantine. Named for what it holds, and deliberately not `/contact`
-      # — that's the public form's own path (POST /api/contact), and nothing here receives a
-      # submission.
+      # The spam quarantine of the contact form. The name says what it holds. It is not `/contact`,
+      # on purpose, because that is the path of the public form (POST /api/contact), and nothing
+      # here takes a submission.
       get    "spam"              => "spam#index",    as: :spam
       post   "spam/:id/not-spam" => "spam#not_spam", as: :spam_not_spam
       delete "spam/:id"          => "spam#destroy",  as: :spam_message
 
-      # GPX tracks rendered as static map images through Mapbox. `preview` and `download` proxy
-      # the render rather than pointing the browser at Mapbox, because the Static Images API
-      # carries the secret token in a query parameter.
-      # ⚠️ `course-maps/status` must stay above `course-maps/:id`, or it's swallowed as a track id.
+      # The GPX tracks, which Mapbox renders as static map images. `preview` and `download` proxy
+      # the render and do not send the browser to Mapbox, because the Static Images API has the
+      # secret token in a query parameter.
+      # ⚠️ `course-maps/status` must stay above `course-maps/:id`. If it does not, Rails reads it
+      # as a track id.
       get    "course-maps"              => "course_maps#index",    as: :course_maps
       post   "course-maps"              => "course_maps#create"
       get    "course-maps/status"       => "course_maps#status",   as: :course_maps_status
@@ -140,14 +144,14 @@ Rails.application.routes.draw do
     end
   end
 
-  # The public API host has no UI, so point a browser that lands on it at the real site. Drawn
-  # after the block above, so on the admin host the home page claims "/" first and this is only
-  # ever reached on the public host. Evaluated per-request, so it tracks SITE_URL rather than
-  # baking in a host.
+  # The public API host has no UI, thus this sends a browser that comes to it to the true site.
+  # Rails draws it after the block above. Thus on the admin host the home page takes "/" first,
+  # and only the public host uses this route. Rails evaluates it for each request, thus it follows
+  # SITE_URL and does not contain a host.
   get "/" => redirect(status: 301) { "#{ENV['SITE_URL'].to_s.chomp('/')}/" }
 
-  # Catch-all, mostly for vulnerability scanners. Handling them in a controller rather than
-  # raising a RoutingError turns a multi-line backtrace into one clean lograge 404 line.
-  # ⚠️ Must stay last; enforced by spec/routing/routes_guard_spec.rb.
+  # The catch-all, mostly for vulnerability scanners. A controller answers them, and the code does
+  # not raise a RoutingError. Thus one lograge 404 line replaces a backtrace of many lines.
+  # ⚠️ This must stay last. spec/routing/routes_guard_spec.rb enforces this.
   match "*unmatched", to: "application#route_not_found", via: :all
 end

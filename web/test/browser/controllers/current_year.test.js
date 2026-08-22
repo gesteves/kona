@@ -11,8 +11,9 @@ describe('current-year controller', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2031-03-04T12:00:00Z'));
 
-    // The server bakes in the build-time year as a no-JS fallback; the point of the controller is
-    // that a site built in 2026 still shows the right copyright range in 2031 without a rebuild.
+    // The server writes the year of the build, for a browser with no JavaScript. The purpose of the
+    // controller is that a site from a build in 2026 still shows the correct range of copyright
+    // years in 2031, with no new build.
     const { element } = await mount(
       'current-year',
       CurrentYearController,

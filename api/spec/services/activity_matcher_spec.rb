@@ -44,7 +44,7 @@ RSpec.describe ActivityMatcher do
     end
 
     it "matches when start times are within 5 truncated minutes and types agree" do
-      # 13:30Z is 07:30 local; 5:59 apart still truncates to 5 minutes.
+      # 13:30Z is 07:30 local time. A difference of 5:59 is still 5 minutes with no seconds.
       expect(described_class.matches?(icu_activity("2026-07-09T07:35:59"), workout, timezone)).to be(true)
     end
 

@@ -1,13 +1,15 @@
-// Loading skeletons for the live-update widgets (Web Awesome `<wa-skeleton>`), remapped from
-// Web Awesome's `--wa-*` defaults to the site's placeholder colors.
-// ⚠️ These overrides win because of ENCAPSULATION CONTEXT, not specificity or layers: per CSS
-// Cascade 5 §6.1 the context is compared before both, and for normal declarations the outer
-// (document) context beats a shadow-tree `:host` rule whatever its specificity or layer. The
-// `:root ` prefixes and the unlayered import in site.css.scss are therefore belt-and-braces here —
-// they'd only matter against an `!important` in the shadow tree, which reverses the context rule.
+// The loading skeletons for the live-update widgets, which are Web Awesome `<wa-skeleton>`
+// elements. These rules change the `--wa-*` defaults of Web Awesome into the placeholder colors of
+// the site.
+// ⚠️ These rules win because of the ENCAPSULATION CONTEXT, and not because of the specificity or the
+// layers. CSS Cascade 5 §6.1 compares the context before the other two, and for a normal
+// declaration the outer context, which is the document, wins over a `:host` rule in a shadow tree,
+// at each specificity and in each layer. Thus the `:root ` prefixes and the unlayered import in
+// site.css.scss are extra protection: they apply only against an `!important` in the shadow tree,
+// which changes the context rule.
 
-// Inline meta skeletons: a single short line at the eyebrow/footer font size, sized to
-// sit on one text line. Width is set per use; everything else is shared.
+// The inline meta skeletons: one short line at the font size of the eyebrow and the footer, with a
+// height for one text line. Each use sets the width, and each other value is the same.
 %skeleton-inline-meta {
   display: inline-flex;
   font-size: var(--font-x-small);
@@ -15,8 +17,8 @@
   vertical-align: middle;
 }
 
-// Stacked body lines: vertical rhythm between stacked skeleton lines, with the outer
-// margins collapsed so the block aligns flush with its container's top and bottom.
+// The body lines in a group: the vertical space between two skeleton lines. The outer margins are
+// zero, thus the block touches the top and the bottom of its container.
 %skeleton-stacked-line {
   margin: 0.75rem 0;
 
@@ -33,9 +35,9 @@
   --color: var(--color-placeholder);
   --sheen-color: color-mix(in oklab, var(--color-placeholder), var(--color-background));
 
-  // ⚠️ The component's `:host` sets `min-height: 1rem`, which floors every `height: 1cap` below and
-  // makes the placeholder taller than the text it reserves space for — the layout shift it exists
-  // to prevent.
+  // ⚠️ The `:host` of the component sets `min-height: 1rem`, which is the minimum for each
+  // `height: 1cap` below. Thus the placeholder is taller than the text that it keeps space for, and
+  // that causes the layout change that it exists to prevent.
   min-height: 0;
 }
 
@@ -43,15 +45,16 @@
   border-radius: 0.25rem;
 }
 
-// ⚠️ `effect="sheen"` animates forever and Web Awesome ships no reduced-motion handling for it.
+// ⚠️ `effect="sheen"` moves for all time, and Web Awesome has no code for a reduced-motion
+// setting.
 @include reduced-motion {
   :root wa-skeleton::part(indicator) {
     animation: none;
   }
 }
 
-// Stat cards (Activity Stats, Whoop): reuse the real `.stats__stat` markup so each
-// line reserves the same height as the real label / number / footer.
+// The stat cards (Activity Stats and Whoop). They use the true `.stats__stat` markup, thus each
+// line keeps the same height as the true label, number, and footer.
 .stats__stat--skeleton {
   .stats__meta wa-skeleton,
   .stats__number wa-skeleton {
@@ -79,14 +82,16 @@
   }
 }
 
-// Footer line (e.g. the Whoop "Join Whoop" line), centered to match `.stats__footer`.
+// The footer line, for example the "Join Whoop" line. It is at the center, as `.stats__footer`
+// is.
 .stats__footer .stats-footer-skeleton {
   @extend %skeleton-inline-meta;
 
   width: 33ch;
 }
 
-// Current weather (homepage): mirrors the `.weather__icon` + `.weather__text` grid.
+// The current weather on the home page. This is the same as the `.weather__icon` and
+// `.weather__text` grid.
 .weather__icon .weather-skeleton-icon {
   aspect-ratio: 1;
   height: auto;
@@ -109,15 +114,16 @@
   }
 }
 
-// Inline article view count.
+// The view count of an article, in a line of text.
 .entry__meta .view-count-skeleton {
   @extend %skeleton-inline-meta;
 
   width: 16ch;
 }
 
-// Entry summary card (upcoming races; reused for trending / recent articles): mirrors the
-// `.entry__meta` eyebrow, `.entry__hed` heading, and `.entry__body` body lines.
+// The summary card of an entry, for the upcoming races. The trending articles and the recent
+// articles also use it. This is the same as the `.entry__meta` eyebrow, the `.entry__hed` heading,
+// and the `.entry__body` body lines.
 .entry__meta .entry-skeleton-eyebrow {
   @extend %skeleton-inline-meta;
 

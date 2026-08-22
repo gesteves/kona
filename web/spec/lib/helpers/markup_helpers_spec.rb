@@ -121,12 +121,13 @@ RSpec.describe MarkupHelpers do
       html = render_tag_description(text)
 
       expect(html).to include('<p>')
-      # External (non-affiliate) link opens in a new tab.
+      # An external link that is not an affiliate link opens in a new tab.
       expect(html).to include("<a href=\"#{external_link}\" rel=\"noopener\" target=\"_blank\">10 km</a>")
-      # Affiliate link is marked sponsored — its pass runs last, so it wins over the external pass.
+      # An affiliate link gets the sponsored mark. Its step runs last, thus it replaces the value
+      # from the external-link step.
       expect(html).to include('rel="sponsored nofollow noopener"')
       expect(html).to include("href=\"#{affiliate_link}\"")
-      # Unit span is wired to the units controller.
+      # The unit span is connected to the units controller.
       expect(html).to include('data-controller="units"')
       expect(html).to include('data-units-imperial-value="6.21 mi"')
     end
@@ -158,8 +159,8 @@ RSpec.describe MarkupHelpers do
         expect(transformed_html).to eq('<figcaption>This is <a href="http://example.com" title="example | page">a link</a> <cite>Photo by Pepe</cite></figcaption>')
       end
 
-      # Splitting on an element's text content and replacing it with plain text nodes threw the
-      # element away — a whole caption written as one link lost the link.
+      # A split on the text content of an element, with plain text nodes in its place, removed the
+      # element. Thus a full caption that is one link lost that link.
       it 'does not split inside an element, dropping its markup' do
         html = '<figcaption><a href="http://example.com">Ride report | Strava</a></figcaption>'
         transformed_html = set_caption_credit(html)
@@ -261,8 +262,8 @@ RSpec.describe MarkupHelpers do
       expect(anchor['title']).to eq('Permalink to Q&A about "gear" <2026>')
     end
 
-    # Accessible name from content descends into the nested anchor and uses its aria-label, so
-    # without an explicit name on the heading itself every heading announced as
+    # The accessible name from the content goes into the anchor and uses its aria-label. Thus
+    # without a name on the heading, each heading spoke as
     # "Permalink to First Heading First Heading".
     it 'names the heading after its own text, not the nested permalink' do
       html = '<h2 id="first">First Heading</h2>'
@@ -387,9 +388,9 @@ RSpec.describe MarkupHelpers do
       end
     end
 
-    # The transform folds the rest of the parent into the caption and then replaces the parent,
-    # so a second image in the same paragraph used to end up inside the first one's <figcaption>
-    # and detached from the tree mid-iteration.
+    # The transform puts the other content of the parent into the caption and then replaces the
+    # parent. Thus a second image in the same paragraph went into the <figcaption> of the first
+    # image, and the code removed it from the tree during the loop.
     context 'with two images in one paragraph' do
       it 'leaves them alone rather than swallowing the second into the first figcaption' do
         html = %(<p><img src="#{image_url}"><img src="#{image_url}"></p>)
@@ -401,7 +402,8 @@ RSpec.describe MarkupHelpers do
     end
 
     context 'when the asset has no known content type' do
-      # E.g. a hotlinked non-Contentful image: no content-type modifier, just the base class.
+      # For example, an image from another site, which is not a Contentful asset: it has no
+      # content-type modifier and only the base class.
       it 'wraps the image in a figure with only the base figure class' do
         allow(self).to receive(:get_asset_content_type).and_return(nil)
         html = %(<p><img src="#{image_url}"></p>)
@@ -420,8 +422,8 @@ RSpec.describe MarkupHelpers do
     let(:iframe_html) { '<iframe src="https://player.example/embed/1"></iframe>' }
 
     context 'with a base class' do
-      # Note the asymmetry with add_figure_elements_to_images: the figure replaces the
-      # iframe *inside* its parent — the wrapping <p> is kept, not replaced.
+      # Note the difference from add_figure_elements_to_images: the figure replaces the iframe *in*
+      # its parent, thus the <p> around it stays and the code does not replace it.
       it 'wraps the iframe in a figure with the base and iframe modifier classes, inside the original parent' do
         transformed_html = add_figure_elements_to_iframes("<p>#{iframe_html}</p>", base_class: 'entry')
         expect(transformed_html).to eq(%(<p><figure class="entry__figure entry__figure--iframe">#{iframe_html}</figure></p>))
@@ -447,7 +449,7 @@ RSpec.describe MarkupHelpers do
     context 'with a base class' do
       it 'wraps the blockquote + script pair in a figure with the base and embed modifier classes' do
         transformed_html = add_figure_elements_to_embeds(embed_html, base_class: 'entry')
-        # Nokogiri serializes a newline before the <script>; pinned as-is.
+        # Nokogiri writes a newline before the <script>. The test uses that exact output.
         expect(transformed_html).to eq(%(<figure class="entry__figure entry__figure--embed"><blockquote class="bluesky-embed"><p>A post</p></blockquote>\n<script src="https://embed.bsky.app/static/embed.js"></script></figure>))
       end
 
@@ -468,7 +470,8 @@ RSpec.describe MarkupHelpers do
     let(:tagged_img) { %(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}">) }
 
     before do
-      # Deterministic stand-in for the CDN URL builder: append the params as a query string.
+      # A replacement for the CDN URL method that always gives the same result: it puts the
+      # parameters at the end as a query string.
       allow(self).to receive(:cdn_image_url) do |url, params = {}|
         params.nil? || params.empty? ? url : "#{url}?#{URI.encode_www_form(params)}"
       end
@@ -476,8 +479,8 @@ RSpec.describe MarkupHelpers do
       allow(self).to receive(:get_asset_content_type).with('asset-1').and_return('image/jpeg')
     end
 
-    # No <picture> and no per-format <source>: one srcset asking for format=auto, which Cloudflare
-    # negotiates from the Accept header.
+    # There is no <picture> and no <source> for each format. There is one srcset with format=auto,
+    # and Cloudflare selects the format from the Accept header.
     it 'puts a format=auto srcset on the image, dropping widths larger than the asset' do
       transformed_html = responsivize_images(tagged_img, widths: [ 100, 200, 300 ], sizes: '100vw')
       expect(transformed_html).to eq(

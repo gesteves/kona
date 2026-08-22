@@ -16,7 +16,7 @@ describe AssetMirror do
     allow(ENV).to receive(:[]).with("R2_BUCKET").and_return(bucket)
   end
 
-  # Reports the object as absent unless a test says otherwise.
+  # Says that the object is absent, if a test does not say another thing.
   def stub_client(exists: false)
     allow(Aws::S3::Client).to receive(:new).and_return(client)
     allow(client).to receive(:put_object)
@@ -35,9 +35,10 @@ describe AssetMirror do
       .and_return(item.nil? ? [] : [ item ])
   end
 
-  # The download streams via Net::HTTP#read_body (see AssetMirror#download for why it can't be
-  # HTTParty), so the stub yields a real response object with a chunked body.
-  # @return [Array] collects the request URIs the code under test actually fetched.
+  # The download uses a stream with Net::HTTP#read_body. Refer to AssetMirror#download for the
+  # reason that it cannot use HTTParty. Thus the stub gives a true response object with a body in
+  # parts.
+  # @return [Array] The request URIs that the code under test got.
   def stub_download(body: "IMAGEBYTES", code: 200)
     requested = []
     klass = code == 200 ? Net::HTTPOK : Net::HTTPForbidden
@@ -53,9 +54,10 @@ describe AssetMirror do
     requested
   end
 
-  # Like stub_download, but the FIRST request answers with a 302 to `location` and every one after
-  # it succeeds — so the collected URIs show whether the hop was followed or refused.
-  # @return [Array] the request URIs actually fetched, in order.
+  # The same as stub_download, but the FIRST request answers with a 302 to `location` and each
+  # request after it is a success. Thus the URIs in the result show if the code followed the
+  # redirect or refused it.
+  # @return [Array] The request URIs that the code got, in order.
   def stub_redirect(location, body: "IMAGEBYTES")
     requested = []
 
@@ -77,8 +79,9 @@ describe AssetMirror do
   before { stub_r2 }
 
   describe "#object_key" do
-    # ⚠️ The cross-app contract: web/lib/data/contentful.rb only swaps the host, so the path it
-    # emits has to be exactly the key written here. Reshaping either side 404s every image.
+    # ⚠️ This is the contract between the two apps: web/lib/data/contentful.rb changes only the
+    # host, thus the path that it writes must be the same as the key here. A change to one side
+    # makes each image 404.
     it "is the Contentful path verbatim, minus the leading slash" do
       expect(mirror.object_key("https://images.ctfassets.net/space/asset1/token/photo.jpg")).to eq(key)
     end
@@ -87,10 +90,10 @@ describe AssetMirror do
       expect(mirror.object_key(asset_url)).to eq(key)
     end
 
-    # ⚠️ Contentful serves some *image* assets from downloads.ctfassets.net — it isn't an
-    # images-vs-files split. Matching only the images host would silently leave those hitting
-    # Contentful forever, which is the whole thing this mirror exists to stop. The path is
-    # identical across hosts, so one key covers the asset either way.
+    # ⚠️ Contentful serves some *image* assets from downloads.ctfassets.net. The two hosts are not
+    # images and files. If the code matches only the images host, those assets go to Contentful for
+    # all time, with no message, and this mirror exists to stop that. The path is the same on both
+    # hosts, thus one key covers the asset from either host.
     it "covers every ctfassets host, keyed on the same path" do
       expect(mirror.object_key("https://downloads.ctfassets.net/space/asset1/token/photo.jpg")).to eq(key)
       expect(mirror.object_key("https://assets.ctfassets.net/space/asset1/token/photo.jpg")).to eq(key)
@@ -117,9 +120,10 @@ describe AssetMirror do
       expect(mirror.sync("asset1")).to eq(:mirrored)
     end
 
-    # ⚠️ Load-bearing on a 512MB worker running at concurrency 5: these originals run to 38MB,
-    # and buffering them into Strings OOM-killed the worker mid-backfill — which loses in-flight
-    # jobs silently, because a hard kill isn't a job failure Sidekiq can retry.
+    # ⚠️ This is necessary on a 512MB worker at concurrency 5: these originals are as large as 38MB,
+    # and Strings that held them caused an OOM kill of the worker during a backfill. That kill loses
+    # the jobs in progress with no message, because a hard kill is not a job failure that Sidekiq
+    # can do again.
     it "streams to a file rather than buffering the body in memory" do
       body = nil
       allow(client).to receive(:put_object) { |args| body = args[:body] }
@@ -127,8 +131,8 @@ describe AssetMirror do
       expect(body).to be_a(Tempfile)
     end
 
-    # ⚠️ Without an explicit content type R2 serves application/octet-stream, which breaks both
-    # the browser and Cloudflare Images.
+    # ⚠️ Without a content type, R2 serves application/octet-stream, and that stops both the browser
+    # and Cloudflare Images.
     it "sets the content type and an immutable cache-control" do
       expect(client).to receive(:put_object).with(
         hash_including(content_type: "image/jpeg", cache_control: "public, max-age=31536000, immutable")
@@ -136,7 +140,8 @@ describe AssetMirror do
       mirror.sync("asset1")
     end
 
-    # What makes retries and the backfill cheap: a re-run costs one HEAD and no transfer.
+    # This is what makes a second attempt and the backfill fast: a second run costs one HEAD and no
+    # data transfer.
     it "skips the download and upload when the object is already there" do
       stub_client(exists: true)
       expect(client).not_to receive(:put_object)
@@ -150,8 +155,8 @@ describe AssetMirror do
       expect(mirror.sync("asset1")).to eq(:skipped)
     end
 
-    # The bytes come from whichever host Contentful named — downloads.ctfassets.net doesn't
-    # support the Images API, but it serves the original just fine, which is all the mirror needs.
+    # The bytes come from the host that Contentful names. downloads.ctfassets.net has no Images API,
+    # but it serves the original, and the mirror needs nothing more.
     it "downloads from the host Contentful gave, keyed on the shared path" do
       requested = stub_download
       stub_asset(url: "//downloads.ctfassets.net/space/asset1/token/photo.jpg")
@@ -171,16 +176,17 @@ describe AssetMirror do
       expect(mirror.sync("asset1")).to eq(:skipped)
     end
 
-    # The raise is what buys Sidekiq's retry; degrading here would leave a silent hole in the
-    # mirror that surfaces as a broken image.
+    # The raise is what makes Sidekiq do the job again. A smaller result here would leave a gap in
+    # the mirror with no message, and that gap becomes a broken image.
     it "raises when the download fails" do
       stub_download(code: 503, body: "nope")
       expect { mirror.sync("asset1") }.to raise_error(ApplicationService::HttpError)
     end
 
-    # ⚠️ Whatever this fetches is written to R2 under the ctfassets-derived key and served from the
-    # public image host, so a hop off ctfassets would publish it. Checking only the first URL isn't
-    # enough — the redirect target has to clear the same allowlist.
+    # ⚠️ The code writes the content that it gets to R2 at the key from ctfassets, and the public
+    # image host serves it. Thus a redirect away from ctfassets would publish that content. A check
+    # of the first URL only is not sufficient: the target of the redirect must also pass the same
+    # list.
     it "refuses a redirect that leaves ctfassets rather than following it" do
       stub_redirect("http://169.254.169.254/latest/meta-data/")
       expect(client).not_to receive(:put_object)
@@ -189,8 +195,8 @@ describe AssetMirror do
         .to raise_error(ArgumentError, /Refusing to mirror from http:\/\/169\.254\.169\.254/)
     end
 
-    # A scheme downgrade is the quieter half of the same problem: an https source redirecting to
-    # plain http on a host that merely ends in ctfassets.net.
+    # A change from https to http is the second half of the same problem: an https source that
+    # redirects to plain http on a host whose name only ends with ctfassets.net.
     it "refuses a redirect that downgrades to plain http" do
       stub_redirect("http://images.ctfassets.net/space/asset1/token/photo.jpg")
       expect(client).not_to receive(:put_object)
@@ -234,7 +240,8 @@ describe AssetMirror do
       expect(AssetSyncJob.jobs).to be_empty
     end
 
-    # A partial page would silently under-enqueue and leave holes nothing else would find.
+    # An incomplete page would add too few jobs, with no message, and leave gaps that nothing else
+    # would find.
     it "enqueues nothing when the asset fetch fails" do
       stub_list(nil)
       expect(mirror.backfill).to eq(:skipped)

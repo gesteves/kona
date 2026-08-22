@@ -1,18 +1,19 @@
-# Selects and arranges the races widget's content from the raw Contentful events, keeping those
-# decisions out of the controller and view.
+# Selects the content of the races widget from the raw Contentful events and puts it in order. Thus
+# the controller and the view do not make those decisions.
 class UpcomingRacesPresenter
   include EventsHelper
 
-  # @return [Array<OpenStruct>] The races to list, soonest first. Empty collapses the widget.
+  # @return [Array<OpenStruct>] The races for the list, the soonest first. An empty array removes
+  #   the widget.
   attr_reader :races
-  # @return [OpenStruct, nil] The featured event, which gets an expanded card.
+  # @return [OpenStruct, nil] The featured event, which gets a large card.
   attr_reader :featured
-  # @return [EventWeatherPresenter, nil] The featured event's race-day weather.
+  # @return [EventWeatherPresenter, nil] The weather of the race day of the featured event.
   attr_reader :event_weather
-  # @return [OpenStruct, nil] The featured event when it's today's race, which gets its own
+  # @return [OpenStruct, nil] The featured event when it is the race of today, which gets its own
   #   section.
   attr_reader :todays_race
-  # @return [String] The IANA timezone anchoring "today" and "soon".
+  # @return [String] The IANA timezone that gives the meaning of "today" and "soon".
   attr_reader :time_zone
 
   # @param events [Array<OpenStruct>] The raw Contentful events.
@@ -27,10 +28,11 @@ class UpcomingRacesPresenter
 
     @todays_race = @featured if @featured && today?(@featured, time_zone)
 
-    # A not-today featured event only earns the expanded card when there's race-day weather to
-    # put in it. The featured window is computed in the owner's timezone and the weather-fetch
-    # window in the event's own, so they can disagree at the 10-day boundary and leave a
-    # featured card with an empty weather block. Today's race keeps its section regardless.
+    # A featured event that is not today gets the large card only when there is race-day weather for
+    # it. The code makes the featured window in the timezone of the owner, and the weather-fetch
+    # window in the timezone of the event. Thus the two can be different at the 10-day limit, and a
+    # featured card could have an empty weather block. The race of today keeps its section in each
+    # condition.
     if @featured && !@todays_race && @event_weather&.forecast.blank?
       @featured = nil
       @event_weather = nil
@@ -38,24 +40,24 @@ class UpcomingRacesPresenter
     end
   end
 
-  # @return [Array<OpenStruct>, nil] The races listed on race day, excluding today's, or nil
-  #   off race day.
+  # @return [Array<OpenStruct>, nil] The races in the list on a race day, but not the race of today.
+  #   It is nil on a day that is not a race day.
   def other_races
     @races.drop(1) if @todays_race
   end
 
-  # Whether an event in the list is the featured one.
+  # Tells if an event in the list is the featured event.
   def featured_event?(event)
     event.sys&.id == featured&.sys&.id
   end
 
-  # @return [String] The layout variant for the main section, off race day.
+  # @return [String] The layout of the main section, on a day that is not a race day.
   def variant
     event_collection_variant(races.size, featured: featured.present?)
   end
 
-  # @return [String] The layout variant for the race-day section, which excludes today's race
-  #   and is never featured.
+  # @return [String] The layout of the race-day section. That section does not include the race of
+  #   today, and it has no featured event.
   def other_races_variant
     event_collection_variant(other_races.size, featured: false)
   end

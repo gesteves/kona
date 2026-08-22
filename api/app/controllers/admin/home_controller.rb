@@ -1,10 +1,10 @@
 module Admin
-  # The admin landing page. Deliberately thin for now — it exists so the shell has a home and the
-  # sign-in redirect has somewhere to land.
+  # The first page of the admin. It is small for now: it exists to give the shell a home page and to
+  # give the sign-in redirect a destination.
   #
-  # ⚠️ Named for the page, but it must stay mounted at `/`, never at `/home`. The zone's
-  # scanner-noise rule blocks the `/home/` prefix family across every host, so drawing this
-  # controller at its own name would 403 it in production and nowhere else.
+  # ⚠️ The name says the page, but Rails must draw it at `/`, and never at `/home`. The scanner-noise
+  # rule of the zone blocks the `/home/` prefix family on each host. Thus a route at the name of this
+  # controller would give a 403 in production, and nowhere else.
   class HomeController < BaseController
     # GET /
     def show

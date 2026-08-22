@@ -1,10 +1,10 @@
-// Inverse of assign-concepts.js: clears `metadata.concepts` on every `article` entry
-// (back to []). Same mechanics — skip-unchanged (entries with no concepts are left alone)
-// and publish-state preservation. Run this before taxonomy:delete, which refuses to run
-// while any entry still links a concept.
+// The opposite of assign-concepts.js: it sets `metadata.concepts` of each `article` entry to [].
+// It works in the same way: it does nothing for an entry with no concept, and it keeps the publish
+// state. Run it before taxonomy:delete, which stops while an entry still has a concept.
 //
-// Env: same as assign-concepts.js (DRY_RUN, ENTRY_ID, CONTENTFUL_ENVIRONMENT).
-// Run: `npm run taxonomy:unassign`.
+// The env vars: the same as in assign-concepts.js, that is, DRY_RUN, ENTRY_ID, and
+// CONTENTFUL_ENVIRONMENT.
+// To run it: `npm run taxonomy:unassign`.
 
 const { LOCALE, paginateAll, createPlainClient, readEnv } = require('./lib/taxonomy');
 

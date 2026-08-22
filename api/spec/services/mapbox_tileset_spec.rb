@@ -88,7 +88,8 @@ RSpec.describe MapboxTileset do
       expect(result).to eq("testuser.abc")
     end
 
-    # ⚠️ PUT, not POST: POST appends to an existing source, which would accumulate stale tracks.
+    # ⚠️ Use PUT, and not POST. A POST adds to a source that exists, thus that source would collect
+    # old tracks.
     it "replaces the source rather than appending to it" do
       described_class.new.create_from_coordinates!(id: "abc", name: "A Ride", coordinates: coordinates)
 
@@ -127,8 +128,8 @@ RSpec.describe MapboxTileset do
   end
 
   describe "#destroy!" do
-    # ⚠️ Both, deliberately: deleting only the tileset orphans its source, which still counts
-    # against the account and is invisible in the tileset list.
+    # ⚠️ The code deletes both, on purpose: a delete of the tileset alone leaves its source, which
+    # still uses the storage of the account and does not appear in the tileset list.
     it "removes the tileset and its source" do
       allow(HTTParty).to receive(:delete).and_return(response(success: true))
 

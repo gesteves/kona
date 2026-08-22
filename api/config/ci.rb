@@ -1,14 +1,14 @@
-# Run using bin/ci
+# Run this with bin/ci.
 #
-# ⚠️ GitHub runs these same gates, but split across the `ruby-tests` and `security` jobs in
-# .github/workflows/api.yml so they go in parallel — nothing keeps the two lists in sync. A step
-# added here has to be added there too, or it only ever runs locally.
+# ⚠️ GitHub runs the same checks, but in two jobs in .github/workflows/api.yml, `ruby-tests` and
+# `security`, thus they run at the same time. Nothing keeps the two lists the same. Add each new
+# step here to that file also, or it runs on your own machine only.
 
 CI.run do
   step "Setup", "bin/setup --skip-server"
 
-  # ⚠️ Must precede rspec: /signin renders through layouts/auth, and Propshaft raises
-  # MissingAssetError when the esbuild output isn't there. bin/setup installs the packages.
+  # ⚠️ This must come before rspec. /signin renders through layouts/auth, and Propshaft raises
+  # MissingAssetError when the esbuild output is absent. bin/setup installs the packages.
   step "Assets: esbuild", "npm run build"
 
   step "Tests: RSpec", "bundle exec rspec"

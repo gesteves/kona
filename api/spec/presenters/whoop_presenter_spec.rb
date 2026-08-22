@@ -76,7 +76,8 @@ RSpec.describe WhoopPresenter do
   describe "#heading_label" do
     include ActiveSupport::Testing::TimeHelpers
 
-    # Freeze to midday in the presenter's timezone so "today"/"yesterday" are deterministic.
+    # Stop the clock at midday in the timezone of the presenter, thus "today" and "yesterday" are
+    # always the same.
     around { |example| travel_to(Time.utc(2026, 6, 15, 18, 0, 0)) { example.run } }
 
     def label_for(sleep_end)

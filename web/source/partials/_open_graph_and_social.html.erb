@@ -6,9 +6,10 @@
   <meta property="og:description" content="<%= h meta_description %>">
 <% end %>
 
-<%# All OG images share the 1200×630 card size; only the URL and alt differ per branch.
-    The alt may be an empty string (cover image without a description) but is only nil when
-    a content page has no title — the one case that omits the og:image:alt tag entirely. %>
+<%# Each OG image has the card size of 1200×630. Only the URL and the alt text are different in each
+    condition. The alt text can be an empty string, for a cover image with no description. It is nil
+    only when a content page has no title, and that is the one condition where the page has no
+    og:image:alt tag. %>
 <% og_image, og_image_alt = if defined?(content) && content.cover_image.present?
      [open_graph_image_url(content.cover_image.url), content.cover_image.description.to_s]
    elsif defined?(content)

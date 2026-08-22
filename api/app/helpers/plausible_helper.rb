@@ -1,7 +1,8 @@
 module PlausibleHelper
-  # Formats an article's pageview count, mirroring the web app's old article_views helper.
+  # Makes the text of the pageview count of an article. It is the same as the article_views helper
+  # that the web app had.
   # @param pageviews [Integer]
-  # @return [String] e.g. "Viewed once", "Viewed 1,234 times", or "Never viewed".
+  # @return [String] For example "Viewed once", "Viewed 1,234 times", or "Never viewed".
   def pageviews_label(pageviews)
     return "Never viewed" if pageviews.zero?
 

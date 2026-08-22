@@ -27,7 +27,8 @@ RSpec.describe MapTrackPresenter do
         .to have_attributes(status_label: "Failed", status_variant: "danger", failed?: true)
     end
 
-    # A record written by an older version, or a corrupted one, still has to render a card.
+    # A record from an older version, and a record with an incorrect shape, must still render a
+    # card.
     it "treats an unrecognized status as still processing" do
       expect(present("status" => "banana")).to have_attributes(status: "processing")
     end
@@ -44,7 +45,7 @@ RSpec.describe MapTrackPresenter do
       expect(present.setting("padding_top")).to eq(80)
     end
 
-    # ⚠️ A record written before a setting existed still has to render, so every key is filled in.
+    # ⚠️ A record from before a setting existed must still render, thus each key gets a value.
     it "fills in a setting the stored record predates" do
       expect(present.setting("track_color")).to eq("#bf0222")
       expect(present.setting("style_preset")).to eq("mapbox://styles/mapbox/outdoors-v12")
@@ -52,8 +53,8 @@ RSpec.describe MapTrackPresenter do
   end
 
   describe "the map style" do
-    # Records written before the dropdown existed kept every style in style_url, which would now
-    # show a Mapbox default sitting in the "custom style" override box.
+    # A record from before the dropdown existed kept each style in style_url. That would now show a
+    # Mapbox default in the "custom style" box.
     it "moves a Mapbox default out of the custom box and into the dropdown" do
       track = present("settings" => { "style_url" => "mapbox://styles/mapbox/dark-v11" })
 

@@ -1,9 +1,10 @@
 <% content_for :title, "Sign in" %>
 
-<%# ⚠️ `turbo: false` is load-bearing. Turbo Drive intercepts same-origin form submissions and
-    follows the response itself, but this one 302s to Google — a cross-origin redirect it can't
-    follow, so the sign-in silently does nothing. `form_with` still emits the CSRF token that
-    omniauth-rails_csrf_protection requires of the request phase. %>
+<%# ⚠️ `turbo: false` is necessary. Turbo Drive takes each same-origin form submission and follows
+    the response itself, but this response is a 302 to Google, which is a redirect to another
+    origin, and Turbo Drive cannot follow it. The sign-in then does nothing and gives no message.
+    `form_with` still writes the CSRF token that omniauth-rails_csrf_protection needs for the
+    request phase. %>
 <%= form_with url: "/auth/google_oauth2", method: :post, data: { turbo: false }, class: "signin__form" do %>
   <wa-button type="submit" variant="brand" appearance="accent" size="large">
     <%= slotted_icon_svg("classic", "brands", "google") %>

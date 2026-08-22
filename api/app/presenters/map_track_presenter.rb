@@ -1,19 +1,19 @@
 require "time"
 
-# Presents one uploaded GPX track, both as a card on the Maps index and as the subject of the
-# render-settings page.
+# Presents one GPX track that a user uploaded, as a card on the Maps index and as the subject of
+# the render-settings page.
 #
-# Paths are passed in rather than built here, matching ConnectedAppPresenter — the view stays
-# free of route helpers and the presenter free of Rails' URL machinery.
+# The caller gives each path, and this class does not make one. ConnectedAppPresenter does the same.
+# Thus the view uses no route helper and this presenter uses no Rails URL code.
 class MapTrackPresenter
   attr_reader :id, :title, :activity_type, :error,
     :show_path, :preview_path, :download_path, :delete_path
 
   # @param record [Hash] One TrackLibrary record.
-  # @param show_path [String] The settings page for this track.
-  # @param preview_path [String] The proxied preview image.
-  # @param download_path [String] The proxied full-size download.
-  # @param delete_path [String] Where the delete form posts.
+  # @param show_path [String] The settings page of this track.
+  # @param preview_path [String] The preview image, through the proxy.
+  # @param download_path [String] The full-size download, through the proxy.
+  # @param delete_path [String] The path that the delete form posts to.
   def initialize(record:, show_path:, preview_path:, download_path:, delete_path:)
     @id = record["id"].to_s
     @title = record["title"].to_s
@@ -33,16 +33,16 @@ class MapTrackPresenter
     TrackLibrary::STATUSES.include?(@status) ? @status : "processing"
   end
 
-  # @return [Boolean] Whether Mapbox is still publishing this track's tileset.
+  # @return [Boolean] True if Mapbox still publishes the tileset of this track.
   def processing? = status == "processing"
 
-  # @return [Boolean] Whether this track can be rendered.
+  # @return [Boolean] True if the code can render this track.
   def ready? = status == "ready"
 
-  # @return [Boolean] Whether publishing gave up.
+  # @return [Boolean] True if the publish stopped after the last attempt.
   def failed? = status == "failed"
 
-  # @return [String] The badge label for the current status.
+  # @return [String] The label of the badge for the current status.
   def status_label
     { "processing" => "Processing", "ready" => "Ready", "failed" => "Failed" }.fetch(status)
   end
@@ -52,19 +52,18 @@ class MapTrackPresenter
     { "processing" => "neutral", "ready" => "success", "failed" => "danger" }.fetch(status)
   end
 
-  # @return [String] The ISO 8601 upload time, for <wa-relative-time>.
+  # @return [String] The upload time in ISO 8601, for <wa-relative-time>.
   def uploaded_at = @uploaded_at
 
-  # @return [String] The sport, e.g. "Road Biking".
+  # @return [String] The sport, for example "Road Biking".
   def summary = @activity_type
 
-  # The render settings, with any missing key filled in from the defaults — a record written before
-  # a new setting existed still has to render.
+  # The render settings. Each key that is absent gets its default value, because a record from
+  # before a new setting must still render.
   #
-  # A "custom" style that is in fact one of Mapbox's own belongs in the dropdown, not in the
-  # override box. That keeps the box empty unless it's genuinely overriding something, and it's
-  # how records written before the dropdown existed — when every style lived in `style_url` —
-  # migrate themselves on first read.
+  # A "custom" style that is in fact a Mapbox style belongs in the dropdown, and not in the override
+  # box. Thus the box stays empty until it truly replaces a style. This is also how a record from
+  # before the dropdown, when each style was in `style_url`, changes itself at the first read.
   # @return [Hash]
   def settings
     merged = StaticMap.defaults_for(nil).merge(@settings)
@@ -73,10 +72,10 @@ class MapTrackPresenter
     merged.merge("style_preset" => merged["style_url"], "style_url" => "")
   end
 
-  # @param key [String] A setting name.
+  # @param key [String] The name of a setting.
   # @return [Object] Its current value.
   def setting(key) = settings[key]
 
-  # @return [String] The DOM id of this track's delete-confirmation dialog.
+  # @return [String] The DOM id of the delete-confirmation dialog of this track.
   def dialog_id = "map-delete-#{@id}"
 end

@@ -1,6 +1,7 @@
-# Allowlist of Font Awesome icons the build needs. web/ POSTs this `icons` tree to the api's
-# /api/icons endpoint, which resolves each id to an SVG; the Font Awesome version now lives in
-# the api (its FONT_AWESOME_VERSION), so it's intentionally not specified here.
+# The list of the Font Awesome icons that the build needs. web/ posts this `icons` tree to the
+# /api/icons endpoint of the api, and that endpoint changes each id into an SVG. The Font Awesome
+# version is now in the api, in its FONT_AWESOME_VERSION, thus this file does not give it, on
+# purpose.
 icons:
   classic:
     brands:

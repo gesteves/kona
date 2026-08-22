@@ -1,5 +1,6 @@
-<%# "Trending Articles" is ranked from Plausible analytics at request time by the API and %>
-<%# swapped in by the live-update controller (which removes it when nothing is trending). %>
-<%# `url` (required local) is the API endpoint: the bare trending path, or /:id carrying the %>
-<%# sys.id of the current article, so trending doesn't list the post you're reading. %>
+<%# The API puts the "Trending Articles" in order from the Plausible analytics, at request time, %>
+<%# and the live-update controller puts them here. It removes them when no article is trending. %>
+<%# `url`, which is a necessary local, is the API endpoint: the trending path with no id, or %>
+<%# /:id with the sys.id of the current article, thus the list does not contain the post that %>
+<%# you read. %>
 <%= partial 'partials/placeholders/article_collection', locals: { section_id: 'trending-articles', heading: 'Trending Articles', url: url } %>

@@ -1,17 +1,19 @@
-# Publishes one uploaded GPX track to Mapbox as a private vector tileset, off the upload request.
+# Publishes one GPX track that a user uploaded to Mapbox, as a private vector tileset. It runs
+# outside the upload request.
 #
-# The Mapbox Tiling Service publishes asynchronously and this polls it, so the job can hold a
-# worker thread for up to MapboxTileset::POLL_TIMEOUT. That's the whole reason the upload doesn't
-# do this inline — the request budget is 20 seconds.
+# The Mapbox Tiling Service publishes asynchronously and this job reads its status. Thus the job can
+# hold a worker thread for as long as MapboxTileset::POLL_TIMEOUT. That is the reason that the upload
+# does not do this work itself: the request budget is 20 seconds.
 #
-# Safe under the inherited 24-hour retry because MapboxTileset#create_from_coordinates! is
-# idempotent: the source upload replaces rather than appends, an existing tileset counts as
-# success, and publishing just mints a new job. ⚠️ fly's `kill_timeout` is 30s, so a deploy
-# landing mid-poll kills this; Sidekiq re-enqueues on a clean SIGTERM and the retry finishes it.
+# This job is safe with the 24-hour retry from the parent class, because you can call
+# MapboxTileset#create_from_coordinates! more than one time: the source upload replaces the source
+# and does not add to it, a tileset that exists is a success, and a publish only makes a new job.
+# ⚠️ The `kill_timeout` of fly is 30s, thus a deploy during a status read stops this job. Sidekiq
+# puts the job in the queue again after a clean SIGTERM, and the next attempt completes it.
 class MapTilesetJob < ApplicationJob
-  # ⚠️ The status is written here rather than in a rescue inside #perform. Marking a record failed
-  # on the first exception would have it flicker failed → processing → failed on every retry, so
-  # "failed" means Sidekiq has genuinely given up.
+  # ⚠️ The code writes the status here, and not in a rescue in #perform. A mark of "failed" at the
+  # first exception would change the record from failed to processing to failed at each attempt.
+  # Thus "failed" here means that Sidekiq stopped after the last attempt.
   sidekiq_retries_exhausted do |msg, exception|
     id = msg["args"].first
     TrackLibrary.new.update(id, "status" => "failed", "error" => exception&.message.to_s.truncate(500))

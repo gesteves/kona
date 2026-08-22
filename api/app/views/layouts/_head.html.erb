@@ -1,26 +1,28 @@
-<%# Shared <head> for the two owner-facing layouts (admin, auth). Both load the same bundle;
-    nothing here is public, hence the blanket noindex. %>
+<%# The shared <head> of the two layouts for the owner: admin and auth. Both load the same bundle,
+    and no page here is public. That is the reason for the noindex on each one. %>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title><%= [ title.presence, "Given to Tri" ].compact.join(" · ") %></title>
-<%# ⚠️ Declared explicitly, and served from public/ rather than through Propshaft. Without a
-    declaration the browser keeps whatever it last saw for this origin — which is Sidekiq's own
-    icon, since Sidekiq::Web ships one and the admin didn't. A fingerprinted /assets path wouldn't
-    fix a bookmark either: that's a bare /favicon.ico request, which only public/ answers. %>
+<%# ⚠️ This is here, and public/ serves it, and not Propshaft. With no declaration, the browser
+    keeps the last icon that it saw for this origin, which is the icon of Sidekiq, because
+    Sidekiq::Web has one and the admin had none. An /assets path with a fingerprint would not
+    correct a bookmark either: a bookmark makes a plain /favicon.ico request, and only public/
+    answers that. %>
 <link rel="icon" href="/favicon.ico" sizes="32x32">
 <%= csrf_meta_tags %>
-<%# Turbo re-applies this nonce to any script it inserts, and refreshes the tag on every visit —
-    which is why the nonce can be per-request without breaking a Drive navigation. %>
+<%# Turbo puts this nonce on each script that it adds, and it refreshes the tag at each visit. That
+    is why each request can have its own nonce and a Drive navigation still works. %>
 <%= csp_meta_tag %>
 
 <script nonce="<%= content_security_policy_nonce %>">
-  // Web Awesome's dark theme is keyed on a `.wa-dark` class, not on prefers-color-scheme, so map
-  // the OS preference onto it here. Inline and before paint, so there's no flash of the light
-  // theme; Turbo replaces <body> and merges <head> but never <html>, so the class survives Drive
-  // visits and only needs setting on a full load.
-  // ⚠️ The nonce is what lets this run under the CSP in OwnerFacing. Don't drop it, and don't move
-  // this into the bundle — it has to execute before paint.
+  // The dark theme of Web Awesome uses a `.wa-dark` class, and not prefers-color-scheme. Thus this
+  // code puts the setting of the operating system on that class. It is inline and it runs before
+  // the paint, thus the light theme never appears first. Turbo replaces <body> and joins the two
+  // <head> elements, but it never changes <html>. Thus the class stays through a Drive visit and
+  // this code needs to run only at a full page load.
+  // ⚠️ The nonce is what lets this run under the CSP in OwnerFacing. Do not remove it, and do not
+  // move this code into the bundle: it must run before the paint.
   (function () {
     var query = window.matchMedia("(prefers-color-scheme: dark)");
     var apply = function (event) {
@@ -31,8 +33,7 @@
   })();
 </script>
 
-<%# ⚠️ Never mutate an attribute of a data-turbo-track element at runtime — Turbo folds its
-    outerHTML into the tracked-element signature, so a change turns every navigation into a full
-    page reload. %>
+<%# ⚠️ Never change an attribute of a data-turbo-track element at run time. Turbo puts the outerHTML
+    of that element into its signature, thus a change makes each navigation a full page load. %>
 <%= stylesheet_link_tag "admin", "data-turbo-track": "reload" %>
 <%= javascript_include_tag "admin", defer: true, "data-turbo-track": "reload" %>

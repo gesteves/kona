@@ -1,41 +1,45 @@
-# Ranks the "You May Also Like" widget by semantic similarity: loads the current article's
-# precomputed Voyage embedding plus every candidate's, scores them by cosine similarity, and
-# returns the nearest neighbors, with recency breaking ties. The request path never calls Voyage
-# — ArticleEmbeddingJob stores the vectors, and this only reads them and does the arithmetic.
+# Puts the articles of the "You May Also Like" widget in order by the similarity of their meaning.
+# It loads the Voyage embedding of the current article and of each candidate, gives each candidate
+# a score from the cosine similarity, and returns the nearest ones. The date selects between two
+# equal scores. The request path never calls Voyage: ArticleEmbeddingJob stores the vectors, and
+# this class only reads them and does the arithmetic.
 class RelatedArticles < ApplicationService
   include ArticleRanking # candidates + payload, shared with TrendingArticles
 
-  # How much of the ranking to cache: plenty to fill the widget, while bounding the cached JSON.
-  # Keyed per article, unlike trending's single shared ranking.
+  # The part of the list that the cache holds. It is enough to fill the widget, and it keeps the
+  # cached JSON small. There is one key for each article. The trending list is different: it has
+  # one shared list.
   MAX_POOL = 12
-  # Neighbors change only when the corpus or its embeddings do, so this can memoize briefly.
+  # The neighbors change only when the articles or their embeddings change, thus the code can keep
+  # the value for a short time.
   RESULT_TTL = 10.minutes
 
-  # @param articles [Articles] The corpus source; injectable for testing.
+  # @param articles [Articles] The source of the articles. A test can supply its own.
   def initialize(articles: Articles.new)
     @articles = articles
   end
 
-  # @param id [String] The article's Contentful id.
-  # @return [Array<OpenStruct>] The `count` articles most semantically related to it.
+  # @param id [String] The Contentful id of the article.
+  # @return [Array<OpenStruct>] The `count` articles with the nearest meaning to it.
   def for_article(id, count: 4)
     ranked(id).first(count)
   end
 
-  # Every entry's nearest neighbors, for the web build's static "You May Also Like" section.
-  # One pass over the corpus rather than one request per article: the vectors load in a single
-  # round trip and the rest is arithmetic.
+  # The nearest neighbors of each entry, for the static "You May Also Like" section of the web
+  # build. This reads the articles one time, and not one time for each article: the vectors come in
+  # one request and the rest is arithmetic.
   #
-  # ⚠️ Uncached, unlike `for_article`. This is called once per build, right after a publish —
-  # the one moment a ten-minute-old ranking would be wrong, since it would omit the entry that
-  # triggered the build. The expensive part (the embeddings themselves) is already cached.
+  # ⚠️ No cache holds this, and `for_article` is different. The build calls this one time,
+  # immediately after a publish. That is the one moment when a list from ten minutes ago would be
+  # wrong, because it would omit the entry that started the build. The slow part, which is the
+  # embeddings, is already in the cache.
   #
-  # ⚠️ Keyed by every published entry, not just the candidates: a Short is a valid query
-  # article — it gets the section on its own page — even though it can never be a neighbor.
-  # `for_article` behaves the same way, having never required the query id to be a candidate.
-  # @param count [Integer] How many neighbors per entry.
-  # @return [Hash{String=>Array<String>}] Contentful id => neighbor ids, nearest first. An entry
-  #   with no stored vector is absent rather than empty.
+  # ⚠️ There is a key for each published entry, and not only for each candidate. A Short is a
+  # correct query article, because the section appears on its own page, but a Short can never be a
+  # neighbor. `for_article` does the same, and it never needed the query id to be a candidate.
+  # @param count [Integer] The number of neighbors for each entry.
+  # @return [Hash{String=>Array<String>}] Contentful id => the neighbor ids, the nearest first. An
+  #   entry with no stored vector is absent, and not empty.
   def all(count: 4)
     rescue_with({}, context: self.class.name) do
       pool = candidates
@@ -55,9 +59,10 @@ class RelatedArticles < ApplicationService
 
   private
 
-  # Scores one query vector against the candidate pool. Same ordering as `rank` — nearest
-  # first, recency breaking ties — so the static section and the widget agree.
-  # @return [Array<String>] The nearest neighbor ids, excluding the query article itself.
+  # Gives each candidate a score against one query vector. The order is the same as in `rank`: the
+  # nearest first, and the date selects between two equal scores. Thus the static section and the
+  # widget agree.
+  # @return [Array<String>] The ids of the nearest neighbors, but not the query article.
   def neighbors_for(id, query_vector, pool, vectors, count)
     scored = pool.filter_map do |article|
       other_id = article.sys&.id
@@ -75,8 +80,8 @@ class RelatedArticles < ApplicationService
       .map { |e| e[:id] }
   end
 
-  # The ranked neighbors, nearest first, cached per article. Empty when the article has no
-  # stored vector or on any error, which collapses the widget.
+  # The neighbors in order, the nearest first. There is one cache entry for each article. It is
+  # empty when the article has no stored vector, and on an error, and the widget then goes away.
   def ranked(id)
     return [] if id.blank?
 
@@ -88,13 +93,13 @@ class RelatedArticles < ApplicationService
     end
   end
 
-  # Scores every candidate by cosine similarity. Candidates with no stored vector yet are
-  # skipped rather than zero-scored.
+  # Gives each candidate a score from the cosine similarity. The code omits a candidate with no
+  # stored vector, and it does not give that candidate a score of zero.
   def rank(id)
     query_vector = load_vector(id)
     return [] if query_vector.blank?
 
-    # The shared candidate set, minus the current article.
+    # The shared set of candidates, but not the current article.
     pool = candidates.reject { |article| article.sys&.id == id }
     return [] if pool.blank?
 
@@ -112,12 +117,12 @@ class RelatedArticles < ApplicationService
       .map { |e| e[:article] }
   end
 
-  # The current article's stored embedding vector (nil when it hasn't been embedded yet).
+  # The stored embedding vector of the current article. It is nil when the article has none.
   def load_vector(id)
     parse_vector($redis.get(ArticleEmbeddingJob.redis_key(id)))
   end
 
-  # @return [Hash] { id => vector or nil } for the whole candidate pool, in one round trip.
+  # @return [Hash] { id => vector or nil } for each candidate, in one request.
   def load_vectors(ids)
     ids = ids.compact
     return {} if ids.empty?
@@ -125,7 +130,7 @@ class RelatedArticles < ApplicationService
     ids.zip(raw).to_h { |id, json| [ id, parse_vector(json) ] }
   end
 
-  # Pulls the vector out of a stored `{ version:, vector: }` JSON blob.
+  # Gets the vector from a stored `{ version:, vector: }` JSON value.
   def parse_vector(json)
     return if json.blank?
     JSON.parse(json)["vector"]
@@ -133,7 +138,8 @@ class RelatedArticles < ApplicationService
     nil
   end
 
-  # Cosine similarity of two equal-length vectors; 0 for blank/mismatched/zero-norm inputs.
+  # The cosine similarity of two vectors of the same length. It is 0 when an input is blank, when
+  # the two lengths are different, or when a norm is zero.
   def cosine(a, b)
     return 0.0 if a.blank? || b.blank? || a.size != b.size
 

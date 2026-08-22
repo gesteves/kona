@@ -20,7 +20,7 @@ RSpec.describe "Admin spam quarantine", type: :request do
     allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
     allow(SpamQuarantine).to receive(:new).and_return(quarantine)
-    # Every admin page renders the nav, which asks for the badge count.
+    # Each admin page renders the nav, and the nav needs the count for the badge.
     allow(quarantine).to receive(:count).and_return(0)
   end
 
@@ -54,7 +54,8 @@ RSpec.describe "Admin spam quarantine", type: :request do
         expect(response.body).to match(%r{<form[^>]*action="/spam/abc123"}m)
         expect(response.body).to include('name="_method" value="delete"')
         expect(response.body).to include("<wa-button type=\"submit\"")
-        # A bare <button> means a button_to crept back in — wa-button renders its own in a shadow root.
+        # A plain <button> means that a button_to came back into the code. wa-button renders its own
+        # button in a shadow root.
         expect(response.body).not_to include("<button")
       end
 
@@ -88,7 +89,8 @@ RSpec.describe "Admin spam quarantine", type: :request do
       expect(response.body).to include('<wa-details summary="Show full message"')
     end
 
-    # ⚠️ These fields are the only unfiltered attacker input this app renders as HTML.
+    # ⚠️ These fields are the only input from an attacker that this app renders as HTML with no
+    # change.
     it "escapes a message that tries to inject markup" do
       allow(quarantine).to receive(:all).and_return([
         message.merge("name" => "<script>alert(1)</script>", "message" => "<img src=x onerror=alert(2)>")
@@ -133,7 +135,8 @@ RSpec.describe "Admin spam quarantine", type: :request do
         "Ivan Petrov",
         "ivan@example.ru",
         "Your website is not ranking on Google.",
-        # The original submission time rides along, so the email doesn't report the release time.
+        # The first submission time goes with the message, thus the email does not give the time of
+        # the release.
         hash_including("ip" => "203.0.113.7", "received_at" => "2026-08-12T14:03:00Z"),
         true
       )
@@ -142,7 +145,8 @@ RSpec.describe "Admin spam quarantine", type: :request do
       expect(flash[:notice]).to include("released")
     end
 
-    # ⚠️ SpamQuarantine#take is fetch-and-remove precisely so a double submit can't double-send.
+    # ⚠️ SpamQuarantine#take reads and deletes in one step, thus two submissions cannot send the
+    # email two times.
     it "does nothing when the message is already gone" do
       allow(quarantine).to receive(:take).with("abc123").and_return(nil)
 

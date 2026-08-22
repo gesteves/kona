@@ -1,7 +1,8 @@
-# Google OAuth for the owner-only surfaces, restricted to a single identity: `hd` rejects any
-# login whose verified hosted domain isn't ours, server-side on the id_token claim, and
-# SessionsController additionally pins the exact email. Both derive from OWNER_EMAIL, so they
-# can't drift. Blank credentials are fine in dev and CI — the provider only fails if exercised.
+# The Google OAuth for the pages of the owner only, for one identity. `hd` refuses each login whose
+# verified hosted domain is not ours, on the server, from the id_token claim. SessionsController
+# also tests the exact email address. Both come from OWNER_EMAIL, thus they always agree. Blank
+# credentials are acceptable in development and in CI, because the provider fails only when
+# something uses it.
 OmniAuth.config.logger = Rails.logger
 
 Rails.application.config.middleware.use OmniAuth::Builder do
@@ -15,12 +16,13 @@ Rails.application.config.middleware.use OmniAuth::Builder do
     }
 end
 
-# ⚠️ A sign-in bypass, and the only thing keeping it out of production is this guard. In OmniAuth's
-# test mode the request phase never reaches Google: POST /auth/google_oauth2 redirects straight to
-# the callback carrying the hash below, so /signin authenticates as OWNER_EMAIL against nothing.
-# Both conditions are required, so neither a stray `DEV_OWNER_SIGNIN` in a deployed environment nor
-# a local RAILS_ENV mistake is enough on its own — and SessionsController still pins the email, so
-# an unset OWNER_EMAIL fails closed rather than signing in as nobody.
+# ⚠️ This code lets a person sign in with no check, and only this condition keeps it out of
+# production. In the test mode of OmniAuth, the request phase never reaches Google: POST
+# /auth/google_oauth2 redirects directly to the callback with the hash below. Thus /signin
+# authenticates as OWNER_EMAIL against nothing. The code needs both conditions. Thus a
+# `DEV_OWNER_SIGNIN` by error in a deployed environment is not sufficient, and a RAILS_ENV error on
+# your own machine is not sufficient. SessionsController also tests the email address, thus an
+# OWNER_EMAIL with no value refuses the sign-in and does not sign in as nobody.
 if Rails.env.development? && ENV["DEV_OWNER_SIGNIN"].present?
   Rails.logger.warn("⚠️ DEV_OWNER_SIGNIN: /signin authenticates as #{ENV['OWNER_EMAIL'].inspect} without Google.")
 

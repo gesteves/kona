@@ -12,8 +12,8 @@ RSpec.describe "Contact", type: :request do
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with("API_TOKEN").and_return(token)
     allow(ENV).to receive(:[]).with("SITE_URL").and_return(site_url)
-    # Default Turnstile to unconfigured so these specs don't depend on a local .env having
-    # TURNSTILE_SECRET; the "Turnstile verification" block stubs Turnstile#verify directly.
+    # By default, Turnstile has no configuration. Thus these specs do not depend on a local .env with
+    # TURNSTILE_SECRET in it. The "Turnstile verification" group stubs Turnstile#verify.
     allow(ENV).to receive(:[]).with("TURNSTILE_SECRET").and_return(nil)
   end
 
@@ -115,9 +115,9 @@ RSpec.describe "Contact", type: :request do
     end
   end
 
-  # Rails rejects these while building the params hash, so the request never reaches the action
-  # and the response is a framework 400 rather than either of the paths above. The report it
-  # would otherwise raise is dropped by ContactBadRequestFilter.
+  # Rails refuses each of these while it makes the params hash. Thus the request never reaches the
+  # action, and the response is a 400 from the framework and not one of the two answers above.
+  # ContactBadRequestFilter removes the report that Rails would send.
   describe "a body that isn't valid UTF-8" do
     let(:form) { { "CONTENT_TYPE" => "application/x-www-form-urlencoded" } }
     let(:body) { "name=Jane+Rider&email=jane%40example.com&message=%FF%FE" }

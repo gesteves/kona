@@ -1,9 +1,9 @@
-# Pure forecast-selection and formatting functions: every method takes the data it works on as
-# an explicit argument, and none read controller state. The CONDITIONS and BEAUFORT constants
-# come from config/initializers/weather_data.rb.
+# The functions that select a forecast and that format a value. Each method takes the data as an
+# argument, and none of them reads the state of a controller. The CONDITIONS constant and the
+# BEAUFORT constant come from config/initializers/weather_data.rb.
 #
-# The prose summary and its business rules live in WeatherSummaryPresenter, which includes this
-# module and passes it the request's data.
+# The text summary and its rules are in WeatherSummaryPresenter, which includes this module and
+# gives it the data of the request.
 module WeatherHelper
   PRECIPITATION_METRIC_UNITS = {
     unit: "mm",
@@ -11,9 +11,9 @@ module WeatherHelper
     thousand: "m"
   }.freeze
 
-  # Validates the exact slices the summary consumes. Checking todays_forecast alone isn't
-  # enough: rest_of_day_forecast switches to the overnight forecast in the evening, so a payload
-  # missing overnight data would pass and then crash the evening summary.
+  # Checks the exact parts of the data that the summary uses. A check of todays_forecast alone is
+  # not sufficient: rest_of_day_forecast changes to the overnight forecast in the evening. Thus a
+  # payload with no overnight data would pass this check and then stop the evening summary.
   def weather_data_is_current?(weather, time_zone)
     current_weather(weather).present? && todays_forecast(weather).present? && rest_of_day_forecast(weather, time_zone).present?
   end
@@ -59,8 +59,8 @@ module WeatherHelper
     Time.parse(forecast.sunset).in_time_zone(time_zone)
   end
 
-  # Whether it's daytime: between today's sunrise and sunset when the payload carries them,
-  # else a 6am–6pm clock check.
+  # Tells if it is daytime: between the sunrise and the sunset of today, when the payload has those
+  # two times. In all other conditions, it tests the clock against 6am and 6pm.
   def daytime?(weather, time_zone)
     now = Time.current.in_time_zone(time_zone)
     if weather.present?
@@ -73,7 +73,8 @@ module WeatherHelper
     end
   end
 
-  # Whether it's evening: past today's sunset when the payload carries it, else a 6pm check.
+  # Tells if it is evening: after the sunset of today, when the payload has that time. In all other
+  # conditions, it tests the clock against 6pm.
   def evening?(weather, time_zone)
     now = Time.current.in_time_zone(time_zone)
     if weather.present?
@@ -103,9 +104,10 @@ module WeatherHelper
     CONDITIONS.dig(condition_code&.to_sym, :phrases, :simplified) || condition_code.underscore.gsub("_", " ")
   end
 
-  # ⚠️ Returns nil rather than raising on a missing reading: the upstreams omit individual fields,
-  # and the arithmetic below turns one into a NoMethodError that 500s the whole widget. Callers
-  # still have to guard per field to avoid rendering a bare label with no number.
+  # ⚠️ This returns nil for a reading that is absent, and it does not raise. Each upstream service
+  # omits some fields, and the arithmetic below makes one of those into a NoMethodError, which gives
+  # the full widget a 500. A caller must still test each field, or the page shows a label with no
+  # number.
   def format_temperature(temp)
     return if temp.blank?
     celsius = "#{number_to_human(temp, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ',')}°C"
@@ -144,7 +146,7 @@ module WeatherHelper
     end
   end
 
-  # ⚠️ Nil-safe for the same reason as format_temperature.
+  # ⚠️ This accepts nil, for the same reason as format_temperature.
   def format_wind_speed(speed)
     return if speed.blank?
     wind_speed_metric = speed.round
@@ -169,8 +171,8 @@ module WeatherHelper
     units_tag(metric, imperial)
   end
 
-  # WeatherKit omits gust data for some forecast days, and the views' surrounding guards only
-  # check the wind speed and direction — so this has to hold its own against a nil.
+  # WeatherKit omits the gust data on some forecast days, and the checks in the views test only the
+  # wind speed and the wind direction. Thus this method must accept a nil.
   def show_gusts?(wind_speed, gusts_speed)
     return false if wind_speed.blank? || gusts_speed.blank?
 
@@ -223,8 +225,9 @@ module WeatherHelper
     meridiem_abbr(remove_widows(time.strftime("%l:%M %p")))
   end
 
-  # The icon id for a condition code. :auto picks the day/night variant from the given
-  # weather + timezone (see #daytime?); :day / :night pick explicitly and need neither.
+  # The icon id for a condition code. :auto selects the day icon or the night icon from the given
+  # weather and timezone (refer to #daytime?). :day and :night select one directly and need
+  # neither.
   def weather_icon(condition_code, variant = :auto, weather: nil, time_zone: nil)
     condition = CONDITIONS[condition_code&.to_sym]
     return "cloud-question" if condition.blank?
@@ -246,7 +249,7 @@ module WeatherHelper
   end
 
   def aqi_icon(aqi)
-    # Without this, a missing AQI falls to the `else` and renders as hazardous air.
+    # Without this, an AQI that is absent goes to the `else` and shows as dangerous air.
     return "sun-haze" if aqi.blank?
 
     case aqi

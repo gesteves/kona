@@ -12,9 +12,9 @@ describe('sendNotification', () => {
   });
 
   it('does nothing when the element exists but has not upgraded yet', () => {
-    // <wa-toast> is a custom element; before its module loads it's an inert unknown element with
-    // no create(). Guarding on the method rather than the element is what keeps a toast fired
-    // early in page life from throwing.
+    // <wa-toast> is a custom element. Before its module loads, it is an unknown element that does
+    // nothing and that has no create(). The code tests the method and not the element, thus a toast
+    // early in the life of the page does not raise.
     document.body.innerHTML = '<wa-toast></wa-toast>';
     expect(() => sendNotification('hello')).not.toThrow();
   });
@@ -37,7 +37,8 @@ describe('sendNotification', () => {
     const create = vi.fn();
     document.querySelector('wa-toast').create = create;
 
-    // Callers pass 'error'; Web Awesome's variant is 'danger'. The mapping is the whole point.
+    // A caller gives 'error', and the Web Awesome variant is 'danger'. This change is the purpose
+    // of the code.
     sendNotification('Nope', 'error');
 
     expect(create.mock.calls[0][1].variant).toBe('danger');
@@ -100,8 +101,8 @@ describe('absoluteUrl', () => {
   it('anchors a fragment to the current path, dropping any query string', () => {
     window.history.replaceState({}, '', '/posts/hello?utm_source=x');
 
-    // Deliberately origin + pathname + hash: a permalink copied from an article shouldn't carry
-    // the reader's tracking params along with it.
+    // This uses the origin, the pathname, and the hash, on purpose: a permalink from an article must
+    // not have the tracking parameters of the reader.
     expect(absoluteUrl('#comments')).toBe(
       'http://localhost:3000/posts/hello#comments'
     );

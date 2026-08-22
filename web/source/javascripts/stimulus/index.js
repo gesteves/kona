@@ -1,4 +1,5 @@
-// Side-effect import: Turbo self-installs on load and nothing here references its exports.
+// This import is for its result only: Turbo installs itself at the load and no code here uses its
+// exports.
 import '@hotwired/turbo';
 import { Application } from '@hotwired/stimulus';
 import '@web.awesome.me/webawesome-pro/dist/styles/themes/default.css';
@@ -25,8 +26,8 @@ import SearchController from './controllers/search_controller';
 import ShareController from './controllers/share_controller';
 import UnitsController from './controllers/units_controller';
 
-// window.Stimulus stays exposed for console debugging, but registration goes through the
-// local binding — the bare global was invisible to static analysis.
+// window.Stimulus stays available for a debug session in the console, but the code registers each
+// controller through the local variable, because a static analysis could not see the global.
 const application = Application.start();
 window.Stimulus = application;
 application.register('back-to-top', BackToTopController);

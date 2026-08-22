@@ -1,16 +1,16 @@
-<%# One sidebar link, as a <wa-button>. Rendered both at the top level and inside a group's panel,
-    which is the whole reason it's a partial.
-    ⚠️ `data-drawer="close"` is what dismisses the mobile drawer after a tap; without it the drawer
-    stays open over the page it just navigated to. It sits on the host, which is where both
-    <wa-drawer>'s document-level handler and its in-drawer one look — a click inside a shadow root
-    retargets to the host before either sees it. %>
+<%# One link of the sidebar, as a <wa-button>. The code renders it at the top level and in the panel
+    of a group, and that is the reason for a partial.
+    ⚠️ `data-drawer="close"` is what closes the drawer on a mobile screen after a tap. Without it,
+    the drawer stays open over the page that the link opened. It is on the host element, and the
+    document handler of <wa-drawer> and its handler in the drawer both look there: a click in a
+    shadow root goes to the host before either handler sees it. %>
 <% current = admin_nav_current?(item[:path]) %>
 <li>
-  <%# `appearance` carries the active state: filled for the current page, plain otherwise —
-      Web Awesome's own steps, rather than a hand-picked background. `aria-current` stays for
-      the semantics, but ⚠️ it is NOT what a screen reader announces: <wa-button> renders its
-      own <a> in a shadow root and forwards none of the host's ARIA to it, so the current item
-      also carries a visually-hidden marker in the label, the same idiom as the new-tab hint. %>
+  <%# `appearance` gives the active state: filled for the current page, and plain for each other
+      page. Those are the values of Web Awesome, and not a background that a person selects.
+      `aria-current` stays for the meaning, but ⚠️ a screen reader does NOT read it: <wa-button>
+      renders its own <a> in a shadow root and sends no ARIA of the host to it. Thus the current
+      item also has a visually-hidden marker in its label, as the new-tab hint does. %>
   <%= tag.wa_button class: "admin-nav__link",
                     href: item[:path],
                     appearance: current ? "filled" : "plain",
@@ -24,8 +24,8 @@
       <span class="wa-visually-hidden">, current page</span>
     <% end %>
     <% if item[:badge] %>
-      <%# ⚠️ Wrapped in a span: a <wa-badge> slotted directly into a <wa-button> is styled as a
-          corner notification dot, which on a full-width nav button lands outside its bounds. %>
+      <%# ⚠️ This is in a span. A <wa-badge> in a slot of a <wa-button> becomes a small dot at a
+          corner, and on a nav button of the full width, that dot goes outside the button. %>
       <span slot="end">
         <wa-badge pill>
           <%= item[:badge] %>

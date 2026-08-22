@@ -1,31 +1,35 @@
 require "sidekiq/web"
-# Adds sidekiq-scheduler's "Recurring Jobs" tab to that dashboard — the schedule, each job's last
-# run, and a manual enqueue button. Must come after sidekiq/web, and rides along on the same
-# SidekiqOwnerGuard below.
+# Adds the "Recurring Jobs" tab of sidekiq-scheduler to that dashboard: the schedule, the last run
+# of each job, and a button that adds a job to the queue. This must come after sidekiq/web, and the
+# same SidekiqOwnerGuard below controls it.
 require "sidekiq-scheduler/web"
 
-# Sidekiq's queues live in the API's own Redis, the same REDIS_URL the cache uses. Pinned
-# explicitly, though Sidekiq would default to it, to mirror config/initializers/redis.rb.
+# The Sidekiq queues are in the Redis of the API, at the same REDIS_URL as the cache. This code sets
+# it, although Sidekiq would use it by default, to be the same as config/initializers/redis.rb.
 redis_url = ENV.fetch("REDIS_URL", "redis://localhost:6379")
 
-# ⚠️ The server and client read timeouts are deliberately different — don't collapse them into
-# one shared hash. The fetch loop wants to be patient; enqueueing wants to fail fast.
+# ⚠️ The read timeout of the server and the read timeout of the client are different, on purpose. Do
+# not put them in one shared hash. The fetch loop must wait; a job that goes into the queue must fail
+# quickly.
 #
-# Server: the fetch loop is a BRPOP with a 2s server-side timeout, and redis-client adds the
-# read timeout on top rather than racing it, so Sidekiq's default 3 gives a 5s budget for a
-# reply due in 2 — tight enough that ordinary CPU steal on a shared-cpu machine raises out of
-# the fetch loop. Widening to 10 makes the window 12s, absorbing blips without hiding a real
-# outage, since an unreachable Redis raises CannotConnectError and still reports immediately.
-# (See lib/sidekiq_redis_timeout_filter.rb, which drops the reports this still produces.)
+# The server: the fetch loop is a BRPOP with a 2s timeout on the server, and redis-client adds its
+# read timeout to that time and does not run the two at the same time. Thus the Sidekiq default of 3
+# gives a 5s budget for a reply that comes in 2s. That is short, and ordinary CPU competition on a
+# shared-cpu machine then raises out of the fetch loop. A value of 10 makes the window 12s, which
+# accepts a short problem and does not hide a true failure, because a Redis that the code cannot
+# reach raises CannotConnectError and still reports immediately. Refer to
+# lib/sidekiq_redis_timeout_filter.rb, which removes the reports that this still makes.
 #
-# Client: runs inside Puma, where several endpoints enqueue in-request, so a long timeout would
-# turn a Redis stall into a hung request against the 20s rack-timeout budget.
+# The client: this runs in Puma, where more than one endpoint adds a job to the queue during a
+# request. Thus a long timeout would make a Redis delay into a request that stops, against the 20s
+# rack-timeout budget.
 Sidekiq.configure_server { |config| config.redis = { url: redis_url, timeout: 10 } }
 Sidekiq.configure_client { |config| config.redis = { url: redis_url } }
 
-# Gates the Sidekiq web UI behind the owner session set by Google sign-in. It's a Rack app
-# rather than a Rails controller, but it's mounted downstream of the session middleware, so the
-# session is in env["rack.session"]. Defined inline to avoid autoload-at-boot ordering issues.
+# The owner session from the Google sign-in controls the Sidekiq web UI. That UI is a Rack app and
+# not a Rails controller, but it is below the session middleware. Thus the session is in
+# env["rack.session"]. This code is here, and not in another file, to prevent an autoload order
+# problem at the start.
 class SidekiqOwnerGuard
   def initialize(app)
     @app = app

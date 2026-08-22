@@ -1,8 +1,8 @@
 require "rails_helper"
 
-# Guards the security-critical wiring: the Sidekiq web UI must never be reachable without the
-# owner session. The Rack guard redirects unauthenticated hits to /signin before any Redis access,
-# so this needs no running Redis. (The authenticated render reads from Redis and isn't exercised.)
+# The tests for a security rule: a visitor must never reach the Sidekiq web UI with no owner
+# session. The Rack guard sends a request with no authentication to /signin before any Redis access,
+# thus these tests need no Redis. The render with a session reads Redis, and no test covers it.
 RSpec.describe "Sidekiq::Web mount", type: :request do
   before do
     allow(ENV).to receive(:[]).and_call_original

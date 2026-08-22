@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe ErrorReporter do
   describe ".report_upstream" do
-    # A stand-in for the Bugsnag::Report yielded to the notify block.
+    # A replacement for the Bugsnag::Report that the notify block gets.
     let(:report) do
       double("Bugsnag::Report", :severity= => nil, :context= => nil, :grouping_hash= => nil, add_metadata: nil)
     end

@@ -1,35 +1,35 @@
-# The Bluesky handle and app password used to open a PDS session, entered on the admin's
-# Connected apps page and held in Redis.
+# The Bluesky handle and app password that open a PDS session. The owner types them on the
+# Connected apps page of the admin, and Redis holds them.
 #
-# Not an ApplicationService: that base class exists for HTTP integrations, and this makes no
-# network calls. Validating a credential pair is StandardSite's job, since it's the thing that
-# knows how to open a session.
+# This is not an ApplicationService, because that base class is for HTTP integrations and this
+# class makes no network call. StandardSite checks a credential pair, because it is the class that
+# opens a session.
 #
-# ⚠️ The app password is encrypted at rest. It's an account-level credential that works from
-# anywhere with no client binding, and this Redis also backs the Sidekiq queues, so the key
-# (derived from secret_key_base, i.e. RAILS_MASTER_KEY) deliberately lives somewhere Redis
-# access alone can't reach.
+# ⚠️ The app password is encrypted in the store. It is an account credential that works from each
+# place, with no connection to one client, and this Redis also holds the Sidekiq queues. Thus the
+# key, which comes from secret_key_base, that is, RAILS_MASTER_KEY, is at a place that Redis access
+# alone cannot reach, on purpose.
 class BlueskyCredentials
-  # Redis hash: "handle" plaintext, "app_password" encrypted.
+  # The Redis hash: "handle" is plain text and "app_password" is encrypted.
   REDIS_KEY = "bluesky:credentials".freeze
 
   Credentials = Data.define(:handle, :app_password) do
-    # @return [Boolean] Whether both halves are present.
+    # @return [Boolean] True if both values are available.
     def usable? = handle.present? && app_password.present?
   end
 
-  # The credentials to authenticate with.
-  # @return [Credentials] With nil members when none are stored.
+  # The credentials for the session.
+  # @return [Credentials] Its members are nil when the store has no credentials.
   def self.fetch
     stored = $redis.hgetall(REDIS_KEY) || {}
     Credentials.new(handle: stored["handle"].presence, app_password: decrypt(stored["app_password"]))
   end
 
-  # @return [Boolean] Whether a usable pair has been entered in the admin.
+  # @return [Boolean] True if the owner entered a correct pair in the admin.
   def self.stored? = fetch.usable?
 
-  # Replaces the stored pair. Callers must validate it first — nothing here checks that the
-  # credentials actually open a session.
+  # Replaces the stored pair. A caller must check the pair first: no code here tests that the
+  # credentials open a session.
   # @param handle [String]
   # @param app_password [String]
   # @return [void]
@@ -38,16 +38,16 @@ class BlueskyCredentials
     nil
   end
 
-  # Forgets the stored pair, leaving the integration inert until one is entered again.
+  # Removes the stored pair. The integration then does nothing until the owner enters a new pair.
   # @return [void]
   def self.clear
     $redis.del(REDIS_KEY)
     nil
   end
 
-  # ⚠️ Returns nil rather than raising when the message can't be read — a rotated
-  # RAILS_MASTER_KEY must degrade to "not connected", which the admin can fix by re-entering the
-  # credentials, not to an exception on every page that renders the status.
+  # ⚠️ This returns nil and does not raise when the code cannot read the message. A new
+  # RAILS_MASTER_KEY must give "not connected", which the owner corrects with new credentials in
+  # the admin. It must not give an exception on each page that shows the status.
   # @param value [String, nil] The encrypted message.
   # @return [String, nil]
   def self.decrypt(value)

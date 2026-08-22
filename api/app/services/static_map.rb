@@ -3,21 +3,21 @@ require "uri"
 
 # Renders one track as a static map image.
 #
-# Nothing is composited locally: the Static Images API draws the track (an `addlayer` over the
-# track's vector tileset) and both pins server-side and returns a finished PNG, so this only ever
-# builds a URL and fetches bytes.
+# This code draws nothing. The Static Images API draws the track (an `addlayer` over the vector
+# tileset of the track) and the two pins on the server, and it returns a complete PNG. Thus this
+# code only makes a URL and gets the bytes.
 #
-# Not an ApplicationService: the response is an image, not cacheable JSON.
+# It is not an ApplicationService, because the response is an image and not cacheable JSON.
 # @see https://docs.mapbox.com/api/maps/static-images/
 class StaticMap
   DEFAULT_STYLE_URL = "mapbox://styles/mapbox/outdoors-v12".freeze
 
-  # A style URL reaches this class from a form field and ends up in a URL the server fetches, so
-  # it's matched against Mapbox's own shape rather than interpolated as given.
+  # A style URL comes to this class from a form field and goes into a URL that the server gets.
+  # Thus the code matches it against the Mapbox shape and does not use it as it is.
   STYLE_URL_FORMAT = %r{\Amapbox://styles/[\w-]+/[\w-]+\z}
 
-  # Mapbox's own styles, offered as a dropdown. A custom style is a free-text field that wins over
-  # whichever of these is picked.
+  # The Mapbox styles, in a dropdown. A custom style is a text field, and it replaces the style
+  # that the user selects here.
   # @see https://docs.mapbox.com/api/maps/styles/#mapbox-styles
   STYLE_PRESETS = {
     "mapbox://styles/mapbox/outdoors-v12" => "Outdoors",
@@ -30,7 +30,8 @@ class StaticMap
     "mapbox://styles/mapbox/navigation-night-v1" => "Navigation, night"
   }.freeze
 
-  # The marker icons on offer, named for what they mark rather than by their Maki id.
+  # The marker icons that are available. The name says what each icon marks, and it is not the
+  # Maki id.
   # @see https://labs.mapbox.com/maki-icons/
   MARKER_ICONS = {
     "pitch" => "Running",
@@ -40,28 +41,29 @@ class StaticMap
     "danger" => "DNF"
   }.freeze
 
-  # Padding and extra map are per-side, in Mapbox's order.
+  # The padding and the extra map apply to each side, in the Mapbox order.
   SIDES = %w[top right bottom left].freeze
 
-  # Ceilings for the per-side values, so a stray keystroke can't ask Mapbox for something absurd.
+  # The maximum values for each side, thus an incorrect keystroke cannot ask Mapbox for a very
+  # large image.
   MAX_PADDING = 500
   MAX_MARGIN_KM = 500
 
-  # The image is always this wide before Mapbox's @2x doubling; height is derived from the track's
-  # aspect ratio unless one is set, and clamped either way.
+  # The image always has this width before the @2x of Mapbox makes it two times larger. The aspect
+  # ratio of the track gives the height, if the settings do not set one. Both have a maximum.
   WIDTH = 1280
   MIN_HEIGHT = 800
   MAX_HEIGHT = 1280
 
-  # Approximate length of one degree of latitude in kilometers. One degree of longitude is this
-  # value scaled by the cosine of the latitude.
+  # The approximate length of one degree of latitude in kilometers. One degree of longitude is
+  # this value multiplied by the cosine of the latitude.
   KM_PER_DEGREE = 111.32
 
   HTTP_TIMEOUT = 30
   HTTP_MAX_ATTEMPTS = 3
 
-  # Every knob, with the value the Rake task used to hardcode. `start_icon` is overridden per
-  # track from its sport — see .defaults_for.
+  # All the settings, with the value that the Rake task contained. The sport of each track gives
+  # its `start_icon`. Refer to .defaults_for.
   DEFAULTS = {
     "padding_top" => 50,
     "padding_right" => 50,
@@ -86,14 +88,14 @@ class StaticMap
 
   class RenderError < StandardError; end
 
-  # The settings a freshly uploaded track starts with: the defaults, with the start marker seeded
-  # from the sport the GPX declared and the style from the environment.
+  # The settings for a new track: the defaults, with the start marker from the sport in the GPX
+  # and the style from the environment.
   #
-  # MAPBOX_STYLE_URL seeds whichever field can hold it — the dropdown if it names one of Mapbox\'s
-  # own styles, the custom field otherwise — so a configured style shows up where it\'s editable
-  # rather than as a preset that silently isn\'t selected.
+  # MAPBOX_STYLE_URL goes into the field that can hold it: the dropdown if it names a Mapbox style,
+  # or the custom field. Thus a style from the configuration appears where you can edit it, and
+  # not as a preset that the form does not select.
   #
-  # @param start_icon [String] The icon GpxTrack#start_icon suggested.
+  # @param start_icon [String] The icon from GpxTrack#start_icon.
   # @return [Hash]
   def self.defaults_for(start_icon)
     configured = ENV["MAPBOX_STYLE_URL"].to_s
@@ -108,32 +110,33 @@ class StaticMap
 
   # @param track [Hash] A TrackLibrary record: "tileset_id", "source_layer", "bounds",
   #   "start_coord", "end_coord", "title".
-  # @param settings [Hash] Render settings, merged over DEFAULTS.
+  # @param settings [Hash] The render settings, which go on top of DEFAULTS.
   def initialize(track:, settings: {})
     @track = track
     @settings = self.class.defaults_for(nil).merge(settings.to_h.compact)
   end
 
-  # @return [String] The Mapbox Static Images API URL, access token included.
+  # @return [String] The Mapbox Static Images API URL, with the access token.
   def url
-    # ⚠️ Mapbox draws overlays in order, so the LAST one listed ends up on top. Start-on-top is the
-    # default because a finish pin dropped over the start of an out-and-back hides where you began.
+    # ⚠️ Mapbox draws the overlays in order, thus the LAST one is on top. The default puts the
+    # start on top, because a finish pin over the start of an out-and-back course hides the
+    # start.
     markers = truthy?(@settings["finish_on_top"]) ? [ marker(:start), marker(:end) ] : [ marker(:end), marker(:start) ]
 
     box = bounds
     bbox = "%5B#{box[:min_lon]},#{box[:min_lat]},#{box[:max_lon]},#{box[:max_lat]}%5D"
     query = { padding: padding.join(","), access_token: render_token }.to_query
 
-    # Always @2x. The API bills per request rather than per pixel, so there is nothing to save by
-    # rendering the preview smaller, and it is shown at full width in the zoom dialog.
+    # Always @2x. The API bills for each request and not for each pixel, thus a smaller preview
+    # saves nothing, and the zoom dialog shows the preview at the full width.
     url = "https://api.mapbox.com/styles/v1/#{style_path}/static/#{markers.join(',')}/#{bbox}/#{WIDTH}x#{height}@2x?#{query}"
     url += "&addlayer=#{layer.to_json}&before_layer=road-label" if layer.present?
     url
   end
 
-  # Fetches the rendered PNG.
+  # Gets the rendered PNG.
   # @return [String] The image bytes.
-  # @raise [RenderError] When Mapbox refuses or keeps failing.
+  # @raise [RenderError] If Mapbox refuses the request or continues to fail.
   def render
     response = get_with_retries(url)
     raise RenderError, error_message_from(response) unless response.success?
@@ -141,15 +144,16 @@ class StaticMap
     response.body
   end
 
-  # @return [String] The download filename, derived from the track's title.
+  # @return [String] The download file name, which comes from the title of the track.
   def filename
     "#{@track['title'].to_s.parameterize.presence || 'map'}.png"
   end
 
   private
 
-  # The Mapbox token, resolved lazily so merely constructing this class never demands one. Prefers
-  # the secret token, which is the only one that can read the private tilesets MTS creates.
+  # The Mapbox token. The code finds it only when it is necessary, thus a new instance of this
+  # class needs no token. It uses the secret token first, because that is the only token that can
+  # read the private tilesets that MTS makes.
   # @return [String]
   def render_token
     ENV["MAPBOX_SECRET_TOKEN"].presence ||
@@ -157,8 +161,8 @@ class StaticMap
       raise(RenderError, "Mapbox access token is missing!")
   end
 
-  # The custom style wins over the dropdown, and the default catches both being unusable.
-  # @return [String] "username/style" from the chosen style URL.
+  # The custom style replaces the dropdown style, and the default applies if both are incorrect.
+  # @return [String] "username/style" from the style URL that the user selects.
   def style_path
     style = [ @settings["style_url"], @settings["style_preset"], DEFAULT_STYLE_URL ]
       .find { |candidate| candidate.to_s.match?(STYLE_URL_FORMAT) }
@@ -166,8 +170,8 @@ class StaticMap
     style.split("/")[3..4].join("/")
   end
 
-  # The track's extent, expanded by the per-side margins. Latitudes convert straight to degrees;
-  # longitudes shorten toward the poles by the cosine of the latitude.
+  # The area of the track, with the margin of each side added. A latitude changes directly into
+  # degrees. A longitude becomes shorter near the poles, by the cosine of the latitude.
   # @return [Hash{Symbol => Float}]
   def bounds
     raw = @track["bounds"] || {}
@@ -185,18 +189,18 @@ class StaticMap
     }
   end
 
-  # @return [Array<Integer>] Padding per side, in Mapbox's order.
+  # @return [Array<Integer>] The padding for each side, in the Mapbox order.
   def padding
     SIDES.map { |side| @settings["padding_#{side}"].to_i.clamp(0, MAX_PADDING) }
   end
 
-  # @return [Array<Float>] Extra kilometers of map per side, in Mapbox's order.
+  # @return [Array<Float>] The extra kilometers of map for each side, in the Mapbox order.
   def margins
     SIDES.map { |side| @settings["margin_#{side}"].to_f.clamp(0, MAX_MARGIN_KM) }
   end
 
-  # A supplied height is only honored when it clears the vertical padding — otherwise there'd be
-  # no room left to draw in, so fall back to the track's own aspect ratio.
+  # The code uses a height from the settings only when it is more than the vertical padding. If it
+  # is not, there is no space to draw in, thus the code uses the aspect ratio of the track.
   # @return [Integer]
   def height
     top, _right, bottom, _left = padding
@@ -207,7 +211,7 @@ class StaticMap
     (WIDTH / aspect_ratio).ceil.clamp(MIN_HEIGHT, MAX_HEIGHT)
   end
 
-  # @return [Float] Width in km over height in km, guarding a degenerate span.
+  # @return [Float] The width in km divided by the height in km. It checks for a span of zero.
   def aspect_ratio
     box = bounds
     center_lat = (box[:min_lat] + box[:max_lat]) / 2
@@ -224,7 +228,7 @@ class StaticMap
   end
 
   # @param which [Symbol] :start or :end.
-  # @return [String] A Mapbox pin overlay, e.g. "pin-l-rocket+18a644(-116.05,43.52)".
+  # @return [String] A Mapbox pin overlay, for example "pin-l-rocket+18a644(-116.05,43.52)".
   def marker(which)
     coordinate = @track[which == :start ? "start_coord" : "end_coord"].to_a
     icon = @settings["#{which}_icon"].to_s.gsub(/[^a-z0-9-]/i, "")
@@ -233,8 +237,8 @@ class StaticMap
     "pin-l-#{icon}+#{color}(#{coordinate[0]},#{coordinate[1]})"
   end
 
-  # The track itself, drawn from its vector tileset beneath the road labels.
-  # @return [Hash, nil] nil when the tileset isn't published yet.
+  # The track, from its vector tileset, below the road labels.
+  # @return [Hash, nil] Nil if the tileset is not published.
   def layer
     tileset_id = @track["tileset_id"]
     return if tileset_id.blank?
@@ -254,18 +258,20 @@ class StaticMap
     }
   end
 
-  # @return [String] Six lowercase hex digits, with any leading "#" and anything invalid stripped.
+  # @return [String] Six lowercase hex digits. It removes a "#" at the start and each incorrect
+  #   character.
   def hex(color)
     digits = color.to_s.delete("#").gsub(/[^0-9a-f]/i, "").downcase.first(6)
     digits.length == 6 ? digits : "000000"
   end
 
-  # Checkbox and JSON round-trips both reach here, so "0" and "false" have to read as false.
+  # A checkbox and a JSON value both come here, thus "0" and "false" must mean false.
   def truthy?(value)
     ActiveModel::Type::Boolean.new.cast(value) || false
   end
 
-  # Retries transient failures (network errors and 5xx) a bounded number of times.
+  # Does the request again after a temporary failure (a network error or a 5xx), a maximum number
+  # of times.
   def get_with_retries(url)
     attempt = 0
     begin
@@ -282,7 +288,7 @@ class StaticMap
     end
   end
 
-  # Builds a readable error from a failed response, falling back to the status code.
+  # Makes a clear error from a failed response. If it cannot, it uses the status code.
   def error_message_from(response)
     message = begin
       JSON.parse(response.body, symbolize_names: true)[:message]

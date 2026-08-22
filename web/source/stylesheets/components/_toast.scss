@@ -1,26 +1,26 @@
-// Web Awesome `<wa-toast>` notifications. We load only Web Awesome's color theme tokens
-// (stimulus/index.js), not its font tokens, and the toast stack renders in the top layer
-// where its shadow text inherits the document default (serif) rather than the site font.
-// `<wa-toast-item>` sets no font of its own, so setting the family on the host elements
-// makes it inherit into the item's shadow DOM.
-// ⚠️ The `--wa-color-*` tokens remapped below live in Web Awesome's `@layer wa-theme`, and every
-// site layer already outranks every `wa-*` layer, so the unlayered import and the `:root ` prefix
-// are belt-and-braces rather than load-bearing (see the note in _skeleton.scss).
+// The Web Awesome `<wa-toast>` messages. The app loads only the color theme tokens of Web Awesome
+// (in stimulus/index.js), and not its font tokens. The toast stack renders in the top layer, where
+// its shadow text takes the document default, which is a serif font, and not the font of the site.
+// `<wa-toast-item>` sets no font of its own, thus a font family on the host elements goes into the
+// shadow DOM of the item.
+// ⚠️ The `--wa-color-*` tokens below are in the `@layer wa-theme` of Web Awesome, and each site
+// layer already wins over each `wa-*` layer. Thus the unlayered import and the `:root ` prefix are
+// extra protection and are not necessary. Refer to the note in _skeleton.scss.
 
 :root wa-toast,
 :root wa-toast-item {
   font-family: var(--lato);
   line-height: var(--line-height-medium);
 
-  // The toast surface is driven by Web Awesome's global theme tokens (raised
-  // surface, border, normal text, neutral close button + progress track), not by
-  // the variant. Those tokens only flip to their dark values under a `.wa-dark`
-  // class, which we never set — the site toggles dark mode via
-  // `prefers-color-scheme` — so the toast would otherwise stay light (white panel,
-  // near-black text) on a dark page. Re-point them here to the same dark-palette
-  // values Web Awesome's own dark theme uses. The variant only colors the accent
-  // stripe/icon (a `-50` shade that reads the same in both modes), so it's left
-  // untouched.
+  // The global theme tokens of Web Awesome give the appearance of the toast: the
+  // raised surface, the border, the normal text, and the neutral close button and
+  // progress track. The variant does not. Those tokens change to their dark values
+  // only with a `.wa-dark` class, and the app never sets that class, because the
+  // site controls the dark mode with `prefers-color-scheme`. Thus the toast would
+  // stay light, with a white panel and almost black text, on a dark page. This code
+  // sets them to the same dark values that the dark theme of Web Awesome uses. The
+  // variant colors only the accent line and the icon, which is a `-50` shade that
+  // looks the same in both modes, thus this code does not change it.
   @include dark-mode {
     --wa-color-surface-raised:    var(--wa-color-neutral-10);
     --wa-color-surface-border:    var(--wa-color-neutral-20);

@@ -1,7 +1,8 @@
 // The main content column.
-// ⚠️ No padding here: <wa-page> already pads the slotted `main`, and adding our own doubles it.
-// No width cap either — the shell fills the window, so anything that needs a reading measure asks
-// for one itself (`wa-prose`, 65ch) instead of every page being centred in a narrow column.
+// ⚠️ There is no padding here: <wa-page> already gives padding to the `main` in its slot, and more
+// padding here makes it two times as large. There is also no maximum width: the shell fills the
+// window, thus each element that needs a reading width asks for one itself, for example `wa-prose`
+// at 65ch. Each page is not in a narrow column at the center.
 
 .admin-main {
   &__title {

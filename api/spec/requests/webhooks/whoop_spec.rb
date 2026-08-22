@@ -10,7 +10,8 @@ RSpec.describe "Webhooks::Whoop", type: :request do
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with("WHOOP_CLIENT_SECRET").and_return(client_secret)
     allow(Whoop).to receive(:new).and_return(whoop)
-    # The webhook only enqueues; jobs run in fake mode, so nothing hits Whoop/Intervals here.
+    # The webhook only adds a job to the queue. Each job runs in the fake mode, thus no code here
+    # calls Whoop or Intervals.icu.
   end
 
   def now_ms
@@ -26,7 +27,8 @@ RSpec.describe "Webhooks::Whoop", type: :request do
     }.merge(overrides)
   end
 
-  # Posts a signed Whoop webhook: base64(HMAC-SHA256(timestamp + rawBody, client_secret)).
+  # Posts a Whoop webhook with a signature: base64(HMAC-SHA256(timestamp + rawBody,
+  # client_secret)).
   def post_webhook(body, secret: client_secret, timestamp: now_ms, signature: nil)
     body = body.to_json unless body.is_a?(String)
     signature ||= Base64.strict_encode64(OpenSSL::HMAC.digest("SHA256", secret, timestamp.to_s + body))

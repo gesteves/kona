@@ -1,16 +1,16 @@
 require "digest"
 
 module StandardSiteHelpers
-  # AT Protocol "sortable base32" alphabet, used to encode TIDs.
+  # The AT Protocol "sortable base32" alphabet, for a TID.
   # @see https://atproto.com/specs/tid
   TID_ALPHABET = "234567abcdefghijklmnopqrstuvwxyz".freeze
 
-  # Derives a Contentful entry's document record key: the low 63 bits of the sys.id's SHA-256
-  # digest, encoded as a TID, since the site.standard.document lexicon requires one.
-  # Must stay identical to the api's StandardSite#document_rkey, or the AT URI emitted here
-  # won't match the record the api publishes to the PDS.
+  # Makes the document record key of a Contentful entry: the low 63 bits of the SHA-256 digest of
+  # the sys.id, as a TID, because the site.standard.document lexicon needs one.
+  # This must stay the same as StandardSite#document_rkey of the api. If it does not, the AT URI here
+  # does not agree with the record that the api publishes to the PDS.
   # @param entry_id [String] The Contentful sys.id.
-  # @return [String] A 13-character TID.
+  # @return [String] A TID of 13 characters.
   def document_rkey(entry_id)
     value = Digest::SHA256.hexdigest(entry_id.to_s).to_i(16) & ((1 << 63) - 1)
     encoded = +""

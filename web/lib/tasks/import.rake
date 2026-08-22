@@ -3,7 +3,7 @@ require "yaml"
 
 DATA_DIRECTORY = "data"
 
-# Remove all existing data files from previous imports.
+# Removes each data file from an earlier import.
 CLOBBER.include %w[ data/*.json ]
 
 namespace :import do
@@ -47,7 +47,7 @@ task import: [ :dotenv, :clobber ] do
 
   output_mutex = Mutex.new
 
-  # These are independent of each other, so they run in parallel.
+  # These do not depend on each other, thus they run at the same time.
   independent_threads = [
     [ :import_contentful, "Importing site content" ],
     [ :import_font_awesome, "Importing icons" ],
@@ -75,19 +75,22 @@ def import_contentful
   Contentful.new.save_data
 end
 
-# Icons per /api/icons call. The api resolves each cache-missed icon from Font Awesome and caps
-# total request time, so the whole allowlist in one request blows that budget on a cold cache.
+# The number of icons in one /api/icons call. The api gets each icon that is not in the cache from
+# Font Awesome, and it has a maximum request time. Thus the full list in one request goes past that
+# time when the cache is empty.
 ICON_IMPORT_BATCH_SIZE = 25
 
-# POSTs data/font_awesome.yml's allowlist to the api in batches and writes data/icons.json, the
-# family → style → [{id, svg}] tree the icon_svg helper reads. Icons are an every-page
-# dependency, so any failure raises and fails the build rather than shipping missing icons.
+# Posts the list in data/font_awesome.yml to the api, in groups, and writes data/icons.json. That
+# file is the family → style → [{id, svg}] tree that the icon_svg helper reads. Each page needs the
+# icons, thus a failure raises and stops the build, and the build does not go to production with an
+# icon that is absent.
 def import_font_awesome
   base = ENV["KONA_API_URL"].to_s.chomp("/")
   raise "KONA_API_URL is not set; cannot fetch icons from the api" if base.blank?
 
   allowlist = YAML.load_file("data/font_awesome.yml")["icons"] || {}
-  # uniq collapses duplicate ids, so a batch boundary can't emit one twice.
+  # uniq removes each id that is the same, thus the limit of a group cannot write one id two
+  # times.
   triples = allowlist.flat_map do |family, styles|
     (styles || {}).flat_map { |style, ids| Array(ids).map { |id| [ family, style, id ] } }
   end.uniq
@@ -97,7 +100,7 @@ def import_font_awesome
     tree = batch.each_with_object({}) do |(family, style, id), acc|
       ((acc[family] ||= {})[style] ||= []) << id
     end
-    # Appended in order, so the output matches the allowlist's order.
+    # The code adds them in order, thus the output has the same order as the list.
     fetch_icons_batch(base, tree).each do |family, styles|
       styles.each do |style, entries|
         ((icons[family] ||= {})[style] ||= []).concat(entries)
@@ -110,18 +113,19 @@ def import_font_awesome
   File.write("data/icons.json", icons.to_json)
 end
 
-# How many times to retry a failed icon batch, and how long to wait before each retry.
+# The number of attempts after a failed icon group, and the time to wait before each attempt.
 #
-# ⚠️ This exists because the api runs on fly machines that auto-stop. A Contentful publish
-# dispatches a build, and if it lands while the origin is cold-starting, the first request can
-# fail — and a failed icon import is deliberately fatal (icons are an every-page dependency), so
-# one cold start would fail the whole deploy. A cold start is measured in seconds, so a couple of
-# backed-off retries covers it without masking a genuinely broken origin.
+# ⚠️ This exists because the api runs on fly machines that stop by themselves. A Contentful publish
+# starts a build, and if that build comes while the origin starts, the first request can fail. A
+# failed icon import stops the build, on purpose, because each page needs the icons. Thus one cold
+# start would stop the full deploy. A cold start takes some seconds, thus two attempts with a wait
+# are sufficient, and they do not hide an origin that is truly broken.
 ICON_IMPORT_MAX_RETRIES = 3
 ICON_IMPORT_RETRY_DELAYS = [ 2, 5, 10 ].freeze
 
-# POSTs one { family => { style => [ids] } } batch to the api, retrying a failure with backoff.
-# @return [Hash] { family => { style => [{ "id", "svg" }] } }; raises once the retries are spent.
+# Posts one { family => { style => [ids] } } group to the api. On a failure it waits, then tries
+# again.
+# @return [Hash] { family => { style => [{ "id", "svg" }] } }. It raises after the last attempt.
 def fetch_icons_batch(base, tree)
   attempt = 0
   begin
@@ -148,9 +152,9 @@ def fetch_icons_batch(base, tree)
   end
 end
 
-# Fetches the standard.site DID and publication URI from the api into
-# data/standard_site.json, for the .well-known endpoint and the verification link tags.
-# Degrades silently: on any failure it writes nothing and the templates omit the markup.
+# Gets the standard.site DID and the publication URI from the api and writes them to
+# data/standard_site.json, for the .well-known endpoint and for the verification link tags.
+# On a failure it writes nothing and gives no message, and the templates then omit the markup.
 def import_standard_site
   safely_perform do
     base = ENV["KONA_API_URL"].to_s.chomp("/")
@@ -163,12 +167,14 @@ def import_standard_site
   end
 end
 
-# Fetches every entry's related-article ids from the api into data/related.json, which
-# ArticleHelpers#related_articles renders as each article's "You May Also Like" section.
+# Gets the related-article ids of each entry from the api and writes them to data/related.json.
+# ArticleHelpers#related_articles renders that data as the "You May Also Like" section of each
+# article.
 #
-# Degrades silently, like import_standard_site: on any failure it writes nothing and the section
-# is omitted. ⚠️ Deliberately NOT a build failure — the ranking is an enhancement, and the api
-# being briefly unreachable shouldn't block a content deploy the way missing icons would.
+# On a failure it writes nothing and gives no message, as import_standard_site does, and the section
+# is then absent. ⚠️ This does NOT stop the build, on purpose. The list is an improvement, and an api
+# that is unavailable for a short time must not stop a content deploy. An icon that is absent is
+# different.
 def import_related
   safely_perform do
     base = ENV["KONA_API_URL"].to_s.chomp("/")
@@ -201,8 +207,9 @@ def measure_and_output(method, description, mutex: nil)
     duration = Time.now - start_time
     log.call("❎ #{description} failed after #{format_duration(duration)}")
     log.call("   Error: #{e.message}")
-    # Fails the build here rather than as a cryptic per-page error later. Imports meant to
-    # degrade gracefully swallow their own errors via safely_perform and never reach this.
+    # This stops the build here, and not with an unclear error on each page later. An import that
+    # must continue after a failure catches its own errors with safely_perform and never comes
+    # here.
     raise
   end
 end

@@ -1,106 +1,114 @@
 # Kona — monorepo guide
 
-This file covers the **monorepo shape and the contract between the two apps**. For app-specific
-commands and conventions, read the nearest `CLAUDE.md`:
+This file gives the **shape of the monorepo and the contract between the two apps**. For the
+commands and the rules of one app, read the nearest `CLAUDE.md`:
 
 - [`web/CLAUDE.md`](web/CLAUDE.md) — Middleman static site (the blog).
 - [`api/CLAUDE.md`](api/CLAUDE.md) — Rails API serving dynamic widgets.
 - [`utilities/contentful/CLAUDE.md`](utilities/contentful/CLAUDE.md) — Contentful migrations + taxonomy.
 
-Work on one app from inside its own directory; each has its own `Gemfile`, `.env.example`, and
-test suite.
+Work on one app from its own directory. Each app has its own `Gemfile`, its own `.env.example`, and
+its own test suite.
 
 ## Repo layout
 
 | Path | What | Deploy |
 |---|---|---|
-| `web/` | Middleman 4 static site (Ruby 4.0.6). Builds the Contentful-powered blog. | Cloudflare Workers (`kona-web`) |
-| `api/` | Rails 8.1 API (Ruby 4.0.6). Serves HTML "widget" fragments embedded into the static pages at runtime, plus a Sidekiq `worker` process and an owner-facing admin UI at the root of the admin host. | fly.io (`kona-api`: `app` + `worker`), behind Cloudflare |
-| `redis/` | `fly.toml` for `kona-redis`, the API's Redis (cache + Sidekiq queues). | fly.io |
-| `utilities/` | Local-only tools. Never deployed — see below. | — |
+| `web/` | The Middleman 4 static site (Ruby 4.0.6). It builds the blog, whose content comes from Contentful. | Cloudflare Workers (`kona-web`) |
+| `api/` | The Rails 8.1 API (Ruby 4.0.6). It serves the HTML "widget" fragments that go into the static pages at run time. It also has a Sidekiq `worker` process and an admin UI for the owner, at the root of the admin host. | fly.io (`kona-api`: `app` and `worker`), behind Cloudflare |
+| `redis/` | The `fly.toml` of `kona-redis`, which is the Redis of the API: the cache and the Sidekiq queues. | fly.io |
+| `utilities/` | The local-only tools. They never go to production. Refer to the text below. | — |
 
-Each app has its own Redis via its own `REDIS_URL`: `api/` uses `kona-redis`, `web/` uses a
-separate Upstash instance. Distinct keyspaces, no shared data.
+Each app has its own Redis, through its own `REDIS_URL`: `api/` uses `kona-redis`, and `web/` uses a
+different Upstash instance. The two keyspaces are separate, and they share no data.
 
-There is also a **Cloudflare R2 bucket** mirroring Contentful's image assets, served from its own
-custom domain in the zone. No config in the repo — dashboard-side, populated by the api. See
-**The image mirror**.
+There is also a **Cloudflare R2 bucket** that holds a copy of each Contentful image asset. Its own
+custom domain in the zone serves it. There is no configuration for it in the repo: it is in the
+dashboard, and the api fills it. Refer to **The image mirror**.
 
 ### `utilities/` — local-only tools
 
-⚠️ **The point of this directory is that it isn't deployed.** `web.yml` and `api.yml` are
-path-filtered on `web/**` / `api/**`, so a change under `utilities/` builds nothing, deploys
-nothing, and never fires the Web deploy's `Cache-Tag: site` edge purge. **Don't make `web/` or
-`api/` depend on anything here** at build or request time. `.github/workflows/utilities.yml` runs
-the checks that exist (today: `utilities/aqi-map/`'s AQI golden vectors) without deploying.
+⚠️ **The purpose of this directory is that nothing here goes to production.** `web.yml` and
+`api.yml` have a path filter on `web/**` and on `api/**`. Thus a change below `utilities/` builds
+nothing, deploys nothing, and never starts the `Cache-Tag: site` edge purge of the Web deploy. **Do
+not make `web/` or `api/` depend on a file here**, at build time or at request time.
+`.github/workflows/utilities.yml` runs the checks that exist, which today are the known-correct AQI
+values of `utilities/aqi-map/`, and it deploys nothing.
 
-- **`utilities/contentful/`** — content migrations + the SKOS taxonomy toolkit.
-- **`utilities/aqi-map/`** — standalone Sinatra app serving one local page: a Mapbox map of
-  historical PurpleAir readings, screenshotted for a post's cover image. Sketch quality and
-  **not deployable** — it binds `127.0.0.1` and proxies a PurpleAir key with no auth of its own.
-  ⚠️ It **duplicates** the EPA correction and AQI conversion from `api/app/services/purple_air.rb`
-  (`utilities/` must not depend on `api/`), so a fix there won't reach it. The copy is isolated in
-  `utilities/aqi-map/lib/epa_aqi.rb` so the two can be diffed directly, and
-  `spec/epa_aqi_check.rb` pins it with golden vectors — computed from the **published equation**,
-  not from either implementation, so a shared bug can't pass. `utilities.yml` runs it.
+- **`utilities/contentful/`** — the content migrations and the SKOS taxonomy toolkit.
+- **`utilities/aqi-map/`** — a Sinatra app of its own. It serves one local page: a Mapbox map of the
+  PurpleAir readings of a time in the past, for a screenshot that becomes the cover image of a post.
+  It is a first version, and **it must not go to production**: it binds `127.0.0.1` and it proxies a
+  PurpleAir key with no authentication of its own.
+  ⚠️ It has a **copy** of the EPA correction and of the AQI conversion from
+  `api/app/services/purple_air.rb`, because `utilities/` must not depend on `api/`. Thus a
+  correction there does not reach this copy. The copy is in `utilities/aqi-map/lib/epa_aqi.rb`
+  alone, thus you can compare the two files directly. `spec/epa_aqi_check.rb` tests it against
+  known-correct values, which come from the **published equation** and not from either copy of the
+  code. Thus one error in both copies cannot pass. `utilities.yml` runs that check.
 
 ## Local development
 
-Two commands, and **which one you run is the choice of API target** — there is deliberately no flag:
+There are two commands, and **the command that you run selects the API**. There is no flag for
+that, on purpose:
 
 ```bash
 overmind start                    # web :4567 + api :3000 + the api's esbuild watch, site → the local api
 cd web && bundle exec middleman   # web only, site → the deployed api
 ```
 
-`overmind` is a prerequisite (`brew install overmind`; it pulls in tmux). It reads `Procfile.dev`
-and `.overmind.env`, and child processes inherit the latter's `KONA_API_URL`/`SITE_URL`. Since
-dotenv never overwrites an already-set variable, that's the whole mechanism — and it's why the
-plain `middleman` command still reaches production off `web/.env`. `overmind restart web` restarts
-one process; `overmind connect api` attaches a real TTY, so `binding.break` works.
+You need `overmind` (`brew install overmind`, which also installs tmux). It reads `Procfile.dev`
+and `.overmind.env`, and each child process gets the `KONA_API_URL` and the `SITE_URL` of that
+second file. dotenv never replaces a variable that has a value, and that is the full mechanism. It
+is also why the plain `middleman` command still reaches production, from `web/.env`.
+`overmind restart web` restarts one process. `overmind connect api` gives a true TTY, thus
+`binding.break` works.
 
-⚠️ **Sidekiq starts with everything else** — `overmind start` runs `web`, `api`, `js`, and
-`worker`. It used to be opt-in, since no widget endpoint enqueues a job, but the admin's Course
-maps page broke that: an uploaded GPX sits on "Processing" until `MapTilesetJob` publishes it. The
-page says so when it finds an empty process set, but the point is not to need that locally.
+⚠️ **Sidekiq starts with the other processes**: `overmind start` runs `web`, `api`, `js`, and
+`worker`. The worker was optional, because no widget endpoint adds a job to a queue. But the Course
+maps page of the admin changed that: a GPX file that a user uploads stays at "Processing" until
+`MapTilesetJob` publishes it. That page says so when it finds no Sidekiq process, but you must not
+need that message on your own machine.
 
-The `js` process is esbuild watching the api's admin bundle. It only matters for the api's admin
-pages and `/signin`; the widgets and the site don't touch it. ⚠️ Those pages raise
-`Propshaft::MissingAssetError` if the bundle was never built, so run `npm run build` in `api/` once
-after a fresh clone (`bin/setup` does it).
+The `js` process is esbuild, which watches the admin bundle of the api. It applies to the admin
+pages of the api and to `/signin` only. The widgets and the site do not use it. ⚠️ Those pages raise
+`Propshaft::MissingAssetError` when nothing made the bundle. Thus run `npm run build` in `api/` one
+time after a new clone. `bin/setup` does that.
 
-Ports: 4567 Middleman, 3000 Rails, 8787 `wrangler dev`, 6379 Redis. The api logs to
-`api/log/development.log`, **not** to its overmind pane.
+The ports: 4567 for Middleman, 3000 for Rails, 8787 for `wrangler dev`, and 6379 for Redis. The api
+writes its log to `api/log/development.log`, and **not** to its overmind pane.
 
-Two transients that look like bugs and aren't:
+Two conditions look like a problem and are not:
 
-- `overmind kill` can leave `.overmind.sock` behind, and the next `overmind start` then refuses
-  with "it looks like Overmind is already running". Delete the socket. Ctrl-C or `overmind quit`
-  exits cleanly instead.
-- A burst of `ActionController::RoutingError`s on the api's **first** page load, self-healing on
-  refresh. `routes.rb` ends in a `*unmatched` catch-all, so once routes are loaded nothing can
-  raise this — it means the route set was momentarily empty. Rails dev has
-  `enable_reloading = true` / `eager_load = false`, so the first request redraws the routes while
-  Puma's other two threads are already serving the rest of the page's five widget fetches. It is
-  a dev-mode reload race, not the proxy.
+- `overmind kill` can leave `.overmind.sock`, and the next `overmind start` then stops with "it
+  looks like Overmind is already running". Delete that socket. Ctrl-C and `overmind quit` both end
+  the session correctly.
+- A group of `ActionController::RoutingError` messages at the **first** page load of the api. They
+  go away at the next load. `routes.rb` ends with a `*unmatched` catch-all, thus nothing can raise
+  that error after Rails loads the routes. Those messages mean that the route set was empty for a
+  short time. Rails in development has `enable_reloading = true` and `eager_load = false`, thus the
+  first request draws the routes again while the two other Puma threads already answer the five
+  widget requests of the page. It is a race in the reload of the development mode, and it is not the
+  proxy.
 
-⚠️ `Procfile.dev` pins `PORT=3000` for the api. Overmind injects a Heroku-style `PORT` per process
-(5000, then +100 each) and `api/config/puma.rb` reads it, so without the pin the api comes up on
-5100 and every widget 502s against a `KONA_API_URL` that looks correct.
+⚠️ `Procfile.dev` sets `PORT=3000` for the api. Overmind gives each process a `PORT` in the Heroku
+style: 5000, then 5100, and so on. `api/config/puma.rb` reads it. Thus without that line, the api
+starts on 5100 and each widget gets a 502 against a `KONA_API_URL` that looks correct.
 
 ⚠️ `/widgets/*` and `POST /api/contact` reach `middleman server` through
-`web/lib/utils/dev_api_proxy.rb`, a dev-only Rack middleware — the static site has no page behind
-those paths, so without it every widget collapses locally. It is **not** a port of
-`web/src/api-proxy.ts` and must not become one: that file's invariants exist to make one shared
-edge cache entry safe for many viewers, and there is no edge here. `/pa/*` and the OG cards are
-deliberately not proxied; they need `wrangler dev` (see [`web/CLAUDE.md`](web/CLAUDE.md)).
+`web/lib/utils/dev_api_proxy.rb`, a Rack middleware for development only. The static site has no
+page at those paths, thus without that middleware each widget goes away on your own machine. It is
+**not** a copy of `web/src/api-proxy.ts` and it must not become one: the rules in that file make one
+shared edge cache entry safe for many viewers, and there is no edge here. `/pa/*` and the OG cards
+have no proxy, on purpose: they need `wrangler dev` (refer to [`web/CLAUDE.md`](web/CLAUDE.md)).
 
 ## Duplicated across the two apps
 
-Beyond the aqi-map copy above, five helpers exist in both `api/` and `web/` because they render
-markup that ends up on the **same page** — the static build renders an article, and the api
-re-renders the same summary text into the trending/related fragments swapped into it. Drift
-changes typography or link behavior mid-page:
+The aqi-map copy above is not the only one: five helpers are in both `api/` and `web/`, because they
+render markup that goes onto the **same page**. The static build renders an article, and the api
+renders the same summary text again, into the trending fragment and the related fragment that
+replace parts of that page. A difference between the two changes the typography, or the behavior of
+a link, in the middle of a page:
 
 | Logic | api | web |
 |---|---|---|
@@ -111,85 +119,101 @@ changes typography or link behavior mid-page:
 | `units_tag` / `add_unit_data_attributes` | `helpers/markup_helper.rb` | `helpers/markup_helpers.rb` |
 | `fix_degrees` | `helpers/text_helper.rb` | `helpers/text_helpers.rb` |
 
-⚠️ `Api::MarkupHelper#render_summary_body` is a deliberately reduced `render_body`, but the
-reductions are load-bearing in one direction: it **must** keep applying `fix_degrees` and
-`mark_affiliate_links`. Dropping the latter silently strips the `rel="sponsored nofollow noopener"`
-disclosure from an affiliate link that carries it everywhere else on the same page.
+⚠️ `Api::MarkupHelper#render_summary_body` is a smaller `render_body`, on purpose, but two of its
+steps are necessary: it **must** continue to call `fix_degrees` and `mark_affiliate_links`. Without
+the second one, an affiliate link loses its `rel="sponsored nofollow noopener"` disclosure, and that
+link has the disclosure at each other place on the same page. The removal gives no message.
 
-⚠️ `open_external_links_in_new_tabs` genuinely **diverges**: web skips same-host links, the api
-opens every absolute link, on the assumption that card bodies only ever link off-site. Nothing
-enforces that assumption.
+⚠️ `open_external_links_in_new_tabs` is truly **different** in the two apps: web omits a link to the
+same host, and the api opens each absolute link. The api assumes that a card body links only to
+another site. No test checks that assumption.
 
-The site **wordmark** and the **favicon** are also duplicated — `web/source/partials/_logo.svg.erb`
-is copied verbatim to `api/app/views/layouts/_logo.html.erb` for the admin header, and
-`web/source/favicon.ico` to `api/public/favicon.ico`. Both are benign: the two never appear on the
-same page, and drift just means a stale admin logo or tab icon. Re-copy the files if the mark
-changes.
+The site **wordmark** and the **favicon** are also in two places.
+`web/source/partials/_logo.svg.erb` is a copy in `api/app/views/layouts/_logo.html.erb`, for the
+admin header, and `web/source/favicon.ico` is a copy in `api/public/favicon.ico`. Both are safe: the
+two copies never appear on the same page, and a difference gives only an old admin logo or an old
+tab icon. Copy the files again when the mark changes.
 
 ## Code style
 
-- **Comments are concise.** Document what a method or function does, and its parameters and
-  return value, using RDoc/YARD (Ruby) or JSDoc (JS/TS). Don't document what the code already
-  says.
-- **Don't write history.** No changelogs, migration narratives, "this used to be…", benchmark
-  transcripts, or records of approaches that were tried and reverted. Those belong in git.
-- **Rationale earns its place only when it's load-bearing** — an invariant that isn't obvious
-  from the code and that a plausible "cleanup" would break. One or two sentences, flagged with
-  ⚠️. Anything longer belongs in a `CLAUDE.md`.
-- Same for these `CLAUDE.md` files: they carry what an agent can't discover by reading the code —
-  cross-app contracts, dashboard-side config, and non-obvious invariants. Keep them short.
-- Never hardcode production hostnames (below).
+- ⚠️ **Write each comment, all the inline documentation, and each change to a `CLAUDE.md` file in
+  ASD-STE100 Simplified Technical English, and keep it short.** This applies to new text and to a
+  change to text that exists. Use the active voice, a simple tense, one topic in each sentence, and
+  a maximum of 25 words in a sentence. Use the approved words: *get*, not "fetch"; *make*, not
+  "build"; *need*, not "require"; *check*, not "verify"; *because*, not "since"; *for example*, not
+  "e.g.". The technical names and the technical verbs of this domain are permitted: cache, render,
+  parse, proxy, enqueue, and more. Do not use an `-ing` clause, an idiom, or a long aside between
+  dashes.
+- **Keep each comment short.** Say what a method or a function does, and give its parameters and its
+  return value, with RDoc or YARD in Ruby, and with JSDoc in JS and TS. Do not say what the code
+  already says.
+- **Do not write history.** Write no changelog, no story of a migration, no "this used to be…", no
+  record of a measurement, and no note about a method that a person tried and then removed. Those
+  belong in git.
+- **Give a reason only when that reason is necessary**: a rule that the code does not show, and that
+  a probable "improvement" would break. Use one sentence or two, with a ⚠️. Put a longer text in a
+  `CLAUDE.md`.
+- The same applies to each `CLAUDE.md` file: it holds what an agent cannot find in the code, that
+  is, a contract between the two apps, a configuration in a dashboard, and a rule that the code does
+  not show. Keep each one short.
+- Never write a production host name in the code. Refer to the text below.
 
 ## Production domains — never hardcode
 
-⚠️ **Never hardcode the production hostnames anywhere** — code, comments, docs, examples, tests,
-CI config. This covers the public site host, the public API host, the admin host, and the fly.io
-origin host. They come from configuration:
+⚠️ **Never write a production host name at any place**: not in the code, not in a comment, not in a
+document, not in an example, not in a test, and not in the CI configuration. This applies to the
+public site host, the public API host, the admin host, and the fly.io origin host. Each one comes
+from the configuration:
 
-- API origin: `KONA_API_URL` (web build, `/widgets/*` proxy, api's CI Slack link).
-- Public API host: `API_HOST` (api — the route constraint that keeps the owner-facing routes off
-  it; host only, no scheme).
-- Site URL: `URL` (web), `SITE_URL` (api).
-- Whoop redirect: `WHOOP_REDIRECT_URI` (⚠️ must name the **admin** host — the callback route
-  doesn't exist on the public API host).
+- The API origin: `KONA_API_URL`. The web build, the `/widgets/*` proxy, and the Slack link of the
+  CI of the api use it.
+- The public API host: `API_HOST`, in the api. The route constraint uses it to keep each route for
+  the owner off that host. Give the host name only, with no scheme.
+- The site URL: `URL` in web, and `SITE_URL` in the api.
+- The Whoop redirect: `WHOOP_REDIRECT_URI`. ⚠️ It must name the **admin** host, because the callback
+  route does not exist on the public API host.
 
-Where a placeholder is genuinely needed, use `https://<your-app-host>/…`.
+Where you need an example host name, use `https://<your-app-host>/…`.
 
-The **root `README.md` is the one exception**: its opening line links the site by name, which is
-what a README is for, and nothing reads it. The rule is about hostnames that *behave* — anything a
-build, a request, a test, or a workflow resolves.
+The **root `README.md` is the one exception**: its first line links to the site by its name, which is
+the purpose of a README, and no code reads that file. This rule is about a host name that a build, a
+request, a test, or a workflow *uses*.
 
 ## Cloudflare sits in front of everything
 
-⚠️ **Nothing in this repo configures the zone.** It's all dashboard-side, invisible to `grep`, and
-several code paths hard-depend on it. Assume every production request traverses Cloudflare before
-reaching the Worker or fly, and check the zone before concluding something is a code problem.
+⚠️ **No file in this repo configures the zone.** Each setting is in the dashboard, `grep` cannot
+find it, and more than one code path needs it. Each production request goes through Cloudflare
+before it reaches the Worker or fly. Thus read the zone before you decide that a problem is in the
+code.
 
-⚠️ Every rule below names hostnames **typed by hand and never validated**. A misspelled host saves
-cleanly, shows as Active, and matches nothing — silently. This has already happened once. Paste
-hostnames from the zone's DNS records, then confirm the rule's Events counter is non-zero.
+⚠️ Each rule below names a host name that **a person typed and that nothing checked**. A host name
+with an error saves correctly, shows as Active, and matches nothing, and it gives no message. That
+already occurred one time. Copy each host name from the DNS records of the zone, then check that the
+Events counter of the rule is more than zero.
 
-- **Client IP** — `CF-Connecting-IP` is the only real visitor IP; fly's `Fly-Client-IP` is a
-  Cloudflare PoP. Read by `api/config/initializers/rack_attack.rb` and `web/src/log.ts`. It's
-  spoofable by anything hitting an origin directly, so it may key throttling and logging but must
-  **never** gate a ban.
-- **Images** — Cloudflare Images serves every transformation from `<IMAGES_URL>/cdn-cgi/image/…`,
-  fetching the source from the R2 mirror. Requires **Transformations** enabled with the mirror
-  host on the source allowlist.
-  ⚠️ **Never add `*.ctfassets.net` to that allowlist.** Its absence is load-bearing: it makes a
-  bad or missing `IMAGE_HOST` fail loudly. Allowlisting ctfassets instead renders a perfect-looking
-  site straight off Contentful while draining the metered bandwidth the mirror exists to protect.
-- **OG cards** — pages with no cover image get an `og:image` rendered on demand by the `kona-web`
-  Worker at `<page path>og.png` (`web/src/og.ts`). Needs the **Workers Paid** plan (~100 ms CPU
-  per render vs Free's 10 ms limit). Details in [`web/CLAUDE.md`](web/CLAUDE.md).
-- **Managed transform** — "Add visitor location headers" must be on, or `CF-IPCity`/`CF-Region`
-  are absent and geo logging degrades to country-only.
+- **The client IP** — `CF-Connecting-IP` is the only true visitor IP. The `Fly-Client-IP` of fly is
+  a Cloudflare PoP. `api/config/initializers/rack_attack.rb` and `web/src/log.ts` read it. Anything
+  that reaches an origin directly can write a false value in it. Thus it can be the key of a
+  throttle and of a log line, but it must **never** control a ban.
+- **The images** — Cloudflare Images serves each transformation from `<IMAGES_URL>/cdn-cgi/image/…`,
+  and it gets the source from the R2 mirror. This needs **Transformations** on, with the mirror host
+  in the list of the permitted sources.
+  ⚠️ **Never add `*.ctfassets.net` to that list.** Its absence is necessary: it makes a bad or
+  absent `IMAGE_HOST` fail with a message. With ctfassets in the list, the site looks correct and it
+  comes directly from Contentful, and it uses the metered bandwidth that the mirror protects.
+- **The OG cards** — a page with no cover image gets an `og:image` that the `kona-web` Worker renders
+  when it is necessary, at `<page path>og.png` (refer to `web/src/og.ts`). This needs the **Workers
+  Paid** plan: a render takes approximately 100 ms of CPU, and the Free plan permits 10 ms. Refer to
+  [`web/CLAUDE.md`](web/CLAUDE.md).
+- **A managed transform** — "Add visitor location headers" must be on. Without it, `CF-IPCity` and
+  `CF-Region` are absent and the log has the country only.
 - **`/cdn-cgi/*` never reaches an origin.** Cloudflare answers it at its own edge.
 
 ### Cache Response Rules (tagging)
 
-Deploys do **not** self-invalidate at the edge, so invalidation is explicit: a rule tags responses
-`Cache-Tag: site`, and `.github/workflows/web.yml` purges that tag on every deploy.
+A deploy does **not** invalidate the edge by itself. Thus the invalidation is a separate step: a
+rule gives each response the tag `Cache-Tag: site`, and `.github/workflows/web.yml` purges that tag
+at each deploy.
 
 ```
 (http.host eq "<site host>" and not starts_with(http.request.uri.path, "/cdn-cgi/"))
@@ -200,50 +224,54 @@ or
 ))
 ```
 
-The first branch is the whole static build. The second is the widget fragments that render
-**Contentful** content, matched by namespace — articles and events are Contentful content types,
-so anything under those prefixes is Contentful-backed by definition, and a new widget there is
-covered automatically. A Contentful publish dispatches a deploy, which fires the purge, so those
-widgets can't serve pre-edit content for their full edge TTL.
+The first part covers the full static build. The second part covers the widget fragments that
+render **Contentful** content, and it matches them by their namespace. Articles and events are
+Contentful content types, thus each path below those prefixes comes from Contentful, and this rule
+covers a new widget there without a change. A Contentful publish starts a deploy, which does the
+purge. Thus those widgets cannot serve content from before an edit for their full edge TTL.
 
-⚠️ **Never collapse this to a path-only or host-only match, and never widen the second branch to
-`/widgets/`.** A purge drops a fragment's `stale-while-revalidate` / `stale-if-error` copies along
-with the fresh one, and those are what keep widgets rendering through a fly outage. Blanket-tagging
-every widget would mean a Contentful publish landing mid-outage collapses all of them site-wide.
-The live-data widgets (`weather/current`, `activity-stats`, `whoop`, `plausible/pageviews/:id`)
-render nothing from Contentful and sit in their own namespaces, which is what keeps them out.
+⚠️ **Never change this into a match on the path only or on the host only, and never widen the second
+part to `/widgets/`.** A purge removes the `stale-while-revalidate` and `stale-if-error` copies of a
+fragment with the fresh copy, and those copies keep the widgets on the page through a fly failure.
+With the tag on each widget, a Contentful publish during a failure would remove each widget on the
+full site. The live-data widgets — `weather/current`, `activity-stats`, `whoop`, and
+`plausible/pageviews/:id` — render nothing from Contentful and are in their own namespaces, and that
+is what keeps them out of this rule.
 
-⚠️ **The OG card paths are deliberately NOT excluded from the first branch.** Article cards are
-content-addressed and never need purging, but **listing pages** (blog index, tag archives, home)
-aren't Contentful entries, so their card URL is fixed forever while their `og:title` can change.
-For those, the deploy purge is the only automatic refresh — and it's automatically correct, since
-the thing that changes such a title is a Contentful publish.
+⚠️ **The OG card paths are NOT outside the first part, on purpose.** The content addresses each
+article card, thus such a card needs no purge. But a **listing page** — the blog index, a tag
+archive, and the home page — is not a Contentful entry. Thus its card URL never changes, and its
+`og:title` can change. For those pages, the deploy purge is the only automatic refresh, and it is
+always correct, because a Contentful publish is the thing that changes such a title.
 
-⚠️ **The image-mirror host is deliberately absent from both branches.** Its objects are immutable
-and content-addressed, so there's nothing a purge could fix, while tagging them would dump the
-entire image cache on every content publish.
+⚠️ **The host of the image mirror is absent from both parts, on purpose.** Each of its objects is
+immutable and the content gives its address, thus a purge can correct nothing. And with the tag,
+each content publish would remove the full image cache.
 
-A **second** rule tags every widget on the api host `widgets`, ordered **after** the `site` rule
-(never First — if Cloudflare stops at the first match, an earlier `widgets` rule would silently end
-the deploy purge for the Contentful-backed widgets). It exists solely to make a manual
-`POST /zones/<id>/purge_cache` with `{"tags":["widgets"]}` one call instead of ~60.
+A **second** rule gives each widget on the api host the tag `widgets`, and it is **after** the
+`site` rule. Never put it first: if Cloudflare stops at the first rule that matches, a `widgets` rule
+before the other one would end the deploy purge of the Contentful widgets, and give no message. That
+second rule exists only to make a manual `POST /zones/<id>/purge_cache` with `{"tags":["widgets"]}`
+one call and not approximately 60.
 
-⚠️ **Never wire `widgets` into the deploy purge.** That workflow purges `{"tags":["site"]}` and
-must keep purging only that, for the reason above. Reach for the manual lever when a widget's
-cached copy is wrong in a way waiting won't fix — a `cache_widget` TTL change (a cached fragment
-keeps the `CDN-Cache-Control` it was *stored* with) or a markup change that must land in step with
-the web placeholder.
+⚠️ **Never put `widgets` in the deploy purge.** That workflow purges `{"tags":["site"]}`, and it must
+purge that tag only, for the reason above. Use the manual purge when the cached copy of a widget is
+incorrect and time cannot correct it: after a change to a `cache_widget` TTL, because a cached
+fragment keeps the `CDN-Cache-Control` that it had when it went into the cache, and after a markup
+change that must arrive with the change to the web placeholder.
 
-⚠️ A **Contentful-backed widget added under a NEW top-level namespace needs this rule edited in
-the dashboard**, and nothing in the repo will remind you — it will go stale forever, silently.
+⚠️ A **Contentful widget below a NEW top-level namespace needs a change to this rule in the
+dashboard**, and no file in the repo gives you that message. Without that change, the widget serves
+old content for all time, and it gives no message.
 
-(Tags must come from a Cache Response Rule; a `Cache-Tag` response header is not consumed by
-Cloudflare. These rules run in the `http_response_cache_settings` phase, after the origin response
-and including Worker subrequests, which is what puts the widget fragments in reach.)
+(Each tag must come from a Cache Response Rule. Cloudflare does not read a `Cache-Tag` response
+header. These rules run in the `http_response_cache_settings` phase, after the response of the
+origin, and that phase includes each subrequest of a Worker. That is what puts the widget fragments
+in reach.)
 
 ### Cache Rules (edge TTL)
 
-Exactly one, scoped far more narrowly than it looks like it needs to be:
+There is one rule, and its scope is much smaller than it appears to need:
 
 ```
 http.host eq "<site host>"
@@ -254,319 +282,341 @@ and not starts_with(http.request.uri.path, "/api/")
 and not starts_with(http.request.uri.path, "/pa/")
 ```
 
-Eligible for cache; **Edge TTL: ignore cache-control, 1 year**; **Browser TTL: respect origin**.
+The response can go in the cache. **Edge TTL: ignore cache-control, 1 year.** **Browser TTL: respect
+origin.**
 
-What it buys is **archive residency** — most URLs here are old posts getting a handful of hits per
-PoP, which fall out of a short edge TTL between visits. The TTL is a ceiling, not a promise: PoPs
-evict under LRU regardless, so it only ever stops being the binding constraint. Why each exclusion:
+The purpose is to **keep the archive in the cache**. Most URLs here are old posts, and each PoP gets
+few requests for them. Thus a short edge TTL removes them between two visits. The TTL is a maximum
+and not a promise: each PoP removes an entry under LRU in each condition, thus this TTL only stops
+being the limit. The reason for each exclusion:
 
-- **`contains "."`** isolates HTML (page URLs are extensionless), leaving fingerprinted assets on
-  the `immutable` policy they already declare correctly. It's also what keeps the **OG cards** out
-  without a clause of its own — which is why that route carries an extension.
-- **`/widgets/`, `/api/`, `/pa/`** — three of the four `run_worker_first` route families live on
-  the site host and are extensionless. A 1-year TTL would pin every widget indefinitely, and
-  caching `/pa/*` would corrupt analytics. **A new `run_worker_first` entry needs a matching
-  exclusion here**, and nothing in the repo will remind you.
+- **`contains "."`** selects the HTML, because a page URL has no extension. Thus each asset with a
+  fingerprint keeps the `immutable` policy that it already declares correctly. It is also what keeps
+  the **OG cards** out of this rule with no clause of their own, and that is why that route has an
+  extension.
+- **`/widgets/`, `/api/`, and `/pa/`** — three of the four `run_worker_first` route families are on
+  the site host and have no extension. A TTL of one year would keep each widget in the cache for all
+  time, and a cached `/pa/*` would give incorrect analytics. **A new `run_worker_first` entry needs
+  a matching exclusion here**, and no file in the repo gives you that message.
 
-⚠️ **Never add a cache rule on the api host.** Widget TTLs come from the origin's own
-`CDN-Cache-Control`; a cache rule would override them wholesale.
+⚠️ **Never add a cache rule on the api host.** The `CDN-Cache-Control` of the origin gives the TTL of
+each widget, and a cache rule would replace each of those values.
 
-⚠️ **The deploy purge is the only thing standing between a 1-year TTL and a page pinned for a
-year.** The rule ignores `Cache-Control` outright, so a purge that silently matches nothing leaves
-the edge serving that copy essentially forever. Treat a purge failure in `web.yml` as a page-level
-outage.
+⚠️ **The deploy purge is the only thing between a TTL of one year and a page in the cache for one
+year.** The rule ignores `Cache-Control`, thus a purge that matches nothing, with no message, leaves
+that copy at the edge for almost all time. Count a purge failure in `web.yml` as an outage of the
+page.
 
 ### Zone security rules
 
-The zone is on Cloudflare **Pro**, so WAF **Managed Rules** and **Super Bot Fight Mode** apply
-zone-wide — **including the api host**, where nearly all traffic is machine-to-machine and looks
-exactly like what those features exist to block.
+The zone is on Cloudflare **Pro**, thus the WAF **Managed Rules** and **Super Bot Fight Mode** apply
+to the full zone, and this **includes the api host**. Almost all the traffic there is between two
+machines, and it looks exactly like the traffic that those two features stop.
 
-⚠️ **The skip rule must exist *before* those features are enabled**, or every widget 403s site-wide
-the moment SBFM goes on.
+⚠️ **The skip rule must exist *before* you set those features on.** Without it, each widget gives a
+403 on the full site at the moment that SBFM starts.
 
-Custom rules, evaluated top to bottom. The BLOCK rules stay above the skip, and the skip does not
-tick "All remaining custom rules":
+The custom rules, in order from the top. Each BLOCK rule stays above the skip rule, and the skip
+rule does not have "All remaining custom rules" on:
 
 | # | Rule | Expression | Action |
 |---|---|---|---|
-| 1 | Abusive Linux crawler with fake Google referrer | desktop-Linux Chrome UA + `google.com` referer | Block |
-| 2 | Block scanner noise | path families no host in the zone serves (see below) | Block |
-| 3 | Block access to original images | `http.host eq "<image host>" and not any(http.request.headers["via"][*] contains "image-resizing")` | Block |
-| 4 | Skip bot protection off the admin host | `http.host ne "<admin host>"` | Skip → all managed rules **and** all SBFM rules |
+| 1 | A bad Linux crawler with a false Google referrer | A desktop Linux Chrome UA and a `google.com` referer | Block |
+| 2 | Block the scanner noise | The path families that no host in the zone serves. Refer to the text below. | Block |
+| 3 | Block a request for an original image | `http.host eq "<image host>" and not any(http.request.headers["via"][*] contains "image-resizing")` | Block |
+| 4 | Skip the bot protection off the admin host | `http.host ne "<admin host>"` | Skip → each managed rule **and** each SBFM rule |
 
-**Rule 1** is knowingly over-broad: those conditions also match a real person on desktop Linux
-clicking a Google result, and blocking them is an accepted cost. The bot gets through managed,
-non-interactive, **and** interactive challenges, so UA + referer is the only thing left that stops
-it. Don't narrow it to challenges — that's the approach that already failed.
+**Rule 1** matches too much, and we know that: those conditions also match a true person on a desktop
+Linux machine who clicks a Google result, and a block of that person is an accepted cost. The bot
+goes past a managed challenge, a challenge with no interaction, **and** an interactive challenge.
+Thus the UA and the referer are the only things left that stop it. Do not change it into a
+challenge: that method already failed.
 
-**Rule 2** is one big `or` over `lower(http.request.uri.path)`, matching by *family*: known-bad
-extensions (`.php`, `.env`, `.sql`, `.yml`, `.pem`, `.key`, …), tool/framework prefixes (`/wp-`,
-`/cgi-bin/`, `/actuator/`, `/phpmyadmin/`, `/k8s/`, `/terraform/`, `/secrets/`, `/config/`,
-`/deploy/`, `/flask/`, `/pki/`, `/home/`, `/analytics/`), secret-material filenames (`credential`,
-`cognito`, `/id_`), any **dot-segment anywhere** (`contains "/."`, with `/.well-known/` exempted),
-and anything outside `GET`/`HEAD`/`POST`.
+**Rule 2** is one long `or` over `lower(http.request.uri.path)`, and it matches by *family*: the
+extensions that a scanner uses (`.php`, `.env`, `.sql`, `.yml`, `.pem`, `.key`, and more); the
+prefixes of a tool or a framework (`/wp-`, `/cgi-bin/`, `/actuator/`, `/phpmyadmin/`, `/k8s/`,
+`/terraform/`, `/secrets/`, `/config/`, `/deploy/`, `/flask/`, `/pki/`, `/home/`, `/analytics/`);
+the file names of secret material (`credential`, `cognito`, `/id_`); a **dot segment at each
+position** (`contains "/."`, but not `/.well-known/`); and each method that is not `GET`, `HEAD`, or
+`POST`.
 
-⚠️ Scanners **percent-encode the dots** (`/terraform/%2eenv%2estaging`) to walk past extension
-matching, so the rule also blocks a bare `contains "%2e"`. Whether that or the decoded form fires
-depends on the zone's **Normalize incoming URLs** setting, and Security Events shows the raw path
-either way — so you cannot tell which form the rule saw. Every clause is chosen to match in *both*
-forms; don't drop either as redundant.
+⚠️ A scanner writes each **dot as a percent escape** (`/terraform/%2eenv%2estaging`), to go past a
+match on the extension. Thus the rule also blocks a plain `contains "%2e"`. The **Normalize incoming
+URLs** setting of the zone decides which of the two forms the rule sees, and Security Events shows
+the raw path in both conditions. Thus you cannot know which form the rule saw. Each clause matches in
+*both* forms, and you must remove neither one.
 
-⚠️ The prefixes are `starts_with`-anchored and the rule is zone-wide. `activate :directory_indexes`
-means pages are served at `/<slug>/`, so a top-level page slugged `config`, `home`, `analytics`, or
-`deploy` would be blocked by its own prefix clause — check `data/pages.json` before adding a prefix,
-and remember this if a new page ever 403s. Every clause must also stay false for the api host
-(`/widgets/`, `/api/`, `/webhooks/`, `/whoop/`, `/auth/`, `/signin`, `/signout`, `/sidekiq`, `/up`)
-and for the R2 key shape (`{space}/{asset id}/{token}/{filename}`).
+⚠️ Each prefix uses `starts_with`, and the rule applies to the full zone. `activate
+:directory_indexes` puts each page at `/<slug>/`. Thus this rule would block a top-level page with
+the slug `config`, `home`, `analytics`, or `deploy`, through its own prefix clause. Read
+`data/pages.json` before you add a prefix, and read this note again if a new page ever gives a 403.
+Each clause must also be false for the api host (`/widgets/`, `/api/`, `/webhooks/`, `/whoop/`,
+`/auth/`, `/signin`, `/signout`, `/sidekiq`, and `/up`) and for the shape of an R2 key
+(`{space}/{asset id}/{token}/{filename}`).
 
-⚠️ **The admin UI is mounted at the root of the admin host**, so its pages claim top-level paths
-(`/spam`, `/location`, `/connected-apps`, `/course-maps` today) and are subject to the same trap
-from the other direction: a new admin page named after one of these prefix families would 403
-zone-wide. Check this rule before naming one.
+⚠️ **The admin UI is at the root of the admin host**, thus its pages use top-level paths: today
+`/spam`, `/location`, `/connected-apps`, and `/course-maps`. They have the same problem from the
+other side: a new admin page with the name of one of those prefix families would give a 403 in the
+full zone. Read this rule before you give a name to a new page.
 
-**Rule 3** tells "Cloudflare Images fetching a source" apart from "someone typing the URL in" via
-the `image-resizing` marker Cloudflare puts in `Via`.
+**Rule 3** knows "Cloudflare Images gets a source" from "a person types the URL", through the
+`image-resizing` text that Cloudflare puts in `Via`.
 
-⚠️ **Never simplify it to a bare host block** — the transformation's own fetch traverses the rules
-pipeline, so a blanket block 403s **every image on the site**. After editing, verify **both**
-directions: a direct `curl` must 403, *and* a page must still render its images.
+⚠️ **Never change it into a block of the full host.** The fetch of the transformation also goes
+through the rules, thus a block of the host gives a 403 for **each image on the site**. After an
+edit, check **both** directions: a direct `curl` must give a 403, *and* a page must still show its
+images.
 
-⚠️ **It is friction, not a boundary**, and both gaps are measured: `Via` is an ordinary request
-header (`curl -H 'Via: 1.1 image-resizing'` returns 200), and the transformation endpoint on the
-site host takes an arbitrary width, so `/cdn-cgi/image/width=7728/<source>` returns a full-resolution
-render. The only thing that would bound the maximum obtainable resolution is **capping the stored
-master** (mirroring `?w=2560` instead of the original).
+⚠️ **It is a difficulty and not a boundary**, and a measurement gave the size of the two gaps. `Via`
+is an ordinary request header (`curl -H 'Via: 1.1 image-resizing'` gives a 200), and the
+transformation endpoint on the site host takes each width. Thus
+`/cdn-cgi/image/width=7728/<source>` gives a render at the full resolution. Only a **smaller stored
+original** would limit the resolution that a person can get: the mirror would hold `?w=2560` and not
+the original file.
 
-**Rule 4** is one condition rather than a per-host path allowlist because **the api app enforces
-the split itself**: `API_HOST` in `api/config/routes.rb` draws the owner-facing routes (`/signin`,
-`/signout`, `/auth/*`, `/whoop/auth`, `/whoop/callback`, `/sidekiq`, and the admin UI at `/`) only
-off the admin host, so the
-public api host answers nothing but `/up` and the three machine namespaces.
+**Rule 4** is one condition and not a list of the permitted paths of each host, because **the api app
+does that itself**: `API_HOST` in `api/config/routes.rb` draws each route for the owner off the admin
+host only. Those routes are `/signin`, `/signout`, `/auth/*`, `/whoop/auth`, `/whoop/callback`,
+`/sidekiq`, and the admin UI at `/`. Thus the public api host answers only `/up` and the three
+machine namespaces.
 
-⚠️ **That route constraint is the whole reason this rule is safe.** An owner-facing route drawn
-outside it lands on a host where managed rules and SBFM are skipped, and nothing in the zone would
-notice. `api/spec/requests/host_constraints_spec.rb` pins both directions.
+⚠️ **That route constraint is the reason that this rule is safe.** A route for the owner outside that
+constraint goes on a host with no managed rules and no SBFM, and nothing in the zone would find it.
+`api/spec/requests/host_constraints_spec.rb` tests both directions.
 
-⚠️ **It's a denylist, so any hostname added to the zone is unprotected by default** — a staging
-subdomain, a second origin, a new service. The earlier allowlist form failed in the opposite and
-much louder direction. Name new hosts here deliberately.
+⚠️ **This rule is a denylist, thus each new host name in the zone has no protection by default**: a
+staging subdomain, a second origin, and a new service. The list of permitted hosts, which this rule
+had before, failed in the opposite direction and gave a much clearer message. Add each new host here,
+with care.
 
-Why the skip is needed at all, host by host:
+The reason for the skip rule, for each host:
 
-- **Site host** — SBFM was blocking **feed readers and Open Graph scrapers**. "Verified bots:
-  Allow" covers Googlebot/Bingbot but not Slack/Mastodon/Discord unfurlers or RSS clients, which
-  are exactly the traffic a blog wants. Those unfurlers are also the only consumers of the OG
-  cards. ⚠️ The host is not purely static: `run_worker_first` claims `/widgets/*`, `/api/contact`,
-  `/pa/*`, and the card paths, and `POST /api/contact` is a real intake carrying arbitrary user
-  prose. Managed rules were never the layer defending it — the honeypot, Turnstile, Akismet, the
-  length caps, and the `contact/ip` throttle are. Don't let this skip become a reason to thin
-  those out.
-- **Image host** — the source fetch has no browser fingerprint at all, the textbook "definitely
-  automated" verdict, so SBFM would collapse every image at once.
-- **Public api host** — `web/src/api-proxy.ts` sends only an `authorization` header,
-  deliberately (the cache entry must be byte-identical for every viewer), which is the same
-  "definitely automated" fingerprint. `/api/` also covers the build-time callers. `/webhooks/`
-  carries unattended POSTs of arbitrary Contentful rich text that will trip a managed injection
-  rule sooner or later; both are HMAC-verified, so managed rules add nothing. ⚠️ A block there
-  fails **silently** — nothing surfaces an error, the PDS sync simply stops happening.
-- **Admin host** — the one host left protected, and the only one whose traffic is a real browser
-  driven by one person: Google sign-in, the admin UI at the host root, the Sidekiq UI, the Whoop OAuth
-  round-trip. A managed challenge there is survivable in a way it is nowhere else. (The admin UI's
-  fingerprinted `/assets/*` ride along on this host; SBFM's **static resource protection is off**,
-  which is what keeps them from being challenged.) ⚠️ Point external uptime checks at
-  `/up` on the **public** host; fly's own checks reach the app on its internal host and never
-  traverse the zone at all.
+- **The site host** — SBFM blocked **each feed reader and each Open Graph scraper**. "Verified bots:
+  Allow" covers Googlebot and Bingbot, but not the unfurler of Slack, Mastodon, or Discord, and not
+  an RSS client. Those are exactly the traffic that a blog needs. Those unfurlers are also the only
+  readers of the OG cards. ⚠️ This host is not static only: `run_worker_first` takes `/widgets/*`,
+  `/api/contact`, `/pa/*`, and the card paths, and `POST /api/contact` takes true text from a user.
+  The managed rules never protected that endpoint: the honeypot, Turnstile, Akismet, the length
+  limits, and the `contact/ip` throttle protect it. Do not use this skip rule as a reason to remove
+  one of those.
+- **The image host** — the source fetch has no browser fingerprint, which is the clearest "this is a
+  machine" result. Thus SBFM would remove each image at the same time.
+- **The public api host** — `web/src/api-proxy.ts` sends an `authorization` header only, on purpose,
+  because the cache entry must have the same bytes for each viewer. That gives the same "this is a
+  machine" fingerprint. `/api/` also covers the callers at build time. `/webhooks/` takes POSTs with
+  Contentful rich text, with no person present, and that text will start a managed injection rule at
+  some time. An HMAC checks both, thus a managed rule adds nothing. ⚠️ A block there gives **no
+  message**: nothing shows an error, and the PDS sync simply stops.
+- **The admin host** — the one host with the protection on, and the only one whose traffic is a true
+  browser that one person controls: the Google sign-in, the admin UI at the root of the host, the
+  Sidekiq UI, and the Whoop OAuth round trip. A managed challenge there is acceptable, and it is not
+  acceptable at any other host. The `/assets/*` files of the admin UI, which have a fingerprint, are
+  also on this host, and the **static resource protection of SBFM is off**, which is what keeps them
+  free of a challenge. ⚠️ Point each external uptime check at `/up` on the **public** host. The
+  checks of fly reach the app on its internal host and never go through the zone.
 
-⚠️ **Rate limiting rules are deliberately NOT in the skip list.** Don't add them.
+⚠️ **The rate limiting rules are NOT in the skip list, on purpose.** Do not add them.
 
-**Managed rules** — deploy the Cloudflare Managed Ruleset with the action overridden to **Log**,
-read Security Events for a week, then switch to defaults. The **OWASP Core Ruleset** is
-deliberately **not** deployed: high-noise, and the main thing it would catch here is the contact
-form's own prose. If ever enabled: PL1, threshold High (60), action Log — never tighter.
+**The managed rules** — start the Cloudflare Managed Ruleset with the action set to **Log**, read
+Security Events for a week, then use the default actions. The **OWASP Core Ruleset** is **not** on,
+on purpose: it gives many false results, and the main thing that it would catch here is the text of
+the contact form. If you ever set it on, use PL1, the High threshold (60), and the Log action, and
+never a stricter value.
 
-**Super Bot Fight Mode** — definitely automated: Block; likely automated: Managed Challenge;
-verified bots: Allow; JS detections: on; **static resource protection: off** (it would challenge
-the site's own CSS/JS/font requests). ⚠️ It does not replace custom rule 1 — that scraper walks
-through interactive challenges.
+**Super Bot Fight Mode** — definitely automated: Block. Likely automated: Managed Challenge. Verified
+bots: Allow. JS detections: on. **Static resource protection: off**, because it would give a
+challenge to the CSS, JavaScript, and font requests of the site. ⚠️ It does not replace custom rule
+1: that scraper goes past an interactive challenge.
 
-**Rate limiting rules** (Pro allows 2):
+**The rate limiting rules.** The Pro plan permits two:
 
-- `/api/contact` — stays on **Block**. ⚠️ Never a challenge action: the no-JS native POST path
-  can't solve one by definition, which would break the progressive-enhancement fallback.
-- Site-host crawler brake — GETs/HEADs outside `/cdn-cgi/`, per IP, ~200 req/min → Managed
-  Challenge. ⚠️ Don't tighten much below that: Pagefind fetches a burst of index chunks per
-  search and Turbo prefetches on hover, so one real reader sits well above a naive rate.
+- `/api/contact` — it stays on **Block**. ⚠️ Never use a challenge action: the native POST path with
+  no JavaScript cannot answer a challenge, and that would break the path for a browser with no
+  JavaScript.
+- A limit on a crawler on the site host — a GET or a HEAD outside `/cdn-cgi/`, for each IP,
+  approximately 200 requests each minute, then a Managed Challenge. ⚠️ Do not use a much lower
+  number: Pagefind gets a group of index files for each search, and Turbo gets a page early when the
+  pointer goes to a link. Thus one true reader is much above a simple rate.
 
-**Other zone settings**, deliberate but not load-bearing: Smart Tiered Cache on, Page Shield
-script monitoring on, Early Hints / HTTP/3 / 0-RTT / Crawler Hints on. **Polish and Mirage stay
-off** — every image already goes through `/cdn-cgi/image/*`, which picks format and quality.
+**The other zone settings.** They are deliberate but not necessary: Smart Tiered Cache on, Page
+Shield script monitoring on, and Early Hints, HTTP/3, 0-RTT, and Crawler Hints on. **Polish and
+Mirage stay off**, because each image already goes through `/cdn-cgi/image/*`, which selects the
+format and the quality.
 
-**Bot blocking is a zone rule, not code.** The `block-bots` edge function was deleted (`3c4e0044`);
-don't reintroduce it. If referral traffic looks wrong, read rule 1 before the code.
+**A zone rule blocks the bots, and no code does.** A person deleted the `block-bots` edge function
+(`3c4e0044`). Do not add it again. If the referral traffic looks incorrect, read rule 1 before you
+read the code.
 
 ## How the two apps connect
 
-The API's routes split by namespace: `/widgets/*` returns HTML fragments (proxied), `/api/*`
-accepts or returns structured data (hit directly at `KONA_API_URL`, except `POST /api/contact`),
-and `/webhooks/*` receives inbound webhooks. The web build reads three at build time:
-`GET /api/standard-site`, `GET /api/related`, and `POST /api/icons`.
+The routes of the API are in three namespaces. `/widgets/*` gives HTML fragments, through the
+proxy. `/api/*` takes or gives structured data, and a caller reaches it directly at `KONA_API_URL`,
+but `POST /api/contact` is different. `/webhooks/*` takes the inbound webhooks. The web build reads
+three paths at build time: `GET /api/standard-site`, `GET /api/related`, and `POST /api/icons`.
 
-1. Browser requests `/widgets/*` (or `POST /api/contact`) on the main site.
-2. `run_worker_first` in `web/wrangler.jsonc` claims those paths, so they invoke Worker code
-   rather than being served from the static asset layer.
-3. `web/src/api-proxy.ts` proxies to `KONA_API_URL`.
-4. The upstream fetch is made cacheable (`cf: { cacheEverything: true }` — widget URLs are
-   extensionless, so Cloudflare's extension-based default would cache nothing) and its TTL comes
-   entirely from the origin's `CDN-Cache-Control` (RFC 9213). One cached copy serves all viewers.
-   ⚠️ The entry is cached under the **api** hostname, which is why the `site` tag rule is scoped
-   to that host.
+1. A browser asks for `/widgets/*`, or does a `POST /api/contact`, on the main site.
+2. `run_worker_first` in `web/wrangler.jsonc` takes those paths, thus they go to the Worker code and
+   not to the static asset layer.
+3. `web/src/api-proxy.ts` sends the request to `KONA_API_URL`.
+4. The code makes the upstream fetch cacheable with `cf: { cacheEverything: true }`, because a widget
+   URL has no extension and the Cloudflare default, which uses the extension, would cache nothing.
+   The `CDN-Cache-Control` of the origin gives the full TTL (RFC 9213). One copy in the cache serves
+   each viewer. ⚠️ The cache holds that entry under the **api** host name, and that is why the
+   `site` tag rule applies to that host.
 
-⚠️ The proxy claims `/api/contact` **explicitly, not `/api/*`**. Don't broaden it, or you'd expose
-`POST /api/location`, `POST /api/icons`, and `POST /api/build` (which ships a production deploy)
-to the browser with the injected bearer.
+⚠️ The proxy takes `/api/contact` **only, and not `/api/*`**. Do not widen it. With `/api/*`, a
+browser could reach `POST /api/location`, `POST /api/icons`, and `POST /api/build`, which starts a
+production deploy, and the proxy would add the bearer token.
 
-Proxy invariants — don't break these:
+The rules of the proxy. Do not break one of these:
 
-- Forwards only `accept` (contact path only) and **injects** a constant
-  `Authorization: Bearer <API_TOKEN>`; the client's own `authorization` is dropped. The token is
-  the same for every viewer, so every upstream request is identical → one shared cache entry.
-  ⚠️ `API_TOKEN` must be in the Worker's dashboard secrets and **match the API's**, or every
-  widget 401s site-wide.
-- Passes the origin's `Cache-Control`, the `ETag`/`Last-Modified` validators, and the **`Age`**
-  of the edge-cached copy through. ⚠️ **`Age` is load-bearing.** The browser policy is
-  `max-age=0, stale-while-revalidate=N`, and RFC 9111 has the browser measure that window from
-  the response's age; without it every viewer gets a full-length window stacked on however long
-  the edge already held the copy. On a counter that only goes up, that reads as the number going
+- It sends `accept` only, and on the contact path only, and it **adds** a constant
+  `Authorization: Bearer <API_TOKEN>`. It removes the `authorization` header of the client. The
+  token is the same for each viewer, thus each upstream request is the same and there is one shared
+  cache entry. ⚠️ `API_TOKEN` must be in the secrets of the Worker in the dashboard, and it must
+  **be the same as the token of the API**. If it is not, each widget gets a 401 on the full site.
+- It sends the `Cache-Control` of the origin, the `ETag` and `Last-Modified` validators, and the
+  **`Age`** of the copy in the edge cache. ⚠️ **`Age` is necessary.** The browser policy is
+  `max-age=0, stale-while-revalidate=N`, and RFC 9111 makes the browser measure that window from
+  the age of the response. Without Age, each viewer gets a full window in addition to the time that
+  the edge already held the copy. On a counter that only goes up, that looks like a number that goes
   *down*.
-- Does **not** forward `CDN-Cache-Control` downstream.
-- Keys the edge cache on **path only** — no query params, no per-user vary. Keep widget inputs in
-  the **path**.
-- Returns an empty, briefly-cached `502` if the upstream throws, so an origin blip collapses the
-  widget rather than pinning an error.
-- **Contact only:** forwards the real visitor IP/UA/geo as `X-Kona-Client-*` (the origin can't
-  see them otherwise — the zone rewrites `CF-*` to describe the Worker's egress) and the
-  `Location` header for the no-JS redirect. The API uses these for Akismet, the rate limit, and
-  the notification email — **never** for a ban.
+- It does **not** send `CDN-Cache-Control` to the browser.
+- The **path alone** is the key of the edge cache: no query parameter, and no value for each user.
+  Put each input of a widget in the **path**.
+- It gives an empty `502` with a short cache time when the upstream call raises. Thus a short
+  problem at the origin removes the widget and does not keep an error in the cache.
+- **On the contact path only:** it sends the true visitor IP, UA, and geo data in the
+  `X-Kona-Client-*` headers, because the origin cannot see them: the zone changes each `CF-*` header
+  to describe the egress of the Worker. It also sends the `Location` header for the redirect of a
+  browser with no JavaScript. The API uses those values for Akismet, for the rate limit, and for the
+  notification email, and **never** for a ban.
 
 ### Contact form (`POST /api/contact`)
 
-The form is a **web partial** (`source/partials/_contact_form.html.erb`), **not** raw HTML in the
-Contentful body — SmartyPants would curl the quotes in its attributes and corrupt the field names
-and Stimulus wiring. The intro copy stays in Contentful.
+The form is a **web partial** (`source/partials/_contact_form.html.erb`), and it is **not** raw HTML
+in the Contentful body. SmartyPants would make the quotation marks in its attributes curly, and that
+would break the field names and the Stimulus attributes. The intro text stays in Contentful.
 
-`Api::ContactController` drops honeypot hits (the hidden `comment` field) and enqueues a
-`ContactMailJob`, which spam-checks with **Akismet** and emails via **Resend** (an HTTPS API — fly
-blocks outbound SMTP) with `Reply-To` set to the sender. **Progressively enhanced**: the `contact`
-Stimulus controller posts via `fetch` with `Accept: application/json` (→ 204/422, toast, no
-navigation); without JS the native POST sends `Accept: text/html` (→ 303 to `/contact/success`).
-Same endpoint, same validation for both.
+`Api::ContactController` removes each submission with a value in the honeypot, which is the hidden
+`comment` field, and it adds a `ContactMailJob` to the queue. That job does the spam check with
+**Akismet** and sends the email with **Resend**, which is an HTTPS API, because fly blocks outbound
+SMTP. It sets `Reply-To` to the sender. The form also works with no JavaScript: with JavaScript, the
+`contact` Stimulus controller posts with `fetch` and `Accept: application/json`, and it gets a 204 or
+a 422, shows a toast, and does not navigate. With no JavaScript, the native POST sends
+`Accept: text/html` and gets a 303 to `/contact/success`. Both use the same endpoint and the same
+checks.
 
-Defense layers: honeypot + Akismet (both paths), server-side length caps, a per-visitor
-rack-attack throttle on the forwarded `X-Kona-Client-IP`, and **Cloudflare Turnstile**. ⚠️
-Turnstile needs JS, so it's verified **only on the JSON path**. Turnstile and Akismet both fail
-open when *unconfigured*; when Akismet *is* configured it fails **closed** — an outage retries the
-intake job rather than delivering an unchecked message.
+The layers of protection: the honeypot and Akismet on both paths, the length limits on the server, a
+rack-attack throttle for each visitor on the `X-Kona-Client-IP` from the proxy, and **Cloudflare
+Turnstile**. ⚠️ Turnstile needs JavaScript, thus the app checks it **on the JSON path only**.
+Turnstile and Akismet both permit the message when there is *no configuration*. When Akismet *has* a
+configuration, it fails **closed**: a failure of the service makes the intake job run again, and the
+app does not deliver a message with no check.
 
-A message Akismet flags is **quarantined, not dropped**: it's held in Redis for a month and listed
-on the admin's Spam page, where releasing it delivers the email and reports the false positive
-back to Akismet. See [`api/CLAUDE.md`](api/CLAUDE.md).
+A message that Akismet marks goes to the **quarantine, and the app does not remove it**: Redis holds
+it for a month and the Spam page of the admin lists it. On that page, the owner sends the email and
+the app tells Akismet that the mark was incorrect. Refer to [`api/CLAUDE.md`](api/CLAUDE.md).
 
 ## The image mirror
 
-Every image is a Cloudflare Images transformation, and Cloudflare fetches the untransformed
-**source** from whatever host the URL names. A source outside the zone can't use Tiered Cache or
-Cache Reserve, so every PoP independently pulled the full-size original from Contentful and
-re-pulled it on eviction. So the assets are mirrored into an **R2 bucket** served from its own
-custom domain in the zone, and that hostname is the transformation source.
+Each image is a Cloudflare Images transformation, and Cloudflare gets the **source**, with no
+transformation, from the host that the URL names. A source outside the zone cannot use Tiered Cache
+and cannot use Cache Reserve. Thus each PoP got the full-size original from Contentful by itself, and
+it got that file again after an eviction. For that reason the app copies each asset into an **R2
+bucket**, which its own custom domain in the zone serves, and that host name is the source of each
+transformation.
 
-The two apps meet **only through the shape of a URL** — no request between them, no imports,
-neither validates the other:
+The two apps meet **only in the shape of a URL**: there is no request between them, there is no
+import, and neither one checks the other:
 
 | | Who | What |
 |---|---|---|
-| Writes | `api` — `AssetMirror` + `AssetSyncJob` on the asset-publish webhook, plus `rake assets:backfill` | An R2 object keyed on Contentful's path **verbatim**: `{space}/{asset id}/{token}/{filename}` |
-| Reads | `web` — `Contentful#rewrite_image_urls` at build time, gated on `IMAGE_HOST` | Swaps **only the host**, so the emitted path is that same key |
+| Writes | `api` — `AssetMirror` and `AssetSyncJob`, from the asset-publish webhook, and `rake assets:backfill` | An R2 object whose key is the Contentful path, **with no change**: `{space}/{asset id}/{token}/{filename}` |
+| Reads | `web` — `Contentful#rewrite_image_urls` at build time, and only when `IMAGE_HOST` has a value | It changes **the host only**, thus the path that it writes is that same key |
 
-⚠️ **Both sides match every `*.ctfassets.net` host and must keep matching the same set.**
-Contentful serves plenty of ordinary image assets from `downloads.ctfassets.net`, which doesn't
-support the Images API at all. Narrowing either side to `images.ctfassets.net` leaves those
-hitting Contentful forever, silently.
+⚠️ **The two sides match each `*.ctfassets.net` host, and they must continue to match the same
+set.** Contentful serves many ordinary image assets from `downloads.ctfassets.net`, and that host
+has no Images API. If you change one side to `images.ctfassets.net` only, those assets go to
+Contentful for all time, and they give no message.
 
-⚠️ **A mismatch — wrong bucket, wrong custom domain, a "tidied" key shape, `IMAGE_HOST` set before
-the backfill finished — 404s every image on the site, and nothing reports it.** Rollout order:
-bucket + custom domain + the SBFM skip + the mirror host on the Transformations allowlist → deploy
-the api with the `R2_*` secrets → `rake assets:backfill` to completion → *only then* set
-`IMAGE_HOST` in the web build env. The window between the last two steps is when images are broken,
-so keep it short — and never "fix" it by allowlisting ctfassets.
+⚠️ **A difference between the two sides makes each image on the site 404, and nothing reports it.**
+Such a difference is the wrong bucket, the wrong custom domain, a key shape that a person "improved",
+or an `IMAGE_HOST` with a value before the backfill was complete. The order of the steps: the
+bucket, the custom domain, the SBFM skip rule, and the mirror host in the Transformations list; then
+a deploy of the api with the `R2_*` secrets; then `rake assets:backfill` to its end; and *only then*
+a value for `IMAGE_HOST` in the build environment of web. The images are broken between the last two
+steps, thus keep that time short. And never correct it with ctfassets in the list.
 
-Three consequences:
+Three results:
 
-- **The mirror is publish-only; unpublish and delete are ignored on purpose.** `web` reads
-  Contentful with a **preview** token, so an unpublished asset is still referenced by built pages.
-  Objects are immutable anyway, so nothing needs invalidating.
-- **Blurhashes go through the mirror too** (`encode_blurhash` resizes via `cdn_image_url` like
-  every other image). ⚠️ It must ask for an explicit `fm:` — with no format Cloudflare returns the
-  source format, and a libvips without that loader fails the decode into a `rescue`, i.e. silently
-  no placeholder.
-- **`IMAGE_HOST` is required everywhere, including locally. It is not a rollback switch.** The
-  rewrite still no-ops when it's blank, but the allowlist names only the mirror host, so an unset
-  `IMAGE_HOST` leaves every image pointed at ctfassets and **403s the lot**. Rolling the mirror
-  back means changing the allowlist in the dashboard first.
-- **Direct access to the mirrored originals is blocked** by custom rule 3 — friction, not a
-  boundary (see above). The mirror stores true originals today (1.39GB, including a dozen 20–38MB
-  camera JPEGs), so that's what a determined caller can still reach.
+- **The mirror copies a publish only. It ignores an unpublish and a delete, on purpose.** `web` reads
+  Contentful with a **preview** token, thus a page from the build still points at an unpublished
+  asset. Each object is immutable, thus nothing needs an invalidation.
+- **A blurhash also goes through the mirror**: `encode_blurhash` resizes with `cdn_image_url`, as
+  each other image does. ⚠️ It must ask for an `fm:` value. With no format, Cloudflare returns the
+  source format, and a libvips with no loader for that format fails the decode into a `rescue`. There
+  is then no placeholder, and no message.
+- **Each environment needs `IMAGE_HOST`, and this includes your own machine. It is not a way to go
+  back.** The rewrite does nothing when the value is blank, but the Transformations list has the
+  mirror host only. Thus an `IMAGE_HOST` with no value leaves each image at ctfassets, and each one
+  gets a **403**. To go back to Contentful, change that list in the dashboard first.
+- **Custom rule 3 blocks a direct request for a mirrored original.** That rule is a difficulty and
+  not a boundary. Refer to the text above. The mirror holds the true originals today: 1.39GB, and
+  that includes twelve camera JPEG files of 20MB to 38MB. Thus a person who wants those files can
+  still get them.
 
 ## The cross-app HTML contract (most important)
 
-The API returns HTML fragments that **replace** placeholder elements in the static site, so their
-markup must stay structurally in sync across the two apps.
+The API gives HTML fragments that **replace** a placeholder element in the static site. Thus the
+markup of the two must have the same structure in the two apps.
 
 `web/source/javascripts/stimulus/controllers/live_update_controller.js` reads
-`data-live-update-url-value`, fetches the fragment, and on a **non-empty** response replaces the
-entire placeholder element. It fetches on connect when the element is a **placeholder**
-(`data-live-update-placeholder-value="true"`), or when the content for that URL is more than a
-minute old; and again on tab `visibilitychange` under the same floor. That clock is module-scoped
-and **keyed by URL**, so it outlives both the placeholder→fragment swap and a Turbo back/forward
-**restoration visit** — which re-renders a cached snapshot containing the *fragment* and never
-revalidates it. Without the clock, a restored widget would display whatever it showed when the
-user last left: a view counter visibly going backwards.
+`data-live-update-url-value`, gets the fragment, and, for a response that is **not empty**, replaces
+the full placeholder element. It gets the fragment on connect when the element is a **placeholder**
+(`data-live-update-placeholder-value="true"`), and when the content of that URL is more than one
+minute old. It gets the fragment again at a tab `visibilitychange`, with the same minimum age. That
+clock is at the module level, and its **key is the URL**. Thus it stays after the swap of the
+placeholder for the fragment, and it stays through a Turbo back or forward **restoration visit**,
+which renders a cached snapshot that contains the *fragment* and which never gets new content.
+Without that clock, a widget from a restoration visit would show the content from the last time that
+the user left the page. On a view counter, that is a number that goes down.
 
-Consequences:
+The results:
 
-- The API fragment's **outermost element must itself carry** `data-controller="live-update"` +
-  `data-live-update-url-value`, or it stops refreshing after the first swap. ⚠️ It must **NOT**
-  carry `data-live-update-placeholder-value`: that flag means "I am an empty skeleton", and on a
-  fragment it would make a transient fetch failure **delete already-rendered content**.
-- Its tag, CSS class names, and DOM shape must match the placeholder.
-- An **empty** response makes the controller **remove the element**, collapsing the widget rather
-  than leaving a stuck skeleton. An empty body is the intentional "no data" signal — don't "fix"
-  it by returning markup. This is unconditional; a non-2xx or network error, by contrast,
-  collapses **only** a placeholder.
+- The **outermost element of the API fragment must have** `data-controller="live-update"` and
+  `data-live-update-url-value`. Without them, it gets no new content after the first swap. ⚠️ It
+  must **NOT** have `data-live-update-placeholder-value`: that flag means "I am an empty skeleton",
+  and on a fragment it makes a short fetch failure **delete content that the page already shows**.
+- Its tag, its CSS class names, and its DOM shape must be the same as in the placeholder.
+- An **empty** response makes the controller **remove the element**. Thus the widget goes away and
+  no skeleton stays on the page. An empty body is the "no data" answer, on purpose. Do not change it
+  into markup. This applies in each condition. A non-2xx status and a network error are different:
+  they remove **a placeholder only**.
 
-Placeholders build the shared attributes with `live_update_attrs`
-(`web/lib/helpers/site_helpers.rb`); the API views build the matching outer element with
+A placeholder makes the shared attributes with `live_update_attrs`
+(`web/lib/helpers/site_helpers.rb`), and an API view makes the matching outer element with
 `live_update_url`.
 
-⚠️ **Not every web-side element is a skeleton.** `live_update_attrs(url, placeholder: false)`
-marks one the build rendered with **real content**, which the fragment then enhances rather than
-fills in — today only the upcoming-races section, which the build writes from `data/events.json`
-and the api re-renders with race-day weather and a "Today's Race" section. Such an element must
-omit the placeholder flag for the same reason the api fragment does: a transient fetch failure
-would delete content that's already correct. It still fetches on connect, because the controller
-counts a never-fetched URL as stale. An **empty** response still removes it — that's the api
-saying there are no upcoming races at all.
+⚠️ **Not each element on the web side is a skeleton.** `live_update_attrs(url, placeholder: false)`
+marks an element that the build renders with **real content**, and the fragment then adds to that
+content and does not fill an empty element. Today that is the upcoming-races section only: the build
+writes it from `data/events.json`, and the api renders it again with the race-day weather and a
+"Today's Race" section. Such an element must not have the placeholder flag, for the same reason as
+the api fragment: a short fetch failure would delete content that is already correct. It still gets
+the fragment on connect, because the controller counts a URL with no fetch as old. An **empty**
+response still removes it, and that is the api saying that there is no upcoming race.
 
-The **web half** is pinned by `web/test/browser/controllers/live_update.test.js`. The two sides are
-compared against each other by `api/spec/contracts/widget_markup_contract_spec.rb`, which reads
-both files across the monorepo and asserts the placeholder and the fragment agree on tag, classes,
-and `data-nosnippet`. It only checks the outer element — everything inside it is still kept in sync
-by hand.
+`web/test/browser/controllers/live_update.test.js` tests the **web half**.
+`api/spec/contracts/widget_markup_contract_spec.rb` compares the two sides: it reads both files
+across the monorepo and checks that the placeholder and the fragment have the same tag, the same
+classes, and the same `data-nosnippet`. It checks the outer element only, and a person keeps each
+element in it the same in the two apps.
 
-⚠️ That spec lives in the api but reads `web/`, and `api.yml` is path-filtered, so the placeholder
-paths it reads are listed in that workflow's `paths:` **on purpose**. Without them the contract
-would go unchecked on exactly the edits most likely to break it. The spec fails if the two lists
-drift.
+⚠️ That spec is in the api but it reads `web/`, and `api.yml` has a path filter. Thus the `paths:` of
+that workflow has each placeholder path that the spec reads, **on purpose**. Without those paths, no
+check would run on the edits that break the contract most often. The spec fails when the two lists
+become different.
 
 | Widget | web placeholder | api view | endpoint |
 |---|---|---|---|
@@ -577,19 +627,20 @@ drift.
 | Upcoming races † | `source/partials/_upcoming_races.html.erb` | `views/widgets/events/upcoming.html.erb` | `/widgets/events/upcoming` |
 | Trending articles | `source/partials/placeholders/_trending.html.erb` | `views/widgets/articles/trending.html.erb` | `/widgets/articles/trending[/:id]` |
 
-† Not a placeholder — the build renders it with real content and the fragment enhances it. See the
-`placeholder: false` note above.
+† This is not a placeholder: the build renders it with real content and the fragment adds to that
+content. Refer to the `placeholder: false` note above.
 
-Shared CSS lives in `web/source/stylesheets/components/` — the api's fragments render classes from
-`_collection.scss`, `_entry.scss`, `_event.scss`, `_stats.scss` and `_weather.scss` (around 38
-classes in total, plus `sr-only`). Treat those five files as jointly owned; an enumeration here
-would go stale on the first widget change.
+The shared CSS is in `web/source/stylesheets/components/`. The fragments of the api use the classes
+of `_collection.scss`, `_entry.scss`, `_event.scss`, `_stats.scss`, and `_weather.scss`:
+approximately 38 classes, and also `sr-only`. The two apps own those five files together. A list of
+the classes here would become incorrect at the first change to a widget.
 
-Both sides build the live-update attribute cluster through a helper — `live_update_attrs` in
-`web/lib/helpers/site_helpers.rb` and in `api/app/helpers/live_update_helper.rb` — rather than
-writing it out per view. The api's omits `data-live-update-placeholder-value` deliberately, and
-`api/spec/support/live_update_contract.rb` is a shared example, included by every widget request
-spec, that fails if a fragment ever grows one.
+The two sides make the group of live-update attributes with a helper: `live_update_attrs` in
+`web/lib/helpers/site_helpers.rb`, and the helper in `api/app/helpers/live_update_helper.rb`. Neither
+side writes those attributes in each view. The helper of the api omits
+`data-live-update-placeholder-value`, on purpose, and `api/spec/support/live_update_contract.rb` is a
+shared example that each widget request spec includes. That example fails when a fragment ever gets
+that attribute.
 
-⚠️ **When you change a widget's markup, class names, or DOM shape, edit the web placeholder and
-the api view together** — and re-check the proxy constraints above.
+⚠️ **When you change the markup, the class names, or the DOM shape of a widget, edit the web
+placeholder and the api view together.** Then read the rules of the proxy above again.

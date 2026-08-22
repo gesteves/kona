@@ -1,7 +1,8 @@
-# Base class for all background jobs. This app uses native Sidekiq, not ActiveJob, which stays
-# disabled in application.rb. Every job is idempotent and takes plain-string args, so the shared
-# `retry_for: 24.hours` is safe: Sidekiq backs off normally, then Dead-sets a job once 24 hours
-# have passed since its first failure, rather than capping by retry count.
+# The base class of each background job. This app uses Sidekiq directly, and not ActiveJob, which
+# stays off in application.rb. You can do each job more than one time, and each job takes plain
+# strings as its arguments. Thus the shared `retry_for: 24.hours` is safe: Sidekiq waits between two
+# attempts, then puts a job in the Dead set 24 hours after its first failure. It does not count the
+# attempts.
 class ApplicationJob
   include Sidekiq::Job
 

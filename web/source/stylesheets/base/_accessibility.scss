@@ -22,12 +22,12 @@
   }
 }
 
-// The skip link's target is focusable only so activating it moves focus, not just the scroll
-// position. It isn't a control, so it doesn't take the focus ring — which would otherwise outline
-// the whole main region.
-// Same for the header: "Back to top" focuses it for the same reason (back_to_top_controller adds
-// tabindex="-1" and calls .focus()), and a programmatic focus after a keyboard activation does
-// match :focus-visible — so without this the entire masthead gets outlined.
+// The target of the skip link can take the focus, and the only reason is that a click on the link
+// then moves the focus and not only the scroll position. It is not a control, thus it takes no focus
+// ring. A focus ring there would put an outline around the full main area.
+// The header is the same: "Back to top" moves the focus to it for the same reason, because
+// back_to_top_controller adds tabindex="-1" and calls .focus(). A focus from code after a keyboard
+// action does match :focus-visible, thus without this rule the full masthead gets an outline.
 .content__main:focus-visible,
 .header:focus-visible {
   outline: none;
@@ -59,8 +59,9 @@
     animation-duration: 0s;
   }
 
-  // ⚠️ <wa-scroller> hardcodes `scroll-behavior: smooth` on its shadow scroll container and ships
-  // no reduced-motion handling. Covers the share row, the footer socials and entry tables.
+  // ⚠️ <wa-scroller> has `scroll-behavior: smooth` in its shadow scroll container and it has no code
+  // for a reduced-motion setting. This rule covers the share row, the social links in the footer,
+  // and the tables in an entry.
   wa-scroller::part(content) {
     scroll-behavior: auto;
   }

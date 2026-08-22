@@ -5,8 +5,8 @@ import { makeCtx, interceptFetch } from './helpers';
 const ORIGIN = 'https://origin.test';
 const SCRIPT_UPSTREAM = 'https://cdn.test/pa.js';
 
-// ASSETS returns a plain marker for every path, so a route that falls through to servePage is
-// distinguishable (body 'ASSET') from one the Worker proxies itself.
+// ASSETS returns the same marker for each path. Thus a route that goes to servePage has the body
+// 'ASSET', and you can see the difference from a route that the Worker answers itself.
 const env = {
   KONA_API_URL: ORIGIN,
   API_TOKEN: 'T',
@@ -28,8 +28,9 @@ const get = (path: string, init?: RequestInit) =>
   );
 
 describe('worker routing (src/index)', () => {
-  // The /pa/script.js route reaches getScript, which uses caches.default. Stub it so tests never
-  // touch real per-test Cache storage (avoids the miniflare isolated-storage teardown bug in CI).
+  // The /pa/script.js route calls getScript, which uses caches.default. Replace it, thus a test
+  // never uses the true Cache storage of that test. This prevents the miniflare storage teardown
+  // problem in CI.
   beforeEach(() => {
     vi.spyOn(caches.default, 'match').mockResolvedValue(undefined);
     vi.spyOn(caches.default, 'put').mockResolvedValue(undefined);
@@ -74,12 +75,12 @@ describe('worker routing (src/index)', () => {
     expect(await res.text()).toBe('SCRIPT');
   });
 
-  // ⚠️ Kept to a 405, which is answered before the handler reaches its dynamic import of
-  // ../src/og-render — a module the vitest pool cannot load (see test/og.test.ts). The og route's
-  // real behavior is covered there, with the render injected.
-  // Every card path ends in /og.png — the home page's card is /og.png itself, and every other
-  // page's hangs off that page's path. Both shapes must reach the renderer (and both are claimed
-  // in run_worker_first: "/og.png" + "/*/og.png").
+  // ⚠️ This test uses a 405, which the code answers before the handler does its dynamic import of
+  // ../src/og-render. The vitest pool cannot load that module (refer to test/og.test.ts). The true
+  // behavior of the og route is in that file, with the render as a parameter.
+  // Each card path ends with /og.png. The card of the home page is /og.png itself, and the card of
+  // each other page comes from the path of that page. Both shapes must reach the renderer, and
+  // run_worker_first takes both: "/og.png" and "/*/og.png".
   it.each(['/og.png', '/2026/06/26/some-post/og.png'])(
     'routes %s to the OG card renderer',
     async (path) => {
@@ -90,7 +91,8 @@ describe('worker routing (src/index)', () => {
   );
 
   it('serves everything else — including the feeds — straight from the asset layer', async () => {
-    // The feeds used to be Worker-routed for per-reader utm rewriting; they are now plain assets.
+    // The Worker answered the feeds and changed the utm parameters for each reader. They are now
+    // plain assets.
     for (const path of [
       '/',
       '/about/',

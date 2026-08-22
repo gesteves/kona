@@ -1,11 +1,14 @@
-// Creates / reconciles the two concept schemes (`sports`, `topics`) and all their concepts
-// from lib/taxonomy.js. Idempotent: creates what's missing, patches drifted prefLabel/broader,
-// skips matches. Only touches prefLabel + broader — descriptions/altLabels are written by
-// taxonomy:describe, so this won't clobber them on re-run.
+// Makes the two concept schemes (`sports` and `topics`) and each of their concepts from
+// lib/taxonomy.js, and corrects the ones that exist. You can run it more than one time: it makes
+// each concept that is absent, corrects a prefLabel or a broader value that is different, and does
+// nothing for a concept that agrees. It changes prefLabel and broader only. taxonomy:describe writes
+// the descriptions and the altLabels, thus a second run of this script does not remove them.
 //
-// ⚠️ Concepts and schemes are ORG-LEVEL and permanent-ish. Dry-run first.
-// Env: CONTENTFUL_MANAGEMENT_TOKEN, CONTENTFUL_ORGANIZATION_ID. DRY_RUN=true = plan only.
-// Run: `npm run taxonomy:create`.
+// ⚠️ The concepts and the schemes belong to the ORGANIZATION and they stay for a long time. Do a dry
+// run first.
+// The env vars: CONTENTFUL_MANAGEMENT_TOKEN and CONTENTFUL_ORGANIZATION_ID. DRY_RUN=true shows the
+// plan only.
+// To run it: `npm run taxonomy:create`.
 
 const {
   LOCALE, SCHEMES, CONCEPTS, conceptsForScheme,
@@ -44,7 +47,7 @@ async function run() {
     if (!dryRun) await client.concept.patch({ organizationId, conceptId: concept.id, version: current.sys.version }, ops);
   }
 
-  // Reconcile each scheme's membership.
+  // Correct the concepts of each scheme.
   const existingSchemes = new Map((await getExistingSchemes(client, { organizationId })).map((s) => [s.sys.id, s]));
   for (const scheme of SCHEMES) {
     const inScheme = conceptsForScheme(scheme.id);

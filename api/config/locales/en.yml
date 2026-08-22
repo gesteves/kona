@@ -1,27 +1,27 @@
-# Files in the config/locales directory are used for internationalization and
-# are automatically loaded by Rails. If you want to use locales other than
-# English, add the necessary files in this directory.
+# Rails uses the files in the config/locales directory for the languages, and it
+# loads them automatically. To use a language other than English, add the
+# necessary files to this directory.
 #
-# To use the locales, use `I18n.t`:
+# To use the languages, call `I18n.t`:
 #
 #     I18n.t "hello"
 #
-# In views, this is aliased to just `t`:
+# In a view, the shorter name `t` does the same:
 #
 #     <%= t("hello") %>
 #
-# To use a different locale, set it with `I18n.locale`:
+# To use a different language, set `I18n.locale`:
 #
 #     I18n.locale = :es
 #
-# This would use the information in config/locales/es.yml.
+# That uses the data in config/locales/es.yml.
 #
-# To learn more about the API, please read the Rails Internationalization guide
-# at https://guides.rubyonrails.org/i18n.html.
+# For more data about the API, read the Rails Internationalization guide at
+# https://guides.rubyonrails.org/i18n.html.
 #
-# Be aware that YAML interprets the following case-insensitive strings as
-# booleans: `true`, `false`, `on`, `off`, `yes`, `no`. Therefore, these strings
-# must be quoted to be interpreted as strings. For example:
+# Note that YAML reads these strings as booleans, in each case: `true`, `false`,
+# `on`, `off`, `yes`, and `no`. Thus you must put quotation marks around such a
+# string to make it a string. For example:
 #
 #     en:
 #       "yes": yup

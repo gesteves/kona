@@ -1,21 +1,23 @@
-# Collaborators normally mixed in from other helper modules, pinned here so helpers can be
-# exercised in isolation. Defined as real methods (not stubs) so `verify_partial_doubles`
-# doesn't reject methods the example group object doesn't implement. Groups that need
-# different behavior can redefine either method locally.
+# The methods that other helper modules usually supply. This file defines them, thus a test can run
+# one helper alone. They are true methods and not stubs, thus `verify_partial_doubles` does not
+# refuse a method that the example group object does not have. A group that needs a different result
+# can define either method again.
 RSpec.shared_context 'default helper stubs' do
   def full_url(path, params = {})
     query = params.present? ? "?#{URI.encode_www_form(params)}" : ''
     "https://example.com#{url_for(path)}#{query}"
   end
 
-  # Stand-in for Middleman's sitemap-aware url_for. The only behavior these specs care about is
-  # the one `activate :directory_indexes` gives it: a source path's `index.html` is dropped, so
-  # `/2024/01/01/post/index.html` is served (and linked to) as `/2024/01/01/post/`.
+  # A replacement for the url_for of Middleman, which reads the sitemap. These specs need one
+  # behavior only, which `activate :directory_indexes` gives: the code removes the `index.html` of a
+  # source path. Thus the app serves `/2024/01/01/post/index.html` as `/2024/01/01/post/`, and each
+  # link uses that path.
   def url_for(path, _options = {})
     path.to_s.sub(%r{index\.html\z}, '')
   end
 
-  # Passthrough sanitize — the real one runs the markdown pipeline, which these specs don't need.
+  # A sanitize that changes nothing. The true method runs the Markdown pipeline, and these specs do
+  # not need it.
   def sanitize(text, **)
     text
   end

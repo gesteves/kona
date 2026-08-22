@@ -3,7 +3,7 @@ require 'ostruct'
 
 RSpec.describe IconHelpers do
   describe '#icon_svg' do
-    # Shaped like data.icons: family → style → [icons].
+    # This has the shape of data.icons: family, then style, then [icons].
     def data
       OpenStruct.new(icons: {
         'classic' => {
@@ -26,7 +26,7 @@ RSpec.describe IconHelpers do
   end
 
   describe '#clock_icon_svg' do
-    # Echo the icon id the rounding logic picked, instead of looking up real SVGs.
+    # This returns the icon id that the code selected, and it does not read a true SVG.
     def icon_svg(_family, _style, icon_id) = icon_id
 
     def icon_at(hour, minute)

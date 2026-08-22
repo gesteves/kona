@@ -1,19 +1,21 @@
-# Shared Contentful GraphQL client: the endpoint, env guard, POST and parse boilerplate, and
-# skip/limit pagination. Upstream failures are reported under the consumer's service label, so
-# Bugsnag grouping stays per-consumer.
+# The shared Contentful GraphQL client: the endpoint, the check on the env vars, the common POST and
+# parse code, and the skip and limit pages. It reports an upstream failure with the label of the
+# service that called it, thus Bugsnag makes one group for each caller.
 class ContentfulClient < ApplicationService
   CONTENTFUL_API_URL = "https://graphql.contentful.com/content/v1/spaces"
   PAGE_SIZE = 100
 
-  # @param service_label [String] The consuming service's name, used for error reporting.
+  # @param service_label [String] The name of the service that calls this class, for the error
+  #   report.
   def initialize(service_label = self.class.name)
     @service_label = service_label
   end
 
-  # Runs a GraphQL query.
+  # Does a GraphQL query.
   # @param gql [String] The query.
-  # @param variables [Hash, nil] Its variables.
-  # @return [Hash, nil] The response's symbolized `data`, or nil when unconfigured or failed.
+  # @param variables [Hash, nil] The variables of the query.
+  # @return [Hash, nil] The `data` of the response, with symbol keys, or nil if there is no
+  #   configuration or the request fails.
   def query(gql, variables = nil)
     space = ENV["CONTENTFUL_SPACE"]
     token = ENV["CONTENTFUL_TOKEN"]
@@ -29,18 +31,18 @@ class ContentfulClient < ApplicationService
     )&.dig(:data)
   end
 
-  # Runs a query and pulls out one collection's items.
-  # @param collection [Symbol] The collection key under `data`.
-  # @return [Array<Hash>, nil] The items, or nil on failure.
+  # Does a query and gets the items of one collection.
+  # @param collection [Symbol] The key of the collection in `data`.
+  # @return [Array<Hash>, nil] The items, or nil if it fails.
   def items(gql, variables = nil, collection:)
     query(gql, variables)&.dig(collection, :items)
   end
 
-  # Pages through a skip/limit collection query.
-  # @param collection [Symbol] The collection key under `data`.
-  # @param strict [Boolean] Whether a failed page aborts the whole fetch, for callers that must
-  #   not act on a partial corpus. Otherwise a failed page just ends the loop.
-  # @return [Array<Hash>, nil] Every item, or nil when a page failed under `strict`.
+  # Reads a collection query with skip and limit, one page at a time.
+  # @param collection [Symbol] The key of the collection in `data`.
+  # @param strict [Boolean] True if a page that fails must stop the full fetch. Use it for a caller
+  #   that must not act on an incomplete set. With false, a page that fails ends the loop.
+  # @return [Array<Hash>, nil] All the items, or nil when a page fails and `strict` is true.
   def paginate(gql, collection:, page_size: PAGE_SIZE, strict: false)
     all = []
     skip = 0
@@ -59,8 +61,8 @@ class ContentfulClient < ApplicationService
 
   private
 
-  # Reports under the consumer's label rather than "ContentfulClient", so the failing consumer
-  # stays visible in the Bugsnag headline.
+  # This reports with the label of the caller, and not with "ContentfulClient". Thus the first line
+  # in Bugsnag names the caller that failed.
   def report_upstream_error(error, context: @service_label, status: nil, url: nil)
     ErrorReporter.report_upstream(error, service: @service_label, context: context, status: status, url: url)
   end

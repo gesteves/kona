@@ -1,13 +1,14 @@
 name: "Utilities"
 
-# Checks for the local-only tools in utilities/. Nothing here deploys — that's the whole point
-# of the directory: `web.yml` and `api.yml` are path-filtered on `web/**` / `api/**`, so a change
-# to a utility never builds the site, redeploys a Worker, or purges the edge cache.
+# The checks for the local-only tools in utilities/. Nothing here goes to production, and that is
+# the purpose of the directory: `web.yml` and `api.yml` have a path filter on `web/**` and `api/**`.
+# Thus a change to a tool never builds the site, never deploys a Worker, and never purges the edge
+# cache.
 #
-# utilities/aqi-map/ has no test framework and doesn't warrant one, but its copy of the EPA AQI
-# math is a hand-maintained duplicate of the api's, so a plain Ruby check pins it to the published
-# equation. utilities/contentful/ is a set of one-off Node scripts run by hand against Contentful;
-# there's nothing to check.
+# utilities/aqi-map/ has no test framework and needs none, but its copy of the EPA AQI math is a
+# copy of the code in the api that a person keeps correct. Thus a plain Ruby check compares it with
+# the published equation. utilities/contentful/ is a set of Node scripts that a person runs one time
+# each against Contentful, and there is nothing to check there.
 on:
   push:
     branches: [main]
@@ -40,17 +41,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # ⚠️ working-directory has to be an input to the action. The job-level
-      # `defaults.run.working-directory` above applies only to `run:` steps, so without this
-      # setup-ruby looks for .ruby-version at the repo root — where there isn't one — and dies
-      # with a bare ENOENT.
+      # ⚠️ working-directory must be an input of the action. The `defaults.run.working-directory` at
+      # the job level applies to a `run:` step only. Thus without this input, setup-ruby looks for
+      # .ruby-version at the root of the repo, where there is none, and it stops with an ENOENT.
       - name: Set up Ruby
         uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
         with:
           working-directory: utilities/aqi-map
           bundler-cache: false
 
-      # No bundle install: the check requires only lib/epa_aqi.rb, which is plain Ruby with no
-      # gem dependencies, so this stays fast and can't be broken by the Sinatra app's Gemfile.
+      # There is no bundle install. The check needs lib/epa_aqi.rb only, which is plain Ruby with no
+      # gem. Thus this step is fast, and the Gemfile of the Sinatra app cannot break it.
       - name: EPA AQI golden vectors
         run: ruby spec/epa_aqi_check.rb

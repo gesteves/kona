@@ -64,7 +64,8 @@ RSpec.describe "Whoop OAuth", type: :request do
 
       get "/whoop/callback", params: { code: "abc", state: "good-state" }
 
-      # Back to the admin page the flow started from, so its status badge reflects the new state.
+      # The browser goes back to the admin page that started the flow, thus its status badge shows
+      # the new state.
       expect(response).to redirect_to("/connected-apps")
       expect(flash[:notice]).to eq("Whoop connected.")
     end
@@ -80,9 +81,9 @@ RSpec.describe "Whoop OAuth", type: :request do
       expect(response.body).to include("Failed to exchange")
     end
 
-    # ⚠️ The callback's query string carries the authorization `code` and the one-time `state`, so
-    # neither a browser nor an intermediary may store it. This is what OwnerFacing is on this
-    # controller for — it has no admin layout of its own to carry the signal.
+    # ⚠️ The query string of the callback has the authorization `code` and the `state`, which works
+    # one time. Thus a browser and each server between must not store it. That is why this controller
+    # uses OwnerFacing: it has no admin layout that could give that instruction.
     it "is never stored or indexed, even on the error paths" do
       get "/whoop/callback", params: { error: "access_denied", state: "anything" }
 

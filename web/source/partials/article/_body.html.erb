@@ -1,11 +1,12 @@
-<%# An entry's full prose: intro + body + affiliate-links disclosure (shared by the article and
-    page templates). `pagefind` (optional local) adds the data-pagefind-body attribute marking
-    the div as search-indexable. %>
+<%# The full text of an entry: the intro, the body, and the affiliate-link disclosure. The article
+    template and the page template share it. `pagefind`, which is an optional local, adds the
+    data-pagefind-body attribute, which lets the site search index the div. %>
 <div class="entry__body"<%= ' data-pagefind-body'.html_safe if defined?(pagefind) && pagefind %>>
   <%= render_body(article.intro, image_variant: :full) %>
   <%= render_body(article.body, image_variant: :full) %>
-  <%# The contact form is a partial, not raw HTML in the Contentful body: SmartyPants (in
-      render_body) curls the quotes in raw HTML attributes and breaks it. See partials/_contact_form. %>
+  <%# The contact form is a partial, and it is not raw HTML in the Contentful body. SmartyPants, in
+      render_body, makes the quotation marks in a raw HTML attribute curly, and that breaks the
+      form. Refer to partials/_contact_form. %>
   <%= partial 'partials/contact_form' if article.slug == 'contact' %>
   <%= partial 'partials/disclosure', locals: { entry: article } %>
 </div>

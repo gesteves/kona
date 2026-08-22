@@ -14,7 +14,8 @@
             placeholder="you.bsky.social" required>
   </wa-input>
 
-  <%# ⚠️ The stored password is never rendered back into the field — only whether one exists. %>
+  <%# ⚠️ The page never renders the stored password into the field. It only says if a password %>
+  <%# exists. %>
   <wa-input type="password" name="app_password" label="App password" autocomplete="off"
             password-toggle required
             hint="<%= @stored ? 'A password is saved. Entering one replaces it.' : 'xxxx-xxxx-xxxx-xxxx' %>">

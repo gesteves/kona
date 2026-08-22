@@ -1,20 +1,20 @@
-# Bugsnag callback that drops the BadRequest raised when a contact-form submission's body isn't
-# valid UTF-8, which spam bots posting cp1251-encoded text do routinely and a browser never does.
-# Rails validates the encoding while building the params hash, so it raises from
-# Instrumentation#process_action — outside the controller, and therefore ahead of the honeypot,
-# the length caps, Turnstile, and Akismet. Nothing is enqueued and the sender already gets a 400;
-# the report is the only thing left to suppress, and it isn't actionable.
+# A Bugsnag callback that removes the BadRequest that Rails raises when the body of a contact-form
+# submission is not correct UTF-8. A spam bot that posts cp1251 text does this often, and a browser
+# never does. Rails checks the encoding while it makes the params hash, thus it raises from
+# Instrumentation#process_action. That is outside the controller, and thus before the honeypot, the
+# length limits, Turnstile, and Akismet. The app adds no job to the queue and the sender already gets
+# a 400. Only the report stays, and nobody can act on it.
 #
-# ⚠️ Scoped to POST /api/contact deliberately. That's the one endpoint taking arbitrary input
-# straight off the internet; a BadRequest on a webhook or a widget means a caller we control
-# started sending garbage, and must keep reporting.
+# ⚠️ This applies to POST /api/contact only, on purpose. That is the one endpoint that takes any
+# input directly from the internet. A BadRequest on a webhook or on a widget means that a caller that
+# we control sends incorrect data, and that must continue to give a report.
 #
-# ⚠️ It can't be a `rescue_from` in the controller: ActionController::Base includes Instrumentation
-# *after* Rescue, so its process_action wraps the rescue chain and the raise escapes to
-# ShowExceptions before any handler runs.
+# ⚠️ This cannot be a `rescue_from` in the controller. ActionController::Base includes Instrumentation
+# *after* Rescue, thus its process_action is around the rescue chain, and the raise goes to
+# ShowExceptions before a handler runs.
 class ContactBadRequestFilter
-  # @param report [Bugsnag::Report] The report about to be delivered.
-  # @return [Boolean] false to drop the report, true to let it through.
+  # @param report [Bugsnag::Report] The report that Bugsnag is ready to send.
+  # @return [Boolean] False to remove the report, and true to send it.
   def self.call(report)
     return true unless report.original_error.is_a?(ActionController::BadRequest)
 

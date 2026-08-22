@@ -47,8 +47,8 @@ RSpec.describe "Admin course maps", type: :request do
       expect(response.body).to include("No tracks yet")
     end
 
-    # A grouped page marks itself in the sidebar the same way an ungrouped one does: the group is a
-    # caption, not a control, so nothing else distinguishes the two.
+    # A page in a group marks itself in the sidebar in the same way as a page that is not in a
+    # group. The group is a caption and not a control, thus nothing else is different.
     it "marks its own nav link as the current page" do
       get "/course-maps"
 
@@ -82,8 +82,9 @@ RSpec.describe "Admin course maps", type: :request do
       expect(response.body).to include("Failed", "bad geometry")
     end
 
-    # ⚠️ The one admin page whose core function needs the worker. Locally it's opt-in, so without
-    # this a track spins on "Processing" forever with nothing saying why.
+    # ⚠️ This is the one admin page whose main function needs the worker. Locally the worker is
+    # optional, thus without this check a track stays at "Processing" for all time and nothing says
+    # why.
     it "says so when nothing is draining the queue" do
       allow(library).to receive(:all).and_return([ ready_track.merge("status" => "processing") ])
       allow(Sidekiq::ProcessSet).to receive(:new).and_return(instance_double(Sidekiq::ProcessSet, size: 0))
@@ -102,7 +103,7 @@ RSpec.describe "Admin course maps", type: :request do
       expect(response.body).not_to include("No Sidekiq worker is running")
     end
 
-    # Nothing is publishing, so the worker is irrelevant — don't pay for the Redis read.
+    # No track is in the publish state, thus the worker does not matter. Do not do the Redis read.
     it "doesn't check the worker when nothing is processing" do
       allow(library).to receive(:all).and_return([ ready_track ])
       expect(Sidekiq::ProcessSet).not_to receive(:new)
@@ -118,7 +119,8 @@ RSpec.describe "Admin course maps", type: :request do
       expect(response.body).to include("MAPBOX_SECRET_TOKEN")
     end
 
-    # ⚠️ Web Awesome components over native elements. A bare <button> means a `button_to` crept in.
+    # ⚠️ Use a Web Awesome component in place of a native element. A plain <button> means that a
+    # `button_to` came into the code.
     it "renders actions as Web Awesome buttons, not native ones" do
       allow(library).to receive(:all).and_return([ ready_track ])
 
@@ -178,7 +180,8 @@ RSpec.describe "Admin course maps", type: :request do
       expect(flash[:alert]).to include("at least one GPX file")
     end
 
-    # An empty file field posts a blank string, and a hand-rolled request can post anything.
+    # An empty file field posts a blank string, and a request that a person makes can post each
+    # content.
     it "ignores a value that isn't an upload at all" do
       post "/course-maps", params: { gpx_files: [ "", "not-a-file" ] }
 
@@ -186,7 +189,7 @@ RSpec.describe "Admin course maps", type: :request do
       expect(flash[:alert]).to include("at least one GPX file")
     end
 
-    # One unparseable track in a batch must not lose the others.
+    # One track in a batch that the code cannot parse must not remove the other tracks.
     it "reports a bad track and keeps the good ones" do
       allow(GpxTrack).to receive(:new).and_invoke(
         ->(*) { raise GpxTrack::ParseError, "No track points found in GPX file" },
@@ -212,7 +215,7 @@ RSpec.describe "Admin course maps", type: :request do
       expect(response.parsed_body).to eq("morning_run_abc" => "processing")
     end
 
-    # ⚠️ Drawn above /course-maps/:id, or it's swallowed as a track id.
+    # ⚠️ Rails must draw this above /course-maps/:id, or it reads the path as a track id.
     it "isn't mistaken for a track" do
       allow(library).to receive(:statuses).and_return({})
 
@@ -240,7 +243,7 @@ RSpec.describe "Admin course maps", type: :request do
       expect(response.body).to include("/course-maps/morning_run_abc/download")
     end
 
-    # An unchecked switch submits nothing, so the pair is what makes "off" reach the server.
+    # A switch that is off submits nothing, thus the pair is what sends "off" to the server.
     it "pairs the marker-order switch with a hidden field" do
       get "/course-maps/morning_run_abc"
 
@@ -263,8 +266,9 @@ RSpec.describe "Admin course maps", type: :request do
         expect(response.body).to include('<wa-dialog id="map-preview-full"')
       end
 
-      # ⚠️ Same URL as the inline preview, so opening the dialog reuses the browser's cached copy.
-      # A larger render here would be a second billed Mapbox request for the same map.
+      # ⚠️ This is the same URL as the preview in the page, thus the dialog uses the copy in the
+      # browser cache. A larger render here would be a second Mapbox request for the same map, and
+      # Mapbox bills each request.
       it "reuses the preview's image rather than rendering again" do
         get "/course-maps/morning_run_abc"
 
@@ -326,8 +330,8 @@ RSpec.describe "Admin course maps", type: :request do
       expect(response.headers["Content-Disposition"]).to include("attachment", "2026-morning-run.png")
     end
 
-    # ⚠️ The Static Images URL carries MAPBOX_SECRET_TOKEN in a query parameter, which is why
-    # these proxy the render instead of redirecting the browser to Mapbox.
+    # ⚠️ The Static Images URL has MAPBOX_SECRET_TOKEN in a query parameter. That is why these
+    # actions proxy the render and do not send the browser to Mapbox.
     it "never puts the Mapbox token in the response" do
       get "/course-maps/morning_run_abc/preview"
 
@@ -335,8 +339,9 @@ RSpec.describe "Admin course maps", type: :request do
       expect(response.headers["Location"]).to be_nil
     end
 
-    # Same render for both; only the disposition differs. The zoom dialog shows the preview at full
-    # width, and a smaller render would save nothing — Mapbox bills per request, not per pixel.
+    # The two actions give the same render, and only the disposition is different. The zoom dialog
+    # shows the preview at the full width, and a smaller render would save nothing, because Mapbox
+    # bills each request and not each pixel.
     it "renders both at the same size" do
       get "/course-maps/morning_run_abc/preview"
       inline = response.body
@@ -353,7 +358,7 @@ RSpec.describe "Admin course maps", type: :request do
       get "/course-maps/morning_run_abc/preview", params: { settings: { padding_top: "12" } }
     end
 
-    # A broken <img> beats a redirect to an HTML page rendered into an image slot.
+    # A broken <img> is better than a redirect to an HTML page in a place for an image.
     it "answers with a status rather than a redirect when the track is gone" do
       allow(library).to receive(:find).with("nope").and_return(nil)
 
@@ -378,10 +383,10 @@ RSpec.describe "Admin course maps", type: :request do
       expect(response).to have_http_status(:bad_gateway)
     end
 
-    # ⚠️ StaticMap#get_with_retries re-raises the ORIGINAL transport exception once its attempts are
-    # exhausted rather than wrapping it in a RenderError, so rescuing only RenderError let a Mapbox
-    # timeout escape as an unhandled 500 — reported to Bugsnag as a crash, and rendered into the
-    # <img> these actions exist to keep as a clean status.
+    # ⚠️ After the last attempt, StaticMap#get_with_retries raises the ORIGINAL transport exception
+    # again and does not put it in a RenderError. Thus a rescue of RenderError alone let a Mapbox
+    # timeout become a 500 that nothing caught. Bugsnag then reported a crash, and that 500 went
+    # into the <img>. These actions exist to give a clean status there.
     it "reports a transport failure as a bad gateway too, not an unhandled 500" do
       [ Net::OpenTimeout, Net::ReadTimeout, SocketError, Errno::ECONNRESET, HTTParty::Error ].each do |error|
         allow_any_instance_of(StaticMap).to receive(:render).and_raise(error)
@@ -410,7 +415,8 @@ RSpec.describe "Admin course maps", type: :request do
       expect(flash[:notice]).to include("2026 Morning Run")
     end
 
-    # Dropping the local record while the remote tileset survives would hide it forever.
+    # A delete of the local record while the remote tileset stays would hide that tileset for all
+    # time.
     it "keeps the record when Mapbox refuses" do
       allow_any_instance_of(MapboxTileset).to receive(:destroy!).and_raise("Mapbox failed to delete tileset: Forbidden")
 

@@ -1,9 +1,9 @@
 require 'spec_helper'
 
-# lib/data/contentful.rb requires graphql/contentful, which introspects the live Contentful
-# schema at load time (network + credentials, unavailable in CI). Register a stand-in module
-# and mark that file as loaded so its require becomes a no-op — these specs cover the pure
-# transform methods only, never the fetch.
+# lib/data/contentful.rb requires graphql/contentful, which reads the live Contentful schema at
+# load time. That needs a network and credentials, which CI does not have. Thus this file registers
+# a replacement module and marks that file as loaded, and the require then does nothing. These
+# specs cover only the transform methods, and never the fetch.
 graphql_client_path = File.expand_path('../../../lib/data/graphql/contentful.rb', __dir__)
 unless $LOADED_FEATURES.include?(graphql_client_path)
   module ContentfulClient
@@ -15,8 +15,8 @@ end
 require_relative '../../../lib/data/contentful'
 
 RSpec.describe Contentful do
-  # The initializer fetches everything from Contentful; allocate skips it so the transform
-  # methods can be exercised against hand-built @content.
+  # The initializer gets all the data from Contentful. allocate does not call it, thus the specs
+  # can run the transform methods against a @content that this file makes.
   def importer(content = {})
     described_class.allocate.tap do |instance|
       instance.instance_variable_set(:@content, { site: {} }.merge(content))
@@ -75,8 +75,8 @@ RSpec.describe Contentful do
     end
 
     it "dates the path in the timestamp's own zone, not UTC (pins permalink stability)" do
-      # 22:30 on June 15 in -06:00 is already June 16 in UTC; the permalink keeps the
-      # local date the editor published under. Normalizing this would move existing URLs.
+      # 22:30 on June 15 in -06:00 is June 16 in UTC. The permalink keeps the local date of the
+      # publish. A change to UTC would move the URLs that exist.
       item = transform(:set_article_path, { draft: false, published_at: '2026-06-15T22:30:00-06:00', slug: 'my-race' })
       expect(item[:path]).to eq('/2026/06/15/my-race/index.html')
     end
@@ -149,8 +149,8 @@ RSpec.describe Contentful do
       expect(blog.first[:items].map { |a| a[:title] }).to eq([ 'Live' ])
     end
 
-    # Without its own summary the index falls through to the sitewide meta description, which
-    # ships /blog and the home page with identical ones. The count is of published entries only.
+    # With no summary of its own, the index uses the sitewide meta description, and /blog and the
+    # home page then have the same one. The count includes only the published entries.
     it 'gives the index its own summary, counting only published entries' do
       instance = importer(articles: [
         { title: 'Live', draft: false },
@@ -164,9 +164,10 @@ RSpec.describe Contentful do
   end
 
   describe 'taxonomy' do
-    # A small Sports taxonomy: Triathlon > Ironman 70.3 (with a description + synonyms), a Races
-    # branch with one race, and a childless Running topic. prefLabel/definition/altLabels are
-    # locale maps and `conceptSchemes` carries scheme membership — matching the delivery API shape.
+    # A small Sports taxonomy: Triathlon > Ironman 70.3, which has a description and synonyms, a
+    # Races branch with one race, and a Running topic with no children. prefLabel, definition, and
+    # altLabels are locale maps, and `conceptSchemes` gives the scheme of each concept. This is the
+    # shape of the delivery API.
     def sports = [ { 'sys' => { 'id' => 'sports' } } ]
     def concept_fixture
       [
@@ -182,14 +183,14 @@ RSpec.describe Contentful do
       ]
     end
 
-    # An importer whose taxonomy fetch is stubbed to `concepts` (empty = no taxonomy).
+    # An importer with a taxonomy fetch that gives `concepts`. An empty value means no taxonomy.
     def importer_with(concepts: concept_fixture, articles: [])
       importer(articles: articles).tap do |instance|
         allow(instance).to receive(:fetch_taxonomy_concepts).and_return(Array(concepts))
       end
     end
 
-    # An article carrying the given concept ids — the shape apply_taxonomy_to_articles reads.
+    # An article with the given concept ids. apply_taxonomy_to_articles reads this shape.
     def article_with(*concept_ids)
       { contentful_metadata: { concepts: concept_ids.map { |id| { id: id } } } }
     end
@@ -248,14 +249,16 @@ RSpec.describe Contentful do
       it 'rolls descendants up into parents and lists all races under the Races branch' do
         tags = built_tags([ article_with('ironman-703', 'cda') ])
         ids = tags.map { |t| t[:tag][:id] }
-        # Triathlon (via descendant), Ironman 70.3, Races (via descendant), CdA — but not childless Running.
+        # Triathlon (from a child), Ironman 70.3, Races (from a child), and CdA, but not Running,
+        # which has no children.
         expect(ids).to match_array(%w[triathlon ironman-703 races cda])
         expect(ids).not_to include('running')
 
         triathlon = tags.find { |t| t[:tag][:id] == 'triathlon' }
         expect(triathlon[:pages].first[:path]).to eq('/tagged/triathlon/index.html')
         expect(triathlon[:pages].first[:items].size).to eq(1)
-        # The tag entry carries its scheme and archive article count (for breadcrumb tie-breaks).
+        # The tag entry has its scheme and the number of articles in its archive. The breadcrumb
+        # code uses that number to select between two concepts.
         expect(triathlon[:tag]).to include(scheme: 'sports', entry_count: 1)
       end
 
@@ -289,16 +292,16 @@ RSpec.describe Contentful do
 
     before { stub_image_host('images.example.com') }
 
-    # Only the host changes: Contentful's path IS the R2 key the api writes under, so any
-    # reshaping here would 404 every image on the site.
+    # Only the host changes. The Contentful path IS the R2 key that the api writes at, thus a
+    # change to the path here would make each image on the site 404.
     it 'swaps the host and keeps the path verbatim' do
       item = transform(:rewrite_image_urls, { url: 'https://images.ctfassets.net/space/asset-1/token/a.jpg' })
       expect(item[:url]).to eq('https://images.example.com/space/asset-1/token/a.jpg')
     end
 
-    # The rewrite used to stash the pre-rewrite URL as :contentful_url, because encode_blurhash
-    # resized via Contentful's Images API query params and the mirror ignores query strings. It
-    # now resizes through Cloudflare Images off this URL, so nothing reads the original.
+    # The rewrite kept the first URL as :contentful_url, because encode_blurhash resized with the
+    # query parameters of the Contentful Images API and the mirror ignores a query string. It now
+    # resizes with Cloudflare Images from this URL, thus no code reads the first URL.
     it 'adds no key beyond the swapped URL' do
       item = transform(:rewrite_image_urls, { url: 'https://images.ctfassets.net/space/asset-1/token/a.jpg' })
       expect(item.keys).to eq([ :url ])
@@ -309,18 +312,19 @@ RSpec.describe Contentful do
       expect(item[:url]).to eq('//images.example.com/space/asset-1/token/a.jpg')
     end
 
-    # A cache buster would be worse than useless: replacing an asset's file mints a new token
-    # segment (so the URL already changes on its own), the mirror keys on the path, and
-    # Contentful rejects parameters it doesn't recognize (ParameterNotAllowed).
+    # A cache buster would cause damage: a new file for an asset gives a new token segment, thus
+    # the URL already changes; the key of the mirror is the path; and Contentful refuses a
+    # parameter that it does not know (ParameterNotAllowed).
     it 'adds no query string' do
       item = transform(:rewrite_image_urls, { url: 'https://images.ctfassets.net/space/asset-1/token/a.jpg', sys: { published_version: 3 } })
       expect(item[:url]).not_to include('?')
     end
 
-    # ⚠️ Contentful serves some *image* assets from downloads.ctfassets.net — it isn't an
-    # images-vs-files split. Matching only images.ctfassets.net would silently leave those
-    # hitting Contentful forever, which is the whole thing the mirror exists to stop. The api's
-    # AssetMirror keys on the same path, which is identical across the hosts.
+    # ⚠️ Contentful serves some *image* assets from downloads.ctfassets.net. The two hosts are not
+    # images and files. If the code matches only images.ctfassets.net, those assets go to
+    # Contentful for all time, with no message, and the mirror exists to stop that. The
+    # AssetMirror of the api uses the same path as its key, and that path is the same on both
+    # hosts.
     it 'rewrites every ctfassets host' do
       %w[images downloads assets].each do |sub|
         item = transform(:rewrite_image_urls, { url: "https://#{sub}.ctfassets.net/space/asset-1/token/a.jpg" })
@@ -333,10 +337,10 @@ RSpec.describe Contentful do
       expect(item[:url]).to eq('https://elsewhere.example.com/a.jpg')
     end
 
-    # The mirror is the ONLY host allowlisted as a Cloudflare Images transformation source, so
-    # skipping the rewrite doesn't fall back to Contentful — it 403s every image on the site.
-    # This used to no-op, which shipped a build where every image was broken while the build
-    # itself reported success.
+    # The mirror is the ONLY host that the zone permits as a Cloudflare Images transformation
+    # source. Thus a build with no rewrite does not use Contentful: it makes each image on the site
+    # 403. This code did nothing before, and that gave a build where each image was broken while
+    # the build reported a success.
     context 'when IMAGE_HOST is unset' do
       before { stub_image_host(nil) }
 
@@ -345,8 +349,9 @@ RSpec.describe Contentful do
           .to raise_error(Contentful::ImageHostMissing, /IMAGE_HOST is unset/)
       end
 
-      # The method-level rescue is there so one malformed asset URL can't take the import down.
-      # It must not also swallow the misconfiguration that makes the whole build worthless.
+      # The rescue at the method level exists so that one asset URL with an incorrect shape cannot
+      # stop the import. It must not also hide the configuration error that makes the full build
+      # useless.
       it 'raises past the rescue that swallows per-asset URL errors' do
         expect { transform(:rewrite_image_urls, { url: 'not a url' }) }
           .to raise_error(Contentful::ImageHostMissing)
@@ -355,8 +360,8 @@ RSpec.describe Contentful do
   end
 
   describe '#get_contentful_data' do
-    # One page of the GraphQL response. `items` is what Contentful actually returned, nulls and
-    # all — it returns null for any link the token can't resolve.
+    # One page of the GraphQL response. `items` is the true content from Contentful, and it
+    # includes each null: Contentful returns null for each link that the token cannot resolve.
     def page(items)
       double(errors: double(present?: false), data: double(to_h: { 'articles' => { 'items' => items } }))
     end
@@ -378,9 +383,9 @@ RSpec.describe Contentful do
       expect(articles.size).to eq(40)
     end
 
-    # The collections are fetched on separate threads (they don't depend on each other), so this
-    # covers the merge: every collection has to land under its own key, and none may bleed into
-    # another's.
+    # The code gets the collections on different threads, because they do not depend on each
+    # other. Thus this example covers the merge: each collection must go under its own key, and no
+    # collection can go into the key of another one.
     it 'fetches independent collections concurrently and merges them under their own keys' do
       client = double
       allow(client).to receive(:query) do |query, **|
@@ -413,9 +418,10 @@ RSpec.describe Contentful do
       expect(articles.size).to eq(107)
     end
 
-    # ⚠️ The regression this exists for: a full page containing an unresolvable link compacts to
-    # 99, and comparing *that* against the limit ends pagination — silently dropping every
-    # remaining page of the collection, with a green build.
+    # ⚠️ This example exists for one failure: a full page with a link that the token cannot resolve
+    # becomes 99 items after `compact`, and a comparison of *that* number with the limit stops the
+    # pages. Thus the code loses each subsequent page of the collection, with no message and with a
+    # green build.
     it 'keeps paginating when a full page contains an unresolvable link' do
       first = Array.new(100) { |i| { 'slug' => "a#{i}" } }
       first[42] = nil

@@ -1,7 +1,7 @@
-# Fetches race events from Contentful. `all` pulls the full set of fields the upcoming-races
-# widget renders (title/summary/description/location/url/date/going/coordinates), which is a
-# superset of what the current-weather widget needs to spot today's race. Cached in Redis for
-# 10 minutes. `all` returns an array wrapped for dot-access.
+# Gets the race events from Contentful. `all` gets each field that the upcoming-races widget
+# renders: title, summary, description, location, url, date, going, and coordinates. That set
+# includes each field that the current-weather widget needs to find the race of today. Redis caches
+# it for 10 minutes. `all` returns an array in an object with dot access.
 class Events < ApplicationService
   include ContentfulConsumer
 
@@ -38,8 +38,8 @@ class Events < ApplicationService
     }
   GRAPHQL
 
-  # Fetches a single event by its Contentful entry ID (with coordinates), for the
-  # per-event weather endpoint. Cached in Redis for 5 minutes.
+  # Gets one event by its Contentful entry ID, with its coordinates, for the weather endpoint of
+  # that event. Redis caches it for 5 minutes.
   # @return [OpenStruct, nil]
   def find(id)
     find_cached_item(id, query: FIND_QUERY, collection: :events,
@@ -49,13 +49,14 @@ class Events < ApplicationService
   # @return [Array<OpenStruct>]
   def all
     items = rescue_with([], context: "Error fetching events") do
-      # The key's suffix is a digest of the query, so changing its field set invalidates the
-      # cache on its own — a value cached under an older shape would be missing fields the views
-      # read. Cached for 5 minutes: the edge cache is the primary freshness layer, and this just
-      # guards Contentful against a stampede.
+      # The end of the key is a digest of the query. Thus a change to its fields makes a new key by
+      # itself. A value in the cache with an older shape would have no value for a field that a view
+      # reads. The cache holds it for 5 minutes: the edge cache is the main layer for freshness, and
+      # this cache only stops many requests to Contentful at one time.
       cached_json("contentful:events:#{cache_version(QUERY)}", expires_in: 5.minutes) do
-        # Paginated and strict: an unpaginated query silently caps at Contentful's default page,
-        # and a partial corpus here drops races from the widget rather than failing visibly.
+        # This reads one page at a time and it is strict. A query with no pages stops at the default
+        # page size of Contentful, with no message, and an incomplete set here removes races from
+        # the widget and gives no error.
         (contentful.paginate(QUERY, collection: :events, strict: true) || []).map { |event| underscore_keys(event) }
       end
     end

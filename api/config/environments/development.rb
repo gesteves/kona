@@ -1,22 +1,22 @@
 require "active_support/core_ext/integer/time"
 
 Rails.application.configure do
-  # Settings specified here will take precedence over those in config/application.rb.
+  # A setting here replaces the same setting in config/application.rb.
 
-  # Make code changes take effect immediately without server restart.
+  # Let a code change apply immediately, with no restart of the server.
   config.enable_reloading = true
 
-  # Do not eager load code on boot.
+  # Do not load all the code at the start.
   config.eager_load = false
 
-  # Show full error reports.
+  # Show a full error report.
   config.consider_all_requests_local = true
 
-  # Enable server timing.
+  # Let the server send its timing data.
   config.server_timing = true
 
-  # Enable/disable Action Controller caching. By default Action Controller caching is disabled.
-  # Run rails dev:cache to toggle Action Controller caching.
+  # Set the Action Controller cache on or off. By default it is off.
+  # Run `rails dev:cache` to change it.
   if Rails.root.join("tmp/caching-dev.txt").exist?
     config.action_controller.perform_caching = true
     config.action_controller.enable_fragment_cache_logging = true
@@ -25,22 +25,23 @@ Rails.application.configure do
     config.action_controller.perform_caching = false
   end
 
-  # Change to :null_store to avoid any caching.
+  # Change this to :null_store for no cache.
   config.cache_store = :memory_store
 
-  # Print deprecation notices to the Rails logger.
+  # Write each deprecation message to the Rails log.
   config.active_support.deprecation = :log
 
-  # Highlight code that triggered redirect in logs.
+  # Mark the code that caused a redirect, in the log.
   config.action_dispatch.verbose_redirect_logs = true
 
-  # Raises error for missing translations.
+  # Raise an error for a translation that is absent.
   # config.i18n.raise_on_missing_translations = true
 
-  # Don't annotate rendered views with file names: this app serves machine-consumed
-  # markup, and the injected HTML comments would otherwise differ from production output.
+  # Do not add the file names to a rendered view. This app serves markup for a machine, and those
+  # HTML comments would make the output different from the production output.
   config.action_view.annotate_rendered_view_with_filenames = false
 
-  # Raise error when a before_action's only/except options reference missing actions.
+  # Raise an error when the only or except option of a before_action names an action that does not
+  # exist.
   config.action_controller.raise_on_missing_callback_actions = true
 end

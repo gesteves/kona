@@ -2,11 +2,12 @@ require 'spec_helper'
 require_relative '../../../lib/utils/dev_api_proxy'
 
 RSpec.describe DevApiProxy do
-  # Records what it was handed, so "fell through untouched" is assertable.
+  # It records each value that it gets, thus a test can check that the request went through with no
+  # change.
   let(:inner) { ->(env) { [ 200, { 'content-type' => 'text/html' }, [ "page:#{env['PATH_INFO']}" ] ] } }
   let(:proxy) { described_class.new(inner) }
 
-  # A minimal HTTParty::Response stand-in: the middleware reads only these three.
+  # A small replacement for an HTTParty::Response: the middleware reads these three values only.
   def upstream(code: 200, body: '', headers: {})
     instance_double(HTTParty::Response, code: code, body: body, headers: headers)
   end

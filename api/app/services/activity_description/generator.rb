@@ -1,19 +1,21 @@
 module ActivityDescription
-  # Composes a Strava-ready description for an Intervals.icu activity — and tidies its name —
-  # then PUTs both back, orchestrating the data gathering, the two Anthropic-backed lines, and
-  # Composer's pure block builders.
+  # Makes a description for an Intervals.icu activity that Strava can show, corrects the name of
+  # the activity, then PUTs both back. It controls the collection of the data, the two lines that
+  # Anthropic writes, and the block functions of Composer.
   class Generator
-    # Prefix shared by every log line this generator emits, for greppability.
+    # This goes at the start of each log line from this generator, thus you can find them with
+    # grep.
     LOG_PREFIX = "Description:"
 
-    # Activity types eligible for a generated description — swim/bike/run only.
+    # The activity types that can get a description: a swim, a bike ride, or a run only.
     ELIGIBLE_SPORTS = %w[Cycling Running Swimming].freeze
 
-    # Sports eligible for the LLM planned-workout headline (🗓️ line).
+    # The sports that can get the planned-workout headline from the LLM, that is, the 🗓️ line.
     HEADLINE_SPORTS = %w[Cycling Running].freeze
 
-    # Dedupes rapid duplicate triggers for one activity, which would otherwise spend double
-    # the LLM tokens and race the final PUT. The TTL bounds a crashed worker's hold.
+    # Removes a second quick trigger for one activity. Without this, the code would use two times
+    # the LLM tokens and two runs would race at the final PUT. The TTL limits the time that a
+    # worker that stops holds the lock.
     LOCK_TTL = 10.minutes
 
     def initialize(intervals: Intervals.new, trainer_road: nil)
@@ -21,10 +23,11 @@ module ActivityDescription
       @trainer_road = trainer_road
     end
 
-    # Generates and writes the description for an activity.
+    # Makes the description for an activity and writes it.
     # @param activity_id [String, Integer] The Intervals.icu activity id.
-    # @param whoop_strain [Float, nil] Optional Whoop strain for the 🔥 line, or nil — the
-    #   description is then composed without it (e.g. when triggered by a non-Whoop source).
+    # @param whoop_strain [Float, nil] The Whoop strain for the 🔥 line, which is optional, or nil.
+    #   The code then makes the description without that line, for example when the trigger is not
+    #   Whoop.
     def generate!(activity_id, whoop_strain: nil)
       with_dedup_lock(activity_id) do
         run(activity_id, whoop_strain)
@@ -72,9 +75,10 @@ module ActivityDescription
       log_info("activity #{activity_id}: updated #{fields.keys.join(', ')}")
     end
 
-    # The 🗓️ planned-workout summary: the one TrainerRoad workout whose name appears verbatim
-    # and case-sensitively in the activity's name, summarized by the LLM. Zero or ambiguous
-    # matches mean no headline. Cycling and running only.
+    # The 🗓️ planned-workout summary: the one TrainerRoad workout whose name is in the name of the
+    # activity, with the same characters and the same case. The LLM writes the summary. With no
+    # match, or with more than one match, there is no headline. This applies to a bike ride and to
+    # a run only.
     # @return [String, nil]
     def planned_summary_line(activity, sport)
       return unless HEADLINE_SPORTS.include?(sport)
@@ -103,8 +107,9 @@ module ActivityDescription
       swallow("planned summary") { Llm.planned_summary(description) }
     end
 
-    # @return [Array<Hash>] The planned workouts for the activity's local date; empty when no
-    #   feed is configured or the fetch fails, so a broken calendar loses only this line.
+    # @return [Array<Hash>] The planned workouts for the local date of the activity. It is empty
+    #   when there is no feed in the configuration or when the fetch fails. Thus a calendar with a
+    #   problem removes only this line.
     def planned_workouts_for(activity)
       swallow("TrainerRoad planned workouts", fallback: []) do
         date = activity_date(activity)
@@ -115,7 +120,8 @@ module ActivityDescription
       end
     end
 
-    # The LLM weather sentence ("{emoji} {sentence}"). Indoor activities never get one.
+    # The weather sentence from the LLM ("{emoji} {sentence}"). An indoor activity never gets
+    # one.
     # @return [String, nil]
     def weather_line(activity)
       return if indoor?(activity)
@@ -129,7 +135,8 @@ module ActivityDescription
       "#{result[:emoji]} #{result[:sentence]}"
     end
 
-    # The 💧 water-temperature line (open-water swims only), from the activity's temp stream.
+    # The 💧 water-temperature line, for an open-water swim only, from the temperature stream of
+    # the activity.
     # @return [String, nil]
     def water_temp_line(activity, swim)
       return unless swim
@@ -141,7 +148,7 @@ module ActivityDescription
       Composer.water_temp_block(median(samples), unit: @intervals.temperature_unit)
     end
 
-    # The 🌡️ heat line: the day's heat-adaptation score.
+    # The 🌡️ heat line: the heat-adaptation score of the day.
     # @return [String, nil]
     def heat_line(activity, swim)
       return if swim
@@ -152,7 +159,7 @@ module ActivityDescription
       Composer.heat_block(heat_adaptation_score: score, swim: swim)
     end
 
-    # @return [Array<Numeric>, nil] The named stream's numeric samples.
+    # @return [Array<Numeric>, nil] The numeric samples of the stream with that name.
     def stream_data(activity_id, type)
       streams = @intervals.activity_streams(activity_id, types: [ type, "time" ])
       stream = Array(streams).find { |candidate| candidate[:type] == type }
@@ -167,11 +174,12 @@ module ActivityDescription
       sorted.length.odd? ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2.0
     end
 
-    # The activity's local calendar date (start_date_local is already athlete-local).
+    # The local calendar date of the activity. start_date_local is already in the time of the
+    # athlete.
     #
-    # ⚠️ Nil-safe on purpose. heat_line reaches this outside the `swallow` wrappers its sibling
-    # steps use, so an activity missing start_date_local used to fail the whole run — and since
-    # that failure is deterministic, ApplicationJob's 24-hour window then retried it all day.
+    # ⚠️ This accepts nil, on purpose. heat_line calls this outside the `swallow` methods that the
+    # other steps use. Thus an activity with no start_date_local stopped the full run. That failure
+    # always occurs, thus the 24-hour window of ApplicationJob then ran the job again all day.
     # @return [Date, nil]
     def activity_date(activity)
       local = activity[:start_date_local]
@@ -182,20 +190,21 @@ module ActivityDescription
       nil
     end
 
-    # Indoor = trainer flag, a "virtual" activity type, or a Zwift source.
+    # An activity is indoor when it has the trainer flag, a "virtual" activity type, or a Zwift
+    # source.
     def indoor?(activity)
       activity[:trainer] == true ||
         activity[:type].to_s.downcase.include?("virtual") ||
         activity[:source].to_s.casecmp("zwift").zero?
     end
 
-    # Runs a best-effort step, swallowing any failure so one flaky source loses only its own
-    # line rather than the whole description.
+    # Runs a step that can fail, and it catches each failure. Thus one source with a problem
+    # removes only its own line, and not the full description.
     #
-    # ⚠️ Not named `safely`: that's UpstreamIsolation's, with a different signature, and this
-    # one's failures would otherwise look like they reached Bugsnag when they didn't.
-    # @param fallback [Object] Value returned when the block raises (nil for a dropped line,
-    #   [] for a collection).
+    # ⚠️ The name is not `safely`. That name belongs to UpstreamIsolation, which has different
+    # parameters, and a failure here would then look like it reached Bugsnag when it did not.
+    # @param fallback [Object] The value to return when the block raises: nil for a line that goes
+    #   away, or [] for a collection.
     def swallow(label, fallback: nil)
       yield
     rescue StandardError => e

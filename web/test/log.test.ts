@@ -22,7 +22,7 @@ describe('requestLogLine', () => {
     const req = new Request('https://www.example.com/', {
       headers: { 'cf-connecting-ip': '203.0.113.4', 'cf-ray': 'ray-9' },
     });
-    // No referer/UA, no request.cf → geo omitted entirely.
+    // There is no referer, no UA, and no request.cf, thus the line has no geo data.
     expect(requestLogLine(req, 'GET /feed.xml', '→ 304')).toBe(
       'GET /feed.xml | → 304 | 203.0.113.4 | ray-9'
     );

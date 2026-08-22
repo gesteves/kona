@@ -1,7 +1,8 @@
-// Element-level defaults. Not a BEM block — everything else in this directory is.
+// The defaults for the elements. This is not a BEM block, and each other file in this directory
+// is.
 
-// <wa-page> injects this reset itself via `:has(wa-page)`, but the documented recommendation is to
-// state it anyway: it covers the server-rendered first paint and browsers without `:has()`.
+// <wa-page> adds this reset itself with `:has(wa-page)`, but the documentation says to write it
+// also: it applies to the first paint from the server and to a browser with no `:has()`.
 html,
 body {
   margin: 0;
@@ -14,15 +15,16 @@ body {
   color: var(--wa-color-text-normal);
 }
 
-// Inline `icon_svg` output. Font Awesome's SVGs carry no intrinsic size — a `viewBox` and nothing
-// else — so every one needs a height; `1em` keeps them proportional to whatever text they sit
-// beside.
+// The output of `icon_svg` in a line of text. A Font Awesome SVG has no size of its own: it has a
+// `viewBox` and nothing more. Thus each one needs a height, and `1em` keeps it at the size of the
+// text beside it.
 //
-// ⚠️ `:not([height])` is what keeps this off an SVG that states its own size, which today means
-// Mapbox GL's map marker. That size is a **presentation attribute**, and any CSS rule outranks one,
-// so an unguarded `height: 1em` shrinks the pin to the map's 12px font — while GL JS goes on
-// offsetting it as though it were full height, floating the tip above the coordinate. That reads as
-// dead-on when zoomed in and kilometres out when zoomed out, which is a maddening thing to debug.
+// ⚠️ `:not([height])` keeps this rule off an SVG that gives its own size, which today is the map
+// marker of Mapbox GL. That size is a **presentation attribute**, and each CSS rule wins over one.
+// Thus a `height: 1em` with no check makes the pin the size of the 12px font of the map, and GL JS
+// continues to offset it as if it were the full height. The point of the pin then floats above the
+// coordinate. That looks correct at a large zoom and kilometres away at a small zoom, and it is
+// very difficult to debug.
 svg:not([height]) {
   fill: currentColor;
   flex: none;
@@ -30,9 +32,9 @@ svg:not([height]) {
   width: auto;
 }
 
-// Turbo's navigation progress bar, in the brand color. web/ hides this outright because the
-// static site navigates instantly and the bar was pure noise; here every navigation is a real
-// server round trip, so it's worth seeing.
+// The navigation progress bar of Turbo, in the brand color. web/ hides it, because the static site
+// navigates immediately and the bar gave no information. Here each navigation is a true request to
+// the server, thus the bar is useful.
 .turbo-progress-bar {
   background-color: var(--color-firebrick);
 }

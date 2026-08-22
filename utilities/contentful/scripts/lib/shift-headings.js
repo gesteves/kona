@@ -1,12 +1,13 @@
-// Shared logic for bump-heading-levels.js and revert-heading-levels.js.
+// The shared code of bump-heading-levels.js and revert-heading-levels.js.
 //
-// Shifts every ATX Markdown heading by `delta` levels in a single pass, so headings are never
-// double-shifted, skipping fenced code blocks so `#` comment lines in code are untouched.
+// It moves each ATX Markdown heading by `delta` levels in one pass, thus it never moves a heading
+// two times. It does not change a fenced code block, thus a `#` comment line in code stays the
+// same.
 //
-// Env vars, as elsewhere in this directory:
-//   DRY_RUN=true                  print per-entry diffs, write nothing
-//   ENTRY_ID=<sys.id>             restrict to a single entry
-//   CONTENTFUL_ENVIRONMENT=<env>  target a non-master environment (default: master)
+// The env vars, as in each other file in this directory:
+//   DRY_RUN=true                  Show the changes of each entry and write nothing.
+//   ENTRY_ID=<sys.id>             Use one entry only.
+//   CONTENTFUL_ENVIRONMENT=<env>  Use an environment that is not master. The default is master.
 const { runMigration } = require('contentful-migration');
 
 const FENCE = /^\s{0,3}(```|~~~)/;
@@ -17,7 +18,8 @@ const TARGETS = [
   { contentType: 'page', fields: ['body'] },
 ];
 
-// Shifts ATX heading levels by `delta`, clamped to 1..6. Returns the new text.
+// Moves each ATX heading level by `delta`, with a minimum of 1 and a maximum of 6. It returns the
+// new text.
 function shiftHeadings(text, delta) {
   let inFence = false;
   return text
@@ -36,7 +38,7 @@ function shiftHeadings(text, delta) {
     .join('\n');
 }
 
-// Prints the changed lines of a field as a small before/after diff.
+// Shows the lines of a field that change, with the old text and the new text.
 function logDiff(label, field, before, after) {
   const beforeLines = before.split('\n');
   const afterLines = after.split('\n');
@@ -49,9 +51,9 @@ function logDiff(label, field, before, after) {
   });
 }
 
-// Builds and runs the migration. Entries (and locales) with no heading changes
-// return undefined so they're skipped — not rewritten, not republished — keeping
-// sitemap <lastmod>, the Atom feed, and webhooks quiet for unchanged content.
+// Makes the migration and runs it. An entry, or a locale, with no heading change returns undefined.
+// Thus the code does not write it and does not publish it again, and the <lastmod> in the sitemap,
+// the Atom feed, and the webhooks stay quiet for content that does not change.
 function runHeadingShift(delta) {
   const dryRun = process.env.DRY_RUN === 'true';
   const onlyId = process.env.ENTRY_ID; // optional: restrict to this one entry
@@ -72,7 +74,8 @@ function runHeadingShift(delta) {
         contentType,
         from: ['title', ...fields],
         to: fields,
-        // Runs once per locale per entry; `meta.id` is the entry's sys.id.
+        // This runs one time for each locale of each entry. `meta.id` is the sys.id of the
+        // entry.
         transformEntryForLocale: (fromFields, locale, meta) => {
           if (onlyId && meta.id !== onlyId) return undefined; // skip all but the target entry
           const title = fromFields.title?.[locale] || '(untitled)';
@@ -93,7 +96,8 @@ function runHeadingShift(delta) {
             }
           }
           if (dryRun) return undefined; // log only, write nothing
-          // Return undefined when nothing changed so the entry is skipped (no version bump).
+          // Return undefined when nothing changes, thus the code does not write the entry and its
+          // version does not increase.
           return Object.keys(out).length ? out : undefined;
         },
         shouldPublish: 'preserve', // re-publish if it was published; leave drafts as drafts

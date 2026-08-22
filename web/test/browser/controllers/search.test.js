@@ -28,7 +28,7 @@ beforeEach(() => {
 
 describe('search controller', () => {
   it('starts the idle preload as soon as a trigger connects', async () => {
-    // Layer 1 of three: by the time anyone realistically clicks, the component UI is resident.
+    // The first of three layers: the component UI is in the page before a person clicks.
     await mountSearch();
 
     expect(pagefind.preloadPagefindWhenIdle).toHaveBeenCalled();
@@ -71,7 +71,7 @@ describe('search controller', () => {
   });
 
   it('tells the nav to close, so dismissing search returns to the page', async () => {
-    // On mobile the Search item lives inside the open hamburger menu.
+    // On a mobile screen, the Search item is in the open menu.
     document.body.appendChild(modal);
     const onClose = vi.fn();
     document.addEventListener('search:close', onClose);
@@ -84,8 +84,8 @@ describe('search controller', () => {
   });
 
   it('does not throw when the modal element is not on the page', async () => {
-    // Development: /pagefind/ doesn't exist, so <pagefind-modal> never upgrades and search is a
-    // deliberate no-op rather than an error.
+    // In development, /pagefind/ does not exist. Thus the browser never upgrades <pagefind-modal>,
+    // and the search does nothing, on purpose, and it gives no error.
     const { controller } = await mountSearch();
 
     await expect(

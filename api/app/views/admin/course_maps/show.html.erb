@@ -5,10 +5,10 @@
 <h1 class="admin-main__title"><%= @track.title %></h1>
 <p class="map-editor__summary"><%= @track.summary %></p>
 
-<%# The form never submits under normal use — the preview controller reads it and rewrites the
-    image and download URLs in place, so tweaking a value doesn't navigate and the field you're
-    editing keeps focus. It stays a real GET form so pressing Enter still works, and so the
-    settings a preview is rendered with are always expressible as a URL. %>
+<%# In normal use the form never submits. The preview controller reads it and changes the image URL
+    and the download URL in place. Thus a change to a value causes no navigation and the field that
+    you edit keeps the focus. It stays a true GET form, thus Enter still works and a URL can always
+    give the settings of a preview. %>
 <div class="map-editor" data-controller="map-preview" data-map-preview-save-url-value="<%= course_map_path(@track.id) %>">
   <%= form_with url: @track.show_path, method: :get, class: "map-editor__settings",
                 data: { map_preview_target: "form", turbo_action: "replace" } do %>
@@ -64,8 +64,8 @@
                          value="<%= @track.setting('end_color') %>" format="hex">
         </wa-color-picker>
 
-        <%# The hidden field is what makes "off" submit at all — an unchecked switch sends nothing.
-            Both share a name, and last-one-wins is what turns the pair into a boolean. %>
+        <%# The hidden field is what sends "off": a switch that is off sends nothing. The two fields
+            have the same name, and the server takes the last one. That makes the pair a boolean. %>
         <input type="hidden" name="settings[finish_on_top]" value="0">
         <wa-switch name="settings[finish_on_top]" value="1"
                    <%= "checked" if ActiveModel::Type::Boolean.new.cast(@track.setting("finish_on_top")) %>
@@ -91,9 +91,9 @@
   <% end %>
 
   <div class="map-editor__preview">
-    <%# The preview doubles as the zoom trigger. The dialog's image uses the *same* URL, so opening
-        it costs no extra Mapbox render — the browser already has that exact response cached, at
-        the same 2x the download gets. %>
+    <%# The preview is also the control that opens the zoom dialog. The image in that dialog uses
+        the *same* URL, thus it needs no second Mapbox render: the browser already has that
+        response in its cache, at the same 2x size as the download. %>
     <wa-button class="map-editor__zoom" appearance="plain" data-dialog="open map-preview-full">
       <img class="map-editor__image" data-map-preview-target="image"
            src="<%= @track.preview_path %>" alt="Map of <%= @track.title %>">
@@ -107,8 +107,8 @@
     </wa-button>
   </div>
 
-  <%# Inside the map-preview controller's element, so its image is retargeted along with the
-      inline one as the settings change. %>
+  <%# This is in the element of the map-preview controller, thus that controller changes this image
+      with the image in the page when a setting changes. %>
   <wa-dialog id="map-preview-full" class="map-zoom" label="<%= @track.title %>" data-controller="dialog">
     <img class="map-zoom__image" data-map-preview-target="image"
          src="<%= @track.preview_path %>" alt="Map of <%= @track.title %>">

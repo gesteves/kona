@@ -41,8 +41,9 @@ RSpec.describe Turnstile do
     expect(service.verify("good-token")).to be(true)
   end
 
-  # Without an explicit timeout, Net::HTTP waits its 60s defaults — a hung siteverify would hold
-  # the contact request until rack-timeout 500s it, defeating the fail-open below.
+  # With no timeout, Net::HTTP waits its default of 60s. Thus a siteverify that stops would hold the
+  # contact request until rack-timeout gives it a 500, and the code below that permits the message
+  # would then do nothing.
   it "posts with a short timeout so a hung siteverify can't hold the request path" do
     stub_response(success: true, body: { success: true }.to_json)
 

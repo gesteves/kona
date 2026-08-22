@@ -8,10 +8,10 @@ RSpec.describe ArticleAttributes do
       expect(path).to eq("/2026/06/15/a-post/")
     end
 
-    # ⚠️ The date comes from the timestamp's own offset, never normalized to UTC. An article
-    # published at 23:30 Pacific is a *January 1st* permalink; resolving it in UTC would move it
-    # to the 2nd, and a published permalink that moves is a dead link plus a zeroed pageview
-    # count (Plausible matches on this path).
+    # ⚠️ The date comes from the offset of the timestamp, and the code never changes it to UTC. An
+    # article that a person publishes at 23:30 Pacific has a permalink for *January 1*. In UTC, that
+    # permalink would move to January 2. A published permalink that moves is a link that does not
+    # work, and its pageview count becomes zero, because Plausible matches on that path.
     it "reckons the date in the timestamp's own zone, not UTC" do
       path = described_class.path(slug: "late-post", published_at: "2026-01-01T23:30:00-08:00")
 
@@ -28,9 +28,9 @@ RSpec.describe ArticleAttributes do
       expect(described_class.path(slug: "p", published_at: nil)).to be_nil
     end
 
-    # The static build emits the same path with an index.html suffix (see the web app's
-    # Contentful#set_article_path), and url_for normalizes that away. If these two formats ever
-    # diverge, every card the api renders points at a 404.
+    # The static build writes the same path with an index.html at the end (refer to
+    # Contentful#set_article_path of the web app), and url_for removes that part. If the two formats
+    # become different, each card that the api renders points at a 404.
     it "matches the static build's permalink format" do
       published_at = "2026-06-15T09:00:00Z"
       published = DateTime.parse(published_at)

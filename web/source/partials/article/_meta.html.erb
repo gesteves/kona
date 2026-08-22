@@ -1,5 +1,6 @@
-<%# The publish-date meta line, shared by the full/compact/short entries (draft label + tags)
-    and the summary card (`show_draft`/`show_tags` false). The date is parsed once here. %>
+<%# The meta line with the publish date. The full entry, the compact entry, and the Short share it,
+    and they show the draft label and the tags. The summary card also shares it, with `show_draft`
+    and `show_tags` set to false. The code parses the date one time, here. %>
 <% render_draft = !defined?(show_draft) || show_draft %>
 <% render_tags = !defined?(show_tags) || show_tags %>
 <% published = published_datetime(article) %>

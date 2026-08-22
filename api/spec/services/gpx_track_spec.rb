@@ -26,8 +26,8 @@ RSpec.describe GpxTrack do
       expect(track.end_coord).to eq([ -116.206274, 43.607905 ])
     end
 
-    # Garmin writes 26 significant digits per value, which triples the Redis payload and the
-    # Mapbox upload for precision finer than a map pixel.
+    # Garmin writes 26 significant digits for each value. That makes the Redis payload and the Mapbox
+    # upload three times larger, for an accuracy that is smaller than one pixel on the map.
     it "rounds coordinates to six decimal places" do
       expect(track.coordinates.flatten).to all(satisfy { |value| value.to_s.split(".").last.length <= 6 })
     end
@@ -101,8 +101,8 @@ RSpec.describe GpxTrack do
       expect(track.id).to match(/\A[a-z0-9_]{1,32}\z/)
     end
 
-    # Two races sharing a long prefix truncate to the same slug, so the digest is what keeps their
-    # tilesets apart.
+    # Two races whose names start with the same long text give the same slug after the cut. Thus the
+    # digest is what keeps their tilesets separate.
     it "distinguishes titles that truncate to the same slug" do
       long = ->(suffix) {
         build(<<~XML).id
@@ -138,7 +138,7 @@ RSpec.describe GpxTrack do
     it { expect(icon_for("running")).to eq("pitch") }
     it { expect(icon_for("road_biking")).to eq("bicycle-share") }
     it { expect(icon_for("open_water_swimming")).to eq("swimming") }
-    # No neutral placeholder any more: an unmatched sport falls back to running.
+    # There is no neutral icon: a sport with no match gets the running icon.
     it { expect(icon_for("skiing")).to eq("pitch") }
   end
 end

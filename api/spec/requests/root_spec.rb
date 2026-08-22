@@ -1,13 +1,14 @@
 require "rails_helper"
 
-# `/` is answered by two different routes depending on the host, and which one wins is decided by
-# the `API_HOST` constraint in config/routes.rb plus the order they're drawn in:
+# Two different routes answer `/`, and the host decides which one. The `API_HOST` constraint in
+# config/routes.rb, and the order that Rails draws the two routes in, make that decision:
 #
-#   * admin host (or any host when API_HOST is unset) — the admin home page, owner-gated
-#   * public API host — a 301 to the main site, since that host has no UI
+#   * the admin host, and each host when API_HOST has no value: the admin home page, which the owner
+#     session controls.
+#   * the public API host: a 301 to the main site, because that host has no UI.
 #
-# spec/requests/host_constraints_spec.rb covers the split with API_HOST set; this file covers the
-# unset case, which is dev, CI, and the .fly.dev origin.
+# spec/requests/host_constraints_spec.rb covers the two routes with a value in API_HOST. This file
+# covers the condition with no value, which is development, CI, and the .fly.dev origin.
 RSpec.describe "Root", type: :request do
   describe "GET / with API_HOST unset" do
     before do

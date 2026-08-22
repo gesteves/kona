@@ -1,8 +1,9 @@
 require "rails_helper"
 
 RSpec.describe SpamQuarantine do
-  # A plain Hash standing in for the Redis hash, so the pruning, ordering, and take-once logic run
-  # for real rather than against a pile of individually stubbed return values.
+  # A plain Hash in place of the Redis hash. Thus the code that removes old entries, the code that
+  # puts them in order, and the code that gives one entry one time all run, and they do not run
+  # against a group of stubbed values.
   let(:store) { {} }
 
   before do
@@ -13,7 +14,8 @@ RSpec.describe SpamQuarantine do
     allow($redis).to receive(:hdel) { |_key, *fields| fields.count { |f| !store.delete(f).nil? } }
   end
 
-  # Writes an entry straight into the fake store, bypassing #store so the timestamp can be forced.
+  # Writes an entry directly into the test store, and it does not call #store. Thus the test can set
+  # the timestamp.
   def seed(id:, received_at:, name: "Spammer", context: {})
     store[id] = {
       "id" => id, "name" => name, "email" => "spam@example.com", "message" => "buy now",
@@ -44,7 +46,7 @@ RSpec.describe SpamQuarantine do
       expect(JSON.parse(store.fetch(id))["context"]).to eq({})
     end
 
-    # Pruning on the write path is what bounds growth when nobody opens the page.
+    # The removal on the write path is what limits the growth when nobody opens the page.
     it "drops expired entries as it writes" do
       seed(id: "old", received_at: 31.days.ago)
 
@@ -82,7 +84,7 @@ RSpec.describe SpamQuarantine do
       expect(store.keys).to eq([ "fresh" ])
     end
 
-    # One bad field must not take down the whole page.
+    # One incorrect field must not stop the full page.
     it "drops an unparseable entry rather than raising" do
       store["broken"] = "{not json"
       seed(id: "fine", received_at: 1.day.ago)
@@ -110,7 +112,8 @@ RSpec.describe SpamQuarantine do
       expect(store).not_to have_key("abc")
     end
 
-    # ⚠️ The whole point of fetch-and-remove: a double click must not deliver the email twice.
+    # ⚠️ This is the purpose of the read and delete in one step: two clicks must not send the email
+    # two times.
     it "returns nil on a second call for the same id" do
       seed(id: "abc", received_at: 1.day.ago)
       quarantine = described_class.new

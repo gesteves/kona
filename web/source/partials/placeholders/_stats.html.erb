@@ -1,11 +1,11 @@
-<%# Loading skeleton for the /activity-stats markup. The live-update controller swaps %>
-<%# in the real markup on connect (or removes this section if there's no data). %>
-<%# `url` (required local) is the API endpoint. %>
+<%# The loading skeleton of the /activity-stats markup. The live-update controller puts the true %>
+<%# markup here on connect, and it removes this section when there is no data. %>
+<%# `url`, which is a necessary local, is the API endpoint. %>
 <section data-nosnippet class="stats stats--has-four" <%= live_update_attrs(url) %> aria-labelledby="hed-stats">
   <h2 class="stats__heading" id="hed-stats">Monthly Totals <i>from</i> <a href="https://intervals.icu" target="_blank" rel="nofollow noopener">Intervals.icu</a></h2>
   <div class="stats__container">
-    <%# "Activities"/"in the past month" match the API view's usual output (it pluralizes and %>
-    <%# lowercases), so the swap doesn't flip the text. %>
+    <%# "Activities" and "in the past month" are the usual output of the API view, which makes the %>
+    <%# plural form and the lowercase text. Thus the swap does not change the text. %>
     <%= partial 'partials/placeholders/stat_skeleton', locals: { icon: 'wave-pulse',      top: 'Activities', bottom: "in the past month" } %>
     <%= partial 'partials/placeholders/stat_skeleton', locals: { icon: 'person-swimming', top: 'Swimming' } %>
     <%= partial 'partials/placeholders/stat_skeleton', locals: { icon: 'person-biking',   top: 'Cycling' } %>

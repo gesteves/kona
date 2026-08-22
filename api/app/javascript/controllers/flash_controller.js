@@ -3,9 +3,9 @@ import { Controller } from "@hotwired/stimulus";
 /**
  * Removes a flash message before Turbo caches the page.
  *
- * ⚠️ Without this the flash is baked into the cached snapshot, so navigating away and pressing
- * Back re-displays a "Whoop disconnected." banner for an action that already happened — and a
- * restoration visit never re-renders, so nothing would clear it.
+ * ⚠️ Without this code, the flash message is in the snapshot in the cache. Thus a navigation away
+ * and then a press of Back shows a "Whoop disconnected." message for an action that already
+ * occurred. A restoration visit never renders again, thus nothing would remove it.
  */
 export default class extends Controller {
   connect() {
@@ -17,7 +17,7 @@ export default class extends Controller {
     document.removeEventListener("turbo:before-cache", this.remove);
   }
 
-  /** Dismisses the message now, from the callout's own close button. */
+  /** Removes the message now, from the close button of the callout. */
   dismiss() {
     this.element.remove();
   }

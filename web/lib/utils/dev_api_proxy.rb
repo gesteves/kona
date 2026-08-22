@@ -1,29 +1,30 @@
 require "httparty"
 
-# Dev-only stand-in for the Cloudflare Worker routes that have no Middleman page behind them, so
-# `middleman server` renders a complete page instead of collapsing every widget. Registered from
-# config.rb's `configure :development` block; never reached by `middleman build`.
+# A development-only replacement for the Cloudflare Worker routes that have no Middleman page. Thus
+# `middleman server` renders a complete page and does not remove each widget. The
+# `configure :development` block of config.rb registers it. `middleman build` never uses it.
 #
-# ⚠️ This is NOT a port of web/src/api-proxy.ts and must not become one. Every invariant that file
-# documents — Age passthrough, ETag revalidation, a byte-identical upstream request per shared
-# cache entry, the query-string strip — exists to make one Cloudflare edge cache entry safe for
-# many viewers. Here there is no edge and one viewer, so this forwards the status, content type
-# and body, and nothing else.
+# ⚠️ This is NOT a copy of web/src/api-proxy.ts and it must not become one. Each rule in that file —
+# the Age header that goes through, the ETag revalidation, an upstream request with the same bytes
+# for each shared cache entry, and the removal of the query string — exists to make one Cloudflare
+# edge cache entry safe for many viewers. Here there is no edge and there is one viewer. Thus this
+# code sends the status, the content type, and the body, and nothing more.
 class DevApiProxy
   WIDGET_PREFIX = "/widgets/"
   CONTACT_PATH = "/api/contact"
 
-  # Generous, like the Worker's: the api may be a fly machine cold-starting from zero, or a local
-  # Rails that hasn't finished booting.
+  # This is long, as it is in the Worker: the api can be a fly machine that starts from zero, or a
+  # local Rails that did not complete its start.
   TIMEOUT = 30
 
-  # @param app [#call] The inner Rack app (Middleman).
+  # @param app [#call] The Rack app below this one, which is Middleman.
   def initialize(app)
     @app = app
   end
 
   # @param env [Hash] The Rack environment.
-  # @return [Array(Integer, Hash, Array<String>)] The upstream response, or the inner app's.
+  # @return [Array(Integer, Hash, Array<String>)] The upstream response, or the response of the
+  #   app below this one.
   def call(env)
     path = env["PATH_INFO"]
     return @app.call(env) unless proxied?(env, path)
@@ -36,8 +37,8 @@ class DevApiProxy
 
   private
 
-  # Only the two routes the Worker claims, and only with the methods it allows. `/pa/*` is
-  # deliberately absent: local page views shouldn't reach Plausible.
+  # Only the two routes that the Worker takes, and only with the methods that it permits. `/pa/*` is
+  # absent, on purpose: a local page view must not reach Plausible.
   def proxied?(env, path)
     method = env["REQUEST_METHOD"]
     return true if path.start_with?(WIDGET_PREFIX) && %w[GET HEAD].include?(method)
@@ -45,7 +46,7 @@ class DevApiProxy
     path == CONTACT_PATH && method == "POST"
   end
 
-  # @param url [String] The resolved upstream URL, used in the failure log.
+  # @param url [String] The full upstream URL, for the failure log.
   def forward(env, path, url)
     response = if path == CONTACT_PATH
       HTTParty.post(url, headers: contact_headers(env), body: env["rack.input"].read,
@@ -59,15 +60,16 @@ class DevApiProxy
     bad_gateway("#{url} -> #{e.class}: #{e.message}")
   end
 
-  # The shared bearer, injected server-side exactly as the Worker does.
+  # The shared bearer token, which the server adds, in the same way as the Worker.
   def auth_headers
     token = ENV["API_TOKEN"].to_s
     token.empty? ? {} : { "authorization" => "Bearer #{token}" }
   end
 
-  # In production the api sits behind Cloudflare and can't see the visitor, so the Worker passes
-  # the real signal under X-Kona-Client-*. Akismet, the notification email and the api's
-  # rack-attack throttle read these, so the contact form can't be exercised locally without them.
+  # In production, Cloudflare is in front of the api and the api cannot see the visitor. Thus the
+  # Worker sends the true data in the X-Kona-Client-* headers. Akismet, the notification email, and
+  # the rack-attack throttle of the api read them. Thus you cannot test the contact form locally
+  # without them.
   def contact_headers(env)
     headers = auth_headers
     headers["accept"] = env["HTTP_ACCEPT"] if env["HTTP_ACCEPT"]
@@ -77,21 +79,22 @@ class DevApiProxy
     headers
   end
 
-  # Status passes through verbatim: an empty 200 is the api's "no data" signal and must still
-  # collapse the widget, and a non-2xx must still leave already-rendered content alone.
-  # `no-store` is a deliberate local divergence from the production
-  # `max-age=0, stale-while-revalidate=N`, so a reload always shows the render you just changed.
+  # The status goes through with no change: an empty 200 is the "no data" answer of the api and must
+  # remove the widget, and a non-2xx must not change content that the page already shows.
+  # `no-store` is different from the production `max-age=0, stale-while-revalidate=N`, on purpose.
+  # Thus a new page load always shows the render that you just changed.
   def rack_response(response)
     headers = { "cache-control" => "no-store" }
     headers["content-type"] = response.headers["content-type"] if response.headers["content-type"]
-    # The no-JS contact path answers with a 303.
+    # The contact path with no JavaScript answers with a 303.
     headers["location"] = response.headers["location"] if response.headers["location"]
 
     [ response.code, headers, [ response.body.to_s ] ]
   end
 
-  # Mirrors the Worker's empty 502. The message is the only record of a misconfigured or
-  # unreachable api — the widget itself just collapses, silently.
+  # This is the same as the empty 502 of the Worker. The message is the only record of an api with
+  # an incorrect configuration, or an api that the code cannot reach. The widget goes away and gives
+  # no message.
   def bad_gateway(message)
     warn "== DevApiProxy: #{message}"
     [ 502, { "cache-control" => "no-store" }, [ "" ] ]

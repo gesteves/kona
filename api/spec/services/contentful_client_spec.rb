@@ -14,12 +14,12 @@ RSpec.describe ContentfulClient do
     ENV["CONTENTFUL_TOKEN"] = original["CONTENTFUL_TOKEN"]
   end
 
-  # One item hash per id, shaped like the collection payload paginate walks.
+  # One item hash for each id, with the shape of the collection payload that paginate reads.
   def page_of(count, start: 0)
     Array.new(count) { |i| { sys: { id: "entry-#{start + i}" } } }
   end
 
-  # post_json's result is dug into as `[:data]`; a nil response stands for a failed page.
+  # The code reads `[:data]` of the result of post_json. A nil response means a page that failed.
   def stub_pages(*pages)
     responses = pages.map do |page|
       page && { data: { articleCollection: { items: page } } }
@@ -84,8 +84,8 @@ RSpec.describe ContentfulClient do
       expect(client.paginate(gql, collection: :articleCollection, page_size: 2).size).to eq(2)
     end
 
-    # The two halves of `strict:`. A ranking that acts on a partial corpus silently drops
-    # articles; a widget that renders one just shows fewer.
+    # The two conditions of `strict:`. A list that uses an incomplete set of articles removes some
+    # articles with no message. A widget with an incomplete set only shows fewer items.
     it "returns the partial result when a page fails and strict is false" do
       stub_pages(page_of(2), nil)
 

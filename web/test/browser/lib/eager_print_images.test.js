@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Safari prints whatever has already loaded, so lazy images come out missing. The module flips
-// them to eager when the reader heads into print.
+// Safari prints the images that already loaded, thus a lazy image is absent. The module changes each
+// lazy image to eager when the reader starts a print.
 
 const MODULE = '../../../source/javascripts/stimulus/lib/eager_print_images';
 
-/** Captures the `matchMedia('print')` change listener so tests can fire it. */
+/** Keeps the change listener of `matchMedia('print')`, thus a test can call it. */
 const stubPrintMedia = () => {
   const listeners = [];
   vi.stubGlobal('matchMedia', () => ({

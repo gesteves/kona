@@ -16,7 +16,7 @@
 
           <p class="connected-app__description"><%= app.description %></p>
 
-          <%# The badge alone is easy to skim past, and this is the one state that needs acting on. %>
+          <%# A reader can miss the badge alone, and this is the one state that needs an action. %>
           <% if app.error.present? %>
             <wa-callout variant="danger">
               <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
@@ -26,23 +26,25 @@
 
           <div class="wa-cluster wa-gap-s">
             <% if app.connectable? %>
-              <%# ⚠️ `turbo: false` because Whoop's connect path is a same-origin URL that 302s
-                  cross-origin, which Turbo Drive can't follow. It is load-bearing: Turbo pierces
-                  shadow roots in both directions — it finds wa-button's inner <a> through the
-                  click's composed path, then finds this attribute back up through the host. It
-                  stays unconditional because the only cost to an app whose connect path is an
-                  ordinary admin page (Bluesky's form) is a full page load. %>
+              <%# ⚠️ This uses `turbo: false`, because the connect path of Whoop is a same-origin URL
+                  that gives a 302 to another origin, and Turbo Drive cannot follow that. It is
+                  necessary: Turbo goes into a shadow root and out of it. It finds the <a> in
+                  wa-button through the composed path of the click, then it finds this attribute on
+                  the host. It has no condition, because for an app whose connect path is an
+                  ordinary admin page, such as the form of Bluesky, the only cost is a full page
+                  load. %>
               <wa-button href="<%= app.connect_path %>" variant="brand" appearance="accent"
                          data-turbo="false">
                 <%= app.connect_label %>
               </wa-button>
             <% end %>
 
-            <%# Not an `elsif`: an errored app offers both, since reconnecting is the fix and
-                disconnecting is the way out. %>
+            <%# This is not an `elsif`: an app in the error state offers both actions, because a new
+                connection is the correction and a disconnect is the way out. %>
             <% if app.disconnectable? %>
-              <%# Same-origin POST-as-DELETE, so Turbo handles it normally. form_with + a
-                  form-associated <wa-button> rather than button_to, which emits a native button. %>
+              <%# This is a same-origin POST that acts as a DELETE, thus Turbo does it in the usual
+                  way. It uses form_with with a <wa-button> that is part of the form, and not
+                  button_to, which writes a native button. %>
               <%= form_with url: app.disconnect_path, method: :delete do %>
                 <wa-button type="submit" variant="danger" appearance="outlined">
                   <%= slotted_icon_svg("classic", "light", "link-slash") %>

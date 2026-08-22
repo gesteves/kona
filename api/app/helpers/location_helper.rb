@@ -1,7 +1,6 @@
 module LocationHelper
-  # Formats a location from Google Maps geocoded address components, with a few
-  # special cases.
-  # @param location [OpenStruct, nil] A dot-accessible GoogleMaps result.
+  # Makes a location name from the address components of Google Maps, with some special conditions.
+  # @param location [OpenStruct, nil] A GoogleMaps result, in an object with dot access.
   # @return [String, nil]
   def format_location(location)
     return if location.blank?
@@ -13,7 +12,7 @@ module LocationHelper
     county = components.find { |c| c.types.include?("administrative_area_level_2") }&.long_name
     country = components.find { |c| c.types.include?("country") }&.long_name
 
-    # Curly apostrophes so places like "Coeur d'Alene" look right.
+    # Use a curly apostrophe, thus a name such as "Coeur d'Alene" is correct.
     city = city&.gsub("'", "’")
     region = region&.gsub("'", "’")
     county = county&.gsub("'", "’")
@@ -34,7 +33,7 @@ module LocationHelper
     end
   end
 
-  # Formats the elevation in both meters and feet (with the metric/imperial toggle).
+  # Makes the elevation text in meters and in feet, with the metric and imperial control.
   # @param elevation [Numeric, nil] The elevation in meters.
   # @return [String, nil]
   def format_elevation(elevation, abbreviated = false)

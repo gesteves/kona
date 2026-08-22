@@ -1,11 +1,12 @@
 require "securerandom"
 
-# Drives the Whoop OAuth2 authorization flow. The authorize endpoint is gated by the owner session
-# so only the owner can attach an account; the callback is reachable without one — Whoop redirects
-# straight to it — and is guarded instead by a one-time state validated against Redis.
+# Does the Whoop OAuth2 authorization flow. The owner session controls the authorize endpoint, thus
+# only the owner can connect an account. A visitor can reach the callback with no session, because
+# Whoop redirects directly to it. A state value that works one time, and that the code compares with
+# Redis, protects that callback.
 #
-# ⚠️ OwnerFacing for the `no-store`: the callback carries the authorization `code` and the `state`
-# in its query string, so it must not be stored by a browser or an intermediary.
+# ⚠️ This uses OwnerFacing for the `no-store` header: the callback has the authorization `code` and
+# the `state` in its query string, thus a browser and each server between must not store it.
 class WhoopOauthController < ActionController::Base
   include Authentication
   include OwnerFacing

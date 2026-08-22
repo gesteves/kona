@@ -28,7 +28,7 @@ RSpec.describe LocationSync do
     )
   end
 
-  # Intervals.icu already matches the resolved context.
+  # Intervals.icu already has the same values as the resolved context.
   let(:profile) { { city: "Denver", state: "Colorado", country: "United States", timezone: "America/Denver" } }
   let(:forecasts) do
     [ { id: 7, provider: "OPEN_WEATHER", location: "Denver, Colorado, United States", label: "Denver, Colorado", lat: 39.7, lon: -104.9, enabled: true } ]

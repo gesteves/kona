@@ -1,12 +1,13 @@
-# A local page: a fullscreen Mapbox map of what each PurpleAir sensor was reading at a past
-# timestamp, to be panned to a good frame and screenshotted for a post's cover image.
+# A local page: a full-screen Mapbox map of the reading of each PurpleAir sensor at a time in the
+# past. Move the map to a good frame, then make a screenshot for the cover image of a post.
 #
-# ⚠️ Local-only and bound to 127.0.0.1 — it proxies a PurpleAir key with no auth of its own.
+# ⚠️ This is local only and it binds 127.0.0.1. It proxies a PurpleAir key and has no
+# authentication of its own.
 #
-# The browser can't call PurpleAir directly: the key would be exposed, CORS isn't guaranteed,
-# and the history endpoint is rate-limited to one request per second per key, which has to be
-# sequenced somewhere. So this proxies it and streams results back as Server-Sent Events, and
-# circles appear as they resolve rather than the page sitting blank for a minute.
+# The browser cannot call PurpleAir directly: the key would be public, CORS is not sure, and the
+# history endpoint has a limit of one request each second for each key, which some code must put
+# in sequence. Thus this app proxies PurpleAir and sends the results back as Server-Sent Events.
+# Each circle appears when its data arrives, and the page is not empty for a minute.
 
 require 'sinatra'
 require 'httparty'
@@ -22,36 +23,36 @@ enable :inline_templates
 
 PURPLE_AIR_API_URL = 'https://api.purpleair.com/v1'
 
-# Outdoor sensors only, and `confidence` is PurpleAir's own data-quality score — the same
-# >= 50 gate api/app/services/purple_air.rb uses.
+# Outdoor sensors only. `confidence` is the data-quality score of PurpleAir. This uses the same
+# limit of 50 or more that api/app/services/purple_air.rb uses.
 MIN_CONFIDENCE = 50
 
-# History averaging interval, in minutes (PurpleAir allows 0/10/30/60/360/1440/…), and how far
-# either side of the target timestamp to search. Passing both start_timestamp and
-# end_timestamp keeps the row count — and so the API point cost — down.
+# The history average interval in minutes (PurpleAir permits 0, 10, 30, 60, 360, 1440, and more),
+# and the time to search before and after the target timestamp. Both start_timestamp and
+# end_timestamp keep the number of rows small, and thus the API point cost small.
 AVERAGE_MINUTES = 10
 WINDOW_SECONDS = 30 * 60
 
-# The history endpoint's rate limit is 1 req/sec per key. A little headroom avoids
-# RateLimitExceededError on a slow clock.
+# The rate limit of the history endpoint is one request each second for each key. A small extra
+# time prevents a RateLimitExceededError when the clock is slow.
 RATE_LIMIT_SLEEP = 1.1
 
-# One request per sensor at ~1s each, so a zoomed-way-out view could otherwise kick off an
-# hour of requests (and spend a lot of API points).
+# There is one request for each sensor, and each request takes approximately one second. Thus a
+# view at a large scale could start an hour of requests and use many API points.
 MAX_SENSORS = 150
 
 HTTP_TIMEOUT = 30
 
-# Readings never change once they're in the past, so a process-local cache makes panning back
-# over ground already covered free rather than another minute of sequential requests.
-# Keyed [sensor_index, timestamp]; a miss with no usable data is cached as :none.
+# A reading in the past never changes. Thus a cache in this process makes a move back over the
+# same area free, and not another minute of requests in sequence.
+# The key is [sensor_index, timestamp]. The cache holds :none for a sensor with no correct data.
 READING_CACHE = {}
 CACHE_MUTEX = Mutex.new
 
-# Identifies the newest sensor crawl. `/sensors` takes the next number and checks it between
-# sensors, so anything that bumps the counter makes an older loop notice it's stale and stop.
-# Closing the EventSource isn't enough on its own: writes to a dropped connection don't fail
-# promptly, so the loop would keep spending API points on a frame you've already left.
+# Identifies the most recent sensor crawl. `/sensors` takes the next number and reads it between
+# sensors. Thus each increase of the counter makes an older loop find that it is old, and stop.
+# A close of the EventSource is not sufficient: a write to a connection that is gone does not fail
+# quickly, thus the loop would continue to use API points for a frame that you left.
 RUN_MUTEX = Mutex.new
 RUN = { id: 0 }
 
@@ -63,8 +64,8 @@ def current_run
   RUN_MUTEX.synchronize { RUN[:id] }
 end
 
-# Cancels whatever crawl is running. Sent by the HUD's Stop button (as a beacon, so it still
-# arrives if the page is navigating away).
+# Stops the crawl that runs now. The Stop button of the HUD sends this as a beacon, thus it
+# arrives even when the page navigates away.
 post '/stop' do
   begin_run!
   status 204
@@ -87,8 +88,8 @@ get '/' do
   }
 end
 
-# Streams the sensors visible in the given bounds, one Server-Sent Event each, with their AQI
-# at the given timestamp.
+# Sends the sensors in the given bounds, one Server-Sent Event for each sensor, with the AQI of
+# the sensor at the given timestamp.
 get '/sensors' do
   halt 500, 'PURPLEAIR_API_KEY is not set.' if ENV['PURPLEAIR_API_KEY'].to_s.empty?
 
@@ -103,7 +104,7 @@ get '/sensors' do
   content_type 'text/event-stream'
   headers 'Cache-Control' => 'no-cache', 'X-Accel-Buffering' => 'no'
 
-  # Claim this crawl. Starting a load implicitly cancels any earlier one still running.
+  # Take this crawl. A new load stops each earlier load that still runs.
   run = begin_run!
 
   stream do |out|
@@ -113,7 +114,7 @@ get '/sensors' do
       out << sse(:meta, found: found.size, queued: queued.size, seconds: (queued.size * RATE_LIMIT_SLEEP).round)
 
       queued.each do |sensor|
-        # Checked before each sensor's request, so Stop takes effect within one sensor.
+        # This runs before the request for each sensor, thus Stop operates after one sensor.
         break unless current_run == run
 
         begin
@@ -121,7 +122,7 @@ get '/sensors' do
           next if aqi.nil?
           out << sse(:sensor, index: sensor[:index], lon: sensor[:lon], lat: sensor[:lat], aqi: aqi)
         rescue StandardError => e
-          # One dead sensor shouldn't end the stream.
+          # One sensor that does not answer must not stop the stream.
           out << sse(:warn, index: sensor[:index], message: e.message)
         end
       end
@@ -133,12 +134,12 @@ get '/sensors' do
   end
 end
 
-# Sensors inside the bounds that plausibly had data at the target timestamp.
+# The sensors in the bounds that can have data at the target timestamp.
 #
-# `max_age: 0` is load-bearing: it defaults to 7 days, which would silently drop every sensor
-# that has gone offline since a historical timestamp. Coordinates and confidence are the
-# sensor's present-day values — history returns neither — so a relocated sensor is plotted
-# where it sits today.
+# `max_age: 0` is important: the default is 7 days, which would remove each sensor that went
+# offline after a timestamp in the past, and give no message. The coordinates and the confidence
+# are the values of today, because the history gives neither. Thus the map shows a sensor that
+# moved at its position of today.
 # @see https://api.purpleair.com/#api-sensors-get-sensors-data
 def sensors_in_bounds(bounds, timestamp)
   body = purple_air_get('/sensors', {
@@ -162,7 +163,7 @@ def sensors_in_bounds(bounds, timestamp)
   end
 end
 
-# The sensor's EPA-corrected AQI at the timestamp, or nil when it has no usable reading there.
+# The EPA-corrected AQI of the sensor at the timestamp, or nil if it has no correct reading.
 def aqi_for(sensor, timestamp)
   key = [sensor[:index], timestamp]
   cached = CACHE_MUTEX.synchronize { READING_CACHE[key] }
@@ -179,7 +180,7 @@ def aqi_for(sensor, timestamp)
   aqi
 end
 
-# The history row nearest the target timestamp.
+# The history row that is nearest to the target timestamp.
 # @see https://api.purpleair.com/#api-sensors-get-sensor-history
 def reading_at(sensor_index, timestamp)
   body = purple_air_get("/sensors/#{sensor_index}/history", {
@@ -213,8 +214,8 @@ def purple_air_get(path, query)
     nil
   end
 
-  # A 200 isn't proof of success: DataInitializingError responds 200, and a truncated response
-  # carries a top-level `error` alongside partial data.
+  # A 200 does not show a success: DataInitializingError answers with 200, and an incomplete
+  # response has a top-level `error` with some of the data.
   raise "PurpleAir #{body['error']}: #{body['description'] || 'no description'}" if body.is_a?(Hash) && body['error']
   raise "PurpleAir returned status #{response.code}" unless response.success?
   raise 'PurpleAir returned an unparseable body' unless body.is_a?(Hash)
@@ -222,8 +223,8 @@ def purple_air_get(path, query)
   body
 end
 
-# PurpleAir responses are columnar — a `fields` array naming the columns of each `data` row —
-# and the column order is explicitly not stable, so always look positions up by name.
+# A PurpleAir response has columns: a `fields` array names the columns of each `data` row. The
+# column order is not stable, thus always find a position by its name.
 def index_of(fields)
   Array(fields).each_with_index.to_h
 end
@@ -236,8 +237,9 @@ def parse_timestamp(value)
   value.to_s.match?(/\A\d+\z/) ? value.to_i : Time.now.to_i
 end
 
-# Defaults to the style utilities/maps renders its static GPX maps with, and honors the same
-# MAPBOX_STYLE_URL, so screenshots from here match those. `?style=` overrides for a one-off.
+# The default is the style that utilities/maps uses for its static GPX maps, and this obeys the
+# same MAPBOX_STYLE_URL. Thus a screenshot from here agrees with those maps. `?style=` replaces
+# the style one time.
 def map_style(param)
   [param, ENV['MAPBOX_STYLE_URL']].find { |v| !v.to_s.strip.empty? } ||
     'mapbox://styles/mapbox/outdoors-v12'
@@ -250,9 +252,9 @@ end
 
 # --- AQI math -------------------------------------------------------------------------------
 #
-# Lives in lib/epa_aqi.rb, which is a deliberate duplicate of api/app/services/purple_air.rb —
-# utilities/ must not depend on api/. Included at the top level so the handlers above can call
-# apply_epa_correction/format_aqi bare, as they always have.
+# This code is in lib/epa_aqi.rb, which is a copy of api/app/services/purple_air.rb, on purpose,
+# because utilities/ must not depend on api/. It is at the top level, thus the handlers above can
+# call apply_epa_correction and format_aqi with no prefix.
 
 __END__
 

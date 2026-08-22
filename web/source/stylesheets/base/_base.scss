@@ -11,9 +11,9 @@ body {
   justify-content: space-between;
   min-height: 100dvh;
 
-  // Fixing the body is what stops the page behind the menu from scrolling. It collapses the
-  // document's scroll height, so nav_controller stashes the scroll offset in `top` and restores
-  // it on close — without that the reader is silently returned to the top of the page.
+  // A fixed body is what stops the scroll of the page behind the menu. It makes the scroll height of
+  // the document zero, thus nav_controller keeps the scroll offset in `top` and puts it back at the
+  // close. Without that, the reader goes to the top of the page and gets no message.
   &.has-nav-open {
     inset-inline: 0;
     position: fixed;

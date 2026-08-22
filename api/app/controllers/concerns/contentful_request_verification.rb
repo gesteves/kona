@@ -1,14 +1,14 @@
 require "openssl"
 
-# Verifies Contentful webhook requests against their HMAC signature, which Contentful computes
-# with CONTENTFUL_WEBHOOK_SECRET over the canonical request and sends in x-contentful-signature,
-# alongside x-contentful-signed-headers and x-contentful-timestamp.
+# Checks each Contentful webhook request against its HMAC signature. Contentful calculates that
+# signature with CONTENTFUL_WEBHOOK_SECRET over the canonical request and sends it in
+# x-contentful-signature, with x-contentful-signed-headers and x-contentful-timestamp.
 # @see https://www.contentful.com/developers/docs/webhooks/request-verification/
 module ContentfulRequestVerification
   extend ActiveSupport::Concern
 
-  # Bounds replay by rejecting timestamps older than this, or in the future. Matches
-  # Contentful's own default.
+  # This limits a replay: the code refuses a timestamp that is older than this value, and a
+  # timestamp in the future. It is the same as the default of Contentful.
   TIMESTAMP_TTL = 30_000 # milliseconds
 
   private
@@ -27,17 +27,17 @@ module ContentfulRequestVerification
     head(:unauthorized) unless ActiveSupport::SecurityUtils.secure_compare(signature, expected)
   end
 
-  # @param timestamp [String] Milliseconds since the epoch.
-  # @return [Boolean] Whether it's within the replay window and not future-dated.
+  # @param timestamp [String] The milliseconds after the epoch.
+  # @return [Boolean] True if it is in the replay window and it is not in the future.
   def fresh_timestamp?(timestamp)
     age = (Time.now.to_f * 1000) - timestamp.to_i
     age >= 0 && age <= TIMESTAMP_TTL
   end
 
-  # Rebuilds the exact string Contentful signed: method, path, the signed headers, and the raw
-  # body, newline-joined. Uses the verbatim request bytes, never re-serialized params, so the
-  # digest matches.
-  # @param signed_headers [String] The comma-separated header names to include.
+  # Makes again the exact string that Contentful signed: the method, the path, the signed headers,
+  # and the raw body, with a newline between them. It uses the bytes of the request, and never the
+  # params after a second serialization. Thus the digest agrees.
+  # @param signed_headers [String] The header names to include, with a comma between them.
   # @return [String]
   def canonical_request(signed_headers)
     headers = signed_headers.split(",").map(&:strip).reject(&:blank?).map do |name|

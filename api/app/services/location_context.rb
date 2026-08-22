@@ -1,13 +1,13 @@
-# Resolves a coordinate pair to the geographic context the location sync pushes to
-# Intervals.icu: a display label, a "city, state, country" location string, the individual
-# city/state/country fields, and the IANA timezone. Faithful port of domestique's
-# resolveLocationContext (which was itself originally ported from this app). Reuses GoogleMaps
-# for the reverse-geocode + timezone and LocationHelper#format_location for the label — the same
-# label builder the weather widgets use — so the label special cases stay in one place.
+# Changes a pair of coordinates into the geographic data that the location sync sends to
+# Intervals.icu: a label for the screen, a "city, state, country" string, the separate city, state,
+# and country fields, and the IANA timezone. This is the same as resolveLocationContext of
+# domestique, which itself came from this app. It uses GoogleMaps for the address and the timezone,
+# and LocationHelper#format_location for the label. The weather widgets use that same label method,
+# thus each special condition of the label is in one place.
 class LocationContext
   include LocationHelper
 
-  # Fallback label when geocoding yields nothing usable.
+  # The label to use when the geocoder gives no correct value.
   DEFAULT_LABEL = "Current location".freeze
 
   attr_reader :latitude, :longitude
@@ -22,7 +22,7 @@ class LocationContext
     @gmaps = GoogleMaps.new(latitude, longitude)
   end
 
-  # Human-readable display label, e.g. "Jackson Hole, Wyoming". Never blank.
+  # The label for the screen, for example "Jackson Hole, Wyoming". It is never blank.
   # @return [String]
   def label
     @label ||= format_location(DeepOstruct.wrap(geocoded: geocoded)).presence ||
@@ -30,14 +30,16 @@ class LocationContext
                DEFAULT_LABEL
   end
 
-  # "city, state, country" (with the obfuscated city), falling back to the label.
+  # "city, state, country", with the city that the code changes. Without those, it gives the
+  # label.
   # @return [String]
   def location
     @location ||= [ city, state, country ].compact_blank.join(", ").presence || label
   end
 
-  # The city, using a broader lookup than the label's (locality → sublocality → the two admin
-  # levels) and obfuscating a precise Teton County location to "Jackson Hole".
+  # The city. This lookup is larger than the lookup of the label: it reads locality, then
+  # sublocality, then the two administrative levels. It also changes an exact location in Teton
+  # County to "Jackson Hole".
   # @return [String, nil]
   def city
     return @city if defined?(@city)
@@ -63,8 +65,9 @@ class LocationContext
     @country = component_long_name("country")
   end
 
-  # The IANA timezone id, or nil when the lookup is unavailable — nil is left unwritten (never
-  # forced to a default), so a failed lookup doesn't overwrite the athlete's real timezone.
+  # The IANA timezone id, or nil when the lookup is not available. The code does not write a nil and
+  # it never uses a default value. Thus a lookup that fails does not replace the true timezone of the
+  # athlete.
   # @return [String, nil]
   def timezone
     return @timezone if defined?(@timezone)
@@ -80,7 +83,8 @@ class LocationContext
     @county = component_long_name("administrative_area_level_2")
   end
 
-  # The long_name of the first geocoded address component whose types include `type`, or nil.
+  # The long_name of the first address component from the geocoder whose types include `type`, or
+  # nil.
   def component_long_name(type)
     components.find { |component| component[:types]&.include?(type) }&.dig(:long_name).presence
   end

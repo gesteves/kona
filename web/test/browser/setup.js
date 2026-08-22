@@ -1,16 +1,17 @@
 import { afterEach, beforeEach, vi } from 'vitest';
 import { restoreStubbedProperties, stopMountedApplications } from './helpers';
 
-// Setup for the jsdom ("browser") project. Two jobs: fill the APIs jsdom omits that this code
-// calls, and guarantee every test starts from a clean document, a clean `window`, and no live
-// Stimulus application.
+// The setup for the jsdom project, which the tests call "browser". It does two things: it adds the
+// APIs that jsdom does not have and that this code calls, and it makes sure that each test starts
+// with a clean document, a clean `window`, and no Stimulus application.
 //
-// The polyfills below are deliberately dumb defaults, not simulations. A test that cares about
-// one of them overrides it (`window.matchMedia = () => ({ matches: true })`), and afterEach puts
-// the default back. The point is that an *un*interested test never crashes on a missing global.
+// The replacements below are simple defaults, and not true simulations, on purpose. A test that
+// needs one of them replaces it (`window.matchMedia = () => ({ matches: true })`), and afterEach
+// puts the default back. Thus a test that does not need one never fails because a global is
+// absent.
 
-// jsdom has no matchMedia at all. Default: no media query matches, i.e. the plain
-// non-reduced-motion, light-mode case.
+// jsdom has no matchMedia. The default: no media query matches, that is, the plain condition with
+// no reduced motion and the light mode.
 const defaultMatchMedia = (query) => ({
   matches: false,
   media: query,
@@ -22,10 +23,11 @@ const defaultMatchMedia = (query) => ({
   dispatchEvent: () => false,
 });
 
-// jsdom implements neither requestIdleCallback nor Element#scrollTo (the latter is defined but
-// throws "Not implemented"). Both are called for side effects only, so a synchronous stand-in and
-// a no-op are honest stubs. `preloadPagefindWhenIdle` explicitly branches on requestIdleCallback
-// being absent, so its own suite deletes this to exercise the Safari-16 fallback path.
+// jsdom has neither requestIdleCallback nor Element#scrollTo. It defines the second one, but that
+// one raises "Not implemented". The code calls both only for their results on the page, thus a
+// stub that runs immediately and a stub that does nothing are correct. `preloadPagefindWhenIdle`
+// tests if requestIdleCallback is absent, thus its own suite removes this stub to run the code for
+// Safari 16.
 const defaultRequestIdleCallback = (callback) => {
   callback({ didTimeout: false, timeRemaining: () => 50 });
   return 0;
@@ -36,14 +38,15 @@ beforeEach(() => {
   window.requestIdleCallback = defaultRequestIdleCallback;
   window.cancelIdleCallback = () => {};
   document.documentElement.scrollTo = () => {};
-  // jsdom defines window.scrollTo but throws "Not implemented"; nav_controller calls it to
-  // restore the reader's position when the menu closes.
+  // jsdom defines window.scrollTo but raises "Not implemented". nav_controller calls it to put the
+  // reader back at their position when the menu closes.
   window.scrollTo = () => {};
 });
 
 afterEach(() => {
-  // Order matters: disconnect controllers before wiping the DOM they're bound to, so a
-  // disconnect() that touches its element (clearing timers, aborting fetches) sees a live tree.
+  // The order is important: disconnect the controllers before you remove the DOM that they use.
+  // Thus a disconnect() that changes its element, for example to stop a timer or a fetch, finds a
+  // live tree.
   stopMountedApplications();
   restoreStubbedProperties();
 
@@ -51,8 +54,8 @@ afterEach(() => {
   document.head.innerHTML = '';
   document.body.className = '';
 
-  // Anything the code under test parks on `window` and memoizes. Left in place, the contact
-  // suite's second test would reuse the first test's resolved Turnstile promise.
+  // Each value that the code under test puts on `window` and keeps. Without this, the second test
+  // of the contact suite would use the Turnstile promise from the first test.
   delete window.turnstile;
   delete window.__konaTurnstileLoad;
   delete window.__konaTurnstileOnload;
@@ -63,7 +66,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
 
-  // The suites that navigate (share, units, analytics) push query strings; reset so the next
-  // test's `new URL(window.location.href)` starts from a known path.
+  // The suites that navigate — share, units, and analytics — add query strings. Set the location
+  // back, thus the `new URL(window.location.href)` of the next test starts from a known path.
   window.history.replaceState({}, '', '/');
 });

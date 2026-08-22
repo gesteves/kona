@@ -1,5 +1,5 @@
-# Shared plumbing for the Google Maps-platform services (Maps, Pollen, Air Quality): the
-# one API key they all authenticate with, read in one place.
+# The shared code of the services on the Google Maps platform: Maps, Pollen, and Air Quality. They
+# all use one API key, and this file reads it in one place.
 module GoogleApi
   private
 

@@ -1,14 +1,15 @@
-# rack-timeout caps total request wall-time, so one slow request can't hold a Puma thread on the
-# lone fly machine (3 threads total). It's the whole-request backstop complementing the per-hop
-# HTTParty timeouts in http_timeouts.rb: those bound each upstream call, this bounds sequential
-# calls, retry backoff, and non-HTTP work alike. Its exception is a direct Exception subclass, so
-# the services' `rescue StandardError` can't swallow it.
+# rack-timeout limits the full time of a request. Thus one slow request cannot hold a Puma thread on
+# the one fly machine, which has three threads. It is the limit for the full request, and the
+# HTTParty timeouts in http_timeouts.rb are the limit for each upstream call. Those limit one call,
+# and this one limits a group of calls in sequence, the waits between two attempts, and the work
+# that is not HTTP. Its exception is a subclass of Exception, thus the `rescue StandardError` of a
+# service cannot catch it.
 #
-# The budget is set via RACK_TIMEOUT_SERVICE_TIMEOUT (20s in fly.toml), which rack-timeout 0.7.0
-# reads at middleware-build time and can't be set from Ruby. That leaves headroom for a
-# legitimately slow multi-call widget while still cutting off a retry storm.
+# RACK_TIMEOUT_SERVICE_TIMEOUT gives the budget, and fly.toml sets it to 20s. rack-timeout 0.7.0
+# reads it when it makes the middleware, and Ruby code cannot set it. That time is enough for a
+# widget that makes many calls, and it still stops a large group of retries.
 
-# rack-timeout logs two INFO lines per request, which would bury lograge's summary. Keep only
-# actual timeouts, which log at ERROR.
+# rack-timeout writes two INFO lines for each request, and those would hide the summary of lograge.
+# Keep the timeouts only, which it writes at the ERROR level.
 Rack::Timeout::Logger.device = $stdout
 Rack::Timeout::Logger.level  = ::Logger::ERROR

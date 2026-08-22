@@ -24,8 +24,8 @@ RSpec.describe StaticMap do
   end
 
   describe "#url" do
-    # Pinned whole, because the parameter order and the raw (unencoded) addlayer JSON are both
-    # part of what Mapbox accepts, and neither is obvious from the code.
+    # The test has the full URL, because the order of the parameters and the raw addlayer JSON, with
+    # no encoding, are both part of what Mapbox accepts, and the code does not show either one.
     it "builds the Static Images request" do
       expect(map.url).to eq(
         "https://api.mapbox.com/styles/v1/testuser/teststyle/static/" \
@@ -38,7 +38,7 @@ RSpec.describe StaticMap do
       )
     end
 
-    # The API bills per request, not per pixel, so there is no cheaper size to render.
+    # The API bills each request and not each pixel, thus no size costs less.
     it "always asks for the retina render" do
       expect(map.url).to include("@2x")
     end
@@ -65,7 +65,8 @@ RSpec.describe StaticMap do
   end
 
   describe "markers" do
-    # ⚠️ Mapbox draws the last overlay on top, so start-on-top means listing the start marker last.
+    # ⚠️ Mapbox draws the last overlay on top. Thus for the start on top, the start marker goes
+    # last.
     it "puts the start pin on top by default" do
       expect(map.url).to include("pin-l-racetrack+f90f1a(11.0,51.0),pin-l-pitch+18a644(10.0,50.0)")
     end
@@ -74,7 +75,7 @@ RSpec.describe StaticMap do
       expect(map("finish_on_top" => "1").url).to include("pin-l-pitch+18a644(10.0,50.0),pin-l-racetrack+f90f1a(11.0,51.0)")
     end
 
-    # The setting round-trips through JSON and a checkbox pair, so "0" has to read as false.
+    # The setting goes through JSON and through a checkbox pair, thus "0" must mean false.
     it "treats a stringy false as off" do
       expect(map("finish_on_top" => "0").url).to include("pin-l-racetrack+f90f1a(11.0,51.0),pin-l-pitch")
     end
@@ -85,8 +86,8 @@ RSpec.describe StaticMap do
       expect(url).to include("pin-l-danger+f90f1a(11.0,51.0)", "pin-l-swimming+00ff00(10.0,50.0)")
     end
 
-    # These reach the URL from a form field, so anything that isn't an icon id or a hex color has
-    # to be stripped rather than interpolated.
+    # These values come to the URL from a form field. Thus the code must remove each value that is
+    # not an icon id and not a hex color, and it must not put such a value in the URL.
     it "strips anything that isn't an icon id or a color" do
       url = map("start_icon" => "swim)+bad(", "start_color" => "nonsense").url
 
@@ -112,8 +113,8 @@ RSpec.describe StaticMap do
         .to include("/styles/v1/someone/winter/static/")
     end
 
-    # ⚠️ The style reaches an outbound URL from a form field. Anything that isn't a Mapbox style
-    # falls back rather than being interpolated.
+    # ⚠️ The style comes to an outbound URL from a form field. For a value that is not a Mapbox
+    # style, the code uses the default and does not put that value in the URL.
     it "falls back to the default when the style isn't a Mapbox style URL" do
       expect(map("style_url" => "https://evil.example.com/x/y").url)
         .to include("/styles/v1/mapbox/outdoors-v12/static/")
@@ -133,13 +134,15 @@ RSpec.describe StaticMap do
       expect(url).to include("padding=10%2C20%2C30%2C40")
     end
 
-    # These come from number fields, so a stray keystroke shouldn't ask Mapbox for something absurd.
+    # These come from number fields, thus an incorrect keystroke must not ask Mapbox for a very
+    # large image.
     it "clamps a runaway side value" do
       expect(map("padding_top" => 99_999).url).to include("padding=500%2C50%2C50%2C50")
     end
 
     it "derives the height from the track's shape when none is set" do
-      # A wide, shallow box: 1° of longitude at 50°N is much shorter than 1° of latitude.
+      # A box that is wide and not tall: 1° of longitude at 50°N is much shorter than 1° of
+      # latitude.
       record["bounds"] = { "min_lon" => 10.0, "max_lon" => 12.0, "min_lat" => 50.0, "max_lat" => 50.1 }
 
       expect(map.url).to include("/1280x800@2x?") # clamped at the floor
@@ -150,7 +153,7 @@ RSpec.describe StaticMap do
       expect(map("height" => "4000").url).to include("/1280x1280@2x?")
     end
 
-    # Otherwise there'd be no room left to draw in.
+    # Without this, there is no space to draw in.
     it "ignores a height that doesn't clear the vertical padding" do
       expect(map("height" => "40", "padding" => "50").url).to include("/1280x1280@2x?")
     end

@@ -1,7 +1,8 @@
-<%# The search trigger, shared by the nav and the footer so the two can't drift — a copy that
-    lost the pointerenter/focus actions would silently give up intent-prefetch on that surface.
-    A button, not an <a href="#">: search needs JS, so there's no destination to fall back to.
-    `wrapper_class` (required local) is the list-item class of the menu it sits in. %>
+<%# The search control. The nav and the footer share it, thus the two always agree: a copy with no
+    pointerenter action and no focus action would stop the early load on that surface, and give no
+    message. It is a button, and not an <a href="#">: the search needs JavaScript, thus there is no
+    destination for a browser with no JavaScript. `wrapper_class`, which is a necessary local, is
+    the list-item class of the menu that contains it. %>
 <li class="<%= wrapper_class %>">
   <button type="button" data-controller="search" data-action="click->search#open pointerenter->search#preload focus->search#preload">Search</button>
 </li>

@@ -1,23 +1,25 @@
 module Webhooks
-  # Receives Contentful webhooks and keeps the derived copies of the content in sync: the
-  # standard.site PDS records, article embeddings, the R2 image mirror, and the static site.
-  # The request only enqueues jobs and returns 204, so slow work can't approach Contentful's
-  # 30s webhook timeout and a failure is retried by Sidekiq rather than dropped. Contentful
-  # doesn't retry deliveries, so the two backfill rake tasks remain the reconciliation net.
+  # Takes the Contentful webhooks and syncs each copy of the content: the standard.site PDS
+  # records, the article embeddings, the R2 image mirror, and the static site.
+  # The request only adds jobs to the queue and returns 204. Thus slow work cannot reach the 30s
+  # webhook timeout of Contentful, and Sidekiq does a failed job again and does not remove it.
+  # Contentful does not send a delivery again, thus the two backfill rake tasks are the
+  # reconciliation net.
   #
-  # Routing comes from the X-Contentful-Topic header plus the payload's content type and id.
-  # The body is never trusted for entry content — the jobs re-fetch from the CDA.
+  # The X-Contentful-Topic header, with the content type and the id in the payload, decide the
+  # route. The code never uses the body as the content of the entry: each job gets that from the
+  # CDA.
   class ContentfulController < BaseController
     include ContentfulRequestVerification
 
-    # Authenticated by Contentful's HMAC request signature (Contentful has no bearer token to
-    # send), and hit directly by Contentful rather than through the proxy.
+    # The HMAC request signature of Contentful authenticates this, because Contentful can send no
+    # bearer token. Contentful sends the request directly, and not through the proxy.
     before_action :verify_contentful_signature!, only: :create
 
     ARTICLE_TYPE = "article".freeze
     SITE_TYPE = "site".freeze
-    # Assets carry no sys.contentType, so they can't be routed by content type the way entries
-    # are, and the topic is the only signal stable across actions — a delete delivers a
+    # An asset has no sys.contentType, thus the code cannot use the content type for it, as it does
+    # for an entry. The topic is the only value that is the same for each action: a delete sends a
     # DeletedAsset payload.
     ASSET_ENTITY = "Asset".freeze
 
@@ -40,32 +42,35 @@ module Webhooks
         when SITE_TYPE
           "sync_publication" if action == "publish"
         end
-      # Pages and any other content type are intentionally ignored.
+      # The code ignores a Page and each other content type, on purpose.
 
       StandardSiteSyncJob.perform_async(operation, entry_id) if operation
 
-      # The vector the build's related-articles ranking is computed from.
+      # The vector that the build uses to make the list of related articles.
       if content_type == ARTICLE_TYPE && entry_id.present?
         ArticleEmbeddingJob.perform_async(action == "publish" ? "embed" : "delete", entry_id)
       end
 
-      # ⚠️ Publish only. Unpublish and delete deliberately don't remove the object: the web
-      # build reads Contentful with a preview token, so an unpublished asset is still
-      # referenced by built pages and dropping it would break live images. Keys are immutable,
-      # so there's nothing to invalidate; orphans are cheap and pruned by hand.
+      # ⚠️ This is for a publish only. An unpublish and a delete do not remove the object, on
+      # purpose: the web build reads Contentful with a preview token, thus a page from the build
+      # still points at an unpublished asset, and a delete would break a live image. Each key is
+      # immutable, thus there is nothing to invalidate. An object that nothing uses is cheap, and a
+      # person removes it.
       AssetSyncJob.perform_async(entry_id) if entity == ASSET_ENTITY && action == "publish" && entry_id.present?
 
-      # Rebuilds the static site whenever published content changes. Only these three actions
-      # change the built site — a draft auto-save must not trigger a deploy.
+      # Builds the static site again at each change to the published content. Only these three
+      # actions change the site from the build: an automatic save of a draft must not start a
+      # deploy.
       SiteBuildJob.perform_async if %w[publish unpublish delete].include?(action)
 
       Rails.logger.info("Contentful webhook handled: contentType=#{content_type} entry=#{entry_id} action=#{action} operation=#{operation || 'ignored'}")
       head :no_content
     rescue StandardError => e
-      # Acknowledged anyway, since Contentful won't retry either way; a transient enqueue
-      # failure is reconciled by the backfill tasks. ⚠️ Reported, not just logged: nothing here
-      # retries, so an unreported failure means no rebuild, no embedding and no PDS sync, with a
-      # log line as the only trace.
+      # The code answers with a success, because Contentful does not send the webhook again in
+      # either condition. The backfill tasks correct a temporary failure to add a job to the queue.
+      # ⚠️ The code reports this and does not only write a log line: nothing here does the work
+      # again. Thus a failure with no report means no new build, no embedding, and no PDS sync, and
+      # a log line is the only record.
       Rails.logger.error("Contentful webhook error: #{e.message}")
       ErrorReporter.report_upstream(e, service: "ContentfulWebhook", context: "contentType=#{content_type} entry=#{entry_id} action=#{action}")
       head :no_content

@@ -1,15 +1,16 @@
-// Upserts 301 `redirect` entries for archive URLs that move in the two-scheme redesign, so old
-// /tagged/* links don't break. Old paths come from web/data/tags.json, so ⚠️ run this BEFORE
-// re-importing. Idempotent: matches by `from`, and leaves unrelated redirects alone.
+// Makes or updates a 301 `redirect` entry for each archive URL that moves in the two-scheme
+// redesign. Thus an old /tagged/* link still works. The old paths come from web/data/tags.json, thus
+// ⚠️ run this BEFORE the next import. You can run it more than one time: it matches on `from` and it
+// does not change another redirect.
 //
-// Env: CONTENTFUL_SPACE, CONTENTFUL_MANAGEMENT_TOKEN, CONTENTFUL_ENVIRONMENT, DRY_RUN.
-// Run: `npm run taxonomy:redirects`.
+// The env vars: CONTENTFUL_SPACE, CONTENTFUL_MANAGEMENT_TOKEN, CONTENTFUL_ENVIRONMENT, and DRY_RUN.
+// To run it: `npm run taxonomy:redirects`.
 
 const fs = require('fs');
 const path = require('path');
 const { LOCALE, CONCEPTS, expandAncestors, paginateAll, createPlainClient, readEnv } = require('./lib/taxonomy');
 
-// Retired concept ids → the new concept whose page best replaces them.
+// Each old concept id, and the new concept whose page is the best replacement for it.
 const RETIRED = { ironman: 'full-distance', 'ironman-703': 'half-distance', olympic: 'olympic-distance', races: 'race-reports' };
 
 const newPath = (id) => `/tagged/${expandAncestors(id).reverse().join('/')}/`;

@@ -30,13 +30,14 @@
     color: var(--color-link-hover);
   }
 
-  // Deliberately :focus-visible, not :focus — on :focus this also stripped the underline for
-  // mouse users, removing the affordance from every link in an entry on click.
+  // This uses :focus-visible, and not :focus, on purpose. With :focus, it also removed the
+  // underline for a mouse user, and each link in an entry then had no mark after a click.
   a:focus-visible {
     text-decoration: none;
   }
 
-  // The / separators between concepts (within a chain) and between chains, kept subtle.
+  // The / character between two concepts in a chain, and between two chains. It is not
+  // prominent.
   .entry__tag-separator {
     color: var(--color-text-tertiary);
     margin: 0 0.25rem;
@@ -145,8 +146,8 @@
   }
 }
 
-// Scrolling and edge affordances are handled by the <wa-scroller> host. Match its
-// scroll-shadow to the page background so the fade works in light and dark mode.
+// The <wa-scroller> host does the scroll and the marks at the edges. Make its scroll shadow the
+// same as the page background, thus the fade works in the light mode and in the dark mode.
 .entry__table {
   --shadow-color: var(--color-background);
 
@@ -155,20 +156,20 @@
   display: block;
   margin: 2rem 0;
 
-  // ⚠️ Stands in for `:host` until the element upgrades — without a scroll container here the table
-  // bursts through the border and the sticky column resolves against the viewport.
+  // ⚠️ This replaces `:host` until the browser upgrades the element. Without a scroll container
+  // here, the table goes past the border and the sticky column uses the viewport.
   &:not(:defined) {
     overflow: auto hidden;
     position: relative;
   }
 
-  // ⚠️ The start shadow paints 2rem of gradient at z-index 2, directly over the pinned labels.
+  // ⚠️ The shadow at the start draws 2rem of a gradient at z-index 2, over the sticky labels.
   &::part(start-shadow) {
     display: none;
   }
 
-  // ⚠️ `separate`, not `collapse`: Chromium and WebKit ignore `position: sticky` on cells in
-  // collapsed-border mode.
+  // ⚠️ Use `separate`, and not `collapse`. Chromium and WebKit ignore `position: sticky` on a cell
+  // in the collapsed-border mode.
   table {
     border-collapse: separate;
     border-spacing: 0;
@@ -186,7 +187,8 @@
     white-space: nowrap;
   }
 
-  // ⚠️ 300 and 600 are the only IBM Plex Mono weights loaded; anything else snaps to one of them.
+  // ⚠️ The page loads only the 300 weight and the 600 weight of IBM Plex Mono. Each other value
+  // becomes one of those two.
   thead th {
     background-color: var(--color-table-header-background);
     border-bottom: 2px solid var(--color-heading);
@@ -196,20 +198,21 @@
     text-transform: uppercase;
   }
 
-  // ⚠️ Cells, not rows: a row paints beneath the sticky column, so a transparent cell would let the
-  // scrolled values show through it.
+  // ⚠️ Use the cells, and not the rows. A row draws below the sticky column, thus a transparent cell
+  // would show the values that scroll below it.
   tbody td {
     background-color: var(--color-table-cell-background);
   }
 
-  // `tr + tr` — the header's 2px rule already separates the first row.
+  // Use `tr + tr`: the 2px line of the header already separates the first row.
   tbody tr + tr td {
     border-top: 1px solid var(--color-table-cell-border);
   }
 
-  // Pins the label column so the values stay labelled while they scroll. ⚠️ Labels wrap where the
-  // value cells don't: at `nowrap` a long one takes 61% of a phone's width. The `ch` floor keeps
-  // short labels on one line and tracks --font-table across the breakpoint.
+  // Keeps the label column in place, thus each value keeps its label while the table scrolls.
+  // ⚠️ A label goes to the next line where a value cell does not. With `nowrap`, a long label takes
+  // 61% of the width of a phone. The minimum in `ch` keeps a short label on one line and follows
+  // --font-table across the breakpoint.
   th:first-child,
   td:first-child {
     border-inline-end: 1px solid var(--color-table-cell-border);
@@ -221,9 +224,9 @@
   }
 }
 
-// The trailing line of a two-line cell, split out of a <br> by
-// MarkupHelpers#split_table_cell_annotations. ⚠️ Resets the size %body-styles gives `small`, which
-// would undo the table's density.
+// The second line of a cell with two lines. MarkupHelpers#split_table_cell_annotations makes it
+// from a <br>. ⚠️ This sets the size again, because %body-styles gives `small` a size that would
+// make the table larger.
 .entry__table-annotation {
   color: var(--color-text-secondary);
   display: block;

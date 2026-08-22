@@ -1,17 +1,18 @@
 module Webhooks
-  # Receives Whoop v2 webhooks and syncs them to Intervals.icu. The request path only verifies
-  # and enqueues, so the response beats Whoop's ~1s ack expectation: the HMAC proves the payload
-  # came from Whoop, and its user_id is checked against the authenticated athlete so a foreign
-  # user gets a 403 and Whoop stops retrying. That id is Redis-cached for a day, keeping the
-  # warm path free of upstream calls.
+  # Takes the Whoop v2 webhooks and syncs them to Intervals.icu. The request path only checks the
+  # payload and adds a job to the queue, thus the response comes before the approximately 1s that
+  # Whoop expects. The HMAC shows that the payload came from Whoop, and the code compares its
+  # user_id with the authenticated athlete. Thus a different user gets a 403 and Whoop does not send
+  # the webhook again. Redis holds that id for a day, thus the warm path makes no upstream call.
   #
-  # Responds 401 for a bad signature or stale timestamp, 400 for a malformed payload, 500 when
-  # the identity check fails, 403 for a foreign user, and 200 on acceptance.
+  # It answers with a 401 for a bad signature or an old timestamp, a 400 for a payload with an
+  # incorrect shape, a 500 when the identity check fails, a 403 for a different user, and a 200 when
+  # it accepts the payload.
   class WhoopController < BaseController
     include WhoopRequestVerification
 
-    # Authenticated by Whoop's HMAC signature (Whoop has no bearer token to send), and hit
-    # directly by Whoop rather than through the proxy.
+    # The HMAC signature of Whoop authenticates this, because Whoop can send no bearer token. Whoop
+    # sends the request directly, and not through the proxy.
     before_action :verify_whoop_signature!, only: :create
 
     def create
@@ -43,8 +44,8 @@ module Webhooks
       nil
     end
 
-    # The HMAC has already proven the body came from Whoop, but wrong types on the required
-    # fields are still rejected before the user_id comparison.
+    # The HMAC already shows that the body came from Whoop, but the code still refuses a necessary
+    # field with an incorrect type, before the user_id comparison.
     def valid_payload?(payload)
       payload.is_a?(Hash) &&
         payload["user_id"].is_a?(Integer) &&
@@ -53,8 +54,8 @@ module Webhooks
         payload["trace_id"].is_a?(String)
     end
 
-    # @return [Integer, nil] The authenticated Whoop user's id, or nil when unresolvable —
-    #   which the caller renders as a 500 so Whoop retries the delivery.
+    # @return [Integer, nil] The id of the authenticated Whoop user, or nil when the code cannot
+    #   find it. The caller then gives a 500, thus Whoop sends the webhook again.
     def fetch_expected_user_id
       Whoop.new.user_id
     rescue StandardError => e

@@ -2,9 +2,9 @@ require "nokogiri"
 require "public_suffix"
 
 module AffiliateLinksHelpers
-  # Whether an entry's intro or body contains Amazon Associates links. Memoized per entry,
-  # since rendering and parsing the whole article is expensive and the disclosure partial
-  # consults it several times per page.
+  # Tells if the intro or the body of an entry has an Amazon Associates link. The app keeps the
+  # value for each entry, because the render and the parse of the full article are slow and the
+  # disclosure partial reads it more than one time on each page.
   # @param content [Object] The entry.
   # @return [Boolean]
   def has_amazon_associates_links?(content)
@@ -24,20 +24,20 @@ module AffiliateLinksHelpers
   end
 
   # @param url [String] The URL to check.
-  # @return [Boolean] Whether the URL is an Amazon Associates link.
+  # @return [Boolean] True if the URL is an Amazon Associates link.
   def amazon_associates_link?(url)
     uri = URI.parse(url)
     params = uri.query ? URI.decode_www_form(uri.query).to_h : {}
     domain = PublicSuffix.domain(uri.host)
     domain == "amzn.to" || (domain == "amazon.com" && params.key?("tag"))
   rescue StandardError
-    # Malformed author-supplied hrefs just aren't affiliate links.
+    # An href from the author with an incorrect shape is not an affiliate link.
     false
   end
 
-  # Builds the affiliate-link disclosure for an entry.
+  # Makes the affiliate-link disclosure of an entry.
   # @param entry [Object] The entry.
-  # @return [String] The disclosure as HTML, empty when none applies.
+  # @return [String] The disclosure as HTML. It is empty when no disclosure applies.
   def affiliate_links_disclosure(entry)
     disclosure = []
     disclosure << "This #{entry_type(entry)&.downcase || 'post'} contains affiliate links, which means I may earn a commission at no additional cost to you if you make a purchase through these links." if show_affiliate_links_disclosure?(entry)
@@ -46,7 +46,7 @@ module AffiliateLinksHelpers
   end
 
   # @param entry [Object] The entry.
-  # @return [Boolean] Whether the general affiliate disclosure applies.
+  # @return [Boolean] True if the general affiliate disclosure applies.
   def show_affiliate_links_disclosure?(entry)
     entry.show_affiliate_links_disclosure || has_amazon_associates_links?(entry)
   end

@@ -1,17 +1,18 @@
-# Pushes the current location to Intervals.icu: updates the athlete profile
-# (city/state/country/timezone) and replaces the weather config with a single forecast at the
-# current coordinates. Each write is skipped when Intervals.icu already matches, so the whole
-# operation is idempotent and safe to retry. Faithful port of domestique's applyLocation.
+# Sends the current location to Intervals.icu: it updates the profile of the athlete (the city, the
+# state, the country, and the timezone) and puts one forecast at the current coordinates in place of
+# the weather configuration. It does no write when Intervals.icu already has the same value. Thus
+# you can do the full operation more than one time, and a second attempt is safe. This is the same
+# as applyLocation of domestique.
 class LocationSync
-  # Prefix shared by every log line this service emits, for greppability.
+  # This goes at the start of each log line from this service, thus you can find them with grep.
   LOG_PREFIX = "Location sync:".freeze
 
-  # The provider for the single forecast we push. Intervals.icu assigns the real forecast id, so
-  # we send 0 and never compare on it.
+  # The provider of the one forecast that this code sends. Intervals.icu gives the true forecast id,
+  # thus this code sends 0 and never compares that field.
   WEATHER_PROVIDER = "OPEN_WEATHER".freeze
 
-  # Forecast fields compared when deciding whether the weather config needs a write — everything
-  # except the Intervals.icu-assigned `id`.
+  # The forecast fields that the code compares to decide if the weather configuration needs a write.
+  # This is each field but the `id`, which Intervals.icu gives.
   COMPARED_FIELDS = %i[provider location label lat lon enabled].freeze
 
   def initialize(intervals: Intervals.new)
@@ -26,18 +27,20 @@ class LocationSync
     profile_written = sync_athlete_profile(context)
     sync_weather_config(context)
 
-    # Prime the timezone cache with the value we just wrote so athlete_timezone reflects it
-    # immediately (the Whoop processor and description generator bucket dates by it). Only when a
-    # profile write actually carried a timezone — a failed lookup (nil) leaves the cache alone.
+    # Put the value that this code just wrote into the timezone cache, thus athlete_timezone gives
+    # it immediately. The Whoop processor and the description generator put each date in a group by
+    # that value. Do this only when a profile write contained a timezone. A lookup that fails gives
+    # nil, and the code then does not change the cache.
     @intervals.cache_athlete_timezone(context.timezone) if profile_written && context.timezone.present?
   end
 
   private
 
-  # Updates the athlete profile when any of city/state/country/timezone differs from Intervals.icu.
-  # Only the resolved (non-blank) fields are sent, so a blank never clears an existing value — but,
-  # matching domestique, a blank field that differs from a stored value still triggers the write.
-  # @return [Boolean] whether a profile write actually happened.
+  # Updates the profile of the athlete when the city, the state, the country, or the timezone is
+  # different from the value in Intervals.icu. It sends only the fields with a value, thus a blank
+  # never removes a value that exists. But, as domestique does, a blank field that is different from
+  # a stored value still causes the write.
+  # @return [Boolean] True if the code did a profile write.
   def sync_athlete_profile(context)
     resolved = {
       city: context.city.presence,
@@ -56,8 +59,9 @@ class LocationSync
     true
   end
 
-  # Replaces the weather config with a single forecast at the current location, unless the
-  # existing config already matches (ignoring the Intervals.icu-assigned id).
+  # Puts one forecast at the current location in place of the weather configuration. It does nothing
+  # if the current configuration already has the same values. The comparison ignores the id, which
+  # Intervals.icu gives.
   def sync_weather_config(context)
     next_forecasts = [ {
       id: 0,
@@ -74,7 +78,8 @@ class LocationSync
     log_info("updated weather config to #{context.label} (#{context.lat}, #{context.lon})")
   end
 
-  # @return [Boolean] whether the two forecast lists match on every compared field, in order.
+  # @return [Boolean] True if the two forecast lists have the same value in each field that the
+  #   code compares, and in the same order.
   def forecasts_equal?(existing, next_forecasts)
     return false unless existing.length == next_forecasts.length
 

@@ -1,10 +1,10 @@
 import { Controller } from '@hotwired/stimulus';
 
-/** Clears an image's placeholder background once it has loaded or failed. */
+/** Removes the placeholder background of an image after it loads or fails. */
 export default class extends Controller {
   connect() {
-    // The `load`/`error` actions cover images that finish after connect; this covers ones that
-    // already finished, which won't fire those events again.
+    // The `load` and `error` actions cover an image that completes after the connect. This code
+    // covers an image that already completed, which sends neither event again.
     if (this.element.complete) {
       this.removePlaceholder();
     }

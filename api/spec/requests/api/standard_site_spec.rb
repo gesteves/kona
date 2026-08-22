@@ -30,8 +30,8 @@ RSpec.describe "Api::StandardSite", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to eq("")
-      # Downgraded to the short empty-response policy, so a credentials blip can't pin the
-      # missing markup at the edge for the full hour.
+      # This uses the short policy of an empty response. Thus a short problem with the credentials
+      # cannot keep the markup absent at the edge for the full hour.
       expect(response.headers["CDN-Cache-Control"]).to eq("public, max-age=60")
     end
   end

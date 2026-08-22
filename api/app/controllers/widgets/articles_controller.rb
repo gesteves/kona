@@ -1,16 +1,18 @@
 module Widgets
-  # The "Trending Articles" widget, ranked from Plausible analytics at request time (instead of baked
-  # into the static build) so it tracks recent traffic instead of going stale between daily rebuilds.
-  # Cached for an hour. Two flavors: every trending article, or all but one (the `:id` an article page
-  # passes for itself, so trending never lists the post you're reading). All ranking lives in the
-  # TrendingArticles service; the card helpers render in the view.
+  # The "Trending Articles" widget. The Plausible analytics give its order at request time, and the
+  # static build does not contain it. Thus it follows the recent traffic and it does not become old
+  # between two daily builds. The cache holds it for one hour. There are two forms: each trending
+  # article, or each trending article but one. An article page gives its own `:id` for that second
+  # form, thus the widget never lists the post that you read. The TrendingArticles service makes the
+  # order, and the card helpers render in the view.
   class ArticlesController < BaseController
     def trending
       render_trending TrendingArticles.new.all(count: 4)
     end
 
-    # Trending minus the `:id` article (the page passes its own id so it isn't listed as trending).
-    # A garbage id (see BaseController::CONTENTFUL_ID_FORMAT) is ignored rather than acted on.
+    # The trending list without the article of the `:id`. The page gives its own id, thus the widget
+    # does not list that page. The code ignores an id with an incorrect shape (refer to
+    # BaseController::CONTENTFUL_ID_FORMAT).
     def trending_excluding
       id = contentful_id_param
       render_trending TrendingArticles.new.excluding(id ? [ id ] : [], count: 4)

@@ -22,8 +22,9 @@ RSpec.describe WhoopTokenRefreshJob do
     described_class.new.perform
   end
 
-  # Whoop#refresh_access_token has already logged and reported the failure; the next tick is the
-  # retry, so the job must not raise into a 24-hour retry window against a revoked token.
+  # Whoop#refresh_access_token already wrote the failure to the log and sent a report. The next run
+  # of this job is the next attempt. Thus the job must not raise, because it would then use a
+  # 24-hour retry window against a token that Whoop removed.
   it "warns rather than raising when the refresh fails" do
     allow(whoop).to receive(:refresh_tokens!).and_return(nil)
     expect(Rails.logger).to receive(:warn).with(/re-authorize/)

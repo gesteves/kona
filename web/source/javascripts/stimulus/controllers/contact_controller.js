@@ -5,33 +5,34 @@ const SUCCESS_MESSAGE = 'Thanks! Your message is on its way.';
 const ERROR_MESSAGE =
   "Sorry, something went wrong and your message wasn't sent. Please try again.";
 
-// Explicit-render mode, so the widget's lifecycle is driven from connect/disconnect and survives
-// Turbo navigation. Readiness comes from Turnstile's own `onload` param — turnstile.ready()
-// throws on a dynamically loaded script.
+// This uses the explicit-render mode. Thus connect and disconnect control the life of the widget,
+// and the widget continues through a Turbo navigation. The `onload` parameter of Turnstile says
+// when it is ready, because turnstile.ready() raises for a script that the page loads at
+// runtime.
 const TURNSTILE_ONLOAD = '__konaTurnstileOnload';
 const TURNSTILE_SRC = `https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=${TURNSTILE_ONLOAD}`;
 
 /**
- * Progressively enhances the contact form. The underlying form is a real POST to /api/contact
- * that works without JS (native submit → redirect to the Thank-You page); this intercepts the
- * submit, posts the same fields via fetch asking for JSON (204/422), and reports the result
- * with a toast instead of navigating.
+ * Adds behavior to the contact form. The form is a true POST to /api/contact that works with no
+ * JavaScript: a native submit, then a redirect to the Thank-You page. This code takes the submit,
+ * posts the same fields with fetch and asks for JSON (204 or 422), and shows the result in a toast
+ * instead of a navigation.
  *
- * With a sitekey configured it also renders a Cloudflare Turnstile widget and sends its token,
- * which the API verifies server-side on the JS path.
+ * With a sitekey in the configuration, it also renders a Cloudflare Turnstile widget and sends its
+ * token. The API checks that token on the server, on the JavaScript path.
  */
 export default class extends Controller {
   static targets = ['submit', 'turnstile'];
   static values = { siteKey: String };
 
-  /** Renders the Turnstile widget, when configured, once its script is ready. */
+  /** Renders the Turnstile widget, if the configuration has one, after its script is ready. */
   connect() {
     if (!this.siteKeyValue || !this.hasTurnstileTarget) return;
     this.loadTurnstile()
       .then(() => {
-        // A Turbo navigation away from /contact can land between the script request and its
-        // resolution. Without this, the widget renders into a detached element and widgetId is
-        // assigned after disconnect() already ran, so it's never torn down.
+        // A Turbo navigation away from /contact can occur between the script request and its
+        // result. Without this check, the widget renders into an element that is not in the
+        // document, and the code sets widgetId after disconnect() ran. Thus nothing removes it.
         if (!this.element.isConnected) return;
         this.widgetId = window.turnstile.render(this.turnstileTarget, {
           sitekey: this.siteKeyValue,
@@ -50,8 +51,8 @@ export default class extends Controller {
   }
 
   /**
-   * Cancels any in-flight submission (so a late response can't fire a toast after a Turbo
-   * navigation) and tears down the Turnstile widget.
+   * Stops a submission in progress, thus a late response cannot show a toast after a Turbo
+   * navigation. It also removes the Turnstile widget.
    */
   disconnect() {
     this.abortController?.abort();
@@ -62,8 +63,8 @@ export default class extends Controller {
   }
 
   /**
-   * Submits the form via fetch instead of a native navigation.
-   * @param {SubmitEvent} event The form submit event.
+   * Submits the form with fetch, and not with a native navigation.
+   * @param {SubmitEvent} event The submit event of the form.
    */
   async submit(event) {
     event.preventDefault();
@@ -73,8 +74,9 @@ export default class extends Controller {
     this.abortController = new AbortController();
     this.setSubmitting(true);
 
-    // Same encoding as the native no-JS POST, so the API handles both identically. Explicit
-    // render means the Turnstile token isn't in a hidden field, so add it here.
+    // This uses the same encoding as the native POST with no JavaScript, thus the API reads both
+    // in the same way. With the explicit render, the Turnstile token is not in a hidden field.
+    // Thus the code adds it here.
     const body = new URLSearchParams(new FormData(form));
     if (this.turnstileToken) {
       body.set('cf-turnstile-response', this.turnstileToken);
@@ -87,10 +89,11 @@ export default class extends Controller {
         body,
         signal: this.abortController.signal,
       });
-      // A 422 is the API rejecting the input, not a failure. Telling the visitor "something went
-      // wrong, please try again" would be both wrong and unactionable — an identical retry fails
-      // identically, and resetTurnstile() has already spent their challenge. The form keeps its
-      // contents so they can fix the field rather than retype the message.
+      // A 422 means that the API refuses the input. It is not a failure. A message that says
+      // "something went wrong, please try again" would be incorrect, and the visitor could do
+      // nothing with it: the same input fails in the same way, and resetTurnstile() already used
+      // their challenge. The form keeps its content, thus the visitor can correct the field and
+      // does not type the message again.
       if (response.status === 422) {
         this.resetTurnstile();
         sendNotification(await this.errorMessage(response), 'error');
@@ -113,8 +116,8 @@ export default class extends Controller {
   }
 
   /**
-   * The API's own validation message, falling back to the generic one if the body isn't the
-   * JSON shape we expect.
+   * The validation message from the API. If the body does not have the JSON shape that this code
+   * needs, it gives the general message.
    * @param {Response} response A 422 response.
    * @returns {Promise<string>}
    */
@@ -127,7 +130,7 @@ export default class extends Controller {
     }
   }
 
-  /** Resets the widget so the next submit gets a fresh token; Turnstile tokens are single-use. */
+  /** Resets the widget, thus the next submit gets a new token. A Turnstile token works one time. */
   resetTurnstile() {
     this.turnstileToken = null;
     if (this.widgetId && window.turnstile) {
@@ -136,8 +139,9 @@ export default class extends Controller {
   }
 
   /**
-   * Loads the Turnstile script once per page, shared across controller instances. Resolves via
-   * Turnstile's `onload` callback (when window.turnstile is ready), not the script's load event.
+   * Loads the Turnstile script one time for each page, and each controller instance uses it. The
+   * `onload` callback of Turnstile resolves the promise, when window.turnstile is ready. The load
+   * event of the script does not.
    * @returns {Promise<void>}
    */
   loadTurnstile() {
@@ -149,8 +153,9 @@ export default class extends Controller {
         script.src = TURNSTILE_SRC;
         script.async = true;
         script.onerror = (error) => {
-          // Clear the memo so a later visit retries. Leaving a rejected promise cached would
-          // disable the challenge for the rest of the page's life after one network blip.
+          // Remove the stored value, thus a later visit tries again. A promise with an error in
+          // the cache would stop the challenge for the rest of the life of the page after one
+          // small network problem.
           window.__konaTurnstileLoad = null;
           script.remove();
           reject(error);
@@ -162,9 +167,9 @@ export default class extends Controller {
   }
 
   /**
-   * Reflects the in-flight state on the submit button (spinner + disabled). No-ops when the
-   * button isn't wired as a target, so the form still works.
-   * @param {boolean} isSubmitting Whether a submission is in flight.
+   * Shows the state of the submission on the submit button: a spinner, and the button is off. It
+   * does nothing if the button is not a target, thus the form still works.
+   * @param {boolean} isSubmitting True if a submission is in progress.
    */
   setSubmitting(isSubmitting) {
     if (!this.hasSubmitTarget) return;

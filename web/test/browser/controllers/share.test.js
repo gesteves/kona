@@ -26,8 +26,9 @@ beforeEach(() => {
 
 describe('revealing the native share button', () => {
   it('unhides when the browser supports the share sheet', async () => {
-    // The button ships hidden and is revealed only where it will work — there's no fallback for
-    // navigator.share, so showing it unconditionally would give desktop Firefox a dead button.
+    // The button is hidden at the start, and the code shows it only where it works. There is no
+    // other method for navigator.share, thus a button that always appears is a button that does
+    // nothing in Firefox on a desktop.
     stubProperty(navigator, 'share', vi.fn());
 
     const { element } = await mount('share', ShareController, nativeButton());
@@ -118,8 +119,8 @@ describe('openShareSheet', () => {
   });
 
   it('stays quiet when the visitor dismisses the sheet', async () => {
-    // Dismissing is a normal outcome, not an error — logging it would fill the console with
-    // noise every time someone changes their mind.
+    // A close of the share sheet is a normal result and not an error. A log line for it would fill
+    // the console each time that a person changes their decision.
     const abortError = new Error('share canceled');
     abortError.name = 'AbortError';
     stubProperty(navigator, 'share', vi.fn().mockRejectedValue(abortError));
@@ -203,9 +204,9 @@ describe('openPopup', () => {
 
 describe('trackShare', () => {
   it('waits for the beacon before navigating to a mailto: link', async () => {
-    // Navigating the current window can cancel an in-flight tracking request, so the mailto and
-    // sms schemes go through trackEventThen and navigate from its callback. (The callback is
-    // deliberately not invoked here: jsdom would try to navigate.)
+    // A navigation in the current window can stop a tracking request in progress. Thus the mailto
+    // scheme and the sms scheme go through trackEventThen and navigate from its function. This test
+    // does not call that function, on purpose, because jsdom would try to navigate.
     const { element } = await mount(
       'share',
       ShareController,

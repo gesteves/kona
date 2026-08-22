@@ -1,17 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
 
-// A shim for a Web Awesome bug: <wa-scroller> renders `<div role="region" aria-orientation="…">`,
-// and aria-orientation isn't valid on the region role, so axe-core and Lighthouse flag it. The
-// markup is in the component's shadow DOM, so it can't be fixed from our templates — the module
-// monkey-patches the element class's `updated()` lifecycle hook instead.
+// A correction for a Web Awesome problem: <wa-scroller> renders
+// `<div role="region" aria-orientation="…">`, and aria-orientation is not correct on the region
+// role. Thus axe-core and Lighthouse report it. The markup is in the shadow DOM of the component,
+// thus our templates cannot correct it. The module changes the `updated()` method of the element
+// class instead.
 //
-// ⚠️ These tests run in ORDER and share one custom element registry (it belongs to the jsdom
-// instance, so vi.resetModules() can't clear it, and re-defining a name throws). The
-// "not yet defined" case therefore has to come first, while 'wa-scroller' is still unregistered.
+// ⚠️ These tests run in ORDER and they share one custom element registry. That registry belongs to
+// the jsdom instance, thus vi.resetModules() cannot empty it, and a second definition of a name
+// raises. Thus the "not yet defined" example must come first, while 'wa-scroller' has no
+// definition.
 
 const MODULE = '../../../source/javascripts/stimulus/lib/patch_scroller_aria';
 
-/** An element stand-in exposing just the shadow root the patch reaches into. */
+/** An element that replaces the true one. It gives only the shadow root that the patch uses. */
 const scrollerWithContent = () => {
   const content = document.createElement('div');
   content.setAttribute('aria-orientation', 'horizontal');
@@ -21,7 +23,7 @@ const scrollerWithContent = () => {
 
 describe('patch_scroller_aria', () => {
   it('waits for the element to be defined when it is not registered yet', async () => {
-    // The defensive branch, for if the import order in index.js ever changes.
+    // The safety code, for a change to the import order in index.js.
     vi.resetModules();
     expect(customElements.get('wa-scroller')).toBeUndefined();
 
@@ -54,8 +56,9 @@ describe('patch_scroller_aria', () => {
     const scroller = scrollerWithContent();
     WaScroller.prototype.updated.call(scroller, 'changes');
 
-    // Both halves matter: strip the attribute, and still run Lit's own updated() — dropping the
-    // latter would break the component's rendering to fix an accessibility warning.
+    // The two parts are both necessary: remove the attribute, and also call the updated() of Lit.
+    // Without the second part, the component does not render correctly, and that is a large cost to
+    // correct an accessibility warning.
     expect(
       scroller.shadowRoot.querySelector().hasAttribute('aria-orientation')
     ).toBe(false);

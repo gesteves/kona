@@ -1,17 +1,18 @@
-# Sidekiq runs as a dedicated fly.io `worker` process (see fly.toml [processes]). Concurrency
-# is kept modest to suit the 512MB VM and to avoid the per-entry backfill fan-out hammering the
-# PDS (each job opens its own session). One default queue is enough for this workload.
+# Sidekiq runs as its own fly.io `worker` process (refer to [processes] in fly.toml). The
+# concurrency is low, for the 512MB VM and to stop the backfill jobs of each entry from many
+# requests to the PDS at one time, because each job opens its own session. One default queue is
+# sufficient for this work.
 :concurrency: 5
 :queues:
   - default
 
-# Recurring jobs, run by sidekiq-scheduler inside this same worker process (the fly `worker`
-# machine has no HTTP service, so it's always-on and never auto-stopped).
+# The recurring jobs. sidekiq-scheduler runs them in this same worker process. The fly `worker`
+# machine has no HTTP service, thus it always runs and it never stops by itself.
 #
-# ⚠️ `cron:`, not `every:` — rufus-scheduler measures an `every` interval from process start, so a
-# 6-hour one would reset on every deploy and could go indefinitely without firing. Cron fires at
-# wall-clock times regardless of restarts. The zone is pinned because fly runs UTC and a dev
-# machine doesn't.
+# ⚠️ Use `cron:`, and not `every:`. rufus-scheduler measures an `every` interval from the start of
+# the process. Thus a 6-hour interval starts again at each deploy and can go for a long time with no
+# run. A cron entry runs at a clock time, and a restart does not change that. The zone is here
+# because fly uses UTC and a development machine does not.
 :scheduler:
   :schedule:
     whoop_token_refresh:

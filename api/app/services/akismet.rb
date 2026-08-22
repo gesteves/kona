@@ -1,39 +1,40 @@
 require "httparty"
 
-# Checks contact-form submissions against Akismet. Returns a plain "true"/"false" body rather
-# than JSON, so it calls HTTParty directly instead of through the JSON helpers.
+# Checks each contact-form submission with Akismet. Akismet returns a plain "true" or "false"
+# body, and not JSON. Thus this class calls HTTParty directly, and not through the JSON methods.
 #
-# ⚠️ Fails **closed** when configured: an outage or unclear verdict raises, so the intake job
-# retries rather than delivering a message that was never spam-checked. It fails open only when
-# unconfigured, which is a deliberate "Akismet off" state.
+# ⚠️ With a configuration, it fails **closed**: a failure of the service, or an answer that is not
+# clear, raises. Thus the intake job runs again and does not deliver a message with no spam check.
+# It fails open only with no configuration, which is the "Akismet off" state, on purpose.
 #
 # @see https://akismet.com/developers/comment-check/
 class Akismet < ApplicationService
-  # Akismet keys the request host on the API key: https://<key>.rest.akismet.com/1.1/…
+  # The API key is part of the request host of Akismet: https://<key>.rest.akismet.com/1.1/…
   AKISMET_API_HOST = "rest.akismet.com"
 
   # @param api_key [String] The Akismet API key.
-  # @param blog [String] The site's home URL, which Akismet requires.
+  # @param blog [String] The home URL of the site, which Akismet needs.
   def initialize(api_key: ENV["AKISMET_API_KEY"], blog: ENV["SITE_URL"])
     @api_key = api_key
     @blog = blog.to_s.chomp("/")
   end
 
-  # @return [Boolean] Whether both the key and the blog URL are present.
+  # @return [Boolean] True if both the key and the blog URL are available.
   def configured?
     @api_key.present? && @blog.present?
   end
 
-  # Runs a comment-check against Akismet.
-  # @param content [String] The message body.
-  # @param author [String, nil] The sender's name.
-  # @param author_email [String, nil] The sender's email.
-  # @param user_ip [String, nil] The real visitor IP, forwarded by the web proxy. Akismet wants
-  #   it; a blank one only weakens the verdict.
-  # @param user_agent [String, nil] The real visitor User-Agent, also proxy-forwarded.
-  # @return [Boolean] Whether the submission is spam. False when unconfigured.
-  # @raise [ApplicationService::HttpError] when configured but Akismet gives no clean verdict,
-  #   so the caller's retry re-checks rather than delivering an unchecked message.
+  # Does a comment-check with Akismet.
+  # @param content [String] The body of the message.
+  # @param author [String, nil] The name of the sender.
+  # @param author_email [String, nil] The email address of the sender.
+  # @param user_ip [String, nil] The true visitor IP, which the web proxy sends. Akismet needs it.
+  #   A blank value makes the answer less accurate.
+  # @param user_agent [String, nil] The true visitor User-Agent, which the proxy also sends.
+  # @return [Boolean] True if the submission is spam. It is false with no configuration.
+  # @raise [ApplicationService::HttpError] If there is a configuration but Akismet gives no clear
+  #   answer. Thus the next attempt of the caller does the check again and does not deliver a
+  #   message with no check.
   def spam?(content:, author: nil, author_email: nil, user_ip: nil, user_agent: nil)
     return false unless configured?
 
@@ -45,7 +46,7 @@ class Akismet < ApplicationService
 
     verdict = response.body.to_s.strip
 
-    # No clean verdict, so raise: a message must not be delivered unchecked.
+    # There is no clear answer, thus raise. The app must not deliver a message with no check.
     unless response.success? && %w[true false].include?(verdict)
       raise ApplicationService::HttpError.new(response.code, response.body, AKISMET_API_HOST)
     end
@@ -53,15 +54,17 @@ class Akismet < ApplicationService
     verdict == "true"
   end
 
-  # Reports a false positive back to Akismet, so a sender the filter keeps catching stops being
-  # flagged. Called when the owner releases a message from the spam quarantine.
+  # Tells Akismet that it marked a correct message as spam. Thus Akismet stops the mark on a sender
+  # that the filter continues to catch. The code calls this when the owner sends a message from the
+  # spam quarantine.
   #
-  # ⚠️ Fails **soft**, inverting this class's contract on purpose. #spam? raises so a message is
-  # never delivered unchecked; this one is training, and a training failure must never block
-  # delivering a message the owner has already judged legitimate. The caller logs and moves on.
+  # ⚠️ This fails **soft**, which is the opposite of the rule of this class, on purpose. #spam?
+  # raises, thus the app never delivers a message with no check. This method is for training, and a
+  # failure in the training must never stop the delivery of a message that the owner already
+  # accepted. The caller writes a log line and continues.
   #
   # @param (see #spam?)
-  # @return [Boolean] Whether Akismet accepted the submission. False when unconfigured.
+  # @return [Boolean] True if Akismet accepted the submission. It is false with no configuration.
   # @see https://akismet.com/developers/submit-ham-false-positive/
   def submit_ham(content:, author: nil, author_email: nil, user_ip: nil, user_agent: nil)
     return false unless configured?
@@ -77,7 +80,7 @@ class Akismet < ApplicationService
 
   private
 
-  # The comment fields both endpoints take, blanks dropped.
+  # The comment fields that both endpoints take. The code removes each blank field.
   # @return [Hash]
   def comment_params(content, author, author_email, user_ip, user_agent)
     {

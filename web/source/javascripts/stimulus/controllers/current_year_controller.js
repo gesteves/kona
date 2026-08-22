@@ -1,8 +1,9 @@
 import { Controller } from '@hotwired/stimulus';
 
 /**
- * Sets the element's text to the current year, so the footer copyright range stays correct without
- * a rebuild. The server renders the build-time year as the no-JS fallback.
+ * Puts the current year in the text of the element, thus the range of copyright years in the footer
+ * stays correct with no new build. The server renders the year of the build, for a browser with no
+ * JavaScript.
  */
 export default class extends Controller {
   connect() {

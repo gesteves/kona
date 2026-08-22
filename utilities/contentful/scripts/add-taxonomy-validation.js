@@ -1,12 +1,15 @@
-// Adds both concept schemes (`sports`, `topics`) as taxonomy validations on the `article`
-// content type, so the editor shows a Taxonomy tab and picks concepts from each. Not marked
-// `required` — assignment is done by assign-concepts.js, and we don't want to block editing.
+// Adds the two concept schemes (`sports` and `topics`) as taxonomy validations on the `article`
+// content type. Thus the editor shows a Taxonomy tab and a person selects a concept from each
+// scheme. They are not `required`: assign-concepts.js sets the concepts, and a required field would
+// stop an edit.
 //
-// Requires the schemes to exist first (run taxonomy:create). Concepts/schemes themselves
-// can't be created via contentful-migration — only referenced as validations here.
+// The schemes must exist first, thus run taxonomy:create. contentful-migration cannot make a concept
+// or a scheme: it can only name one in a validation, as this script does.
 //
-// Env: CONTENTFUL_SPACE, CONTENTFUL_MANAGEMENT_TOKEN, CONTENTFUL_ENVIRONMENT (default master).
-// Run: `npm run taxonomy:validate-article`. Revert: `npm run taxonomy:validate-article:revert`.
+// The env vars: CONTENTFUL_SPACE, CONTENTFUL_MANAGEMENT_TOKEN, and CONTENTFUL_ENVIRONMENT, whose
+// default is master.
+// To run it: `npm run taxonomy:validate-article`. To remove it:
+// `npm run taxonomy:validate-article:revert`.
 
 const { runMigration } = require('contentful-migration');
 const { SCHEMES } = require('./lib/taxonomy');

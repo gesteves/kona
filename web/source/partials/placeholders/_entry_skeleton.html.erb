@@ -1,8 +1,10 @@
-<%# Reusable loading skeleton for an entry card. Mirrors the entry summary structure — %>
-<%# eyebrow, heading, and `lines` lines of body text — so it can stand in for any entry %>
-<%# collection. Pass `lines:` to size the body: events need 4, summaries default to 2. %>
+<%# The loading skeleton of an entry card. Each collection of entries uses it. It has the same %>
+<%# shape as an entry summary: an eyebrow, a heading, and `lines` lines of body text. %>
+<%# Give `lines:` for the size of the body: an event needs 4, and a summary needs 2, which is %>
+<%# the default. %>
 <% line_count = defined?(lines) ? lines : 2 %>
-<%# Container tags mirror the api's _summary card this is swapped for, so selectors like
+<%# The container tags are the same as in the _summary card of the api, which replaces this. Thus a
+<%# selector such as
     `article.entry` or `header.entry__header` in the jointly-owned _entry.scss reach both.
     ⚠️ The heading stays a span, deliberately: an empty h3 would announce a nameless heading. %>
 <article class="entry entry--summary">

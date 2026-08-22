@@ -38,8 +38,8 @@ RSpec.describe Whoop do
       expect(service).not_to be_connected
     end
 
-    # Without credentials the key name isn't even well-formed (the client id is nil), so this
-    # short-circuits rather than probing Redis.
+    # With no credentials, the key name is not correct, because the client id is nil. Thus the code
+    # returns early and does not read Redis.
     it "is false — without touching Redis — when the credentials are missing" do
       allow(ENV).to receive(:[]).with("WHOOP_CLIENT_SECRET").and_return(nil)
       expect($redis).not_to receive(:exists?)
@@ -49,9 +49,9 @@ RSpec.describe Whoop do
   end
 
   describe "#disconnect!" do
-    # ⚠️ The cached user_id must go with the tokens: Webhooks::WhoopController authorizes each
-    # payload against it, and a leftover copy would keep accepting webhooks for an account whose
-    # tokens we just discarded.
+    # ⚠️ The cached user_id must go away with the tokens. Webhooks::WhoopController compares each
+    # payload with it, thus a copy that stays would continue to accept a webhook for an account with
+    # no tokens.
     it "deletes both tokens, the cached user id, the refresh lock, and the recorded failure" do
       expect($redis).to receive(:del).with(
         access_token_key, refresh_token_key, "whoop:cid:user_id", lock_key, error_key
@@ -93,7 +93,8 @@ RSpec.describe Whoop do
       end
 
       it "re-checks the cache inside the lock instead of re-POSTing a rotated refresh token" do
-        # Pre-lock check misses; post-lock check finds the token a concurrent refresh stored.
+        # The check before the lock finds nothing. The check after the lock finds the token that
+        # another refresh at the same time stored.
         allow($redis).to receive(:get).with(access_token_key).and_return(nil, "already-refreshed")
 
         expect(get_access_token).to eq("already-refreshed")
@@ -144,8 +145,8 @@ RSpec.describe Whoop do
       allow(HTTParty).to receive(:post).and_return(token_response)
     end
 
-    # The whole point of the scheduled refresh: the access token is still warm on a normal tick,
-    # so honoring the cache would mean the refresh token never rotates.
+    # This is the purpose of the scheduled refresh: the access token is still good at a normal run,
+    # thus with the cache the refresh token would never rotate.
     it "refreshes even when the cached access token is still valid" do
       allow($redis).to receive(:get).with(access_token_key).and_return("cached-token")
 
@@ -155,8 +156,8 @@ RSpec.describe Whoop do
       expect($redis).to have_received(:del).with(lock_key)
     end
 
-    # ⚠️ force: skips the cache check, never the lock — refreshing alongside an in-request refresh
-    # is the rotation race the lock exists to prevent.
+    # ⚠️ force: does not do the cache check, and it always takes the lock. A refresh at the same time
+    # as a refresh in a request is the rotation race that the lock stops.
     it "still waits for the lock holder rather than racing an in-request refresh" do
       allow($redis).to receive(:set).with(lock_key, "1", nx: true, ex: kind_of(Integer)).and_return(false)
       allow($redis).to receive(:get).with(access_token_key).and_return(nil, "winner-token")
@@ -185,8 +186,8 @@ RSpec.describe Whoop do
       end
     end
 
-    # ⚠️ A 5xx is Whoop being down, not a dead token — flagging it would send the owner off to
-    # re-authorize while the stored credentials are fine.
+    # ⚠️ A 5xx means that Whoop is down, and not that the token is dead. A mark for it would tell the
+    # owner to authorize again while the stored credentials are good.
     context "when Whoop itself is failing" do
       let(:code) { 503 }
 

@@ -1,7 +1,8 @@
 require "rails_helper"
 
 RSpec.describe SidekiqRedisTimeoutFilter do
-  # Bugsnag::Report exposes both of these publicly; instance_double verifies that stays true.
+  # Bugsnag::Report has both of these as public methods, and instance_double checks that they stay
+  # public.
   def report(error:, sidekiq: nil)
     instance_double(Bugsnag::Report, original_error: error, request_data: { sidekiq: sidekiq })
   end
@@ -22,8 +23,8 @@ RSpec.describe SidekiqRedisTimeoutFilter do
       expect(described_class.call(report(error: error))).to be(false)
     end
 
-    # The whole point of the filter: a Redis that is actually unreachable raises
-    # CannotConnectError, which is a sibling of TimeoutError rather than a subclass.
+    # This is the purpose of the filter: a Redis that the code truly cannot reach raises
+    # CannotConnectError, which is beside TimeoutError and not below it.
     it "keeps a connection failure, which is what a real outage raises" do
       error = RedisClient::CannotConnectError.new("Connection refused")
 

@@ -22,8 +22,8 @@ RSpec.describe BlueskyCredentials do
       expect(described_class.fetch.handle).to eq("me.bsky.social")
     end
 
-    # ⚠️ The app password is an account-level credential and this Redis also backs the Sidekiq
-    # queues, so it must never be readable there.
+    # ⚠️ The app password is an account credential, and this Redis also holds the Sidekiq queues. Thus
+    # nobody must be able to read it there.
     it "never writes the app password in the clear" do
       described_class.store(handle: "me.bsky.social", app_password: "abcd-efgh-ijkl-mnop")
 
@@ -69,8 +69,8 @@ RSpec.describe BlueskyCredentials do
     end
   end
 
-  # ⚠️ A rotated RAILS_MASTER_KEY must degrade to "not connected", not raise on every page that
-  # renders the connection status.
+  # ⚠️ A new RAILS_MASTER_KEY must give "not connected". It must not raise on each page that shows
+  # the connection status.
   describe "an undecryptable password" do
     it "is treated as absent rather than raising" do
       $redis.hset(described_class::REDIS_KEY, "handle", "me.bsky.social", "app_password", "not-a-valid-message")

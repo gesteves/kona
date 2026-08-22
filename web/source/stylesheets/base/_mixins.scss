@@ -1,5 +1,5 @@
-// Media Query Mixins
-// Centralized breakpoint management to reduce fragmentation
+// The media query mixins.
+// They keep the breakpoints in one place.
 
 @mixin bp-small {
   @media (min-width: #{$bp-small}) {
@@ -31,24 +31,24 @@
   }
 }
 
-// Motion and color scheme mixins
+// The motion mixins and the color scheme mixins.
 @mixin reduced-motion {
   @media (prefers-reduced-motion: reduce) {
     @content;
   }
 }
 
-// ⚠️ `screen and` is load-bearing: Chrome and Safari honour `prefers-color-scheme` when printing,
-// so without it a reader in dark mode prints light-gray text on white paper.
+// ⚠️ `screen and` is necessary: Chrome and Safari obey `prefers-color-scheme` at print time. Thus
+// without it, a reader in the dark mode prints light gray text on white paper.
 @mixin dark-mode {
   @media screen and (prefers-color-scheme: dark) {
     @content;
   }
 }
 
-// Feature-query forks for text-box trimming, so the verbose (and easy-to-mistype)
-// condition is written once. Use `text-box-trim-supported` for the trimmed styles and
-// `text-box-trim-fallback` for the margin/padding compensation in browsers without it.
+// The feature queries for the text-box trim. Thus a person writes the long condition, which is easy
+// to type incorrectly, one time. Use `text-box-trim-supported` for the trimmed styles, and
+// `text-box-trim-fallback` for the margin and padding in a browser with no support.
 @mixin text-box-trim-supported {
   @supports (text-box-edge: cap) and (text-box-trim: trim-both) {
     @content;
@@ -61,7 +61,8 @@
   }
 }
 
-// Recolors an inline SVG. Both element names are needed: the icon set nests paths in groups.
+// Gives a new color to an inline SVG. It needs the two element names, because the icon set puts
+// each path in a group.
 @mixin svg-fill($fill) {
   g,
   path {
@@ -69,8 +70,8 @@
   }
 }
 
-// The inline "light icon" treatment shared by the metadata rows (entry meta, stats,
-// event weather, buttons): an SVG sized to --light-icon-size and aligned to the text.
+// The inline "light icon" style that the metadata rows share: the entry meta, the stats, the event
+// weather, and the buttons. The SVG has the size --light-icon-size and it aligns with the text.
 @mixin light-icon($fill: var(--color-text-tertiary)) {
   svg {
     display: inline-block;
@@ -82,7 +83,7 @@
   }
 }
 
-// The uppercase mono voice shared by every metadata row and label.
+// The uppercase monospace style that each metadata row and each label shares.
 @mixin meta-label {
   font-family: var(--ibm-plex-mono);
   font-size: var(--font-x-small);
@@ -90,13 +91,13 @@
   text-transform: uppercase;
 }
 
-// Optical trimming of a text block's leading/trailing half-leading.
+// Removes the extra space above and below a block of text.
 @mixin text-box($edge: text) {
   text-box-edge: $edge;
   text-box-trim: trim-both;
 }
 
-// A logo link whose SVG picks up the hover color.
+// A logo link whose SVG takes the hover color.
 @mixin logo-link-fill {
   &:link,
   &:visited {
@@ -114,12 +115,12 @@
   }
 }
 
-// The underline that marks a nav/footer menu link.
+// The underline on a nav menu link and on a footer menu link.
 @mixin nav-underline($color) {
   box-shadow: 0 2px 0 $color;
 }
 
-// The rule + centered-at-medium treatment shared by the section headers.
+// The line, and the center alignment at the medium breakpoint, that the section headers share.
 @mixin section-rule {
   border-bottom: 1px solid var(--color-border);
   margin-bottom: var(--padding);

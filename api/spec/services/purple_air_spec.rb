@@ -3,9 +3,9 @@ require "rails_helper"
 RSpec.describe PurpleAir do
   subject(:service) { described_class.new(37.77, -122.42) }
 
-  # The EPA correction blends three piecewise formulas; the transition bands (30–50 and
-  # 210–260 µg/m³) interpolate between them with a 0→1 weight. Expected values are
-  # hand-computed from the published formulas.
+  # The EPA correction uses three formulas, one for each band. The transition bands, which are 30 to
+  # 50 and 210 to 260 µg/m³, mix two of them with a weight that goes from 0 to 1. A person
+  # calculated each expected value from the published formulas.
   describe "#apply_epa_correction" do
     def correct(pm25, humidity)
       service.send(:apply_epa_correction, pm25, humidity)
@@ -27,7 +27,7 @@ RSpec.describe PurpleAir do
     end
 
     it "blends low and mid formulas across the 30–50 µg/m³ band" do
-      # w = 40/20 - 1.5 = 0.5 → (0.786 * 0.5 + 0.524 * 0.5) * 40 - 0.0862 * 40 + 5.75
+      # w = 40/20 - 1.5 = 0.5, thus (0.786 * 0.5 + 0.524 * 0.5) * 40 - 0.0862 * 40 + 5.75
       expect(correct(40.0, humidity)).to be_within(0.001).of(28.502)
     end
 
@@ -61,9 +61,9 @@ RSpec.describe PurpleAir do
       expect(correct(260.0, humidity)).to be_within(0.001).of(high)
     end
 
-    # Sensors report slightly negative PM2.5 in clean air. The correction is undefined there, and
-    # without a clamp those values fall past every band to the high-concentration polynomial and
-    # come back as hazardous.
+    # A sensor gives a small negative PM2.5 value in clean air. The correction does not apply there,
+    # and without a minimum, such a value goes past each band to the polynomial for a high
+    # concentration and gives a dangerous result.
     it "clamps a negative reading to zero rather than treating it as high-concentration" do
       expect(correct(-2.0, humidity)).to eq(0.0)
     end

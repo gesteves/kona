@@ -1,19 +1,20 @@
 require "htmlentities"
 
 module TextHelpers
-  # Replaces the masculine ordinal indicator (º), often typed by mistake, with the degree
-  # sign (°).
-  # @param text [String] The text to fix.
-  # @return [String, nil] The fixed text, or nil for blank input.
+  # Puts the degree sign (°) in place of the masculine ordinal indicator (º), which a person often
+  # types by error.
+  # @param text [String] The text to correct.
+  # @return [String, nil] The text after the correction, or nil for a blank input.
   def fix_degrees(text)
     return if text.blank?
     text.gsub("º", "°")
   end
 
-  # Renders text and strips its markup, leaving plain text.
-  # @param text [String] The text to sanitize.
-  # @param escape_html_entities [Boolean] Whether to leave entities escaped, e.g. `&` as `&amp;`.
-  # @return [String, nil] The plain text, or nil for blank input.
+  # Renders the text and removes its markup, and only plain text stays.
+  # @param text [String] The text to change.
+  # @param escape_html_entities [Boolean] True to keep each entity in its escaped form, for example
+  #   `&` as `&amp;`.
+  # @return [String, nil] The plain text, or nil for a blank input.
   def sanitize(text, escape_html_entities: false)
     return if text.blank?
     text = Sanitize.fragment(markdown_to_html(text)).strip

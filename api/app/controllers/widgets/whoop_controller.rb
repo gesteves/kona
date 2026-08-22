@@ -1,11 +1,13 @@
 module Widgets
-  # Renders the Whoop stats markup (sleep, recovery, strain) embedded into the static site.
+  # Renders the Whoop stats markup — the sleep, the recovery, and the strain — for the static
+  # site.
   class WhoopController < BaseController
     def show
       cache_widget(ttl: 5.minutes)
 
-      # Each upstream is isolated (safely) so a timeout or raise degrades to "no data" — the
-      # widget collapses or omits a section instead of 500ing. Matches Widgets::WeatherController.
+      # `safely` separates each upstream call. Thus a timeout or a raise gives "no data", and the
+      # widget goes away or omits one section. It does not give a 500. Widgets::WeatherController
+      # does the same.
       location = Location.new
       time_zone = safely("GoogleMaps") { TimeZoneResolver.call(location.latitude, location.longitude) } ||
                   TimeZoneResolver.default

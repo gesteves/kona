@@ -48,8 +48,8 @@ RSpec.describe ConnectedAppPresenter do
     end
   end
 
-  # The state the whole error path exists for: tokens are still in Redis, so this is
-  # indistinguishable from :connected without the error passed in.
+  # This is the state that the error path exists for: the tokens are still in Redis, thus the code
+  # cannot know it from :connected without the error value.
   context "when attached but the service has rejected the credentials" do
     let(:attrs) { super().merge(error: "Whoop rejected the last token refresh (HTTP 401).") }
 
@@ -66,7 +66,7 @@ RSpec.describe ConnectedAppPresenter do
     end
   end
 
-  # Bluesky shares this presenter and passes no error, so a blank one must not read as :error.
+  # Bluesky uses this presenter and gives no error, thus a blank value must not become :error.
   it "ignores a blank error" do
     expect(described_class.new(**attrs.merge(error: "")).state).to eq(:connected)
   end

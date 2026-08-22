@@ -1,13 +1,14 @@
-// Binary modules imported by src/og-render.ts. wrangler turns these into real Worker modules —
-// `.wasm` via its default CompiledWasm rule, `.ttf`/`.png` via the `rules` entry in
-// wrangler.jsonc — but tsc knows nothing about either, so these declarations are what make them
-// typecheck. The shapes match what `wrangler types` emits for those two module types.
+// The binary modules that src/og-render.ts imports. wrangler changes each one into a true Worker
+// module: a `.wasm` file through its default CompiledWasm rule, and a `.ttf` or `.png` file through
+// the `rules` entry in wrangler.jsonc. tsc knows neither of those, thus these declarations are what
+// make the types correct. Their shapes are the same as the output of `wrangler types` for those two
+// module types.
 //
-// ⚠️ Kept out of src/env.d.ts so tsconfig.test.json can include this file without the Worker
-// global shims next to it. The test config pulls in @cloudflare/workers-types, which collides
-// with those shims — but not with ambient module declarations. It needs these because
-// test/og.test.ts imports src/og.ts, whose dynamic import() drags og-render.ts into the program
-// even though the test never executes it.
+// ⚠️ These are not in src/env.d.ts, thus tsconfig.test.json can include this file and not the Worker
+// global declarations beside it. The test configuration loads @cloudflare/workers-types, which
+// conflicts with those declarations, but not with an ambient module declaration. The test
+// configuration needs these, because test/og.test.ts imports src/og.ts, and the dynamic import() in
+// that file brings og-render.ts into the program, although the test never runs it.
 declare module '*.wasm' {
   const value: WebAssembly.Module;
   export default value;

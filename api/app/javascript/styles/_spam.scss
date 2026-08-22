@@ -1,20 +1,21 @@
-// Quarantined contact-form submissions on the Contact page: a list of cards, one per message.
-// ⚠️ The card body is a `wa-stack` and its header a `wa-cluster`, and those zero their children's
-// margins — which is why nothing here resets one.
+// The contact-form submissions in the quarantine, on the Contact page: a list of cards, with one
+// card for each message.
+// ⚠️ The body of the card is a `wa-stack` and its header is a `wa-cluster`, and those two make the
+// margins of their children zero. That is why no rule here sets a margin to zero.
 
-// The list is a `wa-grid`, so this is the whole layout: cards flow into as many columns as fit,
-// one per message, and drop back to one on a narrow window.
+// The list is a `wa-grid`, thus this is the full layout: the cards go into as many columns as the
+// width permits, with one card for each message, and into one column in a narrow window.
 .spam-list {
   --min-column-size: 28rem;
 }
 
 .spam {
-  // Keeps a sender who supplied no spaces from pushing the badge off the card.
+  // This stops a sender name with no space from a move of the badge off the card.
   &__name {
     overflow-wrap: anywhere;
   }
 
-  // Pushes the timestamp to the far edge, past the badge.
+  // Moves the timestamp to the far edge, past the badge.
   &__age {
     margin-inline-start: auto;
   }
@@ -24,9 +25,9 @@
     overflow-wrap: anywhere;
   }
 
-  // ⚠️ `pre-wrap` is what renders the sender's line breaks — the view deliberately doesn't run the
-  // body through simple_format, since this is unescaped-by-nature attacker input.
-  // `anywhere` matters too: spam routinely carries unbroken 200-character URLs.
+  // ⚠️ `pre-wrap` is what shows the line breaks of the sender. The view does not use simple_format
+  // on the body, on purpose, because this text is input from an attacker.
+  // `anywhere` is also necessary: spam often has a URL of 200 characters with no break.
   &__message {
     overflow-wrap: anywhere;
     white-space: pre-wrap;

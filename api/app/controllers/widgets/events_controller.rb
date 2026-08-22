@@ -1,16 +1,18 @@
 module Widgets
-  # The home page's "Upcoming Races" section, rendered server-side at request time (instead of
-  # baked into the static build) so the featured event, the three-vs-four count, and "Today"
-  # labels stay fresh. When an event is featured, its race-day weather renders inline here —
-  # replacing the former standalone weather/event widget. Cached for an hour.
+  # The "Upcoming Races" section of the home page. The server renders it at request time, and the
+  # static build does not contain it. Thus the featured event, the count of three or four, and each
+  # "Today" label stay correct. When there is a featured event, its race-day weather renders here,
+  # and it replaces the separate weather widget of the past. The cache holds it for one hour.
   class EventsController < BaseController
     def upcoming
-      # Edge SWR left at the one-hour default: "Today" labels and the featured-event choice
-      # turn over on the day, so a stale copy shouldn't outlive the fresh window by much.
+      # The stale-while-revalidate value at the edge stays at the default of one hour. Each "Today"
+      # label and the choice of the featured event change with the day, thus an old copy must not
+      # stay much longer than the fresh window.
       render_widget(:upcoming, ttl: 1.hour) do
-        # The owner's configured timezone anchors "today"/"soon" for the race list (this
-        # widget doesn't track the owner's current location). The selection/featuring
-        # decisions live in the presenter; the view reads everything through @races.
+        # The timezone in the configuration of the owner gives the meaning of "today" and "soon" for
+        # the race list. This widget does not follow the current location of the owner. The presenter
+        # selects the races and decides the featured one, and the view reads each value through
+        # @races.
         @races = UpcomingRacesPresenter.new(events: Events.new.all, time_zone: TimeZoneResolver.default)
         @races.races
       end

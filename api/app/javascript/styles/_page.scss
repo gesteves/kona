@@ -1,36 +1,38 @@
-// Configuration for Web Awesome's <wa-page> shell. Custom properties only — the component owns
-// the grid, the sticky regions, the mobile drawer, and the toggle's visibility.
+// The configuration of the <wa-page> shell of Web Awesome. It has custom properties only: the
+// component controls the grid, the sticky areas, the mobile drawer, and the visibility of the
+// button.
 
 wa-page {
-  // The header's content row. The nav toggle is the tallest thing in it, so it's pinned to this
-  // rather than left to <wa-button>'s own sizing — otherwise the bar's height, and the offset
-  // everything else uses to clear it, would depend on a component default.
+  // The content row of the header. The nav button is the tallest element in it, thus this value
+  // sets its height and <wa-button> does not. Without this, a component default would decide the
+  // height of the bar and the offset that each other element uses to stay below it.
   --header-content-height: 2rem;
 
-  // ⚠️ <wa-page> declares --header-height but never measures it — it stays 0px unless we set it,
-  // and its own --scroll-margin-top (used for skip-link and anchor targets) is derived from it.
-  // Derived, not asserted: an arbitrary height fought the padding below and pushed the wordmark
-  // past the bar's own bottom edge. Even space on every side, plus the row it wraps.
+  // ⚠️ <wa-page> declares --header-height but it never measures it. It stays 0px until this code
+  // sets it, and its own --scroll-margin-top, for the skip link and the anchor targets, comes from
+  // it. This code calculates the value and does not use a fixed one: a fixed height fought the
+  // padding below and pushed the wordmark past the bottom edge of the bar. The value is the same
+  // space on each side, plus the row that it contains.
   --header-height: calc(var(--header-content-height) + (var(--wa-space-m) * 2));
 
-  // The sidebar track width. Wide enough that the longest label ("Connected apps") stays on
-  // one line once the nav's padding, the link's padding, and the icon are taken out.
+  // The width of the sidebar track. It is wide enough for the longest label ("Connected apps") on
+  // one line, after the padding of the nav, the padding of the link, and the icon.
   --menu-width: 17rem;
 }
 
-// ⚠️ Must reset to `auto` on mobile: the grid track is governed only by this variable, never by
-// whether the navigation is visible, so leaving it set reserves an empty band down the left once
-// the nav moves into the drawer.
+// ⚠️ This must become `auto` on a mobile screen. Only this variable controls the grid track, and
+// the visibility of the navigation never does. Thus a value here keeps an empty band down the left
+// side after the nav moves into the drawer.
 wa-page[view="mobile"] {
   --menu-width: auto;
 }
 
-// ⚠️ <wa-page> initialises `view` to "desktop" and only corrects it once its ResizeObserver fires,
-// a frame later — so on a phone the navigation paints as a full-width sidebar before moving into
-// the drawer. `wa-cloak` doesn't cover this: it lifts as soon as the element is defined, which is
-// before that first render. Below the breakpoint there is no sidebar layout to want, whatever
-// `view` currently claims, so suppress it until the component agrees.
-// ⚠️ The width must match the `mobile-breakpoint` attribute in layouts/admin.html.erb.
+// ⚠️ <wa-page> sets `view` to "desktop" at the start and corrects it only after its ResizeObserver
+// runs, one frame later. Thus on a phone the navigation appears as a full-width sidebar before it
+// moves into the drawer. `wa-cloak` does not help: it goes away when the element exists, which is
+// before that first render. Below the breakpoint there is no sidebar layout to show, whatever
+// `view` says. Thus this code hides it until the component agrees.
+// ⚠️ The width must be the same as the `mobile-breakpoint` attribute in layouts/admin.html.erb.
 @media (width < 768px) {
   wa-page {
     --menu-width: auto;
@@ -40,11 +42,12 @@ wa-page[view="mobile"] {
     display: none;
   }
 
-  // The same frame, from the other side: the header's nav toggle is wanted below the breakpoint
-  // whatever `view` claims, or it appears late and shoves the wordmark beside it sideways.
-  // ⚠️ Works only because the toggle carries no `wa-mobile-only` class — `wa-base` hides
-  // `[data-toggle-nav]` on desktop without `!important`, while that class's rule uses one, which
-  // no unlayered rule of ours can beat.
+  // The same frame, from the other side: the page needs the nav button of the header below the
+  // breakpoint, whatever `view` says. Without this, the button appears late and moves the wordmark
+  // beside it to the side.
+  // ⚠️ This works only because the button has no `wa-mobile-only` class. `wa-base` hides
+  // `[data-toggle-nav]` on the desktop with no `!important`, and the rule of that class uses one,
+  // which no unlayered rule of ours can win against.
   wa-page:not([view="mobile"]) [data-toggle-nav] {
     display: inline-block;
   }

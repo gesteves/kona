@@ -1,36 +1,36 @@
 module ArticleHelpers
-  # Words per minute behind the "N minute read" estimate, when READING_TIME_WPM isn't a usable
-  # number.
+  # The words per minute for the "N minute read" estimate, when READING_TIME_WPM is not a
+  # correct number.
   DEFAULT_READING_TIME_WPM = 200
 
-  # Whether an entry is a blog post (a full Article or a Short).
+  # Tells if an entry is a blog post (a full Article or a Short).
   # @param entry [Object] The entry to check.
   # @return [Boolean]
   def blog_post?(entry)
     %w[Article Short].include?(entry&.entry_type)
   end
 
-  # Whether an entry is a published (non-draft) blog post. Guards post-only markup like the
-  # article schema, breadcrumbs, and Open Graph article tags.
+  # Tells if an entry is a published blog post, that is, not a draft. It controls the markup for
+  # posts only: the article schema, the breadcrumbs, and the Open Graph article tags.
   # @param entry [Object] The entry to check.
   # @return [Boolean]
   def published_post?(entry)
     blog_post?(entry) && !entry.draft
   end
 
-  # All non-draft articles, newest first (data.articles is already sorted by publish date).
+  # All the non-draft articles, the newest first. data.articles is already in publish-date order.
   # @return [Array<Object>]
   def published_articles
     memoize_by_collection(:published_articles, data.articles) { data.articles.reject(&:draft) }
   end
 
-  # All non-draft pages.
+  # All the non-draft pages.
   # @return [Array<Object>]
   def published_pages
     memoize_by_collection(:published_pages, data.pages) { data.pages.reject(&:draft) }
   end
 
-  # Non-draft articles that may be indexed by search engines.
+  # The non-draft articles that a search engine can index.
   # @return [Array<Object>]
   def indexable_articles
     memoize_by_collection(:indexable_articles, data.articles) do
@@ -38,7 +38,7 @@ module ArticleHelpers
     end
   end
 
-  # Non-draft pages that may be indexed by search engines.
+  # The non-draft pages that a search engine can index.
   # @return [Array<Object>]
   def indexable_pages
     memoize_by_collection(:indexable_pages, data.pages) do
@@ -46,38 +46,38 @@ module ArticleHelpers
     end
   end
 
-  # An entry's publish date, parsed.
+  # The publish date of an entry, after the parse.
   # @param entry [Object] The entry.
   # @return [DateTime]
   def published_datetime(entry)
     DateTime.parse(entry.published_at)
   end
 
-  # The DOM id for an entry element, from its Contentful id (parameterize lowercases it).
+  # The DOM id for an entry element, from its Contentful id. parameterize makes it lowercase.
   # @param entry [Object] The entry.
-  # @param scope [String, nil] A section slug prefixed to the id. Needed when a section may
-  #   list an entry that another section on the same page also lists — unscoped, the two cards
-  #   share an id and every aria-labelledby resolves to the first one.
-  # @return [String] e.g. "entry-1qxuv2jhbvrd9oqmxoneqz".
+  # @param scope [String, nil] A section slug at the start of the id. It is necessary when a
+  #   section can list an entry that another section on the same page also lists. With no scope,
+  #   the two cards have the same id and each aria-labelledby points to the first card.
+  # @return [String] For example "entry-1qxuv2jhbvrd9oqmxoneqz".
   def entry_dom_id(entry, scope: nil)
     "entry-#{scoped_entry_key(entry, scope)}"
   end
 
-  # The DOM id for an entry's heading, referenced by the entry element's aria-labelledby.
+  # The DOM id for the heading of an entry. The aria-labelledby of the entry element points to it.
   # @param entry [Object] The entry.
-  # @param scope [String, nil] As for #entry_dom_id; the two must be given the same scope.
-  # @return [String] e.g. "hed-1qxuv2jhbvrd9oqmxoneqz".
+  # @param scope [String, nil] The same as for #entry_dom_id. Give the two the same scope.
+  # @return [String] For example "hed-1qxuv2jhbvrd9oqmxoneqz".
   def entry_heading_id(entry, scope: nil)
     "hed-#{scoped_entry_key(entry, scope)}"
   end
 
-  # @return [String] The shared id suffix, unchanged from the bare Contentful id when unscoped.
+  # @return [String] The shared end of the id. With no scope, it is the Contentful id.
   def scoped_entry_key(entry, scope)
     [ scope, entry.sys.id ].compact.join("-").parameterize
   end
 
   # @param entry [Object] The entry.
-  # @return [String, nil] The publicly-visible name for the entry's type.
+  # @return [String, nil] The public name of the entry type.
   def entry_type(entry)
     return if entry.entry_type.blank?
     case entry.entry_type
@@ -88,15 +88,15 @@ module ArticleHelpers
     end
   end
 
-  # Builds the article's permalink, labelled with its publish date. The publish-date Stimulus
-  # controller swaps in a live relative timestamp for recent articles; this is the no-JS
-  # fallback.
+  # Makes the permalink of an article, with its publish date as the label. For a recent article,
+  # the publish-date Stimulus controller puts a live relative time in its place. This is the
+  # result when there is no JavaScript.
   # @param article [Object] The article.
-  # @return [String] A <time> wrapping an <a>, so the ISO instant stays machine-readable.
+  # @return [String] A <time> that contains an <a>, thus a machine can still read the ISO instant.
   def article_permalink_timestamp(article)
     published = published_datetime(article)
     options = {
-      # article.path is the source path; url_for turns it into the URL directory_indexes serves.
+      # article.path is the source path. url_for makes the URL that directory_indexes serves.
       href: url_for(article.path),
       title: "Published at #{published.strftime('%-I:%M %p')}",
       "data-publish-date-target": "timestamp"
@@ -107,16 +107,16 @@ module ArticleHelpers
     content_tag :time, link, datetime: published.iso8601
   end
 
-  # ⚠️ Reads `page_content`, never `defined?(content)`. `content` is a template local, so in a
-  # helper method's binding `defined?` is always nil — the guard then falls through to "don't
-  # hide" and every draft ships indexable.
-  # @return [Boolean] Whether the current page should be hidden from search engines.
+  # ⚠️ This reads `page_content`, never `defined?(content)`. `content` is a template local, thus
+  # `defined?` is always nil in the binding of a helper method. The check then gives "do not
+  # hide", and each draft goes to production where a search engine can index it.
+  # @return [Boolean] True if a search engine must not index the current page.
   def hide_from_search_engines?
     return true unless production?
     page = page_content
-    # No proxied content object (the 404 page, and any other frontmatter-only template): the
-    # flag comes from frontmatter instead, defaulting to indexable so ordinary pages are
-    # unaffected.
+    # There is no proxied content object (the 404 page, and each other frontmatter-only
+    # template). The flag then comes from the frontmatter. The default lets a search engine index
+    # the page, thus an ordinary page does not change.
     return current_page.data.index_in_search_engines == false if page.nil?
     return true if page.draft
     !page.index_in_search_engines
@@ -129,8 +129,8 @@ module ArticleHelpers
     full_url(current_page.url)
   end
 
-  # The most recent full articles, excluding drafts and Shorts.
-  # @param count [Integer] How many to return.
+  # The most recent full articles. This does not include the drafts and the Shorts.
+  # @param count [Integer] The number to return.
   # @param exclude [Object] An article to omit.
   # @return [Array<Object>]
   def recent_articles(count: 4, exclude: nil)
@@ -140,17 +140,17 @@ module ArticleHelpers
       .take(count)
   end
 
-  # The entries most semantically related to this one, for the static "You May Also Like"
-  # section. The ranking comes from data/related.json, which `rake import:related` fetches from
-  # the api — it's computed there from Voyage embeddings, the one part of the section this
-  # build can't derive from its own data.
+  # The entries with the nearest meaning to this one, for the static "You May Also Like" section.
+  # The order comes from data/related.json, which `rake import:related` gets from the api. The
+  # api calculates it from the Voyage embeddings. It is the one part of the section that this
+  # build cannot make from its own data.
   #
-  # ⚠️ Empty collapses the section, which is the intended behavior for the three ways this can
-  # come back empty: the import didn't run (no api, no token), the entry has no stored
-  # embedding yet, or every neighbor it named has since been unpublished.
-  # @param article [Object] The entry to find neighbors for.
-  # @param count [Integer] How many to return.
-  # @return [Array<Object>] The related entries, nearest first.
+  # ⚠️ An empty result removes the section. This is correct for the three causes of an empty
+  # result: the import did not run (no api, or no token), the entry has no stored embedding, or
+  # each neighbor that it names is now unpublished.
+  # @param article [Object] The entry to find the neighbors of.
+  # @param count [Integer] The number to return.
+  # @return [Array<Object>] The related entries, the nearest first.
   def related_articles(article, count: 4)
     return [] unless data.respond_to?(:related)
 
@@ -161,9 +161,9 @@ module ArticleHelpers
     ids.filter_map { |id| index[id] }.take(count)
   end
 
-  # @return [Hash{String=>Object}] The published entries by Contentful id, for resolving the
-  #   ids in data/related.json. Memoized for the life of the collection — this is called once
-  #   per article page.
+  # @return [Hash{String=>Object}] The published entries by Contentful id, to find the ids in
+  #   data/related.json. The app keeps the value for the life of the collection, because it
+  #   calls this one time for each article page.
   def published_articles_by_id
     memoize_by_collection(:published_articles_by_id, data.articles) do
       published_articles.index_by { |a| a.sys&.id }
@@ -171,14 +171,14 @@ module ArticleHelpers
   end
 
   # The most recent published entries, for the Atom feed.
-  # @param count [Integer] How many to return.
+  # @param count [Integer] The number to return.
   # @return [Array<Object>]
   def feed_articles(count: 100)
     published_articles.take(count)
   end
 
-  # The most recent indexable full articles, for llms.txt.
-  # @param count [Integer] How many to return.
+  # The most recent full articles that a search engine can index, for llms.txt.
+  # @param count [Integer] The number to return.
   # @return [Array<Object>]
   def llms_articles(count: 100)
     indexable_articles
@@ -186,14 +186,14 @@ module ArticleHelpers
       .take(count)
   end
 
-  # The chronologically adjacent entries, for "Read next" navigation. Includes Shorts, so the
-  # nav works on both kinds of page.
+  # The adjacent entries in time, for the "Read next" navigation. It includes the Shorts, thus
+  # the navigation works on both types of page.
   # @param article [Object] The current entry.
-  # @return [Hash] { newer:, older: }; either is nil at the ends of the archive, and both are
-  #   when the entry isn't in the published sequence (e.g. a draft preview).
+  # @return [Hash] { newer:, older: }. One of them is nil at each end of the archive. Both are
+  #   nil if the entry is not in the published sequence, for example a draft preview.
   def adjacent_articles(article)
     sequence = published_articles
-    # Indexed once per build rather than scanned per article page, which was quadratic.
+    # The app makes this index one time for each build. A scan for each article page is slower.
     positions = memoize_by_collection(:published_article_positions, data.articles) do
       sequence.each_with_index.to_h { |a, i| [ a.path, i ] }
     end
@@ -204,10 +204,10 @@ module ArticleHelpers
     { newer: index.positive? ? sequence[index - 1] : nil, older: sequence[index + 1] }
   end
 
-  # Builds the JSON-LD BlogPosting schema for an article.
+  # Makes the JSON-LD BlogPosting schema for an article.
   # @param content [Object] The article.
   # @see https://developers.google.com/search/docs/appearance/structured-data/article
-  # @return [String, nil] JSON-LD, or nil for a draft.
+  # @return [String, nil] The JSON-LD, or nil for a draft.
   def article_schema(content)
     return if content.draft
     schema = {
@@ -221,7 +221,7 @@ module ArticleHelpers
       "isAccessibleForFree": true,
       "wordCount": article_word_count(content),
       "timeRequired": "PT#{reading_time_minutes(content)}M",
-      # Referenced by @id so consumers resolve to the single sitewide entity for each.
+      # @id points to them, thus a consumer finds the one sitewide entity for each.
       "author": { "@id": schema_entity_id("person", path: "/about") },
       "publisher": { "@id": schema_entity_id("organization") },
       "isPartOf": { "@id": schema_entity_id("website") },
@@ -233,7 +233,7 @@ module ArticleHelpers
     tags = Array(content.contentful_metadata&.tags)
     if tags.present?
       schema["keywords"] = tags.flat_map { |t| [ t.name, *Array(t.synonyms) ] }.uniq
-      # Prefer the content-type concept, then any Topics concept, then whatever's first.
+      # Use the content-type concept first, then a Topics concept, then the first concept.
       section = tags.find { |t| %w[race-reports news reviews].include?(t.id) } ||
                 tags.find { |t| t.scheme == "topics" } || tags.first
       schema["articleSection"] = section.name
@@ -244,19 +244,19 @@ module ArticleHelpers
         image_object(cdn_image_url(content.cover_image.url, { w: w, h: h, fit: "cover" }), w, h)
       end
     else
-      # No cover image: fall back to the generated Open Graph card, so the BlogPosting still
-      # carries an image.
+      # There is no cover image. Use the Open Graph card that the app makes, thus the
+      # BlogPosting still has an image.
       card_url = generate_open_graph_image_url(current_page.url, content.sys&.published_version)
       schema["image"] = [ image_object(card_url, 1200, 630) ]
     end
     schema.to_json
   end
 
-  # Builds the JSON-LD BreadcrumbList for an article: Home › Blog › its topic trail › the
+  # Makes the JSON-LD BreadcrumbList for an article: Home › Blog › its chain of topics › the
   # article.
   # @param content [Object] The article.
   # @see https://developers.google.com/search/docs/appearance/structured-data/breadcrumb
-  # @return [String, nil] JSON-LD, or nil unless the entry is a published post.
+  # @return [String, nil] The JSON-LD, or nil if the entry is not a published post.
   def breadcrumb_schema(content)
     return unless published_post?(content)
 
@@ -265,10 +265,12 @@ module ArticleHelpers
     breadcrumb_list_schema(crumbs)
   end
 
-  # The ancestor chain of an article's deepest-nested concept across either scheme, tie-broken
-  # by the concept's archive article count.
+  # The chain of parents of the most deeply nested concept of an article, in the two schemes. If
+  # two concepts are at the same depth, the number of articles in the archive of the concept
+  # selects one.
   # @param content [Object] The article.
-  # @return [Array<Hash>] Ordered [{ id:, name:, path: }] root-first, or [] when untagged.
+  # @return [Array<Hash>] The [{ id:, name:, path: }] items, the root first, or [] if the article
+  #   has no tags.
   def taxonomy_trail(content)
     tags = Array(content.contentful_metadata&.tags)
     return [] if tags.empty?
@@ -280,8 +282,9 @@ module ArticleHelpers
     chains.max_by { |chain| [ chain.length, index.dig(chain.last[:id], :count).to_i ] }
   end
 
-  # The ancestor chain of a concept id, root-first and inclusive, resolved from data.tags.
-  # @return [Array<Hash>] [{ id:, name:, path: }] or [] if the id isn't a known concept.
+  # The chain of parents of a concept id, from data.tags. It starts at the root and includes the
+  # concept.
+  # @return [Array<Hash>] [{ id:, name:, path: }], or [] if the id is not a known concept.
   def concept_chain(id)
     index = taxonomy_index
     chain = []
@@ -295,46 +298,47 @@ module ArticleHelpers
     chain
   end
 
-  # Concept id => { name:, path:, parent_id:, scheme:, count: }, built from the generated tag
-  # pages. Every ancestor has a page, so chains always resolve fully. Memoized per render.
+  # Concept id => { name:, path:, parent_id:, scheme:, count: }, from the tag pages that the
+  # build makes. Each parent has a page, thus each chain is always complete. The app keeps the
+  # value for each render.
   # @return [Hash{String=>Hash}]
   def taxonomy_index
     @taxonomy_index ||= Array(data.tags).each_with_object({}) do |entry, index|
       tag = entry.tag
-      # entry_count, not count: `count` is Hash#count on the Mash, i.e. the number of keys.
+      # Use entry_count, not count: `count` is Hash#count on the Mash, the number of keys.
       index[tag.id] = { name: tag.name, path: tag.path, parent_id: tag.parent_id, scheme: tag.scheme, count: tag.entry_count }
     end
   end
 
-  # The separator rendered between tag links in a breadcrumb chain.
+  # The separator between the tag links in a breadcrumb chain.
   TAG_SEPARATOR = '<span class="entry__tag-separator" aria-hidden="true">/</span>'.freeze
 
-  # The tag icon for a tag list: a single tag gets the "tag" icon, several get "tags".
-  # @param count [Integer] How many tags the list shows.
+  # The tag icon for a tag list: one tag gets the "tag" icon, more than one gets "tags".
+  # @param count [Integer] The number of tags in the list.
   # @return [String, nil] The icon SVG.
   def tag_list_icon(count)
     icon_svg("classic", "light", count == 1 ? "tag" : "tags")
   end
 
-  # Renders breadcrumb chains of tag links — [label, path] pairs — as slash-separated
-  # role="listitem" spans (both within and between chains). Shared by the article meta line
-  # and the tag-archive header.
-  # @param chains [Array<Array<Array(String, String)>>] Chains of [label, path] pairs.
-  # @return [String] The joined markup.
+  # Renders breadcrumb chains of tag links, that is, [label, path] pairs. Each link is a
+  # role="listitem" span, and a slash goes between the spans in a chain and between the chains.
+  # The article meta line and the tag-archive header both use this.
+  # @param chains [Array<Array<Array(String, String)>>] The chains of [label, path] pairs.
+  # @return [String] The markup, joined.
   def tag_chain_links(chains)
     chains.map do |chain|
       chain.map { |label, path| content_tag(:span, link_to(label, path), role: "listitem") }.join(TAG_SEPARATOR)
     end.join(TAG_SEPARATOR)
   end
 
-  # The "Draft" badge shown on unpublished entries' meta lines.
+  # The "Draft" badge on the meta line of an unpublished entry.
   # @return [String] A highlight span with the typewriter icon.
   def draft_badge
     %(<span class="entry__highlight">#{icon_svg("classic", "regular", "typewriter")} Draft</span>)
   end
 
-  # Counts the words in an article's intro and body. Memoized per entry, since sanitizing the
-  # whole article is expensive and this is called several times per page.
+  # Counts the words in the intro and the body of an article. The app keeps the value for each
+  # entry, because the removal of the markup is slow and each page calls this more than one time.
   # @param article [Object] The article.
   # @return [Integer] The number of words.
   def article_word_count(article)
@@ -349,31 +353,32 @@ module ArticleHelpers
     plain_text.split(/\s+/).size
   end
 
-  # The estimated reading time for an article, in whole minutes (rounded up).
+  # The estimated reading time for an article, in full minutes. It rounds up.
   # @param article [Object] The article.
-  # @return [Integer] Reading time in minutes.
+  # @return [Integer] The reading time in minutes.
   def reading_time_minutes(article)
-    # ⚠️ Not ENV.fetch with a default: that only fires when the key is ABSENT, and a CI variable
-    # that isn't set interpolates to an empty string — present but blank. `''.to_i` is 0, and
-    # dividing by it raises FloatDomainError on every article page.
+    # ⚠️ Do not use ENV.fetch with a default. It gives the default only when the key is ABSENT.
+    # A CI variable with no value becomes an empty string, which is available but blank.
+    # `''.to_i` is 0, and a division by 0 raises FloatDomainError on each article page.
     wpm = ENV["READING_TIME_WPM"].to_i
     wpm = DEFAULT_READING_TIME_WPM unless wpm.positive?
     (article_word_count(article) / wpm.to_f).ceil
   end
 
   # @param article [Object] The article.
-  # @return [String] The reading time as prose, e.g. "A 4-minute read".
+  # @return [String] The reading time as text, for example "A 4-minute read".
   def reading_time(article)
     minutes = reading_time_minutes(article)
-    # Numbers whose spoken form starts with a vowel sound take "An".
+    # A number that starts with a vowel sound when you speak it takes "An".
     indefinite_article = minutes.humanize.match?(/^(eight|eleven)/i) ? "An" : "A"
     "#{indefinite_article} #{minutes}-minute read"
   end
 
-  # Other race reports sharing this article's race concept, newest first. Memoized, since the
-  # template consults it once to pick a section and the partial again to render it.
+  # The other race reports with the same race concept as this article, the newest first. The app
+  # keeps the value, because the template reads it one time to select a section and the partial
+  # reads it again to render it.
   # @param article [Object] The current article.
-  # @param count [Integer] How many to return.
+  # @param count [Integer] The number to return.
   # @return [Array<Object>]
   def related_race_reports(article, count: 4)
     race_id = race_concept_id(article)
@@ -389,8 +394,9 @@ module ArticleHelpers
     end
   end
 
-  # The id of an article's race concept: its deepest Sports concept at or below the race level
-  # (discipline › distance › race, so chain length ≥ 3). Drives race-report grouping.
+  # The id of the race concept of an article: its most deeply nested Sports concept at the race
+  # level or below it (discipline › distance › race, thus the chain length is 3 or more). It
+  # controls the groups of race reports.
   # @param article [Object] The article.
   # @return [String, nil]
   def race_concept_id(article)
@@ -402,20 +408,21 @@ module ArticleHelpers
       &.first
   end
 
-  # Whether an article is tagged as a race report, so a race preview sharing the same race
-  # concept can't slip into the race-report grouping.
+  # Tells if an article has the race-report tag. Thus a race preview with the same race concept
+  # cannot go into the group of race reports.
   # @param article [Object] The article.
   # @return [Boolean]
   def race_report?(article)
     Array(article.contentful_metadata&.tags).any? { |t| t.id == "race-reports" }
   end
 
-  # The article's concepts as breadcrumb chains, one per leaf concept. Chains are walked through
-  # the full taxonomy then filtered to the concepts the article carries, so an unassigned
-  # intermediate is dropped without splitting the chain. Sorted deepest-first, Sports before
-  # Topics on a tie.
+  # The concepts of the article as breadcrumb chains, one chain for each leaf concept. The code
+  # reads each chain through the full taxonomy, then keeps only the concepts that the article
+  # has. Thus it removes a concept in the middle that the article does not have, and the chain
+  # stays complete. The most deeply nested chain is first, and Sports goes before Topics at the
+  # same depth.
   # @param article [Object] The article.
-  # @return [Array<Array>] One array of tags per chain, ordered root → leaf.
+  # @return [Array<Array>] One array of tags for each chain, from the root to the leaf.
   def tag_breadcrumb_chains(article)
     tags = Array(article.contentful_metadata&.tags)
     return [] if tags.empty?

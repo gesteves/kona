@@ -1,5 +1,5 @@
-// The sign-in page: one centered button, nothing else. Deliberately not a <wa-page> — that
-// component's slots and `view` state are inert outside a full app shell.
+// The sign-in page: one button at the center, and nothing more. It is not a <wa-page>, on purpose:
+// the slots and the `view` state of that component do nothing outside a full app shell.
 
 .signin {
   align-items: center;

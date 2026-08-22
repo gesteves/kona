@@ -1,14 +1,16 @@
-// The editable source of truth for the two-scheme taxonomy and the per-article assignments.
-// `taxonomy:preview` renders everything here for review, and the create/describe/assign scripts
-// all read from it, so what you preview is exactly what runs.
+// The one source of the two-scheme taxonomy and of the concepts of each article. You can edit it.
+// `taxonomy:preview` shows all the content here for a review, and the create, describe, and assign
+// scripts read it. Thus the preview shows exactly what the scripts do.
 //
-// Edit freely: CONCEPTS' names, hierarchy, altLabels, and descriptions, and ASSIGNMENTS' most-
-// specific concept(s) per article — the assign script expands each up its `broader` chain, so
-// an article ends up with the full path. altLabels shorten chips and auto-generate
-// /tagged/<synonym> redirects, so leave one off where a short form would collide.
+// You can edit these: the names, the tree, the altLabels, and the descriptions in CONCEPTS, and the
+// most specific concepts of each article in ASSIGNMENTS. The assign script adds each parent from
+// the `broader` chain, thus an article gets the full path. An altLabel makes a chip shorter and
+// makes a /tagged/<synonym> redirect. Thus do not give an altLabel where a short form would be the
+// same as another one.
 //
-// ⚠️ Concepts and schemes are org-level. The prefLabels "Race Reports" and "Reviews" must stay
-// exact — web's share_helpers matches on them. Descriptions are Markdown.
+// ⚠️ The concepts and the schemes belong to the organization. The prefLabels "Race Reports" and
+// "Reviews" must stay exactly the same, because the share_helpers of web match them. Each
+// description is Markdown.
 
 const contentful = require('contentful-management');
 
@@ -20,7 +22,7 @@ const SCHEMES = [
   { id: 'topics', name: 'Topics' },
 ];
 
-// Every concept: { id, name, scheme, broader (parent id | null), altLabels: [], description }.
+// Each concept: { id, name, scheme, broader (the parent id or null), altLabels: [], description }.
 const CONCEPTS = [
   // ─────────────── Sports ───────────────
   { id: 'triathlon', name: 'Triathlon', scheme: 'sports', broader: null, altLabels: [],
@@ -109,10 +111,11 @@ const CONCEPTS = [
     description: 'Personal updates---the ups and downs of chasing races, injuries and all.' },
 ];
 
-// article slug → { sports: <most-specific concept id | null>, topics: [ids] }.
-// Seeded from each article's current concepts, then hand-reviewed. Assign expands each up its
-// broader chain. Conventions: general Ironman news → `triathlon` (the discipline, not a
-// distance); tech posts keep their sport discipline; a couple of recaps carry no content-type.
+// The article slug → { sports: the most specific concept id, or null, topics: [ids] }.
+// This starts from the current concepts of each article, and then a person reads it. The assign
+// script adds each parent from the broader chain. The rules: general Ironman news goes to
+// `triathlon`, which is the discipline and not a distance; a tech post keeps its sport discipline;
+// and two recaps have no content type.
 const ASSIGNMENTS = {
   'a-way-to-track-my-endless-pool-workouts': { sports: 'swimming', topics: ['apps', 'training'] },
   'an-update-on-my-ankle': { sports: 'running', topics: ['personal'] },
@@ -178,7 +181,7 @@ const ASSIGNMENTS = {
 
 const byId = new Map(CONCEPTS.map((c) => [c.id, c]));
 
-// A concept's id chain, most-specific first: [id, parent, grandparent, …].
+// The chain of ids of a concept, the most specific first: [id, parent, parent of the parent, …].
 function expandAncestors(id) {
   const chain = [];
   let cur = id;
@@ -191,9 +194,10 @@ function expandAncestors(id) {
   return chain;
 }
 
-// The full set of concept ids an article should carry (both schemes' paths), de-duped in
-// scheme-then-depth order (Sports discipline→distance→race, then Topics). `unknown` collects
-// any id in the assignment that isn't a real concept.
+// The full set of concept ids that an article must have, that is, the paths of the two schemes.
+// The code removes each copy and puts them in order by scheme and then by depth: Sports gives the
+// discipline, the distance, and the race, and then Topics follows. `unknown` collects each id in
+// the assignment that is not a true concept.
 function resolveAssignment(slug, unknown = []) {
   const a = ASSIGNMENTS[slug];
   if (!a) return null;
@@ -213,7 +217,8 @@ function conceptsForScheme(schemeId) {
   return CONCEPTS.filter((c) => c.scheme === schemeId);
 }
 
-// Turns a title into an id in the existing style (lowercase, drop periods/apostrophes, hyphenate).
+// Changes a title into an id in the same style as the others: lowercase, with no period and no
+// apostrophe, and with a hyphen between the words.
 function slugify(title) {
   return title.toLowerCase().replace(/[.'’]/g, '').replace(/&/g, ' and ')
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');

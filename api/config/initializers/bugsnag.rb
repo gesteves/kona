@@ -1,21 +1,23 @@
-# Reports unhandled exceptions to Bugsnag. The gem's railtie auto-inserts its Rack
-# middleware and hooks ActionDispatch's exception handling, so exceptions are captured
-# even though this API renders errors as plain text (lib/plain_text_exceptions.rb).
+# Sends each exception that nothing catches to Bugsnag. The railtie of the gem adds its Rack
+# middleware and reads the exception code of ActionDispatch. Thus Bugsnag gets each exception,
+# although this API renders an error as plain text (refer to lib/plain_text_exceptions.rb).
 #
-# Only production actually notifies: notify_release_stages is limited to "production",
-# and BUGSNAG_API_KEY is unset in development/test, so this is a no-op locally and in CI.
+# Only production sends a report: notify_release_stages has "production" only, and
+# BUGSNAG_API_KEY has no value in development and in test. Thus this does nothing on your machine
+# and in CI.
 Bugsnag.configure do |config|
   config.api_key = ENV["BUGSNAG_API_KEY"]
   config.release_stage = Rails.env
   config.notify_release_stages = %w[production]
 
-  # Drops the reports Sidekiq's fetch loop produces when the worker VM is briefly frozen by its
-  # host, which Sidekiq already recovers from on its own. See the filter for the three
-  # conditions that keep it from swallowing a real outage. Wrapped in a lambda so the autoloaded
-  # constant resolves on first notify rather than during boot.
+  # Removes the reports from the Sidekiq fetch loop when the host stops the worker VM for a short
+  # time. Sidekiq recovers from that by itself. Refer to the filter for the three conditions that
+  # keep it from a true failure. It is in a lambda, thus the autoloaded constant resolves at the
+  # first report and not at the start.
   config.add_on_error(->(report) { SidekiqRedisTimeoutFilter.call(report) })
 
-  # Drops the unactionable BadRequest a spam bot produces by posting a contact form body that
-  # isn't valid UTF-8. See the filter for why it's scoped to that one endpoint.
+  # Removes the BadRequest that a spam bot causes when it posts a contact-form body that is not
+  # correct UTF-8. Nobody can act on that report. Refer to the filter for the reason that it applies
+  # to that one endpoint.
   config.add_on_error(->(report) { ContactBadRequestFilter.call(report) })
 end

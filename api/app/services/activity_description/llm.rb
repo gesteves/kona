@@ -1,8 +1,8 @@
 module ActivityDescription
-  # The two Anthropic-backed lines of an activity description: the planned-workout summary
-  # (🗓️) and the weather sentence. Both use structured outputs, so the response's first
-  # text block is guaranteed to be valid JSON matching the schema. When ANTHROPIC_API_KEY
-  # is unset both helpers return nil, and the description is composed without their lines.
+  # The two lines of an activity description that Anthropic writes: the planned-workout summary
+  # (🗓️) and the weather sentence. Both use a structured output, thus the first text block of the
+  # response is always correct JSON that agrees with the schema. When ANTHROPIC_API_KEY has no
+  # value, both methods return nil and the code makes the description without their lines.
   module Llm
     extend AnthropicStructuredOutput
 
@@ -11,17 +11,19 @@ module ActivityDescription
 
     DEFAULT_MODEL = "claude-sonnet-5".freeze
     MAX_TOKENS = 512
-    # Generous for these one-sentence prompts; anything longer is a degenerate stall. The
-    # webhook is already acked by the time these run, so this just bounds worker pile-up.
+    # This is long for a one-sentence prompt. A longer time means that the call stopped. The app
+    # already answered the webhook when these run, thus this limit only stops a large number of
+    # jobs on the worker.
     TIMEOUT_SECONDS = 30
 
     module_function
 
-    # Summarizes a planned-workout description into a one-sentence phrase, with no trailing
-    # period — the composer renders it as the 🗓️ line.
-    # @return [String, nil] Nil when unconfigured, blank, or declined for a sparse description.
-    # @raise [StandardError] on transport failure; the generator rescues per-call, so only this
-    #   line is lost.
+    # Makes a one-sentence summary of a planned-workout description, with no period at the end. The
+    # composer renders it as the 🗓️ line.
+    # @return [String, nil] Nil when there is no configuration, when the input is blank, and when
+    #   the model refuses because the description has too little content.
+    # @raise [StandardError] On a transport failure. The generator catches the error for each call,
+    #   thus only this line goes away.
     def planned_summary(planned_description)
       return if planned_description.blank? || !configured?
 
@@ -38,9 +40,10 @@ module ActivityDescription
       parsed[:planned_summary].presence
     end
 
-    # Rewrites a raw weather description as one sentence plus a leading emoji. The caller owns
-    # the indoor check — indoor activities never get a weather line.
-    # @return [Hash, nil] { emoji:, sentence: }, or nil when unconfigured, blank, or declined.
+    # Changes a raw weather description into one sentence with an emoji at the start. The caller
+    # does the indoor check: an indoor activity never gets a weather line.
+    # @return [Hash, nil] { emoji:, sentence: }, or nil when there is no configuration, when the
+    #   input is blank, and when the model refuses.
     def weather_sentence(weather_description)
       return if weather_description.blank? || !configured?
 
@@ -62,7 +65,7 @@ module ActivityDescription
       { emoji: parsed[:weather_emoji], sentence: parsed[:weather_sentence] }
     end
 
-    # @return [String] The env var that overrides the model for this caller.
+    # @return [String] The env var that replaces the model for this caller.
     def anthropic_model_env = "ANTHROPIC_DESCRIPTION_MODEL"
   end
 end

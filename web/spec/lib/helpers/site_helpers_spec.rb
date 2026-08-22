@@ -3,11 +3,12 @@ require 'ostruct'
 require 'padrino-helpers'
 require 'hashie'
 
-# RSpec auto-includes the described module, so SiteHelpers' instance methods are callable directly.
+# RSpec includes the module under test, thus you can call the instance methods of SiteHelpers
+# directly.
 RSpec.describe SiteHelpers do
   include_context 'default helper stubs'
 
-  # Builds a site double shaped like `data.site`.
+  # Makes a site double with the shape of `data.site`.
   def site(socials: [], logo: 'logo', author_name: 'Jane Doe', profile_picture: nil)
     OpenStruct.new(
       title: 'My Site',
@@ -17,8 +18,8 @@ RSpec.describe SiteHelpers do
     )
   end
 
-  # Collaborators normally mixed in from other helper modules; defined here so the schema builders
-  # can be exercised in isolation.
+  # Other helper modules usually supply these methods. This file defines them, thus the test runs
+  # the schema builders alone.
   def data = OpenStruct.new(site: @site || site)
   def site_icon_url(w:) = "https://example.com/icon-#{w}.png"
   def cdn_image_url(url, params = {}) = "#{url}?w=#{params[:w]}"
@@ -281,8 +282,8 @@ RSpec.describe SiteHelpers do
     end
   end
 
-  # page_title branches on `content.is_a?(Hash)`, and the real proxied content objects are
-  # Middleman Mashes (Hash subclasses with dot access) — Hashie::Mash stands in for them here.
+  # page_title tests `content.is_a?(Hash)`, and each true proxied content object is a Middleman
+  # Mash, which is a Hash subclass with dot access. Hashie::Mash replaces one here.
   describe '#page_title' do
     def data = OpenStruct.new(site: OpenStruct.new(meta_title: 'My Site'))
 
@@ -359,8 +360,8 @@ RSpec.describe SiteHelpers do
   end
 
   describe '#meta_description' do
-    # content_summary lives in this module but needs data.site; stubbed so the fallback
-    # ordering is what's under test.
+    # content_summary is in this module but it needs data.site. This file stubs it, thus the test
+    # covers the order of the values only.
     def content_summary(content) = "Summary of #{content.title}."
     def current_page = OpenStruct.new(metadata: { locals: @locals }, data: OpenStruct.new(summary: @frontmatter_summary))
 
@@ -398,17 +399,18 @@ RSpec.describe SiteHelpers do
       expect(attrs).to be_html_safe
     end
 
-    # The placeholder flag is what tells the controller this element holds a skeleton rather than
-    # real content — so it fetches on connect, and collapses instead of sitting stuck if that
-    # fetch fails. The api fragment that replaces it must NOT carry it (a transient failure would
-    # then delete rendered content), which is why only the placeholder side emits it.
+    # The placeholder flag tells the controller that this element holds a skeleton, and not real
+    # content. Thus the controller fetches on connect, and it removes the element if that fetch
+    # fails, and the element does not stay. The api fragment that replaces it must NOT have the
+    # flag, because a temporary failure would then delete content on the page. For that reason only
+    # the placeholder side writes it.
     it 'marks the element a placeholder, since only the placeholder side of the contract does' do
       expect(live_update_attrs('/widgets/whoop')).to include('data-live-update-placeholder-value="true"')
     end
 
-    # An element rendered with real content at build time (the upcoming-races section) opts out:
-    # the flag would make a transient fetch failure delete that content. It still fetches on
-    # connect, because the controller counts a never-fetched URL as stale.
+    # An element that the build renders with real content, that is, the upcoming-races section,
+    # does not have the flag: with the flag, a temporary fetch failure would delete that content.
+    # It still fetches on connect, because the controller counts a URL with no fetch as old.
     it 'omits the placeholder flag and aria-busy for a statically rendered element' do
       attrs = live_update_attrs('/widgets/events/upcoming', placeholder: false)
       expect(attrs).to eq('data-controller="live-update" data-live-update-url-value="/widgets/events/upcoming" data-action="visibilitychange@document->live-update#handleVisibilityChange"')
@@ -419,9 +421,10 @@ RSpec.describe SiteHelpers do
   describe '#social_media_link' do
     include Padrino::Helpers
 
-    # icon_svg lives in IconHelpers and reads data.icons; replaced with a recognizable marker.
-    # Marked html_safe to mirror the template rendering path, where the SVG lands in the page
-    # unescaped. Returns blank for 'obscuresite' to exercise the missing-brand-icon fallback.
+    # icon_svg is in IconHelpers and it reads data.icons. This file replaces it with a marker that
+    # you can see. It is html_safe, as it is in the template render path, where the SVG goes into
+    # the page with no escape. It gives a blank value for 'obscuresite', to test the code for a
+    # brand icon that is absent.
     def icon_svg(family, style, icon_id)
       return '' if icon_id == 'obscuresite'
       %(<svg data-icon="#{family}/#{style}/#{icon_id}"></svg>).html_safe
@@ -463,7 +466,8 @@ RSpec.describe SiteHelpers do
 
     it 'renders the feed item as a clipboard-copy link instead of a plain navigation' do
       item = OpenStruct.new(title: 'Feed', destination: '/feed.xml')
-      # Attribute order follows the shared FEED_CLIPBOARD_ATTRS (controller, action, message).
+      # The order of the attributes comes from the shared FEED_CLIPBOARD_ATTRS: controller, action,
+      # and message.
       expect(shortcut_link(item)).to eq(
         '<a href="/feed.xml" data-controller="clipboard" ' \
         'data-action="click-&gt;clipboard#copy" ' \
@@ -503,10 +507,10 @@ RSpec.describe SiteHelpers do
     end
   end
 
-  # ⚠️ The static/dynamic split is a deploy-breaking invariant, not a formatting preference:
-  # Cloudflare's parser latches at the first dynamic rule and counts everything after it — exact
-  # matches included — against the 100-rule dynamic limit. It used to live in redirects.erb, where
-  # a template can't be tested.
+  # ⚠️ The division into static rules and dynamic rules is a rule that a change can break, and it is
+  # not a style choice. The Cloudflare parser latches at the first dynamic rule and counts each rule
+  # after it, exact matches included, against the limit of 100 dynamic rules. This code was in
+  # redirects.erb, and you cannot test a template.
   describe '#partitioned_redirects' do
     def taxonomy_synonym_redirects
       [ { from: '/tagged/half-ironman', to: '/tagged/triathlon/ironman-703/', status: 301 } ]
@@ -541,7 +545,7 @@ RSpec.describe SiteHelpers do
       expect(static_rules.map { |r| r[:from] }).to include('/tagged/half-ironman')
     end
 
-    # Both are hard deploy failures (code 100324) that a Contentful entry could introduce.
+    # Both stop a deploy (code 100324), and a Contentful entry can cause them.
     it 'drops an absolute-URL source' do
       @redirects = [ redirect('https://old.example.com/post', '/post') ]
 
@@ -568,16 +572,17 @@ RSpec.describe SiteHelpers do
       expect(dynamic_redirect_source?('/a/b.html')).to be(false)
     end
 
-    # Deliberately over-broad: a colon followed by a letter counts wherever it appears, so a
-    # source that merely looks like a placeholder is classified as dynamic. Misclassifying one
-    # rule as dynamic is harmless; the reverse breaks the deploy.
+    # This matches too much, on purpose: a colon with a letter after it counts at each position,
+    # thus a source that only looks like a placeholder becomes a dynamic rule. A static rule that
+    # this code calls dynamic causes no damage. A dynamic rule that this code calls static stops the
+    # deploy.
     it 'treats a mid-segment colon as a placeholder' do
       expect(dynamic_redirect_source?('/a:b')).to be(true)
     end
   end
 
-  # Both were uncovered, and split(':') without a limit silently dropped the middle of a title
-  # carrying more than one colon.
+  # No test covered these two, and split(':') with no limit removed the middle of a title with more
+  # than one colon, and gave no message.
   describe '#feed_title and #feed_subtitle' do
     def data = OpenStruct.new(site: OpenStruct.new(meta_title: @meta_title))
 

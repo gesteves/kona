@@ -2,30 +2,31 @@ require_relative "lib/helpers"
 
 each_kona_helper { |helper| helpers helper }
 
-# Activate and configure extensions
+# Start and configure the extensions.
 # https://middlemanapp.com/advanced/configuration/#configuring-extensions
 
 config[:css_dir]             = 'stylesheets'
 config[:js_dir]              = 'javascripts'
 config[:images_dir]          = 'images'
 
-# esbuild bundles the Stimulus/Turbo JS and the Web Awesome CSS it imports into tmp/dist,
-# which Middleman ingests as if it were source/, so asset_hash applies. The dev server runs
-# the watcher itself, hence no separate `npm run watch` terminal.
-# The watcher needs --watch=forever: Middleman spawns it without stdin, and plain --watch
-# exits when stdin closes.
+# esbuild puts the Stimulus and Turbo JavaScript, and the Web Awesome CSS that it imports, into
+# tmp/dist. Middleman reads that directory as if it were source/, thus asset_hash applies. The
+# development server runs the watcher itself, thus you need no separate `npm run watch` terminal.
+# The watcher needs --watch=forever: Middleman starts it with no stdin, and a plain --watch stops
+# when stdin closes.
 activate :external_pipeline,
   name: :esbuild,
   command: build? ? 'npm run build' : 'npm run watch',
   source: 'tmp/dist',
   latency: 1
 
-# `activate :gzip` is deliberately off: Cloudflare compresses responses itself, so the .gz
-# siblings are never served and only add ~110 files to the Worker asset upload.
-# ⚠️ Autoprefixer is deliberately not activated. Its caniuse dataset is frozen at Safari 15.4, so
-# every browserslist query is either wrong (targets 2022, emitting IE 11 `-ms-grid-*` into a subgrid
-# layout) or inert (matches no known version). Only two prefixes still matter; both are hand-written
-# beside the `@supports` condition that names them — see _nav.scss and base/_extends.scss.
+# `activate :gzip` is off, on purpose: Cloudflare compresses each response itself, thus nothing
+# serves the .gz files and they only add approximately 110 files to the Worker asset upload.
+# ⚠️ Autoprefixer is off, on purpose. Its caniuse data stops at Safari 15.4, thus each browserslist
+# query is incorrect (it targets 2022 and writes the IE 11 `-ms-grid-*` properties into a subgrid
+# layout) or it matches no known version. Only two prefixes are still necessary, and a person writes
+# both of them beside the `@supports` condition that names them. Refer to _nav.scss and
+# base/_extends.scss.
 activate :dotenv
 activate :asset_hash
 activate :directory_indexes
@@ -39,8 +40,8 @@ ignore "/page.html"
 ignore "/short.html"
 ignore "/tag_feed.xml"
 
-# Every generated page — articles, pages, the blog index, and the per-tag pages —
-# proxies its template with itself as the `content` local.
+# Each page that the build makes — an article, a page, the blog index, and a tag page — proxies its
+# template with itself as the `content` local.
 [
   @app.data.articles,
   @app.data.pages,
@@ -52,20 +53,20 @@ ignore "/tag_feed.xml"
   end
 end
 
-# Each tag also gets an Atom feed at "<tag path>feed.xml", listing that tag's entries — the
-# same articles as its archive page, newest first.
+# Each tag also gets an Atom feed at "<tag path>feed.xml". It lists the entries of that tag, which
+# are the same articles as on its archive page, with the newest first.
 @app.data.tags.each do |tag|
   proxy "#{tag.tag.path}feed.xml", "/tag_feed.xml", locals: { content: tag }, ignore: true
 end
 
-# The standard.site verification endpoint, served bare: no layout, no directory index.
+# The standard.site verification endpoint. It has no layout and no directory index.
 page "/.well-known/site.standard.publication", layout: false, directory_index: false
 
 configure :development do
   activate :relative_assets
 
-  # /widgets/* and /api/contact are Worker routes in production, so the dev server has no page
-  # behind them and every widget collapses. This stands in for the Worker's proxy.
+  # In production, /widgets/* and /api/contact are Worker routes. Thus the development server has no
+  # page at those paths and each widget goes away. This code replaces the proxy of the Worker.
   require_relative "lib/utils/dev_api_proxy"
   use DevApiProxy
 end

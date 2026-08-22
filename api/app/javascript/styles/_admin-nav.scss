@@ -1,15 +1,17 @@
-// The sidebar navigation. <wa-page> renders this as a desktop column and moves the same markup
-// into a drawer on mobile, so these rules serve both — only the borders differ per view.
+// The sidebar navigation. <wa-page> renders it as a column on the desktop and moves the same markup
+// into a drawer on a mobile screen. Thus these rules apply to both, and only the borders are
+// different for each view.
 
 .admin-nav {
   border-inline-end: 1px solid var(--wa-color-surface-border);
   height: 100%;
   padding: var(--wa-space-m);
 
-  // The links are <wa-button>s, so hover, active, focus ring, radius and spacing all come from the
-  // component. ⚠️ Only two things are ours: the host is `inline-block`, so it shrink-wraps inside
-  // the <li> without a width; and the button centers its content, which reads as ragged in a
-  // column of links of different lengths.
+  // Each link is a <wa-button>, thus the hover state, the active state, the focus ring, the corner
+  // radius, and the spacing all come from the component. ⚠️ Only two rules are ours: the host is
+  // `inline-block`, thus it becomes as wide as its content in the <li> and needs no width; and the
+  // button puts its content at the center, which looks incorrect in a column of links of different
+  // lengths.
   &__link {
     width: 100%;
 
@@ -18,36 +20,39 @@
     }
   }
 
-  // ⚠️ A fixed square box, overriding the `width: auto` every inline SVG gets in _base.scss. Font
-  // Awesome's viewBoxes are not all square — `house` is 576×512 and `location-dot` 384×512 — so at auto
-  // width no two labels in the column start at the same x. `preserveAspectRatio` defaults to
-  // fitting the glyph inside the box undistorted, which is what <wa-icon> does with the same 1em.
+  // ⚠️ This is a fixed square box, and it replaces the `width: auto` that each inline SVG gets in
+  // _base.scss. The viewBox values of Font Awesome are not all square: `house` is 576×512 and
+  // `location-dot` is 384×512. Thus at an automatic width, no two labels in the column start at the
+  // same x position. The default of `preserveAspectRatio` puts the glyph in the box with no change
+  // to its shape, and <wa-icon> does the same with the same 1em.
   &__link svg[slot="start"] {
     height: 1em;
     width: 1em;
   }
 
-  // Each group's caption. It labels the links below it rather than acting as one, so it's the only
-  // thing in the sidebar that isn't a <wa-button>.
+  // The caption of each group. It names the links below it and it is not a link. Thus it is the one
+  // element in the sidebar that is not a <wa-button>.
   //
-  // ⚠️ The inline padding is <wa-button>'s own, not a chosen value: it's what lines the caption up
-  // with the icons of the links beneath it.
+  // ⚠️ The inline padding is the value from <wa-button>, and not a value that a person selected. It
+  // is what puts the caption in line with the icons of the links below it.
   &__group-label {
     color: var(--wa-color-text-quiet);
     padding-inline-start: var(--wa-form-control-padding-inline);
   }
 
-  // The new-tab marker on external destinations (Sidekiq). ⚠️ `inline-flex`, not the default
-  // inline: an inline SVG sits on its wrapper's text baseline, so the span's box grows by the
-  // descender gap and the icon rides visibly high against the label.
+  // The new-tab mark on an external destination, that is, Sidekiq. ⚠️ Use `inline-flex`, and not
+  // the default of inline. An inline SVG sits on the text baseline of its parent, thus the box of
+  // the span becomes taller by the descender space and the icon is too high beside the label.
   &__hint {
     display: inline-flex;
   }
 
-  // The footer is a sibling slot below the nav rather than a child, so it needs the column's right
-  // border of its own — otherwise the sidebar's edge stops short above the sign-out button.
-  // ⚠️ `width: 100%` is load-bearing on mobile: this becomes a flex item of the drawer's footer,
-  // where it would otherwise shrink to the button and leave the divider spanning half the drawer.
+  // The footer is a slot beside the nav, below it, and not a child of it. Thus it needs its own
+  // right border for the column. Without that border, the edge of the sidebar stops above the
+  // sign-out button.
+  // ⚠️ `width: 100%` is necessary on a mobile screen: this becomes a flex item in the footer of the
+  // drawer, where it would become as wide as the button and the divider would then cross half of
+  // the drawer.
   &__footer {
     border-block-start: 1px solid var(--wa-color-surface-border);
     border-inline-end: 1px solid var(--wa-color-surface-border);
@@ -56,7 +61,7 @@
   }
 }
 
-// In the drawer there is no column to edge, so the vertical borders come off.
+// In the drawer there is no column, thus the vertical borders go away.
 wa-page[view="mobile"] {
   .admin-nav,
   .admin-nav__footer {

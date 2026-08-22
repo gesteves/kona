@@ -9,7 +9,7 @@ RSpec.describe GoogleGeocoder do
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with("GOOGLE_API_KEY").and_return("google-key")
 
-    # Cache always misses; writes are recorded but no-ops.
+    # The cache always gives a miss. The code records each write, and each write does nothing.
     allow($redis).to receive(:get).and_return(nil)
     allow($redis).to receive(:setex)
 
@@ -60,7 +60,7 @@ RSpec.describe GoogleGeocoder do
     expect(described_class.new("Kona").coordinates).to be_nil
   end
 
-  # ⚠️ The pair is stored as the current location, and Location.store validates nothing itself.
+  # ⚠️ The app stores this pair as the current location, and Location.store checks nothing.
   it "refuses coordinates outside the valid ranges" do
     allow(HTTParty).to receive(:get).and_return(
       instance_double(HTTParty::Response, success?: true,
@@ -70,8 +70,8 @@ RSpec.describe GoogleGeocoder do
     expect(described_class.new("Somewhere impossible").coordinates).to be_nil
   end
 
-  # A typo is the common case for an address that resolves to nothing, and retyping it must not
-  # re-query a billed endpoint every time.
+  # A typing error is the usual cause of an address that gives nothing, and a second attempt with the
+  # same text must not call an endpoint that costs money again.
   it "backs off briefly on an address that resolves to nothing" do
     allow(HTTParty).to receive(:get)
       .and_return(instance_double(HTTParty::Response, success?: true, body: { results: [] }.to_json))
@@ -82,7 +82,7 @@ RSpec.describe GoogleGeocoder do
       .with(a_string_starting_with("google:maps:address:"), 5.minutes.to_i, ApplicationService::EMPTY_SENTINEL)
   end
 
-  # An address is arbitrary user text; a raw one would put spaces and colons into the key.
+  # An address is text that a user types. The raw text would put a space and a colon into the key.
   it "keys the cache on a digest, case-folded" do
     keys = []
     allow($redis).to receive(:get) { |key| keys << key and nil }

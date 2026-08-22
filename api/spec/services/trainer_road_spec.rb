@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe TrainerRoad do
   subject(:service) { described_class.new("America/Denver") }
 
-  # Shared by #planned_workouts and #workouts — both parse the same feed.
+  # #planned_workouts and #workouts share this, because both parse the same feed.
   def ics(events)
     body = events.map.with_index do |event, index|
       lines = [ "BEGIN:VEVENT", "UID:#{index}" ]
@@ -141,13 +141,13 @@ RSpec.describe TrainerRoad do
     end
   end
 
-  # The method the weather and Whoop widgets actually call, through workout_scheduled? /
-  # rest_day?. Both read only `.any?`, so anything that changes which events are selected changes
-  # what those widgets say.
+  # The weather widget and the Whoop widget call this method, through workout_scheduled? and
+  # rest_day?. Both read `.any?` only, thus each change to the events that the code selects changes
+  # the text of those widgets.
   describe "#workouts" do
     include ActiveSupport::Testing::TimeHelpers
 
-    # 20:00 on July 9 in America/Denver (UTC-6 in July) — i.e. July 10 in UTC.
+    # 20:00 on July 9 in America/Denver, which is UTC-6 in July. That is July 10 in UTC.
     around { |example| travel_to(Time.utc(2026, 7, 10, 2, 0, 0)) { example.run } }
 
     before do
@@ -178,9 +178,9 @@ RSpec.describe TrainerRoad do
       expect(service.workouts).to eq([])
     end
 
-    # ⚠️ The regression this method carried: `event.dtstart.to_datetime.to_date` reckons a timed
-    # event in its own stored offset, so this 02:00Z event read as July 10 and was dropped from
-    # July 9's list — leaving rest_day? true on a day with a workout on it.
+    # ⚠️ This method had one failure: `event.dtstart.to_datetime.to_date` reads a timed event in its
+    # own stored offset. Thus this 02:00Z event became July 10 and left the list of July 9, and
+    # rest_day? was then true on a day with a workout.
     it "counts a timed evening event on the local day, not the UTC one" do
       stub_calendar([ { start: "20260710T020000Z", end: "20260710T030000Z", summary: "1:00 - Petit" } ])
 

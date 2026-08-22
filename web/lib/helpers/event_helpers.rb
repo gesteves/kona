@@ -1,17 +1,19 @@
-# Build-time selection and markup for the upcoming-races section.
+# The selection and the markup of the upcoming-races section, at build time.
 #
-# ⚠️ These mirror `EventsHelper` and `UpcomingRacesPresenter` in the api, which render the same
-# section at request time and swap it over this one. The two must agree on which races are
-# listed and in what order, or the swap visibly reshuffles the section. Deliberately reduced:
-# the api also features the next race with a race-day weather block and gives today's race its
-# own section, neither of which the build can know. See the root CLAUDE.md.
+# ⚠️ These are a copy of `EventsHelper` and `UpcomingRacesPresenter` in the api, which render the
+# same section at request time and put it in place of this one. The two must agree on the races in
+# the list and on their order. If they do not, the change is visible in the section. This copy is
+# smaller, on purpose: the api also makes the next race a featured race with a race-day weather
+# block, and it gives the race of today its own section. The build cannot know either of those.
+# Refer to the root CLAUDE.md.
 module EventHelpers
-  # How many races the section lists when none is featured — the api's unfeatured take.
+  # The number of races in the section when there is no featured race. It is the same number that
+  # the api uses in that condition.
   UPCOMING_RACES_COUNT = 3
 
-  # The races to list: confirmed events today or later, soonest first.
-  # @param count [Integer] How many to return.
-  # @return [Array] The events, soonest first. Empty collapses the section.
+  # The races for the list: the confirmed events of today or later, the soonest first.
+  # @param count [Integer] The number to return.
+  # @return [Array] The events, the soonest first. An empty array removes the section.
   def upcoming_races(count: UPCOMING_RACES_COUNT)
     events = Array(data.events)
     return [] if events.blank?
@@ -27,9 +29,9 @@ module EventHelpers
       .first(count)
   end
 
-  # @param count [Integer] How many races the section lists.
-  # @return [String] The layout variant, matching the api's `event_collection_variant` for the
-  #   unfeatured case.
+  # @param count [Integer] The number of races in the section.
+  # @return [String] The layout, the same as the `event_collection_variant` of the api when there
+  #   is no featured race.
   def event_collection_variant(count)
     case count
     when 1 then "single"
@@ -39,9 +41,9 @@ module EventHelpers
   end
 
   # @param event [Object] The event.
-  # @return [String] The icon and <time> span for an upcoming race, matching the api's
-  #   `event_timestamp_tag`. Only confirmed events reach here, so the icon is always a
-  #   calendar check.
+  # @return [String] The icon and the <time> span for an upcoming race, the same as the
+  #   `event_timestamp_tag` of the api. Only a confirmed event comes here, thus the icon is always
+  #   a calendar check.
   def event_timestamp_tag(event)
     date = parse_event_date(event)
     return "".html_safe if date.nil?
@@ -50,15 +52,15 @@ module EventHelpers
     content_tag :span, "#{icon_svg('classic', 'light', 'calendar-check')} #{timestamp}".html_safe
   end
 
-  # The JSON-LD `SportsEvent` list for the races the section lists, so the same events the page
-  # shows are machine-readable.
+  # The JSON-LD `SportsEvent` list for the races in the section. Thus a machine can read the same
+  # events that the page shows.
   #
-  # ⚠️ Emitted only for events the build believes are upcoming. There is no scheduled rebuild,
-  # so between publishes this can name a race that has already happened; a past `startDate`
-  # makes the entry ineligible for an event rich result rather than wrong, which is the
-  # tolerable failure here.
-  # @param events [Array] The events, as returned by #upcoming_races.
-  # @return [String, nil] JSON-LD, or nil when there's nothing to list.
+  # ⚠️ The build writes this only for the events that it counts as upcoming. There is no build on a
+  # schedule, thus between two publishes this can name a race that already occurred. A `startDate`
+  # in the past makes the entry incorrect for an event rich result, but the entry is not wrong.
+  # That failure is acceptable here.
+  # @param events [Array] The events, from #upcoming_races.
+  # @return [String, nil] The JSON-LD, or nil if there is nothing to list.
   def events_schema(events)
     entries = Array(events).filter_map { |event| event_schema(event) }
     return if entries.empty?
@@ -67,15 +69,15 @@ module EventHelpers
 
   private
 
-  # @return [Date] Today in the site's configured timezone, so "upcoming" flips at the same
-  #   instant for every reader — the same anchor the publish dates use.
+  # @return [Date] Today in the timezone of the site, thus "upcoming" changes at the same moment
+  #   for each reader. The publish dates use the same timezone.
   def event_today
     zone = site_time_zone
     zone.present? ? Time.now.in_time_zone(zone).to_date : Date.today
   end
 
   # @param event [Object] The event.
-  # @return [Hash, nil] One `SportsEvent` node, or nil without a parseable date.
+  # @return [Hash, nil] One `SportsEvent` node, or nil if the code cannot parse the date.
   def event_schema(event)
     date = parse_event_date(event)
     return if date.nil?
@@ -85,27 +87,28 @@ module EventHelpers
       "@type": "SportsEvent",
       "name": sanitize(event.title),
       "startDate": date.iso8601,
-      # The events are single-day races, and Google treats a missing eventStatus as unknown.
+      # Each event is a race on one day, and Google counts an absent eventStatus as unknown.
       "eventStatus": "https://schema.org/EventScheduled",
       "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode"
     }
     schema[:description] = sanitize(event.summary) if event.summary.present?
     if event.location.present?
-      # `address` as text, not a PostalAddress: Contentful holds the location as one free-text
-      # line ("Richland, Washington") with no structured parts to split it into. Google requires
-      # the field for an event rich result and accepts Text, so this is the most it can say.
+      # `address` is text, and not a PostalAddress. Contentful holds the location as one line of
+      # free text ("Richland, Washington") with no parts to divide it into. Google needs the field
+      # for an event rich result and accepts Text, thus this is all that the build can give.
       place = sanitize(event.location)
       schema[:location] = { "@type": "Place", "name": place, "address": place }
     end
     schema[:url] = event.url if event.url.present?
-    # The author is a competitor, not the organizer — `performer` is the only honest claim the
-    # build can make about this site's relationship to the race.
+    # The author is a competitor, and not the organizer. `performer` is the only correct statement
+    # that the build can make about the relation of this site to the race.
     schema[:performer] = { "@id": schema_entity_id("person", path: "/about") }
     schema
   end
 
-  # ⚠️ Contentful will hold an event with no date, and this runs on the home page's render path
-  # — a bare parse takes the whole page down over one bad entry instead of dropping a card.
+  # ⚠️ Contentful can hold an event with no date, and this code runs on the render path of the home
+  # page. A plain parse would stop the full page because of one bad entry, and not remove one
+  # card.
   # @param event [Object] The event.
   # @return [Date, nil]
   def parse_event_date(event)

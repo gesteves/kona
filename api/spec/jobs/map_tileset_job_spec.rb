@@ -40,7 +40,7 @@ RSpec.describe MapTilesetJob do
     expect(uploader).not_to have_received(:create_from_coordinates!)
   end
 
-  # A retry after a successful publish must not re-upload.
+  # A second attempt after a successful publish must not upload the data again.
   it "does nothing when the track is already published" do
     allow(library).to receive(:find).with("abc").and_return(record.merge("status" => "ready"))
 
@@ -58,8 +58,8 @@ RSpec.describe MapTilesetJob do
     expect(library).to have_received(:update).with("abc", hash_including("status" => "failed"))
   end
 
-  # ⚠️ It raises rather than recording a failure, so Sidekiq's retry applies. Marking it failed
-  # here would have the row flicker failed → processing → failed on every attempt.
+  # ⚠️ It raises and does not record a failure, thus Sidekiq does the job again. A mark of "failed"
+  # here would change the row from failed to processing to failed at each attempt.
   it "lets an upload error raise so the job retries" do
     allow(uploader).to receive(:create_from_coordinates!).and_raise("Mapbox failed to publish tileset")
 

@@ -1,12 +1,12 @@
-# Forces a Whoop token refresh on a schedule (see config/sidekiq.yml) so the rotating refresh
-# token keeps being exercised. Tokens are otherwise only refreshed on demand — by a /widgets/whoop
-# request that misses the edge cache, or by an inbound webhook — so a stretch with no traffic and
-# no workouts leaves the refresh token idle until Whoop expires it, recoverable only by a manual
-# re-auth at /whoop/auth.
+# Does a Whoop token refresh on a schedule (refer to config/sidekiq.yml), thus the app continues to
+# use the refresh token, which rotates. In all other conditions, a refresh occurs only when it is
+# necessary: a /widgets/whoop request that is not in the edge cache, or a webhook. Thus a period with
+# no traffic and no workout leaves the refresh token with no use until Whoop makes it expire, and
+# only a manual authorization at /whoop/auth then corrects that.
 #
-# ⚠️ A failed refresh is deliberately NOT re-raised. Whoop#refresh_access_token already logs it and
-# reports to Bugsnag, and the next tick is the retry — raising would spend the inherited 24-hour
-# window re-POSTing a token Whoop has already revoked.
+# ⚠️ A refresh that fails does NOT raise again, on purpose. Whoop#refresh_access_token already writes
+# it to the log and sends it to Bugsnag, and the next run of this job is the next attempt. A raise
+# would use the 24-hour window of the parent class to POST a token that Whoop already removed.
 class WhoopTokenRefreshJob < ApplicationJob
   def perform
     whoop = Whoop.new

@@ -1,18 +1,20 @@
 require "uri"
 
 module Api
-  # Receives contact-form submissions from the public site, through the web app's proxy, which
-  # injects the bearer. Answers by Accept: JSON callers get 204/422, HTML callers get a 303 to
-  # the site's Thank-You page. The spam check and email run in ContactMailJob so the request
-  # returns fast.
+  # Takes the contact-form submissions from the public site, through the proxy of the web app, which
+  # adds the bearer token. The Accept header decides the answer: a JSON caller gets a 204 or a 422,
+  # and an HTML caller gets a 303 to the Thank-You page of the site. The spam check and the email
+  # run in ContactMailJob, thus the request returns quickly.
   class ContactController < BaseController
-    # This is a cross-origin POST authenticated by the inherited bearer check, not a session.
+    # This is a cross-origin POST. The bearer check from the parent class authenticates it, and not
+    # a session.
     skip_forgery_protection
 
-    # A hidden field, invisible to humans and commonly filled by bots.
+    # A hidden field. A person cannot see it, and a bot often writes a value in it.
     HONEYPOT_FIELD = :comment
 
-    # Length caps, so nobody can post a novel or bloat the Akismet and Resend payloads.
+    # The maximum lengths, thus nobody can post a very long text or make the Akismet payload and
+    # the Resend payload large.
     MAX_NAME = 100
     MAX_EMAIL = 254 # RFC 5321 max
     MAX_MESSAGE = 5000
@@ -20,7 +22,8 @@ module Api
     def create
       no_store!
 
-      # A filled honeypot means a bot. Answer exactly like a success, so it gets no signal.
+      # A honeypot field with a value means a bot. Answer as for a success, thus the bot learns
+      # nothing.
       return respond_success if params[HONEYPOT_FIELD].present?
 
       name = params[:name].to_s.strip
@@ -29,8 +32,8 @@ module Api
 
       return respond_error unless valid?(name, email, message)
 
-      # Turnstile only guards the fetch path, since its widget needs JS. The no-JS path falls
-      # back to the honeypot, Akismet, and the rate limit.
+      # Turnstile protects the fetch path only, because its widget needs JavaScript. The path with
+      # no JavaScript uses the honeypot, Akismet, and the rate limit.
       return respond_error if request.format.json? && !turnstile_ok?
 
       ContactMailJob.perform_async(name, email, message, sender_context)
@@ -39,22 +42,24 @@ module Api
 
     private
 
-    # @return [Boolean] Whether the name, email, and message are present and in bounds.
+    # @return [Boolean] True if the name, the email address, and the message are available and are
+    #   not too long.
     def valid?(name, email, message)
       name.present? && name.length <= MAX_NAME &&
         message.present? && message.length <= MAX_MESSAGE &&
         email.length <= MAX_EMAIL && email.match?(URI::MailTo::EMAIL_REGEXP)
     end
 
-    # @return [Boolean] Whether the Turnstile token passes, or Turnstile is unconfigured.
+    # @return [Boolean] True if the Turnstile token is correct, or if there is no Turnstile
+    #   configuration.
     def turnstile_ok?
       Turnstile.new.verify(params[:"cf-turnstile-response"], remoteip: forwarded("X-Kona-Client-IP"))
     end
 
-    # The real visitor signal the web proxy forwards under custom headers, since the origin
-    # can't see it otherwise. Trusted only for Akismet and the email's Sender details, never for
-    # anything that bans.
-    # @return [Hash] A string-keyed, Sidekiq-serializable hash, with blanks dropped.
+    # The true visitor data that the web proxy sends in its own headers, because the origin cannot
+    # see it. The app uses it only for Akismet and for the Sender details of the email, and never for
+    # a ban.
+    # @return [Hash] A hash with string keys that Sidekiq can serialize. It has no blank value.
     def sender_context
       {
         "ip" => forwarded("X-Kona-Client-IP"),
@@ -65,7 +70,7 @@ module Api
       }.compact
     end
 
-    # @return [String, nil] A proxy-forwarded request header, or nil when blank or absent.
+    # @return [String, nil] A request header from the proxy, or nil if it is blank or absent.
     def forwarded(name)
       request.headers[name].presence
     end
@@ -82,8 +87,9 @@ module Api
       if request.format.json?
         render json: { error: "Please provide your name, a valid email address, and a message." }, status: :unprocessable_content
       else
-        # The no-JS path can't normally reach here, since the fields are `required`, so this
-        # just sends them back to the form rather than rendering a bespoke error page.
+        # The path with no JavaScript does not usually come here, because each field is `required`.
+        # Thus this code sends the visitor back to the form and does not render a separate error
+        # page.
         redirect_to "#{site_url}/contact", status: :see_other, allow_other_host: true
       end
     end

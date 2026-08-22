@@ -18,11 +18,11 @@
         </span>
       <% end %>
     </p>
-    <%# ⚠️ data-pagefind-body on the heading, not the whole page: it makes the archive findable
-        by name in site search as a hub, while leaving the entry list below unindexed. Indexing
-        the list would file every article's intro under its tag pages too, so one query would
-        return the same prose several times over. The heading is always present, so an archive
-        whose concept carries no description is still indexed. %>
+    <%# ⚠️ data-pagefind-body is on the heading, and not on the full page. Thus the site search can
+        find the archive by its name, and it does not index the list of entries below. With that
+        list in the index, the intro of each article would also go under each of its tag pages, and
+        one search would then give the same text more than one time. The heading is always there,
+        thus the search also finds an archive whose concept has no description. %>
     <h1 id="hed" class="blog__hed" data-pagefind-body data-pagefind-meta="title">
       <%= smartypants(content.title) %>
     </h1>

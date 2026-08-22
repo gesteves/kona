@@ -27,9 +27,9 @@ RSpec.describe AirQuality do
     expect(service.data.aqi).to eq(55)
   end
 
-  # ⚠️ The regression this class exists to prevent: the providers are isolated separately, because
-  # chaining them with `||=` alone let a PurpleAir *raise* propagate straight past the fallback —
-  # so the fallback never ran in the one case it was written for.
+  # ⚠️ This is the failure that the class prevents: the code separates each provider, because with
+  # `||=` alone, a *raise* from PurpleAir went past the second provider. Thus that second provider
+  # never ran in the one condition that it exists for.
   it "falls back to Google when PurpleAir raises" do
     allow(purple_air).to receive(:aqi).and_raise(StandardError, "purple air is down")
     allow(google).to receive(:aqi).and_return({ aqi: 55 })

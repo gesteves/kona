@@ -2,19 +2,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ContactController from '../../../source/javascripts/stimulus/controllers/contact_controller';
 import { flushDom, mount } from '../helpers';
 
-// The contact form is progressively enhanced: the markup is a real POST to /api/contact that works
-// with no JS at all (native submit → 303 to the Thank-You page). This controller intercepts the
-// submit and posts the same fields with `Accept: application/json`, so the api answers 204/422 and
-// the result is reported in a toast instead of a navigation.
+// The contact form has an enhancement layer. The markup is a true POST to /api/contact that works
+// with no JavaScript: a native submit, then a 303 to the Thank-You page. This controller takes the
+// submit and posts the same fields with `Accept: application/json`. The api then answers with a 204
+// or a 422, and a toast shows the result instead of a navigation.
 //
-// The encoding is the contract: both paths must send identical bodies, or the api would need two
-// code paths for one form.
+// The encoding is the contract: both paths must send the same body, or the api would need two code
+// paths for one form.
 
 const SITE_KEY = '0x000000000000000000';
 
-// The fields carry no default values on purpose: `form.reset()` restores DEFAULTS, so a test
-// asserting "the form was cleared" against markup with values baked in would pass no matter what
-// the controller did. `mountForm` types into them afterwards instead, like a visitor would.
+// The fields have no default values, on purpose. `form.reset()` puts the DEFAULTS back. Thus a test
+// for "the form is empty" against markup with values would pass for each action of the controller.
+// `mountForm` puts text into the fields after the mount, as a visitor does.
 const form = ({ siteKey = '', submitTarget = true } = {}) => `
   <form action="/api/contact" method="post" data-controller="contact"
         data-action="submit->contact#submit"
@@ -31,7 +31,7 @@ const form = ({ siteKey = '', submitTarget = true } = {}) => `
 let toast;
 let fetchMock;
 
-/** The last message handed to the <wa-toast> stack, with its variant. */
+/** The last message that the code gave to the <wa-toast> stack, with its variant. */
 const lastToast = () => {
   const call = toast.create.mock.calls.at(-1);
   return call && { message: call[0], variant: call[1].variant };
@@ -46,7 +46,7 @@ const mountForm = async (options) => {
   return mounted;
 };
 
-/** Resolves the memoized Turnstile loader the way the real script's onload callback does. */
+/** Resolves the stored Turnstile loader, as the onload callback of the true script does. */
 const resolveTurnstileScript = async () => {
   window.turnstile = {
     render: vi.fn().mockReturnValue('widget-1'),
@@ -78,13 +78,13 @@ describe('submitting', () => {
     await submitForm();
 
     const [url, options] = fetchMock.mock.calls[0];
-    // `form.action` resolves against the document, which is what makes this same-origin and so
-    // routed through the Worker proxy rather than straight at the api origin.
+    // `form.action` resolves against the document, and that is what makes this URL same-origin.
+    // Thus the request goes through the Worker proxy, and not directly to the api origin.
     expect(url).toBe('http://localhost:3000/api/contact');
     expect(options.method).toBe('POST');
     expect(options.headers).toEqual({ Accept: 'application/json' });
-    // Same encoding as the native no-JS POST — including the empty `comment` honeypot, which the
-    // api needs to see in order to decide the submission is human.
+    // This uses the same encoding as the native POST with no JavaScript. It includes the empty
+    // `comment` honeypot field, which the api needs to decide that a person sent the message.
     expect(Object.fromEntries(options.body)).toEqual({
       name: 'Ada',
       email: 'ada@example.com',
@@ -116,10 +116,10 @@ describe('submitting', () => {
   });
 
   it('reports a rejected submission without clearing what was typed', async () => {
-    // A 422 means the message wasn't sent. Wiping the form would throw away prose the visitor
-    // would have to retype. It also surfaces the API's own message: "something went wrong,
-    // please try again" would be wrong (nothing went wrong) and unactionable (an identical
-    // retry fails identically).
+    // A 422 means that the message did not go out. An empty form would remove text that the
+    // visitor would type again. The code also shows the message from the API: "something went
+    // wrong, please try again" would be incorrect, because nothing went wrong, and the visitor
+    // could do nothing with it, because the same input fails in the same way.
     const apiMessage =
       'Please provide your name, a valid email address, and a message.';
     fetchMock.mockResolvedValue({
@@ -233,8 +233,9 @@ describe('submitting', () => {
 
 describe('Turnstile', () => {
   it('loads nothing when no sitekey is configured', async () => {
-    // The sitekey is optional (TURNSTILE_SITE_KEY); with none, the api's check fails open and the
-    // other defenses — honeypot, Akismet, length caps, rate limit — carry the form.
+    // The sitekey (TURNSTILE_SITE_KEY) is optional. With no sitekey, the check of the api permits
+    // the message, and the other protections do the work: the honeypot, Akismet, the length
+    // limits, and the rate limit.
     await mountForm();
 
     expect(document.querySelector('script[src*="turnstile"]')).toBeNull();
@@ -244,8 +245,8 @@ describe('Turnstile', () => {
     await mountForm({ siteKey: SITE_KEY });
 
     const script = document.querySelector('script[src*="turnstile"]');
-    // Explicit render, driven from connect/disconnect, is what makes the widget survive Turbo
-    // navigation — an auto-scan would only run once, on first page load.
+    // The explicit render, which connect and disconnect control, is what keeps the widget through a
+    // Turbo navigation. An automatic scan would run one time only, at the first page load.
     expect(script.src).toContain('render=explicit');
     expect(script.src).toContain('onload=__konaTurnstileOnload');
     expect(script.async).toBe(true);
@@ -263,7 +264,8 @@ describe('Turnstile', () => {
   });
 
   it('loads the script only once, however many instances connect', async () => {
-    // Memoized on `window`, so a Turbo navigation back to the contact page reuses it.
+    // The code keeps this on `window`, thus a Turbo navigation back to the contact page uses it
+    // again.
     await mountForm({ siteKey: SITE_KEY });
     await resolveTurnstileScript();
     const first = window.__konaTurnstileLoad;
@@ -279,7 +281,7 @@ describe('Turnstile', () => {
   it('sends the token with the submission', async () => {
     await mountForm({ siteKey: SITE_KEY });
     await resolveTurnstileScript();
-    // Explicit render means the token arrives by callback, not in a hidden field.
+    // With the explicit render, the token comes from a callback, and not from a hidden field.
     window.turnstile.render.mock.calls[0][1].callback('token-abc');
 
     await submitForm();
@@ -300,8 +302,8 @@ describe('Turnstile', () => {
 
     await submitForm();
 
-    // Tokens are single-use and expire after 300s; sending a spent one would just fail the
-    // server-side check.
+    // A token works one time and it expires after 300s. A token that the code already used would
+    // fail the check on the server.
     expect(fetchMock.mock.calls[0][1].body.has('cf-turnstile-response')).toBe(
       false
     );
@@ -339,7 +341,7 @@ describe('Turnstile', () => {
   });
 
   it('logs and carries on when the script fails to load', async () => {
-    // The form still works — this is the enhancement layer, not the gate.
+    // The form still works. This is the enhancement layer, and not the control.
     const consoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});

@@ -1,34 +1,35 @@
-# Shared behavior for the live-updating widget endpoints embedded in the static site: public
-# HTTP caching headers, and the empty-body "no data" response that collapses a widget.
+# The shared behavior of the live-update widget endpoints in the static site: the public HTTP cache
+# headers, and the response with an empty body that means "no data" and removes a widget.
 module LiveWidget
   extend ActiveSupport::Concern
 
-  # How long the edge may serve a stale fragment while revalidating. Kept short by default —
-  # this is a low-traffic site, so a long window mostly means serving badly stale data rather
-  # than smoothing load. Widgets whose data barely changes override it up to a day.
+  # The time that the edge can serve an old fragment while it gets a new one. The default is short,
+  # because this site has low traffic. Thus a long window gives very old data and does not make the
+  # load smooth. A widget whose data changes very little uses a longer time, up to one day.
   DEFAULT_EDGE_STALE_WHILE_REVALIDATE = 1.hour
-  # How long the edge may serve a stale fragment when the origin 5xxes. Together with
-  # stale-while-revalidate, this is what keeps widgets rendering through a fly outage.
+  # The time that the edge can serve an old fragment when the origin gives a 5xx. With
+  # stale-while-revalidate, this is what keeps the widgets on the page through a fly failure.
   EDGE_STALE_IF_ERROR = 1.day
 
   private
 
-  # Sets an embedded fragment's caching policy, decoupling browser freshness from edge
-  # freshness: the browser is told the fragment is immediately stale but may serve its cached
-  # copy while revalidating against the cheap edge, and the edge keeps it fresh for `ttl`.
+  # Sets the cache policy of a fragment in a page. It separates the freshness in the browser from
+  # the freshness at the edge: the fragment is old for the browser immediately, but the browser can
+  # show its cached copy while it gets a new one from the edge, which is fast. The edge keeps the
+  # fragment fresh for `ttl`.
   #
-  # Never express the edge policy as `s-maxage`: its presence disables both
-  # stale-while-revalidate and stale-if-error (RFC 9111 §4.2.4), which is the resilience these
-  # directives exist to provide.
-  # @param ttl [ActiveSupport::Duration] How long the fragment stays fresh at the edge.
-  # @param stale_while_revalidate [ActiveSupport::Duration] The browser's revalidation grace
-  #   window.
-  # @param edge_stale_while_revalidate [ActiveSupport::Duration] The edge's stale-serving window.
+  # Never write the edge policy as `s-maxage`. That directive stops both stale-while-revalidate and
+  # stale-if-error (RFC 9111 §4.2.4), and those two give the protection that this method needs.
+  # @param ttl [ActiveSupport::Duration] The time that the fragment stays fresh at the edge.
+  # @param stale_while_revalidate [ActiveSupport::Duration] The extra time for the browser to get a
+  #   new copy.
+  # @param edge_stale_while_revalidate [ActiveSupport::Duration] The time that the edge can serve an
+  #   old copy.
   def cache_widget(ttl:, stale_while_revalidate: ttl, edge_stale_while_revalidate: DEFAULT_EDGE_STALE_WHILE_REVALIDATE)
-    # max-age=0, not no-cache, so stale-while-revalidate still applies in the browser.
+    # Use max-age=0, and not no-cache, thus stale-while-revalidate still applies in the browser.
     expires_in 0, public: true, stale_while_revalidate: stale_while_revalidate
-    # CDN-Cache-Control (RFC 9213) is honored by Cloudflare and ignored by browsers, which is
-    # what lets the edge TTL differ from the browser's max-age=0 above.
+    # Cloudflare obeys CDN-Cache-Control (RFC 9213) and a browser ignores it. That is what lets the
+    # edge TTL be different from the max-age=0 of the browser above.
     edge_policy =
       "max-age=#{ttl.to_i}, " \
       "stale-while-revalidate=#{edge_stale_while_revalidate.to_i}, " \
@@ -36,25 +37,26 @@ module LiveWidget
     response.headers["CDN-Cache-Control"] = "public, #{edge_policy}"
   end
 
-  # How long an empty "no data" response stays cached. Short, so a momentary origin blip
-  # doesn't pin an empty widget for the full data TTL, but not zero, so a sustained outage
-  # doesn't hammer the single origin machine.
+  # The time that the cache keeps an empty "no data" response. It is short, thus a short problem at
+  # the origin does not keep an empty widget for the full data TTL. It is not zero, thus a long
+  # failure does not send many requests to the one origin machine.
   EMPTY_TTL = 1.minute
 
-  # Renders the empty body that signals "no data", which makes the live-update controller
-  # remove the placeholder and collapse the widget.
+  # Renders the empty body that means "no data". The live-update controller then removes the
+  # placeholder and the widget goes away.
   def render_empty
     response.headers["CDN-Cache-Control"] = "public, max-age=#{EMPTY_TTL.to_i}"
     render plain: ""
   end
 
-  # Runs the standard widget-action shape: set the cache policy, fetch the data, and render the
-  # view — or the empty "no data" body when the block's result is blank. Actions with several
-  # ivars and bail points keep the explicit cache_widget/render_empty calls instead.
-  # @param view [Symbol] The view to render on success.
-  # @param ttl [ActiveSupport::Duration] How long the fragment stays fresh at the edge.
-  # @param cache_opts [Hash] Passed through to cache_widget.
-  # @yieldreturn [Object] The widget's data; a blank result collapses the widget.
+  # Does the standard steps of a widget action: it sets the cache policy, gets the data, and
+  # renders the view. If the result of the block is blank, it renders the empty "no data" body. An
+  # action with more than one instance variable and more than one exit keeps its own cache_widget
+  # and render_empty calls.
+  # @param view [Symbol] The view to render on a success.
+  # @param ttl [ActiveSupport::Duration] The time that the fragment stays fresh at the edge.
+  # @param cache_opts [Hash] The options that go to cache_widget.
+  # @yieldreturn [Object] The data of the widget. A blank result removes the widget.
   def render_widget(view, ttl:, **cache_opts)
     cache_widget(ttl: ttl, **cache_opts)
     return render_empty if yield.blank?

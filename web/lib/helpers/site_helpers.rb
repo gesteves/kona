@@ -1,24 +1,24 @@
 require "sanitize"
 
 module SiteHelpers
-  # The public Cloudflare Turnstile sitekey for the contact form. Blank when unset, in which
-  # case the widget isn't rendered and the api skips verification.
+  # The public Cloudflare Turnstile sitekey for the contact form. It is blank if no one sets it.
+  # The site then does not render the widget and the api does not do the check.
   # @return [String, nil]
   def turnstile_site_key
     ENV["TURNSTILE_SITE_KEY"]
   end
 
-  # The IANA timezone the site's dates are reckoned in — the owner's location, so "published
-  # today", the clock-vs-calendar icon and the "New" badge flip at the same instant for every
-  # reader instead of in each reader's own zone.
-  # @return [String, nil] Blank when unset, which leaves the publish-date controller on the
-  #   reader's browser timezone.
+  # The IANA timezone for the dates of the site. It is the location of the owner. Thus "published
+  # today", the clock or calendar icon, and the "New" badge change at the same moment for each
+  # reader, and not in the zone of each reader.
+  # @return [String, nil] Blank if no one sets it. The publish-date controller then uses the
+  #   browser timezone of the reader.
   def site_time_zone
     ENV["TIME_ZONE"].presence
   end
 
-  # Generates an Atom-compliant tag URI from a URL and date.
-  # @param url [String] The URL to be converted.
+  # Makes an Atom tag URI from a URL and a date.
+  # @param url [String] The URL to change.
   # @param date [Date, Time] The date for the tag.
   # @return [String] The Atom tag URI.
   def atom_tag(url, date)
@@ -27,11 +27,11 @@ module SiteHelpers
     tag.join("/")
   end
 
-  # Builds the page title.
-  # @param content [Hash, String] A content object (uses its :title) or a literal title string.
-  # @param include_site_name [Boolean] Whether to append the site's title.
-  # @param separator [String] Separator between title segments.
-  # @return [String] The sanitized title.
+  # Makes the page title.
+  # @param content [Hash, String] A content object (this uses its :title) or a title string.
+  # @param include_site_name [Boolean] True to add the title of the site at the end.
+  # @param separator [String] The separator between the title parts.
+  # @return [String] The title, after the app removes unsafe markup.
   def page_title(content, include_site_name: false, separator: " · ")
     title = []
     if content.is_a?(Hash) && !content.is_home_page
@@ -47,64 +47,65 @@ module SiteHelpers
   end
 
   # @param content [Hash, String] A content object or a literal title string.
-  # @return [String] A <title> tag containing the page title and the site name.
+  # @return [String] A <title> tag that contains the page title and the site name.
   def title_tag(content)
     content_tag :title do
       page_title(content, include_site_name: true)
     end
   end
 
-  # Renders a runtime widget's placeholder partial, wired to the endpoint the live-update
-  # controller fetches on connect.
-  # Don't pair these with <link rel="preload" as="fetch">: widget fragments are served
-  # `max-age=0` with no validator, so a preloaded copy is stale on arrival and the controller's
-  # fetch issues a second full request rather than reusing it.
-  # @param name [String] The partial's basename under partials/placeholders/.
-  # @param url [String] The same-origin widget endpoint, passed to the partial as `url`.
+  # Renders the placeholder partial of a runtime widget. The partial points at the endpoint that
+  # the live-update controller gets on connect.
+  # Do not use <link rel="preload" as="fetch"> with these. The app serves widget fragments with
+  # `max-age=0` and no validator. Thus a preloaded copy is already old when it arrives, and the
+  # controller makes a second full request instead of a re-use of that copy.
+  # @param name [String] The base name of the partial in partials/placeholders/.
+  # @param url [String] The same-origin widget endpoint. It goes to the partial as `url`.
   # @return [String] The rendered placeholder.
   def render_widget(name, url)
     partial "partials/placeholders/#{name}", locals: { url: url }
   end
 
-  # The proxied `content` object for the current page, read from page metadata since helpers
-  # can't see template locals.
+  # The proxied `content` object for the current page. It comes from the page metadata, because
+  # a helper cannot read the template locals.
   # @return [Object, nil]
   def page_content
     locals = current_page.metadata[:locals]
     locals && locals[:content]
   end
 
-  # The object driving the page's <title> and og:title: the proxied content object, else the
-  # frontmatter title.
+  # The object that supplies the <title> and og:title of the page: the proxied content object,
+  # or the frontmatter title.
   # @return [Object, String, nil]
   def meta_title_source
     page_content || current_page.data.title.presence
   end
 
-  # The page's meta/og description: the content summary, else the frontmatter summary.
+  # The meta and og description of the page: the content summary, or the frontmatter summary.
   # @return [String, nil]
   def meta_description
     return content_summary(page_content) if page_content
     current_page.data.summary.presence
   end
 
-  # The attributes a live-update element's outer tag carries. Interpolate inside its opening tag.
-  # The api fragment that replaces it repeats all of these except the placeholder flag — see the
-  # web↔api contract in the root CLAUDE.md.
+  # The attributes for the outer tag of a live-update element. Put them in its opening tag. The
+  # api fragment that replaces the element has all of these but the placeholder flag. Refer to
+  # the web↔api contract in the root CLAUDE.md.
   # @param url [String] The same-origin widget endpoint.
-  # @param placeholder [Boolean] Whether this element is an empty skeleton with no real content.
-  # @return [String] HTML attributes.
+  # @param placeholder [Boolean] True if this element is an empty skeleton with no real content.
+  # @return [String] The HTML attributes.
   def live_update_attrs(url, placeholder: true)
-    # url is always an app-generated same-origin path, never user input, so it needs no escaping.
-    # aria-busy marks the skeleton as still loading; the api fragment that replaces it omits it,
-    # the same way it omits the placeholder flag, so the swap reads as "finished" to a screen
-    # reader instead of silently exchanging one nameless region for another.
+    # The app always makes url as a same-origin path. It is never user input, thus it needs no
+    # escape. aria-busy shows that the skeleton still loads. The api fragment that replaces it
+    # does not have aria-busy, as it does not have the placeholder flag. Thus a screen reader
+    # reads the change as "finished", and not as one nameless area in place of another.
     #
-    # ⚠️ `placeholder: false` is for an element rendered with REAL content at build time. The
-    # flag means "I am an empty skeleton": it makes the controller collapse the element when a
-    # fetch fails, which on real content deletes it. Such an element still fetches on connect —
-    # a never-fetched URL counts as stale — so dropping the flag costs no freshness. An empty
-    # response still removes it, which is the api's authoritative "no data".
+    # ⚠️ Use `placeholder: false` for an element that the build renders with REAL content. The
+    # flag means "I am an empty skeleton". It makes the controller remove the element when a
+    # fetch fails, and on real content that deletes the content. Such an element still fetches on
+    # connect, because a URL with no fetch counts as old. Thus the removal of the flag costs no
+    # freshness. An empty response still removes the element, which is the "no data" answer from
+    # the api.
     attrs = %(data-controller="live-update" data-live-update-url-value="#{url}")
     attrs += %( data-live-update-placeholder-value="true" aria-busy="true") if placeholder
     attrs += %( data-action="visibilitychange@document->live-update#handleVisibilityChange")
@@ -112,7 +113,8 @@ module SiteHelpers
   end
 
   # @param content [Object] A content object.
-  # @return [String] Its summary, intro, or the site's meta description, whichever exists first.
+  # @return [String] The summary, the intro, or the meta description of the site — the first one
+  #   that exists.
   def content_summary(content)
     summary = if content.summary.present?
       content.summary
@@ -126,7 +128,7 @@ module SiteHelpers
     sanitize(summary)
   end
 
-  # @return [DateTime] The most recent publish time across pages, articles, and the site entry.
+  # @return [DateTime] The latest publish time of the pages, the articles, and the site entry.
   def site_updated_at
     [
       indexable_pages.map { |p| DateTime.parse(p.sys.published_at) },
@@ -135,8 +137,8 @@ module SiteHelpers
     ].flatten.max
   end
 
-  # The year of the earliest non-draft article, memoized since it renders in every page's footer
-  # and each computation parses every article's publish date.
+  # The year of the first non-draft article. The app keeps the value, because it renders in the
+  # footer of each page and each calculation parses the publish date of each article.
   # @return [String] A four-digit year.
   def copyright_start_year
     memoize_by_collection(:copyright_start_year, data.articles) do
@@ -145,14 +147,14 @@ module SiteHelpers
     end
   end
 
-  # @return [String] The copyright year range, e.g. "2006–2024".
+  # @return [String] The range of copyright years, for example "2006–2024".
   def copyright_years
     "#{copyright_start_year}–#{Time.current.year}"
   end
 
-  # The Atom feeds to advertise in <head>: the main site feed, plus the tag's feed on an archive
-  # page or every one of the article's tags' feeds on a post.
-  # @return [Array<Hash>] Entries of { href:, title: }.
+  # The Atom feeds for the <head>: the main site feed, and also the feed of the tag on an archive
+  # page, or the feed of each tag of the article on a post.
+  # @return [Array<Hash>] Items of { href:, title: }.
   def alternate_feed_links
     links = [ { href: full_url("/feed.xml"), title: sanitize(data.site.meta_title) } ]
     pc = page_content
@@ -172,32 +174,32 @@ module SiteHelpers
     links
   end
 
-  # @return [String] The feed title, taken from the site's meta title.
+  # @return [String] The feed title, from the meta title of the site.
   def feed_title
     data.site.meta_title.split(":", 2).first.strip
   end
 
-  # @return [String, nil] The feed subtitle, or nil when the meta title has no second half.
+  # @return [String, nil] The feed subtitle, or nil if the meta title has no second part.
   def feed_subtitle
     subtitle = data.site.meta_title.split(":", 2).last.strip
     return if subtitle == feed_title
     subtitle
   end
 
-  # Attributes that make a feed link copy its URL to the clipboard instead of navigating. Also
-  # used by MarkupHelpers#copy_feed_links for feed links inside rendered bodies.
+  # The attributes that make a feed link copy its URL to the clipboard instead of navigation.
+  # MarkupHelpers#copy_feed_links also uses them for feed links in rendered bodies.
   FEED_CLIPBOARD_ATTRS = {
     "data-controller": "clipboard",
     "data-action": "click->clipboard#copy",
     "data-clipboard-success-message-value": "The link to the feed has been copied to your clipboard."
   }.freeze
 
-  # Builds a social media link. A "Feed" link copies its URL instead of navigating.
-  # @param title [String] The platform's name.
+  # Makes a social media link. A "Feed" link copies its URL instead of navigation.
+  # @param title [String] The name of the platform.
   # @param destination [String] The profile URL.
   # @param css_class [String] A CSS class for the link.
-  # @param open_in_new_tab [Boolean] Whether to open the link in a new tab.
-  # @return [String] An anchor element wrapping an SVG icon.
+  # @param open_in_new_tab [Boolean] True to open the link in a new tab.
+  # @return [String] An anchor element that contains an SVG icon.
   def social_media_link(title:, destination:, css_class: nil, open_in_new_tab: true)
     icon = if title.downcase == "feed"
       icon_svg("classic", "solid", "rss")
@@ -229,8 +231,8 @@ module SiteHelpers
     end
   end
 
-  # Builds a nav/footer link for a site shortcut. A "Feed" item copies its link instead of
-  # navigating.
+  # Makes a nav or footer link for a site shortcut. A "Feed" item copies its link instead of
+  # navigation.
   # @param item [Object] A menu item with title, destination, and open_in_new_tab.
   # @return [String] An anchor element.
   def shortcut_link(item)
@@ -243,47 +245,47 @@ module SiteHelpers
     end
   end
 
-  # Builds the footer copyright line. The end year is wrapped for the current-year Stimulus
-  # controller to refresh client-side, so it stays correct without a rebuild.
+  # Makes the copyright line in the footer. The last year is in an element that the current-year
+  # Stimulus controller updates in the browser. Thus it stays correct with no new build.
   # @return [String] HTML.
   def footer_text
     years = "#{copyright_start_year}–<span data-controller=\"current-year\">#{Time.current.year}</span>"
     markdown_to_html("© #{years} #{data.site.copyright}")
   end
 
-  # First-party proxy paths for Plausible analytics. Must match the constants in
-  # src/plausible.ts, which does the proxying.
+  # The first-party proxy paths for Plausible analytics. They must agree with the constants in
+  # src/plausible.ts, which does the proxy work.
   PLAUSIBLE_SCRIPT_PATH = "/pa/script.js"
   PLAUSIBLE_EVENT_PATH = "/pa/event"
 
-  # @return [String] The first-party path the Plausible script is proxied from.
+  # @return [String] The first-party path that supplies the Plausible script.
   def plausible_script_path
     PLAUSIBLE_SCRIPT_PATH
   end
 
-  # @return [String] The first-party path Plausible events are posted to.
+  # @return [String] The first-party path that receives the Plausible events.
   def plausible_event_path
     PLAUSIBLE_EVENT_PATH
   end
 
-  # Whether analytics is configured. Gates the analytics script tag; the Worker checks its own
-  # copy of the variable before serving /pa/*.
-  # @return [Boolean] True when PLAUSIBLE_SCRIPT_URL is set.
+  # Tells if the analytics configuration exists. It controls the analytics script tag. The Worker
+  # reads its own copy of the variable before it serves /pa/*.
+  # @return [Boolean] True if PLAUSIBLE_SCRIPT_URL has a value.
   def plausible_installed?
     ENV["PLAUSIBLE_SCRIPT_URL"].present?
   end
 
-  # Builds a stable URL-based @id for a sitewide schema.org entity, so other nodes can reference
-  # it rather than duplicating it.
-  # @param fragment [String] The fragment naming the entity, e.g. "organization".
-  # @param path [String] The page the entity is anchored to.
+  # Makes a stable URL @id for a sitewide schema.org entity. Thus other nodes can refer to it and
+  # do not repeat it.
+  # @param fragment [String] The fragment that names the entity, for example "organization".
+  # @param path [String] The page that holds the entity.
   # @return [String] An absolute URL with a fragment.
   def schema_entity_id(fragment, path: "/")
     "#{full_url(path)}##{fragment}"
   end
 
-  # Builds the JSON-LD CollectionPage schema for a taxonomy archive page, with the listed
-  # entries as its mainEntity ItemList.
+  # Makes the JSON-LD CollectionPage schema for a taxonomy archive page. The entries in the list
+  # are its mainEntity ItemList.
   # @param content [Object] The proxied tag-page object.
   # @see https://schema.org/CollectionPage
   # @return [String] JSON-LD.
@@ -313,14 +315,14 @@ module SiteHelpers
     schema.to_json
   end
 
-  # Builds a JSON-LD ImageObject node.
+  # Makes a JSON-LD ImageObject node.
   # @return [Hash]
   def image_object(url, width, height)
     { "@type": "ImageObject", "url": url, "width": width, "height": height }
   end
 
-  # Builds a JSON-LD BreadcrumbList of Home › Blog › the given crumbs.
-  # @param crumbs [Array<Array(String, String)>] [name, url] pairs appended after Home › Blog.
+  # Makes a JSON-LD BreadcrumbList: Home › Blog › the given crumbs.
+  # @param crumbs [Array<Array(String, String)>] The [name, url] pairs that go after Home › Blog.
   # @see https://schema.org/BreadcrumbList
   # @return [String] JSON-LD.
   def breadcrumb_list_schema(crumbs)
@@ -330,10 +332,10 @@ module SiteHelpers
     { "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": items }.to_json
   end
 
-  # Builds the JSON-LD BreadcrumbList for a taxonomy archive page: Home › Blog › the concept's
-  # ancestor chain, ending at the concept itself.
-  # @param content [Object] The proxied tag-page object, carrying `tag_id`.
-  # @return [String, nil] JSON-LD, or nil when the page has no concept.
+  # Makes the JSON-LD BreadcrumbList for a taxonomy archive page: Home › Blog › the chain of
+  # parents of the concept, and then the concept.
+  # @param content [Object] The proxied tag-page object, which holds `tag_id`.
+  # @return [String, nil] The JSON-LD, or nil if the page has no concept.
   def tag_breadcrumb_schema(content)
     return unless content.tag_id
     chain = concept_chain(content.tag_id)
@@ -342,7 +344,7 @@ module SiteHelpers
     breadcrumb_list_schema(chain.map { |node| [ sanitize(node[:name]), full_url(node[:path]) ] })
   end
 
-  # Builds the JSON-LD Blog schema for the blog index, listing this page's entries as blogPost
+  # Makes the JSON-LD Blog schema for the blog index. The entries of this page are blogPost
   # references.
   # @param content [Object] The proxied blog-index page object.
   # @see https://schema.org/Blog
@@ -369,9 +371,10 @@ module SiteHelpers
     }.to_json
   end
 
-  # Builds redirects from each concept's synonyms to its canonical archive page. Skips a synonym
-  # whose slug is blank, collides with a real tag page, or duplicates another redirect.
-  # @return [Array<Hash>] Entries of { from:, to:, status: }.
+  # Makes a redirect from each synonym of a concept to its canonical archive page. It ignores a
+  # synonym with a blank slug, a synonym that is the same as a real tag page, and a synonym that
+  # is the same as another redirect.
+  # @return [Array<Hash>] Items of { from:, to:, status: }.
   def taxonomy_synonym_redirects
     page_paths = data.tags.map { |t| t.tag.path }.to_set
     taken = data.redirects.map(&:from).to_set
@@ -389,20 +392,21 @@ module SiteHelpers
   end
 
   # @param from [String] A redirect source.
-  # @return [Boolean] Whether Cloudflare counts the rule as "dynamic" — i.e. the source carries
+  # @return [Boolean] True if Cloudflare counts the rule as "dynamic", that is, the source has
   #   a splat or a :placeholder.
   def dynamic_redirect_source?(from)
     from.include?("*") || from.match?(/:[A-Za-z]/)
   end
 
-  # Every redirect rule, split into the order source/redirects.erb must emit them in.
+  # All the redirect rules, in the order that source/redirects.erb must write them.
   #
-  # ⚠️ RULE ORDER IS LOAD-BEARING. Cloudflare's parser allows 2,000 "static" rules but only 100
-  # "dynamic" ones, and it *latches*: at the first dynamic rule, every subsequent rule — exact
-  # matches included — is counted as dynamic too. Emit statics first or the deploy fails with a
-  # bare `code: 100324` once the file passes ~100 lines. Static-first is also the correct match
-  # precedence. Extracted from the template so it can be tested; see the root/web CLAUDE.md.
-  # @return [Array(Array<Hash>, Array<Hash>)] The static rules, then the dynamic ones.
+  # ⚠️ THE ORDER OF THE RULES IS IMPORTANT. The Cloudflare parser permits 2,000 "static" rules but
+  # only 100 "dynamic" rules. It also *latches*: at the first dynamic rule, each subsequent rule
+  # counts as dynamic, exact matches included. Write the static rules first, or the deploy fails
+  # with only `code: 100324` when the file becomes longer than approximately 100 lines. The static
+  # rules first is also the correct match order. This code is outside the template, thus you can
+  # test it. Refer to the root and web CLAUDE.md.
+  # @return [Array(Array<Hash>, Array<Hash>)] The static rules, then the dynamic rules.
   def partitioned_redirects
     rules =
       [
@@ -412,21 +416,22 @@ module SiteHelpers
       taxonomy_synonym_redirects.map { |r| { from: r[:from], to: r[:to], status: r[:status] } } +
       data.redirects.map { |r| { from: r.from, to: r.to, status: r.status } }
 
-    # ⚠️ Cloudflare's _redirects only accepts RELATIVE sources — an absolute-URL `from` is a hard
-    # deploy failure (code 100324). Redirects are authored in Contentful, so this stands between a
-    # mis-entered rule and a broken deploy; cross-domain redirects belong in a zone Bulk Redirect.
+    # ⚠️ The Cloudflare _redirects file accepts only RELATIVE sources. A `from` with an absolute
+    # URL causes a deploy failure (code 100324). The redirects come from Contentful, thus this
+    # check is between an incorrect rule and a broken deploy. Put a cross-domain redirect in a
+    # zone Bulk Redirect.
     rules.reject! { |r| r[:from].match?(%r{\Ahttps?://}) }
-    # ⚠️ Same for 200-status proxy rewrites pointing at an absolute URL. Nothing emits one today
-    # (the /pa/* proxy is the Worker's job now), but the same authoring path could.
+    # ⚠️ The same is true for a 200-status proxy rewrite to an absolute URL. Nothing writes one
+    # today, because the Worker does the /pa/* proxy, but the same path could write one.
     rules.reject! { |r| r[:status].to_i == 200 && r[:to].to_s.match?(%r{\Ahttps?://}) }
 
     rules.partition { |r| !dynamic_redirect_source?(r[:from]) }
   end
 
-  # The author's areas of expertise for schema.org `knowsAbout`: the top-level concepts of the
-  # `sports` scheme. Content-type and meta topics are excluded — they aren't subjects of
-  # expertise.
-  # @return [Array<String>] Sorted discipline names.
+  # The subjects that the author knows, for schema.org `knowsAbout`: the top-level concepts of
+  # the `sports` scheme. This does not include the content-type topics and the meta topics,
+  # because they are not subjects of knowledge.
+  # @return [Array<String>] The discipline names, in order.
   def author_knows_about
     Array(data.tags)
       .map(&:tag)
@@ -436,8 +441,8 @@ module SiteHelpers
       .sort
   end
 
-  # The author's social-profile URLs for schema.org `sameAs`. The feed is excluded — it isn't a
-  # social profile.
+  # The social-profile URLs of the author, for schema.org `sameAs`. This does not include the
+  # feed, because a feed is not a social profile.
   # @return [Array<String>] Profile URLs.
   def author_same_as
     return [] if data.site.socials_collection.items.blank?
@@ -446,8 +451,8 @@ module SiteHelpers
       .map { |s| s.destination }
   end
 
-  # Builds the JSON-LD @graph of the site's sitewide entities — Organization, WebSite, and the
-  # author Person — connected by @id. Per-article schema references these rather than repeating
+  # Makes the JSON-LD @graph of the sitewide entities: Organization, WebSite, and the author
+  # Person. @id connects them. The schema of each article refers to them and does not repeat
   # them.
   # @see https://developers.google.com/search/docs/appearance/structured-data/organization
   # @return [String] JSON-LD.
@@ -493,8 +498,8 @@ module SiteHelpers
     }.to_json
   end
 
-  # Builds the JSON-LD ProfilePage schema marking the about page as the canonical page about the
-  # author Person.
+  # Makes the JSON-LD ProfilePage schema. It marks the about page as the canonical page about
+  # the author Person.
   # @see https://developers.google.com/search/docs/appearance/structured-data/profile-page
   # @return [String] JSON-LD.
   def profile_page_schema

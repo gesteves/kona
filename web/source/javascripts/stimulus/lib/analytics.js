@@ -1,7 +1,7 @@
 /**
- * Sends a call to Plausible if it's available, so tracking is a no-op when the script isn't
- * injected (e.g. in development) instead of a ReferenceError.
- * @param {...*} args - Arguments forwarded to `window.plausible`.
+ * Calls Plausible if it is available. Thus the tracking does nothing when the page has no such
+ * script, for example in development, and it does not raise a ReferenceError.
+ * @param {...*} args - The arguments that go to `window.plausible`.
  */
 function track(...args) {
   if (typeof window.plausible !== 'function') return;
@@ -9,8 +9,8 @@ function track(...args) {
 }
 
 /**
- * Tracks a page view, then strips tracking params from the URL.
- * @param {Object} additionalProps - Optional additional properties to include with the pageview.
+ * Records a page view, then removes the tracking parameters from the URL.
+ * @param {Object} additionalProps - More properties for the page view. They are optional.
  */
 export function trackPageView(additionalProps = {}) {
   const currentUrl = new URL(window.location.href);
@@ -30,20 +30,20 @@ export function trackPageView(additionalProps = {}) {
 }
 
 /**
- * Tracks an event.
- * @param {string} event - The event name to be tracked.
- * @param {Object} props - Additional properties to send with the event.
+ * Records an event.
+ * @param {string} event - The name of the event.
+ * @param {Object} props - More properties to send with the event.
  */
 export function trackEvent(event, props = {}) {
   track(event, { props });
 }
 
 /**
- * Tracks an event, then runs a callback exactly once — even if the event can't be sent. Use
- * this when the callback navigates away, which would otherwise cancel the in-flight request.
- * @param {string} event - The event name to be tracked.
- * @param {Object} props - Additional properties to send with the event.
- * @param {Function} done - Callback to run once the event is sent (or times out).
+ * Records an event, then calls a function one time only, and it calls that function even if the
+ * event does not go out. Use this when the function navigates away, which would stop the request.
+ * @param {string} event - The name of the event.
+ * @param {Object} props - More properties to send with the event.
+ * @param {Function} done - The function to call after the event goes out, or after the timeout.
  */
 export function trackEventThen(event, props, done) {
   let ran = false;
@@ -56,17 +56,17 @@ export function trackEventThen(event, props, done) {
   if (typeof window.plausible !== 'function') return go();
 
   track(event, { props, callback: go });
-  // Fallback so navigation isn't blocked if the callback never fires.
+  // This lets the navigation continue if the function never runs.
   setTimeout(go, 150);
 }
 
 let searchTrackingReady = false;
 
 /**
- * Subscribes to the Pagefind modal's shared search instance and forwards each settled query to
- * Plausible as a `Search` event. Subscribes at most once across all callers and navigations;
- * no-ops without setting the flag until the Pagefind Component UI has loaded, so a later call
- * can retry.
+ * Reads the shared search instance of the Pagefind modal and sends each complete query to
+ * Plausible as a `Search` event. It does this one time for all the callers and all the
+ * navigations. It does nothing, and it does not set the flag, until the Pagefind Component UI
+ * loads. Thus a later call can try again.
  */
 export function initSearchTracking() {
   if (searchTrackingReady) return;
@@ -82,8 +82,8 @@ export function initSearchTracking() {
     if (!term) return;
     const results =
       search?.unfilteredTotalCount ?? search?.results?.length ?? 0;
-    // Trailing-debounce, so the query the user settled on is recorded once rather than every
-    // keystroke prefix.
+    // This waits until the user stops. Thus the code records the final query one time, and not the
+    // text after each keystroke.
     clearTimeout(timer);
     timer = setTimeout(() => {
       if (term === lastTracked) return;
@@ -93,7 +93,7 @@ export function initSearchTracking() {
   });
 }
 
-/** Strips marketing and tracking query parameters from the page URL via replaceState. */
+/** Removes the marketing and tracking query parameters from the page URL, with replaceState. */
 export function cleanUpUrl() {
   const currentUrl = new URL(window.location.href);
   const params = currentUrl.searchParams;
@@ -122,9 +122,10 @@ export function cleanUpUrl() {
       window.location.origin +
       window.location.pathname +
       (params.toString() ? '?' + params.toString() : '');
-    // ⚠️ Carry the existing state through. Turbo keeps its restorationIdentifier in history
-    // state, and this runs on every turbo:load — replacing it with {} on any URL carrying a
-    // utm_/ref param silently breaks scroll and snapshot restoration on back-navigation.
+    // ⚠️ Keep the state that exists. Turbo holds its restorationIdentifier in the history state,
+    // and this code runs at each turbo:load. If it writes {} for a URL with a utm_ or ref
+    // parameter, the scroll position and the snapshot do not come back on a back navigation, and
+    // there is no message.
     window.history.replaceState(window.history.state, '', cleanURL);
   }
 }

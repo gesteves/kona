@@ -1,13 +1,13 @@
-# Isolates one upstream data source: runs the block, and on a raise logs, reports, and returns
-# the fallback — so a failing dependency degrades to "no data" rather than collapsing the whole
-# widget into a 500. The live-update contract prefers an empty or partial fragment over an
-# error.
+# Separates one upstream data source: it runs the block, and on a raise it writes a log line, sends a
+# report, and returns the fallback value. Thus a dependency that fails gives "no data" and does not
+# make the full widget a 500. The live-update contract needs an empty fragment, or a fragment with
+# some data, and not an error.
 module UpstreamIsolation
   private
 
-  # @param service [String] The upstream being isolated, which drives Bugsnag's grouping.
+  # @param service [String] The upstream service. Bugsnag uses it to make its groups.
   # @param fallback [Object] The value to return when the block raises.
-  # @param context [String] A label for the log line and Bugsnag context.
+  # @param context [String] A label for the log line and for the Bugsnag context.
   def safely(service = self.class.name, fallback = nil, context: self.class.name)
     yield
   rescue StandardError => e

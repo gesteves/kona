@@ -3,27 +3,27 @@ require "httparty"
 require "openssl"
 require "base64"
 
-# Fetches weather from Apple's WeatherKit REST API. Authenticates with an ES256 JWT
-# signed from the WEATHERKIT_* credentials. The raw response is cached in Redis for
-# 5 minutes. `data` returns the weather wrapped for dot-access (or nil).
+# Gets the weather from the Apple WeatherKit REST API. It authenticates with an ES256 JWT that it
+# signs with the WEATHERKIT_* credentials. Redis caches the raw response for 5 minutes. `data`
+# returns the weather in an object with dot access, or nil.
 class WeatherKit < ApplicationService
   WEATHERKIT_API_URL = "https://weatherkit.apple.com/api/v1/"
 
-  # ⚠️ This runs inside the weather widget's request, which has a 20s rack-timeout budget and
-  # around ten upstreams in it. Both the per-hop timeout and the total budget are deliberately far
-  # tighter than the app-wide defaults: an unbounded retry chain here (two nested with_retries,
-  # 14s of backoff each on the shared defaults) burns the whole request and 500s the widget, when
-  # collapsing to an empty fragment and letting the edge serve its stale-if-error copy is both
-  # faster and what the live-update contract asks for.
+  # ⚠️ This runs in the request of the weather widget, which has a 20s rack-timeout budget and
+  # approximately ten upstream calls. The timeout for each call and the full budget are both much
+  # smaller than the defaults of the app, on purpose. A chain of retries here with no limit — two
+  # with_retries calls, one in the other, and 14s of waits in each one on the shared defaults —
+  # uses the full request and gives the widget a 500. An empty fragment, where the edge serves its
+  # stale-if-error copy, is faster and is what the live-update contract needs.
   HTTP_TIMEOUT = 4
   REQUEST_BUDGET = 8.0
-  # One quick retry absorbs a transient blip without threatening the budget.
+  # One quick second attempt gets past a short problem and does not use much of the budget.
   RETRY_OPTIONS = { max: 1, base_delay: 0.25 }.freeze
 
   # @param latitude [Float]
   # @param longitude [Float]
-  # @param time_zone [String] IANA timezone id
-  # @param country [String] ISO country code
+  # @param time_zone [String] An IANA timezone id.
+  # @param country [String] An ISO country code.
   def initialize(latitude, longitude, time_zone, country)
     @latitude = latitude
     @longitude = longitude
@@ -32,14 +32,14 @@ class WeatherKit < ApplicationService
     @budget_expires_at = Process.clock_gettime(Process::CLOCK_MONOTONIC) + REQUEST_BUDGET
   end
 
-  # @return [OpenStruct, nil] The weather data (snake_cased, dot-accessible), or nil.
+  # @return [OpenStruct, nil] The weather data, with snake_case keys and dot access, or nil.
   def data
     fetch_wrapped { underscore_keys(get_weather) }
   end
 
   private
 
-  # Gets the current weather data for the location, retrying with backoff on failure.
+  # Gets the current weather data for the location. On a failure it waits, then tries again.
   # @see https://developer.apple.com/documentation/weatherkitrestapi
   # @return [Hash, nil]
   def get_weather
@@ -68,7 +68,8 @@ class WeatherKit < ApplicationService
     end
   end
 
-  # Checks which datasets are available for the location, retrying with backoff on failure.
+  # Finds the data sets that are available for the location. On a failure it waits, then tries
+  # again.
   # @return [Array, nil]
   def availability
     cache_key = "weatherkit:availability:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
@@ -84,23 +85,26 @@ class WeatherKit < ApplicationService
     end
   end
 
-  # Wall-clock left in this instance's budget. Shared across both calls, so a slow availability
-  # lookup eats into what the weather lookup may spend rather than doubling the worst case.
+  # The time that stays in the budget of this instance. The two calls share it, thus a slow
+  # availability lookup uses part of the time of the weather lookup, and the worst case is not two
+  # times as long.
   # @return [Float]
   def remaining_budget
     [ @budget_expires_at - Process.clock_gettime(Process::CLOCK_MONOTONIC), 0.0 ].max
   end
 
-  # The ES256 JWT used to authenticate with WeatherKit. It's app-global (no lat/lon) and valid
-  # for one minute, but signing it (EC key load + sign) is relatively expensive, so cache it in
-  # Redis just under its expiry and reuse it across requests/instances.
+  # The ES256 JWT for the WeatherKit authentication. It is the same for the full app, because it
+  # has no latitude and no longitude, and it is good for one minute. But a signature, which loads
+  # the EC key and signs, is slow. Thus Redis holds it for a little less than its expiry time, and
+  # each request and each instance uses the same one.
   # @return [String, nil]
   def token
     $redis.get("weatherkit:jwt") || generate_token
   end
 
-  # Signs a fresh ES256 JWT and caches it in Redis for 50s (< the 60s exp, leaving a buffer for
-  # clock skew and in-flight requests). Returns nil without caching on failure.
+  # Signs a new ES256 JWT and puts it in Redis for 50s. That is less than the 60s expiry time, and
+  # the extra 10s is for a clock difference and for a request in progress. On a failure it returns
+  # nil and puts nothing in the cache.
   # @see https://developer.apple.com/documentation/weatherkitrestapi/request_authentication_for_weatherkit_rest_api
   # @return [String, nil]
   def generate_token

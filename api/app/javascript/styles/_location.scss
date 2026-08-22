@@ -1,10 +1,12 @@
-// The Location page: the controls that set a location on the left, the map they move on the right.
+// The Location page: the controls that set a location are on the left, and the map that they move
+// is on the right.
 
 .location {
   align-items: start;
   display: grid;
   gap: var(--wa-space-l);
-  // The map leads; the controls column is only as wide as its fields and race buttons need.
+  // The map is the largest part. The controls column is only as wide as its fields and its race
+  // buttons need.
   grid-template-columns: minmax(0, 22rem) minmax(0, 1fr);
 
   @media (width < 60rem) {
@@ -20,8 +22,8 @@
     flex-direction: column;
     gap: var(--wa-space-l);
 
-    // The column already spaces its children, so the divider's own block margin would stack on
-    // top of that gap and leave the rule floating in the middle of a gutter twice as wide.
+    // The column already puts space between its children. Thus the block margin of the divider
+    // would add to that space, and the line would be in the middle of a gap two times as large.
     wa-divider {
       --spacing: 0;
     }
@@ -31,8 +33,8 @@
     align-items: flex-start;
     display: flex;
     flex-direction: column;
-    // Tight between the name and the coordinates, which read as one block; the Save button takes
-    // its own space below.
+    // The space between the name and the coordinates is small, because they read as one block. The
+    // Save button has its own space below.
     gap: var(--wa-space-3xs);
   }
 
@@ -40,7 +42,7 @@
     margin: 0;
   }
 
-  // The tag and the coordinates read as one line, and wrap to two on a narrow column.
+  // The tag and the coordinates read as one line, and they go to two lines in a narrow column.
   &__status {
     align-items: center;
     display: flex;
@@ -55,13 +57,13 @@
     gap: var(--wa-space-s);
   }
 
-  // The search column stretches its children to the address field's width; the button under it
-  // opts back out to its own. (The summary's own `align-items` already does this for Save.)
+  // The search column makes its children as wide as the address field. The button below it keeps
+  // its own width. The `align-items` of the summary already does this for Save.
   &__go {
     align-self: flex-start;
   }
 
-  // Save and Undo, in their own space under the coordinates — which sit tight against the name
+  // Save and Undo, in their own space below the coordinates. The coordinates are near the name
   // above them.
   &__actions {
     display: flex;
@@ -80,12 +82,12 @@
     margin: 0;
   }
 
-  // ⚠️ The list is a `plain-list wa-stack` in the markup rather than a flex column here: the stack
-  // utility is what zeroes the `margin-inline-start` native.css puts on every <li>, which nothing
-  // set on the <ul> can reach.
+  // ⚠️ The list is a `plain-list wa-stack` in the markup, and not a flex column here. The stack
+  // utility is what makes the `margin-inline-start` zero, which native.css puts on each <li>, and no
+  // rule on the <ul> can reach that margin.
   //
-  // The whole row is the button: a race is one target, and a separate "use this" control beside
-  // the name would be a second thing to aim at for the same click.
+  // The full row is the button: a race is one target, and a separate "use this" control beside the
+  // name would be a second target for the same click.
   &__race {
     inline-size: 100%;
 
@@ -96,8 +98,8 @@
       text-align: start;
     }
 
-    // ⚠️ The label is a slot, and slots are inline by default — without this the two lines run
-    // together on one.
+    // ⚠️ The label is a slot, and a slot is inline by default. Without this rule the two lines
+    // become one line.
     &::part(label) {
       display: flex;
       flex-direction: column;
@@ -118,22 +120,22 @@
     overflow-wrap: anywhere;
   }
 
-  // The map stays in view while working down a long list of races. It has to clear the sticky
-  // header — pinning to the viewport top slides the map under it — same as the course-map editor's
-  // preview.
+  // The map stays visible while you read a long list of races. It must be below the sticky header:
+  // at the top of the viewport, the map goes under the header. The preview of the course-map editor
+  // does the same.
   //
-  // ⚠️ A wrapper rather than the map element itself. Mapbox GL JS adds `mapboxgl-map` to its
-  // container and appends its own stylesheet to the head at runtime, i.e. after ours, so
-  // `.mapboxgl-map { position: relative }` beats an equally specific `position: sticky` here on
-  // source order — and `top` then resolves as a plain relative offset that pushes the map down the
-  // page by that much, at every scroll position.
+  // ⚠️ This applies to a parent element, and not to the map element. Mapbox GL JS adds
+  // `mapboxgl-map` to its container and adds its own stylesheet to the head at run time, that is,
+  // after ours. Thus `.mapboxgl-map { position: relative }` wins over a `position: sticky` here with
+  // the same specificity, because of the order. `top` then becomes a plain relative offset that
+  // moves the map down the page by that amount, at each scroll position.
   &__view {
     position: sticky;
     top: calc(var(--header-height, 0px) + var(--wa-space-m));
   }
 
-  // Mapbox GL JS sizes its canvas to this element, so it needs a height of its own — it has no
-  // content to take one from. The background is what's visible while the tiles load.
+  // Mapbox GL JS makes its canvas the size of this element, thus this element needs its own height.
+  // It has no content to take a height from. The background is what you see while the tiles load.
   &__map {
     background-color: var(--wa-color-neutral-fill-quiet);
     block-size: min(70vh, 40rem);

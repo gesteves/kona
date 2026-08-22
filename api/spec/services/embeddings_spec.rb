@@ -51,7 +51,7 @@ RSpec.describe Embeddings do
       .and_return(instance_double(HTTParty::Response, success?: false, code: 429, body: "", request: nil))
 
     expect(embeddings.embed("Some text")).to be_nil
-    # The first attempt plus with_retries' three retries.
+    # The first attempt, and the three more attempts of with_retries.
     expect(HTTParty).to have_received(:post).exactly(4).times
   end
 end

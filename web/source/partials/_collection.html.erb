@@ -1,16 +1,19 @@
-<%# ⚠️ aria-labelledby, so a titled section is exposed as a named `region` landmark. Its
-    API-rendered counterparts (placeholders/_article_collection.html.erb and the api's
-    widgets/articles/_collection) already carry it — without it here, the page's landmark list
-    changes shape once the widgets swap in: "Recent Articles" invisible, "Trending Articles" not. %>
+<%# ⚠️ Use aria-labelledby, thus a section with a title becomes a `region` landmark with a name.
+    The equivalent markup from the API — placeholders/_article_collection.html.erb, and
+    widgets/articles/_collection of the api — already has it. Without it here, the list of
+    landmarks of the page changes when the widgets arrive: "Recent Articles" is then absent and
+    "Trending Articles" is not. %>
 <% section_id = title.present? ? title.parameterize : nil %>
 <section class="collection <%= "collection--#{variant}" if defined?(variant) %>" <% if section_id %>id="<%= section_id %>" aria-labelledby="hed-<%= section_id %>"<% end %>>
   <% if title.present? %>
     <h2 class="collection__heading" <% if section_id %>id="hed-<%= section_id %>"<% end %>><%= smartypants(title) %></h2>
   <% end %>
   <ol class="collection__list">
-    <%# Filter before the <li>, not inside it — otherwise a non-post item emits an empty one. %>
-    <%# `scope_entry_ids` (optional local) scopes each card's DOM ids to this section — set it
-        wherever the section can list an entry another section on the same page also lists. %>
+    <%# Select the items before the <li>, and not in it. If you do it in the <li>, an item that is %>
+    <%# not a post gives an empty <li>. %>
+    <%# `scope_entry_ids`, which is an optional local, puts this section in the DOM id of each card.
+        Set it where the section can list an entry that another section on the same page also
+        lists. %>
     <% id_scope = (defined?(scope_entry_ids) && scope_entry_ids) ? section_id : nil %>
     <% items.select { |item| blog_post?(item) }.each do |item| %>
       <li class="collection__item">

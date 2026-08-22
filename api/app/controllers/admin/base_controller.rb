@@ -1,7 +1,7 @@
 module Admin
-  # Base controller for the owner-facing admin UI — the one part of this app that renders full
-  # HTML pages rather than widget fragments. Inherits ActionController::Base directly, like every
-  # other controller here, to skip the modern-browser gate.
+  # The base controller of the admin UI of the owner. That UI is the one part of this app that renders
+  # full HTML pages and not widget fragments. It inherits from ActionController::Base directly, as
+  # each other controller here does, thus it does not use the modern-browser check.
   class BaseController < ActionController::Base
     include Authentication
     include OwnerFacing
@@ -13,10 +13,10 @@ module Admin
 
     private
 
-    # How many messages are waiting in the spam quarantine, for the nav's badge.
+    # The number of messages in the spam quarantine, for the badge in the nav.
     #
-    # Loaded here rather than in SpamController because the nav is on every admin page. It's a
-    # single HLEN, and these pages already make several Redis round-trips apiece for their icons.
+    # This code is here and not in SpamController, because the nav is on each admin page. It is one
+    # HLEN, and each of these pages already makes more than one Redis request for its icons.
     def load_quarantine_count
       @quarantine_count = SpamQuarantine.new.count
     end

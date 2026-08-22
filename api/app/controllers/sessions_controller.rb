@@ -1,19 +1,19 @@
-# Owner authentication via Google OAuth. Gates /whoop/auth and the Sidekiq UI down to a single
-# identity: the OmniAuth provider's `hd` already rejects logins outside our Google hosted domain;
-# #create additionally pins the exact OWNER_EMAIL and requires a verified email. A successful
-# sign-in stores the owner email in the signed cookie session; Authentication#owner_signed_in?
-# (and the Sidekiq Rack guard) check it.
+# The owner authentication, with Google OAuth. It limits /whoop/auth and the Sidekiq UI to one
+# identity. The `hd` value of the OmniAuth provider already refuses a login outside our Google hosted
+# domain, and #create also tests the exact OWNER_EMAIL and needs an email that Google verified. A
+# successful sign-in puts the owner email in the signed cookie session.
+# Authentication#owner_signed_in?, and the Sidekiq Rack guard, read it.
 class SessionsController < ActionController::Base
-  # The sign-in page is the one owner-facing page reachable without a session, so it's the one
-  # that actually needs the noindex header.
+  # The sign-in page is the one page for the owner that a visitor can reach with no session. Thus it
+  # is the page that needs the noindex header.
   include OwnerFacing
 
-  # Only #new renders — #create, #failure, and #destroy all redirect or `render plain:`, and a
-  # plain render applies no layout.
+  # Only #new renders a page. #create, #failure, and #destroy each redirect or do a `render plain:`,
+  # and a plain render uses no layout.
   layout "auth"
 
-  # The OmniAuth request phase (POST /auth/google_oauth2) is CSRF-protected by
-  # omniauth-rails_csrf_protection; the callback is a GET redirect from Google.
+  # omniauth-rails_csrf_protection gives CSRF protection to the OmniAuth request phase, which is
+  # POST /auth/google_oauth2. The callback is a GET redirect from Google.
 
   # GET /signin
   def new
@@ -45,15 +45,16 @@ class SessionsController < ActionController::Base
   # POST /signout
   def destroy
     reset_session
-    # 303 so Turbo follows the redirect with a GET rather than replaying the POST.
+    # Use a 303, thus Turbo follows the redirect with a GET and does not send the POST again.
     redirect_to "/signin", status: :see_other
   end
 
   private
 
-  # The path stashed by Authentication#require_owner!, or the admin home page (the root of this
-  # host) by default. Only accept a relative path (leading "/" but not "//") so a stale/forged
-  # value can't open-redirect.
+  # The path that Authentication#require_owner! stored, or, by default, the admin home page, which
+  # is the root of this host. It accepts a relative path only, that is, a path that starts with "/"
+  # but not with "//". Thus an old value, or a value that an attacker writes, cannot send the browser
+  # to another site.
   def safe_return_path(path)
     path.present? && path.start_with?("/") && !path.start_with?("//") ? path : "/"
   end

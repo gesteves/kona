@@ -1,15 +1,17 @@
-// One-off: writes the race/event concepts' archive-page descriptions from lib/taxonomy.js.
-// Deliberately scoped to the event concepts listed below, and patches only `/definition`, so
-// descriptions edited directly in Contentful for every other concept are untouched — unlike
-// `taxonomy:describe`, which reconciles them all. Idempotent and skip-unchanged.
+// A script that runs one time: it writes the archive-page description of each race concept and each
+// event concept, from lib/taxonomy.js. It applies to the event concepts in the list below only, on
+// purpose, and it changes `/definition` only. Thus a description that a person edits in Contentful
+// for each other concept stays the same. `taxonomy:describe` is different: it changes all of them.
+// You can run this more than one time, and it does nothing for a concept with no change.
 //
-// Env: CONTENTFUL_MANAGEMENT_TOKEN, CONTENTFUL_ORGANIZATION_ID, DRY_RUN.
-// Run: `npm run taxonomy:describe-events`.
+// The env vars: CONTENTFUL_MANAGEMENT_TOKEN, CONTENTFUL_ORGANIZATION_ID, and DRY_RUN.
+// To run it: `npm run taxonomy:describe-events`.
 
 const { LOCALE, byId, getExistingConcepts, createPlainClient, readEnv } = require('./lib/taxonomy');
 
-// The race/event concepts whose descriptions come from event-descriptions.md. Only these are
-// touched; anything not in this list (topics, distances, disciplines) is ignored entirely.
+// The race concepts and the event concepts whose descriptions come from event-descriptions.md. This
+// script changes these concepts only. It ignores each concept that is not in this list: a topic, a
+// distance, and a discipline.
 const EVENT_IDS = [
   'ironman-canada',
   'ironman-coeur-dalene',

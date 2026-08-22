@@ -1,21 +1,23 @@
 require "active_support/core_ext/object/blank"
 
-# Fetches Font Awesome icon SVGs, caching them in Redis. Icons are immutable for a
-# given version, so cached SVGs are cached for a year — long enough to stay warm, but
-# bounded so icons from a superseded version don't linger forever.
+# Gets the SVG of a Font Awesome icon and puts it in Redis. An icon does not change in one version,
+# thus the cache holds each SVG for a year. That is long enough to keep the cache warm, and it has a
+# limit, thus an icon from an older version does not stay for all time.
 class FontAwesome
   DEFAULT_VERSION = "7.3.0"
   CACHE_TTL = 1.year
-  # Definitive misses (the API answered, but no icon matched) are cached as an empty-string
-  # sentinel so a mistyped/renamed icon id in a view doesn't trigger a GraphQL search on
-  # every render. Kept short so a fixed id (or a new FA release) recovers quickly.
+  # A true miss, where the API answered but no icon matched, goes into the cache as an empty string.
+  # Thus an icon id in a view with a typing error, or with a new name, does not cause a GraphQL
+  # search at each render. The time is short, thus a corrected id, or a new Font Awesome release,
+  # works again quickly.
   MISS_CACHE_TTL = 1.hour
 
-  # Returns the SVG markup for an icon, from Redis if cached or the Font Awesome API otherwise.
-  # @param family [String] The icon's Font Awesome family (e.g., "classic").
-  # @param style [String] The icon's style within the family (e.g., "light").
-  # @param icon_id [String] The icon's identifier (e.g., "person-running").
-  # @return [String, nil] The SVG markup, or nil if not found.
+  # The SVG markup of an icon. It comes from Redis if the cache has it, and from the Font Awesome
+  # API if the cache does not.
+  # @param family [String] The Font Awesome family of the icon, for example "classic".
+  # @param style [String] The style of the icon in that family, for example "light".
+  # @param icon_id [String] The identifier of the icon, for example "person-running".
+  # @return [String, nil] The SVG markup, or nil if the code cannot find the icon.
   def svg(family, style, icon_id)
     version = ENV["FONT_AWESOME_VERSION"].presence || DEFAULT_VERSION
     cached = $redis.get(cache_key_for(version, family, style, icon_id))
@@ -26,8 +28,8 @@ class FontAwesome
 
   private
 
-  # Fetches an SVG from the Font Awesome GraphQL API and caches it in Redis (misses are
-  # negatively cached; transient API failures are not cached at all).
+  # Gets an SVG from the Font Awesome GraphQL API and puts it in Redis. The cache also holds a miss.
+  # It holds no temporary API failure.
   # @see https://fontawesome.com/docs/apis/graphql/get-started
   def fetch_from_api(version, family, style, icon_id)
     response = FontAwesomeClient.client.query(FontAwesomeClient.icons_query, variables: { version: version, query: icon_id })

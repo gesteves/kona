@@ -2,11 +2,11 @@
 
 <h1 class="admin-main__title">Spam</h1>
 
-<%# ⚠️ Every field on these cards is unfiltered attacker input — the one place in this app where
-    that's true of rendered HTML. ERB's default escaping is the whole defense: no `raw`, no
-    `html_safe`, no `simple_format` on any message field. Line breaks come from
-    `white-space: pre-wrap` in _spam.scss. The `raw icon_svg(...)` idiom used elsewhere in the
-    admin must not spread to these values. %>
+<%# ⚠️ Each field on these cards is input from an attacker, and no code removes anything from it.
+    This is the one place in the app where that is true of rendered HTML. The escape that ERB does
+    by default is the only protection: use no `raw`, no `html_safe`, and no `simple_format` on a
+    message field. The line breaks come from `white-space: pre-wrap` in _spam.scss. The
+    `raw icon_svg(...)` code that the other admin pages use must never come to these values. %>
 
 <% if @messages.empty? %>
   <wa-callout variant="neutral">
@@ -49,8 +49,8 @@
             </dl>
 
             <div class="wa-cluster wa-gap-s">
-              <%# form_with + a form-associated <wa-button> rather than button_to, which emits a
-                  native <button>. %>
+              <%# This uses form_with with a <wa-button> that is part of the form, and not
+                  button_to, which writes a native <button>. %>
               <%= form_with url: message.not_spam_path, method: :post do %>
                 <wa-button type="submit" variant="brand" appearance="accent">
                   <%= slotted_icon_svg("classic", "light", "inbox-in") %>
@@ -58,14 +58,15 @@
                 </wa-button>
               <% end %>
 
-              <%# The dialog opens declaratively — wa-dialog listens document-wide for
-                  [data-dialog="open <id>"] and [data-dialog="close"], so no Stimulus action is
-                  needed to work the modal. The `dialog` controller only closes it before Turbo
-                  caches the page. %>
-              <%# ⚠️ Neutral, not danger, and deliberately: the brand ramp here IS red, so a danger
-                  variant beside the brand-accent "Not spam" makes the safe action the loudest thing
-                  on the card and the destructive one indistinguishable from it. Red is reserved for
-                  the confirm button in the dialog, where the choice is actually made. %>
+              <%# The markup opens the dialog: wa-dialog listens on the full document for
+                  [data-dialog="open <id>"] and [data-dialog="close"]. Thus the modal needs no
+                  Stimulus action. The `dialog` controller only closes it before Turbo caches the
+                  page. %>
+              <%# ⚠️ Use neutral, and not danger, on purpose: the brand colors here ARE red. Thus a
+                  danger variant beside the brand-accent "Not spam" makes the safe action the most
+                  prominent one on the card, and it looks the same as the action that deletes. Red
+                  is for the confirm button in the dialog only, where the person makes the
+                  decision. %>
               <wa-button variant="neutral" appearance="outlined" data-dialog="open <%= message.dialog_id %>">
                 <%= slotted_icon_svg("classic", "light", "trash") %>
                 Delete forever

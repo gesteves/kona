@@ -1,28 +1,29 @@
 module LiveUpdateHelper
-  # The URL the embedded fragment refetches itself from. Deliberately relative, so the refetch
-  # goes through the site's same-origin proxy and hits its edge cache.
-  # @return [String] The request's path.
+  # The URL that the fragment in the page gets itself from. It is relative, on purpose, thus the
+  # fetch goes through the same-origin proxy of the site and uses its edge cache.
+  # @return [String] The path of the request.
   def live_update_url
     request.path
   end
 
-  # The attribute cluster a fragment's outermost element must carry, mirroring the static site's
-  # SiteHelpers#live_update_attrs. Emitting them by hand in each view meant six copies of the same
-  # string, and a view that quietly omitted `data-action` would swap in correctly and then simply
-  # never refresh again — nothing visible, nothing tested.
+  # The group of attributes that the outermost element of a fragment must have. It is the same as
+  # SiteHelpers#live_update_attrs of the static site. With the attributes written by hand in each
+  # view, there were six copies of the same string, and a view with no `data-action` would swap in
+  # correctly and then never get new content. There would be nothing to see and nothing to test.
   #
-  # ⚠️ Deliberately WITHOUT `data-live-update-placeholder-value`. That flag means "I'm an empty
-  # skeleton" and makes the element delete itself when a fetch fails; on rendered content it turns
-  # a transient blip into lost content. Never add it here. See the cross-app HTML contract in the
-  # root CLAUDE.md, and the shared example in spec/support/live_update_contract.rb that pins it.
-  # ⚠️ Built as a raw string rather than through `tag.attributes`, which would escape the `->` in
-  # the action descriptor to `-&gt;`. Browsers decode that back and Stimulus still works, but the
-  # emitted markup would no longer match the placeholder it replaces byte for byte, and this
-  # contract is kept in sync by reading the two side by side. The web half
-  # (SiteHelpers#live_update_attrs) is built the same way for the same reason.
+  # ⚠️ This does NOT include `data-live-update-placeholder-value`, on purpose. That flag means "I am
+  # an empty skeleton" and it makes the element delete itself when a fetch fails. On content that
+  # the page shows, it makes a short problem into a loss of content. Never add it here. Refer to the
+  # HTML contract between the two apps in the root CLAUDE.md, and to the shared example in
+  # spec/support/live_update_contract.rb that tests it.
+  # ⚠️ This is a raw string, and not the result of `tag.attributes`. That method would change the
+  # `->` in the action descriptor into `-&gt;`. A browser decodes that back and Stimulus still
+  # works, but the markup would then not have the same bytes as the placeholder that it replaces,
+  # and a person keeps this contract correct with a comparison of the two. The web half
+  # (SiteHelpers#live_update_attrs) uses a raw string for the same reason.
   #
-  # The URL is always this app's own request path, never user input, so it needs no escaping.
-  # @return [String] The attributes, marked HTML-safe.
+  # The URL is always the request path of this app, and never user input, thus it needs no escape.
+  # @return [String] The attributes, marked as HTML-safe.
   def live_update_attrs
     %(data-controller="live-update" data-live-update-url-value="#{live_update_url}" data-action="visibilitychange@document->live-update#handleVisibilityChange").html_safe
   end

@@ -1,9 +1,11 @@
-// Exports the space to a timestamped JSON backup before a destructive migration. Wraps the
-// contentful-cli `space export` so it picks up CONTENTFUL_* from .env like every other script
-// here (via `node --env-file=.env`), instead of requiring the vars in your shell.
+// Copies the space into a JSON backup file with a timestamp, before a migration that removes data.
+// It calls the `space export` of contentful-cli, thus that command reads each CONTENTFUL_* var from
+// .env, as each other script here does with `node --env-file=.env`, and you do not need those vars
+// in your shell.
 //
-// Writes contentful-export-<space>-<env>-<timestamp>.json into this directory (gitignored).
-// Run: `npm run backup` (targets CONTENTFUL_ENVIRONMENT or master).
+// It writes contentful-export-<space>-<env>-<timestamp>.json into this directory, and .gitignore
+// contains that name.
+// To run it: `npm run backup`. It uses CONTENTFUL_ENVIRONMENT, or master.
 const { execFileSync } = require('child_process');
 
 const spaceId = process.env.CONTENTFUL_SPACE;

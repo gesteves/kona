@@ -44,7 +44,8 @@ RSpec.describe BayHelper do
 
   describe "#format_bay_current_speed" do
     it "converts m/s to km/h and reuses the wind-speed unit toggle" do
-      # 5 m/s == 18 km/h; format_wind_speed needs the view helpers, so use a helper context.
+      # 5 m/s is 18 km/h. format_wind_speed needs the view helpers, thus this uses a helper
+      # context.
       html = Class.new do
         include ActionView::Helpers::TagHelper
         include UnitsHelper
@@ -57,8 +58,9 @@ RSpec.describe BayHelper do
   end
 end
 
-# bay_water_temperature_sentence reaches across helpers (in_san_francisco? and
-# format_temperature), so exercise it in a full helper context where those are available.
+# bay_water_temperature_sentence calls other helpers, that is, in_san_francisco? and
+# format_temperature. Thus these tests use a full helper context, where those methods are
+# available.
 RSpec.describe BayHelper, "#bay_water_temperature_sentence", type: :helper do
   let(:location) { double("location") }
 

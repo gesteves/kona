@@ -1,17 +1,18 @@
-# Applies Whoop webhook side effects to Intervals.icu. Which date's wellness is refreshed
-# depends on the event type:
+# Applies the results of a Whoop webhook to Intervals.icu. The event type decides which date the
+# code refreshes:
 #
-#   - workout.updated: the workout's own date, since Whoop scores workouts late and fires
-#     updates for retroactive edits. Also writes WhoopWorkoutStrain on the matching activity
-#     and enqueues an ActivityDescriptionJob.
-#   - sleep.updated: today and yesterday — sleep finalization is what marks the prior day's
-#     strain complete — plus WhoopSleepPerformance.
-#   - recovery.updated: today, plus WhoopRecovery.
-#   - anything else: today.
+#   - workout.updated: the date of the workout, because Whoop scores a workout late and sends an
+#     update for an edit to a past workout. This also writes WhoopWorkoutStrain on the activity
+#     that matches, and it adds an ActivityDescriptionJob to the queue.
+#   - sleep.updated: today and yesterday, because the end of the sleep is what completes the strain
+#     of the previous day. This also writes WhoopSleepPerformance.
+#   - recovery.updated: today, and it also writes WhoopRecovery.
+#   - each other event: today.
 #
-# Every write is an idempotent PUT of an absolute value, so Sidekiq's retries are safe.
+# Each write is a PUT of an absolute value that you can do more than one time. Thus the Sidekiq
+# retries are safe.
 class WhoopWebhookProcessor
-  # Prefixes every log line this processor emits, for greppability.
+  # Goes at the start of each log line from this processor, thus you can find them with grep.
   LOG_PREFIX = "Whoop webhook:"
 
   def initialize(whoop: Whoop.new, intervals: Intervals.new)
@@ -20,24 +21,25 @@ class WhoopWebhookProcessor
   end
 
   # @param event_type [String] The Whoop webhook event type.
-  # @param resource_id [String] The event's resource UUID: a workout UUID for workout.*
-  #   events, a *sleep* UUID for both sleep.* and recovery.* events, per Whoop's v2 spec.
+  # @param resource_id [String] The resource UUID of the event: a workout UUID for a workout.*
+  #   event, and a *sleep* UUID for both a sleep.* event and a recovery.* event, as the Whoop v2
+  #   specification says.
   def process(event_type, resource_id)
     case event_type
     when "workout.updated"
       process_workout_updated(resource_id)
     when "sleep.updated"
-      # Both days in one fetch: each refresh pulls its date ±1, so asking separately means two
-      # overlapping paginated requests covering a 4-day span between them.
+      # Get both days in one fetch. Each refresh gets its date and one day at each side, thus two
+      # separate requests would read the same data two times and cover a span of 4 days.
       refresh_daily_whoop_strain(today - 1, today)
       refresh_sleep_performance(resource_id)
     when "recovery.updated"
       refresh_daily_whoop_strain(today)
       refresh_recovery(resource_id)
     else
-      # TODO: workout.deleted falls through here, so a deleted Whoop workout leaves an orphan
-      # WhoopWorkoutStrain on the Intervals.icu activity. Decide the intended semantics
-      # before wiring up a cleanup path.
+      # TODO: workout.deleted comes here, thus a Whoop workout that a user deletes leaves an old
+      # WhoopWorkoutStrain on the Intervals.icu activity. Decide the correct behavior before you
+      # make a path that removes it.
       refresh_daily_whoop_strain(today)
     end
   end
@@ -51,8 +53,8 @@ class WhoopWebhookProcessor
       return
     end
 
-    # The workout's day, not today: a late score or a retroactive edit changes that day's
-    # strain, not the current day's.
+    # Use the day of the workout, and not today. A late score or an edit to a past workout changes
+    # the strain of that day, and not the strain of today.
     workout_date = workout[:start_time].in_time_zone(timezone).to_date
     refresh_daily_whoop_strain(workout_date)
 
@@ -66,9 +68,9 @@ class WhoopWebhookProcessor
     enqueue_description(match, workout)
   end
 
-  # Finds the Intervals.icu activity matching a Whoop workout, searching its date ± a day to
-  # absorb timezone boundaries and overnight workouts.
-  # @return [Hash, nil] The activity, or nil when nothing matches.
+  # Finds the Intervals.icu activity for a Whoop workout. It searches the date of the workout and
+  # one day at each side, for the timezone limits and for a workout through the night.
+  # @return [Hash, nil] The activity, or nil if nothing matches.
   def matching_activity(workout, workout_date)
     candidates = @intervals.activities!(oldest: workout_date - 1, newest: workout_date + 1)
     match = candidates.find { |candidate| ActivityMatcher.matches?(candidate, workout, timezone) }
@@ -76,11 +78,11 @@ class WhoopWebhookProcessor
     match
   end
 
-  # Enqueues the description job for a matched activity, but only for swim, bike, and run —
-  # other sports keep their WhoopWorkoutStrain and simply get no description. The job is
-  # deliberately decoupled from the metric sync: it retries independently, and it keeps
-  # working without Whoop, losing only the 🔥 line. Only the strain is passed through; the
-  # generator re-derives everything else and owns the eligibility check.
+  # Adds the description job to the queue for an activity that matches, but only for a swim, a
+  # bike ride, or a run. Each other sport keeps its WhoopWorkoutStrain and gets no description. The
+  # job is separate from the metric sync, on purpose: it runs again by itself, and it continues to
+  # work without Whoop, with only the 🔥 line absent. Only the strain goes to the job. The
+  # generator makes each other value again and does the eligibility check.
   def enqueue_description(match, workout)
     match_type = ActivityMatcher.normalize_type(match[:type])
     unless ActivityDescription::Generator::ELIGIBLE_SPORTS.include?(match_type)
@@ -91,9 +93,10 @@ class WhoopWebhookProcessor
     ActivityDescriptionJob.perform_async(match[:id], workout[:strain])
   end
 
-  # Writes each date's raw 0–21 cycle strain to its Intervals.icu wellness record. Cycles are
-  # fetched once for the whole span with a ±1-day buffer and bucketed by their end time in the
-  # athlete's timezone; an in-progress cycle counts as today.
+  # Writes the raw 0–21 cycle strain of each date to its Intervals.icu wellness record. The code
+  # gets the cycles one time for the full span, with one extra day at each side, and puts them in
+  # groups by their end time in the timezone of the athlete. A cycle that is not complete counts as
+  # today.
   # @param dates [Array<Date>] The dates to refresh.
   def refresh_daily_whoop_strain(*dates)
     return if dates.empty?
@@ -117,8 +120,8 @@ class WhoopWebhookProcessor
     end
   end
 
-  # Writes a sleep's performance percentage to the wellness record for its local end date.
-  # Skips naps and sleeps with no performance score.
+  # Writes the performance percentage of a sleep to the wellness record of its local end date. It
+  # does nothing for a nap and for a sleep with no performance score.
   def refresh_sleep_performance(sleep_id)
     sleep_data = @whoop.get_sleep(sleep_id)
     if sleep_data.nil?
@@ -140,8 +143,8 @@ class WhoopWebhookProcessor
     write_wellness(date, :WhoopSleepPerformance, performance)
   end
 
-  # Writes the recovery score for the cycle a sleep was scored against, keyed by the sleep's
-  # local end date. recovery.updated payloads carry the sleep's UUID, not the recovery's.
+  # Writes the recovery score of the cycle that the sleep has a score for. The key is the local end
+  # date of the sleep. A recovery.updated payload has the UUID of the sleep, not of the recovery.
   def refresh_recovery(sleep_id)
     sleep_data = @whoop.get_sleep(sleep_id)
     if sleep_data.nil?
@@ -159,16 +162,17 @@ class WhoopWebhookProcessor
     write_wellness(date, :WhoopRecovery, recovery.dig(:score, :recovery_score))
   end
 
-  # Writes a custom field to the wellness record for a date, guarded against a missing field.
+  # Writes a custom field to the wellness record of a date. It checks for a field that is absent.
   def write_wellness(date, field, value)
     write_custom_field(field, "wellness #{date}", value) do
       @intervals.update_wellness!(date.iso8601, field => value)
     end
   end
 
-  # Runs a write targeting a custom Intervals.icu field. A 422 means the field hasn't been
-  # created in the athlete's settings; that's warned and swallowed, so one missing field can't
-  # poison the rest of the webhook's side effects. Anything else propagates and retries.
+  # Does a write to a custom Intervals.icu field. A 422 means that the settings of the athlete do
+  # not have that field. The code writes a warning and continues, thus one field that is absent
+  # cannot stop the other results of the webhook. Each other error goes to the caller and the job
+  # runs again.
   def write_custom_field(field, target, value)
     yield
     log_info("updated #{target} #{field} value=#{value}")
@@ -182,8 +186,8 @@ class WhoopWebhookProcessor
     )
   end
 
-  # Converts a UTC timestamp to a local calendar date using Whoop's fixed timezone_offset —
-  # the offset in force at the moment of the event, not the athlete's current one.
+  # Changes a UTC timestamp into a local calendar date with the Whoop timezone_offset. That is the
+  # offset at the moment of the event, and not the current offset of the athlete.
   # @return [Date]
   def local_date_from_offset(utc_timestamp, offset)
     seconds =
@@ -200,8 +204,8 @@ class WhoopWebhookProcessor
     @timezone ||= @intervals.athlete_timezone
   end
 
-  # Memoized so one run has a single consistent "today" — sleep.updated reads both today and
-  # yesterday, and could otherwise straddle midnight mid-run.
+  # The code keeps this value, thus one run has one "today". sleep.updated reads today and
+  # yesterday, and without this the run could go through midnight.
   def today
     @today ||= Time.find_zone!(timezone).today
   end

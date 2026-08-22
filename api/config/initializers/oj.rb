@@ -1,7 +1,7 @@
 require "oj"
 
-# Route JSON through Oj for speed. The read-through Redis cache parses on every hit and
-# serializes on every write (ApplicationService#cached_json), and the services parse upstream
-# response bodies — all hot paths.
+# Use Oj for the JSON, because it is faster. The read-through Redis cache parses at each read and
+# serializes at each write (refer to ApplicationService#cached_json), and each service parses the
+# body of an upstream response. Each of those runs many times.
 Oj.mimic_JSON      # JSON.parse / JSON.generate (incl. symbolize_names) → Oj
 Oj.optimize_rails  # ActiveSupport #to_json → Oj

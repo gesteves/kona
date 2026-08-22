@@ -10,7 +10,7 @@ RSpec.describe "Whoop", type: :request do
   end
 
   before do
-    # Avoid touching Redis / Google Maps for the timezone; fall back to the default.
+    # Do not use Redis or Google Maps for the timezone. Use the default value.
     allow(Location).to receive(:new).and_return(instance_double(Location, latitude: nil, longitude: nil))
     allow_any_instance_of(TrainerRoad).to receive(:workouts).and_return([])
     allow_any_instance_of(Whoop).to receive(:stats).and_return(stats)

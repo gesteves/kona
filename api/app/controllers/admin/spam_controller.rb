@@ -1,7 +1,8 @@
 module Admin
-  # The contact-form spam quarantine: everything Akismet flagged, held for a month so a false
-  # positive can be released instead of vanishing. Clean submissions never appear here — they go
-  # straight to email from ContactMailJob.
+  # The spam quarantine of the contact form: each message that Akismet marked. The app holds them
+  # for a month, thus the owner can send a correct message that Akismet marked, and that message
+  # does not go away. A message with no mark never appears here: ContactMailJob sends it directly as
+  # an email.
   class SpamController < BaseController
     # GET /spam
     def index
@@ -16,8 +17,8 @@ module Admin
 
     # POST /spam/:id/not-spam
     #
-    # Releases a message: it's removed from the queue and re-enters the normal pipeline, which
-    # also reports the false positive back to Akismet.
+    # Sends a message: the code removes it from the queue and puts it in the normal path again, and
+    # that path also tells Akismet that its mark was incorrect.
     def not_spam
       message = SpamQuarantine.new.take(params[:id])
       return redirect_to(spam_path, status: :see_other, alert: "That message is no longer in the queue.") if message.nil?
@@ -26,8 +27,8 @@ module Admin
         message["name"],
         message["email"],
         message["message"],
-        # Carries the original submission time into the email, which would otherwise report the
-        # moment the message was released.
+        # This puts the first submission time in the email. Without it, the email would give the
+        # time when the owner sent the message.
         (message["context"] || {}).merge("received_at" => message["received_at"]),
         true
       )

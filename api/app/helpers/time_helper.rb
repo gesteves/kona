@@ -1,6 +1,6 @@
 module TimeHelper
-  # Formats a timestamp in the given timezone as "HH:MM <abbr>AM</abbr>", wrapping the
-  # meridiem in an <abbr> tag. Returns an HTML-unsafe string (render with `raw`).
+  # Formats a timestamp in the given timezone as "HH:MM <abbr>AM</abbr>". It puts the AM or the PM
+  # in an <abbr> tag. It returns a string that is not HTML-safe, thus render it with `raw`.
   # @param time [String, Time, nil] The time to format.
   # @param time_zone [String, nil] The IANA timezone id.
   # @return [String, nil]
@@ -10,11 +10,12 @@ module TimeHelper
     meridiem_abbr(Time.parse(time.to_s).in_time_zone(time_zone).strftime("%I:%M %p"))
   end
 
-  # Wraps the meridiem (AM/PM) in an <abbr> tag. Shared by the time and weather formatters.
+  # Puts the AM or the PM in an <abbr> tag. The time formatter and the weather formatter share it.
   #
-  # ⚠️ Word-bounded, and titled. Unbounded, it mangled any prose containing "am"/"pm" —
-  # "Amsterdam", "campus" — and this is public on a helper mixed into WeatherSummaryPresenter,
-  # which composes sentences. A title-less <abbr> also gives a screen reader nothing to expand.
+  # ⚠️ The match needs a word limit, and the tag needs a title. With no word limit, it changed each
+  # text with "am" or "pm" in it, for example "Amsterdam" and "campus", and this method is public on
+  # a helper that WeatherSummaryPresenter includes, and that class makes sentences. An <abbr> with
+  # no title also gives a screen reader no full form to speak.
   # @param text [String]
   # @return [String]
   def meridiem_abbr(text)

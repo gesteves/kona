@@ -1,14 +1,16 @@
 import { Controller } from "@hotwired/stimulus";
 
 /**
- * Collapses a four-sided value (padding, extra map) into one field while every side matches.
+ * Shows a value for four sides, for example the padding or the extra map, in one field while the
+ * four values are the same.
  *
- * All four fields stay in the DOM and stay named, so the form always submits four values — three
- * are only hidden. While linked, the first field's value is mirrored into the other three.
+ * All four fields stay in the DOM and keep their names, thus the form always submits four values.
+ * The code only hides three of them. While the four fields are together, the value of the first
+ * field goes into the other three.
  *
- * ⚠️ The mirror runs on the first field's own `input` event, which fires at the target before it
- * reaches the form. That ordering is what lets the preview controller, listening on the form, read
- * the already-mirrored values.
+ * ⚠️ The copy runs on the `input` event of the first field, and that event occurs at the field
+ * before it reaches the form. That order is what lets the preview controller, which listens on the
+ * form, read the values after the copy.
  */
 export default class extends Controller {
   static targets = ["toggle", "primary", "extra"];
@@ -37,14 +39,14 @@ export default class extends Controller {
     if (this.linked) this.mirror();
   }
 
-  /** @returns {boolean} Whether every side is being driven by the first field. */
+  /** @returns {boolean} True if the first field gives the value of each side. */
   get linked() {
     return this.toggleTarget.checked;
   }
 
   render() {
     this.element.classList.toggle("sides--linked", this.linked);
-    // Reading "Padding" over one box beats reading "Top" over a box that also sets the other three.
+    // "Padding" above one box is better than "Top" above a box that also sets the other three.
     this.primaryTarget.label = this.linked ? this.linkedLabelValue : this.sideLabel;
   }
 

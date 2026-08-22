@@ -1,11 +1,11 @@
-// Silent placeholders for the shared typographic treatments, @extend-ed by the components
-// (entry, blog, home, stats, weather). Placeholders emit nothing on their own, so only the
-// extending selectors reach the compiled CSS.
-// ⚠️ Unlike components/_layout.scss, these emit into `@layer base` — `@extend` merges selectors at
-// the placeholder's DEFINITION site, and this file is imported inside that layer. So roughly half
-// the base layer is component CSS, and any components-layer rule beats what's declared here
-// regardless of specificity. Relied on in places; don't "fix" the layering without re-checking
-// every same-specificity pair across the boundary.
+// The silent placeholders for the shared type treatments. The components use @extend on them:
+// entry, blog, home, stats, and weather. A placeholder writes nothing by itself, thus only the
+// selectors that extend it reach the compiled CSS.
+// ⚠️ components/_layout.scss is different: these placeholders write into `@layer base`, because
+// `@extend` joins the selectors at the place where the code DEFINES the placeholder, and this file
+// is in that layer. Thus approximately half of the base layer is component CSS, and each rule in
+// the components layer wins over a rule here, at each specificity. Some code depends on that. Do
+// not change the layers until you read each pair with the same specificity across the limit.
 %entry-header {
   h1,
   h2,
@@ -33,9 +33,10 @@
       text-decoration-thickness: 2px;
 
       @media screen {
-        // ⚠️ Prefix hand-written: the second arm of the condition is true in Chrome < 120, where
-        // only the prefixed property clips. Without it that branch sets `color: transparent` with
-        // no clip and the heading turns invisible. Nothing prefixes it for us — see config.rb.
+        // ⚠️ A person writes the prefix here. The second part of the condition is true in Chrome
+        // before version 120, where only the property with the prefix clips. Without it, that part
+        // sets `color: transparent` with no clip and the heading becomes invisible. No tool adds
+        // the prefix. Refer to config.rb.
         @supports (background-clip: text) or (-webkit-background-clip: text) {
           background: var(--gradient-link);
           // stylelint-disable-next-line property-no-vendor-prefix
@@ -129,8 +130,8 @@
   ul {
     margin-inline: 1rem;
 
-    // ⚠️ `margin-inline`, not `margin` — the shorthand also zeroed the 1.5rem block rhythm set
-    // above. Only the indent should drop here; the ol markers move to -2rem to compensate.
+    // ⚠️ Use `margin-inline`, and not `margin`. The short form also made the 1.5rem block spacing
+    // above zero. Only the indent must go away here. The ol markers move to -2rem for that.
     @include bp-medium {
       margin-inline: 0;
     }
@@ -190,9 +191,10 @@
     position: relative;
   }
 
-  // ⚠️ One raise mechanism only. `position: relative` + top/bottom is the whole offset; adding
-  // `vertical-align: super` back composes with it and lifts superscripts about twice as far as
-  // either rule intends, which at font-size 50%/line-height 0 collides with the line above.
+  // ⚠️ Use one method to move the text up. `position: relative` with top or bottom is the full
+  // offset. `vertical-align: super` adds to it and moves each superscript approximately two times
+  // as far as each rule wants. At font-size 50% and line-height 0, the text then touches the line
+  // above.
   sup {
     top: -0.5rem;
   }
@@ -318,8 +320,9 @@
     text-decoration-color: currentcolor;
   }
 
-  // Deliberately :focus-visible — on :focus this also strips the underline for mouse users,
-  // and the underline is a body link's only affordance (the color is currentcolor).
+  // This uses :focus-visible, on purpose. With :focus, it also removes the underline for a mouse
+  // user, and the underline is the only mark of a link in the body text, because its color is
+  // currentcolor.
   a:focus-visible {
     text-decoration: none;
   }
@@ -348,9 +351,9 @@
       }
     }
   
-    // `-webkit-initial-letter` doesn't work correctly with @font-face in WebKit:
+    // `-webkit-initial-letter` does not work correctly with @font-face in WebKit:
     // https://bugs.webkit.org/show_bug.cgi?id=195002
-    // Use a float instead.
+    // Use a float.
     @supports (-webkit-initial-letter: 3) and (not (initial-letter: 3)) {
       & > p:first-of-type::first-letter {
         float: left;
@@ -364,9 +367,8 @@
       }
     }
   
-    // Browsers that don't support `initial-letter` or `-webkit-initial-letter`.
-    // (AKA Firefox).
-    // Target it separately to deal with weird alignment issues.
+    // For a browser with no `initial-letter` and no `-webkit-initial-letter`, that is, Firefox.
+    // Use a separate rule for it, because its alignment is different.
     @supports not ((initial-letter: 3) or (-webkit-initial-letter: 3)) {
       & > p:first-of-type::first-letter {
         float: left;
@@ -416,7 +418,7 @@
   padding-bottom: 1rem;
 
   @media screen {
-    // ⚠️ Prefix hand-written — see the note on %entry-header above.
+    // ⚠️ A person writes the prefix here. Refer to the note on %entry-header above.
     @supports (background-clip: text) or (-webkit-background-clip: text) {
       background: var(--gradient-heading);
       // stylelint-disable-next-line property-no-vendor-prefix

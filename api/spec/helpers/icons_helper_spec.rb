@@ -3,7 +3,8 @@ require "rails_helper"
 RSpec.describe IconsHelper do
   subject(:helper) do
     Class.new { include IconsHelper }.new.tap do |h|
-      # Echo the requested icon id so we can assert which clock face is chosen, without Font Awesome.
+      # This returns the icon id from the request, thus a test can check which clock icon the code
+      # selects, and it needs no Font Awesome.
       allow(h).to receive(:icon_svg) { |_family, _style, id| id }
     end
   end

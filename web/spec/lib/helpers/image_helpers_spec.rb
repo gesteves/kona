@@ -2,12 +2,13 @@ require 'spec_helper'
 require 'ostruct'
 
 RSpec.describe ImageHelpers do
-  # Shaped like data.assets; @assets is set per example before the index is built.
+  # This has the shape of data.assets. Each example sets @assets before the code makes the index.
   def data = OpenStruct.new(assets: @assets || [])
 
-  # IMAGES_URL is the host Cloudflare serves transformations from, and is required everywhere —
-  # there's no Contentful-resizing fallback, so unset means raise. Nothing here reads CONTEXT or
-  # URL. Defaults to set, since that's every environment the code supports.
+  # IMAGES_URL is the host that Cloudflare serves each transformation from, and each environment
+  # needs it. There is no fallback to a Contentful resize, thus no value means a raise. No code
+  # here reads CONTEXT or URL. The default is a value, because that is each environment that the
+  # code supports.
   def stub_env(images_url: 'https://example.com')
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with('IMAGES_URL').and_return(images_url)
@@ -78,8 +79,8 @@ RSpec.describe ImageHelpers do
       expect(cdn_image_url(original, w: 10)).to eq('https://example.com/cdn-cgi/image/width=10/https://cdn.example.com/canonical.jpg')
     end
 
-    # The whole point of the hard requirement: this used to resize via Contentful instead, which
-    # looked identical in the browser and drained Contentful's bandwidth until someone noticed.
+    # This is why the value is necessary: the code resized with Contentful, which looked the same
+    # in the browser and used the Contentful bandwidth until a person found it.
     context 'when IMAGES_URL is unset' do
       before { stub_env(images_url: nil) }
 
@@ -122,7 +123,7 @@ RSpec.describe ImageHelpers do
       expect(url).to include('height=630')
     end
 
-    # Centre-cropped on purpose. gravity=auto was tried and reverted: its saliency crops were
+    # The code cuts the image at the center, on purpose. gravity=auto gave saliency crops that were
     # too unpredictable on these photos.
     it 'centre-crops on Cloudflare, asking for no gravity' do
       url = open_graph_image_url('https://images.ctfassets.net/s/a/t/p.jpg')
@@ -152,9 +153,9 @@ RSpec.describe ImageHelpers do
     end
   end
 
-  # Cloudflare branch, exact output pinned. Cloudflare puts its options in the path, so the
-  # option order, their names (width/height/format/fit, not w/h/fm), and the fact that the
-  # source URL is appended raw all have to survive a refactor unchanged.
+  # The Cloudflare code, with the exact output. Cloudflare puts its options in the path. Thus the
+  # order of the options, their names (width, height, format, and fit, and not w, h, and fm), and
+  # the source URL at the end with no change must all stay the same after a change to the code.
   describe '#cdn_image_url exact Cloudflare output' do
     let(:source) { 'https://images.ctfassets.net/space/asset-1/token/photo.jpg' }
 
@@ -170,9 +171,9 @@ RSpec.describe ImageHelpers do
       expect(url).to eq("https://example.com/cdn-cgi/image/format=auto,width=100/#{source}")
     end
 
-    # Cloudflare rejects a URL with no options, and anim=true is its default — so this is how a
-    # params-less caller asks for the image untransformed. Emitting no format here is what keeps
-    # gifs animated and preserves transparency; don't "tidy" it into format=auto.
+    # Cloudflare refuses a URL with no options, and anim=true is its default. Thus this is how a
+    # caller with no parameters asks for the image with no transformation. No format here is what
+    # keeps a gif animated and keeps the transparency. Do not change it to format=auto.
     it 'falls back to anim=true when there are no params, transforming nothing' do
       url = cdn_image_url(source)
       expect(url).to eq("https://example.com/cdn-cgi/image/anim=true/#{source}")
@@ -183,8 +184,8 @@ RSpec.describe ImageHelpers do
       expect(url).to eq("https://example.com/cdn-cgi/image/width=50/#{source}")
     end
 
-    # The candidates are joined with ", " — commas also separate Cloudflare's options, so the
-    # space is what keeps the srcset parseable. Don't join with a bare comma.
+    # A ", " goes between the candidates. A comma also goes between the Cloudflare options, thus
+    # the space is what lets a parser read the srcset. Do not use a comma alone.
     it 'builds a srcset whose candidates stay distinguishable from the option commas' do
       set = srcset(url: source, widths: [ 100, 200 ], options: { fm: 'auto' })
       expect(set).to eq(
@@ -209,8 +210,8 @@ RSpec.describe ImageHelpers do
         )
       end
 
-      # The rescue below exists for a site entry with no logo. It must not also swallow a
-      # misconfigured build into a silently missing icon.
+      # The rescue below exists for a site entry with no logo. It must not also change a build with
+      # an incorrect configuration into an icon that is absent with no message.
       it 'lets a missing IMAGES_URL raise through its rescue' do
         stub_env(images_url: nil)
         expect { site_icon_url(w: 32) }.to raise_error(ImageHelpers::ImagesUrlMissing)
@@ -225,12 +226,12 @@ RSpec.describe ImageHelpers do
   end
 
   describe '#generate_open_graph_image_url' do
-    # root_url lives in UrlHelpers; only ImageHelpers is auto-included here. The card route is
-    # served by the site's own Worker, so this is the only host involved.
+    # root_url is in UrlHelpers, and RSpec includes only ImageHelpers here. The Worker of the site
+    # serves the card route, thus this is the only host.
     def root_url = @root_url || 'https://example.com'
 
-    # The card hangs off the page's own path, so the Worker can derive the page from the request
-    # path instead of a ?path= parameter — see web/src/og.ts.
+    # The card URL comes from the path of the page. Thus the Worker can find the page from the
+    # request path, and not from a ?path= parameter. Refer to web/src/og.ts.
     it 'hangs the card off the page’s own path, with a version cache buster' do
       result = generate_open_graph_image_url('/articles/foo/', 1082)
       parsed = URI.parse(result)
@@ -257,7 +258,7 @@ RSpec.describe ImageHelpers do
   end
 
   describe 'blurhash pipeline' do
-    # A published 1600x900 JPEG; the 32px-wide blurhash thumb is 32x18.
+    # A published JPEG of 1600x900. The blurhash thumbnail at 32px wide is 32x18.
     def asset(content_type: 'image/jpeg', published_version: 3)
       OpenStruct.new(
         sys: OpenStruct.new(id: 'asset-1', published_version: published_version),
@@ -275,10 +276,10 @@ RSpec.describe ImageHelpers do
       before do
         allow(self).to receive(:redis).and_return(fake_redis)
         allow(self).to receive(:encode_blurhash).with('asset-1', 32, 18).and_return('LEHV6nWB2yk8pyo0adR*.7kCMdnj')
-        # ⚠️ Blurhash.decode is deliberately NOT stubbed. It's pure Ruby and a 32x18 decode is
-        # sub-millisecond, and a stub returning a flat array is exactly what hid the TypeError
-        # from `pixels.pack('C*')` on decode's real nested [row][col][r,g,b,a] output — every
-        # cache miss produced no placeholder for weeks. Let the real shape through.
+        # ⚠️ This does NOT stub Blurhash.decode, on purpose. It is Ruby only, and a 32x18 decode
+        # takes less than a millisecond. A stub that returns a flat array is what hid the TypeError
+        # from `pixels.pack('C*')` on the true nested [row][col][r,g,b,a] output of decode. Each
+        # cache miss then gave no placeholder for weeks. Use the true shape.
         allow(fake_image).to receive(:copy).and_return(fake_image)
         allow(fake_image).to receive(:extract_band).and_return(fake_image)
         allow(Vips::Image).to receive(:new_from_memory).and_return(fake_image)
@@ -290,7 +291,7 @@ RSpec.describe ImageHelpers do
 
       it 'flattens the decoded pixels before packing them into the vips buffer' do
         blurhash_jpeg_data_uri('asset-1')
-        # 32x18 RGBA, one byte per band — the nested array pack raises TypeError instead.
+        # 32x18 RGBA, with one byte for each band. A pack of the nested array raises TypeError.
         expect(Vips::Image).to have_received(:new_from_memory)
           .with(satisfy { |buffer| buffer.bytesize == 32 * 18 * 4 }, 32, 18, 4, :uchar)
       end
@@ -324,9 +325,9 @@ RSpec.describe ImageHelpers do
     end
 
     describe '#encode_blurhash' do
-      # The thumbnail is resized by Cloudflare like every other image on the site. It used to go
-      # straight to Contentful's Images API to save a transformation, but a transformation costs
-      # a fraction of a cent and Contentful's asset bandwidth is what's metered.
+      # Cloudflare resizes the thumbnail, as it resizes each other image on the site. The code went
+      # to the Contentful Images API to save a transformation, but a transformation costs a small
+      # part of a cent and the Contentful asset bandwidth is what has a meter.
       it 'resizes the thumbnail through Cloudflare Images' do
         stub_env(images_url: 'https://example.com')
         allow(URI).to receive(:open).and_raise(StandardError, 'stop here')
@@ -342,9 +343,9 @@ RSpec.describe ImageHelpers do
         )
       end
 
-      # The mirrored URL is the right source here: Cloudflare fetches it from inside the zone,
-      # and the resize lives in the path, so nothing depends on the source honouring query
-      # strings (R2 ignores them, which is why this couldn't use the mirror before).
+      # The mirror URL is the correct source here: Cloudflare gets it from inside the zone, and the
+      # resize is in the path. Thus no code needs the source to read a query string. R2 ignores a
+      # query string, and that is why this code could not use the mirror before.
       it 'sources the thumbnail from the R2 mirror when the rewrite is on' do
         @assets = [
           OpenStruct.new(
@@ -367,8 +368,9 @@ RSpec.describe ImageHelpers do
         )
       end
 
-      # Nothing renders without IMAGES_URL anyway, but the rescue here would turn that into a
-      # silent loss of placeholders rather than the loud failure cdn_image_url exists to give.
+      # Nothing renders without IMAGES_URL, but the rescue here would change that into a loss of
+      # the placeholders with no message, and cdn_image_url exists to give a failure with a
+      # message.
       it 'warns and returns nil when IMAGES_URL is unset' do
         stub_env(images_url: nil)
         allow(self).to receive(:warn)

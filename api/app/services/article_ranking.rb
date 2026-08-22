@@ -1,20 +1,23 @@
-# Shared behavior for the request-time article rankings (TrendingArticles, RelatedArticles):
-# the candidate corpus filter and the self-contained card payload the rankings cache. Both
-# services set @articles (an Articles corpus source) in their constructors.
+# The shared code of the article lists that the app makes at request time: TrendingArticles and
+# RelatedArticles. It has the filter that selects the candidate articles, and the complete card data
+# that each list puts in the cache. Each of the two services sets @articles, which is an Articles
+# source, in its constructor.
 module ArticleRanking
-  # Bump when `payload` changes shape. ⚠️ Both rankings cache `payload` under their own keys, so
-  # every such key must carry this — versioning it per-service left one of them serving entries
-  # missing the new fields for a full TTL.
+  # Increase this after a change to the shape of `payload`. ⚠️ Each of the two lists puts `payload`
+  # in the cache under its own key, thus each such key must contain this value. With one version
+  # number for each service, one of the two served entries with no value for the new fields, for a
+  # full TTL.
   PAYLOAD_VERSION = 4
 
   private
 
-  # Published, non-Short articles with a resolvable path (drafts/Shorts excluded — matches web).
+  # The published articles that are not a Short and that have a path. This does not include a draft
+  # and a Short, and web does the same.
   def candidates
     @articles.list.reject { |a| a.draft || a.entry_type == "Short" || a.path.blank? }
   end
 
-  # The fields the card views render, so the cached ranking is self-contained.
+  # The fields that the card views render, thus the list in the cache is complete.
   def payload(article)
     {
       title: article.title,

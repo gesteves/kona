@@ -1,14 +1,14 @@
 /**
- * The security headers the Worker routes can't inherit.
+ * The security headers that the Worker routes cannot get from another place.
  *
- * ⚠️ These paths are claimed by `run_worker_first`, so they never touch the static asset layer
- * and never get the `/*` rules in `source/headers` — every one of them has to be re-set here.
- * Keep this list in step with that file's `/*` block. The CSP is deliberately not duplicated: it
- * is long, Report-Only, and describes documents, whereas these responses are HTML fragments and
- * PNGs that are never a top-level browsing context in normal use.
+ * ⚠️ `run_worker_first` takes these paths, thus they never reach the static asset layer and never
+ * get the `/*` rules of `source/headers`. Each header must go here again. Keep this list the same
+ * as the `/*` block of that file. The CSP is not here, on purpose: it is long, it is Report-Only,
+ * and it describes a document. These responses are HTML fragments and PNGs, and in normal use they
+ * are never a top-level browsing context.
  *
- * @param headers The response headers to add to, mutated in place.
- * @returns The same Headers, for chaining into a Response init.
+ * @param headers The response headers. This function changes them in place.
+ * @returns The same Headers, for use in a Response init.
  */
 export function withSecurityHeaders(headers: Headers): Headers {
   headers.set('referrer-policy', 'no-referrer-when-downgrade');

@@ -1,8 +1,9 @@
 require "ostruct"
 
-# Recursively wraps parsed JSON (Hashes/Arrays) in OpenStructs so it can be read with
-# dot notation, the way the Middleman `data.*` objects were. This lets the weather
-# helpers be ported almost verbatim. Missing keys return nil (like OpenStruct/Middleman).
+# Puts parsed JSON, that is, a Hash or an Array, into an OpenStruct at each level. Thus the code can
+# read it with dot notation, as it read the `data.*` objects of Middleman. That is why the weather
+# helpers needed almost no change. A key that is absent gives nil, as in OpenStruct and in
+# Middleman.
 module DeepOstruct
   module_function
 

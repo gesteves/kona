@@ -42,7 +42,8 @@
     font-style: italic;
   }
 
-  // ⚠️ 700, not 600: Lato ships 300/300i/700 here, so 600 already snaps to the 700 face.
+  // ⚠️ Use 700, and not 600. Lato has the 300, 300i, and 700 weights here, thus 600 already gives
+  // the 700 face.
   b,
   strong {
     font-weight: 700;
@@ -79,8 +80,9 @@
   grid-column: span 12;
 }
 
-// <wa-scroller> host: scrolls the social links horizontally instead of wrapping at narrow
-// widths. Match the scroll-shadow fade to the footer gradient's top color in each mode.
+// The <wa-scroller> host: it scrolls the social links horizontally and does not put them on two
+// lines at a small width. Make the scroll shadow the same as the top color of the footer gradient,
+// in each mode.
 .footer__socials {
   --shadow-color: var(--color-alice-blue);
 
@@ -96,8 +98,9 @@
   }
 }
 
-// max-content keeps the row from wrapping; left-aligned by default, right-aligned when it
-// fits on wider footers. On overflow the auto margin collapses to 0 so the scroller scrolls.
+// max-content keeps the row on one line. It starts at the left by default, and it moves to the
+// right when it fits in a wider footer. When it is too wide, the automatic margin becomes 0 and the
+// scroller scrolls.
 .footer__socials-list {
   align-items: center;
   display: flex;
@@ -182,8 +185,8 @@
     content: none;
   }
 
-  // The search trigger is a <button> — it needs JS, so there's no href to fall back to — and is
-  // stripped back to match the links beside it.
+  // The search control is a <button>, because it needs JavaScript and there is no href for a browser
+  // with no JavaScript. This rule removes its appearance, thus it looks like the links beside it.
   button {
     appearance: none;
     background: none;

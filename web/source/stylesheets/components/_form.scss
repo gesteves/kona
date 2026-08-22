@@ -3,9 +3,9 @@
   flex-flow: column;
   margin: 1.5rem 0;
 
-  // The visible fields are Web Awesome custom elements (<wa-input>, <wa-textarea>) whose
-  // shadow controls use `font-family: inherit`, so setting the family on the host carries
-  // the site font into them. Width/margin lay the fields out in the flex column.
+  // Each visible field is a Web Awesome custom element (<wa-input> or <wa-textarea>), and each
+  // control in its shadow DOM uses `font-family: inherit`. Thus a font family on the host gives the
+  // site font to the control. The width and the margin put the fields in the flex column.
   wa-input,
   wa-textarea {
     font-family: var(--lato);
@@ -17,8 +17,8 @@
     align-self: flex-start;
     font-family: var(--lato);
 
-    // The send icon is a raw inline SVG slotted into the button's `end` slot
-    // (the site doesn't use <wa-icon>); size it to the label and inherit its color.
+    // The send icon is an inline SVG in the `end` slot of the button, because the site does not use
+    // <wa-icon>. Make it the size of the label and give it the color of the label.
     svg[slot="end"] {
       fill: currentcolor;
       height: 1em;
@@ -26,13 +26,14 @@
     }
   }
 
-  // The honeypot field the api checks (`comment`); keep it hidden from real visitors.
+  // The honeypot field that the api reads (`comment`). Keep it hidden from a true visitor.
   label.hp {
     display: none;
   }
 
-  // Cloudflare Turnstile mounts here. Match the field spacing when the widget is present; collapse
-  // the gap when it isn't (no sitekey configured, or before the widget renders).
+  // Cloudflare Turnstile goes here. Use the same space as between two fields when the widget is
+  // present. Remove that space when it is absent, that is, when there is no sitekey in the
+  // configuration and before the widget renders.
   .contact__turnstile {
     margin: 0 0 2rem;
 

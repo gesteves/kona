@@ -1,6 +1,6 @@
-# Resolves the current air quality, preferring PurpleAir (nearest sensor) and falling
-# back to the Google Air Quality API, mirroring the web app's import logic.
-# `data` returns the AQI wrapped for dot-access (aqi/category/description) or nil.
+# Finds the current air quality. It uses PurpleAir first, with the nearest sensor, and then the
+# Google Air Quality API. The import code of the web app does the same.
+# `data` returns the AQI in an object with dot access, with aqi, category, and description, or nil.
 class AirQuality
   include UpstreamIsolation
 
@@ -10,9 +10,9 @@ class AirQuality
     @country_code = country_code
   end
 
-  # ⚠️ Each provider is isolated separately. Chaining them with `||=` alone only falls back when
-  # PurpleAir returns *nil* — a raise propagates straight past the Google fallback, so the
-  # fallback never ran in exactly the case it exists for.
+  # ⚠️ The code separates each provider. With `||=` alone, it uses Google only when PurpleAir returns
+  # *nil*. A raise goes past the Google code, thus that code never ran in the one condition that it
+  # exists for.
   # @return [OpenStruct, nil]
   def data
     aqi = safely("PurpleAir") { PurpleAir.new(@latitude, @longitude).aqi }

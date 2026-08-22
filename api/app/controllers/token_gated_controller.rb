@@ -1,8 +1,10 @@
-# Abstract base for the token-gated programmatic endpoints. Inherits ActionController::Base
-# directly to skip the modern-browser gate, and renders bare responses with no layout.
+# The abstract base of the endpoints for a machine, which need a token. It inherits from
+# ActionController::Base directly, thus it does not use the modern-browser check, and it renders a
+# plain response with no layout.
 #
-# Every action requires the API_TOKEN bearer, so scanners get a cheap 401 before any controller
-# or upstream work; deliberately public endpoints skip_before_action the check.
+# Each action needs the API_TOKEN bearer token, thus a scanner gets a fast 401 before each controller
+# operation and each upstream call. An endpoint that is public, on purpose, removes that check with
+# skip_before_action.
 class TokenGatedController < ActionController::Base
   include LiveWidget
   include TokenAuthentication

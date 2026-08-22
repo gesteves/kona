@@ -1,6 +1,7 @@
 module ArticlesHelper
-  # A permalink <a> whose text is the publication date (the no-JS fallback). The publish-date
-  # Stimulus controller swaps in a live relative timestamp client-side for recent articles.
+  # A permalink <a> whose text is the publish date. That is the result with no JavaScript. For a
+  # recent article, the publish-date Stimulus controller puts a live relative time in its place, in
+  # the browser.
   def article_permalink_timestamp(article)
     published = DateTime.parse(article.published_at)
     options = {
@@ -11,8 +12,9 @@ module ArticlesHelper
     link = content_tag :a, options do
       published.strftime("%A, %B %-e, %Y")
     end
-    # Wrap in a <time> so the ISO publish instant is machine-readable. The Stimulus controller
-    # swaps the inner <a>'s content for recent posts; this wrapper (and its datetime) is untouched.
+    # Put this in a <time>, thus a machine can read the ISO publish instant. The Stimulus controller
+    # changes the content of the <a> in it for a recent post, and this element, with its datetime,
+    # does not change.
     content_tag :time, link, datetime: published.iso8601
   end
 end

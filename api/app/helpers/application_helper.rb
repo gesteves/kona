@@ -1,11 +1,11 @@
 module ApplicationHelper
-  # The IANA timezone the site's publish dates are reckoned in.
+  # The IANA timezone of the publish dates of the site.
   #
-  # ⚠️ Mirrors the static site's SiteHelpers#site_time_zone, nil included — the controller falls
-  # back to the reader's browser zone for a blank value, so a different default here (e.g.
-  # TimeZoneResolver.default) would make the same article show the "New" badge in one list and
-  # not the other on the same page.
-  # @return [String, nil] An IANA timezone id, or nil when unset.
+  # ⚠️ This is the same as SiteHelpers#site_time_zone of the static site, and this includes the nil
+  # value. The controller uses the browser zone of the reader for a blank value. Thus a different
+  # default here, for example TimeZoneResolver.default, would show the "New" badge on one article in
+  # one list and not in the other list, on the same page.
+  # @return [String, nil] An IANA timezone id, or nil when it has no value.
   def site_time_zone
     ENV["TIME_ZONE"].presence
   end

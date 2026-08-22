@@ -1,13 +1,13 @@
-# Fetches air quality from the Google Air Quality API (the fallback when PurpleAir has
-# no nearby sensor, e.g. outside the US). `aqi` returns { aqi:, category:, description: }
-# or nil.
+# Gets the air quality from the Google Air Quality API. The app uses it when PurpleAir has no sensor
+# near the location, for example outside the USA. `aqi` returns { aqi:, category:, description: }, or
+# nil.
 class GoogleAirQuality < ApplicationService
   include GoogleApi
 
   GOOGLE_AQI_API_URL = "https://airquality.googleapis.com/v1"
 
-  # Google's forecast endpoint only covers the next 96 hours (4 days); a dateTime beyond that
-  # returns 400 "The specified time period is not supported". Bail before requesting one.
+  # The forecast endpoint of Google covers the next 96 hours, that is, 4 days. A dateTime after that
+  # gives a 400 with "The specified time period is not supported". Stop before such a request.
   FORECAST_MAX_HORIZON = 96.hours
 
   def initialize(latitude, longitude, country_code, aqi_code = "usa_epa_nowcast", datetime = nil)
@@ -31,10 +31,11 @@ class GoogleAirQuality < ApplicationService
 
     data = data[:hourlyForecasts].first if data[:hourlyForecasts].present?
 
-    # Only trust the requested local index (US EPA NowCast). Google's Universal AQI (uaqi) runs
-    # on an inverted 0–100 scale (0 = worst, 100 = best), the opposite of US EPA — rendering it
-    # under our EPA icon/label semantics would show a wrong-scale number. If the local index
-    # isn't returned, return nil so the widget collapses the AQI line rather than mislead.
+    # Use the local index only, which is the US EPA NowCast. The Universal AQI of Google (uaqi) uses
+    # a 0 to 100 scale in the other direction: 0 is the worst and 100 is the best, which is the
+    # opposite of the US EPA scale. With our EPA icon and label, that number would be incorrect. If
+    # the response has no local index, return nil, thus the widget removes the AQI line and shows no
+    # incorrect number.
     result = data[:indexes]&.find { |i| i[:code] == @aqi_code }
     return if result.blank?
 

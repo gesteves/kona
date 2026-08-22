@@ -1,14 +1,16 @@
 module Api
-  # Sets the current location used by the weather/Whoop widgets. A bearer-token-secured POST writes
-  # the shared "location:current" Redis key (read by this app's Location service); this replaced the
-  # old build-hook ingress. It also enqueues a LocationSyncJob to propagate the location to
-  # Intervals.icu (athlete profile + weather config) in the background.
+  # Sets the current location that the weather widget and the Whoop widget use. A POST with a bearer
+  # token writes the shared "location:current" Redis key, which the Location service of this app
+  # reads. This replaced the build-hook input of the past. It also adds a LocationSyncJob to the
+  # queue, which sends the location to Intervals.icu, to the profile of the athlete and to the
+  # weather configuration, in the background.
   #
-  # The write itself lives in Location.store, shared with the admin's Location page so the two
-  # can't drift. This endpoint keeps its own error messages: they're read by external callers.
+  # Location.store does the write, and the Location page of the admin uses the same method. Thus the
+  # two always agree. This endpoint keeps its own error messages, because an external caller reads
+  # them.
   class LocationController < BaseController
-    # The API_TOKEN bearer check is inherited from BaseController; only forgery protection
-    # (this is a POST) needs handling here.
+    # The API_TOKEN bearer check comes from BaseController. Only the forgery protection needs code
+    # here, because this is a POST.
     skip_forgery_protection
 
     def create

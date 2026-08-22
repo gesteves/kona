@@ -20,10 +20,10 @@
   }
 }
 
-// The optional archive intro (a concept's Markdown description), sitting below the header
-// and above the list. Styled like blog post body text; %body-styles zeroes its trailing
-// margin (& > *:last-child). Carries the same bottom border/spacing as the header so it's
-// clearly separated from the entry list.
+// The archive intro, which is optional and which is the Markdown description of a concept. It is
+// below the header and above the list. It looks like the body text of a blog post, and %body-styles
+// makes its last margin zero, with & > *:last-child. It has the same bottom border and the same
+// space as the header, thus a reader sees that it is separate from the list of entries.
 .blog__description {
   @extend %body-styles;
   @include section-rule;

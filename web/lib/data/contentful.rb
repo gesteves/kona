@@ -4,8 +4,8 @@ require "httparty"
 require_relative "graphql/contentful"
 
 class Contentful
-  # Raised when IMAGE_HOST is unset. The zone allowlists only the R2 mirror as a Cloudflare
-  # Images source, so there is no working URL to emit without it.
+  # The app raises this when IMAGE_HOST has no value. The zone permits only the R2 mirror as a
+  # Cloudflare Images source, thus there is no correct URL to write without it.
   class ImageHostMissing < StandardError
     MESSAGE = <<~MSG.freeze
       IMAGE_HOST is unset, so asset URLs would still point at Contentful.
@@ -38,7 +38,7 @@ class Contentful
     generate_content!
   end
 
-  # Writes every fetched collection to data/*.json.
+  # Writes each collection that it gets to data/*.json.
   def save_data
     @content.each do |type, data|
       save_to_file(type, data)
@@ -49,16 +49,17 @@ class Contentful
 
   # Writes one collection to data/<type>.json.
   #
-  # ⚠️ Deliberately unrescued. `rake clobber` deletes data/*.json, so a swallowed write failure
-  # leaves the file missing while the import still reports success — and the build then renders
-  # pages against data that isn't there. Fail loudly, like import:icons does.
-  # @param type [Symbol] The collection's name.
+  # ⚠️ There is no rescue here, on purpose. `rake clobber` deletes data/*.json. Thus a write
+  # failure that a rescue hides leaves the file absent while the import reports success, and the
+  # build then renders pages with data that does not exist. Fail with a message, as import:icons
+  # does.
+  # @param type [Symbol] The name of the collection.
   # @param data [Array<Hash>, Hash] The data to write.
   def save_to_file(type, data)
     File.write("data/#{type}.json", data.to_json)
   end
 
-  # Fetches everything from Contentful and derives the collections the build reads.
+  # Gets all the data from Contentful and makes the collections that the build reads.
   def generate_content!
     get_contentful_data
     process_site
@@ -70,8 +71,8 @@ class Contentful
     generate_tags
   end
 
-  # Fetches every collection from Contentful's GraphQL API, paginating each one.
-  # @return [Hash{Symbol => Object}] The paginated collections to fetch, by data key.
+  # Gets each collection from the Contentful GraphQL API, one page at a time.
+  # @return [Hash{Symbol => Object}] The collections to get, by data key.
   def collection_queries
     {
       articles: ContentfulClient::QUERIES::Articles,
@@ -83,19 +84,19 @@ class Contentful
     }
   end
 
-  # Pages within a collection have to be sequential (each `skip` depends on the last page), but
-  # the collections don't depend on each other, so they're fetched concurrently. A raise in any
-  # thread surfaces on the join and still fails the import.
+  # The pages in one collection must come in sequence, because each `skip` depends on the last
+  # page. But the collections do not depend on each other, thus the code gets them at the same
+  # time. A raise in a thread comes back at the join and still stops the import.
   def get_contentful_data
     collection_queries
       .map { |key, query| Thread.new { [ key, fetch_collection(key, query) ] } }
       .each { |thread| key, items = thread.value; @content[key] += items }
   end
 
-  # Pages through one collection.
-  # @param key [Symbol] The collection's data key.
+  # Reads one collection, one page at a time.
+  # @param key [Symbol] The data key of the collection.
   # @param query [Object] The GraphQL query.
-  # @return [Array<Hash>] Every item in it.
+  # @return [Array<Hash>] All the items in it.
   def fetch_collection(key, query)
     limit = 100
     skip = 0
@@ -109,9 +110,9 @@ class Contentful
       page = data.dig(key, :items) || []
       items += page.compact
 
-      # ⚠️ The page's raw size decides whether there's another page, not the compacted one.
-      # Contentful returns a null item for any link it can't resolve, so comparing after
-      # `compact` ends pagination early and silently truncates the collection.
+      # ⚠️ The raw size of the page tells if there is another page. Do not use the size after
+      # `compact`. Contentful returns a null item for each link that it cannot resolve. Thus a
+      # comparison after `compact` stops the pages too soon and makes the collection incomplete.
       break if page.size < limit
 
       skip += limit
@@ -120,20 +121,20 @@ class Contentful
     items
   end
 
-  # Collapses the sites collection to the single site entry.
+  # Makes the sites collection into the one site entry.
   def process_site
     @content[:site] = @content[:sites].first
     @content.delete(:sites)
   end
 
-  # Derives each article's taxonomy, entry fields, and path.
+  # Makes the taxonomy, the entry fields, and the path of each article.
   def process_articles
     apply_taxonomy_to_articles
     process_collection(:articles, :set_article_path)
   end
 
-  # Rewrites each article's contentful_metadata[:tags] from its assigned concept ids, joining
-  # them to their name, short name, scheme, parent, path, and synonyms.
+  # Changes the contentful_metadata[:tags] of each article from its concept ids. It joins each id
+  # to its name, short name, scheme, parent, path, and synonyms.
   def apply_taxonomy_to_articles
     taxo = taxonomy
     @content[:articles].each do |item|
@@ -144,15 +145,16 @@ class Contentful
     end
   end
 
-  # Derives each page's entry fields and path.
+  # Makes the entry fields and the path of each page.
   def process_pages
     process_collection(:pages, :set_page_path, entry_type: "Page")
   end
 
-  # Derives the entry fields for a collection, sets each item's path, and sorts newest-first.
-  # @param key [Symbol] The @content collection to process.
-  # @param path_setter [Symbol] The method that sets each item's :path.
-  # @param entry_type [String, nil] A fixed entry type, or nil to derive it per item.
+  # Makes the entry fields for a collection, sets the path of each item, and puts the newest item
+  # first.
+  # @param key [Symbol] The @content collection to change.
+  # @param path_setter [Symbol] The method that sets the :path of each item.
+  # @param entry_type [String, nil] A fixed entry type, or nil to make one for each item.
   def process_collection(key, path_setter, entry_type: nil)
     @content[key].map! do |item|
       set_entry_type(item, entry_type)
@@ -162,51 +164,53 @@ class Contentful
       set_template(item)
     end
 
-    # sort_by! parses each date once, where sort! would parse twice per comparison.
+    # sort_by! parses each date one time. sort! would parse two dates for each comparison.
     @content[key].sort_by! { |item| DateTime.parse(item[:published_at]) }.reverse!
   end
 
-  # Points every asset URL at the image mirror.
+  # Sets each asset URL to the image mirror.
   def process_assets
     @content[:assets].map! do |item|
       rewrite_image_urls(item)
     end
   end
 
-  # Points an asset's URL at IMAGE_HOST, the R2 bucket the api mirrors published assets into,
-  # so Cloudflare Images fetches the untransformed source from inside our own zone.
+  # Sets the URL of an asset to IMAGE_HOST, the R2 bucket that the api copies published assets
+  # into. Thus Cloudflare Images gets the source with no transformation from inside our own zone.
   #
-  # Cross-app contract: only the host changes, so Contentful's path is the R2 key. The api
-  # writes objects under exactly this path, neither side validates the other, and a mismatch
-  # 404s every image on the site silently. Setting IMAGE_HOST also asserts the mirror is
-  # populated — run the api's `rake assets:backfill` first. See the root CLAUDE.md.
-  # @param item [Hash] The asset to rewrite.
+  # This is a contract between the two apps: only the host changes, thus the Contentful path is
+  # the R2 key. The api writes each object at this same path. Neither side checks the other, and
+  # a difference makes each image on the site 404 with no message. A value in IMAGE_HOST also
+  # says that the mirror is complete. Run the `rake assets:backfill` of the api first. Refer to
+  # the root CLAUDE.md.
+  # @param item [Hash] The asset to change.
   # @return [Hash] The asset.
-  # @raise [ImageHostMissing] if IMAGE_HOST is unset.
+  # @raise [ImageHostMissing] If IMAGE_HOST has no value.
   def rewrite_image_urls(item)
     raise ImageHostMissing if ENV["IMAGE_HOST"].blank?
 
     uri = URI.parse(item[:url])
-    # Every ctfassets host, not just images.ctfassets.net: Contentful serves some image assets
-    # from downloads.ctfassets.net, and matching only the images host would leave those hitting
-    # Contentful forever. Paths are identical across hosts, so one key covers both. The api's
-    # AssetMirror#object_key must keep matching the same set.
+    # Match each ctfassets host, not only images.ctfassets.net. Contentful serves some image
+    # assets from downloads.ctfassets.net. If you match only the images host, those assets go to
+    # Contentful for all time. The paths are the same on both hosts, thus one key is sufficient
+    # for both. The AssetMirror#object_key of the api must match the same set.
     if uri.host.to_s.end_with?(".ctfassets.net")
       uri.host = ENV["IMAGE_HOST"]
       item[:url] = uri.to_s
     end
     item
   rescue ImageHostMissing
-    # A misconfigured build must fail; the rescue below only covers one asset's malformed URL.
+    # A build with an incorrect configuration must fail. The rescue below is only for one asset
+    # with an incorrect URL.
     raise
   rescue => e
     puts "Error rewriting image URL: #{e.message}"
     item
   end
 
-  # Sets an item's entry type: the given one, else Article or Short depending on whether it has
-  # a body.
-  # @param item [Hash] The item to process.
+  # Sets the entry type of an item: the given type, or Article if the item has a body and Short
+  # if it does not.
+  # @param item [Hash] The item to change.
   # @param type [String, nil] A fixed type.
   # @return [Hash] The item.
   def set_entry_type(item, type = nil)
@@ -220,8 +224,9 @@ class Contentful
     item
   end
 
-  # Marks an item a draft when it has no published version, and unindexable when it's a draft.
-  # @param item [Hash] The item to process.
+  # Marks an item as a draft if it has no published version. A draft also gets a mark that stops
+  # a search engine from an index of it.
+  # @param item [Hash] The item to change.
   # @return [Hash] The item.
   def set_draft_status(item)
     draft = item.dig(:sys, :published_version).blank?
@@ -230,8 +235,8 @@ class Contentful
     item
   end
 
-  # Sets an item's published and updated timestamps.
-  # @param item [Hash] The item to process.
+  # Sets the published and updated timestamps of an item.
+  # @param item [Hash] The item to change.
   # @return [Hash] The item.
   def set_timestamps(item)
     item[:published_at] = item.dig(:published) || item.dig(:sys, :first_published_at) || Time.now.to_s
@@ -240,28 +245,28 @@ class Contentful
   end
 
   # @param item [Hash] A draft item.
-  # @return [String] The stable id-based preview path drafts live at.
+  # @return [String] The stable preview path of a draft, which comes from its id.
   def draft_path(item)
     "/id/#{item.dig(:sys, :id)}/index.html"
   end
 
-  # Sets an article's path: its draft preview path, or its dated permalink.
-  # @param item [Hash] The article to process.
+  # Sets the path of an article: its draft preview path, or its permalink with the date.
+  # @param item [Hash] The article to change.
   # @return [Hash] The article.
   def set_article_path(item)
     item[:path] = if item[:draft]
       draft_path(item)
     else
-      # Y/M/D come from the timestamp's own zone, never normalized to UTC: published permalinks
-      # must not move, and the local date is the one the entry was published under.
+      # The year, month, and day come from the zone of the timestamp. Never change them to UTC.
+      # A published permalink must not move, and the local date is the publish date of the entry.
       published = DateTime.parse(item[:published_at])
       "/#{published.strftime('%Y')}/#{published.strftime('%m')}/#{published.strftime('%d')}/#{item[:slug]}/index.html"
     end
     item
   end
 
-  # Sets a page's path: its draft preview path, the site root, or its slug.
-  # @param item [Hash] The page to process.
+  # Sets the path of a page: its draft preview path, the site root, or its slug.
+  # @param item [Hash] The page to change.
   # @return [Hash] The page.
   def set_page_path(item)
     item[:path] = if item[:draft]
@@ -274,8 +279,8 @@ class Contentful
     item
   end
 
-  # Sets the Middleman template an item renders through.
-  # @param item [Hash] The item to process.
+  # Sets the Middleman template that renders an item.
+  # @param item [Hash] The item to change.
   # @return [Hash] The item.
   def set_template(item)
     item[:template] = if item[:entry_type] == "Article"
@@ -290,16 +295,16 @@ class Contentful
     item
   end
 
-  # Builds the per-tag archive pages: one per concept with articles in its own subtree, so a
-  # parent lists everything its descendants are tagged with. Concepts with an empty subtree get
-  # no page.
+  # Makes the archive page for each tag: one page for each concept that has articles in its own
+  # subtree. Thus a parent lists each article that its children have a tag for. A concept with an
+  # empty subtree gets no page.
   def generate_tags
     taxo = taxonomy
     children = Hash.new { |h, k| h[k] = [] }
     taxo.each_value { |c| children[c[:parent_id]] << c[:id] if c[:parent_id] }
 
-    # Hoisted: published_articles rebuilds the array on every call, and this loop runs once per
-    # concept. The set is fixed for the whole loop.
+    # This is outside the loop, because published_articles makes the array again at each call and
+    # this loop runs one time for each concept. The set does not change in the loop.
     candidates = published_articles
 
     @content[:tags] = taxo.values.filter_map do |concept|
@@ -311,22 +316,22 @@ class Contentful
 
       description = concept[:description].presence
       summary = description || default_tag_summary(concept[:name], tagged.size)
-      # The page renders this as "Updated", and sitemap.xml derives lastmod from the same field,
-      # so it tracks the newest edit — not the newest publish.
+      # The page renders this as "Updated", and sitemap.xml makes lastmod from the same field.
+      # Thus it follows the most recent edit, and not the most recent publish.
       updated_at = tagged.filter_map { |a| a[:updated_at] || a[:published_at] }.max
-      # `path` carries a trailing slash; listing_page wants the bare base.
+      # `path` has a slash at the end. listing_page needs the base with no slash.
       pages = listing_page(tagged, base_path: concept[:path].chomp("/"), template: "/tag.html",
                            title: concept[:name], summary: summary, description: description,
                            updated_at: updated_at, tag_id: concept[:id])
-      # entry_count, not count: `count` collides with Hash#count on the Hashie::Mash.
+      # Use entry_count, not count: `count` is Hash#count on the Hashie::Mash.
       { tag: concept.slice(:id, :name, :path, :scheme, :parent_id, :description, :synonyms).merge(entry_count: tagged.size), pages: pages }
     end
   end
 
-  # @return [Array<String>] Every descendant concept id, walked depth-first.
+  # @return [Array<String>] All the child concept ids, in depth-first order.
   def descendant_ids(id, children)
     result = []
-    # Set, not Array#include?, which made the walk quadratic in the subtree size.
+    # Use a Set, not Array#include?. Array#include? made this much slower on a large subtree.
     seen = Set.new
     stack = children[id].dup
     until stack.empty?
@@ -338,20 +343,20 @@ class Contentful
     result
   end
 
-  # The archive summary used when a concept has no description of its own.
+  # The archive summary for a concept that has no description of its own.
   def default_tag_summary(name, size)
     "Browse #{size.humanize} #{'entry'.pluralize(size)} tagged “#{name}.”"
   end
 
-  # The blog index's own meta description. Without it `content_summary` falls all the way
-  # through to the sitewide meta description, so /blog and the home page ship identical ones.
-  # Only `summary:` is set, not `description:` — articles.html.erb renders no description block,
-  # so this is a meta tag and nothing else.
+  # The meta description of the blog index. Without it, `content_summary` goes to the sitewide
+  # meta description, and /blog and the home page then have the same one. This sets only
+  # `summary:`, not `description:`, because articles.html.erb renders no description block. Thus
+  # this is a meta tag and nothing more.
   def default_blog_summary(size)
     "Browse the complete archive of #{size.humanize} #{'entry'.pluralize(size)}, newest first."
   end
 
-  # Builds the blog index listing: every published entry, newest first.
+  # Makes the list for the blog index: each published entry, the newest first.
   # @return [Array<Hash>] The blog's listing page.
   def generate_blog
     entries = published_articles
@@ -359,13 +364,13 @@ class Contentful
                                    title: "Blog", summary: default_blog_summary(entries.size))
   end
 
-  # @return [Array<Hash>] The non-draft articles, newest first.
+  # @return [Array<Hash>] The non-draft articles, the newest first.
   def published_articles
     @content[:articles].reject { |a| a[:draft] }
   end
 
-  # Builds the listing page for a collection of articles. Returned as a one-element array
-  # because the page proxies in config.rb iterate over a collection.
+  # Makes the listing page for a collection of articles. It returns an array with one item,
+  # because the page proxies in config.rb read a collection.
   # @return [Array<Hash>] One listing page.
   def listing_page(articles, base_path:, template:, title:, summary: nil, description: nil, updated_at: nil, tag_id: nil)
     page_data = {
@@ -375,7 +380,7 @@ class Contentful
     }
     page_data[:summary] = summary if summary
     page_data[:description] = description if description
-    # Tag-archive metadata; nil for the blog index.
+    # The metadata of the tag archive. It is nil for the blog index.
     page_data[:tag_id] = tag_id if tag_id
     page_data[:updated_at] = updated_at if updated_at
     page_data[:items] = articles
@@ -383,15 +388,15 @@ class Contentful
     [ page_data ]
   end
 
-  # The taxonomy concepts keyed by id, memoized for the build. GraphQL returns only concept ids
-  # on entries, so the rest is joined from the delivery taxonomy REST endpoint.
+  # The taxonomy concepts by id. The app keeps the value for the build. GraphQL gives only the
+  # concept ids on an entry, thus the delivery taxonomy REST endpoint supplies the other fields.
   # @return [Hash{String=>Hash}]
   def taxonomy
     @taxonomy ||= build_taxonomy
   end
 
-  # Builds the taxonomy lookup: resolves localized labels, reads each concept's parent from its
-  # first `broader` link, and derives its nested archive path.
+  # Makes the taxonomy lookup: it finds the localized labels, reads the parent of each concept
+  # from its first `broader` link, and makes its nested archive path.
   def build_taxonomy
     concepts = fetch_taxonomy_concepts
     by_id = {}
@@ -414,21 +419,21 @@ class Contentful
     by_id
   end
 
-  # The most compact label for a concept's chip: the shortest of its name and synonyms,
-  # preferring the name on ties. The full name is still used for titles and breadcrumbs.
+  # The shortest label for the chip of a concept: the shortest of its name and its synonyms. If
+  # two are the same length, it uses the name. The titles and the breadcrumbs use the full name.
   def shortest_label(name, synonyms)
     ([ name ].compact + Array(synonyms)).reject(&:blank?).min_by(&:length) || name
   end
 
-  # Fetches every concept from the delivery taxonomy endpoint, cursor-paginated. Concepts are
-  # the sole source of article categorization, so a non-2xx fails the build.
-  # @return [Array<Hash>] Raw concept hashes, with localized fields as locale maps.
+  # Gets each concept from the delivery taxonomy endpoint, one page at a time with a cursor. The
+  # concepts are the only source of the categories of an article, thus a non-2xx stops the build.
+  # @return [Array<Hash>] The raw concept hashes. Each localized field is a locale map.
   def fetch_taxonomy_concepts
     space = ENV["CONTENTFUL_SPACE"]
     token = ENV["CONTENTFUL_TOKEN"]
-    # ⚠️ Raise, don't return []: concepts are the only source of categorization, so an empty
-    # taxonomy is a *successful* build with no tag pages, no breadcrumbs and no article:tag
-    # metadata — the same silent-misconfiguration failure ImageHostMissing exists to prevent.
+    # ⚠️ Raise here, do not return []. The concepts are the only source of the categories. Thus
+    # an empty taxonomy gives a *successful* build with no tag pages, no breadcrumbs, and no
+    # article:tag metadata. This is the same failure with no message that ImageHostMissing stops.
     raise "CONTENTFUL_SPACE and CONTENTFUL_TOKEN are required to fetch the taxonomy." if space.blank? || token.blank?
 
     url = "https://preview.contentful.com/spaces/#{space}/environments/master/taxonomy/concepts?limit=1000"
@@ -442,20 +447,21 @@ class Contentful
       items.concat(Array(body["items"]))
       nxt = body.dig("pages", "next")
       break if nxt.blank?
-      # A full URL on the delivery API; guarded in case it's ever a path.
+      # This is a full URL on the delivery API. The check is for a path, if it becomes one.
       url = nxt.start_with?("http") ? nxt : "https://preview.contentful.com#{nxt}"
     end
     items
   end
 
-  # Resolves a localized concept field to its single value, passing through plain values.
+  # Changes a localized concept field into its one value. A plain value does not change.
   def localized(field)
     return field unless field.is_a?(Hash)
     field.values.first
   end
 
-  # The nested archive URL for a concept, following parent links to the root. The trailing
-  # slash matches the built directory-index page, so links don't redirect. Cycle-safe.
+  # The nested archive URL for a concept. It follows the parent links to the root. The slash at
+  # the end agrees with the directory-index page that the build makes, thus a link does not
+  # redirect. A cycle in the links cannot stop it.
   def concept_path(id, by_id)
     chain = []
     cur = id
@@ -468,7 +474,7 @@ class Contentful
     "/tagged/#{chain.join('/')}/"
   end
 
-  # Tags events with their entry type, honoring DEBUG_EVENT_DATE to shift an event's date.
+  # Gives each event its entry type. DEBUG_EVENT_DATE can move the date of an event.
   def process_events
     @content[:events].map! do |event|
       if ENV["DEBUG_EVENT_DATE"].present?

@@ -1,40 +1,45 @@
 module IconsHelper
-  # Returns the SVG markup for a Font Awesome icon.
-  # @param family [String] The icon's family (e.g., "classic").
-  # @param style [String] The icon's style within the family (e.g., "light").
-  # @param icon_id [String] The icon's identifier (e.g., "person-running").
-  # @return [String, nil] The SVG markup for the icon.
+  # The SVG markup of a Font Awesome icon.
+  # @param family [String] The family of the icon, for example "classic".
+  # @param style [String] The style of the icon in that family, for example "light".
+  # @param icon_id [String] The identifier of the icon, for example "person-running".
+  # @return [String, nil] The SVG markup of the icon.
   def icon_svg(family, style, icon_id)
-    # Memoize per request (the helper context): fragments repeat icon ids (e.g. arrow-down
-    # per stat), and each un-memoized lookup is a Redis round-trip.
+    # The code keeps the value for each request, in the helper context. A fragment uses the same
+    # icon id more than one time, for example arrow-down for each stat, and each lookup with no
+    # stored value is one request to Redis.
     @icon_svg_cache ||= {}
     key = [ family, style, icon_id ]
     @icon_svg_cache[key] = (@font_awesome ||= FontAwesome.new).svg(family, style, icon_id) unless @icon_svg_cache.key?(key)
 
-    # Decorative icons: hide from assistive tech (they always sit next to a text label or
-    # an aria-label'd parent). focusable="false" keeps legacy Edge/IE from tab-stopping the SVG.
+    # These icons are decoration. Hide them from the assistive technology, because each one is
+    # always beside a text label or in a parent with an aria-label. `focusable="false"` stops the
+    # old Edge and IE from a tab stop on the SVG.
     @icon_svg_cache[key]&.sub("<svg", '<svg aria-hidden="true" focusable="false"')
   end
 
-  # Returns a Font Awesome icon's SVG markup with a `slot` attribute, for the Web Awesome
-  # components that take their icon through a named slot (`start`/`end` on <wa-button>, `icon` on
-  # <wa-callout>). Returns a safe buffer, so views don't need `raw` — forgetting it renders the
-  # markup as visible text.
-  # @param family [String] The icon's family (e.g., "classic").
-  # @param style [String] The icon's style within the family (e.g., "light").
-  # @param icon_id [String] The icon's identifier (e.g., "trash").
-  # @param slot [String] The component slot to place it in.
-  # @return [ActiveSupport::SafeBuffer, nil] The SVG markup, or nil if the icon isn't found.
+  # The SVG markup of a Font Awesome icon, with a `slot` attribute. This is for a Web Awesome
+  # component that takes its icon in a named slot: `start` or `end` on <wa-button>, and `icon` on
+  # <wa-callout>. It returns a safe buffer, thus a view needs no `raw`. Without `raw`, a plain String
+  # renders as text on the page.
+  # @param family [String] The family of the icon, for example "classic".
+  # @param style [String] The style of the icon in that family, for example "light".
+  # @param icon_id [String] The identifier of the icon, for example "trash".
+  # @param slot [String] The slot of the component for the icon.
+  # @return [ActiveSupport::SafeBuffer, nil] The SVG markup, or nil if the code cannot find the
+  #   icon.
   def slotted_icon_svg(family, style, icon_id, slot: "start")
     svg = icon_svg(family, style, icon_id)
     raw svg.sub("<svg", %(<svg slot="#{ERB::Util.h(slot)}")) if svg
   end
 
-  # Integer hour (1–12) → word, for the clock-face icon ids (clock-three, clock-three-thirty, …).
+  # The hour as an integer (1 to 12) → the word, for the clock icon ids: clock-three,
+  # clock-three-thirty, and more.
   CLOCK_NUMBER_WORDS = %w[zero one two three four five six seven eight nine ten eleven twelve].freeze
 
-  # Returns the SVG for the clock-face icon closest to the given time. Mirrors the static site's
-  # clock_icon_svg; the number words are inlined so no humanize gem is needed.
+  # The SVG of the clock icon that is nearest to the given time. This is the same as the
+  # clock_icon_svg of the static site. The number words are in this file, thus the app needs no
+  # humanize gem.
   # @param datetime [DateTime, Time]
   # @return [String, nil]
   def clock_icon_svg(datetime, family = "classic", style = "light")

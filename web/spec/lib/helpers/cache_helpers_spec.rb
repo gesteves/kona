@@ -2,7 +2,7 @@ require 'spec_helper'
 require_relative '../../../lib/utils/redis_connection'
 
 RSpec.describe CacheHelpers do
-  # $redis is a global memo, so each example starts from a clean slate.
+  # $redis is a global value that the app keeps, thus each example starts with no value.
   around do |example|
     previous = $redis
     $redis = nil
@@ -20,8 +20,8 @@ RSpec.describe CacheHelpers do
       expect(redis).to be(client)
     end
 
-    # The blurhash cache reaches for this once per asset; a fresh connection per call would open
-    # one socket per image against a metered Upstash instance.
+    # The blurhash cache calls this one time for each asset. A new connection for each call would
+    # open one socket for each image, against a metered Upstash instance.
     it 'memoizes the connection across calls' do
       allow(Redis).to receive(:new).once.and_return(double('redis'))
 

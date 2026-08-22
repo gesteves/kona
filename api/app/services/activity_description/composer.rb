@@ -1,25 +1,27 @@
 module ActivityDescription
-  # Pure functions that build and assemble the description's blocks, plus the activity name
-  # cleanup that rides along with them. Layout: an optional
-  # user-written headline (preserved verbatim — never generated) sits above a stack of
-  # emoji-prefixed stat lines, in order: planned summary (🗓️) · weather · water temp (💧) ·
-  # power (⚡️) · heat (🌡️) · Whoop strain (🔥). No I/O — the generator gathers the data and
-  # passes it in.
+  # Functions that make the blocks of the description and put them together, and the code that
+  # corrects the activity name. The layout: a headline that the user writes, which is optional and
+  # which the code keeps with no change and never makes, goes above a group of stat lines. Each
+  # stat line starts with an emoji, in this order: the planned summary (🗓️), the weather, the water
+  # temperature (💧), the power (⚡️), the heat (🌡️), and the Whoop strain (🔥). There is no I/O
+  # here: the generator collects the data and gives it to these functions.
   module Composer
-    # Codepoint ranges covering every emoji this module emits and every weather emoji the
-    # LLM is likely to pick: Misc Symbols/Dingbats plus the main emoji blocks. Headline
-    # content (user prose) starts with a letter, so this only ever strips stat-shaped lines.
+    # The code point ranges for each emoji that this module writes and for each weather emoji that
+    # the LLM can select: Miscellaneous Symbols, Dingbats, and the main emoji blocks. The text of a
+    # headline, which the user writes, starts with a letter. Thus this only removes a line with the
+    # shape of a stat line.
     EMOJI_RANGES = [ 0x2600..0x27BF, 0x1F300..0x1F6FF, 0x1F900..0x1F9FF, 0x1FA00..0x1FAFF ].freeze
 
-    # Rouvy names its uploads "ROUVY - <route> - <YYYY-MM-DD>".
+    # Rouvy gives each upload the name "ROUVY - <route> - <YYYY-MM-DD>".
     ROUVY_PREFIX = /\AROUVY\b/
     ROUVY_TRAILING_DATE = /\s*[-–—]\s*\d{4}-\d{2}-\d{2}\z/
 
     module_function
 
-    # Assembles the final description: the preserved headline (blank-line separated) above
-    # the emoji stat lines (joined by single newlines — a stacked stat block, not paragraphs).
-    # @return [String] Empty when there's nothing to say.
+    # Makes the final description: the headline that the code keeps, with a blank line below it,
+    # then the emoji stat lines with one newline between them. That gives a block of stat lines,
+    # and not paragraphs.
+    # @return [String] It is empty when there is no content.
     def compose(headline: nil, planned: nil, weather: nil, water_temp: nil, power: nil, heat: nil, whoop: nil)
       blocks = []
       blocks << "🗓️ #{planned}" if planned.present?
@@ -37,9 +39,10 @@ module ActivityDescription
       stat_section
     end
 
-    # Extracts the user-written headline from an existing description: every line that isn't
-    # one of the emoji-prefixed stat lines, joined back together so multi-paragraph prose
-    # round-trips (runs of blank lines collapse to one). Nil when nothing non-stat remains.
+    # Gets the headline that the user wrote from a description: each line that is not one of the
+    # stat lines with an emoji. It joins them again, thus text with more than one paragraph stays
+    # the same, and a group of blank lines becomes one blank line. It gives nil when only the stat
+    # lines stay.
     # @return [String, nil]
     def headline(description)
       return if description.blank?
@@ -53,12 +56,12 @@ module ActivityDescription
       kept.join("\n").gsub(/\n{3,}/, "\n\n").strip.presence
     end
 
-    # Tidies a Rouvy-generated activity name: "ROUVY" becomes "Rouvy", and a trailing date drops
-    # along with its hyphen when there is one. Any other name is returned unchanged.
+    # Corrects an activity name that Rouvy makes: "ROUVY" becomes "Rouvy", and the code removes a
+    # date at the end with its hyphen. Each other name stays the same.
     #
-    # ⚠️ Gated on the uppercase prefix so a hand-written title that happens to end in a date is
-    # never truncated.
-    # @return [String, nil] nil when the name is blank.
+    # ⚠️ This runs only for the name with the uppercase text at the start. Thus the code never cuts
+    # a title that a person writes and that ends with a date.
+    # @return [String, nil] Nil when the name is blank.
     def clean_name(name)
       return if name.blank?
       return name unless name.match?(ROUVY_PREFIX)
@@ -66,10 +69,10 @@ module ActivityDescription
       name.sub(ROUVY_PREFIX, "Rouvy").sub(ROUVY_TRAILING_DATE, "").strip
     end
 
-    # The cycling power line, e.g. "⚡️ Avg 200 W · NP 210 W · IF 0.71 · TSS 98".
-    # Partial data renders only the present fields; nil when the activity isn't cycling or
-    # carries no power fields.
-    # @param activity [Hash] Raw Intervals.icu activity (symbolized keys).
+    # The cycling power line, for example "⚡️ Avg 200 W · NP 210 W · IF 0.71 · TSS 98".
+    # With some data absent, the line has only the fields that are available. It is nil when the
+    # activity is not a bike ride, or when it has no power fields.
+    # @param activity [Hash] The raw Intervals.icu activity, with symbol keys.
     # @return [String, nil]
     def power_block(activity)
       return unless ActivityMatcher.normalize_type(activity[:type]) == "Cycling"
@@ -89,8 +92,9 @@ module ActivityDescription
       "⚡️ #{parts.join(' · ')}"
     end
 
-    # The CORE heat line: the daily heat-adaptation score, when positive. Suppressed for swims —
-    # the CORE sensor is inaccurate in water. E.g. "🌡️ 72% heat adapted".
+    # The CORE heat line: the heat-adaptation score of the day, when it is more than zero. The
+    # code omits it for a swim, because the CORE sensor is not accurate in water. For example,
+    # "🌡️ 72% heat adapted".
     # @return [String, nil]
     def heat_block(heat_adaptation_score:, swim:)
       return if swim
@@ -100,7 +104,7 @@ module ActivityDescription
       "🌡️ #{heat_adaptation_score.round}% heat adapted"
     end
 
-    # The Whoop strain line, e.g. "🔥 12.4 Whoop Strain". Suppressed for swims.
+    # The Whoop strain line, for example "🔥 12.4 Whoop Strain". The code omits it for a swim.
     # @return [String, nil]
     def whoop_block(strain, swim:)
       return if swim || strain.nil?
@@ -108,10 +112,12 @@ module ActivityDescription
       "🔥 #{format('%.1f', strain)} Whoop Strain"
     end
 
-    # The open-water swim water-temperature line, e.g. "💧 Water temperature 15.5 °C".
-    # Whole degrees render without the trailing .0 ("59 °F", not "59.0 °F").
-    # @param median_temp_celsius [Numeric, nil] Median of the activity's temp stream.
-    # @param unit [Symbol] :celsius or :fahrenheit (the athlete's preference).
+    # The water-temperature line for an open-water swim, for example
+    # "💧 Water temperature 15.5 °C". A value with no fraction has no ".0" at the end: "59 °F", not
+    # "59.0 °F".
+    # @param median_temp_celsius [Numeric, nil] The median of the temperature stream of the
+    #   activity.
+    # @param unit [Symbol] :celsius or :fahrenheit, which the athlete selects.
     # @return [String, nil]
     def water_temp_block(median_temp_celsius, unit:)
       return if median_temp_celsius.nil?
@@ -126,8 +132,8 @@ module ActivityDescription
       "💧 Water temperature #{formatted.sub(/\.0(?=\s|\z)/, '')}"
     end
 
-    # Whether a line leads with a pictographic emoji (one of our stat prefixes, the
-    # LLM-picked weather emoji, or another tool's marker line).
+    # Tells if a line starts with an emoji: one of the stat emoji of this app, the weather emoji
+    # that the LLM selects, or the marker line of another tool.
     def starts_with_emoji?(line)
       codepoint = line.each_codepoint.first
       codepoint.present? && EMOJI_RANGES.any? { |range| range.cover?(codepoint) }

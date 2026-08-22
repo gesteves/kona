@@ -1,24 +1,26 @@
 import satori, { init as initYoga } from 'satori/standalone';
 import { Resvg, initWasm } from '@resvg/resvg-wasm';
-// Wasm imports yield an already-compiled WebAssembly.Module, which is why this works on Workers
-// at all: the runtime forbids compiling wasm from bytes. Covered by wrangler's default module
-// rules and typed by the shim in src/env.d.ts.
+// A wasm import gives a WebAssembly.Module that is already compiled, and that is why this works on
+// Workers: the runtime does not permit a compile of wasm from bytes. The default module rules of
+// wrangler cover this, and the shim in src/env.d.ts gives the types.
 import yogaWasm from 'satori/yoga.wasm';
 import resvgWasm from '@resvg/resvg-wasm/index_bg.wasm';
-// Data modules (ArrayBuffer) — these need the `rules` entry in wrangler.jsonc.
+// The Data modules (ArrayBuffer). These need the `rules` entry in wrangler.jsonc.
 import fontData from './assets/IBMPlexSansCondensed-Bold.ttf';
 import logoPng from './assets/logo.png';
 
-// The Open Graph card renderer: satori lays the card out as SVG, resvg rasterizes it to PNG.
+// The Open Graph card renderer: satori makes the layout of the card as SVG, and resvg changes that
+// SVG into a PNG.
 //
-// Deliberately not imported at the top of src/og.ts — it's reached through a dynamic import()
-// behind the RenderCard seam, so other routes never evaluate satori's module-scope code and the
-// test suite can exercise the route without loading the Data modules (see web/CLAUDE.md).
+// src/og.ts does not import this at the top, on purpose. It reaches this module through a dynamic
+// import() behind the RenderCard parameter. Thus the other routes never run the module code of
+// satori, and the test suite can run the route and not load the Data modules. Refer to
+// web/CLAUDE.md.
 
 const WIDTH = 1200;
 const HEIGHT = 630;
 
-/** satori reads only `type` and `props`, so this replaces React's createElement. */
+/** satori reads only `type` and `props`, thus this replaces the createElement of React. */
 type Element = { type: string; props: Record<string, unknown> };
 
 function h(
@@ -29,7 +31,8 @@ function h(
   return { type, props: { ...props, children } };
 }
 
-/** Base64-encodes an ArrayBuffer, chunked so the spread can't blow the call stack. */
+/** Changes an ArrayBuffer into base64. It uses small parts, thus the spread cannot fill the call
+ * stack. */
 function base64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let binary = '';
@@ -39,13 +42,15 @@ function base64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-// Inlined once at module scope. Must stay a PNG: satori decodes only PNG and JPEG. To change
-// it, replace src/assets/logo.png and bump OG_TEMPLATE_VERSION in lib/helpers/image_helpers.rb.
+// This is in the module code, one time. It must stay a PNG, because satori decodes only PNG and
+// JPEG. To change it, replace src/assets/logo.png and increase OG_TEMPLATE_VERSION in
+// lib/helpers/image_helpers.rb.
 const logoDataUri = `data:image/png;base64,${base64(logoPng)}`;
 
 /**
- * Builds the card's element tree.
- * Style props only — satori's `tw` shorthand reads `process.env` unguarded and throws in Workers.
+ * Makes the element tree of the card.
+ * It uses style props only. The `tw` shorthand of satori reads `process.env` with no check and
+ * raises in Workers.
  */
 function cardElement(title: string): Element {
   return h(
@@ -93,10 +98,10 @@ function cardElement(title: string): Element {
 let ready: Promise<void> | undefined;
 
 /**
- * Initializes both wasm modules, once per isolate.
- * Memoizes a promise rather than a boolean: resvg sets its own flag only after awaiting the
- * load, so concurrent first requests would both get past it and the second would throw
- * "Already initialized", permanently poisoning the isolate.
+ * Starts both wasm modules, one time for each isolate.
+ * It keeps a promise, and not a boolean. resvg sets its own flag only after it waits for the load.
+ * Thus two first requests at the same time would both go past that flag, and the second one would
+ * raise "Already initialized" and make the isolate unusable.
  */
 function init(): Promise<void> {
   ready ??= (async () => {
@@ -107,7 +112,7 @@ function init(): Promise<void> {
 
 /**
  * Renders the OG card for a title.
- * @returns The bytes of a 1200×630 PNG.
+ * @returns The bytes of a PNG of 1200×630.
  */
 export async function renderCard(
   title: string
@@ -127,14 +132,15 @@ export async function renderCard(
     ],
   });
 
-  // satori embeds the font as vector paths, so resvg needs no font database of its own.
+  // satori puts the font in the SVG as vector paths, thus resvg needs no font database.
   const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: WIDTH } });
   const rendered = resvg.render();
-  // asPng() is typed ArrayBufferLike-backed, which a Response body won't accept. wasm-bindgen
-  // copies the bytes into a fresh ArrayBuffer, so narrowing is safe.
+  // The type of asPng() is ArrayBufferLike, and a Response body does not accept that type.
+  // wasm-bindgen copies the bytes into a new ArrayBuffer, thus a narrower type is correct.
   const png = rendered.asPng() as Uint8Array<ArrayBuffer>;
-  // The wasm linear heap isn't reached by the JS GC, so both must be freed explicitly or a
-  // long-lived isolate leaks until it hits the memory limit mid-render.
+  // The JS garbage collector does not reach the linear heap of the wasm module. Thus the code must
+  // free both, or an isolate that lives a long time uses more and more memory and reaches the
+  // memory limit during a render.
   rendered.free();
   resvg.free();
 

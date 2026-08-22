@@ -1,9 +1,9 @@
-# Generates a descriptive email subject for a contact-form submission, so the inbox can be
-# triaged at a glance. One structured-output Anthropic call with thinking disabled — a subject
-# line doesn't benefit from reasoning, and it would eat the tight token budget.
+# Makes a clear email subject for a contact-form submission, thus the owner can read the inbox
+# quickly. It is one Anthropic call with a structured output and with the thinking off, because a
+# subject line does not need reasoning and the thinking would use the small token budget.
 #
-# Fails soft: returns nil on any problem, and the caller falls back to a static subject. A
-# subject line is never worth failing or retrying the email over.
+# It fails soft: it returns nil for each problem, and the caller then uses a fixed subject. A
+# subject line is never a reason to stop an email or to send it again.
 module ContactSubject
   extend AnthropicStructuredOutput
 
@@ -15,12 +15,14 @@ module ContactSubject
 
   module_function
 
-  # @return [String] The env var that overrides the model for this caller.
+  # @return [String] The env var that replaces the model for this caller.
   def anthropic_model_env = "ANTHROPIC_CONTACT_SUBJECT_MODEL"
 
-  # @param name [String] The sender's name, as context; it needn't appear in the subject.
-  # @param message [String] The message to summarize.
-  # @return [String, nil] A one-line subject, or nil when unconfigured, blank, or on error.
+  # @param name [String] The name of the sender, as data for the model. It does not need to be in
+  #   the subject.
+  # @param message [String] The message to make a summary of.
+  # @return [String, nil] A subject of one line, or nil when there is no configuration, when the
+  #   message is blank, and on an error.
   def generate(name:, message:)
     return if message.blank? || !configured?
 

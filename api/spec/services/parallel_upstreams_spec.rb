@@ -19,8 +19,8 @@ RSpec.describe ParallelUpstreams do
   end
 
   it "actually runs the blocks concurrently" do
-    # Each block blocks until every other one has started, so this only completes if they are
-    # genuinely running at the same time — serial execution would deadlock on the first.
+    # Each block waits until each other block starts. Thus this example ends only when they all run
+    # at the same time. In sequence, the first block would stop and wait for all time.
     barrier = Queue.new
     started = Queue.new
     blocks = (1..3).to_h do |i|
@@ -34,8 +34,8 @@ RSpec.describe ParallelUpstreams do
     expect(thread.value).to eq(job1: 1, job2: 2, job3: 3)
   end
 
-  # The contract is that callers wrap their own blocks in `safely`. This documents what happens
-  # when one doesn't, so nobody assumes the join swallows failures.
+  # The rule is that a caller puts its own block in `safely`. This example shows the result when a
+  # caller does not do that, thus no person believes that the join catches a failure.
   it "propagates a raise from a block that was not isolated" do
     expect { runner.run(ok: -> { 1 }, boom: -> { raise "upstream down" }) }
       .to raise_error("upstream down")

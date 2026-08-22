@@ -1,9 +1,10 @@
 require "redis"
 
-# Single owner of the shared $redis connection, the build-time cache, so the URL fallback and
-# timeouts live in one place. (Named RedisConnection because the redis gem owns RedisClient.)
+# The one owner of the shared $redis connection, which is the cache of the build. Thus the default
+# URL and the timeouts are in one place. The name is RedisConnection, because the redis gem owns the
+# name RedisClient.
 module RedisConnection
-  # @return [Redis] The shared connection, opened on first use.
+  # @return [Redis] The shared connection. The code opens it at the first use.
   def self.connection
     $redis ||= Redis.new(
       url: ENV["REDIS_URL"] || "redis://localhost:6379",

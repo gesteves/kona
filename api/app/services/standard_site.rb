@@ -1,26 +1,26 @@
 require "digest"
 
-# Publishes the blog to the AT Protocol as standard.site records, driven by Contentful
-# webhooks plus the `standard_site:backfill` rake task:
-#   - one site.standard.publication record tracks the site,
-#   - one site.standard.document record per published Article/Short tracks each post,
-#   - records are pruned when a post is unpublished or deleted.
+# Publishes the blog to the AT Protocol as standard.site records. Contentful webhooks and the
+# `standard_site:backfill` rake task start the sync:
+#   - one site.standard.publication record for the site,
+#   - one site.standard.document record for each published Article or Short,
+#   - a record goes away when its post becomes unpublished or deleted.
 #
-# A SHA-256 fingerprint of each record's content is cached in Redis, so the expensive part
-# (a cover-image blob upload plus a putRecord) only runs when the content actually changed.
-# Everything no-ops without Bluesky credentials.
+# Redis caches a SHA-256 fingerprint of the content of each record. Thus the slow part (a
+# cover-image blob upload and a putRecord) runs only when the content changes.
+# Without Bluesky credentials, this service does nothing.
 # @see https://standard.site
 class StandardSite < ApplicationService
   include ContentfulConsumer
 
-  # AT Protocol "sortable base32" alphabet. Both standard.site lexicons require every record
-  # key to be a TID, so no natural id can be used as an rkey directly.
+  # The AT Protocol "sortable base32" alphabet. Each standard.site lexicon needs a TID for each
+  # record key. Thus you cannot use a natural id as an rkey.
   # @see https://atproto.com/specs/tid
   TID_ALPHABET = "234567abcdefghijklmnopqrstuvwxyz"
 
-  # Derives a stable TID from a seed: the low 63 bits of its SHA-256 digest, base32-encoded.
-  # web's StandardSiteHelpers#document_rkey must use the identical algorithm, or the AT URI it
-  # emits won't match the record published here.
+  # Makes a stable TID from a seed: the low 63 bits of its SHA-256 digest, in base32.
+  # web's StandardSiteHelpers#document_rkey must use the same algorithm. If it does not, the AT
+  # URI that it writes does not agree with the record that this class publishes.
   # @param seed [String]
   # @return [String] A 13-character TID.
   def self.tid(seed)
@@ -33,7 +33,7 @@ class StandardSite < ApplicationService
     encoded.rjust(13, TID_ALPHABET[0])
   end
 
-  # Builds a site.standard.theme.color#rgb value.
+  # Makes a site.standard.theme.color#rgb value.
   # @param r [Integer] Red channel, 0-255.
   # @param g [Integer] Green channel, 0-255.
   # @param b [Integer] Blue channel, 0-255.
@@ -42,9 +42,9 @@ class StandardSite < ApplicationService
     { "$type" => "site.standard.theme.color#rgb", "r" => r, "g" => g, "b" => b }
   end
 
-  # The publication's theme, for readers that render the site's content in their own chrome.
-  # ⚠️ Mirrors web's LIGHT-mode tokens in web/source/stylesheets/base/_props.scss; the lexicon
-  # has no dark-mode counterpart. Nothing checks the two stay in step.
+  # The theme of the publication, for readers that show the site content in their own interface.
+  # ⚠️ This is a copy of web's LIGHT-mode tokens in web/source/stylesheets/base/_props.scss. The
+  # lexicon has no dark-mode equivalent. No test makes sure that the two agree.
   BASIC_THEME = {
     "$type" => "site.standard.theme.basic",
     "background" => rgb(255, 255, 255),       # white
@@ -55,26 +55,27 @@ class StandardSite < ApplicationService
 
   PUBLICATION_COLLECTION = "site.standard.publication"
   DOCUMENT_COLLECTION = "site.standard.document"
-  # The publication is the repo's singleton, at a stable TID derived from the "self" seed.
+  # The publication is the singleton of the repo, at a stable TID made from the "self" seed.
   PUBLICATION_RKEY = tid("self")
-  # Where the publication used to live, before the lexicon required a TID. Backfill prunes it.
+  # The old rkey of the publication, from before the lexicon needed a TID. The backfill deletes it.
   LEGACY_PUBLICATION_RKEY = "self"
   DEFAULT_PDS_URL = "https://bsky.social"
-  # A DID is stable for an account, so it's cached without a TTL.
+  # A DID stays the same for an account. Thus the cache holds it with no TTL.
   DID_CACHE_KEY = "standard_site:did"
 
-  # Sanity guard for a Contentful sys.id before it's turned into a record key.
+  # A check on a Contentful sys.id before it becomes a record key.
   ENTRY_ID_PATTERN = /\A[a-zA-Z0-9._~:-]{1,512}\z/
 
-  # Builds the publication's at:// URI. The single source of truth for the format, shared by
-  # the sync paths and the /api/standard-site endpoint.
+  # Makes the at:// URI of the publication. This is the only source of the format. The sync
+  # paths and the /api/standard-site endpoint use it.
   # @param did [String]
   # @return [String]
   def self.publication_uri(did)
     "at://#{did}/#{PUBLICATION_COLLECTION}/#{PUBLICATION_RKEY}"
   end
 
-  # The article fields the document builders need, shared by the by-id and list queries.
+  # The article fields that the document builders need. The by-id query and the list query
+  # share them.
   ARTICLE_ITEM_FIELDS = <<~GRAPHQL.freeze
     title
     slug
@@ -115,18 +116,18 @@ class StandardSite < ApplicationService
     }
   GRAPHQL
 
-  # @param credentials [BlueskyCredentials::Credentials] The pair to authenticate with. Injected
-  #   so the admin can validate a pair the owner just typed, before it's stored.
+  # @param credentials [BlueskyCredentials::Credentials] The pair that opens the session. The
+  #   caller supplies it, thus the admin can check a new pair before the app stores it.
   def initialize(credentials: BlueskyCredentials.fetch)
     @handle = credentials.handle
     @app_password = credentials.app_password
     @pds_url = (ENV["BLUESKY_PDS_URL"].presence || DEFAULT_PDS_URL).chomp("/")
   end
 
-  # Syncs an entry's document record. The entry is re-fetched from the delivery API rather
-  # than read from the webhook body, whose cover image is an unresolved link and whose tags
-  # lack names; the retries absorb Contentful's brief post-publish propagation lag. A draft,
-  # non-publishable, or vanished entry is treated as a delete.
+  # Syncs the document record of an entry. This method gets the entry again from the delivery
+  # API. It does not read the webhook body, because that body has an unresolved cover-image link
+  # and tags with no names. The retries give Contentful time to propagate the change. A draft
+  # entry, a non-publishable entry, or an absent entry causes a delete.
   # @param entry_id [String] The Contentful sys.id.
   # @return [Symbol] :synced, :unchanged, :deleted, or :skipped.
   def sync_document(entry_id)
@@ -149,7 +150,8 @@ class StandardSite < ApplicationService
     do_sync_document(post, document_rkey(entry_id), publication_uri)
   end
 
-  # Removes an unpublished or deleted entry's document record. Idempotent.
+  # Removes the document record of an unpublished or deleted entry. It is safe to do this more
+  # than one time.
   # @param entry_id [String] The Contentful sys.id.
   # @return [Symbol] :deleted or :skipped.
   def delete_document(entry_id)
@@ -160,7 +162,7 @@ class StandardSite < ApplicationService
     remove_document!(document_rkey(entry_id))
   end
 
-  # Re-syncs the publication record from the current site entry.
+  # Syncs the publication record again from the current site entry.
   # @return [Symbol] :synced, :unchanged, or :skipped.
   def sync_publication
     return log_skip("publication", "no Bluesky credentials") unless valid_credentials?
@@ -171,11 +173,11 @@ class StandardSite < ApplicationService
     do_sync_publication(site)
   end
 
-  # Reconciles the whole PDS repo with the published Contentful corpus: syncs the publication,
-  # enqueues a sync job per publishable post, then prunes orphaned document records. The safety
-  # net for webhook deliveries that failed, since Contentful doesn't retry them.
-  # Needs a running Sidekiq worker to drain the enqueued jobs. Pruning is inline and safe to
-  # run immediately, since it only touches records outside the published set.
+  # Makes the full PDS repo agree with the published Contentful content. It syncs the
+  # publication, adds a sync job for each publishable post, then deletes orphan document records.
+  # This is the safety net for failed webhook deliveries, because Contentful does not send them
+  # again. A Sidekiq worker must run, to do the queued jobs. The delete step runs immediately and
+  # is safe, because it touches only records outside the published set.
   def backfill
     return log_skip("backfill", "no Bluesky credentials") unless valid_credentials?
     return log_skip("backfill", "could not authenticate with the PDS") unless create_session
@@ -187,7 +189,7 @@ class StandardSite < ApplicationService
     prune_legacy_publication
 
     items = fetch_all_articles
-    # Bail before pruning, so a transient fetch error can't prune live records to nothing.
+    # Stop before the delete step, thus a temporary fetch error cannot delete all the live records.
     return log_skip("backfill", "article fetch failed; not pruning") if items.nil?
 
     current = []
@@ -202,8 +204,8 @@ class StandardSite < ApplicationService
     log("backfill complete: #{current.size} document sync job(s) enqueued, #{pruned} record(s) pruned")
   end
 
-  # The account's DID, from the Redis cache, resolving a session on demand when absent.
-  # @return [String, nil] The DID, or nil without credentials or when resolution fails.
+  # The DID of the account, from the Redis cache. If the cache is empty, this opens a session.
+  # @return [String, nil] The DID, or nil if credentials are absent or the lookup fails.
   def did
     rescue_with(context: "standard.site DID") do
       cached = $redis.get(DID_CACHE_KEY)
@@ -213,24 +215,24 @@ class StandardSite < ApplicationService
     end
   end
 
-  # @return [Boolean] true if both Bluesky credentials are present.
+  # @return [Boolean] True if both Bluesky credentials are available.
   def valid_credentials?
     @handle.present? && @app_password.present?
   end
 
-  # Whether an account is attached, for the Connected apps page. Deliberately not a live
-  # createSession: the page renders this on every load, and a PDS round trip there would put an
-  # upstream outage in the path of the admin's own navigation.
+  # Tells if an account is connected, for the Connected apps page. This does not do a live
+  # createSession, on purpose. The page shows this on each load. A PDS request here would put an
+  # upstream failure in the path of the admin navigation.
   # @return [Boolean]
   def connected? = valid_credentials?
 
-  # Validates a credential pair by opening a session with it, and stores it on success. The DID
-  # the session resolves is cached in the same step.
+  # Checks a credential pair: it opens a session with the pair, then stores the pair if the
+  # session opens. The same step caches the DID that the session finds.
   #
-  # ⚠️ On a DID change the publication record's fingerprint has to go. Document fingerprints
-  # cover the publication's at:// URI, which carries the DID, so they invalidate themselves when
-  # the account changes; the publication record's doesn't, and a stale one would report
-  # :unchanged forever and never sync to the new repo.
+  # ⚠️ The fingerprint of the publication record must go away when the DID changes. Document
+  # fingerprints include the at:// URI of the publication, which contains the DID, thus they
+  # become invalid by themselves. The fingerprint of the publication record does not. An old one
+  # would report :unchanged for all time and never sync to the new repo.
   # @return [Boolean] Whether the credentials opened a session and were stored.
   def connect!
     return false unless valid_credentials?
@@ -243,30 +245,30 @@ class StandardSite < ApplicationService
     true
   end
 
-  # Forgets the stored credentials.
+  # Removes the stored credentials.
   #
-  # ⚠️ Leaves DID_CACHE_KEY alone. The DID is public data, not a credential, and the records it
-  # addresses still exist — GET /api/standard-site feeds the verification <link> tags on every
-  # page of the static site, so clearing it here would silently strip them site-wide at the next
-  # build.
+  # ⚠️ This does not touch DID_CACHE_KEY. The DID is public data, not a credential, and its
+  # records continue to exist. GET /api/standard-site supplies the verification <link> tags on
+  # each page of the static site. If you clear the DID here, the next build removes those tags
+  # from the full site with no message.
   # @return [void]
   def disconnect!
     BlueskyCredentials.clear
   end
 
-  # Selects the posts that should have a document record: published Articles and Shorts.
-  # Pages are deliberately excluded.
-  # @param posts [Array<Hash>] Decorated posts, string-keyed.
+  # Selects the posts that must have a document record: published Articles and Shorts.
+  # This does not include Pages, on purpose.
+  # @param posts [Array<Hash>] Decorated posts, with string keys.
   # @return [Array<Hash>]
   def publishable_posts(posts)
     Array(posts).select { |a| !a["draft"] && %w[Article Short].include?(a["entry_type"]) }
   end
 
-  # Builds a site.standard.publication record. The icon is passed in rather than uploaded
-  # here, so the record can be built network-free for fingerprinting.
-  # @param site [Hash] Decorated site, string-keyed.
-  # @param icon [Hash, String, nil] The uploaded blob, or a source descriptor when
-  #   fingerprinting.
+  # Makes a site.standard.publication record. The caller supplies the icon and this method does
+  # not upload it. Thus you can make the record for a fingerprint with no network use.
+  # @param site [Hash] The decorated site, with string keys.
+  # @param icon [Hash, String, nil] The uploaded blob, or a source descriptor for a
+  #   fingerprint.
   # @return [Hash]
   def build_publication_record(site, icon: nil)
     record = {
@@ -282,12 +284,12 @@ class StandardSite < ApplicationService
     record
   end
 
-  # Builds a site.standard.document record. The cover image is passed in rather than uploaded
-  # here, so the record can be built network-free for fingerprinting.
-  # @param post [Hash] A decorated post, string-keyed.
-  # @param publication_uri [String] The publication's at:// URI.
-  # @param cover_image [Hash, String, nil] The uploaded blob, or a source descriptor when
-  #   fingerprinting.
+  # Makes a site.standard.document record. The caller supplies the cover image and this method
+  # does not upload it. Thus you can make the record for a fingerprint with no network use.
+  # @param post [Hash] A decorated post, with string keys.
+  # @param publication_uri [String] The at:// URI of the publication.
+  # @param cover_image [Hash, String, nil] The uploaded blob, or a source descriptor for a
+  #   fingerprint.
   # @return [Hash]
   def build_document_record(post, publication_uri, cover_image: nil)
     record = {
@@ -314,26 +316,26 @@ class StandardSite < ApplicationService
     record
   end
 
-  # An entry's document record key, derived from the sys.id alone so sync, delete, and prune
-  # all compute the same key — a delete has no post data to work from.
+  # The document record key of an entry. It comes from the sys.id only, thus sync, delete, and
+  # prune calculate the same key. A delete has no post data.
   # @param entry_id [String] The Contentful sys.id.
   # @return [String] A 13-character TID.
   def document_rkey(entry_id)
     self.class.tid(entry_id)
   end
 
-  # @param existing [Array<String>] rkeys currently in the document collection.
-  # @param current [Array<String>] rkeys that should remain.
+  # @param existing [Array<String>] The rkeys now in the document collection.
+  # @param current [Array<String>] The rkeys that must stay.
   # @return [Array<String>] The rkeys on the PDS that are no longer current.
   def rkeys_to_prune(existing, current)
     Array(existing) - Array(current)
   end
 
-  # A content fingerprint for a post's document record, built from the same builder as the
-  # synced record with the cover image standing in as its source URL — so a swapped image
-  # still changes the fingerprint, without a network round trip.
-  # @param post [Hash] A decorated post, string-keyed.
-  # @param publication_uri [String] The publication's at:// URI.
+  # A content fingerprint for the document record of a post. It uses the same builder as the
+  # synced record, but the source URL of the cover image replaces the blob. Thus a different
+  # image changes the fingerprint with no network request.
+  # @param post [Hash] A decorated post, with string keys.
+  # @param publication_uri [String] The at:// URI of the publication.
   # @return [String]
   def document_fingerprint(post, publication_uri)
     record = build_document_record(post, publication_uri, cover_image: cover_source(post["cover_image"]))
@@ -341,7 +343,7 @@ class StandardSite < ApplicationService
   end
 
   # A content fingerprint for the publication record.
-  # @param site [Hash] Decorated site, string-keyed.
+  # @param site [Hash] The decorated site, with string keys.
   # @return [String]
   def publication_fingerprint(site)
     record = build_publication_record(site, icon: cover_source(site["logo"]))
@@ -350,27 +352,27 @@ class StandardSite < ApplicationService
 
   private
 
-  # Logs a one-line operation message at info level and returns `result`, so callers can
-  # `return log(msg, :result)`.
-  # @return The passed-through result.
+  # Writes a one-line operation message at info level and returns `result`. Thus a caller can
+  # write `return log(msg, :result)`.
+  # @return The same result.
   def log(message, result = nil)
     Rails.logger.info("standard.site: #{message}")
     result
   end
 
-  # Logs why an operation was skipped and returns :skipped.
+  # Writes why an operation did not run and returns :skipped.
   def log_skip(subject, reason)
     log("#{subject} skipped (#{reason})", :skipped)
   end
 
   # @param entry_id [String, nil]
-  # @return [Boolean] true if the id is a usable AT Protocol record key.
+  # @return [Boolean] True if the id can be an AT Protocol record key.
   def eligible?(entry_id)
     entry_id.present? && ENTRY_ID_PATTERN.match?(entry_id.to_s)
   end
 
-  # A stable descriptor of an image's source, standing in for an uploaded blob when
-  # fingerprinting. Contentful URLs are version-addressed, so a replaced asset changes it.
+  # A stable descriptor of the source of an image. It replaces an uploaded blob in a fingerprint.
+  # A Contentful URL contains a version, thus a new asset changes the descriptor.
   # @param image [Hash, nil] An object with 'url' and 'content_type' keys.
   # @return [String, nil]
   def cover_source(image)
@@ -379,9 +381,9 @@ class StandardSite < ApplicationService
     "#{url}|#{image['content_type']}"
   end
 
-  # Syncs the publication record, skipping the upload and putRecord when its fingerprint is
-  # unchanged.
-  # @param site [Hash] Decorated site, string-keyed.
+  # Syncs the publication record. If the fingerprint does not change, the upload and the
+  # putRecord do not run.
+  # @param site [Hash] The decorated site, with string keys.
   # @return [Symbol] :unchanged, :synced, or :error.
   def do_sync_publication(site)
     fingerprint = publication_fingerprint(site)
@@ -397,18 +399,18 @@ class StandardSite < ApplicationService
     log("publication synced", :synced)
   end
 
-  # Deletes the publication record at the legacy "self" rkey, which the lexicon no longer
-  # accepts. Idempotent, so it can run on every backfill.
+  # Deletes the publication record at the old "self" rkey, which the lexicon does not accept.
+  # It is safe to run this on each backfill.
   def prune_legacy_publication
     return if PUBLICATION_RKEY == LEGACY_PUBLICATION_RKEY
     delete_record(PUBLICATION_COLLECTION, LEGACY_PUBLICATION_RKEY)
   end
 
-  # Syncs one document record, skipping the cover-image upload and putRecord when its
-  # fingerprint is unchanged.
-  # @param post [Hash] A decorated post, string-keyed.
+  # Syncs one document record. If the fingerprint does not change, the cover-image upload and
+  # the putRecord do not run.
+  # @param post [Hash] A decorated post, with string keys.
   # @param rkey [String] The record key.
-  # @param publication_uri [String] The publication's at:// URI.
+  # @param publication_uri [String] The at:// URI of the publication.
   # @return [Symbol] :unchanged, :synced, or :error.
   def do_sync_document(post, rkey, publication_uri)
     fingerprint = document_fingerprint(post, publication_uri)
@@ -424,11 +426,11 @@ class StandardSite < ApplicationService
     log("document #{rkey} synced", :synced)
   end
 
-  # Deletes a document record by rkey and forgets its fingerprint.
+  # Deletes a document record by rkey and removes its fingerprint.
   #
-  # ⚠️ The fingerprint is only forgotten once the delete actually succeeded. Dropping it after a
-  # failed delete leaves the record live on the PDS with nothing left to notice the drift, and the
-  # job returns as if it had worked.
+  # ⚠️ This removes the fingerprint only after the delete is successful. If you remove it after
+  # a failed delete, the record stays on the PDS and nothing can find the difference. The job
+  # then returns as if it was successful.
   # @return [Symbol] :deleted, or :error when the PDS rejected the delete.
   def remove_document(rkey)
     return log("document #{rkey} deleteRecord failed", :error) unless delete_record(DOCUMENT_COLLECTION, rkey)
@@ -437,10 +439,10 @@ class StandardSite < ApplicationService
     log("document #{rkey} deleted", :deleted)
   end
 
-  # remove_document, but raising on failure so Sidekiq retries the job.
+  # The same as remove_document, but it raises on failure, thus Sidekiq does the job again.
   #
-  # ⚠️ The backfill's prune path deliberately calls remove_document instead — one unreachable
-  # record must not abort a whole reconciliation run.
+  # ⚠️ The prune path of the backfill uses remove_document, on purpose. One record that the app
+  # cannot reach must not stop a full reconciliation run.
   # @return [Symbol] :deleted.
   def remove_document!(rkey)
     result = remove_document(rkey)
@@ -452,32 +454,35 @@ class StandardSite < ApplicationService
   # --- Contentful (delivery API) ------------------------------------------------------
 
   # @param entry_id [String] The Contentful sys.id.
-  # @return [Hash, nil] The raw symbolized article item, or nil when missing or failed.
+  # @return [Hash, nil] The raw article item with symbol keys, or nil if it is absent or the
+  #   request fails.
   def fetch_article(entry_id)
     query_contentful(ARTICLE_QUERY, { id: entry_id })&.dig(:articles, :items)&.first
   end
 
-  # @return [Hash, nil] The decorated site, string-keyed, or nil when missing or failed.
+  # @return [Hash, nil] The decorated site with string keys, or nil if it is absent or the
+  #   request fails.
   def fetch_site
     item = query_contentful(SITE_QUERY)&.dig(:sites, :items)&.first
     item && decorate_site(item)
   end
 
-  # Pages through the whole article collection. Strict, because the sync must never act on a
-  # partial corpus.
-  # @return [Array<Hash>, nil] Every raw article item, or nil if any page failed.
+  # Reads the full article collection, one page at a time. It is strict, because the sync must
+  # never use an incomplete set.
+  # @return [Array<Hash>, nil] All the raw article items, or nil if one page fails.
   def fetch_all_articles
     contentful.paginate(ARTICLES_LIST_QUERY, collection: :articles, strict: true)
   end
 
-  # @return [Hash, nil] The query's `data`, or nil when unconfigured or the request failed.
+  # @return [Hash, nil] The `data` of the query, or nil if there is no configuration or the
+  #   request fails.
   def query_contentful(query, variables = nil)
     contentful.query(query, variables)
   end
 
-  # Maps a raw GraphQL article item to the string-keyed shape the record builders expect.
-  # ArticleAttributes keeps draft, entry_type, and path consistent with the rest of the app.
-  # @param item [Hash] A raw symbolized article item.
+  # Changes a raw GraphQL article item into the string-key shape that the record builders need.
+  # ArticleAttributes keeps draft, entry_type, and path the same as in the other parts of the app.
+  # @param item [Hash] A raw article item with symbol keys.
   # @return [Hash]
   def decorate_post(item)
     sys = item[:sys] || {}
@@ -509,9 +514,9 @@ class StandardSite < ApplicationService
     }
   end
 
-  # The article's tags for the record, joining the concept ids GraphQL returns to their names.
-  # Concepts whose name can't be resolved are dropped.
-  # @param item [Hash] A raw symbolized article item.
+  # The tags of the article for the record. It joins the concept ids from GraphQL to their names.
+  # It removes each concept with a name that it cannot find.
+  # @param item [Hash] A raw article item with symbol keys.
   # @return [Array<Hash>] { "id", "name" } hashes.
   def article_tags(item)
     Array(item.dig(:contentfulMetadata, :concepts)).filter_map do |concept|
@@ -520,14 +525,15 @@ class StandardSite < ApplicationService
     end
   end
 
-  # Concept id => name for the whole taxonomy, fetched once per sync. Empty when unavailable.
+  # Concept id => name for the full taxonomy. The app gets it one time for each sync. It is empty
+  # if the taxonomy is not available.
   # @return [Hash{String=>String}]
   def taxonomy_names
     @taxonomy_names ||= TaxonomyConcepts.new.names || {}
   end
 
-  # @param item [Hash] A raw symbolized site item.
-  # @return [Hash] The string-keyed site the publication builder expects.
+  # @param item [Hash] A raw site item with symbol keys.
+  # @return [Hash] The site with string keys, for the publication builder.
   def decorate_site(item)
     logo = item[:logo]
     {
@@ -537,39 +543,39 @@ class StandardSite < ApplicationService
     }
   end
 
-  # --- Fingerprint cache (this app's Redis; not read by the web app) ------------------
+  # --- Fingerprint cache (the Redis of this app; the web app does not read it) --------
 
-  # The Redis key a record's fingerprint is cached under, scoped by collection so a document
-  # and the publication can't collide on rkey.
+  # The Redis key for the fingerprint of a record. The collection is part of the key, thus a
+  # document and the publication cannot have the same rkey.
   def fingerprint_key(collection, rkey)
     "standard_site:fingerprint:#{collection}:#{rkey}"
   end
 
-  # @return [String, nil] The last-synced fingerprint, or nil when absent.
+  # @return [String, nil] The fingerprint from the last sync, or nil if it is absent.
   def stored_fingerprint(collection, rkey)
     return unless defined?($redis) && $redis
     $redis.get(fingerprint_key(collection, rkey))
   end
 
-  # Persists a record's fingerprint, with no TTL — it outlives any single sync.
+  # Stores the fingerprint of a record with no TTL. It stays after each sync.
   def store_fingerprint(collection, rkey, value)
     return unless defined?($redis) && $redis
     $redis.set(fingerprint_key(collection, rkey), value)
   end
 
-  # Drops a pruned record's cached fingerprint, so it re-syncs if it ever reappears.
+  # Removes the cached fingerprint of a deleted record, thus it syncs again if it comes back.
   def forget_fingerprint(rkey)
     return unless defined?($redis) && $redis
     $redis.del(fingerprint_key(DOCUMENT_COLLECTION, rkey))
   end
 
-  # @return [String] The production site root, without a trailing slash.
+  # @return [String] The production site root, with no slash at the end.
   def publication_url
     ENV["SITE_URL"].to_s.chomp("/")
   end
 
-  # Normalizes a post path to the canonical page URL, so document verification fetches the
-  # page that actually carries the <link> tag.
+  # Changes a post path into the canonical page URL. Thus document verification gets the page
+  # that has the <link> tag.
   # @param path [String] The decorated post path.
   # @return [String, nil]
   def document_path(path)
@@ -580,9 +586,9 @@ class StandardSite < ApplicationService
 
   # --- PDS (AT Protocol) --------------------------------------------------------------
 
-  # Authenticates with the PDS, resolving the DID and the repo's service endpoint, and caches
-  # the DID.
-  # @return [Boolean] Whether a usable session was established.
+  # Opens a session with the PDS. It finds the DID and the service endpoint of the repo, then
+  # caches the DID.
+  # @return [Boolean] True if a session is available.
   def create_session
     return false unless valid_credentials?
 
@@ -609,15 +615,16 @@ class StandardSite < ApplicationService
   end
 
   # @param doc [Hash, nil] A DID document.
-  # @return [String, nil] Its #atproto_pds service endpoint.
+  # @return [String, nil] The #atproto_pds service endpoint of the document.
   def pds_endpoint_from_did_doc(doc)
     return if doc.blank?
     service = Array(doc["service"]).find { |s| s["id"].to_s.end_with?("#atproto_pds") }
     service&.dig("serviceEndpoint")&.chomp("/")
   end
 
-  # Creates or updates a record, idempotent on repo + collection + rkey. Sends validate:false
-  # because the PDS doesn't know the site.standard.* lexicons.
+  # Makes or updates a record. The repo, the collection, and the rkey identify it, thus you can
+  # do this more than one time. It sends validate:false, because the PDS does not know the
+  # site.standard.* lexicons.
   # @return [Boolean] Whether it succeeded.
   def put_record(collection, rkey, record)
     response = HTTParty.post(
@@ -632,16 +639,16 @@ class StandardSite < ApplicationService
     response.success?
   end
 
-  # Deletes every document record whose rkey isn't in the current set.
-  # @param current_rkeys [Array<String>] The rkeys that should remain.
-  # @return [Integer] How many records were pruned.
+  # Deletes each document record with an rkey that is not in the current set.
+  # @param current_rkeys [Array<String>] The rkeys that must stay.
+  # @return [Integer] The number of records that it deleted.
   def prune_documents(current_rkeys)
     stale = rkeys_to_prune(list_record_rkeys(DOCUMENT_COLLECTION), current_rkeys)
     stale.count { |rkey| remove_document(rkey) == :deleted }
   end
 
   # @param collection [String] The collection to list.
-  # @return [Array<String>] Every rkey in it, paged through the cursor.
+  # @return [Array<String>] All the rkeys in it. The cursor gives one page at a time.
   def list_record_rkeys(collection)
     rkeys = []
     cursor = nil
@@ -678,9 +685,9 @@ class StandardSite < ApplicationService
     response.success?
   end
 
-  # Downloads a resized copy of an image and uploads it to the PDS as a blob.
-  # @return [Hash, nil] The blob, or nil on any failure or without a session — in which case
-  #   the caller omits the field.
+  # Downloads a smaller copy of an image and uploads it to the PDS as a blob.
+  # @return [Hash, nil] The blob, or nil if there is a failure or no session. The caller then
+  #   omits the field.
   def upload_image_blob(url, content_type, w:, h:)
     return if @access_jwt.blank? || url.blank?
     bytes, mime = fetch_resized_image(url, content_type, w: w, h: h)
@@ -700,9 +707,10 @@ class StandardSite < ApplicationService
     nil
   end
 
-  # Fetches a resized image as raw bytes via Contentful's Images API, keeping blobs under 1MB.
-  # Hitting Contentful directly is fine here, since this only runs on publish.
-  # @return [Array(String, String), nil] [bytes, mime_type], or nil on failure.
+  # Gets a smaller image as raw bytes from the Contentful Images API. This keeps each blob below
+  # 1MB. A direct request to Contentful is satisfactory here, because this runs only at publish
+  # time.
+  # @return [Array(String, String), nil] [bytes, mime_type], or nil if it fails.
   def fetch_resized_image(url, content_type, w:, h:)
     return if url.blank?
     source = url.to_s.start_with?("//") ? "https:#{url}" : url
@@ -720,8 +728,8 @@ class StandardSite < ApplicationService
     nil
   end
 
-  # Builds a Contentful Images API URL, normalizing onto images.ctfassets.net — the downloads
-  # host doesn't support transformations.
+  # Makes a Contentful Images API URL. It always uses images.ctfassets.net, because the downloads
+  # host does not do transformations.
   # @return [String]
   def images_api_url(url, w:, h:, fm:)
     uri = URI.parse(url)
@@ -736,9 +744,9 @@ class StandardSite < ApplicationService
     { "Content-Type" => "application/json", "Authorization" => "Bearer #{@access_jwt}" }
   end
 
-  # Renders Markdown to plain text: no markup, decoded entities, collapsed whitespace.
-  # Deliberately not MarkdownHelper#markdown_to_plain_text — this skips SmartyPants, and its
-  # output feeds the content fingerprints, so changing it would re-sync every record.
+  # Changes Markdown into plain text: no markup, decoded entities, and one space between words.
+  # This is not MarkdownHelper#markdown_to_plain_text, on purpose. It does not use SmartyPants.
+  # Its output goes into the content fingerprints, thus a change here syncs each record again.
   # @param text [String, nil] The Markdown.
   # @return [String, nil] The plain text, or nil when blank.
   def plain_text(text)
@@ -748,13 +756,13 @@ class StandardSite < ApplicationService
     decoded.gsub(/\s+/, " ").strip.presence
   end
 
-  # @return [Redcarpet::Markdown] The reusable renderer.
+  # @return [Redcarpet::Markdown] The shared renderer.
   def markdown
     @markdown ||= Redcarpet::Markdown.new(Redcarpet::Render::HTML.new, **MarkdownHelper::EXTENSIONS)
   end
 
   # @param value [String, nil] A timestamp.
-  # @return [String, nil] It as a UTC RFC3339 string with millisecond precision.
+  # @return [String, nil] The timestamp as a UTC RFC3339 string with milliseconds.
   def iso8601(value)
     return if value.blank?
     Time.parse(value.to_s).utc.iso8601(3)
@@ -764,7 +772,7 @@ class StandardSite < ApplicationService
 
   # @param str [String, nil] The string.
   # @param max [Integer] The maximum number of grapheme clusters.
-  # @return [String, nil] The truncated string.
+  # @return [String, nil] The string, made shorter.
   def truncate_graphemes(str, max)
     return str if str.blank?
     graphemes = str.scan(/\X/)

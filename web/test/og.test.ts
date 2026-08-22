@@ -2,12 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handleOg, readOgTitle } from '../src/og';
 import { makeCtx, assetsReturning, assetsRecording } from './helpers';
 
-// ⚠️ This suite deliberately never imports ../src/og-render, and neither does anything it loads.
-// That module imports the card font and logo as Data modules, and the vitest pool's module
-// fallback loader force-types only `.wasm` — everything else is read as UTF-8 and parsed as JS,
-// so a `.ttf` import there dies with a syntax error that looks nothing like its cause. The
-// `render` parameter on handleOg is the seam that keeps it out; see web/CLAUDE.md.
-// The render itself is covered by `wrangler dev` instead.
+// ⚠️ This suite never imports ../src/og-render, on purpose, and nothing that it loads imports that
+// module. That module imports the card font and the logo as Data modules, and the fallback module
+// loader of the vitest pool sets the type only for `.wasm`. It reads each other file as UTF-8 and
+// parses it as JS. Thus a `.ttf` import there gives a syntax error that does not show its cause.
+// The `render` parameter on handleOg is what keeps that module out. Refer to web/CLAUDE.md.
+// `wrangler dev` covers the render itself.
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47]) as Uint8Array<ArrayBuffer>;
 const renderStub = () => vi.fn(async () => PNG);
@@ -23,16 +23,16 @@ const withTitle = (title: string) =>
 const envWith = (response: () => Response) =>
   ({ ASSETS: assetsReturning(response) }) as unknown as Env;
 
-// Cards hang off the page's own path: the card for /post/ is /post/og.png, and the home page's
-// is /og.png. `v` is the only parameter left.
+// The path of the page gives the path of its card: the card for /post/ is /post/og.png, and the
+// card for the home page is /og.png. `v` is the only parameter.
 const request = (path: string, init?: RequestInit) =>
   new Request(`https://www.example.com${path}`, init);
 
 describe('handleOg', () => {
-  // The handler reads and writes caches.default. Stub both so tests never touch real (per-test
-  // isolated) Cache storage — that write otherwise trips the same miniflare isolated-storage
-  // teardown bug the plausible and index suites work around. `match` → miss forces the render
-  // path; `put` → no-op.
+  // The handler reads caches.default and writes to it. Replace both, thus a test never uses the
+  // true Cache storage, which the pool keeps separate for each test. Without this, the write
+  // causes the same miniflare storage teardown problem that the plausible suite and the index
+  // suite also prevent. `match` gives a miss, which makes the code render. `put` does nothing.
   beforeEach(() => {
     vi.spyOn(caches.default, 'match').mockResolvedValue(undefined);
     vi.spyOn(caches.default, 'put').mockResolvedValue(undefined);
@@ -53,8 +53,8 @@ describe('handleOg', () => {
       expect(render).not.toHaveBeenCalled();
     });
 
-    // Defensive only: the router and the run_worker_first globs both key on the suffix, so this
-    // is only reachable if the two have drifted apart.
+    // This is a safety check only. The router and the run_worker_first globs both use the suffix,
+    // thus this code runs only when the two do not agree.
     it('400s a path that is not a card path', async () => {
       const res = await handleOg(
         request('/post/?v=v1'),
@@ -65,8 +65,9 @@ describe('handleOg', () => {
       expect(res.status).toBe(400);
     });
 
-    // Every non-image response body is just its own status line — no bespoke message describing
-    // which internal step failed, since this endpoint is public and nothing reads the body.
+    // The body of each response that is not an image is only its status line. There is no message
+    // that names the step that failed, because this endpoint is public and nothing reads the
+    // body.
     it.each([
       [400, '400 Bad Request', '/post/?v=v1', 'GET'],
       [405, '405 Method Not Allowed', '/og.png', 'POST'],
@@ -84,15 +85,15 @@ describe('handleOg', () => {
   });
 
   describe('title lookup through the ASSETS binding', () => {
-    // The card's own path names the page: chop the filename off the end and that's what gets
-    // looked up. A bare /og.png is the home page's card. ⚠️ The trailing slash has to survive —
-    // the built asset is /post/index.html, and auto-trailing-slash answers a slashless /post
-    // with a redirect, which the 200-only check downstream would turn into a 404.
+    // The path of the card names the page: remove the file name from the end, and the code looks
+    // up the remainder. A path of /og.png alone is the card of the home page. ⚠️ The slash at the
+    // end must stay. The asset from the build is /post/index.html, and auto-trailing-slash answers
+    // a /post with no slash with a redirect. The check for a 200 below would make that a 404.
     it.each([
       ['/2026/06/26/post/og.png?v=v1-9#frag', '/2026/06/26/post/'],
       ['/og.png?v=v1', '/'],
-      // ⚠️ Protocol-relative-looking paths must stay on this origin — the lookup assigns
-      // `pathname` rather than resolving the path against the incoming URL, so they do.
+      // ⚠️ A path that looks like it has no protocol must stay on this origin. The lookup sets
+      // `pathname` and does not resolve the path against the URL that comes in, thus it stays.
       ['//evil.example/og.png?v=v1', '//evil.example/'],
     ])(
       'asks the asset layer for %s on the incoming origin',
@@ -122,8 +123,9 @@ describe('handleOg', () => {
       expect(assets.requests[0].url).toBe('https://www.example.com/post/');
     });
 
-    // not_found_handling: "404-page" means a miss returns the built 404 page's markup, which has
-    // an og:title of its own — so the status, not the body, is what rules it out.
+    // With not_found_handling: "404-page", a miss returns the markup of the 404 page from the
+    // build, and that page has an og:title of its own. Thus the status, and not the body, is what
+    // removes it.
     it('404s when the asset layer does not return a clean 200', async () => {
       const render = renderStub();
       const res = await handleOg(
@@ -241,9 +243,10 @@ describe('handleOg', () => {
         renderStub()
       );
 
-      // ⚠️ `v` must survive into the key — it is what makes the card content-addressed, so
-      // dropping it would serve a republished page's old PNG forever. Junk params must not, or
-      // ?x=<random> mints an unbounded number of entries, each a miss costing a full render.
+      // ⚠️ `v` must go into the key. It is what makes the content address the card, thus without
+      // it the code would serve the old PNG of a page that a user published again, for all time. A
+      // bad parameter must not go into the key: with it, ?x=<random> makes an unlimited number of
+      // entries, and each one is a miss that costs a full render.
       const [matched] = vi.mocked(caches.default.match).mock.calls[0];
       const [stored] = vi.mocked(caches.default.put).mock.calls[0];
       const expected = 'https://www.example.com/post/og.png?v=v1-9';
@@ -251,9 +254,9 @@ describe('handleOg', () => {
       expect((stored as Request).url).toBe(expected);
     });
 
-    // ⚠️ `v` is caller-supplied, so it is a cache key an attacker writes. Without normalisation
-    // every distinct value is a miss costing a full satori + resvg render and a stored PNG —
-    // dropping the *other* params is not enough on its own.
+    // ⚠️ The caller supplies `v`, thus an attacker can write a cache key. Without a correction of
+    // the value, each different value is a miss that costs a full satori and resvg render and a
+    // PNG in the cache. To remove the *other* parameters is not sufficient.
     it.each([
       ['?v=' + 'a'.repeat(200), 'a long junk value'],
       ['?v=v1-9-extra', 'a value that only looks like a version'],
@@ -347,10 +350,10 @@ describe('readOgTitle', () => {
     ).resolves.toBeNull();
   });
 
-  // The body is enqueued but never closed, so this can only resolve if the read stops at the tag
-  // rather than draining to the end — which is the whole point on a route near the CPU budget.
-  // (Whether the cancel propagates all the way to the source stream is HTMLRewriter's business,
-  // so it isn't asserted here.)
+  // The code adds the body to the stream but never closes it. Thus this can resolve only if the
+  // read stops at the tag and does not go to the end. That is the purpose on a route that is near
+  // the CPU limit. HTMLRewriter decides if the cancel reaches the source stream, thus this file
+  // does not test that.
   it('stops reading once the tag is found instead of draining the body', async () => {
     const body = new ReadableStream({
       start(controller) {
@@ -369,8 +372,8 @@ describe('readOgTitle', () => {
     ).resolves.toBe('Early');
   });
 
-  // ⚠️ HTMLRewriter's getAttribute returns the attribute exactly as written, entities included,
-  // so decodeEntities still runs on the way out.
+  // ⚠️ The getAttribute of HTMLRewriter returns the attribute as the source writes it, with the
+  // entities. Thus decodeEntities still runs on the result.
   it.each([
     ['&amp;', '&'],
     ['&lt;tag&gt;', '<tag>'],
@@ -386,9 +389,10 @@ describe('readOgTitle', () => {
     ).resolves.toBe(expected);
   });
 
-  // ⚠️ String.fromCodePoint throws RangeError above 0x10FFFF, and this runs on a path handleOg
-  // does not wrap — so one bad entity in a published og:title used to 500 the card outright.
-  // Left as written rather than dropped, so the damage is a visible entity, not a silent gap.
+  // ⚠️ String.fromCodePoint raises RangeError above 0x10FFFF, and this code runs on a path that
+  // handleOg does not catch. Thus one bad entity in a published og:title made the card give a 500.
+  // The code keeps the entity as the source writes it and does not remove it. Thus the result is
+  // an entity that you can see, and not a gap with no message.
   it.each([
     ['&#1114112;', '&#1114112;'],
     ['&#x110000;', '&#x110000;'],
@@ -402,8 +406,8 @@ describe('readOgTitle', () => {
     }
   );
 
-  // ⚠️ `&amp;` is the escape for the ampersand that introduces every other entity, so a decoder
-  // that ran twice would turn this into a literal "<".
+  // ⚠️ `&amp;` is the escape for the ampersand that starts each other entity. Thus a decoder that
+  // ran two times would make this into a "<" character.
   it('does not double-decode an escaped entity', async () => {
     await expect(
       readOgTitle(page('<meta property="og:title" content="&amp;lt;">'))

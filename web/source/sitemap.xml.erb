@@ -16,8 +16,8 @@
       <lastmod><%= DateTime.parse(article.updated_at).strftime('%Y-%m-%d') %></lastmod>
     </url>
   <% end %>
-  <%# Listing hubs — the blog index and per-tag pages. They have no updated_at of their
-      own, so lastmod is the newest entry each page lists. %>
+  <%# The list pages: the blog index and each tag page. They have no updated_at of their own, thus
+      lastmod is the date of the newest entry on each page. %>
   <% (data.blog + data.tags.flat_map(&:pages)).select { |p| p.index_in_search_engines }.each do |page| %>
     <url>
       <loc><%= full_url(page.path) %></loc>

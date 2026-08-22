@@ -1,5 +1,5 @@
-# Fetches the pollen forecast from the Google Pollen API. The raw response is cached in
-# Redis for an hour. `data` returns it wrapped for dot-access (keys snake_cased), or nil.
+# Gets the pollen forecast from the Google Pollen API. Redis caches the raw response for one hour.
+# `data` gives it in an object with dot access and with snake_case keys, or nil.
 class GooglePollen < ApplicationService
   include GoogleApi
 

@@ -8,23 +8,24 @@ export default class extends Controller {
     preloadPagefindWhenIdle();
   }
 
-  /** Hover/focus is the earliest signal someone is heading for search. */
+  /** A pointer or a focus on the button is the first sign that a person wants to search. */
   preload() {
     loadPagefind();
   }
 
   /**
-   * Opens the search modal, awaiting the component UI in case the preloads haven't finished.
-   * @param {Event} event - The event that triggered the open.
+   * Opens the search modal. It waits for the component UI, because an earlier load can be in
+   * progress.
+   * @param {Event} event - The event that started the open.
    */
   async open(event) {
     event.preventDefault();
     await loadPagefind();
     document.querySelector('pagefind-modal')?.open?.();
     initSearchTracking();
-    // On mobile the Search item sits inside the open hamburger menu; close it so dismissing
-    // search returns straight to the page. After the await on purpose: if the modal isn't
-    // ready, leaving the menu up beats closing it onto a bare page.
+    // On a mobile screen, the Search item is in the open menu. Close that menu, thus a close of the
+    // search goes directly to the page. This is after the wait, on purpose: if the modal is not
+    // ready, an open menu is better than a close onto an empty page.
     this.dispatch('close', { target: document });
   }
 }

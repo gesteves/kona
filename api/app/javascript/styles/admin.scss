@@ -1,11 +1,12 @@
-// Styles for the owner-facing admin UI. Bundled by esbuild (via esbuild-sass-plugin) into
-// app/assets/builds/admin.css, after Web Awesome's own stylesheet — see the ordering note in
-// admin.js. Everything here is unlayered, so it outranks every `wa-*` layer without specificity
-// tricks.
+// The styles of the admin UI of the owner. esbuild, with esbuild-sass-plugin, puts them into
+// app/assets/builds/admin.css, after the stylesheet of Web Awesome. Refer to the note about the
+// order in admin.js. Each rule here has no layer, thus it wins over each `wa-*` layer and needs no
+// change to its specificity.
 //
-// One BEM block per partial (`plain-list` aside). Layout, spacing, and type come from Web Awesome's
-// utilities and `--wa-*` custom properties rather than from rules here, so the `.wa-dark` class the
-// layouts set from `prefers-color-scheme` flips these along with the components.
+// There is one BEM block for each partial, and `plain-list` is the exception. The layout, the
+// spacing, and the type come from the utilities and the `--wa-*` custom properties of Web Awesome,
+// and not from a rule here. Thus the `.wa-dark` class, which the layouts set from
+// `prefers-color-scheme`, changes these styles with the components.
 
 @use "tokens";
 @use "base";

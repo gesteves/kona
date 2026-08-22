@@ -1,13 +1,13 @@
 :root {
-  // Own the colour scheme here rather than inheriting whatever Web Awesome's theme sets.
-  // That theme declares `color-scheme: light` on a zero-specificity `:where(:root)` and
-  // only switches to dark behind a `.wa-dark` class this app never sets — so form
-  // controls, scrollbars, and other UA-painted chrome stayed light even at night. This
-  // app drives dark mode entirely from `prefers-color-scheme` (see below), and declaring
-  // both values lets the UA follow it.
+  // Set the color scheme here, and do not use the value from the Web Awesome theme. That theme
+  // declares `color-scheme: light` on a `:where(:root)` with zero specificity, and it changes to
+  // dark only with a `.wa-dark` class that this app never sets. Thus the form controls, the
+  // scrollbars, and the other parts that the browser paints stayed light at night. This app
+  // controls the dark mode with `prefers-color-scheme` only (refer to the code below), and both
+  // values here let the browser follow it.
   color-scheme: light dark;
 
-  // Swatches: https://coolors.co/faf7fa-092034-bf0222-f9cb40-121216
+  // The colors: https://coolors.co/faf7fa-092034-bf0222-f9cb40-121216
   // Blues
   --color-alice-blue:            #EEF5FC;
   --color-alice-blue-darker:     #DCECF9;
@@ -27,7 +27,7 @@
   // Yellows
   --color-sunglow:        #F9CB40;
 
-  // Pure Grays
+  // The pure grays
   --color-cultured:       #FAFAFA;
   --color-platinum:       #EBEBEB;
   --color-gainsboro:      #E0E0E0;
@@ -38,14 +38,14 @@
   --color-jet:            #292929;
   --color-eerie-black:    #141414;
 
-  // Basics
+  // The basics
   --max-width-container: 1280px;
   --padding:             2rem;
   --content-padding:     2rem;
   --column-gap:          1rem;
   --row-gap:             2rem;
 
-  // Colors
+  // The colors
   --color-accent:                         var(--color-firebrick);
   --color-aside-background:               var(--color-alice-blue);
   --color-aside-border:                   var(--color-columbia-blue);
@@ -85,17 +85,17 @@
   --color-table-header-background:        var(--color-alice-blue);
   --color-text-secondary:                 var(--color-granite-gray);
 
-  // Not spanish-gray (#999): it measures 2.85:1 on white, and this token colors the entry meta
-  // line and the light-icon fills, not just decoration.
+  // Do not use spanish-gray (#999): it gives 2.85:1 on white, and this token colors the meta line
+  // of an entry and the fill of a light icon. It is not decoration only.
   --color-text-tertiary:                  var(--color-dim-gray);
   --color-text:                           var(--color-jet);
 
-  // Gradients - Simplified from verbose 39-line definitions
+  // The gradients, in a short form
   --gradient-background:       linear-gradient(180deg, var(--color-alice-blue), var(--color-alice-blue-darker));
   --gradient-heading:                 linear-gradient(180deg, var(--color-prussian-blue), var(--color-oxford-blue));
   --gradient-link:                    linear-gradient(180deg, var(--color-red-cmyk), var(--color-firebrick));
 
-  // Font sizes
+  // The font sizes
   --font-x-large: clamp(36px, 10vw, 72px);
   --font-large:   clamp(24px, 10vw, 48px);
   --font-semi-large: 22px;
@@ -104,7 +104,7 @@
   --font-x-small: 10px;
   --font-table: 12px;
 
-  // Line height
+  // The line height
   --line-height-x-large:    1;
   --line-height-large:      1;
   --line-height-semi-large: 1.125;
@@ -113,23 +113,24 @@
   --line-height-x-small:    2.4;
   --line-height-table:      1.5;
 
-  // Fonts
+  // The fonts
   --ibm-plex-mono:           'IBM Plex Mono', ui-monospace, 'Cascadia Code', 'Source Code Pro', menlo, consolas, 'DejaVu Sans Mono', monospace;
   --lato:                    'Lato', inter, roboto, 'Helvetica Neue', 'Arial Nova', 'Nimbus Sans', arial, sans-serif;
   --ibm-plex-sans-condensed: 'IBM Plex Sans Condensed', 'DIN Alternate', bahnschrift, 'Franklin Gothic Medium', 'Nimbus Sans Narrow', sans-serif-condensed, sans-serif;
 
-  // Radii
+  // The corner radii
   --radius-small:  2px;
   --radius-medium: 4px;
   --radius-pill:   25px;
 
-  // Other
+  // The other values
   --transition-duration: 250ms;
   --picture-outdent:     var(--content-padding);
   --light-icon-size:     0.8rem;
 
-  // Stacking order for the two overlays that can coexist: the open nav panel, and anything that
-  // must sit above it (the hamburger that closes it, the skip link, sticky table columns).
+  // The stack order for the two overlays that can be present at the same time: the open nav panel,
+  // and each element that must be above it, that is, the menu button that closes it, the skip link,
+  // and the sticky table columns.
   --z-nav-overlay:   2;
   --z-above-overlay: 3;
 
@@ -155,10 +156,10 @@
   }
 
   @include dark-mode {
-    // ⚠️ --color-link / --color-link-hover / --color-accent / --gradient-link are deliberately NOT
-    // remapped here. #BF0222 is the brand red and measures 3.25:1 on black, and the hover #DE0227
-    // measures 4.14:1; both are knowingly accepted hits, not oversights. Don't "fix" them by
-    // lightening the red.
+    // ⚠️ --color-link, --color-link-hover, --color-accent, and --gradient-link do NOT change here,
+    // on purpose. #BF0222 is the brand red and it gives 3.25:1 on black, and the hover color
+    // #DE0227 gives 4.14:1. These two values are an accepted cost, and not an error. Do not make
+    // the red lighter.
     --color-aside-background:           var(--color-rich-black-darker);
     --color-aside-border:               var(--color-oxford-blue);
     --color-aside-text:                 var(--color-alice-blue);
@@ -187,8 +188,8 @@
   }
 
   @include reduced-motion {
-    // 0s, not 0: a unitless zero is invalid as a <time>, so this only ever worked because the
-    // invalid value made the shorthands using it fall back to their initial 0s.
+    // Use 0s, and not 0. A zero with no unit is not a correct <time>. This code worked only because
+    // an incorrect value made each shorthand that used it go back to its own default of 0s.
     --transition-duration: 0s;
   }
 }

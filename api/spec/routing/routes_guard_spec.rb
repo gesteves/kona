@@ -1,16 +1,16 @@
 require "rails_helper"
 
-# Guards for the two load-bearing constraints in config/routes.rb that used to be enforced
-# only by ⚠️ comments:
+# The tests for the two necessary rules in config/routes.rb, which only a ⚠️ comment gave before:
 #
-#   1. The plain-text 404 catch-all must stay the LAST route — anything added after it is
-#      shadowed, and scanner probes go back to raising routing errors instead of clean 404s.
-#   2. Every top-level route prefix must be listed in RACK_ATTACK_KNOWN_PREFIXES
-#      (config/initializers/rack_attack.rb) — rack-attack throttles anything outside the
-#      known prefixes as a scanner probe, so a new top-level route that isn't added there
-#      gets its real traffic rate-limited.
+#   1. The plain-text 404 catch-all must stay the LAST route. Rails never reaches a route after it,
+#      and a scanner probe then raises a routing error and does not give a clean 404.
+#   2. RACK_ATTACK_KNOWN_PREFIXES (config/initializers/rack_attack.rb) must contain each top-level
+#      route prefix. rack-attack limits the rate of each path outside those prefixes, because it
+#      counts that path as a scanner probe. Thus a new top-level route that is not there gets a rate
+#      limit on its true traffic.
 RSpec.describe "config/routes.rb guards" do
-  # The app's drawn routes (skipping Rails' internal dev-only info routes).
+  # The routes that Rails draws for the app. This does not include the internal info routes of
+  # Rails, which exist in development only.
   let(:drawn_routes) { Rails.application.routes.routes.reject(&:internal) }
 
   it "keeps the *unmatched catch-all as the last route" do

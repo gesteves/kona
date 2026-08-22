@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import NavController from '../../../source/javascripts/stimulus/controllers/nav_controller';
 import { mount } from '../helpers';
 
-// The open/closed state lives as a class on <body> (the menu is full-screen on mobile), so the
-// controller's job is to keep that class and the button's ARIA state in lockstep.
+// A class on <body> holds the open or closed state, because the menu covers the full screen on a
+// mobile device. Thus the work of the controller is to keep that class and the ARIA state of the
+// button the same.
 
 const MARKUP = `
   <nav data-controller="nav" data-nav-open-class="nav-open">
@@ -50,8 +51,8 @@ describe('nav controller', () => {
   });
 
   it('closes when search opens, so dismissing search returns to the page', async () => {
-    // On mobile the Search item sits inside the open hamburger menu; search#open dispatches
-    // `search:close` on the document so the menu isn't left standing behind the modal.
+    // On a mobile screen, the Search item is in the open menu. search#open sends `search:close` on
+    // the document, thus the menu does not stay behind the modal.
     const { element } = await mountNav();
     element.querySelector('button').click();
 
@@ -69,8 +70,8 @@ describe('nav controller', () => {
     expect(isOpen()).toBe(false);
   });
 
-  // The open menu is a full-viewport overlay. Without inert, the reader can tab straight through
-  // it into page content they can't see.
+  // The open menu covers the full viewport. Without inert, the reader can use Tab to go through it
+  // into page content that they cannot see.
   it('makes the page behind the menu inert while it is open', async () => {
     const { element } = await mountNav();
     const main = document.createElement('main');
@@ -84,8 +85,9 @@ describe('nav controller', () => {
     expect(main.inert).toBe(false);
   });
 
-  // The open menu fixes <body>, which collapses the scroll height — so the offset has to be
-  // stashed and put back, or closing the menu silently returns the reader to the top.
+  // The open menu makes <body> fixed, and the scroll height then becomes zero. Thus the code must
+  // keep the offset and put it back, or a close of the menu takes the reader to the top with no
+  // message.
   it('restores the scroll position when the menu closes', async () => {
     const { element } = await mountNav();
     window.scrollY = 1200;

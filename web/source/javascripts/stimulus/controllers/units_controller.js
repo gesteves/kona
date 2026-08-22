@@ -1,6 +1,6 @@
 import { Controller } from '@hotwired/stimulus';
 
-/** Renders a measurement in the units matching the reader's locale. */
+/** Renders a measurement in the units of the locale of the reader. */
 export default class extends Controller {
   static values = { imperial: String, metric: String };
 
@@ -9,8 +9,8 @@ export default class extends Controller {
   }
 
   /**
-   * Whether the reader's locale uses imperial units. A `locale` query param overrides the
-   * browser's, for debugging.
+   * Tells if the locale of the reader uses the imperial units. A `locale` query parameter replaces
+   * the locale of the browser, for a debug session.
    * @returns {boolean}
    */
   isImperialLocale() {
@@ -22,7 +22,7 @@ export default class extends Controller {
     return imperialLocales.includes(userLocale);
   }
 
-  /** Sets the element's text to the imperial or metric value. */
+  /** Puts the imperial value or the metric value in the text of the element. */
   setUnits() {
     if (this.isImperialLocale()) {
       this.element.textContent = this.imperialValue;

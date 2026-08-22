@@ -1,4 +1,5 @@
-<%# Each conversion is formatted once and reused; distance_value/distance_unit would each redo it. %>
+<%# The code formats each conversion one time and uses that result again. distance_value and %>
+<%# distance_unit would each do the conversion again. %>
 <% metric_value, metric_unit = distance_parts(distance) %>
 <% imperial_value, imperial_unit = distance_parts(distance, units: "imperial") %>
 <div class="stats__stat">

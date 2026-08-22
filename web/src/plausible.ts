@@ -1,31 +1,31 @@
-// First-party proxy for Plausible analytics, adapted from Plausible's official Cloudflare
-// Workers guide (https://plausible.io/docs/proxy/guides/cloudflare).
+// The first-party proxy for Plausible analytics. It comes from the official Cloudflare Workers
+// guide of Plausible (https://plausible.io/docs/proxy/guides/cloudflare).
 //
-// Do not "clean up" the /pa/ path: paths containing "plausible", "analytics", "tracking", or
-// "stats" get blocked by content blockers. The obfuscated prefix is the feature.
+// Do not change the /pa/ path to a clearer name: a content blocker stops a path that contains
+// "plausible", "analytics", "tracking", or "stats". The unclear prefix is the purpose.
 
 import { withSecurityHeaders } from './headers';
 
-// Must match PLAUSIBLE_SCRIPT_PATH / PLAUSIBLE_EVENT_PATH in web/lib/helpers/site_helpers.rb,
-// which generate the inline init snippet.
+// These must agree with PLAUSIBLE_SCRIPT_PATH and PLAUSIBLE_EVENT_PATH in
+// web/lib/helpers/site_helpers.rb, which make the inline init code.
 const SCRIPT_PATH = '/pa/script.js';
 const EVENT_PATH = '/pa/event';
 const EVENT_UPSTREAM = 'https://plausible.io/api/event';
 
-/** Analytics must never hold a request open; an abort falls through to the silent fallback. */
+/** The analytics must never keep a request open. A stop goes to the fallback with no message. */
 const UPSTREAM_TIMEOUT_MS = 10_000;
 
 /**
- * Routes a /pa/* request to the script or event handler.
- * @returns A 404 when analytics isn't configured, otherwise the handler's response — or a
- *   silent fallback, since analytics must never break a page.
+ * Sends a /pa/* request to the script handler or to the event handler.
+ * @returns A 404 if there is no analytics configuration. In all other conditions, the response of
+ *   the handler, or a fallback with no message, because the analytics must never stop a page.
  */
 export async function handlePlausible(
   request: Request,
   env: Env,
   ctx: ExecutionContext
 ): Promise<Response> {
-  // Mirrors plausible_installed? on the Ruby side.
+  // This is the same as plausible_installed? in the Ruby code.
   if (!env.PLAUSIBLE_SCRIPT_URL) return notFound();
 
   const pathname = new URL(request.url).pathname;
@@ -40,10 +40,10 @@ export async function handlePlausible(
 }
 
 /**
- * ⚠️ Every response this module builds goes through withSecurityHeaders. /pa/* is claimed by
- * `run_worker_first`, so it never touches the static asset layer and never gets `source/headers`'
- * `/*` block — and this route serves executable JavaScript from the site's own origin, which
- * without `nosniff` is the one place that matters most.
+ * ⚠️ Each response from this module goes through withSecurityHeaders. `run_worker_first` takes
+ * /pa/*, thus it never reaches the static asset layer and never gets the `/*` block of
+ * `source/headers`. This route also serves JavaScript that runs, from the origin of the site, and
+ * that is the place where `nosniff` is the most important.
  */
 function securedResponse(
   body: BodyInit | null,
@@ -57,7 +57,7 @@ function notFound(): Response {
   return securedResponse(null, { status: 404 });
 }
 
-/** A no-op script, so an upstream outage never surfaces as a failed-resource console error. */
+/** A script that does nothing, thus an upstream failure never gives a console error. */
 function emptyScript(): Response {
   return securedResponse('', {
     status: 200,
@@ -65,14 +65,15 @@ function emptyScript(): Response {
   });
 }
 
-/** An empty 202, so a dropped event resolves cleanly in window.plausible()'s fetch. */
+/** An empty 202, thus the fetch in window.plausible() resolves for an event that goes away. */
 function emptyEvent(): Response {
   return securedResponse(null, { status: 202 });
 }
 
 /**
- * Serves the tracking script from caches.default, fetching upstream on a miss. Honors the
- * upstream Cache-Control; only ok responses are stored, so an error is never pinned.
+ * Serves the tracking script from caches.default, and gets it from upstream on a miss. It obeys
+ * the upstream Cache-Control. It stores only a good response, thus an error never stays in the
+ * cache.
  */
 async function getScript(
   request: Request,
@@ -86,9 +87,10 @@ async function getScript(
     });
   }
 
-  // Key on the bare script path, not the inbound request: the Cache API keys on the full URL,
-  // so `?x=<random>` would mint unbounded entries that each refetch Plausible's CDN. Nothing
-  // reads a query param, so normalizing is lossless. A GET key also lets HEAD share the entry.
+  // Use the script path alone as the key, and not the request that comes in. The Cache API uses
+  // the full URL as its key, thus `?x=<random>` would make an unlimited number of entries, and
+  // each one would get the file from the CDN of Plausible again. No code reads a query parameter,
+  // thus this change loses nothing. A GET key also lets a HEAD request use the same entry.
   const cacheKey = new Request(new URL(SCRIPT_PATH, request.url).toString());
 
   let response = await caches.default.match(cacheKey);
@@ -97,17 +99,17 @@ async function getScript(
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
     if (!upstream.ok) return emptyScript();
-    // ⚠️ Rebuilt from an explicit allowlist, not `new Response(upstream.body, upstream)` minus a
-    // couple of names. Everything else Plausible's CDN sets — its own CORS and caching headers,
-    // any Set-Cookie — would otherwise be re-served under this origin AND persisted in
-    // caches.default for its full TTL. The allowlist also drops set-cookie and vary for free,
-    // which caches.default.put() rejects outright.
+    // ⚠️ The code makes the headers again from a list of the permitted names. It does not use
+    // `new Response(upstream.body, upstream)` with two names removed. Each other header that the
+    // CDN of Plausible sets — its own CORS and cache headers, and any Set-Cookie — would go to
+    // the browser under this origin AND stay in caches.default for its full TTL. The list also
+    // removes set-cookie and vary, and caches.default.put() refuses those two.
     const headers = withSecurityHeaders(new Headers());
     headers.set(
       'content-type',
       upstream.headers.get('content-type') ?? 'application/javascript'
     );
-    // The upstream's own Cache-Control is honored, as before.
+    // The code obeys the Cache-Control of the upstream response.
     for (const name of ['cache-control', 'etag', 'last-modified']) {
       const value = upstream.headers.get(name);
       if (value) headers.set(name, value);
@@ -128,9 +130,9 @@ async function getScript(
 }
 
 /**
- * Forwards the event POST upstream with cookies stripped (Plausible is cookieless) and the
- * real visitor IP as X-Forwarded-For — otherwise Plausible sees this Worker's egress PoP and
- * collapses every event to one location, breaking its unique-visitor hash.
+ * Sends the event POST upstream with no cookies, because Plausible uses no cookies, and with the
+ * true visitor IP in X-Forwarded-For. Without that IP, Plausible sees the egress PoP of this
+ * Worker and puts each event at one location, which breaks its unique-visitor hash.
  */
 async function postEvent(request: Request): Promise<Response> {
   if (request.method !== 'POST') {
@@ -143,8 +145,8 @@ async function postEvent(request: Request): Promise<Response> {
   const response = await fetch(upstream, {
     signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
   });
-  // Status only. Returning the upstream response verbatim would replay Plausible's own
-  // Set-Cookie and CORS headers under this origin, which is the thing the cookie strip above
-  // exists to prevent; window.plausible() reads nothing but the status.
+  // Give the status only. The upstream response with no change would send the Set-Cookie and the
+  // CORS headers of Plausible under this origin, and the removal of the cookies above exists to
+  // stop that. window.plausible() reads only the status.
   return securedResponse(null, { status: response.status });
 }

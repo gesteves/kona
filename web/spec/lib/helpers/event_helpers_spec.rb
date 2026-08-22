@@ -5,16 +5,17 @@ require 'padrino-helpers'
 RSpec.describe EventHelpers do
   include_context 'default helper stubs'
 
-  # Padrino's content_tag/link_to, which event_timestamp_tag builds its markup with.
+  # The content_tag and link_to of Padrino, which event_timestamp_tag uses for its markup.
   include Padrino::Helpers
 
-  # A stand-in for the icon pipeline; the real one reads data/icons.json.
+  # A replacement for the icon code. The true code reads data/icons.json.
   def icon_svg(*) = '<svg></svg>'
 
-  # The site's configured timezone. Overridden in the group that exercises the fallback.
+  # The timezone from the configuration of the site. The group that tests the default value
+  # replaces it.
   def site_time_zone = 'America/Denver'
 
-  # Builds an event double shaped like a `data.events` entry.
+  # Makes an event double with the shape of a `data.events` entry.
   def event(id:, date:, going: true, title: 'A Race', location: 'Somewhere', url: nil, summary: nil)
     OpenStruct.new(
       sys: OpenStruct.new(id: id),
@@ -27,11 +28,11 @@ RSpec.describe EventHelpers do
     )
   end
 
-  # `data.events` as the helpers read it.
+  # `data.events`, in the shape that the helpers read.
   def data = OpenStruct.new(events: @events || [])
 
-  # Pins "today" so the today-or-later boundary is testable. Overrides the module's own private
-  # method, which reads the clock in the site's timezone.
+  # Sets "today", thus the test can check the limit of today or later. It replaces the private
+  # method of the module, which reads the clock in the timezone of the site.
   def event_today = Date.new(2026, 6, 15)
 
   describe '#upcoming_races' do
@@ -44,8 +45,9 @@ RSpec.describe EventHelpers do
       expect(upcoming_races.map { |e| e.sys.id }).to eq(%w[a b c])
     end
 
-    # `going` is the owner's "I am actually racing this" flag; the api filters on it, so the
-    # build must too or the two lists disagree the moment the widget swaps in.
+    # `going` is the flag that says that the owner races this event. The api uses it to select the
+    # events, thus the build must also use it. If it does not, the two lists are different when the
+    # widget replaces the section.
     it 'drops events the owner is not going to' do
       @events = [
         event(id: 'skipped', date: '2026-06-20T07:00:00-06:00', going: false),
@@ -67,8 +69,8 @@ RSpec.describe EventHelpers do
       expect(upcoming_races.size).to eq(described_class::UPCOMING_RACES_COUNT)
     end
 
-    # ⚠️ Contentful will hold an event with no date, and this runs on the home page's render
-    # path — one bad entry must drop its own card, not the whole page.
+    # ⚠️ Contentful can hold an event with no date, and this code runs on the render path of the home
+    # page. One bad entry must remove its own card, and not the full page.
     it 'drops an event with a missing or unparseable date rather than raising' do
       @events = [
         event(id: 'undated', date: nil),
@@ -85,8 +87,8 @@ RSpec.describe EventHelpers do
   end
 
   describe '#event_collection_variant' do
-    # Mirrors the api's event_collection_variant for the unfeatured case; a mismatch reflows
-    # the section the instant the widget swaps in.
+    # This is the same as the event_collection_variant of the api when there is no featured event. A
+    # difference changes the layout of the section when the widget replaces it.
     it 'matches the api layout variant for each count' do
       expect(event_collection_variant(1)).to eq('single')
       expect(event_collection_variant(2)).to eq('halves')
@@ -120,11 +122,11 @@ RSpec.describe EventHelpers do
         'url' => 'https://example.org/race',
         'description' => 'A race.'
       )
-      # `address` is required for an event rich result; the location is one free-text line, so
-      # name and address are necessarily the same string.
+      # An event rich result needs `address`. The location is one line of free text, thus the name
+      # and the address are the same string.
       expect(node['location']).to eq('@type' => 'Place', 'name' => 'Jackson, WY', 'address' => 'Jackson, WY')
-      # The author competes, not organizes — referenced by @id so it resolves to the one
-      # sitewide Person node.
+      # The author competes and does not organize. @id points to the author, thus each reference
+      # goes to the one sitewide Person node.
       expect(node['performer']).to eq('@id' => 'https://example.com/about#person')
     end
 

@@ -1,10 +1,11 @@
-# Fetches San Francisco Bay conditions (water temperature, tidal current) from the
-# Goodspeed API (NOAA SFBOFS model at station SFB1204). No auth. The response is cached
-# in Redis for 5 minutes. `data` returns it wrapped for dot-access (timeseries), or nil.
+# Gets the conditions of San Francisco Bay — the water temperature and the tidal current — from the
+# Goodspeed API, which uses the NOAA SFBOFS model at station SFB1204. It needs no authentication.
+# Redis caches the response for 5 minutes. `data` gives the timeseries in an object with dot access,
+# or nil.
 #
-# Opt-in: with `GOODSPEED_API_URL` unset the service is inert and returns nil, which every
-# consumer already treats as "no bay data" — the water-temperature sentence and the race-day
-# bay readings are simply omitted.
+# This service is optional: with no value in `GOODSPEED_API_URL` it does nothing and returns nil.
+# Each caller already reads that as "no bay data", thus the water-temperature sentence and the
+# race-day bay readings are absent.
 class Goodspeed < ApplicationService
   # @return [OpenStruct, nil]
   def data

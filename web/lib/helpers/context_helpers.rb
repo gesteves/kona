@@ -1,10 +1,10 @@
 module ContextHelpers
-  # @return [String, nil] The deploy context, set in the build env.
+  # @return [String, nil] The deploy context, from the build environment.
   def deploy_context
     ENV["DEPLOY_CONTEXT"].presence
   end
 
-  # @return [Boolean] Whether this build is the real public site.
+  # @return [Boolean] True if this build is the true public site.
   def production?
     deploy_context == "production"
   end

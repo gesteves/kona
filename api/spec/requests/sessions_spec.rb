@@ -16,34 +16,35 @@ RSpec.describe "Owner sessions", type: :request do
       expect(response.body).to include("Sign in with Google")
     end
 
-    # The page renders through layouts/auth, so it depends on the esbuild output Propshaft
-    # fingerprints. A missing build raises Propshaft::MissingAssetError rather than degrading —
-    # which is why CI has to run `npm run build` before rspec.
+    # The page renders through layouts/auth, thus it needs the esbuild output that Propshaft gives a
+    # fingerprint. With no build, Propshaft raises MissingAssetError and gives no smaller result.
+    # That is why CI must run `npm run build` before rspec.
     it "links the compiled admin bundle" do
       get "/signin"
       expect(response.body).to match(%r{/assets/admin-[0-9a-f]+\.css})
       expect(response.body).to match(%r{/assets/admin-[0-9a-f]+\.js})
     end
 
-    # ⚠️ Turbo Drive can't follow the cross-origin redirect to Google, so the form must opt out.
+    # ⚠️ Turbo Drive cannot follow the cross-origin redirect to Google, thus the form must not use
+    # it.
     it "opts the sign-in form out of Turbo" do
       get "/signin"
       expect(response.body).to include('data-turbo="false"')
     end
 
-    # ⚠️ icon_svg returns a plain String, so ERB escapes it without `raw`. The failure isn't
-    # subtle-but-invisible: the escaped markup lands in the button as literal text and stretches
-    # it to a few thousand pixels wide.
+    # ⚠️ icon_svg returns a plain String, thus ERB escapes it without `raw`. You can see that
+    # failure: the escaped markup goes into the button as text and makes the button a few thousand
+    # pixels wide.
     it "renders the Google mark as markup rather than escaped text" do
       get "/signin"
       expect(response.body).to match(/<svg [^>]*class="stub-icon"/)
       expect(response.body).not_to include("&lt;svg")
     end
 
-    # This is the one owner-facing page reachable without a session, so it's the one a crawler can
-    # actually reach. ⚠️ The header matters beyond the meta tag: robots.txt disallows this host, so
-    # a crawler never fetches the page to see the tag, yet the URL can still be indexed from an
-    # external link.
+    # This is the one page for the owner that a visitor can reach with no session, thus it is the
+    # one page that a crawler can reach. ⚠️ The header does more than the meta tag: robots.txt
+    # refuses this host, thus a crawler never gets the page and never sees the tag, but a search
+    # engine can still index the URL from an external link.
     it "tells crawlers not to index it, by header and by meta tag" do
       get "/signin"
 
@@ -52,7 +53,7 @@ RSpec.describe "Owner sessions", type: :request do
       expect(response.body).to include('<meta name="robots" content="noindex">')
     end
 
-    # The page is deliberately just the button — no heading, no explanatory copy.
+    # The page has the button only, on purpose: no heading and no other text.
     it "renders nothing but the sign-in button" do
       get "/signin"
 

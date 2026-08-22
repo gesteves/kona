@@ -4,8 +4,8 @@ RSpec.describe "Widgets::Plausible pageviews", type: :request do
   let(:article) { DeepOstruct.wrap(slug: "my-race-report", published: "2026-05-01T09:00:00-06:00", sys: { id: "abc123", first_published_at: "2026-05-01T09:00:00Z" }) }
 
   before do
-    # The widget renders empty without a site id; stub it so the spec doesn't depend on the
-    # developer's local .env (it's unset in CI).
+    # The widget is empty with no site id. This stub gives one, thus the spec does not depend on the
+    # local .env of a person. That var has no value in CI.
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with("PLAUSIBLE_SITE_ID").and_return("example.com")
 
@@ -24,7 +24,7 @@ RSpec.describe "Widgets::Plausible pageviews", type: :request do
     expect(response.body).to include("<svg")                       # eye icon, rendered unescaped
     expect(response.body).to include("Viewed 1,234 times")
     expect(response.body).to include('href="https://plausible.io/')
-    # Reconstructed path in the dashboard link, URL-encoded into the query string.
+    # The path in the dashboard link, in a URL-safe form in the query string.
     expect(response.body).to include(ERB::Util.url_encode("/2026/05/01/my-race-report/"))
   end
 
@@ -42,7 +42,8 @@ RSpec.describe "Widgets::Plausible pageviews", type: :request do
 
     get "/widgets/plausible/pageviews/abc123", headers: auth_headers
 
-    # The raw "&" must not leak into the query string (it would inject a bogus param).
+    # A plain "&" must not go into the query string, because it would add an incorrect
+    # parameter.
     expect(response.body).to include(ERB::Util.url_encode("/2026/05/01/q&a-recap/"))
     expect(response.body).not_to include("page,/2026/05/01/q&a-recap/")
   end
@@ -55,8 +56,9 @@ RSpec.describe "Widgets::Plausible pageviews", type: :request do
     expect(response.body).to include("Viewed 5 times")
   end
 
-  # One site-wide query serves every article — a per-article query would multiply the call
-  # volume by the size of the corpus and blow Plausible's 600/hour limit at this TTL.
+  # One query for the full site gives the data of each article. A query for each article would
+  # multiply the number of calls by the number of articles, and it would go past the limit of
+  # Plausible of 600 calls each hour, at this TTL.
   it "asks for every article's counts in one all-time query, not one query per article" do
     expect_any_instance_of(Plausible).to receive(:pageviews_by_path)
       .with(date_range: "all").once.and_return("/2026/05/01/my-race-report/" => 5)

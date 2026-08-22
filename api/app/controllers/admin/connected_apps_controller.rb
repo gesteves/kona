@@ -1,7 +1,7 @@
 module Admin
-  # Lists the external apps this app holds credentials for, and lets the owner attach or detach
-  # them. Whoop is the only one today; the page is a list so adding a second is a matter of
-  # appending a presenter.
+  # Lists the external apps whose credentials this app holds, and lets the owner connect one or
+  # disconnect one. Whoop is the only one today. The page is a list, thus a second app needs only a
+  # new presenter at the end.
   class ConnectedAppsController < BaseController
     # GET /connected-apps
     def show
@@ -22,8 +22,8 @@ module Admin
       ConnectedAppPresenter.new(
         name: "Bluesky",
         description: "Publishes the blog to the AT Protocol as standard.site records.",
-        # No deployment-config step to get wrong: the credentials are the connection, so this
-        # never has an :unconfigured state.
+        # There is no deploy configuration to make incorrect: the credentials are the connection,
+        # thus this app never has the :unconfigured state.
         configured: true,
         connected: service.connected?,
         connect_path: bluesky_connection_path,
@@ -46,11 +46,11 @@ module Admin
       )
     end
 
-    # Whoop leaves its tokens in Redis after rejecting them, so `connected?` alone can't tell a
-    # working integration from a dead one — WhoopTokenRefreshJob would go on failing every six
-    # hours behind a green badge.
+    # Whoop keeps its tokens in Redis after it refuses them, thus `connected?` alone cannot show the
+    # difference between an integration that works and one that does not. WhoopTokenRefreshJob would
+    # continue to fail each six hours below a green badge.
     # @param error [Hash, nil] Whoop#refresh_error.
-    # @return [String, nil] A sentence for the card, or nil when the last refresh succeeded.
+    # @return [String, nil] A sentence for the card, or nil when the last refresh was successful.
     def whoop_error_message(error)
       return if error.blank?
 

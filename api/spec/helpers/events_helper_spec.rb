@@ -1,20 +1,21 @@
 require "rails_helper"
 
-# Unit coverage for the events helper. The tricky bits — "is it today?", "is the race in
-# progress?", which calendar/tracking icon to show, and how the upcoming-races collection is
-# selected and laid out — all hinge on the current date and time, so the clock is frozen to a
-# fixed midday in the race timezone (America/Denver) to keep "today" deterministic regardless
-# of the machine's own timezone.
+# The unit tests for the events helper. The difficult parts are "is it today?", "does the race occur
+# now?", which calendar or tracking icon to show, and how the code selects and lays out the
+# upcoming-races collection. All of them depend on the current date and time. Thus these tests stop
+# the clock at midday in the race timezone (America/Denver), and "today" is then always the same, at
+# each machine timezone.
 #
-# `in_progress?` prefers the featured race's fetched weather (its sunrise..sunset window) and
-# otherwise falls back to `daytime?` — itself weather-derived (covered by the weather specs)
-# and ultimately the location-local clock — so `daytime?` is stubbed here to isolate the event
-# logic, and a small `build_event_weather` stands in for the presenter's sun times. `icon_svg` is
-# stubbed to echo the family/style/id it was asked for, so we can assert which icon each helper picked.
+# `in_progress?` uses the weather of the featured race first, that is, its sunrise to sunset window.
+# Without that weather it uses `daytime?`, which also comes from the weather (the weather specs
+# cover it) and, at the end, from the clock at the location. Thus this file stubs `daytime?` and the
+# tests cover the event code alone. A small `build_event_weather` replaces the sun times of the
+# presenter. `icon_svg` returns the family, the style, and the id that it gets, thus a test can
+# check which icon each helper selected.
 RSpec.describe EventsHelper, type: :helper do
   include ActiveSupport::Testing::TimeHelpers
 
-  # 2026-06-03 18:00 UTC == 2026-06-03 12:00 MDT, so "today" in America/Denver is June 3, 2026.
+  # 2026-06-03 18:00 UTC is 2026-06-03 12:00 MDT, thus "today" in America/Denver is June 3, 2026.
   around { |example| travel_to(Time.utc(2026, 6, 3, 18, 0, 0)) { example.run } }
 
   let(:time_zone) { "America/Denver" }
@@ -24,8 +25,8 @@ RSpec.describe EventsHelper, type: :helper do
     allow(helper).to receive(:icon_svg) { |family, style, id| %(<svg data-icon="#{family}-#{style}-#{id}"></svg>).html_safe }
   end
 
-  # An ISO8601 timestamp at 9am in the race timezone, `days` away from the frozen "today".
-  # Zoned (carries an offset) so it parses to an unambiguous instant on any machine.
+  # An ISO8601 timestamp at 9am in the race timezone, `days` from the fixed "today". It has an
+  # offset, thus it parses to one exact instant on each machine.
   def event_date(days)
     (Time.current.in_time_zone("America/Denver") + days.days).change(hour: 9).iso8601
   end
@@ -43,10 +44,11 @@ RSpec.describe EventsHelper, type: :helper do
     }.merge(overrides))
   end
 
-  # A stand-in for the featured race's EventWeatherPresenter, exposing just the sunrise/sunset
-  # the in-progress check reads. `offset_hours` brackets the frozen "now" by default (sun up an
-  # hour ago, down in an hour); pass times to place the window elsewhere. Sun times are absolute
-  # (UTC "Z") instants, matching WeatherKit's payload.
+  # A replacement for the EventWeatherPresenter of the featured race. It gives only the sunrise and
+  # the sunset that the in-progress check reads. By default, `offset_hours` puts the fixed "now"
+  # between the two: the sun came up one hour ago and goes down in one hour. Give times to put the
+  # window at another place. The sun times are absolute instants in UTC with a "Z", as they are in
+  # the payload of WeatherKit.
   def build_event_weather(sunrise: 1.hour.ago, sunset: 1.hour.from_now)
     DeepOstruct.wrap(sunrise: sunrise&.utc&.iso8601, sunset: sunset&.utc&.iso8601)
   end
@@ -90,15 +92,16 @@ RSpec.describe EventsHelper, type: :helper do
 
     context "with the featured race's fetched weather" do
       it "uses the event's daylight window over the fallback clock — in progress within it" do
-        # daytime? (the fallback) is stubbed false, so a true result can only come from the
-        # event's own sunrise..sunset window bracketing now.
+        # The stub for daytime?, which is the second method, gives false. Thus a true result can
+        # come only from the sunrise to sunset window of the event, with now between the two.
         allow(helper).to receive(:daytime?).and_return(false)
         in_progress = helper.in_progress?(build_event(days_from_today: 0), time_zone, event_weather: build_event_weather)
         expect(in_progress).to be(true)
       end
 
       it "uses the event's daylight window over the fallback clock — not in progress outside it" do
-        # Fallback clock says daytime, but the event's sun has already set, so it's not live.
+        # The second method says daytime, but the sun of the event went down. Thus the race is not
+        # live.
         weather = build_event_weather(sunrise: 8.hours.ago, sunset: 1.hour.ago)
         expect(helper.in_progress?(build_event(days_from_today: 0), time_zone, event_weather: weather)).to be(false)
       end
@@ -198,7 +201,8 @@ RSpec.describe EventsHelper, type: :helper do
     end
 
     it "highlights based on the featured race's fetched weather window, not the fallback clock" do
-      # Fallback clock would say night, but the event's sun is currently up → live and pulsing.
+      # The second method would say night, but the sun of the event is up. Thus the race is live and
+      # the indicator moves.
       allow(helper).to receive(:daytime?).and_return(false)
       event = build_event(days_from_today: 0, tracking_url: "https://track.example.com")
       tag = helper.event_live_tracking_tag(event, time_zone, event_weather: build_event_weather)
@@ -249,8 +253,9 @@ RSpec.describe EventsHelper, type: :helper do
       expect(helper.upcoming_races(events.shuffle, time_zone).size).to eq(3)
     end
 
-    # Contentful will save an event with no date. Every date-reading helper is on this widget's
-    # render path, so an unguarded parse would 500 the whole fragment over one bad entry.
+    # Contentful can save an event with no date. Each helper that reads a date is on the render path
+    # of this widget, thus a parse with no check would give a 500 for the full fragment because of
+    # one bad entry.
     it "drops an event with a missing or unparseable date instead of raising" do
       good = build_event(days_from_today: 2)
       dateless = build_event(days_from_today: 0, date: nil)

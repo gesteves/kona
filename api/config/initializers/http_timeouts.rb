@@ -1,12 +1,12 @@
 require "httparty"
 
-# Default connect and read timeouts for every upstream HTTP call. Every service reaches its API
-# through the module-level HTTParty methods, which resolve through HTTParty::Basement, so
-# setting the defaults here covers every call site in one place.
+# The default connect timeout and read timeout of each upstream HTTP call. Each service calls its
+# API through the module-level HTTParty methods, and those go through HTTParty::Basement. Thus the
+# defaults here apply to each call site, from one place.
 #
-# Without this each call inherits Net::HTTP's ~60s defaults, and a couple of stalled upstreams
-# would tie up all three Puma threads — worse still under with_retries, where a hang isn't a
-# raised error until those 60s elapse. rack_timeout.rb backstops the request as a whole; this
-# caps the individual hops. Per-call options still win.
+# Without this file, each call uses the Net::HTTP defaults of approximately 60s, and two upstream
+# services that stop would use all three Puma threads. That is worse with with_retries, where a stop
+# is not an error until those 60s end. rack_timeout.rb is the limit of the full request, and this
+# file is the limit of each call. An option on one call still wins.
 HTTParty::Basement.open_timeout 5
 HTTParty::Basement.read_timeout 10

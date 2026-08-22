@@ -13,16 +13,18 @@
   @include meta-label;
 }
 
-// <wa-scroller> host: scrolls the buttons horizontally instead of wrapping at narrow
-// widths. Match the scroll-shadow fade to the page background so it works in both modes.
+// The <wa-scroller> host: it scrolls the buttons horizontally and does not put them on two lines at
+// a small width. Make the scroll shadow the same as the page background, thus it works in the light
+// mode and in the dark mode.
 .share__scroller {
   --shadow-color: var(--color-background);
 
   display: block;
 }
 
-// max-content + auto inline margins: centered when the row fits, and when it overflows the
-// margins collapse to 0 so it left-aligns and the scroller scrolls (first button reachable).
+// max-content with automatic inline margins: the row is at the center when it fits. When it is too
+// wide, the margins become 0, thus the row starts at the left and the scroller scrolls. The reader
+// can then reach the first button.
 .share__buttons {
   display: flex;
   flex-flow: row nowrap;
@@ -68,10 +70,10 @@
   }
 }
 
-// The component's one hidden state: the native-share <button> carries it directly (the share
-// controller removes it when navigator.share exists), and the clipboard button's link/check
-// icon spans swap it on copy. Scoped under .share__button so it outranks both the button's
-// own display and the `span, svg { display: block }` sizing above.
+// The one hidden state of this component. The native-share <button> has it, and the share controller
+// removes it when navigator.share exists. The link icon span and the check icon span of the
+// clipboard button also exchange it at a copy. It is below .share__button, thus it wins over the
+// display of the button and over the `span, svg { display: block }` rule above.
 .share__button.share__hidden,
 .share__button .share__hidden {
   display: none;

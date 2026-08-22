@@ -12,7 +12,7 @@ RSpec.describe WhoopWebhookProcessor do
     allow(intervals).to receive(:update_activity!)
   end
 
-  # A SCORED cycle whose end lands on the given local date in the athlete's timezone.
+  # A cycle with a SCORE, whose end is on the given local date in the timezone of the athlete.
   def cycle_for(date, strain: 14.2, score_state: "SCORED")
     end_time = Time.find_zone!(timezone).parse("#{date} 06:00:00").utc.iso8601
     { id: 1, score_state: score_state, end: end_time, score: { strain: strain } }
@@ -43,7 +43,7 @@ RSpec.describe WhoopWebhookProcessor do
     end
 
     it "uses the workout's date in the athlete's timezone, not the UTC date" do
-      # 23:30 local on the 8th is 05:30 UTC on the 9th — the local date must win.
+      # 23:30 local time on the 8th is 05:30 UTC on the 9th. The local date must apply.
       late_workout = whoop_workout(start_time: "2026-07-09T05:30:00Z")
       allow(whoop).to receive(:get_workout).and_return(late_workout)
       allow(intervals).to receive(:activities!).and_return([])
@@ -118,10 +118,10 @@ RSpec.describe WhoopWebhookProcessor do
 
       processor.process("sleep.updated", "s1")
 
-      # One fetch spanning both days (each end padded by a day), not one per day: asking
-      # separately meant two overlapping paginated requests for a 4-day span.
+      # One fetch covers both days, with one extra day at each end. It is not one fetch for each
+      # day: two separate requests read the same data two times and cover a span of 4 days.
       expect(whoop).to have_received(:raw_cycles).with((today - 2).iso8601, (today + 1).iso8601).once
-      # 04:30Z at -05:00 is 23:30 the previous day.
+      # 04:30Z at -05:00 is 23:30 on the previous day.
       expect(intervals).to have_received(:update_wellness!).with("2026-01-01", WhoopSleepPerformance: 88)
     end
 
@@ -132,7 +132,7 @@ RSpec.describe WhoopWebhookProcessor do
 
       allow(whoop).to receive(:get_sleep).and_return(sleep_data.merge(end: "2026-01-01T22:30:00Z", timezone_offset: "+0200"))
       processor.process("sleep.updated", "s1")
-      # 22:30Z at +02:00 is 00:30 the next day.
+      # 22:30Z at +02:00 is 00:30 on the next day.
       expect(intervals).to have_received(:update_wellness!).with("2026-01-02", WhoopSleepPerformance: 88).twice
     end
 

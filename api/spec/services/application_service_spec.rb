@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe ApplicationService do
-  # A tiny subclass that exposes the protected/private helpers for testing.
+  # A small subclass that makes the protected and private methods available to the tests.
   let(:service_class) do
     Class.new(ApplicationService) do
       def cache(*args, **kwargs, &block) = cached_json(*args, **kwargs, &block)
@@ -67,9 +67,9 @@ RSpec.describe ApplicationService do
       expect(service.cache("k", expires_in: 5.minutes) { nil }).to be_nil
     end
 
-    # ⚠️ This is the rate-limit backoff. `parse_json` returns nil on any non-2xx, so a caller that
-    # never caches a blank re-queries a failing upstream on every request — the 429 removing its
-    # own protection. These pin both halves of that.
+    # ⚠️ This is the delay for the rate limit. `parse_json` returns nil for each non-2xx, thus a
+    # caller that never caches a blank result asks a failing upstream service again at each request.
+    # The 429 then removes its own protection. These examples test both halves of that.
     context "when a negative TTL is given" do
       it "stores a sentinel for a blank value" do
         allow($redis).to receive(:get).with("k").and_return(nil)
@@ -138,9 +138,10 @@ RSpec.describe ApplicationService do
       expect(service.http_get("https://example.test")).to be_nil
     end
 
-    # These are documented as total — "the parsed body, or nil" — and several callers have no
-    # rescue of their own, relying on the controller's `safely` wrapper. A 204 or an empty 200
-    # must not become a JSON::ParserError. parse_json! already guarded this; parse_json didn't.
+    # The documentation says that these methods always give a result: "the parsed body, or nil".
+    # More than one caller has no rescue and depends on the `safely` method of the controller. Thus
+    # a 204, or a 200 with an empty body, must not become a JSON::ParserError. parse_json! already
+    # had this check, and parse_json did not.
     it "returns nil for an empty success body rather than raising" do
       allow(HTTParty).to receive(:get).and_return(response_double(success: true, body: ""))
       expect { service.http_get("https://example.test") }.not_to raise_error
@@ -235,9 +236,9 @@ RSpec.describe ApplicationService do
       expect(slept).to eq([ 0.25, 0.5 ])
     end
 
-    # ⚠️ The whole point of the deadline: the default backoff totals 14s, which is longer than the
-    # request budget the widget endpoints run under. Without it, a failing upstream burns the
-    # request (and its Puma thread) instead of collapsing the widget.
+    # ⚠️ This is the purpose of the deadline: the default waits are 14s in total, which is longer
+    # than the request budget of a widget endpoint. Without the deadline, a failing upstream service
+    # uses the full request and its Puma thread, and the widget does not go away.
     it "stops retrying once the next backoff wouldn't fit inside the deadline" do
       slept = []
       allow(service).to receive(:sleep) { |seconds| slept << seconds }

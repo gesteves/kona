@@ -5,7 +5,7 @@ RSpec.describe RelatedArticles do
 
   let(:articles) { instance_double(Articles) }
 
-  # Builds a decorated article the way Articles#list would return it.
+  # Makes an article with the fields that Articles#list gives.
   def article(id:, slug:, published_at:, entry_type: "Article", draft: false)
     path = "/#{DateTime.parse(published_at).strftime('%Y/%m/%d')}/#{slug}/"
     DeepOstruct.wrap(
@@ -18,8 +18,9 @@ RSpec.describe RelatedArticles do
     { version: 1, vector: vector }.to_json
   end
 
-  # Vectors chosen so cosine(query, ·) orders near > mid > far; self/draft/short share the query's
-  # vector (cosine 1) to prove they're excluded by identity/type, not by a low score.
+  # The vectors give this order from cosine(query, ·): near, then mid, then far. The article itself,
+  # the draft, and the Short have the same vector as the query, thus their cosine is 1. That shows
+  # that the code removes them for their id and their type, and not for a low score.
   let(:store) do
     {
       "embeddings:article:q1" => vec_json([ 1.0, 0.0, 0.0 ]),
@@ -44,8 +45,9 @@ RSpec.describe RelatedArticles do
 
   before do
     allow(articles).to receive(:list).and_return(corpus)
-    # The ranked result is cached via cached_json; stub Redis so the suite stays Redis-free. The
-    # ranked-cache key isn't in `store`, so get returns nil (a miss) and the ranking is computed.
+    # cached_json puts the result in the cache. This stubs Redis, thus the suite needs no Redis. The
+    # key of that cache is not in `store`, thus get returns nil, which is a miss, and the code
+    # calculates the order.
     allow($redis).to receive(:get) { |key| store[key] }
     allow($redis).to receive(:setex)
     allow($redis).to receive(:mget) { |*keys| keys.map { |key| store[key] } }
@@ -100,8 +102,8 @@ RSpec.describe RelatedArticles do
       expect(service.all["q1"]).to eq(%w[near mid far])
     end
 
-    # ⚠️ A Short is a valid query article — it gets the section on its own page — even though
-    # ArticleRanking#candidates keeps it out of every neighbor list.
+    # ⚠️ A Short is a correct query article, because the section appears on its own page.
+    # ArticleRanking#candidates keeps it out of each neighbor list.
     it "keys Shorts too, while never listing one as a neighbor" do
       result = service.all
 
@@ -129,7 +131,7 @@ RSpec.describe RelatedArticles do
       expect(service.all(count: 2)["q1"]).to eq(%w[near mid])
     end
 
-    # One mget for the whole corpus, rather than one per article as for_article would do.
+    # One mget for each article, and not one mget for each article as for_article does.
     it "loads every vector in a single round trip" do
       expect($redis).to receive(:mget).once.and_call_original
 

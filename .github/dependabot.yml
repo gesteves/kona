@@ -1,12 +1,13 @@
 version: 2
 
-# @web.awesome.me/webawesome-pro comes from a private Cloudsmith registry (see web/.npmrc), so
-# Dependabot needs credentials of its own or it silently skips that package while still opening
-# PRs for the public ones. `token` here becomes the registry's `_authToken`, matching .npmrc.
-# ⚠️ `${{secrets.…}}` resolves against the *Dependabot* secret store, which is separate from the
-# Actions one — the same token has to exist in both (Settings → Secrets → Dependabot), or this
-# reads empty. The Actions copy is what `.github/workflows/web.yml` passes to `npm ci`; a
-# Dependabot-triggered run reads the Dependabot copy, and without it every `npm ci` 401s.
+# @web.awesome.me/webawesome-pro comes from a private Cloudsmith registry (refer to web/.npmrc).
+# Thus Dependabot needs its own credentials. Without them it does nothing for that package, with no
+# message, and it still opens a PR for each public package. The `token` here becomes the `_authToken`
+# of the registry, as in .npmrc.
+# ⚠️ `${{secrets.…}}` reads the *Dependabot* secret store, which is not the Actions store. The same
+# token must be in both (Settings → Secrets → Dependabot), or this value is empty. The copy in
+# Actions is what `.github/workflows/web.yml` gives to `npm ci`. A run that Dependabot starts reads
+# the Dependabot copy, and without it each `npm ci` gets a 401.
 registries:
   webawesome:
     type: npm-registry
@@ -44,7 +45,7 @@ updates:
         patterns:
           - "*"
 
-  # Both apps pull Web Awesome Pro from the private registry above, so both need it listed.
+  # Both apps get Web Awesome Pro from the private registry above, thus both need it here.
   - package-ecosystem: "npm"
     directories:
       - "/web"
@@ -64,9 +65,10 @@ updates:
         patterns:
           - "*"
 
-  # The local-only tools in utilities/. Nothing here deploys, but all three ship tracked
-  # lockfiles that would otherwise never see a CVE bump — and utilities/maps has CI to validate
-  # the bumps against. Grouped and on the same weekly cadence as everything else.
+  # The local-only tools in utilities/. Nothing here goes to production, but all three have a
+  # lockfile in the repo, and without this entry no CVE would ever change one. utilities/maps also
+  # has CI to check each change. They are in one group, on the same weekly schedule as each other
+  # entry.
   - package-ecosystem: "bundler"
     directories:
       - "/utilities/maps"
@@ -102,9 +104,10 @@ updates:
           - "*"
 
   # `directory: "/"` covers .github/workflows only. The composite action in
-  # .github/actions/notify-slack has its own `uses:` (slackapi/slack-github-action) and needs its
-  # own entry, pointed at the folder holding action.yml, or it never gets updated.
-  # ci-context isn't listed because it uses no third-party actions — add it if that changes.
+  # .github/actions/notify-slack has its own `uses:`, which is slackapi/slack-github-action. Thus it
+  # needs its own entry that points at the folder with its action.yml, or nothing updates it.
+  # ci-context is not here, because it uses no action from another repository. Add it if that
+  # changes.
   - package-ecosystem: "github-actions"
     directories:
       - "/"

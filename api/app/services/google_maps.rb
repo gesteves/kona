@@ -1,6 +1,7 @@
-# Interfaces with the Google Maps API to reverse-geocode coordinates and fetch their
-# timezone and elevation. Each lookup is fetched lazily and memoized — asking only for the
-# timezone won't trigger the geocode/elevation calls — and cached in Redis for a day.
+# Uses the Google Maps API to find the address of a pair of coordinates and to get their timezone
+# and their elevation. The code does each lookup only when it is necessary and then keeps the
+# result. Thus a request for the timezone alone does not start the geocode call and the elevation
+# call. Redis caches each result for a day.
 class GoogleMaps < ApplicationService
   include GoogleApi
 
@@ -8,27 +9,27 @@ class GoogleMaps < ApplicationService
 
   GOOGLE_MAPS_API_URL = "https://maps.googleapis.com/maps/api"
 
-  # @param latitude [Float] The latitude for the location.
-  # @param longitude [Float] The longitude for the location.
+  # @param latitude [Float] The latitude of the location.
+  # @param longitude [Float] The longitude of the location.
   def initialize(latitude, longitude)
     @latitude = latitude
     @longitude = longitude
   end
 
-  # The assembled location hash (geocoded address, timezone, elevation). Triggers all three
-  # lookups.
+  # The full location hash: the address from the geocoder, the timezone, and the elevation. This
+  # starts all three lookups.
   # @return [Hash]
   def location
     @location ||= { geocoded: geocoded, time_zone: time_zone, elevation: elevation }
   end
 
-  # @return [Hash, nil] The reverse-geocoded address (snake_cased keys), or nil.
+  # @return [Hash, nil] The address from the geocoder, with snake_case keys, or nil.
   def geocoded
     return @geocoded if defined?(@geocoded)
     @geocoded = underscore_keys(reverse_geocode)
   end
 
-  # @return [Hash, nil] The timezone data (snake_cased keys), or nil.
+  # @return [Hash, nil] The timezone data, with snake_case keys, or nil.
   def time_zone
     return @time_zone if defined?(@time_zone)
     @time_zone = underscore_keys(get_time_zone)
@@ -40,23 +41,23 @@ class GoogleMaps < ApplicationService
     @elevation = get_elevation&.dig(:elevation)
   end
 
-  # Returns a timezone ID of the form "America/Denver".
+  # The timezone ID, in the form "America/Denver".
   # @return [String, nil] The timezone ID.
   def time_zone_id
     time_zone&.dig(:time_zone_id)
   end
 
-  # Returns the country code for the coordinates.
-  # @return [String, nil] The country code, or nil if unavailable.
+  # The country code of the coordinates.
+  # @return [String, nil] The country code, or nil if it is not available.
   def country_code
     geocoded&.dig(:address_components)&.find { |component| component[:types].include?("country") }&.dig(:short_name)
   end
 
   private
 
-  # Reverse-geocodes the coordinates into a human-readable address.
+  # Changes the coordinates into an address that a person can read.
   # @see https://developers.google.com/maps/documentation/geocoding/requests-reverse-geocoding
-  # @return [Hash, nil] The geocoding data, or nil if fetching fails.
+  # @return [Hash, nil] The geocoder data, or nil if the fetch fails.
   def reverse_geocode
     return unless coordinates?
 
@@ -71,9 +72,9 @@ class GoogleMaps < ApplicationService
     end
   end
 
-  # Gets the elevation for the coordinates.
+  # Gets the elevation of the coordinates.
   # @see https://developers.google.com/maps/documentation/elevation/requests-elevation
-  # @return [Hash, nil] The elevation data, or nil if fetching fails.
+  # @return [Hash, nil] The elevation data, or nil if the fetch fails.
   def get_elevation
     return unless coordinates?
 
@@ -86,9 +87,9 @@ class GoogleMaps < ApplicationService
     end
   end
 
-  # Gets timezone data for the coordinates.
+  # Gets the timezone data of the coordinates.
   # @see https://developers.google.com/maps/documentation/timezone/requests-timezone
-  # @return [Hash, nil] The timezone data, or nil if fetching fails.
+  # @return [Hash, nil] The timezone data, or nil if the fetch fails.
   def get_time_zone
     return unless coordinates?
 

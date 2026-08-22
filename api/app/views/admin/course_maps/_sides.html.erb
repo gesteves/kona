@@ -1,11 +1,14 @@
-<%# A four-sided value (padding, extra map) as one field when every side matches and four when they
-    don't — the common case is uniform, and four boxes to change one number is worse than a toggle.
-    The fields are always in the DOM and always named, so hiding three of them still submits four
-    values; the controller mirrors the first into the rest while they're linked.
+<%# A value for four sides, that is, the padding or the extra map. It is one field while the four
+    values are the same, and four fields when they are different. The four values are usually the
+    same, and four boxes to change one number are worse than one control.
+    Each field is always in the DOM and always has a name, thus the form submits four values while
+    three of them are hidden. The controller copies the value of the first field into the other
+    three while the four fields are together.
 
-    The collapsed state is applied by the controller rather than rendered here, so it can read the
-    per-side label off the markup before swapping it. Nothing flashes: <wa-page> stays cloaked
-    until the custom elements upgrade. %>
+    The controller applies the state with one field, and this template does not render it, thus the
+    controller can read the label of each side from the markup before it makes the change. Nothing
+    appears and then goes away, because <wa-page> stays hidden until the browser upgrades each
+    custom element. %>
 <div class="sides" data-controller="linked-sides" data-linked-sides-linked-label-value="<%= linked_label %>">
   <div class="sides__grid">
     <% StaticMap::SIDES.each_with_index do |side, index| %>

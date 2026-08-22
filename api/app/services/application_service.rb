@@ -1,13 +1,14 @@
 require "httparty"
 require "digest"
 
-# Base class for the external-API service objects: the read-through Redis cache, the HTTParty
-# and JSON-parse boilerplate, key transforms, and the shared retry/error handling.
+# The base class for the external-API service objects. It has the read-through Redis cache, the
+# common HTTParty and JSON-parse code, the key transforms, and the shared retry and error code.
 class ApplicationService
   include UpstreamIsolation
 
-  # Raised by the bang variants on a non-success response. Carries the status and body so
-  # callers can branch on the failure mode instead of string-matching messages.
+  # The bang methods raise this when a response is not a success. It holds the status and the
+  # body, thus a caller can select an action from the type of failure and does not compare
+  # message text.
   class HttpError < StandardError
     attr_reader :status, :body
 
@@ -18,33 +19,33 @@ class ApplicationService
     end
   end
 
-  # Marks a key whose upstream returned nothing. Deliberately not valid JSON, so it can never be
-  # confused with a stored value. Above `private` because that doesn't apply to constants anyway,
-  # and the specs assert on it.
+  # Marks a key whose upstream gave no data. It is not correct JSON, on purpose, thus it can
+  # never look like a stored value. It is above `private` because `private` does not apply to a
+  # constant, and the specs read it.
   EMPTY_SENTINEL = "__EMPTY__".freeze
 
   private
 
-  # Read-through JSON cache. Development bypasses the cache entirely so changes are visible
-  # without waiting out a TTL.
+  # A read-through JSON cache. In development it does not use the cache, thus you see a change
+  # and do not wait for a TTL.
   #
-  # Uses the shared $redis rather than Rails.cache: the keyspace predates this app and keeps
-  # greppable key names, and the semantics differ from Rails.cache.fetch.
+  # It uses the shared $redis, and not Rails.cache. The keyspace is older than this app and keeps
+  # key names that you can find with grep, and the behavior is different from Rails.cache.fetch.
   #
-  # ⚠️ A blank result is only cached when `empty_expires_in` is given, and callers that talk to a
-  # rate-limited upstream **must** give it. `parse_json` returns nil on any non-2xx, so without a
-  # negative TTL a 429 caches nothing and every subsequent request re-queries with no backoff —
-  # i.e. the one condition that produces a rate-limit trip is also the one that removes all
-  # throttling. Keep the negative TTL short: it's a backoff, not a cache.
+  # ⚠️ The cache holds a blank result only when you give `empty_expires_in`, and a caller of an
+  # upstream with a rate limit **must** give it. `parse_json` returns nil for each non-2xx. Thus
+  # with no negative TTL, a 429 puts nothing in the cache and each subsequent request asks again
+  # with no delay. That is, the one condition that causes a rate-limit failure is also the one
+  # that removes all the control. Keep the negative TTL short: it is a delay, not a cache.
   # @param key [String] The Redis key.
-  # @param expires_in [ActiveSupport::Duration, Integer, nil] TTL in seconds. Only a positive
-  #   TTL caches — nothing is ever cached indefinitely.
-  # @param empty_expires_in [ActiveSupport::Duration, Integer, nil] TTL for a blank result. Nil
-  #   (the default) keeps the old behavior of never caching one.
-  # @param symbolize [Boolean] Whether to parse with symbolized keys.
-  # @yieldreturn [Object] The freshly fetched, JSON-serializable value.
-  # @return [Object, nil] Nil for a cached-blank, whatever the block returned otherwise — so a
-  #   caller that distinguishes nil from [] must normalize.
+  # @param expires_in [ActiveSupport::Duration, Integer, nil] The TTL in seconds. Only a positive
+  #   TTL puts a value in the cache. Nothing stays in the cache for all time.
+  # @param empty_expires_in [ActiveSupport::Duration, Integer, nil] The TTL for a blank result.
+  #   Nil, the default, does not put a blank result in the cache.
+  # @param symbolize [Boolean] True to parse with symbol keys.
+  # @yieldreturn [Object] The new value, which must be JSON-serializable.
+  # @return [Object, nil] Nil for a blank value in the cache, or the value from the block. Thus a
+  #   caller that must know nil from [] has to correct the result.
   def cached_json(key, expires_in: nil, empty_expires_in: nil, symbolize: true)
     return yield if Rails.env.development?
 
@@ -66,65 +67,66 @@ class ApplicationService
     value
   end
 
-  # A short digest of whatever determines a cached value's *shape* — usually the query that
-  # produced it — for use as a cache-key suffix.
+  # A short digest of the things that decide the *shape* of a cached value, which is usually the
+  # query that made it. Put it at the end of a cache key.
   #
-  # This replaces hand-maintained `:v2` suffixes, which only work if whoever edits a query also
-  # remembers to bump them in the same commit. When they don't, the cache serves values missing
-  # the fields the new code reads, which surfaces as a nil-dereference somewhere unrelated. A
-  # digest busts itself.
-  # ⚠️ Joined on NUL, and written as the `\x00` escape rather than a literal zero byte. NUL is the
-  # separator because no input can contain it, so ["ab", "c"] and ["a", "bc"] can't collide; the
-  # escape is because a raw one makes git classify this whole file as binary, which costs every
-  # line-by-line diff, blame, and PR review in it.
-  # @param inputs [Array<#to_s>] The things whose change should invalidate the cache.
+  # This replaces a `:v2` suffix that a person increases by hand. Such a suffix works only if the
+  # person who edits a query also increases it in the same commit. If they do not, the cache
+  # gives values with no data for the fields that the new code reads, and the result is a nil
+  # dereference at some other place. A digest changes by itself.
+  # ⚠️ A NUL joins the inputs, and the code writes it as the `\x00` escape and not as a zero byte.
+  # NUL is the separator because no input can contain it, thus ["ab", "c"] and ["a", "bc"] cannot
+  # give the same digest. The escape is necessary because git counts a file with a raw zero byte
+  # as binary, and that stops each line diff, each blame, and each PR review in the file.
+  # @param inputs [Array<#to_s>] The things that must invalidate the cache when they change.
   # @return [String] An 8-character hex digest.
   def cache_version(*inputs)
     Digest::SHA256.hexdigest(inputs.join("\x00"))[0, 8]
   end
 
   # GETs a URL.
-  # @param symbolize [Boolean] Whether to parse with symbolized keys.
-  # @param options [Hash] Passed through to HTTParty.
-  # @return [Object, nil] The parsed body, or nil on a non-success response.
+  # @param symbolize [Boolean] True to parse with symbol keys.
+  # @param options [Hash] The options that go to HTTParty.
+  # @return [Object, nil] The parsed body, or nil if the response is not a success.
   def get_json(url, symbolize: true, **options)
     parse_json(HTTParty.get(url, **options), symbolize: symbolize)
   end
 
   # POSTs to a URL.
-  # @param symbolize [Boolean] Whether to parse with symbolized keys.
-  # @param options [Hash] Passed through to HTTParty.
-  # @return [Object, nil] The parsed body, or nil on a non-success response.
+  # @param symbolize [Boolean] True to parse with symbol keys.
+  # @param options [Hash] The options that go to HTTParty.
+  # @return [Object, nil] The parsed body, or nil if the response is not a success.
   def post_json(url, symbolize: true, **options)
     parse_json(HTTParty.post(url, **options), symbolize: symbolize)
   end
 
-  # Like get_json, but raises rather than swallowing a failure to nil — which is what makes it
-  # retryable inside with_retries.
-  # @raise [HttpError] on a non-success response.
+  # The same as get_json, but it raises and does not return nil on a failure. Thus with_retries
+  # can do it again.
+  # @raise [HttpError] If the response is not a success.
   def get_json!(url, symbolize: true, **options)
     parse_json!(HTTParty.get(url, **options), symbolize: symbolize)
   end
 
-  # Like post_json, but raises rather than swallowing a failure to nil.
+  # The same as post_json, but it raises and does not return nil on a failure.
   # @see #get_json!
-  # @raise [HttpError] on a non-success response.
+  # @raise [HttpError] If the response is not a success.
   def post_json!(url, symbolize: true, **options)
     parse_json!(HTTParty.post(url, **options), symbolize: symbolize)
   end
 
-  # PUTs to a URL. There is deliberately no swallowing variant: PUTs are writes, and callers
-  # need the failure's status to choose between retrying and degrading.
-  # @param symbolize [Boolean] Whether to parse with symbolized keys.
-  # @param options [Hash] Passed through to HTTParty.
-  # @raise [HttpError] on a non-success response.
+  # PUTs to a URL. There is no method that returns nil on a failure, on purpose. A PUT is a
+  # write, and a caller needs the failure status to select between another attempt and a smaller
+  # result.
+  # @param symbolize [Boolean] True to parse with symbol keys.
+  # @param options [Hash] The options that go to HTTParty.
+  # @raise [HttpError] If the response is not a success.
   def put_json!(url, symbolize: true, **options)
     parse_json!(HTTParty.put(url, **options), symbolize: symbolize)
   end
 
   # @param response [HTTParty::Response] The response to parse.
-  # @return [Object, nil] The parsed body, or nil when it's empty.
-  # @raise [HttpError] when the response wasn't successful.
+  # @return [Object, nil] The parsed body, or nil if the body is empty.
+  # @raise [HttpError] If the response is not a success.
   def parse_json!(response, symbolize: true)
     raise HttpError.new(response.code, response.body, response.request&.last_uri) unless response.success?
 
@@ -132,27 +134,28 @@ class ApplicationService
   end
 
   # @param response [HTTParty::Response] The response to parse.
-  # @return [Object, nil] The parsed body, or nil when the response wasn't successful or empty.
+  # @return [Object, nil] The parsed body, or nil if the response is not a success or is empty.
   def parse_json(response, symbolize: true)
     unless response.success?
       report_upstream_error("HTTP #{response.code}", status: response.code, url: response.request&.last_uri&.to_s)
       return
     end
 
-    # ⚠️ Same guard as parse_json!. This method is documented as total — get_json/post_json return
-    # "the parsed body, or nil" and never raise — so a 204, or a 200 with an empty body, must not
-    # become a JSON::ParserError escaping into a caller with no rescue of its own.
+    # ⚠️ The same check as in parse_json!. The documentation says that this method always gives a
+    # result: get_json and post_json return "the parsed body, or nil" and never raise. Thus a 204,
+    # or a 200 with an empty body, must not become a JSON::ParserError in a caller that has no
+    # rescue.
     JSON.parse(response.body, symbolize_names: symbolize) if response.body.present?
   end
 
-  # Recursively rewrites camelCase keys to snake_case symbols.
-  # @param object [Hash, Array, nil] The object to transform.
+  # Changes each camelCase key into a snake_case symbol, at each level.
+  # @param object [Hash, Array, nil] The object to change.
   def underscore_keys(object)
     object&.deep_transform_keys { |key| key.to_s.underscore.to_sym }
   end
 
-  # Memoized dot-access wrapper for a service's payload. Memoizes even a nil result, so a
-  # failed fetch isn't retried within the instance.
+  # A dot-access object for the payload of a service. The app keeps the value, and it keeps a nil
+  # result too. Thus the instance does not do a failed fetch again.
   # @yieldreturn [Hash, Array, nil] The raw payload.
   # @return [OpenStruct, Array, nil]
   def fetch_wrapped
@@ -161,26 +164,28 @@ class ApplicationService
     @wrapped_data = raw && DeepOstruct.wrap(raw)
   end
 
-  # @return [Boolean] Whether usable coordinates were supplied. The geo services no-op
+  # @return [Boolean] True if the caller gave correct coordinates. The geo services do nothing
   #   without them.
   def coordinates?
     @latitude.present? && @longitude.present?
   end
 
-  # Runs the block, retrying with exponential backoff on any error.
+  # Runs the block. On an error it waits, then does the block again, and each wait is two times
+  # the last one.
   #
-  # ⚠️ The backoff sleeps in the calling thread. The defaults (2s + 4s + 8s) were chosen for
-  # Sidekiq jobs and are longer than the whole 20s rack-timeout budget, so a **request-path**
-  # caller must pass a `deadline` — otherwise the retries alone outlast the request and the widget
-  # 500s instead of degrading to an empty fragment.
+  # ⚠️ The wait occurs in the calling thread. The defaults (2s, then 4s, then 8s) are for the
+  # Sidekiq jobs, and together they are longer than the full 20s rack-timeout budget. Thus a
+  # caller in a **request path** must give a `deadline`. If it does not, the waits alone are
+  # longer than the request, and the widget gives a 500 instead of an empty fragment.
   #
-  # No jitter: the retry counts are tiny and the upstreams are single-tenant, so there's no herd
-  # to spread out.
-  # @param max [Integer] Maximum retries after the first attempt.
-  # @param base_delay [Numeric] Seconds to wait before the first retry; doubles each time.
-  # @param deadline [Numeric] Total wall-clock seconds this call may spend, sleeps included. A
-  #   retry is skipped when its backoff wouldn't finish inside the deadline.
-  # @return [Object, nil] The block's value, or nil once attempts or the deadline are exhausted.
+  # There is no random change to the wait: the retry counts are small and each upstream has one
+  # tenant, thus there is no group of clients to separate in time.
+  # @param max [Integer] The maximum number of attempts after the first attempt.
+  # @param base_delay [Numeric] The seconds to wait before the second attempt. Each wait is two
+  #   times the last one.
+  # @param deadline [Numeric] The maximum seconds for this call, and this includes the waits. An
+  #   attempt does not occur if its wait would end after the deadline.
+  # @return [Object, nil] The value from the block, or nil after the attempts or the deadline end.
   def with_retries(max: 3, base_delay: 2, deadline: Float::INFINITY)
     started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     attempts = 0
@@ -199,14 +204,16 @@ class ApplicationService
     end
   end
 
-  # Runs the block, logging and swallowing any error. Sugar over UpstreamIsolation#safely.
-  # @param fallback [Object] The value to return on error.
+  # Runs the block. It writes each error to the log and does not raise. It is a short form of
+  # UpstreamIsolation#safely.
+  # @param fallback [Object] The value to return on an error.
   # @param context [String] A label for the log line.
   def rescue_with(fallback = nil, context: self.class.name)
     safely(self.class.name, fallback, context: context) { yield }
   end
 
-  # Reports a handled upstream failure to Bugsnag, tagged with this service's class name.
+  # Sends an upstream failure that the code caught to Bugsnag, with the class name of this
+  # service as a tag.
   # @see ErrorReporter.report_upstream
   def report_upstream_error(error, context: self.class.name, status: nil, url: nil)
     ErrorReporter.report_upstream(error, service: self.class.name, context: context, status: status, url: url)

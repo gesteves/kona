@@ -25,7 +25,7 @@ RSpec.describe "Admin Bluesky connection", type: :request do
       expect(response.body).to include('name="app_password"')
     end
 
-    # ⚠️ Web Awesome components over native elements, as everywhere else in the admin.
+    # ⚠️ Use a Web Awesome component in place of a native element, as in each other admin page.
     it "uses Web Awesome controls rather than native ones" do
       get "/connected-apps/bluesky"
 
@@ -69,8 +69,9 @@ RSpec.describe "Admin Bluesky connection", type: :request do
   describe "POST /connected-apps/bluesky" do
     before { sign_in! }
 
-    # ⚠️ Validated by actually opening a session: a typo'd app password stored blind would leave
-    # the sync failing silently on the next publish.
+    # ⚠️ The code checks the pair with a true session. An app password with a typing error, that the
+    # code stores with no check, would make the sync fail at the next publish and give no
+    # message.
     context "when the credentials open a session" do
       before { allow_any_instance_of(StandardSite).to receive(:create_session).and_return(true) }
 
@@ -133,8 +134,8 @@ RSpec.describe "Admin Bluesky connection", type: :request do
       expect(BlueskyCredentials.stored?).to be(false)
     end
 
-    # ⚠️ The DID is public data, not a credential, and GET /api/standard-site feeds the
-    # verification <link> tags on every page of the static site.
+    # ⚠️ The DID is public data and not a credential, and GET /api/standard-site supplies the
+    # verification <link> tags on each page of the static site.
     it "leaves the cached DID alone" do
       $redis.set(StandardSite::DID_CACHE_KEY, "did:plc:abc123")
 

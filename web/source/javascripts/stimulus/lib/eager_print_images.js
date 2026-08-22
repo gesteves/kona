@@ -1,10 +1,10 @@
-// Every entry image is `loading="lazy"`, and Chrome and Firefox force those to load before they
-// paginate. Safari doesn't: it prints whatever has already loaded, so an article printed without
-// being scrolled through comes out with its photos missing (only the blurhash placeholder, and
-// only if the reader has "print backgrounds" on).
+// Each entry image has `loading="lazy"`, and Chrome and Firefox load each one before they make the
+// pages. Safari does not: it prints the images that already loaded. Thus an article that a reader
+// prints with no scroll has no photos. It has the blurhash placeholder only, and only when the
+// reader sets "print backgrounds" on.
 
 /**
- * Switches every lazy image to eager so the print layout can include it.
+ * Changes each lazy image to eager, thus the print layout can contain it.
  * @returns {void}
  */
 export function eagerLoadImages() {
@@ -14,8 +14,8 @@ export function eagerLoadImages() {
 }
 
 /**
- * Listens for both routes into print. ⚠️ Both are needed: `beforeprint` doesn't fire in every
- * Safari path, and the media query alone misses printing from a background tab.
+ * Waits for the two ways into a print. ⚠️ Both are necessary: `beforeprint` does not occur in each
+ * Safari path, and the media query alone does not find a print from a tab in the background.
  * @returns {void}
  */
 export function watchForPrint() {

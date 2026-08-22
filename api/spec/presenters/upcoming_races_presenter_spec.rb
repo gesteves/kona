@@ -1,14 +1,14 @@
 require "rails_helper"
 
-# Coverage for the races widget's selection/arrangement decisions: which races to list, when
-# the first is featured (and gets race-day weather), when it's today's race, and the demote
-# rule when a featured event's weather isn't available. The date math itself (upcoming_races,
-# featured?, today?) is covered by events_helper_spec; RaceDayWeather is stubbed here so no
-# upstream fetches happen.
+# The tests for the decisions of the races widget: which races go in the list, when the first race is
+# a featured race and gets the race-day weather, when it is the race of today, and the rule that
+# removes the featured state when the weather of a featured event is not available. The date
+# calculations, that is, upcoming_races, featured?, and today?, are in events_helper_spec. This file
+# stubs RaceDayWeather, thus no upstream fetch occurs.
 RSpec.describe UpcomingRacesPresenter do
   include ActiveSupport::Testing::TimeHelpers
 
-  # 2026-06-03 18:00 UTC == 2026-06-03 12:00 MDT, so "today" in America/Denver is June 3, 2026.
+  # 2026-06-03 18:00 UTC is 2026-06-03 12:00 MDT, thus "today" in America/Denver is June 3, 2026.
   around { |example| travel_to(Time.utc(2026, 6, 3, 18, 0, 0)) { example.run } }
 
   let(:time_zone) { "America/Denver" }
@@ -51,7 +51,8 @@ RSpec.describe UpcomingRacesPresenter do
     it "marks only the featured event and reports a featured layout variant" do
       expect(presenter.featured_event?(presenter.races.first)).to be(true)
       expect(presenter.featured_event?(presenter.races.last)).to be(false)
-      # Two races with the first featured → single (the featured card takes the full row).
+      # Two races, and the first one is a featured race. The layout is single, because the featured
+      # card takes the full row.
       expect(presenter.variant).to eq("single")
     end
   end

@@ -5,8 +5,8 @@ import { handleOg, isOgPath } from './og';
 import { handlePlausible } from './plausible';
 import { servePage } from './serve-page';
 
-// Worker entry point. Only the paths in wrangler.jsonc's run_worker_first allowlist reach this
-// code; everything else is served straight from the static asset layer.
+// The entry point of the Worker. Only the paths in the run_worker_first list of wrangler.jsonc come
+// here. The static asset layer serves each other path.
 export default {
   async fetch(
     request: Request,
@@ -15,11 +15,11 @@ export default {
   ): Promise<Response> {
     const { pathname } = new URL(request.url);
 
-    // The handlers log their own failures; this only catches what escapes them, which would
-    // otherwise be a bare platform 500 with nothing written anywhere.
+    // Each handler writes its own failures to the log. This code catches only a failure that gets
+    // past a handler. Without it, such a failure is a platform 500 with no record.
     try {
-      // /api/contact is claimed explicitly, not /api/*, so the other origin-only /api endpoints
-      // stay unreachable from the browser.
+      // This takes /api/contact and not /api/*, thus a browser cannot reach the other /api
+      // endpoints, which are on the origin only.
       if (pathname.startsWith('/widgets/') || pathname === '/api/contact') {
         return await handleApi(request, env);
       }
@@ -27,15 +27,15 @@ export default {
         return await handlePlausible(request, env, ctx);
       if (isOgPath(pathname)) return await handleOg(request, env, ctx);
 
-      // Defensive fallthrough: nothing else reaches the Worker under the allowlist, but drift
-      // between it and this router should serve the page from assets rather than error.
+      // A safety path: nothing else comes to the Worker under that list. But if the list and this
+      // router do not agree, the code must serve the page from the assets and not give an error.
       return await servePage(request, env);
     } catch (error) {
       console.error(
         requestLogLine(request, 'worker error', pathname, String(error))
       );
-      // Secured like every other Worker-built response: this one is reachable as a top-level
-      // document, so it must not be the one that ships without nosniff.
+      // This response gets the same headers as each other response from the Worker. A browser can
+      // open it as a top-level document, thus it must not be the one response with no nosniff.
       return new Response('Internal Server Error', {
         status: 500,
         headers: withSecurityHeaders(

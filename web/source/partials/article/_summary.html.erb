@@ -1,5 +1,6 @@
-<%# `id_scope` (optional local) prefixes this card's DOM ids with a section slug, for a section
-    that may list an entry another section on the same page also lists. %>
+<%# `id_scope`, which is an optional local, puts a section slug at the start of each DOM id of this
+    card. Use it for a section that can list an entry that another section on the same page also
+    lists. %>
 <% id_scope = defined?(id_scope) ? id_scope : nil %>
 <article class="entry entry--summary" id="<%= entry_dom_id(article, scope: id_scope) %>" aria-labelledby="<%= entry_heading_id(article, scope: id_scope) %>">
   <header class="entry__header">

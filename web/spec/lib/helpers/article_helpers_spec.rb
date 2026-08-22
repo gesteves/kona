@@ -2,14 +2,16 @@ require 'spec_helper'
 require 'ostruct'
 require 'padrino-helpers'
 
-# RSpec auto-includes the described module, so ArticleHelpers' instance methods are callable directly.
+# RSpec includes the module under test, thus you can call the instance methods of ArticleHelpers
+# directly.
 RSpec.describe ArticleHelpers do
   include_context 'default helper stubs'
 
-  # The canonical URL of the article under test, shared by the schema groups below.
+  # The canonical URL of the article under test. The schema groups below share it.
   def canonical_url = 'https://example.com/2024/01/01/post/'
 
-  # Builds an article double shaped like a `data.articles` entry (dot-access, nested tags/event).
+  # Makes an article double with the shape of a `data.articles` entry: dot access, and nested tags
+  # and event.
   def article(slug:, title: 'Title', tags: [], published_at: '2024-01-01T10:00:00Z',
               entry_type: 'Article', draft: false, index_in_search_engines: true,
               intro: nil, body: nil, summary: nil)
@@ -28,19 +30,21 @@ RSpec.describe ArticleHelpers do
     )
   end
 
-  # Sets the corpus returned by `data.articles`.
+  # Sets the articles that `data.articles` returns.
   def stub_corpus(articles)
     @corpus = articles
   end
 
-  # The helper depends on this collaborator (normally mixed in from another module); defined
-  # directly so verifying-doubles doesn't reject stubbing methods this object doesn't implement.
+  # The helper needs this method, which another module usually supplies. This file defines it
+  # directly, thus a verifying double does not refuse a stub of a method that this object does not
+  # have.
   def data
     OpenStruct.new(articles: @corpus || [])
   end
 
   describe '#adjacent_articles' do
-    # data.articles arrives sorted newest-first, so index-1 is newer and index+1 is older.
+    # data.articles comes with the newest article first, thus index-1 is newer and index+1 is
+    # older.
     let(:corpus) do
       [
         article(slug: 'newest', published_at: '2024-03-01T00:00:00Z'),
@@ -78,7 +82,7 @@ RSpec.describe ArticleHelpers do
         article(slug: 'oldest', published_at: '2024-01-01T00:00:00Z')
       ]
       stub_corpus(mixed)
-      # The draft is dropped from the sequence, so 'newest' sits next to the Short.
+      # The code removes the draft from the sequence, thus 'newest' is beside the Short.
       expect(adjacent_articles(mixed[0])[:older].slug).to eq('short')
       result = adjacent_articles(mixed[2])
       expect(result[:newer].slug).to eq('newest')
@@ -114,7 +118,7 @@ RSpec.describe ArticleHelpers do
         article(slug: 'keep-old', published_at: '2024-01-01T00:00:00Z')
       ]
       stub_corpus(corpus)
-      # data.articles is already sorted newest-first upstream, so the helper preserves input order.
+      # data.articles already has the newest article first, thus the helper keeps the input order.
       expect(llms_articles.map(&:slug)).to eq(%w[keep-new keep-old])
     end
 
@@ -125,8 +129,8 @@ RSpec.describe ArticleHelpers do
   end
 
   describe '#article_schema' do
-    # Collaborators that live in other helper modules at runtime; stubbed here so the schema builder
-    # is exercised in isolation.
+    # These methods are in other helper modules at run time. This file stubs them, thus the test
+    # runs the schema builder alone.
     def content_summary(content) = content.summary
     def schema_entity_id(fragment, path: '/') = "https://example.com#{path == '/' ? '/' : "#{path}/"}##{fragment}"
     def cdn_image_url(url, params = {}) = "#{url}?w=#{params[:w]}&h=#{params[:h]}"
@@ -299,10 +303,10 @@ RSpec.describe ArticleHelpers do
       expect(reading_time_minutes(article(slug: 'a', intro: 'so short'))).to eq(1)
     end
 
-    # ⚠️ An unset GitHub Actions variable interpolates to an EMPTY STRING, so the env key is
-    # present and blank — ENV.fetch's default never fires, `''.to_i` is 0, and the division
-    # raised FloatDomainError on every article page. That broke a production deploy; the build
-    # is the only thing that exercised it, since nothing else divides by this.
+    # ⚠️ A GitHub Actions variable with no value becomes an EMPTY STRING. Thus the env key is
+    # available and blank, the default of ENV.fetch never applies, `''.to_i` is 0, and the division
+    # raised FloatDomainError on each article page. That stopped a production deploy. Only the
+    # build ran that code, because nothing else divides by this value.
     it 'falls back to the default rate when READING_TIME_WPM is present but unusable' do
       a = article(slug: 'a', intro: ([ 'word' ] * 250).join(' '))
       [ '', '   ', 'abc', '0', '-5' ].each do |value|
@@ -315,7 +319,7 @@ RSpec.describe ArticleHelpers do
   end
 
   describe '#reading_time' do
-    # Exactly N minutes at the default 200 wpm.
+    # Exactly N minutes at the default of 200 words each minute.
     def article_with_minutes(minutes)
       article(slug: "m#{minutes}", intro: ([ 'word' ] * (minutes * 200)).join(' '))
     end
@@ -376,17 +380,18 @@ RSpec.describe ArticleHelpers do
     end
   end
 
-  # ⚠️ These two groups reach the content object the way Middleman actually supplies it — through
-  # `current_page.metadata[:locals][:content]`, via SiteHelpers' real `page_content`. Do not
-  # shortcut it with a `def content` stub: that defines a *method*, which makes `defined?(content)`
-  # true and passes against a binding Middleman never produces. That is precisely what hid these
-  # helpers reading `defined?(content)` and shipping every draft indexable.
+  # ⚠️ These two groups get the content object in the way that Middleman gives it: through
+  # `current_page.metadata[:locals][:content]`, with the real `page_content` of SiteHelpers. Do not
+  # replace that with a `def content` stub. Such a stub defines a *method*, which makes
+  # `defined?(content)` true and gives a pass against a binding that Middleman never makes. That is
+  # what hid the code that read `defined?(content)` and sent each draft to production where a
+  # search engine could index it.
   def page_content = SiteHelpers.instance_method(:page_content).bind_call(self)
   def current_page = OpenStruct.new(url: '/2024/01/01/post/', metadata: { locals: @page_locals || {} }, data: OpenStruct.new(@page_data || {}))
 
   describe '#canonical_url' do
-    # The outer group pins `canonical_url` as a plain stub for the schema groups; rebind the
-    # real module method here so this group exercises ArticleHelpers' implementation.
+    # The group above makes `canonical_url` a plain stub for the schema groups. Put the real module
+    # method back here, thus this group runs the code of ArticleHelpers.
     def canonical_url = ArticleHelpers.instance_method(:canonical_url).bind_call(self)
 
     it 'is the full URL of the current page when the page has no content object' do
@@ -434,7 +439,7 @@ RSpec.describe ArticleHelpers do
       expect(hide_from_search_engines?).to be(false)
     end
 
-    # The 404 page has no proxied content object, so its opt-out lives in frontmatter.
+    # The 404 page has no proxied content object, thus its flag is in the frontmatter.
     it 'hides a content-object-less page whose frontmatter opts out' do
       @page_data = { index_in_search_engines: false }
       expect(hide_from_search_engines?).to be(true)
@@ -445,14 +450,15 @@ RSpec.describe ArticleHelpers do
     it 'derives the entry and heading DOM ids from the parameterized Contentful id' do
       entry = article(slug: 'post')
       entry.sys = OpenStruct.new(id: '1QxUv2jHbvRd9OqMxOneqZ')
-      # parameterize downcases, so mixed-case Contentful ids come out lowercased. Accepted
-      # trade-off (documented in the helper): ids differing only by case would collide, but
-      # changing the derivation now would churn every published page's DOM ids.
+      # parameterize makes the text lowercase, thus a Contentful id with two cases becomes
+      # lowercase. This is an accepted cost, and the helper says so: two ids that are different only
+      # in case would become one, but a change now would change the DOM id on each published
+      # page.
       expect(entry_dom_id(entry)).to eq('entry-1qxuv2jhbvrd9oqmxoneqz')
       expect(entry_heading_id(entry)).to eq('hed-1qxuv2jhbvrd9oqmxoneqz')
     end
 
-    # The related-articles section scopes its cards, because read_next renders further summary
+    # The related-articles section gives each card a scope, because read_next renders more summary
     # cards for the same entries on the same page.
     it 'prefixes both ids with a scope when one is given' do
       entry = article(slug: 'post')
@@ -463,7 +469,7 @@ RSpec.describe ArticleHelpers do
   end
 
   describe '#related_articles' do
-    # This group needs `data.related` as well as `data.articles`.
+    # This group needs `data.related` and also `data.articles`.
     def data
       fields = { articles: @corpus || [] }
       fields[:related] = @related unless @related.nil?
@@ -490,7 +496,7 @@ RSpec.describe ArticleHelpers do
       expect(related_articles(corpus.first, count: 1).map(&:slug)).to eq([ 'c' ])
     end
 
-    # The three ways this comes back empty all collapse the section rather than raising.
+    # The three causes of an empty result all remove the section, and none of them raises.
     it 'returns nothing when the import never ran' do
       @related = nil
       expect(related_articles(corpus.first)).to eq([])
@@ -501,35 +507,39 @@ RSpec.describe ArticleHelpers do
       expect(related_articles(corpus.first)).to eq([])
     end
 
-    # A neighbor unpublished since the ranking was computed is dropped, not rendered as a blank.
+    # The code removes a neighbor that became unpublished after the calculation of the list. It
+    # does not render a blank card.
     it 'drops ids that no longer resolve to a published entry' do
       @related = { 'id-a' => %w[id-gone id-b] }
       expect(related_articles(corpus.first).map(&:slug)).to eq([ 'b' ])
     end
   end
 
-  # The taxonomy-aware helpers need tags carrying path/parent_id (not just id/name) and a
-  # data.tags hierarchy, so this group defines richer builders that override the outer ones.
+  # The helpers that read the taxonomy need tags with path and parent_id, and not only id and name,
+  # and they need a data.tags tree. Thus this group defines larger builders that replace the ones
+  # above.
   describe 'taxonomy-aware helpers' do
-    # A concept "tag" as it appears on an article / in data.tags: id, name, short_name, path,
-    # parent, scheme, and archive count (for the breadcrumb popularity tie-break).
+    # A concept "tag" as it is on an article and in data.tags: id, name, short_name, path, parent,
+    # scheme, and the archive count, which the breadcrumb code uses to select between two
+    # concepts.
     def concept(id, name, path:, parent_id: nil, scheme: nil, count: 0, short_name: nil)
       OpenStruct.new(id: id, name: name, short_name: short_name || name, path: path, parent_id: parent_id, scheme: scheme, entry_count: count)
     end
 
-    # An article whose contentful_metadata.tags are full concept doubles.
+    # An article whose contentful_metadata.tags are complete concept doubles.
     def tagged_article(slug:, concepts:, **opts)
       a = article(slug: slug, **opts)
       a.contentful_metadata = OpenStruct.new(tags: concepts)
       a
     end
 
-    # Shorthands for the concepts used below (matching the data.tags hierarchy).
+    # Short names for the concepts below. They agree with the data.tags tree.
     def cda = concept('ironman-703-coeur-dalene', 'Ironman 70.3 Coeur d’Alene', path: '/tagged/triathlon/half-distance/ironman-703-coeur-dalene/', parent_id: 'half-distance', scheme: 'sports')
     def race_reports = concept('race-reports', 'Race Reports', path: '/tagged/race-reports/', scheme: 'topics')
 
-    # data.tags mirrors the generated tag pages: Sports (Triathlon › Half Distance › a race) and
-    # Topics (Race Reports, News, Reviews, Tech › Gear), each with its scheme + archive count.
+    # data.tags is the same as the tag pages that the build makes: Sports (Triathlon › Half
+    # Distance › one race) and Topics (Race Reports, News, Reviews, and Tech › Gear). Each concept
+    # has its scheme and its archive count.
     def data
       tags = [
         concept('triathlon', 'Triathlon', path: '/tagged/triathlon/', scheme: 'sports', count: 20),
@@ -581,7 +591,7 @@ RSpec.describe ArticleHelpers do
     describe '#race_concept_id / #related_race_reports' do
       it 'is the deepest Sports concept — a specific race (chain length ≥ 3)' do
         expect(race_concept_id(tagged_article(slug: 'cda', concepts: [ cda, race_reports ]))).to eq('ironman-703-coeur-dalene')
-        # A distance-only article (no specific race) has no race concept.
+        # An article with a distance only, and no race, has no race concept.
         half = concept('half-distance', 'Half Distance', path: '/tagged/triathlon/half-distance/', parent_id: 'triathlon', scheme: 'sports')
         expect(race_concept_id(tagged_article(slug: 'general', concepts: [ half ]))).to be_nil
       end
@@ -625,7 +635,7 @@ RSpec.describe ArticleHelpers do
       end
 
       it 'follows the full taxonomy to the root, omitting unassigned intermediates (e.g. "Other")' do
-        # The article carries the race + discipline but NOT the "Other" bucket in between.
+        # The article has the race and the discipline, but NOT the "Other" group between them.
         art = tagged_article(slug: 'alcatraz', concepts: [
           concept('triathlon', 'Triathlon', path: '/tagged/triathlon/', scheme: 'sports'),
           concept('escape-from-alcatraz-triathlon', 'Escape from Alcatraz Triathlon', short_name: 'Escape from Alcatraz',

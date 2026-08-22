@@ -1,18 +1,19 @@
 name: "API"
 
-# ⚠️ `push` is scoped to main on purpose. It used to be ["*"], which meant every push to a
-# branch with an open PR ran the checks twice — once for the push (refs/heads/<branch>) and once
-# for the PR (refs/pull/N/merge). Those are different `github.ref` values, so the concurrency
-# group below never collapsed them. Branch work is covered by the pull_request trigger.
-# The composite actions are in `paths` because the notify job below uses them — without the
-# entry, editing one would trigger no CI at all.
+# ⚠️ `push` applies to main only, on purpose. With ["*"], each push to a branch with an open PR ran
+# the checks two times: one time for the push (refs/heads/<branch>) and one time for the PR
+# (refs/pull/N/merge). These are different `github.ref` values, thus the concurrency group below
+# cannot make them one. The pull_request trigger covers the work on a branch.
+# `paths` includes the composite actions, because the notify job below uses them. Without the
+# entry, a change to one of them would run no CI at all.
 #
-# ⚠️ The `web/source/partials/...` entries are deliberate and must stay. They are not this app's
-# files: they're the placeholders that api/spec/contracts/widget_markup_contract_spec.rb reads
-# across the monorepo (via Rails.root.join("../web")) to check each widget fragment still matches
-# the element it replaces. Filtered on 'api/**' alone, that spec only ran when the api half
-# changed — so editing a placeholder, which is the more likely edit, silently skipped the only
-# check that compares the two. Keep this list in step with WIDGET_MARKUP_PAIRS in that spec.
+# ⚠️ The `web/source/partials/...` entries are correct and must stay. They are not files of this
+# app: they are the placeholders that api/spec/contracts/widget_markup_contract_spec.rb reads
+# across the monorepo, with Rails.root.join("../web"), to check that each widget fragment still
+# agrees with the element that it replaces. With a filter on 'api/**' alone, that spec ran only
+# when the api half changed. Thus a change to a placeholder, which is the more probable change,
+# did not do the one check that compares the two. Keep this list the same as WIDGET_MARKUP_PAIRS
+# in that spec.
 on:
   push:
     branches: [main]
@@ -33,16 +34,17 @@ on:
       - 'web/source/partials/_upcoming_races.html.erb'
       - 'web/source/partials/article/_full.html.erb'
 
-# No job writes to the repository — the deploy authenticates to fly with FLY_API_TOKEN, not
-# GITHUB_TOKEN. Pin it read-only rather than inheriting the repo-wide default.
+# No job writes to the repository. The deploy uses FLY_API_TOKEN for fly, and not GITHUB_TOKEN.
+# Set GITHUB_TOKEN to read-only here. Do not use the default value of the repository.
 permissions:
   contents: read
 
-# ⚠️ cancel-in-progress is deliberately OFF for main, because this group covers the deploy job.
-# Cancelling `flyctl deploy` mid-run can leave the app/worker machines on mixed versions — fly
-# rolls machines one at a time, so there's no equivalent of the wrangler guarantee that the new
-# version only goes live at the very end (see the note in web.yml). On branches/PRs the group
-# only covers tests, where cancelling a superseded run is free.
+# ⚠️ cancel-in-progress is OFF for main, on purpose, because this group includes the deploy job. A
+# stop of `flyctl deploy` during a run can leave the app machine and the worker machine on
+# different versions. fly changes the machines one at a time, thus there is no equivalent of the
+# wrangler behavior, where the new version goes live only at the end (refer to the note in
+# web.yml). On a branch or a PR the group covers only the tests, where a stop of an old run costs
+# nothing.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
@@ -89,9 +91,9 @@ jobs:
           cache: npm
           cache-dependency-path: api/package-lock.json
 
-      # ⚠️ Not optional. spec/requests/sessions_spec.rb renders /login through layouts/auth, which
-      # calls stylesheet_link_tag "admin" — and Propshaft raises MissingAssetError rather than
-      # degrading when the esbuild output isn't there.
+      # ⚠️ This is necessary. spec/requests/sessions_spec.rb renders /login through layouts/auth,
+      # which calls stylesheet_link_tag "admin". Propshaft raises MissingAssetError when the
+      # esbuild output is absent, and it gives no smaller result.
       - name: Install JavaScript dependencies
         run: npm ci
         env:
@@ -122,7 +124,7 @@ jobs:
           working-directory: api
           bundler-cache: true
 
-      # Rails' omakase ruleset, inherited verbatim — see api/.rubocop.yml.
+      # The omakase ruleset of Rails, with no change. Refer to api/.rubocop.yml.
       - name: RuboCop (style)
         run: bundle exec rubocop --no-color
 
@@ -140,8 +142,8 @@ jobs:
     if: always()
 
     steps:
-      # This job only posts to Slack; the checkout exists solely so the local composite actions
-      # below resolve. Fetch just .github rather than the whole tree.
+      # This job only sends a message to Slack. The checkout is here only to make the local
+      # composite actions below available. Get .github only, and not the full tree.
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -185,21 +187,23 @@ jobs:
       - name: CI context
         uses: ./.github/actions/ci-context
 
-      # (No "deploy starting" notification, matching web.yml — a deploy already posts on success
-      # or failure, and a third message per deploy was noise. Nothing keys off it. This also
-      # dropped the only link to the fly monitoring dashboard; put it back on the failure message
-      # below if it's ever missed, rather than reinstating a whole extra notification.)
+      # (There is no "deploy starting" message, and web.yml is the same. A deploy already sends a
+      # message on a success or on a failure, and a third message for each deploy was too much.
+      # Nothing depends on it. This also removed the one link to the fly monitoring dashboard. Put
+      # that link on the failure message below if you need it, and do not add a full message.)
       #
-      # ⚠️ Pinned to a commit SHA, NOT @master and not the `1.6` tag. This runs in the job that
-      # holds FLY_API_TOKEN, so any ref that can be *moved* means whatever that third-party repo
-      # points it at later executes here with the deploy credential — and a tag is movable, not
-      # just a branch. A SHA is a content hash, so the code can't change under us. The trailing
-      # comment is the human-readable version; Dependabot's github-actions updater bumps both.
+      # ⚠️ This points at a commit SHA, and NOT at @master and NOT at the `1.6` tag. This runs in
+      # the job that holds FLY_API_TOKEN. Thus with a ref that a person can *move*, the code that
+      # the other repository later puts at that ref runs here with the deploy credential. A tag can
+      # move, as a branch can. A SHA is a hash of the content, thus the code cannot change. The
+      # comment at the end gives the version for a person to read. The github-actions updater of
+      # Dependabot changes both.
       - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
 
-      # ⚠️ --remote-only builds on fly's builder, not this runner, so the private-registry token
-      # has to travel with the build. --build-secret is what puts it on the BuildKit secret mount
-      # the Dockerfile reads; without it `npm ci` 401s and every deploy fails.
+      # ⚠️ --remote-only builds on the builder of fly, and not on this runner. Thus the token for
+      # the private registry must go with the build. --build-secret is what puts it on the BuildKit
+      # secret mount that the Dockerfile reads. Without it, `npm ci` gets a 401 and each deploy
+      # fails.
       - name: Deploy to Fly.io
         id: fly_deploy
         working-directory: api

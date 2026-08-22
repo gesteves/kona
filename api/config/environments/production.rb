@@ -1,60 +1,63 @@
 require "active_support/core_ext/integer/time"
 
 Rails.application.configure do
-  # Settings specified here will take precedence over those in config/application.rb.
+  # A setting here replaces the same setting in config/application.rb.
 
-  # Code is not reloaded between requests.
+  # Rails does not load the code again between two requests.
   config.enable_reloading = false
 
-  # Eager load code on boot for better performance and memory savings (ignored by Rake tasks).
+  # Load all the code at the start, for more speed and less memory. A Rake task ignores this.
   config.eager_load = true
 
-  # Full error reports are disabled.
+  # The app does not show a full error report.
   config.consider_all_requests_local = false
 
-  # Turn on fragment caching in view templates.
+  # Let the view templates cache their fragments.
   config.action_controller.perform_caching = true
 
-  # Cache assets for far-future expiry since they are all digest stamped.
+  # Keep each asset in the cache for a long time, because each name contains a digest.
   config.public_file_server.headers = { "cache-control" => "public, max-age=#{1.year.to_i}" }
 
-  # Enable serving of images, stylesheets, and JavaScripts from an asset server.
+  # Let an asset server give the images, the stylesheets, and the JavaScript.
   # config.asset_host = "http://assets.example.com"
 
-  # Assume all access to the app is happening through a SSL-terminating reverse proxy.
+  # Each request to the app comes through a reverse proxy that ends the SSL connection.
   config.assume_ssl = true
 
-  # Force all access to the app over SSL, use Strict-Transport-Security, and use secure cookies.
+  # Make each request to the app use SSL, use Strict-Transport-Security, and use secure cookies.
   config.force_ssl = true
 
-  # Skip http-to-https redirect for the default health check endpoint.
+  # Do not redirect the default health check endpoint from http to https.
   # config.ssl_options = { redirect: { exclude: ->(request) { request.path == "/up" } } }
 
-  # Log to STDOUT with the current request id as a default log tag.
+  # Write the log to STDOUT, with the id of the current request as a default tag.
   config.log_tags = [ :request_id ]
   config.logger   = ActiveSupport::TaggedLogging.logger(STDOUT)
 
-  # Change to "debug" to log everything (including potentially personally-identifiable information!).
+  # Change this to "debug" to write each line to the log. That can include data that identifies a
+  # person.
   config.log_level = ENV.fetch("RAILS_LOG_LEVEL", "info")
 
-  # Prevent health checks from clogging up the logs.
+  # Keep the health checks out of the log.
   config.silence_healthcheck_path = "/up"
 
-  # Don't log any deprecations.
+  # Do not write a deprecation message to the log.
   config.active_support.report_deprecations = false
 
-  # Replace the default in-process memory cache store with a durable alternative.
+  # Replace the default memory cache in this process with a store that keeps its data.
   # config.cache_store = :mem_cache_store
 
-  # Enable locale fallbacks for I18n (makes lookups for any locale fall back to
-  # the I18n.default_locale when a translation cannot be found).
+  # Let I18n use another language: a lookup in each language uses I18n.default_locale when it finds
+  # no translation.
   config.i18n.fallbacks = true
 
-  # Reject requests with a spoofed/raw-IP `Host` header (DNS rebinding & Host-header attacks),
-  # which is most of the direct-to-origin scanner traffic. The allowlist is read from
-  # ALLOWED_HOSTS (comma-separated) — never hardcode the hostname. Guarded so the app stays
-  # permissive until the var is set: deploy is safe, then set the fly secret to activate it.
-  # The /up health check is excluded so fly's checks (which hit the internal host) keep passing.
+  # Refuse a request with a false `Host` header or with an IP address in it. Those are DNS
+  # rebinding attacks and Host-header attacks, and they are most of the scanner traffic that goes
+  # directly to the origin. ALLOWED_HOSTS gives the list of permitted hosts, with a comma between
+  # them. Never write a hostname in the code. There is a check here, thus the app accepts each host
+  # until the variable has a value: the deploy is safe, and you then set the fly secret to make this
+  # operate. The /up health check is not in this rule, thus the checks of fly, which use the
+  # internal host, continue to pass.
   if ENV["ALLOWED_HOSTS"].present?
     config.hosts.concat(ENV["ALLOWED_HOSTS"].split(",").map(&:strip).reject(&:empty?))
     config.host_authorization = { exclude: ->(request) { request.path == "/up" } }

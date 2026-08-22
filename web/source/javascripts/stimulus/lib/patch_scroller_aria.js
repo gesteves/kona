@@ -1,14 +1,14 @@
-// <wa-scroller> renders its region as `<div role="region" aria-orientation="...">`, which axe
-// and Lighthouse flag — `aria-orientation` isn't valid on the `region` role. The markup is in
-// shadow DOM, so it can't be fixed from our templates.
+// <wa-scroller> renders its area as `<div role="region" aria-orientation="...">`, and axe and
+// Lighthouse report that, because `aria-orientation` is not correct on the `region` role. The markup
+// is in the shadow DOM, thus our templates cannot correct it.
 //
-// TODO: Remove once the upstream bug is fixed and we've upgraded:
-// https://github.com/shoelace-style/webawesome/issues/2364
+// TODO: Remove this file after the other project corrects the problem and we install the new
+// version: https://github.com/shoelace-style/webawesome/issues/2364
 
 /**
- * Patches `updated()` to strip the invalid attribute after every render.
- * Must run synchronously, before Lit's first render microtask — orientation never changes, so
- * `updated()` won't fire again to catch a late patch.
+ * Changes `updated()` to remove the incorrect attribute after each render.
+ * This must run immediately, before the first render microtask of Lit. The orientation never
+ * changes, thus `updated()` does not run again and a late change would do nothing.
  */
 function patchScrollerAria(WaScroller) {
   if (!WaScroller) {
@@ -27,7 +27,7 @@ const WaScroller = customElements.get('wa-scroller');
 if (WaScroller) {
   patchScrollerAria(WaScroller);
 } else {
-  // Fallback if import order ever changes; only safe before any instance has rendered.
+  // This applies if the import order changes. It is safe only before an instance renders.
   customElements
     .whenDefined('wa-scroller')
     .then(() => patchScrollerAria(customElements.get('wa-scroller')));

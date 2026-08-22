@@ -18,8 +18,9 @@
   </wa-callout>
 <% end %>
 
-<%# form_with + a form-associated <wa-button> rather than button_to, which emits a native
-    <button>. <wa-file-input> is form-associated too, so the files ride along normally. %>
+<%# This uses form_with with a <wa-button> that is part of the form, and not button_to, which
+    writes a native <button>. <wa-file-input> is also part of the form, thus the files go with the
+    submission. %>
 <%= form_with url: course_maps_path, method: :post, multipart: true, class: "track-upload" do %>
   <wa-file-input name="gpx_files[]" multiple accept=".gpx" label="GPX files"
                  hint="Each track is published to Mapbox as a private vector tileset, which takes a minute or two.">
@@ -36,8 +37,8 @@
     No tracks yet. Upload a GPX file and it'll show up here once Mapbox has published it.
   </wa-callout>
 <% else %>
-  <%# The list polls while anything is still publishing, then stops. Mapbox's tiling service is
-      asynchronous, so there's nothing to push from here. %>
+  <%# The list reads the status while a track publishes, and then it stops. The tiling service of
+      Mapbox is asynchronous, thus the server can send nothing to the page. %>
   <ul class="track-list plain-list wa-grid wa-gap-m" data-controller="map-status" data-map-status-url-value="<%= course_maps_status_path %>">
     <% @tracks.each do |track| %>
       <li data-map-status-id="<%= track.id %>" data-map-status-state="<%= track.status %>">
@@ -70,9 +71,10 @@
                 </span>
               <% end %>
 
-              <%# Neutral rather than danger for the same reason as the spam cards: the brand ramp
-                  here is red, so a danger variant beside a brand-accent button makes the safe
-                  action the loudest thing on the card. Red is reserved for the dialog's confirm. %>
+              <%# Use neutral and not danger, for the same reason as on the spam cards: the brand
+                  colors here are red. Thus a danger variant beside a brand-accent button makes the
+                  safe action the most prominent one on the card. Red is for the confirm button in
+                  the dialog only. %>
               <wa-button variant="neutral" appearance="outlined" data-dialog="open <%= track.dialog_id %>">
                 <%= slotted_icon_svg("classic", "light", "trash") %>
                 Delete
@@ -81,9 +83,9 @@
           </div>
         </wa-card>
 
-        <%# The dialog opens declaratively — wa-dialog listens document-wide for
-            [data-dialog="open <id>"] and [data-dialog="close"]. The `dialog` controller only
-            closes it before Turbo caches the page. %>
+        <%# The markup opens the dialog: wa-dialog listens on the full document for
+            [data-dialog="open <id>"] and [data-dialog="close"]. The `dialog` controller only closes
+            it before Turbo caches the page. %>
         <wa-dialog id="<%= track.dialog_id %>" label="Delete this track?" data-controller="dialog">
           <p>
             This deletes <strong><%= track.title %></strong> here and removes its tileset and

@@ -1,14 +1,17 @@
-// Teardown: deletes every concept scheme and concept in the org, so the taxonomy can be rebuilt
-// with reused ids. Schemes go first, then concepts deepest-first, so a parent is never removed
-// while a child still points at it. Refuses to run while any entry still links a concept.
+// This removes each concept scheme and each concept in the organization, thus you can make the
+// taxonomy again with the same ids. The schemes go first, then the concepts, and the most deeply
+// nested concept goes first. Thus the code never removes a parent while a child points at it. It
+// refuses to run while an entry still has a concept.
 //
-// ⚠️ This removes ALL taxonomy in the org. Run `npm run taxonomy:unassign` first, and dry-run.
-// Env: CONTENTFUL_MANAGEMENT_TOKEN, CONTENTFUL_ORGANIZATION_ID, CONTENTFUL_SPACE, DRY_RUN.
-// Run: `npm run taxonomy:delete`.
+// ⚠️ This removes ALL the taxonomy in the organization. Run `npm run taxonomy:unassign` first, and
+// do a dry run.
+// The env vars: CONTENTFUL_MANAGEMENT_TOKEN, CONTENTFUL_ORGANIZATION_ID, CONTENTFUL_SPACE, and
+// DRY_RUN.
+// To run it: `npm run taxonomy:delete`.
 
 const { getExistingConcepts, getExistingSchemes, createPlainClient, readEnv } = require('./lib/taxonomy');
 
-// Depth of a live concept following its first `broader` link up the (live) tree.
+// The depth of a concept. The code follows its first `broader` link up the tree.
 function depthOf(id, parentOf) {
   let depth = 0, cur = id, seen = new Set();
   while (parentOf.get(cur) && !seen.has(cur)) { seen.add(cur); depth += 1; cur = parentOf.get(cur); if (depth > 20) break; }
@@ -23,7 +26,7 @@ async function run() {
   const schemes = await getExistingSchemes(client, { organizationId });
   if (concepts.length === 0 && schemes.length === 0) { console.log('Nothing to delete — org taxonomy is empty.'); return; }
 
-  // Safety: refuse if any entry still links a concept we're about to delete.
+  // A safety check: stop if an entry still has a concept that this code is ready to delete.
   const ids = concepts.map((c) => c.sys.id);
   if (ids.length) {
     const inUse = await client.entry.getMany({ spaceId, environmentId, query: { 'metadata.concepts.sys.id[in]': ids.join(','), limit: 1 } });
@@ -33,13 +36,13 @@ async function run() {
     }
   }
 
-  // Delete all schemes first.
+  // Delete each scheme first.
   for (const scheme of schemes) {
     console.log(`- delete scheme ${scheme.sys.id}`);
     if (!dryRun) await client.conceptScheme.delete({ organizationId, conceptSchemeId: scheme.sys.id, version: scheme.sys.version });
   }
 
-  // Delete concepts deepest-first.
+  // Delete the concepts, and the most deeply nested one first.
   const parentOf = new Map(concepts.map((c) => [c.sys.id, c.broader?.[0]?.sys?.id || null]));
   const ordered = [...concepts].sort((a, b) => depthOf(b.sys.id, parentOf) - depthOf(a.sys.id, parentOf));
   for (const c of ordered) {

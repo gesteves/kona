@@ -1,7 +1,7 @@
 <%#
-  Race-day weather block for the featured event, rendered inline in the upcoming-races section.
-  Takes `event_weather` (an EventWeatherPresenter) as a local. Moved here from the former
-  standalone weather/event view.
+  The race-day weather block of the featured event. It renders in the upcoming-races section. It
+  takes `event_weather`, which is an EventWeatherPresenter, as a local. This code came from the
+  separate weather/event view of the past.
 %>
 <%
   event = event_weather.event
@@ -9,8 +9,9 @@
   event_forecast = event_weather.forecast
 %>
 <section class="event__weather" aria-labelledby="weather-hed-<%= event.sys.id.parameterize %>" data-nosnippet>
-  <%# h4, not h5: this sits inside the event's h3 card, inside the section's h2 — skipping a level
-      is a WCAG 1.3.1 failure. Styled by class, so the level is free to be correct. %>
+  <%# Use h4, and not h5: this is in the h3 card of the event, which is in the h2 of the section.
+      A level that a page omits is a WCAG 1.3.1 failure. A class gives the appearance, thus the
+      level can be correct. %>
   <h4 class="event__weather-heading" id="weather-hed-<%= event.sys.id.parameterize %>">Race Day Weather</h4>
   <div class="event__weather-stats">
     <% if event.location.present? %>
@@ -26,9 +27,9 @@
         <span class="event__weather-stat"><%= raw icon_svg("classic", "light", weather_icon(event_forecast.condition_code, :day)) %> <%= format_condition(event_forecast.condition_code) %></span>
       </div>
       <% if event_forecast.temperature_min.present? || event_forecast.temperature_max.present? %>
-        <%# ⚠️ Guarded per field, like the bay readings below: the `||` above admits a forecast day
-            carrying only one of the two, and rendering the other would print a bare "low"/"high"
-            with no reading. %>
+        <%# ⚠️ There is a check for each field, as for the bay readings below. The `||` above accepts
+            a forecast day with one of the two values only, and the other value would then print a
+            "low" or a "high" with no number. %>
         <div class="event__weather-stat-group">
           <% if event_forecast.temperature_min.present? %>
             <span class="event__weather-stat">
@@ -85,8 +86,9 @@
       <% end %>
     <% end %>
     <% bay = event_weather.bay %>
-    <%# ⚠️ Guarded per field, not on `bay` as a whole: Goodspeed omits individual readings, and the
-        arithmetic below turns one missing field into a NoMethodError that 500s the whole widget. %>
+    <%# ⚠️ There is a check for each field, and not one check on `bay`. Goodspeed omits some
+        readings, and the arithmetic below makes one field that is absent into a NoMethodError,
+        which gives the full widget a 500. %>
     <% show_water_temp = bay.present? && bay.water_temp_c.present? %>
     <% show_current = bay.present? && bay.current_speed_ms.present? && bay.current_bearing_deg.present? %>
     <% if show_water_temp || show_current %>

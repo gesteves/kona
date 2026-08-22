@@ -1,7 +1,8 @@
 require "rails_helper"
 
 RSpec.describe ContactBadRequestFilter do
-  # Bugsnag::Report exposes both of these publicly; instance_double verifies that stays true.
+  # Bugsnag::Report has both of these as public methods, and instance_double checks that they stay
+  # public.
   def report(error:, env: nil)
     instance_double(Bugsnag::Report, original_error: error, request_data: { rack_env: env })
   end

@@ -1,9 +1,10 @@
-// External accounts on the Connected apps page: a list of cards, one per integration.
-// ⚠️ The card body is a `wa-stack` and its header a `wa-cluster`, and those zero their children's
-// margins — which is why nothing here resets one.
+// The external accounts on the Connected apps page: a list of cards, with one card for each
+// integration.
+// ⚠️ The body of the card is a `wa-stack` and its header is a `wa-cluster`, and those two make the
+// margins of their children zero. That is why no rule here sets a margin to zero.
 
 .connected-app {
-  // Pushes the status badge to the far edge of the card.
+  // Moves the status badge to the far edge of the card.
   &__name {
     margin-inline-end: auto;
   }

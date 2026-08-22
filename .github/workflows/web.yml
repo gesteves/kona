@@ -1,28 +1,30 @@
 name: "Web"
 
-# Builds and deploys the Middleman static site to the kona-web Cloudflare Worker.
+# Builds the Middleman static site and deploys it to the kona-web Cloudflare Worker.
 #
 # Triggers:
-#   - push to main / PR touching web/**  -> item 1: only rebuild when the web app actually
-#     changed (an api/-only or utilities/-only change never runs this workflow).
-#     ⚠️ `push` is scoped to main on purpose. It used to be ["*"], which meant every push to a
-#     branch with an open PR ran `checks` twice — once for the push (refs/heads/<branch>) and
-#     once for the PR (refs/pull/N/merge). Those are different `github.ref` values, so the
-#     concurrency group below never collapsed them. Work on a branch is covered by the
-#     pull_request trigger; main is covered here.
-#   - repository_dispatch: contentful-publish -> item 2: kona-api fires this when content is
-#     published/unpublished in Contentful (see api/app/jobs/site_build_job.rb).
-#   - repository_dispatch: api-build -> the same job, fired by a POST to the api's /api/build
-#     endpoint (bearer-gated) — a programmatic "rebuild now" for scripts and automation. Both
-#     types run identically here; they're separate only so the Slack notification can say which
-#     one triggered the deploy (see .github/actions/ci-context/action.yml).
-#   - workflow_dispatch -> manual "Run workflow" button (from main). An on-demand rebuild:
-#     the build always pulls Contentful drafts (preview token + `preview: true`) and renders
-#     each to /id/<entry-id>/ (noindex, unlisted), but only publish/unpublish/delete fires a
-#     build — so this is how you surface an in-progress draft without publishing it.
+#   - A push to main, or a PR that touches web/** -> item 1: build again only when the web app
+#     changes. A change to api/ only, or to utilities/ only, does not run this workflow.
+#     ⚠️ `push` applies to main only, on purpose. With ["*"], each push to a branch with an open
+#     PR ran `checks` two times: one time for the push (refs/heads/<branch>) and one time for the
+#     PR (refs/pull/N/merge). These are different `github.ref` values, thus the concurrency group
+#     below cannot make them one. The pull_request trigger covers the work on a branch, and this
+#     trigger covers main.
+#   - repository_dispatch: contentful-publish -> item 2: kona-api sends this when a user
+#     publishes or unpublishes content in Contentful (refer to api/app/jobs/site_build_job.rb).
+#   - repository_dispatch: api-build -> the same job. A POST to the /api/build endpoint of the
+#     api sends it, and that endpoint needs a bearer token. It is a "build now" command for a
+#     script or for automation. The two types run in the same way here. They are different only
+#     to let the Slack notification say which one started the deploy (refer to
+#     .github/actions/ci-context/action.yml).
+#   - workflow_dispatch -> the manual "Run workflow" button, from main. This builds on demand.
+#     The build always gets the Contentful drafts (a preview token and `preview: true`) and
+#     renders each draft to /id/<entry-id>/, which is noindex and in no list. But only a publish,
+#     an unpublish, or a delete starts a build. Thus this button shows a draft that is not
+#     complete, and you do not publish it.
 #
-# The composite actions are in `paths` too: they're used by the jobs below, so a change to one
-# of them needs to run this workflow — without the entry it would trigger no CI at all.
+# `paths` also includes the composite actions. The jobs below use them, thus a change to one of
+# them must run this workflow. Without the entry, such a change would run no CI at all.
 on:
   push:
     branches: [main]
@@ -40,15 +42,16 @@ on:
     types: [contentful-publish, api-build]
   workflow_dispatch:
 
-# No job writes to the repository — the deploy and the cache purge authenticate with
-# CLOUDFLARE_API_TOKEN and Slack with its webhook, never GITHUB_TOKEN. Pin it read-only rather
-# than inheriting whatever the repo-wide default happens to be.
+# No job writes to the repository. The deploy and the cache purge use CLOUDFLARE_API_TOKEN, and
+# Slack uses its webhook. They never use GITHUB_TOKEN. Set GITHUB_TOKEN to read-only here. Do not
+# use the default value of the repository.
 permissions:
   contents: read
 
-# Coalesce rapid pushes / content publishes: a newer run cancels the in-flight one so we only
-# build the latest. Safe mid-deploy — wrangler activates the new Worker version only at the very
-# end, so a cancelled deploy leaves the current version live.
+# Make one run from a group of quick pushes or content publishes: a new run stops the run in
+# progress, thus the workflow builds only the most recent content. This is safe during a deploy,
+# because wrangler activates the new Worker version only at the end. Thus a deploy that stops
+# keeps the current version live.
 concurrency:
   group: web-${{ github.ref }}
   cancel-in-progress: true
@@ -58,11 +61,11 @@ jobs:
     name: Checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Skipped on a Contentful publish (repository_dispatch) and a manual rebuild
-    # (workflow_dispatch): both just rebuild the code already on main against current content, so
-    # there's nothing new to test/lint/typecheck — and the code on main already passed checks when
-    # it was pushed. Keeps content republishes and on-demand preview rebuilds off the ~1-minute
-    # test critical path.
+    # This does not run for a Contentful publish (repository_dispatch) or for a manual build
+    # (workflow_dispatch). Both build the code that is already on main with the current content.
+    # Thus there is nothing new to test, to lint, or to typecheck, and the code on main passed the
+    # checks at the push. This keeps a content publish and an on-demand preview build off the test
+    # path, which takes approximately one minute.
     if: github.event_name != 'repository_dispatch' && github.event_name != 'workflow_dispatch'
 
     defaults:
@@ -79,19 +82,19 @@ jobs:
           working-directory: web
           bundler-cache: true
 
-      # One of the slower steps here, though it moves a lot with the apt mirror: measured at 13s
-      # and at 48s in `deploy` on different runs, against ~16s for the site build itself. That
-      # ratio is why moving blurhash generation into the api to drop this install was considered
-      # and dropped — it wouldn't buy back meaningful wall-clock. libvips isn't on the runner
-      # image, so the whole tree is downloaded fresh: `libvips` is a *virtual* package provided
-      # by libvips42t64, which pulls ~33 direct dependencies (ImageMagick, poppler, librsvg,
-      # heif, jxl...). libvips42t64 itself declares no Recommends, but everything underneath it
-      # does, and apt installs recommends by default — hence --no-install-recommends. Keep the
-      # virtual name rather than libvips42t64: it survives Ubuntu's package renames (the t64
-      # suffix is itself one).
-      # ⚠️ Needed in BOTH jobs. web/lib/helpers/image_helpers.rb requires 'vips' at the top
-      # level, so rspec can't even load the helper without it — the specs stubbing Vips::Image
-      # doesn't help.
+      # This is one of the slower steps, but its time changes with the apt mirror. Different runs
+      # of `deploy` measured 13s and 48s, against approximately 16s for the site build. That ratio
+      # is why the blurhash generation stays here: a move into the api would remove this install
+      # but would not save much time. libvips is not on the runner image, thus apt downloads the
+      # full tree. `libvips` is a *virtual* package that libvips42t64 supplies, and that package
+      # needs approximately 33 direct dependencies (ImageMagick, poppler, librsvg, heif, jxl, and
+      # more). libvips42t64 declares no Recommends, but the packages below it do, and apt installs
+      # the recommends by default. Thus this uses --no-install-recommends. Keep the virtual name
+      # and do not use libvips42t64: the virtual name stays correct through the Ubuntu package
+      # renames (the t64 suffix is one of those renames).
+      # ⚠️ BOTH jobs need this. web/lib/helpers/image_helpers.rb requires 'vips' at the top level.
+      # Thus rspec cannot load the helper without it, and the specs that stub Vips::Image do not
+      # help.
       - name: Install libvips (ruby-vips / blurhashes)
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips
 
@@ -107,9 +110,10 @@ jobs:
         env:
           WEBAWESOME_NPM_TOKEN: ${{ secrets.WEBAWESOME_NPM_TOKEN }}
 
-      # rspec directly, NOT `rake test`: loading the Rakefile requires the data layer, which
-      # introspects the live Contentful schema at boot (needs creds/network). rspec loads only the
-      # specs, and contentful_spec stubs that client, so the suite runs credential-free in CI.
+      # Use rspec directly, NOT `rake test`. The Rakefile loads the data layer, which reads the
+      # live Contentful schema at boot and thus needs credentials and a network. rspec loads only
+      # the specs, and contentful_spec stubs that client. Thus the suite runs in CI with no
+      # credentials.
       - name: Ruby tests
         run: bundle exec rspec
 
@@ -122,8 +126,9 @@ jobs:
       - name: RuboCop (style)
         run: bundle exec rubocop --no-color
 
-      # Covers source/javascripts/** and test/browser/**, which `npm run check` doesn't reach —
-      # both tsconfigs include only src/ and test/*.ts. See eslint.config.mjs.
+      # This covers source/javascripts/** and test/browser/**, which `npm run check` does not
+      # reach, because the two tsconfig files include only src/ and test/*.ts. Refer to
+      # eslint.config.mjs.
       - name: Lint JavaScript
         run: npm run lint:js
 
@@ -137,7 +142,7 @@ jobs:
     name: Security scan
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Same skip as `checks`: a content republish rebuilds code that already passed on push.
+    # The same rule as `checks`: a content publish builds code that already passed at the push.
     if: github.event_name != 'repository_dispatch' && github.event_name != 'workflow_dispatch'
 
     defaults:
@@ -148,16 +153,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # No libvips here: bundler-audit reads the lockfile and never loads the app, so this job
-      # skips the slowest step in the workflow.
+      # There is no libvips here. bundler-audit reads the lockfile and never loads the app, thus
+      # this job does not do the slowest step in the workflow.
       - name: Set up Ruby
         uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
         with:
           working-directory: web
           bundler-cache: true
 
-      # This app parses untrusted content at build time (nokogiri, redcarpet, sanitize) and its
-      # Worker exposes a public POST, so it wants the same CVE gate the api has always had.
+      # This app parses content that it does not control at build time (nokogiri, redcarpet,
+      # sanitize), and its Worker has a public POST. Thus it needs the same CVE check as the api.
       - name: bundler-audit (Ruby dependency CVEs)
         run: bundle exec bundle-audit check --update
 
@@ -166,18 +171,20 @@ jobs:
         with:
           node-version-file: web/.nvmrc
 
-      # --omit=dev mirrors what the deploy job installs, so this scans what actually ships: Turbo,
-      # Stimulus and Web Awesome reach every visitor's browser, satori and resvg run in the Worker,
-      # and Pagefind ships wasm to anyone who searches.
+      # --omit=dev is the same as the install in the deploy job. Thus this scans the code that
+      # goes to production: Turbo, Stimulus, and Web Awesome go to the browser of each visitor,
+      # satori and resvg run in the Worker, and Pagefind sends wasm to each person who searches.
       #
-      # ⚠️ Blocking, like bundler-audit above. It was `continue-on-error` while wrangler's
-      # miniflare → undici chain kept a high advisory permanently open — but that suppressed the
-      # six dependencies that DO ship along with the one that doesn't, which is the failure mode
-      # this step exists to prevent. Keeping it green is a dependency bump, not a flag.
+      # ⚠️ This step stops the workflow on a failure, as bundler-audit above does. With
+      # `continue-on-error`, the miniflare → undici chain of wrangler kept one high advisory open,
+      # and that hid the six dependencies that DO go to production together with the one that does
+      # not. That is the failure that this step stops. To keep this step green, increase a
+      # dependency version. Do not add a flag.
       #
-      # ⚠️ If it goes red over tooling again: `wrangler` and `@cloudflare/vitest-pool-workers`
-      # must be bumped **together** — the pool exact-pins wrangler and miniflare, so npm dedupes
-      # a lone `npm update wrangler` straight back to the pinned version and nothing moves.
+      # ⚠️ If this step becomes red because of the tools again, increase the versions of
+      # `wrangler` and `@cloudflare/vitest-pool-workers` **together**. The pool pins the exact
+      # versions of wrangler and miniflare. Thus npm moves an `npm update wrangler` alone back to
+      # the pinned version, and nothing changes.
       - name: npm audit (JS dependency CVEs)
         run: npm audit --omit=dev --audit-level=high
 
@@ -186,13 +193,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: [checks, security]
-    # always() so a checks failure still notifies; skipped on the dispatch/manual triggers, where
-    # checks didn't run.
+    # Use always(), thus a failure in checks still sends a message. This does not run for the
+    # dispatch trigger or the manual trigger, where checks did not run.
     if: ${{ always() && github.event_name != 'repository_dispatch' && github.event_name != 'workflow_dispatch' }}
 
     steps:
-      # This job only posts to Slack; the checkout exists solely so the local composite actions
-      # below resolve. Fetch just .github rather than the whole tree.
+      # This job only sends a message to Slack. The checkout is here only to make the local
+      # composite actions below available. Get .github only, and not the full tree.
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -227,18 +234,20 @@ jobs:
     timeout-minutes: 30
     needs: [checks, security]
     concurrency: deploy-kona-web
-    # Deploy on a push to main, a Contentful publish, or a manual rebuild; never on PRs or other
-    # branches. workflow_dispatch is restricted to main so a manual run can't ship a feature branch
-    # to the single production Worker (run it from another branch and it's a harmless no-op: checks
-    # are skipped and this guard blocks the deploy). The [skip deploy] / [no deploy] escape hatch
-    # only applies to pushes (a dispatch/manual run has no commit). The result guards let the deploy
-    # run when a dependency is *skipped* (a content dispatch or manual run, where neither checks nor
-    # security runs) as well as when it *succeeds* (a code push) — but not when it fails;
-    # !cancelled() is what lets this evaluate past a skipped dependency.
+    # Deploy on a push to main, on a Contentful publish, or on a manual build. Never deploy on a
+    # PR or on another branch. workflow_dispatch applies to main only, thus a manual run cannot
+    # send a feature branch to the one production Worker. A run from another branch does nothing
+    # and causes no damage: the checks do not run and this condition stops the deploy. The
+    # [skip deploy] and [no deploy] text applies only to a push, because a dispatch run or a
+    # manual run has no commit. The result conditions let the deploy run when a dependency is
+    # *skipped* (a content dispatch or a manual run, where neither checks nor security runs) and
+    # also when it is *successful* (a code push). They do not let it run when a dependency fails.
+    # !cancelled() is what lets this expression continue past a dependency that did not run.
     #
-    # ⚠️ Both `needs` must be named here. `!cancelled()` replaces the implicit "all needs succeeded"
-    # gate, so a dependency this expression doesn't mention isn't gating anything — `security` was
-    # unlisted, which silently made the CVE scan non-blocking for the deploy it exists to block.
+    # ⚠️ Name both `needs` here. `!cancelled()` replaces the implicit "all needs are successful"
+    # condition. Thus a dependency that this expression does not name controls nothing. The
+    # expression did not name `security`, which let the CVE scan permit the deploy that it exists
+    # to stop.
     if: >-
       !cancelled() &&
       (needs.checks.result == 'success' || needs.checks.result == 'skipped') &&
@@ -253,11 +262,11 @@ jobs:
       run:
         working-directory: web
 
-    # The production build needs none of the test toolchain; the Gemfile groups it so this can
-    # skip it, mirroring `npm ci --omit=dev` below.
-    # ⚠️ Job-level, NOT on the setup-ruby step. Scoped to that step it only skips the *install*;
-    # `bundle exec rake build` further down then materializes the full lockfile, doesn't find the
-    # gems that were never installed, and fails the deploy with Bundler::GemNotFound.
+    # The production build needs none of the test tools. The Gemfile puts them in a group, thus
+    # this can omit them, as `npm ci --omit=dev` below does.
+    # ⚠️ Put this at the job level, NOT on the setup-ruby step. On that step it omits only the
+    # *install*. `bundle exec rake build` below then reads the full lockfile, does not find the
+    # gems that no step installed, and stops the deploy with Bundler::GemNotFound.
     env:
       BUNDLE_WITHOUT: development:test
 
@@ -274,19 +283,19 @@ jobs:
           working-directory: web
           bundler-cache: true
 
-      # One of the slower steps here, though it moves a lot with the apt mirror: measured at 13s
-      # and at 48s in `deploy` on different runs, against ~16s for the site build itself. That
-      # ratio is why moving blurhash generation into the api to drop this install was considered
-      # and dropped — it wouldn't buy back meaningful wall-clock. libvips isn't on the runner
-      # image, so the whole tree is downloaded fresh: `libvips` is a *virtual* package provided
-      # by libvips42t64, which pulls ~33 direct dependencies (ImageMagick, poppler, librsvg,
-      # heif, jxl...). libvips42t64 itself declares no Recommends, but everything underneath it
-      # does, and apt installs recommends by default — hence --no-install-recommends. Keep the
-      # virtual name rather than libvips42t64: it survives Ubuntu's package renames (the t64
-      # suffix is itself one).
-      # ⚠️ Needed in BOTH jobs. web/lib/helpers/image_helpers.rb requires 'vips' at the top
-      # level, so rspec can't even load the helper without it — the specs stubbing Vips::Image
-      # doesn't help.
+      # This is one of the slower steps, but its time changes with the apt mirror. Different runs
+      # of `deploy` measured 13s and 48s, against approximately 16s for the site build. That ratio
+      # is why the blurhash generation stays here: a move into the api would remove this install
+      # but would not save much time. libvips is not on the runner image, thus apt downloads the
+      # full tree. `libvips` is a *virtual* package that libvips42t64 supplies, and that package
+      # needs approximately 33 direct dependencies (ImageMagick, poppler, librsvg, heif, jxl, and
+      # more). libvips42t64 declares no Recommends, but the packages below it do, and apt installs
+      # the recommends by default. Thus this uses --no-install-recommends. Keep the virtual name
+      # and do not use libvips42t64: the virtual name stays correct through the Ubuntu package
+      # renames (the t64 suffix is one of those renames).
+      # ⚠️ BOTH jobs need this. web/lib/helpers/image_helpers.rb requires 'vips' at the top level.
+      # Thus rspec cannot load the helper without it, and the specs that stub Vips::Image do not
+      # help.
       - name: Install libvips (ruby-vips / blurhashes)
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips
 
@@ -297,25 +306,27 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      # --omit=dev: the deploy only needs the build/deploy tools (esbuild + its bundle imports,
-      # pagefind, wrangler — all in `dependencies`), NOT the test/lint toolchain (vitest +
-      # workerd, typescript, stylelint, prettier — all devDependencies). Skipping those cuts the
-      # install noticeably. The `checks` job still runs a full `npm ci` since it needs them.
+      # --omit=dev: the deploy needs only the build and deploy tools (esbuild and its bundle
+      # imports, pagefind, and wrangler, which are all in `dependencies`). It does not need the
+      # test and lint tools (vitest, workerd, typescript, stylelint, and prettier, which are all
+      # devDependencies). Without those, the install is much faster. The `checks` job still does a
+      # full `npm ci`, because it needs them.
       - name: Install npm dependencies
         run: npm ci --omit=dev
         env:
           WEBAWESOME_NPM_TOKEN: ${{ secrets.WEBAWESOME_NPM_TOKEN }}
 
-      # (There's deliberately no "deploy starting" notification here, unlike api.yml. A Contentful
-      # publish dispatches this workflow, so deploys are frequent and each one already posts on
-      # activation and again once the edge cache is purged; a third message per publish was noise.
-      # Nothing keys off it — a failure at any point still notifies below.)
+      # (There is no "deploy starting" message here, on purpose, and api.yml is different. A
+      # Contentful publish starts this workflow, thus deploys are frequent. Each deploy already
+      # sends a message at the activation and again after the purge of the edge cache. A third
+      # message for each publish was too much. Nothing depends on it, and a failure at any point
+      # still sends a message below.)
       #
-      # rake build = import (Contentful/icons/standard-site) -> middleman build -> rename
-      # _redirects/_headers -> pagefind. It does NOT run tests (those are the `checks` job's job,
-      # which gates deploys on code pushes). Tokens come from *secrets* (no hostnames live in this
-      # file). DEPLOY_CONTEXT=production makes it a real production build (canonicals/feeds/og from
-      # URL, the analytics snippet, etc.).
+      # rake build = import (Contentful, icons, standard-site) -> middleman build -> rename
+      # _redirects and _headers -> pagefind. It does NOT run the tests. The `checks` job runs them,
+      # and it controls the deploy on a code push. The tokens come from *secrets*, and no hostname
+      # is in this file. DEPLOY_CONTEXT=production makes a true production build: the canonicals,
+      # the feeds, and the og data come from URL, and the analytics snippet is present.
       - name: Build the site
         run: bundle exec rake build
         env:
@@ -328,33 +339,34 @@ jobs:
           KONA_API_URL: ${{ secrets.KONA_API_URL }}
           URL: ${{ secrets.URL }}
           IMAGES_URL: ${{ secrets.IMAGES_URL }}
-          # ⚠️ REQUIRED, and setting it asserts the api's R2 image mirror is populated — asset
-          # URLs get their host swapped to it and 404 until the objects exist. An empty secret is
-          # NOT a rollback: the zone allowlists only the mirror as a Transformations source
-          # (*.ctfassets.net deliberately isn't), so an unset value 403s every image on the site.
+          # ⚠️ This is NECESSARY. A value here says that the R2 image mirror of the api is
+          # complete. The build changes the host of each asset URL to it, and each URL 404s until
+          # the objects exist. An empty secret is NOT a way to go back: the zone permits only the
+          # mirror as a Transformations source, and it does not permit *.ctfassets.net, on
+          # purpose. Thus a value that is not set 403s each image on the site.
           IMAGE_HOST: ${{ secrets.IMAGE_HOST }}
           PLAUSIBLE_SCRIPT_URL: ${{ secrets.PLAUSIBLE_SCRIPT_URL }}
           TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
-          # ⚠️ A repo *variable*, not a secret — and note an unset one interpolates to an EMPTY
-          # STRING, not an absent env var, so anything read here must treat blank as unset.
-          # Unset, publish dates fall back to each reader's own browser timezone, so the "New"
-          # badge flips at a different instant per reader.
+          # ⚠️ This is a repository *variable*, not a secret. A variable with no value becomes an
+          # EMPTY STRING, and not an absent env var. Thus each reader of this value must count a
+          # blank value as no value. With no value, a publish date uses the browser timezone of
+          # each reader, and the "New" badge changes at a different moment for each reader.
           TIME_ZONE: ${{ vars.TIME_ZONE }}
 
-      # keep_vars:true + no `routes` in wrangler.jsonc means this never clobbers the dashboard
-      # vars/secrets or the www custom domain. Runs non-interactively, so the drift prompt doesn't
-      # apply. Uploads build/ (assets.directory).
+      # keep_vars:true, and wrangler.jsonc has no `routes`. Thus this never replaces the vars and
+      # secrets in the dashboard or the www custom domain. It runs with no user, thus the drift
+      # question does not occur. It uploads build/ (assets.directory).
       - name: Deploy to Cloudflare
         run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      # ⚠️ Announced BEFORE the purge below, deliberately. `wrangler deploy` returns once the new
-      # version is activated, so the site is live at this point — the purge only stops the edge
-      # serving *stale* copies, and its 30s propagation sleep would otherwise pad this ping by half
-      # a minute past the thing it's reporting. Keep it here; if a step is ever added that the site
-      # genuinely isn't live without, this moves back below it.
+      # ⚠️ This message goes out BEFORE the purge below, on purpose. `wrangler deploy` returns
+      # after the activation of the new version, thus the site is live at this point. The purge
+      # only stops the edge from old copies, and its 30s wait for propagation would delay this
+      # message by half a minute after the event that it reports. Keep the message here. If
+      # someone adds a step that the site is not live without, move this message below that step.
       - name: Notify Slack (deploy successful)
         if: success()
         continue-on-error: true
@@ -365,65 +377,69 @@ jobs:
           color: "good"
           fallback: "Web deploy successful"
 
-      # wrangler deploy doesn't purge Cloudflare's edge cache, so without this the edge keeps
-      # serving pre-deploy HTML/feeds (cf-cache-status: HIT → stale 304s) until the entries age
-      # out. Every asset-layer response is tagged `Cache-Tag: site` (a host-scoped zone Cache
-      # Response Rule — root CLAUDE.md); purging just that tag evicts the site's pages/feeds while
-      # leaving image transformations (/cdn-cgi/image/*, never tagged) intact. The same rule's
-      # second branch tags the Contentful-backed widget fragments on the api host, so this also
-      # evicts those — that's deliberate, since a Contentful publish dispatches this workflow and
-      # they'd otherwise serve pre-edit content; the live-data widgets carry no `site` tag and
-      # survive.
+      # wrangler deploy does not purge the Cloudflare edge cache. Without this step, the edge
+      # continues to serve the HTML and the feeds from before the deploy (cf-cache-status: HIT,
+      # then old 304s) until the entries expire. A zone Cache Response Rule for this host gives
+      # each asset-layer response the tag `Cache-Tag: site` (refer to the root CLAUDE.md). A purge
+      # of that tag alone removes the pages and the feeds of the site, and it keeps the image
+      # transformations (/cdn-cgi/image/*, which have no tag). The second part of the same rule
+      # gives the tag to the Contentful widget fragments on the api host, thus this purge also
+      # removes those. That is correct, because a Contentful publish starts this workflow and
+      # those fragments would show content from before the edit. The live-data widgets have no
+      # `site` tag and stay in the cache.
       #
-      # ⚠️ Purge ONLY the `site` tag. Widget fragments also carry a `widgets` tag (a second zone
-      # Cache Response Rule) — that one is a MANUAL lever and must never be added here. A purge
-      # drops a fragment's stale-while-revalidate / stale-if-error copies along with the fresh one,
-      # and those are what keep the live-data widgets rendering through a fly outage; since a
-      # Contentful publish dispatches this workflow, adding `widgets` would mean a publish landing
-      # mid-outage collapses every widget site-wide. Root CLAUDE.md has the full reasoning.
-      # --fail-with-body → red CI if the purge 4xxs. Reuses CLOUDFLARE_API_TOKEN, which now also
-      # carries the Zone → Cache Purge permission.
+      # ⚠️ Purge ONLY the `site` tag. The widget fragments also have a `widgets` tag from a second
+      # zone Cache Response Rule. That tag is a MANUAL control, and it must never go here. A purge
+      # removes the stale-while-revalidate and stale-if-error copies of a fragment with the fresh
+      # copy, and those copies keep the live-data widgets in operation through a fly failure. A
+      # Contentful publish starts this workflow. Thus with `widgets` here, a publish during a
+      # failure would remove each widget on the full site. The root CLAUDE.md has the full
+      # explanation.
+      # --fail-with-body makes the CI red if the purge gives a 4xx. It uses CLOUDFLARE_API_TOKEN,
+      # which now also has the Zone → Cache Purge permission.
       #
-      # --retry 3 --retry-all-errors rides out a transient blip (5xx, connection reset, DNS) rather
-      # than leaving content pinned at the edge until the next deploy over something that would
-      # have worked a second later. --retry-all-errors is the load-bearing half: plain --retry
-      # covers transport errors and a few 5xx, but NOT the 4xx/5xx that --fail-with-body turns into
-      # a non-zero exit, which is most of what we'd want to retry here. It deliberately does not
-      # paper over a bad token — a 403 retries three times, still fails the step, and still fires
-      # the "purge failed" notification below. Moving this into the api as a retrying Sidekiq job
-      # was considered; it buys the same transient resilience for a zone-scoped Cloudflare token on
-      # the api and a 24h-later Bugsnag report in place of a loud, immediate CI failure.
+      # --retry 3 --retry-all-errors continues through a temporary problem (a 5xx, a connection
+      # reset, or DNS). Without it, the content stays at the edge until the next deploy because of
+      # a problem that would go away in one second. --retry-all-errors is the important half:
+      # --retry alone covers the transport errors and some 5xx errors, but NOT the 4xx and 5xx
+      # errors that --fail-with-body makes into a non-zero exit, and those are most of what we
+      # want to try again. It does not hide a bad token, on purpose. A 403 tries three times,
+      # still fails the step, and still sends the "purge failed" message below. A move of this
+      # step into the api as a Sidekiq job with retries gives the same protection from a temporary
+      # problem, but it needs a zone Cloudflare token on the api, and it gives a Bugsnag report 24
+      # hours later in place of an immediate CI failure.
       #
-      # ⚠️ The sleep comes FIRST, and there is deliberately only one purge. `wrangler deploy`
-      # returns at activation, but propagation across PoPs takes a few seconds — and a request
-      # served by a not-yet-updated PoP right after a purge re-caches OLD content, which, since
-      # deploys don't self-invalidate at the edge, stays pinned until the NEXT deploy's purge.
-      # Purging only once propagation has settled is what makes that race impossible. This used to
-      # purge immediately and then again after the sleep; the second call was the one doing the
-      # real work, and the first bought nothing the second didn't also cover.
-      # The cost is that the edge may serve the previous copy for the length of the sleep. That's
-      # the right trade: it's bounded and self-correcting, whereas a re-pin lasts until the next
-      # deploy. Nothing waits on this — the success ping above has already gone out.
+      # ⚠️ The sleep comes FIRST, and there is only one purge, on purpose. `wrangler deploy`
+      # returns at the activation, but the propagation to all the PoPs takes some seconds. A
+      # request that a PoP with the old version answers immediately after a purge puts OLD content
+      # in the cache again. A deploy does not invalidate the edge by itself, thus that content
+      # stays until the purge of the NEXT deploy. A purge after the propagation is complete makes
+      # that race impossible. A first purge before the sleep gives nothing that the purge after
+      # the sleep does not also give.
+      # The cost is that the edge can serve the previous copy for the length of the sleep. That is
+      # the correct choice: the time is short and the condition corrects itself, but old content
+      # in the cache again stays until the next deploy. Nothing waits for this step, because the
+      # success message above already went out.
       #
-      # ⚠️ The verification below is the load-bearing half, because the API call above cannot fail
-      # for the thing most likely to go wrong. A purge for a tag that matches NOTHING — because the
-      # Cache Response Rule was disabled, or names a hostname that was typed by hand and never
-      # validated, which has already happened once — returns 200 success. Combined with an edge TTL
-      # that ignores Cache-Control for a year, that leaves pages pinned essentially forever while
-      # CI stays green. Nothing else in the repo would notice.
+      # ⚠️ The check below is the important half, because the API call above cannot fail for the
+      # most probable problem. A purge for a tag that matches NOTHING returns 200 success. This
+      # occurs when the Cache Response Rule is off, or when it names a hostname that someone typed
+      # by hand and no one checked, which has already occurred one time. With an edge TTL that
+      # ignores Cache-Control for a year, the pages then stay in the cache for almost all time
+      # while the CI stays green. Nothing else in the repo would find this.
       #
-      # `age` is the signal, not cf-cache-status. A surviving entry carries the age it accumulated
-      # since it was cached, which is at minimum the interval since the previous deploy; an evicted
-      # one comes back with no age at all, or a tiny one if another visitor repopulated it in the
-      # seconds since. That asymmetry is what makes this robust rather than racy — a repopulation
-      # can only ever produce a *small* age, which is the passing case either way. A missing header
-      # (uncached / DYNAMIC) passes too: the point is to catch a stale copy surviving, not to
-      # assert the page is cacheable.
+      # `age` is the signal, not cf-cache-status. An entry that stays has the age that it collected
+      # since it went into the cache, which is at minimum the time since the previous deploy. An
+      # entry that goes away comes back with no age, or with a small age if another visitor put it
+      # in the cache again in the seconds after the purge. That difference makes this check
+      # dependable and not a race: a new entry can give only a *small* age, which is the pass
+      # condition in both conditions. A header that is absent (no cache, or DYNAMIC) also passes.
+      # The purpose is to find an old copy that stays, and not to say that the page is cacheable.
       #
-      # ⚠️ The three values arrive through `env:`, not `${{ }}` inside the script. `${{ }}` splices
-      # into the script's *source*, which puts the token in the runner's process argv and would let
-      # a secret containing shell metacharacters run as code — the same hazard
-      # .github/actions/ci-context avoids for commit messages.
+      # ⚠️ The three values come through `env:`, and not through `${{ }}` in the script. `${{ }}`
+      # puts the value into the *source* of the script. That puts the token in the process argv of
+      # the runner, and it would let a secret with shell metacharacters run as code. This is the
+      # same danger that .github/actions/ci-context prevents for a commit message.
       - name: Purge Cloudflare edge cache (tag "site")
         id: purge
         env:
@@ -439,10 +455,11 @@ jobs:
             -H "Content-Type: application/json" \
             --data '{"tags":["site"]}'
 
-          # Let the eviction propagate before asking a PoP what it has.
+          # Wait for the propagation of the removal before you ask a PoP what it has.
           sleep 10
-          # No path appended: URL may or may not carry a trailing slash (full_url overwrites the
-          # path, so the Ruby side never had to care), and "<url>//" is a different cache entry.
+          # Do not add a path. URL can have a slash at the end or no slash at the end. full_url
+          # replaces the path, thus the Ruby code does not need to know. And "<url>//" is a
+          # different cache entry.
           headers=$(curl -sS -D - -o /dev/null --retry 3 --retry-all-errors "$SITE_URL")
           age=$(printf '%s' "$headers" | tr -d '\r' | awk 'tolower($1) == "age:" { print $2; exit }')
           status=$(printf '%s' "$headers" | tr -d '\r' | awk 'tolower($1) == "cf-cache-status:" { print $2; exit }')
@@ -453,11 +470,12 @@ jobs:
             exit 1
           fi
 
-      # Not redundant with "deploy successful" above — it carries the half that message can't.
-      # That one fires at activation, when the edge may still be handing out the previous copy;
-      # this one means the stale copies are gone and every PoP now serves the new build. Blue
-      # rather than green, deliberately: it's a follow-up to the deploy, not a second success, and
-      # colouring it `good` would make every deploy look like it succeeded twice.
+      # This message is not the same as "deploy successful" above. It gives the half that the
+      # other message cannot give. The other message goes out at the activation, when the edge can
+      # still give the previous copy. This message means that the old copies are gone and that
+      # each PoP now serves the new build. The color is blue and not green, on purpose: this is a
+      # second part of the deploy, and not a second success. The color `good` would make each
+      # deploy look like two successes.
       - name: Notify Slack (cache purged)
         if: success()
         continue-on-error: true
@@ -468,15 +486,15 @@ jobs:
           color: "#439FE0"
           fallback: "Web cache purge successful"
 
-      # Its own message, because the success ping has already gone out by now and a bare "deploy
-      # failed" after "deploy successful" would read as a contradiction and send you looking in
-      # the wrong place. What actually happened is narrower: the site is live, but the edge may
-      # keep serving the previous copy — and since deploys don't self-invalidate, that stays
-      # pinned until the next deploy purges it, so it wants a manual purge. `warning` rather than
-      # `danger` is what carries that "partly worked" nuance now that the text is terse.
-      # Covers both halves of the step above: the API call erroring, and the verification finding
-      # the purge matched nothing. The run log says which, and the consequence is the same either
-      # way.
+      # This has its own message, because the success message already went out. A plain "deploy
+      # failed" after "deploy successful" would look like a contradiction and would send you to
+      # the wrong place. The true condition is smaller: the site is live, but the edge can continue
+      # to give the previous copy. A deploy does not invalidate the edge by itself, thus that copy
+      # stays until the purge of the next deploy. Thus it needs a manual purge. The color is
+      # `warning` and not `danger`, which shows that one part worked, now that the text is short.
+      # This covers both halves of the step above: an error in the API call, and a check that finds
+      # that the purge matched nothing. The run log says which one occurred, and the result is the
+      # same for both.
       - name: Notify Slack (purge failed)
         if: failure() && steps.purge.outcome == 'failure'
         continue-on-error: true
@@ -487,9 +505,9 @@ jobs:
           color: "warning"
           fallback: "Web cache purge failed"
 
-      # Everything up to and including the deploy. Scoped off the purge so the two can't both
-      # fire: steps.purge.outcome is '' when the step never ran, so this still covers an earlier
-      # failure.
+      # This covers each step to the deploy and the deploy itself. It uses the purge result, thus
+      # the two messages cannot both go out. steps.purge.outcome is '' when the step did not run,
+      # thus this still covers a failure before the purge.
       - name: Notify Slack (deploy failed)
         if: failure() && steps.purge.outcome != 'failure'
         continue-on-error: true

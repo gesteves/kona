@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushDom, mount } from '../helpers';
 
-// The widget refresh controller — the web half of the cross-app HTML contract (root CLAUDE.md).
-// Two kinds of element run it and the difference is one boolean:
+// The widget refresh controller, which is the web half of the HTML contract between the two apps
+// (refer to the root CLAUDE.md). Two types of element run it, and one boolean gives the difference:
 //
-//   placeholder — the web-side skeleton. No real content, so it always fetches on connect and
-//                 collapses itself if the fetch fails.
-//   fragment    — the api view that replaces it. Real content, so it fetches only when that
-//                 content is stale, and KEEPS what it has on a failed fetch.
+//   placeholder — the skeleton on the web side. It has no real content, thus it always fetches on
+//                 connect and it removes itself if the fetch fails.
+//   fragment    — the api view that replaces the skeleton. It has real content, thus it fetches
+//                 only when that content is old, and it KEEPS its content if a fetch fails.
 //
-// Nearly every test below is really a test of that split, plus the module-scoped clock that makes
-// a Turbo back/forward restoration visit refresh instead of freezing.
+// Almost each test below tests that difference, and also the clock at the module level that makes a
+// Turbo back or forward restoration visit get new content instead of a stop.
 
 const WIDGET_URL = '/widgets/plausible/pageviews/abc123';
 const OTHER_URL = '/widgets/weather/current';
@@ -22,13 +22,13 @@ const placeholder = (url = WIDGET_URL) =>
         data-live-update-placeholder-value="true"
         data-action="visibilitychange@document->live-update#handleVisibilityChange"><wa-skeleton></wa-skeleton></div>`;
 
-// Note the absence of data-live-update-placeholder-value: that omission is the contract.
+// data-live-update-placeholder-value is absent, and that is the contract.
 const fragment = (url = WIDGET_URL, body = '48 views') =>
   `<div class="pageviews" data-controller="live-update"
         data-live-update-url-value="${url}"
         data-action="visibilitychange@document->live-update#handleVisibilityChange">${body}</div>`;
 
-/** A response with only the three members the controller actually reads. */
+/** A response with only the three members that the controller reads. */
 const respondWith = (body, { ok = true, status = 200 } = {}) => ({
   ok,
   status,
@@ -40,9 +40,9 @@ let fetchMock;
 let now;
 
 beforeEach(async () => {
-  // The clock (`lastFetchAtByUrl`) is module state and survives between tests in a file, which
-  // would make each test depend on its predecessors. Reset the registry and re-import so every
-  // test starts from an empty clock.
+  // The clock (`lastFetchAtByUrl`) is module state and it stays between the tests in a file, which
+  // would make each test depend on the tests before it. Reset the registry and import again, thus
+  // each test starts with an empty clock.
   vi.resetModules();
   LiveUpdateController = (
     await import('../../../source/javascripts/stimulus/controllers/live_update_controller')
@@ -55,7 +55,7 @@ beforeEach(async () => {
   vi.stubGlobal('fetch', fetchMock);
 });
 
-/** Renders new markup into the live document, the way a Turbo snapshot render does. */
+/** Puts new markup in the live document, in the way that a Turbo snapshot render does. */
 const render = async (html) => {
   document.body.innerHTML = html;
   await flushDom();
@@ -78,9 +78,10 @@ describe('on connect', () => {
   });
 
   it('does not refetch the fragment it just swapped in', async () => {
-    // The loop guard. The fragment carries the same data-controller, so it connects the instant
-    // it lands; keying the clock by URL means it finds the inserting fetch's own timestamp
-    // already recorded, and stays put. Get this wrong and the widget self-DDoSes.
+    // This stops a loop. The fragment has the same data-controller, thus it connects immediately
+    // when it arrives. The URL is the key of the clock, thus the fragment finds the time of the
+    // fetch that added it, and it does nothing. An error here makes the widget send many requests
+    // to itself.
     await mountLiveUpdate(placeholder());
     await flushDom();
     await flushDom();
@@ -89,8 +90,8 @@ describe('on connect', () => {
   });
 
   it('fetches for a fragment whose URL has never been fetched in this document', async () => {
-    // Unknown counts as stale. In practice this is the case where a page is entered with markup
-    // that already holds content — nothing in this document vouches for how old it is.
+    // A URL with no time counts as old. In practice this occurs when a page starts with markup that
+    // already has content, and nothing in the document says how old that content is.
     await mountLiveUpdate(fragment());
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -108,10 +109,11 @@ describe('on connect', () => {
   });
 
   it('fetches for a restored fragment once its content is a minute old', async () => {
-    // This is the bug the placeholder/clock split exists to fix. A Turbo restoration visit
-    // re-renders the cached snapshot — which contains the FRAGMENT — and issues no network
-    // request of its own, so without this the widget would show whatever it showed when the user
-    // last left the page, indefinitely. On a view counter that reads as the number going down.
+    // The placeholder flag and the clock exist to correct this problem. A Turbo restoration visit
+    // renders the cached snapshot again, and that snapshot contains the FRAGMENT. It makes no
+    // network request. Thus without this code the widget would show the content from the last time
+    // that the user left the page, for all time. On a view counter, that looks like a number that
+    // goes down.
     await mountLiveUpdate(placeholder());
     await flushDom();
     fetchMock.mockClear();
@@ -127,7 +129,7 @@ describe('on connect', () => {
     await flushDom();
     fetchMock.mockClear();
 
-    // A different widget, well inside the throttle window for the first one.
+    // A different widget, inside the throttle window of the first one.
     await render(fragment(OTHER_URL));
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -154,9 +156,9 @@ describe('on an empty response', () => {
   });
 
   it('removes a rendered fragment too', async () => {
-    // An empty body is the api's authoritative "no data" answer, not a failure — an Upcoming
-    // Races widget whose last race has passed is supposed to disappear. So this one collapse is
-    // unconditional, unlike every other failure path below.
+    // An empty body is the "no data" answer from the api, and not a failure. An Upcoming Races
+    // widget whose last race is in the past must go away. Thus this removal has no condition, and
+    // each other failure path below is different.
     fetchMock.mockResolvedValue(respondWith('   \n  '));
 
     await mountLiveUpdate(fragment());
@@ -190,9 +192,9 @@ describe('when the fetch fails', () => {
   });
 
   it('KEEPS a rendered fragment on a non-2xx', async () => {
-    // The regression that matters. A transient origin blip must never destroy content that is
-    // already on screen — the whole reason the collapse behavior is tied to the placeholder flag
-    // instead of applying to everything running this controller.
+    // This is the important failure. A short problem at the origin must never remove content that
+    // is already on the screen. That is why the placeholder flag controls the removal, and why the
+    // removal does not apply to each element that runs this controller.
     fetchMock.mockResolvedValue(respondWith('', { ok: false, status: 502 }));
 
     await mountLiveUpdate(fragment(WIDGET_URL, '48 views'));
@@ -212,7 +214,7 @@ describe('when the fetch fails', () => {
   });
 
   it('holds the throttle after a failure, so a dead endpoint is not retried on every trigger', async () => {
-    // The clock records the ATTEMPT, not the outcome.
+    // The clock records the ATTEMPT, and not the result.
     fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
 
     await mountLiveUpdate(fragment());
@@ -228,9 +230,9 @@ describe('when the fetch fails', () => {
 
 describe('request lifecycle', () => {
   it('aborts an in-flight request when the element leaves the DOM', async () => {
-    // How this happens for real: Turbo swaps the <body> out from under a widget that is still
-    // waiting on the api. Without the abort, the late response would call replaceElement on a
-    // detached node — a silent no-op on a good day, and a stale render on a bad one.
+    // This is how it occurs: Turbo replaces the <body> while a widget still waits for the api.
+    // Without the abort, the late response would call replaceElement on a node that is not in the
+    // document. That does nothing at the best, and it renders old content at the worst.
     let capturedSignal;
     fetchMock.mockImplementation(async (_url, options) => {
       capturedSignal = options.signal;
@@ -247,7 +249,7 @@ describe('request lifecycle', () => {
   });
 
   it('swallows an abort without collapsing the placeholder', async () => {
-    // A navigation mid-flight is not a failure, so it must not trigger the collapse path.
+    // A navigation during a request is not a failure, thus it must not start the removal path.
     const consoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
@@ -294,7 +296,7 @@ describe('handleVisibilityChange', () => {
   });
 
   it('does nothing while the content is fresh', async () => {
-    // Without the throttle, one alt-tab refetches all five home-page widgets at once.
+    // Without the throttle, one change of the window gets all five home-page widgets again.
     await mountLiveUpdate(placeholder());
     await flushDom();
     fetchMock.mockClear();

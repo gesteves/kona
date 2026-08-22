@@ -1,19 +1,19 @@
 require "rails_helper"
 
-# Coverage for the weather helper's selection and formatting methods. The prose summary and
-# its business rules moved to WeatherSummaryPresenter (see weather_summary_presenter_spec).
+# The tests for the selection methods and the format methods of the weather helper. The text summary
+# and its rules moved to WeatherSummaryPresenter (refer to weather_summary_presenter_spec).
 #
-# Most tests build a weather fixture whose forecast window and sunrise/sunset are expressed
-# as offsets from the current time, so they're self-consistent without freezing the clock. The
-# no-forecast daytime/evening fallback reads the wall clock in the given timezone, so it
-# freezes a fixed UTC instant and asserts against the Denver-local hour.
+# Most of the tests make a weather object whose forecast window, sunrise, and sunset are times from
+# the current time. Thus they agree with each other and the test does not stop the clock. The
+# daytime and evening code with no forecast reads the clock in the given timezone. Thus that test
+# stops the clock at a UTC instant and tests against the local hour in Denver.
 RSpec.describe WeatherHelper, type: :helper do
   include ActiveSupport::Testing::TimeHelpers
 
   let(:time_zone) { "America/Denver" }
 
-  # Builds a weather fixture. `current`, `today`, `rest_of_day`, and `overnight` are merged
-  # into the respective sub-hashes; `sunrise`/`sunset` override today's sun times.
+  # Makes a weather object. `current`, `today`, `rest_of_day`, and `overnight` go into their own
+  # sub-hashes. `sunrise` and `sunset` replace the sun times of today.
   def build_weather(current: {}, today: {}, rest_of_day: {}, overnight: {}, sunrise: nil, sunset: nil, alerts: [])
     now = Time.current
     DeepOstruct.wrap(
@@ -56,7 +56,7 @@ RSpec.describe WeatherHelper, type: :helper do
   end
 
   # ---------------------------------------------------------------------------
-  # Condition phrases
+  # The condition phrases
   # ---------------------------------------------------------------------------
   describe "condition phrasing" do
     it "looks up the current/forecast/simplified phrases from CONDITIONS" do
@@ -73,7 +73,7 @@ RSpec.describe WeatherHelper, type: :helper do
   end
 
   # ---------------------------------------------------------------------------
-  # Number / unit formatting
+  # The number format and the unit format
   # ---------------------------------------------------------------------------
   describe "#format_temperature" do
     it "renders both Celsius and Fahrenheit with the unit toggle" do
@@ -179,7 +179,7 @@ RSpec.describe WeatherHelper, type: :helper do
   end
 
   # ---------------------------------------------------------------------------
-  # Pollen
+  # The pollen
   # ---------------------------------------------------------------------------
   describe "pollen" do
     it "reports the highest non-zero index and its category" do
@@ -201,7 +201,7 @@ RSpec.describe WeatherHelper, type: :helper do
   end
 
   # ---------------------------------------------------------------------------
-  # Weather data presence
+  # The availability of the weather data
   # ---------------------------------------------------------------------------
   describe "weather data presence" do
     it "exposes current weather and today's forecast and reports currency" do
@@ -233,7 +233,7 @@ RSpec.describe WeatherHelper, type: :helper do
   end
 
   # ---------------------------------------------------------------------------
-  # Time of day
+  # The time of day
   # ---------------------------------------------------------------------------
   describe "#daytime? / #evening?" do
     it "is daytime between sunrise and sunset" do
@@ -249,14 +249,14 @@ RSpec.describe WeatherHelper, type: :helper do
     end
 
     it "falls back to clock hours in the given timezone when there's no weather" do
-      # The timezone is America/Denver (UTC-6 in June), so the fallback reads the Denver-local
-      # hour, not the machine's. 18:00 UTC == 12:00 MDT (daytime).
+      # The timezone is America/Denver, which is UTC-6 in June. Thus the code reads the local hour
+      # in Denver, and not the hour of the machine. 18:00 UTC is 12:00 MDT, which is daytime.
       travel_to(Time.utc(2026, 6, 3, 18, 0, 0)) do
         expect(helper.daytime?(nil, time_zone)).to be(true)
         expect(helper.evening?(nil, time_zone)).to be(false)
       end
 
-      # 04:00 UTC == 22:00 MDT the previous evening.
+      # 04:00 UTC is 22:00 MDT, which is the evening of the previous day.
       travel_to(Time.utc(2026, 6, 4, 4, 0, 0)) do
         expect(helper.daytime?(nil, time_zone)).to be(false)
         expect(helper.evening?(nil, time_zone)).to be(true)
@@ -282,7 +282,7 @@ RSpec.describe WeatherHelper, type: :helper do
   end
 
   # ---------------------------------------------------------------------------
-  # Icon + alerts
+  # The icon and the alerts
   # ---------------------------------------------------------------------------
   describe "#weather_icon" do
     it "returns a single string icon directly" do

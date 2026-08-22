@@ -1,36 +1,36 @@
 require "nokogiri"
 
 module MarkupHelper
-  # Renders a tag wired to the units Stimulus controller. Uses the non-block content_tag form
-  # on purpose — the block form needs an output buffer, which the presenters don't have.
+  # Renders a tag that is connected to the units Stimulus controller. It uses the content_tag form
+  # with no block, on purpose: the block form needs an output buffer, and a presenter has none.
   def units_tag(metric, imperial, tag = :span)
     content_tag tag.to_sym, metric, "data-controller": "units", "data-units-imperial-value": imperial, "data-units-metric-value": metric, title: "#{metric} | #{imperial}"
   end
 
-  # Renders a card's Markdown body to HTML. A deliberately minimal subset of the static site's
-  # render_body: card bodies are short prose, so this skips the asset, figure, srcset, and
-  # blurhash machinery — which is welded to the build-time asset index anyway — and does only
-  # the two transforms these bodies use. A Markdown image or table degrades to a plain element.
+  # Renders the Markdown body of a card into HTML. This is a small part of the render_body of the
+  # static site, on purpose. The body of a card is short text, thus this code does not do the asset,
+  # figure, srcset, and blurhash steps, which need the asset index from the build. It does only the
+  # two transforms that these bodies need. A Markdown image or table becomes a plain element.
   # @param text [String, nil] The Markdown.
-  # @return [String, nil] The HTML, or nil for blank input.
+  # @return [String, nil] The HTML, or nil for a blank input.
   def render_summary_body(text)
     html = markdown_to_html(fix_degrees(text))
     return if html.blank?
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
     add_unit_data_attributes(doc)
     open_external_links_in_new_tabs(doc)
-    # ⚠️ After open_external_links_in_new_tabs, never before — both write `rel`, and the
-    # sponsored disclosure has to be the one that survives. The static site's render_body
-    # orders them the same way for the same reason.
+    # ⚠️ This must come after open_external_links_in_new_tabs, and never before. Both write `rel`,
+    # and the sponsored disclosure must be the value that stays. The render_body of the static site
+    # has the same order, for the same reason.
     mark_affiliate_links(doc)
     doc.to_html
   end
 
   private
 
-  # Flags Amazon Associates links as sponsored. Mirrors the static site's
-  # MarkupHelpers#mark_affiliate_links: an article summary rendered into a widget fragment has to
-  # carry the same disclosure it carries on the page itself.
+  # Marks each Amazon Associates link as sponsored. This is the same as
+  # MarkupHelpers#mark_affiliate_links of the static site: an article summary in a widget fragment
+  # must have the same disclosure that it has on the page.
   def mark_affiliate_links(doc)
     doc.css("a").each do |a|
       next unless amazon_associates_link?(a["href"])
@@ -40,10 +40,10 @@ module MarkupHelper
     doc
   end
 
-  # ⚠️ Matches the registrable domain by suffix rather than through PublicSuffix, which the web
-  # app uses but this app doesn't depend on. Keep the two in agreement.
+  # ⚠️ This matches the domain by the end of the host name, and it does not use PublicSuffix. The
+  # web app uses PublicSuffix, but this app does not have that dependency. Keep the two the same.
   # @param url [String, nil]
-  # @return [Boolean] Whether the URL is an Amazon Associates link.
+  # @return [Boolean] True if the URL is an Amazon Associates link.
   def amazon_associates_link?(url)
     uri = URI.parse(url.to_s)
     host = uri.host.to_s.downcase
@@ -52,17 +52,17 @@ module MarkupHelper
 
     URI.decode_www_form(uri.query.to_s).to_h.key?("tag")
   rescue StandardError
-    # Malformed author-supplied hrefs just aren't affiliate links.
+    # An href from the author with an incorrect shape is not an affiliate link.
     false
   end
 
-  # @return [Boolean] Whether host is `domain` or a subdomain of it.
+  # @return [Boolean] True if host is `domain`, or a subdomain of it.
   def domain?(host, domain)
     host == domain || host.end_with?(".#{domain}")
   end
 
-  # Rewrites the `data-imperial` shorthand authors write in Contentful into the units
-  # controller's attributes.
+  # Changes the `data-imperial` shorthand from Contentful into the attributes of the units
+  # controller.
   def add_unit_data_attributes(doc)
     doc.css("[data-imperial]").each do |element|
       replacement = units_tag(element.text, element["data-imperial"], element.name.to_sym)
@@ -71,14 +71,14 @@ module MarkupHelper
     doc
   end
 
-  # Opens absolute links in a new tab. ⚠️ Deliberately without the web helper's same-host
-  # exception — these bodies only ever link to external race sites — but otherwise matched to it,
-  # malformed-href skip included.
+  # Opens each absolute link in a new tab. ⚠️ This does not have the same-host exception of the web
+  # helper, on purpose, because these bodies link only to external race sites. In each other way it
+  # is the same, and this includes the code that ignores an href with an incorrect shape.
   def open_external_links_in_new_tabs(doc)
     doc.css("a").each do |a|
       href = a["href"]
       next unless href&.start_with?("http://", "https://")
-      # Author-supplied links can be malformed; skip them rather than marking them up.
+      # A link from the author can be incorrect. Ignore such a link and do not change it.
       link_host = URI.parse(href).host rescue next
       next if link_host.blank?
 

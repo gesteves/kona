@@ -23,16 +23,16 @@ RSpec.describe "Admin location", type: :request do
     allow_any_instance_of(Events).to receive(:all).and_return(DeepOstruct.wrap(events))
   end
 
-  # ⚠️ `on:` becomes a **zoned** 9am timestamp, like Contentful's own dates. `Time.parse` reads a
-  # bare "2026-10-10" in the *machine's* zone, so a UTC CI box resolves it to the day before in the
-  # zone the page reckons in, sliding every date here back one.
+  # ⚠️ `on:` becomes a 9am timestamp **with a zone**, as a Contentful date has. `Time.parse` reads a
+  # plain "2026-10-10" in the zone of the *machine*. Thus a CI machine in UTC gives the day before,
+  # in the zone that the page uses, and each date here moves back one day.
   def event(title:, on:, going: true, location: "Kona, Hawaii", lat: 19.64, lon: -155.99)
     date = ActiveSupport::TimeZone[TimeZoneResolver.default].parse("#{on} 09:00").iso8601
     { title: title, date: date, going: going, location: location, coordinates: { lat: lat, lon: lon } }
   end
 
-  # The page previews what the weather widget would print, which means Google's geocoder. Stubbed
-  # at GoogleMaps so the real format_location still runs on the way through.
+  # The page shows the name that the weather widget would show, and that comes from the geocoder of
+  # Google. The stub is at GoogleMaps, thus the true format_location still runs.
   def stub_geocoding(place:)
     components = [
       { types: [ "administrative_area_level_2" ], long_name: "Teton County" },
@@ -63,12 +63,12 @@ RSpec.describe "Admin location", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("43.48, -110.76")
       expect(response.body).to match(/<wa-badge[^>]*variant="success"[^>]*>Saved</m)
-      # ⚠️ Mapbox takes longitude first; a latitude-first center puts the pin in the sea.
+      # ⚠️ Mapbox needs the longitude first. With the latitude first, the pin goes into the sea.
       expect(response.body).to include('data-location-map-center-value="[-110.76,43.48]"')
     end
 
-    # The whole point of the heading: it's format_location's output, so it reads exactly as the
-    # weather widget will — special cases (this is one) included.
+    # This is the purpose of the heading: it is the output of format_location, thus it reads exactly
+    # as it reads in the weather widget. This includes each special condition, and this is one.
     it "names the place the way the weather widget would, and the widgets' time zone" do
       get "/location"
 
@@ -84,9 +84,9 @@ RSpec.describe "Admin location", type: :request do
       expect(response.body).to include("43.48, -110.76")
     end
 
-    # ⚠️ The map runs in the browser, so its token is in the page. It must be the public one —
-    # MAPBOX_SECRET_TOKEN carries tilesets:write, and StaticMap prefers it for *server-side*
-    # rendering, which is exactly the fallback that must not happen here.
+    # ⚠️ The map runs in the browser, thus its token is in the page. It must be the public token.
+    # MAPBOX_SECRET_TOKEN has tilesets:write, and StaticMap uses it first for a render on the
+    # *server*. That is the value that must never appear here.
     it "renders the public Mapbox token and never the secret one" do
       get "/location"
 
@@ -102,7 +102,8 @@ RSpec.describe "Admin location", type: :request do
       expect(response.body).to include("MAPBOX_ACCESS_TOKEN")
     end
 
-    # Location prefers the env var, so a pin drop would write Redis and change nothing anyone reads.
+    # Location uses the env var first, thus a pin writes to Redis and changes nothing that a person
+    # reads.
     it "warns when LOCATION overrides whatever is stored" do
       allow(ENV).to receive(:[]).with("LOCATION").and_return("37.77,-122.42")
 
@@ -122,7 +123,7 @@ RSpec.describe "Admin location", type: :request do
       expect(response.body).to include("data-location-map-center-value=\"#{LocationPresenter::WORLD_CENTER.to_json}\"")
     end
 
-    # Nothing is staged on arrival, so there is nothing to write and nothing to throw away.
+    # Nothing is staged at the first render, thus there is nothing to write and nothing to remove.
     it "renders Save and Undo disabled, and the lookup it stages through" do
       get "/location"
 
@@ -132,7 +133,7 @@ RSpec.describe "Admin location", type: :request do
       expect(response.body).to include('data-location-map-lookup-url-value="/location/lookup"')
     end
 
-    # ⚠️ Web Awesome components over native elements, as everywhere else in the admin.
+    # ⚠️ Use a Web Awesome component in place of a native element, as in each other admin page.
     it "renders its one control as a Web Awesome button" do
       get "/location"
 
@@ -165,7 +166,7 @@ RSpec.describe "Admin location", type: :request do
         expect(response.body).to include('data-latitude="19.64"')
         expect(response.body).to include('data-longitude="-155.99"')
         expect(response.body).not_to include("Last year’s")
-        # Soonest first.
+        # The soonest race is first.
         expect(response.body.index("Boulder")).to be < response.body.index("Kona")
       end
     end
@@ -176,7 +177,7 @@ RSpec.describe "Admin location", type: :request do
       expect(response.body).not_to include("Upcoming races")
     end
 
-    # Contentful is one more upstream this page doesn't need to work.
+    # Contentful is one more upstream service, and this page works without it.
     it "still renders the map when the events can't be fetched" do
       allow_any_instance_of(Events).to receive(:all).and_call_original
       allow(HTTParty).to receive(:post).and_raise(StandardError, "Contentful is down")
@@ -200,8 +201,8 @@ RSpec.describe "Admin location", type: :request do
       expect(LocationSyncJob).to have_enqueued_sidekiq_job(37.7749, -122.4194)
     end
 
-    # The page updates its heading from this rather than reloading, so a stale name never sits
-    # over a pin that's since moved.
+    # The page changes its heading from this response and does not load the page again. Thus an old
+    # name never stays above a pin that moved.
     it "answers with the place the new pin resolves to" do
       allow($redis).to receive(:set)
 
@@ -245,8 +246,8 @@ RSpec.describe "Admin location", type: :request do
       expect(response).to have_http_status(:unprocessable_content)
     end
 
-    # ⚠️ Coordinates only. An address is resolved by the lookup first, so there's one shape of
-    # thing this stores and one place that decides what a valid location is.
+    # ⚠️ This takes coordinates only. The lookup resolves an address first, thus this action stores
+    # one shape of data and one place decides what a correct location is.
     it "ignores an address, which is the lookup's job" do
       expect_any_instance_of(GoogleGeocoder).not_to receive(:coordinates)
       expect($redis).not_to receive(:set)
@@ -261,7 +262,7 @@ RSpec.describe "Admin location", type: :request do
   describe "GET /location/lookup" do
     before do
       sign_in!
-      # Nothing here may write. Every example runs with the store wired to fail loudly.
+      # No code here can write. Each example runs with a store that raises on a write.
       allow($redis).to receive(:set).and_raise("the lookup must not write")
     end
 
@@ -276,7 +277,7 @@ RSpec.describe "Admin location", type: :request do
       expect(LocationSyncJob.jobs).to be_empty
     end
 
-    # What the page previews a pin drop with, before Save is pressed.
+    # The name that the page shows for a pin, before a person presses Save.
     it "names a coordinate pair, without storing it" do
       get "/location/lookup", params: { latitude: "37.7749", longitude: "-122.4194" }
 
@@ -300,8 +301,8 @@ RSpec.describe "Admin location", type: :request do
       expect(response).to have_http_status(:unprocessable_content)
     end
 
-    # ⚠️ Falling through to the address on an unusable pair would resolve a place the caller never
-    # asked about — and the page would stage it.
+    # ⚠️ A change to the address for an incorrect pair would find a place that the caller did not ask
+    # for, and the page would stage that place.
     it "never falls back to the address when a coordinate was sent too" do
       expect_any_instance_of(GoogleGeocoder).not_to receive(:coordinates)
 

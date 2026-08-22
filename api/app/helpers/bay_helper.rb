@@ -1,10 +1,11 @@
 module BayHelper
-  # Approximate flood-current set at SFB1204 (flows into the bay, roughly ESE).
+  # The approximate direction of the flood current at SFB1204. It goes into the bay, at
+  # approximately ESE.
   BAY_FLOOD_BEARING_DEG = 110
-  # Below this current speed (knots) the current is treated as slack.
+  # Below this speed in knots, the code counts the current as slack.
   BAY_SLACK_CURRENT_KT = 0.15
 
-  # Finds the Goodspeed timeseries entry closest to the given time (within `freshness`).
+  # Finds the Goodspeed entry that is nearest to the given time, in the `freshness` window.
   # @param goodspeed [OpenStruct, nil] The Goodspeed bay-conditions data.
   # @return [OpenStruct, nil]
   def bay_conditions_at(goodspeed, time, freshness: 30.minutes)
@@ -19,7 +20,7 @@ module BayHelper
     closest
   end
 
-  # Classifies the bay current as :slack, :flood, or :ebb.
+  # Gives the bay current a type: :slack, :flood, or :ebb.
   def bay_current_state(entry)
     return :slack if entry.current_speed_kt < BAY_SLACK_CURRENT_KT
     delta = (entry.current_bearing_deg - BAY_FLOOD_BEARING_DEG).abs % 360
@@ -27,15 +28,17 @@ module BayHelper
     delta <= 90 ? :flood : :ebb
   end
 
-  # Formats the bay current speed (m/s → km/h) reusing the wind-speed metric/imperial toggle.
+  # Formats the speed of the bay current, from m/s into km/h. It uses the metric and imperial
+  # control of the wind speed.
   def format_bay_current_speed(speed_ms)
     format_wind_speed(speed_ms * 3.6)
   end
 
-  # Sentence describing the current SF Bay water temperature, for weather_summary.
+  # A sentence about the current water temperature of San Francisco Bay, for weather_summary.
   # @param goodspeed [OpenStruct, nil] The Goodspeed bay-conditions data.
-  # @param location [OpenStruct, nil] The current location (a GoogleMaps result).
-  # @return [String, nil] nil unless the location is SF and a recent entry exists.
+  # @param location [OpenStruct, nil] The current location, from a GoogleMaps result.
+  # @return [String, nil] It is nil if the location is not San Francisco, and if there is no recent
+  #   entry.
   def bay_water_temperature_sentence(goodspeed, location)
     return nil unless in_san_francisco?(location)
     entry = bay_conditions_at(goodspeed, Time.now)

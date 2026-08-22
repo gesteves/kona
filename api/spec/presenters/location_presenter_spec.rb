@@ -3,8 +3,8 @@ require "rails_helper"
 RSpec.describe LocationPresenter do
   include ActiveSupport::Testing::TimeHelpers
 
-  # The zone the presenter reckons "upcoming" in, and the one the fixtures below date themselves
-  # in — one source of truth, since a race's calendar day depends on both agreeing.
+  # The zone that the presenter uses for "upcoming", and the zone of the dates below. There is one
+  # source, because the calendar day of a race needs the two to agree.
   def time_zone = "America/Denver"
 
   def presenter(stored: nil, override: nil, map_token: "pk.token", place: "Jackson Hole, Wyoming",
@@ -34,7 +34,8 @@ RSpec.describe LocationPresenter do
       expect(subject).to be_set
     end
 
-    # Display only — what's stored, and what #latitude/#longitude hand the map, is the full value.
+    # This applies to the screen only. The stored value, and the value that #latitude and
+    # #longitude give the map, is the full value.
     it "rounds the displayed pair to three decimals" do
       subject = presenter(stored: [ 43.478123, -110.762987 ])
 
@@ -43,15 +44,15 @@ RSpec.describe LocationPresenter do
       expect(subject.center).to eq([ -110.762987, 43.478123 ])
     end
 
-    # ⚠️ The one place that isn't rounded: it echoes what's in the environment, so it has to match
-    # what was typed there.
+    # ⚠️ This is the one value that the code does not round. It shows the value from the environment,
+    # thus it must be the same as the text there.
     it "leaves the override callout's coordinates exact" do
       subject = presenter(override: [ 37.774929, -122.419418 ])
 
       expect(subject.override_summary).to eq("37.774929, -122.419418")
     end
 
-    # Location reads the env var first, so the page has to show what actually wins.
+    # Location reads the env var first, thus the page must show the value that applies.
     it "prefers the override, and says it's overridden" do
       subject = presenter(stored: [ 43.48, -110.76 ], override: [ 37.77, -122.42 ])
 
@@ -77,8 +78,8 @@ RSpec.describe LocationPresenter do
       expect(subject.details).to eq("43.48, -110.76")
     end
 
-    # A geocode that resolves to nothing is what the widget would render as a blank; the
-    # coordinates are more use than a placeholder.
+    # A geocode that finds nothing gives a blank in the widget. The coordinates are more useful than
+    # a placeholder.
     it "falls back to the coordinates when nothing geocoded" do
       subject = presenter(stored: [ 43.48, -110.76 ], place: nil)
 
@@ -93,8 +94,8 @@ RSpec.describe LocationPresenter do
       expect(subject.details).to include("Drop a pin")
     end
 
-    # The badge says whether the coordinates beside it are written down. Nothing can be staged before
-    # the page loads, so a stored location is always "Saved" here.
+    # The badge says if the app stored the coordinates beside it. Nothing can be staged before the
+    # page loads, thus a stored location is always "Saved" here.
     it "tags a stored location as saved, and no location as unset" do
       expect(presenter(stored: [ 43.48, -110.76 ]).state_label).to eq("Saved")
       expect(presenter(stored: [ 43.48, -110.76 ]).state_variant).to eq("success")
@@ -104,7 +105,7 @@ RSpec.describe LocationPresenter do
   end
 
   describe "the map" do
-    # ⚠️ Mapbox takes longitude first; passing a latitude-first pair puts the pin in the sea.
+    # ⚠️ Mapbox needs the longitude first. With the latitude first, the pin goes into the sea.
     it "centers longitude-first on the location" do
       expect(presenter(stored: [ 43.48, -110.76 ]).center).to eq([ -110.76, 43.48 ])
       expect(presenter(stored: [ 43.48, -110.76 ]).zoom).to eq(11)
@@ -122,12 +123,12 @@ RSpec.describe LocationPresenter do
   end
 
   describe "the race shortcuts" do
-    # 2026-08-20 18:00 UTC == 12:00 MDT, so "today" in America/Denver is August 20, 2026.
+    # 2026-08-20 18:00 UTC is 12:00 MDT, thus "today" in America/Denver is August 20, 2026.
     around { |example| travel_to(Time.utc(2026, 8, 20, 18, 0, 0)) { example.run } }
 
-    # ⚠️ `on:` becomes a **zoned** 9am timestamp, like Contentful's own dates. `Time.parse` reads a
-    # bare "2026-10-10" in the *machine's* zone, so a UTC CI box resolves it to the day before in
-    # America/Denver and every date here slides back one.
+    # ⚠️ `on:` becomes a 9am timestamp **with a zone**, as a Contentful date has. `Time.parse` reads
+    # a plain "2026-10-10" in the zone of the *machine*. Thus a CI machine in UTC gives the day
+    # before in America/Denver, and each date here moves back one day.
     def event(title:, on: nil, date: nil, going: true, location: "Kona, Hawaii",
               lat: 19.64, lon: -155.99)
       date ||= ActiveSupport::TimeZone[time_zone].parse("#{on} 09:00").iso8601
@@ -146,8 +147,8 @@ RSpec.describe LocationPresenter do
       expect(subject.races.map(&:title)).to eq([ "Boulder", "Kona" ])
     end
 
-    # ⚠️ Not EventsHelper#upcoming_races: that caps the widget's list at three or four. Every race
-    # ahead is a place you might be.
+    # ⚠️ This is not EventsHelper#upcoming_races. That method limits the list of the widget to three
+    # or four races. Each race that is ahead is a place where you can be.
     it "lists more than the widget would" do
       events = (1..6).map { |n| event(title: "Race #{n}", on: "2026-09-0#{n}") }
 
@@ -166,7 +167,7 @@ RSpec.describe LocationPresenter do
       expect(subject.races).to be_empty
     end
 
-    # A button with nowhere to send the map isn't a shortcut.
+    # A button with no place to move the map to is not a shortcut.
     it "drops races without coordinates" do
       subject = presenter(events: [ event(title: "Unplaced", on: "2026-09-01", lat: nil, lon: nil) ])
 

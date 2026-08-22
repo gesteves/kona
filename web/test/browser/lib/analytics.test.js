@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Every export here is a no-op-if-absent wrapper around Plausible. The queue stub is set up inline
-// in the page head before the deferred script loads, so the guard exists for the cases where
-// there's no script at all — development, and any page built without PLAUSIBLE_SCRIPT_URL. A
-// ReferenceError there would take down whatever called it (a share click, a page view).
+// Each export here calls Plausible, and it does nothing when Plausible is absent. The page head
+// makes the queue stub before the deferred script loads. Thus the check is for the conditions with
+// no script at all: development, and each page that a build makes with no PLAUSIBLE_SCRIPT_URL. A
+// ReferenceError there would stop the code that called it, that is, a share click or a page view.
 
 let analytics;
 
 beforeEach(async () => {
-  // `searchTrackingReady` is module state; a fresh import per test keeps initSearchTracking's
-  // "subscribe exactly once" tests independent of each other.
+  // `searchTrackingReady` is module state. A new import for each test keeps the "one subscribe
+  // only" tests of initSearchTracking separate from each other.
   vi.resetModules();
   analytics =
     await import('../../../source/javascripts/stimulus/lib/analytics');
@@ -63,8 +63,8 @@ describe('trackPageView', () => {
   });
 
   it('reads the query before scrubbing the URL', () => {
-    // trackPageView calls cleanUpUrl() on the way out. If the order were reversed, a visit tagged
-    // ?utm_source=… would be reported against an already-rewritten URL.
+    // trackPageView calls cleanUpUrl() at the end. In the other order, a visit with ?utm_source=…
+    // would go to the analytics with a URL that the code already changed.
     window.plausible = vi.fn();
     window.history.replaceState({}, '', '/search?q=marathon&utm_source=news');
 
@@ -95,8 +95,8 @@ describe('cleanUpUrl', () => {
   });
 
   it('leaves the history alone when there is nothing to strip', () => {
-    // Guarding the replaceState matters: an unconditional one would rewrite history on every
-    // Turbo page view for no reason.
+    // The check before the replaceState is important: a replaceState with no check would change the
+    // history at each Turbo page view, for no purpose.
     window.history.replaceState({}, '', '/post?q=hi');
     const replaceState = vi.spyOn(window.history, 'replaceState');
 
@@ -105,9 +105,9 @@ describe('cleanUpUrl', () => {
     expect(replaceState).not.toHaveBeenCalled();
   });
 
-  // Turbo stores its restorationIdentifier in history state, and this runs on every turbo:load.
-  // Passing a fresh {} drops it, which breaks scroll and snapshot restoration on back-navigation
-  // for any page reached with a utm_/ref param.
+  // Turbo holds its restorationIdentifier in the history state, and this code runs at each
+  // turbo:load. A new {} removes it, and the scroll position and the snapshot then do not come back
+  // on a back navigation, for each page that a visitor reaches with a utm_ or ref parameter.
   it('preserves the existing history state', () => {
     const turboState = { turbo: { restorationIdentifier: 'abc123' } };
     window.history.replaceState(turboState, '', '/post?utm_source=news');
@@ -147,8 +147,8 @@ describe('trackEvent', () => {
 
 describe('trackEventThen', () => {
   it('runs the callback immediately when Plausible is absent', () => {
-    // The callback navigates the page. It must run whether or not analytics exist — otherwise a
-    // mailto: share link would silently do nothing in development.
+    // The function navigates the page. It must run with the analytics and without them. Without
+    // this rule, a mailto: share link would do nothing in development, and give no message.
     const done = vi.fn();
 
     analytics.trackEventThen('Share', {}, done);
@@ -180,7 +180,7 @@ describe('trackEventThen', () => {
   });
 
   it('runs the callback exactly once when both the callback and the timeout fire', () => {
-    // Double-navigating is the failure this guards against.
+    // Two navigations is the failure that this test checks for.
     vi.useFakeTimers();
     window.plausible = vi.fn((_event, options) => options.callback());
     const done = vi.fn();
@@ -193,7 +193,7 @@ describe('trackEventThen', () => {
 });
 
 describe('initSearchTracking', () => {
-  /** Stands in for the Pagefind Component UI's shared search instance. */
+  /** Replaces the shared search instance of the Pagefind Component UI. */
   const stubPagefindInstance = (instance) => {
     window.PagefindComponents = {
       getInstanceManager: () => ({ getInstance: () => instance }),
@@ -205,8 +205,8 @@ describe('initSearchTracking', () => {
   });
 
   it('stays retryable after a no-op, rather than latching off', () => {
-    // Every Search trigger calls this on connect, long before the modal's JS is loaded. If the
-    // first miss set the flag, search tracking would never start on any page.
+    // Each Search button calls this on connect, much earlier than the load of the JavaScript of
+    // the modal. If the first call set the flag, the search tracking would never start on a page.
     analytics.initSearchTracking();
 
     const on = vi.fn();
@@ -235,7 +235,7 @@ describe('initSearchTracking', () => {
     analytics.initSearchTracking();
     const onResults = instance.on.mock.calls[0][1];
 
-    // Typing "zwift", one keystroke at a time.
+    // The user types "zwift", one character at a time.
     for (const term of ['z', 'zw', 'zwi', 'zwif', 'zwift']) {
       instance.searchTerm = term;
       onResults({ unfilteredTotalCount: 3 });

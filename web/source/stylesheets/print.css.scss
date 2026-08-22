@@ -1,8 +1,8 @@
-// ⚠️ Pin the type scale and spacing. `bp-medium` is a `min-width` query, and in print it resolves
-// against the page box — so whether 768px is reached depends on the paper size and the reader's
-// margin setting. Safari clears it on US Letter and Firefox doesn't, which prints the same article
-// at 24px in one and 16px in the other (25 pages vs 12). These are the sub-breakpoint values, held
-// steady so paper never depends on that coin flip.
+// ⚠️ Set the type scale and the spacing here. `bp-medium` is a `min-width` query, and in print it
+// applies to the page box. Thus the paper size and the margin setting of the reader decide if the
+// page reaches 768px. Safari reaches it on US Letter and Firefox does not, thus one browser prints
+// the same article at 24px and the other at 16px: 25 pages against 12. These are the values below
+// the breakpoint, and they stay the same. Thus paper never depends on that difference.
 :root {
   --column-gap:          1rem;
   --font-large:          48px;
@@ -20,11 +20,11 @@
   --row-gap:             2rem;
 }
 
-// Chrome, and everything that recirculates the reader somewhere else — none of which means
-// anything on paper. ⚠️ `.collection` covers every recirculation module at once (Related, Trending,
-// More Reports From This Race, Read Next, Upcoming Races); they're built by partials/_collection
-// with an interpolated id, so matching on the class is the only way to catch them all. They're also
-// live-update widgets, so printing before the swap would emit rows of blank skeleton boxes.
+// The interface, and each module that sends the reader to another page. None of them has a meaning
+// on paper. ⚠️ `.collection` covers each such module: Related, Trending, More Reports From This
+// Race, Read Next, and Upcoming Races. partials/_collection makes them with an id that it
+// calculates, thus the class is the only way to match all of them. They are also live-update
+// widgets, thus a print before the swap would give rows of empty skeleton boxes.
 #header,
 #nav,
 #social-sharing,
@@ -38,10 +38,10 @@ wa-skeleton {
   display: none;
 }
 
-// ⚠️ Block flow, not grid. Gecko fragments a grid container badly across pages — the entry's header
-// takes page one and the body is pushed whole to page two, leaving most of a sheet blank. Chrome and
-// WebKit paginate it fine, so this reproduces only in Firefox. The grid exists to place things on
-// the 12-column page grid, which paper doesn't have.
+// ⚠️ Use block flow, and not a grid. Gecko divides a grid container across pages incorrectly: the
+// header of the entry takes page one and the full body goes to page two, and most of one sheet is
+// empty. Chrome and WebKit divide it correctly, thus this occurs only in Firefox. The grid exists to
+// put the content on the 12-column page grid, and paper has no such grid.
 body,
 .content,
 .content__main,
@@ -55,7 +55,7 @@ body,
   display: block;
 }
 
-// Keep headings with the text they introduce, and never strand a single line across a page.
+// Keep each heading with the text below it, and never put one line alone on a page.
 h1,
 h2,
 h3,
@@ -78,23 +78,25 @@ tr {
   break-inside: avoid;
 }
 
-// ⚠️ Print engines drop background colors and box-shadows, which is all that distinguishes an aside
-// or a blockquote from body copy. Restate the marker as a border so it survives.
+// ⚠️ A print engine removes the background colors and the box shadows, and those are the only things
+// that make an aside or a blockquote different from the body text. Use a border, which the print
+// engine keeps.
 .entry__body {
   aside,
   blockquote {
     border-inline-start: 4px solid var(--color-text-tertiary);
   }
 
-  // Long lines wrap instead of being clipped — `overflow: auto` has nowhere to scroll on paper.
+  // A long line goes to the next line and the code does not cut it. `overflow: auto` cannot scroll
+  // on paper.
   pre {
     overflow: visible;
     white-space: pre-wrap;
   }
 }
 
-// ⚠️ The host clips overflow, so without these a table wider than the paper silently loses its
-// right-hand columns.
+// ⚠️ The parent element cuts the content that goes past its edge. Thus without these rules, a table
+// that is wider than the paper loses its columns on the right, with no message.
 .entry__table {
   border-color: var(--color-text-tertiary);
   margin-inline: 0;
@@ -129,8 +131,9 @@ tr {
   }
 }
 
-// ⚠️ The caption's inset compensates for the figure's outdent on screen; with the outdent removed
-// it would print the image edge-to-edge and the caption inset by --picture-outdent.
+// ⚠️ The inset of the caption is for the outdent of the figure on the screen. With no outdent, the
+// print would put the image at the full width and the caption at --picture-outdent from the
+// edge.
 .entry__figure {
   margin-inline: 0;
 
@@ -147,8 +150,8 @@ tr {
     color: var(--color-link);
   }
 
-  // Spell out the destination, which a printed page can't otherwise convey. ⚠️ Absolute URLs only —
-  // a fragment or relative href prints as noise the reader can't act on.
+  // Write the destination, which a page on paper cannot show in another way. ⚠️ Use an absolute URL
+  // only. A fragment or a relative href prints as text that the reader cannot use.
   &[href^="http"]::after {
     color: var(--color-text-secondary);
     content: "(" attr(href) ")";
@@ -162,8 +165,9 @@ tr {
   text-decoration: none;
 }
 
-// ⚠️ Well under a page: the figure has to hold its caption too, and `break-inside: avoid` is only
-// honored while the whole thing still fits on one sheet — above that the engine has to split it.
+// ⚠️ This is much less than one page: the figure must also hold its caption, and the engine obeys
+// `break-inside: avoid` only while the full figure fits on one sheet. Above that size, the engine
+// must divide it.
 img {
   height: auto;
   margin: 0 auto;

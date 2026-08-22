@@ -42,8 +42,8 @@ RSpec.describe MarkupHelper do
       expect(helper.render_summary_body("")).to be_nil
     end
 
-    # The same summary text renders on the article page (via the static build) and inside the
-    # trending/related widget fragment. The disclosure has to survive both paths.
+    # The same summary text renders on the article page, from the static build, and in the trending
+    # or related widget fragment. The disclosure must stay in both.
     describe "affiliate links" do
       it "marks an Amazon Associates link as sponsored" do
         result = helper.render_summary_body("Bought [these](https://www.amazon.com/dp/B01?tag=kona-20).")

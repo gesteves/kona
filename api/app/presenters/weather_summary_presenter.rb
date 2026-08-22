@@ -1,8 +1,8 @@
-# Builds the current-weather widget's prose summary — the business rules (is it good or bad
-# weather, is it indoor season) and the sentence builders that compose it — keeping them out
-# of the helper layer, which retains the thin formatting/selection methods (WeatherHelper).
-# A plain object: it holds the request's weather data as its own state and passes it
-# explicitly to the pure helper functions it composes.
+# Makes the text summary of the current-weather widget. It holds the rules (is the weather good or
+# bad, and is it the indoor season) and the methods that make each sentence. Those stay out of the
+# helper layer, which keeps the small format and selection methods (WeatherHelper).
+# This is a plain object: it holds the weather data of the request as its own state, and it gives
+# that data to each helper function that it calls.
 class WeatherSummaryPresenter
   include WeatherHelper   # forecast selection + condition/temperature/wind formatting
   include MarkupHelper    # units_tag
@@ -15,7 +15,8 @@ class WeatherSummaryPresenter
   include LocationHelper  # format_location / format_elevation / in_jackson_hole?
   include BayHelper       # bay_water_temperature_sentence
 
-  # For the non-block content_tag the formatting helpers build (units_tag, beaufort_description).
+  # For the content_tag with no block that the format helpers make: units_tag and
+  # beaufort_description.
   include ActionView::Helpers::TagHelper
 
   def initialize(weather: nil, location: nil, air_quality: nil, pollen: nil, events: nil, goodspeed: nil, workouts: nil, time_zone: nil)
@@ -29,15 +30,16 @@ class WeatherSummaryPresenter
     @time_zone = time_zone.presence || TimeZoneResolver.default
   end
 
-  # Both forecast selections linear-scan the daily forecast and re-parse two timestamps per day,
-  # and several sentences ask for them. Memoized here — where the request's state already lives —
-  # rather than in WeatherHelper, which is deliberately a set of pure functions over their
-  # arguments.
+  # Each of the two forecast selections reads the daily forecast from the start and parses two
+  # timestamps for each day, and more than one sentence needs them. This class keeps the values,
+  # because the state of the request is already here. WeatherHelper does not keep them, because it
+  # is a set of functions that use only their arguments, on purpose.
   #
-  # ⚠️ The memo goes on `todays_forecast` itself, not on a wrapper, because sunrise/sunset (and
-  # through them daytime?/evening?/rest_of_day_forecast) each call it internally — one summary
-  # asks about ten times over. Overriding the selection is what makes all of those cheap; a
-  # wrapper would only have covered the direct callers. Delegates for any other weather object.
+  # ⚠️ The value goes on `todays_forecast` itself, and not on another method, because sunrise and
+  # sunset, and through them daytime?, evening?, and rest_of_day_forecast, each call it. One summary
+  # calls it approximately ten times. A new selection method here makes all of those fast. Another
+  # method around it would cover only the direct callers. Each other weather object goes to the
+  # original method.
   def todays_forecast(weather = @weather)
     return super unless weather.equal?(@weather)
     return @todays_forecast if defined?(@todays_forecast)
@@ -51,7 +53,8 @@ class WeatherSummaryPresenter
     @rest_of_day = rest_of_day_forecast(@weather, @time_zone)
   end
 
-  # Same shape, for the events side: race_day? calls todays_race, and the summary asks five times.
+  # The same shape for the events: race_day? calls todays_race, and the summary calls it five
+  # times.
   def todays_race(events = @events, time_zone = @time_zone)
     return super unless events.equal?(@events) && time_zone == @time_zone
     return @todays_race if defined?(@todays_race)
@@ -59,7 +62,7 @@ class WeatherSummaryPresenter
     @todays_race = super
   end
 
-  # The full composed summary as HTML (each sentence wrapped in a span).
+  # The full summary as HTML. Each sentence is in a span.
   def weather_summary
     summary = []
     summary << race_day
@@ -77,12 +80,14 @@ class WeatherSummaryPresenter
     markdown_to_html(summary.reject(&:blank?).map { |t| "<span>#{t}</span>" }.join(" "))
   end
 
-  # The icon id for the current conditions (day/night-aware), for the widget's header.
+  # The icon id for the current conditions, for the header of the widget. It knows the day and the
+  # night.
   def icon
     weather_icon(current_weather(@weather)&.condition_code, :auto, weather: @weather, time_zone: @time_zone)
   end
 
-  # The active weather alerts, deduped and sorted for display.
+  # The weather alerts that apply now. The code removes the copies and puts them in order for the
+  # screen.
   def alerts
     weather_alerts(@weather)
   end
@@ -111,8 +116,8 @@ class WeatherSummaryPresenter
 
   def currently
     current = current_weather(@weather)
-    # The temperature carries the sentence; without it there's nothing to say, so drop the whole
-    # sentence rather than emitting "with a temperature of".
+    # The temperature is the content of the sentence. Without it there is nothing to say, thus the
+    # code removes the full sentence and does not write "with a temperature of".
     temperature = format_temperature(current&.temperature)
     return if temperature.blank?
 
@@ -128,10 +133,10 @@ class WeatherSummaryPresenter
   def wind
     current = current_weather(@weather)
     direction = wind_direction(current&.wind_direction)
-    # ⚠️ Guard before formatting, not after. WeatherKit omits individual fields, and
-    # format_wind_speed's `.round` turns a missing windSpeed into a NoMethodError that 500s the
-    # widget instead of collapsing it. A nil speed coerces to 0 knots, which is Beaufort 0, so
-    # it returns here.
+    # ⚠️ Do the check before the format, and not after. WeatherKit omits some fields, and the
+    # `.round` in format_wind_speed makes a windSpeed that is absent into a NoMethodError. The
+    # widget then gives a 500 and does not go away. A nil speed becomes 0 knots, which is
+    # Beaufort 0, thus this method returns here.
     wind_speed_knots = kph_to_knots(current&.wind_speed.to_f)
     return if direction.blank? || beaufort_number(wind_speed_knots).zero?
 
@@ -162,8 +167,8 @@ class WeatherSummaryPresenter
   def forecast
     text = []
     text << "#{today_or_tonight(@weather, @time_zone)}'s forecast #{format_forecasted_condition(rest_of_day.condition_code).downcase}"
-    # Composed from whichever readings are present: a day forecast missing one of the two would
-    # otherwise read "with a high of  and a low of 12°C".
+    # This uses the readings that are available. Without the check, a day forecast with one of the
+    # two values absent would read "with a high of  and a low of 12°C".
     temperatures = []
     temperatures << "a high of #{format_temperature(today.temperature_max)}" if !evening?(@weather, @time_zone) && today.temperature_max.present?
     temperatures << "a low of #{format_temperature(today.temperature_min)}" if today.temperature_min.present?
@@ -184,9 +189,9 @@ class WeatherSummaryPresenter
     text.join(", ")
   end
 
-  # ⚠️ Sun times are genuinely absent above the polar circles, and weather_data_is_current? — the
-  # gate that lets the rest of the summary assume its data — doesn't check them. Drop the line
-  # rather than collapsing the whole widget over it.
+  # ⚠️ The sun times are absent above the polar circles, and weather_data_is_current?, the check
+  # that lets the rest of the summary use its data, does not test them. Remove the line, and do not
+  # remove the full widget.
   def sunrise_or_sunset
     now = Time.now
     todays_sunrise = sunrise(@weather, @time_zone)
@@ -232,8 +237,9 @@ class WeatherSummaryPresenter
   def bad_weather?
     current = current_weather(@weather)
 
-    # Coerced rather than dereferenced: WeatherKit omits individual fields (snowfall on a dry
-    # day, gusts on some forecast days), and a missing one must not take the widget down.
+    # The code changes the value and does not read a method on it. WeatherKit omits some fields,
+    # for example the snowfall on a dry day and the gusts on some forecast days, and a field that is
+    # absent must not stop the widget.
     aqi = @air_quality&.aqi.to_i
     current_temperature = (current.temperature_apparent || current.temperature).to_f
     high_temperature = today.temperature_max.to_f
@@ -261,8 +267,8 @@ class WeatherSummaryPresenter
     current.temperature.to_f >= 30 || current.temperature_apparent.to_f >= 30
   end
 
-  # With no apparent temperature there's nothing to show alongside the real one, so hide it
-  # rather than rounding a nil.
+  # With no apparent temperature there is nothing to show beside the true temperature. Thus the
+  # code hides it and does not round a nil.
   def hide_apparent_temperature?
     current = current_weather(@weather)
     return true if current.temperature.blank? || current.temperature_apparent.blank?

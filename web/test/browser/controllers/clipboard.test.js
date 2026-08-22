@@ -17,7 +17,7 @@ const MARKUP = `
 
 let toast;
 
-/** The last message handed to the <wa-toast> stack, with its variant. */
+/** The last message that the code gave to the <wa-toast> stack, with its variant. */
 const lastToast = () => {
   const call = toast.create.mock.calls.at(-1);
   return call && { message: call[0], variant: call[1].variant };
@@ -36,7 +36,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-/** Mounts the controller with a clipboard whose writeText resolves or rejects. */
+/** Puts the controller in the page, with a clipboard whose writeText succeeds or fails. */
 const mountClipboard = async (writeText, markup = MARKUP) => {
   if (writeText) stubProperty(navigator, 'clipboard', { writeText });
   const mounted = await mount('clipboard', ClipboardController, markup);
@@ -52,7 +52,8 @@ describe('clipboard controller', () => {
     element.click();
     await flushDom();
 
-    // The href is root-relative in the markup; what lands on the clipboard has to be shareable.
+    // The href in the markup starts at the root. The value on the clipboard must be a URL that a
+    // person can share.
     expect(writeText).toHaveBeenCalledWith(
       'http://localhost:3000/2026/01/01/hello'
     );
@@ -93,8 +94,9 @@ describe('clipboard controller', () => {
   });
 
   it('cancels the pending revert when the element goes away', async () => {
-    // Turbo navigating away mid-countdown would otherwise leave a timer poking at a detached
-    // node, and — worse — one that fires against the next page's icons if they are reused.
+        // Without this code, a Turbo navigation during the countdown leaves a timer that changes a node
+    // that is not in the document. It is worse if the next page uses the same icons: the timer then
+    // changes those icons.
     vi.useFakeTimers();
     const { element } = await mountClipboard(
       vi.fn().mockResolvedValue(undefined)
@@ -111,7 +113,7 @@ describe('clipboard controller', () => {
   });
 
   it('reports failure when the clipboard write is rejected', async () => {
-    // Safari rejects writeText outside a user gesture, and any browser rejects it without
+    // Safari refuses writeText outside a user action, and each browser refuses it with no
     // permission.
     const { element } = await mountClipboard(
       vi.fn().mockRejectedValue(new Error('denied'))

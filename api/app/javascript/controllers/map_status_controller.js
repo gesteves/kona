@@ -4,11 +4,11 @@ import { visit } from "@hotwired/turbo";
 const INTERVAL = 5000;
 
 /**
- * Refreshes the Maps list while Mapbox is still publishing an upload.
+ * Gets the Maps list again while Mapbox still publishes an upload.
  *
- * Mapbox's tiling service is asynchronous and there's nothing to push from the origin, so the page
- * asks. It polls a status-only endpoint rather than reloading, and only re-renders once a status
- * actually changes — a publish takes a minute or two, so most ticks find nothing.
+ * The tiling service of Mapbox is asynchronous and the origin can send nothing to the page. Thus the
+ * page asks. It reads a status-only endpoint and does not load the page again, and it renders again
+ * only when a status changes. A publish takes one or two minutes, thus most reads find no change.
  */
 export default class extends Controller {
   static values = { url: String };
@@ -21,7 +21,7 @@ export default class extends Controller {
     this.stop();
   }
 
-  /** Schedules the next check, or stops if nothing is in flight. */
+  /** Starts the timer for the next check, or stops if no upload is in progress. */
   poll() {
     this.stop();
     if (!this.pendingIds().length) return;
@@ -36,18 +36,19 @@ export default class extends Controller {
 
       const statuses = await response.json();
       if (this.changed(statuses)) {
-        // Replace rather than push, so polling doesn't stack history entries.
+        // Replace the history entry and do not add one, thus these reads do not fill the
+        // history.
         visit(window.location.href, { action: "replace" });
         return;
       }
     } catch {
-      // A dropped request is not worth surfacing; the next tick tries again.
+      // A request that fails needs no message, because the next check tries again.
     }
 
     this.poll();
   }
 
-  /** @returns {string[]} Ids of rows the server last rendered as still publishing. */
+  /** @returns {string[]} The ids of the rows that the server last rendered in the publish state. */
   pendingIds() {
     return this.rows()
       .filter((row) => row.dataset.mapStatusState === "processing")
@@ -55,8 +56,8 @@ export default class extends Controller {
   }
 
   /**
-   * Whether any row the server rendered as publishing has since moved on — including by being
-   * deleted in another tab, which drops it from the response entirely.
+   * Tells if a row that the server rendered in the publish state changed. This includes a row that
+   * a person deleted in another tab, which is then absent from the response.
    * @returns {boolean}
    */
   changed(statuses) {

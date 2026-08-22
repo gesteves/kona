@@ -26,8 +26,9 @@ RSpec.describe "Api::Related", type: :request do
     get "/api/related", headers: auth_headers
   end
 
-  # ⚠️ Not edge-cached on purpose: it's fetched once per build, right after the publish that
-  # triggered it, so a cached copy would be wrong in exactly the case that matters.
+  # ⚠️ The edge does not cache this, on purpose: the build gets it one time, immediately after the
+  # publish that started the build. Thus a copy in the cache would be wrong in the one condition
+  # that is important.
   it "sets no edge cache policy" do
     allow_any_instance_of(RelatedArticles).to receive(:all).and_return({})
 

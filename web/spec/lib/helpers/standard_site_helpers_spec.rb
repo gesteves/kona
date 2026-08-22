@@ -2,8 +2,9 @@ require 'spec_helper'
 
 RSpec.describe StandardSiteHelpers do
   describe "#document_rkey" do
-    # The exact TID for the fixture sys.id is asserted here (and in api's matching spec)
-    # so the two apps can never drift: the <link> AT URI must equal the published record.
+    # This test has the exact TID for the sys.id of the example, and the matching spec of the api has
+    # it too. Thus the two apps always agree: the AT URI in the <link> must be the same as the record
+    # that the app publishes.
     it "derives a valid 13-character TID from the Contentful sys.id" do
       rkey = document_rkey("6L1asJJq4umcGEvD0hfqxE")
       expect(rkey).to eq("3446ygrm3x4bk")

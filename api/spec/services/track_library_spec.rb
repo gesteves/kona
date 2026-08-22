@@ -3,8 +3,8 @@ require "rails_helper"
 RSpec.describe TrackLibrary do
   subject(:library) { described_class.new }
 
-  # Backed by a real Hash rather than per-call stubs, so ordering, overwrite, and the pruning
-  # arithmetic are exercised for real. Same approach as spam_quarantine_spec.
+  # This uses a true Hash and not a stub for each call. Thus the order, the replacement of a value,
+  # and the arithmetic that removes old entries all run. spam_quarantine_spec does the same.
   let(:store) { {} }
   let(:strings) { {} }
 
@@ -54,8 +54,8 @@ RSpec.describe TrackLibrary do
       expect(record["settings"]).to include("start_icon" => "pitch", "padding_top" => 50)
     end
 
-    # ⚠️ The coordinates go in their own key, not the record: `app` and `worker` are separate fly
-    # machines, and the index page loads every record in full.
+    # ⚠️ The coordinates go in their own key, and not in the record. `app` and `worker` are different
+    # fly machines, and the index page loads each record in full.
     it "stages the coordinates separately, with an expiry" do
       id = library.stage(track)
 
@@ -114,7 +114,8 @@ RSpec.describe TrackLibrary do
       expect(settings).to include("padding_top" => "10", "track_color" => "#ffffff", "start_icon" => "pitch")
     end
 
-    # The keys come from a form, so anything that isn't a render setting must not reach the record.
+    # The keys come from a form, thus each value that is not a render setting must not go into the
+    # record.
     it "ignores keys that aren't settings" do
       id = library.stage(track)
 

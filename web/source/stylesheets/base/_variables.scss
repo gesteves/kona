@@ -1,9 +1,9 @@
-// Breakpoints
+// The breakpoints
 $bp-small: 400px;
 $bp-medium: 768px;
 $bp-large: 1024px;
 $bp-x-large: 1280px;
 
-// The nav's own breakpoint — a semantic alias that's deliberately the same value as
-// $bp-medium today; defined in terms of it so they can't silently drift apart.
+// The breakpoint of the nav. It is a name with a meaning, and today it has the same value as
+// $bp-medium, on purpose. It comes from that variable, thus the two always agree.
 $bp-nav: $bp-medium;

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
-  <%# max/min are nil for an empty feed, which would raise on .rfc3339 / .strftime below. %>
+  <%# max and min are nil for an empty feed, and .rfc3339 and .strftime below would then raise. %>
   <% updated = articles.map { |e| DateTime.parse(e.updated_at) }.max || DateTime.now %>
   <id><%= atom_tag(full_url(html_path), articles.map { |e| published_datetime(e) }.min || updated) %></id>
   <title><%=h title %></title>
@@ -20,11 +20,11 @@
       <author>
         <name><%=h entry.author.name %></name>
       </author>
-      <%# ⚠️ Goes through content_summary, not entry.summary: Shorts carry no summary field, and
-          Atom requires the element to have content. Its trailing `sanitize` is also what keeps
-          the entities single-escaped — it decodes to Unicode, so the smartypants below has no
-          straight quotes left to turn into `&rsquo;` for `h` to escape a second time. Same
-          reason the title above sanitizes first. %>
+      <%# ⚠️ This uses content_summary, and not entry.summary: a Short has no summary field, and Atom
+          needs content in this element. The `sanitize` at the end is also what escapes each entity
+          one time only: it decodes to Unicode, thus the smartypants below finds no straight
+          quotation mark to change into `&rsquo;`, and `h` then does not escape that a second time.
+          The title above uses sanitize first for the same reason. %>
       <summary><%=h smartypants(content_summary(entry)) %></summary>
       <content type="html">
         <%=h render_feed_body(entry.intro) %>

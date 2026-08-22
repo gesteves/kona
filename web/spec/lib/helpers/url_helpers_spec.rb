@@ -1,14 +1,15 @@
 require 'spec_helper'
 
 RSpec.describe UrlHelpers do
-  # Middleman's url_for resolves a resource to its path; identity is enough here.
+  # The url_for of Middleman changes a resource into its path. A method that returns its argument
+  # is sufficient here.
   def url_for(resource) = resource
 
   def stub_env(deploy_context: nil, url: nil)
     allow(ENV).to receive(:[]).and_call_original
-    # DEPLOY_CONTEXT must be stubbed even when a test doesn't care about it: a real build
-    # env sets it — e.g. DEPLOY_CONTEXT=production, which rake loads from .env before the
-    # suite runs. Left unstubbed it leaks through and_call_original and forces production?
+    # Each test must stub DEPLOY_CONTEXT, and this includes a test that does not use it. A true build
+    # environment sets it, for example DEPLOY_CONTEXT=production, which rake loads from .env before
+    # the suite runs. Without a stub, that value goes through and_call_original and makes production?
     # true here.
     allow(ENV).to receive(:[]).with('DEPLOY_CONTEXT').and_return(deploy_context)
     allow(ENV).to receive(:[]).with('URL').and_return(url)

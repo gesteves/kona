@@ -36,8 +36,8 @@ RSpec.describe "Activity stats", type: :request do
     expect(cache_control).to include("max-age=0")
     expect(cache_control).to include("stale-while-revalidate=300")
 
-    # The edge policy, in the standard RFC 9213 dialect Cloudflare reads. It must never use
-    # s-maxage — that would disable stale-while-revalidate and stale-if-error outright.
+    # The edge policy, in the RFC 9213 form that Cloudflare reads. It must never use s-maxage,
+    # because that directive stops stale-while-revalidate and stale-if-error.
     cdn = response.headers["CDN-Cache-Control"]
     expect(cdn).to include("public")
     expect(cdn).to include("max-age=300")
@@ -75,7 +75,8 @@ RSpec.describe "Activity stats", type: :request do
 
       edge = response.headers["CDN-Cache-Control"]
       expect(edge).to eq("public, max-age=60")
-      # No stale-serving directives: an empty response must never be served past its minute.
+      # There is no directive for an old copy: the edge must never serve an empty response after
+      # its one minute.
       expect(edge).not_to include("stale-while-revalidate")
       expect(edge).not_to include("stale-if-error")
     end

@@ -1,5 +1,5 @@
-<%# No aria-labelledby: a bare <div> has no role, so the label is discarded. The <h1> inside
-    already names the page. %>
+<%# There is no aria-labelledby: a plain <div> has no role, thus the browser ignores the label.
+    The <h1> in it already names the page. %>
 <div class="home">
   <section class="home__intro">
     <h1 class="home__headline" id="hed">
@@ -18,7 +18,8 @@
   <%= render_widget 'trending', '/widgets/articles/trending' %>
   <%= render_widget 'weather', '/widgets/weather/current' %>
   <% if data.events.present? %>
-    <%# Not a placeholders/ partial, so it's rendered directly rather than via render_widget. %>
+    <%# This is not a partial in placeholders/, thus the code renders it directly and not with %>
+    <%# render_widget. %>
     <%= partial 'partials/upcoming_races', locals: { url: '/widgets/events/upcoming' } %>
   <% end %>
 </div>

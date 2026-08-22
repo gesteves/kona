@@ -1,6 +1,6 @@
 <div class="blog">
-  <%# The blog index shows no visible headline (unlike tag pages), but every page needs %>
-  <%# its subject as the sole <h1>, so it's screen-reader-only here. %>
+  <%# The blog index shows no visible heading, and a tag page is different. But each page needs %>
+  <%# its subject as its one <h1>, thus this heading is for a screen reader only. %>
   <h1 class="sr-only" id="hed"><%= smartypants(content.title) %></h1>
   <%= partial 'partials/blog_list', locals: { content: content } %>
 </div>

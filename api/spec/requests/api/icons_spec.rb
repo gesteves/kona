@@ -33,7 +33,7 @@ RSpec.describe "Api::Icons", type: :request do
       .with("classic", "solid", "heart").and_return("<svg>heart</svg>")
     allow_any_instance_of(FontAwesome).to receive(:svg)
       .with("classic", "solid", "check").and_return("<svg>check</svg>")
-    # A miss (nil) — must be omitted from the response entirely.
+    # A miss, which is a nil. The response must not contain it.
     allow_any_instance_of(FontAwesome).to receive(:svg)
       .with("classic", "light", "no-such-icon").and_return(nil)
 
@@ -75,8 +75,8 @@ RSpec.describe "Api::Icons", type: :request do
     expect(response).to have_http_status(:unprocessable_content)
   end
 
-  # ⚠️ Every miss here is a billed upstream call and a Redis key that lives for a year. The web
-  # build posts in batches of 25, but that's the caller's convention — this is the ceiling.
+  # ⚠️ Each miss here is an upstream call that costs money and a Redis key that stays for a year. The
+  # web build posts groups of 25, but that is a rule of the caller. This is the maximum.
   it "refuses an oversized tree before making a single upstream call" do
     expect_any_instance_of(FontAwesome).not_to receive(:svg)
 
@@ -87,8 +87,8 @@ RSpec.describe "Api::Icons", type: :request do
     expect(JSON.parse(response.body)["error"]).to include("Too many icons")
   end
 
-  # A family, style, or id outside Font Awesome's identifier shape can't name a real icon, so it
-  # must never reach the upstream — or mint a cache key built by interpolating it.
+  # A family, a style, or an id outside the identifier shape of Font Awesome can name no true icon.
+  # Thus it must never reach the upstream service, and it must never become part of a cache key.
   it "drops segments that can't name a real icon, without asking upstream about them" do
     allow_any_instance_of(FontAwesome).to receive(:svg)
       .with("classic", "solid", "heart").and_return("<svg>heart</svg>")

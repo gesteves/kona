@@ -12,7 +12,7 @@ RSpec.describe Plausible do
     allow($redis).to receive(:setex)
   end
 
-  # { path => pageviews } → the event:page rows Plausible returns.
+  # { path => pageviews } becomes the event:page rows that Plausible returns.
   def rows(by_path)
     by_path.map { |path, total| { dimensions: [ path ], metrics: [ total ] } }
   end
@@ -31,8 +31,9 @@ RSpec.describe Plausible do
       expect(service.pageviews_by_path["/2026/05/09/never-viewed/"]).to eq(0)
     end
 
-    # A per-article query would scale the call volume with the corpus and blow Plausible's
-    # 600/hour limit at the widget's 5-minute TTL — see Widgets::PlausibleController.
+    # A query for each article would make the number of calls grow with the number of articles, and
+    # it would go past the limit of Plausible of 600 calls each hour, at the 5-minute TTL of the
+    # widget. Refer to Widgets::PlausibleController.
     it "asks for every article page in a single query" do
       expect(service).to receive(:post_json).once do |_url, **options|
         body = JSON.parse(options[:body])
@@ -65,8 +66,8 @@ RSpec.describe Plausible do
       expect(service.pageviews_by_path).to eq({})
     end
 
-    # nil vs. {} is what lets callers tell "analytics are down" (collapse the widget) apart from
-    # "nothing has been viewed" (render a zero count).
+    # The difference between nil and {} is what lets a caller know "the analytics are down", where
+    # the widget goes away, from "nobody read the page", where the widget shows a count of zero.
     it "returns nil when the query is unavailable" do
       allow(service).to receive(:post_json).and_return(nil)
 

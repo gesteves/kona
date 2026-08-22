@@ -2,16 +2,16 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-// A guard on the bundle entry point rather than on any one controller's behaviour.
+// A check on the entry point of the bundle, and not on the behavior of one controller.
 //
-// index.js is the only place a controller becomes reachable from markup, and forgetting to add a
-// new one there fails in the most quiet way this codebase has: the `data-controller` attribute is
-// simply inert. Nothing errors, nothing logs, the page renders — the feature just doesn't happen.
-// Importing index.js to check this isn't an option (it pulls in the whole Web Awesome Pro theme
-// and registers a dozen custom elements), so this reads the source instead.
+// index.js is the only place that makes a controller available to the markup. A new controller that
+// nobody adds there fails in the quietest way in this code: the `data-controller` attribute does
+// nothing. There is no error, there is no log line, and the page renders. The feature simply does
+// not occur. An import of index.js for this check is not possible, because it loads the full Web
+// Awesome Pro theme and registers twelve custom elements. Thus this file reads the source text.
 
-// Resolved from the Vitest root (web/) rather than from import.meta.url: under the jsdom
-// environment that is an http:// URL, which node:fs rejects outright.
+// The path comes from the Vitest root, which is web/, and not from import.meta.url. In the jsdom
+// environment, import.meta.url is an http:// URL, and node:fs refuses that.
 const STIMULUS_DIR = resolve(process.cwd(), 'source/javascripts/stimulus');
 const TEST_DIR = resolve(process.cwd(), 'test/browser');
 
@@ -21,20 +21,20 @@ const controllerFiles = readdirSync(join(STIMULUS_DIR, 'controllers'))
   .filter((file) => file.endsWith('_controller.js'))
   .sort();
 
-/** back_to_top_controller.js → back-to-top */
+/** back_to_top_controller.js gives back-to-top. */
 const identifierFor = (file) =>
   file.replace(/_controller\.js$/, '').replace(/_/g, '-');
 
 /**
- * Every `<application>.register('id', ClassName)` in index.js, as [identifier, className].
- * The receiver is matched loosely on purpose: this reads index.js as text, so pinning it to one
- * variable name makes a rename look like every controller silently unregistering.
+ * Each `<application>.register('id', ClassName)` in index.js, as [identifier, className].
+ * The match on the receiver is wide, on purpose: this code reads index.js as text, thus a match on
+ * one variable name would make a change to that name look like a loss of each controller.
  */
 const registrations = [
   ...indexSource.matchAll(/\b\w+\.register\(\s*'([^']+)'\s*,\s*(\w+)\s*\)/g),
 ].map((match) => [match[1], match[2]]);
 
-/** Every `import ClassName from './controllers/file'` in index.js, as [className, file]. */
+/** Each `import ClassName from './controllers/file'` in index.js, as [className, file]. */
 const imports = new Map(
   [
     ...indexSource.matchAll(
@@ -45,8 +45,8 @@ const imports = new Map(
 
 describe('controller registration', () => {
   it('finds the controllers to check', () => {
-    // Guards the guard: a rename that broke the glob would otherwise make every test below pass
-    // vacuously.
+        // This checks the check: without it, a change to a name that broke the glob would make each
+    // test below pass with no content.
     expect(controllerFiles.length).toBeGreaterThan(0);
   });
 
@@ -73,14 +73,14 @@ describe('controller registration', () => {
   });
 
   it('uses each identifier only once', () => {
-    // A duplicate would silently win over the earlier registration.
+    // A second registration with the same id replaces the first one, and gives no message.
     const identifiers = registrations.map(([id]) => id);
 
     expect(identifiers).toEqual([...new Set(identifiers)]);
   });
 
   it('has a test file for every controller', () => {
-    // The suite that keeps this suite honest.
+    // The suite that checks this suite.
     const tested = new Set(
       readdirSync(join(TEST_DIR, 'controllers'))
         .filter((file) => file.endsWith('.test.js'))

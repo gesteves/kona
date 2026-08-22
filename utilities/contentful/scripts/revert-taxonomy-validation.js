@@ -1,9 +1,10 @@
-// Inverse of add-taxonomy-validation.js: removes all taxonomy validations from the
-// `article` content type (hides the Taxonomy tab). Does not touch entries' assigned
-// concepts — use taxonomy:unassign for that.
+// The opposite of add-taxonomy-validation.js: it removes each taxonomy validation from the `article`
+// content type, and the Taxonomy tab then goes away. It does not change the concepts of an entry.
+// Use taxonomy:unassign for that.
 //
-// Env: CONTENTFUL_SPACE, CONTENTFUL_MANAGEMENT_TOKEN, CONTENTFUL_ENVIRONMENT (default master).
-// Run: `npm run taxonomy:validate-article:revert`.
+// The env vars: CONTENTFUL_SPACE, CONTENTFUL_MANAGEMENT_TOKEN, and CONTENTFUL_ENVIRONMENT, whose
+// default is master.
+// To run it: `npm run taxonomy:validate-article:revert`.
 
 const { runMigration } = require('contentful-migration');
 

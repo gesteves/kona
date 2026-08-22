@@ -7,8 +7,8 @@ RSpec.describe "Admin connected apps", type: :request do
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
-    # Bluesky renders a card of its own on this page; clear it so the Whoop cases don't depend on
-    # whatever credentials happen to be around.
+    # Bluesky has its own card on this page. Remove it, thus the Whoop examples do not depend on the
+    # credentials that are available.
     $redis.del(BlueskyCredentials::REDIS_KEY)
   end
 
@@ -44,7 +44,8 @@ RSpec.describe "Admin connected apps", type: :request do
 
         expect(response.body).to include("Not connected")
         expect(response.body).to include("/whoop/auth")
-        # ⚠️ /whoop/auth is same-origin but 302s to Whoop, which Turbo Drive can't follow.
+        # ⚠️ /whoop/auth is same-origin, but it gives a 302 to Whoop, and Turbo Drive cannot
+        # follow that.
         expect(response.body).to include('data-turbo="false"')
       end
     end
@@ -64,8 +65,8 @@ RSpec.describe "Admin connected apps", type: :request do
         expect(response.body).not_to include("/whoop/auth")
       end
 
-      # ⚠️ Web Awesome components over native elements. A bare <button> means a `button_to` crept
-      # back in — wa-button renders its own inside a shadow root.
+      # ⚠️ Use a Web Awesome component in place of a native element. A plain <button> means that a
+      # `button_to` came back into the code: wa-button renders its own button in a shadow root.
       it "renders Disconnect as a Web Awesome button in a real form" do
         get "/connected-apps"
 
@@ -76,9 +77,9 @@ RSpec.describe "Admin connected apps", type: :request do
       end
     end
 
-    # ⚠️ Whoop leaves its tokens in Redis after rejecting them, so this state is identical to the
-    # one above as far as connected? can tell. Without the recorded failure it shows a green badge
-    # while the widget and the Intervals.icu sync are dead.
+    # ⚠️ Whoop keeps its tokens in Redis after it refuses them, thus connected? cannot see the
+    # difference between this state and the state above. Without the record of the failure, the page
+    # shows a green badge while the widget and the Intervals.icu sync do not work.
     context "when Whoop is connected but its refresh token has been rejected" do
       before do
         allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(true)

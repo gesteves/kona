@@ -7,9 +7,9 @@
   </header>
   <div class="entry__body">
     <%= render_body(article.intro) %>
-    <%# ⚠️ The title is in the accessible name, visually hidden. The icon is aria-hidden, so
-        without it the blog index emits ~40 links all named just "Continue reading" — which is
-        what a screen reader's links list shows. %>
+    <%# ⚠️ The title is in the accessible name, and it is visually hidden. The icon is aria-hidden.
+        Without the title, the blog index has approximately 40 links, and each one has the name
+        "Continue reading". That is the list that a screen reader shows. %>
     <%= link_to "Continue reading<span class=\"sr-only\">: #{h sanitize(article.title)}</span> #{icon_svg("classic", "light", "arrow-right")}", article.path, class: "entry__read-more" %>
   </div>
 </article>

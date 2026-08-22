@@ -5,9 +5,9 @@
   display: grid;
 }
 
-// Live-update wrapper around one or more sibling collections (the races widget's "Today's
-// Race" + "Upcoming Races" sections). display:contents keeps the wrapper boxless so the
-// collections still subgrid directly onto the page grid.
+// The live-update element around one collection or more, for example the "Today's Race" section
+// and the "Upcoming Races" section of the races widget. display:contents gives this element no box,
+// thus each collection still uses the page grid as its subgrid.
 .collection-group {
   display: contents;
 }
@@ -66,22 +66,24 @@
   }
 }
 
-// Half-width collection holding a single entry. Two of these sit side by side at bp-medium
-// (the "Read Next" older/newer pair — older left, newer right, following source order) and
-// stack on small screens. Unlike the item-span variants above, this sets the *collection's*
-// own span so each side is an independent half-width subgrid.
+// A collection at half the width, with one entry. At bp-medium, two of them are beside each other:
+// the older and the newer pair of "Read Next", with the older at the left and the newer at the
+// right, in the source order. On a small screen one goes below the other. The item-span rules above
+// are different: this rule sets the span of the *collection*, thus each side is its own subgrid at
+// half the width.
 .collection--adjacent {
-  // Two halves sit side by side in one page-grid row, so the shorter one is stretched to the
-  // taller one's height. Anchor its rows to the top (default is stretch, which spreads the free
-  // space between the heading and the list) so both cards' timestamps and headlines line up.
+  // The two halves are beside each other in one row of the page grid, thus the shorter one becomes
+  // as tall as the taller one. Put its rows at the top. The default is stretch, which puts the free
+  // space between the heading and the list. Thus the timestamps and the headlines of the two cards
+  // align.
   align-content: start;
 
   @include bp-medium {
     grid-column: span 6;
   }
 
-  // At an end of the archive only one neighbor exists; center the lone card so it doesn't
-  // sit against one edge with an empty half beside it.
+  // At each end of the archive there is one neighbor only. Put that card at the center, thus it is
+  // not at one edge with an empty half beside it.
   &:only-child {
     @include bp-medium {
       grid-column: 4 / span 6;

@@ -19,8 +19,9 @@
   width: 100vw;
   z-index: var(--z-nav-overlay);
 
-  // ⚠️ Prefix hand-written: Safari only unprefixed `backdrop-filter` in 18, and the second arm of
-  // the condition is what lets 16–17 in. Nothing prefixes it for us — see config.rb.
+  // ⚠️ A person writes the prefix here. Safari accepted `backdrop-filter` with no prefix only from
+  // version 18, and the second part of the condition is what accepts versions 16 and 17. No tool
+  // adds the prefix. Refer to config.rb.
   @supports (backdrop-filter: none) or (-webkit-backdrop-filter: none) {
     // stylelint-disable-next-line property-no-vendor-prefix
     -webkit-backdrop-filter: blur(20px);

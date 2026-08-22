@@ -1,10 +1,11 @@
 <%#
-  Article summary card for the trending section. Local: `article`. Ported from the static site's
-  partials/article/_summary.html.erb — prose body via the minimal renderer; no cover image.
+  The summary card of an article, for the trending section. Its local is `article`. This code comes
+  from partials/article/_summary.html.erb of the static site. The small renderer makes the body
+  text, and there is no cover image.
 %>
 <% published_at = DateTime.parse(article.published_at) %>
-<%# Scoped by section: the same article can appear here and in a build-rendered section on the
-    same page (related articles, read-next). %>
+<%# The section is part of each id: the same article can be here and in a section from the build on
+    the same page, that is, the related articles or the read-next section. %>
 <% entry_id = "#{section_id}-#{article.sys.id.parameterize}" %>
 <article class="entry entry--summary" id="entry-<%= entry_id %>" aria-labelledby="hed-<%= entry_id %>">
   <header class="entry__header">

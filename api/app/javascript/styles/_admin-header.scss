@@ -1,42 +1,45 @@
-// The sticky top bar. Holds the mobile nav toggle and the site wordmark.
+// The sticky bar at the top. It holds the nav button for a mobile screen and the site wordmark.
 
 .admin-header {
   align-items: center;
   background-color: var(--wa-color-surface-raised);
-  // ⚠️ Height comes from <wa-page>'s --header-height rather than from padding, so the bar and
-  // everything that has to clear it (the map editor's pinned preview) can't drift apart. Set it
-  // in _page.scss, not here — and note that --header-height already accounts for the block
-  // spacing, which is why the padding below is inline-only. <wa-page>'s own
-  // `::slotted([slot='header'])` sets `padding: var(--wa-space-m)` on all four sides, so the
-  // block half has to be zeroed or it double-counts and squeezes the content out of the bar.
+  // ⚠️ The height comes from the --header-height of <wa-page>, and not from the padding. Thus the
+  // bar and each element that must stay below it, for example the pinned preview of the map editor,
+  // always agree. Set that variable in _page.scss, and not here. Note that --header-height already
+  // includes the block spacing, and that is why the padding below applies to the inline sides only.
+  // The `::slotted([slot='header'])` of <wa-page> sets `padding: var(--wa-space-m)` on the four
+  // sides. Thus the block padding must be zero, or the space counts two times and the content goes
+  // out of the bar.
   block-size: var(--header-height);
   border-block-end: 1px solid var(--wa-color-surface-border);
   display: flex;
   gap: var(--wa-space-m);
-  // ⚠️ The arrangement is <wa-page>'s own `justify-content: space-between`, from
-  // `::slotted([slot='header'])` — don't restate it, invert it, or reach for an auto margin. Two
-  // children on mobile puts the toggle at the start and the wordmark at the end; on desktop the
-  // toggle is `display: none`, leaving one child, and space-between collapses to flush start.
-  // That holds on the FIRST painted frame only because _page.scss forces the toggle visible below
-  // the breakpoint — `view` initialises to "desktop", so without it the wordmark would paint left
-  // and slide across the bar a frame later.
+  // ⚠️ The layout comes from the `justify-content: space-between` of <wa-page>, in
+  // `::slotted([slot='header'])`. Do not write it again, do not change its direction, and do not use
+  // an automatic margin. Two children on a mobile screen put the button at the start and the
+  // wordmark at the end. On the desktop the button is `display: none`, thus there is one child, and
+  // space-between then puts it at the start. That is true on the FIRST frame only because
+  // _page.scss makes the button visible below the breakpoint. `view` starts as "desktop", thus
+  // without that rule the wordmark would draw at the left and move across the bar one frame
+  // later.
   padding-block: 0;
   padding-inline: var(--wa-space-m);
 
-  // Pins the tallest item, so the bar's height is a token rather than a <wa-button> default.
+  // Sets the height of the tallest item, thus a token gives the height of the bar and a
+  // <wa-button> default does not.
   [data-toggle-nav] {
     block-size: var(--header-content-height);
   }
 
-  // The wordmark links home. Sized by height — it's a wide lockup (~3.7:1), so a width would
-  // make its height unpredictable against the bar.
+  // The wordmark is a link to the home page. Its height sets its size, because it is wide
+  // (approximately 3.7 to 1) and a width would make its height unpredictable against the bar.
   &__home {
     color: var(--wa-color-text-normal);
     display: flex;
 
-    // ⚠️ The copied SVG hardcodes `fill="#020a0a"` on every path, which is invisible against the
-    // dark theme's surface. Overriding to `currentColor` is what makes the mark follow the theme,
-    // and is why the logo is inlined rather than served as an image.
+    // ⚠️ The SVG copy contains `fill="#020a0a"` on each path, and that color is invisible on the
+    // surface of the dark theme. A change to `currentColor` makes the mark follow the theme, and
+    // that is why the logo is in the page and not an image file.
     svg {
       fill: currentColor;
       height: 1.5rem;

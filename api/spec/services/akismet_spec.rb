@@ -67,8 +67,8 @@ RSpec.describe Akismet do
       )
     end
 
-    # ⚠️ The opposite of #spam?, deliberately. This is training; its failure must never stand
-    # between the owner and a message they've already judged legitimate.
+    # ⚠️ This is the opposite of #spam?, on purpose. It is for training, and a failure of it must
+    # never stop a message that the owner already accepted.
     it "reports failure rather than raising, so a caller can shrug it off" do
       stub_response(success: false, body: "")
       expect(service.submit_ham(**check_args)).to be(false)

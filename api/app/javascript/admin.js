@@ -1,37 +1,39 @@
-// esbuild entrypoint for the owner-facing admin UI. Bundles the Web Awesome stylesheet, our Sass,
-// Turbo, the Web Awesome components the layouts use, and the Stimulus application into
-// app/assets/builds/admin.js + admin.css, which Propshaft then fingerprints. Build config, and why
-// it's a file rather than CLI flags, in esbuild.config.mjs.
+// The esbuild entry point for the admin UI of the owner. It puts the Web Awesome stylesheet, our
+// Sass, Turbo, the Web Awesome components that the layouts use, and the Stimulus application into
+// app/assets/builds/admin.js and admin.css. Propshaft then adds a fingerprint to each name. The
+// build configuration is in esbuild.config.mjs, with the reason that it is a file and not a set of
+// CLI flags.
 
-// ⚠️ Order is load-bearing: Web Awesome puts every rule in `@layer wa-native, wa-base, …`, and
-// unlayered rules outrank layered ones whatever their specificity — so our styles win on cascade
-// origin alone, but only because esbuild concatenates them *after* webawesome.css.
+// ⚠️ The order is important: Web Awesome puts each rule in `@layer wa-native, wa-base, …`, and an
+// unlayered rule wins over a rule in a layer, at each specificity. Thus our styles win because of
+// the cascade origin, but only because esbuild puts them *after* webawesome.css.
 import "@web.awesome.me/webawesome-pro/dist/styles/webawesome.css";
 import "./styles/admin.scss";
 
-// Side-effect import: Turbo self-installs on load and nothing here references its exports.
+// This import is for its result only: Turbo installs itself at the load and no code here uses its
+// exports.
 import "@hotwired/turbo";
 import { Application } from "@hotwired/stimulus";
 
-// The full stylesheet above is deliberate — `layers.css` is what defines `.wa-mobile-only` and the
-// rule hiding `[data-toggle-nav]` on desktop, and `utilities/fouce.css` is what provides
-// `.wa-cloak`. Cherry-picking the theme (as web/ does) would silently drop both.
-// <wa-page> statically imports button, drawer, and icon, so those arrive with it.
+// The full stylesheet above is correct, on purpose. `layers.css` defines `.wa-mobile-only` and the
+// rule that hides `[data-toggle-nav]` on the desktop, and `utilities/fouce.css` gives `.wa-cloak`.
+// A selection of the theme only, as web/ does, would remove both with no message.
+// <wa-page> imports button, drawer, and icon, thus those three come with it.
 import "@web.awesome.me/webawesome-pro/dist/components/page/page.js";
 import "@web.awesome.me/webawesome-pro/dist/components/card/card.js";
 import "@web.awesome.me/webawesome-pro/dist/components/callout/callout.js";
-// The Location page's rule between the address search and the race shortcuts.
+// The line on the Location page between the address search and the race shortcuts.
 import "@web.awesome.me/webawesome-pro/dist/components/divider/divider.js";
 import "@web.awesome.me/webawesome-pro/dist/components/badge/badge.js";
-// The Contact page's spam cards. wa-details and wa-dialog render their own chevron and close
-// icons through <wa-icon library="system">, which resolves to inline data URIs bundled with the
-// component — so the "don't use <wa-icon>" rule doesn't reach them. Ours still go via icon_svg.
+// The spam cards of the Contact page. wa-details and wa-dialog render their own chevron icon and
+// close icon with <wa-icon library="system">, which gives inline data URIs from the component. Thus
+// the "do not use <wa-icon>" rule does not apply to them. Our icons still come from icon_svg.
 import "@web.awesome.me/webawesome-pro/dist/components/details/details.js";
 import "@web.awesome.me/webawesome-pro/dist/components/dialog/dialog.js";
 import "@web.awesome.me/webawesome-pro/dist/components/relative-time/relative-time.js";
-// Form controls, for the Course maps page's upload and render settings and the Location page's
-// coordinates. Every other form in the admin is action-only; these are form-associated, so they
-// submit and appear in FormData exactly like native controls.
+// The form controls, for the upload and the render settings of the Course maps page and for the
+// coordinates of the Location page. Each other form in the admin has an action only. These controls
+// are part of their form, thus they submit and appear in FormData as a native control does.
 import "@web.awesome.me/webawesome-pro/dist/components/file-input/file-input.js";
 import "@web.awesome.me/webawesome-pro/dist/components/input/input.js";
 import "@web.awesome.me/webawesome-pro/dist/components/number-input/number-input.js";
@@ -49,8 +51,8 @@ import MapStatusController from "./controllers/map_status_controller";
 import MapPreviewController from "./controllers/map_preview_controller";
 import LinkedSidesController from "./controllers/linked_sides_controller";
 
-// window.Stimulus stays exposed for console debugging, but registration goes through the local
-// binding — the bare global is invisible to static analysis.
+// window.Stimulus stays available for a debug session in the console, but the code registers each
+// controller through the local variable, because a static analysis cannot see the global.
 const application = Application.start();
 window.Stimulus = application;
 application.register("flash", FlashController);

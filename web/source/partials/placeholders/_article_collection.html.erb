@@ -1,8 +1,9 @@
-<%# Shared placeholder shell for the API-ranked article collections (trending / related): a
-    collection-section skeleton the live-update controller swaps for the API fragment, or
-    removes when the API has nothing to show (empty response). Locals: `section_id` and
-    `heading` (must match the API view's shared _collection partial so the swap is seamless),
-    and `url` (the API endpoint). %>
+<%# The shared placeholder of each article collection that the API puts in order: the trending
+    collection and the related collection. It is a skeleton of a collection section. The
+    live-update controller replaces it with the API fragment, and it removes the element when the
+    API has nothing to show, that is, an empty response. The locals: `section_id` and `heading`,
+    which must be the same as in the shared _collection partial of the API view, thus a reader does
+    not see the change, and `url`, which is the API endpoint. %>
 <section class="collection collection--halves" id="<%= section_id %>" aria-labelledby="hed-<%= section_id %>" data-nosnippet <%= live_update_attrs(url) %>>
   <h2 class="collection__heading" id="hed-<%= section_id %>"><%= heading %></h2>
   <ol class="collection__list">

@@ -1,7 +1,8 @@
-# Syncs the athlete's current location to Intervals.icu (profile + weather config) off the
-# request path. Enqueued by Api::LocationController after it stores the coordinates in Redis.
-# The sync is idempotent (skip-if-unchanged), so the inherited time-boxed retry (retry_for:
-# 24.hours) is safe.
+# Sends the current location of the athlete to Intervals.icu, to the profile and to the weather
+# configuration, outside the request path. Api::LocationController adds it to the queue after it
+# stores the coordinates in Redis. You can do the sync more than one time, because it does nothing
+# when the values do not change. Thus the retry window from the parent class (retry_for: 24.hours) is
+# safe.
 class LocationSyncJob < ApplicationJob
   # @param latitude [Float]
   # @param longitude [Float]

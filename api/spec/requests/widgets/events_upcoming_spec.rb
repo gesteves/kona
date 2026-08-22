@@ -92,7 +92,7 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
     expect(response.body).to include("Upcoming Races")
     expect(response.body).to include("Featured Race")
     expect(response.body).to include("Later Race")
-    # Outer element keeps refreshing after the static site swaps it in.
+    # The outer element continues to get new content after the static site puts it in the page.
     expect(response.body).to include('data-controller="live-update"')
     expect(response.body).to include('data-live-update-url-value="/widgets/events/upcoming"')
   end
@@ -143,9 +143,10 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
   end
 
   context "when the next race is featured but has no race-day weather" do
-    # The featured window (close?, owner timezone) and the weather-fetch window (the event's
-    # own timezone) disagree at the 10-day boundary, so the forecast never gets fetched. The
-    # event must not get the featured layout — no expanded card, no empty "Race Day Weather" block.
+    # The featured window, which close? makes in the timezone of the owner, and the weather-fetch
+    # window, which uses the timezone of the event, do not agree at the 10-day limit. Thus the code
+    # never gets the forecast. The event must not get the featured layout: no large card, and no
+    # empty "Race Day Weather" block.
     before { allow_any_instance_of(WeatherKit).to receive(:data).and_return(nil) }
 
     it "demotes it to a regular upcoming race without the featured layout or weather block" do
@@ -196,9 +197,10 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
     end
   end
 
-  # On race day today's race gets its own "Today's Race" section, with the rest under
-  # "Upcoming Races". The clock is frozen so "today" is deterministic; the controller's
-  # today? check runs in the default zone (America/Denver), so dates are built there.
+  # On a race day, the race of today gets its own "Today's Race" section, and the other races go
+  # below "Upcoming Races". The test stops the clock, thus "today" is always the same. The today?
+  # check of the controller runs in the default zone, which is America/Denver, thus the test makes
+  # each date in that zone.
   context "on race day" do
     include ActiveSupport::Testing::TimeHelpers
 
@@ -236,7 +238,8 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
       )
     end
 
-    # Weather whose forecast day covers today, so the featured race-day weather renders.
+    # Weather with a forecast day for today, thus the code renders the race-day weather of the
+    # featured event.
     let(:today_weather) do
       DeepOstruct.wrap(
         forecast_daily: {
@@ -277,17 +280,17 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
       expect(response.body).to include("Upcoming Races")
       expect(response.body).to include("Hometown Marathon")
 
-      # Today's race: its own featured, single-card section, with race-day weather.
+      # The race of today: its own featured section with one card, and the race-day weather.
       expect(response.body).to include('id="todays-race"')
       expect(response.body).to include("collection--single collection--has-featured")
       expect(response.body).to include("Race Day Weather")
 
-      # The remaining races render plain under a non-featured "Upcoming Races" section.
+      # The other races render in a plain "Upcoming Races" section with no featured event.
       expect(response.body).to include('id="upcoming-races"')
       expect(response.body).to include("collection--thirds")
       expect(response.body).to include("June 18, 2026") # an upcoming event keeps its date
 
-      # The wrapper is the live-update root.
+      # The outer element is the live-update root.
       expect(response.body).to include('data-controller="live-update"')
       expect(response.body).to include('data-live-update-url-value="/widgets/events/upcoming"')
     end
@@ -295,7 +298,7 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
     it "omits today's race's timestamp (the heading already says it's today)" do
       get "/widgets/events/upcoming", headers: auth_headers
 
-      # event_timestamp_tag would render "<span>…icon… Today</span>"; it's suppressed here.
+      # event_timestamp_tag would render "<span>…icon… Today</span>". This code omits it.
       expect(response.body).not_to include("Today</span>")
     end
 
@@ -334,9 +337,10 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
     end
   end
 
-  # ⚠️ The cases above fail a whole upstream. These keep the forecast day but drop one field from
-  # it — the shape the `||` guard used to admit, rendering the surviving half's label with no
-  # reading behind it (and, before format_temperature was made nil-safe, 500ing the widget).
+  # ⚠️ Each example above makes a full upstream service fail. These examples keep the forecast day
+  # but remove one field from it. The `||` check accepted that shape, and the page then showed the
+  # label of the other value with no number. Before format_temperature accepted a nil, that shape
+  # also gave the widget a 500.
   context "when the race-day forecast is missing one of its temperatures" do
     it "renders only the low when the day carries no high" do
       weather.forecast_daily.days.first.daytime_forecast.temperature_max = nil

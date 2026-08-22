@@ -1,11 +1,11 @@
 require "rails_helper"
 
-# Each /widgets/* fragment REPLACES a placeholder element in the static build, so the two
-# outermost elements must agree on tag and classes — they're what the page's CSS grid lays out.
-# The two halves live in separate apps and are edited by hand; until this spec, nothing compared
-# them, and the root CLAUDE.md said so in as many words.
+# Each /widgets/* fragment REPLACES a placeholder element in the static build. Thus the two
+# outermost elements must have the same tag and the same classes, because the CSS grid of the page
+# lays them out. The two halves are in two apps and a person edits each one. Before this spec,
+# nothing compared them, and the root CLAUDE.md said so.
 #
-# Pairs are [web placeholder, api view], both repo-relative.
+# Each pair is [the web placeholder, the api view], and both paths start at the root of the repo.
 WIDGET_MARKUP_PAIRS = {
   "activity stats" => [ "source/partials/placeholders/_stats.html.erb", "app/views/widgets/activity_stats/show.html.erb" ],
   "whoop" => [ "source/partials/placeholders/_whoop.html.erb", "app/views/widgets/whoop/show.html.erb" ],
@@ -18,9 +18,9 @@ WIDGET_MARKUP_PAIRS = {
 RSpec.describe "web placeholder ↔ api fragment markup contract" do
   web_root = Rails.root.join("../web")
 
-  # The live-update root: the first element whose opening tag calls live_update_attrs. Found by
-  # marker rather than by position because the pageviews placeholder is an inline span partway
-  # down an article partial, not the file's first tag.
+  # The live-update root: the first element whose opening tag calls live_update_attrs. The code finds
+  # it by that call and not by its position, because the pageviews placeholder is a span in the
+  # middle of an article partial, and not the first tag of the file.
   # @param path [Pathname] An ERB template.
   # @return [Hash] { tag:, classes:, nosnippet: }
   def live_update_root(path)
@@ -55,13 +55,13 @@ RSpec.describe "web placeholder ↔ api fragment markup contract" do
     end
   end
 
-  # A new widget added without a pair here would silently go back to being hand-synced.
+  # A new widget with no pair here would go back to a sync by hand, with no message.
   it "leaves no widget view unpaired" do
     rendered = Dir[Rails.root.join("app/views/widgets/**/*.html.erb")]
       .map { |view| Pathname(view).relative_path_from(Rails.root).to_s }
       .grep_v(%r{/_}) # partials are reached through the view that renders them
 
-    # trending is a one-line wrapper around the _collection partial paired above.
+    # trending is one line around the _collection partial, which is in a pair above.
     covered = WIDGET_MARKUP_PAIRS.values.map(&:last) + %w[
       app/views/widgets/articles/trending.html.erb
     ]
@@ -69,10 +69,10 @@ RSpec.describe "web placeholder ↔ api fragment markup contract" do
     expect(rendered - covered).to be_empty
   end
 
-  # ⚠️ This spec lives in the api but reads the web app, and api.yml is path-filtered — so it only
-  # runs when a listed path changes. A placeholder outside that filter can be edited with the
-  # contract unchecked, which is the failure this whole file exists to prevent. Assert the filter
-  # actually covers every placeholder we pair.
+  # ⚠️ This spec is in the api but it reads the web app, and api.yml has a path filter. Thus the spec
+  # runs only when a path in that list changes. A person can edit a placeholder outside that filter
+  # and nothing checks the contract, and this file exists to prevent that failure. This example
+  # checks that the filter covers each placeholder in a pair.
   it "is reachable from CI for every placeholder it pairs" do
     workflow = File.read(Rails.root.join("../.github/workflows/api.yml"))
     filters = workflow.scan(%r{^\s*-\s*'(web/[^']+)'$}).flatten.uniq

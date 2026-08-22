@@ -1,9 +1,9 @@
 import { Controller } from '@hotwired/stimulus';
 
-/** Scrolls the page back to the top, honoring prefers-reduced-motion. */
+/** Scrolls the page to the top. It obeys prefers-reduced-motion. */
 export default class extends Controller {
   /**
-   * @param {Event} event The click event that triggered the action.
+   * @param {Event} event The click event that started the action.
    */
   go(event) {
     event.preventDefault();
@@ -22,12 +22,13 @@ export default class extends Controller {
   }
 
   /**
-   * Moves focus to the element the link points at.
+   * Moves the focus to the element that the link points at.
    *
-   * ⚠️ preventDefault above suppresses the hash navigation that would have done this, so without
-   * it a keyboard user is scrolled to the top with focus left behind in the footer. tabindex=-1
-   * makes a non-interactive target focusable without adding it to the tab order.
-   * @param {HTMLElement} link The clicked link.
+   * ⚠️ The preventDefault above stops the hash navigation that would move the focus. Thus without
+   * this code, the page scrolls to the top for a keyboard user and the focus stays in the footer.
+   * tabindex=-1 lets an element that is not interactive take the focus, and it does not put that
+   * element in the tab order.
+   * @param {HTMLElement} link The link that the user clicked.
    */
   focusTarget(link) {
     const hash = link?.getAttribute('href') ?? '';

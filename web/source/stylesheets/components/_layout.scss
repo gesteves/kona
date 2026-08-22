@@ -1,16 +1,17 @@
-// Silent placeholders for the recurring page-grid idioms, @extend-ed by the components.
-// Imported first in the components layer: @extend emits the merged selectors here, so the
-// shared declarations stay in the same cascade layer as the components that use them.
-// ⚠️ That holds for THIS file only — base/_extends.scss emits into `@layer base` instead.
+// The silent placeholders for the page-grid patterns that the components use with @extend.
+// The code imports this file first in the components layer: @extend writes the joined selectors
+// here, thus the shared declarations stay in the same cascade layer as the components that use
+// them.
+// ⚠️ That is true for THIS file only. base/_extends.scss writes into `@layer base`.
 
-// A block that spans the full page grid and re-exposes its columns to its children.
+// A block that covers the full page grid and gives its columns to its children.
 %subgrid-full {
   grid-column: 1 / -1;
   grid-template-columns: subgrid;
 }
 
-// The readable centered column: full-width on small screens, inset by two columns on
-// either side from bp-medium up.
+// The center column for the text: the full width on a small screen, and two columns in from each
+// side at bp-medium and above.
 %centered-column {
   grid-column: 1 / -1;
 
@@ -19,7 +20,7 @@
   }
 }
 
-// The top-level 12-column page container (.content, .footer__wrapper).
+// The top-level page container of 12 columns: .content and .footer__wrapper.
 %page-grid {
   box-sizing: border-box;
   display: grid;
@@ -29,7 +30,7 @@
   width: 100%;
 }
 
-// The separator that tops each widget section (stats, weather, collections).
+// The line above each widget section: the stats, the weather, and the collections.
 %section-topped {
   border-top: 2px solid var(--color-border);
   padding: var(--padding) 0 0 0;

@@ -1,33 +1,35 @@
 name: "Notify Slack"
 description: "Post a CI/deploy status message to Slack with the standard commit attachment and workflow footer."
 
-# Every workflow posts through this action, so the conventions below are what keep the channel
-# readable — api.yml and web.yml drifted apart once already. Match them when adding a message.
+# Each workflow sends its messages through this action. Thus the rules below are what keep the
+# channel easy to read. api.yml and web.yml became different one time. Obey these rules when you add
+# a message.
 #
-#   Which messages exist. Checks post exactly one result per run, pass or fail. Deploys post on
-#   success and on failure — deliberately NOT on start: a Contentful publish dispatches a web
-#   deploy, so deploys are frequent and a third message per deploy was noise. Add a message only
-#   for an outcome the existing ones can't express (web's "cache purge successful" earns its place
-#   because "deploy successful" fires at activation, while the edge may still be serving the
-#   previous copy).
+#   The messages that exist. The checks send one result for each run: a pass or a failure. A deploy
+#   sends a message on a success and on a failure. It does NOT send one at the start, on purpose: a
+#   Contentful publish starts a web deploy, thus deploys are frequent and a third message for each
+#   deploy was too much. Add a message only for a result that the messages above cannot give. The
+#   "cache purge successful" message of web is correct, because "deploy successful" goes out at the
+#   activation, and the edge can still serve the previous copy.
 #
-#   Colour. good = it worked. danger = it failed. warning = it partly worked and needs a human
-#   (web's purge failure: deployed, but possibly serving stale). #439FE0 = informational
-#   follow-up to something already reported — never for a second success, or every deploy looks
-#   like it succeeded twice.
+#   The color. good means that it worked. danger means that it failed. warning means that one part
+#   worked and that a person must act: the purge failure of web means that the deploy is live but
+#   that the edge can serve old content. #439FE0 means more data about something that a message
+#   already reported. Never use it for a second success, or each deploy looks like two successes.
 #
-#   Emoji. :rocket: deploy succeeded. :warning: failed or degraded. :broom: cache purged.
+#   The emoji. :rocket: means that the deploy is successful. :warning: means a failure or a smaller
+#   result. :broom: means that the cache purge is complete.
 #
-#   Text vs fallback. `text` is Slack mrkdwn with ONE link, on the words describing the outcome
-#   ("<url|successful>", "<run|failed>") — a success links to the thing that's now live, a
-#   failure links to the run. `fallback` is a plain one-line summary with NO url: it's the
-#   notification-preview text, the attachment already carries the link, and a raw url there just
-#   makes the preview unreadable.
+#   The text and the fallback. `text` is Slack mrkdwn with ONE link, on the words that give the
+#   result ("<url|successful>", "<run|failed>"). A success links to the thing that is now live, and
+#   a failure links to the run. `fallback` is a plain one-line summary with NO url. It is the text
+#   of the notification preview, the attachment already has the link, and a url there makes the
+#   preview difficult to read.
 #
-#   Naming. "<App> <thing> <outcome>" — "Web checks passed", "API deploy failed", "Web cache purge
-#   successful". The app prefix is what makes a message legible in a channel carrying both, and the
-#   fixed shape is what makes the whole set skimmable; resist explaining the outcome in the text
-#   (the colour and the linked run cover it).
+#   The name. "<App> <thing> <outcome>", for example "Web checks passed", "API deploy failed", and
+#   "Web cache purge successful". The name of the app is what makes a message clear in a channel
+#   with both apps, and the fixed shape is what makes the full set easy to read. Do not give the
+#   cause of the result in the text: the color and the link to the run give it.
 
 inputs:
   webhook:

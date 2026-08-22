@@ -1,11 +1,11 @@
-<%# The entry list shared by the blog index (articles.html.erb) and tag pages (tag.html.erb).
-    `content` is one listing page hash from Contentful#listing_page. %>
+<%# The list of entries that the blog index (articles.html.erb) and each tag page (tag.html.erb)
+    share. `content` is one listing-page hash from Contentful#listing_page. %>
 <% if content.items.present? %>
   <ol class="blog__list">
-    <%# ⚠️ Separator decided by index, not `item == content.items.last`. These are Hashie::Mashes,
-        so `==` is a recursive deep comparison of the whole article — body and all — run once per
-        item. It's also wrong on its own terms: two entries with identical field values would both
-        suppress their separator. %>
+    <%# ⚠️ The index decides the separator, and not `item == content.items.last`. Each item is a
+        Hashie::Mash, thus `==` compares the full article at each level, and this includes the body,
+        one time for each item. That test is also incorrect: two entries with the same field values
+        would both omit their separator. %>
     <% last_index = content.items.size - 1 %>
     <% content.items.each_with_index do |item, index| %>
       <li class="blog__list-item">
