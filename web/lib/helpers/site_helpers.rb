@@ -88,18 +88,27 @@ module SiteHelpers
     current_page.data.summary.presence
   end
 
-  # The attributes a live-update placeholder's outer element carries. Interpolate inside its
-  # opening tag.
+  # The attributes a live-update element's outer tag carries. Interpolate inside its opening tag.
   # The api fragment that replaces it repeats all of these except the placeholder flag — see the
   # web↔api contract in the root CLAUDE.md.
   # @param url [String] The same-origin widget endpoint.
+  # @param placeholder [Boolean] Whether this element is an empty skeleton with no real content.
   # @return [String] HTML attributes.
-  def live_update_attrs(url)
+  def live_update_attrs(url, placeholder: true)
     # url is always an app-generated same-origin path, never user input, so it needs no escaping.
     # aria-busy marks the skeleton as still loading; the api fragment that replaces it omits it,
     # the same way it omits the placeholder flag, so the swap reads as "finished" to a screen
     # reader instead of silently exchanging one nameless region for another.
-    %(data-controller="live-update" data-live-update-url-value="#{url}" data-live-update-placeholder-value="true" aria-busy="true" data-action="visibilitychange@document->live-update#handleVisibilityChange").html_safe
+    #
+    # ⚠️ `placeholder: false` is for an element rendered with REAL content at build time. The
+    # flag means "I am an empty skeleton": it makes the controller collapse the element when a
+    # fetch fails, which on real content deletes it. Such an element still fetches on connect —
+    # a never-fetched URL counts as stale — so dropping the flag costs no freshness. An empty
+    # response still removes it, which is the api's authoritative "no data".
+    attrs = %(data-controller="live-update" data-live-update-url-value="#{url}")
+    attrs += %( data-live-update-placeholder-value="true" aria-busy="true") if placeholder
+    attrs += %( data-action="visibilitychange@document->live-update#handleVisibilityChange")
+    attrs.html_safe
   end
 
   # @param content [Object] A content object.

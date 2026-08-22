@@ -343,10 +343,20 @@ class Contentful
     "Browse #{size.humanize} #{'entry'.pluralize(size)} tagged “#{name}.”"
   end
 
+  # The blog index's own meta description. Without it `content_summary` falls all the way
+  # through to the sitewide meta description, so /blog and the home page ship identical ones.
+  # Only `summary:` is set, not `description:` — articles.html.erb renders no description block,
+  # so this is a meta tag and nothing else.
+  def default_blog_summary(size)
+    "Browse the complete archive of #{size.humanize} #{'entry'.pluralize(size)}, newest first."
+  end
+
   # Builds the blog index listing: every published entry, newest first.
   # @return [Array<Hash>] The blog's listing page.
   def generate_blog
-    @content[:blog] = listing_page(published_articles, base_path: "/blog", template: "/articles.html", title: "Blog")
+    entries = published_articles
+    @content[:blog] = listing_page(entries, base_path: "/blog", template: "/articles.html",
+                                   title: "Blog", summary: default_blog_summary(entries.size))
   end
 
   # @return [Array<Hash>] The non-draft articles, newest first.

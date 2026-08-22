@@ -1,20 +1,50 @@
-<%# Loading skeleton for the races widget. The wrapper carries the live-update attributes; %>
-<%# it's display:contents, so the section lays out directly in the page grid. The API swaps %>
-<%# the whole wrapper in on connect — a single "Upcoming Races" section, or a "Today's Race" %>
-<%# + "Upcoming Races" pair on race day — and removes it on an empty response (no upcoming %>
-<%# races). See api/app/views/widgets/events/. `url` (required local) is the API endpoint. %>
-<div class="collection-group" data-nosnippet <%= live_update_attrs(url) %>>
-  <%# The api picks this modifier from the race count (and adds collection--has-featured, or a %>
-  <%# second "Today's Race" section on race day), so only the wrapper above is a fixed shape. %>
-  <%# --thirds/3 items is the common case; the grid reflows on the others. %>
-  <section class="collection collection--thirds" id="upcoming-races" aria-labelledby="hed-upcoming-races">
-    <h2 class="collection__heading" id="hed-upcoming-races">Upcoming Races</h2>
-    <ol class="collection__list">
-      <% 3.times do %>
-        <li class="collection__item">
-          <%= partial 'partials/placeholders/entry_skeleton', locals: { lines: 4 } %>
-        </li>
-      <% end %>
-    </ol>
-  </section>
-</div>
+<%# The upcoming-races section, rendered from data/events.json at build time and enhanced by the
+    api at runtime: the live-update controller swaps in a fragment that adds the featured race's
+    race-day weather, live-tracking link, and a separate "Today's Race" section.
+
+    ⚠️ It carries live_update_attrs with `placeholder: false`, so a failed fetch leaves this
+    content standing instead of deleting it. Don't add the placeholder flag back — it means
+    "I am an empty skeleton". An EMPTY response still removes the section, which is correct:
+    that's the api saying there are no upcoming races at all.
+
+    ⚠️ Structurally paired with api/app/views/widgets/events/upcoming.html.erb; the outer element
+    is pinned by api/spec/contracts/widget_markup_contract_spec.rb. `url` is a required local. %>
+<% races = upcoming_races %>
+<% if races.present? %>
+  <div class="collection-group" data-nosnippet <%= live_update_attrs(url, placeholder: false) %>>
+    <section class="collection collection--<%= event_collection_variant(races.size) %>" id="upcoming-races" aria-labelledby="hed-upcoming-races">
+      <h2 class="collection__heading" id="hed-upcoming-races">Upcoming Races</h2>
+      <ol class="collection__list">
+        <% races.each do |event| %>
+          <% id = event.sys.id.parameterize %>
+          <li class="collection__item">
+            <article class="entry entry--summary event" id="event-<%= id %>" aria-labelledby="hed-<%= id %>">
+              <div class="event__inner">
+                <header class="entry__header">
+                  <p class="entry__meta">
+                    <%= event_timestamp_tag(event) %>
+                    <% if event.location.present? %>
+                      <span><%= icon_svg("classic", "light", "location-dot") %> <%= event.location %></span>
+                    <% end %>
+                  </p>
+                  <h3 class="entry__hed" id="hed-<%= id %>">
+                    <% if event.url.present? %>
+                      <%= link_to smartypants(event.title), event.url, rel: "noopener", target: "_blank" %>
+                    <% else %>
+                      <%= smartypants(event.title) %>
+                    <% end %>
+                  </h3>
+                </header>
+                <div class="entry__body">
+                  <%= render_tag_description(event.summary) %>
+                </div>
+              </div>
+            </article>
+          </li>
+        <% end %>
+      </ol>
+    </section>
+  </div>
+  <% schema = events_schema(races) %>
+  <% if schema %><script type="application/ld+json"><%= schema %></script><% end %>
+<% end %>

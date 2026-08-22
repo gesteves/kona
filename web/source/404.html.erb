@@ -2,6 +2,9 @@
 title: Page not found.
 summary: I'm sorry, but the page you were looking for can't be found.
 body: I'm sorry, but the page you were looking for can't be found.
+# Cloudflare serves this body under a 404, so a crawler shouldn't index it under the URL it
+# happened to ask for. This page has no proxied content object, so the flag lives here.
+index_in_search_engines: false
 ---
 
 <%# No aria-labelledby: a bare <div> has no role, so the label is discarded. The <h1> inside

@@ -3,9 +3,12 @@
     <% if article.draft %>
       <p class="entry__meta"><%= draft_badge %></p>
     <% end %>
-    <h1 class="entry__hed" id="<%= entry_heading_id(article) %>">
+    <h1 class="entry__hed" id="<%= entry_heading_id(article) %>" data-pagefind-meta="title">
       <%= smartypants(article.title) %>
     </h1>
   </header>
-  <%= partial 'partials/article/body', locals: { article: article } %>
+  <%# Pages are indexed for site search like entries are. ⚠️ Gated on index_in_search_engines as
+      well as draft, unlike the entry templates: /contact/success and /oauth/callback are ordinary
+      published pages that opt out, and they'd otherwise turn up in the search modal. %>
+  <%= partial 'partials/article/body', locals: { article: article, pagefind: !article.draft && article.index_in_search_engines } %>
 </article>

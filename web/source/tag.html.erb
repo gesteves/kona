@@ -18,7 +18,12 @@
         </span>
       <% end %>
     </p>
-    <h1 id="hed" class="blog__hed">
+    <%# ⚠️ data-pagefind-body on the heading, not the whole page: it makes the archive findable
+        by name in site search as a hub, while leaving the entry list below unindexed. Indexing
+        the list would file every article's intro under its tag pages too, so one query would
+        return the same prose several times over. The heading is always present, so an archive
+        whose concept carries no description is still indexed. %>
+    <h1 id="hed" class="blog__hed" data-pagefind-body data-pagefind-meta="title">
       <%= smartypants(content.title) %>
     </h1>
     <p class="entry__meta">
@@ -33,7 +38,7 @@
   </header>
 
   <% if content.description.present? %>
-    <div class="blog__description"><%= render_tag_description(content.description) %></div>
+    <div class="blog__description" data-pagefind-body><%= render_tag_description(content.description) %></div>
   <% end %>
 
   <%= partial 'partials/blog_list', locals: { content: content } %>

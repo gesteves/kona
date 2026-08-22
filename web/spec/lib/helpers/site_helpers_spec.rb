@@ -405,6 +405,15 @@ RSpec.describe SiteHelpers do
     it 'marks the element a placeholder, since only the placeholder side of the contract does' do
       expect(live_update_attrs('/widgets/whoop')).to include('data-live-update-placeholder-value="true"')
     end
+
+    # An element rendered with real content at build time (the upcoming-races section) opts out:
+    # the flag would make a transient fetch failure delete that content. It still fetches on
+    # connect, because the controller counts a never-fetched URL as stale.
+    it 'omits the placeholder flag and aria-busy for a statically rendered element' do
+      attrs = live_update_attrs('/widgets/events/upcoming', placeholder: false)
+      expect(attrs).to eq('data-controller="live-update" data-live-update-url-value="/widgets/events/upcoming" data-action="visibilitychange@document->live-update#handleVisibilityChange"')
+      expect(attrs).to be_html_safe
+    end
   end
 
   describe '#social_media_link' do

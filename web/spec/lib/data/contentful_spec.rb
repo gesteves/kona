@@ -148,6 +148,19 @@ RSpec.describe Contentful do
       expect(blog.size).to eq(1)
       expect(blog.first[:items].map { |a| a[:title] }).to eq([ 'Live' ])
     end
+
+    # Without its own summary the index falls through to the sitewide meta description, which
+    # ships /blog and the home page with identical ones. The count is of published entries only.
+    it 'gives the index its own summary, counting only published entries' do
+      instance = importer(articles: [
+        { title: 'Live', draft: false },
+        { title: 'Draft', draft: true }
+      ])
+      instance.send(:generate_blog)
+
+      blog = instance.instance_variable_get(:@content)[:blog]
+      expect(blog.first[:summary]).to eq('Browse the complete archive of one entry, newest first.')
+    end
   end
 
   describe 'taxonomy' do

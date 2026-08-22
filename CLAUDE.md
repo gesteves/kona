@@ -548,6 +548,15 @@ Placeholders build the shared attributes with `live_update_attrs`
 (`web/lib/helpers/site_helpers.rb`); the API views build the matching outer element with
 `live_update_url`.
 
+⚠️ **Not every web-side element is a skeleton.** `live_update_attrs(url, placeholder: false)`
+marks one the build rendered with **real content**, which the fragment then enhances rather than
+fills in — today only the upcoming-races section, which the build writes from `data/events.json`
+and the api re-renders with race-day weather and a "Today's Race" section. Such an element must
+omit the placeholder flag for the same reason the api fragment does: a transient fetch failure
+would delete content that's already correct. It still fetches on connect, because the controller
+counts a never-fetched URL as stale. An **empty** response still removes it — that's the api
+saying there are no upcoming races at all.
+
 The **web half** is pinned by `web/test/browser/controllers/live_update.test.js`. The two sides are
 compared against each other by `api/spec/contracts/widget_markup_contract_spec.rb`, which reads
 both files across the monorepo and asserts the placeholder and the fragment agree on tag, classes,
@@ -565,9 +574,12 @@ drift.
 | Whoop | `source/partials/placeholders/_whoop.html.erb` | `views/widgets/whoop/show.html.erb` | `/widgets/whoop` |
 | Current weather | `source/partials/placeholders/_weather.html.erb` | `views/widgets/weather/current.html.erb` | `/widgets/weather/current` |
 | Pageviews | `source/partials/article/_full.html.erb` (inline `span`) | `views/widgets/plausible/pageviews.html.erb` | `/widgets/plausible/pageviews/:id` |
-| Upcoming races | `source/partials/_upcoming_races.html.erb` | `views/widgets/events/upcoming.html.erb` | `/widgets/events/upcoming` |
+| Upcoming races † | `source/partials/_upcoming_races.html.erb` | `views/widgets/events/upcoming.html.erb` | `/widgets/events/upcoming` |
 | Trending articles | `source/partials/placeholders/_trending.html.erb` | `views/widgets/articles/trending.html.erb` | `/widgets/articles/trending[/:id]` |
 | Related articles | `source/partials/placeholders/_related.html.erb` | `views/widgets/articles/related.html.erb` | `/widgets/articles/related/:id` |
+
+† Not a placeholder — the build renders it with real content and the fragment enhances it. See the
+`placeholder: false` note above.
 
 Shared CSS lives in `web/source/stylesheets/components/` — the api's fragments render classes from
 `_collection.scss`, `_entry.scss`, `_event.scss`, `_stats.scss` and `_weather.scss` (around 38

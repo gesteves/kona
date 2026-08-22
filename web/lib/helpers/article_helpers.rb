@@ -105,7 +105,10 @@ module ArticleHelpers
   def hide_from_search_engines?
     return true unless production?
     page = page_content
-    return false if page.nil?
+    # No proxied content object (the 404 page, and any other frontmatter-only template): the
+    # flag comes from frontmatter instead, defaulting to indexable so ordinary pages are
+    # unaffected.
+    return current_page.data.index_in_search_engines == false if page.nil?
     return true if page.draft
     !page.index_in_search_engines
   end

@@ -162,6 +162,7 @@ module ContentfulClient
           location
           url
           date
+          going
           sys {
             ...SysFields
           }

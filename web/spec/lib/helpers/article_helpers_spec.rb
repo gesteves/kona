@@ -382,7 +382,7 @@ RSpec.describe ArticleHelpers do
   # true and passes against a binding Middleman never produces. That is precisely what hid these
   # helpers reading `defined?(content)` and shipping every draft indexable.
   def page_content = SiteHelpers.instance_method(:page_content).bind_call(self)
-  def current_page = OpenStruct.new(url: '/2024/01/01/post/', metadata: { locals: @page_locals || {} })
+  def current_page = OpenStruct.new(url: '/2024/01/01/post/', metadata: { locals: @page_locals || {} }, data: OpenStruct.new(@page_data || {}))
 
   describe '#canonical_url' do
     # The outer group pins `canonical_url` as a plain stub for the schema groups; rebind the
@@ -432,6 +432,12 @@ RSpec.describe ArticleHelpers do
 
     it 'indexes a page with no content object, e.g. a static template' do
       expect(hide_from_search_engines?).to be(false)
+    end
+
+    # The 404 page has no proxied content object, so its opt-out lives in frontmatter.
+    it 'hides a content-object-less page whose frontmatter opts out' do
+      @page_data = { index_in_search_engines: false }
+      expect(hide_from_search_engines?).to be(true)
     end
   end
 
