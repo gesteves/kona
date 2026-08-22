@@ -20,7 +20,7 @@
     "taxonomy:redirects": "node --env-file=.env scripts/create-redirects.js"
   },
   "dependencies": {
-    "contentful-management": "^12.14.0",
+    "contentful-management": "^12.15.0",
     "contentful-migration": "^5.1.0"
   }
 }
