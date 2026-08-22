@@ -45,7 +45,7 @@ const imports = new Map(
 
 describe('controller registration', () => {
   it('finds the controllers to check', () => {
-        // This checks the check: without it, a change to a name that broke the glob would make each
+    // This checks the check: without it, a change to a name that broke the glob would make each
     // test below pass with no content.
     expect(controllerFiles.length).toBeGreaterThan(0);
   });

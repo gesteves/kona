@@ -276,7 +276,7 @@ describe('handlePlausible', () => {
         makeCtx()
       );
 
-            // The code keeps these: the browser needs them to run the script and to cache it.
+      // The code keeps these: the browser needs them to run the script and to cache it.
       expect(res.headers.get('content-type')).toBe('application/javascript');
       expect(res.headers.get('cache-control')).toBe('public, max-age=3600');
       // The code removes these: each other header from the CDN of Plausible would go to the browser

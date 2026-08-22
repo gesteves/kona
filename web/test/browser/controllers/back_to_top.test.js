@@ -20,7 +20,7 @@ describe('back-to-top controller', () => {
     element.dispatchEvent(event);
 
     expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
-        // Without preventDefault, the browser also goes to #top, at the same time as the smooth
+    // Without preventDefault, the browser also goes to #top, at the same time as the smooth
     // scroll.
     expect(event.defaultPrevented).toBe(true);
   });

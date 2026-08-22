@@ -94,7 +94,7 @@ describe('clipboard controller', () => {
   });
 
   it('cancels the pending revert when the element goes away', async () => {
-        // Without this code, a Turbo navigation during the countdown leaves a timer that changes a node
+    // Without this code, a Turbo navigation during the countdown leaves a timer that changes a node
     // that is not in the document. It is worse if the next page uses the same icons: the timer then
     // changes those icons.
     vi.useFakeTimers();
