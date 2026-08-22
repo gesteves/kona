@@ -26,6 +26,13 @@ namespace :import do
     RedisConnection.connection
     measure_and_output(:import_standard_site, "Fetching standard.site verification data")
   end
+
+  desc "Fetches the related-articles ranking from the api"
+  task related: [ :dotenv ] do
+    setup_data_directory
+    RedisConnection.connection
+    measure_and_output(:import_related, "Fetching related articles")
+  end
 end
 
 desc "Imports all content for the site"
@@ -40,11 +47,12 @@ task import: [ :dotenv, :clobber ] do
 
   output_mutex = Mutex.new
 
-  # These three are independent, so they run in parallel.
+  # These are independent of each other, so they run in parallel.
   independent_threads = [
     [ :import_contentful, "Importing site content" ],
     [ :import_font_awesome, "Importing icons" ],
-    [ :import_standard_site, "Fetching standard.site verification data" ]
+    [ :import_standard_site, "Fetching standard.site verification data" ],
+    [ :import_related, "Fetching related articles" ]
   ].map do |method, description|
     Thread.new do
       measure_and_output(method, description, mutex: output_mutex)
@@ -152,6 +160,24 @@ def import_standard_site
     data = JSON.parse(response.body)
     next if data["publication_uri"].blank?
     File.write("data/standard_site.json", { did: data["did"], publication_uri: data["publication_uri"] }.to_json)
+  end
+end
+
+# Fetches every entry's related-article ids from the api into data/related.json, which
+# ArticleHelpers#related_articles renders as each article's "You May Also Like" section.
+#
+# Degrades silently, like import_standard_site: on any failure it writes nothing and the section
+# is omitted. ⚠️ Deliberately NOT a build failure — the ranking is an enhancement, and the api
+# being briefly unreachable shouldn't block a content deploy the way missing icons would.
+def import_related
+  safely_perform do
+    base = ENV["KONA_API_URL"].to_s.chomp("/")
+    next if base.blank?
+    response = HTTParty.get("#{base}/api/related", headers: { "Authorization" => "Bearer #{ENV['API_TOKEN']}" })
+    next unless response.success? && response.body.present?
+    related = JSON.parse(response.body)
+    next unless related.is_a?(Hash) && related.present?
+    File.write("data/related.json", related.to_json)
   end
 end
 

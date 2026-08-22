@@ -78,12 +78,20 @@ to work against both apps at once.
 
 ### Import subtasks
 
-`rake import` runs all three in parallel: `import:content` (Contentful), `import:icons` (POSTs the
-`data/font_awesome.yml` allowlist to the api's `/api/icons` and writes `data/icons.json`), and
-`import:standard_site` (fetches the DID + publication URI from the api). Also `rake redis:clear`.
+`rake import` runs all four in parallel: `import:content` (Contentful), `import:icons` (POSTs the
+`data/font_awesome.yml` allowlist to the api's `/api/icons` and writes `data/icons.json`),
+`import:standard_site` (fetches the DID + publication URI from the api), and `import:related`
+(fetches the embedding-similarity ranking behind each article's "You May Also Like" section into
+`data/related.json`). Also `rake redis:clear`.
 
 ⚠️ A failed `import:icons` **raises** — icons are an every-page dependency, so the build fails
-loudly rather than shipping pages with missing icons. `import:standard_site` degrades gracefully.
+loudly rather than shipping pages with missing icons. `import:standard_site` and `import:related`
+degrade gracefully: they write nothing and the markup they feed is omitted.
+
+⚠️ `import:related` reads a ranking the api computes from vectors `ArticleEmbeddingJob` writes off
+the Contentful publish webhook — the same webhook that dispatches this build. The embedding lands
+in seconds and the build takes minutes, so it wins in practice, but a just-published article whose
+vector isn't stored yet simply gets no section until the next build.
 
 ## Key locations
 

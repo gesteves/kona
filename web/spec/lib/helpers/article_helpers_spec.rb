@@ -451,6 +451,61 @@ RSpec.describe ArticleHelpers do
       expect(entry_dom_id(entry)).to eq('entry-1qxuv2jhbvrd9oqmxoneqz')
       expect(entry_heading_id(entry)).to eq('hed-1qxuv2jhbvrd9oqmxoneqz')
     end
+
+    # The related-articles section scopes its cards, because read_next renders further summary
+    # cards for the same entries on the same page.
+    it 'prefixes both ids with a scope when one is given' do
+      entry = article(slug: 'post')
+      entry.sys = OpenStruct.new(id: '1QxUv2jHbvRd9OqMxOneqZ')
+      expect(entry_dom_id(entry, scope: 'you-may-also-like')).to eq('entry-you-may-also-like-1qxuv2jhbvrd9oqmxoneqz')
+      expect(entry_heading_id(entry, scope: 'you-may-also-like')).to eq('hed-you-may-also-like-1qxuv2jhbvrd9oqmxoneqz')
+    end
+  end
+
+  describe '#related_articles' do
+    # This group needs `data.related` as well as `data.articles`.
+    def data
+      fields = { articles: @corpus || [] }
+      fields[:related] = @related unless @related.nil?
+      OpenStruct.new(fields)
+    end
+
+    def entry(slug, id)
+      a = article(slug: slug)
+      a.sys = OpenStruct.new(id: id)
+      a
+    end
+
+    let(:corpus) { [ entry('a', 'id-a'), entry('b', 'id-b'), entry('c', 'id-c') ] }
+
+    before { stub_corpus(corpus) }
+
+    it 'resolves the imported ids to entries, in the order the api ranked them' do
+      @related = { 'id-a' => %w[id-c id-b] }
+      expect(related_articles(corpus.first).map(&:slug)).to eq(%w[c b])
+    end
+
+    it 'takes at most `count`' do
+      @related = { 'id-a' => %w[id-c id-b] }
+      expect(related_articles(corpus.first, count: 1).map(&:slug)).to eq([ 'c' ])
+    end
+
+    # The three ways this comes back empty all collapse the section rather than raising.
+    it 'returns nothing when the import never ran' do
+      @related = nil
+      expect(related_articles(corpus.first)).to eq([])
+    end
+
+    it 'returns nothing when the entry has no stored embedding' do
+      @related = { 'id-b' => [ 'id-c' ] }
+      expect(related_articles(corpus.first)).to eq([])
+    end
+
+    # A neighbor unpublished since the ranking was computed is dropped, not rendered as a blank.
+    it 'drops ids that no longer resolve to a published entry' do
+      @related = { 'id-a' => %w[id-gone id-b] }
+      expect(related_articles(corpus.first).map(&:slug)).to eq([ 'b' ])
+    end
   end
 
   # The taxonomy-aware helpers need tags carrying path/parent_id (not just id/name) and a

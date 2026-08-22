@@ -16,15 +16,6 @@ module Widgets
       render_trending TrendingArticles.new.excluding(id ? [ id ] : [], count: 4)
     end
 
-    # The "You May Also Like" widget: articles semantically related to :id (its Contentful entry id),
-    # ranked by embedding similarity in the RelatedArticles service.
-    def related
-      render_widget(:related, ttl: 1.hour, edge_stale_while_revalidate: 1.day) do
-        id = contentful_id_param
-        @articles = id ? RelatedArticles.new.for_article(id, count: 4) : []
-      end
-    end
-
     private
 
     def render_trending(articles)

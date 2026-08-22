@@ -9,9 +9,12 @@
   <% end %>
   <ol class="collection__list">
     <%# Filter before the <li>, not inside it — otherwise a non-post item emits an empty one. %>
+    <%# `scope_entry_ids` (optional local) scopes each card's DOM ids to this section — set it
+        wherever the section can list an entry another section on the same page also lists. %>
+    <% id_scope = (defined?(scope_entry_ids) && scope_entry_ids) ? section_id : nil %>
     <% items.select { |item| blog_post?(item) }.each do |item| %>
       <li class="collection__item">
-        <%= partial 'partials/article/summary', locals: { article: item } %>
+        <%= partial 'partials/article/summary', locals: { article: item, id_scope: id_scope } %>
       </li>
     <% end %>
   </ol>

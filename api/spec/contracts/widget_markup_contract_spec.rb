@@ -61,10 +61,9 @@ RSpec.describe "web placeholder ↔ api fragment markup contract" do
       .map { |view| Pathname(view).relative_path_from(Rails.root).to_s }
       .grep_v(%r{/_}) # partials are reached through the view that renders them
 
-    # trending/related are one-line wrappers around the _collection partial paired above.
+    # trending is a one-line wrapper around the _collection partial paired above.
     covered = WIDGET_MARKUP_PAIRS.values.map(&:last) + %w[
       app/views/widgets/articles/trending.html.erb
-      app/views/widgets/articles/related.html.erb
     ]
 
     expect(rendered - covered).to be_empty

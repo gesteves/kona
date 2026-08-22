@@ -1,4 +1,0 @@
-<%# "You May Also Like" is ranked by semantic similarity (article embeddings) at request time by %>
-<%# the API and swapped in by the live-update controller (which removes it when there's nothing %>
-<%# related). `url` (required local) is the API endpoint carrying the article's Contentful id. %>
-<%= partial 'partials/placeholders/article_collection', locals: { section_id: 'you-may-also-like', heading: 'You May Also Like', url: url } %>

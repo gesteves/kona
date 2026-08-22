@@ -21,9 +21,6 @@ Rails.application.routes.draw do
     get "articles/trending" => "articles#trending"
     get "articles/trending/:id" => "articles#trending_excluding", as: "articles_trending_excluding"
 
-    # Articles semantically related to :id, ranked from precomputed Voyage embeddings.
-    get "articles/related/:id" => "articles#related"
-
     get "plausible/pageviews/:id" => "plausible#pageviews"
     get "whoop" => "whoop#show"
   end
@@ -46,6 +43,10 @@ Rails.application.routes.draw do
 
     # Resolves the web build's posted Font Awesome allowlist to pre-rendered SVGs.
     post "icons" => "icons#create"
+
+    # Every entry's nearest neighbors by embedding similarity, which the web build renders as
+    # each article's static "You May Also Like" section.
+    get "related" => "related#show"
   end
 
   # Inbound webhooks, one controller per service.

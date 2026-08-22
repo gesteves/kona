@@ -1,4 +1,8 @@
+<%# ⚠️ scope_entry_ids for the same reason partials/_related does: read_next renders further
+    summary cards on this same page, and another report from this race is very often also the
+    chronologically adjacent entry. Unscoped, the two cards would share a DOM id and both
+    aria-labelledby references would resolve to the first. %>
 <% race_reports = related_race_reports(article) %>
 <% if race_reports.present? %>
-  <%= partial 'partials/collection', locals: { title: "More Reports From This Race", items: race_reports, variant: "halves" } %>
+  <%= partial 'partials/collection', locals: { title: "More Reports From This Race", items: race_reports, variant: "halves", scope_entry_ids: true } %>
 <% end %>

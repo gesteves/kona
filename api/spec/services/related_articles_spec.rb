@@ -94,4 +94,52 @@ RSpec.describe RelatedArticles do
       expect(service.for_article("q1").map(&:slug)).to eq(%w[newer older])
     end
   end
+
+  describe "#all" do
+    it "ranks every published entry, agreeing with for_article" do
+      expect(service.all["q1"]).to eq(%w[near mid far])
+    end
+
+    # ⚠️ A Short is a valid query article — it gets the section on its own page — even though
+    # ArticleRanking#candidates keeps it out of every neighbor list.
+    it "keys Shorts too, while never listing one as a neighbor" do
+      result = service.all
+
+      expect(result).to have_key("short")
+      expect(result["short"]).to eq(%w[q1 near mid far])
+      expect(result.values.flatten).not_to include("short")
+    end
+
+    it "omits drafts entirely, as query articles and as neighbors" do
+      result = service.all
+
+      expect(result).not_to have_key("draft")
+      expect(result.values.flatten).not_to include("draft")
+    end
+
+    it "omits an entry whose embedding hasn't been stored yet" do
+      store.delete("embeddings:article:near")
+      result = service.all
+
+      expect(result).not_to have_key("near")
+      expect(result.values.flatten).not_to include("near")
+    end
+
+    it "caps each list at `count`" do
+      expect(service.all(count: 2)["q1"]).to eq(%w[near mid])
+    end
+
+    # One mget for the whole corpus, rather than one per article as for_article would do.
+    it "loads every vector in a single round trip" do
+      expect($redis).to receive(:mget).once.and_call_original
+
+      service.all
+    end
+
+    it "returns an empty hash rather than raising when the corpus is unavailable" do
+      allow(articles).to receive(:list).and_return([])
+
+      expect(service.all).to eq({})
+    end
+  end
 end

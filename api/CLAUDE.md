@@ -37,7 +37,6 @@ a cached copy before revalidating.
 | GET | `/widgets/weather/current` | weather/AQI/pollen | 5 min |
 | GET | `/widgets/events/upcoming` | upcoming races; the featured event has inline race-day weather | 1 hr |
 | GET | `/widgets/articles/trending[/:id]` | "hot today" articles; `:id` excludes one Contentful id, so an article page can drop itself | 1 hr |
-| GET | `/widgets/articles/related/:id` | "You May Also Like", from precomputed Voyage embeddings | 1 hr |
 | GET | `/widgets/whoop` | sleep/recovery/strain | 5 min |
 | GET | `/widgets/plausible/pageviews/:id` | pageview count by Contentful id | 5 min |
 | POST | `/api/location` | sets Redis `location:current` + enqueues `LocationSyncJob`, via `Location.store` | — |
@@ -45,6 +44,7 @@ a cached copy before revalidating.
 | POST | `/api/build` | enqueues `SiteBuildJob`; 202, or 429 inside the 60s dedupe lock | — |
 | POST | `/api/icons` | resolves the web build's Font Awesome allowlist to SVGs | — |
 | GET | `/api/standard-site` | `{did, publication_uri}` for the build's verification markup | 1 hr |
+| GET | `/api/related` | `{contentful id => [related ids]}` from precomputed Voyage embeddings, for the build's static "You May Also Like" section | — |
 | POST | `/webhooks/contentful` | enqueues PDS sync, embedding, asset-mirror, and site-build jobs; 204 | — |
 | POST | `/webhooks/whoop` | enqueues `WhoopWebhookJob`; 200 `{ok: true}` | — |
 | GET | `/whoop/auth`, `/whoop/callback` | Whoop OAuth (authorize is owner-gated) | — |
@@ -789,7 +789,8 @@ Rails `config/credentials.yml.enc` + `master.key`).
   slug), `PLAUSIBLE_API_KEY` + `PLAUSIBLE_SITE_ID` (⚠️ with either unset the pageviews widget
   collapses and `TrendingArticles` silently degrades to recency order — an INFO log is the only
   sign, and the result looks exactly like "working, nothing trending"), `VOYAGE_API_KEY` (unset =
-  no embeddings, so the related-articles widget collapses), `MAPBOX_USERNAME` +
+  no embeddings, so `GET /api/related` returns `{}` and the build omits every "You May Also Like"
+  section), `MAPBOX_USERNAME` +
   `MAPBOX_SECRET_TOKEN` (a token with `tilesets:write` and `tilesets:read`; with either unset the
   Maps page says so and refuses uploads) plus `MAPBOX_ACCESS_TOKEN` (the ⚠️ **public** token: it
   renders server-side when there's no secret token, and it's what the Location page's browser map

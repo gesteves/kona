@@ -44,7 +44,7 @@ module Webhooks
 
       StandardSiteSyncJob.perform_async(operation, entry_id) if operation
 
-      # Keeps the related-articles widget current without a rebuild.
+      # The vector the build's related-articles ranking is computed from.
       if content_type == ARTICLE_TYPE && entry_id.present?
         ArticleEmbeddingJob.perform_async(action == "publish" ? "embed" : "delete", entry_id)
       end

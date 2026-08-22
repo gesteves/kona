@@ -409,8 +409,8 @@ don't reintroduce it. If referral traffic looks wrong, read rule 1 before the co
 
 The API's routes split by namespace: `/widgets/*` returns HTML fragments (proxied), `/api/*`
 accepts or returns structured data (hit directly at `KONA_API_URL`, except `POST /api/contact`),
-and `/webhooks/*` receives inbound webhooks. The web build reads two at build time:
-`GET /api/standard-site` and `POST /api/icons`.
+and `/webhooks/*` receives inbound webhooks. The web build reads three at build time:
+`GET /api/standard-site`, `GET /api/related`, and `POST /api/icons`.
 
 1. Browser requests `/widgets/*` (or `POST /api/contact`) on the main site.
 2. `run_worker_first` in `web/wrangler.jsonc` claims those paths, so they invoke Worker code
@@ -576,7 +576,6 @@ drift.
 | Pageviews | `source/partials/article/_full.html.erb` (inline `span`) | `views/widgets/plausible/pageviews.html.erb` | `/widgets/plausible/pageviews/:id` |
 | Upcoming races † | `source/partials/_upcoming_races.html.erb` | `views/widgets/events/upcoming.html.erb` | `/widgets/events/upcoming` |
 | Trending articles | `source/partials/placeholders/_trending.html.erb` | `views/widgets/articles/trending.html.erb` | `/widgets/articles/trending[/:id]` |
-| Related articles | `source/partials/placeholders/_related.html.erb` | `views/widgets/articles/related.html.erb` | `/widgets/articles/related/:id` |
 
 † Not a placeholder — the build renders it with real content and the fragment enhances it. See the
 `placeholder: false` note above.

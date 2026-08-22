@@ -55,16 +55,25 @@ module ArticleHelpers
 
   # The DOM id for an entry element, from its Contentful id (parameterize lowercases it).
   # @param entry [Object] The entry.
+  # @param scope [String, nil] A section slug prefixed to the id. Needed when a section may
+  #   list an entry that another section on the same page also lists — unscoped, the two cards
+  #   share an id and every aria-labelledby resolves to the first one.
   # @return [String] e.g. "entry-1qxuv2jhbvrd9oqmxoneqz".
-  def entry_dom_id(entry)
-    "entry-#{entry.sys.id.parameterize}"
+  def entry_dom_id(entry, scope: nil)
+    "entry-#{scoped_entry_key(entry, scope)}"
   end
 
   # The DOM id for an entry's heading, referenced by the entry element's aria-labelledby.
   # @param entry [Object] The entry.
+  # @param scope [String, nil] As for #entry_dom_id; the two must be given the same scope.
   # @return [String] e.g. "hed-1qxuv2jhbvrd9oqmxoneqz".
-  def entry_heading_id(entry)
-    "hed-#{entry.sys.id.parameterize}"
+  def entry_heading_id(entry, scope: nil)
+    "hed-#{scoped_entry_key(entry, scope)}"
+  end
+
+  # @return [String] The shared id suffix, unchanged from the bare Contentful id when unscoped.
+  def scoped_entry_key(entry, scope)
+    [ scope, entry.sys.id ].compact.join("-").parameterize
   end
 
   # @param entry [Object] The entry.
@@ -129,6 +138,36 @@ module ArticleHelpers
       .reject { |a| a.path == exclude&.path }
       .reject { |a| a.entry_type == "Short" }
       .take(count)
+  end
+
+  # The entries most semantically related to this one, for the static "You May Also Like"
+  # section. The ranking comes from data/related.json, which `rake import:related` fetches from
+  # the api — it's computed there from Voyage embeddings, the one part of the section this
+  # build can't derive from its own data.
+  #
+  # ⚠️ Empty collapses the section, which is the intended behavior for the three ways this can
+  # come back empty: the import didn't run (no api, no token), the entry has no stored
+  # embedding yet, or every neighbor it named has since been unpublished.
+  # @param article [Object] The entry to find neighbors for.
+  # @param count [Integer] How many to return.
+  # @return [Array<Object>] The related entries, nearest first.
+  def related_articles(article, count: 4)
+    return [] unless data.respond_to?(:related)
+
+    ids = Array(data.related[article.sys&.id])
+    return [] if ids.empty?
+
+    index = published_articles_by_id
+    ids.filter_map { |id| index[id] }.take(count)
+  end
+
+  # @return [Hash{String=>Object}] The published entries by Contentful id, for resolving the
+  #   ids in data/related.json. Memoized for the life of the collection — this is called once
+  #   per article page.
+  def published_articles_by_id
+    memoize_by_collection(:published_articles_by_id, data.articles) do
+      published_articles.index_by { |a| a.sys&.id }
+    end
   end
 
   # The most recent published entries, for the Atom feed.

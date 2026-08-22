@@ -1,12 +1,12 @@
 <%= partial 'partials/article/full', locals: { article: content } %>
 <%= partial 'partials/share', locals: { article: content } %>
 <%# Show race reports from the same event when there are any; otherwise show the semantically- %>
-<%# related "You May Also Like" widget (served by the API). They're mutually exclusive so the two %>
-<%# sections never duplicate each other. %>
+<%# related "You May Also Like" section. They're mutually exclusive so the two never duplicate %>
+<%# each other. %>
 <% if related_race_reports(content).present? %>
   <%= partial 'partials/race_reports', locals: { article: content } %>
 <% else %>
-  <%= render_widget 'related', "/widgets/articles/related/#{content.sys.id}" %>
+  <%= partial 'partials/related', locals: { article: content } %>
 <% end %>
 <%# Exclude only this article so trending doesn't repeat it. %>
 <%= render_widget 'trending', "/widgets/articles/trending/#{content.sys.id}" %>

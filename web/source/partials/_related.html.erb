@@ -1,0 +1,12 @@
+<%# The "You May Also Like" section, rendered at build time from the embedding ranking the api
+    computes (data/related.json, via `rake import:related`). Renders nothing when the entry has
+    no neighbors, which is what collapsed the widget this replaced.
+
+    ⚠️ scope_entry_ids is load-bearing: read_next renders further summary cards on this same
+    page, and a semantically-related entry is quite often also the chronologically adjacent one.
+    Unscoped, the two cards would share a DOM id and both aria-labelledby references would
+    resolve to the first. `article` is a required local. %>
+<% related = related_articles(article) %>
+<% if related.present? %>
+  <%= partial 'partials/collection', locals: { title: "You May Also Like", items: related, variant: "halves", scope_entry_ids: true } %>
+<% end %>

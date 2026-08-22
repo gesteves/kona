@@ -3,7 +3,8 @@
   partials/article/_summary.html.erb — prose body via the minimal renderer; no cover image.
 %>
 <% published_at = DateTime.parse(article.published_at) %>
-<%# Scoped by section: one article can appear in both trending and related on the same page. %>
+<%# Scoped by section: the same article can appear here and in a build-rendered section on the
+    same page (related articles, read-next). %>
 <% entry_id = "#{section_id}-#{article.sys.id.parameterize}" %>
 <article class="entry entry--summary" id="entry-<%= entry_id %>" aria-labelledby="hed-<%= entry_id %>">
   <header class="entry__header">

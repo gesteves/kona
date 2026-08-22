@@ -1,7 +1,10 @@
-<article class="entry entry--summary" id="<%= entry_dom_id(article) %>" aria-labelledby="<%= entry_heading_id(article) %>">
+<%# `id_scope` (optional local) prefixes this card's DOM ids with a section slug, for a section
+    that may list an entry another section on the same page also lists. %>
+<% id_scope = defined?(id_scope) ? id_scope : nil %>
+<article class="entry entry--summary" id="<%= entry_dom_id(article, scope: id_scope) %>" aria-labelledby="<%= entry_heading_id(article, scope: id_scope) %>">
   <header class="entry__header">
     <%= partial 'partials/article/meta', locals: { article: article, show_draft: false, show_tags: false } %>
-    <h3 class="entry__hed" id="<%= entry_heading_id(article) %>">
+    <h3 class="entry__hed" id="<%= entry_heading_id(article, scope: id_scope) %>">
       <%= link_to smartypants(article.title), article.path %>
     </h3>
   </header>
