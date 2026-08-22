@@ -58,7 +58,7 @@ export default class extends Controller {
   }
 
   /**
-     * Shows a relative time that changes by itself for a recent article, or the absolute date from
+   * Shows a relative time that changes by itself for a recent article, or the absolute date from
    * the server for an older article. The relative time is a <wa-relative-time> element, which
    * updates itself. This code still renders each minute, thus the display changes to the absolute
    * date when the article is no longer from today.
