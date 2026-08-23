@@ -11,13 +11,6 @@ module ImagesHelper
   # write side, and the two must match the same set.
   ASSET_HOST_SUFFIX = ".ctfassets.net".freeze
 
-  # The shape of a cover image on a card: the height divided by the width, that is, 3:2.
-  #
-  # ⚠️ ImageHelpers::CARD_RATIO of the static site and .entry__cover-image in
-  # web/source/stylesheets/components/_entry.scss must hold the same value. The two cards go on the
-  # same page.
-  CARD_RATIO = Rational(2, 3)
-
   # The `card` variant of config/srcsets.yml. ⚠️ That file is a copy of web/data/srcsets.yml, word
   # for word: the two cards go on the same page, thus a difference gives one image at the wrong
   # size in the middle of one section. The file gives the method that makes the widths, and
@@ -33,6 +26,19 @@ module ImagesHelper
 
   # ⚠️ Keep the 1x desktop width first: `cover_image_tag` reads it for the `src`.
   CARD_WIDTHS = CARD.fetch("widths").map(&:to_i).freeze
+
+  # The shape of a cover image on a card: the height divided by the width. It comes from the
+  # `ratio` of the `card` variant, which reads "16:9", thus srcsets.yml is the ONE place that holds
+  # the shape and both apps read the same value.
+  CARD_RATIO = begin
+    w, h = CARD.fetch("ratio").split(":", 2).map(&:to_i)
+    Rational(h, w)
+  end
+
+  # The same shape for CSS: "16:9" becomes "16 / 9". `cover_image_tag` writes it into the markup as
+  # `--card-ratio`, and _entry.scss reads it. Thus the stylesheet follows this file and a person
+  # does not edit the shape in two languages.
+  CARD_ASPECT_RATIO = CARD.fetch("ratio").sub(":", " / ").freeze
 
   # The <img> of the cover image of an article card.
   #
@@ -77,7 +83,12 @@ module ImagesHelper
     }
 
     placeholder = blurhash_placeholder(cover)
-    attributes[:style] = "--placeholder:url('#{placeholder}');" if placeholder.present?
+    # ⚠️ The shape goes in the markup, and not in the stylesheet. _entry.scss of web reads
+    # --card-ratio, thus srcsets.yml is the one place that holds it. Keep the placeholder in the
+    # SAME attribute: a second style attribute would replace this one.
+    style = [ "--card-ratio:#{CARD_ASPECT_RATIO};" ]
+    style << "--placeholder:url('#{placeholder}');" if placeholder.present?
+    attributes[:style] = style.join
 
     unless gif
       attributes[:sizes] = CARD_SIZES

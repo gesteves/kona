@@ -12,7 +12,9 @@
     ⚠️ The heading stays a span, deliberately: an empty h3 would announce a nameless heading. %>
 <article class="entry entry--summary">
   <% if show_image %>
-    <span class="entry__cover"><wa-skeleton class="entry-skeleton-cover" effect="sheen"></wa-skeleton></span>
+    <%# --card-ratio holds the box of the skeleton, thus the section does not jump when the api
+        fragment replaces it. It comes from data/srcsets.yml, as the cover image does. %>
+    <span class="entry__cover"><wa-skeleton class="entry-skeleton-cover" effect="sheen" style="--card-ratio:<%= card_aspect_ratio %>;"></wa-skeleton></span>
   <% end %>
   <header class="entry__header">
     <p class="entry__meta"><wa-skeleton class="entry-skeleton-eyebrow" effect="sheen"></wa-skeleton></p>

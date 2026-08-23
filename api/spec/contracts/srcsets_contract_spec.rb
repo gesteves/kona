@@ -24,6 +24,19 @@ RSpec.describe "web ↔ api srcsets contract" do
     expect(ImagesHelper::CARD_WIDTHS).to eq(card.fetch("widths"))
   end
 
+  # ⚠️ The shape of a card is in this file ONLY. Both apps read it for the `h` of each candidate,
+  # and both write it into the markup as --card-ratio, which _entry.scss and _skeleton.scss read.
+  # A number in a stylesheet or in a helper would be a second place to edit, and nothing would
+  # compare the two.
+  it "takes the card shape from that file, and holds it nowhere else" do
+    ratio = YAML.load_file(web_path).fetch("card").fetch("ratio")
+    w, h = ratio.split(":", 2).map(&:to_i)
+
+    expect(ratio).to match(/\A\d+:\d+\z/), "the card ratio uses the width:height syntax"
+    expect(ImagesHelper::CARD_RATIO).to eq(Rational(h, w))
+    expect(ImagesHelper::CARD_ASPECT_RATIO).to eq("#{w} / #{h}")
+  end
+
   # `cover_image_tag` reads widths.first for the `src`. With the list in another order, the src
   # would be a candidate for a phone, and each desktop card would then be soft.
   it "keeps the 1x desktop width first in the card widths" do

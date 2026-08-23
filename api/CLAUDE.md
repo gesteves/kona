@@ -168,11 +168,17 @@ between the two apps, and neither side checks the other.** The full text is in t
 
 The trending card renders the cover image of the article. Two parts make it:
 
-- **`config/srcsets.yml`** holds the `sizes` and the candidate widths of the card. It is a copy of
+- **`config/srcsets.yml`** holds the shape (`ratio`, as `"16:9"`), the `sizes`, and the candidate
+  widths of the card. It is a copy of
   `web/data/srcsets.yml`, word for word, and `ImagesHelper` reads its `card` variant one time at
   boot. ⚠️ Copy the full file (`cp web/data/srcsets.yml api/config/srcsets.yml`), and do not copy
   the `card` block alone: `spec/contracts/srcsets_contract_spec.rb` compares the two files and
   fails on each difference. That file also gives the method that makes the widths.
+  ⚠️ **`ratio` is the ONE place that holds the shape of a card.** Both apps read it for the `h` of
+  each candidate, and both write it into the markup as the `--card-ratio` custom property, which
+  `.entry__cover-image` in `_entry.scss` and `.entry-skeleton-cover` in `_skeleton.scss` read. Thus
+  a change to the shape is one edit and one `cp`. Never write a number in a stylesheet or in a
+  helper.
 - **`ImagesHelper`** makes the URL: `<IMAGES_URL>/cdn-cgi/image/<options>/<mirror url>`. It changes
   each `*.ctfassets.net` host to `IMAGE_HOST`, which is the R2 mirror, as the web build does. ⚠️ It
   returns nil when either variable has no value, and it never raises: a raise here gives a 500 and

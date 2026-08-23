@@ -130,9 +130,11 @@
   width: 33%;
 }
 
-// The cover image of a summary card. It keeps the same box as .entry__cover-image.
+// The cover image of a summary card. It keeps the same box as .entry__cover-image, thus the
+// section does not jump when the fragment replaces the skeleton. ⚠️ --card-ratio comes from the
+// markup, from srcsets.yml. Refer to .entry__cover-image in _entry.scss.
 .entry__cover .entry-skeleton-cover {
-  aspect-ratio: 3 / 2;
+  aspect-ratio: var(--card-ratio, 16 / 9);
   display: block;
   height: auto;
   width: 100%;

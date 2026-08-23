@@ -6,7 +6,10 @@ require 'padrino-helpers'
 
 RSpec.describe ImageHelpers do
   # This has the shape of data.assets. Each example sets @assets before the code makes the index.
-  def data = OpenStruct.new(assets: @assets || [])
+  # The real data/srcsets.yml, thus a spec reads the same card shape and widths as the build.
+  def real_srcsets = OpenStruct.new(YAML.load_file('data/srcsets.yml').transform_values { |v| OpenStruct.new(v) })
+
+  def data = OpenStruct.new(assets: @assets || [], srcsets: real_srcsets)
 
   # IMAGES_URL is the host that Cloudflare serves each transformation from, and each environment
   # needs it. There is no fallback to a Contentful resize, thus no value means a raise. No code
@@ -118,10 +121,10 @@ RSpec.describe ImageHelpers do
       expect(set).to include('fit=cover')
     end
 
-    it 'crops to 3:2 with the card ratio' do
-      set = srcset(url: 'https://images.ctfassets.net/s/a/t/p.jpg', widths: [ 600 ], ratio: ImageHelpers::CARD_RATIO)
+    it 'crops to 16:9 with the card ratio' do
+      set = srcset(url: 'https://images.ctfassets.net/s/a/t/p.jpg', widths: [ 600 ], ratio: card_ratio)
       expect(set).to include('width=600')
-      expect(set).to include('height=400')
+      expect(set).to include('height=338')
       expect(set).to include('fit=cover')
     end
   end
@@ -453,7 +456,7 @@ RSpec.describe ImageHelpers do
       html = cover_image_tag(entry)
 
       expect(html).to include('width="592"')
-      expect(html).to include('height="395"')
+      expect(html).to include('height="333"')
       expect(html).to include('alt=""')
       expect(html).to include('loading="lazy"')
       expect(html).to include('decoding="async"')
@@ -461,11 +464,11 @@ RSpec.describe ImageHelpers do
       expect(html).to include('data-controller="image-placeholder"')
     end
 
-    it 'cuts each candidate to 3:2' do
+    it 'cuts each candidate to 16:9' do
       html = cover_image_tag(entry)
 
-      expect(html).to include('width=592,height=395,fit=cover')
-      expect(html).to include('width=1184,height=789,fit=cover')
+      expect(html).to include('width=592,height=333,fit=cover')
+      expect(html).to include('width=1184,height=666,fit=cover')
     end
 
     # ⚠️ Cloudflare renders and bills one transformation for each different URL. A src with

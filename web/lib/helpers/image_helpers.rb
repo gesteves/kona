@@ -28,9 +28,6 @@ module ImageHelpers
   # element is not necessary.
   CDN_IMAGE_FORMATS = { "avif" => "avif", "webp" => "webp", "jpg" => "jpeg", "auto" => "auto" }.freeze
 
-  # The shape of a cover image on a card: the height divided by the width, that is, 3:2. The
-  # `aspect-ratio` of .entry__cover-image in _entry.scss must be the same value.
-  CARD_RATIO = Rational(2, 3)
 
   # The time that the cache keeps a rendered blurhash placeholder. The key contains the
   # published_version of the asset, thus each entry is immutable and a new publish makes a new
@@ -156,6 +153,23 @@ module ImageHelpers
     (width * ratio).round
   end
 
+  # The shape of a cover image on a card: the height divided by the width. It comes from the
+  # `ratio` of the `card` variant of data/srcsets.yml, which reads "16:9", thus that file is the ONE
+  # place that holds the shape and the api reads the same value from its copy.
+  # @return [Rational]
+  def card_ratio
+    w, h = data.srcsets.card.ratio.split(":", 2).map(&:to_i)
+    Rational(h, w)
+  end
+
+  # The same shape for CSS: "16:9" becomes "16 / 9". `cover_image_tag` and the entry skeleton write
+  # it into the markup as `--card-ratio`, and _entry.scss and _skeleton.scss read it. Thus the
+  # stylesheets follow srcsets.yml and a person does not edit the shape in two languages.
+  # @return [String]
+  def card_aspect_ratio
+    data.srcsets.card.ratio.sub(":", " / ")
+  end
+
   # Makes the <img> of the cover image of an entry, for a card.
   #
   # ⚠️ It gives the element `alt=""`. The caller must put it in a link with `aria-hidden="true"`
@@ -175,7 +189,7 @@ module ImageHelpers
     # The first width of a variant is its 1x size at the largest breakpoint. Each other candidate
     # is for a smaller viewport or a denser screen. Thus it is the correct src.
     width = [ config.widths.first, widths.max ].min
-    height = candidate_height(width, CARD_RATIO)
+    height = candidate_height(width, card_ratio)
 
     # A GIF gets no transformation and no srcset: a transformation makes one static frame from it.
     # responsivize_images and resize_images have the same rule.
@@ -199,12 +213,17 @@ module ImageHelpers
       "data-action": "load->image-placeholder#removePlaceholder error->image-placeholder#removePlaceholder"
     }
 
+    # ⚠️ The shape goes in the markup, and not in the stylesheet. _entry.scss reads --card-ratio,
+    # thus data/srcsets.yml is the one place that holds it. Keep the placeholder in the SAME
+    # attribute: a second style attribute would replace this one.
+    style = [ "--card-ratio:#{card_aspect_ratio};" ]
     placeholder = blurhash_svg_data_uri(asset_id)
-    attributes[:style] = "--placeholder:url('#{placeholder}');" if placeholder.present?
+    style << "--placeholder:url('#{placeholder}');" if placeholder.present?
+    attributes[:style] = style.join
 
     unless gif
       attributes[:sizes] = config.sizes.join(", ")
-      attributes[:srcset] = srcset(url: cover.url, widths: widths, ratio: CARD_RATIO, options: { fm: "auto" })
+      attributes[:srcset] = srcset(url: cover.url, widths: widths, ratio: card_ratio, options: { fm: "auto" })
     end
 
     tag(:img, attributes)

@@ -123,10 +123,14 @@
 }
 
 // ⚠️ Keep aspect-ratio and object-fit with the width and the height attributes of the element.
-// They are what holds the shape when a srcset candidate is not exactly 3:2, for example a GIF,
-// which gets no transformation. The value must be the same as ImageHelpers::CARD_RATIO.
+// They are what holds the shape when a srcset candidate is not that shape, for example a GIF,
+// which gets no transformation.
+// ⚠️ --card-ratio comes from the markup, and BOTH apps write it from the `ratio` of the `card`
+// variant of srcsets.yml. Thus that file is the one place that holds the shape. Do not write a
+// number here: the value below is a fallback for a fragment with no custom property, and nothing
+// serves one today.
 .entry__cover-image {
-  aspect-ratio: 3 / 2;
+  aspect-ratio: var(--card-ratio, 16 / 9);
   border-radius: var(--radius-medium);
   display: block;
   object-fit: cover;

@@ -124,8 +124,13 @@ a link, in the middle of a page:
 
 ⚠️ **The cover image of a card is in two places, and no check compares them.** The api renders the
 card of the trending widget, and the build renders each other card, and the two go on the same page.
-The shape (3:2), the `sizes` list, the widths, and the attributes must be the same. The
+The `sizes` list, the widths, and the attributes must be the same. The
 `widget_markup_contract_spec` compares the outer element of the **collection** only.
+⚠️ **The shape is in one place: the `ratio` of the `card` variant of `srcsets.yml`** (`"16:9"`).
+Both apps read it for the `h` of each candidate, and both write it into the markup as the
+`--card-ratio` custom property. `.entry__cover-image` in `_entry.scss` and `.entry-skeleton-cover` in
+`_skeleton.scss` read that property, thus neither stylesheet holds a number. A change to the shape
+is one edit and one `cp`, and `srcsets_contract_spec` fails when a person forgets the copy.
 
 ⚠️ **`api/config/srcsets.yml` is a copy of `web/data/srcsets.yml`, word for word**, and it is the
 one duplication in this table that a check covers: `api/spec/contracts/srcsets_contract_spec.rb`

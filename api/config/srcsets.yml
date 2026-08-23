@@ -63,6 +63,11 @@ home:
     - 417
     - 441
 card:
+  # The shape of a card cover, as width:height. ⚠️ This is the ONE source of that shape. Both apps
+  # read it for the `h` of each candidate, and both write it into the markup as the `--card-ratio`
+  # custom property, which _entry.scss and _skeleton.scss then read. Thus a change here, and the
+  # `cp` below, is the full change. No other variant has a ratio: only a card crops.
+  ratio: "16:9"
   sizes:
     - auto
     - "(min-width: 1280px) 592px"

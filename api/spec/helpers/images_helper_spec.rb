@@ -25,8 +25,8 @@ RSpec.describe ImagesHelper do
   describe "#cdn_image_url" do
     it "makes a transformation URL on IMAGES_URL, from the mirror host" do
       stub_images
-      expect(helper.cdn_image_url(asset_url, w: 592, h: 395, fit: "cover"))
-        .to eq("https://site.example/cdn-cgi/image/width=592,height=395,fit=cover/https://images.example/space/asset1/token/photo.jpg")
+      expect(helper.cdn_image_url(asset_url, w: 592, h: 333, fit: "cover"))
+        .to eq("https://site.example/cdn-cgi/image/width=592,height=333,fit=cover/https://images.example/space/asset1/token/photo.jpg")
     end
 
     it "keeps the Contentful path word for word" do
@@ -73,7 +73,7 @@ RSpec.describe ImagesHelper do
       html = helper.cover_image_tag(article)
 
       expect(html).to include('width="592"')
-      expect(html).to include('height="395"')
+      expect(html).to include('height="333"')
       expect(html).to include('alt=""')
       expect(html).to include('loading="lazy"')
       expect(html).to include('decoding="async"')
@@ -81,11 +81,11 @@ RSpec.describe ImagesHelper do
       expect(html).to include('data-controller="image-placeholder"')
     end
 
-    it "cuts each candidate to 3:2" do
+    it "cuts each candidate to 16:9" do
       html = helper.cover_image_tag(article)
 
-      expect(html).to include("width=592,height=395,fit=cover")
-      expect(html).to include("width=1184,height=789,fit=cover")
+      expect(html).to include("width=592,height=333,fit=cover")
+      expect(html).to include("width=1184,height=666,fit=cover")
     end
 
     # ⚠️ Cloudflare renders and bills one transformation for each different URL. A src with
