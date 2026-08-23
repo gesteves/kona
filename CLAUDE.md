@@ -120,12 +120,20 @@ a link, in the middle of a page:
 | `fix_degrees` | `helpers/text_helper.rb` | `helpers/text_helpers.rb` |
 | Cover image URL and its `<img>` | `helpers/images_helper.rb` | `helpers/image_helpers.rb` |
 | The blurhash placeholder | `services/blurhash_placeholder.rb` | `helpers/image_helpers.rb` |
-| The card `sizes` and its widths | `helpers/images_helper.rb` | `data/srcsets.yml` |
+| The card `sizes` and its widths | `config/srcsets.yml` | `data/srcsets.yml` |
 
 ⚠️ **The cover image of a card is in two places, and no check compares them.** The api renders the
 card of the trending widget, and the build renders each other card, and the two go on the same page.
 The shape (3:2), the `sizes` list, the widths, and the attributes must be the same. The
 `widget_markup_contract_spec` compares the outer element of the **collection** only.
+
+⚠️ **`api/config/srcsets.yml` is a copy of `web/data/srcsets.yml`, word for word**, and it is the
+one duplication in this table that a check covers: `api/spec/contracts/srcsets_contract_spec.rb`
+compares the two files. The api uses the `card` variant alone, and the other variants stay only to
+make the copy one command: `cp web/data/srcsets.yml api/config/srcsets.yml`. The api cannot read
+the file of web, because its Docker image holds `api/` only. ⚠️ That spec reads a `web/` file, thus
+`web/data/srcsets.yml` is in the `paths:` of `api.yml`, for the same reason as the placeholder
+paths.
 
 ⚠️ The two blurhash copies use different Redis keys, on purpose: the build writes
 `blurhash:jpeg:*` in the Redis of web, and the api writes `blurhash:svg:*` in `kona-redis`. The two

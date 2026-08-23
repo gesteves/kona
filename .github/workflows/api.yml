@@ -14,6 +14,9 @@ name: "API"
 # when the api half changed. Thus a change to a placeholder, which is the more probable change,
 # did not do the one check that compares the two. Keep this list the same as WIDGET_MARKUP_PAIRS
 # in that spec.
+# ⚠️ `web/data/srcsets.yml` is there for the same reason:
+# api/spec/contracts/srcsets_contract_spec.rb reads it and compares it with api/config/srcsets.yml,
+# which is a copy of it.
 on:
   push:
     branches: [main]
@@ -24,6 +27,7 @@ on:
       - 'web/source/partials/placeholders/**'
       - 'web/source/partials/_upcoming_races.html.erb'
       - 'web/source/partials/article/_full.html.erb'
+      - 'web/data/srcsets.yml'
   pull_request:
     branches: [main]
     paths:
@@ -33,6 +37,7 @@ on:
       - 'web/source/partials/placeholders/**'
       - 'web/source/partials/_upcoming_races.html.erb'
       - 'web/source/partials/article/_full.html.erb'
+      - 'web/data/srcsets.yml'
 
 # No job writes to the repository. The deploy uses FLY_API_TOKEN for fly, and not GITHUB_TOKEN.
 # Set GITHUB_TOKEN to read-only here. Do not use the default value of the repository.

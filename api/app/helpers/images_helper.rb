@@ -1,3 +1,5 @@
+require "yaml"
+
 module ImagesHelper
   # The Cloudflare Images transformation path. The options go in the path, and not in the query
   # string.
@@ -16,20 +18,21 @@ module ImagesHelper
   # same page.
   CARD_RATIO = Rational(2, 3)
 
-  # The card `sizes` and the card candidate widths. ⚠️ They are a copy of the `card` variant in
-  # web/data/srcsets.yml. A card of this app and a card of the build go on the same page, thus a
-  # difference gives one image at the wrong size in the middle of one section. That file gives the
-  # method that makes the widths.
-  CARD_SIZES = [
-    "auto",
-    "(min-width: 1280px) 592px",
-    "(min-width: 768px) calc((((100vw - 4rem - (11 * 2rem))/12) * 6) + (5 * 2rem))",
-    "calc(100vw - 4rem)"
-  ].join(", ").freeze
+  # The `card` variant of config/srcsets.yml. ⚠️ That file is a copy of web/data/srcsets.yml, word
+  # for word: the two cards go on the same page, thus a difference gives one image at the wrong
+  # size in the middle of one section. The file gives the method that makes the widths, and
+  # spec/contracts/srcsets_contract_spec.rb fails when the two copies are different.
+  #
+  # ⚠️ This reads the file one time, at the boot of the app, and `fetch` raises for a key that is
+  # absent. Thus a file with a fault stops the deploy. That is on purpose, and it is not the same
+  # as the rule below that `cdn_image_url` must never raise: that rule is about a REQUEST, where a
+  # raise gives a 500 and leaves an empty skeleton on the page.
+  CARD = YAML.load_file(Rails.root.join("config", "srcsets.yml")).fetch("card").freeze
 
-  # The desktop width at 1x, then at 2x, then the current iPhones at 3x and the current iPads at
-  # 2x. ⚠️ Keep 592 first: `cover_image_tag` reads it for the `src`.
-  CARD_WIDTHS = [ 592, 1184, 724, 738, 928, 936, 978, 1014, 1068, 1128 ].freeze
+  CARD_SIZES = CARD.fetch("sizes").join(", ").freeze
+
+  # ⚠️ Keep the 1x desktop width first: `cover_image_tag` reads it for the `src`.
+  CARD_WIDTHS = CARD.fetch("widths").map(&:to_i).freeze
 
   # The <img> of the cover image of an article card.
   #
