@@ -20,8 +20,11 @@ module Widgets
 
     private
 
+    # ⚠️ Keep the default edge stale-while-revalidate. A longer window makes each copy live for
+    # max-age plus that window, thus a markup change stays out of some PoPs for that full time,
+    # and a tag purge that misses gives no message.
     def render_trending(articles)
-      render_widget(:trending, ttl: 1.hour, edge_stale_while_revalidate: 1.day) { @articles = articles }
+      render_widget(:trending, ttl: 1.hour) { @articles = articles }
     end
   end
 end

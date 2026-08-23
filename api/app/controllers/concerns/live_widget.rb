@@ -5,7 +5,7 @@ module LiveWidget
 
   # The time that the edge can serve an old fragment while it gets a new one. The default is short,
   # because this site has low traffic. Thus a long window gives very old data and does not make the
-  # load smooth. A widget whose data changes very little uses a longer time, up to one day.
+  # load smooth. A long window also keeps a markup change out of some PoPs for that full time.
   DEFAULT_EDGE_STALE_WHILE_REVALIDATE = 1.hour
   # The time that the edge can serve an old fragment when the origin gives a 5xx. With
   # stale-while-revalidate, this is what keeps the widgets on the page through a fly failure.

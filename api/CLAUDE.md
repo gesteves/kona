@@ -746,9 +746,13 @@ its response. `spec/support/live_update_contract.rb` fails if a fragment gets su
 
 The code is in `app/controllers/concerns/live_widget.rb`. `cache_widget(ttl:)` sets:
 
-- For the browser: `Cache-Control: public, max-age=0, stale-while-revalidate=86400`
+- For the browser: `Cache-Control: public, max-age=0, stale-while-revalidate=<ttl>`
 - For the edge:
   `CDN-Cache-Control: public, max-age=<ttl>, stale-while-revalidate=3600, stale-if-error=86400`
+
+⚠️ **Keep the edge `stale-while-revalidate` at its one-hour default.** A copy lives for its
+`max-age` plus that window. Thus a longer window keeps an old fragment in some PoPs for that full
+time, and a tag purge that misses gives no message.
 
 This is RFC 9213: Cloudflare obeys `CDN-Cache-Control` and a browser ignores it. That is what
 permits an edge TTL that is different from the `max-age=0` of the browser.
