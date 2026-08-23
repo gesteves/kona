@@ -810,7 +810,9 @@ it needs an edit in the dashboard. The full reason, and the manual `widgets` tag
 
 ## Commands
 
-Run `nvm use` before each `npm` command, as you do in `web/`.
+Run `nvm use` before each `npm` command, as you do in `web/`. There is one native dependency:
+**libvips** (`brew install vips`), which `ruby-vips` opens at the boot of Rails. Thus `rspec` and
+`bin/dev` both fail without it, and `web/` needs the same library.
 
 ```bash
 bin/dev                                                          # the server here (or bin/setup)

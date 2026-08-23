@@ -84,6 +84,20 @@ jobs:
           working-directory: api
           bundler-cache: true
 
+      # ⚠️ This is necessary, and only this job needs it. `Bundler.require` in
+      # config/application.rb loads ruby-vips, which opens the shared library at that moment. Thus
+      # rspec cannot boot Rails without it, and a stub of Vips::Image does not help. The `security`
+      # job needs nothing: RuboCop and Brakeman parse the source, and bundler-audit reads the
+      # lockfile. The `deploy` job needs nothing: `flyctl deploy --remote-only` makes the image on
+      # the builder of fly, and the Dockerfile installs libvips there.
+      # ⚠️ Keep the virtual name `libvips`, and do not write libvips42t64. The virtual name stays
+      # correct through each Ubuntu package rename, and the t64 suffix is one of those renames.
+      # --no-install-recommends is necessary: the approximately 33 dependencies below libvips
+      # (ImageMagick, poppler, librsvg, and more) declare recommends that apt installs by default.
+      # web.yml does the same, for the same reason.
+      - name: Install libvips (ruby-vips / blurhashes)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips
+
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
