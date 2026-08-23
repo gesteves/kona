@@ -5,6 +5,21 @@ RSpec.describe ImagesHelper do
 
   let(:asset_url) { "https://images.ctfassets.net/space/asset1/token/photo.jpg" }
 
+  # ⚠️ Each expected card size below comes from config/srcsets.yml. Thus a change to the shape or
+  # to the widths needs an edit in that ONE file, and no edit here. These read the file directly,
+  # and they do not use the constants under test: a helper that parses `ratio` incorrectly must
+  # fail. srcsets_contract_spec.rb pins the width:height syntax and the copy from web.
+  def card_config = YAML.load_file(Rails.root.join("config/srcsets.yml")).fetch("card")
+
+  # @return [Array<Integer>] The candidate widths, the smallest first, as the helper sorts them.
+  def card_candidate_widths = card_config.fetch("widths").sort
+
+  # @return [Integer] The height of a card candidate at that width.
+  def card_height(width)
+    w, h = card_config.fetch("ratio").split(":", 2).map(&:to_i)
+    (width * Rational(h, w)).round
+  end
+
   def stub_images(images_url: "https://site.example", image_host: "images.example")
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with("IMAGES_URL").and_return(images_url)
@@ -25,8 +40,8 @@ RSpec.describe ImagesHelper do
   describe "#cdn_image_url" do
     it "makes a transformation URL on IMAGES_URL, from the mirror host" do
       stub_images
-      expect(helper.cdn_image_url(asset_url, w: 592, h: 333, fit: "cover"))
-        .to eq("https://site.example/cdn-cgi/image/width=592,height=333,fit=cover/https://images.example/space/asset1/token/photo.jpg")
+      expect(helper.cdn_image_url(asset_url, w: 100, h: 50, fit: "cover"))
+        .to eq("https://site.example/cdn-cgi/image/width=100,height=50,fit=cover/https://images.example/space/asset1/token/photo.jpg")
     end
 
     it "keeps the Contentful path word for word" do
@@ -72,8 +87,8 @@ RSpec.describe ImagesHelper do
     it "makes an img with the card size, an empty alt, and the placeholder attributes" do
       html = helper.cover_image_tag(article)
 
-      expect(html).to include('width="592"')
-      expect(html).to include('height="333"')
+      expect(html).to include(%(width="#{card_candidate_widths.first}"))
+      expect(html).to include(%(height="#{card_height(card_candidate_widths.first)}"))
       expect(html).to include('alt=""')
       expect(html).to include('loading="lazy"')
       expect(html).to include('decoding="async"')
@@ -81,11 +96,12 @@ RSpec.describe ImagesHelper do
       expect(html).to include('data-controller="image-placeholder"')
     end
 
-    it "cuts each candidate to 16:9" do
+    it "cuts each candidate to the card ratio" do
       html = helper.cover_image_tag(article)
 
-      expect(html).to include("width=592,height=333,fit=cover")
-      expect(html).to include("width=1184,height=666,fit=cover")
+      [ card_candidate_widths.first, card_candidate_widths.last ].each do |w|
+        expect(html).to include("width=#{w},height=#{card_height(w)},fit=cover")
+      end
     end
 
     # ⚠️ Cloudflare renders and bills one transformation for each different URL. A src with
@@ -107,7 +123,7 @@ RSpec.describe ImagesHelper do
       html = helper.cover_image_tag(article(width: 700, height: 500))
 
       expect(html).to include("700w")
-      expect(html).not_to include("1184w")
+      expect(html).not_to include("#{card_candidate_widths.last}w")
     end
 
     it "gives a GIF no srcset, because a transformation removes its animation" do

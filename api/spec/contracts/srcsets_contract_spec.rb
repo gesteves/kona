@@ -39,8 +39,18 @@ RSpec.describe "web ↔ api srcsets contract" do
 
   # `cover_image_tag` reads widths.first for the `src`. With the list in another order, the src
   # would be a candidate for a phone, and each desktop card would then be soft.
+  #
+  # ⚠️ This takes the desktop width from the `sizes` list, and it holds no number of its own. Thus
+  # a change to the width of a card is an edit in srcsets.yml alone. The two must agree: `sizes`
+  # tells the browser how wide the element is at the largest breakpoint, and `widths.first` is the
+  # candidate that `src` names for that width.
   it "keeps the 1x desktop width first in the card widths" do
-    expect(ImagesHelper::CARD_WIDTHS.first).to eq(592)
-    expect(ImagesHelper::CARD_SIZES).to include("(min-width: 1280px) 592px")
+    card = YAML.load_file(web_path).fetch("card")
+    desktop_size = card.fetch("sizes").grep(/min-width/).first
+    desktop_width = desktop_size[/(\d+)px\z/, 1].to_i
+
+    expect(desktop_width).to be_positive, "the first min-width entry of `sizes` must end in a px width"
+    expect(ImagesHelper::CARD_WIDTHS.first).to eq(desktop_width)
+    expect(ImagesHelper::CARD_SIZES).to include(desktop_size)
   end
 end

@@ -11,6 +11,22 @@ RSpec.describe ImageHelpers do
 
   def data = OpenStruct.new(assets: @assets || [], srcsets: real_srcsets)
 
+  # ⚠️ Each expected card size below comes from data/srcsets.yml. Thus a change to the shape or to
+  # the widths needs an edit in that ONE file, and no edit here. These read the file directly, and
+  # they do not call the helper under test: a helper that parses `ratio` incorrectly must fail.
+  # srcsets_contract_spec.rb of the api pins the width:height syntax.
+  def card_config = YAML.load_file('data/srcsets.yml').fetch('card')
+
+  # ⚠️ Not `card_widths`: ImageHelpers has a method with that name, and this group includes it.
+  # @return [Array<Integer>] The candidate widths, the smallest first, as the helper sorts them.
+  def card_candidate_widths = card_config.fetch('widths').sort
+
+  # @return [Integer] The height of a card candidate at that width.
+  def card_height(width)
+    w, h = card_config.fetch('ratio').split(':', 2).map(&:to_i)
+    (width * Rational(h, w)).round
+  end
+
   # IMAGES_URL is the host that Cloudflare serves each transformation from, and each environment
   # needs it. There is no fallback to a Contentful resize, thus no value means a raise. No code
   # here reads CONTEXT or URL. The default is a value, because that is each environment that the
@@ -121,10 +137,10 @@ RSpec.describe ImageHelpers do
       expect(set).to include('fit=cover')
     end
 
-    it 'crops to 16:9 with the card ratio' do
+    it 'crops with the card ratio' do
       set = srcset(url: 'https://images.ctfassets.net/s/a/t/p.jpg', widths: [ 600 ], ratio: card_ratio)
       expect(set).to include('width=600')
-      expect(set).to include('height=338')
+      expect(set).to include("height=#{card_height(600)}")
       expect(set).to include('fit=cover')
     end
   end
@@ -455,8 +471,8 @@ RSpec.describe ImageHelpers do
     it 'renders the card size, an empty alt, and the placeholder attributes' do
       html = cover_image_tag(entry)
 
-      expect(html).to include('width="592"')
-      expect(html).to include('height="333"')
+      expect(html).to include(%(width="#{card_candidate_widths.first}"))
+      expect(html).to include(%(height="#{card_height(card_candidate_widths.first)}"))
       expect(html).to include('alt=""')
       expect(html).to include('loading="lazy"')
       expect(html).to include('decoding="async"')
@@ -464,11 +480,12 @@ RSpec.describe ImageHelpers do
       expect(html).to include('data-controller="image-placeholder"')
     end
 
-    it 'cuts each candidate to 16:9' do
+    it 'cuts each candidate to the card ratio' do
       html = cover_image_tag(entry)
 
-      expect(html).to include('width=592,height=333,fit=cover')
-      expect(html).to include('width=1184,height=666,fit=cover')
+      [ card_candidate_widths.first, card_candidate_widths.last ].each do |w|
+        expect(html).to include("width=#{w},height=#{card_height(w)},fit=cover")
+      end
     end
 
     # ⚠️ Cloudflare renders and bills one transformation for each different URL. A src with
@@ -493,7 +510,7 @@ RSpec.describe ImageHelpers do
       html = cover_image_tag(OpenStruct.new(cover_image: OpenStruct.new(url: @assets.first.url, width: 700, height: 500)))
 
       expect(html).to include('700w')
-      expect(html).not_to include('1184w')
+      expect(html).not_to include("#{card_candidate_widths.last}w")
     end
 
     it 'gives a GIF no srcset, because a transformation removes its animation' do
