@@ -127,24 +127,6 @@ RSpec.describe TrendingArticles do
     end
   end
 
-  describe "#excluding" do
-    it "drops every article whose Contentful id is in the list" do
-      ids = service.excluding(%w[a5 a6], count: 4).map { |a| a.sys.id }
-      expect(ids).not_to include("a5", "a6")
-      expect(ids).to eq(%w[a1 a2 a3 a4]) # the rest, in ranked (here recency) order
-    end
-
-    it "tolerates ids that aren't in the corpus" do
-      ids = service.excluding(%w[nope], count: 4).map { |a| a.sys.id }
-      expect(ids).to eq(service.all(count: 4).map { |a| a.sys.id })
-    end
-
-    it "still excludes drafts and Shorts" do
-      ids = service.excluding(%w[a5], count: 10).map { |a| a.sys.id }
-      expect(ids).not_to include("s1", "d1")
-    end
-  end
-
   describe "caching" do
     it "computes the ranking once per clock hour and reuses it across variants" do
       store = {}
@@ -152,11 +134,11 @@ RSpec.describe TrendingArticles do
       allow($redis).to receive(:setex) { |key, _ttl, value| store[key] = value }
 
       service.all(count: 4)
-      service.excluding(%w[a5], count: 4)
-      service.excluding(%w[garbage-id], count: 4)
+      service.all(count: 4)
+      service.all(count: 10)
 
       # rank runs one time for the hour: the two Plausible queries, for the recent window and for
-      # the baseline, and Articles#list each run one time, for each set of excluded ids.
+      # the baseline, and Articles#list each run one time, for each call.
       expect(plausible_service).to have_received(:pageviews_by_path).twice
       expect(articles_service).to have_received(:list).once
     end

@@ -3,6 +3,4 @@
 <%# One section: the reports of the same race first, then the related entries fill each empty %>
 <%# place. Refer to recirculation_section. %>
 <%= partial 'partials/recirculation', locals: { article: content } %>
-<%# Remove this article only, thus the trending list does not contain it. %>
-<%= render_widget 'trending', "/widgets/articles/trending/#{content.sys.id}" %>
 <%= partial 'partials/read_next', locals: { article: content } %>

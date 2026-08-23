@@ -3,6 +3,4 @@
 <%# A Short has no event, thus it always shows the "You May Also Like" section, which uses the %>
 <%# meaning of the articles. %>
 <%= partial 'partials/related', locals: { article: content } %>
-<%# Remove this entry only, thus the trending list does not contain it. %>
-<%= render_widget 'trending', "/widgets/articles/trending/#{content.sys.id}" %>
 <%= partial 'partials/read_next', locals: { article: content } %>

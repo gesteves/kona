@@ -1,6 +1,11 @@
 <%# The API puts the "Trending Articles" in order from the Plausible analytics, at request time, %>
 <%# and the live-update controller puts them here. It removes them when no article is trending. %>
-<%# `url`, which is a necessary local, is the API endpoint: the trending path with no id, or %>
-<%# /:id with the sys.id of the current article, thus the list does not contain the post that %>
-<%# you read. %>
+<%# `url`, which is a necessary local, is the API endpoint. %>
+<%#
+    ⚠️ This section is for the home page and for a Page ONLY. An entry page does not show it, on
+    purpose: that page already has "More Reports From This Race", "You May Also Like", and the
+    Previous and Next cards, and a fourth list of articles was too much. A Page cannot show "You
+    May Also Like", because that section comes from the embeddings of an entry. Thus the trending
+    list is the recirculation of a Page.
+%>
 <%= partial 'partials/placeholders/article_collection', locals: { section_id: 'trending-articles', heading: 'Trending Articles', url: url } %>

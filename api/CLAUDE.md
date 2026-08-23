@@ -41,7 +41,7 @@ edge serves a cached copy before it gets a new one.
 | GET | `/widgets/activity-stats` | Intervals.icu totals | 5 min |
 | GET | `/widgets/weather/current` | weather/AQI/pollen | 5 min |
 | GET | `/widgets/events/upcoming` | upcoming races; the featured event has inline race-day weather | 1 hr |
-| GET | `/widgets/articles/trending[/:id]` | "hot today" articles; `:id` excludes one Contentful id, so an article page can drop itself | 1 hr |
+| GET | `/widgets/articles/trending` | "hot today" articles. ⚠️ The home page and a Page call this. An **entry page does not** show the section: it already has its own recirculation. | 1 hr |
 | GET | `/widgets/whoop` | sleep/recovery/strain | 5 min |
 | GET | `/widgets/plausible/pageviews/:id` | pageview count by Contentful id | 5 min |
 | POST | `/api/location` | sets Redis `location:current` + enqueues `LocationSyncJob`, via `Location.store` | — |

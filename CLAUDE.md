@@ -659,10 +659,17 @@ become different.
 | Current weather | `source/partials/placeholders/_weather.html.erb` | `views/widgets/weather/current.html.erb` | `/widgets/weather/current` |
 | Pageviews | `source/partials/article/_full.html.erb` (inline `span`) | `views/widgets/plausible/pageviews.html.erb` | `/widgets/plausible/pageviews/:id` |
 | Upcoming races † | `source/partials/_upcoming_races.html.erb` | `views/widgets/events/upcoming.html.erb` | `/widgets/events/upcoming` |
-| Trending articles | `source/partials/placeholders/_trending.html.erb` | `views/widgets/articles/trending.html.erb` | `/widgets/articles/trending[/:id]` |
+| Trending articles ‡ | `source/partials/placeholders/_trending.html.erb` | `views/widgets/articles/trending.html.erb` | `/widgets/articles/trending` |
 
 † This is not a placeholder: the build renders it with real content and the fragment adds to that
 content. Refer to the `placeholder: false` note above.
+
+‡ The home page and a Page render this one. An **entry page does not**, on purpose: it already has
+"More Reports From This Race", "You May Also Like", and the Previous and Next cards. A Page cannot
+show "You May Also Like", which comes from the embeddings of an entry, thus the trending list is the
+recirculation of a Page. ⚠️ The endpoint had a `/:id` form that removed the current article, for an
+entry page. That page no longer shows the section, thus the route, `ArticlesController#trending_excluding`,
+and `TrendingArticles#excluding` are all gone. Do not add them again for an entry page.
 
 The shared CSS is in `web/source/stylesheets/components/`. The fragments of the api use the classes
 of `_collection.scss`, `_entry.scss`, `_event.scss`, `_stats.scss`, and `_weather.scss`:

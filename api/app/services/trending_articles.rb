@@ -49,14 +49,6 @@ class TrendingArticles < ApplicationService
     ranked.first(count)
   end
 
-  # The first `count` hot articles, but not an article with a Contentful id in `ids`. Thus a page
-  # can remove the cards that it already shows, and an article page removes itself.
-  # @return [Array<OpenStruct>]
-  def excluding(ids, count: 4)
-    excluded = Array(ids).to_set
-    ranked.reject { |article| excluded.include?(article.sys&.id) }.first(count)
-  end
-
   private
 
   # Each thing that decides the content of the list, as a digest in the cache key.

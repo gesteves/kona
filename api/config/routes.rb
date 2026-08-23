@@ -15,11 +15,9 @@ Rails.application.routes.draw do
     # The featured event contains the weather for the day of the race.
     get "events/upcoming" => "events#upcoming"
 
-    # The Plausible analytics give the order at request time. The path with no id returns each
-    # trending article. /:id removes one Contentful id, thus an article page can omit itself. The
-    # id is a path segment, because the path alone is the edge cache key.
+    # The Plausible analytics give the order at request time. The home page and a Page call this.
+    # An entry page does not: it already has its own recirculation sections.
     get "articles/trending" => "articles#trending"
-    get "articles/trending/:id" => "articles#trending_excluding", as: "articles_trending_excluding"
 
     get "plausible/pageviews/:id" => "plausible#pageviews"
     get "whoop" => "whoop#show"

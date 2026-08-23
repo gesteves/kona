@@ -153,29 +153,4 @@ RSpec.describe "Widgets::Articles trending", type: :request do
       expect(response).to have_http_status(:unauthorized)
     end
   end
-
-  describe "GET /widgets/articles/trending/:id" do
-    it "drops the given article and advertises the path as its refetch URL" do
-      get "/widgets/articles/trending/a5", headers: auth_headers
-
-      expect(response).to have_http_status(:ok)
-      expect(response.body).not_to include("Spiking Article") # a5 is excluded
-      expect(response.body).to include("Steady Article")       # a non-excluded article still trends
-      expect(response.body).to include("Newest Article")
-      expect(response.body).to include('data-live-update-url-value="/widgets/articles/trending/a5"')
-    end
-
-    it "ignores a malformed id (serves full trending) and never errors" do
-      get "/widgets/articles/trending/@@@", headers: auth_headers
-
-      expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Spiking Article") # nothing excluded
-      expect(response.body).to include("Steady Article")
-    end
-
-    it "requires the API_TOKEN bearer" do
-      get "/widgets/articles/trending/a5"
-      expect(response).to have_http_status(:unauthorized)
-    end
-  end
 end
