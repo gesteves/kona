@@ -11,7 +11,8 @@
     "check": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "pagefind": "pagefind --site build"
+    "pagefind": "pagefind --site build",
+    "test:a11y": "node test/a11y/run.mjs"
   },
   "dependencies": {
     "@hotwired/stimulus": "^3.2.2",
@@ -27,6 +28,7 @@
     "@cloudflare/vitest-pool-workers": "^0.22.0",
     "@cloudflare/workers-types": "^5.20260812.1",
     "@eslint/js": "^10.0.1",
+    "axe-core": "4.13.0",
     "eslint": "^10.8.1",
     "globals": "^17.11.0",
     "jsdom": "^30.0.1",

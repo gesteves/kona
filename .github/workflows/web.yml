@@ -356,6 +356,17 @@ jobs:
       # keep_vars:true, and wrangler.jsonc has no `routes`. Thus this never replaces the vars and
       # secrets in the dashboard or the www custom domain. It runs with no user, thus the drift
       # question does not occur. It uploads build/ (assets.directory).
+      # The HTML only, thus the artifact stays small. The accessibility job below reads it.
+      # ⚠️ This uploads and nothing more. The check itself is a SEPARATE job, thus it cannot delay
+      # or stop this deploy.
+      - name: Save the pages for the accessibility check
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: web-html
+          path: web/build/**/*.html
+          retention-days: 1
+          if-no-files-found: warn
+
       - name: Deploy to Cloudflare
         run: npx wrangler deploy
         env:
@@ -517,3 +528,72 @@ jobs:
           text: "Web deploy <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|failed> :warning:"
           color: "danger"
           fallback: "Web deploy failed"
+
+  # The accessibility check of the pages that the deploy sent.
+  #
+  # ⚠️ This is a SEPARATE job, and it runs AFTER the site is live, on purpose. It can never delay a
+  # deploy and it can never stop one. A Contentful publish starts this workflow, thus an
+  # accessibility problem in the content must not stop a publish. The result comes to Slack, and a
+  # person acts on it.
+  #
+  # ⚠️ It is a separate job for a second reason: it needs jsdom and axe-core, which are
+  # devDependencies. The deploy job installs with `npm ci --omit=dev`, thus it does not have them.
+  # This job does a full `npm ci`.
+  accessibility:
+    name: Accessibility check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [deploy]
+    # A deploy that failed uploaded no pages. There is then nothing to check, and the deploy already
+    # sent its own message.
+    if: ${{ always() && needs.deploy.result == 'success' }}
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: CI context
+        uses: ./.github/actions/ci-context
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # A full install, and not --omit=dev: the check needs jsdom and axe-core.
+      - name: Install npm dependencies
+        run: npm ci
+        env:
+          WEBAWESOME_NPM_TOKEN: ${{ secrets.WEBAWESOME_NPM_TOKEN }}
+
+      - name: Get the pages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: web-html
+          path: web/build
+
+      # continue-on-error, thus a violation makes this step red and the job green. The next step
+      # reads the outcome and sends the message.
+      - name: Run axe
+        id: axe
+        continue-on-error: true
+        run: npm run test:a11y
+
+      # ⚠️ On a failure only. The deploy already sends a success message, and a second one makes one
+      # deploy look like two successes. `warning` is the color for "it is live and a person must
+      # act". Refer to .github/actions/notify-slack.
+      - name: Notify Slack (accessibility violations)
+        if: ${{ steps.axe.outcome == 'failure' }}
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          text: "Web accessibility check <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|found violations> :warning:"
+          color: "warning"
+          fallback: "Web accessibility check found violations"

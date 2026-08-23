@@ -613,6 +613,85 @@ RSpec.describe ArticleHelpers do
       end
     end
 
+    describe '#recirculation_sections' do
+      # This group needs data.related as well as data.articles and data.tags.
+      def data
+        base = super
+        OpenStruct.new(articles: base.articles, tags: base.tags, related: @related || {})
+      end
+
+      # A tagged article that also has a sys id, thus data.related can name it.
+      def entry(slug, id, concepts: [], **opts)
+        a = tagged_article(slug: slug, concepts: concepts, **opts)
+        a.sys = OpenStruct.new(id: id)
+        a
+      end
+
+      # ⚠️ This is the reason for the change: the two sections excluded each other, thus this
+      # article showed one card where five were possible.
+      it 'renders the race reports and the related entries together' do
+        a = entry('cda-2026', 'id-a', concepts: [ race_reports, cda ], published_at: '2026-06-01T00:00:00Z')
+        sibling = entry('cda-2025', 'id-sib', concepts: [ race_reports, cda ], published_at: '2025-06-01T00:00:00Z')
+        near = %w[id-n1 id-n2 id-n3 id-n4].each_with_index.map { |id, i| entry("near-#{i}", id) }
+        stub_corpus([ a, sibling, *near ])
+        @related = { 'id-a' => %w[id-n1 id-n2 id-n3 id-n4] }
+
+        sections = recirculation_sections(a)
+        expect(sections[:reports].map(&:slug)).to eq([ 'cda-2025' ])
+        expect(sections[:related].map(&:slug)).to eq(%w[near-0 near-1 near-2 near-3])
+      end
+
+      # A report of the same race is often also the nearest entry by meaning. The same card in the
+      # two sections would give two DOM ids that are the same.
+      it 'never lists an entry in both sections, and never the article itself' do
+        a = entry('cda-2026', 'id-a', concepts: [ race_reports, cda ], published_at: '2026-06-01T00:00:00Z')
+        sibling = entry('cda-2025', 'id-sib', concepts: [ race_reports, cda ], published_at: '2025-06-01T00:00:00Z')
+        other = entry('other', 'id-o')
+        stub_corpus([ a, sibling, other ])
+        @related = { 'id-a' => %w[id-sib id-a id-o] }
+
+        sections = recirculation_sections(a)
+        expect(sections[:reports].map(&:slug)).to eq([ 'cda-2025' ])
+        expect(sections[:related].map(&:slug)).to eq([ 'other' ])
+      end
+
+      # ⚠️ The api sends more neighbors than one section shows (RelatedController::COUNT), because
+      # the dedup above removes some of them. Without that headroom the second section is short.
+      it 'still fills the related section when the reports also appear in the related list' do
+        a = entry('cda-2026', 'id-a', concepts: [ race_reports, cda ], published_at: '2026-06-01T00:00:00Z')
+        sibs = %w[2025 2024].each_with_index.map do |year, i|
+          entry("cda-#{year}", "id-sib#{i}", concepts: [ race_reports, cda ], published_at: "#{year}-06-01T00:00:00Z")
+        end
+        near = (1..4).map { |i| entry("near-#{i}", "id-n#{i}") }
+        stub_corpus([ a, *sibs, *near ])
+        # The api ranks the two reports first, because their meaning is nearest.
+        @related = { 'id-a' => %w[id-sib0 id-sib1 id-n1 id-n2 id-n3 id-n4] }
+
+        sections = recirculation_sections(a)
+        expect(sections[:reports].size).to eq(2)
+        expect(sections[:related].map(&:slug)).to eq(%w[near-1 near-2 near-3 near-4])
+      end
+
+      it 'gives the related entries only when the article has no race' do
+        a = entry('post', 'id-a')
+        other = entry('other', 'id-o')
+        stub_corpus([ a, other ])
+        @related = { 'id-a' => [ 'id-o' ] }
+
+        sections = recirculation_sections(a)
+        expect(sections[:reports]).to eq([])
+        expect(sections[:related].map(&:slug)).to eq([ 'other' ])
+      end
+
+      # Two empty lists render no section at all.
+      it 'is empty when the article has no neighbor' do
+        a = entry('lonely', 'id-a')
+        stub_corpus([ a ])
+
+        expect(recirculation_sections(a)).to eq({ reports: [], related: [] })
+      end
+    end
+
     describe '#tag_breadcrumb_chains' do
       def triathlon = concept('triathlon', 'Triathlon', path: '/tagged/triathlon/', scheme: 'sports')
       def half = concept('half-distance', 'Half Distance', path: '/tagged/triathlon/half-distance/', parent_id: 'triathlon', scheme: 'sports')

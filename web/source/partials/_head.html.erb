@@ -42,18 +42,16 @@
       constraint on where the stylesheet lands in this head. %>
   <%= javascript_include_tag 'site', defer: 'defer', 'data-turbo-track': 'reload' %>
   <%# The Web Awesome theme. esbuild takes it from the one CSS import in stimulus/index.js.
-      ⚠️ This is render-blocking and it does NOT have to be — it's custom-property definitions
-      only (it pulls in layers.css and a colour palette, but neither native.css nor
-      utilities.css, so it styles no plain HTML element), and every token consumer is a WA
-      custom element that can't render styled until the deferred bundle above upgrades it.
-      But do NOT unblock it with the usual `media="print" onload="this.media='all'"` swap:
-      `data-turbo-track="reload"` folds this element's outerHTML into Turbo's tracked-element
-      signature (HeadSnapshot#trackedElementSignature), so mutating `media` at runtime makes
-      every navigation's comparison fail and Turbo full-page-reloads, taking view transitions
-      with it. That's been tried and reverted. Any fix must leave the element unmutated —
-      inline the CSS in a <style>, or drop this tag and inject the <link> from JS the way
-      lib/pagefind.js does. %>
-  <%= stylesheet_link_tag '/javascripts/site', 'data-turbo-track': 'reload' %>
+      It does NOT stop the first render: this element only preloads the file, and
+      javascripts/stimulus/lib/wa_theme.js adds the <link rel="stylesheet"> when the bundle runs.
+      The file holds custom-property definitions only, and each consumer is a Web Awesome custom
+      element that cannot render styled until that same bundle upgrades it.
+      ⚠️ This element carries the URL, because asset_hash puts a hash in the name and the
+      JavaScript cannot write it. Do not give it `data-turbo-track`, and never change one of its
+      attributes at run time. Turbo puts the outerHTML of a tracked element in its signature, thus
+      a change makes each navigation a full page load and stops the view transitions, with no
+      message. Refer to lib/wa_theme.js. %>
+  <link rel="preload" as="style" data-wa-theme href="<%= asset_path(:css, '/javascripts/site') %>">
   <%= stylesheet_link_tag 'site', 'data-turbo-track': 'reload' %>
   <%= stylesheet_link_tag 'print', media: 'print', 'data-turbo-track': 'reload' %>
   <%= yield_content :assets %>

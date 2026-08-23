@@ -14,7 +14,7 @@ module MarkupHelpers
   # @param text [String] The Markdown text to render.
   # @param image_variant [Symbol] The responsive-images configuration to use.
   # @return [String] The HTML after the transforms.
-  def render_body(text, image_variant: :entry)
+  def render_body(text, image_variant: :entry, first_image: nil)
     srcset = data.srcsets[image_variant]
     render_markup(text) do |doc|
       open_external_links_in_new_tabs(doc)
@@ -26,7 +26,8 @@ module MarkupHelpers
       add_figure_elements_to_embeds(doc, base_class: "entry")
       set_caption_credit(doc)
       wrap_figcaption_emoji(doc)
-      responsivize_images(doc, widths: srcset.widths, sizes: srcset.sizes.join(", "))
+      responsivize_images(doc, widths: srcset.widths, sizes: srcset.sizes.join(", "),
+                          first_image: first_image)
       add_image_placeholders(doc)
       set_alt_text(doc)
       mark_affiliate_links(doc)
@@ -34,6 +35,7 @@ module MarkupHelpers
       scope_table_headers(doc)
       split_table_cell_annotations(doc)
       add_heading_permalinks(doc)
+      set_iframe_titles(doc)
       lazy_load_iframes(doc)
     end
   end
@@ -63,7 +65,12 @@ module MarkupHelpers
       add_image_data_attributes(doc)
       add_figure_elements_to_images(doc, base_class: "home")
       set_caption_credit(doc)
-      responsivize_images(doc, widths: data.srcsets.home.widths, sizes: data.srcsets.home.sizes.join(", "), square: true)
+      # ⚠️ `first_image: :eager` is correct HERE and almost nowhere else. A measurement of the
+      # home page gave this image as the LCP element: it is above the fold, and each other
+      # candidate is text. The `home` variant has no `auto` in its `sizes` for the same reason:
+      # `auto` is valid on a lazy image only. Refer to data/srcsets.yml.
+      responsivize_images(doc, widths: data.srcsets.home.widths, sizes: data.srcsets.home.sizes.join(", "),
+                          square: true, first_image: :eager)
       add_image_placeholders(doc)
       set_alt_text(doc)
     end
@@ -285,7 +292,27 @@ module MarkupHelpers
   # @param lazy [Boolean] True to load the image only when it is necessary.
   # @param square [Boolean] True to cut the image to a square.
   # @return [String, Nokogiri::XML::Node] The HTML after the change.
-  def responsivize_images(html, widths: [ 100, 200, 300 ], sizes: "100vw", lazy: true, square: false)
+  # Marks the first asset image of the page as the probable LCP element.
+  #
+  # ⚠️ The flag is an instance variable, thus it covers the full page: `_body.html.erb` calls
+  # render_body two times, for the intro and for the body, and only the first image of the two gets
+  # the mark. Middleman gives each page its own template context. Refer to MemoizationHelpers.
+  # @return [Boolean] True one time for each page, and false after that.
+  def claim_lcp_image
+    return false if @lcp_image_claimed
+    @lcp_image_claimed = true
+  end
+
+  # `first_image` gives the first asset image of the PAGE a role:
+  #   :priority  `fetchpriority="high"`, and the image stays lazy.
+  #   :eager     the same, and `loading="eager"`.
+  #
+  # ⚠️ Use `:eager` only where a measurement gives that image as the LCP element, and only with a
+  # `sizes` list that has no `auto`. `auto` is valid on a lazy image only, and a browser ignores it
+  # on an eager image. Today the home page hero is the one such image. Most body images are below
+  # the fold, thus `:priority` is correct there and `:eager` would get an image that nobody sees.
+  def responsivize_images(html, widths: [ 100, 200, 300 ], sizes: "100vw", lazy: true, square: false,
+                          first_image: nil)
     with_nokogiri_doc(html) do |doc|
       each_asset_image(doc) do |img, asset_id, original_url|
         width, height = get_asset_dimensions(asset_id)
@@ -299,6 +326,10 @@ module MarkupHelpers
         img_widths = img_widths.uniq.sort
 
         img["loading"] = "lazy" if lazy
+        if first_image && claim_lcp_image
+          img["fetchpriority"] = "high"
+          img["loading"] = "eager" if first_image == :eager
+        end
         if width.present? && height.present?
           img["width"] = width
           img["height"] = square ? width : height
@@ -506,6 +537,23 @@ module MarkupHelpers
     end
   end
 
+  # Gives each iframe an accessible name.
+  #
+  # ⚠️ A frame with no name is a serious WCAG failure: a screen reader announces only "frame". An
+  # embed comes from raw HTML in the Contentful body, thus a person writes it by hand and a `title`
+  # is easy to forget. This step is the one thing between that and a page with no name for its
+  # player. It never replaces a title that the author wrote.
+  # @param html [String, Nokogiri::XML::Node] The HTML to change.
+  # @return [String, Nokogiri::XML::Node] The HTML after the change.
+  def set_iframe_titles(html)
+    with_nokogiri_doc(html) do |doc|
+      doc.css("iframe").each do |iframe|
+        next if iframe["title"].present?
+        iframe["title"] = iframe_title(iframe)
+      end
+    end
+  end
+
   # Marks each iframe to load only when it is necessary.
   # @param html [String, Nokogiri::XML::Node] The HTML to change.
   # @return [String, Nokogiri::XML::Node] The HTML after the change.
@@ -518,6 +566,21 @@ module MarkupHelpers
   end
 
   private
+
+  # The name for an iframe with no title: the caption of its figure, or the host that it embeds.
+  # @param iframe [Nokogiri::XML::Node] The iframe.
+  # @return [String] The title.
+  def iframe_title(iframe)
+    caption = iframe.parent&.at_css("figcaption")&.text.to_s.strip
+    return caption if caption.present?
+
+    host = begin
+      URI.parse(iframe["src"].to_s).host
+    rescue URI::InvalidURIError
+      nil
+    end
+    host.present? ? "Embedded content from #{host.sub(/\Awww\./, '')}" : "Embedded content"
+  end
 
   # Puts a node in a <figure>, but not if its parent is already a <figure>. Then it adds the
   # figure classes.

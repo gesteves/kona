@@ -1,8 +1,0 @@
-<%# ⚠️ This uses scope_entry_ids for the same reason as partials/_related: read_next renders more
-    summary cards on this same page, and another report from this race is often also the adjacent
-    entry in time. Without the section in the id, the two cards would have the same DOM id and both
-    aria-labelledby values would point at the first card. %>
-<% race_reports = related_race_reports(article) %>
-<% if race_reports.present? %>
-  <%= partial 'partials/collection', locals: { title: "More Reports From This Race", items: race_reports, variant: "halves", scope_entry_ids: true } %>
-<% end %>

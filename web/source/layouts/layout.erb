@@ -14,5 +14,10 @@
     <%= partial 'partials/footer' %>
     <pagefind-modal></pagefind-modal>
     <%= partial 'partials/notifications' %>
+    <%# The live region that announces a Turbo navigation. Refer to the page controller.
+        ⚠️ data-turbo-permanent keeps this ONE element across each navigation. Turbo replaces the
+        body, thus without it each page would bring a new region that already holds its text, and a
+        screen reader does not announce such a region. It needs the id for that flag. %>
+    <div id="route-announcer" class="sr-only" role="status" aria-live="polite" data-turbo-permanent></div>
   </body>
 </html>

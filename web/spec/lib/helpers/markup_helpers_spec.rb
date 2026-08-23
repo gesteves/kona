@@ -524,6 +524,77 @@ RSpec.describe MarkupHelpers do
       html = %(<img src="#{image_url}">)
       expect(responsivize_images(html)).to eq(html)
     end
+
+    describe 'the LCP mark' do
+      let(:two_images) { tagged_img * 2 }
+
+      it 'adds no fetchpriority when the caller does not ask for it' do
+        expect(responsivize_images(tagged_img, widths: [ 100 ], sizes: '100vw')).not_to include('fetchpriority')
+      end
+
+      it 'marks the first image of the page only' do
+        html = responsivize_images(two_images, widths: [ 100 ], sizes: '100vw', first_image: :priority)
+        expect(html.scan('fetchpriority="high"').size).to eq(1)
+        expect(html.index('fetchpriority')).to be < html.index('><img')
+      end
+
+      # ⚠️ _body.html.erb calls render_body two times, for the intro and for the body. The mark
+      # must cross that boundary, or each half would mark its own first image.
+      it 'keeps the mark across two calls, thus the intro wins over the body' do
+        first = responsivize_images(tagged_img, widths: [ 100 ], sizes: '100vw', first_image: :priority)
+        second = responsivize_images(tagged_img, widths: [ 100 ], sizes: '100vw', first_image: :priority)
+
+        expect(first).to include('fetchpriority="high"')
+        expect(second).not_to include('fetchpriority')
+      end
+
+      # ⚠️ Most body images are below the fold, thus :priority must NOT make an image eager. A
+      # measurement gave the LCP element of an article as text.
+      it 'leaves the image lazy for :priority' do
+        html = responsivize_images(tagged_img, widths: [ 100 ], sizes: '100vw', first_image: :priority)
+        expect(html).to include('loading="lazy"')
+        expect(html).not_to include('loading="eager"')
+      end
+
+      # The home page hero is the LCP element of that page. Refer to render_home_body.
+      it 'makes the first image eager for :eager, and leaves the others lazy' do
+        html = responsivize_images(two_images, widths: [ 100 ], sizes: '100vw', first_image: :eager)
+        expect(html.scan('loading="eager"').size).to eq(1)
+        expect(html.scan('loading="lazy"').size).to eq(1)
+        expect(html.scan('fetchpriority="high"').size).to eq(1)
+        expect(html.index('loading="eager"')).to be < html.index('loading="lazy"')
+      end
+    end
+  end
+
+  # ⚠️ A frame with no accessible name is a serious WCAG failure, and axe found one in a podcast
+  # embed from the Contentful body.
+  describe '#set_iframe_titles' do
+    it 'names an iframe from the host that it embeds' do
+      html = %(<iframe src="https://embed.podcasts.apple.com/us/podcast/x"></iframe>)
+      expect(set_iframe_titles(html)).to include('title="Embedded content from embed.podcasts.apple.com"')
+    end
+
+    it 'prefers the caption of the figure' do
+      html = %(<figure><iframe src="https://example.com/x"></iframe><figcaption>Episode 12</figcaption></figure>)
+      expect(set_iframe_titles(html)).to include('title="Episode 12"')
+    end
+
+    it 'never replaces a title that the author wrote' do
+      html = %(<iframe src="https://example.com/x" title="My player"></iframe>)
+      result = set_iframe_titles(html)
+      expect(result).to include('title="My player"')
+      expect(result).not_to include('Embedded content')
+    end
+
+    it 'falls back when the src is absent' do
+      expect(set_iframe_titles('<iframe></iframe>')).to include('title="Embedded content"')
+    end
+
+    it 'removes a www prefix from the host' do
+      html = %(<iframe src="https://www.youtube.com/embed/x"></iframe>)
+      expect(set_iframe_titles(html)).to include('title="Embedded content from youtube.com"')
+    end
   end
 
   describe '#resize_images' do

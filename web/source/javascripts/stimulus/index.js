@@ -10,6 +10,7 @@ import '@web.awesome.me/webawesome-pro/dist/components/input/input.js';
 import '@web.awesome.me/webawesome-pro/dist/components/textarea/textarea.js';
 import '@web.awesome.me/webawesome-pro/dist/components/button/button.js';
 import '@web.awesome.me/webawesome-pro/dist/components/scroller/scroller.js';
+import './lib/wa_theme';
 import './lib/patch_scroller_aria';
 import './lib/eager_print_images';
 

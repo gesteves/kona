@@ -375,8 +375,7 @@ module ArticleHelpers
   end
 
   # The other race reports with the same race concept as this article, the newest first. The app
-  # keeps the value, because the template reads it one time to select a section and the partial
-  # reads it again to render it.
+  # keeps the value, because recirculation_section reads it and the title needs it again.
   # @param article [Object] The current article.
   # @param count [Integer] The number to return.
   # @return [Array<Object>]
@@ -392,6 +391,29 @@ module ArticleHelpers
         .sort_by { |a| -published_datetime(a).to_i }
         .take(count)
     end
+  end
+
+  # The entries for the two recirculation sections of an article: the reports of the same race, and
+  # then the related entries.
+  #
+  # ⚠️ The two sections excluded each other before, thus a race with only one or two other reports
+  # gave one or two cards where four were possible. Race reports are the largest group on the site,
+  # thus that applied to most of them. The two now render together, and the dedup below is what
+  # makes that safe: a report of the same race is often also a near entry by meaning, and the same
+  # card two times would give two DOM ids that are the same.
+  # @param article [Object] The article.
+  # @param count [Integer] The number of cards in each section.
+  # @return [Hash] { reports:, related: }. An empty list renders no section.
+  def recirculation_sections(article, count: 4)
+    reports = related_race_reports(article, count: count)
+
+    seen = reports.filter_map { |a| a.sys&.id }.to_set
+    seen << article.sys&.id
+    related = related_articles(article, count: count + reports.size)
+      .reject { |a| seen.include?(a.sys&.id) }
+      .take(count)
+
+    { reports: reports, related: related }
   end
 
   # The id of the race concept of an article: its most deeply nested Sports concept at the race

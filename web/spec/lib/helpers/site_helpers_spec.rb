@@ -145,7 +145,7 @@ RSpec.describe SiteHelpers do
       expect(schema['@type']).to eq('BreadcrumbList')
       expect(schema['itemListElement']).to eq([
         { '@type' => 'ListItem', 'position' => 1, 'name' => 'Home', 'item' => 'https://example.com/' },
-        { '@type' => 'ListItem', 'position' => 2, 'name' => 'Blog', 'item' => 'https://example.com/blog' },
+        { '@type' => 'ListItem', 'position' => 2, 'name' => 'Blog', 'item' => 'https://example.com/blog/' },
         { '@type' => 'ListItem', 'position' => 3, 'name' => 'Triathlon', 'item' => 'https://example.com/tagged/triathlon/' },
         { '@type' => 'ListItem', 'position' => 4, 'name' => 'Half Distance', 'item' => 'https://example.com/tagged/triathlon/half-distance/' }
       ])
@@ -154,6 +154,14 @@ RSpec.describe SiteHelpers do
     it 'returns nil when the page has no concept' do
       expect(tag_breadcrumb_schema(OpenStruct.new(tag_id: nil))).to be_nil
       expect(tag_breadcrumb_schema(OpenStruct.new(tag_id: 'unknown'))).to be_nil
+    end
+
+    # ⚠️ /blog with no slash at the end is a 301 (auto-trailing-slash). Thus a crumb without it
+    # points at a redirect while each other URL on the page is canonical.
+    it 'gives the Blog crumb the slash at the end, thus it is not a redirect' do
+      schema = JSON.parse(tag_breadcrumb_schema(OpenStruct.new(tag_id: 'half-distance')))
+      blog = schema['itemListElement'].find { |i| i['name'] == 'Blog' }
+      expect(blog['item']).to end_with('/blog/')
     end
   end
 
@@ -483,6 +491,32 @@ RSpec.describe SiteHelpers do
     it 'renders everything else as a plain link' do
       item = OpenStruct.new(title: 'About', destination: '/about', open_in_new_tab: false)
       expect(shortcut_link(item)).to eq('<a href="/about">About</a>')
+    end
+
+    context 'when a page renders' do
+      # A destination comes from Contentful, thus it can have a slash at the end or no slash, and
+      # current_page.url always has one.
+      def current_page = OpenStruct.new(url: '/about/')
+
+      it 'marks the link to this page with aria-current, with or without the slash' do
+        %w[/about /about/].each do |destination|
+          item = OpenStruct.new(title: 'About', destination: destination, open_in_new_tab: false)
+          expect(shortcut_link(item)).to eq('<a href="' + destination + '" aria-current="page">About</a>')
+        end
+      end
+
+      it 'leaves another page, an absolute URL, and the feed with no aria-current' do
+        [
+          OpenStruct.new(title: 'Contact', destination: '/contact/', open_in_new_tab: false),
+          OpenStruct.new(title: 'GitHub', destination: 'https://github.com/x', open_in_new_tab: true),
+          OpenStruct.new(title: 'Feed', destination: '/feed.xml')
+        ].each { |item| expect(shortcut_link(item)).not_to include('aria-current') }
+      end
+
+      it 'ignores a query and a fragment on the destination' do
+        item = OpenStruct.new(title: 'About', destination: '/about/?utm=1#bio', open_in_new_tab: false)
+        expect(shortcut_link(item)).to include('aria-current="page"')
+      end
     end
   end
 

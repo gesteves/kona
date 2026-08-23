@@ -46,9 +46,12 @@ full:
     - 1206
     - 1260
     - 1320
+# ⚠️ This variant has NO `auto`, and each other variant has one. The home page hero is the LCP
+# element of that page, thus it is the one image that renders EAGER (refer to render_home_body).
+# `auto` is valid on a lazy image only, and a browser ignores it on an eager image. The list below
+# is complete without it. Do not add `auto` back unless that image becomes lazy again.
 home:
   sizes:
-    - auto
     - "(min-width: 1280px) 488px"
     - "(min-width: 768px) calc((((100vw - 4rem - (11 * 2rem))/12) * 5) + (4 * 2rem))"
     - "calc((((100vw - 4rem - (11 * 1rem))/12) * 5) + (4 * 1rem))"

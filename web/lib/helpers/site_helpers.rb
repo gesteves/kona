@@ -232,7 +232,7 @@ module SiteHelpers
   end
 
   # Makes a nav or footer link for a site shortcut. A "Feed" item copies its link instead of
-  # navigation.
+  # navigation. The link to the page that renders now gets aria-current="page".
   # @param item [Object] A menu item with title, destination, and open_in_new_tab.
   # @return [String] An anchor element.
   def shortcut_link(item)
@@ -240,9 +240,34 @@ module SiteHelpers
       link_to item.title, item.destination, **FEED_CLIPBOARD_ATTRS
     elsif item.open_in_new_tab
       link_to item.title, item.destination, rel: "noopener", target: "_blank"
+    elsif current_shortcut?(item.destination)
+      link_to item.title, item.destination, "aria-current": "page"
     else
       link_to item.title, item.destination
     end
+  end
+
+  # Tells if a menu destination is the page that renders now.
+  #
+  # ⚠️ A destination comes from Contentful, thus it can have a slash at the end or no slash. The
+  # comparison adds the slash to both, because `activate :directory_indexes` puts each page at
+  # /<slug>/. An absolute URL and a protocol-relative URL are never the current page.
+  # @param destination [String] The destination of the menu item.
+  # @return [Boolean]
+  def current_shortcut?(destination)
+    return false if destination.blank?
+    return false if destination.match?(%r{\A([a-z][a-z0-9+.\-]*:|//)}i)
+
+    here = (current_page.url if defined?(current_page))
+    return false if here.blank?
+
+    normalize_menu_path(here) == normalize_menu_path(destination)
+  end
+
+  # @param path [String] A path, with or without the slash at the end.
+  # @return [String] The path with one slash at the end, and with no query and no fragment.
+  def normalize_menu_path(path)
+    path.to_s.split(/[?#]/).first.to_s.chomp("/") + "/"
   end
 
   # Makes the copyright line in the footer. The last year is in an element that the current-year
@@ -322,11 +347,15 @@ module SiteHelpers
   end
 
   # Makes a JSON-LD BreadcrumbList: Home › Blog › the given crumbs.
+  #
+  # ⚠️ The Blog crumb needs the slash at the end. `activate :directory_indexes` puts that page at
+  # /blog/, and `html_handling: "auto-trailing-slash"` in wrangler.jsonc answers /blog with a 301.
+  # Thus a crumb with no slash points at a redirect, and each other URL on the page is canonical.
   # @param crumbs [Array<Array(String, String)>] The [name, url] pairs that go after Home › Blog.
   # @see https://schema.org/BreadcrumbList
   # @return [String] JSON-LD.
   def breadcrumb_list_schema(crumbs)
-    items = [ [ "Home", full_url("/") ], [ "Blog", full_url("/blog") ], *crumbs ].map.with_index(1) do |(name, url), position|
+    items = [ [ "Home", full_url("/") ], [ "Blog", full_url("/blog/") ], *crumbs ].map.with_index(1) do |(name, url), position|
       { "@type": "ListItem", "position": position, "name": name, "item": url }
     end
     { "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": items }.to_json

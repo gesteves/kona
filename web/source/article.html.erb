@@ -1,13 +1,8 @@
 <%= partial 'partials/article/full', locals: { article: content } %>
 <%= partial 'partials/share', locals: { article: content } %>
-<%# Show the race reports of the same event when there are some. In all other conditions, show %>
-<%# the "You May Also Like" section, which uses the meaning of the articles. Only one of the two %>
-<%# appears, thus they never show the same entry. %>
-<% if related_race_reports(content).present? %>
-  <%= partial 'partials/race_reports', locals: { article: content } %>
-<% else %>
-  <%= partial 'partials/related', locals: { article: content } %>
-<% end %>
+<%# One section: the reports of the same race first, then the related entries fill each empty %>
+<%# place. Refer to recirculation_section. %>
+<%= partial 'partials/recirculation', locals: { article: content } %>
 <%# Remove this article only, thus the trending list does not contain it. %>
 <%= render_widget 'trending', "/widgets/articles/trending/#{content.sys.id}" %>
 <%= partial 'partials/read_next', locals: { article: content } %>

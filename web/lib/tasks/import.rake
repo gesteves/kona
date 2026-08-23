@@ -32,6 +32,7 @@ namespace :import do
     setup_data_directory
     RedisConnection.connection
     measure_and_output(:import_related, "Fetching related articles")
+    report_related_coverage
   end
 end
 
@@ -60,6 +61,10 @@ task import: [ :dotenv, :clobber ] do
   end
 
   independent_threads.each(&:join)
+
+  # This runs after the join, because it reads the output of two importers that run at the same
+  # time.
+  report_related_coverage
 
   total_duration = Time.now - overall_start_time
   puts "\n" + "=" * 60
@@ -185,6 +190,35 @@ def import_related
     next unless related.is_a?(Hash) && related.present?
     File.write("data/related.json", related.to_json)
   end
+end
+
+# The part of the archive that needs a related list before the build reports one that is thin.
+# An entry that a person just published has no vector yet, thus a small gap is normal.
+RELATED_COVERAGE_FLOOR = 0.8
+
+# Reports a related-articles file that is absent or thin.
+#
+# ⚠️ import_related writes nothing on a failure and gives no message, and that rule is correct: an
+# api that is unavailable must not stop a content deploy. But the result is that each article
+# quietly loses four internal links across the full site. This gives that failure a voice. It does
+# NOT stop the build.
+def report_related_coverage
+  articles = JSON.parse(File.read("data/articles.json")) rescue nil
+  return if articles.nil?
+
+  expected = articles.count { |a| !a["draft"] }
+  return if expected.zero?
+
+  related = JSON.parse(File.read("data/related.json")) rescue nil
+  if related.nil?
+    puts "⚠️  data/related.json is absent. Each article loses its “You May Also Like” section."
+    return
+  end
+
+  covered = related.count { |_id, ids| Array(ids).any? }
+  return if covered >= expected * RELATED_COVERAGE_FLOOR
+
+  puts "⚠️  Related articles cover #{covered} of #{expected} entries. The api may not have each embedding."
 end
 
 def safely_perform
