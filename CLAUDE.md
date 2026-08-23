@@ -268,11 +268,16 @@ always correct, because a Contentful publish is the thing that changes such a ti
 immutable and the content gives its address, thus a purge can correct nothing. And with the tag,
 each content publish would remove the full image cache.
 
-A **second** rule gives each widget on the api host the tag `widgets`, and it is **after** the
-`site` rule. Never put it first: if Cloudflare stops at the first rule that matches, a `widgets` rule
-before the other one would end the deploy purge of the Contentful widgets, and give no message. That
-second rule exists only to make a manual `POST /zones/<id>/purge_cache` with `{"tags":["widgets"]}`
-one call and not approximately 60.
+A **second** rule gives each widget on the api host the tag `widgets`. It exists only to make a
+manual `POST /zones/<id>/purge_cache` with `{"tags":["widgets"]}` one call and not approximately 60.
+
+The two rules **stack**: a widget below `/widgets/articles/` or `/widgets/events/` gets both tags.
+Each rule uses the **Add to existing tags** action, and that action makes them add. The order of the
+two rules does not change the tags.
+
+⚠️ **Keep the action of each rule at "Add to existing tags".** With "Override existing tags", the
+`widgets` rule would remove `site` from each Contentful widget. The deploy purge would then miss
+those widgets, and it would give no message.
 
 ⚠️ **Never put `widgets` in the deploy purge.** That workflow purges `{"tags":["site"]}`, and it must
 purge that tag only, for the reason above. Use the manual purge when the cached copy of a widget is
@@ -284,10 +289,18 @@ change that must arrive with the change to the web placeholder.
 dashboard**, and no file in the repo gives you that message. Without that change, the widget serves
 old content for all time, and it gives no message.
 
-(Each tag must come from a Cache Response Rule. Cloudflare does not read a `Cache-Tag` response
-header. These rules run in the `http_response_cache_settings` phase, after the response of the
-origin, and that phase includes each subrequest of a Worker. That is what puts the widget fragments
-in reach.)
+⚠️ **Cloudflare Trace cannot show these rules.** Trace walks the request phases only, and it never
+gets a response from an origin. To check a tag, purge it, then read `CF-Cache-Status` on the next
+request.
+
+(A `Cache-Tag` response header from an origin also works, and purge by tag is on each plan. Thus
+these rules are a decision and not a necessity. Two reasons keep them. First, the site host has no
+origin that writes a header: each page is a static file from the asset layer of the Worker. Thus
+that half needs a rule in each condition. Second, a header for the widget half would then give one
+tag two sources, in two apps and two deploy pipelines. One rule covers the two hosts instead. The
+cost is discoverability, and the warning above about a new namespace is that cost. These rules run
+in the `http_response_cache_settings` phase, after the response of the origin. That phase includes
+each subrequest of a Worker, and that puts the widget fragments in reach.)
 
 ### Cache Rules (edge TTL)
 
