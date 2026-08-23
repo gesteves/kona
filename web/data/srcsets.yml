@@ -10,9 +10,8 @@
 #   3. Multiply by the scale factor of the device, and round up.
 #   4. Remove each duplicate, and add the desktop width at 1x and at 2x.
 #
-# The devices are the current iPhones and iPads, and a desktop at 1280px and above:
+# The devices are the current iPhones, and a desktop at 1280px and above:
 #   390, 402, 420, 440 at 3x  — iPhone 17e, iPhone 17 and 17 Pro, iPhone Air, iPhone 17 Pro Max
-#   820, 834, 1024, 1032 at 2x — iPad Air 11" and 13", iPad Pro 11" and 13"
 #
 # ⚠️ The FIRST width of a variant must be its 1x desktop width. `cover_image_tag` reads
 # `widths.first` for the `src`, in both apps.
@@ -31,13 +30,9 @@ entry:
     - 800
     - 1600
     - 978
-    - 987
-    - 1006
     - 1014
     - 1068
     - 1128
-    - 1259
-    - 1270
 full:
   sizes:
     - auto
@@ -49,12 +44,8 @@ full:
     - 2016
     - 1170
     - 1206
-    - 1250
     - 1260
-    - 1273
     - 1320
-    - 1590
-    - 1603
 home:
   sizes:
     - auto
@@ -64,14 +55,10 @@ home:
   widths:
     - 488
     - 976
-    - 380
-    - 395
+    - 381
+    - 396
     - 417
-    - 442
-    - 593
-    - 605
-    - 763
-    - 770
+    - 441
 card:
   sizes:
     - auto
@@ -81,10 +68,6 @@ card:
   widths:
     - 592
     - 1184
-    - 724
-    - 738
-    - 928
-    - 936
     - 978
     - 1014
     - 1068
