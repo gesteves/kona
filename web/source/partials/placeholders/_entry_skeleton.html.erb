@@ -3,11 +3,17 @@
 <%# Give `lines:` for the size of the body: an event needs 4, and a summary needs 2, which is %>
 <%# the default. %>
 <% line_count = defined?(lines) ? lines : 2 %>
+<%# Give `image: true` where the fragment renders a cover image. Without it, the section jumps when
+    the fragment replaces the skeleton. %>
+<% show_image = defined?(image) ? image : false %>
 <%# The container tags are the same as in the _summary card of the api, which replaces this. Thus a
 <%# selector such as
     `article.entry` or `header.entry__header` in the jointly-owned _entry.scss reach both.
     ⚠️ The heading stays a span, deliberately: an empty h3 would announce a nameless heading. %>
 <article class="entry entry--summary">
+  <% if show_image %>
+    <span class="entry__cover"><wa-skeleton class="entry-skeleton-cover" effect="sheen"></wa-skeleton></span>
+  <% end %>
   <header class="entry__header">
     <p class="entry__meta"><wa-skeleton class="entry-skeleton-eyebrow" effect="sheen"></wa-skeleton></p>
     <span class="entry__hed"><wa-skeleton class="entry-skeleton-heading" effect="sheen"></wa-skeleton></span>

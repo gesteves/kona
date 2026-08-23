@@ -9,7 +9,7 @@
   <ol class="collection__list">
     <% 4.times do %>
       <li class="collection__item">
-        <%= partial 'partials/placeholders/entry_skeleton' %>
+        <%= partial 'partials/placeholders/entry_skeleton', locals: { image: true } %>
       </li>
     <% end %>
   </ol>

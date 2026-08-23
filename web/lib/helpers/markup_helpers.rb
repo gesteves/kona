@@ -27,7 +27,6 @@ module MarkupHelpers
       set_caption_credit(doc)
       wrap_figcaption_emoji(doc)
       responsivize_images(doc, widths: srcset.widths, sizes: srcset.sizes.join(", "))
-      resize_images(doc, width: srcset.widths.max)
       add_image_placeholders(doc)
       set_alt_text(doc)
       mark_affiliate_links(doc)
@@ -65,7 +64,6 @@ module MarkupHelpers
       add_figure_elements_to_images(doc, base_class: "home")
       set_caption_credit(doc)
       responsivize_images(doc, widths: data.srcsets.home.widths, sizes: data.srcsets.home.sizes.join(", "), square: true)
-      resize_images(doc)
       add_image_placeholders(doc)
       set_alt_text(doc)
     end
@@ -306,12 +304,23 @@ module MarkupHelpers
           img["height"] = square ? width : height
         end
 
-        img["src"] = cdn_image_url(original_url)
-
-        next if content_type == "image/gif"
+        # No transformation for a GIF, thus it keeps its animation. A width would make one static
+        # frame from it. resize_images has the same rule.
+        if content_type == "image/gif"
+          img["src"] = cdn_image_url(original_url)
+          next
+        end
 
         img["sizes"] = sizes
-        img["srcset"] = srcset(url: original_url, widths: img_widths, square: square, options: { fm: "auto" })
+        img["srcset"] = srcset(url: original_url, widths: img_widths, ratio: (1 if square), options: { fm: "auto" })
+
+        # ⚠️ The src must be one of the candidates above, word for word: the same parameters, in the
+        # same order. Cloudflare renders and bills one transformation for each different URL, thus a
+        # src that only looks the same is a second render of each image that no browser uses.
+        src_width = img_widths.max
+        src_query = { fm: "auto", w: src_width }
+        src_query.merge!({ h: src_width, fit: "cover" }) if square
+        img["src"] = cdn_image_url(original_url, src_query)
       end
     end
   end

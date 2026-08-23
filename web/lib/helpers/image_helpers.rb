@@ -28,6 +28,10 @@ module ImageHelpers
   # element is not necessary.
   CDN_IMAGE_FORMATS = { "avif" => "avif", "webp" => "webp", "jpg" => "jpeg", "auto" => "auto" }.freeze
 
+  # The shape of a cover image on a card: the height divided by the width, that is, 3:2. The
+  # `aspect-ratio` of .entry__cover-image in _entry.scss must be the same value.
+  CARD_RATIO = Rational(2, 3)
+
   # The time that the cache keeps a rendered blurhash placeholder. The key contains the
   # published_version of the asset, thus each entry is immutable and a new publish makes a new
   # entry. The TTL removes the old entries. It is not for freshness.
@@ -132,16 +136,92 @@ module ImageHelpers
   # Makes a responsive srcset.
   # @param url [String] The URL of the image.
   # @param widths [Array<Integer>] The widths to make candidates for.
-  # @param square [Boolean] True to cut each candidate to a square.
+  # @param ratio [Numeric, nil] The height of a candidate divided by its width. It cuts each
+  #   candidate to that shape. Nil keeps the shape of the asset.
   # @param options [Hash] More transformation parameters.
   # @return [String] The srcset attribute value.
-  def srcset(url:, widths:, square: false, options: {})
+  def srcset(url:, widths:, ratio: nil, options: {})
     srcset = widths.map do |w|
       query = options.merge({ w: w })
-      query.merge!({ h: w, fit: "cover" }) if square
+      query.merge!({ h: candidate_height(w, ratio), fit: "cover" }) if ratio
       cdn_image_url(url, query) + " #{w}w"
     end
     srcset.join(", ")
+  end
+
+  # @param width [Integer] The width of the candidate.
+  # @param ratio [Numeric] The height divided by the width.
+  # @return [Integer] The height of the candidate.
+  def candidate_height(width, ratio)
+    (width * ratio).round
+  end
+
+  # Makes the <img> of the cover image of an entry, for a card.
+  #
+  # ⚠️ It gives the element `alt=""`. The caller must put it in a link with `aria-hidden="true"`
+  # and `tabindex="-1"`. The headline below the image already links to the same page, thus without
+  # that, each card gives two identical tab stops and two identical entries in the link list of a
+  # screen reader.
+  # @param entry [Object] The article or the page.
+  # @param variant [Symbol] The name of the srcset variant in data/srcsets.yml.
+  # @return [String] The <img> element, or an empty string when the entry has no cover image.
+  def cover_image_tag(entry, variant: :card)
+    cover = entry&.cover_image
+    return "" if cover&.url.blank?
+
+    asset_id = get_asset_id(cover.url)
+    config = data.srcsets.public_send(variant)
+    widths = card_widths(config.widths, cover.width)
+    # The first width of a variant is its 1x size at the largest breakpoint. Each other candidate
+    # is for a smaller viewport or a denser screen. Thus it is the correct src.
+    width = [ config.widths.first, widths.max ].min
+    height = candidate_height(width, CARD_RATIO)
+
+    # A GIF gets no transformation and no srcset: a transformation makes one static frame from it.
+    # responsivize_images and resize_images have the same rule.
+    gif = get_asset_content_type(asset_id) == "image/gif"
+    # ⚠️ The src must be one of the candidates below, word for word, and `fm` is part of that.
+    # Cloudflare renders and bills one transformation for each different URL, thus a src that only
+    # looks the same is a second render of each cover image that no browser uses.
+    src_query = { fm: "auto", w: width, h: height, fit: "cover" }
+
+    attributes = {
+      src: gif ? cdn_image_url(cover.url) : cdn_image_url(cover.url, src_query),
+      width: width,
+      height: height,
+      alt: "",
+      # `loading="lazy"` is necessary: each sizes list starts with `auto`, and a browser ignores
+      # that keyword on an image that it loads at once.
+      loading: "lazy",
+      decoding: "async",
+      class: "entry__cover-image placeholder",
+      "data-controller": "image-placeholder",
+      "data-action": "load->image-placeholder#removePlaceholder error->image-placeholder#removePlaceholder"
+    }
+
+    placeholder = blurhash_svg_data_uri(asset_id)
+    attributes[:style] = "--placeholder:url('#{placeholder}');" if placeholder.present?
+
+    unless gif
+      attributes[:sizes] = config.sizes.join(", ")
+      attributes[:srcset] = srcset(url: cover.url, widths: widths, ratio: CARD_RATIO, options: { fm: "auto" })
+    end
+
+    tag(:img, attributes)
+  end
+
+  # The candidate widths of a card image. It removes each width above the width of the asset,
+  # because Cloudflare does not make an image larger than its source.
+  # @param widths [Array<Integer>] The widths of the variant.
+  # @param asset_width [Integer, nil] The width of the asset.
+  # @return [Array<Integer>] The widths, in order, with no duplicate.
+  def card_widths(widths, asset_width)
+    candidates = widths.dup
+    if asset_width.present?
+      candidates << asset_width if asset_width < candidates.max
+      candidates = candidates.reject { |w| w > asset_width }
+    end
+    candidates.uniq.sort
   end
 
   # Makes the Open Graph card URL for a cover image, at the size that Facebook recommends. It

@@ -484,9 +484,20 @@ RSpec.describe MarkupHelpers do
     it 'puts a format=auto srcset on the image, dropping widths larger than the asset' do
       transformed_html = responsivize_images(tagged_img, widths: [ 100, 200, 300 ], sizes: '100vw')
       expect(transformed_html).to eq(
-        %(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}" loading="lazy" width="200" height="100" ) +
+        %(<img src="#{image_url}?fm=auto&amp;w=200" data-asset-id="asset-1" data-original-url="#{image_url}" loading="lazy" width="200" height="100" ) +
         %(sizes="100vw" srcset="#{image_url}?fm=auto&amp;w=100 100w, #{image_url}?fm=auto&amp;w=200 200w">)
       )
+    end
+
+    # ⚠️ Cloudflare renders and bills one transformation for each different URL. A src with
+    # parameters that only look the same is a second render of each image that no browser uses.
+    it 'uses the largest candidate as the src, word for word' do
+      transformed_html = responsivize_images(tagged_img, widths: [ 100, 200, 300 ], sizes: '100vw')
+      src = transformed_html[/\ssrc="([^"]+)"/, 1]
+      candidates = transformed_html[/srcset="([^"]+)"/, 1].split(', ').map { |c| c.split(' ').first }
+
+      expect(candidates).to include(src)
+      expect(src).to eq(candidates.last)
     end
 
     it 'inserts the asset width as a srcset candidate when it falls below the largest requested width' do
@@ -498,7 +509,7 @@ RSpec.describe MarkupHelpers do
     it 'crops square candidates and sets the height to the width when square' do
       transformed_html = responsivize_images(tagged_img, widths: [ 100 ], sizes: '100vw', square: true, lazy: false)
       expect(transformed_html).to eq(
-        %(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}" width="200" height="200" ) +
+        %(<img src="#{image_url}?fm=auto&amp;w=100&amp;h=100&amp;fit=cover" data-asset-id="asset-1" data-original-url="#{image_url}" width="200" height="200" ) +
         %(sizes="100vw" srcset="#{image_url}?fm=auto&amp;w=100&amp;h=100&amp;fit=cover 100w">)
       )
     end

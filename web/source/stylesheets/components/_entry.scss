@@ -112,6 +112,27 @@
   }
 }
 
+// The cover image of a summary card. The link is aria-hidden and it is not a tab stop. Refer to
+// the comment in partials/article/_summary.html.erb.
+// Each element in the card has a margin of zero, thus the leading of the line makes each other
+// gap. The image has none. This margin gives the eyebrow below it the same space that the eyebrow
+// and the headline have between them. The skeleton uses this same class, thus it stays in step.
+.entry__cover {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+// ⚠️ Keep aspect-ratio and object-fit with the width and the height attributes of the element.
+// They are what holds the shape when a srcset candidate is not exactly 3:2, for example a GIF,
+// which gets no transformation. The value must be the same as ImageHelpers::CARD_RATIO.
+.entry__cover-image {
+  aspect-ratio: 3 / 2;
+  border-radius: var(--radius-medium);
+  display: block;
+  object-fit: cover;
+  width: 100%;
+}
+
 .entry__figure {
   margin: 1.5rem 0; 
 
@@ -295,6 +316,11 @@
 }
 
 .entry--summary {
+  // The cover image, then the header, then the body. The body takes the free height, thus the
+  // headers of two cards beside each other align. A card with no cover image, that is a Short,
+  // puts its two children in the first two rows and the last row is empty.
+  grid-template-rows: auto auto 1fr;
+
   .entry__body {
     p {
       font-size: var(--font-small);

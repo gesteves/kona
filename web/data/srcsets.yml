@@ -1,3 +1,26 @@
+# The responsive-image configuration. `sizes` describes the width of the element, and `widths` is
+# the list of the candidates that Cloudflare Images renders.
+#
+# ⚠️ Each candidate is one transformation for each image. Keep each list small.
+#
+# The method for a new list, and for a change to a `sizes` value:
+#   1. Render the element at the logical width of each device below.
+#   2. Measure the element, and do not calculate it. The outdent of a figure, and the gap that
+#      changes at the breakpoint, both make the true width different from the column arithmetic.
+#   3. Multiply by the scale factor of the device, and round up.
+#   4. Remove each duplicate, and add the desktop width at 1x and at 2x.
+#
+# The devices are the current iPhones and iPads, and a desktop at 1280px and above:
+#   390, 402, 420, 440 at 3x  — iPhone 17e, iPhone 17 and 17 Pro, iPhone Air, iPhone 17 Pro Max
+#   820, 834, 1024, 1032 at 2x — iPad Air 11" and 13", iPad Pro 11" and 13"
+#
+# ⚠️ The FIRST width of a variant must be its 1x desktop width. `cover_image_tag` reads
+# `widths.first` for the `src`, in both apps.
+#
+# ⚠️ api/config/srcsets.yml is a COPY of this file, word for word. The api renders the trending
+# card, and its Docker image holds `api/` only, thus it cannot read this file. It uses the `card`
+# variant alone, and the other variants stay only to let a person copy the file and compare the
+# two. `api/spec/contracts/srcsets_contract_spec.rb` fails when the two are different.
 entry:
   sizes:
     - auto
@@ -7,25 +30,14 @@ entry:
   widths:
     - 800
     - 1600
-    - 1098
-    - 1092
-    - 1050
-    - 700
-    - 987
     - 978
-    - 622
-    - 933
-    - 512
-    - 256
-    - 1360
-    - 918
-    - 459
-    - 974
-    - 986
+    - 987
     - 1006
-    - 1258
-    - 1128
     - 1014
+    - 1068
+    - 1128
+    - 1259
+    - 1270
 full:
   sizes:
     - auto
@@ -35,25 +47,14 @@ full:
   widths:
     - 1008
     - 2016
-    - 1590
-    - 1272
-    - 1250
-    - 1232
-    - 1162
-    - 581
-    - 1488
-    - 1290
-    - 1284
-    - 1242
-    - 828
-    - 1179
     - 1170
-    - 750
-    - 1125
-    - 640
-    - 320
-    - 1320
     - 1206
+    - 1250
+    - 1260
+    - 1273
+    - 1320
+    - 1590
+    - 1603
 home:
   sizes:
     - auto
@@ -62,14 +63,29 @@ home:
     - "calc((((100vw - 4rem - (11 * 1rem))/12) * 5) + (4 * 1rem))"
   widths:
     - 488
-    - 967
-    - 426
-    - 429
-    - 384
-    - 381
-    - 240
-    - 360
-    - 426
-    - 550
-    - 762
-    - 194
+    - 976
+    - 380
+    - 395
+    - 417
+    - 442
+    - 593
+    - 605
+    - 763
+    - 770
+card:
+  sizes:
+    - auto
+    - "(min-width: 1280px) 592px"
+    - "(min-width: 768px) calc((((100vw - 4rem - (11 * 2rem))/12) * 6) + (5 * 2rem))"
+    - "calc(100vw - 4rem)"
+  widths:
+    - 592
+    - 1184
+    - 724
+    - 738
+    - 928
+    - 936
+    - 978
+    - 1014
+    - 1068
+    - 1128

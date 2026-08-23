@@ -1,5 +1,8 @@
 require 'spec_helper'
 require 'ostruct'
+require 'yaml'
+# `tag` comes from Padrino, which Middleman gives to a template but not to an example group.
+require 'padrino-helpers'
 
 RSpec.describe ImageHelpers do
   # This has the shape of data.assets. Each example sets @assets before the code makes the index.
@@ -108,10 +111,17 @@ RSpec.describe ImageHelpers do
       )
     end
 
-    it 'crops square when asked' do
-      set = srcset(url: 'https://images.ctfassets.net/s/a/t/p.jpg', widths: [ 100 ], square: true)
+    it 'crops to a square with ratio 1' do
+      set = srcset(url: 'https://images.ctfassets.net/s/a/t/p.jpg', widths: [ 100 ], ratio: 1)
       expect(set).to include('width=100')
       expect(set).to include('height=100')
+      expect(set).to include('fit=cover')
+    end
+
+    it 'crops to 3:2 with the card ratio' do
+      set = srcset(url: 'https://images.ctfassets.net/s/a/t/p.jpg', widths: [ 600 ], ratio: ImageHelpers::CARD_RATIO)
+      expect(set).to include('width=600')
+      expect(set).to include('height=400')
       expect(set).to include('fit=cover')
     end
   end
@@ -412,6 +422,94 @@ RSpec.describe ImageHelpers do
         allow(self).to receive(:blurhash_svg).with('asset-1').and_return(nil)
         expect(blurhash_svg_data_uri('asset-1')).to be_nil
       end
+    end
+  end
+
+  describe '#cover_image_tag' do
+    include Padrino::Helpers::TagHelpers
+
+    # The true variants, thus the example fails when a person removes the `card` variant or
+    # changes its first width.
+    let(:srcsets) { OpenStruct.new(YAML.load_file('data/srcsets.yml').transform_values { |v| OpenStruct.new(v) }) }
+
+    def data = OpenStruct.new(assets: @assets || [], srcsets: srcsets)
+
+    def entry(url: 'https://images.ctfassets.net/space/asset-1/token/photo.jpg')
+      OpenStruct.new(cover_image: url && OpenStruct.new(url: url, width: 3000, height: 2000))
+    end
+
+    before do
+      @assets = [
+        OpenStruct.new(
+          sys: OpenStruct.new(id: 'asset-1', published_version: 7),
+          url: 'https://images.ctfassets.net/space/asset-1/token/photo.jpg',
+          width: 3000, height: 2000, description: 'A finish line', content_type: 'image/jpeg'
+        )
+      ]
+      allow(self).to receive(:blurhash_svg_data_uri).and_return(nil)
+    end
+
+    it 'renders the card size, an empty alt, and the placeholder attributes' do
+      html = cover_image_tag(entry)
+
+      expect(html).to include('width="592"')
+      expect(html).to include('height="395"')
+      expect(html).to include('alt=""')
+      expect(html).to include('loading="lazy"')
+      expect(html).to include('decoding="async"')
+      expect(html).to include('class="entry__cover-image placeholder"')
+      expect(html).to include('data-controller="image-placeholder"')
+    end
+
+    it 'cuts each candidate to 3:2' do
+      html = cover_image_tag(entry)
+
+      expect(html).to include('width=592,height=395,fit=cover')
+      expect(html).to include('width=1184,height=789,fit=cover')
+    end
+
+    # ⚠️ Cloudflare renders and bills one transformation for each different URL. A src with
+    # parameters that only look the same is a second render of each cover image that no browser
+    # uses.
+    it 'uses one of its own srcset candidates as the src' do
+      html = cover_image_tag(entry).to_s
+      src = html[/\ssrc="([^"]+)"/, 1]
+      candidates = html[/srcset="([^"]+)"/, 1].split(', ').map { |c| c.split(' ').first }
+
+      expect(candidates).to include(src)
+    end
+
+    it 'gives a GIF a src with no transformation, thus it keeps its animation' do
+      @assets.first.content_type = 'image/gif'
+
+      expect(cover_image_tag(entry)).to include('/cdn-cgi/image/anim=true/')
+    end
+
+    it 'removes each candidate that is wider than the asset' do
+      @assets.first.width = 700
+      html = cover_image_tag(OpenStruct.new(cover_image: OpenStruct.new(url: @assets.first.url, width: 700, height: 500)))
+
+      expect(html).to include('700w')
+      expect(html).not_to include('1184w')
+    end
+
+    it 'gives a GIF no srcset, because a transformation removes its animation' do
+      @assets.first.content_type = 'image/gif'
+      html = cover_image_tag(entry)
+
+      expect(html).not_to include('srcset')
+      expect(html).not_to include('sizes')
+    end
+
+    it 'writes the blurhash placeholder as a custom property' do
+      allow(self).to receive(:blurhash_svg_data_uri).and_return('data:image/svg+xml,x')
+
+      expect(cover_image_tag(entry)).to include('--placeholder:url(')
+    end
+
+    it 'is an empty string when the entry has no cover image' do
+      expect(cover_image_tag(entry(url: nil))).to eq('')
+      expect(cover_image_tag(nil)).to eq('')
     end
   end
 end

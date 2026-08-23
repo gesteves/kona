@@ -130,6 +130,18 @@
   width: 33%;
 }
 
+// The cover image of a summary card. It keeps the same box as .entry__cover-image.
+.entry__cover .entry-skeleton-cover {
+  aspect-ratio: 3 / 2;
+  display: block;
+  height: auto;
+  width: 100%;
+
+  &::part(indicator) {
+    border-radius: var(--radius-medium);
+  }
+}
+
 .entry__hed .entry-skeleton-heading {
   height: 1cap;
   font-size: var(--font-large);

@@ -1,10 +1,11 @@
 <%# The navigation through the archive in order. It has two halves, and at a larger breakpoint they
     are beside each other: the older entry at the left ("Previous") and the newer entry at the right
-    ("Next"). Each one is a summary card with no body, thus the reader can go back or forward
-    through the archive. Each half is its own collection, thus each one has its own heading. At an
-    end of the archive, only one half renders, and it moves to the center. Refer to
-    .collection--adjacent. It renders nothing when the entry has no neighbor, for example a draft
-    preview. %>
+    ("Next"). Each one is a summary card with no body and no cover image, thus the reader can go
+    back or forward through the archive. ⚠️ The cover image is off here on purpose: a Short has
+    none, and a Short beside an Article gives two halves of a very different height.
+    Each half is its own collection, thus each one has its own heading. At an end of the archive,
+    only one half renders, and it moves to the center. Refer to .collection--adjacent. It renders
+    nothing when the entry has no neighbor, for example a draft preview. %>
 <% adjacent = adjacent_articles(article) %>
 <% older = adjacent[:older] %>
 <% newer = adjacent[:newer] %>
@@ -18,7 +19,7 @@
         <h2 class="collection__heading" id="hed-<%= id %>-entry"><%= heading %></h2>
         <ol class="collection__list">
           <li class="collection__item">
-            <%= partial 'partials/article/summary', locals: { article: entry, show_body: false } %>
+            <%= partial 'partials/article/summary', locals: { article: entry, show_body: false, show_cover: false } %>
           </li>
         </ol>
       </section>

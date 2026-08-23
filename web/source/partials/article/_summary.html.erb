@@ -3,6 +3,18 @@
     lists. %>
 <% id_scope = defined?(id_scope) ? id_scope : nil %>
 <article class="entry entry--summary" id="<%= entry_dom_id(article, scope: id_scope) %>" aria-labelledby="<%= entry_heading_id(article, scope: id_scope) %>">
+  <%# ⚠️ The link is aria-hidden and it is not a tab stop, and the image has an empty alt. The
+      headline below links to the same page. Without this, each card gives two identical tab stops
+      and two identical entries in the link list of a screen reader.
+      ⚠️ Keep this markup the same as api/app/views/widgets/articles/_summary.html.erb. The two
+      cards go on the same page, and no check compares them. %>
+  <%# `show_cover`, which is an optional local, is false where the card must be text only. Today
+      that is the read-next section: a Short has no cover image, thus a Short beside an Article
+      would give two halves of a different height. %>
+  <% cover = (!defined?(show_cover) || show_cover) ? cover_image_tag(article) : "" %>
+  <% if cover.present? %>
+    <%= link_to cover, article.path, class: "entry__cover", tabindex: "-1", "aria-hidden": "true" %>
+  <% end %>
   <header class="entry__header">
     <%= partial 'partials/article/meta', locals: { article: article, show_draft: false, show_tags: false } %>
     <h3 class="entry__hed" id="<%= entry_heading_id(article, scope: id_scope) %>">
