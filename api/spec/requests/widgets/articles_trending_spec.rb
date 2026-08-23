@@ -2,19 +2,27 @@ require "rails_helper"
 
 RSpec.describe "Widgets::Articles trending", type: :request do
   # Makes an article with the fields that Articles#list gives.
-  def article(id:, title:, slug:, published_at:, summary: "A short summary.", entry_type: "Article", draft: false)
+  def article(id:, title:, slug:, published_at:, summary: "A short summary.", entry_type: "Article", draft: false, cover_image: nil)
     path = "/#{DateTime.parse(published_at).strftime('%Y/%m/%d')}/#{slug}/"
     DeepOstruct.wrap(
       title: title, slug: slug, summary: summary, published_at: published_at,
-      entry_type: entry_type, draft: draft, path: path, sys: { id: id }
+      entry_type: entry_type, draft: draft, path: path, cover_image: cover_image, sys: { id: id }
     )
+  end
+
+  def cover(asset_id: "asset1")
+    {
+      url: "https://images.ctfassets.net/space/#{asset_id}/token/photo.jpg",
+      width: 3000, height: 2000, content_type: "image/jpeg",
+      sys: { id: asset_id, published_version: 3 }
+    }
   end
 
   let(:art_newest)   { article(id: "a1", title: "Newest Article",   slug: "newest",   published_at: "2024-12-30T10:00:00Z") }
   let(:art_april)    { article(id: "a2", title: "April Article",    slug: "april",    published_at: "2024-04-01T10:00:00Z") }
   let(:art_march)    { article(id: "a3", title: "March Article",    slug: "march",    published_at: "2024-03-01T10:00:00Z") }
   let(:art_february) { article(id: "a4", title: "February Article", slug: "february", published_at: "2024-02-01T10:00:00Z") }
-  let(:art_spiking)  { article(id: "a5", title: "Spiking Article",  slug: "spiking",  published_at: "2024-01-01T10:00:00Z") }
+  let(:art_spiking)  { article(id: "a5", title: "Spiking Article",  slug: "spiking",  published_at: "2024-01-01T10:00:00Z", cover_image: cover) }
   let(:art_steady)   { article(id: "a6", title: "Steady Article",   slug: "steady",   published_at: "2023-12-01T10:00:00Z") }
   let(:art_short)    { article(id: "s1", title: "A Short Post",     slug: "short",     published_at: "2024-06-01T10:00:00Z", entry_type: "Short") }
 
@@ -44,6 +52,43 @@ RSpec.describe "Widgets::Articles trending", type: :request do
     # example gives its cached result to another one.
     allow($redis).to receive(:get).and_return(nil)
     allow($redis).to receive(:setex)
+  end
+
+  describe "the cover image" do
+    it "renders the image in a link that is not a tab stop, and gives the image an empty alt" do
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("IMAGES_URL").and_return("https://site.example")
+      allow(ENV).to receive(:[]).with("IMAGE_HOST").and_return("images.example")
+
+      get "/widgets/articles/trending", headers: auth_headers
+
+      expect(response.body).to include('class="entry__cover"')
+      expect(response.body).to include('tabindex="-1"')
+      expect(response.body).to include('class="entry__cover-image placeholder"')
+      expect(response.body).to include('alt=""')
+      expect(response.body).to include("https://images.example/space/asset1/token/photo.jpg")
+    end
+
+    it "renders no image for an article with no cover image" do
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("IMAGES_URL").and_return("https://site.example")
+      allow(ENV).to receive(:[]).with("IMAGE_HOST").and_return("images.example")
+
+      get "/widgets/articles/trending", headers: auth_headers
+
+      expect(response.body.scan("entry__cover-image").size).to eq(1)
+    end
+
+    it "renders no image at all when IMAGE_HOST has no value, and never a ctfassets src" do
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("IMAGES_URL").and_return("https://site.example")
+      allow(ENV).to receive(:[]).with("IMAGE_HOST").and_return(nil)
+
+      get "/widgets/articles/trending", headers: auth_headers
+
+      expect(response.body).not_to include("entry__cover")
+      expect(response.body).not_to include("ctfassets.net")
+    end
   end
 
   it_behaves_like "a live-update fragment", "/widgets/articles/trending"

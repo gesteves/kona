@@ -125,6 +125,29 @@ RSpec.describe "Webhooks::Contentful", type: :request do
       end
     end
 
+    describe "card placeholders (AssetBlurhashJob)" do
+      def asset_payload(id) = { "sys" => { "id" => id, "type" => "Asset" } }
+
+      it "enqueues a blurhash job on an asset publish, beside the mirror job" do
+        post_webhook(asset_payload("asset1"), topic: "ContentManagement.Asset.publish")
+        expect(response).to have_http_status(:no_content)
+        expect(AssetBlurhashJob).to have_enqueued_sidekiq_job("asset1")
+      end
+
+      it "enqueues no blurhash job on an unpublish, a delete, or an auto_save" do
+        %w[unpublish delete auto_save].each do |action|
+          AssetBlurhashJob.clear
+          post_webhook(asset_payload("asset1"), topic: "ContentManagement.Asset.#{action}")
+          expect(AssetBlurhashJob.jobs).to be_empty
+        end
+      end
+
+      it "enqueues no blurhash job for entries" do
+        post_webhook(entry_payload("entry123", "article"), topic: "ContentManagement.Entry.publish")
+        expect(AssetBlurhashJob.jobs).to be_empty
+      end
+    end
+
     describe "web rebuild trigger (SiteBuildJob)" do
       it "enqueues a rebuild on publish, unpublish, and delete of any content type" do
         %w[publish unpublish delete].each do |action|

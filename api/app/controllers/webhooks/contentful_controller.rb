@@ -56,7 +56,12 @@ module Webhooks
       # still points at an unpublished asset, and a delete would break a live image. Each key is
       # immutable, thus there is nothing to invalidate. An object that nothing uses is cheap, and a
       # person removes it.
-      AssetSyncJob.perform_async(entry_id) if entity == ASSET_ENTITY && action == "publish" && entry_id.present?
+      if entity == ASSET_ENTITY && action == "publish" && entry_id.present?
+        AssetSyncJob.perform_async(entry_id)
+        # The blurhash placeholder of the card. It is a separate job, thus a failure here cannot
+        # stop the mirror above.
+        AssetBlurhashJob.perform_async(entry_id)
+      end
 
       # Builds the static site again at each change to the published content. Only these three
       # actions change the site from the build: an automatic save of a draft must not start a

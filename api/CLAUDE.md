@@ -110,7 +110,8 @@ mount.
 API: Intervals.icu, Apple WeatherKit (with an ES256 JWT), Google Maps (`GoogleMaps` finds an address
 from coordinates, and `GoogleGeocoder` finds coordinates from an address), Google Air Quality, Google
 Pollen, PurpleAir, Whoop (OAuth2), TrainerRoad (iCal), Contentful, Plausible, Font Awesome,
-Goodspeed, Akismet, Resend, Turnstile, Voyage (`Embeddings`), `StandardSite`, and `AssetMirror`.
+Goodspeed, Akismet, Resend, Turnstile, Voyage (`Embeddings`), `StandardSite`, `AssetMirror`, and
+`BlurhashPlaceholder`.
 Five more are not subclasses of `ApplicationService`, because they are not cacheable reads:
 `SpamQuarantine`, `TrackLibrary`, and `BlueskyCredentials` use Redis only and no HTTP; `GpxTrack`
 parses only; and `MapboxTileset` and `StaticMap` are different (refer to **The course-map
@@ -163,16 +164,47 @@ between the two apps, and neither side checks the other.** The full text is in t
 - It does nothing when the `R2_*` vars are absent, thus it stays inactive in development and in
   CI.
 
+### The card cover image
+
+The trending card renders the cover image of the article. Two parts make it:
+
+- **`ImagesHelper`** makes the URL: `<IMAGES_URL>/cdn-cgi/image/<options>/<mirror url>`. It changes
+  each `*.ctfassets.net` host to `IMAGE_HOST`, which is the R2 mirror, as the web build does. ⚠️ It
+  returns nil when either variable has no value, and it never raises: a raise here gives a 500 and
+  leaves an empty skeleton on the home page. ⚠️ It never falls back to a ctfassets URL. Such a URL
+  gets a 403 as a transformation source, and it uses the metered Contentful bandwidth as a direct
+  `src`.
+- **`BlurhashPlaceholder`** makes the small blurred SVG that shows before the image loads.
+  `AssetBlurhashJob` does that one time for each asset, off the asset-publish webhook, and
+  `rake blurhash:backfill` does it for the assets that exist. The view then reads one Redis key,
+  `blurhash:svg:<asset id>:<published version>`. ⚠️ The job gets its 32-pixel thumbnail from the
+  **Contentful Images API**, and not through the mirror: a mirror fetch would make it wait for
+  `AssetSyncJob`. Thus an asset on `downloads.ctfassets.net`, which has no Images API, gets no
+  placeholder, and the card then shows the flat colour.
+
+⚠️ **This needs `libvips` at run time**, through the `ruby-vips` gem. `libvips42t64` is in the
+**base** stage of the Dockerfile, and not in the build stage: the final stage is `FROM base` and it
+copies only `/rails` from `build`. ⚠️ The name has the `t64` suffix because `ruby:<version>-slim` is
+Debian **trixie**, and the 64-bit `time_t` transition renamed the package. On bookworm it is
+`libvips42`. ⚠️ The `blurhash` gem is the **fork** at `github.com/gesteves/blurhash`,
+at the same ref as `web/Gemfile`. The rubygems release has `encode` only, and this code needs
+`decode` and `valid_blurhash?`.
+
+⚠️ **Set `IMAGES_URL` and `IMAGE_HOST` as fly secrets, then run `rake blurhash:backfill`.** Without
+the two variables the card renders no image at all. Without the backfill each card shows the flat
+colour until a person publishes its asset again.
+
 ### Webhooks
 
 `Webhooks::ContentfulController` takes each publish, unpublish, and delete event, and
 `ContentfulRequestVerification` checks its HMAC. That controller **only adds jobs to the queue** and
 returns a 204, and the Sidekiq worker does the work. At each publish it adds the standard.site sync,
-the article embedding, the R2 asset copy, and **`SiteBuildJob`**, which builds the web site again.
+the article embedding, the R2 asset copy, the blurhash placeholder, and **`SiteBuildJob`**, which
+builds the web site again.
 Set the Contentful webhook to a publish, an unpublish, and a delete of an **Entry and an Asset**,
 thus a change to an image also starts a build. Do **not** include an automatic save. ⚠️ Contentful
-does **not** send a delivery again. `rake standard_site:backfill` and `rake assets:backfill` are the
-reconciliation paths.
+does **not** send a delivery again. `rake standard_site:backfill`, `rake assets:backfill`, and
+`rake blurhash:backfill` are the reconciliation paths.
 
 `Webhooks::WhoopController` takes the Whoop v2 webhooks. `WhoopRequestVerification` checks them with
 the HMAC method of Whoop: `WHOOP_CLIENT_SECRET` signs a base64 HMAC over the timestamp and the raw
@@ -201,6 +233,7 @@ Thus that shared window is safe.
 |---|---|
 | `StandardSiteSyncJob(operation, entry_id)` | standard.site PDS sync |
 | `AssetSyncJob(asset_id)` | Copies one image asset into R2. ⚠️ It raises and does not give a smaller result. |
+| `AssetBlurhashJob(asset_id)` | Makes the blurhash placeholder of one image asset. It fails soft. |
 | `ArticleEmbeddingJob(operation, entry_id)` | keeps an article's Voyage embedding in sync |
 | `SiteBuildJob(event_type)` | fires a GitHub `repository_dispatch` to rebuild the web site |
 | `WhoopWebhookJob(event_type, resource_id, trace_id)` | syncs Whoop metrics to Intervals.icu |
@@ -832,7 +865,9 @@ value is a secret of fly.io, and Rails also uses `config/credentials.yml.enc` an
   `GOOGLE_OAUTH_CLIENT_SECRET`, `OWNER_EMAIL`, `GOOGLE_API_KEY`, `API_TOKEN` (it must be equal to
   the token of the web app), `WEATHERKIT_KEY_ID`, `WEATHERKIT_TEAM_ID`, `WEATHERKIT_SERVICE_ID`,
   `WEATHERKIT_PRIVATE_KEY` (a .p8 file in base64), `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`,
-  `CONTENTFUL_WEBHOOK_SECRET` (an HMAC secret of 64 characters), `SITE_URL`, `RESEND_API_KEY`,
+  `CONTENTFUL_WEBHOOK_SECRET` (an HMAC secret of 64 characters), `SITE_URL`, `IMAGES_URL` and
+  `IMAGE_HOST` (the same values as the web app; with either one absent, the trending card renders no
+  image), `RESEND_API_KEY`,
   `CONTACT_FROM_ADDRESS` (a sender on a domain that Resend verified — it needs SPF and DKIM only,
   thus it can share a domain with a Google Workspace mailbox), `CONTACT_TO_ADDRESS`.
 - **Optional**: `AKISMET_API_KEY` (with no value the check is off and each message goes out with no

@@ -61,6 +61,14 @@ gem "anthropic"
 gem "graphql-client"
 # Faster JSON parsing/serialization for the read-through Redis cache and service responses
 gem "oj"
+# Renders the blurhash placeholders of the card cover images. ruby-vips decodes the thumbnail and
+# writes the small JPEG; the blurhash gem encodes and decodes the hash. Both are FFI wrappers, so
+# the build stage needs no new packages, but the RUNTIME needs libvips (see the Dockerfile).
+gem "ruby-vips"
+# ⚠️ This is the same fork and the same ref as web/Gemfile, and not the rubygems release. The
+# release has `encode` only. `decode` and `valid_blurhash?` are in the fork, and this code needs
+# both. `ref`, and not a branch, is what makes `bundle update` give the same result each time.
+gem "blurhash", git: "https://github.com/gesteves/blurhash", ref: "8c7700513460f748596a43609bae3f12a6400974"
 # S3-compatible client for Cloudflare R2, which mirrors Contentful's image assets so the
 # site's images are served from our own zone instead of Contentful. See AssetMirror.
 gem "aws-sdk-s3"

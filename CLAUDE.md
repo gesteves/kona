@@ -118,6 +118,18 @@ a link, in the middle of a page:
 | Canonical article path | `services/article_attributes.rb` | `lib/data/contentful.rb` |
 | `units_tag` / `add_unit_data_attributes` | `helpers/markup_helper.rb` | `helpers/markup_helpers.rb` |
 | `fix_degrees` | `helpers/text_helper.rb` | `helpers/text_helpers.rb` |
+| Cover image URL and its `<img>` | `helpers/images_helper.rb` | `helpers/image_helpers.rb` |
+| The blurhash placeholder | `services/blurhash_placeholder.rb` | `helpers/image_helpers.rb` |
+| The card `sizes` and its widths | `helpers/images_helper.rb` | `data/srcsets.yml` |
+
+⚠️ **The cover image of a card is in two places, and no check compares them.** The api renders the
+card of the trending widget, and the build renders each other card, and the two go on the same page.
+The shape (3:2), the `sizes` list, the widths, and the attributes must be the same. The
+`widget_markup_contract_spec` compares the outer element of the **collection** only.
+
+⚠️ The two blurhash copies use different Redis keys, on purpose: the build writes
+`blurhash:jpeg:*` in the Redis of web, and the api writes `blurhash:svg:*` in `kona-redis`. The two
+keyspaces are separate, thus neither app can read the value of the other one.
 
 ⚠️ `Api::MarkupHelper#render_summary_body` is a smaller `render_body`, on purpose, but two of its
 steps are necessary: it **must** continue to call `fix_degrees` and `mark_affiliate_links`. Without
@@ -534,6 +546,7 @@ import, and neither one checks the other:
 |---|---|---|
 | Writes | `api` — `AssetMirror` and `AssetSyncJob`, from the asset-publish webhook, and `rake assets:backfill` | An R2 object whose key is the Contentful path, **with no change**: `{space}/{asset id}/{token}/{filename}` |
 | Reads | `web` — `Contentful#rewrite_image_urls` at build time, and only when `IMAGE_HOST` has a value | It changes **the host only**, thus the path that it writes is that same key |
+| Reads | `api` — `ImagesHelper#cdn_image_url`, at the render of the trending card | The same change, at request time, from `IMAGE_HOST` |
 
 ⚠️ **The two sides match each `*.ctfassets.net` host, and they must continue to match the same
 set.** Contentful serves many ordinary image assets from `downloads.ctfassets.net`, and that host

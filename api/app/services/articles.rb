@@ -40,6 +40,13 @@ class Articles < ApplicationService
           summary
           published
           body
+          coverImage {
+            url
+            width
+            height
+            contentType
+            sys { id publishedVersion }
+          }
           sys { id firstPublishedAt publishedVersion }
         }
       }

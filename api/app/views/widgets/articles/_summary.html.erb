@@ -1,13 +1,22 @@
 <%#
   The summary card of an article, for the trending section. Its local is `article`. This code comes
   from partials/article/_summary.html.erb of the static site. The small renderer makes the body
-  text, and there is no cover image.
+  text.
 %>
 <% published_at = DateTime.parse(article.published_at) %>
 <%# The section is part of each id: the same article can be here and in a section from the build on
     the same page, that is, the related articles or the read-next section. %>
 <% entry_id = "#{section_id}-#{article.sys.id.parameterize}" %>
 <article class="entry entry--summary" id="entry-<%= entry_id %>" aria-labelledby="hed-<%= entry_id %>">
+  <%# ⚠️ The link is aria-hidden and it is not a tab stop, and the image has an empty alt. The
+      headline below links to the same page. Without this, each card gives two identical tab stops
+      and two identical entries in the link list of a screen reader.
+      ⚠️ Keep this markup the same as web/source/partials/article/_summary.html.erb. The two cards
+      go on the same page, and no check compares them. %>
+  <% cover = cover_image_tag(article) %>
+  <% if cover.present? %>
+    <%= link_to cover, article.path, class: "entry__cover", tabindex: "-1", "aria-hidden": "true" %>
+  <% end %>
   <header class="entry__header">
     <p class="entry__meta"
       data-controller="publish-date"

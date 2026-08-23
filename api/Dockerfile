@@ -22,9 +22,14 @@ FROM docker.io/library/ruby:$RUBY_VERSION-slim AS base
 # Rails app lives here
 WORKDIR /rails
 
-# Install base packages needed at runtime
+# Install base packages needed at runtime.
+# ⚠️ libvips is the runtime of the ruby-vips gem, which renders the blurhash placeholders. It must
+# be in THIS stage: the final stage is `FROM base` and copies only /rails from `build`.
+# ⚠️ The package name is `libvips42t64`, and not `libvips42`. ruby:$RUBY_VERSION-slim is Debian
+# trixie, and the 64-bit time_t transition renamed it. On bookworm it is `libvips42`. A change of
+# the base image can need a change here, and the build then fails at this line.
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y curl libyaml-0-2 && \
+    apt-get install --no-install-recommends -y curl libyaml-0-2 libvips42t64 && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Set production environment
