@@ -1,20 +1,27 @@
 module AdminHelper
+  # The id of the Republish dialog. The layout renders that dialog, and the nav item opens it.
+  # ⚠️ Both sides read this constant, thus the two values cannot become different.
+  REPUBLISH_DIALOG_ID = "republish-site".freeze
+
   # The items of the admin sidebar that are not in a group, in the order that they appear. The owner
-  # uses these two often, thus they need no click first. Each other item is in a group. Refer to
+  # uses these often, thus they need no click first. Each other item is in a group. Refer to
   # #admin_nav_groups.
   #
   # This is data, and not markup that a person writes. Thus the code for `data-drawer="close"`, for
   # `aria-current`, and for the icons is in layouts/_admin_nav_item.html.erb, one time only.
   # `external: true` marks a destination outside the Rails admin UI, which opens in a new tab.
+  # `dialog:` marks an item that is an action and not a destination: it opens a dialog of the
+  # layout, and it has no :path.
   #
   # @param quarantine_count [Integer] The number of messages in the spam quarantine. The caller
   #   gives it, and this method does not read an instance variable. Thus this method uses only its
   #   arguments, as each other helper here does.
-  # @return [Array<Hash>] Each item has :label, :path, and :icon, which are the three arguments of
-  #   icon_svg. An item can also have :badge and :external.
+  # @return [Array<Hash>] Each item has :label, :icon, and either :path or :dialog. :icon holds the
+  #   three arguments of icon_svg. An item can also have :badge and :external.
   def admin_nav_items(quarantine_count: 0)
     [
       { label: "Home", path: root_path, icon: %w[classic light house] },
+      { label: "Republish site", dialog: REPUBLISH_DIALOG_ID, icon: %w[classic light arrows-rotate] },
       { label: "Spam", path: spam_path, icon: %w[classic light envelopes-bulk],
         badge: quarantine_count.to_i.positive? ? quarantine_count.to_i : nil }
     ]

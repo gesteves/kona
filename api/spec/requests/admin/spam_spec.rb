@@ -110,7 +110,8 @@ RSpec.describe "Admin spam quarantine", type: :request do
       get "/spam"
 
       expect(response.body).to include("Nothing flagged")
-      expect(response.body).not_to include("<wa-dialog")
+      # The layout always holds the Republish dialog, thus this looks for a delete confirmation.
+      expect(response.body).not_to include('id="spam-delete-')
     end
 
     it "never lets an admin page be stored" do

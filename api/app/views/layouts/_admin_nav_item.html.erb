@@ -4,7 +4,10 @@
     the drawer stays open over the page that the link opened. It is on the host element, and the
     document handler of <wa-drawer> and its handler in the drawer both look there: a click in a
     shadow root goes to the host before either handler sees it. %>
-<% current = admin_nav_current?(item[:path]) %>
+<%# An item with :dialog is an action and not a destination: it opens a dialog of the layout. It
+    renders as the same <wa-button> with no href. `data-dialog` and `data-drawer` both have a
+    handler on the document, thus one tap closes the drawer and opens the dialog. %>
+<% current = item[:path].present? && admin_nav_current?(item[:path]) %>
 <li>
   <%# `appearance` gives the active state: filled for the current page, and plain for each other
       page. Those are the values of Web Awesome, and not a background that a person selects.
@@ -16,7 +19,8 @@
                     appearance: current ? "filled" : "plain",
                     target: (item[:external] ? "_blank" : nil),
                     rel: (item[:external] ? "noopener" : nil),
-                    data: { drawer: "close" },
+                    data: { drawer: "close",
+                            dialog: (item[:dialog] ? "open #{item[:dialog]}" : nil) },
                     aria: { current: current ? "page" : nil } do %>
     <%= slotted_icon_svg(*item[:icon]) %>
     <%= item[:label] %>

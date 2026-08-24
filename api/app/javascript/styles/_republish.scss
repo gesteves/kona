@@ -1,0 +1,20 @@
+// The Republish dialog, which the nav opens on each admin page.
+
+.republish {
+  &__later {
+    display: grid;
+    gap: var(--wa-space-m);
+    // The date needs more room than the time, because it has three segments.
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+
+    @media (width < 30rem) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    // ⚠️ `hidden` is a presentation of the browser that a display rule wins against. The grid above
+    // would show the fields for "Now".
+    &[hidden] {
+      display: none;
+    }
+  }
+}

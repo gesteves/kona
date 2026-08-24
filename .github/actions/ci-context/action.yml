@@ -57,17 +57,19 @@ runs:
         #   repository_dispatch -> the SiteBuildJob of the api. The commit is the current state of
         #     main, thus the sha has no meaning. Remove it. DISPATCH_TYPE, which is the `event_type`
         #     of the event and which github.event.action gives, says which caller sent it:
-        #     contentful-publish is a Contentful publish or unpublish, and api-build is a POST to
-        #     /api/build. For a type that this code does not know, it uses the Contentful text and
-        #     does not write a blank line.
+        #     contentful-publish is a Contentful publish or unpublish, api-build is a POST to
+        #     /api/build, and admin-republish is the Republish dialog of the admin UI. For a type
+        #     that this code does not know, it uses the Contentful text and does not write a blank
+        #     line.
         #   workflow_dispatch   -> a manual "Run workflow". The sha DOES have a meaning, because it
         #     is what the deploy sent. Keep the link and say why there is no message.
         COMMIT_LINK="<${SERVER_URL}/${REPOSITORY}/commit/${SHA}|\`${SHORT_SHA}\`>"
         case "$EVENT_NAME" in
           repository_dispatch)
             case "$DISPATCH_TYPE" in
-              api-build) COMMIT_CONTEXT="Rebuild triggered via the API" ;;
-              *)         COMMIT_CONTEXT="Content update — published in Contentful" ;;
+              api-build)       COMMIT_CONTEXT="Rebuild triggered via the API" ;;
+              admin-republish) COMMIT_CONTEXT="Republished from the admin" ;;
+              *)               COMMIT_CONTEXT="Content update — published in Contentful" ;;
             esac
             ;;
           workflow_dispatch)   COMMIT_CONTEXT="Manual rebuild of ${COMMIT_LINK}" ;;

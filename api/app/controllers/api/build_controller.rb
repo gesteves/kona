@@ -10,17 +10,15 @@ module Api
     skip_forgery_protection
 
     # A short lock, thus a caller that sends many requests cannot start many Actions runs. A second
-    # request in that time gets a 429. The code never removes the lock: it expires.
+    # request in that time gets a 429. SiteBuildJob holds the key and the window, because the
+    # Republish page of the admin shares the same lock.
     #
-    # ⚠️ This applies to this endpoint only, on purpose. The Contentful webhook adds SiteBuildJob to
-    # the queue itself, and it must not share this window. If it did, a publish during the lock
-    # would go away with no message, and the site would be old.
-    BUILD_LOCK_KEY = "build:trigger_lock".freeze
-    BUILD_LOCK_TTL = 60.seconds
-
+    # ⚠️ The Contentful webhook adds SiteBuildJob to the queue itself, and it must not share this
+    # window. If it did, a publish during the lock would go away with no message, and the site would
+    # be old.
     def create
-      unless $redis.set(BUILD_LOCK_KEY, "1", nx: true, ex: BUILD_LOCK_TTL.to_i)
-        return render json: { error: "A build was already triggered in the last #{BUILD_LOCK_TTL.to_i} seconds" },
+      unless SiteBuildJob.claim_trigger_lock
+        return render json: { error: "A build was already triggered in the last #{SiteBuildJob::TRIGGER_LOCK_TTL.to_i} seconds" },
           status: :too_many_requests
       end
 

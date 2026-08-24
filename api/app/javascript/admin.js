@@ -42,6 +42,11 @@ import "@web.awesome.me/webawesome-pro/dist/components/color-picker/color-picker
 import "@web.awesome.me/webawesome-pro/dist/components/select/select.js";
 import "@web.awesome.me/webawesome-pro/dist/components/option/option.js";
 import "@web.awesome.me/webawesome-pro/dist/components/switch/switch.js";
+// The Republish dialog of the admin layout: two radios, a date, and a time.
+import "@web.awesome.me/webawesome-pro/dist/components/radio-group/radio-group.js";
+import "@web.awesome.me/webawesome-pro/dist/components/radio/radio.js";
+import "@web.awesome.me/webawesome-pro/dist/components/date-input/date-input.js";
+import "@web.awesome.me/webawesome-pro/dist/components/time-input/time-input.js";
 import "@web.awesome.me/webawesome-pro/dist/components/spinner/spinner.js";
 
 import FlashController from "./controllers/flash_controller";
@@ -50,6 +55,7 @@ import LocationMapController from "./controllers/location_map_controller";
 import MapStatusController from "./controllers/map_status_controller";
 import MapPreviewController from "./controllers/map_preview_controller";
 import LinkedSidesController from "./controllers/linked_sides_controller";
+import RepublishController from "./controllers/republish_controller";
 
 // window.Stimulus stays available for a debug session in the console, but the code registers each
 // controller through the local variable, because a static analysis cannot see the global.
@@ -61,3 +67,4 @@ application.register("location-map", LocationMapController);
 application.register("map-status", MapStatusController);
 application.register("map-preview", MapPreviewController);
 application.register("linked-sides", LinkedSidesController);
+application.register("republish", RepublishController);

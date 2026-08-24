@@ -393,9 +393,9 @@ Each clause must also be false for the api host (`/widgets/`, `/api/`, `/webhook
 (`{space}/{asset id}/{token}/{filename}`).
 
 ⚠️ **The admin UI is at the root of the admin host**, thus its pages use top-level paths: today
-`/spam`, `/location`, `/connected-apps`, and `/course-maps`. They have the same problem from the
-other side: a new admin page with the name of one of those prefix families would give a 403 in the
-full zone. Read this rule before you give a name to a new page.
+`/spam`, `/location`, `/republish`, `/connected-apps`, and `/course-maps`. They have the same
+problem from the other side: a new admin page with the name of one of those prefix families would
+give a 403 in the full zone. Read this rule before you give a name to a new page.
 
 **Rule 3** knows "Cloudflare Images gets a source" from "a person types the URL", through the
 `image-resizing` text that Cloudflare puts in `Via`.

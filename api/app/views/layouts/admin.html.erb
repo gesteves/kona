@@ -68,5 +68,9 @@
         <%= yield %>
       </main>
     </wa-page>
+
+    <%# The Republish dialog, which the nav item of the same name opens. It is outside <wa-page>, on
+        purpose: refer to the comment at the top of the partial. %>
+    <%= render "layouts/republish_dialog" %>
   </body>
 </html>

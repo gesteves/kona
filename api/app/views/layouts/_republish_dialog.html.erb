@@ -1,0 +1,39 @@
+<%# The Republish dialog. The layout renders it one time, and the "Republish site" item of the nav
+    opens it with `data-dialog="open"`. Thus each admin page can start a build of the web site.
+    ⚠️ It is a sibling of <wa-page>, and not a child. That component moves its `slot="navigation"`
+    content between the sidebar and the drawer, and this dialog must not travel with it. %>
+<%# ⚠️ The two footer buttons are outside the <form>, because a slot takes a direct child of the
+    dialog only. `form="republish-form"` is what makes the submit button part of that form: a
+    form-associated element reads that attribute, as a native control does. %>
+<wa-dialog id="<%= AdminHelper::REPUBLISH_DIALOG_ID %>" label="Republish the site"
+           class="republish" data-controller="dialog republish"
+           data-action="wa-show->republish#stamp">
+  <%= form_with url: republish_path, method: :post, id: "republish-form",
+                class: "republish__form wa-stack wa-gap-l" do %>
+    <wa-radio-group name="schedule" value="now" label="When?"
+                    data-republish-target="schedule"
+                    data-action="change->republish#toggle">
+      <wa-radio value="now">Now</wa-radio>
+      <wa-radio value="later">At a specific time</wa-radio>
+    </wa-radio-group>
+
+    <%# The script fills both fields with the current local date and time. Thus the server writes no
+        value: it knows UTC only, and a value from it would show a time that the owner does not
+        have on the clock. %>
+    <div class="republish__later" data-republish-target="later" hidden>
+      <wa-date-input name="date" label="Date" disable-past
+                     data-republish-target="date"></wa-date-input>
+      <wa-time-input name="time" label="Time"
+                     data-republish-target="time"></wa-time-input>
+    </div>
+
+    <%# The zone of the browser. The server reads the date and the time in this zone. %>
+    <input type="hidden" name="time_zone" data-republish-target="zone">
+  <% end %>
+
+  <wa-button slot="footer" appearance="outlined" data-dialog="close">Cancel</wa-button>
+  <wa-button slot="footer" type="submit" form="republish-form" variant="brand" appearance="accent">
+    <%= slotted_icon_svg("classic", "light", "arrows-rotate") %>
+    Republish
+  </wa-button>
+</wa-dialog>

@@ -119,6 +119,11 @@ Rails.application.routes.draw do
       get  "location/lookup" => "location#lookup", as: :location_lookup
       post "location"        => "location#create"
 
+      # Builds and deploys the static site again, now or at a time that the owner picks. It adds
+      # the same SiteBuildJob that a Contentful publish and POST /api/build add, with its own event
+      # type. There is no page here: the nav opens a dialog, and the dialog posts to this path.
+      post "republish" => "republish#create", as: :republish
+
       # The spam quarantine of the contact form. The name says what it holds. It is not `/contact`,
       # on purpose, because that is the path of the public form (POST /api/contact), and nothing
       # here takes a submission.

@@ -46,7 +46,7 @@ edge serves a cached copy before it gets a new one.
 | GET | `/widgets/plausible/pageviews/:id` | pageview count by Contentful id | 5 min |
 | POST | `/api/location` | sets Redis `location:current` + enqueues `LocationSyncJob`, via `Location.store` | — |
 | POST | `/api/contact` | drops honeypot hits + enqueues `ContactMailJob`; JSON → 204/422, HTML → 303 | — |
-| POST | `/api/build` | enqueues `SiteBuildJob`; 202, or 429 inside the 60s dedupe lock | — |
+| POST | `/api/build` | enqueues `SiteBuildJob`; 202, or 429 inside the 60s dedupe lock, which `POST /republish` shares | — |
 | POST | `/api/icons` | resolves the web build's Font Awesome allowlist to SVGs | — |
 | GET | `/api/standard-site` | `{did, publication_uri}` for the build's verification markup | 1 hr |
 | GET | `/api/related` | `{contentful id => [related ids]}` from precomputed Voyage embeddings, for the build's static "You May Also Like" section | — |
@@ -59,6 +59,7 @@ edge serves a cached copy before it gets a new one.
 | GET/POST/DELETE | `/connected-apps/bluesky` | the Bluesky handle + app password form, and disconnect | `no-store` |
 | GET | `/location/lookup` | resolves an `address` or a coordinate pair to `{latitude, longitude, place}`. ⚠️ **Never writes** | `no-store` |
 | POST | `/location` | same write as `POST /api/location`, coordinates only; answers with the coordinates and the geocoded place | `no-store` |
+| POST | `/republish` | starts a build of the web site now, or at a time that the owner picks. The Republish dialog of the nav posts here | `no-store` |
 | POST | `/course-maps`; PATCH/DELETE `/course-maps/:id`; GET `/course-maps/status` | upload GPX tracks, save render settings, delete a track, poll publish status | `no-store` |
 | GET | `/course-maps/:id/preview`, `/course-maps/:id/download` | the rendered PNG, proxied from Mapbox; same render, only the disposition differs | `no-store` |
 | — | `/sidekiq` | job dashboard (owner-session gated) | — |
@@ -329,7 +330,7 @@ Thus that shared window is safe.
 | `AssetSyncJob(asset_id)` | Copies one image asset into R2. ⚠️ It raises and does not give a smaller result. |
 | `AssetBlurhashJob(asset_id)` | Makes the blurhash placeholder of one image asset. It fails soft. |
 | `ArticleEmbeddingJob(operation, entry_id)` | keeps an article's Voyage embedding in sync |
-| `SiteBuildJob(event_type)` | fires a GitHub `repository_dispatch` to rebuild the web site |
+| `SiteBuildJob(event_type)` | fires a GitHub `repository_dispatch` to rebuild the web site. ⚠️ The one job that a caller schedules, with `perform_at` |
 | `WhoopWebhookJob(event_type, resource_id, trace_id)` | syncs Whoop metrics to Intervals.icu |
 | `ActivityDescriptionJob(activity_id, whoop_strain = nil)` | (re)generates an activity's Strava description and tidies its name |
 | `LocationSyncJob(latitude, longitude)` | propagates the current location to Intervals.icu |
@@ -338,13 +339,21 @@ Thus that shared window is safe.
 | `MapTilesetJob(id)` | publishes an uploaded GPX track to Mapbox as a vector tileset |
 | `WhoopTokenRefreshJob()` | forces a Whoop token refresh on a schedule (see below) |
 
-- **`SiteBuildJob`** has two callers, and each one has its own event type: the Contentful webhook
-  sends `contentful-publish`, and `POST /api/build` sends `api-build`. The two builds are the same,
-  and the two types exist only to let the Slack notification of the deploy name the cause. ⚠️ **The
-  `repository_dispatch.types` of that workflow must keep both types.** GitHub accepts an event with
-  a type that is not in that list, answers with a 204, and runs nothing, and it gives no message.
-  The event type is always a constant from the caller, and never a request parameter. The job does
-  nothing when `GITHUB_DISPATCH_TOKEN` or `GITHUB_REPOSITORY` has no value.
+- **`SiteBuildJob`** has three callers, and each one has its own event type: the Contentful webhook
+  sends `contentful-publish`, `POST /api/build` sends `api-build`, and the Republish dialog of the
+  admin sends `admin-republish`. The three builds are the same, and the three types exist only to
+  let the Slack notification of the deploy name the cause. ⚠️ **The `repository_dispatch.types` of
+  that workflow must keep all three types.** GitHub accepts an event with a type that is not in that
+  list, answers with a 204, and runs nothing, and it gives no message. The event type is always a
+  constant from the caller, and never a request parameter. The job does nothing when
+  `GITHUB_DISPATCH_TOKEN` or `GITHUB_REPOSITORY` has no value.
+  - **The trigger lock is on this class**, as `TRIGGER_LOCK_KEY` and `.claim_trigger_lock`. The two
+    manual callers — `POST /api/build` and the Republish dialog — share that 60-second window. Thus
+    a double click, or a click after a `curl`, cannot start two Actions runs. ⚠️ The Contentful
+    webhook must never take it: a publish inside the window would go away with no message.
+  - **This is the one job that a caller schedules.** The Republish dialog uses `perform_at`, which
+    puts the job in the scheduled set of Sidekiq. The Scheduled tab of `/sidekiq` lists it, and it
+    is the only place that can cancel it.
 - **`ActivityDescriptionJob`** does not know its source. It writes the stat lines with an emoji: the
   power, the heat, the Whoop strain, and the water temperature. It also writes two lines that
   Anthropic makes: a summary of the planned workout, which the code matches against the TrainerRoad
@@ -535,14 +544,39 @@ on the dark theme. `_admin-header.scss` changes that to `currentColor`, and that
 for the inline SVG in place of an image: an `<img>` cannot take the color of the text. A difference
 between the two copies costs no more than an old admin logo.
 
-The sidebar comes from `AdminHelper`: `#admin_nav_items` gives the two items with no group, which
-are Home and Spam, and `#admin_nav_groups` gives the groups with a caption, which are Tools,
-Settings, and More. Both render through `layouts/_admin_nav_item`, thus the code for the drawer, the
-active state, and the icons is written one time. Each item is a `<wa-button appearance="plain" href>`
-with an icon at its start, and the item of the current page is `filled`. Thus the active state is a
-step of Web Awesome, and not a background color that a person selected. An item with
-`external: true`, which is Sidekiq only today because it renders its own layout, opens in a new tab
-with `rel="noopener"` and a hidden "(opens in a new tab)".
+The sidebar comes from `AdminHelper`: `#admin_nav_items` gives the three items with no group, which
+are Home, Republish site, and Spam, and `#admin_nav_groups` gives the groups with a caption, which
+are Tools, Settings, and More. Both render through `layouts/_admin_nav_item`, thus the code for the
+drawer, the active state, and the icons is written one time. Each item is a
+`<wa-button appearance="plain" href>` with an icon at its start, and the item of the current page is
+`filled`. Thus the active state is a step of Web Awesome, and not a background color that a person
+selected. An item with `external: true`, which is Sidekiq only today because it renders its own
+layout, opens in a new tab with `rel="noopener"` and a hidden "(opens in a new tab)".
+
+⚠️ **An item with `dialog:` is an action and not a destination**, and it has no `:path`. It renders
+as the same button with no `href` and with `data-dialog="open <id>"`. It keeps `data-drawer="close"`,
+thus one tap on a phone closes the drawer and opens the dialog: both attributes have a handler on the
+document. **Republish site**, directly below Home, is the only one today. It opens
+`layouts/_republish_dialog`, which the layout renders one time, and `POST /republish` then starts a
+build of the web site, now or at a time that the owner picks. The rules of that dialog:
+
+- ⚠️ **It is a sibling of `<wa-page>`, and not a child.** That component moves its
+  `slot="navigation"` content between the sidebar and the drawer, and the dialog must not travel
+  with it.
+- ⚠️ **The two footer buttons are outside the `<form>`.** A slot takes a direct child of the dialog
+  only. `form="republish-form"` joins the submit button to that form, because `<wa-button>` is
+  form-associated and reads that attribute as a native control does.
+- ⚠️ **The browser gives the time zone**, and the `republish` controller fills the date and the time
+  with the current *local* values. It must never use `toISOString()`: that method gives UTC, and the
+  fields would then show a time that the owner does not have on the clock. This app declares no
+  `config.time_zone`, thus the UTC fallback of the server means only that the script did not run.
+- ⚠️ **A time that has already passed builds now, and it is not an error.** The dialog can stay open
+  past that moment. To refuse it makes the owner type the time again for the build that they already
+  asked for.
+- ⚠️ **`RepublishController` matches the shape of the date and the time before it parses them.**
+  `Time#parse` is permissive: it reads `"not-a-date 06:30"` as 06:30 today, and that time has passed,
+  thus text with a mistake would start a build. `MAX_HORIZON`, which is 90 days, guards the other
+  side: a year with a mistake would park a job in Redis for decades.
 
 A group is only a caption above its own `<ul>` of those same links:
 

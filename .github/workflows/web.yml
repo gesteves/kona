@@ -14,8 +14,12 @@ name: "Web"
 #     publishes or unpublishes content in Contentful (refer to api/app/jobs/site_build_job.rb).
 #   - repository_dispatch: api-build -> the same job. A POST to the /api/build endpoint of the
 #     api sends it, and that endpoint needs a bearer token. It is a "build now" command for a
-#     script or for automation. The two types run in the same way here. They are different only
-#     to let the Slack notification say which one started the deploy (refer to
+#     script or for automation.
+#   - repository_dispatch: admin-republish -> the same job. The Republish dialog of the admin UI
+#     sends it, now or at a time that the owner picks (refer to
+#     api/app/controllers/admin/republish_controller.rb).
+#     The three types run in the same way here. They are different only to let the Slack
+#     notification say which one started the deploy (refer to
 #     .github/actions/ci-context/action.yml).
 #   - workflow_dispatch -> the manual "Run workflow" button, from main. This builds on demand.
 #     The build always gets the Contentful drafts (a preview token and `preview: true`) and
@@ -39,7 +43,7 @@ on:
       - '.github/workflows/web.yml'
       - '.github/actions/**'
   repository_dispatch:
-    types: [contentful-publish, api-build]
+    types: [contentful-publish, api-build, admin-republish]
   workflow_dispatch:
 
 # No job writes to the repository. The deploy and the cache purge use CLOUDFLARE_API_TOKEN, and
