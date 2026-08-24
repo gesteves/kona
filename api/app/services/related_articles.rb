@@ -8,8 +8,9 @@
 #                 with a demotion when the candidate reports the same race as the query article.
 #   * score     = relevance + a small addition for a recent article and for one that people read.
 #
-# A floor over the **relevance** removes each candidate that is not truly related. The score then
-# puts the survivors in order, and MMR selects the final list.
+# A floor over the **relevance** marks each candidate that is truly related. MMR then selects the
+# final list from those candidates first. ⚠️ The floor selects which candidates to prefer, and it
+# never makes the list short: the section renders a two-column grid, thus it must always be full.
 class RelatedArticles < ApplicationService
   include ArticleRanking # candidates, shared with TrendingArticles
 
@@ -19,11 +20,9 @@ class RelatedArticles < ApplicationService
   MMR_LAMBDA = ENV.fetch("RELATED_MMR_LAMBDA", 0.7).to_f
   # The floor, in standard deviations above the mean relevance of that query.
   FLOOR_SIGMAS = ENV.fetch("RELATED_FLOOR_SIGMAS", 0.5).to_f
-  # ⚠️ The absolute part of the floor, and the reason that a section can render nothing. After the
-  # mean subtraction, the mean similarity of a pair is near 0. Thus a positive score means "these
-  # two are more alike than two articles of this corpus usually are", and a score at or below 0
-  # means that the candidate is not truly related. A floor in standard deviations alone can never
-  # empty a list, because it always keeps the best part of the distribution.
+  # The absolute part of the floor. After the mean subtraction, the mean similarity of a pair is
+  # near 0. Thus a positive score means "these two are more alike than two articles of this corpus
+  # usually are", and a score at or below 0 means that the candidate is not truly related.
   MIN_SCORE = 0.0
   # The candidates that go into MMR. A larger pool gives MMR more to select from, and it costs one
   # similarity for each pair inside the pool.
@@ -58,10 +57,9 @@ class RelatedArticles < ApplicationService
   # correct query article, because the section appears on its own page, but a Short can never be a
   # neighbor.
   #
-  # ⚠️ An entry with a vector always gets a key, and its list is empty when no candidate goes past
-  # the floor. An entry with **no vector** is absent. Thus the key says "this entry has an
-  # embedding", and `report_related_coverage` in the web build can tell a missing embedding from a
-  # floor that removed each candidate. Those two look the same, and only one of them is a problem.
+  # ⚠️ An entry with a vector always gets a key. An entry with **no vector** is absent. Thus the key
+  # says "this entry has an embedding", and `report_related_coverage` in the web build can tell a
+  # missing embedding from an entry that simply has few neighbors.
   # @param count [Integer] The number of neighbors for each entry.
   # @return [Hash{String=>Array<String>}] Contentful id => the neighbor ids, the nearest first.
   def all(count: 4)
@@ -99,8 +97,7 @@ class RelatedArticles < ApplicationService
 
     scored = score_rows(article, pool, context)
     floor = floor_for(scored)
-    survivors = scored.select { |row| above_floor?(row, floor) }.sort_by { |row| -row[:score] }.first(MMR_POOL)
-    selected = select_by_mmr(survivors, count).map { |row| row[:id] }.to_set
+    selected = select_by_mmr(mmr_pool(scored, count), count).map { |row| row[:id] }.to_set
 
     rows = scored.sort_by { |row| -row[:score] }.map do |row|
       row.except(:vector).merge(above_floor: above_floor?(row, floor), selected: selected.include?(row[:id]))
@@ -131,15 +128,29 @@ class RelatedArticles < ApplicationService
     }
   end
 
-  # Gives each candidate a score against one query article, removes the candidates below the floor,
-  # and lets MMR select the final list.
+  # Gives each candidate a score against one query article and lets MMR select the final list.
   # @return [Array<String>] The ids of the neighbors, the nearest first.
   def neighbors_for(article, pool, context, count)
     scored = score_rows(article, pool, context)
-    floor = floor_for(scored)
-    survivors = scored.select { |row| above_floor?(row, floor) }.sort_by { |row| -row[:score] }.first(MMR_POOL)
 
-    select_by_mmr(survivors, count).map { |row| row[:id] }
+    select_by_mmr(mmr_pool(scored, count), count).map { |row| row[:id] }
+  end
+
+  # The candidates that go into MMR: each one above the floor, and then the best of the others when
+  # too few go past it.
+  #
+  # ⚠️ The floor selects which candidates to PREFER, and it never makes the section short. The
+  # section renders a two-column grid, thus a list of three leaves a hole. An article whose
+  # candidates are all below the floor still gets a full list, and the best of a weak group is at
+  # its start.
+  # @return [Array<Hash>] The pool, the best first.
+  def mmr_pool(scored, count)
+    ranked = scored.sort_by { |row| -row[:score] }
+    floor = floor_for(scored)
+    above, below = ranked.partition { |row| above_floor?(row, floor) }
+
+    preferred = above.first(MMR_POOL)
+    preferred + below.first([ count - preferred.size, 0 ].max)
   end
 
   # The score of each candidate against one query article.

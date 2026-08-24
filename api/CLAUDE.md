@@ -267,9 +267,12 @@ path never calls Voyage.
 - ⚠️ **The floor reads the relevance and not the score.** The score holds the small addition for the
   date and the popularity. A new or a popular article that is not related must never go past the
   floor because of that addition. `MIN_SCORE` is 0 and it is exclusive: after the mean subtraction,
-  the mean similarity of a pair is near 0, thus a score at or below 0 means "not related". A floor in
-  standard deviations alone can never empty a list, and an empty list is how a section renders
-  nothing.
+  the mean similarity of a pair is near 0, thus a score at or below 0 means "not related".
+- ⚠️ **The floor selects which candidates to PREFER, and it never makes the list short.** `mmr_pool`
+  takes each candidate above the floor, then fills the rest from the best of the others. The section
+  renders a two-column grid, thus a list of three leaves a hole. An earlier version made the section
+  short, or absent, when each candidate was below the floor. A Short with few near articles then
+  showed three cards.
 - ⚠️ **The same-race demotion is a demotion and never an exclusion.** A Short renders
   `_related.html.erb` with no "More Reports From This Race" section above it. It is also small on
   purpose: a shared rare concept is true relatedness, and it wins against the demotion. **MMR** does

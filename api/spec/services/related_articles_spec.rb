@@ -57,7 +57,7 @@ RSpec.describe RelatedArticles do
 
   describe "#all" do
     it "puts the neighbors of each entry in order, the nearest first" do
-      expect(service.all["q1"]).to eq(%w[near mid])
+      expect(service.all["q1"]).to eq(%w[near mid far])
     end
 
     it "omits the query article itself, a draft, and a Short" do
@@ -98,16 +98,16 @@ RSpec.describe RelatedArticles do
       service.all
     end
 
-    # ⚠️ The key says "this entry has an embedding". Thus the coverage report of the web build can
-    # tell a missing embedding from a floor that removed each candidate.
-    it "keys an entry with a vector even when no candidate goes past the floor" do
-      allow(articles).to receive(:list).and_return(corpus)
+    # ⚠️ The section renders a two-column grid, thus a short list leaves a hole. The floor selects
+    # which candidates to prefer, and it never makes the list short.
+    it "gives a full list even when no candidate goes past the floor" do
       stub_const("RelatedArticles::FLOOR_SIGMAS", 100.0)
 
-      result = service.all
+      expect(service.all(count: 3)["q1"]).to eq(%w[near mid far])
+    end
 
-      expect(result).to have_key("q1")
-      expect(result["q1"]).to eq([])
+    it "gives every candidate it has when the corpus is smaller than count" do
+      expect(service.all(count: 10)["q1"]).to eq(%w[near mid far])
     end
 
     it "gives an empty hash and does not raise when the corpus is not available" do
@@ -117,9 +117,9 @@ RSpec.describe RelatedArticles do
     end
   end
 
-  # ⚠️ The floor is what stops four unrelated cards below "You May Also Like". After the mean
-  # subtraction a score at or below 0 means "not more alike than two articles of this corpus
-  # usually are".
+  # After the mean subtraction, a score at or below 0 means "not more alike than two articles of
+  # this corpus usually are". The floor puts each such candidate below the others, and the list
+  # still fills.
   describe "the floor" do
     let(:store) do
       {
@@ -137,8 +137,16 @@ RSpec.describe RelatedArticles do
       ]
     end
 
-    it "gives an empty list when nothing is truly related" do
-      expect(service.all["q1"]).to eq([])
+    it "still fills the list when nothing is truly related" do
+      expect(service.all(count: 2)["q1"].size).to eq(2)
+    end
+
+    # The floor keeps its meaning in the report, thus a person can see a weak group.
+    it "marks each candidate as below the floor in the report" do
+      rows = service.explain("q1")[:rows]
+
+      expect(rows.map { |row| row[:above_floor] }).to all(be(false))
+      expect(rows.map { |row| row[:selected] }).to include(true)
     end
   end
 

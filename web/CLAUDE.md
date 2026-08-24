@@ -101,11 +101,10 @@ arrives in seconds and the build takes minutes, thus the embedding is usually fi
 that a person just published, and whose vector is not in the store, gets no section until the next
 build.
 
-⚠️ In `data/related.json`, a **key** says that the api has an embedding for that entry, and an
-**empty list** says that no candidate went past the similarity floor of the api. The second one is a
-correct answer, and the section is then absent on purpose. Thus `report_related_coverage` counts the
-keys and never the lists that have an entry. To count the lists reports a floor that operates as a
-missing embedding.
+⚠️ In `data/related.json`, a **key** says that the api has an embedding for that entry. Thus
+`report_related_coverage` counts the keys and never the lists that have an entry. To count the lists
+would report an entry with few neighbors as a missing embedding. The api always fills a list to the
+number that the caller asks for, thus an empty list means that the corpus itself is empty.
 
 ## Key locations
 
