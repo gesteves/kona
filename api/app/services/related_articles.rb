@@ -57,9 +57,13 @@ class RelatedArticles < ApplicationService
   # ⚠️ There is a key for each published entry, and not only for each candidate. A Short is a
   # correct query article, because the section appears on its own page, but a Short can never be a
   # neighbor.
+  #
+  # ⚠️ An entry with a vector always gets a key, and its list is empty when no candidate goes past
+  # the floor. An entry with **no vector** is absent. Thus the key says "this entry has an
+  # embedding", and `report_related_coverage` in the web build can tell a missing embedding from a
+  # floor that removed each candidate. Those two look the same, and only one of them is a problem.
   # @param count [Integer] The number of neighbors for each entry.
-  # @return [Hash{String=>Array<String>}] Contentful id => the neighbor ids, the nearest first. An
-  #   entry with no stored vector is absent, and not empty.
+  # @return [Hash{String=>Array<String>}] Contentful id => the neighbor ids, the nearest first.
   def all(count: 4)
     rescue_with({}, context: self.class.name) do
       pool = candidates
@@ -72,8 +76,7 @@ class RelatedArticles < ApplicationService
         id = article.sys&.id
         next if id.blank? || context[:vectors][id].blank?
 
-        neighbors = neighbors_for(article, pool, context, count)
-        acc[id] = neighbors if neighbors.present?
+        acc[id] = neighbors_for(article, pool, context, count)
       end
     end
   end

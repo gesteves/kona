@@ -98,6 +98,18 @@ RSpec.describe RelatedArticles do
       service.all
     end
 
+    # ⚠️ The key says "this entry has an embedding". Thus the coverage report of the web build can
+    # tell a missing embedding from a floor that removed each candidate.
+    it "keys an entry with a vector even when no candidate goes past the floor" do
+      allow(articles).to receive(:list).and_return(corpus)
+      stub_const("RelatedArticles::FLOOR_SIGMAS", 100.0)
+
+      result = service.all
+
+      expect(result).to have_key("q1")
+      expect(result["q1"]).to eq([])
+    end
+
     it "gives an empty hash and does not raise when the corpus is not available" do
       allow(articles).to receive(:list).and_return([])
 
@@ -125,8 +137,8 @@ RSpec.describe RelatedArticles do
       ]
     end
 
-    it "gives no neighbor when nothing is truly related" do
-      expect(service.all).not_to have_key("q1")
+    it "gives an empty list when nothing is truly related" do
+      expect(service.all["q1"]).to eq([])
     end
   end
 

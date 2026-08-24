@@ -101,6 +101,12 @@ arrives in seconds and the build takes minutes, thus the embedding is usually fi
 that a person just published, and whose vector is not in the store, gets no section until the next
 build.
 
+⚠️ In `data/related.json`, a **key** says that the api has an embedding for that entry, and an
+**empty list** says that no candidate went past the similarity floor of the api. The second one is a
+correct answer, and the section is then absent on purpose. Thus `report_related_coverage` counts the
+keys and never the lists that have an entry. To count the lists reports a floor that operates as a
+missing embedding.
+
 ## Key locations
 
 - `config.rb` — the Middleman configuration and the proxy setup. `Rakefile` — the Redis start and

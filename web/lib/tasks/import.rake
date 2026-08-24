@@ -215,10 +215,19 @@ def report_related_coverage
     return
   end
 
-  covered = related.count { |_id, ids| Array(ids).any? }
+  # ⚠️ A key says "the api has an embedding for this entry", and an empty list says "no candidate
+  # went past the similarity floor". Those two are different, and only the first one is a problem.
+  # To count the entries with a neighbor would report the floor as a missing embedding.
+  covered = related.size
+  empty = related.count { |_id, ids| Array(ids).empty? }
+
+  if empty.positive?
+    puts "ℹ️  #{empty} of #{covered} entries have no related article. Read `rake related:inspect` in the api."
+  end
+
   return if covered >= expected * RELATED_COVERAGE_FLOOR
 
-  puts "⚠️  Related articles cover #{covered} of #{expected} entries. The api may not have each embedding."
+  puts "⚠️  The api has an embedding for #{covered} of #{expected} entries. Run `rake embeddings:backfill`."
 end
 
 def safely_perform
