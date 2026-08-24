@@ -16,6 +16,45 @@ class TaxonomyConcepts < ApplicationService
     end
   end
 
+  # The parent of each concept and the scheme that holds it. RelatedArticles uses the parents to
+  # give a smaller weight to a match between two concepts that share an ancestor.
+  # @return [Hash{String=>Hash}] id => { broader:, scheme: }.
+  def tree
+    concepts.each_with_object({}) do |concept, map|
+      id = concept.dig(:sys, :id).to_s
+      next if id.blank?
+
+      map[id] = {
+        broader: Array(concept[:broader]).filter_map { |b| b.dig(:sys, :id).presence },
+        scheme: Array(concept[:conceptSchemes]).filter_map { |s| s.dig(:sys, :id).presence }.first
+      }
+    end
+  end
+
+  # Each ancestor of one concept, from its parent upward. A cycle in the data cannot make an
+  # endless loop, because the code stops at an id that it saw before.
+  #
+  # ⚠️ The name is not `ancestors`. That name is a method of Module, and Rails and RSpec both call
+  # it on a class. To override it broke each of those callers.
+  # @param id [String] The concept id.
+  # @param tree [Hash] The output of #tree.
+  # @return [Array<String>] The ancestor ids.
+  def self.ancestor_ids(id, tree)
+    seen = []
+    # ⚠️ The copy is necessary. Array() gives the same object back for an array, thus shift and
+    # concat below changed the tree of the caller. The first article then removed the ancestors
+    # for each article after it.
+    queue = Array(tree.dig(id.to_s, :broader)).dup
+
+    while (current = queue.shift)
+      next if seen.include?(current)
+      seen << current
+      queue.concat(Array(tree.dig(current, :broader)))
+    end
+
+    seen
+  end
+
   private
 
   # @return [Array<Hash>] The raw concept items, from the cache.

@@ -35,15 +35,25 @@ RSpec.describe "Widgets::Articles trending", type: :request do
     by_path.map { |path, total| { dimensions: [ path ], metrics: [ total ] } }
   end
 
+  # The all-time query asks for the visitors and the pageviews, thus each of its rows holds two
+  # values.
+  def total_rows(by_path)
+    by_path.map { |path, total| { dimensions: [ path ], metrics: [ total, total ] } }
+  end
+
   before do
     allow_any_instance_of(Articles).to receive(:list).and_return(corpus)
     recent = rows(art_spiking.path => 15, art_steady.path => 72)
     baseline = rows(art_spiking.path => 30, art_steady.path => 2000)
-    # The recent window and the baseline are two event:page queries over two ranges. The length of
-    # the range selects the answer: the recent range is short, and the baseline range is
-    # approximately one month.
+    all_time = total_rows(art_steady.path => 900)
+    # The recent window and the baseline are two visit:entry_page queries over two ranges. The
+    # length of the range selects the answer: the recent range is short, and the baseline range is
+    # approximately one month. The all-time query gives the order of the group with no traffic.
     allow_any_instance_of(Plausible).to receive(:query) do |**kwargs|
-      first, last = kwargs[:date_range]
+      range = kwargs[:date_range]
+      next { results: all_time } unless range.is_a?(Array)
+
+      first, last = range
       span_hours = (Time.parse(last) - Time.parse(first)) / 3600.0
       { results: span_hours <= (TrendingArticles::RECENT_WINDOW_HOURS + 1) ? recent : baseline }
     end

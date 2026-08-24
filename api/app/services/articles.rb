@@ -47,6 +47,7 @@ class Articles < ApplicationService
             contentType
             sys { id publishedVersion }
           }
+          contentfulMetadata { concepts { id } }
           sys { id firstPublishedAt publishedVersion }
         }
       }
@@ -105,6 +106,9 @@ class Articles < ApplicationService
   # Adds the fields that the build also makes, and removes the large `body`, which the code gets
   # only to know a full Article from a Short. ArticleAttributes makes those fields, and the
   # standard.site sync and the pageviews widget also use it.
+  #
+  # It also makes the nested taxonomy metadata into a flat `concept_ids` list. RelatedArticles
+  # reads that list, and the flat form keeps the cached JSON small.
   def decorate(item)
     derived = ArticleAttributes.derive(
       slug: item[:slug],
@@ -114,7 +118,16 @@ class Articles < ApplicationService
       body: item[:body]
     )
 
-    item.except(:body).merge(derived)
+    item.except(:body, :contentful_metadata)
+        .merge(derived)
+        .merge(concept_ids: concept_ids(item))
+  end
+
+  # The taxonomy concept ids of one raw item.
+  # @param item [Hash] The raw article, with underscore keys.
+  # @return [Array<String>] The ids, or an empty list when the entry has no concept.
+  def concept_ids(item)
+    Array(item.dig(:contentful_metadata, :concepts)).filter_map { |concept| concept[:id].presence }
   end
 
   # Does a Contentful GraphQL query and returns its `articles.items`, or nil if there is no API

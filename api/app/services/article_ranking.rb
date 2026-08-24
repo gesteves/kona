@@ -1,12 +1,9 @@
-# The shared code of the article lists that the app makes at request time: TrendingArticles and
-# RelatedArticles. It has the filter that selects the candidate articles, and the complete card data
-# that each list puts in the cache. Each of the two services sets @articles, which is an Articles
-# source, in its constructor.
+# The shared code of the article lists: TrendingArticles and RelatedArticles. It has the filter
+# that selects the candidate articles, and the complete card data that TrendingArticles puts in the
+# cache. Each of the two services sets @articles, which is an Articles source, in its constructor.
 module ArticleRanking
-  # Increase this after a change to the shape of `payload`. ⚠️ Each of the two lists puts `payload`
-  # in the cache under its own key, thus each such key must contain this value. With one version
-  # number for each service, one of the two served entries with no value for the new fields, for a
-  # full TTL.
+  # Increase this after a change to the shape of `payload`. ⚠️ The cache key of TrendingArticles
+  # must contain this value, because that cache holds a full payload and not an id.
   PAYLOAD_VERSION = 5
 
   private

@@ -36,6 +36,9 @@ RSpec.describe TrendingArticles do
   let(:recent) { { art_spiking.path => 15, art_steady.path => 72 } }
   let(:baseline) { { art_spiking.path => 30, art_steady.path => 2000 } }
 
+  # The visitors of all time. They order the group with a score of 0.
+  let(:all_time) { {} }
+
   let(:articles_service) { instance_double(Articles, list: corpus) }
   let(:plausible_service) { instance_double(Plausible) }
   subject(:service) { described_class.new(articles: articles_service, plausible: plausible_service) }
@@ -44,22 +47,25 @@ RSpec.describe TrendingArticles do
   after { travel_back }
 
   before do
-    stub_plausible(recent: recent, baseline: baseline)
+    stub_plausible(recent: recent, baseline: baseline, all_time: all_time)
     # cached_json puts the list in the cache. This stubs Redis, thus the suite needs no Redis and
     # each example is separate.
     allow($redis).to receive(:get).and_return(nil)
     allow($redis).to receive(:setex)
   end
 
-  # The recent window and the baseline are two { path => pageviews } lookups over two date ranges.
+  # The recent window and the baseline are two { path => visitors } lookups over two date ranges.
   # The length of the range selects the answer: the recent range is short, and the baseline range is
   # approximately one month.
-  def stub_plausible(recent:, baseline:)
-    allow(plausible_service).to receive(:pageviews_by_path) do |**kwargs|
+  def stub_plausible(recent:, baseline:, all_time: {})
+    allow(plausible_service).to receive(:entry_visitors_by_path) do |**kwargs|
       first, last = kwargs[:date_range]
       span_hours = (Time.parse(last) - Time.parse(first)) / 3600.0
       span_hours <= (described_class::RECENT_WINDOW_HOURS + 1) ? recent : baseline
     end
+
+    allow(plausible_service).to receive(:totals_by_path)
+      .and_return(all_time.transform_values { |visitors| { visitors: visitors, pageviews: visitors } })
   end
 
   describe "#all" do
@@ -88,20 +94,54 @@ RSpec.describe TrendingArticles do
       expect(ids).not_to include("s1", "d1")
     end
 
-    it "ignores recent traffic below the eligibility floor" do
-      # 3 recent views, which is less than MIN_RECENT_PAGEVIEWS, on a baseline of zero would give a
-      # very large surge without the minimum. The minimum makes the score 0, thus the article goes
-      # into the group that the date orders, and the oldest is last.
+    # ⚠️ This is what the prior on both sides of the ratio does. 3 visitors on a baseline of zero
+    # gave a surge of 3 with the prior on the divisor alone, and that looked the same as a true
+    # surge. Now it gives a modest score below both true surges.
+    it "keeps a very small count below a true surge" do
       noisy = article(id: "n1", slug: "noisy", published_at: "2023-11-01T10:00:00Z")
       allow(articles_service).to receive(:list).and_return(corpus + [ noisy ])
       stub_plausible(recent: recent.merge(noisy.path => 3), baseline: baseline)
+
       ids = service.all(count: 10).map { |a| a.sys.id }
-      expect(ids).to eq(%w[a5 a6 a1 a2 a3 a4 n1])
+
+      expect(ids.first(3)).to eq(%w[a5 a6 n1])
+      expect(ids.index("n1")).to be > ids.index("a5")
     end
 
-    it "falls back to recency order when there's no recent traffic" do
-      stub_plausible(recent: {}, baseline: {})
+    # The floor is a percentile of the articles that got any traffic. Thus it goes up when many
+    # articles have traffic, and no person tunes a number when the traffic of the site changes.
+    it "removes an article below the percentile when many articles have traffic" do
+      busy = (1..8).map { |i| article(id: "b#{i}", slug: "busy#{i}", published_at: "2024-01-0#{i}T10:00:00Z") }
+      quiet = article(id: "q1", slug: "quiet", published_at: "2023-12-01T10:00:00Z")
+      allow(articles_service).to receive(:list).and_return(busy + [ quiet ])
+      # Each busy article has 40 visitors, thus the floor is 40. The quiet one has 3.
+      stub_plausible(
+        recent: busy.to_h { |a| [ a.path, 40 ] }.merge(quiet.path => 3),
+        baseline: {}
+      )
+
       ids = service.all(count: 10).map { |a| a.sys.id }
+
+      expect(ids.last).to eq("q1")
+    end
+
+    # ⚠️ The fallback is the popularity of all time, and not the date. The widget renders on the
+    # home page, which already lists the new posts. Thus a fallback by date made it a copy of that
+    # list.
+    it "falls back to the popularity of all time when there is no recent traffic" do
+      stub_plausible(recent: {}, baseline: {}, all_time: { art_march.path => 900, art_february.path => 400 })
+
+      ids = service.all(count: 10).map { |a| a.sys.id }
+
+      expect(ids).to eq(%w[a3 a4 a1 a2 a5 a6])
+    end
+
+    # The date is the last key, thus the order is always the same. sort_by is not stable.
+    it "falls back to the date when nothing has traffic at all" do
+      stub_plausible(recent: {}, baseline: {})
+
+      ids = service.all(count: 10).map { |a| a.sys.id }
+
       expect(ids).to eq(%w[a1 a2 a3 a4 a5 a6])
     end
 
@@ -114,14 +154,18 @@ RSpec.describe TrendingArticles do
       expect(service.all(count: 1).size).to eq(1)
     end
 
-    it "degrades to an empty list instead of raising on a malformed publish date" do
+    # ⚠️ The rescue is for each article. One bad date made the full widget empty for a full hour.
+    it "omits an article with a malformed publish date and keeps the others" do
       bad = article(id: "x1", slug: "bad", published_at: "2024-01-01T10:00:00Z")
       allow(bad).to receive(:published_at).and_return("not-a-date")
       allow(articles_service).to receive(:list).and_return(corpus + [ bad ])
-      expect(service.all(count: 4)).to eq([])
+
+      ids = service.all(count: 10).map { |a| a.sys.id }
+
+      expect(ids).to eq(%w[a5 a6 a1 a2 a3 a4])
     end
 
-    it "matches Plausible pageviews by the article's /YYYY/MM/DD/slug/ path" do
+    it "matches the Plausible rows by the /YYYY/MM/DD/slug/ path of the article" do
       expect(art_spiking.path).to eq("/2024/01/15/spiking/")
       expect(service.all(count: 10).map { |a| a.sys.id }).to include("a5")
     end
@@ -137,9 +181,9 @@ RSpec.describe TrendingArticles do
       service.all(count: 4)
       service.all(count: 10)
 
-      # rank runs one time for the hour: the two Plausible queries, for the recent window and for
+      # rank runs one time for the hour: the two entry-page queries, for the recent window and for
       # the baseline, and Articles#list each run one time, for each call.
-      expect(plausible_service).to have_received(:pageviews_by_path).twice
+      expect(plausible_service).to have_received(:entry_visitors_by_path).twice
       expect(articles_service).to have_received(:list).once
     end
 
@@ -153,8 +197,8 @@ RSpec.describe TrendingArticles do
       service.all(count: 4)
 
       # A new hour gives a new cache key, thus the code calculates again and does two more
-      # Plausible queries.
-      expect(plausible_service).to have_received(:pageviews_by_path).exactly(4).times
+      # entry-page queries.
+      expect(plausible_service).to have_received(:entry_visitors_by_path).exactly(4).times
     end
   end
 end

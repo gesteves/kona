@@ -12,8 +12,16 @@ RSpec.describe Plausible do
     allow($redis).to receive(:setex)
   end
 
-  # { path => pageviews } becomes the event:page rows that Plausible returns.
-  def rows(by_path)
+  # { path => pageviews } becomes the event:page rows that Plausible returns. The all-time query
+  # asks for the visitors first and the pageviews second, thus each row holds two values.
+  def rows(by_path, visitors = {})
+    by_path.map do |path, total|
+      { dimensions: [ path ], metrics: [ visitors[path].to_i, total ] }
+    end
+  end
+
+  # The rows of the entry-page query, which asks for the visitors only.
+  def entry_rows(by_path)
     by_path.map { |path, total| { dimensions: [ path ], metrics: [ total ] } }
   end
 
@@ -38,6 +46,7 @@ RSpec.describe Plausible do
       expect(service).to receive(:post_json).once do |_url, **options|
         body = JSON.parse(options[:body])
         expect(body["dimensions"]).to eq([ "event:page" ])
+        expect(body["metrics"]).to eq([ "visitors", "pageviews" ])
         expect(body["date_range"]).to eq("all")
         expect(body["filters"]).to eq([ [ "matches", "event:page", [ "^/20\\d{2}/" ] ] ])
         { results: [] }
@@ -79,6 +88,55 @@ RSpec.describe Plausible do
       expect(service).not_to receive(:post_json)
 
       expect(service.pageviews_by_path).to be_nil
+    end
+  end
+
+  describe "#totals_by_path" do
+    # ⚠️ One query body gives both metrics. The pageviews widget reads the pageviews and
+    # TrendingArticles reads the visitors, thus the two share one key and one call.
+    it "gives the visitors and the pageviews of each path from one query" do
+      expect(service).to receive(:post_json).once
+        .and_return(results: rows({ "/2026/05/01/a/" => 12 }, { "/2026/05/01/a/" => 7 }))
+
+      expect(service.totals_by_path).to eq("/2026/05/01/a/" => { visitors: 7, pageviews: 12 })
+    end
+  end
+
+  describe "#entry_visitors_by_path" do
+    # ⚠️ TrendingArticles reads this and not the pageviews. The trending widget renders on the home
+    # page and on each Page, thus its own clicks go into the pageviews of an article.
+    it "asks for the visitors of each entry page in a single query" do
+      expect(service).to receive(:post_json).once do |_url, **options|
+        body = JSON.parse(options[:body])
+        expect(body["dimensions"]).to eq([ "visit:entry_page" ])
+        expect(body["metrics"]).to eq([ "visitors" ])
+        expect(body["filters"]).to eq([ [ "matches", "visit:entry_page", [ "^/20\\d{2}/" ] ] ])
+        { results: [] }
+      end
+
+      service.entry_visitors_by_path
+    end
+
+    it "folds the rows into { path => visitors }" do
+      allow(service).to receive(:post_json)
+        .and_return(results: entry_rows("/2026/05/01/a/" => 4, "/2026/05/02/b/" => 9))
+
+      expect(service.entry_visitors_by_path).to eq("/2026/05/01/a/" => 4, "/2026/05/02/b/" => 9)
+    end
+
+    # ⚠️ ArticleAttributes.path always writes the slash at the end. Thus a path with no slash would
+    # never join to an article, and it would count as zero.
+    it "adds the slash at the end of a path that has none" do
+      allow(service).to receive(:post_json)
+        .and_return(results: entry_rows("/2026/05/01/a" => 4, "/2026/05/01/a/" => 1))
+
+      expect(service.entry_visitors_by_path).to eq("/2026/05/01/a/" => 5)
+    end
+
+    it "returns nil when the query is unavailable" do
+      allow(service).to receive(:post_json).and_return(nil)
+
+      expect(service.entry_visitors_by_path).to be_nil
     end
   end
 end

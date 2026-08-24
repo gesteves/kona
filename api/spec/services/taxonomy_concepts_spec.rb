@@ -46,4 +46,37 @@ RSpec.describe TaxonomyConcepts do
     expect(service).not_to receive(:get_json)
     expect(service.names).to eq({})
   end
+
+  describe ".ancestor_ids" do
+    let(:tree) do
+      {
+        "triathlon" => { broader: [], scheme: "sports" },
+        "full-distance" => { broader: [ "triathlon" ], scheme: "sports" },
+        "kona" => { broader: [ "full-distance" ], scheme: "sports" }
+      }
+    end
+
+    it "gives each ancestor, from the parent upward" do
+      expect(described_class.ancestor_ids("kona", tree)).to eq(%w[full-distance triathlon])
+    end
+
+    # ⚠️ Array() gives the same object back for an array. Thus a queue with no copy changed the
+    # tree of the caller, and the first article removed the ancestors for each one after it.
+    it "does not change the tree that the caller gave" do
+      described_class.ancestor_ids("kona", tree)
+
+      expect(tree.dig("kona", :broader)).to eq([ "full-distance" ])
+      expect(described_class.ancestor_ids("kona", tree)).to eq(%w[full-distance triathlon])
+    end
+
+    it "stops at a cycle in the data" do
+      cyclic = { "a" => { broader: [ "b" ] }, "b" => { broader: [ "a" ] } }
+
+      expect(described_class.ancestor_ids("a", cyclic)).to eq(%w[b a])
+    end
+
+    it "gives an empty list for an id that it does not know" do
+      expect(described_class.ancestor_ids("unknown", tree)).to eq([])
+    end
+  end
 end

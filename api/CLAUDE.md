@@ -112,6 +112,10 @@ from coordinates, and `GoogleGeocoder` finds coordinates from an address), Googl
 Pollen, PurpleAir, Whoop (OAuth2), TrainerRoad (iCal), Contentful, Plausible, Font Awesome,
 Goodspeed, Akismet, Resend, Turnstile, Voyage (`Embeddings`), `StandardSite`, `AssetMirror`, and
 `BlurhashPlaceholder`.
+The two article rankings, `TrendingArticles` and `RelatedArticles`, share `ArticleRanking`. Three
+more classes hold the parts of the "You May Also Like" score: `ArticleSimilarity` is the vector
+arithmetic, `ArticleTaxonomy` is the concept overlap, and `RelatedInspector` makes the two reports
+of `rake related:*`. Refer to **The article rankings**.
 Five more are not subclasses of `ApplicationService`, because they are not cacheable reads:
 `SpamQuarantine`, `TrackLibrary`, and `BlueskyCredentials` use Redis only and no HTTP; `GpxTrack`
 parses only; and `MapboxTileset` and `StaticMap` are different (refer to **The course-map
@@ -121,11 +125,28 @@ it tries again after a failure. `DeepOstruct` gives dot access.
 
 ⚠️ **Plausible permits 600 calls each hour**, and `cached_json` limits each different query body to
 one call for its 5-minute TTL. Thus the number of *different queries* is important, and the number of
-requests is not. For that reason `Plausible#pageviews_by_path` is **one query for the full site**,
-and `TrendingArticles` and the pageviews widget of each article share it. A query for each article
-would make one key for each article, and the number of calls would then grow with the number of
-articles and go past the limit. **Do not add a query for each article, and do the calculation again
-before you make either TTL shorter.**
+requests is not. For that reason each `Plausible` aggregate is **one query for the full site**, and
+never one query for each article. A query for each article would make one key for each article, and
+the number of calls would then grow with the number of articles and go past the limit. **Do not add
+a query for each article, and do the calculation again before you make either TTL shorter.**
+
+There are **three different query bodies**, which is 36 calls each hour:
+
+| Method | Dimension | Metrics | Who reads it |
+|---|---|---|---|
+| `totals_by_path(date_range: "all")` | `event:page` | `visitors`, `pageviews` | the pageviews widget reads the pageviews; `TrendingArticles` and `RelatedArticles` read the visitors |
+| `entry_visitors_by_path` (the recent window) | `visit:entry_page` | `visitors` | `TrendingArticles` |
+| `entry_visitors_by_path` (the baseline window) | `visit:entry_page` | `visitors` | `TrendingArticles` |
+
+⚠️ **`TrendingArticles` reads the visitors of an ENTRY PAGE, and not the pageviews of a page.** The
+trending widget renders on the home page and on each Page. Thus its own clicks go into the pageviews
+of an article, and a rank by pageviews put the output of the module back into its own input. At the
+traffic of this site that loop can supply most of the recent traffic of an article. A session that
+*starts* on the article measures the demand from outside the site, and no click inside the site can
+change it. Do not change this back to `event:page`.
+
+⚠️ **`totals_by_path` gives two metrics from one query body, on purpose.** Two queries would cost two
+keys for the same data. `pageviews_by_path` is a small wrapper over it.
 
 **The types of failure that you must know:**
 
@@ -204,6 +225,65 @@ at the same ref as `web/Gemfile`. The rubygems release has `encode` only, and th
 ⚠️ **Set `IMAGES_URL` and `IMAGE_HOST` as fly secrets, then run `rake blurhash:backfill`.** Without
 the two variables the card renders no image at all. Without the backfill each card shows the flat
 colour until a person publishes its asset again.
+
+### The article rankings
+
+Two modules put articles in order, and each one has its own rules.
+
+**`TrendingArticles`** reads the entry-page visitors of two moving windows and gives each article a
+score. Read the ⚠️ above about `visit:entry_page`.
+
+- ⚠️ **The prior goes on BOTH sides of the surge ratio** (`(recent + PRIOR) / (expected + PRIOR)`).
+  It moves a ratio from a small count toward 1, which is "no surge". With the prior on the divisor
+  alone, an article with no baseline and 5 visitors got a surge of 5, and a true surge looked
+  exactly the same. This is the one change that makes the score correct at the traffic of this site.
+- ⚠️ **The floor is adaptive**: it is a percentile of the articles that got any traffic, and never
+  less than `ABSOLUTE_MIN`. Thus no person tunes a number when the traffic changes. It drops back to
+  `ABSOLUTE_MIN` when fewer than `MIN_ABOVE_FLOOR` articles go past it, because a quiet week must
+  not empty the widget.
+- ⚠️ **`MIN_ABOVE_FLOOR` is a constant and not the `count` of the caller.** The cache holds one list
+  for each hour and each caller shares it. A `count` there would make that list different for each
+  caller below one key.
+- ⚠️ **The group with a score of 0 goes in the order of the visitors of all time, and not the date.**
+  The widget renders on the home page, which already lists the new posts. Thus a fallback by date
+  made the widget a copy of that list. The date stays as the last key only because `sort_by` is not
+  stable.
+- ⚠️ **Each new setting must go into `#ranking_version`.** That digest is the cache key. A setting
+  outside it leaves the previous list in the cache for its full hour, below a key that looks
+  correct.
+
+**`RelatedArticles`** reads the stored Voyage vectors and gives each candidate a score. The request
+path never calls Voyage.
+
+- ⚠️ **`ArticleSimilarity.prepare` subtracts the mean vector of the corpus.** This is what makes the
+  ranker operate. The corpus has one author, one domain, and one genre, thus each vector holds a
+  large shared component and the similarities group into a narrow band where the order is near to
+  noise. The subtraction removes that shared direction. It also makes each vector a unit vector, thus
+  a similarity is a dot product: the old cosine calculated the norm of the same vector some hundreds
+  of times.
+- ⚠️ **The concept overlap uses an IDF weight.** "Race Reports" is on most articles and gives almost
+  no information, and "Ironman Canada" is very specific. A plain Jaccard would let the common
+  concepts control the result, and each article would look related to each other article.
+- ⚠️ **The floor reads the relevance and not the score.** The score holds the small addition for the
+  date and the popularity. A new or a popular article that is not related must never go past the
+  floor because of that addition. `MIN_SCORE` is 0 and it is exclusive: after the mean subtraction,
+  the mean similarity of a pair is near 0, thus a score at or below 0 means "not related". A floor in
+  standard deviations alone can never empty a list, and an empty list is how a section renders
+  nothing.
+- ⚠️ **The same-race demotion is a demotion and never an exclusion.** A Short renders
+  `_related.html.erb` with no "More Reports From This Race" section above it. It is also small on
+  purpose: a shared rare concept is true relatedness, and it wins against the demotion. **MMR** does
+  most of the work to go wider, because four reports of one race are near-copies of each other.
+- ⚠️ **`TaxonomyConcepts.ancestor_ids` is not named `ancestors`.** That name is a method of Module,
+  and Rails and RSpec both call it on a class. It also copies the `broader` list, because `Array()`
+  gives the same object back and the queue changed the tree of the caller.
+
+**The inspection tools.** ⚠️ No A/B test can operate at the traffic of this site. Thus
+`rake related:inspect[slug]` and `rake related:audit` are the only method to know if a change to the
+ranking helped. The audit gives the spread of the similarity **before and after** the mean
+subtraction, and that number decides if the corpus needs an embedding for each chunk of a body. It
+also names each entry whose stored embedding is older than the entry: Contentful never sends a
+webhook again, thus `rake embeddings:backfill` is the only correction.
 
 ### Webhooks
 
@@ -907,9 +987,9 @@ value is a secret of fly.io, and Rails also uses `config/credentials.yml.enc` an
   that, and a difference gives a 404 for each image), `GITHUB_DISPATCH_TOKEN` and
   `GITHUB_REPOSITORY` (a fine-grained PAT with **Contents: Read and write**, and the `owner/repo`
   slug), `PLAUSIBLE_API_KEY` and `PLAUSIBLE_SITE_ID` (⚠️ if one of the two has no value, the
-  pageviews widget collapses and `TrendingArticles` changes to the order by date with no message.
-  An INFO log is the only sign, and the result looks exactly like "it operates, and nothing is
-  trending"), `VOYAGE_API_KEY` (with no value there are no embeddings, thus `GET /api/related`
+  pageviews widget collapses and `TrendingArticles` changes to the order by popularity with no
+  message. An INFO log is the only sign, and the result looks exactly like "it operates, and nothing
+  is trending"), `VOYAGE_API_KEY` (with no value there are no embeddings, thus `GET /api/related`
   returns `{}` and the build omits each "You May Also Like" section), `MAPBOX_USERNAME` and
   `MAPBOX_SECRET_TOKEN` (a token with `tilesets:write` and `tilesets:read`. If one of the two has no
   value, the Maps page says so and refuses each upload), `MAPBOX_ACCESS_TOKEN` (the ⚠️ **public**
@@ -917,9 +997,10 @@ value is a secret of fly.io, and Rails also uses `config/credentials.yml.enc` an
   the Location page needs it. With no value that page changes to a form for the coordinates),
   `MAPBOX_STYLE_URL` (the default style for a new track. Each track can use a different style, and
   the Location page ignores this value), `REDIS_POOL_SIZE` (the default is 10. Make it as large as
-  the largest consumer, which is the concurrency of Sidekiq), and the four `TRENDING_*` values for
-  the ranking (read `.env.example`. They are part of the cache key of the ranking, thus a change to
-  one makes that cache invalid).
+  the largest consumer, which is the concurrency of Sidekiq), the six `TRENDING_*` values for the
+  trending ranking (read `.env.example`. They are part of the cache key of that ranking, thus a
+  change to one makes the cache invalid), and the three `RELATED_*` values for the "You May Also
+  Like" ranking (no cache holds that ranking, thus a change applies at the next build).
 
 ## Conventions & gates
 
