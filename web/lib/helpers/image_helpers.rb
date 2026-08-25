@@ -154,17 +154,18 @@ module ImageHelpers
   end
 
   # The shape of a cover image on a card: the height divided by the width. It comes from the
-  # `ratio` of the `card` variant of data/srcsets.yml, which reads "16:9", thus that file is the ONE
-  # place that holds the shape and the api reads the same value from its copy.
+  # `ratio` of the `card` variant of data/srcsets.yml, thus that file is the ONE place that holds
+  # the shape and the api reads the same value from its copy.
   # @return [Rational]
   def card_ratio
     w, h = data.srcsets.card.ratio.split(":", 2).map(&:to_i)
     Rational(h, w)
   end
 
-  # The same shape for CSS: "16:9" becomes "16 / 9". `cover_image_tag` and the entry skeleton write
-  # it into the markup as `--card-ratio`, and _entry.scss and _skeleton.scss read it. Thus the
-  # stylesheets follow srcsets.yml and a person does not edit the shape in two languages.
+  # The same shape in the CSS form: it changes the colon into a slash. `cover_image_tag` and the
+  # entry skeleton write it into the markup as `--card-ratio`, and _entry.scss and _skeleton.scss
+  # read it. Thus the stylesheets follow srcsets.yml, and a person does not edit the shape in two
+  # languages.
   # @return [String]
   def card_aspect_ratio
     data.srcsets.card.ratio.sub(":", " / ")

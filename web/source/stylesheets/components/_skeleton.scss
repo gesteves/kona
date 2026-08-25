@@ -134,8 +134,12 @@
 // section does not jump when the fragment replaces the skeleton. ⚠️ --card-ratio comes from the
 // markup, from srcsets.yml. Refer to .entry__cover-image in _entry.scss.
 .entry__cover .entry-skeleton-cover {
-  aspect-ratio: var(--card-ratio, 16 / 9);
-  display: block;
+  aspect-ratio: var(--card-ratio, 3 / 2);
+  // ⚠️ Keep this `flex`. The indicator in the shadow tree is a flex item with `flex: 1 1 auto`,
+  // and it has no content. With `display: block` the host is not a flex container, thus that
+  // element gets a height of zero and the box stays empty. `height: auto` lets aspect-ratio give
+  // the height, in place of the `height: 100%` of the component.
+  display: flex;
   height: auto;
   width: 100%;
 

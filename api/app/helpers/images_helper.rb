@@ -28,16 +28,16 @@ module ImagesHelper
   CARD_WIDTHS = CARD.fetch("widths").map(&:to_i).freeze
 
   # The shape of a cover image on a card: the height divided by the width. It comes from the
-  # `ratio` of the `card` variant, which reads "16:9", thus srcsets.yml is the ONE place that holds
-  # the shape and both apps read the same value.
+  # `ratio` of the `card` variant, thus srcsets.yml is the ONE place that holds the shape and both
+  # apps read the same value.
   CARD_RATIO = begin
     w, h = CARD.fetch("ratio").split(":", 2).map(&:to_i)
     Rational(h, w)
   end
 
-  # The same shape for CSS: "16:9" becomes "16 / 9". `cover_image_tag` writes it into the markup as
-  # `--card-ratio`, and _entry.scss reads it. Thus the stylesheet follows this file and a person
-  # does not edit the shape in two languages.
+  # The same shape in the CSS form: it changes the colon into a slash. `cover_image_tag` writes it
+  # into the markup as `--card-ratio`, and _entry.scss reads it. Thus the stylesheet follows this
+  # file, and a person does not edit the shape in two languages.
   CARD_ASPECT_RATIO = CARD.fetch("ratio").sub(":", " / ").freeze
 
   # The <img> of the cover image of an article card.

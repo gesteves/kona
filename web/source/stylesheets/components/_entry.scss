@@ -130,7 +130,7 @@
 // number here: the value below is a fallback for a fragment with no custom property, and nothing
 // serves one today.
 .entry__cover-image {
-  aspect-ratio: var(--card-ratio, 16 / 9);
+  aspect-ratio: var(--card-ratio, 3 / 2);
   border-radius: var(--radius-medium);
   display: block;
   object-fit: cover;

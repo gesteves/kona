@@ -126,7 +126,7 @@ a link, in the middle of a page:
 card of the trending widget, and the build renders each other card, and the two go on the same page.
 The `sizes` list, the widths, and the attributes must be the same. The
 `widget_markup_contract_spec` compares the outer element of the **collection** only.
-⚠️ **The shape is in one place: the `ratio` of the `card` variant of `srcsets.yml`** (`"16:9"`).
+⚠️ **The shape is in one place: the `ratio` of the `card` variant of `srcsets.yml`**.
 Both apps read it for the `h` of each candidate, and both write it into the markup as the
 `--card-ratio` custom property. `.entry__cover-image` in `_entry.scss` and `.entry-skeleton-cover` in
 `_skeleton.scss` read that property, thus neither stylesheet holds a number. A change to the shape

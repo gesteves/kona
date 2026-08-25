@@ -189,7 +189,7 @@ between the two apps, and neither side checks the other.** The full text is in t
 
 The trending card renders the cover image of the article. Two parts make it:
 
-- **`config/srcsets.yml`** holds the shape (`ratio`, as `"16:9"`), the `sizes`, and the candidate
+- **`config/srcsets.yml`** holds the shape (`ratio`), the `sizes`, and the candidate
   widths of the card. It is a copy of
   `web/data/srcsets.yml`, word for word, and `ImagesHelper` reads its `card` variant one time at
   boot. ⚠️ Copy the full file (`cp web/data/srcsets.yml api/config/srcsets.yml`), and do not copy
