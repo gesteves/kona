@@ -59,7 +59,7 @@ edge serves a cached copy before it gets a new one.
 | GET/POST/DELETE | `/connected-apps/bluesky` | the Bluesky handle + app password form, and disconnect | `no-store` |
 | GET | `/location/lookup` | resolves an `address` or a coordinate pair to `{latitude, longitude, place}`. ⚠️ **Never writes** | `no-store` |
 | POST | `/location` | same write as `POST /api/location`, coordinates only; answers with the coordinates and the geocoded place | `no-store` |
-| POST | `/republish` | starts a build of the web site now, or at a time that the owner picks. The Republish dialog of the nav posts here | `no-store` |
+| POST | `/republish` | starts a build of the web site after the minutes that the owner picks, where zero is now. The Republish dialog of the nav posts here | `no-store` |
 | POST | `/course-maps`; PATCH/DELETE `/course-maps/:id`; GET `/course-maps/status` | upload GPX tracks, save render settings, delete a track, poll publish status | `no-store` |
 | GET | `/course-maps/:id/preview`, `/course-maps/:id/download` | the rendered PNG, proxied from Mapbox; same render, only the disposition differs | `no-store` |
 | — | `/sidekiq` | job dashboard (owner-session gated) | — |
@@ -361,9 +361,14 @@ Thus that shared window is safe.
     manual callers — `POST /api/build` and the Republish dialog — share that 60-second window. Thus
     a double click, or a click after a `curl`, cannot start two Actions runs. ⚠️ The Contentful
     webhook must never take it: a publish inside the window would go away with no message.
-  - **This is the one job that a caller schedules.** The Republish dialog uses `perform_at`, which
-    puts the job in the scheduled set of Sidekiq. The Scheduled tab of `/sidekiq` lists it, and it
-    is the only place that can cancel it.
+  - **This is the one job that a caller schedules.** `.schedule_in` uses `perform_in`, which puts
+    the job in the scheduled set of Sidekiq, and the Scheduled tab of `/sidekiq` lists it.
+    ⚠️ **The admin keeps one scheduled republish only.** `.schedule_in` keeps its jid in
+    `SCHEDULED_JID_KEY`, and it calls `.cancel_scheduled` first. Thus a second republish replaces
+    the first, and it does not add a build. An immediate republish cancels it as well, **after** it
+    takes the trigger lock: in the other order, a click inside the window of that lock would cancel
+    the scheduled build and start nothing. The jid can name a job that ran already, or one that a
+    person deleted in `/sidekiq`; `find_job` gives nil for both, and the code then cancels nothing.
 - **`ActivityDescriptionJob`** does not know its source. It writes the stat lines with an emoji: the
   power, the heat, the Whoop strain, and the water temperature. It also writes two lines that
   Anthropic makes: a summary of the planned workout, which the code matches against the TrainerRoad
@@ -568,7 +573,7 @@ as the same button with no `href` and with `data-dialog="open <id>"`. It keeps `
 thus one tap on a phone closes the drawer and opens the dialog: both attributes have a handler on the
 document. **Republish site**, directly below Home, is the only one today. It opens
 `layouts/_republish_dialog`, which the layout renders one time, and `POST /republish` then starts a
-build of the web site, now or at a time that the owner picks. The rules of that dialog:
+build of the web site, after 0 to 60 minutes. The rules of that dialog:
 
 - ⚠️ **It is a sibling of `<wa-page>`, and not a child.** That component moves its
   `slot="navigation"` content between the sidebar and the drawer, and the dialog must not travel
@@ -576,17 +581,21 @@ build of the web site, now or at a time that the owner picks. The rules of that 
 - ⚠️ **The two footer buttons are outside the `<form>`.** A slot takes a direct child of the dialog
   only. `form="republish-form"` joins the submit button to that form, because `<wa-button>` is
   form-associated and reads that attribute as a native control does.
-- ⚠️ **The browser gives the time zone**, and the `republish` controller fills the date and the time
-  with the current *local* values. It must never use `toISOString()`: that method gives UTC, and the
-  fields would then show a time that the owner does not have on the clock. This app declares no
-  `config.time_zone`, thus the UTC fallback of the server means only that the script did not run.
-- ⚠️ **A time that has already passed builds now, and it is not an error.** The dialog can stay open
-  past that moment. To refuse it makes the owner type the time again for the build that they already
-  asked for.
-- ⚠️ **`RepublishController` matches the shape of the date and the time before it parses them.**
-  `Time#parse` is permissive: it reads `"not-a-date 06:30"` as 06:30 today, and that time has passed,
-  thus text with a mistake would start a build. `MAX_HORIZON`, which is 90 days, guards the other
-  side: a year with a mistake would park a job in Redis for decades.
+- ⚠️ **The delay is minutes from now, and not a date and a time.** Thus the browser sends no time
+  zone, and the server needs none: it adds the minutes to the current time. Do not add a date field
+  again. `MIN_MINUTES` and `MAX_MINUTES` bound the delay, and 60 minutes also stops a job that would
+  sit in Redis for a long time.
+- ⚠️ **A delay of zero is "now", and the dialog has one control and no radio group.** The **label of
+  the submit button** is the only thing that says which of the two the value gives: "Republish now"
+  at zero, and "Republish in 5 minutes" above it. Thus `republish_controller.js` must keep that
+  label with each edit of the field. A value outside the limits gets the plain word, and the
+  `required`, `min`, and `max` of the field then stop the submit.
+- ⚠️ **`RepublishController` matches the digits before it converts.** `to_i` gives 0 for text, and 0
+  is now, thus `"soon"` would start a build. It reads `"5.9"` as 5. The number input of the dialog
+  carries the same limits, but a client can send any value.
+- **The field submits the form on Enter**, because the submit button is in a slot outside that form.
+  The controller stops the default action first, thus one Enter gives one submit whether or not the
+  browser finds the button through its `form` attribute.
 
 A group is only a caption above its own `<ul>` of those same links:
 

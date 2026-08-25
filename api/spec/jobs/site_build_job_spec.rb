@@ -75,6 +75,45 @@ RSpec.describe SiteBuildJob do
     end
   end
 
+  describe "the scheduled republish" do
+    let(:scheduled_set) { instance_double(Sidekiq::ScheduledSet) }
+    let(:scheduled_job) { instance_double(Sidekiq::SortedEntry) }
+
+    before do
+      allow(Sidekiq::ScheduledSet).to receive(:new).and_return(scheduled_set)
+      allow($redis).to receive(:getdel).with("build:scheduled_jid").and_return(nil)
+      allow($redis).to receive(:set)
+    end
+
+    it "keeps the jid, with a TTL that outlives the job" do
+      allow(described_class).to receive(:perform_in).and_return("abc123")
+      expect($redis).to receive(:set).with("build:scheduled_jid", "abc123", ex: 10.minutes.to_i + 60)
+
+      described_class.schedule_in(10.minutes, described_class::ADMIN_EVENT_TYPE)
+    end
+
+    it "cancels the build that is scheduled before it schedules the next one" do
+      allow($redis).to receive(:getdel).with("build:scheduled_jid").and_return("old-jid")
+      allow(scheduled_set).to receive(:find_job).with("old-jid").and_return(scheduled_job)
+      expect(scheduled_job).to receive(:delete).and_return(true)
+
+      expect(described_class.schedule_in(5.minutes, described_class::ADMIN_EVENT_TYPE)).to be(true)
+      expect(described_class).to have_enqueued_sidekiq_job("admin-republish").at(5.minutes.from_now)
+    end
+
+    it "says that it cancelled nothing when no build is scheduled" do
+      expect(described_class.cancel_scheduled).to be(false)
+    end
+
+    # ⚠️ The jid can name a job that ran already, or one that a person deleted in /sidekiq.
+    it "says that it cancelled nothing when the jid is no longer in the scheduled set" do
+      allow($redis).to receive(:getdel).with("build:scheduled_jid").and_return("gone")
+      allow(scheduled_set).to receive(:find_job).with("gone").and_return(nil)
+
+      expect(described_class.cancel_scheduled).to be(false)
+    end
+  end
+
   it "retries failed jobs for up to 24 hours" do
     expect(described_class.get_sidekiq_options["retry_for"]).to eq(24.hours)
   end

@@ -1,4 +1,5 @@
 require "httparty"
+require "sidekiq/api"
 
 # Builds the web site again and deploys it. It sends a GitHub `repository_dispatch`, and
 # .github/workflows/web.yml waits for that event. There are three callers, and each one has its own
@@ -25,6 +26,10 @@ class SiteBuildJob < ApplicationJob
   TRIGGER_LOCK_KEY = "build:trigger_lock".freeze
   TRIGGER_LOCK_TTL = 60.seconds
 
+  # The jid of the republish that is scheduled. The admin keeps one only, thus each new republish
+  # cancels the one before it.
+  SCHEDULED_JID_KEY = "build:scheduled_jid".freeze
+
   # Takes the "build now" lock. The two manual callers share it, thus a double click, or a click
   # after a curl, cannot start two Actions runs.
   #
@@ -34,6 +39,30 @@ class SiteBuildJob < ApplicationJob
   #   one.
   def self.claim_trigger_lock
     !!$redis.set(TRIGGER_LOCK_KEY, "1", nx: true, ex: TRIGGER_LOCK_TTL.to_i)
+  end
+
+  # Schedules a build, and cancels the build that is scheduled already.
+  # @param delay [ActiveSupport::Duration] The time from now.
+  # @param event_type [String] One of the three event types above.
+  # @return [Boolean] true when this call cancelled a build that was scheduled.
+  def self.schedule_in(delay, event_type)
+    replaced = cancel_scheduled
+    jid = perform_in(delay, event_type)
+    # The key must outlive the job, thus the TTL adds a margin to the delay.
+    $redis.set(SCHEDULED_JID_KEY, jid, ex: delay.to_i + TRIGGER_LOCK_TTL.to_i)
+    replaced
+  end
+
+  # Removes the scheduled build from the scheduled set of Sidekiq.
+  #
+  # ⚠️ The key can name a job that ran already, or one that a person deleted in `/sidekiq`.
+  # `find_job` gives nil for both, thus this method then cancels nothing and says so.
+  # @return [Boolean] true when a job left the scheduled set.
+  def self.cancel_scheduled
+    jid = $redis.getdel(SCHEDULED_JID_KEY)
+    return false if jid.blank?
+
+    !!Sidekiq::ScheduledSet.new.find_job(jid)&.delete
   end
 
   # This has a default value and it is not necessary. Thus the Contentful caller stays a plain

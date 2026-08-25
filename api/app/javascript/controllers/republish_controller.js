@@ -1,48 +1,74 @@
 import { Controller } from "@hotwired/stimulus";
 
 /**
- * The Republish dialog: it selects an immediate build or a build at a time that the owner picks.
+ * The Republish dialog: one delay in minutes, where zero is "now".
  *
- * The server knows UTC only, thus this code gives it the zone of the browser and fills the two
- * fields with the local date and time.
+ * The label of the submit button says what the current value does. That label is the only thing
+ * that tells the owner "now" from "later", thus it must follow each edit of the field.
  */
 export default class extends Controller {
-  static targets = ["schedule", "later", "date", "time", "zone"];
+  static targets = ["form", "minutes", "submit", "label"];
 
   connect() {
-    this.zoneTarget.value = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
-    this.stamp();
-    this.toggle();
+    // A restoration visit of Turbo can render a snapshot that has the button in its busy state.
+    this.submitTarget.loading = false;
+    // ⚠️ It waits for the definition. Before the upgrade, `value` of the field is undefined, and the
+    // label would then stay at the plain word for a value that is correct.
+    customElements.whenDefined("wa-number-input").then(() => this.relabel());
   }
 
   /**
-   * Puts the current local date and time into the two fields.
+   * Writes what the submit button does into its label.
    *
-   * ⚠️ It reads the parts of the local Date, and it never uses toISOString(). That method gives
-   * UTC, thus the fields would show a time that the owner does not have on the clock.
-   * This runs at connect and at each `wa-show` of the dialog, thus a second open is never old.
+   * A value outside the limits gets the plain word, because the delay is then unknown. The field is
+   * `required` and it has a min and a max, thus the browser stops that submit.
    */
-  stamp() {
-    const now = new Date();
-    const pad = (value) => String(value).padStart(2, "0");
+  relabel() {
+    const minutes = this.minutes;
 
-    this.dateTarget.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    this.timeTarget.value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-  }
-
-  /**
-   * Shows the date and the time for "later", and hides them for "now".
-   *
-   * A disabled control submits nothing and skips its own validation. Thus the fields cannot stop a
-   * submit while they are out of view.
-   */
-  toggle() {
-    const later = this.scheduleTarget.value === "later";
-
-    this.laterTarget.hidden = !later;
-    for (const field of [this.dateTarget, this.timeTarget]) {
-      field.required = later;
-      field.disabled = !later;
+    if (minutes === null) {
+      this.labelTarget.textContent = "Republish";
+    } else if (minutes === 0) {
+      this.labelTarget.textContent = "Republish now";
+    } else {
+      this.labelTarget.textContent = `Republish in ${minutes} minute${minutes === 1 ? "" : "s"}`;
     }
+  }
+
+  /**
+   * Submits the form from the field, because the submit button is in a slot outside that form.
+   *
+   * ⚠️ It stops the default action first. Thus one Enter gives one submit, and it does that whether
+   * or not the browser finds the button through its `form` attribute.
+   * @param {KeyboardEvent} event
+   */
+  submitOnEnter(event) {
+    if (event.key !== "Enter") return;
+
+    event.preventDefault();
+    this.formTarget.requestSubmit();
+  }
+
+  /**
+   * Makes the submit button busy, because the POST goes on to a full page load.
+   */
+  markBusy() {
+    this.submitTarget.loading = true;
+  }
+
+  /**
+   * The delay of the field, or null when it is empty or outside the limits of the markup.
+   * @returns {number|null}
+   */
+  get minutes() {
+    const value = this.minutesTarget.value;
+    if (value === "") return null;
+
+    const minutes = Number(value);
+    const min = Number(this.minutesTarget.getAttribute("min"));
+    const max = Number(this.minutesTarget.getAttribute("max"));
+    if (!Number.isInteger(minutes) || minutes < min || minutes > max) return null;
+
+    return minutes;
   }
 }

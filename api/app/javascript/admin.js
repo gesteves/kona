@@ -42,11 +42,7 @@ import "@web.awesome.me/webawesome-pro/dist/components/color-picker/color-picker
 import "@web.awesome.me/webawesome-pro/dist/components/select/select.js";
 import "@web.awesome.me/webawesome-pro/dist/components/option/option.js";
 import "@web.awesome.me/webawesome-pro/dist/components/switch/switch.js";
-// The Republish dialog of the admin layout: two radios, a date, and a time.
-import "@web.awesome.me/webawesome-pro/dist/components/radio-group/radio-group.js";
-import "@web.awesome.me/webawesome-pro/dist/components/radio/radio.js";
-import "@web.awesome.me/webawesome-pro/dist/components/date-input/date-input.js";
-import "@web.awesome.me/webawesome-pro/dist/components/time-input/time-input.js";
+// The "Processing" state of a track on the Course maps page.
 import "@web.awesome.me/webawesome-pro/dist/components/spinner/spinner.js";
 
 import FlashController from "./controllers/flash_controller";
