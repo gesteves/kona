@@ -130,20 +130,35 @@ never one query for each article. A query for each article would make one key fo
 the number of calls would then grow with the number of articles and go past the limit. **Do not add
 a query for each article, and do the calculation again before you make either TTL shorter.**
 
-There are **three different query bodies**, which is 36 calls each hour:
+There are **five different query bodies**, which is 60 calls each hour:
 
 | Method | Dimension | Metrics | Who reads it |
 |---|---|---|---|
 | `totals_by_path(date_range: "all")` | `event:page` | `visitors`, `pageviews` | the pageviews widget reads the pageviews; `TrendingArticles` and `RelatedArticles` read the visitors |
+| `page_visitors_by_path` (the recent window) | `event:page` | `visitors`, `pageviews` | `TrendingArticles` |
+| `page_visitors_by_path` (the baseline window) | `event:page` | `visitors`, `pageviews` | `TrendingArticles` |
 | `entry_visitors_by_path` (the recent window) | `visit:entry_page` | `visitors` | `TrendingArticles` |
 | `entry_visitors_by_path` (the baseline window) | `visit:entry_page` | `visitors` | `TrendingArticles` |
 
-⚠️ **`TrendingArticles` reads the visitors of an ENTRY PAGE, and not the pageviews of a page.** The
-trending widget renders on the home page and on each Page. Thus its own clicks go into the pageviews
-of an article, and a rank by pageviews put the output of the module back into its own input. At the
-traffic of this site that loop can supply most of the recent traffic of an article. A session that
-*starts* on the article measures the demand from outside the site, and no click inside the site can
-change it. Do not change this back to `event:page`.
+⚠️ **`TrendingArticles` blends the two dimensions, and it never reads the pageviews.** A reader who
+arrives on the home page and then selects one article is a true signal, and `visit:entry_page` alone
+cannot see it. But the trending widget renders on the home page and on each Page, thus its own
+clicks are part of `event:page`, and a rank on that dimension alone puts the output of the module
+back into its own input. At the traffic of this site that loop can supply most of the recent traffic
+of an article.
+
+The blend keeps both properties: `visit:entry_page` is the demand from **outside** the site and gets
+the full weight, and the difference between the two dimensions is the arrivals from **inside** the
+site and gets `TRENDING_INTERNAL_WEIGHT` (default 0.5). Refer to `TrendingArticles#heat_by_path`.
+
+⚠️ **Keep that weight below 1**, and keep the metric at `visitors` and not `pageviews`. The visitors
+metric counts a reader one time however many times they load the page, thus a reload cannot raise
+it.
+
+⚠️ **The recent window and the baseline must use the same blend.** The score is a ratio of the two,
+and a different blend on each side gives a number with no meaning. ⚠️ `heat_by_path` returns an
+empty hash when **either** query is not available. A blend of one good query and one empty query
+would score each article on its internal traffic alone, and that list looks correct.
 
 ⚠️ **`totals_by_path` gives two metrics from one query body, on purpose.** Two queries would cost two
 keys for the same data. `pageviews_by_path` is a small wrapper over it.
@@ -230,8 +245,8 @@ colour until a person publishes its asset again.
 
 Two modules put articles in order, and each one has its own rules.
 
-**`TrendingArticles`** reads the entry-page visitors of two moving windows and gives each article a
-score. Read the ⚠️ above about `visit:entry_page`.
+**`TrendingArticles`** reads the blended visitors of two moving windows and gives each article a
+score. Read the ⚠️ above about the blend of `visit:entry_page` and `event:page`.
 
 - ⚠️ **The prior goes on BOTH sides of the surge ratio** (`(recent + PRIOR) / (expected + PRIOR)`).
   It moves a ratio from a small count toward 1, which is "no surge". With the prior on the divisor
@@ -1052,7 +1067,7 @@ value is a secret of fly.io, and Rails also uses `config/credentials.yml.enc` an
   the Location page needs it. With no value that page changes to a form for the coordinates),
   `MAPBOX_STYLE_URL` (the default style for a new track. Each track can use a different style, and
   the Location page ignores this value), `REDIS_POOL_SIZE` (the default is 10. Make it as large as
-  the largest consumer, which is the concurrency of Sidekiq), the six `TRENDING_*` values for the
+  the largest consumer, which is the concurrency of Sidekiq), the seven `TRENDING_*` values for the
   trending ranking (read `.env.example`. They are part of the cache key of that ranking, thus a
   change to one makes the cache invalid), and the three `RELATED_*` values for the "You May Also
   Like" ranking (no cache holds that ranking, thus a change applies at the next build).

@@ -64,12 +64,24 @@ class Plausible < ApplicationService
     )
   end
 
+  # The unique visitors of each article page over a date range, and it counts each one time however
+  # they arrived.
+  #
+  # ⚠️ A click inside the site goes into this number, and the trending widget renders on the home
+  # page and on each Page. Thus the widget can put its own clicks here, and its output would then
+  # order its own input. TrendingArticles gives this part of the signal a weight below 1 for that
+  # reason. Refer to TrendingArticles::INTERNAL_WEIGHT.
+  # @param date_range [String, Array] A Plausible date range: "all", or a [from, to] pair.
+  # @return [Hash, nil] { path => visitors }, or nil if the query is not available.
+  def page_visitors_by_path(date_range: "all")
+    column(totals_by_path(date_range: date_range), :visitors)
+  end
+
   # The unique visitors whose session STARTED on each article page.
   #
-  # ⚠️ TrendingArticles reads this and not the pageviews, on purpose. The trending widget renders
-  # on the home page and on each Page. Thus its own clicks go into the pageviews of an article,
-  # and the module would put its own output in order. A session that starts on the article
-  # measures the demand from outside the site, and a click inside the site cannot change it.
+  # ⚠️ A session that starts on the article measures the demand from OUTSIDE the site, and no click
+  # inside the site can change it. TrendingArticles reads this together with
+  # page_visitors_by_path, and it gives this part the full weight.
   #
   # @param date_range [String, Array] A Plausible date range: "all", or a [from, to] pair.
   # @return [Hash, nil] { path => visitors }, or nil if the query is not available. That is what

@@ -57,15 +57,28 @@ RSpec.describe TrendingArticles do
   # The recent window and the baseline are two { path => visitors } lookups over two date ranges.
   # The length of the range selects the answer: the recent range is short, and the baseline range is
   # approximately one month.
-  def stub_plausible(recent:, baseline:, all_time: {})
+  #
+  # `recent_page` and `baseline_page` are the visitors of the PAGE, which include the arrivals from
+  # inside the site. Each one is the same as its entry-page count by default, thus there are no
+  # internal arrivals and the blend of heat_by_path gives the entry-page count alone.
+  def stub_plausible(recent:, baseline:, all_time: {}, recent_page: nil, baseline_page: nil)
     allow(plausible_service).to receive(:entry_visitors_by_path) do |**kwargs|
-      first, last = kwargs[:date_range]
-      span_hours = (Time.parse(last) - Time.parse(first)) / 3600.0
-      span_hours <= (described_class::RECENT_WINDOW_HOURS + 1) ? recent : baseline
+      recent_range?(kwargs[:date_range]) ? recent : baseline
+    end
+
+    allow(plausible_service).to receive(:page_visitors_by_path) do |**kwargs|
+      recent_range?(kwargs[:date_range]) ? (recent_page || recent) : (baseline_page || baseline)
     end
 
     allow(plausible_service).to receive(:totals_by_path)
       .and_return(all_time.transform_values { |visitors| { visitors: visitors, pageviews: visitors } })
+  end
+
+  # @return [Boolean] true for the recent window, and false for the baseline.
+  def recent_range?(date_range)
+    first, last = date_range
+    span_hours = (Time.parse(last) - Time.parse(first)) / 3600.0
+    span_hours <= (described_class::RECENT_WINDOW_HOURS + 1)
   end
 
   describe "#all" do
@@ -87,6 +100,48 @@ RSpec.describe TrendingArticles do
         baseline: { low.path => 20, high.path => 4000 }
       )
       expect(service.all(count: 2).map { |a| a.sys.id }).to eq(%w[l1 h1])
+    end
+
+    # ⚠️ This is the reason for the blend. A reader who arrives on the home page and then selects
+    # one article is a true signal, and the entry-page count alone cannot see it.
+    it "counts an article that readers find only from inside the site" do
+      # a3 has no session that starts on it, and 30 visitors that reach it from another page.
+      stub_plausible(
+        recent: {}, baseline: {},
+        recent_page: { art_march.path => 30 }, baseline_page: {}
+      )
+
+      expect(service.all(count: 1).map { |a| a.sys.id }).to eq(%w[a3])
+    end
+
+    # ⚠️ INTERNAL_WEIGHT must stay below 1. The widget renders on the home page and on each Page,
+    # thus its own clicks are part of the page count, and an equal weight would let it order its
+    # own output.
+    it "gives an arrival from inside the site less weight than one from outside" do
+      outside = article(id: "o1", slug: "outside", published_at: "2024-01-01T10:00:00Z")
+      inside  = article(id: "i1", slug: "inside",  published_at: "2024-01-01T10:00:00Z")
+      allow(articles_service).to receive(:list).and_return([ outside, inside ])
+      # The same 20 visitors and the same baseline. They start a session on `outside`, and they
+      # reach `inside` from another page.
+      stub_plausible(
+        recent: { outside.path => 20, inside.path => 0 },
+        baseline: { outside.path => 2, inside.path => 2 },
+        recent_page: { outside.path => 20, inside.path => 20 },
+        baseline_page: { outside.path => 2, inside.path => 2 }
+      )
+
+      expect(service.all(count: 2).map { |a| a.sys.id }).to eq(%w[o1 i1])
+    end
+
+    # ⚠️ A blend of one good query and one empty query would score each article on its internal
+    # traffic alone, and that list looks correct.
+    it "falls back to popularity when one of the two visitor queries is not available" do
+      stub_plausible(recent: recent, baseline: baseline, all_time: { art_march.path => 900 })
+      allow(plausible_service).to receive(:page_visitors_by_path).and_return(nil)
+
+      ids = service.all(count: 10).map { |a| a.sys.id }
+
+      expect(ids).to eq(%w[a3 a1 a2 a4 a5 a6])
     end
 
     it "excludes drafts and Shorts" do
@@ -181,9 +236,10 @@ RSpec.describe TrendingArticles do
       service.all(count: 4)
       service.all(count: 10)
 
-      # rank runs one time for the hour: the two entry-page queries, for the recent window and for
-      # the baseline, and Articles#list each run one time, for each call.
+      # rank runs one time for the hour: two queries for each window, which are the entry-page
+      # visitors and the page visitors, and Articles#list each run one time, for each call.
       expect(plausible_service).to have_received(:entry_visitors_by_path).twice
+      expect(plausible_service).to have_received(:page_visitors_by_path).twice
       expect(articles_service).to have_received(:list).once
     end
 
@@ -197,8 +253,9 @@ RSpec.describe TrendingArticles do
       service.all(count: 4)
 
       # A new hour gives a new cache key, thus the code calculates again and does two more
-      # entry-page queries.
+      # queries of each kind.
       expect(plausible_service).to have_received(:entry_visitors_by_path).exactly(4).times
+      expect(plausible_service).to have_received(:page_visitors_by_path).exactly(4).times
     end
   end
 end

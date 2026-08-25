@@ -6,11 +6,11 @@ require "set"
 # widget changes through the day, and it does not move as much as a "right now" signal would on a
 # site with low traffic.
 #
-# The score of each article comes from two Plausible queries that start at the current clock hour:
-#   * heat          = the entry-page visitors in the last RECENT_WINDOW_HOURS, with no weight.
-#   * baseline_rate = the entry-page visitors for each hour in the BASELINE_DAYS *before* the
-#                     recent window, divided by the hours that the article existed. Thus a surge
-#                     cannot make its own baseline larger.
+# The score of each article comes from Plausible queries that start at the current clock hour:
+#   * heat          = the blended visitors in the last RECENT_WINDOW_HOURS. Refer to heat_by_path.
+#   * baseline_rate = the blended visitors for each hour in the BASELINE_DAYS *before* the recent
+#                     window, divided by the hours that the article existed. Thus a surge cannot
+#                     make its own baseline larger.
 #   * surge         = (heat + PRIOR) / (baseline_rate · RECENT_WINDOW_HOURS + PRIOR).
 #   * score         = log(surge + 1) · relative_weight + log(heat + 1) · absolute_weight
 #
@@ -25,6 +25,11 @@ class TrendingArticles < ApplicationService
   RECENT_WINDOW_HOURS = Integer(ENV.fetch("TRENDING_RECENT_WINDOW_HOURS", 48))
   # The length of the baseline, in days. It ends where the recent window starts.
   BASELINE_DAYS = Integer(ENV.fetch("TRENDING_BASELINE_DAYS", 30))
+  # The weight of a visitor who reached the article from inside the site. ⚠️ It must stay below 1.
+  # This widget renders on the home page and on each Page, thus its own clicks are part of that
+  # number, and a weight of 1 would let the widget order its own output. A weight of 0 counts the
+  # demand from outside the site alone. Refer to heat_by_path.
+  INTERNAL_WEIGHT = ENV.fetch("TRENDING_INTERNAL_WEIGHT", 0.5).to_f
   # ⚠️ The prior goes on BOTH sides of the surge ratio, on purpose. It moves a ratio from a small
   # count toward 1, which is "no surge". With the prior on the divisor alone, an article with no
   # baseline and 5 visitors got a surge of 5, and a true surge looked exactly the same.
@@ -69,7 +74,7 @@ class TrendingArticles < ApplicationService
   def ranking_version
     @ranking_version ||= cache_version(
       PAYLOAD_VERSION, RECENT_WINDOW_HOURS, BASELINE_DAYS, PRIOR, ABSOLUTE_MIN, FLOOR_PERCENTILE,
-      MIN_ABOVE_FLOOR, MAX_POOL, relative_weight, absolute_weight
+      MIN_ABOVE_FLOOR, MAX_POOL, INTERNAL_WEIGHT, relative_weight, absolute_weight
     )
   end
 
@@ -95,8 +100,8 @@ class TrendingArticles < ApplicationService
     articles = candidates
     return [] if articles.blank?
 
-    recent = entry_visitors(date_range: [ (t_end - (RECENT_WINDOW_HOURS * 3600)).iso8601, t_end.iso8601 ])
-    baseline = entry_visitors(date_range: [ (t_end - (BASELINE_DAYS * 86_400)).iso8601, (t_end - (RECENT_WINDOW_HOURS * 3600)).iso8601 ])
+    recent = heat_by_path(date_range: [ (t_end - (RECENT_WINDOW_HOURS * 3600)).iso8601, t_end.iso8601 ])
+    baseline = heat_by_path(date_range: [ (t_end - (BASELINE_DAYS * 86_400)).iso8601, (t_end - (RECENT_WINDOW_HOURS * 3600)).iso8601 ])
     warn_if_no_analytics(articles, recent)
 
     baseline_end = t_end - (RECENT_WINDOW_HOURS * 3600)
@@ -110,7 +115,7 @@ class TrendingArticles < ApplicationService
       published = published_at(article)
       next if published.nil?
 
-      score, heat = evaluate(recent[article.path].to_i, baseline[article.path].to_f, published, baseline_start, baseline_end, floor)
+      score, heat = evaluate(recent[article.path].to_f, baseline[article.path].to_f, published, baseline_start, baseline_end, floor)
       { article: article, score: score, heat: heat, popularity: popularity[article.path].to_i, published: published }
     end
 
@@ -131,7 +136,7 @@ class TrendingArticles < ApplicationService
     nonzero = recent.values.reject(&:zero?).sort
     return ABSOLUTE_MIN if nonzero.empty?
 
-    floor = [ nonzero[(nonzero.size * FLOOR_PERCENTILE).floor].to_i, ABSOLUTE_MIN ].max
+    floor = [ nonzero[(nonzero.size * FLOOR_PERCENTILE).floor].to_f, ABSOLUTE_MIN ].max
     # ⚠️ A quiet week must not empty the widget. Go back to the absolute minimum when too few
     # articles go past the percentile.
     return ABSOLUTE_MIN if nonzero.count { |value| value >= floor } < MIN_ABOVE_FLOOR
@@ -139,11 +144,30 @@ class TrendingArticles < ApplicationService
     floor
   end
 
-  # One Plausible call for a date range. A query that is not available gives an empty hash, which
-  # gives each article a score of 0 and puts the list in popularity order.
-  # @return [Hash] { path => entry-page visitors }.
-  def entry_visitors(date_range:)
-    @plausible.entry_visitors_by_path(date_range: date_range) || {}
+  # The heat of each article over a date range: the visitors who arrived from outside the site, at
+  # the full weight, plus the visitors who arrived from inside it, at INTERNAL_WEIGHT.
+  #
+  # ⚠️ The caller uses this for the recent window AND for the baseline. The two must use the same
+  # blend, or the ratio between them has no meaning.
+  #
+  # ⚠️ A nil from either query means "not available", and this gives an empty hash for that. A
+  # blend of one good query and one empty query would give a list that looks correct and is not:
+  # with no entry visitors, each article would score on its internal traffic alone.
+  # @param date_range [Array] A Plausible [from, to] pair.
+  # @return [Hash] { path => heat }, with a default of 0.0.
+  def heat_by_path(date_range:)
+    entry = @plausible.entry_visitors_by_path(date_range: date_range)
+    page = @plausible.page_visitors_by_path(date_range: date_range)
+    return {} if entry.nil? || page.nil?
+
+    (entry.keys | page.keys).each_with_object(Hash.new(0.0)) do |path, heat|
+      external = entry[path].to_f
+      # ⚠️ Clamp at zero. Plausible counts a visitor of an entry page in both numbers, thus the
+      # difference is the internal arrivals. A small difference in the two queries must never make
+      # this negative.
+      internal = [ page[path].to_f - external, 0.0 ].max
+      heat[path] = external + (INTERNAL_WEIGHT * internal)
+    end
   end
 
   # ⚠️ The pageviews widget already caches this query body. Thus the fallback order costs no more
@@ -205,7 +229,7 @@ class TrendingArticles < ApplicationService
   # message: there are candidates but each one has zero recent visitors. That means that Plausible
   # is down or that the paths changed.
   def warn_if_no_analytics(articles, recent)
-    return if articles.any? { |a| recent[a.path].to_i.positive? }
-    Rails.logger.info("TrendingArticles: no entry-page visitors for any of #{articles.size} candidates over #{RECENT_WINDOW_HOURS}h (Plausible down or path mismatch?)")
+    return if articles.any? { |a| recent[a.path].to_f.positive? }
+    Rails.logger.info("TrendingArticles: no visitors for any of #{articles.size} candidates over #{RECENT_WINDOW_HOURS}h (Plausible down or path mismatch?)")
   end
 end

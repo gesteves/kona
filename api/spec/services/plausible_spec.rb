@@ -102,9 +102,42 @@ RSpec.describe Plausible do
     end
   end
 
+  describe "#page_visitors_by_path" do
+    # ⚠️ This is the visitors, and it is not the pageviews. Thus a reader who reloads a page, or
+    # who reads it again, counts one time, and nobody can raise it by a reload.
+    it "takes the visitors out of the event:page query" do
+      allow(service).to receive(:post_json)
+        .and_return(results: rows({ "/2026/05/01/a/" => 300 }, { "/2026/05/01/a/" => 9 }))
+
+      expect(service.page_visitors_by_path).to eq("/2026/05/01/a/" => 9)
+    end
+
+    # ⚠️ It sends the query body of totals_by_path, word for word. The body is the cache key, thus
+    # the two share one entry and the blend of TrendingArticles adds no call for a range that the
+    # pageviews widget already asks for.
+    it "sends the same query body as the pageviews of the same range" do
+      bodies = []
+      allow(service).to receive(:post_json) do |_url, **options|
+        bodies << options[:body]
+        { results: [] }
+      end
+
+      service.page_visitors_by_path(date_range: "all")
+      service.pageviews_by_path(date_range: "all")
+
+      expect(bodies.uniq.size).to eq(1)
+    end
+
+    it "returns nil when the query is unavailable" do
+      allow(service).to receive(:post_json).and_return(nil)
+
+      expect(service.page_visitors_by_path).to be_nil
+    end
+  end
+
   describe "#entry_visitors_by_path" do
-    # ⚠️ TrendingArticles reads this and not the pageviews. The trending widget renders on the home
-    # page and on each Page, thus its own clicks go into the pageviews of an article.
+    # ⚠️ A session that starts on the article measures the demand from OUTSIDE the site. No click
+    # inside the site can change it, thus the trending widget cannot raise it with its own clicks.
     it "asks for the visitors of each entry page in a single query" do
       expect(service).to receive(:post_json).once do |_url, **options|
         body = JSON.parse(options[:body])
