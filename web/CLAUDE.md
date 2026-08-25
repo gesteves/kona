@@ -87,24 +87,20 @@ the same time.
 `rake import` runs all four at the same time. `import:content` reads Contentful. `import:icons`
 posts the list in `data/font_awesome.yml` to the `/api/icons` of the api and writes
 `data/icons.json`. `import:standard_site` gets the DID and the publication URI from the api.
-`import:related` gets the order of the related articles, which the api makes from the embeddings,
-and writes it to `data/related.json`. Each article uses that order for its "You May Also Like"
+`import:related` gets the order of the related articles, which the api makes from a BM25 index of
+the article text, and writes it to `data/related.json`. Each article uses that order for its "You May Also Like"
 section. There is also `rake redis:clear`.
 
 ⚠️ A failure in `import:icons` **raises**. Each page needs the icons, thus the build stops with a
 message and it does not send pages with an icon absent. `import:standard_site` and `import:related`
 are different: they write nothing on a failure, and the markup that they supply is then absent.
 
-⚠️ `import:related` reads an order that the api makes from the vectors that `ArticleEmbeddingJob`
-writes, from the Contentful publish webhook. That same webhook starts this build. The embedding
-arrives in seconds and the build takes minutes, thus the embedding is usually first. But an article
-that a person just published, and whose vector is not in the store, gets no section until the next
-build.
-
-⚠️ In `data/related.json`, a **key** says that the api has an embedding for that entry. Thus
-`report_related_coverage` counts the keys and never the lists that have an entry. To count the lists
-would report an entry with few neighbors as a missing embedding. The api always fills a list to the
-number that the caller asks for, thus an empty list means that the corpus itself is empty.
+⚠️ In `data/related.json`, a **key** says that the api ranked that entry. Thus
+`report_related_coverage` counts the keys and never the lists that have an entry. The api makes its
+index from the same Contentful read that gives it the article list, thus each published entry gets a
+key and no external call can leave a gap. It also always fills a list to the number that the caller
+asks for, thus an empty list means that the corpus itself is empty. A gap in either number means that
+the api could not read Contentful. Run `rake related:audit` there.
 
 ## Key locations
 

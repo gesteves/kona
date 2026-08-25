@@ -1,11 +1,9 @@
-# Puts the articles of the "You May Also Like" section in order. It reads the Voyage embedding of
-# each article, gives each candidate a score, and returns the nearest ones. The request path never
-# calls Voyage: ArticleEmbeddingJob stores the vectors, and this class only reads them and does the
-# arithmetic.
+# Puts the articles of the "You May Also Like" section in order. It makes a BM25 index of the text
+# of each article, gives each candidate a score, and returns the nearest ones.
 #
 # The score of one candidate has two parts:
-#   * relevance = (TAXONOMY_WEIGHT · concept overlap + (1 - TAXONOMY_WEIGHT) · vector similarity),
-#                 with a demotion when the candidate reports the same race as the query article.
+#   * relevance = (LEXICAL_WEIGHT · BM25 similarity + taxonomy weight · concept overlap), with a
+#                 demotion when the candidate reports the same race as the query article.
 #   * score     = relevance + a small addition for a recent article and for one that people read.
 #
 # A floor over the **relevance** marks each candidate that is truly related. MMR then selects the
@@ -14,16 +12,22 @@
 class RelatedArticles < ApplicationService
   include ArticleRanking # candidates, shared with TrendingArticles
 
-  # The weight of the concept overlap. The vector similarity gets the rest.
-  TAXONOMY_WEIGHT = ENV.fetch("RELATED_TAXONOMY_WEIGHT", 0.25).to_f
+  # The weight of the BM25 similarity. The concept overlap gets the rest.
+  #
+  # ⚠️ The taxonomy earns a large share here. A person assigned each concept, and it is the only
+  # signal for a pair of articles that shares no words.
+  LEXICAL_WEIGHT = ENV.fetch("RELATED_LEXICAL_WEIGHT", 0.65).to_f
   # The balance of MMR: 1.0 is relevance only, and 0.0 is diversity only.
   MMR_LAMBDA = ENV.fetch("RELATED_MMR_LAMBDA", 0.7).to_f
   # The floor, in standard deviations above the mean relevance of that query.
   FLOOR_SIGMAS = ENV.fetch("RELATED_FLOOR_SIGMAS", 0.5).to_f
-  # The absolute part of the floor. After the mean subtraction, the mean similarity of a pair is
-  # near 0. Thus a positive score means "these two are more alike than two articles of this corpus
-  # usually are", and a score at or below 0 means that the candidate is not truly related.
-  MIN_SCORE = 0.0
+  # The absolute part of the floor. Two articles of this corpus that share no rare word and no
+  # concept score near zero, thus a relevance below this value means "not truly related".
+  #
+  # ⚠️ This value must stay above zero. A BM25 similarity and a concept overlap are both never
+  # negative, thus a floor at zero would mark each candidate as related. Read `rake related:inspect`
+  # after a change to LEXICAL_WEIGHT, because that weight moves this distribution.
+  MIN_SCORE = 0.02
   # The candidates that go into MMR. A larger pool gives MMR more to select from, and it costs one
   # similarity for each pair inside the pool.
   MMR_POOL = 24
@@ -46,20 +50,16 @@ class RelatedArticles < ApplicationService
   end
 
   # The nearest neighbors of each entry, for the static "You May Also Like" section of the web
-  # build. This reads the articles one time, and not one time for each article: the vectors come in
-  # one request and the rest is arithmetic.
+  # build. This reads the articles one time, and not one time for each article: the index is made
+  # one time and the rest is arithmetic.
   #
   # ⚠️ No cache holds this. The build calls it one time, immediately after a publish. That is the
   # one moment when a list from ten minutes ago would be wrong, because it would omit the entry
-  # that started the build. The slow part, which is the embeddings, is already in the cache.
+  # that started the build.
   #
   # ⚠️ There is a key for each published entry, and not only for each candidate. A Short is a
   # correct query article, because the section appears on its own page, but a Short can never be a
   # neighbor.
-  #
-  # ⚠️ An entry with a vector always gets a key. An entry with **no vector** is absent. Thus the key
-  # says "this entry has an embedding", and `report_related_coverage` in the web build can tell a
-  # missing embedding from an entry that simply has few neighbors.
   # @param count [Integer] The number of neighbors for each entry.
   # @return [Hash{String=>Array<String>}] Contentful id => the neighbor ids, the nearest first.
   def all(count: 4)
@@ -72,7 +72,7 @@ class RelatedArticles < ApplicationService
 
       published.each_with_object({}) do |article, acc|
         id = article.sys&.id
-        next if id.blank? || context[:vectors][id].blank?
+        next if id.blank? || !context[:index].key?(id)
 
         acc[id] = neighbors_for(article, pool, context, count)
       end
@@ -83,7 +83,7 @@ class RelatedArticles < ApplicationService
   # same methods as `all`, thus the report can never describe a different ranking.
   # @param id [String] The Contentful id of the query article.
   # @param count [Integer] The number of neighbors that the section shows.
-  # @return [Hash, nil] { floor:, rows: }, or nil when the corpus or the vector is absent.
+  # @return [Hash, nil] { floor:, rows: }, or nil when the corpus or the text is absent.
   def explain(id, count: 4)
     pool = candidates
     published = @articles.list.reject(&:draft)
@@ -93,14 +93,14 @@ class RelatedArticles < ApplicationService
     return if article.nil?
 
     context = build_context(published, pool, detailed: true)
-    return if context[:vectors][id].blank?
+    return unless context[:index].key?(id)
 
     scored = score_rows(article, pool, context)
     floor = floor_for(scored)
-    selected = select_by_mmr(mmr_pool(scored, count), count).map { |row| row[:id] }.to_set
+    selected = select_by_mmr(mmr_pool(scored, count), count, context[:index]).map { |row| row[:id] }.to_set
 
     rows = scored.sort_by { |row| -row[:score] }.map do |row|
-      row.except(:vector).merge(above_floor: above_floor?(row, floor), selected: selected.include?(row[:id]))
+      row.merge(above_floor: above_floor?(row, floor), selected: selected.include?(row[:id]))
     end
 
     { floor: floor, rows: rows }
@@ -108,17 +108,18 @@ class RelatedArticles < ApplicationService
 
   private
 
-  # Everything that each query article reads: the prepared vectors, the taxonomy scorer, the
+  # Everything that each query article reads: the lexical index, the taxonomy scorer, the
   # popularity, and the race of each candidate. The code makes it one time for the full corpus.
-  # @param detailed [Boolean] True to keep the vectors with no mean subtraction, for the report.
+  # @param detailed [Boolean] True to also give the shared terms of each pair, for the report.
   def build_context(published, pool, detailed: false)
     ids = (published + pool).filter_map { |article| article.sys&.id }.uniq
     taxonomy = ArticleTaxonomy.new(articles: published, tree: taxonomy_tree)
-    raw = load_vectors(ids)
 
     {
-      vectors: ArticleSimilarity.prepare(raw),
-      raw: detailed ? raw.transform_values { |v| v && ArticleSimilarity.unit(v) } : nil,
+      # ⚠️ The index reads the published entries alone. A draft in it would change the IDF of each
+      # term and the mean document length, thus it would move a score that no person can explain.
+      index: ArticleIndex.new(@articles.corpus.slice(*ids)),
+      detailed: detailed,
       titles: published.each_with_object({}) { |a, acc| acc[a.sys&.id] = a.title },
       taxonomy: taxonomy,
       # ⚠️ One time for each article, and not one time for each pair. This loop compares each
@@ -133,7 +134,7 @@ class RelatedArticles < ApplicationService
   def neighbors_for(article, pool, context, count)
     scored = score_rows(article, pool, context)
 
-    select_by_mmr(mmr_pool(scored, count), count).map { |row| row[:id] }
+    select_by_mmr(mmr_pool(scored, count), count, context[:index]).map { |row| row[:id] }
   end
 
   # The candidates that go into MMR: each one above the floor, and then the best of the others when
@@ -154,33 +155,30 @@ class RelatedArticles < ApplicationService
   end
 
   # The score of each candidate against one query article.
-  # @return [Array<Hash>] One row for each candidate with a vector.
+  # @return [Array<Hash>] One row for each candidate.
   def score_rows(article, pool, context)
     id = article.sys&.id
-    query_vector = context[:vectors][id]
+    index = context[:index]
     query_race = context[:races][id]
 
     pool.filter_map do |candidate|
       other_id = candidate.sys&.id
-      next if other_id.blank? || other_id == id
+      # A candidate with no text carries no signal, thus it is not a neighbor.
+      next if other_id.blank? || other_id == id || !index.key?(other_id)
 
-      vector = context[:vectors][other_id]
-      next if vector.blank?
-
-      centered = ArticleSimilarity.similarity(query_vector, vector)
+      lexical = index.similarity(id, other_id)
       overlap = context[:taxonomy].overlap(id, other_id)
       penalty = same_race_penalty(other_id, query_race, context)
-      relevance = (((1.0 - TAXONOMY_WEIGHT) * centered) + (TAXONOMY_WEIGHT * overlap)) * penalty
+      relevance = ((LEXICAL_WEIGHT * lexical) + ((1.0 - LEXICAL_WEIGHT) * overlap)) * penalty
 
       {
         id: other_id,
         title: context[:titles][other_id],
-        raw: context[:raw] ? ArticleSimilarity.similarity(context[:raw][id], context[:raw][other_id]) : 0.0,
-        centered: centered,
+        lexical: lexical,
         overlap: overlap,
         relevance: relevance,
         score: relevance + context[:priors][other_id].to_f,
-        vector: vector
+        terms: context[:detailed] ? index.terms_in_common(id, other_id) : []
       }
     end
   end
@@ -194,8 +192,7 @@ class RelatedArticles < ApplicationService
   end
 
   # The larger of two floors: the mean relevance plus FLOOR_SIGMAS standard deviations, and
-  # MIN_SCORE. Each candidate below it is not truly related. Thus an article with no true neighbor
-  # gives a short list, or none, and the section then renders nothing.
+  # MIN_SCORE. Each candidate below it is not truly related, and `mmr_pool` prefers the others.
   #
   # ⚠️ The floor reads the relevance and not the score, on purpose. The score holds the addition
   # for the date and the popularity. A new or a popular article that is not related must never go
@@ -222,8 +219,9 @@ class RelatedArticles < ApplicationService
   #
   # ⚠️ This is what makes the section go wider. The nearest four articles are frequently
   # near-copies of each other, and the reader then gets one direction and not four.
-  # @param scored [Array<Hash>] The candidates that went past the floor.
-  def select_by_mmr(scored, count)
+  # @param scored [Array<Hash>] The pool, from `mmr_pool`.
+  # @param index [ArticleIndex] The source of the similarity of two candidates.
+  def select_by_mmr(scored, count, index)
     return scored.first(count) if scored.size <= 1
 
     remaining = scored.sort_by { |row| -row[:score] }
@@ -231,7 +229,7 @@ class RelatedArticles < ApplicationService
 
     while selected.size < count && remaining.any?
       best = remaining.max_by do |entry|
-        nearest = selected.map { |other| ArticleSimilarity.similarity(entry[:vector], other[:vector]) }.max
+        nearest = selected.map { |other| index.similarity(entry[:id], other[:id]) }.max
         (MMR_LAMBDA * entry[:score]) - ((1.0 - MMR_LAMBDA) * nearest)
       end
 
@@ -245,8 +243,10 @@ class RelatedArticles < ApplicationService
   # The small addition for each candidate, from its date and from the visitors of all time. It is
   # never more than PRIOR_WEIGHT.
   #
-  # ⚠️ The code adds this and does not multiply by it. A similarity after the mean subtraction can
-  # be negative, and a multiplier above 1 would make such a score smaller.
+  # ⚠️ The code adds this and does not multiply by it. A multiplier would give the largest lift to
+  # the candidate that is already the most relevant, and almost none to the others. Thus it would
+  # make the first position stronger and it would not select between two near-equal candidates,
+  # which is the one purpose of this addition.
   # @return [Hash{String=>Float}] id => the addition.
   def priors(pool)
     visitors = all_time_visitors
@@ -280,25 +280,9 @@ class RelatedArticles < ApplicationService
     totals.each_with_object(Hash.new(0)) { |(path, values), acc| acc[path] = values[:visitors].to_i }
   end
 
-  # A failure here gives an empty tree, thus the taxonomy part of the score becomes 0 and the
-  # vector similarity alone puts the articles in order.
+  # A failure here gives an empty tree, thus the taxonomy part of the score becomes 0 and the BM25
+  # similarity alone puts the articles in order.
   def taxonomy_tree
     rescue_with({}, context: "#{self.class.name} taxonomy") { @taxonomy.tree } || {}
-  end
-
-  # @return [Hash] { id => vector or nil } for each id, in one request.
-  def load_vectors(ids)
-    ids = ids.compact
-    return {} if ids.empty?
-    raw = $redis.mget(*ids.map { |id| ArticleEmbeddingJob.redis_key(id) })
-    ids.zip(raw).to_h { |id, json| [ id, parse_vector(json) ] }
-  end
-
-  # Gets the vector from a stored `{ version:, vector: }` JSON value.
-  def parse_vector(json)
-    return if json.blank?
-    JSON.parse(json)["vector"]
-  rescue JSON::ParserError
-    nil
   end
 end

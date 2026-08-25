@@ -18,26 +18,28 @@ RSpec.describe RelatedArticles do
     )
   end
 
-  def vec_json(vector)
-    { version: 1, vector: vector }.to_json
+  # The words go in the body alone, thus one word is one token and the field weights do not apply.
+  # A word that two documents share raises their similarity, and a word of its own lowers it.
+  def texts(map)
+    map.transform_values { |words| { title: nil, summary: nil, intro: nil, body: words } }
   end
 
-  # The vectors give this order from the similarity to the query: near, then mid, then far. The
-  # article itself, the draft, and the Short have the same vector as the query, thus their
-  # similarity is 1. That shows that the code removes them for their id and their type, and not for
-  # a low score.
-  let(:store) do
-    {
-      "embeddings:article:q1" => vec_json([ 1.0, 0.0, 0.0 ]),
-      "embeddings:article:near" => vec_json([ 0.9, 0.1, 0.0 ]),
-      "embeddings:article:mid" => vec_json([ 0.8, 0.2, 0.0 ]),
-      "embeddings:article:far" => vec_json([ 0.0, 1.0, 0.0 ]),
-      "embeddings:article:draft" => vec_json([ 1.0, 0.0, 0.0 ]),
-      "embeddings:article:short" => vec_json([ 1.0, 0.0, 0.0 ])
-    }
-  end
-
+  # `near` shares three words with the query, `mid` shares two, and `far` shares one. Each
+  # candidate shares no word with another candidate, thus MMR cannot change this order. The draft
+  # and the Short repeat the query exactly, thus their similarity is the largest of all. That shows
+  # that the code removes them for their id and their type, and not for a low score.
   let(:corpus) do
+    texts(
+      "q1" => "alpha bravo charlie delta echo foxtrot",
+      "near" => "alpha bravo charlie near1 near2 near3",
+      "mid" => "delta echo mid1 mid2 mid3 mid4",
+      "far" => "foxtrot far1 far2 far3 far4 far5",
+      "draft" => "alpha bravo charlie delta echo foxtrot",
+      "short" => "alpha bravo charlie delta echo foxtrot"
+    )
+  end
+
+  let(:list) do
     [
       article(id: "q1", slug: "self", published_at: "2024-05-01T10:00:00Z"),
       article(id: "near", slug: "near", published_at: "2024-04-01T10:00:00Z"),
@@ -49,10 +51,8 @@ RSpec.describe RelatedArticles do
   end
 
   before do
-    allow(articles).to receive(:list).and_return(corpus)
-    allow($redis).to receive(:get) { |key| store[key] }
-    allow($redis).to receive(:setex)
-    allow($redis).to receive(:mget) { |*keys| keys.map { |key| store[key] } }
+    allow(articles).to receive(:list).and_return(list)
+    allow(articles).to receive(:corpus).and_return(corpus)
   end
 
   describe "#all" do
@@ -80,8 +80,8 @@ RSpec.describe RelatedArticles do
       expect(result.values.flatten).not_to include("draft")
     end
 
-    it "omits an entry with no stored vector" do
-      store.delete("embeddings:article:near")
+    it "omits an entry with no text" do
+      allow(articles).to receive(:corpus).and_return(corpus.except("near"))
       result = service.all
 
       expect(result).not_to have_key("near")
@@ -92,8 +92,9 @@ RSpec.describe RelatedArticles do
       expect(service.all(count: 1)["q1"]).to eq(%w[near])
     end
 
-    it "reads each vector in one round trip" do
-      expect($redis).to receive(:mget).once.and_call_original
+    # ⚠️ The index is made one time for the full corpus, and not one time for each query article.
+    it "makes the index one time" do
+      expect(articles).to receive(:corpus).once.and_return(corpus)
 
       service.all
     end
@@ -117,19 +118,18 @@ RSpec.describe RelatedArticles do
     end
   end
 
-  # After the mean subtraction, a score at or below 0 means "not more alike than two articles of
-  # this corpus usually are". The floor puts each such candidate below the others, and the list
-  # still fills.
+  # A BM25 similarity is never negative, thus MIN_SCORE and not zero is what says "not related".
+  # The floor puts each such candidate below the others, and the list still fills.
   describe "the floor" do
-    let(:store) do
-      {
-        "embeddings:article:q1" => vec_json([ 1.0, 0.0, 0.0 ]),
-        "embeddings:article:a" => vec_json([ 0.0, 1.0, 0.0 ]),
-        "embeddings:article:b" => vec_json([ 0.0, 0.0, 1.0 ])
-      }
+    let(:corpus) do
+      texts(
+        "q1" => "alpha bravo charlie",
+        "a" => "delta echo foxtrot",
+        "b" => "golf hotel india"
+      )
     end
 
-    let(:corpus) do
+    let(:list) do
       [
         article(id: "q1", slug: "self", published_at: "2024-05-01T10:00:00Z"),
         article(id: "a", slug: "a", published_at: "2024-04-01T10:00:00Z"),
@@ -160,15 +160,15 @@ RSpec.describe RelatedArticles do
       }
     end
 
-    let(:store) do
-      {
-        "embeddings:article:q1" => vec_json([ 1.0, 0.0, 0.0 ]),
-        "embeddings:article:shared" => vec_json([ 0.2, 1.0, 0.0 ]),
-        "embeddings:article:alone" => vec_json([ 0.2, 1.0, 0.0 ])
-      }
+    let(:corpus) do
+      texts(
+        "q1" => "alpha bravo charlie",
+        "shared" => "alpha bravo charlie",
+        "alone" => "alpha bravo charlie"
+      )
     end
 
-    let(:corpus) do
+    let(:list) do
       [
         article(id: "q1", slug: "self", published_at: "2024-05-01T10:00:00Z",
                 concept_ids: %w[kona race-reports]),
@@ -179,7 +179,7 @@ RSpec.describe RelatedArticles do
       ]
     end
 
-    # The two candidates have the same vector. Thus the concept overlap alone decides the order.
+    # The two candidates have the same text. Thus the concept overlap alone decides the order.
     it "puts the article that shares a rare concept above one that shares only a common concept" do
       expect(service.all["q1"].first).to eq("shared")
     end
@@ -197,12 +197,20 @@ RSpec.describe RelatedArticles do
       row = report[:rows].first
 
       expect(report[:floor]).to be_a(Float)
-      expect(row).to include(:id, :title, :raw, :centered, :overlap, :relevance, :score, :above_floor, :selected)
+      expect(row).to include(:id, :title, :lexical, :overlap, :relevance, :score, :above_floor, :selected)
       expect(row[:id]).to eq("near")
       expect(row[:selected]).to be(true)
     end
 
-    it "gives nil for an entry with no stored vector" do
+    # ⚠️ A person cannot read a vector, and a person can read these words. This column is the
+    # reason to prefer a lexical index to an embedding.
+    it "names the words that the two articles share" do
+      row = service.explain("q1")[:rows].find { |r| r[:id] == "near" }
+
+      expect(row[:terms]).to contain_exactly("alpha", "bravo", "charlie")
+    end
+
+    it "gives nil for an entry that the index does not hold" do
       expect(service.explain("unknown")).to be_nil
     end
   end
@@ -213,21 +221,22 @@ RSpec.describe RelatedArticles do
     # The floor is off, thus this example measures MMR alone.
     before { stub_const("RelatedArticles::FLOOR_SIGMAS", -10.0) }
 
-    let(:store) do
-      {
-        "embeddings:article:q1" => vec_json([ 1.0, 0.0, 0.0 ]),
-        # Three near-copies of each other, and all three are close to the query.
-        "embeddings:article:c1" => vec_json([ 0.98, 0.20, 0.0 ]),
-        "embeddings:article:c2" => vec_json([ 0.97, 0.21, 0.0 ]),
-        "embeddings:article:c3" => vec_json([ 0.96, 0.22, 0.0 ]),
-        # A different direction, and only a little further from the query.
-        "embeddings:article:other" => vec_json([ 0.95, 0.0, 0.30 ])
-      }
+    # Each candidate shares the same three words with the query. But c1, c2, and c3 also share
+    # three words with each other, and `other` shares none. Thus the four are equally relevant and
+    # only the diversity separates them.
+    let(:corpus) do
+      texts(
+        "q1" => "alpha bravo charlie",
+        "c1" => "alpha bravo charlie kilo lima mike c1x",
+        "c2" => "alpha bravo charlie kilo lima mike c2x",
+        "c3" => "alpha bravo charlie kilo lima mike c3x",
+        "other" => "alpha bravo charlie oscar papa quebec romeo"
+      )
     end
 
-    let(:corpus) do
+    let(:list) do
       %w[q1 c1 c2 c3 other].each_with_index.map do |id, index|
-        article(id: id, slug: id, published_at: "2024-0#{index + 1}-01T10:00:00Z")
+        article(id: id, slug: id, published_at: "2024-0#{5 - index}-01T10:00:00Z")
       end
     end
 
@@ -257,15 +266,15 @@ RSpec.describe RelatedArticles do
       }
     end
 
-    let(:store) do
-      {
-        "embeddings:article:q1" => vec_json([ 1.0, 0.0, 0.0 ]),
-        "embeddings:article:same" => vec_json([ 0.9, 0.1, 0.0 ]),
-        "embeddings:article:different" => vec_json([ 0.9, 0.1, 0.0 ])
-      }
+    let(:corpus) do
+      texts(
+        "q1" => "alpha bravo charlie",
+        "same" => "alpha bravo charlie",
+        "different" => "alpha bravo charlie"
+      )
     end
 
-    let(:corpus) do
+    let(:list) do
       [
         article(id: "q1", slug: "self", published_at: "2024-05-01T10:00:00Z", concept_ids: %w[kona]),
         article(id: "same", slug: "same", published_at: "2024-04-01T10:00:00Z", concept_ids: %w[kona]),
@@ -274,9 +283,9 @@ RSpec.describe RelatedArticles do
     end
 
     # The concept overlap is off, thus this example measures the demotion alone. The two
-    # candidates have the same vector.
+    # candidates have the same text.
     it "lowers the score of a report of the same race" do
-      stub_const("RelatedArticles::TAXONOMY_WEIGHT", 0.0)
+      stub_const("RelatedArticles::LEXICAL_WEIGHT", 1.0)
       rows = service.explain("q1")[:rows].index_by { |row| row[:id] }
 
       expect(rows["same"][:relevance]).to be < rows["different"][:relevance]

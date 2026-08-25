@@ -141,12 +141,12 @@ module ArticleHelpers
   end
 
   # The entries with the nearest meaning to this one, for the static "You May Also Like" section.
-  # The order comes from data/related.json, which `rake import:related` gets from the api. The
-  # api calculates it from the Voyage embeddings. It is the one part of the section that this
-  # build cannot make from its own data.
+  # The order comes from data/related.json, which `rake import:related` gets from the api. The api
+  # makes it from a BM25 index of the article text and from the concepts. It is the one part of the
+  # section that this build cannot make from its own data.
   #
   # ⚠️ An empty result removes the section. This is correct for the three causes of an empty
-  # result: the import did not run (no api, or no token), the entry has no stored embedding, or
+  # result: the import did not run (no api, or no token), the api could not read Contentful, or
   # each neighbor that it names is now unpublished.
   # @param article [Object] The entry to find the neighbors of.
   # @param count [Integer] The number to return.

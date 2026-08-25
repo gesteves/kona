@@ -1,6 +1,7 @@
 <%# The "You May Also Like" section. The build renders it from the order that the api calculates
-    from the embeddings (data/related.json, through `rake import:related`). It renders nothing when
-    the entry has no neighbor, and that is what removed the widget that this section replaced.
+    from the article text and the concepts (data/related.json, through `rake import:related`). It
+    renders nothing when the entry has no neighbor, and that is what removed the widget that this
+    section replaced.
 
     ⚠️ scope_entry_ids is necessary: read_next renders more summary cards on this same page, and an
     entry with a near meaning is often also the adjacent entry in time. Without the section in the

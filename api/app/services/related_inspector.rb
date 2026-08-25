@@ -4,12 +4,11 @@
 # method to know if a change to the ranking of RelatedArticles helped. `inspect_article` calls
 # RelatedArticles#explain, thus the report can never describe a different ranking.
 class RelatedInspector < ApplicationService
-  # The audit compares the spread of the similarity before and after the mean subtraction. It uses
-  # a sample and not each pair, because the number of pairs grows with the square of the corpus.
+  # The audit reads a sample of the pairs and not each one, because the number of pairs grows with
+  # the square of the corpus.
   SAMPLE_SIZE = 120
-  # Below this ratio of new spread against old spread, the mean subtraction did not separate the
-  # scores enough, and the chunk method is the next step.
-  GOOD_SPREAD_GAIN = 1.5
+  # The number of cards that the section renders. The build takes this many from the list.
+  SECTION_COUNT = 4
 
   def initialize(articles: Articles.new, related: RelatedArticles.new)
     @articles = articles
@@ -22,9 +21,8 @@ class RelatedInspector < ApplicationService
     article = @articles.list.reject(&:draft).find { |a| a.slug == slug }
     return { error: "No published entry has the slug #{slug.inspect}." } if article.nil?
 
-    id = article.sys&.id
-    report = @related.explain(id)
-    return { error: "#{slug} has no stored embedding. Run rake embeddings:backfill." } if report.nil?
+    report = @related.explain(article.sys&.id)
+    return { error: "#{slug} has no text, thus the index holds nothing for it." } if report.nil?
 
     {
       title: article.title,
@@ -36,39 +34,38 @@ class RelatedInspector < ApplicationService
     }
   end
 
-  # @return [Hash] The health of the corpus.
+  # The health of the corpus: how much of it the index holds, how many entries get a full section,
+  # and how far the similarities separate.
+  # @return [Hash]
   def audit
     published = @articles.list.reject(&:draft)
-    vectors = load_vectors(published)
-    present = vectors.compact_blank
-
-    raw = spread(present.values.map { |v| ArticleSimilarity.unit(v) })
-    centered = spread(ArticleSimilarity.prepare(present).values)
-    stale_ids = stale(published)
+    ids = published.filter_map { |article| article.sys&.id }
+    index = ArticleIndex.new(@articles.corpus.slice(*ids))
+    indexed = ids.count { |id| index.key?(id) }
+    neighbors = @related.all(count: SECTION_COUNT) || {}
 
     {
       total: published.size,
-      with_vector: present.size,
-      coverage: published.empty? ? 0 : (100.0 * present.size / published.size).round(1),
-      stale: stale_ids.size,
-      stale_ids: stale_ids,
-      raw: raw,
-      centered: centered,
-      verdict: verdict(raw, centered)
+      indexed: indexed,
+      coverage: published.empty? ? 0.0 : (100.0 * indexed / published.size).round(1),
+      keyed: neighbors.size,
+      short: neighbors.count { |_id, list| list.size < SECTION_COUNT },
+      spread: spread(index, ids)
     }
   end
 
   private
 
-  # The mean and the standard deviation of the similarity of a sample of pairs.
+  # The mean and the standard deviation of the similarity of a sample of pairs. A larger standard
+  # deviation means that the scores separate, thus the order carries more than noise.
   # @return [Hash] { mean:, sd: }.
-  def spread(vectors)
-    return { mean: 0.0, sd: 0.0 } if vectors.size < 2
+  def spread(index, ids)
+    sample = ids.first(SAMPLE_SIZE)
+    return { mean: 0.0, sd: 0.0 } if sample.size < 2
 
-    sample = vectors.first(SAMPLE_SIZE)
     values = []
     sample.each_with_index do |a, i|
-      sample[(i + 1)..].each { |b| values << ArticleSimilarity.similarity(a, b) }
+      sample[(i + 1)..].each { |b| values << index.similarity(a, b) }
     end
     return { mean: 0.0, sd: 0.0 } if values.empty?
 
@@ -76,56 +73,5 @@ class RelatedInspector < ApplicationService
     variance = values.sum { |value| (value - mean)**2 } / values.size
 
     { mean: mean, sd: Math.sqrt(variance) }
-  end
-
-  # Says if the mean subtraction separated the scores enough.
-  def verdict(raw, centered)
-    return "Too few vectors to judge the spread." if centered[:sd].zero?
-
-    gain = raw[:sd].zero? ? Float::INFINITY : centered[:sd] / raw[:sd]
-    if gain >= GOOD_SPREAD_GAIN
-      format("The mean subtraction made the spread %.1f times larger. The scores separate.", gain)
-    else
-      format(
-        "The mean subtraction made the spread %.1f times larger only. The scores still group " \
-        "together, thus read the chunk method in the plan.", gain
-      )
-    end
-  end
-
-  # @return [Hash{String=>Array<Float>,nil}] The stored vector of each entry.
-  def load_vectors(published)
-    ids = published.filter_map { |article| article.sys&.id }
-    return {} if ids.empty?
-
-    raw = $redis.mget(*ids.map { |id| ArticleEmbeddingJob.redis_key(id) })
-    ids.zip(raw).to_h { |id, json| [ id, parse_payload(json)&.dig("vector") ] }
-  end
-
-  # The entries whose stored embedding is older than the entry itself. Contentful never sends a
-  # webhook again, thus this is the only method to find one.
-  # @return [Array<String>]
-  def stale(published)
-    ids = published.filter_map { |article| article.sys&.id }
-    return [] if ids.empty?
-
-    versions = ids.zip($redis.mget(*ids.map { |id| ArticleEmbeddingJob.redis_key(id) }))
-                  .to_h { |id, json| [ id, parse_payload(json)&.dig("version") ] }
-
-    published.filter_map do |article|
-      id = article.sys&.id
-      current = article.sys&.published_version
-      stored = versions[id]
-      next if id.blank? || current.blank? || stored.blank?
-
-      id if stored.to_i < current.to_i
-    end
-  end
-
-  def parse_payload(json)
-    return if json.blank?
-    JSON.parse(json)
-  rescue JSON::ParserError
-    nil
   end
 end

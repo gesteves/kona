@@ -1,6 +1,6 @@
 module Webhooks
   # Takes the Contentful webhooks and syncs each copy of the content: the standard.site PDS
-  # records, the article embeddings, the R2 image mirror, and the static site.
+  # records, the R2 image mirror, and the static site.
   # The request only adds jobs to the queue and returns 204. Thus slow work cannot reach the 30s
   # webhook timeout of Contentful, and Sidekiq does a failed job again and does not remove it.
   # Contentful does not send a delivery again, thus the two backfill rake tasks are the
@@ -46,11 +46,6 @@ module Webhooks
 
       StandardSiteSyncJob.perform_async(operation, entry_id) if operation
 
-      # The vector that the build uses to make the list of related articles.
-      if content_type == ARTICLE_TYPE && entry_id.present?
-        ArticleEmbeddingJob.perform_async(action == "publish" ? "embed" : "delete", entry_id)
-      end
-
       # ⚠️ This is for a publish only. An unpublish and a delete do not remove the object, on
       # purpose: the web build reads Contentful with a preview token, thus a page from the build
       # still points at an unpublished asset, and a delete would break a live image. Each key is
@@ -74,7 +69,7 @@ module Webhooks
       # The code answers with a success, because Contentful does not send the webhook again in
       # either condition. The backfill tasks correct a temporary failure to add a job to the queue.
       # ⚠️ The code reports this and does not only write a log line: nothing here does the work
-      # again. Thus a failure with no report means no new build, no embedding, and no PDS sync, and
+      # again. Thus a failure with no report means no new build and no PDS sync, and
       # a log line is the only record.
       Rails.logger.error("Contentful webhook error: #{e.message}")
       ErrorReporter.report_upstream(e, service: "ContentfulWebhook", context: "contentType=#{content_type} entry=#{entry_id} action=#{action}")

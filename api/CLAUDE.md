@@ -49,8 +49,8 @@ edge serves a cached copy before it gets a new one.
 | POST | `/api/build` | enqueues `SiteBuildJob`; 202, or 429 inside the 60s dedupe lock, which `POST /republish` shares | — |
 | POST | `/api/icons` | resolves the web build's Font Awesome allowlist to SVGs | — |
 | GET | `/api/standard-site` | `{did, publication_uri}` for the build's verification markup | 1 hr |
-| GET | `/api/related` | `{contentful id => [related ids]}` from precomputed Voyage embeddings, for the build's static "You May Also Like" section | — |
-| POST | `/webhooks/contentful` | enqueues PDS sync, embedding, asset-mirror, and site-build jobs; 204 | — |
+| GET | `/api/related` | `{contentful id => [related ids]}` from the BM25 index of the article text, for the build's static "You May Also Like" section | — |
+| POST | `/webhooks/contentful` | enqueues PDS sync, asset-mirror, and site-build jobs; 204 | — |
 | POST | `/webhooks/whoop` | enqueues `WhoopWebhookJob`; 200 `{ok: true}` | — |
 | GET | `/whoop/auth`, `/whoop/callback` | Whoop OAuth (authorize is owner-gated) | — |
 | GET | `/signin`, `/auth/google_oauth2/callback`; POST `/signout` | owner session | `no-store` |
@@ -111,12 +111,11 @@ mount.
 API: Intervals.icu, Apple WeatherKit (with an ES256 JWT), Google Maps (`GoogleMaps` finds an address
 from coordinates, and `GoogleGeocoder` finds coordinates from an address), Google Air Quality, Google
 Pollen, PurpleAir, Whoop (OAuth2), TrainerRoad (iCal), Contentful, Plausible, Font Awesome,
-Goodspeed, Akismet, Resend, Turnstile, Voyage (`Embeddings`), `StandardSite`, `AssetMirror`, and
-`BlurhashPlaceholder`.
+Goodspeed, Akismet, Resend, Turnstile, `StandardSite`, `AssetMirror`, and `BlurhashPlaceholder`.
 The two article rankings, `TrendingArticles` and `RelatedArticles`, share `ArticleRanking`. Three
-more classes hold the parts of the "You May Also Like" score: `ArticleSimilarity` is the vector
-arithmetic, `ArticleTaxonomy` is the concept overlap, and `RelatedInspector` makes the two reports
-of `rake related:*`. Refer to **The article rankings**.
+more classes hold the parts of the "You May Also Like" score: `ArticleIndex` is the BM25 index of
+the article text, `ArticleTaxonomy` is the concept overlap, and `RelatedInspector` makes the two
+reports of `rake related:*`. Refer to **The article rankings**.
 Five more are not subclasses of `ApplicationService`, because they are not cacheable reads:
 `SpamQuarantine`, `TrackLibrary`, and `BlueskyCredentials` use Redis only and no HTTP; `GpxTrack`
 parses only; and `MapboxTileset` and `StaticMap` are different (refer to **The course-map
@@ -253,22 +252,35 @@ score. Read the ⚠️ above about `visit:entry_page`.
   outside it leaves the previous list in the cache for its full hour, below a key that looks
   correct.
 
-**`RelatedArticles`** reads the stored Voyage vectors and gives each candidate a score. The request
-path never calls Voyage.
+**`RelatedArticles`** makes a BM25 index of the text of each article and gives each candidate a
+score. It calls no external API: the text comes from `Articles#corpus`, which is the same Contentful
+read that each other list uses.
 
-- ⚠️ **`ArticleSimilarity.prepare` subtracts the mean vector of the corpus.** This is what makes the
-  ranker operate. The corpus has one author, one domain, and one genre, thus each vector holds a
-  large shared component and the similarities group into a narrow band where the order is near to
-  noise. The subtraction removes that shared direction. It also makes each vector a unit vector, thus
-  a similarity is a dot product: the old cosine calculated the norm of the same vector some hundreds
-  of times.
+- ⚠️ **Do not change this into a neural embedding.** This corpus is approximately 60 entries by one
+  author in one domain. An embedding of it puts most of its magnitude into the one direction that
+  each entry shares: a measurement gave a mean similarity of a pair of **+0.48**. The scores then
+  group into a narrow band where the order is near to noise, and the code needs a correction to
+  operate at all. The IDF of BM25 removes that shared vocabulary by design.
+- ⚠️ **A person can read the words that two articles share.** No A/B test can operate at this
+  traffic, thus a person must read the order and judge it. `terms_in_common` gives those words, and
+  `rake related:inspect` prints them. That is not possible with a vector, and it is a large part of
+  the reason for this design.
+- ⚠️ **The BM25 length normalization is necessary and not a refinement.** The median Article is
+  approximately 18,000 characters and the median Short is approximately 1,000. At `B = 0`, each long
+  article would win against each Short at every query.
+- ⚠️ **The index reads the published entries alone.** A draft in it would change the IDF of each term
+  and the mean document length, thus it would move a score that no person can explain.
+- ⚠️ **There is no stop word list, on purpose.** The IDF gives a term that most of the corpus holds a
+  weight near zero. A list would remove almost nothing, and it would add a file to maintain.
 - ⚠️ **The concept overlap uses an IDF weight.** "Race Reports" is on most articles and gives almost
   no information, and "Ironman Canada" is very specific. A plain Jaccard would let the common
   concepts control the result, and each article would look related to each other article.
 - ⚠️ **The floor reads the relevance and not the score.** The score holds the small addition for the
   date and the popularity. A new or a popular article that is not related must never go past the
-  floor because of that addition. `MIN_SCORE` is 0 and it is exclusive: after the mean subtraction,
-  the mean similarity of a pair is near 0, thus a score at or below 0 means "not related".
+  floor because of that addition.
+- ⚠️ **`MIN_SCORE` must stay above zero.** A BM25 similarity and a concept overlap are both never
+  negative, thus a floor at zero would mark each candidate as related. `LEXICAL_WEIGHT` moves that
+  distribution, thus read `rake related:inspect` after a change to it.
 - ⚠️ **The floor selects which candidates to PREFER, and it never makes the list short.** `mmr_pool`
   takes each candidate above the floor, then fills the rest from the best of the others. The section
   renders a two-column grid, thus a list of three leaves a hole. An earlier version made the section
@@ -284,10 +296,9 @@ path never calls Voyage.
 
 **The inspection tools.** ⚠️ No A/B test can operate at the traffic of this site. Thus
 `rake related:inspect[slug]` and `rake related:audit` are the only method to know if a change to the
-ranking helped. The audit gives the spread of the similarity **before and after** the mean
-subtraction, and that number decides if the corpus needs an embedding for each chunk of a body. It
-also names each entry whose stored embedding is older than the entry: Contentful never sends a
-webhook again, thus `rake embeddings:backfill` is the only correction.
+ranking helped. `inspect` prints each candidate with its BM25 similarity, its concept overlap, its
+score, and **the words that the two articles share**. `audit` gives the coverage of the index, the
+number of entries with a short list, and the spread of the similarity of a pair.
 
 ### Webhooks
 
@@ -329,7 +340,6 @@ Thus that shared window is safe.
 | `StandardSiteSyncJob(operation, entry_id)` | standard.site PDS sync |
 | `AssetSyncJob(asset_id)` | Copies one image asset into R2. ⚠️ It raises and does not give a smaller result. |
 | `AssetBlurhashJob(asset_id)` | Makes the blurhash placeholder of one image asset. It fails soft. |
-| `ArticleEmbeddingJob(operation, entry_id)` | keeps an article's Voyage embedding in sync |
 | `SiteBuildJob(event_type)` | fires a GitHub `repository_dispatch` to rebuild the web site. ⚠️ The one job that a caller schedules, with `perform_at` |
 | `WhoopWebhookJob(event_type, resource_id, trace_id)` | syncs Whoop metrics to Intervals.icu |
 | `ActivityDescriptionJob(activity_id, whoop_strain = nil)` | (re)generates an activity's Strava description and tidies its name |
@@ -1026,8 +1036,7 @@ value is a secret of fly.io, and Rails also uses `config/credentials.yml.enc` an
   slug), `PLAUSIBLE_API_KEY` and `PLAUSIBLE_SITE_ID` (⚠️ if one of the two has no value, the
   pageviews widget collapses and `TrendingArticles` changes to the order by popularity with no
   message. An INFO log is the only sign, and the result looks exactly like "it operates, and nothing
-  is trending"), `VOYAGE_API_KEY` (with no value there are no embeddings, thus `GET /api/related`
-  returns `{}` and the build omits each "You May Also Like" section), `MAPBOX_USERNAME` and
+  is trending"), `MAPBOX_USERNAME` and
   `MAPBOX_SECRET_TOKEN` (a token with `tilesets:write` and `tilesets:read`. If one of the two has no
   value, the Maps page says so and refuses each upload), `MAPBOX_ACCESS_TOKEN` (the ⚠️ **public**
   token: the server uses it to render when there is no secret token, and the map in the browser on

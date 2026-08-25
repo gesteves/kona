@@ -193,7 +193,7 @@ def import_related
 end
 
 # The part of the archive that needs a related list before the build reports one that is thin.
-# An entry that a person just published has no vector yet, thus a small gap is normal.
+# The two apps read Contentful separately, thus a small skew between them is normal.
 RELATED_COVERAGE_FLOOR = 0.8
 
 # Reports a related-articles file that is absent or thin.
@@ -215,19 +215,19 @@ def report_related_coverage
     return
   end
 
-  # ⚠️ A key says "the api has an embedding for this entry", and an empty list says "no candidate
-  # went past the similarity floor". Those two are different, and only the first one is a problem.
-  # To count the entries with a neighbor would report the floor as a missing embedding.
+  # ⚠️ A key says "the api ranked this entry", and an empty list says "the api found no candidate
+  # at all". Those two are different. The api makes its index from the same content that it reads
+  # for the list, thus each published entry gets a key and no list is short.
   covered = related.size
   empty = related.count { |_id, ids| Array(ids).empty? }
 
   if empty.positive?
-    puts "ℹ️  #{empty} of #{covered} entries have no related article. Read `rake related:inspect` in the api."
+    puts "⚠️  #{empty} of #{covered} entries got an empty list. Run `rake related:audit` in the api."
   end
 
   return if covered >= expected * RELATED_COVERAGE_FLOOR
 
-  puts "⚠️  The api has an embedding for #{covered} of #{expected} entries. Run `rake embeddings:backfill`."
+  puts "⚠️  The api ranked #{covered} of #{expected} entries. Run `rake related:audit` in the api."
 end
 
 def safely_perform

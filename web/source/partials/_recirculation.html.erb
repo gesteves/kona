@@ -1,6 +1,6 @@
 <%# The recirculation of an article. It has two sections, and each one renders only when it has
     entries: the reports of the same race, and then the related entries, which the api calculates
-    from the embeddings (data/related.json, through `rake import:related`).
+    from the article text and the concepts (data/related.json, through `rake import:related`).
 
     ⚠️ The two sections excluded each other before, thus a race with one or two other reports showed
     one or two cards. recirculation_sections removes from the second list each entry that the first

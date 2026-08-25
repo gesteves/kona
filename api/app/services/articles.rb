@@ -1,6 +1,6 @@
 # Gets the articles from Contentful. `find` gets one article by its entry ID, for the pageviews
-# widget. `list` gets each published article, for the trending list at request time. Redis caches
-# both.
+# widget. `list` gets each published article, for the trending list at request time. `corpus` gets
+# the text of each one, for the lexical index of the related list. Redis caches each of the three.
 class Articles < ApplicationService
   include ContentfulConsumer
 
@@ -16,16 +16,19 @@ class Articles < ApplicationService
     }
   GRAPHQL
 
-  # The text and the content version of one article, to calculate its embedding. publishedVersion
-  # increases at each publish, thus it is also a content fingerprint for the cached vector.
-  EMBED_QUERY = <<~GRAPHQL.freeze
-    query($id: String!) {
-      articles: articleCollection(where: { sys: { id: $id } }, limit: 1) {
+  # The text of each article, for the lexical index of RelatedArticles.
+  #
+  # ⚠️ `intro` is the whole content of a Short. A Short has no body, and a Short is a correct query
+  # article for the related section. Thus the index must read this field.
+  CORPUS_QUERY = <<~GRAPHQL.freeze
+    query($skip: Int, $limit: Int) {
+      articles: articleCollection(skip: $skip, limit: $limit) {
         items {
           title
+          summary
           intro
           body
-          sys { id publishedVersion }
+          sys { id }
         }
       }
     }
@@ -60,21 +63,6 @@ class Articles < ApplicationService
                          cache_key: "contentful:article", context: "Error fetching article #{id}")
   end
 
-  # The embedding inputs of one article: the title, the intro, the body, and sys.published_version.
-  # The true article content is the intro and the body for a full Article, and the intro only for a
-  # Short. The code gets this again for the embedding job. No cache holds it, because a publish
-  # webhook is the only caller and the version must be the version of the new entry.
-  # @return [OpenStruct, nil]
-  def find_for_embedding(id)
-    return if id.blank?
-
-    item = rescue_with(context: "Error fetching article #{id} for embedding") do
-      underscore_keys(query_articles(EMBED_QUERY, { id: id })&.first)
-    end
-
-    item && DeepOstruct.wrap(item)
-  end
-
   # Each published article, with the fields that the trending list and the card render need: path,
   # entry_type, draft, and published_at. The cache holds this for 5 minutes. The edge cache is the
   # main layer for freshness, and this cache only stops many requests to Contentful at one time.
@@ -91,16 +79,42 @@ class Articles < ApplicationService
     (items || []).map { |item| DeepOstruct.wrap(item) }
   end
 
+  # The text of each article, by Contentful id, for the lexical index of RelatedArticles.
+  #
+  # ⚠️ This is a query of its own and it is not part of `list`, on purpose. `list` removes the body
+  # and its cached value must stay small: TrendingArticles holds a full card payload below one key.
+  # Only the related section reads this text, and it runs one time for each build.
+  # @return [Hash{String=>Hash}] Contentful id => { title:, summary:, intro:, body: }.
+  def corpus
+    items = rescue_with([], context: "Error fetching the article corpus") do
+      # A digest of the query goes at the end, thus a change to its fields makes a new cache key.
+      cached_json("contentful:articles:corpus:#{cache_version(CORPUS_QUERY)}", expires_in: 5.minutes) do
+        fetch_corpus.map { |item| underscore_keys(item) }
+      end
+    end
+
+    (items || []).each_with_object({}) do |item, acc|
+      id = item.dig(:sys, :id)
+      acc[id] = item.slice(:title, :summary, :intro, :body) if id.present?
+    end
+  end
+
   private
 
   # Reads the full articleCollection, one page at a time. After a page fails, it keeps the pages
   # that it already got.
   def fetch_all
     # This is strict. Without that, a page that fails would give an incomplete set of articles, and
-    # `list` would keep that set in the cache for five minutes. embeddings:backfill reads through
-    # it, thus it would add too few jobs against a set that looked complete. AssetMirror and
-    # StandardSite are strict for the same reason.
+    # `list` would keep that set in the cache for five minutes. The related list and the trending
+    # list would then omit an article that exists. AssetMirror and StandardSite are strict for the
+    # same reason.
     contentful.paginate(LIST_QUERY, collection: :articles, strict: true) || []
+  end
+
+  # Reads the text of the full articleCollection. It is strict for the same reason as `fetch_all`:
+  # an incomplete corpus would change the IDF of the index and stay in the cache.
+  def fetch_corpus
+    contentful.paginate(CORPUS_QUERY, collection: :articles, strict: true) || []
   end
 
   # Adds the fields that the build also makes, and removes the large `body`, which the code gets
@@ -128,11 +142,5 @@ class Articles < ApplicationService
   # @return [Array<String>] The ids, or an empty list when the entry has no concept.
   def concept_ids(item)
     Array(item.dig(:contentful_metadata, :concepts)).filter_map { |concept| concept[:id].presence }
-  end
-
-  # Does a Contentful GraphQL query and returns its `articles.items`, or nil if there is no API
-  # configuration or the request fails.
-  def query_articles(query, variables)
-    contentful.items(query, variables, collection: :articles)
   end
 end
