@@ -316,13 +316,14 @@ class Contentful
 
       description = concept[:description].presence
       summary = description || default_tag_summary(concept[:name], tagged.size)
-      # The page renders this as "Updated", and sitemap.xml makes lastmod from the same field.
-      # Thus it follows the most recent edit, and not the most recent publish.
-      updated_at = tagged.filter_map { |a| a[:updated_at] || a[:published_at] }.max
+      # The publish date of the newest entry in the archive. The page renders it. ⚠️ Do not use
+      # `updated_at` here: sitemap.xml makes lastmod from the most recent *edit* of an entry, and
+      # the page shows the most recent *publish*.
+      published_at = tagged.filter_map { |a| a[:published_at] }.max_by { |d| DateTime.parse(d) }
       # `path` has a slash at the end. listing_page needs the base with no slash.
       pages = listing_page(tagged, base_path: concept[:path].chomp("/"), template: "/tag.html",
                            title: concept[:name], summary: summary, description: description,
-                           updated_at: updated_at, tag_id: concept[:id])
+                           published_at: published_at, tag_id: concept[:id])
       # Use entry_count, not count: `count` is Hash#count on the Hashie::Mash.
       { tag: concept.slice(:id, :name, :path, :scheme, :parent_id, :description, :synonyms).merge(entry_count: tagged.size), pages: pages }
     end
@@ -372,7 +373,7 @@ class Contentful
   # Makes the listing page for a collection of articles. It returns an array with one item,
   # because the page proxies in config.rb read a collection.
   # @return [Array<Hash>] One listing page.
-  def listing_page(articles, base_path:, template:, title:, summary: nil, description: nil, updated_at: nil, tag_id: nil)
+  def listing_page(articles, base_path:, template:, title:, summary: nil, description: nil, published_at: nil, tag_id: nil)
     page_data = {
       template: template,
       path: "#{base_path}/index.html",
@@ -382,7 +383,7 @@ class Contentful
     page_data[:description] = description if description
     # The metadata of the tag archive. It is nil for the blog index.
     page_data[:tag_id] = tag_id if tag_id
-    page_data[:updated_at] = updated_at if updated_at
+    page_data[:published_at] = published_at if published_at
     page_data[:items] = articles
     page_data[:index_in_search_engines] = true
     [ page_data ]

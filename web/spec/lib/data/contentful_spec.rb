@@ -278,8 +278,18 @@ RSpec.describe Contentful do
         older = article_with('ironman-703').merge(published_at: '2024-06-01T00:00:00Z')
         tags = built_tags([ newer, older ]) # newest-first, as published_articles delivers them
         page = tags.find { |t| t[:tag][:id] == 'ironman-703' }[:pages].first
-        expect(page).to include(tag_id: 'ironman-703', updated_at: '2025-06-01T00:00:00Z')
+        expect(page).to include(tag_id: 'ironman-703', published_at: '2025-06-01T00:00:00Z')
         expect(page).not_to have_key(:entry_count)
+      end
+
+      it 'ignores a recent edit of an older entry' do
+        newer = article_with('ironman-703').merge(published_at: '2025-06-01T00:00:00Z',
+                                                  updated_at: '2025-06-02T00:00:00Z')
+        older = article_with('ironman-703').merge(published_at: '2024-06-01T00:00:00Z',
+                                                  updated_at: '2026-01-01T00:00:00Z')
+        tags = built_tags([ newer, older ])
+        page = tags.find { |t| t[:tag][:id] == 'ironman-703' }[:pages].first
+        expect(page[:published_at]).to eq('2025-06-01T00:00:00Z')
       end
     end
   end

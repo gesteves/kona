@@ -1,11 +1,11 @@
 <div class="blog">
   <header class="blog__header">
     <p class="entry__meta">
-      <% if content.updated_at %>
-        <% updated = DateTime.parse(content.updated_at) %>
+      <% if content.published_at %>
+        <% latest = DateTime.parse(content.published_at) %>
         <span>
           <%= icon_svg("classic", "light", "calendar") %>
-          Updated <%= content_tag :time, updated.strftime('%B %-e, %Y'), datetime: updated.iso8601 %>
+          Updated <%= content_tag :time, latest.strftime('%B %-e, %Y'), datetime: latest.iso8601 %>
         </span>
       <% end %>
       <% ancestors = content.tag_id ? concept_chain(content.tag_id)[0...-1] : [] %>
