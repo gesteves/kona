@@ -72,7 +72,7 @@ RSpec.describe "Widgets::Articles trending", type: :request do
 
       get "/widgets/articles/trending", headers: auth_headers
 
-      expect(response.body).to include('class="entry__cover"')
+      expect(response.body).to include('class="entry__cover plausible-event-name=Article+Click plausible-event-section=trending"')
       expect(response.body).to include('tabindex="-1"')
       expect(response.body).to include('class="entry__cover-image placeholder"')
       expect(response.body).to include('alt=""')
@@ -128,6 +128,26 @@ RSpec.describe "Widgets::Articles trending", type: :request do
       get "/widgets/articles/trending", headers: auth_headers
 
       expect(response.body).to include('href="/2024/01/01/spiking/"')
+    end
+
+    # ⚠️ The tracking script of the static page reads these class names off the link itself. It
+    # walks four nodes up from the click at the most, thus the classes cannot move to the card.
+    # Refer to the root CLAUDE.md.
+    it "tags each link into an article with the trending section, for the analytics" do
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("IMAGES_URL").and_return("https://site.example")
+      allow(ENV).to receive(:[]).with("IMAGE_HOST").and_return("images.example")
+
+      get "/widgets/articles/trending", headers: auth_headers
+
+      links = response.body.scan(/<a [^>]*>/).select { |a| a.include?("plausible-event-name") }
+      # Four cards. Each one tags its headline and its permalink, and the one card with a cover
+      # image tags that link too.
+      expect(links.size).to eq(9)
+      expect(links).to all(include("plausible-event-name=Article+Click"))
+      expect(links).to all(include("plausible-event-section=trending"))
+      expect(links.count { |a| a.include?("entry__cover") }).to eq(1)
+      expect(links.count { |a| a.include?("data-publish-date-target") }).to eq(4)
     end
 
     it "sets a one-hour edge caching header" do

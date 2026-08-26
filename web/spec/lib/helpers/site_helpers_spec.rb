@@ -642,4 +642,16 @@ RSpec.describe SiteHelpers do
       expect(feed_subtitle).to be_nil
     end
   end
+  describe '#article_click_classes' do
+    it 'makes the name class and the section class' do
+      expect(article_click_classes('recent'))
+        .to eq('plausible-event-name=Article+Click plausible-event-section=recent')
+    end
+
+    # ⚠️ The name class on its own sends an event with no section, and nothing shows that error.
+    it 'gives nil for a blank section' do
+      expect(article_click_classes(nil)).to be_nil
+      expect(article_click_classes('')).to be_nil
+    end
+  end
 end

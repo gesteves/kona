@@ -15,7 +15,7 @@
       go on the same page, and no check compares them. %>
   <% cover = cover_image_tag(article) %>
   <% if cover.present? %>
-    <%= link_to cover, article.path, class: "entry__cover", tabindex: "-1", "aria-hidden": "true" %>
+    <%= link_to cover, article.path, class: [ "entry__cover", article_click_classes(tracking_section) ].compact.join(" "), tabindex: "-1", "aria-hidden": "true" %>
   <% end %>
   <header class="entry__header">
     <p class="entry__meta"
@@ -28,11 +28,11 @@
       <span>
         <span data-publish-date-target="clock" hidden><%= raw clock_icon_svg(published_at) %></span>
         <span data-publish-date-target="calendar"><%= raw icon_svg("classic", "light", "calendar") %></span>
-        <%= article_permalink_timestamp(article) %>
+        <%= article_permalink_timestamp(article, link_class: article_click_classes(tracking_section)) %>
       </span>
     </p>
     <h3 class="entry__hed" id="hed-<%= entry_id %>">
-      <%= link_to raw(smartypants(article.title)), article.path %>
+      <%= link_to raw(smartypants(article.title)), article.path, class: article_click_classes(tracking_section) %>
     </h3>
   </header>
   <div class="entry__body">

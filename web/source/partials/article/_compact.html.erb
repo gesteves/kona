@@ -1,8 +1,9 @@
+<% tracking_section = defined?(tracking_section) ? tracking_section : nil %>
 <article class="entry entry--compact" id="<%= entry_dom_id(article) %>" aria-labelledby="<%= entry_heading_id(article) %>">
   <header class="entry__header">
-    <%= partial 'partials/article/meta', locals: { article: article } %>
+    <%= partial 'partials/article/meta', locals: { article: article, tracking_section: tracking_section } %>
     <h2 class="entry__hed" id="<%= entry_heading_id(article) %>">
-      <%= link_to smartypants(article.title), article.path %>
+      <%= link_to smartypants(article.title), article.path, class: article_click_classes(tracking_section) %>
     </h2>
   </header>
   <%# ⚠️ The link is aria-hidden and it is not a tab stop, and the image has an empty alt. The
@@ -12,13 +13,13 @@
       to the first cover image of the page, thus a Short at the top of the list wastes nothing. %>
   <% cover = cover_image_tag(article, variant: :card_large, eager: true) %>
   <% if cover.present? %>
-    <%= link_to cover, article.path, class: "entry__cover entry__cover--inline", tabindex: "-1", "aria-hidden": "true" %>
+    <%= link_to cover, article.path, class: [ "entry__cover entry__cover--inline", article_click_classes(tracking_section) ].compact.join(" "), tabindex: "-1", "aria-hidden": "true" %>
   <% end %>
   <div class="entry__body">
     <%= render_body(article.intro) %>
     <%# ⚠️ The title is in the accessible name, and it is visually hidden. The icon is aria-hidden.
         Without the title, the blog index has approximately 40 links, and each one has the name
         "Continue reading". That is the list that a screen reader shows. %>
-    <%= link_to "Continue reading<span class=\"sr-only\">: #{h sanitize(article.title)}</span> #{icon_svg("classic", "light", "arrow-right")}", article.path, class: "entry__read-more" %>
+    <%= link_to "Continue reading<span class=\"sr-only\">: #{h sanitize(article.title)}</span> #{icon_svg("classic", "light", "arrow-right")}", article.path, class: [ "entry__read-more", article_click_classes(tracking_section) ].compact.join(" ") %>
   </div>
 </article>

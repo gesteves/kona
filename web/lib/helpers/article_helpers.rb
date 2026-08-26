@@ -92,14 +92,17 @@ module ArticleHelpers
   # the publish-date Stimulus controller puts a live relative time in its place. This is the
   # result when there is no JavaScript.
   # @param article [Object] The article.
+  # @param link_class [String, nil] The class names for the <a>. Use article_click_classes for the
+  #   analytics of a card. Leave it out on the page of the article: that link is the page itself.
   # @return [String] A <time> that contains an <a>, thus a machine can still read the ISO instant.
-  def article_permalink_timestamp(article)
+  def article_permalink_timestamp(article, link_class: nil)
     published = published_datetime(article)
     options = {
       # article.path is the source path. url_for makes the URL that directory_indexes serves.
       href: url_for(article.path),
       title: "Published at #{published.strftime('%-I:%M %p')}",
-      "data-publish-date-target": "timestamp"
+      "data-publish-date-target": "timestamp",
+      class: link_class
     }
     link = content_tag :a, options do
       published.strftime("%A, %B %-e, %Y")

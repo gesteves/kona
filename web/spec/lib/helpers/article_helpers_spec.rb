@@ -271,6 +271,18 @@ RSpec.describe ArticleHelpers do
       a.path = '/2024/01/01/post/index.html'
       expect(article_permalink_timestamp(a)).to include('href="/2024/01/01/post/"')
     end
+
+    # ⚠️ The page of the article renders this link too, and it points at that same page. Thus a
+    # class attribute must be absent when the caller gives no class.
+    it 'writes no class attribute with no link_class' do
+      result = article_permalink_timestamp(article(slug: 'post', published_at: '2024-01-01T10:00:00Z'))
+      expect(result).not_to include('class=')
+    end
+
+    it 'puts link_class on the anchor' do
+      a = article(slug: 'post', published_at: '2024-01-01T10:00:00Z')
+      expect(article_permalink_timestamp(a, link_class: 'tracking')).to include('class="tracking"')
+    end
   end
 
   describe '#compute_article_word_count' do

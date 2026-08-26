@@ -1,10 +1,13 @@
 <% standalone = defined?(indexable) && indexable %>
+<%# A Short renders its full body here, thus the permalink of the meta line is its one link into
+    the entry. It carries the analytics of the card. %>
+<% tracking_section = defined?(tracking_section) ? tracking_section : nil %>
 <% index_body = standalone && !article.draft %>
 <%# The landmark takes its name from the sr-only heading below, which is an <h1> on its own page and
     an <h2> in a list. Both carry entry_heading_id, thus one aria-labelledby covers the two. %>
 <article class="entry entry--compact" id="<%= entry_dom_id(article) %>" aria-labelledby="<%= entry_heading_id(article) %>">
   <header class="entry__header">
-    <%= partial 'partials/article/meta', locals: { article: article } %>
+    <%= partial 'partials/article/meta', locals: { article: article, tracking_section: tracking_section } %>
     <%# The visible title of a Short is the bold run-in below, and not a heading. Thus the heading
         here is for a screen reader only, and the run-in is aria-hidden, and a screen reader then
         speaks the title one time.

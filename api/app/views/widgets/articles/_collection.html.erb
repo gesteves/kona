@@ -14,7 +14,7 @@
             STATIC build renders on the same page. The related articles and the read-next section
             both have summary cards, and with no section in the id, two cards would have the same id
             and an aria-labelledby would point at the wrong card. %>
-        <%= render "summary", article: article, section_id: section_id %>
+        <%= render "summary", article: article, section_id: section_id, tracking_section: tracking_section %>
       </li>
     <% end %>
   </ol>

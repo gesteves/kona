@@ -20,6 +20,6 @@ index_in_search_engines: false
     </section>
     <% recent = recent_articles %>
     <% if recent.present? %>
-      <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent, variant: "centered" } %>
+      <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent, variant: "centered", tracking_section: "not-found" } %>
     <% end %>
 </div>

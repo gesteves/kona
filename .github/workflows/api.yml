@@ -28,6 +28,7 @@ on:
       - 'web/source/partials/_upcoming_races.html.erb'
       - 'web/source/partials/article/_full.html.erb'
       - 'web/data/srcsets.yml'
+      - 'web/lib/helpers/site_helpers.rb'
   pull_request:
     branches: [main]
     paths:
@@ -38,6 +39,7 @@ on:
       - 'web/source/partials/_upcoming_races.html.erb'
       - 'web/source/partials/article/_full.html.erb'
       - 'web/data/srcsets.yml'
+      - 'web/lib/helpers/site_helpers.rb'
 
 # No job writes to the repository. The deploy uses FLY_API_TOKEN for fly, and not GITHUB_TOKEN.
 # Set GITHUB_TOKEN to read-only here. Do not use the default value of the repository.

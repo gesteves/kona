@@ -1,13 +1,15 @@
 module ArticlesHelper
   # A permalink <a> whose text is the publish date. That is the result with no JavaScript. For a
   # recent article, the publish-date Stimulus controller puts a live relative time in its place, in
-  # the browser.
-  def article_permalink_timestamp(article)
+  # the browser. `link_class` gives the class names of the <a>; use article_click_classes for the
+  # analytics of a card.
+  def article_permalink_timestamp(article, link_class: nil)
     published = DateTime.parse(article.published_at)
     options = {
       href: article.path,
       title: "Published at #{published.strftime('%-I:%M %p')}",
-      "data-publish-date-target": "timestamp"
+      "data-publish-date-target": "timestamp",
+      class: link_class
     }
     link = content_tag :a, options do
       published.strftime("%A, %B %-e, %Y")

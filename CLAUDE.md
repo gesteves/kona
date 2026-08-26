@@ -121,6 +121,7 @@ a link, in the middle of a page:
 | Cover image URL and its `<img>` | `helpers/images_helper.rb` | `helpers/image_helpers.rb` |
 | The blurhash placeholder | `services/blurhash_placeholder.rb` | `helpers/image_helpers.rb` |
 | The card `sizes` and its widths | `config/srcsets.yml` | `data/srcsets.yml` |
+| `article_click_classes` + `ARTICLE_CLICK_EVENT` | `helpers/plausible_helper.rb` | `helpers/site_helpers.rb` |
 
 ⚠️ **The cover image of a card is in two places, and no check compares them.** The api renders the
 card of the trending widget, and the build renders each other card, and the two go on the same page.
@@ -696,3 +697,49 @@ that attribute.
 
 ⚠️ **When you change the markup, the class names, or the DOM shape of a widget, edit the web
 placeholder and the api view together.** Then read the rules of the proxy above again.
+
+## The analytics of a card click
+
+Each link into an article carries the Plausible class names of one custom event, **`Article
+Click`**, with a `section` property that names the module that holds the link. Thus the dashboard
+answers "where does a reader enter an article from, inside the site". The tracking script also adds
+a `url` property with the destination, and the `event:page` dimension of Plausible is the page that
+the reader clicked on. Thus neither one needs a property.
+
+`article_click_classes(section)` makes the class names, in both apps. The build renders each card of
+the page, and the api renders the card of the trending fragment into that same page.
+`api/spec/contracts/article_click_contract_spec.rb` compares the name of the event across the two
+apps: one goal in the dashboard matches one name only, thus a difference makes the trending section
+stop converting and gives no message.
+
+| `section` | Module |
+|---|---|
+| `recent` | Recent Articles, on the home page |
+| `trending` | Trending Articles — **the api fragment**, on the home page and on a Page |
+| `race-reports` | More Reports From This Race |
+| `related` | You May Also Like |
+| `next` / `previous` | The two halves of the read-next navigation |
+| `blog-list` | The blog index and each tag archive |
+| `not-found` | Recent Articles, on the 404 page |
+
+⚠️ **The goal must exist in the Plausible dashboard, with that exact text.** Plausible accepts an
+event that no goal matches, shows nothing, and does not fill in the data from before. A custom event
+also counts toward the billable pageviews.
+
+⚠️ **The classes go on each `<a>`, and never on the card.** The tracking script walks **four nodes
+up** from the click at the most, and it looks for the anchor and the tagged element together. From
+the "Continue reading" link and from the date permalink, the `<article>` is outside that range. Such
+a link then sends nothing, and it gives no message.
+
+⚠️ **A section name must have no space, no `=`, and no `--`.** The script parses the class name with
+`/plausible-event-(.+)(=|--)(.+)/`, and it changes each `+` into a space.
+
+⚠️ **A section name is NOT the DOM id of the section.** `partials/_collection.html.erb` makes that id
+from the heading, with `title.parameterize`. Thus a new heading would give the same module a new name
+in the dashboard, and it would split the data. Each call site passes an explicit `tracking_section`.
+
+⚠️ **The page of the article must not pass `tracking_section` to `partials/article/_meta`.** The
+permalink there points at the page that the reader is already on.
+
+⚠️ The trending fragment is at the edge for an hour. Thus a change to these classes needs the manual
+`widgets` tag purge, or the cards keep the old markup until that TTL ends.

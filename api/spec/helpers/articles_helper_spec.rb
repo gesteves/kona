@@ -26,5 +26,16 @@ RSpec.describe ArticlesHelper do
       expect(result).to start_with('<time datetime="2024-01-01T10:00:00+00:00">')
       expect(result).to end_with("</time>")
     end
+
+    # ⚠️ The page of the article renders this link too, and it points at that same page. Thus a
+    # class attribute must be absent when the caller gives no class.
+    it "writes no class attribute with no link_class" do
+      expect(helper.article_permalink_timestamp(article)).not_to include("class=")
+    end
+
+    it "puts link_class on the anchor" do
+      result = helper.article_permalink_timestamp(article, link_class: "tracking")
+      expect(result).to include('class="tracking"')
+    end
   end
 end

@@ -312,6 +312,24 @@ module SiteHelpers
     ENV["PLAUSIBLE_SCRIPT_URL"].present?
   end
 
+  # The name of the Plausible goal for a click on a link into an article. ⚠️ The goal in the
+  # dashboard must have this exact text. Plausible drops an event that no goal matches, and it does
+  # not fill in the data from before. The api has a copy in helpers/plausible_helper.rb.
+  ARTICLE_CLICK_EVENT = "Article Click"
+
+  # Makes the Plausible tagged-event classes for a link into an article. The tracking script reads
+  # the class names of the link and sends one event, with the section and the destination URL.
+  # ⚠️ A section name must have no space, no "=", and no "--": the script parses the class name.
+  # ⚠️ It gives nil for a blank section. The name class on its own sends an event with no section,
+  # and nothing shows that error.
+  # @param section [String] The analytics name of the section that holds the link.
+  # @return [String, nil] The class names, or nil.
+  def article_click_classes(section)
+    return if section.blank?
+
+    "plausible-event-name=#{ARTICLE_CLICK_EVENT.tr(' ', '+')} plausible-event-section=#{section}"
+  end
+
   # Makes a stable URL @id for a sitewide schema.org entity. Thus other nodes can refer to it and
   # do not repeat it.
   # @param fragment [String] The fragment that names the entity, for example "organization".

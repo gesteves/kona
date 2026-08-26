@@ -15,9 +15,13 @@
         Set it where the section can list an entry that another section on the same page also
         lists. %>
     <% id_scope = (defined?(scope_entry_ids) && scope_entry_ids) ? section_id : nil %>
+    <%# ⚠️ `tracking_section` is the analytics name of the section, and it is NOT section_id.
+        section_id comes from the heading, thus a new heading would break the data in the
+        dashboard, with no message. %>
+    <% tracking_section = defined?(tracking_section) ? tracking_section : nil %>
     <% items.select { |item| blog_post?(item) }.each do |item| %>
       <li class="collection__item">
-        <%= partial 'partials/article/summary', locals: { article: item, id_scope: id_scope } %>
+        <%= partial 'partials/article/summary', locals: { article: item, id_scope: id_scope, tracking_section: tracking_section } %>
       </li>
     <% end %>
   </ol>
