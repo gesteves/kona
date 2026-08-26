@@ -126,11 +126,17 @@ a link, in the middle of a page:
 card of the trending widget, and the build renders each other card, and the two go on the same page.
 The `sizes` list, the widths, and the attributes must be the same. The
 `widget_markup_contract_spec` compares the outer element of the **collection** only.
-⚠️ **The shape is in one place: the `ratio` of the `card` variant of `srcsets.yml`**.
+⚠️ **The shape is in one place: the `ratio` of a card variant of `srcsets.yml`**.
 Both apps read it for the `h` of each candidate, and both write it into the markup as the
 `--card-ratio` custom property. `.entry__cover-image` in `_entry.scss` and `.entry-skeleton-cover` in
 `_skeleton.scss` read that property, thus neither stylesheet holds a number. A change to the shape
 is one edit and one `cp`, and `srcsets_contract_spec` fails when a person forgets the copy.
+There are two card variants. `card` is the half-width card of a collection, and `card_large` is the
+cover image of an entry in the blog list and in a tag archive. `card_large` merges the `entry`
+variant with a YAML merge key, because that element is the same centered text column, and it adds a
+`ratio` of its own. ⚠️ **A merge key needs `aliases: true` at each `YAML.load_file` of that file.**
+Psych 5 refuses an alias by default. The Middleman build already passes it, and the api and each
+spec pass it in the code.
 
 ⚠️ **`api/config/srcsets.yml` is a copy of `web/data/srcsets.yml`, word for word**, and it is the
 one duplication in this table that a check covers: `api/spec/contracts/srcsets_contract_spec.rb`

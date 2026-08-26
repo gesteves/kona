@@ -5,6 +5,15 @@
       <%= link_to smartypants(article.title), article.path %>
     </h2>
   </header>
+  <%# ⚠️ The link is aria-hidden and it is not a tab stop, and the image has an empty alt. The
+      headline above and the "Continue reading" button below both link to the same page. Without
+      this, each entry in the list gives three identical tab stops.
+      ⚠️ `eager: true` goes on each card, and not on the first one. claim_lcp_image gives the mark
+      to the first cover image of the page, thus a Short at the top of the list wastes nothing. %>
+  <% cover = cover_image_tag(article, variant: :card_large, eager: true) %>
+  <% if cover.present? %>
+    <%= link_to cover, article.path, class: "entry__cover entry__cover--inline", tabindex: "-1", "aria-hidden": "true" %>
+  <% end %>
   <div class="entry__body">
     <%= render_body(article.intro) %>
     <%# ⚠️ The title is in the accessible name, and it is visually hidden. The icon is aria-hidden.

@@ -154,11 +154,12 @@ module ImageHelpers
   end
 
   # The shape of a cover image on a card: the height divided by the width. It comes from the
-  # `ratio` of the `card` variant of data/srcsets.yml, thus that file is the ONE place that holds
-  # the shape and the api reads the same value from its copy.
+  # `ratio` of a card variant of data/srcsets.yml, thus that file is the ONE place that holds the
+  # shape and the api reads the same value from its copy.
+  # @param variant [Symbol] The name of the card variant.
   # @return [Rational]
-  def card_ratio
-    w, h = data.srcsets.card.ratio.split(":", 2).map(&:to_i)
+  def card_ratio(variant = :card)
+    w, h = data.srcsets.public_send(variant).ratio.split(":", 2).map(&:to_i)
     Rational(h, w)
   end
 
@@ -166,9 +167,10 @@ module ImageHelpers
   # entry skeleton write it into the markup as `--card-ratio`, and _entry.scss and _skeleton.scss
   # read it. Thus the stylesheets follow srcsets.yml, and a person does not edit the shape in two
   # languages.
+  # @param variant [Symbol] The name of the card variant.
   # @return [String]
-  def card_aspect_ratio
-    data.srcsets.card.ratio.sub(":", " / ")
+  def card_aspect_ratio(variant = :card)
+    data.srcsets.public_send(variant).ratio.sub(":", " / ")
   end
 
   # Makes the <img> of the cover image of an entry, for a card.
@@ -178,9 +180,10 @@ module ImageHelpers
   # that, each card gives two identical tab stops and two identical entries in the link list of a
   # screen reader.
   # @param entry [Object] The article or the page.
-  # @param variant [Symbol] The name of the srcset variant in data/srcsets.yml.
+  # @param variant [Symbol] The name of the card variant in data/srcsets.yml.
+  # @param eager [Boolean] True to ask for the LCP mark. Refer to the note below.
   # @return [String] The <img> element, or an empty string when the entry has no cover image.
-  def cover_image_tag(entry, variant: :card)
+  def cover_image_tag(entry, variant: :card, eager: false)
     cover = entry&.cover_image
     return "" if cover&.url.blank?
 
@@ -190,7 +193,11 @@ module ImageHelpers
     # The first width of a variant is its 1x size at the largest breakpoint. Each other candidate
     # is for a smaller viewport or a denser screen. Thus it is the correct src.
     width = [ config.widths.first, widths.max ].min
-    height = candidate_height(width, card_ratio)
+    height = candidate_height(width, card_ratio(variant))
+
+    # ⚠️ `eager` is a request and not a command. claim_lcp_image gives the mark to the FIRST image
+    # of the page, thus a caller can pass it for each card in a list and one card only takes it.
+    lcp = eager && claim_lcp_image
 
     # A GIF gets no transformation and no srcset: a transformation makes one static frame from it.
     # responsivize_images and resize_images have the same rule.
@@ -206,25 +213,31 @@ module ImageHelpers
       height: height,
       alt: "",
       # `loading="lazy"` is necessary: each sizes list starts with `auto`, and a browser ignores
-      # that keyword on an image that it loads at once.
-      loading: "lazy",
+      # that keyword on an image that it loads at once. The eager image below drops `auto` for the
+      # same reason.
+      loading: lcp ? "eager" : "lazy",
       decoding: "async",
       class: "entry__cover-image placeholder",
       "data-controller": "image-placeholder",
       "data-action": "load->image-placeholder#removePlaceholder error->image-placeholder#removePlaceholder"
     }
 
+    attributes[:fetchpriority] = "high" if lcp
+
     # ⚠️ The shape goes in the markup, and not in the stylesheet. _entry.scss reads --card-ratio,
     # thus data/srcsets.yml is the one place that holds it. Keep the placeholder in the SAME
     # attribute: a second style attribute would replace this one.
-    style = [ "--card-ratio:#{card_aspect_ratio};" ]
+    style = [ "--card-ratio:#{card_aspect_ratio(variant)};" ]
     placeholder = blurhash_svg_data_uri(asset_id)
     style << "--placeholder:url('#{placeholder}');" if placeholder.present?
     attributes[:style] = style.join
 
     unless gif
-      attributes[:sizes] = config.sizes.join(", ")
-      attributes[:srcset] = srcset(url: cover.url, widths: widths, ratio: card_ratio, options: { fm: "auto" })
+      # ⚠️ `auto` is valid on a lazy image only, and a browser ignores it on an eager one. Thus the
+      # eager card drops it and uses the media conditions after it, which are complete without it.
+      sizes = lcp ? config.sizes.reject { |s| s == "auto" } : config.sizes
+      attributes[:sizes] = sizes.join(", ")
+      attributes[:srcset] = srcset(url: cover.url, widths: widths, ratio: card_ratio(variant), options: { fm: "auto" })
     end
 
     tag(:img, attributes)

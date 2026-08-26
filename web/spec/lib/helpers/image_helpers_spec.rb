@@ -7,7 +7,7 @@ require 'padrino-helpers'
 RSpec.describe ImageHelpers do
   # This has the shape of data.assets. Each example sets @assets before the code makes the index.
   # The real data/srcsets.yml, thus a spec reads the same card shape and widths as the build.
-  def real_srcsets = OpenStruct.new(YAML.load_file('data/srcsets.yml').transform_values { |v| OpenStruct.new(v) })
+  def real_srcsets = OpenStruct.new(YAML.load_file('data/srcsets.yml', aliases: true).transform_values { |v| OpenStruct.new(v) })
 
   def data = OpenStruct.new(assets: @assets || [], srcsets: real_srcsets)
 
@@ -15,7 +15,7 @@ RSpec.describe ImageHelpers do
   # the widths needs an edit in that ONE file, and no edit here. These read the file directly, and
   # they do not call the helper under test: a helper that parses `ratio` incorrectly must fail.
   # srcsets_contract_spec.rb of the api pins the width:height syntax.
-  def card_config = YAML.load_file('data/srcsets.yml').fetch('card')
+  def card_config = YAML.load_file('data/srcsets.yml', aliases: true).fetch('card')
 
   # ⚠️ Not `card_widths`: ImageHelpers has a method with that name, and this group includes it.
   # @return [Array<Integer>] The candidate widths, the smallest first, as the helper sorts them.
@@ -26,6 +26,12 @@ RSpec.describe ImageHelpers do
     w, h = card_config.fetch('ratio').split(':', 2).map(&:to_i)
     (width * Rational(h, w)).round
   end
+
+  # The variant of a cover image in the blog list and in a tag archive. It merges `entry` in the
+  # YAML, thus these examples also fail when a person breaks that merge key.
+  def card_large_config = YAML.load_file('data/srcsets.yml', aliases: true).fetch('card_large')
+
+  def card_large_candidate_widths = card_large_config.fetch('widths').sort
 
   # IMAGES_URL is the host that Cloudflare serves each transformation from, and each environment
   # needs it. There is no fallback to a Contentful resize, thus no value means a raise. No code
@@ -449,7 +455,7 @@ RSpec.describe ImageHelpers do
 
     # The true variants, thus the example fails when a person removes the `card` variant or
     # changes its first width.
-    let(:srcsets) { OpenStruct.new(YAML.load_file('data/srcsets.yml').transform_values { |v| OpenStruct.new(v) }) }
+    let(:srcsets) { OpenStruct.new(YAML.load_file('data/srcsets.yml', aliases: true).transform_values { |v| OpenStruct.new(v) }) }
 
     def data = OpenStruct.new(assets: @assets || [], srcsets: srcsets)
 
@@ -530,6 +536,65 @@ RSpec.describe ImageHelpers do
     it 'is an empty string when the entry has no cover image' do
       expect(cover_image_tag(entry(url: nil))).to eq('')
       expect(cover_image_tag(nil)).to eq('')
+    end
+
+    # ⚠️ These read card_large from the file. The variant merges `entry`, thus the examples fail
+    # when a person removes the anchor, the merge key, or the `ratio` of its own.
+    it 'renders the card_large widths and the sizes of that variant' do
+      html = cover_image_tag(entry, variant: :card_large).to_s
+
+      expect(html).to include(%(width="#{card_large_candidate_widths.first}"))
+      expect(html).to include("#{card_large_candidate_widths.last}w")
+      expect(html).to include(card_large_config.fetch('sizes').join(', '))
+    end
+
+    it 'cuts each card_large candidate to the ratio of that variant' do
+      w, h = card_large_config.fetch('ratio').split(':', 2).map(&:to_i)
+      width = card_large_candidate_widths.first
+      html = cover_image_tag(entry, variant: :card_large)
+
+      expect(html).to include("width=#{width},height=#{(width * Rational(h, w)).round},fit=cover")
+    end
+
+    # ⚠️ This is the LCP mark of a listing page. `auto` is valid on a lazy image only, thus the
+    # eager image must not have it, and each image after the first must stay lazy.
+    it 'gives the LCP mark to the FIRST eager card only' do
+      first = cover_image_tag(entry, variant: :card_large, eager: true).to_s
+      second = cover_image_tag(entry, variant: :card_large, eager: true).to_s
+
+      expect(first).to include('loading="eager"')
+      expect(first).to include('fetchpriority="high"')
+      expect(first[/sizes="([^"]+)"/, 1]).not_to include('auto')
+
+      expect(second).to include('loading="lazy"')
+      expect(second).not_to include('fetchpriority')
+      expect(second[/sizes="([^"]+)"/, 1]).to include('auto')
+    end
+
+    it 'stays lazy and keeps `auto` when the caller asks for no eager load' do
+      html = cover_image_tag(entry, variant: :card_large).to_s
+
+      expect(html).to include('loading="lazy"')
+      expect(html).not_to include('fetchpriority')
+      expect(html[/sizes="([^"]+)"/, 1]).to start_with('auto')
+    end
+  end
+
+  describe '#card_ratio and #card_aspect_ratio' do
+    def data = OpenStruct.new(assets: [], srcsets: real_srcsets)
+
+    it 'reads the ratio of the variant that the caller names' do
+      w, h = card_large_config.fetch('ratio').split(':', 2).map(&:to_i)
+
+      expect(card_ratio(:card_large)).to eq(Rational(h, w))
+      expect(card_aspect_ratio(:card_large)).to eq("#{w} / #{h}")
+    end
+
+    it 'reads the `card` variant with no argument, for the entry skeleton' do
+      w, h = card_config.fetch('ratio').split(':', 2).map(&:to_i)
+
+      expect(card_ratio).to eq(Rational(h, w))
+      expect(card_aspect_ratio).to eq("#{w} / #{h}")
     end
   end
 end

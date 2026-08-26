@@ -18,7 +18,7 @@ RSpec.describe "web ↔ api srcsets contract" do
   # ⚠️ This is the reason for the copy. The two checks above and below are not the same: the file
   # can be equal and the helper can still read the wrong key.
   it "renders the card from the `card` variant of that file" do
-    card = YAML.load_file(web_path).fetch("card")
+    card = YAML.load_file(web_path, aliases: true).fetch("card")
 
     expect(ImagesHelper::CARD_SIZES).to eq(card.fetch("sizes").join(", "))
     expect(ImagesHelper::CARD_WIDTHS).to eq(card.fetch("widths"))
@@ -29,7 +29,7 @@ RSpec.describe "web ↔ api srcsets contract" do
   # A number in a stylesheet or in a helper would be a second place to edit, and nothing would
   # compare the two.
   it "takes the card shape from that file, and holds it nowhere else" do
-    ratio = YAML.load_file(web_path).fetch("card").fetch("ratio")
+    ratio = YAML.load_file(web_path, aliases: true).fetch("card").fetch("ratio")
     w, h = ratio.split(":", 2).map(&:to_i)
 
     expect(ratio).to match(/\A\d+:\d+\z/), "the card ratio uses the width:height syntax"
@@ -45,7 +45,7 @@ RSpec.describe "web ↔ api srcsets contract" do
   # tells the browser how wide the element is at the largest breakpoint, and `widths.first` is the
   # candidate that `src` names for that width.
   it "keeps the 1x desktop width first in the card widths" do
-    card = YAML.load_file(web_path).fetch("card")
+    card = YAML.load_file(web_path, aliases: true).fetch("card")
     desktop_size = card.fetch("sizes").grep(/min-width/).first
     desktop_width = desktop_size[/(\d+)px\z/, 1].to_i
 

@@ -9,7 +9,7 @@ RSpec.describe ImagesHelper do
   # to the widths needs an edit in that ONE file, and no edit here. These read the file directly,
   # and they do not use the constants under test: a helper that parses `ratio` incorrectly must
   # fail. srcsets_contract_spec.rb pins the width:height syntax and the copy from web.
-  def card_config = YAML.load_file(Rails.root.join("config/srcsets.yml")).fetch("card")
+  def card_config = YAML.load_file(Rails.root.join("config/srcsets.yml"), aliases: true).fetch("card")
 
   # @return [Array<Integer>] The candidate widths, the smallest first, as the helper sorts them.
   def card_candidate_widths = card_config.fetch("widths").sort

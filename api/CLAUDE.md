@@ -210,6 +210,10 @@ The trending card renders the cover image of the article. Two parts make it:
   boot. ⚠️ Copy the full file (`cp web/data/srcsets.yml api/config/srcsets.yml`), and do not copy
   the `card` block alone: `spec/contracts/srcsets_contract_spec.rb` compares the two files and
   fails on each difference. That file also gives the method that makes the widths.
+  ⚠️ The file has a second card variant, `card_large`, which the static site alone renders. This
+  app reads `card` and never sees it. ⚠️ `card_large` uses a YAML **merge key**, thus each
+  `YAML.load_file` of this file needs `aliases: true`. The constant below reads the file at boot,
+  and Psych 5 refuses an alias by default. Without the flag the app raises at boot.
   ⚠️ **`ratio` is the ONE place that holds the shape of a card.** Both apps read it for the `h` of
   each candidate, and both write it into the markup as the `--card-ratio` custom property, which
   `.entry__cover-image` in `_entry.scss` and `.entry-skeleton-cover` in `_skeleton.scss` read. Thus

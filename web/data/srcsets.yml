@@ -16,11 +16,18 @@
 # ⚠️ The FIRST width of a variant must be its 1x desktop width. `cover_image_tag` reads
 # `widths.first` for the `src`, in both apps.
 #
+# ⚠️ This file uses a YAML anchor and a merge key (`card_large` merges `entry`). Psych 5 refuses an
+# alias by default. Thus each reader that calls YAML.load_file on this file must pass
+# `aliases: true`. The Middleman build needs no change: Middleman::Util::Data already passes it.
+#
 # ⚠️ api/config/srcsets.yml is a COPY of this file, word for word. The api renders the trending
 # card, and its Docker image holds `api/` only, thus it cannot read this file. It uses the `card`
 # variant alone, and the other variants stay only to let a person copy the file and compare the
 # two. `api/spec/contracts/srcsets_contract_spec.rb` fails when the two are different.
-entry:
+#
+# ⚠️ The anchor below is the centered text column, which is 8 of the 12 columns. `card_large` is
+# the same element, thus it merges this variant and adds a shape only.
+entry: &entry
   sizes:
     - auto
     - "(min-width: 1280px) 800px"
@@ -63,10 +70,12 @@ home:
     - 417
     - 441
 card:
-  # The shape of a card cover, as width:height. ⚠️ This is the ONE source of that shape. Both apps
-  # read it for the `h` of each candidate, and both write it into the markup as the `--card-ratio`
-  # custom property, which _entry.scss and _skeleton.scss then read. Thus a change here, and the
-  # `cp` below, is the full change. No other variant has a ratio: only a card crops.
+  # The shape of a card cover, as width:height. ⚠️ A card variant of this file is the ONE source of
+  # that shape. Both apps read it for the `h` of each candidate, and both write it into the markup
+  # as the `--card-ratio` custom property, which _entry.scss and _skeleton.scss then read. Thus a
+  # change here, and the `cp` below, is the full change. Only a card has a ratio, because only a
+  # card crops.
+  # This variant is the half-width card of a collection: 6 of the 12 columns.
   ratio: "3:2"
   sizes:
     - auto
@@ -80,3 +89,10 @@ card:
     - 1014
     - 1068
     - 1128
+# The cover image of an entry in the blog list and in a tag archive. That element is the centered
+# text column, which is the element that `entry` describes. Thus this variant merges the `sizes`
+# and the `widths` of `entry`, and the two can never become different.
+# ⚠️ It adds a `ratio` of its own, because a card crops and `entry` does not.
+card_large:
+  <<: *entry
+  ratio: "3:2"

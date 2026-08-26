@@ -20,7 +20,10 @@ module ImagesHelper
   # absent. Thus a file with a fault stops the deploy. That is on purpose, and it is not the same
   # as the rule below that `cdn_image_url` must never raise: that rule is about a REQUEST, where a
   # raise gives a 500 and leaves an empty skeleton on the page.
-  CARD = YAML.load_file(Rails.root.join("config", "srcsets.yml")).fetch("card").freeze
+  #
+  # ⚠️ `aliases: true` is necessary. The file uses a merge key, and Psych 5 refuses an alias by
+  # default. Without the flag the app raises Psych::AliasesNotEnabled at boot.
+  CARD = YAML.load_file(Rails.root.join("config", "srcsets.yml"), aliases: true).fetch("card").freeze
 
   CARD_SIZES = CARD.fetch("sizes").join(", ").freeze
 

@@ -122,10 +122,17 @@
   margin-bottom: 0.5rem;
 }
 
+// The cover image between the headline and the body copy of a list entry. .entry__cover has a
+// bottom margin only, for a cover above the eyebrow of a summary card. This one breaks a run of
+// text, thus it takes the same space on both sides.
+.entry__cover--inline {
+  margin: 1rem 0;
+}
+
 // ⚠️ Keep aspect-ratio and object-fit with the width and the height attributes of the element.
 // They are what holds the shape when a srcset candidate is not that shape, for example a GIF,
 // which gets no transformation.
-// ⚠️ --card-ratio comes from the markup, and BOTH apps write it from the `ratio` of the `card`
+// ⚠️ --card-ratio comes from the markup, and BOTH apps write it from the `ratio` of a card
 // variant of srcsets.yml. Thus that file is the one place that holds the shape. Do not write a
 // number here: the value below is a fallback for a fragment with no custom property, and nothing
 // serves one today.
@@ -308,9 +315,14 @@
   }
 }
 
+// Three rows, and the order is different in the two. .entry--compact is the header, the cover
+// image, then the body. .entry--summary is the cover image, the header, then the body. The body
+// takes the free height, thus the headers of two cards beside each other align. A card with no
+// cover image, that is a Short, puts its two children in the first two rows and the last row is
+// empty.
 .entry--compact,
 .entry--summary {
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto 1fr;
   
   .entry__hed {
     font-size: var(--font-medium);
@@ -320,11 +332,6 @@
 }
 
 .entry--summary {
-  // The cover image, then the header, then the body. The body takes the free height, thus the
-  // headers of two cards beside each other align. A card with no cover image, that is a Short,
-  // puts its two children in the first two rows and the last row is empty.
-  grid-template-rows: auto auto 1fr;
-
   .entry__body {
     p {
       font-size: var(--font-small);
