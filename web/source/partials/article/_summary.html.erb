@@ -2,8 +2,9 @@
     card. Use it for a section that can list an entry that another section on the same page also
     lists. %>
 <% id_scope = defined?(id_scope) ? id_scope : nil %>
-<%# `tracking_section` is the analytics name of the section that holds this card. Refer to the
-    root CLAUDE.md. ⚠️ Give it a value at each call site: with none, the card sends no event. %>
+<%# `tracking_section` is the heading of the section that holds this card, word for word. The
+    collection partial reads it from its own title. Refer to the root CLAUDE.md.
+    ⚠️ With no value the card sends no event, and nothing shows that. %>
 <% tracking_section = defined?(tracking_section) ? tracking_section : nil %>
 <article class="entry entry--summary" id="<%= entry_dom_id(article, scope: id_scope) %>" aria-labelledby="<%= entry_heading_id(article, scope: id_scope) %>">
   <%# ⚠️ The link is aria-hidden and it is not a tab stop, and the image has an empty alt. The

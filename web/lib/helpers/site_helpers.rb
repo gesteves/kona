@@ -319,7 +319,9 @@ module SiteHelpers
 
   # Makes the Plausible tagged-event classes for a link into an article. The tracking script reads
   # the class names of the link and sends one event, with the section and the destination URL.
-  # ⚠️ A section name must have no space, no "=", and no "--": the script parses the class name.
+  # ⚠️ A section name is the heading of the section, word for word. It can have a space, because
+  # the script changes each "+" back into a space, but it must have no "=" and no "--": the script
+  # parses the class name with /plausible-event-(.+)(=|--)(.+)/.
   # ⚠️ It gives nil for a blank section. The name class on its own sends an event with no section,
   # and nothing shows that error.
   # @param section [String] The analytics name of the section that holds the link.
@@ -327,7 +329,15 @@ module SiteHelpers
   def article_click_classes(section)
     return if section.blank?
 
-    "plausible-event-name=#{ARTICLE_CLICK_EVENT.tr(' ', '+')} plausible-event-section=#{section}"
+    "plausible-event-name=#{plausible_class_value(ARTICLE_CLICK_EVENT)} " \
+      "plausible-event-section=#{plausible_class_value(section)}"
+  end
+
+  # @param value [String] The text of an event name or of a property value.
+  # @return [String] That text as one class name. A space becomes a "+", which the script reads
+  #   back as a space. A value with a space and no encoding would become more than one class name.
+  def plausible_class_value(value)
+    value.tr(" ", "+")
   end
 
   # Makes a stable URL @id for a sitewide schema.org entity. Thus other nodes can refer to it and

@@ -644,8 +644,15 @@ RSpec.describe SiteHelpers do
   end
   describe '#article_click_classes' do
     it 'makes the name class and the section class' do
-      expect(article_click_classes('recent'))
-        .to eq('plausible-event-name=Article+Click plausible-event-section=recent')
+      expect(article_click_classes('Recent Articles'))
+        .to eq('plausible-event-name=Article+Click plausible-event-section=Recent+Articles')
+    end
+
+    # ⚠️ A space in a value must become a '+'. Without that, 'You May Also Like' is four class
+    # names, and the script then reads a section of 'You'.
+    it 'makes one class name from a section with a space' do
+      expect(article_click_classes('You May Also Like'))
+        .to eq('plausible-event-name=Article+Click plausible-event-section=You+May+Also+Like')
     end
 
     # ⚠️ The name class on its own sends an event with no section, and nothing shows that error.

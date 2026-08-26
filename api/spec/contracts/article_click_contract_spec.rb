@@ -25,7 +25,7 @@ RSpec.describe "web ↔ api article-click contract" do
   it "makes a class name that the tracking script can parse" do
     helper = Class.new { include PlausibleHelper }.new
 
-    expect(helper.article_click_classes("trending"))
-      .to eq("plausible-event-name=Article+Click plausible-event-section=trending")
+    expect(helper.article_click_classes("Trending Articles"))
+      .to eq("plausible-event-name=Article+Click plausible-event-section=Trending+Articles")
   end
 end

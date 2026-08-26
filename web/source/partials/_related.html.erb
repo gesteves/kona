@@ -9,5 +9,5 @@
     first card. `article` is a necessary local. %>
 <% related = related_articles(article) %>
 <% if related.present? %>
-  <%= partial 'partials/collection', locals: { title: "You May Also Like", items: related, variant: "halves", scope_entry_ids: true, tracking_section: "related" } %>
+  <%= partial 'partials/collection', locals: { title: "You May Also Like", items: related, variant: "halves", scope_entry_ids: true } %>
 <% end %>

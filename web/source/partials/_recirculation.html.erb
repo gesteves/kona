@@ -12,8 +12,8 @@
     `article` is a necessary local. %>
 <% sections = recirculation_sections(article) %>
 <% if sections[:reports].present? %>
-  <%= partial 'partials/collection', locals: { title: "More Reports From This Race", items: sections[:reports], variant: "halves", scope_entry_ids: true, tracking_section: "race-reports" } %>
+  <%= partial 'partials/collection', locals: { title: "More Reports From This Race", items: sections[:reports], variant: "halves", scope_entry_ids: true } %>
 <% end %>
 <% if sections[:related].present? %>
-  <%= partial 'partials/collection', locals: { title: "You May Also Like", items: sections[:related], variant: "halves", scope_entry_ids: true, tracking_section: "related" } %>
+  <%= partial 'partials/collection', locals: { title: "You May Also Like", items: sections[:related], variant: "halves", scope_entry_ids: true } %>
 <% end %>

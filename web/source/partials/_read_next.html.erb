@@ -19,7 +19,7 @@
         <h2 class="collection__heading" id="hed-<%= id %>-entry"><%= heading %></h2>
         <ol class="collection__list" role="list">
           <li class="collection__item">
-            <%= partial 'partials/article/summary', locals: { article: entry, show_body: false, show_cover: false, tracking_section: id } %>
+            <%= partial 'partials/article/summary', locals: { article: entry, show_body: false, show_cover: false, tracking_section: heading } %>
           </li>
         </ol>
       </section>

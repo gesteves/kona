@@ -10,9 +10,9 @@
     <% content.items.each_with_index do |item, index| %>
       <li class="blog__list-item">
         <% if item.entry_type == 'Short' %>
-          <%= partial 'partials/article/short', locals: { article: item, tracking_section: "blog-list" } %>
+          <%= partial 'partials/article/short', locals: { article: item, tracking_section: "Blog List" } %>
         <% else %>
-          <%= partial 'partials/article/compact', locals: { article: item, tracking_section: "blog-list" } %>
+          <%= partial 'partials/article/compact', locals: { article: item, tracking_section: "Blog List" } %>
         <% end %>
         <% unless index == last_index %><hr class="blog__separator" aria-hidden="true"><% end %>
       </li>

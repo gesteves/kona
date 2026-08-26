@@ -15,13 +15,15 @@
         Set it where the section can list an entry that another section on the same page also
         lists. %>
     <% id_scope = (defined?(scope_entry_ids) && scope_entry_ids) ? section_id : nil %>
-    <%# ⚠️ `tracking_section` is the analytics name of the section, and it is NOT section_id.
-        section_id comes from the heading, thus a new heading would break the data in the
-        dashboard, with no message. %>
-    <% tracking_section = defined?(tracking_section) ? tracking_section : nil %>
+    <%# The analytics of a card names its section by the HEADING, word for word. Thus a new
+        heading makes a new line in the dashboard, and you can compare the two. Refer to the root
+        CLAUDE.md. `tracking_section` overrides it, for a heading that is not unique in the site.
+        ⚠️ Read it into ANOTHER name. `x = defined?(x) ? x : y` never gives y: the assignment makes
+        the parser declare x, thus defined? is always true and the value is nil. %>
+    <% section_label = defined?(tracking_section) ? tracking_section : title %>
     <% items.select { |item| blog_post?(item) }.each do |item| %>
       <li class="collection__item">
-        <%= partial 'partials/article/summary', locals: { article: item, id_scope: id_scope, tracking_section: tracking_section } %>
+        <%= partial 'partials/article/summary', locals: { article: item, id_scope: id_scope, tracking_section: section_label } %>
       </li>
     <% end %>
   </ol>

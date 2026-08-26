@@ -72,7 +72,7 @@ RSpec.describe "Widgets::Articles trending", type: :request do
 
       get "/widgets/articles/trending", headers: auth_headers
 
-      expect(response.body).to include('class="entry__cover plausible-event-name=Article+Click plausible-event-section=trending"')
+      expect(response.body).to include('class="entry__cover plausible-event-name=Article+Click plausible-event-section=Trending+Articles"')
       expect(response.body).to include('tabindex="-1"')
       expect(response.body).to include('class="entry__cover-image placeholder"')
       expect(response.body).to include('alt=""')
@@ -145,7 +145,7 @@ RSpec.describe "Widgets::Articles trending", type: :request do
       # image tags that link too.
       expect(links.size).to eq(9)
       expect(links).to all(include("plausible-event-name=Article+Click"))
-      expect(links).to all(include("plausible-event-section=trending"))
+      expect(links).to all(include("plausible-event-section=Trending+Articles"))
       expect(links.count { |a| a.include?("entry__cover") }).to eq(1)
       expect(links.count { |a| a.include?("data-publish-date-target") }).to eq(4)
     end

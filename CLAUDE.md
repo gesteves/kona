@@ -712,15 +712,27 @@ the page, and the api renders the card of the trending fragment into that same p
 apps: one goal in the dashboard matches one name only, thus a difference makes the trending section
 stop converting and gives no message.
 
+**The heading of the section IS the value of `section`, word for word**, and the partial reads it
+from the same `title` local that it renders. Thus the dashboard reads as the page reads.
+
+⚠️ **A new heading is a new line in the dashboard, and that is the purpose.** The old line stops and
+the new one starts on the day of the deploy, thus you can compare the two and see what the new words
+did. Nothing joins them again, thus a heading that you change and then change back gives three
+lines. Change a heading when you want that measurement.
+
 | `section` | Module |
 |---|---|
-| `recent` | Recent Articles, on the home page |
-| `trending` | Trending Articles — **the api fragment**, on the home page and on a Page |
-| `race-reports` | More Reports From This Race |
-| `related` | You May Also Like |
-| `next` / `previous` | The two halves of the read-next navigation |
-| `blog-list` | The blog index and each tag archive |
-| `not-found` | Recent Articles, on the 404 page |
+| `Recent Articles` | The home page |
+| `Trending Articles` | **The api fragment**, on the home page and on a Page |
+| `More Reports From This Race` | An entry page |
+| `You May Also Like` | An entry page and a Short |
+| `Previous` / `Next` | The two halves of the read-next navigation |
+| `Blog List` | The blog index and each tag archive. **An override.** ⚠️ Those pages have **no** section heading: the `<h1>` is the name of the page, and for a tag archive that is the name of the tag. Thus the heading would make one value for each tag, and `event:page` already gives you that. |
+| `Recent Articles (404)` | The 404 page. **An override.** ⚠️ Its heading is the same as the one on the home page. The plain heading would merge the two, and `event:page` cannot separate them: a 404 is served at whatever URL the reader asked for. |
+
+The first five come from the heading and no call site names them. The last two are the only
+`tracking_section` locals in the repo, and each one is there because its heading cannot be the
+value.
 
 ⚠️ **The goal must exist in the Plausible dashboard, with that exact text.** Plausible accepts an
 event that no goal matches, shows nothing, and does not fill in the data from before. A custom event
@@ -731,12 +743,20 @@ up** from the click at the most, and it looks for the anchor and the tagged elem
 the "Continue reading" link and from the date permalink, the `<article>` is outside that range. Such
 a link then sends nothing, and it gives no message.
 
-⚠️ **A section name must have no space, no `=`, and no `--`.** The script parses the class name with
-`/plausible-event-(.+)(=|--)(.+)/`, and it changes each `+` into a space.
+⚠️ **The helper encodes each space as a `+`, and the script reads it back as a space.** Do not write
+a raw heading into a class attribute: `class="… plausible-event-section=You May Also Like"` is four
+class names, and the script then records a section of "You". A heading can still have no `=` and no
+`--`, because the script parses the class name with `/plausible-event-(.+)(=|--)(.+)/`.
 
-⚠️ **A section name is NOT the DOM id of the section.** `partials/_collection.html.erb` makes that id
-from the heading, with `title.parameterize`. Thus a new heading would give the same module a new name
-in the dashboard, and it would split the data. Each call site passes an explicit `tracking_section`.
+⚠️ **Read an optional local into ANOTHER name when its default is not nil.**
+`partials/_collection.html.erb` writes `section_label = defined?(tracking_section) ? tracking_section
+: title`. With `tracking_section` on the left, the assignment makes the parser declare that local,
+thus `defined?` is always true and the value is always nil. The default would never apply, each card
+would lose its classes, and no check would show it. The `id_scope` line above it is safe only because
+its default IS nil.
+
+⚠️ **The value is the heading and NOT the DOM id.** `partials/_collection.html.erb` makes that id
+from the same heading with `title.parameterize`, and that is a slug. Do not use one for the other.
 
 ⚠️ **The page of the article must not pass `tracking_section` to `partials/article/_meta`.** The
 permalink there points at the page that the reader is already on.

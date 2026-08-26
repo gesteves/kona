@@ -12,7 +12,7 @@
   <%= render_widget 'stats', '/widgets/activity-stats' %>
   <% recent = recent_articles %>
   <% if recent.present? %>
-    <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent, variant: "halves", tracking_section: "recent" } %>
+    <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent, variant: "halves" } %>
   <% end %>
   <%= render_widget 'whoop', '/widgets/whoop' %>
   <%= render_widget 'trending', '/widgets/articles/trending' %>
