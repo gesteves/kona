@@ -112,20 +112,32 @@ module SiteHelpers
     attrs.html_safe
   end
 
+  # The longest description that this method returns. A search engine shows approximately 160
+  # characters and each unfurl cuts at its own length, thus a longer string only removes the control
+  # of what a reader sees.
+  SUMMARY_LENGTH = 200
+
   # @param content [Object] A content object.
   # @return [String] The summary, the intro, or the meta description of the site — the first one
-  #   that exists.
+  #   that exists, cut to SUMMARY_LENGTH.
+  #
+  # ⚠️ The cut is at the END, and it covers each branch. A Short has no summary field and its intro
+  # is the full post, thus that branch gave a description of some thousands of characters. An
+  # authored `summary` has no limit either. One cut here is one rule.
+  # ⚠️ Four places read this: the meta description, og:description, BlogPosting.description, and the
+  # Atom <summary>. The Atom <content> still holds the full post, thus a shorter summary there is
+  # correct.
   def content_summary(content)
     summary = if content.summary.present?
       content.summary
     elsif content.entry_type == "Short"
       content.intro
     elsif content.intro.present?
-      content.intro&.truncate(200)
+      content.intro
     else
       data.site.meta_description
     end
-    sanitize(summary)
+    sanitize(summary)&.truncate(SUMMARY_LENGTH)
   end
 
   # @return [DateTime] The latest publish time of the pages, the articles, and the site entry.
@@ -510,7 +522,7 @@ module SiteHelpers
       "@type": "Person",
       "@id": schema_entity_id("person", path: "/about"),
       "name": data.site.author.name,
-      "url": full_url("/about")
+      "url": full_url("/about/")
     }
     person["sameAs"] = same_as if same_as.present?
     knows_about = author_knows_about

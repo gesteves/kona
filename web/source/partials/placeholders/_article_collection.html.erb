@@ -6,7 +6,7 @@
     not see the change, and `url`, which is the API endpoint. %>
 <section class="collection collection--halves" id="<%= section_id %>" aria-labelledby="hed-<%= section_id %>" data-nosnippet <%= live_update_attrs(url) %>>
   <h2 class="collection__heading" id="hed-<%= section_id %>"><%= heading %></h2>
-  <ol class="collection__list">
+  <ol class="collection__list" role="list">
     <% 4.times do %>
       <li class="collection__item">
         <%= partial 'partials/placeholders/entry_skeleton', locals: { image: true } %>

@@ -2,7 +2,12 @@
 <%# live-update controller puts the true markup here on connect, and it removes this element when %>
 <%# there is no current weather, that is, an empty response. `url`, which is a necessary local, %>
 <%# is the API endpoint. %>
-<div class="weather" data-nosnippet <%= live_update_attrs(url) %>>
+<section class="weather" data-nosnippet <%= live_update_attrs(url) %> aria-labelledby="hed-weather">
+  <%# ⚠️ The heading is sr-only, and each other widget has a visible one. This widget is a
+      sentence and its design has no heading, but with no name it is not a landmark and a screen
+      reader cannot reach it, and the swap of the fragment for the skeleton is then silent.
+      ⚠️ Keep this the same as the other side of the pair. %>
+  <h2 class="sr-only" id="hed-weather">Current conditions</h2>
   <%# The api fragment that replaces this element also has aria-hidden. Refer to %>
   <%# widgets/weather/current. %>
   <div class="weather__icon" aria-hidden="true"><wa-skeleton class="weather-skeleton-icon" effect="sheen"></wa-skeleton></div>
@@ -12,4 +17,4 @@
     <wa-skeleton class="weather-skeleton-text" effect="sheen"></wa-skeleton>
     <wa-skeleton class="weather-skeleton-text" effect="sheen"></wa-skeleton>
   </div>
-</div>
+</section>

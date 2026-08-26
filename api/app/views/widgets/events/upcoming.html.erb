@@ -11,7 +11,7 @@
   <% if @races.todays_race %>
     <section class="collection collection--single collection--has-featured" id="todays-race" aria-labelledby="hed-todays-race">
       <h2 class="collection__heading" id="hed-todays-race">Today’s Race</h2>
-      <ol class="collection__list">
+      <ol class="collection__list" role="list">
         <li class="collection__item">
           <%# show_timestamp: false, because the "Today's Race" heading already says the day. %>
           <%= render "event", event: @races.todays_race, featured: true, event_weather: @races.event_weather, time_zone: @races.time_zone, show_timestamp: false %>
@@ -21,7 +21,7 @@
     <% if @races.other_races.present? %>
       <section class="collection collection--<%= @races.other_races_variant %>" id="upcoming-races" aria-labelledby="hed-upcoming-races">
         <h2 class="collection__heading" id="hed-upcoming-races">Upcoming Races</h2>
-        <ol class="collection__list">
+        <ol class="collection__list" role="list">
           <% @races.other_races.each do |event| %>
             <li class="collection__item">
               <%= render "event", event: event, featured: false, event_weather: nil, time_zone: @races.time_zone %>
@@ -33,7 +33,7 @@
   <% else %>
     <section class="collection collection--<%= @races.variant %><%= " collection--has-featured" if @races.featured %>" id="upcoming-races" aria-labelledby="hed-upcoming-races">
       <h2 class="collection__heading" id="hed-upcoming-races">Upcoming Races</h2>
-      <ol class="collection__list">
+      <ol class="collection__list" role="list">
         <% @races.races.each do |event| %>
           <% featured = @races.featured_event?(event) %>
           <li class="collection__item">

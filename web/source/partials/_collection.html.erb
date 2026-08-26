@@ -8,7 +8,7 @@
   <% if title.present? %>
     <h2 class="collection__heading" <% if section_id %>id="hed-<%= section_id %>"<% end %>><%= smartypants(title) %></h2>
   <% end %>
-  <ol class="collection__list">
+  <ol class="collection__list" role="list">
     <%# Select the items before the <li>, and not in it. If you do it in the <li>, an item that is %>
     <%# not a post gives an empty <li>. %>
     <%# `scope_entry_ids`, which is an optional local, puts this section in the DOM id of each card.

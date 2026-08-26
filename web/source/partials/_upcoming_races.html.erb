@@ -15,7 +15,7 @@
   <div class="collection-group" data-nosnippet <%= live_update_attrs(url, placeholder: false) %>>
     <section class="collection collection--<%= event_collection_variant(races.size) %>" id="upcoming-races" aria-labelledby="hed-upcoming-races">
       <h2 class="collection__heading" id="hed-upcoming-races">Upcoming Races</h2>
-      <ol class="collection__list">
+      <ol class="collection__list" role="list">
         <% races.each do |event| %>
           <% id = event.sys.id.parameterize %>
           <li class="collection__item">

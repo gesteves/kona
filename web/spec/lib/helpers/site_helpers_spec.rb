@@ -263,10 +263,14 @@ RSpec.describe SiteHelpers do
         'inLanguage' => 'en-US',
         'publisher' => { '@id' => 'https://example.com/#organization' }
       )
+      # ⚠️ `url` has the slash at the end and `@id` does not, and that is on purpose. `url` is a
+      # navigable claim, and activate :directory_indexes puts that page at /about/, thus a URL with
+      # no slash names a 301. `@id` is an opaque identifier that each `author` reference points at,
+      # and a change to it would orphan every one of them.
       expect(nodes['Person']).to include(
         '@id' => 'https://example.com/about#person',
         'name' => 'Jane Doe',
-        'url' => 'https://example.com/about',
+        'url' => 'https://example.com/about/',
         'sameAs' => [ 'https://bsky.app/x' ]
       )
       expect(nodes['Person']['image']).to include('@type' => 'ImageObject', 'width' => 500, 'height' => 500, 'caption' => 'A portrait.')

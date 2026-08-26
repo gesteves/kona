@@ -7,7 +7,7 @@
 %>
 <section class="collection collection--halves" id="<%= section_id %>" aria-labelledby="hed-<%= section_id %>" data-nosnippet <%= live_update_attrs %>>
   <h2 class="collection__heading" id="hed-<%= section_id %>"><%= heading %></h2>
-  <ol class="collection__list">
+  <ol class="collection__list" role="list">
     <% articles.each do |article| %>
       <li class="collection__item">
         <%# section_id makes the ids of the card different from the ids in each section that the

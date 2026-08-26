@@ -117,6 +117,19 @@ the api could not read Contentful. Run `rake related:audit` there.
   family and style, for example `classic.light`, before `icon_svg` can use it. That is an edit to
   one yml file on the web side, and the api finds the icon when it is necessary.
 
+### The size of a listing page
+
+The blog index and each tag archive render **every** entry, and no page has pagination. That is
+good for a crawler: each post is two clicks from the home page, there is no `rel=prev/next` to get
+incorrect, and there is no paginated-canonical trap. The cost is the size of the page.
+
+⚠️ **Known boundary, measured at 58 entries: `/blog/` is approximately 580KB of HTML.** The cover
+image of a card is approximately 20% of that, because each one holds six srcset candidates and an
+inline blurhash data URI. A Short also renders its full body in the list, because its intro *is* the
+post. This is acceptable at 58 entries and it will not be at 300. When it becomes a problem, the
+first step is to render the inline blurhash for the first cards only, and pagination is the last
+step, not the first.
+
 ### Render-blocking budget
 
 **Only `stylesheets/site.css` can stop the first render.** `_head.html.erb` has an order that makes

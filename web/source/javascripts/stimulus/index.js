@@ -9,6 +9,10 @@ import '@web.awesome.me/webawesome-pro/dist/components/toast/toast.js';
 import '@web.awesome.me/webawesome-pro/dist/components/input/input.js';
 import '@web.awesome.me/webawesome-pro/dist/components/textarea/textarea.js';
 import '@web.awesome.me/webawesome-pro/dist/components/button/button.js';
+// ⚠️ <wa-button loading> renders a <wa-spinner> in its shadow root, and button.js does not
+// import it. Without this line that element never upgrades, thus the submit button of the
+// contact form shows no busy state at all, and it gives no message.
+import '@web.awesome.me/webawesome-pro/dist/components/spinner/spinner.js';
 import '@web.awesome.me/webawesome-pro/dist/components/scroller/scroller.js';
 import './lib/wa_theme';
 import './lib/patch_scroller_aria';

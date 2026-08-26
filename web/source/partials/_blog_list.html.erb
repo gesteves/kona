@@ -1,7 +1,7 @@
 <%# The list of entries that the blog index (articles.html.erb) and each tag page (tag.html.erb)
     share. `content` is one listing-page hash from Contentful#listing_page. %>
 <% if content.items.present? %>
-  <ol class="blog__list">
+  <ol class="blog__list" role="list">
     <%# ⚠️ The index decides the separator, and not `item == content.items.last`. Each item is a
         Hashie::Mash, thus `==` compares the full article at each level, and this includes the body,
         one time for each item. That test is also incorrect: two entries with the same field values
@@ -14,7 +14,7 @@
         <% else %>
           <%= partial 'partials/article/compact', locals: { article: item } %>
         <% end %>
-        <% unless index == last_index %><hr class="blog__separator"><% end %>
+        <% unless index == last_index %><hr class="blog__separator" aria-hidden="true"><% end %>
       </li>
     <% end %>
   </ol>

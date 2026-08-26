@@ -1,4 +1,9 @@
-<div class="weather" data-nosnippet <%= live_update_attrs %>>
+<section class="weather" data-nosnippet <%= live_update_attrs %> aria-labelledby="hed-weather">
+  <%# ⚠️ The heading is sr-only, and each other widget has a visible one. This widget is a
+      sentence and its design has no heading, but with no name it is not a landmark and a screen
+      reader cannot reach it, and the swap of the fragment for the skeleton is then silent.
+      ⚠️ Keep this the same as the other side of the pair. %>
+  <h2 class="sr-only" id="hed-weather">Current conditions</h2>
   <div class="weather__icon" aria-hidden="true"><%= raw icon_svg("classic", "thin", @summary.icon) %></div>
   <div class="weather__text">
     <%= raw @summary.weather_summary %>
@@ -9,4 +14,4 @@
       </a>
     <% end %>
   </div>
-</div>
+</section>

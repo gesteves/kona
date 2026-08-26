@@ -190,13 +190,29 @@ describe('submitting', () => {
 
     await submitForm();
     expect(button.loading).toBe(true);
-    expect(button.disabled).toBe(true);
+    // ⚠️ aria-disabled, and not `disabled`. `disabled` puts tabindex="-1" on the real button in the
+    // shadow root, and the focus of the user, which is ON that button, goes to the body.
+    expect(button.getAttribute('aria-disabled')).toBe('true');
 
     resolveFetch({ ok: true, status: 204 });
     await flushDom();
 
     expect(button.loading).toBe(false);
-    expect(button.disabled).toBe(false);
+    expect(button.getAttribute('aria-disabled')).toBe('false');
+  });
+
+  // ⚠️ This is the guard against the focus bug coming back, and jsdom cannot test the focus itself:
+  // <wa-button> never upgrades here, thus it cannot take the focus at all. The `disabled` PROPERTY
+  // is the thing that moved the focus to the body in a true browser, thus this example pins that
+  // the code never sets it.
+  it('never sets the disabled property, which would drop the focus to the body', async () => {
+    await mountForm();
+    const button = document.querySelector('[data-contact-target="submit"]');
+
+    await submitForm();
+
+    expect(button.disabled).toBeUndefined();
+    expect(button.hasAttribute('disabled')).toBe(false);
   });
 
   it('re-enables the submit button even when the request fails', async () => {
@@ -207,8 +223,10 @@ describe('submitting', () => {
     await submitForm();
 
     expect(
-      document.querySelector('[data-contact-target="submit"]').disabled
-    ).toBe(false);
+      document
+        .querySelector('[data-contact-target="submit"]')
+        .getAttribute('aria-disabled')
+    ).toBe('false');
   });
 
   it('still submits when the button is not wired as a target', async () => {

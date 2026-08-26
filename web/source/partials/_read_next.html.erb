@@ -17,7 +17,7 @@
       <% next unless entry %>
       <section class="collection collection--adjacent" aria-labelledby="hed-<%= id %>-entry">
         <h2 class="collection__heading" id="hed-<%= id %>-entry"><%= heading %></h2>
-        <ol class="collection__list">
+        <ol class="collection__list" role="list">
           <li class="collection__item">
             <%= partial 'partials/article/summary', locals: { article: entry, show_body: false, show_cover: false } %>
           </li>

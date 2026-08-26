@@ -31,6 +31,7 @@ module MarkupHelpers
       add_image_placeholders(doc)
       set_alt_text(doc)
       mark_affiliate_links(doc)
+      restore_list_semantics(doc)
       responsivize_tables(doc)
       scope_table_headers(doc)
       split_table_cell_annotations(doc)
@@ -411,6 +412,20 @@ module MarkupHelpers
   def responsivize_tables(html, css_class: "entry__table")
     with_nokogiri_doc(html) do |doc|
       doc.css("table").each { |table| table.wrap("<wa-scroller class=\"#{css_class}\" orientation=\"horizontal\"></wa-scroller>") }
+    end
+  end
+
+  # Gives each list in the body an explicit list role.
+  #
+  # ⚠️ This is necessary, and it is not a duplicate of the implicit role. Safari removes the list
+  # semantics from VoiceOver for a list with `list-style: none`, and base/_extends.scss sets that on
+  # each body list. An <ol> is the worst case: it also draws its number from a CSS counter, thus a
+  # numbered list reads as prose with no order and no count.
+  # @param html [String, Nokogiri::XML::Node] The HTML to change.
+  # @return [String, Nokogiri::XML::Node] The HTML after the change.
+  def restore_list_semantics(html)
+    with_nokogiri_doc(html) do |doc|
+      doc.css("ul, ol").each { |list| list["role"] = "list" }
     end
   end
 

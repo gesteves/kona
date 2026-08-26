@@ -1,25 +1,26 @@
 <% standalone = defined?(indexable) && indexable %>
 <% index_body = standalone && !article.draft %>
-<%# The landmark needs a name. On its own page, it uses its sr-only <h1>. In a list, a Short has no
-    heading at all (its title is the inline run-in below), so it carries the title as a label —
-    otherwise the blog list mixes named and unnamed article landmarks. %>
-<% label_attr = if standalone
-     %(aria-labelledby="#{entry_heading_id(article)}")
-   else
-     %(aria-label="#{h sanitize(article.title)}")
-   end %>
-<article class="entry entry--compact" id="<%= entry_dom_id(article) %>" <%= label_attr.html_safe %>>
+<%# The landmark takes its name from the sr-only heading below, which is an <h1> on its own page and
+    an <h2> in a list. Both carry entry_heading_id, thus one aria-labelledby covers the two. %>
+<article class="entry entry--compact" id="<%= entry_dom_id(article) %>" aria-labelledby="<%= entry_heading_id(article) %>">
   <header class="entry__header">
     <%= partial 'partials/article/meta', locals: { article: article } %>
-    <%# On its own page, the Short needs its title as the <h1> of the page, but the visible title %>
-    <%# is the run-in below. Thus the heading is for a screen reader only, and the run-in is %>
-    <%# aria-hidden, and a screen reader then speaks the title one time. In a list there is no %>
-    <%# <h1>, thus a screen reader speaks the run-in. %>
-    <% if standalone %><h1 class="sr-only" id="<%= entry_heading_id(article) %>"><%= smartypants(article.title) %></h1><% end %>
+    <%# The visible title of a Short is the bold run-in below, and not a heading. Thus the heading
+        here is for a screen reader only, and the run-in is aria-hidden, and a screen reader then
+        speaks the title one time.
+        ⚠️ A Short needs this heading in a LIST as well, and not on its own page only. Without it,
+        the blog index and each tag archive give no heading for approximately half of their entries,
+        and heading navigation, which is how a screen-reader user reads a list page, goes past each
+        one. On its own page the level is h1, and in a list it is h2, beside the h2 of _compact. %>
+    <% if standalone %>
+      <h1 class="sr-only" id="<%= entry_heading_id(article) %>"><%= smartypants(article.title) %></h1>
+    <% else %>
+      <h2 class="sr-only" id="<%= entry_heading_id(article) %>"><%= smartypants(article.title) %></h2>
+    <% end %>
     <% if index_body %><span hidden data-pagefind-meta="title"><%= smartypants(article.title) %></span><% end %>
   </header>
   <div class="entry__body"<%= ' data-pagefind-body'.html_safe if index_body %>>
-    <%= prepend_title(smartypants(article.title), render_body(article.intro), hidden_from_at: standalone) %>
+    <%= prepend_title(smartypants(article.title), render_body(article.intro), hidden_from_at: true) %>
     <%= partial 'partials/disclosure', locals: { entry: article } %>
   </div>
 </article>

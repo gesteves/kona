@@ -169,11 +169,17 @@ export default class extends Controller {
   /**
    * Shows the state of the submission on the submit button: a spinner, and the button is off. It
    * does nothing if the button is not a target, thus the form still works.
+   *
+   * ⚠️ Use aria-disabled, and not `disabled`. The user pressed this button, thus it has the focus,
+   * and `disabled` puts tabindex="-1" on the real button in the shadow root. The focus then goes to
+   * the body and it does not come back, and the user loses their place in the form.
+   * ⚠️ aria-disabled does not stop a second submit, and it must not: `submit()` aborts the request
+   * in progress and sends the new one, on purpose. Thus two presses still give one message.
    * @param {boolean} isSubmitting True if a submission is in progress.
    */
   setSubmitting(isSubmitting) {
     if (!this.hasSubmitTarget) return;
     this.submitTarget.loading = isSubmitting;
-    this.submitTarget.disabled = isSubmitting;
+    this.submitTarget.setAttribute('aria-disabled', String(isSubmitting));
   }
 }

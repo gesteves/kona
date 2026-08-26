@@ -7,7 +7,7 @@
     <% socials = data.site.socials_collection.items.compact %>
     <% if socials.present? %>
       <wa-scroller class="footer__socials" orientation="horizontal" without-scrollbar>
-        <ul class="footer__socials-list">
+        <ul class="footer__socials-list" role="list">
           <% socials.each do |i| %>
             <li class="footer__social-item"><%= social_media_link(title: i.title, destination: i.destination, css_class: "share__button", open_in_new_tab: i.open_in_new_tab) %></li>
           <% end %>
@@ -21,7 +21,7 @@
 
     <% menu_items = data.site.footer_links_collection.items.compact %>
     <% if menu_items.present? %>
-      <ul class="footer__menu">
+      <ul class="footer__menu" role="list">
         <% menu_items.each do |i| %>
           <li class="footer__menu-item">
             <%= shortcut_link(i) %>
