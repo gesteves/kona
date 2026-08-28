@@ -166,11 +166,38 @@ class Whoop < ApplicationService
 
     token_data = JSON.parse(response.body, symbolize_names: true)
     store_tokens(token_data)
+    store_account_email!
     token_data
   rescue StandardError => e
     Rails.logger.error("Error exchanging Whoop authorization code: #{e}")
     report_upstream_error(e, context: "Whoop OAuth code exchange")
     nil
+  end
+
+  # The email address of the authorized athlete. The Connected apps page names the account with
+  # it.
+  #
+  # ⚠️ This reads Redis and makes no request, on purpose. That page shows the state of each
+  # integration on each load, thus a fetch here would put an upstream failure in the path of the
+  # admin navigation. `store_account_email!` is what writes the value.
+  # @return [String, nil] The address, or nil before the app stored one.
+  def account_email
+    $redis.get(account_email_key).presence
+  end
+
+  # Gets the profile of the athlete and stores the email address. `exchange_code_for_tokens` calls
+  # this, and `WhoopTokenRefreshJob` calls it for a connection that this app made before this code
+  # existed.
+  #
+  # ⚠️ It fails soft. The address is a label for the admin, thus a Whoop that is not available must
+  # never stop an authorization or a token refresh.
+  # @return [String, nil] The address, or nil if the fetch failed.
+  def store_account_email!
+    email = rescue_with(context: "Whoop profile") { authed_get_or_nil("user/profile/basic") }&.dig(:email)
+    return if email.blank?
+
+    $redis.set(account_email_key, email)
+    email
   end
 
   # @return [Boolean] True if an account is connected now. The refresh token is the only
@@ -209,7 +236,8 @@ class Whoop < ApplicationService
   # no access token for the fetch.
   # @return [void]
   def disconnect!
-    $redis.del(access_token_key, refresh_token_key, user_id_key, refresh_lock_key, refresh_error_key)
+    $redis.del(access_token_key, refresh_token_key, user_id_key, refresh_lock_key, refresh_error_key,
+               account_email_key)
     nil
   end
 
@@ -466,5 +494,9 @@ class Whoop < ApplicationService
 
   def user_id_key
     "whoop:#{@client_id}:user_id"
+  end
+
+  def account_email_key
+    "whoop:#{@client_id}:account_email"
   end
 end

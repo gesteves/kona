@@ -20,3 +20,12 @@
       class: WhoopTokenRefreshJob
       queue: default
       description: 'Forces a Whoop token refresh so the rotating refresh token stays alive'
+
+    # ⚠️ A Threads token lives 60 days, it has no refresh token, and an expired one is dead for all
+    # time. Meta also refuses a refresh of a token that is less than 24 hours old, thus the job
+    # counts that as "not yet" and not as a failure. Each day gives the window many attempts.
+    threads_token_refresh:
+      cron: '0 4 * * * UTC'
+      class: ThreadsTokenRefreshJob
+      queue: default
+      description: 'Renews the 60-day Threads token before it expires'

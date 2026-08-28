@@ -9,10 +9,10 @@ RSpec.describe "Admin connected apps", type: :request do
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
     # Bluesky and Mastodon each have their own card on this page. Remove their credentials, thus
     # the Whoop examples do not depend on the credentials that are available.
-    $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY)
+    $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY, ThreadsCredentials::REDIS_KEY)
   end
 
-  after { $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY) }
+  after { $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY, ThreadsCredentials::REDIS_KEY) }
 
   def sign_in!
     sign_in_as(email: owner_email)
@@ -63,6 +63,25 @@ RSpec.describe "Admin connected apps", type: :request do
         expect(response.body).to include("Connected")
         expect(response.body).to include("Disconnect")
         expect(response.body).not_to include("/whoop/auth")
+      end
+
+      it "names the connected athlete" do
+        allow_any_instance_of(Whoop).to receive(:account_email).and_return("athlete@example.com")
+
+        get "/connected-apps"
+
+        expect(response.body).to include("Connected as athlete@example.com")
+      end
+
+      # The label arrives with the next scheduled refresh for a connection that this app made
+      # before it stored one. Until then the card must still read as connected.
+      it "says Connected with no label stored yet" do
+        allow_any_instance_of(Whoop).to receive(:account_email).and_return(nil)
+
+        get "/connected-apps"
+
+        expect(response.body).to include("Connected.")
+        expect(response.body).not_to include("Connected as")
       end
 
       # ⚠️ Use a Web Awesome component in place of a native element. A plain <button> means that a
@@ -133,7 +152,7 @@ RSpec.describe "Admin connected apps", type: :request do
       it "reports it as connected and offers Disconnect" do
         get "/connected-apps"
 
-        expect(response.body).to include("Connected")
+        expect(response.body).to include("Connected as @me.bsky.social")
         expect(response.body).to match(%r{<form[^>]*action="/connected-apps/bluesky"}m)
         expect(response.body).to include('name="_method" value="delete"')
       end
@@ -172,7 +191,7 @@ RSpec.describe "Admin connected apps", type: :request do
       it "names the account and offers Disconnect" do
         get "/connected-apps"
 
-        expect(response.body).to include("@me@mastodon.social")
+        expect(response.body).to include("Connected as @me@mastodon.social")
         expect(response.body).to match(%r{<form[^>]*action="/connected-apps/mastodon"}m)
         expect(response.body).to include('name="_method" value="delete"')
       end
@@ -181,6 +200,72 @@ RSpec.describe "Admin connected apps", type: :request do
         get "/connected-apps"
 
         expect(response.body).not_to include("tok-en")
+      end
+    end
+  end
+
+  describe "the Threads card" do
+    before do
+      sign_in!
+      allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(false)
+      allow(ENV).to receive(:[]).with("THREADS_APP_ID").and_return("app-id")
+      allow(ENV).to receive(:[]).with("THREADS_APP_SECRET").and_return("app-secret")
+    end
+
+    it "offers the authorize link when no account is attached" do
+      get "/connected-apps"
+
+      expect(response.body).to include("Threads")
+      expect(response.body).to include("/connected-apps/threads/authorize")
+    end
+
+    # Unlike Bluesky and Mastodon, this one has app credentials in the environment, thus it has a
+    # real :unconfigured state.
+    it "reports it as unconfigured without the Meta app credentials" do
+      allow(ENV).to receive(:[]).with("THREADS_APP_ID").and_return(nil)
+
+      get "/connected-apps"
+
+      expect(response.body).to include("Not configured")
+      expect(response.body).not_to include("/connected-apps/threads/authorize")
+    end
+
+    context "when an account is connected" do
+      before do
+        ThreadsCredentials.store_account(
+          access_token: "a-long-lived-token", expires_in: 60.days.to_i,
+          user_id: "12345", username: "me"
+        )
+      end
+
+      it "names the account and offers Disconnect" do
+        get "/connected-apps"
+
+        expect(response.body).to include("Connected as @me")
+        expect(response.body).to match(%r{<form[^>]*action="/connected-apps/threads"}m)
+        expect(response.body).to include('name="_method" value="delete"')
+      end
+
+      it "never renders the stored token" do
+        get "/connected-apps"
+
+        expect(response.body).not_to include("a-long-lived-token")
+      end
+
+      # ⚠️ An expired Threads token cannot be renewed. Thus a refused refresh must reach the owner
+      # while the token still works, exactly as a refused Whoop refresh does.
+      context "and the last refresh was refused" do
+        before { ThreadsCredentials.record_refresh_error(400) }
+
+        it "flags it and offers Reconnect alongside Disconnect" do
+          get "/connected-apps"
+
+          expect(response.body).to include("Needs attention")
+          expect(response.body).to include("HTTP 400")
+          expect(response.body).to include("cannot be renewed")
+          expect(response.body).to include("Reconnect")
+          expect(response.body).to include("Disconnect")
+        end
       end
     end
   end

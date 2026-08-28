@@ -58,6 +58,7 @@ edge serves a cached copy before it gets a new one.
 | POST | `/spam/:id/not-spam`; DELETE `/spam/:id`, `/connected-apps/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
 | GET/POST/DELETE | `/connected-apps/bluesky` | the Bluesky handle + app password form, and disconnect | `no-store` |
 | GET/POST/DELETE | `/connected-apps/mastodon`; GET `/connected-apps/mastodon/callback` | the Mastodon instance form, the OAuth callback, and disconnect | `no-store` |
+| GET | `/connected-apps/threads/authorize`, `/connected-apps/threads/callback`; DELETE `/connected-apps/threads` | Threads OAuth, and disconnect | `no-store` |
 | GET | `/location/lookup` | resolves an `address` or a coordinate pair to `{latitude, longitude, place}`. ⚠️ **Never writes** | `no-store` |
 | POST | `/location` | same write as `POST /api/location`, coordinates only; answers with the coordinates and the geocoded place | `no-store` |
 | POST | `/republish` | starts a build of the web site after the minutes that the owner picks, where zero is now. The Republish dialog of the nav posts here | `no-store` |
@@ -112,15 +113,15 @@ mount.
 API: Intervals.icu, Apple WeatherKit (with an ES256 JWT), Google Maps (`GoogleMaps` finds an address
 from coordinates, and `GoogleGeocoder` finds coordinates from an address), Google Air Quality, Google
 Pollen, PurpleAir, Whoop (OAuth2), TrainerRoad (iCal), Contentful, Plausible, Font Awesome,
-Goodspeed, Akismet, Resend, Turnstile, Mastodon (OAuth2), `StandardSite`, `AssetMirror`, and
-`BlurhashPlaceholder`.
+Goodspeed, Akismet, Resend, Turnstile, Mastodon (OAuth2), Threads (OAuth2), `StandardSite`,
+`AssetMirror`, and `BlurhashPlaceholder`.
 The two article rankings, `TrendingArticles` and `RelatedArticles`, share `ArticleRanking`. Three
 more classes hold the parts of the "You May Also Like" score: `ArticleIndex` is the BM25 index of
 the article text, `ArticleTaxonomy` is the concept overlap, and `RelatedInspector` makes the two
 reports of `rake related:*`. Refer to **The article rankings**.
-Six more are not subclasses of `ApplicationService`, because they are not cacheable reads:
-`SpamQuarantine`, `TrackLibrary`, `BlueskyCredentials`, and `MastodonCredentials` use Redis only and
-no HTTP; `GpxTrack` parses only; and `MapboxTileset` and `StaticMap` are different (refer to **The
+Seven more are not subclasses of `ApplicationService`, because they are not cacheable reads:
+`SpamQuarantine`, `TrackLibrary`, `BlueskyCredentials`, `MastodonCredentials`, and
+`ThreadsCredentials` use Redis only and no HTTP; `GpxTrack` parses only; and `MapboxTileset` and `StaticMap` are different (refer to **The
 course-map renderer**).
 `cached_json(key, expires_in:)` gives the read-through Redis cache. HTTParty makes each request, and
 it tries again after a failure. `DeepOstruct` gives dot access.
@@ -369,6 +370,7 @@ Thus that shared window is safe.
 | `ContactDeliveryJob(payload)` | the one retryable *delivery* unit — sends via Resend |
 | `MapTilesetJob(id)` | publishes an uploaded GPX track to Mapbox as a vector tileset |
 | `WhoopTokenRefreshJob()` | forces a Whoop token refresh on a schedule (see below) |
+| `ThreadsTokenRefreshJob()` | renews the 60-day Threads token each day (see below) |
 
 - **`SiteBuildJob`** has three callers, and each one has its own event type: the Contentful webhook
   sends `contentful-publish`, `POST /api/build` sends `api-build`, and the Republish dialog of the
@@ -420,8 +422,10 @@ machine, use `bundle exec sidekiq`.
 **The recurring jobs** come from `sidekiq-scheduler`. Its schedule is below `:scheduler:` in
 `config/sidekiq.yml`, and it starts in the Sidekiq **server** only. Puma loads the gem and schedules
 nothing, thus no job runs two times across the two fly machines. Its "Recurring Jobs" tab is on the
-`/sidekiq` dashboard, which the owner session controls. Today there is one scheduled job,
-`WhoopTokenRefreshJob`, each 6 hours. Whoop rotates its refresh token at each refresh, and it makes
+`/sidekiq` dashboard, which the owner session controls. Today there are two scheduled jobs.
+`ThreadsTokenRefreshJob` runs each day, and it is the thing that keeps the Threads connection: that
+token lives 60 days, it has no refresh token, and an expired one is dead for all time. Refer to
+**Connected apps**. `WhoopTokenRefreshJob` runs each 6 hours. Whoop rotates its refresh token at each refresh, and it makes
 a token with no use expire. In all other conditions the app refreshes a token **only when it is
 necessary**. Thus a quiet period, with no widget traffic and no webhook, would leave the integration
 in a state that needs a manual authorization at `/whoop/auth`. The job calls
@@ -629,16 +633,26 @@ A group is only a caption above its own `<ul>` of those same links:
   `_base.scss` gives to each inline SVG. The viewBox of a Font Awesome icon is not always square,
   thus at an automatic width no two labels in the column start at the same x.
 
-**Connected apps** (`/connected-apps`) connects Whoop, Bluesky, and Mastodon, and disconnects
-them.
+**Connected apps** (`/connected-apps`) connects Whoop, Bluesky, Mastodon, and Threads, and
+disconnects them.
 `ConnectedAppPresenter` renders four states from a `valid_credentials?` and `connected?` pair and an
 optional `error:` string. The fourth state, `:error`, means connected but broken, and it gives
 **both** Reconnect and Disconnect. A new authorization is the correction, and a rule to disconnect
 first would remove the one thing that makes this state different from a new setup.
 
+**A card that is connected names its account** — "Connected as …" — and a card that is not connected
+says what the integration does. `#card_description` makes that one line for each of the four.
+⚠️ **Each of those names comes from Redis, and no card makes a request to get one.** That page
+renders on each load of the admin, thus a fetch would put an upstream failure in the path of the
+navigation. `StandardSite#connected?` has the same rule, and its comment gives the reason.
+
 - **Whoop** uses OAuth, and `Whoop#disconnect!` removes the tokens. ⚠️ It also deletes the cached
   `user_id`, because `Webhooks::WhoopController` authorizes each payload against it. A copy that
   stays continues to accept a webhook for an account with no tokens.
+  - The card names the athlete with the email address that `store_account_email!` stores at the
+    authorization. ⚠️ **`WhoopTokenRefreshJob` stores it when it is absent**, and that is the only
+    thing that gives the label to a connection from before this code. Without it the owner must
+    authorize again to see which account is connected.
   - ⚠️ **A refused refresh keeps the tokens.** Thus `connected?`, which asks only if a refresh token
     exists, continues to say true while nothing operates. `Whoop#record_refresh_error` writes
     `whoop:<client id>:refresh_error` for a **4xx** from the token endpoint, and `#refresh_error`
@@ -697,6 +711,37 @@ first would remove the one thing that makes this state different from a new setu
   - **`disconnect!` tells the instance to revoke the token, then clears the store.** ⚠️ It clears
     the store whether the revoke works or not: the instance can be away, and a disconnect that the
     owner asked for must not depend on that.
+- **Threads** does an OAuth round trip with Meta, and **nothing reads the account yet**. Its app
+  credentials are `THREADS_APP_ID` and `THREADS_APP_SECRET`, from the Meta dashboard, thus this app
+  *does* have the `:unconfigured` state and Mastodon does not. `Admin::ThreadsController` has the
+  three actions, and `ThreadsCredentials` keeps the token in the Redis hash `threads:credentials`,
+  encrypted for the same reason as the Bluesky app password. There is **no form**: the app
+  credentials come from the environment, thus the Connect button goes to the authorize action, as
+  the one of Whoop does.
+  - ⚠️ **A Threads token expires, and an expired one is dead for all time.** Meta gives a token of
+    1 hour, which `connect!` changes into a token of 60 days, and there is **no refresh token**: the
+    token renews itself. Thus `ThreadsTokenRefreshJob` is not an improvement, and it is the thing
+    that keeps the connection. Without it the account disconnects itself 60 days after a person
+    connects it, and only a new authorization corrects that.
+  - ⚠️ **Meta refuses a refresh of a token that is less than 24 hours old.** `refresh!` gives
+    `:too_soon` for that and never records a failure. Without that state, the card would say "Needs
+    attention" for a connection that a person made minutes before.
+  - ⚠️ **The `redirect_uri` is NOT an environment variable**, and `threads_callback_url` gives it
+    from the request. Thus it always names the admin host, which is the only host that draws the
+    callback route, and the ⚠️ that `WHOOP_REDIRECT_URI` needs does not apply here. **The Meta
+    dashboard must list that same URL** in the redirect callback URLs of the app.
+  - ⚠️ **`SCOPES` asks for `threads_basic` and `threads_content_publish`.** Nothing posts today, and
+    the app asks for the write scope now, because a new scope needs a new authorization by the
+    owner. ⚠️ **The Meta dashboard must permit each scope in that list first**, and it must also
+    permit `threads_content_publish` for the app. Without that, the authorization screen fails and
+    no code here can show the reason.
+  - ⚠️ **`Threads#connect!` reads `/me` before it stores the token.** A token that cannot read its
+    own account is not a connection, and the card must not show one.
+  - ⚠️ **Meta gives no endpoint to revoke a token**, thus `disconnect!` is a local removal only. To
+    end the access at Meta, the owner must also remove the app at Threads → Settings → Website
+    permissions.
+  - The card names the account and the days before the token renews. A refused refresh gives the
+    `:error` state, exactly as a refused Whoop refresh does.
 
 ### The spam quarantine
 
@@ -1085,7 +1130,11 @@ value is a secret of fly.io, and Rails also uses `config/credentials.yml.enc` an
   app password of Bluesky are **not** environment variables: a person sets them on the Connected
   apps page of the admin, and the app stores them in Redis. ⚠️ **Mastodon has no environment
   variable at all**: the app registers itself on the instance that the owner names, and the same
-  page is the only method to connect it), `BUGSNAG_API_KEY` (for production
+  page is the only method to connect it), `THREADS_APP_ID` and `THREADS_APP_SECRET` (the Threads app
+  of the Meta dashboard. ⚠️ There is no redirect-URI variable: the callback URL comes from the
+  request, and the dashboard must list `https://<your-admin-host>/connected-apps/threads/callback`.
+  ⚠️ The *account* is connected on the admin page, and its token lives 60 days and cannot be renewed
+  after it expires, thus `ThreadsTokenRefreshJob` needs the worker process to run), `BUGSNAG_API_KEY` (for production
   only), `ALLOWED_HOSTS` (a list of permitted `Host` values, separated by a comma; for production
   only. With no value the app accepts each host, thus it is safe to deploy before you set it, and
   `/up` is always exempt), `API_HOST` (the public API host name. With no value the app draws each

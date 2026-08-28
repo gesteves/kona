@@ -1,12 +1,31 @@
 require "rails_helper"
 
 RSpec.describe WhoopTokenRefreshJob do
-  let(:whoop) { instance_double(Whoop, valid_credentials?: true, connected?: true) }
+  let(:whoop) { instance_double(Whoop, valid_credentials?: true, connected?: true, account_email: "athlete@example.com") }
 
   before { allow(Whoop).to receive(:new).and_return(whoop) }
 
   it "forces a token refresh" do
     expect(whoop).to receive(:refresh_tokens!).and_return("fresh-token")
+    described_class.new.perform
+  end
+
+  # The Connected apps page names the connected account, and it reads that label from Redis only.
+  # Thus this job is what fills it in for a connection that this app made before it stored one.
+  it "stores the athlete's email when the label is missing" do
+    allow(whoop).to receive(:refresh_tokens!).and_return("fresh-token")
+    allow(whoop).to receive(:account_email).and_return(nil)
+
+    expect(whoop).to receive(:store_account_email!)
+
+    described_class.new.perform
+  end
+
+  it "does not fetch the label again once it is stored" do
+    allow(whoop).to receive(:refresh_tokens!).and_return("fresh-token")
+
+    expect(whoop).not_to receive(:store_account_email!)
+
     described_class.new.perform
   end
 

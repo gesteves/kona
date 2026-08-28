@@ -48,13 +48,59 @@ RSpec.describe Whoop do
     end
   end
 
+  describe "#account_email" do
+    let(:email_key) { "whoop:cid:account_email" }
+
+    it "returns the stored address" do
+      allow($redis).to receive(:get).with(email_key).and_return("athlete@example.com")
+
+      expect(service.account_email).to eq("athlete@example.com")
+    end
+
+    # ⚠️ The Connected apps page reads this on each load. A fetch here would put an upstream failure
+    # in the path of the admin navigation.
+    it "never calls Whoop" do
+      allow(HTTParty).to receive(:get)
+
+      service.account_email
+
+      expect(HTTParty).not_to have_received(:get)
+    end
+  end
+
+  describe "#store_account_email!" do
+    let(:email_key) { "whoop:cid:account_email" }
+
+    before { allow($redis).to receive(:get).with(access_token_key).and_return("cached-token") }
+
+    it "stores the address from the profile" do
+      allow(HTTParty).to receive(:get).and_return(
+        instance_double(HTTParty::Response, success?: true, code: 200,
+                        body: { user_id: 1, email: "athlete@example.com" }.to_json, request: nil)
+      )
+
+      expect(service.store_account_email!).to eq("athlete@example.com")
+      expect($redis).to have_received(:set).with(email_key, "athlete@example.com")
+    end
+
+    # ⚠️ The address is a label for the admin. A Whoop that is not available must never stop an
+    # authorization or a token refresh.
+    it "fails soft when the profile fetch does not work" do
+      allow(HTTParty).to receive(:get).and_raise(SocketError)
+
+      expect { service.store_account_email! }.not_to raise_error
+      expect(service.store_account_email!).to be_nil
+    end
+  end
+
   describe "#disconnect!" do
     # ⚠️ The cached user_id must go away with the tokens. Webhooks::WhoopController compares each
     # payload with it, thus a copy that stays would continue to accept a webhook for an account with
     # no tokens.
-    it "deletes both tokens, the cached user id, the refresh lock, and the recorded failure" do
+    it "deletes both tokens, the cached user id, the refresh lock, the failure, and the label" do
       expect($redis).to receive(:del).with(
-        access_token_key, refresh_token_key, "whoop:cid:user_id", lock_key, error_key
+        access_token_key, refresh_token_key, "whoop:cid:user_id", lock_key, error_key,
+        "whoop:cid:account_email"
       )
 
       service.disconnect!

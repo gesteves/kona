@@ -4,7 +4,7 @@ module Admin
   class ConnectedAppsController < BaseController
     # GET /connected-apps
     def show
-      @apps = [ bluesky_app, mastodon_app, whoop_app ]
+      @apps = [ bluesky_app, mastodon_app, threads_app, whoop_app ]
     end
 
     # DELETE /connected-apps/whoop
@@ -20,7 +20,11 @@ module Admin
 
       ConnectedAppPresenter.new(
         name: "Bluesky",
-        description: "Publishes the blog to the AT Protocol as standard.site records.",
+        description: card_description(
+          connected: service.connected?,
+          account: ("@#{service.handle}" if service.handle.present?),
+          summary: "Publishes the blog to the AT Protocol as standard.site records."
+        ),
         # There is no deploy configuration to make incorrect: the credentials are the connection,
         # thus this app never has the :unconfigured state.
         configured: true,
@@ -35,7 +39,11 @@ module Admin
 
       ConnectedAppPresenter.new(
         name: "Mastodon",
-        description: mastodon_description(service.handle),
+        description: card_description(
+          connected: service.connected?,
+          account: service.handle,
+          summary: "Connects a Mastodon account."
+        ),
         # The registration and the token are the connection, and each one comes from the round
         # trip. Thus there is no deploy configuration and no :unconfigured state.
         configured: true,
@@ -45,13 +53,35 @@ module Admin
       )
     end
 
-    # @param handle [String, nil] The "@user@instance" name of the connected account.
-    # @return [String] One line for the card. The account is there when there is one, because the
-    #   instance is the part of this connection that the owner selects.
-    def mastodon_description(handle)
-      return "Connects a Mastodon account. Nothing posts to it yet." if handle.blank?
+    def threads_app
+      service = Threads.new
 
-      "Connected as #{handle}. Nothing posts to it yet."
+      ConnectedAppPresenter.new(
+        name: "Threads",
+        description: card_description(
+          connected: service.connected?,
+          account: ("@#{service.username}" if service.username.present?),
+          summary: "Connects a Threads account."
+        ),
+        configured: service.valid_credentials?,
+        connected: service.connected?,
+        connect_path: threads_authorize_path,
+        disconnect_path: threads_connection_path,
+        error: (threads_error_message(service.refresh_error) if service.connected?)
+      )
+    end
+
+    # ⚠️ A Threads token that expires is dead for all time, and only a new authorization corrects
+    # that. Thus a refused refresh must reach the owner while the token is still good.
+    # @param error [Hash, nil] ThreadsCredentials refresh_error.
+    # @return [String, nil] A sentence for the card, or nil when the last refresh was successful.
+    def threads_error_message(error)
+      return if error.blank?
+
+      failed_at = Time.zone.parse(error[:at].to_s)
+      when_it_failed = failed_at ? " on #{failed_at.strftime('%B %-e, %Y at %-I:%M %p %Z')}" : ""
+
+      "Threads refused the last token refresh (HTTP #{error[:code]})#{when_it_failed}. "         "Reconnect before the token expires: an expired Threads token cannot be renewed."
     end
 
     def whoop_app
@@ -60,13 +90,33 @@ module Admin
 
       ConnectedAppPresenter.new(
         name: "Whoop",
-        description: "Syncs strain, sleep, and recovery to Intervals.icu, and powers the Whoop widget.",
+        description: card_description(
+          connected: connected,
+          account: service.account_email,
+          summary: "Syncs strain, sleep, and recovery to Intervals.icu, and powers the Whoop widget."
+        ),
         configured: service.valid_credentials?,
         connected: connected,
         connect_path: "/whoop/auth",
         disconnect_path: whoop_connection_path,
         error: (whoop_error_message(service.refresh_error) if connected)
       )
+    end
+
+    # The one line of a card. A connected app names its account, thus the page says which account
+    # it holds and not what the integration does.
+    #
+    # ⚠️ Each `account` here comes from Redis, and no card makes a request to name its account. The
+    # page renders on each load of the admin, thus a fetch would put an upstream failure in the path
+    # of the navigation.
+    # @param connected [Boolean] True if an account is connected now.
+    # @param account [String, nil] The name of that account, in the form of its own service.
+    # @param summary [String] The line to show when nothing is connected: what the integration does.
+    # @return [String]
+    def card_description(connected:, account:, summary:)
+      return summary unless connected
+
+      account.present? ? "Connected as #{account}." : "Connected."
     end
 
     # Whoop keeps its tokens in Redis after it refuses them, thus `connected?` alone cannot show the

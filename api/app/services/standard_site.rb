@@ -215,6 +215,11 @@ class StandardSite < ApplicationService
     end
   end
 
+  # The handle that the owner entered. The Connected apps page names the account with it, and it
+  # makes no request to get it.
+  # @return [String, nil]
+  attr_reader :handle
+
   # @return [Boolean] True if both Bluesky credentials are available.
   def valid_credentials?
     @handle.present? && @app_password.present?

@@ -122,6 +122,13 @@ Rails.application.routes.draw do
       delete "connected-apps/mastodon"          => "mastodon#destroy",  as: nil
       get    "connected-apps/mastodon/callback" => "mastodon#callback", as: :mastodon_callback
 
+      # Threads does an OAuth round trip with app credentials from the environment, thus it needs
+      # no form: the Connect button of the card goes to the authorize action. The callback stays
+      # below /connected-apps for the same reason as the Mastodon one.
+      get    "connected-apps/threads/authorize" => "threads#authorize", as: :threads_authorize
+      get    "connected-apps/threads/callback"  => "threads#callback",  as: :threads_callback
+      delete "connected-apps/threads"           => "threads#destroy",   as: :threads_connection
+
       # The current location, on a map. The POST writes the same Redis key as the
       # POST /api/location that needs a bearer token, through Location.store. The lookup finds an
       # address or names a pair of coordinates and writes **nothing**, which is what lets the page
