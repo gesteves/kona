@@ -111,6 +111,17 @@ Rails.application.routes.draw do
       post   "connected-apps/bluesky" => "bluesky#create",  as: nil
       delete "connected-apps/bluesky" => "bluesky#destroy", as: nil
 
+      # Mastodon does an OAuth round trip, and the owner must name an instance first: this app
+      # registers itself on that instance and has no client before that. Thus the form, the
+      # callback, and the disconnect are all on that controller.
+      # ⚠️ The callback stays below /connected-apps, and it is not a top-level /mastodon path. Thus
+      # it needs no new prefix in RACK_ATTACK_KNOWN_PREFIXES and no new name in the scanner-noise
+      # rule of the zone.
+      get    "connected-apps/mastodon"          => "mastodon#show",     as: :mastodon_connection
+      post   "connected-apps/mastodon"          => "mastodon#create",   as: nil
+      delete "connected-apps/mastodon"          => "mastodon#destroy",  as: nil
+      get    "connected-apps/mastodon/callback" => "mastodon#callback", as: :mastodon_callback
+
       # The current location, on a map. The POST writes the same Redis key as the
       # POST /api/location that needs a bearer token, through Location.store. The lookup finds an
       # address or names a pair of coordinates and writes **nothing**, which is what lets the page

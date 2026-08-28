@@ -57,6 +57,7 @@ edge serves a cached copy before it gets a new one.
 | GET | `/`, `/spam`, `/location`, `/connected-apps`, `/course-maps`, `/course-maps/:id` | admin UI (owner-session gated) | `no-store` |
 | POST | `/spam/:id/not-spam`; DELETE `/spam/:id`, `/connected-apps/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
 | GET/POST/DELETE | `/connected-apps/bluesky` | the Bluesky handle + app password form, and disconnect | `no-store` |
+| GET/POST/DELETE | `/connected-apps/mastodon`; GET `/connected-apps/mastodon/callback` | the Mastodon instance form, the OAuth callback, and disconnect | `no-store` |
 | GET | `/location/lookup` | resolves an `address` or a coordinate pair to `{latitude, longitude, place}`. ⚠️ **Never writes** | `no-store` |
 | POST | `/location` | same write as `POST /api/location`, coordinates only; answers with the coordinates and the geocoded place | `no-store` |
 | POST | `/republish` | starts a build of the web site after the minutes that the owner picks, where zero is now. The Republish dialog of the nav posts here | `no-store` |
@@ -111,15 +112,16 @@ mount.
 API: Intervals.icu, Apple WeatherKit (with an ES256 JWT), Google Maps (`GoogleMaps` finds an address
 from coordinates, and `GoogleGeocoder` finds coordinates from an address), Google Air Quality, Google
 Pollen, PurpleAir, Whoop (OAuth2), TrainerRoad (iCal), Contentful, Plausible, Font Awesome,
-Goodspeed, Akismet, Resend, Turnstile, `StandardSite`, `AssetMirror`, and `BlurhashPlaceholder`.
+Goodspeed, Akismet, Resend, Turnstile, Mastodon (OAuth2), `StandardSite`, `AssetMirror`, and
+`BlurhashPlaceholder`.
 The two article rankings, `TrendingArticles` and `RelatedArticles`, share `ArticleRanking`. Three
 more classes hold the parts of the "You May Also Like" score: `ArticleIndex` is the BM25 index of
 the article text, `ArticleTaxonomy` is the concept overlap, and `RelatedInspector` makes the two
 reports of `rake related:*`. Refer to **The article rankings**.
-Five more are not subclasses of `ApplicationService`, because they are not cacheable reads:
-`SpamQuarantine`, `TrackLibrary`, and `BlueskyCredentials` use Redis only and no HTTP; `GpxTrack`
-parses only; and `MapboxTileset` and `StaticMap` are different (refer to **The course-map
-renderer**).
+Six more are not subclasses of `ApplicationService`, because they are not cacheable reads:
+`SpamQuarantine`, `TrackLibrary`, `BlueskyCredentials`, and `MastodonCredentials` use Redis only and
+no HTTP; `GpxTrack` parses only; and `MapboxTileset` and `StaticMap` are different (refer to **The
+course-map renderer**).
 `cached_json(key, expires_in:)` gives the read-through Redis cache. HTTParty makes each request, and
 it tries again after a failure. `DeepOstruct` gives dot access.
 
@@ -566,11 +568,12 @@ to `auto` for `view='mobile'`, or an empty band stays at the left. Each nav link
 the page: the component sets it when it sees our `[data-toggle-nav]`, but not before it upgrades.
 Until then its own hamburger button shows on a row with no style above the header.
 
-⚠️ **Two flows must refuse Turbo** with `data-turbo="false"`: the Google sign-in form and the
-**Connect** link of Whoop. Both are same-origin URLs that redirect to a different origin, and Turbo
-Drive cannot follow that. It fails with no message, and the click appears to do nothing. The
-Connected apps view puts the attribute on the Connect button of each card. For a card whose path is
-an ordinary admin page, which is the form of Bluesky, the only cost is a full page load.
+⚠️ **Three flows must refuse Turbo** with `data-turbo="false"`: the Google sign-in form, the
+**Connect** link of Whoop, and the instance form of Mastodon. Each one is a same-origin URL that
+redirects to a different origin, and Turbo Drive cannot follow that. It fails with no message, and
+the click appears to do nothing. The Connected apps view puts the attribute on the Connect button of
+each card. For a card whose path is an ordinary admin page, which is the form of Bluesky, the only
+cost is a full page load.
 
 The header has the wordmark of the site, `layouts/_logo.html.erb`, which is a **copy word for word**
 of `web/source/partials/_logo.svg.erb`. ⚠️ Its paths contain `fill="#020a0a"`, which you cannot see
@@ -626,7 +629,8 @@ A group is only a caption above its own `<ul>` of those same links:
   `_base.scss` gives to each inline SVG. The viewBox of a Font Awesome icon is not always square,
   thus at an automatic width no two labels in the column start at the same x.
 
-**Connected apps** (`/connected-apps`) connects Whoop and Bluesky and disconnects them.
+**Connected apps** (`/connected-apps`) connects Whoop, Bluesky, and Mastodon, and disconnects
+them.
 `ConnectedAppPresenter` renders four states from a `valid_credentials?` and `connected?` pair and an
 optional `error:` string. The fourth state, `:error`, means connected but broken, and it gives
 **both** Reconnect and Disconnect. A new authorization is the correction, and a rule to disconnect
@@ -666,6 +670,33 @@ first would remove the one thing that makes this state different from a new setu
     never syncs to the new repo.
   - ⚠️ **To flush Redis costs a new connection**, because the credentials are only there and no
     other code can make them again.
+- **Mastodon** does an OAuth round trip, and **nothing reads the account yet**: the admin only makes
+  the connection and shows it. `Admin::MastodonController` has all four of its actions, and
+  `MastodonCredentials` keeps the client and the token in the Redis hash `mastodon:credentials`. The
+  client secret and the access token are encrypted, for the same reason as the Bluesky app password.
+  - ⚠️ **Mastodon has no central developer dashboard, because each instance is a separate server.**
+    Thus the owner names an instance, the app registers itself there (`POST /api/v1/apps`), and it
+    keeps the client that the instance gives. **There is no environment variable and no dashboard
+    step**, and this app never has the `:unconfigured` state.
+  - ⚠️ **The `redirect_uri` comes from `mastodon_callback_url`, thus it names the host of the
+    request.** The registration and the token exchange must send the same value, and for that reason
+    the store keeps it. A client that a person registered from one host does not operate from
+    another one, and the instance answers `invalid_grant`. To connect the account again corrects it.
+  - ⚠️ **`store_client` removes the token and the handle.** Without that, an owner who names a
+    second instance keeps the token of the first one, and the card shows "Connected" for an account
+    that the new client cannot reach.
+  - ⚠️ **`Mastodon#connect!` reads the account before it stores the token.** A token that cannot
+    read its own account is not a connection, and the card must not show one.
+  - ⚠️ **The callback is an admin page, thus the owner session controls it**, and the one-time state
+    in `mastodon:oauth:state` controls it a second time. The Whoop callback cannot use the session,
+    because Whoop redirects to a public host. Mastodon redirects the browser of the owner back to
+    this host, and that browser has the session.
+  - ⚠️ **The instance ties the scope to the token that it gives.** Thus a change to
+    `Mastodon::SCOPES` needs a new registration and a new authorization, and the owner must connect
+    the account again. `write:statuses` is in the list now for a later use, and no code posts today.
+  - **`disconnect!` tells the instance to revoke the token, then clears the store.** ⚠️ It clears
+    the store whether the revoke works or not: the instance can be away, and a disconnect that the
+    owner asked for must not depend on that.
 
 ### The spam quarantine
 
@@ -1052,7 +1083,9 @@ value is a secret of fly.io, and Rails also uses `config/credentials.yml.enc` an
   integration is off, and the app omits the sentence about the water temperature and the bay
   readings for a race day in SF), `LOCATION`, `TIME_ZONE`, `BLUESKY_PDS_URL` (⚠️ the handle and the
   app password of Bluesky are **not** environment variables: a person sets them on the Connected
-  apps page of the admin, and the app stores them in Redis), `BUGSNAG_API_KEY` (for production
+  apps page of the admin, and the app stores them in Redis. ⚠️ **Mastodon has no environment
+  variable at all**: the app registers itself on the instance that the owner names, and the same
+  page is the only method to connect it), `BUGSNAG_API_KEY` (for production
   only), `ALLOWED_HOSTS` (a list of permitted `Host` values, separated by a comma; for production
   only. With no value the app accepts each host, thus it is safe to deploy before you set it, and
   `/up` is always exempt), `API_HOST` (the public API host name. With no value the app draws each

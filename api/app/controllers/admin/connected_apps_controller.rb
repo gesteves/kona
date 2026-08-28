@@ -1,11 +1,10 @@
 module Admin
   # Lists the external apps whose credentials this app holds, and lets the owner connect one or
-  # disconnect one. Whoop is the only one today. The page is a list, thus a second app needs only a
-  # new presenter at the end.
+  # disconnect one. The page is a list, thus a new app needs only a new presenter at the end.
   class ConnectedAppsController < BaseController
     # GET /connected-apps
     def show
-      @apps = [ bluesky_app, whoop_app ]
+      @apps = [ bluesky_app, mastodon_app, whoop_app ]
     end
 
     # DELETE /connected-apps/whoop
@@ -29,6 +28,30 @@ module Admin
         connect_path: bluesky_connection_path,
         disconnect_path: bluesky_connection_path
       )
+    end
+
+    def mastodon_app
+      service = Mastodon.new
+
+      ConnectedAppPresenter.new(
+        name: "Mastodon",
+        description: mastodon_description(service.handle),
+        # The registration and the token are the connection, and each one comes from the round
+        # trip. Thus there is no deploy configuration and no :unconfigured state.
+        configured: true,
+        connected: service.connected?,
+        connect_path: mastodon_connection_path,
+        disconnect_path: mastodon_connection_path
+      )
+    end
+
+    # @param handle [String, nil] The "@user@instance" name of the connected account.
+    # @return [String] One line for the card. The account is there when there is one, because the
+    #   instance is the part of this connection that the owner selects.
+    def mastodon_description(handle)
+      return "Connects a Mastodon account. Nothing posts to it yet." if handle.blank?
+
+      "Connected as #{handle}. Nothing posts to it yet."
     end
 
     def whoop_app

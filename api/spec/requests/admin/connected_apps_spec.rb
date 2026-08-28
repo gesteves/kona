@@ -7,12 +7,12 @@ RSpec.describe "Admin connected apps", type: :request do
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
-    # Bluesky has its own card on this page. Remove it, thus the Whoop examples do not depend on the
-    # credentials that are available.
-    $redis.del(BlueskyCredentials::REDIS_KEY)
+    # Bluesky and Mastodon each have their own card on this page. Remove their credentials, thus
+    # the Whoop examples do not depend on the credentials that are available.
+    $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY)
   end
 
-  after { $redis.del(BlueskyCredentials::REDIS_KEY) }
+  after { $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY) }
 
   def sign_in!
     sign_in_as(email: owner_email)
@@ -142,6 +142,45 @@ RSpec.describe "Admin connected apps", type: :request do
         get "/connected-apps"
 
         expect(response.body).not_to include("abcd-efgh")
+      end
+    end
+  end
+
+  describe "the Mastodon card" do
+    before do
+      sign_in!
+      allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(false)
+    end
+
+    it "offers a link to the instance form when no account is attached" do
+      get "/connected-apps"
+
+      expect(response.body).to include("Mastodon")
+      expect(response.body).to include("/connected-apps/mastodon")
+      expect(response.body).to include("Not connected")
+    end
+
+    context "when an account is connected" do
+      before do
+        MastodonCredentials.store_client(
+          instance: "mastodon.social", client_id: "id", client_secret: "secret",
+          redirect_uri: "http://www.example.com/connected-apps/mastodon/callback"
+        )
+        MastodonCredentials.store_token(access_token: "tok-en", handle: "@me@mastodon.social")
+      end
+
+      it "names the account and offers Disconnect" do
+        get "/connected-apps"
+
+        expect(response.body).to include("@me@mastodon.social")
+        expect(response.body).to match(%r{<form[^>]*action="/connected-apps/mastodon"}m)
+        expect(response.body).to include('name="_method" value="delete"')
+      end
+
+      it "never renders the stored token" do
+        get "/connected-apps"
+
+        expect(response.body).not_to include("tok-en")
       end
     end
   end
