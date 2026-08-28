@@ -8,30 +8,28 @@ class ConnectedAppPresenter
 
   # @param name [String] The name on the screen, for example "Whoop".
   # @param description [String] One line that says what the integration does.
-  # @param configured [Boolean] True if the environment has its credentials.
   # @param connected [Boolean] True if an account is connected now.
   # @param connect_path [String] The path of the "Connect" link.
   # @param disconnect_path [String] The path that the "Disconnect" button posts to.
   # @param error [String, nil] The cause of a failure of a connected account, for example
   #   credentials that the service now refuses. It is nil when the account works.
-  def initialize(name:, description:, configured:, connected:, connect_path:, disconnect_path:, error: nil)
+  def initialize(name:, description:, connected:, connect_path:, disconnect_path:, error: nil)
     @name = name
     @description = description
-    @configured = configured
     @connected = connected
     @connect_path = connect_path
     @disconnect_path = disconnect_path
     @error = error
   end
 
-  # :unconfigured is different from :disconnected, on purpose. The first is a problem with the
-  # deploy, because the env vars are absent, and it offers no action. The second needs one click.
-  # :error is the third state: the credentials are there but the service refuses them. Redis cannot
-  # show the difference between that state and :connected, thus without :error the page would show
-  # the integration as good for all time.
-  # @return [Symbol] :unconfigured, :disconnected, :connected, or :error.
+  # ⚠️ :error is the state that Redis cannot show: the credentials are there but the service
+  # refuses them. Without it the page would show the integration as good for all time.
+  #
+  # There is no :unconfigured state, on purpose. An integration whose configuration is absent
+  # cannot operate, thus `Admin::ConnectedAppsController` leaves its card off the page and does not
+  # render one with no action.
+  # @return [Symbol] :disconnected, :connected, or :error.
   def state
-    return :unconfigured unless @configured
     return :disconnected unless @connected
 
     @error.present? ? :error : :connected
@@ -39,23 +37,12 @@ class ConnectedAppPresenter
 
   # @return [String] The label of the badge for the current state.
   def status_label
-    {
-      unconfigured: "Not configured", disconnected: "Not connected",
-      connected: "Connected", error: "Needs attention"
-    }.fetch(state)
+    { disconnected: "Not connected", connected: "Connected", error: "Needs attention" }.fetch(state)
   end
 
   # @return [String] The Web Awesome badge variant for the current state.
   def status_variant
-    {
-      unconfigured: "neutral", disconnected: "warning",
-      connected: "success", error: "danger"
-    }.fetch(state)
-  end
-
-  # @return [Boolean] True if the credentials are absent, thus there is no action to do.
-  def unconfigured?
-    state == :unconfigured
+    { disconnected: "warning", connected: "success", error: "danger" }.fetch(state)
   end
 
   # An app in the error state also offers connect. A new authorization *is* the correction, and a

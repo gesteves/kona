@@ -6,8 +6,8 @@ require "uri"
 #
 # ⚠️ Mastodon has no central developer dashboard, because each instance is a separate server. Thus
 # this app registers itself on the instance that the owner names (POST /api/v1/apps) and keeps the
-# client that the instance gives. There is no env var for this integration, and there is no
-# :unconfigured state.
+# client that the instance gives. There is no env var for this integration, thus the Connected apps
+# page always shows its card.
 # @see https://docs.joinmastodon.org/methods/apps/
 class Mastodon < ApplicationService
   # The name that the instance shows to the owner on its Authorized apps page.

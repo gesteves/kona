@@ -21,15 +21,25 @@ RSpec.describe "Admin connected apps", type: :request do
   describe "GET /connected-apps" do
     before { sign_in! }
 
+    # ⚠️ A card whose integration cannot operate is not on the page at all. It offers no action,
+    # thus a card for it is a row that a person can do nothing about.
     context "when Whoop is not configured" do
       before { allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(false) }
 
-      it "reports it as unconfigured and offers no action" do
+      it "leaves the card off the page" do
         get "/connected-apps"
 
         expect(response).to have_http_status(:ok)
-        expect(response.body).to include("Not configured")
+        expect(response.body).not_to include("Whoop")
         expect(response.body).not_to include("/whoop/auth")
+      end
+
+      # Bluesky and Mastodon need no configuration, thus the page is never empty.
+      it "still renders the cards that need no configuration" do
+        get "/connected-apps"
+
+        expect(response.body).to include("Bluesky")
+        expect(response.body).to include("Mastodon")
       end
     end
 
@@ -219,14 +229,13 @@ RSpec.describe "Admin connected apps", type: :request do
       expect(response.body).to include("/connected-apps/threads/authorize")
     end
 
-    # Unlike Bluesky and Mastodon, this one has app credentials in the environment, thus it has a
-    # real :unconfigured state.
-    it "reports it as unconfigured without the Meta app credentials" do
+    # Unlike Bluesky and Mastodon, this one needs app credentials in the environment.
+    it "leaves the card off the page without the Meta app credentials" do
       allow(ENV).to receive(:[]).with("THREADS_APP_ID").and_return(nil)
 
       get "/connected-apps"
 
-      expect(response.body).to include("Not configured")
+      expect(response.body).not_to include("Threads")
       expect(response.body).not_to include("/connected-apps/threads/authorize")
     end
 

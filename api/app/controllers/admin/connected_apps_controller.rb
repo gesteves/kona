@@ -3,8 +3,13 @@ module Admin
   # disconnect one. The page is a list, thus a new app needs only a new presenter at the end.
   class ConnectedAppsController < BaseController
     # GET /connected-apps
+    #
+    # ⚠️ A card is on the page only when its integration can operate. Whoop and Threads need
+    # credentials in the environment, thus without those the page hides the card and does not offer
+    # an action that cannot work. Bluesky and Mastodon have no such configuration — their
+    # credentials *are* the connection — thus they are always here and the list is never empty.
     def show
-      @apps = [ bluesky_app, mastodon_app, threads_app, whoop_app ]
+      @apps = [ bluesky_app, mastodon_app, threads_app, whoop_app ].compact
     end
 
     # DELETE /connected-apps/whoop
@@ -18,6 +23,8 @@ module Admin
     def bluesky_app
       service = StandardSite.new
 
+      # There is no deploy configuration to make incorrect: the credentials are the connection,
+      # thus this card is always on the page.
       ConnectedAppPresenter.new(
         name: "Bluesky",
         description: card_description(
@@ -25,9 +32,6 @@ module Admin
           account: ("@#{service.handle}" if service.handle.present?),
           summary: "Publishes the blog to the AT Protocol as standard.site records."
         ),
-        # There is no deploy configuration to make incorrect: the credentials are the connection,
-        # thus this app never has the :unconfigured state.
-        configured: true,
         connected: service.connected?,
         connect_path: bluesky_connection_path,
         disconnect_path: bluesky_connection_path
@@ -37,6 +41,8 @@ module Admin
     def mastodon_app
       service = Mastodon.new
 
+      # The registration and the token are the connection, and each one comes from the round trip.
+      # Thus there is no deploy configuration and this card is always on the page.
       ConnectedAppPresenter.new(
         name: "Mastodon",
         description: card_description(
@@ -44,17 +50,17 @@ module Admin
           account: service.handle,
           summary: "Connects a Mastodon account."
         ),
-        # The registration and the token are the connection, and each one comes from the round
-        # trip. Thus there is no deploy configuration and no :unconfigured state.
-        configured: true,
         connected: service.connected?,
         connect_path: mastodon_connection_path,
         disconnect_path: mastodon_connection_path
       )
     end
 
+    # @return [ConnectedAppPresenter, nil] Nil without the Meta app credentials, thus the page
+    #   hides the card.
     def threads_app
       service = Threads.new
+      return unless service.valid_credentials?
 
       ConnectedAppPresenter.new(
         name: "Threads",
@@ -63,7 +69,6 @@ module Admin
           account: ("@#{service.username}" if service.username.present?),
           summary: "Connects a Threads account."
         ),
-        configured: service.valid_credentials?,
         connected: service.connected?,
         connect_path: threads_authorize_path,
         disconnect_path: threads_connection_path,
@@ -84,8 +89,12 @@ module Admin
       "Threads refused the last token refresh (HTTP #{error[:code]})#{when_it_failed}. "         "Reconnect before the token expires: an expired Threads token cannot be renewed."
     end
 
+    # @return [ConnectedAppPresenter, nil] Nil without the Whoop OAuth credentials, thus the page
+    #   hides the card.
     def whoop_app
       service = Whoop.new
+      return unless service.valid_credentials?
+
       connected = service.connected?
 
       ConnectedAppPresenter.new(
@@ -95,7 +104,6 @@ module Admin
           account: service.account_email,
           summary: "Syncs strain, sleep, and recovery to Intervals.icu, and powers the Whoop widget."
         ),
-        configured: service.valid_credentials?,
         connected: connected,
         connect_path: "/whoop/auth",
         disconnect_path: whoop_connection_path,

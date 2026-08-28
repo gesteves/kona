@@ -635,10 +635,16 @@ A group is only a caption above its own `<ul>` of those same links:
 
 **Connected apps** (`/connected-apps`) connects Whoop, Bluesky, Mastodon, and Threads, and
 disconnects them.
-`ConnectedAppPresenter` renders four states from a `valid_credentials?` and `connected?` pair and an
-optional `error:` string. The fourth state, `:error`, means connected but broken, and it gives
-**both** Reconnect and Disconnect. A new authorization is the correction, and a rule to disconnect
-first would remove the one thing that makes this state different from a new setup.
+`ConnectedAppPresenter` renders three states from `connected?` and an optional `error:` string. The
+third state, `:error`, means connected but broken, and it gives **both** Reconnect and Disconnect. A
+new authorization is the correction, and a rule to disconnect first would remove the one thing that
+makes this state different from a new setup.
+
+⚠️ **A card is on the page only when its integration can operate.** `#show` calls `valid_credentials?`
+and leaves out the card of an integration whose credentials are absent from the environment, thus
+there is no `:unconfigured` state and no card that offers no action. Today that applies to **Whoop**
+and **Threads**. Bluesky and Mastodon have no such configuration — their credentials *are* the
+connection — thus their cards are always there and the page is never empty.
 
 **A card that is connected names its account** — "Connected as …" — and a card that is not connected
 says what the integration does. `#card_description` makes that one line for each of the four.
@@ -691,7 +697,7 @@ navigation. `StandardSite#connected?` has the same rule, and its comment gives t
   - ⚠️ **Mastodon has no central developer dashboard, because each instance is a separate server.**
     Thus the owner names an instance, the app registers itself there (`POST /api/v1/apps`), and it
     keeps the client that the instance gives. **There is no environment variable and no dashboard
-    step**, and this app never has the `:unconfigured` state.
+    step**, thus the page always shows this card.
   - ⚠️ **The `redirect_uri` comes from `mastodon_callback_url`, thus it names the host of the
     request.** The registration and the token exchange must send the same value, and for that reason
     the store keeps it. A client that a person registered from one host does not operate from
@@ -712,10 +718,10 @@ navigation. `StandardSite#connected?` has the same rule, and its comment gives t
     the store whether the revoke works or not: the instance can be away, and a disconnect that the
     owner asked for must not depend on that.
 - **Threads** does an OAuth round trip with Meta, and **nothing reads the account yet**. Its app
-  credentials are `THREADS_APP_ID` and `THREADS_APP_SECRET`, from the Meta dashboard, thus this app
-  *does* have the `:unconfigured` state and Mastodon does not. `Admin::ThreadsController` has the
-  three actions, and `ThreadsCredentials` keeps the token in the Redis hash `threads:credentials`,
-  encrypted for the same reason as the Bluesky app password. There is **no form**: the app
+  credentials are `THREADS_APP_ID` and `THREADS_APP_SECRET`, from the Meta dashboard, thus this card
+  *does* go off the page without them and the Mastodon card does not. `Admin::ThreadsController` has
+  the three actions, and `ThreadsCredentials` keeps the token in the Redis hash
+  `threads:credentials`, encrypted for the same reason as the Bluesky app password. There is **no form**: the app
   credentials come from the environment, thus the Connect button goes to the authorize action, as
   the one of Whoop does.
   - ⚠️ **A Threads token expires, and an expired one is dead for all time.** Meta gives a token of

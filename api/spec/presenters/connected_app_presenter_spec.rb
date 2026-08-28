@@ -7,26 +7,16 @@ RSpec.describe ConnectedAppPresenter do
     {
       name: "Whoop",
       description: "Syncs strain, sleep, and recovery.",
-      configured: true,
       connected: true,
       connect_path: "/whoop/auth",
       disconnect_path: "/connected-apps/whoop"
     }
   end
 
-  context "when the credentials aren't set" do
-    let(:attrs) { super().merge(configured: false, connected: false) }
-
-    it "offers no action — it's a deployment problem, not a one-click fix" do
-      expect(app.state).to eq(:unconfigured)
-      expect(app.status_label).to eq("Not configured")
-      expect(app).to be_unconfigured
-      expect(app).not_to be_connectable
-      expect(app).not_to be_disconnectable
-    end
-  end
-
-  context "when configured but nothing is attached" do
+  # ⚠️ There is no :unconfigured state. An integration whose credentials are absent gets no card
+  # at all, and Admin::ConnectedAppsController is what leaves it off the page.
+  # spec/requests/admin/connected_apps_spec.rb covers that.
+  context "when nothing is attached" do
     let(:attrs) { super().merge(connected: false) }
 
     it "offers connect only" do
