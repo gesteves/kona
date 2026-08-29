@@ -15,7 +15,8 @@ RSpec.describe "Admin share", type: :request do
 
   after { $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY, ThreadsCredentials::REDIS_KEY) }
 
-  before { SharePostJob.jobs.clear }
+  # One job for each network, thus each example clears all three.
+  before { [ BlueskyPostJob, MastodonPostJob, ThreadsPostJob ].each { |job| job.jobs.clear } }
 
   def connect(bluesky:, mastodon:, threads:)
     allow_any_instance_of(StandardSite).to receive(:connected?).and_return(bluesky)
@@ -98,38 +99,53 @@ RSpec.describe "Admin share", type: :request do
       let(:url) { "https://example.test/2026/07/12/ironman-canada/" }
 
 
-      it "adds one job with the link, the body, and the networks" do
+      it "adds the job of the network, with the link and the body" do
         post "/share", params: { article_url: url, body: "A long day.", networks: [ "bluesky" ] }
 
         expect(response).to redirect_to(share_path)
         expect(flash[:notice]).to include("Queued a post to Bluesky.")
-        expect(SharePostJob.jobs.size).to eq(1)
-        rkey, link, body, networks = SharePostJob.jobs.first["args"]
+        expect(BlueskyPostJob.jobs.size).to eq(1)
+        rkey, link, body = BlueskyPostJob.jobs.first["args"]
         expect(link).to eq(url)
         expect(body).to eq("A long day.")
-        expect(networks).to eq([ "bluesky" ])
         # ⚠️ The controller makes the record key, and the job writes with putRecord at that key.
         # Thus a Sidekiq retry replaces one post and does not add a second one.
         expect(rkey).to match(/\A[234567a-z]{13}\z/)
       end
 
-      it "queues both networks that work" do
-        connect(bluesky: true, mastodon: true, threads: false)
+      # ⚠️ One job for each network, thus a failure at one service retries that service alone.
+      it "adds one job for each network, and gives all three the same key" do
+        connect(bluesky: true, mastodon: true, threads: true)
 
-        post "/share", params: { article_url: url, body: "Hi.", networks: %w[bluesky mastodon] }
+        post "/share", params: { article_url: url, body: "Hi.", networks: %w[bluesky mastodon threads] }
 
-        expect(flash[:notice]).to eq("Queued a post to Bluesky and Mastodon.")
+        expect(flash[:notice]).to eq("Queued a post to Bluesky, Mastodon, and Threads.")
+        keys = [ BlueskyPostJob, MastodonPostJob, ThreadsPostJob ].map do |job|
+          expect(job.jobs.size).to eq(1)
+          job.jobs.first["args"].first
+        end
+        expect(keys.uniq.size).to eq(1)
       end
 
-      # The owner chose to be able to tick a network that no code sends to yet. The notice must
-      # then say so, or a post that never arrives looks like a failure.
-      it "names a network that it cannot post to yet" do
-        connect(bluesky: true, mastodon: false, threads: true)
+      it "adds no job for a network that the owner did not tick" do
+        connect(bluesky: true, mastodon: true, threads: true)
 
-        post "/share", params: { article_url: url, body: "Hi.", networks: %w[bluesky threads] }
+        post "/share", params: { article_url: url, body: "Hi.", networks: [ "mastodon" ] }
 
-        expect(flash[:notice]).to include("Queued a post to Bluesky.")
-        expect(flash[:notice]).to include("Threads isn't wired up yet.")
+        expect(MastodonPostJob.jobs.size).to eq(1)
+        expect(BlueskyPostJob.jobs).to be_empty
+        expect(ThreadsPostJob.jobs).to be_empty
+      end
+
+      # ⚠️ A row with no account renders `disabled`, thus a browser cannot tick it. A request that
+      # a person writes by hand can, and the job would then retry "not connected" for 24 hours.
+      it "refuses a network that has no account" do
+        connect(bluesky: true, mastodon: false, threads: false)
+
+        post "/share", params: { article_url: url, body: "Hi.", networks: [ "mastodon" ] }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(MastodonPostJob.jobs).to be_empty
       end
 
       # ⚠️ The link field takes any URL, thus the owner can share a page on another site.
@@ -138,13 +154,14 @@ RSpec.describe "Admin share", type: :request do
                                  networks: [ "bluesky" ] }
 
         expect(response).to redirect_to(share_path)
-        expect(SharePostJob.jobs.first["args"][1]).to eq("https://someone-else.test/a-post/")
+        expect(BlueskyPostJob.jobs.first["args"][1]).to eq("https://someone-else.test/a-post/")
       end
 
       it "ignores a network key that this app does not know" do
         post "/share", params: { article_url: url, body: "Hi.", networks: %w[bluesky myspace] }
 
-        expect(SharePostJob.jobs.first["args"].last).to eq([ "bluesky" ])
+        expect(BlueskyPostJob.jobs.size).to eq(1)
+        expect(flash[:notice]).to eq("Queued a post to Bluesky.")
       end
 
       describe "scheduling" do
@@ -162,7 +179,7 @@ RSpec.describe "Admin share", type: :request do
 
           expect(response).to redirect_to(share_path)
           expected = Time.use_zone("America/New_York") { Time.zone.parse("#{on} 09:00") }
-          expect(SharePostJob.jobs.first["at"]).to be_within(1).of(expected.to_f)
+          expect(BlueskyPostJob.jobs.first["at"]).to be_within(1).of(expected.to_f)
         end
 
         it "names the moment in the notice, in that same zone" do
@@ -185,7 +202,7 @@ RSpec.describe "Admin share", type: :request do
                                    schedule: "1", date: on, time: "09:00" }
 
           expected = Time.use_zone("America/Denver") { Time.zone.parse("#{on} 09:00") }
-          expect(SharePostJob.jobs.first["at"]).to be_within(1).of(expected.to_f)
+          expect(BlueskyPostJob.jobs.first["at"]).to be_within(1).of(expected.to_f)
         end
 
         # That field comes from the browser, thus a value with a mistake must never raise.
@@ -195,7 +212,7 @@ RSpec.describe "Admin share", type: :request do
                                    time_zone: "Mars/Olympus_Mons" }
 
           expect(response).to redirect_to(share_path)
-          expect(SharePostJob.jobs.size).to eq(1)
+          expect(BlueskyPostJob.jobs.size).to eq(1)
         end
 
         it "posts now when the switch is off, and schedules nothing" do
@@ -203,7 +220,7 @@ RSpec.describe "Admin share", type: :request do
                                    schedule: "0", date: on, time: "09:00" }
 
           expect(flash[:notice]).to include("Queued a post to Bluesky.")
-          expect(SharePostJob.jobs.first["at"]).to be_nil
+          expect(BlueskyPostJob.jobs.first["at"]).to be_nil
         end
 
         it "refuses a moment in the past" do
@@ -212,7 +229,7 @@ RSpec.describe "Admin share", type: :request do
 
           expect(response).to have_http_status(:unprocessable_content)
           expect(response.body).to include("Pick a time in the future.")
-          expect(SharePostJob.jobs).to be_empty
+          expect(BlueskyPostJob.jobs).to be_empty
         end
 
         # ⚠️ There is no limit on how far ahead this can be, on purpose. A post about a race can
@@ -224,7 +241,7 @@ RSpec.describe "Admin share", type: :request do
                                    schedule: "1", date: far.strftime("%Y-%m-%d"), time: "09:00" }
 
           expect(response).to redirect_to(share_path)
-          expect(SharePostJob.jobs.size).to eq(1)
+          expect(BlueskyPostJob.jobs.size).to eq(1)
         end
 
         it "refuses a schedule with no date, and keeps the fields open" do
@@ -235,7 +252,7 @@ RSpec.describe "Admin share", type: :request do
           expect(response.body).to include("Pick a date and a time to schedule it.")
           expect(response.body).to include(%(value="09:00"))
           expect(response.body).to include("<wa-switch name=\"schedule\" value=\"1\" checked")
-          expect(SharePostJob.jobs).to be_empty
+          expect(BlueskyPostJob.jobs).to be_empty
         end
       end
 
@@ -247,7 +264,7 @@ RSpec.describe "Admin share", type: :request do
           expect(response).to have_http_status(:unprocessable_content)
           expect(response.body).to include("Write something to post.")
           expect(response.body).to include(%(value="#{url}"))
-          expect(SharePostJob.jobs).to be_empty
+          expect(BlueskyPostJob.jobs).to be_empty
         end
 
         it "refuses a body past the limit and keeps it in the field" do
@@ -258,7 +275,7 @@ RSpec.describe "Admin share", type: :request do
           expect(response).to have_http_status(:unprocessable_content)
           expect(response.body).to include("301 characters")
           expect(response.body).to include(long)
-          expect(SharePostJob.jobs).to be_empty
+          expect(BlueskyPostJob.jobs).to be_empty
         end
 
         it "refuses a value that is not a URL" do
@@ -266,15 +283,15 @@ RSpec.describe "Admin share", type: :request do
 
           expect(response).to have_http_status(:unprocessable_content)
           expect(response.body).to include("Paste a link to share.")
-          expect(SharePostJob.jobs).to be_empty
+          expect(BlueskyPostJob.jobs).to be_empty
         end
 
         it "refuses a draft with no network" do
           post "/share", params: { article_url: url, body: "Hi.", networks: [] }
 
           expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include("Pick at least one place to post it.")
-          expect(SharePostJob.jobs).to be_empty
+          expect(response.body).to include("Pick at least one connected place to post it.")
+          expect(BlueskyPostJob.jobs).to be_empty
         end
       end
     end

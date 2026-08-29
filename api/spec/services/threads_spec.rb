@@ -214,4 +214,131 @@ RSpec.describe Threads do
       expect(HTTParty).not_to have_received(:get)
     end
   end
+
+  describe "#post!" do
+    let(:url) { "https://example.test/a-post/" }
+    let(:key) { "3kabc" }
+    let(:container_key) { "threads:container:#{key}" }
+
+    before do
+      connect!
+      $redis.del(container_key)
+      allow(HTTParty).to receive(:post) do |endpoint, _options|
+        if endpoint.end_with?("/threads")
+          http_response({ id: "container-1" })
+        else
+          http_response({ id: "post-1" })
+        end
+      end
+    end
+
+    after { $redis.del(container_key) }
+
+    def post!(**overrides)
+      described_class.new.post!(**{ text: "Read this", url: url, idempotency_key: key }.merge(overrides))
+    end
+
+    it "refuses when no account is connected" do
+      ThreadsCredentials.clear
+
+      expect { post! }.to raise_error(/not connected/)
+    end
+
+    it "refuses a post with no body" do
+      expect { post!(text: "  ") }.to raise_error(/empty/)
+    end
+
+    # ⚠️ The URL is a link_attachment and it is NOT in the text, thus Meta renders its own preview
+    # card and the URL uses none of the 500 characters. Mastodon is the opposite.
+    it "makes a TEXT container with the link attached" do
+      post!
+
+      expect(HTTParty).to have_received(:post).with(
+        "https://graph.threads.net/v1.0/12345/threads",
+        hash_including(body: { media_type: "TEXT", text: "Read this", link_attachment: url })
+      )
+    end
+
+    it "keeps the link out of the text" do
+      post!
+
+      expect(HTTParty).to have_received(:post).with(
+        a_string_ending_with("/threads"),
+        hash_including(body: hash_including(text: "Read this"))
+      )
+    end
+
+    it "attaches nothing when there is no link" do
+      post!(url: nil)
+
+      expect(HTTParty).to have_received(:post).with(
+        a_string_ending_with("/threads"),
+        hash_including(body: { media_type: "TEXT", text: "Read this" })
+      )
+    end
+
+    it "publishes the container it made, and answers with the id of the post" do
+      expect(post!).to eq("post-1")
+
+      expect(HTTParty).to have_received(:post).with(
+        "https://graph.threads.net/v1.0/12345/threads_publish",
+        hash_including(body: { creation_id: "container-1" })
+      )
+    end
+
+    it "forgets the container after Meta published it" do
+      post!
+
+      expect($redis.get(container_key)).to be_nil
+    end
+
+    describe "when the publish fails" do
+      before do
+        allow(HTTParty).to receive(:post) do |endpoint, _options|
+          if endpoint.end_with?("/threads")
+            http_response({ id: "container-1" })
+          else
+            http_response({ error: { message: "not ready" } }, success: false, code: 400)
+          end
+        end
+      end
+
+      it "raises with the message of Meta, thus the job runs again" do
+        expect { post! }.to raise_error(/not ready/)
+      end
+
+      # ⚠️ Meta gives no idempotency header. The container id stays in Redis, thus the retry
+      # publishes the container that this attempt made and does not make a second post.
+      it "keeps the container for the retry" do
+        expect { post! }.to raise_error(/not ready/)
+
+        expect($redis.get(container_key)).to eq("container-1")
+      end
+
+      it "makes no second container on the next attempt" do
+        creates = 0
+        allow(HTTParty).to receive(:post) do |endpoint, _options|
+          if endpoint.end_with?("/threads")
+            creates += 1
+            http_response({ id: "container-1" })
+          else
+            http_response({ error: { message: "not ready" } }, success: false, code: 400)
+          end
+        end
+
+        2.times { expect { post! }.to raise_error(/not ready/) }
+
+        # ⚠️ One create only. The second attempt read the container out of Redis, thus a failure
+        # between the two steps cannot leave a new container at each attempt.
+        expect(creates).to eq(1)
+      end
+    end
+
+    it "raises when Meta refuses the container" do
+      allow(HTTParty).to receive(:post)
+        .and_return(http_response({ error: { message: "bad token" } }, success: false, code: 401))
+
+      expect { post! }.to raise_error(/bad token/)
+    end
+  end
 end

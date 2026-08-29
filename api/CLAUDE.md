@@ -56,7 +56,7 @@ edge serves a cached copy before it gets a new one.
 | GET | `/signin`, `/auth/google_oauth2/callback`; POST `/signout` | owner session | `no-store` |
 | GET | `/`, `/spam`, `/location`, `/connected-apps`, `/course-maps`, `/course-maps/:id` | admin UI (owner-session gated) | `no-store` |
 | GET | `/share` | the Share composer | `no-store` |
-| POST | `/share` | checks the draft and adds a `SharePostJob`, now or at a date and a time; 303, or 422 with the draft still in the form | `no-store` |
+| POST | `/share` | checks the draft and adds one post job for each network that the owner ticked, now or at a date and a time; 303, or 422 with the draft still in the form | `no-store` |
 | POST | `/spam/:id/not-spam`; DELETE `/spam/:id`, `/connected-apps/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
 | GET/POST/DELETE | `/connected-apps/bluesky` | the Bluesky handle + app password form, and disconnect | `no-store` |
 | GET/POST/DELETE | `/connected-apps/mastodon`; GET `/connected-apps/mastodon/callback` | the Mastodon instance form, the OAuth callback, and disconnect | `no-store` |
@@ -369,7 +369,9 @@ Thus that shared window is safe.
 | `WhoopWebhookJob(event_type, resource_id, trace_id)` | syncs Whoop metrics to Intervals.icu |
 | `ActivityDescriptionJob(activity_id, whoop_strain = nil)` | (re)generates an activity's Strava description and tidies its name |
 | `LocationSyncJob(latitude, longitude)` | propagates the current location to Intervals.icu |
-| `SharePostJob(rkey, url, text, networks)` | posts one draft from the Share page to Bluesky and Mastodon. ⚠️ The caller makes `rkey`, which is also the Mastodon idempotency key; refer to **The share composer** |
+| `BlueskyPostJob(key, url, text)` | posts one draft to Bluesky |
+| `MastodonPostJob(key, url, text)` | posts one draft to Mastodon |
+| `ThreadsPostJob(key, url, text)` | posts one draft to Threads |
 | `ContactMailJob(name, email, message, context, restored_from_spam = false)` | contact intake: Akismet + compose |
 | `ContactDeliveryJob(payload)` | the one retryable *delivery* unit — sends via Resend |
 | `MapTilesetJob(id)` | publishes an uploaded GPX track to Mapbox as a vector tileset |
@@ -723,7 +725,7 @@ navigation. `StandardSite#connected?` has the same rule, and its comment gives t
   - **`disconnect!` tells the instance to revoke the token, then clears the store.** ⚠️ It clears
     the store whether the revoke works or not: the instance can be away, and a disconnect that the
     owner asked for must not depend on that.
-- **Threads** does an OAuth round trip with Meta, and **nothing reads the account yet**. Its app
+- **Threads** does an OAuth round trip with Meta, and the Share page posts to it. Its app
   credentials are `THREADS_APP_ID` and `THREADS_APP_SECRET`, from the Meta dashboard, thus this card
   *does* go off the page without them and the Mastodon card does not. `Admin::ThreadsController` has
   the three actions, and `ThreadsCredentials` keeps the token in the Redis hash
@@ -742,11 +744,10 @@ navigation. `StandardSite#connected?` has the same rule, and its comment gives t
     from the request. Thus it always names the admin host, which is the only host that draws the
     callback route, and the ⚠️ that `WHOOP_REDIRECT_URI` needs does not apply here. **The Meta
     dashboard must list that same URL** in the redirect callback URLs of the app.
-  - ⚠️ **`SCOPES` asks for `threads_basic` and `threads_content_publish`.** Nothing posts today, and
-    the app asks for the write scope now, because a new scope needs a new authorization by the
-    owner. ⚠️ **The Meta dashboard must permit each scope in that list first**, and it must also
-    permit `threads_content_publish` for the app. Without that, the authorization screen fails and
-    no code here can show the reason.
+  - ⚠️ **`SCOPES` asks for `threads_basic` and `threads_content_publish`.** The second one is what
+    `#post!` needs. ⚠️ **The Meta dashboard must permit each scope in that list first**, and it must
+    also permit `threads_content_publish` for the app. Without that, the authorization screen fails
+    and no code here can show the reason.
   - ⚠️ **`Threads#connect!` reads `/me` before it stores the token.** A token that cannot read its
     own account is not a connection, and the card must not show one.
   - ⚠️ **Meta gives no endpoint to revoke a token**, thus `disconnect!` is a local removal only. To
@@ -758,9 +759,7 @@ navigation. `StandardSite#connected?` has the same rule, and its comment gives t
 ### The share composer
 
 **Share a post** (`/share`) drafts one post about a link for Bluesky, Mastodon, and Threads, now or
-at a date and a time. ⚠️ **Bluesky and Mastodon post today, and Threads does not.**
-`Threads::SCOPES` already asks for `threads_content_publish`, thus that pass adds the write and
-needs no new authorization by the owner.
+at a date and a time. All three post.
 
 - **The link is a plain `wa-input type="url"`, and there is NO list of the entries.** The owner
   pastes a link. ⚠️ **Do not add a picker of the articles back.** The card of a post comes from the
@@ -781,7 +780,7 @@ needs no new authorization by the owner.
   Thus the code that posts decides that, and this page keeps the URL of the entry beside the text.
 - ⚠️ **Do not add a Bluesky threadgate or postgate control.** The owner read those options and
   refused them. This page has no control for one network alone.
-- **`POST /share` adds a `SharePostJob` and answers with a 303.** A refusal renders the page again
+- **`POST /share` adds one post job for each network and answers with a 303.** A refusal renders the page again
   with a **422** and keeps the draft, and it does not redirect. ⚠️ The draft is the expensive part
   of this page, thus a redirect that loses 300 characters is worse than a page that renders again.
   `SharePresenter` takes `body:`, `article_url:`, and `selected:` for that.
@@ -816,13 +815,17 @@ needs no new authorization by the owner.
     them, and that is where you delete one. ⚠️ Unlike `SiteBuildJob`, this job keeps **no** jid and
     a new schedule cancels nothing: the owner can line up more than one post, and each is its own
     job with its own record key.
-- ⚠️ **Threads does not post yet, and its row is still selectable when it is connected.**
-  `SharePostJob::SUPPORTED` names what works, the job logs each skip, and the notice says which
-  network it could not send to. A tick that gives no post and no message would look exactly like a
-  failure.
-- ⚠️ **The job tries each network before it raises, and not one at a time.** One service that is
-  away must not stop the other one. The retry then sends to both again, and the idempotency of each
-  network is what makes that safe. Refer to **Posting to Bluesky** and **Posting to Mastodon**.
+- ⚠️ **There is ONE JOB FOR EACH NETWORK, and not one job for all of them.**
+  `Admin::ShareController::POST_JOBS` maps a key to its job, and the action adds one job for each
+  network that the owner ticked. **This is the point**: a failure at one service retries that
+  service alone, and a network that already posted is never sent again. An earlier version had one
+  job that posted to each network, and a retry of it went back to every one of them.
+- ⚠️ **One key goes to all three jobs, and each attempt of each job carries it.** `Bluesky.new_tid`
+  makes it. Bluesky writes at that **record key**, Mastodon sends it as its **`Idempotency-Key`**,
+  and Threads keeps its **media container** below it. That is what makes the retry of each job safe.
+- ⚠️ **The action posts only to a network that has an account.** A row with no account renders
+  `disabled`, thus a browser cannot tick it, but a request that a person writes by hand can. Without
+  that check the job would raise "not connected" and retry for 24 hours.
 - **The three rows are always on the page**, and a row with no account is `disabled` with a link to
   Connected apps. That is different from Connected apps, which hides such a card: there the card
   offers an action that would fail, and here a disabled row says why one of three names cannot take
@@ -883,7 +886,7 @@ report, and it must inherit `ApplicationService` for `report_upstream_error`.
   units, thus it counts one emoji as 2 or more. `share_controller.js` counts the same way in the
   browser with `Intl.Segmenter`, and a spec pins `Bluesky::MAX_GRAPHEMES` to
   `SharePresenter::BODY_LIMIT`.
-- **`post!` raises at each failure**, on purpose, thus `SharePostJob` does the work again. The
+- **`post!` raises at each failure**, on purpose, thus `BlueskyPostJob` does the work again. The
   record key is what makes that safe.
 
 ### Posting to Mastodon
@@ -893,12 +896,12 @@ round trip are in the same class; refer to **Connected apps**.
 
 - ⚠️ **The URL goes in the TEXT here, and Bluesky puts it in an embed.** Mastodon renders a link
   inline and makes its own preview card from the `og:` tags of that page. Thus this class needs no
-  card and no image upload, and `SharePostJob` reads no `OpenGraph` card for it. **This is the
+  card and no image upload, and `MastodonPostJob` reads no `OpenGraph` card for it. **This is the
   concrete reason that the Share page keeps the link out of the body**: each network attaches one
   differently, thus the page holds the link beside the text and each service composes its own.
 - ⚠️ **`Idempotency-Key` is what makes a retry safe**, and it is the Mastodon answer to the
   `putRecord` of Bluesky. The instance keeps that key and answers with the status that it made
-  already. `SharePostJob` sends the **same `rkey`** that the controller made before it added the
+  already. `MastodonPostJob` sends the **same key** that the controller made before it added the
   job, thus each attempt carries one key.
   ⚠️ **That window is not for ever.** The instance holds the key for a limited time, thus a retry a
   long time later can still make a second post. It covers the attempts that follow quickly, which is
@@ -908,8 +911,34 @@ round trip are in the same class; refer to **Connected apps**.
   true length, and a default instance permits 500. The body of a draft is at most 300, which is the
   Bluesky limit, thus 300 + 2 newlines + 23 is 325 and a post always fits. An instance with a limit
   below that would refuse the post, and the job would then run again.
-- **`post!` raises at each failure**, as `Bluesky#post!` does, thus `SharePostJob` does the work
-  again.
+- **`post!` raises at each failure**, as `Bluesky#post!` does, thus `MastodonPostJob` does the
+  work again.
+
+### Posting to Threads
+
+`Threads#post!` needs the **two steps** of Meta: it makes a media container, then it publishes that
+container.
+
+- ⚠️ **The URL is a `link_attachment`, and it is NOT in the text.** Meta then renders its own
+  preview card, and the URL uses none of the 500 characters. **Mastodon is the opposite** and puts
+  the link in the text, and Bluesky is a third form again, with an embed that holds an image blob.
+  Those three are the reason that the Share page keeps the link **beside** the body.
+- ⚠️ **Meta gives NO idempotency header, and the container is the answer to that.** `#post!` keeps
+  the id of the container in Redis at `threads:container:<key>`, and it deletes that key only
+  **after** Meta publishes. Thus a failure between the two steps leaves the container for the retry,
+  and that retry publishes the same container in place of a second post. Without this, each attempt
+  would make one more container, and a person would get more than one post.
+  - The TTL is 20 hours. ⚠️ Meta expires a container after 24 hours, thus a longer TTL would name a
+    container that is gone.
+- ⚠️ **It publishes at once, and it does not wait 30 seconds.** Meta asks a caller to wait for its
+  servers to process an **upload**, and a TEXT post uploads nothing. If Meta refuses because the
+  container is not ready, `#post!` raises and **the retry of Sidekiq is the wait**. The container
+  stays in Redis, thus that retry costs no new container.
+- **`MAX_CHARACTERS` is 500 and this class checks nothing.** The body of a draft is at most 300,
+  which is the Bluesky limit, thus a post always fits.
+- ⚠️ **`error_message` parses the body itself and does not use `parse_json`.** That helper returns
+  nil for a response that failed **and** reports an upstream error, and this method already runs
+  inside one.
 
 ### The spam quarantine
 

@@ -2,9 +2,17 @@ module Admin
   # The Share composer: it picks a published entry, drafts one body, and adds a SharePostJob for
   # the networks that the owner selected.
   #
-  # ⚠️ Only Bluesky posts today. `SharePostJob::SUPPORTED` names the networks that work, and the
-  # notice says which ones the job skips.
+  # ⚠️ There is one job for each network, and not one job for all of them. Thus a failure at one
+  # service retries that service alone, and a network that already posted is never sent again.
   class ShareController < BaseController
+    # The job of each network. ⚠️ This is the one list, and `#social_networks` below must name the
+    # same keys. A key with no job here is a network that this app cannot post to.
+    POST_JOBS = {
+      "bluesky" => BlueskyPostJob,
+      "mastodon" => MastodonPostJob,
+      "threads" => ThreadsPostJob
+    }.freeze
+
     # GET /share
     #
     # ⚠️ The page renders with no account connected, and each row is then disabled. It is a draft
@@ -31,9 +39,17 @@ module Admin
         return render :show, status: :unprocessable_content
       end
 
-      args = [ Bluesky.new_tid, article_url, params[:body].to_s, selected_networks ]
+      # ⚠️ One key goes to each network, and each attempt of each job carries it: Bluesky writes at
+      # that record key, Mastodon sends it as its Idempotency-Key, and Threads keeps its media
+      # container below it. That is what makes the retry of each job safe.
+      key = Bluesky.new_tid
       at = scheduled_at
-      at ? SharePostJob.perform_at(at, *args) : SharePostJob.perform_async(*args)
+
+      selected_networks.each do |network|
+        job = POST_JOBS.fetch(network)
+        at ? job.perform_at(at, key, article_url, params[:body].to_s)
+           : job.perform_async(key, article_url, params[:body].to_s)
+      end
 
       redirect_to share_path, status: :see_other, notice: queued_notice(at)
     end
@@ -74,9 +90,18 @@ module Admin
       SharePresenter.new(networks: social_networks, **overrides)
     end
 
-    # @return [Array<String>] The keys that the owner ticked, and only the ones that this app knows.
+    # The networks that the owner ticked, that this app can post to, **and that have an account**.
+    #
+    # ⚠️ The connected check is here and not in the view alone. A row with no account renders
+    # `disabled`, thus a browser cannot tick it, but a request that a person writes by hand can.
+    # Without this, the job would raise "not connected" and retry for 24 hours.
+    # @return [Array<String>]
     def selected_networks
-      @selected_networks ||= Array(params[:networks]).map(&:to_s) & social_networks.map(&:key)
+      @selected_networks ||= begin
+        ticked = Array(params[:networks]).map(&:to_s)
+        connected = social_networks.select(&:connected?).map(&:key)
+        ticked & connected & POST_JOBS.keys
+      end
     end
 
     # The link to share. ⚠️ It is not always an article of this site: the field takes any URL, and
@@ -94,7 +119,7 @@ module Admin
         return "That post is #{Bluesky.post_length(params[:body])} characters. " \
                "The limit is #{Bluesky::MAX_GRAPHEMES}."
       end
-      return "Pick at least one place to post it." if selected_networks.empty?
+      return "Pick at least one connected place to post it." if selected_networks.empty?
 
       schedule_error
     end
@@ -149,21 +174,12 @@ module Admin
     end
 
     # @param at [ActiveSupport::TimeWithZone, nil] The moment, or nil to post now.
-    # @return [String] The notice, which names each network that the job cannot send to yet.
+    # @return [String]
     def queued_notice(at)
-      skipped = selected_networks - SharePostJob::SUPPORTED
-      posting = selected_networks & SharePostJob::SUPPORTED
-      notice =
-        if posting.empty?
-          "Nothing to post yet."
-        elsif at
-          "Scheduled a post to #{to_sentence(posting)} for #{format_schedule(at)}."
-        else
-          "Queued a post to #{to_sentence(posting)}."
-        end
-      return notice if skipped.empty?
+      names = to_sentence(selected_networks)
+      return "Scheduled a post to #{names} for #{format_schedule(at)}." if at
 
-      "#{notice} #{to_sentence(skipped)} #{skipped.one? ? 'isn\'t' : 'aren\'t'} wired up yet."
+      "Queued a post to #{names}."
     end
 
     # The moment in the words of the owner, in the zone that they picked it in. To answer in the
