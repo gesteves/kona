@@ -43,7 +43,9 @@
 // The preview of the card that each network will render. <wa-card> draws the border, the corner,
 // and the padding, thus this block holds only the shape of the picture and the type of the body.
 .share-card {
-  margin-block-start: var(--wa-space-2xs);
+  // ⚠️ It clears the focus ring of the field above. That ring draws outside the border of the
+  // input, thus a smaller gap lets the two touch.
+  margin-block-start: var(--wa-space-s);
   max-width: 32rem;
 
   &[hidden] {
