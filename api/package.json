@@ -8,9 +8,9 @@
   "dependencies": {
     "@hotwired/stimulus": "^3.2.2",
     "@hotwired/turbo": "^8.0.23",
-    "@web.awesome.me/webawesome-pro": "^3.11.0",
+    "@web.awesome.me/webawesome-pro": "^3.12.0",
     "esbuild": "^0.28.1",
     "esbuild-sass-plugin": "^3.7.0",
-    "sass-embedded": "^1.102.0"
+    "sass-embedded": "^1.103.1"
   }
 }

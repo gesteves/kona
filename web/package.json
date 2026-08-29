@@ -18,18 +18,18 @@
     "@hotwired/stimulus": "^3.2.2",
     "@hotwired/turbo": "^8.0.23",
     "@resvg/resvg-wasm": "^2.6.2",
-    "@web.awesome.me/webawesome-pro": "^3.11.0",
+    "@web.awesome.me/webawesome-pro": "^3.12.0",
     "esbuild": "^0.28.2",
     "pagefind": "^1.5.2",
-    "satori": "^0.29.1",
-    "wrangler": "^4.124.0"
+    "satori": "^0.33.4",
+    "wrangler": "^4.126.0"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.22.0",
     "@cloudflare/workers-types": "^5.20260812.1",
     "@eslint/js": "^10.0.1",
     "axe-core": "4.13.0",
-    "eslint": "^10.8.1",
+    "eslint": "^10.9.1",
     "globals": "^17.11.0",
     "jsdom": "^30.0.1",
     "prettier": "^3.9.5",
