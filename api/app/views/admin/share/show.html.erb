@@ -22,6 +22,9 @@
               autocomplete="off" spellcheck="false"
               data-share-target="link"
               data-action="input->share#schedulePreview change->share#schedulePreview">
+      <%# It spins for the whole wait: the debounce and then the request. ⚠️ It needs a rule for
+          `[hidden]`; refer to _share.scss. %>
+      <wa-spinner slot="end" class="share__spinner" data-share-target="spinner" hidden></wa-spinner>
     </wa-input>
 
     <%# The card that each network will render. The controller fills it and shows it, thus it is

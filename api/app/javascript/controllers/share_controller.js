@@ -10,7 +10,7 @@ const PREVIEW_DEBOUNCE = 600;
  */
 export default class extends Controller {
   static targets = [
-    "body", "count", "submit", "link", "preview", "previewImage", "previewHost",
+    "body", "count", "submit", "link", "spinner", "preview", "previewImage", "previewHost",
     "previewTitle", "previewDescription", "previewKind",
     "schedule", "scheduleFields", "date", "time", "timeZone", "label"
   ];
@@ -112,6 +112,16 @@ export default class extends Controller {
    */
   schedulePreview() {
     clearTimeout(this.previewTimer);
+
+    // An empty field asks for nothing, thus it waits for nothing either.
+    if (!this.linkTarget.value?.trim()) {
+      this.busy(false);
+      return this.hidePreview();
+    }
+
+    // ⚠️ It spins from the keystroke and not from the request. The debounce is most of the wait,
+    // and a field that does nothing for 600ms reads as a field that is broken.
+    this.busy(true);
     this.previewTimer = setTimeout(() => this.preview(), PREVIEW_DEBOUNCE);
   }
 
@@ -124,24 +134,38 @@ export default class extends Controller {
    */
   async preview() {
     const url = this.linkTarget.value?.trim() ?? "";
-    if (!url) return this.hidePreview();
+    if (!url) {
+      this.busy(false);
+      return this.hidePreview();
+    }
 
-    let card;
+    // ⚠️ Each call takes the next number, and only the newest one may write. A request that is
+    // still out when the owner types again must not describe a link that they already replaced,
+    // and must not stop the spinner of the request that replaced it.
+    this.previewSeq = (this.previewSeq ?? 0) + 1;
+    const seq = this.previewSeq;
+
     try {
       const response = await fetch(`${this.previewUrlValue}?${new URLSearchParams({ url })}`, {
         headers: { Accept: "application/json" }
       });
+      if (seq !== this.previewSeq) return;
+
       if (!response.ok) return this.hidePreview();
-      card = await response.json();
+      this.showPreview(await response.json());
     } catch {
-      return this.hidePreview();
+      if (seq === this.previewSeq) this.hidePreview();
+    } finally {
+      if (seq === this.previewSeq) this.busy(false);
     }
+  }
 
-    // ⚠️ The field can change while this request is out. A late answer must not describe a link
-    // that the owner already replaced.
-    if (this.linkTarget.value?.trim() !== url) return;
-
-    this.showPreview(card);
+  /**
+   * Shows or hides the spinner in the link field.
+   * @param {boolean} on
+   */
+  busy(on) {
+    this.spinnerTarget.hidden = !on;
   }
 
   /**

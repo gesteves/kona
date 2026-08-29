@@ -16,6 +16,13 @@
     align-items: start;
   }
 
+  // ⚠️ A rule of Web Awesome gives <wa-spinner> a display, and an author rule beats the
+  // `[hidden] { display: none }` of the browser whatever its layer. Thus the attribute alone hides
+  // nothing, and this rule is what makes it work. `.share__schedule` above needs the same.
+  &__spinner[hidden] {
+    display: none;
+  }
+
   &__count {
     color: var(--wa-color-text-quiet);
     margin: var(--wa-space-2xs) 0 0;
