@@ -57,6 +57,8 @@ edge serves a cached copy before it gets a new one.
 | GET | `/`, `/spam`, `/location`, `/connected-apps`, `/course-maps`, `/course-maps/:id` | admin UI (owner-session gated) | `no-store` |
 | GET | `/share` | the Share composer | `no-store` |
 | POST | `/share` | checks the draft and adds one post job for each network that the owner ticked, now or at a date and a time; 303, or 422 with the draft still in the form | `no-store` |
+| GET | `/share/preview` | the card of a link, as JSON, for the preview on the page | `no-store` |
+| GET | `/share/preview/image` | proxies the picture of that card. ⚠️ The parameter is the **page**, not the picture | `no-store` |
 | POST | `/spam/:id/not-spam`; DELETE `/spam/:id`, `/connected-apps/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
 | GET/POST/DELETE | `/connected-apps/bluesky` | the Bluesky handle + app password form, and disconnect | `no-store` |
 | GET/POST/DELETE | `/connected-apps/mastodon`; GET `/connected-apps/mastodon/callback` | the Mastodon instance form, the OAuth callback, and disconnect | `no-store` |
@@ -787,6 +789,33 @@ at a date and a time. All three post.
   - ⚠️ **The result is that this page makes NO request to Contentful when it renders**, and a spec
     pins that. An earlier version read `Articles#list` into a `wa-combobox` of every entry, and it
     also had to leave `ArticleRanking#candidates` alone, because that filter drops each Short.
+- **The page previews the card before the owner posts.** `GET /share/preview` gives the card as
+  JSON, and the Stimulus controller reads it 600ms after the typing stops. The badge on that card
+  says **which of the two Bluesky cards** the post will get, and that is the thing the owner cannot
+  know until after the post without it.
+  - ⚠️ **The browser cannot read the page itself.** The CSP of the admin has `connect-src :self`,
+    and another host sends no CORS header. Thus this app reads it. **Do not try to move this into
+    the browser.**
+  - ⚠️ **The picture is a proxy of ours, and never the `og:image` itself**, because `img-src` is
+    `:self`. `GET /share/preview/image` sends it, exactly as the Course maps page proxies a Mapbox
+    render.
+  - ⚠️ **The parameter of that proxy is the URL of the PAGE, and not of the picture.** Thus a caller
+    cannot name any URL for this app to get: the picture is always the one that the `og:` tags of
+    that page name.
+  - **It shows the bytes that go up as the blob**, because it calls the same `Bluesky#card_image`.
+    That method is public for this reason alone.
+  - The card is a **`<wa-card>`** with the picture in its `media` slot. ⚠️ **`with-media` follows
+    the picture, and it is not in the markup.** That component has no `:has-slotted` to read, thus
+    the flag is the only thing that tells it to draw the media section, and a card with the flag and
+    no picture draws an empty band.
+  - ⚠️ **`Bluesky` requires `vips` inside `#shrink`, and NOT at the top of the file.** libvips is a
+    native library. A require at the top makes each path of that class need it, thus a post with a
+    small picture, and each preview, would fail on a machine with no libvips. `#shrink` also rescues
+    **`LoadError`**, which is not a `StandardError`: without that name the page gives a 500 in place
+    of a card with no picture. `BlurhashPlaceholder` keeps its require at the top, because that
+    class exists only to use libvips.
+  - `OpenGraph#fetch` caches for 15 minutes, thus a preview also **warms the cache** that the post
+    job reads a moment later.
 - **One body goes to the three networks, and the limit is 300**, which is the limit of Bluesky and
   the shortest of the three. `SharePresenter::BODY_LIMIT` and `WARN_AT` hold the two numbers, the
   view writes them into the markup, and the Stimulus controller reads them there.

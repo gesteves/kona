@@ -1,15 +1,20 @@
 import { Controller } from "@hotwired/stimulus";
 
+// How long the link field must be quiet before this reads the card. Each preview is one request of
+// this app, which then reads the page of another host.
+const PREVIEW_DEBOUNCE = 600;
+
 /**
  * The Share composer: the character count, the schedule fields, the label of the submit button,
  * and the time zone of the browser. The form itself posts to POST /share.
  */
 export default class extends Controller {
   static targets = [
-    "body", "count", "submit",
+    "body", "count", "submit", "link", "preview", "previewImage", "previewHost",
+    "previewTitle", "previewDescription", "previewKind",
     "schedule", "scheduleFields", "date", "time", "timeZone", "label"
   ];
-  static values = { limit: Number, warnAt: Number };
+  static values = { limit: Number, warnAt: Number, previewUrl: String };
 
   connect() {
     // A restoration visit can render a snapshot that holds the button in its busy state.
@@ -33,6 +38,8 @@ export default class extends Controller {
       // This sets `required` as well, thus a page that renders again with the fields open keeps
       // that state.
       this.toggleSchedule();
+      // A page that renders again after a refusal holds a link, thus the card comes back with it.
+      this.preview();
     });
   }
 
@@ -95,6 +102,78 @@ export default class extends Controller {
 
     const when = this.scheduledAt;
     this.labelTarget.textContent = when ? `Schedule for ${when}` : "Schedule";
+  }
+
+  /**
+   * Waits for the typing to stop, then reads the card.
+   *
+   * ⚠️ Each preview is one request of this app, which then reads the page. Thus it waits, and it
+   * does not read at each keystroke.
+   */
+  schedulePreview() {
+    clearTimeout(this.previewTimer);
+    this.previewTimer = setTimeout(() => this.preview(), PREVIEW_DEBOUNCE);
+  }
+
+  /**
+   * Reads the card of the link and shows it.
+   *
+   * ⚠️ The browser cannot read another site by itself: the CSP of the admin has `connect-src
+   * :self`, and another host sends no CORS header. Thus this asks this app, and the picture comes
+   * from this app as well, because `img-src` is `:self`.
+   */
+  async preview() {
+    const url = this.linkTarget.value?.trim() ?? "";
+    if (!url) return this.hidePreview();
+
+    let card;
+    try {
+      const response = await fetch(`${this.previewUrlValue}?${new URLSearchParams({ url })}`, {
+        headers: { Accept: "application/json" }
+      });
+      if (!response.ok) return this.hidePreview();
+      card = await response.json();
+    } catch {
+      return this.hidePreview();
+    }
+
+    // ⚠️ The field can change while this request is out. A late answer must not describe a link
+    // that the owner already replaced.
+    if (this.linkTarget.value?.trim() !== url) return;
+
+    this.showPreview(card);
+  }
+
+  /**
+   * @param {object} card The answer of the preview action.
+   */
+  showPreview(card) {
+    this.previewHostTarget.textContent = card.host ?? "";
+    this.previewTitleTarget.textContent = card.title ?? "";
+    this.previewDescriptionTarget.textContent = card.description ?? "";
+
+    // ⚠️ `withMedia` follows the picture. <wa-card> has no `:has-slotted` to read, thus that flag
+    // is the only thing that tells it to draw the media section. A card with the flag and no
+    // picture draws an empty band above the text.
+    this.previewImageTarget.hidden = !card.image_path;
+    this.previewTarget.withMedia = !!card.image_path;
+    if (card.image_path) this.previewImageTarget.src = card.image_path;
+
+    // This is the thing that the owner cannot know until after the post without it.
+    this.previewKindTarget.textContent = card.standard_site ? "Standard.site" : "Open Graph";
+    this.previewKindTarget.variant = card.standard_site ? "success" : "neutral";
+
+    this.previewTarget.hidden = false;
+  }
+
+  /**
+   * Hides the card, and drops the picture so a stale one never shows with a new link.
+   */
+  hidePreview() {
+    this.previewTarget.hidden = true;
+    this.previewTarget.withMedia = false;
+    this.previewImageTarget.hidden = true;
+    this.previewImageTarget.removeAttribute("src");
   }
 
   /**

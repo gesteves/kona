@@ -147,6 +147,142 @@ RSpec.describe "Admin share", type: :request do
       end
     end
 
+    describe "GET /share/preview" do
+      before { sign_in_as(email: owner_email) }
+
+      let(:card) do
+        OpenGraph::Card.new(url: "https://example.test/a/", title: "A title",
+                            description: "A summary.", image_url: "https://cdn.test/og.png",
+                            document_uri: "at://did:plc:abc/site.standard.document/d1")
+      end
+
+      it "needs the owner session" do
+        reset!
+
+        get "/share/preview", params: { url: "https://example.test/a/" }
+
+        expect(response).to redirect_to("/signin")
+      end
+
+      it "gives the card of the link" do
+        allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
+
+        get "/share/preview", params: { url: "https://example.test/a/" }
+
+        body = response.parsed_body
+        expect(body["title"]).to eq("A title")
+        expect(body["description"]).to eq("A summary.")
+        expect(body["host"]).to eq("example.test")
+      end
+
+      # ⚠️ This is the useful part: the owner cannot know which of the two cards Bluesky will
+      # render until after the post without it.
+      it "says when the page publishes standard.site records" do
+        allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
+
+        get "/share/preview", params: { url: "https://example.test/a/" }
+
+        expect(response.parsed_body["standard_site"]).to be(true)
+      end
+
+      it "says when it is an ordinary link card" do
+        allow_any_instance_of(OpenGraph).to receive(:fetch)
+          .and_return(OpenGraph::Card.new(url: "https://other.test/", title: "T", description: nil,
+                                          image_url: nil))
+
+        get "/share/preview", params: { url: "https://other.test/" }
+
+        expect(response.parsed_body["standard_site"]).to be(false)
+      end
+
+      # ⚠️ The og:image itself is never in the answer. The CSP of the admin has `img-src :self`,
+      # thus the browser must ask this app for the picture.
+      it "gives the path of our own proxy and not the og:image" do
+        allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
+
+        get "/share/preview", params: { url: "https://example.test/a/" }
+
+        expect(response.parsed_body["image_path"]).to start_with("/share/preview/image")
+        expect(response.body).not_to include("cdn.test")
+      end
+
+      it "gives no image path for a page with no picture" do
+        allow_any_instance_of(OpenGraph).to receive(:fetch)
+          .and_return(OpenGraph::Card.new(url: "https://other.test/", title: "T", description: nil,
+                                          image_url: nil))
+
+        get "/share/preview", params: { url: "https://other.test/" }
+
+        expect(response.parsed_body["image_path"]).to be_nil
+      end
+
+      it "refuses a value that is not a link, and reads nothing" do
+        expect_any_instance_of(OpenGraph).not_to receive(:fetch)
+
+        get "/share/preview", params: { url: "not a link" }
+
+        expect(response).to have_http_status(:unprocessable_content)
+      end
+    end
+
+    describe "GET /share/preview/image" do
+      before { sign_in_as(email: owner_email) }
+
+      let(:card) do
+        OpenGraph::Card.new(url: "https://example.test/a/", title: "T", description: nil,
+                            image_url: "https://cdn.test/og.png")
+      end
+
+      it "needs the owner session" do
+        reset!
+
+        get "/share/preview/image", params: { url: "https://example.test/a/" }
+
+        expect(response).to redirect_to("/signin")
+      end
+
+      # ⚠️ The parameter is the page, and not the picture. Thus a caller cannot name any URL for
+      # this app to get: the picture is always the one that the og: tags of that page name.
+      # `Bluesky#card_image` gives the same bytes that go up as the blob.
+      it "sends the picture that the og: tags of the page name" do
+        allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
+        allow_any_instance_of(Bluesky).to receive(:card_image)
+          .with("https://cdn.test/og.png")
+          .and_return({ body: "bytes", content_type: "image/png" })
+
+        get "/share/preview/image", params: { url: "https://example.test/a/" }
+
+        expect(response).to have_http_status(:ok)
+        expect(response.media_type).to eq("image/png")
+        expect(response.body).to eq("bytes")
+      end
+
+      it "answers 404 for a page with no picture" do
+        allow_any_instance_of(OpenGraph).to receive(:fetch)
+          .and_return(OpenGraph::Card.new(url: "https://other.test/", title: nil, description: nil,
+                                          image_url: nil))
+
+        get "/share/preview/image", params: { url: "https://other.test/" }
+
+        expect(response).to have_http_status(:not_found)
+      end
+
+      it "answers 404 when the picture cannot be read" do
+        allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
+        allow_any_instance_of(Bluesky).to receive(:card_image).and_return(nil)
+
+        get "/share/preview/image", params: { url: "https://example.test/a/" }
+
+        expect(response).to have_http_status(:not_found)
+      end
+
+      it "refuses a value that is not a link" do
+        get "/share/preview/image", params: { url: "javascript:alert(1)" }
+
+        expect(response).to have_http_status(:unprocessable_content)
+      end
+    end
+
     describe "POST /share" do
       before { sign_in_as(email: owner_email) }
 

@@ -1,5 +1,3 @@
-require "vips"
-
 # Posts to Bluesky, as the account that Connected apps holds.
 #
 # ⚠️ This is not `StandardSite`. That class writes `site.standard.*` records, which are a mirror of
@@ -120,6 +118,42 @@ class Bluesky < ApplicationService
     self.class.post_url(@handle, rkey)
   end
 
+  # Gets the picture of a website card, ready to go up as a blob.
+  #
+  # ⚠️ **This is public because the Share preview proxies it.** The admin cannot show an `og:image`
+  # from another host directly: the CSP of the admin has `img-src :self`. Thus the preview asks this
+  # app for the picture, and it then shows **the exact bytes that this class uploads** and not the
+  # original file.
+  #
+  # Each step fails soft, on purpose: a picture past `MAX_CARD_IMAGE_BYTES`, a body that is not an
+  # image, and a decode that fails each give nil. A card with no picture still renders.
+  # @param url [String, nil] The og:image.
+  # @return [Hash, nil] `{ body:, content_type: }`, or nil after any failure.
+  def card_image(url)
+    return if url.blank?
+
+    picture = download(url, max_bytes: MAX_CARD_IMAGE_BYTES,
+                            headers: { "User-Agent" => OpenGraph::USER_AGENT },
+                            open_timeout: OpenGraph::OPEN_TIMEOUT, read_timeout: OpenGraph::READ_TIMEOUT,
+                            follow_redirects: true, limit: 5)
+    return if picture.nil?
+
+    bytes = picture[:body]
+    mime = picture[:content_type].split(";").first.to_s.strip
+
+    # ⚠️ A host with no content type, or a 200 that is an HTML error page, must not go up as a
+    # picture. The shrink decodes the bytes with libvips, thus it is also the check that they are
+    # an image. It runs for an oversized picture for the same reason as before: a blob past the
+    # limit fails at putRecord.
+    bytes, mime = shrink(bytes) if !mime.start_with?("image/") || bytes.bytesize > MAX_BLOB_BYTES
+    return if bytes.blank? || bytes.bytesize > MAX_BLOB_BYTES
+
+    { body: bytes, content_type: mime }
+  rescue StandardError => e
+    report_upstream_error(e, context: "bluesky card image", url: url)
+    nil
+  end
+
   private
 
   # @return [String] The name of this client in each log line of AtProto.
@@ -183,28 +217,10 @@ class Bluesky < ApplicationService
   # @param url [String, nil] The og:image.
   # @return [Hash, nil] The blob, or nil after any failure.
   def upload_card_image(url)
-    return if url.blank?
-
-    picture = download(url, max_bytes: MAX_CARD_IMAGE_BYTES,
-                            headers: { "User-Agent" => OpenGraph::USER_AGENT },
-                            open_timeout: OpenGraph::OPEN_TIMEOUT, read_timeout: OpenGraph::READ_TIMEOUT,
-                            follow_redirects: true, limit: 5)
+    picture = card_image(url)
     return if picture.nil?
 
-    bytes = picture[:body]
-    mime = picture[:content_type].split(";").first.to_s.strip
-
-    # ⚠️ A host with no content type, or a 200 that is an HTML error page, must not go up as a
-    # picture. The shrink decodes the bytes with libvips, thus it is also the check that they are
-    # an image. It runs for an oversized picture for the same reason as before: a blob past the
-    # limit fails at putRecord.
-    bytes, mime = shrink(bytes) if !mime.start_with?("image/") || bytes.bytesize > MAX_BLOB_BYTES
-    return if bytes.blank? || bytes.bytesize > MAX_BLOB_BYTES
-
-    upload_blob(bytes, mime)
-  rescue StandardError => e
-    report_upstream_error(e, context: "bluesky card image", url: url)
-    nil
+    upload_blob(picture[:body], picture[:content_type])
   end
 
   # Makes a picture into a JPEG that fits under the blob limit.
@@ -215,10 +231,17 @@ class Bluesky < ApplicationService
   # @param bytes [String] The original image.
   # @return [Array(String, String), Array(nil, nil)] [bytes, mime], or [nil, nil] when it cannot.
   def shrink(bytes)
+    # ⚠️ The require is **here** and not at the top of the file. libvips is a native library, and a
+    # require at the top makes each path of this class need it: a post with a small picture, and
+    # the preview of the Share page, would then both fail where nothing has to shrink anything.
+    # ⚠️ LoadError is not a StandardError, thus the rescue below must name it. Without that, a
+    # machine with no libvips gives a 500 in place of a card with no picture.
+    require "vips"
+
     image = Vips::Image.new_from_buffer(bytes, "")
     image = image.resize(CARD_IMAGE_WIDTH.to_f / image.width) if image.width > CARD_IMAGE_WIDTH
     [ image.jpegsave_buffer(Q: CARD_IMAGE_QUALITY, strip: true), "image/jpeg" ]
-  rescue StandardError => e
+  rescue StandardError, LoadError => e
     report_upstream_error(e, context: "bluesky card image resize")
     [ nil, nil ]
   end

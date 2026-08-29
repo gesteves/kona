@@ -148,6 +148,13 @@ Rails.application.routes.draw do
       get  "share" => "share#show", as: :share
       post "share" => "share#create"
 
+      # The preview of the link that the owner pasted. ⚠️ `share/preview/image` must stay above
+      # `share/preview`, or Rails reads it as part of that path.
+      # The image is a proxy, and not a link to the other host: the CSP of the admin has
+      # `img-src :self`. Refer to **The share composer** in CLAUDE.md.
+      get "share/preview/image" => "share#preview_image", as: :share_preview_image
+      get "share/preview"       => "share#preview",       as: :share_preview
+
       # The spam quarantine of the contact form. The name says what it holds. It is not `/contact`,
       # on purpose, because that is the path of the public form (POST /api/contact), and nothing
       # here takes a submission.

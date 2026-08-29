@@ -59,7 +59,65 @@ module Admin
       redirect_to share_path, status: :see_other, notice: queued_notice(at)
     end
 
+    # GET /share/preview
+    #
+    # The card of a link, as JSON, for the preview on the page. ⚠️ The browser cannot read another
+    # site by itself: the CSP of the admin has `connect-src :self`, and another host sends no CORS
+    # header. Thus this app reads it.
+    #
+    # `OpenGraph#fetch` caches for 15 minutes, thus a preview also warms the cache that the post
+    # job reads a moment later.
+    def preview
+      url = params[:url].to_s.strip
+      return render json: { error: "That is not a link." }, status: :unprocessable_content unless
+        OpenGraph.http_url?(url)
+
+      card = OpenGraph.new.fetch(url)
+      render json: {
+        url: card.url,
+        title: card.title,
+        description: card.description,
+        host: host_of(card.url),
+        # ⚠️ The path of our own proxy, and never the og:image itself. Refer to #preview_image.
+        image_path: (share_preview_image_path(url: url) if card.image_url.present?),
+        standard_site: card.document_uri.present?
+      }
+    end
+
+    # GET /share/preview/image
+    #
+    # Proxies the picture of a card.
+    #
+    # ⚠️ **The browser cannot load the og:image directly**: the CSP of the admin has
+    # `img-src :self`. Thus this action reads it and sends it from this host, exactly as the Course
+    # maps page does for a Mapbox render.
+    #
+    # ⚠️ The parameter is the URL of the **page**, and not of the picture. Thus a caller cannot name
+    # any URL for this app to get: the picture is always the one that the og: tags of that page
+    # name. `Bluesky#card_image` then gives the **same bytes that go up as the blob**, thus the
+    # preview shows what the card will hold and not the original file.
+    def preview_image
+      url = params[:url].to_s.strip
+      return head :unprocessable_content unless OpenGraph.http_url?(url)
+
+      image_url = OpenGraph.new.fetch(url).image_url
+      return head :not_found if image_url.blank?
+
+      picture = Bluesky.new.card_image(image_url)
+      return head :not_found if picture.nil?
+
+      send_data picture[:body], type: picture[:content_type], disposition: "inline"
+    end
+
     private
+
+    # @param url [String, nil]
+    # @return [String, nil] The host of a URL, for the line below the title of the preview.
+    def host_of(url)
+      URI.parse(url.to_s).host
+    rescue URI::InvalidURIError
+      nil
+    end
 
     # The networks that this page can post to, in a stable order.
     #

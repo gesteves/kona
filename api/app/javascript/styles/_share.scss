@@ -32,3 +32,47 @@
     font-weight: var(--wa-font-weight-semibold);
   }
 }
+
+// The preview of the card that each network will render. <wa-card> draws the border, the corner,
+// and the padding, thus this block holds only the shape of the picture and the type of the body.
+.share-card {
+  margin-block-start: var(--wa-space-2xs);
+  max-width: 32rem;
+
+  &[hidden] {
+    display: none;
+  }
+
+  &__image {
+    // The shape that Bluesky and Mastodon both draw a card picture in.
+    aspect-ratio: 1.91;
+    display: block;
+    object-fit: cover;
+    width: 100%;
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  &__kind {
+    align-self: start;
+    margin-block-end: var(--wa-space-2xs);
+  }
+
+  &__host {
+    color: var(--wa-color-text-quiet);
+    margin: 0;
+  }
+
+  &__title {
+    font-weight: var(--wa-font-weight-semibold);
+    margin: 0;
+  }
+
+  &__description {
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-s);
+    margin: 0;
+  }
+}

@@ -328,6 +328,25 @@ RSpec.describe Bluesky do
         expect(@sent["record"]["embed"]["external"]["uri"]).to eq("https://example.test/short/")
       end
 
+      # ⚠️ libvips is a native library, and the require is inside #shrink and not at the top of the
+      # file. Thus a post with a picture that needs no shrink never needs libvips at all, and a
+      # machine without it gets a card with no picture in place of a 500. LoadError is not a
+      # StandardError, thus the rescue there names it.
+      it "posts with no picture on a machine that has no libvips" do
+        big = "x" * (described_class::MAX_BLOB_BYTES + 1)
+        allow(HTTParty).to receive(:get)
+          .with("https://cdn.test/og.png", anything)
+          .and_return(instance_double(HTTParty::Response, success?: true, body: big, code: 200,
+                                      headers: { "content-type" => "image/png" }))
+        allow_any_instance_of(described_class).to receive(:require).with("vips")
+          .and_raise(LoadError, "cannot load such file -- vips")
+
+        service.post!(rkey: "3kabc", text: "Read this", card: card)
+
+        expect(@sent["record"]["embed"]["external"]).not_to have_key("thumb")
+        expect(@sent["record"]["text"]).to eq("Read this")
+      end
+
       # ⚠️ A blob past the limit fails at putRecord and not at the upload, thus the whole post
       # would go away and the message would name the embed.
       it "shrinks a picture that is over the blob limit" do

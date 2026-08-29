@@ -8,17 +8,38 @@
               class: "share wa-stack wa-gap-l",
               data: { controller: "share",
                       action: "submit->share#markBusy",
+                      share_preview_url_value: share_preview_path,
                       share_limit_value: @share.body_limit,
                       share_warn_at_value: @share.warn_at } do %>
 
   <%# A plain URL field. ⚠️ There is no list of the articles here, on purpose: the card of a post
       comes from the og: tags of whatever page this names, thus a link to another site needs no more
       code and a list would only cover this one site. %>
-  <wa-input type="url" name="article_url" label="Link" required
-            value="<%= @share.article_url %>"
-            placeholder="https://"
-            autocomplete="off" spellcheck="false">
-  </wa-input>
+  <div>
+    <wa-input type="url" name="article_url" label="Link" required
+              value="<%= @share.article_url %>"
+              placeholder="https://"
+              autocomplete="off" spellcheck="false"
+              data-share-target="link"
+              data-action="input->share#schedulePreview change->share#schedulePreview">
+    </wa-input>
+
+    <%# The card that each network will render. The controller fills it and shows it, thus it is
+        empty and hidden until the owner pastes a link.
+        ⚠️ `with-media` is not in this markup: a page can have no picture, thus the controller sets
+        it with the image. %>
+    <wa-card class="share-card" data-share-target="preview" hidden>
+      <img slot="media" class="share-card__image" data-share-target="previewImage" alt="" hidden>
+
+      <%# ⚠️ This is the useful part: it says which of the two cards Bluesky will render, and the
+          owner cannot know that until after the post without it. %>
+      <wa-badge class="share-card__kind" appearance="outlined"
+                data-share-target="previewKind"></wa-badge>
+      <p class="share-card__host wa-caption-s" data-share-target="previewHost"></p>
+      <p class="share-card__title" data-share-target="previewTitle"></p>
+      <p class="share-card__description" data-share-target="previewDescription"></p>
+    </wa-card>
+  </div>
 
   <div>
     <%# ⚠️ No `maxlength` and no `with-count`. Both measure UTF-16 code units, and Bluesky counts
