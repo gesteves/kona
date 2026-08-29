@@ -124,6 +124,56 @@ module AtProto
     response.success?
   end
 
+  # Splits an `at://` URI into its three parts.
+  # @param uri [String, nil]
+  # @return [Array(String, String, String), nil] [did, collection, rkey], or nil for a URI with
+  #   another shape.
+  def parse_at_uri(uri)
+    match = uri.to_s.match(%r{\Aat://(?<did>[^/]+)/(?<collection>[^/]+)/(?<rkey>[^/?\#]+)\z})
+    return if match.nil?
+
+    [ match[:did], match[:collection], match[:rkey] ]
+  end
+
+  # Reads one record and makes a `com.atproto.repo.strongRef` of it.
+  #
+  # ⚠️ A strongRef needs the **CID**, and an `at://` URI does not hold one. Thus the only way to
+  # make one is to read the record. The CID also changes at each write, thus this cannot be cached
+  # for a long time: a ref with an old CID names a version that is gone.
+  # @param uri [String] An at:// URI.
+  # @return [Hash, nil] `{ "uri" =>, "cid" => }`, or nil when the record cannot be read.
+  def strong_ref(uri)
+    did, collection, rkey = parse_at_uri(uri)
+    return if did.blank?
+
+    service = service_for(did)
+    return if service.blank?
+
+    record = get_json("#{service}/xrpc/com.atproto.repo.getRecord",
+                      query: { repo: did, collection: collection, rkey: rkey })
+    return if record.blank? || record[:cid].blank?
+
+    { "uri" => record[:uri].presence || uri, "cid" => record[:cid] }
+  rescue StandardError => e
+    report_upstream_error(e, context: "#{at_proto_label} getRecord")
+    nil
+  end
+
+  # The host that holds a repo.
+  #
+  # ⚠️ A PDS answers `getRecord` for its **own** repos only. Thus a DID that is not ours needs its
+  # DID document first. `did:plc` resolves at the directory, and each other method gives nil, thus
+  # the caller then makes no ref and the card is an ordinary one.
+  # @param did [String]
+  # @return [String, nil]
+  def service_for(did)
+    return @service_url if did == @did && @service_url.present?
+    return unless did.start_with?("did:plc:")
+
+    doc = get_json("https://plc.directory/#{did}", symbolize: false)
+    pds_endpoint_from_did_doc(doc)
+  end
+
   # Uploads raw bytes to the PDS as a blob.
   # @param bytes [String] The binary data.
   # @param mime [String] Its content type.

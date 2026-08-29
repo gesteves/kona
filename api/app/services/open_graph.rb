@@ -1,6 +1,7 @@
 require "nokogiri"
 
-# Reads the Open Graph tags of a URL, for the website card of a post.
+# Reads the Open Graph tags of a URL, and its standard.site link tags, for the website card of a
+# post.
 #
 # ⚠️ The card of a share comes from **the page itself**, and not from Contentful. The URL can be a
 # Short, which has no cover image, or a page on another site. Thus the page that the owner links to
@@ -10,7 +11,17 @@ require "nokogiri"
 # Bluesky renders that.
 class OpenGraph < ApplicationService
   # A card that this app read.
-  Card = Data.define(:url, :title, :description, :image_url)
+  #
+  # `document_uri` and `publication_uri` are the `at://` URIs of the standard.site records of the
+  # page, from its `<link rel>` tags. They are nil for a page that publishes none, and Bluesky then
+  # renders an ordinary link card.
+  Card = Data.define(:url, :title, :description, :image_url, :document_uri, :publication_uri) do
+    # ⚠️ The two standard.site fields default to nil. Most pages publish neither, thus a caller
+    # that makes an ordinary card must not have to name them.
+    def initialize(document_uri: nil, publication_uri: nil, **rest)
+      super
+    end
+  end
 
   # ⚠️ A default user agent gets a 403 from many hosts, and the card is then empty with no reason.
   USER_AGENT = "kona/1.0 (+https://github.com/gesteves/kona)".freeze
@@ -38,7 +49,7 @@ class OpenGraph < ApplicationService
   # @param url [String] An http or https URL.
   # @return [Card] The card. Each field but `url` can be nil.
   def fetch(url)
-    return Card.new(url: url, title: nil, description: nil, image_url: nil) unless self.class.http_url?(url)
+    return blank_card(url) unless self.class.http_url?(url)
 
     data = cached_json("open_graph:#{Digest::SHA256.hexdigest(url)}", expires_in: CACHE_TTL) do
       read(url)
@@ -46,7 +57,14 @@ class OpenGraph < ApplicationService
     data ||= {}
 
     Card.new(url: url, title: data[:title], description: data[:description],
-             image_url: data[:image_url])
+             image_url: data[:image_url], document_uri: data[:document_uri],
+             publication_uri: data[:publication_uri])
+  end
+
+  # @return [Card] A card with the URL and nothing else.
+  def blank_card(url)
+    Card.new(url: url, title: nil, description: nil, image_url: nil, document_uri: nil,
+             publication_uri: nil)
   end
 
   private
@@ -77,8 +95,22 @@ class OpenGraph < ApplicationService
     {
       title: meta(doc, "og:title") || doc.at_css("title")&.text&.strip.presence,
       description: meta(doc, "og:description") || meta_name(doc, "description"),
-      image_url: absolute(meta(doc, "og:image") || meta_name(doc, "twitter:image"), url)
+      image_url: absolute(meta(doc, "og:image") || meta_name(doc, "twitter:image"), url),
+      document_uri: at_uri(doc, "site.standard.document"),
+      publication_uri: at_uri(doc, "site.standard.publication")
     }
+  end
+
+  # Reads one standard.site `<link rel>` tag.
+  #
+  # ⚠️ A crawler of Bluesky runs no JavaScript, thus these tags must come from the server. The build
+  # of `web/` writes both of them into the head of each published post
+  # (`web/source/partials/_head.html.erb`). A page with no such tag gets an ordinary card.
+  # @param rel [String] "site.standard.document" or "site.standard.publication".
+  # @return [String, nil] The at:// URI, or nil when the page has no such tag.
+  def at_uri(doc, rel)
+    value = doc.at_css(%(link[rel="#{rel}"]))&.[]("href")&.strip
+    value if value.to_s.start_with?("at://")
   end
 
   # @return [String, nil] The content of a `property` meta tag.

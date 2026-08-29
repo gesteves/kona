@@ -93,6 +93,40 @@ RSpec.describe OpenGraph do
       expect(service.fetch(url).title).to eq("A long page")
     end
 
+    # ⚠️ These tags are what let Bluesky render the standard.site card in place of the ordinary
+    # one. A crawler runs no JavaScript, thus the build of web/ writes both into the head.
+    it "reads the standard.site link tags" do
+      stub_page(<<~HTML)
+        <html><head>
+          <link rel="site.standard.publication" href="at://did:plc:abc/site.standard.publication/pub1">
+          <link rel="site.standard.document" href="at://did:plc:abc/site.standard.document/doc1">
+        </head></html>
+      HTML
+
+      card = service.fetch(url)
+
+      expect(card.document_uri).to eq("at://did:plc:abc/site.standard.document/doc1")
+      expect(card.publication_uri).to eq("at://did:plc:abc/site.standard.publication/pub1")
+    end
+
+    # A page on another site publishes no such tag, and Bluesky then renders the ordinary card.
+    it "gives no at:// URI for a page with no standard.site tags" do
+      stub_page("<html><head><title>Hi</title></head></html>")
+
+      card = service.fetch(url)
+
+      expect(card.document_uri).to be_nil
+      expect(card.publication_uri).to be_nil
+    end
+
+    # ⚠️ A ref must be an at:// URI. A tag with another value is not one, and a record that cannot
+    # be read would fail the whole post.
+    it "ignores a link tag whose href is not an at:// URI" do
+      stub_page(%(<html><head><link rel="site.standard.document" href="/a-post/"></head></html>))
+
+      expect(service.fetch(url).document_uri).to be_nil
+    end
+
     # ⚠️ A Short has no cover image, and a page on another site can have no tags at all. Bluesky
     # renders a card with the URL alone, thus this must never raise and never be nil.
     it "gives the URL alone for a page with no tags" do

@@ -138,6 +138,103 @@ RSpec.describe Bluesky do
         expect(embed["external"]["thumb"]).to eq({ "$type" => "blob" })
       end
 
+      describe "the standard.site refs" do
+        let(:document_uri) { "at://did:plc:abc/site.standard.document/doc1" }
+        let(:publication_uri) { "at://did:plc:abc/site.standard.publication/pub1" }
+        let(:standard_card) do
+          OpenGraph::Card.new(url: "https://example.test/post/", title: "A title",
+                              description: "A summary.", image_url: nil,
+                              document_uri: document_uri, publication_uri: publication_uri)
+        end
+
+        def stub_get_record(cids = { "doc1" => "bafydoc", "pub1" => "bafypub" })
+          allow(HTTParty).to receive(:get)
+            .with(a_string_including("com.atproto.repo.getRecord"), anything) do |_url, options|
+              rkey = options[:query][:rkey]
+              cid = cids[rkey]
+              instance_double(HTTParty::Response, success?: cid.present?, code: cid ? 200 : 404,
+                              body: { uri: "at://did:plc:abc/x/#{rkey}", cid: cid }.to_json,
+                              request: nil)
+            end
+        end
+
+        # ⚠️ This is what makes Bluesky render the standard.site card and not the ordinary one. The
+        # embed stays an app.bsky.embed.external, and associatedRefs is what it adds.
+        it "adds the document and the publication, in that order" do
+          stub_get_record
+
+          service.post!(rkey: "3kabc", text: "Read this", card: standard_card)
+
+          refs = @sent["record"]["embed"]["external"]["associatedRefs"]
+          expect(@sent["record"]["embed"]["$type"]).to eq("app.bsky.embed.external")
+          expect(refs).to eq([
+            { "uri" => "at://did:plc:abc/x/doc1", "cid" => "bafydoc" },
+            { "uri" => "at://did:plc:abc/x/pub1", "cid" => "bafypub" }
+          ])
+        end
+
+        # ⚠️ A strongRef needs the CID, and an at:// URI does not hold one. Thus the code must read
+        # each record.
+        it "reads each record from the PDS of the repo" do
+          stub_get_record
+
+          service.post!(rkey: "3kabc", text: "Read this", card: standard_card)
+
+          expect(HTTParty).to have_received(:get).with(
+            "https://pds.test/xrpc/com.atproto.repo.getRecord",
+            hash_including(query: { repo: "did:plc:abc", collection: "site.standard.document",
+                                    rkey: "doc1" })
+          )
+        end
+
+        # A page on another site publishes no such tag. Bluesky then renders the ordinary card.
+        it "adds no refs for a page with no standard.site tags" do
+          service.post!(rkey: "3kabc", text: "Read this", card: card)
+
+          expect(@sent["record"]["embed"]["external"]).not_to have_key("associatedRefs")
+        end
+
+        # ⚠️ It falls back with no message, on purpose: an ordinary card is still a good card.
+        it "falls back to the ordinary card when the record cannot be read" do
+          stub_get_record({})
+
+          service.post!(rkey: "3kabc", text: "Read this", card: standard_card)
+
+          expect(@sent["record"]["embed"]["external"]).not_to have_key("associatedRefs")
+          expect(@sent["record"]["embed"]["external"]["uri"]).to eq("https://example.test/post/")
+        end
+
+        # ⚠️ The publication tag is on each page of a site, and the document is the thing that names
+        # one article. Thus the publication alone is not a card.
+        it "adds nothing when only the publication resolves" do
+          stub_get_record({ "pub1" => "bafypub" })
+
+          service.post!(rkey: "3kabc", text: "Read this", card: standard_card)
+
+          expect(@sent["record"]["embed"]["external"]).not_to have_key("associatedRefs")
+        end
+
+        it "keeps the document alone when the publication cannot be read" do
+          stub_get_record({ "doc1" => "bafydoc" })
+
+          service.post!(rkey: "3kabc", text: "Read this", card: standard_card)
+
+          expect(@sent["record"]["embed"]["external"]["associatedRefs"].size).to eq(1)
+        end
+
+        # ⚠️ A PDS answers getRecord for its own repos only, thus another DID needs its DID document
+        # first. did:web gives nil here, and the card is then the ordinary one.
+        it "makes no ref for a DID method that it cannot resolve" do
+          card = OpenGraph::Card.new(url: "https://other.test/post/", title: "T", description: "D",
+                                     image_url: nil,
+                                     document_uri: "at://did:web:other.test/site.standard.document/d")
+
+          service.post!(rkey: "3kabc", text: "Read this", card: card)
+
+          expect(@sent["record"]["embed"]["external"]).not_to have_key("associatedRefs")
+        end
+      end
+
       # ⚠️ The link is the card, and it is not in the text. Thus the URL uses none of the 300
       # characters.
       it "keeps the URL out of the text" do

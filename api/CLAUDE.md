@@ -887,6 +887,11 @@ report, and it must inherit `ApplicationService` for `report_upstream_error`.
   rkey.
 - ⚠️ **The link of a post is a website card (`app.bsky.embed.external`), and it is NOT in the
   text.** Thus the URL uses none of the 300 characters.
+- ⚠️ **A card of a post of THIS site is a standard.site card, and each other one is an ordinary
+  link card.** The embed stays an `app.bsky.embed.external` in both conditions, and
+  **`associatedRefs`** is the one thing that makes the difference: a list of
+  `com.atproto.repo.strongRef`, the `site.standard.document` first and the
+  `site.standard.publication` second. Refer to **The standard.site card** below.
 - ⚠️ **The card comes from the `og:` tags of the page, through `OpenGraph`, and NOT from
   Contentful.** Two reasons, and each one is enough: a **Short has no cover image**, and the link
   can be a page on **another site**. `OpenGraph#fetch` reads `og:title`, `og:description`, and
@@ -933,6 +938,29 @@ report, and it must inherit `ApplicationService` for `report_upstream_error`.
   `SharePresenter::BODY_LIMIT`.
 - **`post!` raises at each failure**, on purpose, thus `BlueskyPostJob` does the work again. The
   record key is what makes that safe.
+
+#### The standard.site card
+
+⚠️ **A `site.standard.document` record alone gives no card.** The post must name that record in its
+embed, and Bluesky then renders the enhanced card in place of the ordinary one.
+
+- **`OpenGraph` reads the `at://` URIs from the `<link rel>` tags of the page**, and not from
+  Contentful and not from a lookup of the entry. `web/source/partials/_head.html.erb` writes
+  `site.standard.publication` on each page and `site.standard.document` on each published post.
+  ⚠️ **A crawler of Bluesky runs no JavaScript, thus those tags must stay server-rendered.**
+  ⚠️ The result is that this works for **any** site that publishes them, and not for this one only.
+- **`AtProto#strong_ref` makes each ref.** ⚠️ A strongRef needs the **CID**, and an `at://` URI
+  holds none. Thus the only way to make one is to read the record with `com.atproto.repo.getRecord`.
+  The CID also changes at each write, thus **nothing caches a ref**: an old CID names a version that
+  is gone.
+- ⚠️ **A PDS answers `getRecord` for its OWN repos only.** `AtProto#service_for` gives the
+  authenticated service for our own DID, and it resolves `did:plc` at `plc.directory`. Each other
+  method gives nil, and the card is then the ordinary one.
+- ⚠️ **The publication alone is not a card.** That tag is on each page of a site, and the document
+  is the thing that names one article. Thus with no document `associated_refs` gives an empty list.
+- **Each step falls back with no message, on purpose.** No tag, a record that this app cannot read,
+  and a DID that it cannot resolve all give the ordinary card from the `og:` tags. An ordinary card
+  is still a good card, and a failure here must never lose the post.
 
 ### Posting to Mastodon
 

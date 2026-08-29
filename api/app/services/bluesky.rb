@@ -142,7 +142,33 @@ class Bluesky < ApplicationService
     thumb = upload_card_image(card.image_url)
     external["thumb"] = thumb if thumb.present?
 
+    refs = associated_refs(card)
+    external["associatedRefs"] = refs if refs.any?
+
     { "$type" => "app.bsky.embed.external", "external" => external }
+  end
+
+  # The standard.site records of the page, as strongRefs.
+  #
+  # ⚠️ **This is what makes Bluesky render the standard.site card and not the ordinary one.** The
+  # embed stays an `app.bsky.embed.external`, and `associatedRefs` is what it adds: the document
+  # first, then the publication.
+  #
+  # It **falls back with no message**, on purpose. A page that publishes no `<link rel>` tag, a
+  # record that this app cannot read, and a DID with a method that it cannot resolve each give an
+  # empty list, and Bluesky then renders the ordinary card from the og: tags. A link to another site
+  # is the usual reason.
+  # @param card [OpenGraph::Card]
+  # @return [Array<Hash>] The refs, in the order that the documentation gives.
+  # @see https://github.com/bluesky-social/atproto/discussions/4978
+  def associated_refs(card)
+    document = strong_ref(card.document_uri) if card.document_uri.present?
+    # ⚠️ The publication alone is not a card. That tag is on each page of the site, and the document
+    # is the thing that names one article. Thus with no document this adds nothing.
+    return [] if document.blank?
+
+    publication = strong_ref(card.publication_uri) if card.publication_uri.present?
+    [ document, publication ].compact
   end
 
   # Downloads the og:image of the link and uploads it as a blob.
