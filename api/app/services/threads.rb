@@ -356,8 +356,14 @@ class Threads < ApplicationService
   # @param response [HTTParty::Response]
   # @return [String]
   def error_message(response)
-    error = JSON.parse(response.body.to_s, symbolize_names: true)[:error] || {}
+    parsed = JSON.parse(response.body.to_s, symbolize_names: true)
+    error = parsed.is_a?(Hash) ? parsed[:error].to_h : {}
     parts = [ "HTTP #{response.code}" ]
+
+    # ⚠️ Meta sometimes answers 500 with NO error object at all, and the fields below are then all
+    # empty. The raw body is the only thing left to read, thus it goes in the message.
+    return "HTTP #{response.code} body=#{response.body.to_s[0, 300].inspect}" if error.empty?
+
     parts << error[:message] if error[:message].present?
     parts << "type=#{error[:type]}" if error[:type].present?
     parts << "code=#{error[:code]}" if error[:code].present?
