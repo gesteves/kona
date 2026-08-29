@@ -64,6 +64,13 @@ updates:
       npm-dependencies:
         patterns:
           - "*"
+    # ⚠️ satori 0.33 made `harfbuzzjs` a dependency of each render, and the Worker cannot run it:
+    # its Emscripten loader reads `fs` and `self.location`, and it compiles the wasm from bytes,
+    # which the runtime refuses. Thus the card renderer of web/ stays below 0.33. Remove this
+    # entry only after a render works in `wrangler dev`. Refer to web/CLAUDE.md.
+    ignore:
+      - dependency-name: "satori"
+        versions: [">=0.33.0"]
 
   # The local-only tools in utilities/. Nothing here goes to production, but all three have a
   # lockfile in the repo, and without this entry no CVE would ever change one. utilities/maps also
