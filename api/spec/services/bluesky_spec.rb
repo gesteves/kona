@@ -20,7 +20,9 @@ RSpec.describe Bluesky do
     allow(HTTParty).to receive(:post)
       .with(a_string_including("com.atproto.repo.putRecord"), anything) do |_url, options|
         @sent = JSON.parse(options[:body])
-        instance_double(HTTParty::Response, success?: true, body: "{}", code: 200)
+        # putRecord answers with the reference of the record that it wrote.
+        body = { uri: "at://did:plc:abc/#{@sent['collection']}/#{@sent['rkey']}", cid: "bafypost" }
+        instance_double(HTTParty::Response, success?: true, body: body.to_json, code: 200)
       end
   end
 
@@ -83,10 +85,14 @@ RSpec.describe Bluesky do
       expect(HTTParty).not_to have_received(:post)
     end
 
-    it "writes the post and answers with its public URL" do
-      url = service.post!(rkey: "3kabc", text: "A long day.")
+    # ⚠️ It answers with the reference as well as the URL. The next post of a thread names this one
+    # by its `uri` and its `cid`, and an at:// URI holds no CID.
+    it "writes the post and answers with its reference and its public URL" do
+      result = service.post!(rkey: "3kabc", text: "A long day.")
 
-      expect(url).to eq("https://bsky.app/profile/me.bsky.social/post/3kabc")
+      expect(result["url"]).to eq("https://bsky.app/profile/me.bsky.social/post/3kabc")
+      expect(result["uri"]).to eq("at://did:plc:abc/app.bsky.feed.post/3kabc")
+      expect(result["cid"]).to eq("bafypost")
       expect(@sent["collection"]).to eq("app.bsky.feed.post")
       expect(@sent["rkey"]).to eq("3kabc")
       expect(@sent["record"]["text"]).to eq("A long day.")

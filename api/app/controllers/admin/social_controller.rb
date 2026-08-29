@@ -38,22 +38,24 @@ module Admin
       # ⚠️ It renders again and does not redirect. A redirect would lose the words that the owner
       # wrote, and the draft is the expensive part of this page.
       if error
-        @social = presenter(body: body, article_url: params[:article_url],
-                           selected: selected_networks, scheduled: scheduled?,
-                           date: params[:date], time: params[:time])
+        @social = presenter(posts: posts, selected: selected_networks, scheduled: scheduled?,
+                            date: params[:date], time: params[:time])
         flash.now[:alert] = error
         return render :show, status: :unprocessable_content
       end
 
-      # ⚠️ One key goes to each network, and each attempt of each job carries it: Bluesky writes at
-      # that record key, Mastodon sends it as its Idempotency-Key, and Threads keeps its media
-      # container below it. That is what makes the retry of each job safe.
-      key = Bluesky.new_tid
+      # ⚠️ One key for each POST, and the three networks share those keys: Bluesky writes at that
+      # record key, Mastodon sends it as its Idempotency-Key, and Threads keeps its media container
+      # below it. Each attempt of each job carries the key of its own post, and that is what makes
+      # a retry safe.
+      payload = posts.map { |post| { "key" => Bluesky.new_tid, "text" => post[:text], "link" => post[:link] } }
       at = scheduled_at
 
+      # ⚠️ Only the FIRST post of each network is scheduled. That job adds the job of the post below
+      # it when it succeeds, thus the rest of a thread goes out with it and needs no time of its own.
       selected_networks.each do |network|
         job = NETWORKS.fetch(network)[:job]
-        at ? job.perform_at(at, key, article_url, body) : job.perform_async(key, article_url, body)
+        at ? job.perform_at(at, payload) : job.perform_async(payload)
       end
 
       redirect_to social_path, status: :see_other, notice: queued_notice(at)
@@ -176,32 +178,67 @@ module Admin
       end
     end
 
-    # The link to share. ⚠️ It is not always an article of this site: the field takes any URL, and
-    # the card of the post comes from the og: tags of that page.
-    # @return [String]
-    def article_url
-      params[:article_url].to_s.strip
-    end
-
-    # The body of the post. ⚠️ It is stripped one time, here, thus the count, the limit, and the
-    # three services all read the same text. Without that, a body with a newline at its end went
-    # to Bluesky as it was and to Mastodon with the newline removed.
-    # @return [String]
-    def body
-      @body ||= params[:body].to_s.strip
+    # Each post of the thread, in order.
+    #
+    # ⚠️ The form sends `posts[][text]` and `posts[][link]`, and Rails starts a new hash when a key
+    # repeats. Thus **both fields must render for every block, in the same order**, or each pair
+    # after a block that omits one moves by one.
+    #
+    # ⚠️ Each field is stripped one time, here, thus the count, the limit, and the three services
+    # all read the same text. Without that, a body with a newline at its end went to Bluesky as it
+    # was and to Mastodon with the newline removed.
+    #
+    # A block with nothing at all in it is dropped: an empty block that the owner added and left
+    # alone must not refuse the whole draft.
+    # @return [Array<Hash>] `[{ text:, link: }, …]`
+    def posts
+      @posts ||= Array(params[:posts]).map { |post|
+        { text: post[:text].to_s.strip, link: post[:link].to_s.strip }
+      }.reject { |post| post[:text].blank? && post[:link].blank? }
     end
 
     # @return [String, nil] The reason to refuse, or nil when the draft is good.
     def validation_error
-      return "Paste a link to share." unless OpenGraph.http_url?(article_url)
-      return "Write something to post." if body.blank?
-      unless Bluesky.valid_post_length?(body)
-        return "That post is #{Bluesky.post_length(body)} characters. " \
-               "The limit is #{Bluesky::MAX_GRAPHEMES}."
+      return "Write something to post." if posts.empty?
+      if posts.length > SocialPresenter::MAX_POSTS
+        return "A thread takes at most #{SocialPresenter::MAX_POSTS} posts."
       end
+
+      posts.each_with_index do |post, index|
+        message = post_error(post, index)
+        return message if message
+      end
+
       return "Pick at least one place to post it." if selected_networks.empty?
 
       schedule_error
+    end
+
+    # ⚠️ A message names the post, because a thread has more than one and a plain message does not
+    # say which one is wrong.
+    # @param post [Hash]
+    # @param index [Integer]
+    # @return [String, nil]
+    def post_error(post, index)
+      label = posts.one? ? "That post" : "Post #{index + 1}"
+
+      # ⚠️ Every post needs words. Each of the three networks refuses a body that is empty, thus a
+      # link with no words is not a post.
+      if post[:text].blank?
+        return posts.one? ? "Write something to post." : "#{label} needs something to say."
+      end
+
+      unless Bluesky.valid_post_length?(post[:text])
+        return "#{label} is #{Bluesky.post_length(post[:text])} characters. " \
+               "The limit is #{Bluesky::MAX_GRAPHEMES}."
+      end
+
+      # ⚠️ The link is optional. It is only refused when it is there and it is not http or https.
+      if post[:link].present? && !OpenGraph.http_url?(post[:link])
+        return "#{label} needs a link that starts with http:// or https://."
+      end
+
+      nil
     end
 
     # @return [Boolean] True when the owner opened the schedule fields.
@@ -257,9 +294,10 @@ module Admin
     # @return [String]
     def queued_notice(at)
       names = to_sentence(selected_networks)
-      return "Scheduled a post to #{names} for #{format_schedule(at)}." if at
+      what = posts.one? ? "a post" : "a thread of #{posts.length} posts"
+      return "Scheduled #{what} to #{names} for #{format_schedule(at)}." if at
 
-      "Sent to #{names}."
+      posts.one? ? "Sent to #{names}." : "Sent a thread of #{posts.length} posts to #{names}."
     end
 
     # The moment in the words of the owner, in the zone that they picked it in. To answer in the

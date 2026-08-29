@@ -8,56 +8,27 @@
               class: "social wa-stack wa-gap-l",
               data: { controller: "social",
                       action: "submit->social#markBusy",
-                      social_preview_url_value: social_preview_path,
-                      social_limit_value: @social.body_limit,
-                      social_warn_at_value: @social.warn_at } do %>
+                      social_max_posts_value: @social.max_posts } do %>
 
-  <%# A plain URL field. ⚠️ There is no list of the articles here, on purpose: the card of a post
-      comes from the og: tags of whatever page this names, thus a link to another site needs no more
-      code and a list would only cover this one site. %>
-  <div>
-    <wa-input type="url" name="article_url" label="Link" required
-              value="<%= @social.article_url %>"
-              placeholder="https://"
-              autocomplete="off" spellcheck="false"
-              data-social-target="link"
-              data-action="input->social#schedulePreview change->social#schedulePreview">
-      <%# It spins for the whole wait: the debounce and then the request. ⚠️ It needs a rule for
-          `[hidden]`; refer to _social.scss. %>
-      <wa-spinner slot="end" class="social__spinner" data-social-target="spinner" hidden></wa-spinner>
-    </wa-input>
-
-    <%# The card that each network will render. The controller fills it and shows it, thus it is
-        empty and hidden until the owner pastes a link.
-        ⚠️ `with-media` is not in this markup: a page can have no picture, thus the controller sets
-        it with the image. %>
-    <wa-card class="social-card" data-social-target="preview" hidden>
-      <img slot="media" class="social-card__image" data-social-target="previewImage" alt="" hidden>
-
-      <%# ⚠️ This is the useful part: it says which of the two cards Bluesky will render, and the
-          owner cannot know that until after the post without it. %>
-      <wa-badge class="social-card__kind" appearance="outlined"
-                data-social-target="previewKind"></wa-badge>
-      <p class="social-card__host wa-caption-s" data-social-target="previewHost"></p>
-      <p class="social-card__title" data-social-target="previewTitle"></p>
-      <p class="social-card__description" data-social-target="previewDescription"></p>
-    </wa-card>
+  <%# One block for each post of the thread. The Add control below clones the template. %>
+  <div class="social__posts wa-stack wa-gap-l" data-social-target="posts">
+    <% @social.posts.each do |post| %>
+      <%= render "post", post: post, limit: @social.body_limit, warn_at: @social.warn_at %>
+    <% end %>
   </div>
 
-  <div>
-    <%# ⚠️ No `maxlength` and no `with-count`. Both measure UTF-16 code units, and Bluesky counts
-        graphemes: one emoji is 1 there and 2 or more here. The count line below is ours, and it
-        warns and never stops a keystroke. %>
-    <wa-textarea name="body" label="Post" rows="5" resize="auto" required
-                 value="<%= @social.body %>"
-                 placeholder="What do you want to say about it?"
-                 data-social-target="body"
-                 data-action="input->social#count">
-    </wa-textarea>
+  <%# ⚠️ The template holds ONE empty block, and the browser never renders its content until the
+      controller clones it. Thus its fields are not in the form and they send nothing. %>
+  <template data-social-target="template">
+    <%= render "post", post: SocialPresenter::Post.new, limit: @social.body_limit,
+                       warn_at: @social.warn_at %>
+  </template>
 
-    <%# The server writes the first value, thus the line has its height before the JavaScript runs
-        and the page does not move. The controller writes each value after that. %>
-    <p class="social__count wa-caption-s" aria-live="polite" data-social-target="count">0 / <%= @social.body_limit %></p>
+  <div class="wa-cluster wa-gap-s">
+    <wa-button appearance="outlined" data-social-target="add" data-action="click->social#addPost">
+      <%= slotted_icon_svg("classic", "light", "plus") %>
+      Add another post
+    </wa-button>
   </div>
 
   <%# Each connected row is ticked on the first load, and a submit that fails keeps the ticks of

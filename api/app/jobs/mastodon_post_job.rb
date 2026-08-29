@@ -1,17 +1,26 @@
-# Posts one draft from the Social media page to Mastodon.
+# Posts one post of a draft from the Social media page to Mastodon, then adds the job of the next
+# one.
 #
-# ⚠️ You can do this job more than one time. `key` goes in the `Idempotency-Key` header, and the
-# instance then answers with the status that it made already. ⚠️ That window is not for ever, thus
-# a retry a long time later can still make a second post.
+# ⚠️ **There is one job for each POST, and not one job for the whole thread.** Refer to
+# BlueskyPostJob for the reason.
 #
-# ⚠️ There is one job for each network, and not one job for all of them. Thus a failure at one
-# service retries that service alone, and a network that already posted is never sent again.
+# ⚠️ You can do each attempt more than one time. `key` goes in the `Idempotency-Key` header, and the
+# instance then answers with the status that it made already. That window is not for ever, thus the
+# service also keeps the status in Redis for the length of the retries.
 class MastodonPostJob < ApplicationJob
-  # @param key [String] The idempotency key, which is the same value for each attempt.
-  # @param url [String] The link to share. Mastodon renders it in the text.
-  # @param text [String] The body of the post.
-  def perform(key, url, text)
-    posted = Mastodon.new.post!(text: text, url: url, idempotency_key: key)
-    Rails.logger.info("MastodonPostJob: posted at #{posted}")
+  # @param posts [Array<Hash>] `[{ "key" =>, "text" =>, "link" => }, …]`, the whole thread.
+  # @param index [Integer] Which post of that list this job writes.
+  # @param in_reply_to_id [String, nil] The id of the status above, or nil for the first.
+  def perform(posts, index = 0, in_reply_to_id = nil)
+    post = posts[index]
+    return if post.blank?
+
+    # ⚠️ Mastodon renders the link inline and makes its own preview card, thus this reads no og:
+    # tags at all.
+    status = Mastodon.new.post!(text: post["text"], url: post["link"],
+                                idempotency_key: post["key"], in_reply_to_id: in_reply_to_id)
+    Rails.logger.info("MastodonPostJob: posted #{index + 1}/#{posts.length} at #{status['url']}")
+
+    self.class.perform_async(posts, index + 1, status["id"]) if posts[index + 1]
   end
 end

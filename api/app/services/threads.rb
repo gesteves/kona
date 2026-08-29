@@ -176,16 +176,17 @@ class Threads < ApplicationService
   # @param text [String] The body of the post.
   # @param url [String, nil] The link to attach.
   # @param idempotency_key [String] A value that is the same for each attempt.
+  # @param reply_to_id [String, nil] The media id of the post above this one, for a thread.
   # @return [String] The id of the post that Meta made.
   # @raise [RuntimeError] It raises at each failure, thus the job does the work again.
-  def post!(text:, url: nil, idempotency_key:)
+  def post!(text:, url: nil, idempotency_key:, reply_to_id: nil)
     raise "Threads is not connected" unless connected?
     raise "The Threads token expired; connect the account again" if expired?
 
     text = text.to_s.strip
     raise "The post is empty" if text.blank?
 
-    container_id = container_for(text: text, url: url, key: idempotency_key)
+    container_id = container_for(text: text, url: url, key: idempotency_key, reply_to_id: reply_to_id)
     published = publish_container(container_id)
 
     # ⚠️ It forgets the container only after Meta published it. To forget it earlier would let a
@@ -244,20 +245,23 @@ class Threads < ApplicationService
 
   # Gets the container that a previous attempt made, or makes one.
   # @return [String] The container id.
-  def container_for(text:, url:, key:)
+  def container_for(text:, url:, key:, reply_to_id: nil)
     stored = $redis.get(container_key(key))
     return stored if stored.present?
 
-    container_id = create_container(text: text, url: url)
+    container_id = create_container(text: text, url: url, reply_to_id: reply_to_id)
     $redis.set(container_key(key), container_id, ex: CONTAINER_TTL)
     container_id
   end
 
   # Makes a TEXT media container.
   # @return [String] The container id.
-  def create_container(text:, url:)
+  def create_container(text:, url:, reply_to_id: nil)
     body = { media_type: "TEXT", text: text }
     body[:link_attachment] = url if url.present?
+    # ⚠️ The reply goes on the CONTAINER and not on the publish. Meta reads it only here.
+    # @see https://developers.facebook.com/documentation/threads/reference/publishing
+    body[:reply_to_id] = reply_to_id if reply_to_id.present?
 
     response = HTTParty.post("#{API_URL}/#{@credentials.user_id}/threads",
                              body: body, query: { access_token: @credentials.access_token },

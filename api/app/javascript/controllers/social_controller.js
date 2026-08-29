@@ -1,28 +1,26 @@
 import { Controller } from "@hotwired/stimulus";
 
-// How long the link field must be quiet before this reads the card. Each preview is one request of
-// this app, which then reads the page of another host.
-const PREVIEW_DEBOUNCE = 600;
-
 /**
- * The Social media page: the character count, the schedule fields, the label of the submit button,
- * and the time zone of the browser. The form itself posts to POST /social.
+ * The Social media page: the posts of a thread, the schedule fields, the label of the submit
+ * button, and the time zone of the browser. The form posts to POST /social.
+ *
+ * ⚠️ The count and the link preview of one post are NOT here. Each block is its own `social-post`
+ * controller, thus this one never reaches into a block and never needs an index.
  */
 export default class extends Controller {
   static targets = [
-    "body", "count", "submit", "link", "spinner", "preview", "previewImage", "previewHost",
-    "previewTitle", "previewDescription", "previewKind",
-    "schedule", "scheduleFields", "date", "time", "timeZone", "label"
+    "submit", "label", "posts", "post", "postLabel", "template", "add", "remove",
+    "schedule", "scheduleFields", "date", "time", "timeZone",
   ];
-  static values = { limit: Number, warnAt: Number, previewUrl: String };
+  static values = { maxPosts: Number };
 
   connect() {
     // A restoration visit can render a snapshot that holds the button in its busy state.
     this.submitTarget.loading = false;
 
     // ⚠️ The date and the time carry no zone. This is what gives them a meaning, and it is the
-    // reason that a date field is safe here and was not safe in the Republish dialog. When this
-    // controller does not run, the field stays empty and the server falls back to TIME_ZONE.
+    // reason that a date field is safe here and was not safe in the Republish dialog. With no
+    // JavaScript the field stays empty and the server falls back to TIME_ZONE.
     const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (zone) this.timeZoneTarget.value = zone;
 
@@ -30,45 +28,68 @@ export default class extends Controller {
     // components until the browser upgrades them.
     //
     // A Turbo restoration visit renders a snapshot that holds the values and no controller state.
-    // Thus the count and the schedule run at connect and not at the first event only.
-    Promise.all([
-      "wa-textarea", "wa-switch", "wa-date-input", "wa-time-input"
-    ].map((tag) => customElements.whenDefined(tag))).then(() => {
-      this.count();
+    // Thus the schedule runs at connect and not at the first event only.
+    Promise.all(
+      ["wa-switch", "wa-date-input", "wa-time-input"].map((tag) => customElements.whenDefined(tag))
+    ).then(() => {
       // This sets `required` as well, thus a page that renders again with the fields open keeps
       // that state.
       this.toggleSchedule();
-      // A page that renders again after a refusal holds a link, thus the card comes back with it.
-      this.preview();
     });
+
+    this.renumber();
   }
 
   /**
-   * Writes the length of the body against the limit, and colors that line.
-   */
-  count() {
-    const length = this.graphemes(this.bodyTarget.value ?? "");
-
-    this.countTarget.textContent = `${length} / ${this.limitValue}`;
-    this.countTarget.classList.toggle("social__count--warning",
-      length >= this.warnAtValue && length <= this.limitValue);
-    this.countTarget.classList.toggle("social__count--over", length > this.limitValue);
-  }
-
-  /**
-   * The length of a string in graphemes, which is how Bluesky counts.
+   * Adds one empty post at the end of the thread, from the template.
    *
-   * ⚠️ `String#length` gives UTF-16 code units, thus one emoji counts as 2 or more there and as 1
-   * at Bluesky. The spread is the fallback: it splits by code point, which is correct for an emoji
-   * with one code point and not for a family or a flag.
-   * @param {string} text
-   * @returns {number}
+   * ⚠️ The content of a <template> is inert: the browser renders none of it and its fields are not
+   * in the form. Only this clone puts a block in the document.
    */
-  graphemes(text) {
-    if (typeof Intl.Segmenter !== "function") return [...text].length;
+  addPost(event) {
+    event.preventDefault();
+    if (this.postTargets.length >= this.maxPostsValue) return;
 
-    this.segmenter ||= new Intl.Segmenter("en", { granularity: "grapheme" });
-    return [...this.segmenter.segment(text)].length;
+    this.postsTarget.appendChild(this.templateTarget.content.cloneNode(true));
+    this.renumber();
+
+    // The words are the point of a new post, thus the caret goes there.
+    const added = this.postTargets[this.postTargets.length - 1];
+    added.querySelector("wa-textarea")?.focus();
+  }
+
+  /**
+   * Removes the post that holds the control that was pressed.
+   */
+  removePost(event) {
+    event.preventDefault();
+    if (this.postTargets.length <= 1) return;
+
+    event.target.closest("[data-social-target='post']")?.remove();
+    this.renumber();
+  }
+
+  /**
+   * Writes "Post N" into each label, and hides Remove while there is one post.
+   *
+   * ⚠️ This is the ONLY numbering, and it is for the reader. The field names carry no index, thus
+   * nothing here changes what the form sends. Refer to the note in _post.html.erb.
+   *
+   * ⚠️ The target is `postLabel` and NOT `label`. The submit button owns `label`, and one name for
+   * both made `labelTarget` find the first post and write "Post now" into it.
+   */
+  renumber() {
+    const posts = this.postTargets;
+
+    posts.forEach((post, index) => {
+      const label = post.querySelector("[data-social-target='postLabel']");
+      if (label) label.textContent = posts.length > 1 ? `Post ${index + 1}` : "";
+
+      const remove = post.querySelector("[data-social-target='remove']");
+      if (remove) remove.hidden = posts.length <= 1;
+    });
+
+    this.addTarget.disabled = posts.length >= this.maxPostsValue;
   }
 
   /**
@@ -79,8 +100,8 @@ export default class extends Controller {
     this.scheduleFieldsTarget.hidden = !on;
 
     // ⚠️ `required` follows the switch, and it is not in the markup. A required control inside a
-    // hidden block would refuse "Post now", and the browser cannot show that message on an
-    // element that nobody can see.
+    // hidden block would refuse "Post now", and the browser cannot show that message on an element
+    // that nobody can see.
     this.dateTarget.required = on;
     this.timeTarget.required = on;
 
@@ -105,103 +126,7 @@ export default class extends Controller {
   }
 
   /**
-   * Waits for the typing to stop, then reads the card.
-   *
-   * ⚠️ Each preview is one request of this app, which then reads the page. Thus it waits, and it
-   * does not read at each keystroke.
-   */
-  schedulePreview() {
-    clearTimeout(this.previewTimer);
-
-    // An empty field asks for nothing, thus it waits for nothing either.
-    if (!this.linkTarget.value?.trim()) {
-      this.busy(false);
-      return this.hidePreview();
-    }
-
-    // ⚠️ It spins from the keystroke and not from the request. The debounce is most of the wait,
-    // and a field that does nothing for 600ms reads as a field that is broken.
-    this.busy(true);
-    this.previewTimer = setTimeout(() => this.preview(), PREVIEW_DEBOUNCE);
-  }
-
-  /**
-   * Reads the card of the link and shows it.
-   *
-   * ⚠️ The browser cannot read another site by itself: the CSP of the admin has `connect-src
-   * :self`, and another host sends no CORS header. Thus this asks this app, and the picture comes
-   * from this app as well, because `img-src` is `:self`.
-   */
-  async preview() {
-    const url = this.linkTarget.value?.trim() ?? "";
-    if (!url) {
-      this.busy(false);
-      return this.hidePreview();
-    }
-
-    // ⚠️ Each call takes the next number, and only the newest one may write. A request that is
-    // still out when the owner types again must not describe a link that they already replaced,
-    // and must not stop the spinner of the request that replaced it.
-    this.previewSeq = (this.previewSeq ?? 0) + 1;
-    const seq = this.previewSeq;
-
-    try {
-      const response = await fetch(`${this.previewUrlValue}?${new URLSearchParams({ url })}`, {
-        headers: { Accept: "application/json" }
-      });
-      if (seq !== this.previewSeq) return;
-
-      if (!response.ok) return this.hidePreview();
-      this.showPreview(await response.json());
-    } catch {
-      if (seq === this.previewSeq) this.hidePreview();
-    } finally {
-      if (seq === this.previewSeq) this.busy(false);
-    }
-  }
-
-  /**
-   * Shows or hides the spinner in the link field.
-   * @param {boolean} on
-   */
-  busy(on) {
-    this.spinnerTarget.hidden = !on;
-  }
-
-  /**
-   * @param {object} card The answer of the preview action.
-   */
-  showPreview(card) {
-    this.previewHostTarget.textContent = card.host ?? "";
-    this.previewTitleTarget.textContent = card.title ?? "";
-    this.previewDescriptionTarget.textContent = card.description ?? "";
-
-    // ⚠️ `withMedia` follows the picture. <wa-card> has no `:has-slotted` to read, thus that flag
-    // is the only thing that tells it to draw the media section. A card with the flag and no
-    // picture draws an empty band above the text.
-    this.previewImageTarget.hidden = !card.image_path;
-    this.previewTarget.withMedia = !!card.image_path;
-    if (card.image_path) this.previewImageTarget.src = card.image_path;
-
-    // This is the thing that the owner cannot know until after the post without it.
-    this.previewKindTarget.textContent = card.standard_site ? "Standard.site" : "Open Graph";
-    this.previewKindTarget.variant = card.standard_site ? "success" : "neutral";
-
-    this.previewTarget.hidden = false;
-  }
-
-  /**
-   * Hides the card, and drops the picture so a stale one never shows with a new link.
-   */
-  hidePreview() {
-    this.previewTarget.hidden = true;
-    this.previewTarget.withMedia = false;
-    this.previewImageTarget.hidden = true;
-    this.previewImageTarget.removeAttribute("src");
-  }
-
-  /**
-   * Makes the submit button busy. The POST adds a job and then redirects, thus the page waits.
+   * Makes the submit button busy.
    *
    * ⚠️ This is on the `submit` of the form, and not on the `click` of the button. A click happens
    * **before** the browser checks the fields. Thus on a form that is not complete the submit never
@@ -229,5 +154,4 @@ export default class extends Controller {
       month: "short", day: "numeric", hour: "numeric", minute: "2-digit"
     });
   }
-
 }

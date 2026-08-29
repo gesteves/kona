@@ -16,6 +16,11 @@
     align-items: start;
   }
 
+  &__posts {
+    // The blocks stack, and wa-stack gives the gap.
+    width: 100%;
+  }
+
   // ⚠️ A rule of Web Awesome gives <wa-spinner> a display, and an author rule beats the
   // `[hidden] { display: none }` of the browser whatever its layer. Thus the attribute alone hides
   // nothing, and this rule is what makes it work. `.social__schedule` above needs the same.
@@ -83,5 +88,31 @@
     color: var(--wa-color-text-quiet);
     font-size: var(--wa-font-size-s);
     margin: 0;
+  }
+}
+
+// One post of a thread. It is a block and not a card: a card here would compete with the preview
+// card inside it.
+.social-post {
+  border-inline-start: 2px solid var(--wa-color-surface-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--wa-space-xs);
+  padding-inline-start: var(--wa-space-m);
+
+  &__head {
+    // It keeps its height while the label is empty, thus one post and a thread line up the same.
+    align-items: center;
+    min-height: var(--wa-space-xl);
+  }
+
+  &__label {
+    color: var(--wa-color-text-quiet);
+    margin-inline-end: auto;
+  }
+
+  &__remove[hidden] {
+    // ⚠️ The same rule as the spinner above: an author rule beats the `[hidden]` of the browser.
+    display: none;
   }
 }

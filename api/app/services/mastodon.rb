@@ -158,29 +158,37 @@ class Mastodon < ApplicationService
   # @param text [String] The body of the post.
   # @param url [String, nil] The link to add below the body.
   # @param idempotency_key [String, nil] A value that is the same for each attempt.
-  # @return [String] The public URL of the status.
+  # @param in_reply_to_id [String, nil] The id of the status above this one, for a thread.
+  # @return [Hash] `{ "id" =>, "url" => }`. The next post of a thread names this one with the `id`.
   # @raise [ApplicationService::HttpError, RuntimeError] It raises at each failure, thus
   #   MastodonPostJob does the work again.
-  def post!(text:, url: nil, idempotency_key: nil)
+  def post!(text:, url: nil, idempotency_key: nil, in_reply_to_id: nil)
     raise "Mastodon is not connected" unless connected?
 
     status = [ text.to_s.strip, url.to_s.strip ].reject(&:blank?).join("\n\n")
     raise "The post is empty" if status.blank?
 
-    posted = posted_status_url(idempotency_key)
+    posted = posted_status(idempotency_key)
     return posted if posted.present?
 
     headers = { "Authorization" => "Bearer #{@credentials.access_token}" }
     headers["Idempotency-Key"] = idempotency_key if idempotency_key.present?
 
+    body = { status: status, visibility: VISIBILITY, language: LANGUAGE }
+    body[:in_reply_to_id] = in_reply_to_id if in_reply_to_id.present?
+
     response = post_json!(
       "https://#{@credentials.instance}/api/v1/statuses",
-      body: { status: status, visibility: VISIBILITY, language: LANGUAGE },
+      body: body,
       headers: headers
     )
-    status_url = response&.dig(:url).presence || "https://#{@credentials.instance}/"
-    remember_status_url(idempotency_key, status_url)
-    status_url
+    # The keys are strings, thus this survives a round trip through the arguments of a Sidekiq job.
+    result = {
+      "id" => response&.dig(:id).presence&.to_s,
+      "url" => response&.dig(:url).presence || "https://#{@credentials.instance}/"
+    }
+    remember_status(idempotency_key, result)
+    result
   end
 
   # Tells the instance to forget the token, then removes the stored credentials.
@@ -227,21 +235,31 @@ class Mastodon < ApplicationService
   end
 
   # @param key [String, nil] The idempotency key.
-  # @return [String] The Redis key that holds the URL of the status of one job.
+  # @return [String] The Redis key that holds the status that one job posted.
   def status_key(key) = "mastodon:status:#{key}"
 
-  # @return [String, nil] The URL that an earlier attempt of the same job posted.
-  def posted_status_url(key)
+  # ⚠️ It keeps the **id** as well as the URL. A thread names the status above it by its id, thus a
+  # second attempt of a job that already posted must give that id back and not only a URL.
+  # @return [Hash, nil] What an earlier attempt of the same job posted.
+  def posted_status(key)
     return if key.blank?
 
-    $redis.get(status_key(key)).presence
+    raw = $redis.get(status_key(key)).presence
+    return if raw.blank?
+
+    parsed = JSON.parse(raw) rescue nil
+    return parsed if parsed.is_a?(Hash) && parsed["id"].present?
+
+    # A value that an earlier version of this code wrote is the URL alone. It has no id, thus a
+    # reply cannot name it, and the post itself is already out.
+    { "id" => nil, "url" => raw }
   end
 
   # @return [void]
-  def remember_status_url(key, status_url)
+  def remember_status(key, result)
     return if key.blank?
 
-    $redis.set(status_key(key), status_url, ex: STATUS_TTL.to_i)
+    $redis.set(status_key(key), result.to_json, ex: STATUS_TTL.to_i)
     nil
   end
 end

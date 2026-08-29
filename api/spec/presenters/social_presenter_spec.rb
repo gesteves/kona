@@ -23,13 +23,15 @@ RSpec.describe SocialPresenter do
 
   describe "the draft" do
     # ⚠️ A failed submit renders the page again, thus the owner must not lose what they wrote.
-    it "puts each submitted value back" do
-      presenter = described_class.new(networks: [ network ], body: "Hi", article_url: "https://x.test/",
-                                      selected: [ "bluesky" ], scheduled: true, date: "2026-09-01",
-                                      time: "09:00")
+    it "puts each submitted post back, in order" do
+      presenter = described_class.new(
+        networks: [ network ],
+        posts: [ { text: "One", link: "https://x.test/" }, { text: "Two", link: "" } ],
+        selected: [ "bluesky" ], scheduled: true, date: "2026-09-01", time: "09:00"
+      )
 
-      expect(presenter.body).to eq("Hi")
-      expect(presenter.article_url).to eq("https://x.test/")
+      expect(presenter.posts.map(&:text)).to eq(%w[One Two])
+      expect(presenter.posts.map(&:link)).to eq([ "https://x.test/", "" ])
       expect(presenter).to be_scheduled
       expect(presenter.date).to eq("2026-09-01")
       expect(presenter.time).to eq("09:00")
@@ -37,35 +39,22 @@ RSpec.describe SocialPresenter do
       expect(presenter.selected?("mastodon")).to be(false)
     end
 
-    it "is blank on a first load" do
-      expect(presenter.body).to eq("")
-      expect(presenter.article_url).to eq("")
+    # ⚠️ There is always at least one post, thus the view renders one empty block.
+    it "gives one empty post on a first load" do
+      presenter = described_class.new(networks: [ network ])
+
+      expect(presenter.posts.length).to eq(1)
+      expect(presenter.posts.first.text).to eq("")
+      expect(presenter.posts.first.link).to eq("")
       expect(presenter).not_to be_scheduled
     end
-  end
 
-  describe "the ticks" do
-    let(:rows) do
-      [ network, network(key: "mastodon", name: "Mastodon", account: "@me@x.test"),
-        network(key: "threads", name: "Threads", account: nil, connected: false) ]
-    end
+    it "knows a thread from one post" do
+      one = described_class.new(networks: [ network ], posts: [ { text: "One" } ])
+      many = described_class.new(networks: [ network ], posts: [ { text: "One" }, { text: "Two" } ])
 
-    # The owner posts to each connected network nearly always, thus the page must not ask for
-    # three clicks each time.
-    it "ticks each connected network on a first load" do
-      presenter = described_class.new(networks: rows)
-
-      expect(presenter.selected?("bluesky")).to be(true)
-      expect(presenter.selected?("mastodon")).to be(true)
-      expect(presenter.selected?("threads")).to be(false)
-    end
-
-    # ⚠️ A submit that fails passes the choice of the owner back, and an empty choice is a choice.
-    it "ticks nothing when the owner unticked each one" do
-      presenter = described_class.new(networks: rows, selected: [])
-
-      expect(presenter.selected?("bluesky")).to be(false)
-      expect(presenter.selected?("mastodon")).to be(false)
+      expect(one).not_to be_thread
+      expect(many).to be_thread
     end
   end
 

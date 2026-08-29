@@ -56,7 +56,7 @@ edge serves a cached copy before it gets a new one.
 | GET | `/signin`, `/auth/google_oauth2/callback`; POST `/signout` | owner session | `no-store` |
 | GET | `/`, `/spam`, `/location`, `/connected-apps`, `/course-maps`, `/course-maps/:id` | admin UI (owner-session gated) | `no-store` |
 | GET | `/social` | the Social media page | `no-store` |
-| POST | `/social` | checks the draft and adds one post job for each network that the owner ticked, now or at a date and a time; 303, or 422 with the draft still in the form | `no-store` |
+| POST | `/social` | checks the draft and adds the FIRST post job of each network that the owner ticked, now or at a date and a time; 303, or 422 with the draft still in the form | `no-store` |
 | GET | `/social/preview` | the card of a link, as JSON, for the preview on the page | `no-store` |
 | GET | `/social/preview/image` | proxies the picture of that card. ⚠️ The parameter is the **page**, not the picture | `no-store` |
 | POST | `/spam/:id/not-spam`; DELETE `/spam/:id`, `/connected-apps/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
@@ -376,9 +376,9 @@ Thus that shared window is safe.
 | `WhoopWebhookJob(event_type, resource_id, trace_id)` | syncs Whoop metrics to Intervals.icu |
 | `ActivityDescriptionJob(activity_id, whoop_strain = nil)` | (re)generates an activity's Strava description and tidies its name |
 | `LocationSyncJob(latitude, longitude)` | propagates the current location to Intervals.icu |
-| `BlueskyPostJob(key, url, text)` | posts one draft to Bluesky |
-| `MastodonPostJob(key, url, text)` | posts one draft to Mastodon |
-| `ThreadsPostJob(key, url, text)` | posts one draft to Threads |
+| `BlueskyPostJob(posts, index, reply)` | posts one post of a thread to Bluesky, then adds the job of the next |
+| `MastodonPostJob(posts, index, in_reply_to_id)` | the same, for Mastodon |
+| `ThreadsPostJob(posts, index, reply_to_id)` | the same, for Threads |
 | `ContactMailJob(name, email, message, context, restored_from_spam = false)` | contact intake: Akismet + compose |
 | `ContactDeliveryJob(payload)` | the one retryable *delivery* unit — sends via Resend |
 | `MapTilesetJob(id)` | publishes an uploaded GPX track to Mapbox as a vector tileset |
@@ -779,9 +779,12 @@ hangs gives a 500 in place of the message of the page, and a disconnect never re
 
 ### The Social media page
 
-**Social media** (`/social`) drafts one post about a link for Bluesky, Mastodon, and Threads, now or
-at a date and a time. All three post.
+**Social media** (`/social`) drafts a post, or a **thread** of them, for Bluesky, Mastodon, and
+Threads, now or at a date and a time. All three post. Each post has an **optional** link.
 
+- ⚠️ **The link is OPTIONAL, and every post has one of its own.** A post with none is words alone
+  and it makes no card, and the job then reads no page at all. The action refuses a link only when
+  it is **there** and it is not http or https.
 - **The link is a plain `wa-input type="url"`, and there is NO list of the entries.** The owner
   pastes a link. ⚠️ **Do not add a picker of the articles back.** The card of a post comes from the
   `og:` tags of whatever page the link names, thus a link to another site needs no more code, and a
@@ -897,6 +900,52 @@ at a date and a time. All three post.
   it before an account exists. Do not gate it on the connection state.
   ⚠️ `SocialController#social_networks` reads each state from **Redis**, and no service makes an HTTP
   request, for the same reason as the Connected apps page.
+
+#### A thread
+
+The owner adds posts below the first, and each one has its own words and its own optional link.
+
+- **The form sends `posts[][text]` and `posts[][link]`.** ⚠️ **Rails starts a new hash when a key
+  repeats, thus both fields must render for every block, in the same order.** A block that omits one
+  moves each pair below it by one. There is **no index in the name**, on purpose: an index needs
+  renumbering in the browser at each add and each remove, and that is the thing that breaks.
+- **The view holds a `<template>` of one empty block**, and the outer `social` controller clones it.
+  ⚠️ The content of a `<template>` is a separate fragment: `querySelectorAll` does not reach it, thus
+  Stimulus does not count the block inside it and its fields are not in the form.
+- ⚠️ **Each block is its own `social-post` controller**, which owns that block's count, spinner, and
+  preview. The outer controller never reaches into a block. A flat list of targets would need an
+  index at every call.
+- ⚠️ **The per-post label is `data-social-target="postLabel"` and NOT `label`.** The submit button
+  owns `label`, and one name for both made `labelTarget` find the first post and write "Post now"
+  into it.
+- **`SocialPresenter::MAX_POSTS` is 25.** It is a guard against a runaway form and not a rule of any
+  network.
+- A block with **nothing at all** in it is dropped, thus an empty block that the owner added and
+  left alone does not refuse the draft.
+- ⚠️ **A message names the post** — "Post 2 is 301 characters." — because a thread has more than one
+  and a plain message does not say which one is wrong. With one post the messages keep their
+  singular form.
+
+**The chain.** ⚠️ **There is one job for each POST, and not one job for the whole thread.** Each job
+posts its own index and then adds the job of the one below it.
+
+- ⚠️ **This is what makes a retry safe, and it needs no new Redis store**: a failure runs **one**
+  post again, and that post is idempotent for the reason that each network already had — Bluesky
+  writes with `putRecord` at its own key, Mastodon sends that key as its `Idempotency-Key`, and
+  Threads keeps its media container below it. A single job for the whole chain would, on a retry, go
+  back to the posts that already went out.
+- ⚠️ **The controller makes one key for each post**, and the three networks share those keys. The
+  reply reference travels in the **job arguments**, thus it is the same at each attempt.
+- ⚠️ **Only the FIRST job of each network is scheduled.** The rest of the chain goes out with it.
+- The reply of each network: Bluesky takes `reply: { root:, parent: }`, two strongRefs, thus
+  `AtProto#put_record` answers with `{ "uri" =>, "cid" => }` and not with a Boolean. Mastodon takes
+  `in_reply_to_id`, thus `Mastodon#post!` answers with the `id` as well as the URL, and the Redis
+  value that it remembers holds both. Threads takes `reply_to_id` **on the container**.
+- ⚠️ **The root of a Bluesky thread is the FIRST post, and the parent is the one just above.** The
+  job carries the root through the chain and never makes it again.
+- ⚠️ **A thread that fails part of the way through leaves the posts above it published**, on that
+  network only. This is accepted: the alternative is to delete posts that are already public, and a
+  reader may have replied to one. Each other network has its own chain and is unaffected.
 
 ### Posting to Bluesky
 

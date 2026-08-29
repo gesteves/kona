@@ -91,11 +91,16 @@ class Bluesky < ApplicationService
   # @param rkey [String] The record key, from `Bluesky.new_tid`.
   # @param text [String] The body of the post, as plain text.
   # @param card [OpenGraph::Card, nil] The card of the link, from `OpenGraph#fetch`. Only its `url`
-  #   is necessary: a card with no title and no picture still renders.
-  # @return [String] The public URL of the post.
+  #   is necessary: a card with no title and no picture still renders. Nil gives a post with no
+  #   card at all.
+  # @param reply [Hash, nil] `{ "root" =>, "parent" => }`, each a reference from an earlier call.
+  #   ⚠️ The **root** is the first post of the thread, and the **parent** is the one just above.
+  #   The caller carries the root through the chain and never makes it again.
+  # @return [Hash] `{ "uri" =>, "cid" =>, "url" => }`. The next post of a thread names this one with
+  #   the `uri` and the `cid`.
   # @raise [RuntimeError] When the credentials, the length, the session, or the write fails. It
   #   raises on purpose: `BlueskyPostJob` then does the work again.
-  def post!(rkey:, text:, card: nil)
+  def post!(rkey:, text:, card: nil, reply: nil)
     raise "Bluesky is not connected" unless valid_credentials?
     raise "The post is empty or longer than #{MAX_GRAPHEMES} characters" unless self.class.valid_post_length?(text)
     raise "Could not open a Bluesky session" unless open_session(handle: @handle, app_password: @app_password)
@@ -110,12 +115,14 @@ class Bluesky < ApplicationService
     record["facets"] = facets if facets.any?
     embed = build_card(card)
     record["embed"] = embed if embed.present?
+    record["reply"] = reply if reply.present?
 
     # ⚠️ It does not send `validate: false`. The PDS knows the app.bsky.* lexicons, thus its own
     # check finds a record with an error before the post reaches a feed.
-    raise "Bluesky refused the post" unless put_record(COLLECTION, rkey, record, validate: nil)
+    written = put_record(COLLECTION, rkey, record, validate: nil)
+    raise "Bluesky refused the post" if written.blank?
 
-    self.class.post_url(@handle, rkey)
+    written.merge("url" => self.class.post_url(@handle, rkey))
   end
 
   # Gets the picture of a website card, ready to go up as a blob.

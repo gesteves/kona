@@ -51,7 +51,7 @@ RSpec.describe "Admin social media", type: :request do
         get "/social"
 
         expect(response).to have_http_status(:ok)
-        expect(response.body).to include(%(<wa-input type="url" name="article_url"))
+        expect(response.body).to include(%(<wa-input type="url" name="posts[][link]"))
         expect(response.body).to include("<wa-textarea")
         expect(response.headers["Cache-Control"]).to include("no-store")
       end
@@ -69,8 +69,8 @@ RSpec.describe "Admin social media", type: :request do
       it "writes the character limit into the markup for the controller to read" do
         get "/social"
 
-        expect(response.body).to include(%(data-social-limit-value="#{SocialPresenter::BODY_LIMIT}"))
-        expect(response.body).to include(%(data-social-warn-at-value="#{SocialPresenter::WARN_AT}"))
+        expect(response.body).to include(%(data-social-post-limit-value="#{SocialPresenter::BODY_LIMIT}"))
+        expect(response.body).to include(%(data-social-post-warn-at-value="#{SocialPresenter::WARN_AT}"))
       end
 
       # The server renders the first count, thus the line has its height before the JavaScript
@@ -290,24 +290,136 @@ RSpec.describe "Admin social media", type: :request do
 
 
       it "adds the job of the network, with the link and the body" do
-        post "/social", params: { article_url: url, body: "A long day.", networks: [ "bluesky" ] }
+        post "/social", params: { posts: [ { text: "A long day.", link: url } ], networks: [ "bluesky" ] }
 
         expect(response).to redirect_to(social_path)
         expect(flash[:notice]).to include("Sent to Bluesky.")
         expect(BlueskyPostJob.jobs.size).to eq(1)
-        rkey, link, body = BlueskyPostJob.jobs.first["args"]
-        expect(link).to eq(url)
-        expect(body).to eq("A long day.")
-        # ⚠️ The controller makes the record key, and the job writes with putRecord at that key.
-        # Thus a Sidekiq retry replaces one post and does not add a second one.
-        expect(rkey).to match(/\A[234567a-z]{13}\z/)
+        payload = BlueskyPostJob.jobs.first["args"].first
+        expect(payload.length).to eq(1)
+        expect(payload.first["link"]).to eq(url)
+        expect(payload.first["text"]).to eq("A long day.")
+        # ⚠️ The controller makes the key of each post, and each job writes at that key. Thus a
+        # Sidekiq retry replaces one post and does not add a second one.
+        expect(payload.first["key"]).to match(/\A[234567a-z]{13}\z/)
+      end
+
+      # ⚠️ The link is optional. A post with no link is words alone, and it makes no card.
+      it "takes a post with no link" do
+        post "/social", params: { posts: [ { text: "No link here." } ], networks: [ "bluesky" ] }
+
+        expect(response).to redirect_to(social_path)
+        expect(BlueskyPostJob.jobs.first["args"].first.first["link"]).to eq("")
+      end
+
+      describe "a thread" do
+        # ⚠️ The form sends `posts[][text]` and `posts[][link]`, and Rails starts a new hash when a
+        # key repeats. Thus each pair must stay together and in order.
+        it "adds one job for the thread, with each post in order and a key of its own" do
+          post "/social", params: {
+            posts: [ { text: "One", link: "https://example.test/a/" },
+                     { text: "Two", link: "" },
+                     { text: "Three", link: "https://example.test/b/" } ],
+            networks: [ "bluesky" ]
+          }
+
+          expect(response).to redirect_to(social_path)
+          expect(BlueskyPostJob.jobs.size).to eq(1)
+          payload = BlueskyPostJob.jobs.first["args"].first
+          expect(payload.map { |p| p["text"] }).to eq(%w[One Two Three])
+          expect(payload.map { |p| p["link"] })
+            .to eq([ "https://example.test/a/", "", "https://example.test/b/" ])
+          expect(payload.map { |p| p["key"] }.uniq.length).to eq(3)
+        end
+
+        it "names the thread in the notice" do
+          connect(bluesky: true, mastodon: true, threads: false)
+
+          post "/social", params: { posts: [ { text: "One" }, { text: "Two" } ],
+                                    networks: %w[bluesky mastodon] }
+
+          expect(flash[:notice]).to eq("Sent a thread of 2 posts to Bluesky and Mastodon.")
+        end
+
+        # ⚠️ Only the FIRST post of each network is scheduled. That job adds the next one when it
+        # succeeds, thus the rest of the thread needs no time of its own.
+        it "schedules the first job of each network only" do
+          on = 10.days.from_now.strftime("%Y-%m-%d")
+
+          post "/social", params: { posts: [ { text: "One" }, { text: "Two" } ],
+                                    networks: [ "bluesky" ], schedule: "1", date: on,
+                                    time: "09:00", time_zone: "America/Denver" }
+
+          expect(BlueskyPostJob.jobs.size).to eq(1)
+          expect(BlueskyPostJob.jobs.first["at"]).to be_present
+          expect(flash[:notice]).to include("Scheduled a thread of 2 posts to Bluesky")
+        end
+
+        # An empty block that the owner added and left alone must not refuse the whole draft.
+        it "drops a block with nothing in it" do
+          post "/social", params: { posts: [ { text: "One" }, { text: "", link: "" } ],
+                                    networks: [ "bluesky" ] }
+
+          expect(response).to redirect_to(social_path)
+          expect(BlueskyPostJob.jobs.first["args"].first.length).to eq(1)
+        end
+
+        # ⚠️ A message names the post: a thread has more than one, and a plain message does not say
+        # which one is wrong.
+        it "names the post that is too long" do
+          post "/social", params: { posts: [ { text: "One" }, { text: "a" * 301 } ],
+                                    networks: [ "bluesky" ] }
+
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(response.body).to include("Post 2 is 301 characters.")
+          expect(BlueskyPostJob.jobs).to be_empty
+        end
+
+        it "names the post with a link that is not a link" do
+          post "/social", params: { posts: [ { text: "One" }, { text: "Two", link: "nope" } ],
+                                    networks: [ "bluesky" ] }
+
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(response.body).to include("Post 2 needs a link that starts with http://")
+        end
+
+        it "refuses a post of the thread that has a link and no words" do
+          post "/social", params: {
+            posts: [ { text: "One" }, { text: "", link: "https://example.test/a/" } ],
+            networks: [ "bluesky" ]
+          }
+
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(response.body).to include("Post 2 needs something to say.")
+        end
+
+        it "refuses a thread past the limit" do
+          post "/social", params: {
+            posts: Array.new(SocialPresenter::MAX_POSTS + 1) { |i| { text: "Post #{i}" } },
+            networks: [ "bluesky" ]
+          }
+
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(response.body).to include("at most #{SocialPresenter::MAX_POSTS} posts")
+          expect(BlueskyPostJob.jobs).to be_empty
+        end
+
+        # ⚠️ A refusal renders again and keeps every post. A redirect would lose what the owner
+        # wrote, and a thread is more of it.
+        it "puts every post back after a refusal, in order" do
+          post "/social", params: { posts: [ { text: "First words" }, { text: "a" * 301 } ],
+                                    networks: [ "bluesky" ] }
+
+          expect(response.body).to include("First words")
+          expect(response.body).to include("a" * 301)
+        end
       end
 
       # ⚠️ One job for each network, thus a failure at one service retries that service alone.
       it "adds one job for each network, and gives all three the same key" do
         connect(bluesky: true, mastodon: true, threads: true)
 
-        post "/social", params: { article_url: url, body: "Hi.", networks: %w[bluesky mastodon threads] }
+        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: %w[bluesky mastodon threads] }
 
         expect(flash[:notice]).to eq("Sent to Bluesky, Mastodon, and Threads.")
         keys = [ BlueskyPostJob, MastodonPostJob, ThreadsPostJob ].map do |job|
@@ -320,7 +432,7 @@ RSpec.describe "Admin social media", type: :request do
       it "adds no job for a network that the owner did not tick" do
         connect(bluesky: true, mastodon: true, threads: true)
 
-        post "/social", params: { article_url: url, body: "Hi.", networks: [ "mastodon" ] }
+        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "mastodon" ] }
 
         expect(MastodonPostJob.jobs.size).to eq(1)
         expect(BlueskyPostJob.jobs).to be_empty
@@ -332,7 +444,7 @@ RSpec.describe "Admin social media", type: :request do
       it "refuses a network that has no account" do
         connect(bluesky: true, mastodon: false, threads: false)
 
-        post "/social", params: { article_url: url, body: "Hi.", networks: [ "mastodon" ] }
+        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "mastodon" ] }
 
         expect(response).to have_http_status(:unprocessable_content)
         expect(MastodonPostJob.jobs).to be_empty
@@ -340,15 +452,16 @@ RSpec.describe "Admin social media", type: :request do
 
       # ⚠️ The link field takes any URL, thus the owner can share a page on another site.
       it "takes a link that is not an article of this site" do
-        post "/social", params: { article_url: "https://someone-else.test/a-post/", body: "Good.",
+        post "/social", params: { posts: [ { text: "Good.", link: "https://someone-else.test/a-post/" } ],
                                  networks: [ "bluesky" ] }
 
         expect(response).to redirect_to(social_path)
-        expect(BlueskyPostJob.jobs.first["args"][1]).to eq("https://someone-else.test/a-post/")
+        expect(BlueskyPostJob.jobs.first["args"].first.first["link"])
+          .to eq("https://someone-else.test/a-post/")
       end
 
       it "ignores a network key that this app does not know" do
-        post "/social", params: { article_url: url, body: "Hi.", networks: %w[bluesky myspace] }
+        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: %w[bluesky myspace] }
 
         expect(BlueskyPostJob.jobs.size).to eq(1)
         expect(flash[:notice]).to eq("Sent to Bluesky.")
@@ -359,7 +472,7 @@ RSpec.describe "Admin social media", type: :request do
       it "refuses the Threads row when its token expired" do
         expire_threads
 
-        post "/social", params: { article_url: url, body: "Hi.", networks: [ "threads" ] }
+        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "threads" ] }
 
         expect(response).to have_http_status(:unprocessable_content)
         expect(ThreadsPostJob.jobs).to be_empty
@@ -368,14 +481,14 @@ RSpec.describe "Admin social media", type: :request do
       # ⚠️ The body is stripped one time, here. Without that a newline at its end went to Bluesky
       # as it was and to Mastodon with the newline removed.
       it "strips the body before it counts it and before it adds the job" do
-        post "/social", params: { article_url: url, body: "  A long day.\n\n", networks: [ "bluesky" ] }
+        post "/social", params: { posts: [ { text: "  A long day.\n\n", link: url } ], networks: [ "bluesky" ] }
 
         expect(response).to redirect_to(social_path)
-        expect(BlueskyPostJob.jobs.first["args"].last).to eq("A long day.")
+        expect(BlueskyPostJob.jobs.first["args"].first.first["text"]).to eq("A long day.")
       end
 
       it "refuses a body that is only white space" do
-        post "/social", params: { article_url: url, body: " \n ", networks: [ "bluesky" ] }
+        post "/social", params: { posts: [ { text: " \n ", link: url } ], networks: [ "bluesky" ] }
 
         expect(response).to have_http_status(:unprocessable_content)
         expect(response.body).to include("Write something to post.")
@@ -386,7 +499,7 @@ RSpec.describe "Admin social media", type: :request do
       it "keeps the rows unticked after a refusal when the owner unticked them" do
         connect(bluesky: true, mastodon: true, threads: false)
 
-        post "/social", params: { article_url: url, body: "", networks: [] }
+        post "/social", params: { posts: [ { text: "", link: url } ], networks: [] }
 
         expect(response).to have_http_status(:unprocessable_content)
         expect(response.body).not_to match(/value="bluesky"[^>]*\schecked>/)
@@ -402,7 +515,7 @@ RSpec.describe "Admin social media", type: :request do
         # one meaning. This is the difference from the Republish dialog, which takes minutes from
         # now for exactly this reason.
         it "reads the date and the time in the zone that the browser sent" do
-          post "/social", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
                                    schedule: "1", date: on, time: "09:00",
                                    time_zone: "America/New_York" }
 
@@ -412,7 +525,7 @@ RSpec.describe "Admin social media", type: :request do
         end
 
         it "names the moment in the notice, in that same zone" do
-          post "/social", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
                                    schedule: "1", date: on, time: "09:00",
                                    time_zone: "America/New_York" }
 
@@ -427,7 +540,7 @@ RSpec.describe "Admin social media", type: :request do
         it "falls back to the configured zone with no time zone field" do
           allow(TimeZoneResolver).to receive(:default).and_return("America/Denver")
 
-          post "/social", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
                                    schedule: "1", date: on, time: "09:00" }
 
           expected = Time.use_zone("America/Denver") { Time.zone.parse("#{on} 09:00") }
@@ -436,7 +549,7 @@ RSpec.describe "Admin social media", type: :request do
 
         # That field comes from the browser, thus a value with a mistake must never raise.
         it "falls back for a time zone that Rails does not know" do
-          post "/social", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
                                    schedule: "1", date: on, time: "09:00",
                                    time_zone: "Mars/Olympus_Mons" }
 
@@ -445,7 +558,7 @@ RSpec.describe "Admin social media", type: :request do
         end
 
         it "posts now when the switch is off, and schedules nothing" do
-          post "/social", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
                                    schedule: "0", date: on, time: "09:00" }
 
           expect(flash[:notice]).to include("Sent to Bluesky.")
@@ -453,7 +566,7 @@ RSpec.describe "Admin social media", type: :request do
         end
 
         it "refuses a moment in the past" do
-          post "/social", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
                                    schedule: "1", date: "2020-01-01", time: "09:00" }
 
           expect(response).to have_http_status(:unprocessable_content)
@@ -466,7 +579,7 @@ RSpec.describe "Admin social media", type: :request do
         it "takes a moment years from now" do
           far = 3.years.from_now
 
-          post "/social", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
                                    schedule: "1", date: far.strftime("%Y-%m-%d"), time: "09:00" }
 
           expect(response).to redirect_to(social_path)
@@ -476,7 +589,7 @@ RSpec.describe "Admin social media", type: :request do
         # ⚠️ `Time.zone.parse("garbage 09:00")` gives today at 09:00. Without the check of the
         # shape, a value with a mistake would schedule a post for today.
         it "refuses a date that is not a date" do
-          post "/social", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
                                    schedule: "1", date: "garbage", time: "09:00" }
 
           expect(response).to have_http_status(:unprocessable_content)
@@ -485,7 +598,7 @@ RSpec.describe "Admin social media", type: :request do
         end
 
         it "refuses a time that is not a time" do
-          post "/social", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
                                    schedule: "1", date: on, time: "9 in the morning" }
 
           expect(response).to have_http_status(:unprocessable_content)
@@ -493,7 +606,7 @@ RSpec.describe "Admin social media", type: :request do
         end
 
         it "refuses a schedule with no date, and keeps the fields open" do
-          post "/social", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
                                    schedule: "1", date: "", time: "09:00" }
 
           expect(response).to have_http_status(:unprocessable_content)
@@ -507,7 +620,7 @@ RSpec.describe "Admin social media", type: :request do
       # ⚠️ A refusal renders the page again and keeps the draft. A redirect would lose it.
       context "when the draft is not good" do
         it "refuses an empty body and keeps the picker" do
-          post "/social", params: { article_url: url, body: "", networks: [ "bluesky" ] }
+          post "/social", params: { posts: [ { text: "", link: url } ], networks: [ "bluesky" ] }
 
           expect(response).to have_http_status(:unprocessable_content)
           expect(response.body).to include("Write something to post.")
@@ -518,7 +631,7 @@ RSpec.describe "Admin social media", type: :request do
         it "refuses a body past the limit and keeps it in the field" do
           long = "a" * (Bluesky::MAX_GRAPHEMES + 1)
 
-          post "/social", params: { article_url: url, body: long, networks: [ "bluesky" ] }
+          post "/social", params: { posts: [ { text: long, link: url } ], networks: [ "bluesky" ] }
 
           expect(response).to have_http_status(:unprocessable_content)
           expect(response.body).to include("301 characters")
@@ -527,15 +640,15 @@ RSpec.describe "Admin social media", type: :request do
         end
 
         it "refuses a value that is not a URL" do
-          post "/social", params: { article_url: "not a link", body: "Hi.", networks: [ "bluesky" ] }
+          post "/social", params: { posts: [ { text: "Hi.", link: "not a link" } ], networks: [ "bluesky" ] }
 
           expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include("Paste a link to share.")
+          expect(response.body).to include("needs a link that starts with http://")
           expect(BlueskyPostJob.jobs).to be_empty
         end
 
         it "refuses a draft with no network" do
-          post "/social", params: { article_url: url, body: "Hi.", networks: [] }
+          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [] }
 
           expect(response).to have_http_status(:unprocessable_content)
           expect(response.body).to include("Pick at least one place to post it.")
@@ -556,7 +669,7 @@ RSpec.describe "Admin social media", type: :request do
         get "/social"
 
         expect(response).to have_http_status(:ok)
-        expect(response.body).to include(%(name="article_url"))
+        expect(response.body).to include(%(name="posts[][text]"))
       end
 
       it "disables each of the three rows" do

@@ -109,8 +109,11 @@ module AtProto
   # @param collection [String] The lexicon id.
   # @param rkey [String] The record key.
   # @param record [Hash] The record.
+  # ⚠️ It answers with the **reference** of the record and not with a Boolean, because a reply
+  # names its parent by `uri` **and** `cid`, and an `at://` URI holds no CID. Each caller that only
+  # asks "did it work" still reads it correctly: a Hash is truthy and nil is not.
   # @param validate [Boolean, nil] False where the PDS does not know the lexicon. Nil omits it.
-  # @return [Boolean] Whether it succeeded.
+  # @return [Hash, nil] `{ "uri" =>, "cid" => }`, or nil after a failure.
   def put_record(collection, rkey, record, validate: false)
     body = { repo: @did, collection: collection, rkey: rkey, record: record }
     body[:validate] = validate unless validate.nil?
@@ -120,8 +123,13 @@ module AtProto
     unless response.success?
       Rails.logger.warn("#{at_proto_label}: failed to put #{collection}/#{rkey} (HTTP #{response.code}: #{response.body})")
       report_upstream_error("HTTP #{response.code}", context: "#{at_proto_label} putRecord #{collection}/#{rkey}", status: response.code)
+      return
     end
-    response.success?
+
+    # The keys are strings, thus the reference survives a round trip through the arguments of a
+    # Sidekiq job with no change.
+    written = JSON.parse(response.body.to_s) rescue {}
+    { "uri" => written["uri"].presence || "at://#{@did}/#{collection}/#{rkey}", "cid" => written["cid"] }
   end
 
   # Splits an `at://` URI into its three parts.

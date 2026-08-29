@@ -60,6 +60,7 @@ import MapPreviewController from "./controllers/map_preview_controller";
 import LinkedSidesController from "./controllers/linked_sides_controller";
 import RepublishController from "./controllers/republish_controller";
 import SocialController from "./controllers/social_controller";
+import SocialPostController from "./controllers/social_post_controller";
 
 // window.Stimulus stays available for a debug session in the console, but the code registers each
 // controller through the local variable, because a static analysis cannot see the global.
@@ -73,3 +74,4 @@ application.register("map-preview", MapPreviewController);
 application.register("linked-sides", LinkedSidesController);
 application.register("republish", RepublishController);
 application.register("social", SocialController);
+application.register("social-post", SocialPostController);

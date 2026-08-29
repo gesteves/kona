@@ -1,17 +1,25 @@
-# Posts one draft from the Social media page to Threads.
+# Posts one post of a draft from the Social media page to Threads, then adds the job of the next
+# one.
 #
-# ⚠️ You can do this job more than one time. Meta gives no idempotency header, thus `Threads#post!`
-# keeps the id of the media container in Redis below `key`. A retry then publishes the container
-# that it made already, in place of a second one.
+# ⚠️ **There is one job for each POST, and not one job for the whole thread.** Refer to
+# BlueskyPostJob for the reason.
 #
-# ⚠️ There is one job for each network, and not one job for all of them. Thus a failure at one
-# service retries that service alone, and a network that already posted is never sent again.
+# ⚠️ You can do each attempt more than one time. Meta gives no idempotency header, thus
+# `Threads#post!` keeps the id of the media container in Redis below `key`. A retry then publishes
+# the container that it made already, in place of a second one.
 class ThreadsPostJob < ApplicationJob
-  # @param key [String] The idempotency key, which is the same value for each attempt.
-  # @param url [String] The link to share. Threads attaches it as a link_attachment.
-  # @param text [String] The body of the post.
-  def perform(key, url, text)
-    posted = Threads.new.post!(text: text, url: url, idempotency_key: key)
-    Rails.logger.info("ThreadsPostJob: posted #{posted}")
+  # @param posts [Array<Hash>] `[{ "key" =>, "text" =>, "link" => }, …]`, the whole thread.
+  # @param index [Integer] Which post of that list this job writes.
+  # @param reply_to_id [String, nil] The media id of the post above, or nil for the first.
+  def perform(posts, index = 0, reply_to_id = nil)
+    post = posts[index]
+    return if post.blank?
+
+    # ⚠️ Threads attaches the link itself, thus this reads no og: tags either.
+    posted = Threads.new.post!(text: post["text"], url: post["link"],
+                               idempotency_key: post["key"], reply_to_id: reply_to_id)
+    Rails.logger.info("ThreadsPostJob: posted #{index + 1}/#{posts.length} as #{posted}")
+
+    self.class.perform_async(posts, index + 1, posted) if posts[index + 1]
   end
 end

@@ -212,7 +212,7 @@ RSpec.describe Mastodon do
       connect_account!
       $redis.del(status_key)
       allow(HTTParty).to receive(:post)
-        .and_return(http_response({ url: "https://mastodon.social/@me/1" }))
+        .and_return(http_response({ id: "1", url: "https://mastodon.social/@me/1" }))
     end
 
     after { $redis.del(status_key) }
@@ -276,23 +276,34 @@ RSpec.describe Mastodon do
       )
     end
 
-    it "answers with the URL of the status" do
-      expect(post!).to eq("https://mastodon.social/@me/1")
+    # ⚠️ It answers with the id as well as the URL. A thread names the status above it by its id.
+    it "answers with the id and the URL of the status" do
+      expect(post!).to eq({ "id" => "1", "url" => "https://mastodon.social/@me/1" })
     end
 
     # ⚠️ The instance keeps the idempotency key for approximately an hour, and the Sidekiq retries
-    # go on for 24. The URL in Redis is what makes a late retry safe.
-    it "remembers the URL of the status below the key" do
+    # go on for 24. The status in Redis is what makes a late retry safe.
+    it "remembers the status below the key" do
       post!
 
-      expect($redis.get(status_key)).to eq("https://mastodon.social/@me/1")
+      expect(JSON.parse($redis.get(status_key)))
+        .to eq({ "id" => "1", "url" => "https://mastodon.social/@me/1" })
       expect($redis.ttl(status_key)).to be_within(60).of(described_class::STATUS_TTL.to_i)
     end
 
-    it "answers with the URL of an earlier attempt and posts nothing" do
+    it "answers with the status of an earlier attempt and posts nothing" do
+      $redis.set(status_key, { "id" => "1", "url" => "https://mastodon.social/@me/1" }.to_json)
+
+      expect(post!).to eq({ "id" => "1", "url" => "https://mastodon.social/@me/1" })
+      expect(HTTParty).not_to have_received(:post)
+    end
+
+    # ⚠️ An earlier version of this code kept the URL alone. That value has no id, thus a reply
+    # cannot name it, and the post is already out. It must not post a second time.
+    it "reads a remembered value from before the id, and posts nothing" do
       $redis.set(status_key, "https://mastodon.social/@me/1")
 
-      expect(post!).to eq("https://mastodon.social/@me/1")
+      expect(post!).to eq({ "id" => nil, "url" => "https://mastodon.social/@me/1" })
       expect(HTTParty).not_to have_received(:post)
     end
 
