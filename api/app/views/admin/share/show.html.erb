@@ -1,0 +1,87 @@
+<% content_for :title, "Share a post" %>
+
+<h1 class="admin-main__title">Share a post</h1>
+
+<% if @share.empty? %>
+  <%# Articles#list gives an empty array after a failure, thus this is what a Contentful outage
+      looks like. The rest of the form still renders, and the picker is then empty. %>
+  <wa-callout variant="warning">
+    <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
+    Couldn't load the articles. Reload the page, or check that Contentful is up.
+  </wa-callout>
+<% end %>
+
+<%# The form submits nowhere in this pass: the Share button is inert. The field names are already
+    the ones that a later POST needs, thus that pass adds an action and not a new form. %>
+<div class="share wa-stack wa-gap-l"
+     data-controller="share"
+     data-share-limit-value="<%= @share.body_limit %>"
+     data-share-warn-at-value="<%= @share.warn_at %>">
+
+  <%# The combobox filters its own options. The Stimulus controller only widens the match to the
+      summary and the URL, thus a URL that you paste finds its entry. %>
+  <div>
+    <wa-combobox label="Article" name="article_url" with-clear
+                 placeholder="Search by title, or paste a URL"
+                 data-share-target="combobox"
+                 data-action="change->share#pick">
+      <% @share.articles.each do |article| %>
+        <wa-option value="<%= article.url %>"
+                   data-title="<%= article.title %>"
+                   data-summary="<%= article.summary %>"
+                   data-url="<%= article.url %>"
+                   data-published-at="<%= article.published_at %>">
+          <%= article.title %>
+        </wa-option>
+      <% end %>
+    </wa-combobox>
+
+    <%# The controller fills this and shows it. It stays empty until an entry is selected, thus the
+        page never shows an empty card. %>
+    <p class="share__article" data-share-target="selection" hidden>
+      <span class="share__article-title" data-share-target="selectionTitle"></span>
+      <span class="share__article-url" data-share-target="selectionUrl"></span>
+    </p>
+  </div>
+
+  <div>
+    <%# ⚠️ No `maxlength` and no `with-count`. Both measure UTF-16 code units, and Bluesky counts
+        graphemes: one emoji is 1 there and 2 or more here. The count line below is ours, and it
+        warns and never stops a keystroke. %>
+    <wa-textarea name="body" label="Post" rows="5" resize="auto"
+                 placeholder="What do you want to say about it?"
+                 data-share-target="body"
+                 data-action="input->share#count">
+    </wa-textarea>
+
+    <%# The server writes the first value, thus the line has its height before the JavaScript runs
+        and the page does not move. The controller writes each value after that. %>
+    <p class="share__count wa-caption-s" aria-live="polite" data-share-target="count">0 / <%= @share.body_limit %></p>
+  </div>
+
+  <wa-checkbox-group label="Post to">
+    <% @share.networks.each do |network| %>
+      <% if network.connected? %>
+        <wa-checkbox name="networks[]" value="<%= network.key %>" hint="<%= network.account_line %>">
+          <%= network.name %>
+        </wa-checkbox>
+      <% else %>
+        <%# A network with no account keeps its row and is disabled. The Connected apps page hides
+            such a card, because there the card offers an action that would fail. Here a disabled
+            row says why one of three names is not available. %>
+        <wa-checkbox name="networks[]" value="<%= network.key %>" disabled>
+          <%= network.name %>
+          <span slot="hint">Not connected. <%= link_to "Connect it", connected_apps_path %>.</span>
+        </wa-checkbox>
+      <% end %>
+    <% end %>
+  </wa-checkbox-group>
+
+  <%# ⚠️ This button is inert, on purpose. No code posts to a network yet. %>
+  <div class="wa-cluster wa-gap-s">
+    <wa-button variant="brand" appearance="accent" disabled>
+      <%= slotted_icon_svg("classic", "light", "paper-plane") %>
+      Share
+    </wa-button>
+  </div>
+</div>

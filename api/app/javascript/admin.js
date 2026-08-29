@@ -44,6 +44,11 @@ import "@web.awesome.me/webawesome-pro/dist/components/option/option.js";
 import "@web.awesome.me/webawesome-pro/dist/components/switch/switch.js";
 // The "Processing" state of a track on the Course maps page.
 import "@web.awesome.me/webawesome-pro/dist/components/spinner/spinner.js";
+// The Share composer. wa-combobox brings wa-option, wa-popup, wa-tag, and wa-spinner with it.
+import "@web.awesome.me/webawesome-pro/dist/components/combobox/combobox.js";
+import "@web.awesome.me/webawesome-pro/dist/components/textarea/textarea.js";
+import "@web.awesome.me/webawesome-pro/dist/components/checkbox/checkbox.js";
+import "@web.awesome.me/webawesome-pro/dist/components/checkbox-group/checkbox-group.js";
 
 import FlashController from "./controllers/flash_controller";
 import DialogController from "./controllers/dialog_controller";
@@ -52,6 +57,7 @@ import MapStatusController from "./controllers/map_status_controller";
 import MapPreviewController from "./controllers/map_preview_controller";
 import LinkedSidesController from "./controllers/linked_sides_controller";
 import RepublishController from "./controllers/republish_controller";
+import ShareController from "./controllers/share_controller";
 
 // window.Stimulus stays available for a debug session in the console, but the code registers each
 // controller through the local variable, because a static analysis cannot see the global.
@@ -64,3 +70,4 @@ application.register("map-status", MapStatusController);
 application.register("map-preview", MapPreviewController);
 application.register("linked-sides", LinkedSidesController);
 application.register("republish", RepublishController);
+application.register("share", ShareController);

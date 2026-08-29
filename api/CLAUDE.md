@@ -55,6 +55,7 @@ edge serves a cached copy before it gets a new one.
 | GET | `/whoop/auth`, `/whoop/callback` | Whoop OAuth (authorize is owner-gated) | — |
 | GET | `/signin`, `/auth/google_oauth2/callback`; POST `/signout` | owner session | `no-store` |
 | GET | `/`, `/spam`, `/location`, `/connected-apps`, `/course-maps`, `/course-maps/:id` | admin UI (owner-session gated) | `no-store` |
+| GET | `/share` | the Share composer. ⚠️ It drafts only, and nothing posts | `no-store` |
 | POST | `/spam/:id/not-spam`; DELETE `/spam/:id`, `/connected-apps/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
 | GET/POST/DELETE | `/connected-apps/bluesky` | the Bluesky handle + app password form, and disconnect | `no-store` |
 | GET/POST/DELETE | `/connected-apps/mastodon`; GET `/connected-apps/mastodon/callback` | the Mastodon instance form, the OAuth callback, and disconnect | `no-store` |
@@ -748,6 +749,50 @@ navigation. `StandardSite#connected?` has the same rule, and its comment gives t
     permissions.
   - The card names the account and the days before the token renews. A refused refresh gives the
     `:error` state, exactly as a refused Whoop refresh does.
+
+### The share composer
+
+**Share a post** (`/share`) drafts one post about a published entry for Bluesky, Mastodon, and
+Threads. ⚠️ **Nothing posts.** The Share button is inert, and `Admin::ShareController` has one read
+action. `Mastodon::SCOPES` already asks for `write:statuses` and `Threads::SCOPES` already asks for
+`threads_content_publish`, thus a later pass adds the write and needs no new authorization.
+
+- **The picker holds each published entry**, from `Articles#list`, and a `wa-combobox` filters them
+  in the browser. There are approximately 60 entries, thus this needs **no search endpoint**.
+  `share_controller.js` widens the filter of the component to the summary and the URL, thus a URL
+  that the owner pastes finds its entry.
+  - ⚠️ **`SharePresenter` does not reuse `ArticleRanking#candidates`.** That method removes each
+    **Short**, because the trending widget shows full articles only. A Short is a published entry
+    and the owner can share one.
+  - ⚠️ **Do not use Pagefind here.** That index is an output of the **web** build, it is gitignored,
+    and the image of this app holds `api/` only. To read it across the origins needs the site host
+    in the CSP of `OwnerFacing` and CORS headers on those assets, and it makes this app depend on
+    the build of `web/`. It also indexes each *page* and not each entry. For a search of the full
+    body, the path is `ArticleIndex`, the BM25 index that this app already has.
+  - ⚠️ **This page reads Contentful at the render, and Connected apps does not.** That rule protects
+    a page whose purpose is not the upstream data, and here the list *is* the page. `Articles#list`
+    gives an empty array after a failure, thus the page renders a callout and never a 500.
+- **One body goes to the three networks, and the limit is 300**, which is the limit of Bluesky and
+  the shortest of the three. `SharePresenter::BODY_LIMIT` and `WARN_AT` hold the two numbers, the
+  view writes them into the markup, and the Stimulus controller reads them there.
+  - ⚠️ **Do not use the `maxlength` or the `with-count` of `wa-textarea`.** Both measure UTF-16 code
+    units, and Bluesky counts **graphemes**: one emoji is 1 there and 2 or more here. The controller
+    counts with `Intl.Segmenter`.
+  - ⚠️ **The count warns and never stops a keystroke.** `maxlength` would refuse one with no message.
+- **The link is not part of the body, and the count does not hold it.** Each network attaches a link
+  differently: Threads makes an attachment, Bluesky makes an embed, and Mastodon renders it inline.
+  Thus the code that posts decides that, and this page keeps the URL of the entry beside the text.
+- ⚠️ **Do not add a Bluesky threadgate or postgate control.** The owner read those options and
+  refused them. This page has no control for one network alone.
+- **The three rows are always on the page**, and a row with no account is `disabled` with a link to
+  Connected apps. That is different from Connected apps, which hides such a card: there the card
+  offers an action that would fail, and here a disabled row says why one of three names cannot take
+  a post.
+- ⚠️ **The page renders with no account connected, and the nav always holds it.** Each of the three
+  rows is then disabled. It is a draft screen, thus the owner must be able to look at it and change
+  it before an account exists. Do not gate it on the connection state.
+  ⚠️ `ShareController#social_networks` reads each state from **Redis**, and no service makes an HTTP
+  request, for the same reason as the Connected apps page.
 
 ### The spam quarantine
 

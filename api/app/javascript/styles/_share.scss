@@ -1,0 +1,37 @@
+// The Share composer. The form controls and the layout come from Web Awesome, thus this file holds
+// only the selection line below the picker and the states of the count line.
+.share {
+  &__article {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-3xs);
+    margin: var(--wa-space-2xs) 0 0;
+  }
+
+  &__article-title {
+    font-weight: var(--wa-font-weight-semibold);
+  }
+
+  &__article-url {
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-s);
+    // A permalink has no space in it, thus it would push the column wider without this.
+    overflow-wrap: anywhere;
+  }
+
+  &__count {
+    color: var(--wa-color-text-quiet);
+    margin: var(--wa-space-2xs) 0 0;
+  }
+
+  // The two states of the count line. The controller adds them, and the words in the line say the
+  // same thing, thus the color is not the only signal.
+  &__count--warning {
+    color: var(--wa-color-warning-on-quiet);
+  }
+
+  &__count--over {
+    color: var(--wa-color-danger-on-quiet);
+    font-weight: var(--wa-font-weight-semibold);
+  }
+}

@@ -142,6 +142,11 @@ Rails.application.routes.draw do
       # type. There is no page here: the nav opens a dialog, and the dialog posts to this path.
       post "republish" => "republish#create", as: :republish
 
+      # The Share composer, which drafts one post for the connected social accounts. The nav
+      # leaves it out when no account is connected, and #show then redirects.
+      # ⚠️ Nothing posts yet: the Share button on that page is inert.
+      get "share" => "share#show", as: :share
+
       # The spam quarantine of the contact form. The name says what it holds. It is not `/contact`,
       # on purpose, because that is the path of the public form (POST /api/contact), and nothing
       # here takes a submission.
