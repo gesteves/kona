@@ -241,6 +241,33 @@ Events counter of the rule is more than zero.
   `CF-Region` are absent and the log has the country only.
 - **`/cdn-cgi/*` never reaches an origin.** Cloudflare answers it at its own edge.
 
+### The origin certificate
+
+⚠️ **Cloudflare proxies each host, thus fly cannot renew its origin certificate by itself.** The A
+and AAAA records of a host name Cloudflare, and not fly. Thus the usual check of fly fails, and
+`fly certs show <host>` says "DNS records do not match the expected values" and keeps the status at
+"Issuing…".
+
+The certificate then expires, and the failure is silent and total. The fly edge sends **no
+certificate**, Cloudflare answers **525 SSL handshake failed**, and **the fly log shows nothing**,
+because no request completes the handshake. On the public API host this stops each widget and
+`POST /api/icons`, thus the build of web fails with a 525 and names no cause.
+
+**Each** host needs two more DNS records. Keep both **DNS only**, with no proxy:
+
+```
+CNAME _acme-challenge.<host>  →  <host>.<app id>.flydns.net.
+TXT   _fly-ownership.<host>   →  app-<app id>
+```
+
+The CNAME lets Let's Encrypt do the DNS-01 challenge, and the TXT tells fly that we own a host that
+a proxy fronts. `fly certs setup <host> -a kona-api` prints the two exact values, and
+`fly certs check <host> -a kona-api` starts the check again after you add them.
+
+⚠️ **Nothing in this repo watches that expiry, and there is no alarm.** Each host has its own
+certificate and its own date. Read `fly certs list -a kona-api` first when a request to an origin
+gives a 525.
+
 ### Cache Response Rules (tagging)
 
 A deploy does **not** invalidate the edge by itself. Thus the invalidation is a separate step: a
