@@ -157,7 +157,7 @@ RSpec.describe "Admin share", type: :request do
         post "/share", params: { article_url: url, body: "A long day.", networks: [ "bluesky" ] }
 
         expect(response).to redirect_to(share_path)
-        expect(flash[:notice]).to include("Queued a post to Bluesky.")
+        expect(flash[:notice]).to include("Sent to Bluesky.")
         expect(BlueskyPostJob.jobs.size).to eq(1)
         rkey, link, body = BlueskyPostJob.jobs.first["args"]
         expect(link).to eq(url)
@@ -173,7 +173,7 @@ RSpec.describe "Admin share", type: :request do
 
         post "/share", params: { article_url: url, body: "Hi.", networks: %w[bluesky mastodon threads] }
 
-        expect(flash[:notice]).to eq("Queued a post to Bluesky, Mastodon, and Threads.")
+        expect(flash[:notice]).to eq("Sent to Bluesky, Mastodon, and Threads.")
         keys = [ BlueskyPostJob, MastodonPostJob, ThreadsPostJob ].map do |job|
           expect(job.jobs.size).to eq(1)
           job.jobs.first["args"].first
@@ -215,7 +215,7 @@ RSpec.describe "Admin share", type: :request do
         post "/share", params: { article_url: url, body: "Hi.", networks: %w[bluesky myspace] }
 
         expect(BlueskyPostJob.jobs.size).to eq(1)
-        expect(flash[:notice]).to eq("Queued a post to Bluesky.")
+        expect(flash[:notice]).to eq("Sent to Bluesky.")
       end
 
       # ⚠️ A dead Threads token is connected and cannot post. Without this check the job would
@@ -312,7 +312,7 @@ RSpec.describe "Admin share", type: :request do
           post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
                                    schedule: "0", date: on, time: "09:00" }
 
-          expect(flash[:notice]).to include("Queued a post to Bluesky.")
+          expect(flash[:notice]).to include("Sent to Bluesky.")
           expect(BlueskyPostJob.jobs.first["at"]).to be_nil
         end
 
@@ -402,7 +402,7 @@ RSpec.describe "Admin share", type: :request do
           post "/share", params: { article_url: url, body: "Hi.", networks: [] }
 
           expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include("Pick at least one connected place to post it.")
+          expect(response.body).to include("Pick at least one place to post it.")
           expect(BlueskyPostJob.jobs).to be_empty
         end
       end

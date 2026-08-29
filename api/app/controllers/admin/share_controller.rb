@@ -141,7 +141,7 @@ module Admin
         return "That post is #{Bluesky.post_length(body)} characters. " \
                "The limit is #{Bluesky::MAX_GRAPHEMES}."
       end
-      return "Pick at least one connected place to post it." if selected_networks.empty?
+      return "Pick at least one place to post it." if selected_networks.empty?
 
       schedule_error
     end
@@ -201,7 +201,7 @@ module Admin
       names = to_sentence(selected_networks)
       return "Scheduled a post to #{names} for #{format_schedule(at)}." if at
 
-      "Queued a post to #{names}."
+      "Sent to #{names}."
     end
 
     # The moment in the words of the owner, in the zone that they picked it in. To answer in the
