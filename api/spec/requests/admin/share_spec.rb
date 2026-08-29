@@ -113,15 +113,23 @@ RSpec.describe "Admin share", type: :request do
         expect(rkey).to match(/\A[234567a-z]{13}\z/)
       end
 
-      # The owner chose to be able to tick a network that no code sends to yet. The notice must
-      # then say so, or a post that never arrives looks like a failure.
-      it "names a network that it cannot post to yet" do
+      it "queues both networks that work" do
         connect(bluesky: true, mastodon: true, threads: false)
 
         post "/share", params: { article_url: url, body: "Hi.", networks: %w[bluesky mastodon] }
 
+        expect(flash[:notice]).to eq("Queued a post to Bluesky and Mastodon.")
+      end
+
+      # The owner chose to be able to tick a network that no code sends to yet. The notice must
+      # then say so, or a post that never arrives looks like a failure.
+      it "names a network that it cannot post to yet" do
+        connect(bluesky: true, mastodon: false, threads: true)
+
+        post "/share", params: { article_url: url, body: "Hi.", networks: %w[bluesky threads] }
+
         expect(flash[:notice]).to include("Queued a post to Bluesky.")
-        expect(flash[:notice]).to include("Mastodon isn't wired up yet.")
+        expect(flash[:notice]).to include("Threads isn't wired up yet.")
       end
 
       # ⚠️ The link field takes any URL, thus the owner can share a page on another site.

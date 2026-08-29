@@ -18,6 +18,11 @@ RSpec.describe Mastodon do
     )
   end
 
+  def connect_account!
+    register_client!
+    MastodonCredentials.store_token(access_token: "an-access-token", handle: "@me@mastodon.social")
+  end
+
   describe ".normalize_instance" do
     it "accepts a bare hostname" do
       expect(described_class.normalize_instance("mastodon.social")).to eq("mastodon.social")
@@ -175,6 +180,90 @@ RSpec.describe Mastodon do
       described_class.new.disconnect!
 
       expect(MastodonCredentials.connected?).to be(false)
+    end
+  end
+
+  describe "#post!" do
+    let(:url) { "https://example.test/a-post/" }
+
+    before do
+      connect_account!
+      allow(HTTParty).to receive(:post)
+        .and_return(http_response({ url: "https://mastodon.social/@me/1" }))
+    end
+
+    def post!(**overrides)
+      described_class.new.post!(**{ text: "Read this", url: url, idempotency_key: "3kabc" }.merge(overrides))
+    end
+
+    it "refuses when no account is connected" do
+      MastodonCredentials.clear
+
+      expect { post! }.to raise_error(/not connected/)
+    end
+
+    # ⚠️ The URL goes in the TEXT here, and Bluesky puts it in an embed. Mastodon renders a link
+    # inline and makes its own preview card from the og: tags of that page.
+    it "puts the link in the status, below the body" do
+      post!
+
+      expect(HTTParty).to have_received(:post).with(
+        "https://mastodon.social/api/v1/statuses",
+        hash_including(body: hash_including(status: "Read this\n\n#{url}"))
+      )
+    end
+
+    it "posts the body alone when there is no link" do
+      post!(url: nil)
+
+      expect(HTTParty).to have_received(:post).with(
+        anything, hash_including(body: hash_including(status: "Read this"))
+      )
+    end
+
+    # ⚠️ This header is what makes a retry safe: the instance answers with the status that it made
+    # already, in place of a second one. SharePostJob sends the same key at each attempt.
+    it "sends the idempotency key and the bearer token" do
+      post!
+
+      expect(HTTParty).to have_received(:post).with(
+        anything,
+        hash_including(headers: {
+          "Authorization" => "Bearer an-access-token",
+          "Idempotency-Key" => "3kabc"
+        })
+      )
+    end
+
+    it "omits the header when the caller gives no key" do
+      post!(idempotency_key: nil)
+
+      expect(HTTParty).to have_received(:post).with(
+        anything, hash_including(headers: { "Authorization" => "Bearer an-access-token" })
+      )
+    end
+
+    it "posts in public and in English" do
+      post!
+
+      expect(HTTParty).to have_received(:post).with(
+        anything, hash_including(body: hash_including(visibility: "public", language: "en"))
+      )
+    end
+
+    it "answers with the URL of the status" do
+      expect(post!).to eq("https://mastodon.social/@me/1")
+    end
+
+    it "refuses a draft with no body and no link" do
+      expect { post!(text: "  ", url: nil) }.to raise_error(/empty/)
+    end
+
+    # ⚠️ It raises and does not fail soft, thus SharePostJob does the work again.
+    it "raises when the instance refuses the status" do
+      allow(HTTParty).to receive(:post).and_return(http_response({ error: "no" }, success: false, code: 422))
+
+      expect { post! }.to raise_error(ApplicationService::HttpError)
     end
   end
 end

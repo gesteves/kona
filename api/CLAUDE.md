@@ -369,7 +369,7 @@ Thus that shared window is safe.
 | `WhoopWebhookJob(event_type, resource_id, trace_id)` | syncs Whoop metrics to Intervals.icu |
 | `ActivityDescriptionJob(activity_id, whoop_strain = nil)` | (re)generates an activity's Strava description and tidies its name |
 | `LocationSyncJob(latitude, longitude)` | propagates the current location to Intervals.icu |
-| `SharePostJob(rkey, url, text, networks)` | posts one draft from the Share page. ⚠️ The caller makes `rkey`; refer to **The share composer** |
+| `SharePostJob(rkey, url, text, networks)` | posts one draft from the Share page to Bluesky and Mastodon. ⚠️ The caller makes `rkey`, which is also the Mastodon idempotency key; refer to **The share composer** |
 | `ContactMailJob(name, email, message, context, restored_from_spam = false)` | contact intake: Akismet + compose |
 | `ContactDeliveryJob(payload)` | the one retryable *delivery* unit — sends via Resend |
 | `MapTilesetJob(id)` | publishes an uploaded GPX track to Mapbox as a vector tileset |
@@ -696,8 +696,7 @@ navigation. `StandardSite#connected?` has the same rule, and its comment gives t
     never syncs to the new repo.
   - ⚠️ **To flush Redis costs a new connection**, because the credentials are only there and no
     other code can make them again.
-- **Mastodon** does an OAuth round trip, and **nothing reads the account yet**: the admin only makes
-  the connection and shows it. `Admin::MastodonController` has all four of its actions, and
+- **Mastodon** does an OAuth round trip, and the Share page posts to it. `Admin::MastodonController` has all four of its actions, and
   `MastodonCredentials` keeps the client and the token in the Redis hash `mastodon:credentials`. The
   client secret and the access token are encrypted, for the same reason as the Bluesky app password.
   - ⚠️ **Mastodon has no central developer dashboard, because each instance is a separate server.**
@@ -719,7 +718,8 @@ navigation. `StandardSite#connected?` has the same rule, and its comment gives t
     this host, and that browser has the session.
   - ⚠️ **The instance ties the scope to the token that it gives.** Thus a change to
     `Mastodon::SCOPES` needs a new registration and a new authorization, and the owner must connect
-    the account again. `write:statuses` is in the list now for a later use, and no code posts today.
+    the account again. `write:statuses` is what `Mastodon#post!` needs; refer to **Posting to
+    Mastodon**.
   - **`disconnect!` tells the instance to revoke the token, then clears the store.** ⚠️ It clears
     the store whether the revoke works or not: the instance can be away, and a disconnect that the
     owner asked for must not depend on that.
@@ -758,9 +758,9 @@ navigation. `StandardSite#connected?` has the same rule, and its comment gives t
 ### The share composer
 
 **Share a post** (`/share`) drafts one post about a link for Bluesky, Mastodon, and Threads, now or
-at a date and a time. ⚠️ **Only Bluesky posts today.** `Mastodon::SCOPES` already asks for
-`write:statuses` and `Threads::SCOPES` already asks for `threads_content_publish`, thus each later
-pass adds the write and needs no new authorization by the owner.
+at a date and a time. ⚠️ **Bluesky and Mastodon post today, and Threads does not.**
+`Threads::SCOPES` already asks for `threads_content_publish`, thus that pass adds the write and
+needs no new authorization by the owner.
 
 - **The link is a plain `wa-input type="url"`, and there is NO list of the entries.** The owner
   pastes a link. ⚠️ **Do not add a picker of the articles back.** The card of a post comes from the
@@ -816,10 +816,13 @@ pass adds the write and needs no new authorization by the owner.
     them, and that is where you delete one. ⚠️ Unlike `SiteBuildJob`, this job keeps **no** jid and
     a new schedule cancels nothing: the owner can line up more than one post, and each is its own
     job with its own record key.
-- ⚠️ **Only Bluesky posts today, and the other two rows are still selectable when they are
-  connected.** `SharePostJob::SUPPORTED` names what works, the job logs each skip, and the notice
-  says which network it could not send to. A tick that gives no post and no message would look
-  exactly like a failure.
+- ⚠️ **Threads does not post yet, and its row is still selectable when it is connected.**
+  `SharePostJob::SUPPORTED` names what works, the job logs each skip, and the notice says which
+  network it could not send to. A tick that gives no post and no message would look exactly like a
+  failure.
+- ⚠️ **The job tries each network before it raises, and not one at a time.** One service that is
+  away must not stop the other one. The retry then sends to both again, and the idempotency of each
+  network is what makes that safe. Refer to **Posting to Bluesky** and **Posting to Mastodon**.
 - **The three rows are always on the page**, and a row with no account is `disabled` with a link to
   Connected apps. That is different from Connected apps, which hides such a card: there the card
   offers an action that would fail, and here a disabled row says why one of three names cannot take
@@ -882,6 +885,31 @@ report, and it must inherit `ApplicationService` for `report_upstream_error`.
   `SharePresenter::BODY_LIMIT`.
 - **`post!` raises at each failure**, on purpose, thus `SharePostJob` does the work again. The
   record key is what makes that safe.
+
+### Posting to Mastodon
+
+`Mastodon#post!` sends one `POST /api/v1/statuses`. The connection, the registration, and the OAuth
+round trip are in the same class; refer to **Connected apps**.
+
+- ⚠️ **The URL goes in the TEXT here, and Bluesky puts it in an embed.** Mastodon renders a link
+  inline and makes its own preview card from the `og:` tags of that page. Thus this class needs no
+  card and no image upload, and `SharePostJob` reads no `OpenGraph` card for it. **This is the
+  concrete reason that the Share page keeps the link out of the body**: each network attaches one
+  differently, thus the page holds the link beside the text and each service composes its own.
+- ⚠️ **`Idempotency-Key` is what makes a retry safe**, and it is the Mastodon answer to the
+  `putRecord` of Bluesky. The instance keeps that key and answers with the status that it made
+  already. `SharePostJob` sends the **same `rkey`** that the controller made before it added the
+  job, thus each attempt carries one key.
+  ⚠️ **That window is not for ever.** The instance holds the key for a limited time, thus a retry a
+  long time later can still make a second post. It covers the attempts that follow quickly, which is
+  nearly all of them.
+- **Each post is `public` and `en`.** This blog has one author and one language.
+- ⚠️ **This class needs no length check.** Mastodon counts a URL as **23** characters whatever its
+  true length, and a default instance permits 500. The body of a draft is at most 300, which is the
+  Bluesky limit, thus 300 + 2 newlines + 23 is 325 and a post always fits. An instance with a limit
+  below that would refuse the post, and the job would then run again.
+- **`post!` raises at each failure**, as `Bluesky#post!` does, thus `SharePostJob` does the work
+  again.
 
 ### The spam quarantine
 

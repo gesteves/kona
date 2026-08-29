@@ -1,8 +1,7 @@
 require "httparty"
 require "uri"
 
-# Connects a Mastodon account with the OAuth2 authorization code flow. Nothing reads the account
-# yet: the admin only makes the connection and shows its state.
+# Connects a Mastodon account with the OAuth2 authorization code flow, and posts to it.
 #
 # ⚠️ Mastodon has no central developer dashboard, because each instance is a separate server. Thus
 # this app registers itself on the instance that the owner names (POST /api/v1/apps) and keeps the
@@ -19,6 +18,17 @@ class Mastodon < ApplicationService
 
   # A plain hostname, with at least one dot and no port and no path.
   INSTANCE_PATTERN = /\A[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+\z/
+
+  # Each post is public and in English. This blog has one author and one language.
+  VISIBILITY = "public".freeze
+  LANGUAGE = "en".freeze
+
+  # ⚠️ Mastodon counts a URL as this many characters, whatever its true length, and the limit of a
+  # default instance is 500. The body of a draft is at most 300, which is the Bluesky limit. Thus
+  # 300 + 2 newlines + 23 is 325 and a post always fits, and this class needs no length check.
+  # An instance with a limit below 325 would refuse the post, and the job would then run again.
+  URL_WEIGHT = 23
+  DEFAULT_MAX_CHARACTERS = 500
 
   # Changes what the owner types into a bare hostname. It accepts a URL and a full handle:
   # "https://Mastodon.social/" and "@me@mastodon.social" both give "mastodon.social".
@@ -118,6 +128,42 @@ class Mastodon < ApplicationService
       )
       true
     end
+  end
+
+  # Publishes one status.
+  #
+  # ⚠️ **The URL goes in the TEXT here, and Bluesky puts it in an embed.** Mastodon renders a link
+  # inline and makes its own preview card from the og: tags of that page. Thus this class needs no
+  # card and no image upload, and `Bluesky` builds both.
+  #
+  # ⚠️ `idempotency_key` is what makes a retry safe. Mastodon keeps that key and answers with the
+  # status that it already made, in place of a second one. `SharePostJob` gives the record key that
+  # the controller made before it added the job, thus each attempt sends the same key.
+  # **That window is not for ever**: the instance holds the key for a limited time, thus a retry a
+  # long time later can still make a second post. It covers the attempts that follow quickly, which
+  # is nearly all of them.
+  #
+  # @param text [String] The body of the post.
+  # @param url [String, nil] The link to add below the body.
+  # @param idempotency_key [String, nil] A value that is the same for each attempt.
+  # @return [String] The public URL of the status.
+  # @raise [ApplicationService::HttpError, RuntimeError] It raises at each failure, thus
+  #   SharePostJob does the work again.
+  def post!(text:, url: nil, idempotency_key: nil)
+    raise "Mastodon is not connected" unless connected?
+
+    status = [ text.to_s.strip, url.to_s.strip ].reject(&:blank?).join("\n\n")
+    raise "The post is empty" if status.blank?
+
+    headers = { "Authorization" => "Bearer #{@credentials.access_token}" }
+    headers["Idempotency-Key"] = idempotency_key if idempotency_key.present?
+
+    response = post_json!(
+      "https://#{@credentials.instance}/api/v1/statuses",
+      body: { status: status, visibility: VISIBILITY, language: LANGUAGE },
+      headers: headers
+    )
+    response&.dig(:url).presence || "https://#{@credentials.instance}/"
   end
 
   # Tells the instance to forget the token, then removes the stored credentials.
