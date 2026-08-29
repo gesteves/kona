@@ -14,10 +14,39 @@ class Threads < ApplicationService
   GRAPH_URL = "https://graph.threads.net".freeze
   API_URL = "https://graph.threads.net/v1.0".freeze
 
-  # ⚠️ `threads_basic` is the minimum, and each Threads endpoint needs it.
-  # `threads_content_publish` is what `#post!` needs. The Meta dashboard must also permit each scope
-  # in this list, and a change here needs a new authorization by the owner.
-  SCOPES = "threads_basic,threads_content_publish".freeze
+  # Each permission that the Meta dashboard of this app permits, but for `threads_trending_topics`,
+  # which the owner did not enable.
+  #
+  # ⚠️ **`threads_manage_replies` is the one that a THREAD needs.** The dashboard describes it as
+  # "create a reply on behalf of a Threads profile", and a container with a `reply_to_id` is a
+  # reply. Without it every reply container answered 500.
+  #
+  # ⚠️ **The reply guidance of Meta is misleading**: it says that a reply needs the **owner of the
+  # root post**, or `threads_keyword_search`, or `threads_manage_mentions`. This account **is** the
+  # owner of its own root post, thus by that rule it needs no permission at all, and the reply
+  # still failed. Read the description of the permission and not that page.
+  #
+  # ⚠️ **Meta answers `500` with an EMPTY body for a permission that the token does not hold**, and
+  # not a 403 and not an OAuthException. Thus a missing permission reads as a fault of Meta, and a
+  # delay, the transport, and the shape of the id were each measured and each was innocent. The
+  # test that names one: `GET /{user}/threads_publishing_limit` answers 200 for
+  # `fields=quota_usage` and the same empty 500 for `fields=reply_quota_usage`.
+  #
+  # ⚠️ A change here needs a **new authorization by the owner**: a token keeps the permissions that
+  # made it. Thus the owner disconnects Threads on the Connected apps page and connects it again.
+  SCOPES = %w[
+    threads_basic
+    threads_content_publish
+    threads_delete
+    threads_keyword_search
+    threads_location_tagging
+    threads_manage_insights
+    threads_manage_mentions
+    threads_manage_replies
+    threads_profile_discovery
+    threads_read_replies
+    threads_share_to_instagram
+  ].join(",").freeze
 
   # The limit of the text of a post. Meta counts characters, and the body of a draft is at most 300,
   # thus a post always fits and this class needs no check.

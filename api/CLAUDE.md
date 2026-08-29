@@ -758,10 +758,24 @@ hangs gives a 500 in place of the message of the page, and a disconnect never re
     from the request. Thus it always names the admin host, which is the only host that draws the
     callback route, and the ⚠️ that `WHOOP_REDIRECT_URI` needs does not apply here. **The Meta
     dashboard must list that same URL** in the redirect callback URLs of the app.
-  - ⚠️ **`SCOPES` asks for `threads_basic` and `threads_content_publish`.** The second one is what
-    `#post!` needs. ⚠️ **The Meta dashboard must permit each scope in that list first**, and it must
-    also permit `threads_content_publish` for the app. Without that, the authorization screen fails
-    and no code here can show the reason.
+  - ⚠️ **`SCOPES` asks for each permission that the Meta dashboard permits**, but for
+    `threads_trending_topics`, which the owner did not enable. **`threads_manage_replies` is the one
+    that a THREAD needs**: the dashboard describes it as "create a reply on behalf of a Threads
+    profile", and a container with a `reply_to_id` is a reply. Without it every reply container
+    answered 500. ⚠️ **The dashboard must permit each scope in that list first.** Without that, the
+    authorization screen fails and no code here can show the reason.
+  - ⚠️ **The reply guidance of Meta is misleading.** It says a reply needs the **owner of the root
+    post**, or `threads_keyword_search`, or `threads_manage_mentions`. This account **is** the owner
+    of its own root post, thus by that rule it needs no permission and the reply still failed. Read
+    the description of the permission in the dashboard, and not that page.
+  - ⚠️ **Meta answers `500` with an EMPTY body for a scope that the token does not hold**, and not
+    a 403 and not an OAuthException. Thus a missing scope reads as a fault of Meta. To name one,
+    call `GET /{user}/threads_publishing_limit`: `fields=quota_usage` answers 200 with the scopes
+    above, and `fields=reply_quota_usage` answers the same empty 500 when `threads_manage_replies`
+    is absent.
+  - ⚠️ **A new scope needs a new authorization by the owner.** A token that exists keeps the scopes
+    that made it, thus the owner disconnects Threads on the Connected apps page and connects it
+    again.
   - ⚠️ **`Threads#connect!` reads `/me` before it stores the token.** A token that cannot read its
     own account is not a connection, and the card must not show one.
   - ⚠️ **Meta gives no endpoint to revoke a token**, thus `disconnect!` is a local removal only. To
