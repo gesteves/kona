@@ -14,6 +14,9 @@ module AtProto
   # The PDS of the account, when `BLUESKY_PDS_URL` has no value.
   DEFAULT_PDS_URL = "https://bsky.social".freeze
 
+  # ⚠️ `new_tid` must give a value that rises at each call, and Puma runs more than one thread.
+  TID_LOCK = Mutex.new
+
   # The "sortable base32" alphabet of a record key.
   # @see https://atproto.com/specs/tid
   TID_ALPHABET = "234567abcdefghijklmnopqrstuvwxyz".freeze
@@ -46,8 +49,15 @@ module AtProto
     # clock id. Thus a later record sorts after an earlier one, which is what a feed needs.
     # @return [String] A 13-character TID.
     def new_tid
-      micros = (Time.now.to_r * 1_000_000).to_i & ((1 << 53) - 1)
-      encode_tid((micros << 10) | SecureRandom.random_number(1 << 10))
+      # ⚠️ It is MONOTONIC, and the clock alone is not. The caller makes one key for each post of a
+      # thread in one loop, thus two calls land in the same microsecond. The 10 low bits are
+      # random, thus the keys of a thread would then sort in a random order and a reply could come
+      # above its own root. This gives the next microsecond in place of a repeat.
+      TID_LOCK.synchronize do
+        micros = (Time.now.to_r * 1_000_000).to_i & ((1 << 53) - 1)
+        @last_tid_micros = @last_tid_micros.to_i >= micros ? @last_tid_micros + 1 : micros
+        encode_tid((@last_tid_micros << 10) | SecureRandom.random_number(1 << 10))
+      end
     end
   end
 

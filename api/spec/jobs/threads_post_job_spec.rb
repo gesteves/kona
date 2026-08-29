@@ -60,6 +60,16 @@ RSpec.describe ThreadsPostJob do
       expect(reply_to_id).to eq("17900000000000000")
     end
 
+    # ⚠️ Meta answered 500 for a container whose reply_to_id named a post that it had just
+    # published: that post is not a reply target yet. Bluesky and Mastodon need no such wait.
+    it "waits before the reply that follows a post" do
+      described_class.new.perform(thread)
+
+      expect(described_class::REPLY_DELAY).to be >= 15.seconds
+      expect(described_class.jobs.first["at"])
+        .to be_within(5).of(described_class::REPLY_DELAY.from_now.to_f)
+    end
+
     it "adds no job after the last post" do
       described_class.new.perform(thread, 1, "17900000000000000")
 

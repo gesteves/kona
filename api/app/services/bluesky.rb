@@ -109,7 +109,11 @@ class Bluesky < ApplicationService
       "$type" => COLLECTION,
       "text" => text,
       "langs" => LANGS,
-      "createdAt" => Time.now.utc.iso8601
+      # ⚠️ MILLISECONDS. `iso8601` with no argument gives whole seconds, and two posts of one thread
+      # go out inside the same second: both then carry the same createdAt. The AppView sorts an
+      # author feed by that value, and the root of the thread went missing from the Posts tab while
+      # its reply stayed. Each other client writes milliseconds, and `StandardSite` does as well.
+      "createdAt" => Time.now.utc.iso8601(3)
     }
     facets = build_facets(text)
     record["facets"] = facets if facets.any?

@@ -27,6 +27,13 @@ class Threads < ApplicationService
   # thus a value above that would name a container that is gone.
   CONTAINER_TTL = 20 * 60 * 60
 
+  # ⚠️ Meta needs time to process a container, and it answers `400 subcode 4279009` ("The requested
+  # resource does not exist") for a publish that comes too early. Its documentation asks a caller to
+  # wait approximately 30 seconds. A TEXT post uploads nothing, thus this waits for the **status**
+  # in place of a flat sleep: it is usually ready at the first read.
+  CONTAINER_POLL_SECONDS = 3
+  CONTAINER_POLL_ATTEMPTS = 12
+
   # The seconds that each call to Meta can take. ⚠️ `connect!` runs in the OAuth callback, which is
   # a request with a 20-second rack-timeout. Without a limit, a Meta that hangs gives a 500 in place
   # of the message of the page.
@@ -187,6 +194,7 @@ class Threads < ApplicationService
     raise "The post is empty" if text.blank?
 
     container_id = container_for(text: text, url: url, key: idempotency_key, reply_to_id: reply_to_id)
+    wait_for_container(container_id)
     published = publish_container(container_id)
 
     # ⚠️ It forgets the container only after Meta published it. To forget it earlier would let a
@@ -278,12 +286,46 @@ class Threads < ApplicationService
     id
   end
 
-  # Publishes a container.
+  # Waits until Meta finished the container.
   #
-  # ⚠️ Meta asks a caller to wait approximately 30 seconds before it publishes, to give its servers
-  # time to process an **upload**. A TEXT post uploads nothing, thus this publishes at once. If Meta
-  # refuses because the container is not ready, this raises and the retry of Sidekiq is the wait.
-  # The container id stays in Redis, thus that retry publishes the same container.
+  # ⚠️ **A publish that comes too early gets `400 subcode 4279009`**, and that answer reads as "The
+  # requested resource does not exist", which sounds like a container that was never made. An
+  # earlier version published at once, on the reasoning that a TEXT post uploads nothing. That
+  # reasoning was wrong: Meta processes a TEXT container as well.
+  #
+  # It raises when the container never becomes ready. The id stays in Redis, thus the retry of the
+  # job waits for the same container and makes no second one.
+  # @param container_id [String]
+  # @return [void]
+  def wait_for_container(container_id)
+    CONTAINER_POLL_ATTEMPTS.times do |attempt|
+      case container_status(container_id)
+      when "FINISHED", "PUBLISHED" then return
+      when "ERROR"   then raise "Threads could not process the container #{container_id}"
+      when "EXPIRED" then raise "The Threads container #{container_id} expired"
+      end
+
+      sleep CONTAINER_POLL_SECONDS unless Rails.env.test? || attempt == CONTAINER_POLL_ATTEMPTS - 1
+    end
+
+    raise "The Threads container #{container_id} is still not ready"
+  end
+
+  # @param container_id [String]
+  # @return [String, nil] FINISHED, IN_PROGRESS, ERROR, EXPIRED, PUBLISHED, or nil when the read
+  #   fails. A read that fails counts as "not ready" and the caller tries again.
+  def container_status(container_id)
+    response = HTTParty.get("#{API_URL}/#{container_id}",
+                            query: { fields: "status", access_token: @credentials.access_token },
+                            timeout: REQUEST_TIMEOUT)
+    return unless response.success?
+
+    parse_json(response)&.dig(:status)
+  rescue StandardError
+    nil
+  end
+
+  # Publishes a container.
   # @return [String] The id of the post.
   def publish_container(container_id)
     response = HTTParty.post("#{API_URL}/#{@credentials.user_id}/threads_publish",

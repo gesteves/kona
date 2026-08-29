@@ -272,6 +272,9 @@ RSpec.describe Threads do
     before do
       connect!
       $redis.del(container_key)
+      # ⚠️ The publish waits for the status of the container. Meta answers 400 subcode 4279009 for
+      # a publish that comes too early.
+      allow(HTTParty).to receive(:get).and_return(http_response({ status: "FINISHED" }))
       allow(HTTParty).to receive(:post) do |endpoint, _options|
         if endpoint.end_with?("/threads")
           http_response({ id: "container-1" })
@@ -397,6 +400,57 @@ RSpec.describe Threads do
         # ⚠️ One create only. The second attempt read the container out of Redis, thus a failure
         # between the two steps cannot leave a new container at each attempt.
         expect(creates).to eq(1)
+      end
+    end
+
+    describe "the wait for the container" do
+      # ⚠️ Meta answers 400 subcode 4279009 for a publish that comes too early, and that reads as
+      # "The requested resource does not exist". An earlier version published at once, because a
+      # TEXT post uploads nothing. Meta processes a TEXT container as well.
+      it "reads the status before it publishes" do
+        post!
+
+        expect(HTTParty).to have_received(:get).with(
+          "https://graph.threads.net/v1.0/container-1",
+          hash_including(query: hash_including(fields: "status"))
+        )
+      end
+
+      it "publishes a container that Meta already published" do
+        allow(HTTParty).to receive(:get).and_return(http_response({ status: "PUBLISHED" }))
+
+        expect(post!).to eq("post-1")
+      end
+
+      it "raises for a container that Meta could not process" do
+        allow(HTTParty).to receive(:get).and_return(http_response({ status: "ERROR" }))
+
+        expect { post! }.to raise_error(/could not process/)
+      end
+
+      it "raises for a container that expired" do
+        allow(HTTParty).to receive(:get).and_return(http_response({ status: "EXPIRED" }))
+
+        expect { post! }.to raise_error(/expired/)
+      end
+
+      # ⚠️ It raises and does not publish. The container id stays in Redis, thus the retry of the
+      # job waits for the same container and makes no second one.
+      it "raises when the container never becomes ready, and keeps it for the retry" do
+        allow(HTTParty).to receive(:get).and_return(http_response({ status: "IN_PROGRESS" }))
+
+        expect { post! }.to raise_error(/still not ready/)
+
+        expect($redis.get(container_key)).to eq("container-1")
+        expect(HTTParty).not_to have_received(:post).with(a_string_ending_with("threads_publish"), anything)
+      end
+
+      # A read that fails is not an answer, thus it counts as "not ready" and never as an error of
+      # its own.
+      it "treats a status that it cannot read as not ready" do
+        allow(HTTParty).to receive(:get).and_return(http_response({}, success: false, code: 500))
+
+        expect { post! }.to raise_error(/still not ready/)
       end
     end
 
