@@ -143,8 +143,8 @@ Rails.application.routes.draw do
       post "republish" => "republish#create", as: :republish
 
       # The Share composer, which drafts one post for the connected social accounts. The nav
-      # leaves it out when no account is connected, and #show then redirects.
-      # ⚠️ Nothing posts yet: the Share button on that page is inert.
+      # always holds it, and the page renders with no account connected: each row is then disabled.
+      # The POST adds one job for each network that the owner ticked.
       get  "share" => "share#show", as: :share
       post "share" => "share#create"
 

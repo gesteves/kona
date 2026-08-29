@@ -27,6 +27,11 @@ class Threads < ApplicationService
   # thus a value above that would name a container that is gone.
   CONTAINER_TTL = 20 * 60 * 60
 
+  # The seconds that each call to Meta can take. ⚠️ `connect!` runs in the OAuth callback, which is
+  # a request with a 20-second rack-timeout. Without a limit, a Meta that hangs gives a 500 in place
+  # of the message of the page.
+  REQUEST_TIMEOUT = 10
+
   def initialize(credentials = ThreadsCredentials.fetch)
     @app_id = ENV["THREADS_APP_ID"]
     @app_secret = ENV["THREADS_APP_SECRET"]
@@ -36,8 +41,21 @@ class Threads < ApplicationService
   # @return [Boolean] True if the Meta app credentials are available.
   def valid_credentials? = @app_id.present? && @app_secret.present?
 
-  # @return [Boolean] True if an account is connected now.
+  # @return [Boolean] True if an account is connected now. ⚠️ A connected account can hold an
+  #   expired token: read `#expired?` before you post.
   def connected? = valid_credentials? && @credentials.usable?
+
+  # ⚠️ An expired token is dead for all time, and `connected?` stays true because the token is still
+  # in the store. This is the one thing that shows the difference, thus the Connected apps card and
+  # the Share page both read it.
+  # @return [Boolean] True if the account is connected and its token passed its expiry time.
+  def expired? = connected? && @credentials.expired?
+
+  # @return [Boolean] True if the account can take a post now.
+  def usable? = connected? && !@credentials.expired?
+
+  # @return [Time, nil] The moment that the token expires.
+  def expires_at = @credentials.expires_at
 
   # @return [String, nil] The name of the connected account, with no "@".
   def username = @credentials.username
@@ -101,16 +119,18 @@ class Threads < ApplicationService
   # this each day.
   #
   # @return [Symbol] :refreshed when the token is new, :too_soon when Meta would refuse it because
-  #   the token is less than 24 hours old, :skipped when there is nothing to refresh, and :failed
-  #   when the call did not work.
+  #   the token is less than 24 hours old, :skipped when no account is connected, :expired when the
+  #   token is dead and only a new authorization corrects that, and :failed when the call did not
+  #   work.
   def refresh!
     return :skipped unless connected?
-    return :skipped if @credentials.expired?
+    return :expired if @credentials.expired?
     return :too_soon unless @credentials.refreshable?
 
     response = HTTParty.get(
       "#{GRAPH_URL}/refresh_access_token",
-      query: { grant_type: "th_refresh_token", access_token: @credentials.access_token }
+      query: { grant_type: "th_refresh_token", access_token: @credentials.access_token },
+      timeout: REQUEST_TIMEOUT
     )
 
     unless response.success?
@@ -160,7 +180,10 @@ class Threads < ApplicationService
   # @raise [RuntimeError] It raises at each failure, thus the job does the work again.
   def post!(text:, url: nil, idempotency_key:)
     raise "Threads is not connected" unless connected?
-    raise "The post is empty" if text.to_s.strip.blank?
+    raise "The Threads token expired; connect the account again" if expired?
+
+    text = text.to_s.strip
+    raise "The post is empty" if text.blank?
 
     container_id = container_for(text: text, url: url, key: idempotency_key)
     published = publish_container(container_id)
@@ -183,7 +206,8 @@ class Threads < ApplicationService
         grant_type: "authorization_code",
         redirect_uri: redirect_uri,
         code: code
-      }
+      },
+      timeout: REQUEST_TIMEOUT
     )
     token if token.present? && token[:access_token].present?
   end
@@ -196,7 +220,8 @@ class Threads < ApplicationService
         grant_type: "th_exchange_token",
         client_secret: @app_secret,
         access_token: short_lived_token
-      }
+      },
+      timeout: REQUEST_TIMEOUT
     )
     token if token.present? && token[:access_token].present?
   end
@@ -207,7 +232,8 @@ class Threads < ApplicationService
   def get_profile(access_token)
     profile = get_json(
       "#{API_URL}/me",
-      query: { fields: "id,username", access_token: access_token }
+      query: { fields: "id,username", access_token: access_token },
+      timeout: REQUEST_TIMEOUT
     )
     profile if profile.present? && profile[:username].present?
   end
@@ -234,7 +260,8 @@ class Threads < ApplicationService
     body[:link_attachment] = url if url.present?
 
     response = HTTParty.post("#{API_URL}/#{@credentials.user_id}/threads",
-                             body: body, query: { access_token: @credentials.access_token })
+                             body: body, query: { access_token: @credentials.access_token },
+                             timeout: REQUEST_TIMEOUT)
     raise "Threads refused the container: #{error_message(response)}" unless response.success?
 
     id = parse_json(response)&.dig(:id)
@@ -253,7 +280,8 @@ class Threads < ApplicationService
   def publish_container(container_id)
     response = HTTParty.post("#{API_URL}/#{@credentials.user_id}/threads_publish",
                              body: { creation_id: container_id },
-                             query: { access_token: @credentials.access_token })
+                             query: { access_token: @credentials.access_token },
+                             timeout: REQUEST_TIMEOUT)
     raise "Threads refused to publish: #{error_message(response)}" unless response.success?
 
     id = parse_json(response)&.dig(:id)

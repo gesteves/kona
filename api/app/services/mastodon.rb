@@ -30,6 +30,16 @@ class Mastodon < ApplicationService
   URL_WEIGHT = 23
   DEFAULT_MAX_CHARACTERS = 500
 
+  # The seconds that each call to the instance can take. ⚠️ The registration, the token exchange,
+  # and the revoke each run in a request with a 20-second rack-timeout, and the owner types the
+  # hostname. A host that accepts the connection and then hangs would give a 500 in place of the
+  # message of the page, and `disconnect!` would then never reach its clear.
+  REQUEST_TIMEOUT = 10
+
+  # How long the URL of a posted status stays in Redis, for a retry. ⚠️ It is longer than the
+  # `retry_for` of ApplicationJob, thus each attempt of one job finds it.
+  STATUS_TTL = 25.hours
+
   # Changes what the owner types into a bare hostname. It accepts a URL and a full handle:
   # "https://Mastodon.social/" and "@me@mastodon.social" both give "mastodon.social".
   # @param value [String, nil]
@@ -64,7 +74,8 @@ class Mastodon < ApplicationService
           redirect_uris: redirect_uri,
           scopes: SCOPES,
           website: ENV["SITE_URL"]
-        }
+        },
+        timeout: REQUEST_TIMEOUT
       )
       next false if client.blank? || client[:client_id].blank? || client[:client_secret].blank?
 
@@ -114,7 +125,8 @@ class Mastodon < ApplicationService
           client_secret: @credentials.client_secret,
           redirect_uri: @credentials.redirect_uri,
           scope: SCOPES
-        }
+        },
+        timeout: REQUEST_TIMEOUT
       )
       access_token = token&.dig(:access_token)
       next false if access_token.blank?
@@ -136,24 +148,27 @@ class Mastodon < ApplicationService
   # inline and makes its own preview card from the og: tags of that page. Thus this class needs no
   # card and no image upload, and `Bluesky` builds both.
   #
-  # ⚠️ `idempotency_key` is what makes a retry safe. Mastodon keeps that key and answers with the
-  # status that it already made, in place of a second one. `SharePostJob` gives the record key that
-  # the controller made before it added the job, thus each attempt sends the same key.
-  # **That window is not for ever**: the instance holds the key for a limited time, thus a retry a
-  # long time later can still make a second post. It covers the attempts that follow quickly, which
-  # is nearly all of them.
+  # ⚠️ Two things make a retry safe, and each one covers a window that the other does not.
+  # `idempotency_key` goes in the `Idempotency-Key` header: the instance keeps that key for
+  # approximately an hour and answers with the status that it already made. `MastodonPostJob` gives
+  # the record key that the controller made before it added the job, thus each attempt sends the
+  # same key. The Sidekiq retries go on for 24 hours, thus this method also keeps the URL of the
+  # status in Redis below that key, and a later attempt returns it and posts nothing.
   #
   # @param text [String] The body of the post.
   # @param url [String, nil] The link to add below the body.
   # @param idempotency_key [String, nil] A value that is the same for each attempt.
   # @return [String] The public URL of the status.
   # @raise [ApplicationService::HttpError, RuntimeError] It raises at each failure, thus
-  #   SharePostJob does the work again.
+  #   MastodonPostJob does the work again.
   def post!(text:, url: nil, idempotency_key: nil)
     raise "Mastodon is not connected" unless connected?
 
     status = [ text.to_s.strip, url.to_s.strip ].reject(&:blank?).join("\n\n")
     raise "The post is empty" if status.blank?
+
+    posted = posted_status_url(idempotency_key)
+    return posted if posted.present?
 
     headers = { "Authorization" => "Bearer #{@credentials.access_token}" }
     headers["Idempotency-Key"] = idempotency_key if idempotency_key.present?
@@ -163,19 +178,23 @@ class Mastodon < ApplicationService
       body: { status: status, visibility: VISIBILITY, language: LANGUAGE },
       headers: headers
     )
-    response&.dig(:url).presence || "https://#{@credentials.instance}/"
+    status_url = response&.dig(:url).presence || "https://#{@credentials.instance}/"
+    remember_status_url(idempotency_key, status_url)
+    status_url
   end
 
   # Tells the instance to forget the token, then removes the stored credentials.
   #
   # ⚠️ The local credentials go away whether the revoke works or not. The instance can be away, or
   # the owner can have removed the app there, and a disconnect that the owner asked for must not
-  # depend on that.
+  # depend on that. The `ensure` is what makes that true for a rack-timeout as well: that exception
+  # is not a StandardError, thus `rescue_with` does not catch it.
   # @return [void]
   def disconnect!
     revoke! if @credentials.usable?
-    MastodonCredentials.clear
     nil
+  ensure
+    MastodonCredentials.clear
   end
 
   private
@@ -185,7 +204,8 @@ class Mastodon < ApplicationService
   def verify_credentials(access_token)
     account = get_json(
       "https://#{@credentials.instance}/api/v1/accounts/verify_credentials",
-      headers: { "Authorization" => "Bearer #{access_token}" }
+      headers: { "Authorization" => "Bearer #{access_token}" },
+      timeout: REQUEST_TIMEOUT
     )
     account if account.present? && account[:acct].present?
   end
@@ -199,9 +219,29 @@ class Mastodon < ApplicationService
           client_id: @credentials.client_id,
           client_secret: @credentials.client_secret,
           token: @credentials.access_token
-        }
+        },
+        timeout: REQUEST_TIMEOUT
       )
     end
+    nil
+  end
+
+  # @param key [String, nil] The idempotency key.
+  # @return [String] The Redis key that holds the URL of the status of one job.
+  def status_key(key) = "mastodon:status:#{key}"
+
+  # @return [String, nil] The URL that an earlier attempt of the same job posted.
+  def posted_status_url(key)
+    return if key.blank?
+
+    $redis.get(status_key(key)).presence
+  end
+
+  # @return [void]
+  def remember_status_url(key, status_url)
+    return if key.blank?
+
+    $redis.set(status_key(key), status_url, ex: STATUS_TTL.to_i)
     nil
   end
 end

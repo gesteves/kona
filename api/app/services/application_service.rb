@@ -114,6 +114,57 @@ class ApplicationService
     parse_json!(HTTParty.post(url, **options), symbolize: symbolize)
   end
 
+  # Downloads a URL, and reads at most `max_bytes` of it.
+  #
+  # ⚠️ The worker is a 512MB VM at concurrency 5, and a body that goes into memory with no limit
+  # has killed it before (refer to AssetMirror). This method reads the body in fragments and stops
+  # at the limit, thus a page or a picture of any size costs at most `max_bytes` of memory.
+  # @param url [String]
+  # @param max_bytes [Integer] The most bytes to keep.
+  # @param keep_head [Boolean] True to return the first `max_bytes` of a body that is longer. False,
+  #   the default, returns nil for such a body.
+  # @param options [Hash] The options that go to HTTParty.
+  # @return [Hash, nil] `{ body:, content_type:, url: }` for a 2xx, where `url` is the final URL
+  #   after each redirect. Nil for each other status, for an empty body, and for a body past the
+  #   limit when `keep_head` is false.
+  def download(url, max_bytes:, keep_head: false, **options)
+    body = String.new(encoding: Encoding::BINARY)
+    content_type = nil
+    received = false
+    response = nil
+
+    catch(:capped) do
+      response = HTTParty.get(url, **options, stream_body: true) do |fragment|
+        next unless (200..299).cover?(fragment.code)
+
+        received = true
+        content_type ||= fragment.http_response["content-type"].to_s
+        body << fragment.to_s.b
+        throw :capped if body.bytesize > max_bytes
+      end
+    end
+
+    return unless received
+
+    if body.bytesize > max_bytes
+      return unless keep_head
+      body = body.byteslice(0, max_bytes)
+    end
+
+    # The charset of the response names the encoding of the text, as HTTParty does for a body that
+    # it reads in one piece. A body with no charset, or with a name that Ruby does not know, stays
+    # binary, and Nokogiri then reads the meta tag.
+    charset = content_type.to_s[/charset=["']?([^;"'\s]+)/i, 1]
+    begin
+      body.force_encoding(charset) if charset
+    rescue ArgumentError
+      nil
+    end
+
+    final_url = response&.request&.last_uri&.to_s.presence || url.to_s
+    { body: body, content_type: content_type.to_s, url: final_url }
+  end
+
   # PUTs to a URL. There is no method that returns nil on a failure, on purpose. A PUT is a
   # write, and a caller needs the failure status to select between another attempt and a smaller
   # result.

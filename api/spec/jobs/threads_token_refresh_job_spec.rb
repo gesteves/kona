@@ -28,4 +28,14 @@ RSpec.describe ThreadsTokenRefreshJob do
 
     expect { described_class.new.perform }.not_to raise_error
   end
+
+  # ⚠️ Nothing can renew an expired token. The log line is the only record of it outside the
+  # Connected apps page, thus it must be a warning and not silence.
+  it "writes a warning when the token expired, and does not raise" do
+    allow_any_instance_of(Threads).to receive(:refresh!).and_return(:expired)
+    allow(Rails.logger).to receive(:warn)
+
+    expect { described_class.new.perform }.not_to raise_error
+    expect(Rails.logger).to have_received(:warn).with(/expired/)
+  end
 end

@@ -36,6 +36,8 @@
     <p class="share__count wa-caption-s" aria-live="polite" data-share-target="count">0 / <%= @share.body_limit %></p>
   </div>
 
+  <%# Each connected row is ticked on the first load, and a submit that fails keeps the ticks of
+      the owner. SharePresenter#selected? decides. %>
   <wa-checkbox-group label="Post to">
     <% @share.networks.each do |network| %>
       <% if network.connected? %>
@@ -49,7 +51,7 @@
             row says why one of three names is not available. %>
         <wa-checkbox name="networks[]" value="<%= network.key %>" disabled>
           <%= network.name %>
-          <span slot="hint">Not connected. <%= link_to "Connect it", connected_apps_path %>.</span>
+          <span slot="hint"><%= network.notice || "Not connected." %> <%= link_to "Connect it", connected_apps_path %>.</span>
         </wa-checkbox>
       <% end %>
     <% end %>
@@ -79,7 +81,9 @@
 
       <%# ⚠️ The browser writes its own IANA zone here. Without it the server cannot know what
           "9:00" means, and that is the reason that the Republish dialog has minutes and no date.
-          With no JavaScript this field stays empty and the server uses TIME_ZONE. %>
+          When the Stimulus controller did not run, this field stays empty and the server uses
+          TIME_ZONE. That is a fallback for a script error only: each wa-* control above needs
+          JavaScript to be part of the form, thus this page does not work with no JavaScript. %>
       <input type="hidden" name="time_zone" data-share-target="timeZone">
     </div>
   </div>

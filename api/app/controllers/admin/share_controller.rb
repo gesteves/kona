@@ -1,17 +1,23 @@
 module Admin
-  # The Share composer: it picks a published entry, drafts one body, and adds a SharePostJob for
-  # the networks that the owner selected.
+  # The Share composer: the owner pastes a link, drafts one body, and the action adds one post job
+  # for each network that they ticked.
   #
   # ⚠️ There is one job for each network, and not one job for all of them. Thus a failure at one
   # service retries that service alone, and a network that already posted is never sent again.
   class ShareController < BaseController
-    # The job of each network. ⚠️ This is the one list, and `#social_networks` below must name the
-    # same keys. A key with no job here is a network that this app cannot post to.
-    POST_JOBS = {
-      "bluesky" => BlueskyPostJob,
-      "mastodon" => MastodonPostJob,
-      "threads" => ThreadsPostJob
+    # Each network that this page can post to, in the order of the page. `:job` posts to it, and
+    # `:status` names the private method below that reads its state from Redis. ⚠️ This is the one
+    # list: a network that is not here cannot take a post.
+    NETWORKS = {
+      "bluesky"  => { name: "Bluesky",  job: BlueskyPostJob,  status: :bluesky_status },
+      "mastodon" => { name: "Mastodon", job: MastodonPostJob, status: :mastodon_status },
+      "threads"  => { name: "Threads",  job: ThreadsPostJob,  status: :threads_status }
     }.freeze
+
+    # The shape of the two schedule fields, as the browser sends them. ⚠️ `Time.zone.parse` reads
+    # "garbage 09:00" as today at 09:00, thus the action must match the shape before it parses.
+    DATE_PATTERN = /\A\d{4}-\d{2}-\d{2}\z/
+    TIME_PATTERN = /\A\d{2}:\d{2}(:\d{2})?\z/
 
     # GET /share
     #
@@ -23,8 +29,8 @@ module Admin
 
     # POST /share
     #
-    # It checks the draft, then adds the job. ⚠️ It makes the record key **here** and gives it to
-    # the job. `Bluesky#post!` writes with `putRecord` at that key, thus a Sidekiq retry replaces
+    # It checks the draft, then adds the jobs. ⚠️ It makes the record key **here** and gives it to
+    # each job. `Bluesky#post!` writes with `putRecord` at that key, thus a Sidekiq retry replaces
     # the same post and does not add a second one.
     def create
       error = validation_error
@@ -32,7 +38,7 @@ module Admin
       # ⚠️ It renders again and does not redirect. A redirect would lose the words that the owner
       # wrote, and the draft is the expensive part of this page.
       if error
-        @share = presenter(body: params[:body], article_url: params[:article_url],
+        @share = presenter(body: body, article_url: params[:article_url],
                            selected: selected_networks, scheduled: scheduled?,
                            date: params[:date], time: params[:time])
         flash.now[:alert] = error
@@ -46,9 +52,8 @@ module Admin
       at = scheduled_at
 
       selected_networks.each do |network|
-        job = POST_JOBS.fetch(network)
-        at ? job.perform_at(at, key, article_url, params[:body].to_s)
-           : job.perform_async(key, article_url, params[:body].to_s)
+        job = NETWORKS.fetch(network)[:job]
+        at ? job.perform_at(at, key, article_url, body) : job.perform_async(key, article_url, body)
       end
 
       redirect_to share_path, status: :see_other, notice: queued_notice(at)
@@ -63,26 +68,35 @@ module Admin
     # failure must not go into the path of a page load.
     # @return [Array<SharePresenter::Network>]
     def social_networks
-      @social_networks ||= begin
-        bluesky = StandardSite.new
-        mastodon = Mastodon.new
-        threads = Threads.new
-
-        [
-          SharePresenter::Network.new(
-            key: "bluesky", name: "Bluesky", connected: bluesky.connected?,
-            account: ("@#{bluesky.handle}" if bluesky.handle.present?)
-          ),
-          SharePresenter::Network.new(
-            key: "mastodon", name: "Mastodon", connected: mastodon.connected?,
-            account: mastodon.handle
-          ),
-          SharePresenter::Network.new(
-            key: "threads", name: "Threads", connected: threads.connected?,
-            account: ("@#{threads.username}" if threads.username.present?)
-          )
-        ]
+      @social_networks ||= NETWORKS.map do |key, network|
+        connected, account, notice = send(network[:status])
+        SharePresenter::Network.new(key: key, name: network[:name], connected: connected,
+                                    account: account, notice: notice)
       end
+    end
+
+    # Each `*_status` method gives `[connected, account, notice]`: whether the row can take a post,
+    # the name of the account, and the reason for a row that cannot. A nil notice gives the default
+    # "Not connected." of the view.
+    # @return [Array]
+    def bluesky_status
+      service = StandardSite.new
+      [ service.connected?, ("@#{service.handle}" if service.handle.present?), nil ]
+    end
+
+    # @return [Array]
+    def mastodon_status
+      service = Mastodon.new
+      [ service.connected?, service.handle, nil ]
+    end
+
+    # ⚠️ A Threads account with an expired token is connected and cannot post: `usable?` is the
+    # check, and not `connected?`. Without that the job would raise for 24 hours.
+    # @return [Array]
+    def threads_status
+      service = Threads.new
+      notice = "The Threads token expired." if service.expired?
+      [ service.usable?, ("@#{service.username}" if service.username.present?), notice ]
     end
 
     # @return [SharePresenter]
@@ -100,7 +114,7 @@ module Admin
       @selected_networks ||= begin
         ticked = Array(params[:networks]).map(&:to_s)
         connected = social_networks.select(&:connected?).map(&:key)
-        ticked & connected & POST_JOBS.keys
+        ticked & connected & NETWORKS.keys
       end
     end
 
@@ -111,12 +125,20 @@ module Admin
       params[:article_url].to_s.strip
     end
 
+    # The body of the post. ⚠️ It is stripped one time, here, thus the count, the limit, and the
+    # three services all read the same text. Without that, a body with a newline at its end went
+    # to Bluesky as it was and to Mastodon with the newline removed.
+    # @return [String]
+    def body
+      @body ||= params[:body].to_s.strip
+    end
+
     # @return [String, nil] The reason to refuse, or nil when the draft is good.
     def validation_error
-      return "Paste a link to share." unless OpenGraph.new.http_url?(article_url)
-      return "Write something to post." if params[:body].blank?
-      unless Bluesky.valid_post_length?(params[:body])
-        return "That post is #{Bluesky.post_length(params[:body])} characters. " \
+      return "Paste a link to share." unless OpenGraph.http_url?(article_url)
+      return "Write something to post." if body.blank?
+      unless Bluesky.valid_post_length?(body)
+        return "That post is #{Bluesky.post_length(body)} characters. " \
                "The limit is #{Bluesky::MAX_GRAPHEMES}."
       end
       return "Pick at least one connected place to post it." if selected_networks.empty?
@@ -142,8 +164,8 @@ module Admin
     #
     # ⚠️ A date and a time carry **no zone**. The browser writes its own IANA id into a hidden
     # field, thus "9:00" has one meaning. That is the difference from the Republish dialog, which
-    # takes minutes from now for exactly this reason. With no JavaScript the field is empty, and
-    # `TIME_ZONE` is the fallback.
+    # takes minutes from now for exactly this reason. When the Stimulus controller did not run, the
+    # field is empty and `TIME_ZONE` is the fallback.
     # @return [ActiveSupport::TimeWithZone, nil] The moment, or nil when a field is empty or has a
     #   value that cannot be read.
     def scheduled_at
@@ -158,7 +180,7 @@ module Admin
 
       date = params[:date].to_s.strip
       time = params[:time].to_s.strip
-      return nil if date.blank? || time.blank?
+      return nil unless date.match?(DATE_PATTERN) && time.match?(TIME_PATTERN)
 
       Time.use_zone(schedule_zone) { Time.zone.parse("#{date} #{time}") }
     rescue ArgumentError

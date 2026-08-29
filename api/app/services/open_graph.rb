@@ -18,18 +18,27 @@ class OpenGraph < ApplicationService
   OPEN_TIMEOUT = 5
   READ_TIMEOUT = 10
 
-  # The largest page that this reads. The tags are in the <head>, thus a body that goes on for a
-  # long time is only a cost.
+  # The most bytes of a page that this reads. The tags are in the <head>, thus the read stops at
+  # this limit and the rest of the body never arrives.
   MAX_BYTES = 2 * 1024 * 1024
 
   # The cache is short. The owner can edit a title and share the post again a minute later.
   CACHE_TTL = 15.minutes
 
+  # @param url [String, nil]
+  # @return [Boolean] True for an http or https URL.
+  def self.http_url?(url)
+    uri = URI.parse(url.to_s)
+    uri.is_a?(URI::HTTP) && uri.host.present?
+  rescue URI::InvalidURIError
+    false
+  end
+
   # Reads the card of a URL.
   # @param url [String] An http or https URL.
   # @return [Card] The card. Each field but `url` can be nil.
   def fetch(url)
-    return Card.new(url: url, title: nil, description: nil, image_url: nil) unless http_url?(url)
+    return Card.new(url: url, title: nil, description: nil, image_url: nil) unless self.class.http_url?(url)
 
     data = cached_json("open_graph:#{Digest::SHA256.hexdigest(url)}", expires_in: CACHE_TTL) do
       read(url)
@@ -40,25 +49,20 @@ class OpenGraph < ApplicationService
              image_url: data[:image_url])
   end
 
-  # @param url [String, nil]
-  # @return [Boolean] True for an http or https URL.
-  def http_url?(url)
-    uri = URI.parse(url.to_s)
-    uri.is_a?(URI::HTTP) && uri.host.present?
-  rescue URI::InvalidURIError
-    false
-  end
-
   private
 
   # Gets the page and reads its tags. It fails soft: the caller then has the URL alone.
   # @return [Hash] { title:, description:, image_url: }
   def read(url)
-    response = HTTParty.get(url, headers: { "User-Agent" => USER_AGENT, "Accept" => "text/html" },
-                                 timeout: READ_TIMEOUT, follow_redirects: true, limit: 5)
-    return {} unless response.success?
+    page = download(url, max_bytes: MAX_BYTES, keep_head: true,
+                         headers: { "User-Agent" => USER_AGENT, "Accept" => "text/html" },
+                         open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT,
+                         follow_redirects: true, limit: 5)
+    return {} if page.nil?
 
-    parse(response.body.to_s.byteslice(0, MAX_BYTES).to_s, url)
+    # ⚠️ A relative og:image resolves against the final URL, after each redirect, and not against
+    # the URL that the owner typed.
+    parse(page[:body], page[:url])
   rescue StandardError => e
     report_upstream_error(e, context: "Open Graph read", url: url)
     {}

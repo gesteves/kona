@@ -12,7 +12,11 @@ class SharePresenter
   WARN_AT = 270
 
   # One row of the "Post to" list.
-  Network = Data.define(:key, :name, :account, :connected) do
+  Network = Data.define(:key, :name, :account, :connected, :notice) do
+    # @param notice [String, nil] The reason for a row that cannot take a post, for example an
+    #   expired token. Nil gives the default "Not connected." of the view.
+    def initialize(key:, name:, account: nil, connected: false, notice: nil) = super
+
     def connected? = connected
 
     # The line below the name, for a network that is connected. The view renders its own line, with
@@ -34,16 +38,19 @@ class SharePresenter
   # @param body [String, nil] The draft to put back in the field. ⚠️ A failed submit renders this
   #   page again, thus the owner must not lose 300 characters that they wrote.
   # @param article_url [String, nil] The link to put back.
-  # @param selected [Array<String>] The network keys to tick again.
+  # @param selected [Array<String>, nil] The network keys to tick. ⚠️ Nil, the first load, ticks
+  #   each connected network: the owner posts to all of them nearly always, and the page must not
+  #   ask for three clicks each time. An array is the choice of the owner, and an empty one ticks
+  #   nothing.
   # @param scheduled [Boolean] True to open the schedule fields again.
   # @param date [String, nil] The date to put back, as YYYY-MM-DD.
   # @param time [String, nil] The time to put back, as HH:mm.
-  def initialize(networks:, body: nil, article_url: nil, selected: [],
+  def initialize(networks:, body: nil, article_url: nil, selected: nil,
                  scheduled: false, date: nil, time: nil)
     @networks = networks
     @body = body.to_s
     @article_url = article_url.to_s
-    @selected = Array(selected).map(&:to_s)
+    @selected = selected.nil? ? networks.select(&:connected?).map(&:key) : Array(selected).map(&:to_s)
     @scheduled = scheduled
     @date = date.to_s
     @time = time.to_s
@@ -66,7 +73,7 @@ class SharePresenter
   # ⚠️ There is no `max_date`, on purpose. The owner can schedule a post as far ahead as they want.
 
   # @param key [String] A network key.
-  # @return [Boolean] True when the owner ticked that network.
+  # @return [Boolean] True when the row is ticked.
   def selected?(key) = @selected.include?(key.to_s)
 
   # @return [Integer]

@@ -64,6 +64,15 @@ RSpec.describe ThreadsCredentials do
 
       expect(described_class.fetch.refresh_error).to be_nil
     end
+
+    # ⚠️ `nil.to_i` is 0, and a token that expires at once is one that `refresh!` never touches
+    # while the card says Connected.
+    it "gives a token with no expires_in the default lifetime" do
+      described_class.store_access_token(access_token: "a-token", expires_in: nil)
+
+      expect(described_class.fetch.expires_at).to be_within(1.minute).of(described_class::DEFAULT_TOKEN_LIFETIME.from_now)
+      expect(described_class.fetch).not_to be_expired
+    end
   end
 
   describe "#refreshable?" do

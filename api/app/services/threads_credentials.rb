@@ -8,16 +8,23 @@
 # This is not an ApplicationService, because that base class is for HTTP integrations and this
 # class makes no network call. Threads is the class that talks to the API.
 #
-# ⚠️ The access token is encrypted in the store. It posts as the owner, and this Redis also holds
-# the Sidekiq queues. Thus the key, which comes from secret_key_base, that is, RAILS_MASTER_KEY, is
-# at a place that Redis access alone cannot reach, on purpose.
+# ⚠️ The access token is encrypted in the store (refer to EncryptedCredentials). It posts as the
+# owner.
 class ThreadsCredentials
+  include EncryptedCredentials
+
   # The Redis hash. "access_token" is encrypted, and the other fields are plain text.
   REDIS_KEY = "threads:credentials".freeze
+  # ⚠️ Never change this value. Refer to EncryptedCredentials.
+  ENCRYPTION_SALT = "threads credentials".freeze
 
   # Meta refuses a refresh of a token that is less than 24 hours old. The margin keeps the app off
   # that limit when the clocks do not agree.
   MIN_TOKEN_AGE = 25.hours
+
+  # The life of a long-lived token, for a response with no `expires_in`. ⚠️ Without this default a
+  # missing value gives a token that expires at once, and `refresh!` then never touches it.
+  DEFAULT_TOKEN_LIFETIME = 60.days
 
   Credentials = Data.define(:access_token, :user_id, :username, :issued_at, :expires_at, :refresh_error) do
     # @return [Boolean] True if an account is connected now.
@@ -55,7 +62,7 @@ class ThreadsCredentials
 
   # Stores the account at the end of the OAuth round trip.
   # @param access_token [String] The long-lived token.
-  # @param expires_in [Integer] The seconds that Meta gives it.
+  # @param expires_in [Integer, nil] The seconds that Meta gives it.
   # @param user_id [String] The Threads id of the account.
   # @param username [String] The name to show in the admin.
   # @return [void]
@@ -69,16 +76,18 @@ class ThreadsCredentials
   #
   # It also removes the record of a refused refresh: a token that arrives is the correction.
   # @param access_token [String]
-  # @param expires_in [Integer] The seconds that Meta gives it.
+  # @param expires_in [Integer, nil] The seconds that Meta gives it. With no value, or a value that
+  #   is not positive, the token gets DEFAULT_TOKEN_LIFETIME.
   # @return [void]
   def self.store_access_token(access_token:, expires_in:)
     now = Time.current
+    lifetime = expires_in.to_i.positive? ? expires_in.to_i.seconds : DEFAULT_TOKEN_LIFETIME
 
     $redis.hset(
       REDIS_KEY,
-      "access_token", encryptor.encrypt_and_sign(access_token.to_s),
+      "access_token", encrypt(access_token),
       "issued_at", now.utc.iso8601,
-      "expires_at", (now + expires_in.to_i.seconds).utc.iso8601
+      "expires_at", (now + lifetime).utc.iso8601
     )
     $redis.hdel(REDIS_KEY, "refresh_error")
     nil
@@ -99,26 +108,6 @@ class ThreadsCredentials
     nil
   end
 
-  # Removes the token and the account. The owner must authorize the app again to connect.
-  # @return [void]
-  def self.clear
-    $redis.del(REDIS_KEY)
-    nil
-  end
-
-  # ⚠️ This returns nil and does not raise when the code cannot read the message. A new
-  # RAILS_MASTER_KEY must give "not connected", which the owner corrects with a new connection in
-  # the admin. It must not give an exception on each page that shows the status.
-  # @param value [String, nil] The encrypted message.
-  # @return [String, nil]
-  def self.decrypt(value)
-    return if value.blank?
-    encryptor.decrypt_and_verify(value).presence
-  rescue StandardError
-    nil
-  end
-  private_class_method :decrypt
-
   # @param value [String, nil] An ISO8601 time.
   # @return [Time, nil]
   def self.parse_time(value)
@@ -136,12 +125,4 @@ class ThreadsCredentials
     nil
   end
   private_class_method :parse_json
-
-  # @return [ActiveSupport::MessageEncryptor]
-  def self.encryptor
-    @encryptor ||= ActiveSupport::MessageEncryptor.new(
-      Rails.application.key_generator.generate_key("threads credentials", ActiveSupport::MessageEncryptor.key_len)
-    )
-  end
-  private_class_method :encryptor
 end

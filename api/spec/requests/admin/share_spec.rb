@@ -24,7 +24,17 @@ RSpec.describe "Admin share", type: :request do
     allow_any_instance_of(Mastodon).to receive(:connected?).and_return(mastodon)
     allow_any_instance_of(Mastodon).to receive(:handle).and_return(mastodon ? "@me@instance.test" : nil)
     allow_any_instance_of(Threads).to receive(:connected?).and_return(threads)
+    allow_any_instance_of(Threads).to receive(:usable?).and_return(threads)
+    allow_any_instance_of(Threads).to receive(:expired?).and_return(false)
     allow_any_instance_of(Threads).to receive(:username).and_return(threads ? "me" : nil)
+  end
+
+  # A Threads account whose token is dead: connected, and not usable.
+  def expire_threads
+    allow_any_instance_of(Threads).to receive(:connected?).and_return(true)
+    allow_any_instance_of(Threads).to receive(:usable?).and_return(false)
+    allow_any_instance_of(Threads).to receive(:expired?).and_return(true)
+    allow_any_instance_of(Threads).to receive(:username).and_return("me")
   end
 
   describe "GET /share" do
@@ -77,6 +87,50 @@ RSpec.describe "Admin share", type: :request do
         expect(response.body).to include("Posts as @me.bsky.social.")
         expect(response.body).to include('<wa-checkbox name="networks[]" value="mastodon" disabled>')
         expect(response.body).to include("Not connected.")
+      end
+
+      it "names the account of each of the three networks" do
+        connect(bluesky: true, mastodon: true, threads: true)
+
+        get "/share"
+
+        expect(response.body).to include("Posts as @me.bsky.social.")
+        expect(response.body).to include("Posts as @me@instance.test.")
+        expect(response.body).to include("Posts as @me.")
+      end
+
+      # The owner posts to each connected network nearly always, thus the page must not ask for
+      # three clicks each time.
+      it "ticks each connected row and not a disabled one" do
+        connect(bluesky: true, mastodon: true, threads: false)
+
+        get "/share"
+
+        expect(response.body).to match(/value="bluesky"[^>]*\schecked>/)
+        expect(response.body).to match(/value="mastodon"[^>]*\schecked>/)
+        expect(response.body).not_to match(/value="threads"[^>]*\schecked>/)
+      end
+
+      # ⚠️ A dead Threads token is connected and cannot post. The row must say so, and not
+      # "Not connected", which would send the owner to look for a card that is green.
+      it "disables the Threads row when its token expired, and says why" do
+        expire_threads
+
+        get "/share"
+
+        expect(response.body).to include('<wa-checkbox name="networks[]" value="threads" disabled>')
+        expect(response.body).to include("The Threads token expired.")
+      end
+
+      # ⚠️ Each state comes from Redis. An upstream failure must not go into the path of a page
+      # load, thus this page makes no HTTP request at all.
+      it "makes no HTTP request" do
+        expect(HTTParty).not_to receive(:get)
+        expect(HTTParty).not_to receive(:post)
+
+        get "/share"
+
+        expect(response).to have_http_status(:ok)
       end
 
       # ⚠️ The house rule: every submit is a <wa-button> in a form_with, and never a native button.
@@ -164,6 +218,45 @@ RSpec.describe "Admin share", type: :request do
         expect(flash[:notice]).to eq("Queued a post to Bluesky.")
       end
 
+      # ⚠️ A dead Threads token is connected and cannot post. Without this check the job would
+      # raise at Meta and retry for 24 hours.
+      it "refuses the Threads row when its token expired" do
+        expire_threads
+
+        post "/share", params: { article_url: url, body: "Hi.", networks: [ "threads" ] }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(ThreadsPostJob.jobs).to be_empty
+      end
+
+      # ⚠️ The body is stripped one time, here. Without that a newline at its end went to Bluesky
+      # as it was and to Mastodon with the newline removed.
+      it "strips the body before it counts it and before it adds the job" do
+        post "/share", params: { article_url: url, body: "  A long day.\n\n", networks: [ "bluesky" ] }
+
+        expect(response).to redirect_to(share_path)
+        expect(BlueskyPostJob.jobs.first["args"].last).to eq("A long day.")
+      end
+
+      it "refuses a body that is only white space" do
+        post "/share", params: { article_url: url, body: " \n ", networks: [ "bluesky" ] }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.body).to include("Write something to post.")
+      end
+
+      # ⚠️ A submit that fails keeps the ticks of the owner, and an empty choice is a choice. The
+      # default ticks apply to the first load only.
+      it "keeps the rows unticked after a refusal when the owner unticked them" do
+        connect(bluesky: true, mastodon: true, threads: false)
+
+        post "/share", params: { article_url: url, body: "", networks: [] }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.body).not_to match(/value="bluesky"[^>]*\schecked>/)
+        expect(response.body).not_to match(/value="mastodon"[^>]*\schecked>/)
+      end
+
       describe "scheduling" do
         # Any date in the future. ⚠️ It must not be a constant: a date that a person writes here
         # becomes the past, and the action then refuses it and the example fails one day.
@@ -242,6 +335,25 @@ RSpec.describe "Admin share", type: :request do
 
           expect(response).to redirect_to(share_path)
           expect(BlueskyPostJob.jobs.size).to eq(1)
+        end
+
+        # ⚠️ `Time.zone.parse("garbage 09:00")` gives today at 09:00. Without the check of the
+        # shape, a value with a mistake would schedule a post for today.
+        it "refuses a date that is not a date" do
+          post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+                                   schedule: "1", date: "garbage", time: "09:00" }
+
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(response.body).to include("Pick a date and a time to schedule it.")
+          expect(BlueskyPostJob.jobs).to be_empty
+        end
+
+        it "refuses a time that is not a time" do
+          post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+                                   schedule: "1", date: on, time: "9 in the morning" }
+
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(BlueskyPostJob.jobs).to be_empty
         end
 
         it "refuses a schedule with no date, and keeps the fields open" do

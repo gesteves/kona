@@ -19,6 +19,10 @@ class Bluesky < ApplicationService
   # The largest blob that a PDS takes for a card thumbnail. A record with a larger one fails at
   # `putRecord` and not at the upload, thus the reason arrives late and reads as "blob too big".
   MAX_BLOB_BYTES = 976_560
+  # The most bytes of an og:image that this class downloads. ⚠️ The picture belongs to a page that
+  # the owner linked to, and the worker is a 512MB VM at concurrency 5. A picture past this limit
+  # loses the thumbnail and never the post.
+  MAX_CARD_IMAGE_BYTES = 10 * 1024 * 1024
   # The width to shrink an oversized thumbnail to. Bluesky renders a card at approximately this
   # width, thus a larger picture is only bandwidth.
   CARD_IMAGE_WIDTH = 1200
@@ -37,8 +41,9 @@ class Bluesky < ApplicationService
   # A bare URL. It does not take a trailing period or bracket, which is nearly always punctuation
   # of the sentence and not part of the address.
   URL_PATTERN = %r{(?:^|[$|\W])(https?://[a-zA-Z0-9\-._~:/?\#\[\]@!$&'()*+,;%=]*[a-zA-Z0-9\-_~/\#@$&*+=])}
-  # A #hashtag.
-  TAG_PATTERN = /(?:^|[$|\W])(\#\w+)/
+  # A #hashtag. ⚠️ It does not start with a digit, as in the client of Bluesky: "#1" is a number
+  # and not a tag.
+  TAG_PATTERN = /(?:^|[$|\W])(\#(?!\d)\w+)/
 
   # The number of grapheme clusters in a post.
   #
@@ -91,7 +96,7 @@ class Bluesky < ApplicationService
   #   is necessary: a card with no title and no picture still renders.
   # @return [String] The public URL of the post.
   # @raise [RuntimeError] When the credentials, the length, the session, or the write fails. It
-  #   raises on purpose: `SharePostJob` then does the work again.
+  #   raises on purpose: `BlueskyPostJob` then does the work again.
   def post!(rkey:, text:, card: nil)
     raise "Bluesky is not connected" unless valid_credentials?
     raise "The post is empty or longer than #{MAX_GRAPHEMES} characters" unless self.class.valid_post_length?(text)
@@ -145,24 +150,30 @@ class Bluesky < ApplicationService
   # ⚠️ This is not `AtProto#upload_image_blob`, which asks the Contentful Images API for a smaller
   # copy. The picture here belongs to the page that the owner linked to, which can be another site
   # and can be a Short, which has no cover image at all.
+  #
+  # Each step fails soft, on purpose: a picture past `MAX_CARD_IMAGE_BYTES`, a body that is not an
+  # image, and a picture that stays past the blob limit after the shrink each give nil, and the card
+  # then renders with no thumbnail.
   # @param url [String, nil] The og:image.
   # @return [Hash, nil] The blob, or nil after any failure.
   def upload_card_image(url)
     return if url.blank?
 
-    response = HTTParty.get(url, headers: { "User-Agent" => OpenGraph::USER_AGENT },
-                                 timeout: OpenGraph::READ_TIMEOUT, follow_redirects: true, limit: 5)
-    unless response.success?
-      report_upstream_error("HTTP #{response.code}", context: "bluesky card image", status: response.code, url: url)
-      return
-    end
+    picture = download(url, max_bytes: MAX_CARD_IMAGE_BYTES,
+                            headers: { "User-Agent" => OpenGraph::USER_AGENT },
+                            open_timeout: OpenGraph::OPEN_TIMEOUT, read_timeout: OpenGraph::READ_TIMEOUT,
+                            follow_redirects: true, limit: 5)
+    return if picture.nil?
 
-    bytes = response.body.to_s
-    mime = response.headers["content-type"].to_s.split(";").first.presence || "image/jpeg"
-    return if bytes.blank? || !mime.start_with?("image/")
+    bytes = picture[:body]
+    mime = picture[:content_type].split(";").first.to_s.strip
 
-    bytes, mime = shrink(bytes) if bytes.bytesize > MAX_BLOB_BYTES
-    return if bytes.blank?
+    # ⚠️ A host with no content type, or a 200 that is an HTML error page, must not go up as a
+    # picture. The shrink decodes the bytes with libvips, thus it is also the check that they are
+    # an image. It runs for an oversized picture for the same reason as before: a blob past the
+    # limit fails at putRecord.
+    bytes, mime = shrink(bytes) if !mime.start_with?("image/") || bytes.bytesize > MAX_BLOB_BYTES
+    return if bytes.blank? || bytes.bytesize > MAX_BLOB_BYTES
 
     upload_blob(bytes, mime)
   rescue StandardError => e
@@ -170,7 +181,7 @@ class Bluesky < ApplicationService
     nil
   end
 
-  # Makes an oversized picture into a JPEG that fits under the blob limit.
+  # Makes a picture into a JPEG that fits under the blob limit.
   #
   # ⚠️ A blob past the limit fails at `putRecord`, and not at the upload. Thus without this step the
   # whole post fails, and the message names the embed and not the picture. libvips is already a
@@ -190,10 +201,17 @@ class Bluesky < ApplicationService
   #
   # ⚠️ The body is plain text, and it is not Markdown. Thus this does not render anything first,
   # and each offset comes from the same string that the record holds.
+  #
+  # ⚠️ The links come first, and a mention or a tag inside a link is not a facet. A URL such as
+  # `…/profile/@me.bsky.social` or `…/#section` would otherwise get two facets over one range, and
+  # a client renders that as a broken link.
   # @param text [String]
   # @return [Array<Hash>]
   def build_facets(text)
-    link_facets(text) + mention_facets(text) + tag_facets(text)
+    links = link_facets(text)
+    inside_link = links.map { |facet| facet["index"]["byteStart"]...facet["index"]["byteEnd"] }
+
+    links + mention_facets(text, skip: inside_link) + tag_facets(text, skip: inside_link)
   end
 
   # @return [Array<Hash>] One app.bsky.richtext.facet#link for each bare URL.
@@ -205,9 +223,10 @@ class Bluesky < ApplicationService
 
   # Resolves each @handle and drops one that the PDS does not know: a facet with no DID makes the
   # record invalid.
+  # @param skip [Array<Range>] The byte ranges to leave alone.
   # @return [Array<Hash>]
-  def mention_facets(text)
-    scan_facets(text, MENTION_PATTERN) do |match|
+  def mention_facets(text, skip: [])
+    scan_facets(text, MENTION_PATTERN, skip: skip) do |match|
       did = resolve_handle(match.delete_prefix("@"))
       next if did.blank?
 
@@ -215,9 +234,10 @@ class Bluesky < ApplicationService
     end
   end
 
+  # @param skip [Array<Range>] The byte ranges to leave alone.
   # @return [Array<Hash>] One app.bsky.richtext.facet#tag for each #hashtag.
-  def tag_facets(text)
-    scan_facets(text, TAG_PATTERN) do |match|
+  def tag_facets(text, skip: [])
+    scan_facets(text, TAG_PATTERN, skip: skip) do |match|
       { "$type" => "app.bsky.richtext.facet#tag", "tag" => match.delete_prefix("#") }
     end
   end
@@ -228,18 +248,23 @@ class Bluesky < ApplicationService
   # is 1 character and 2 bytes, thus a character offset moves the highlight of each facet after it.
   # @param text [String]
   # @param pattern [Regexp] A pattern whose first group is the thing to mark.
+  # @param skip [Array<Range>] Byte ranges. A match that starts inside one is not a facet, and the
+  #   block does not run for it.
   # @return [Array<Hash>] The facets. The block returns nil to drop one.
-  def scan_facets(text, pattern)
+  def scan_facets(text, pattern, skip: [])
     facets = []
     text.to_s.scan(pattern) do
       match = Regexp.last_match
+      start_char, end_char = match.offset(1)
+      byte_start = text[0...start_char].bytesize
+      next if skip.any? { |range| range.cover?(byte_start) }
+
       feature = yield(match[1])
       next if feature.blank?
 
-      start_char, end_char = match.offset(1)
       facets << {
         "index" => {
-          "byteStart" => text[0...start_char].bytesize,
+          "byteStart" => byte_start,
           "byteEnd" => text[0...end_char].bytesize
         },
         "features" => [ feature ]

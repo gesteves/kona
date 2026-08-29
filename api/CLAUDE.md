@@ -125,7 +125,12 @@ reports of `rake related:*`. Refer to **The article rankings**.
 Seven more are not subclasses of `ApplicationService`, because they are not cacheable reads:
 `SpamQuarantine`, `TrackLibrary`, `BlueskyCredentials`, `MastodonCredentials`, and
 `ThreadsCredentials` use Redis only and no HTTP; `GpxTrack` parses only; and `MapboxTileset` and `StaticMap` are different (refer to **The
-course-map renderer**).
+course-map renderer**). The three credential stores share the `EncryptedCredentials` concern,
+which encrypts each secret field. ⚠️ **Never change the `ENCRYPTION_SALT` of a store**: the salt is
+part of the key, thus a new salt makes each stored secret unreadable and each card says "not
+connected".
+`ApplicationService#download` reads a URL in fragments and stops at a byte limit. ⚠️ Use it for
+each body whose size another site decides, for example an `og:image`: the worker is a 512MB VM.
 `cached_json(key, expires_in:)` gives the read-through Redis cache. HTTParty makes each request, and
 it tries again after a failure. `DeepOstruct` gives dot access.
 
@@ -660,6 +665,12 @@ says what the integration does. `#card_description` makes that one line for each
 renders on each load of the admin, thus a fetch would put an upstream failure in the path of the
 navigation. `StandardSite#connected?` has the same rule, and its comment gives the reason.
 
+⚠️ **Each call to another service from a connect or a disconnect action has a timeout**
+(`Mastodon::REQUEST_TIMEOUT`, `Threads::REQUEST_TIMEOUT`, and `AtProto::SESSION_TIMEOUT`). Those
+actions run in a request with a 20-second rack-timeout, and that timeout raises an exception that
+is **not** a `StandardError`, thus `rescue_with` does not catch it. Without the timeouts a host that
+hangs gives a 500 in place of the message of the page, and a disconnect never reaches its clear.
+
 - **Whoop** uses OAuth, and `Whoop#disconnect!` removes the tokens. ⚠️ It also deletes the cached
   `user_id`, because `Webhooks::WhoopController` authorizes each payload against it. A copy that
   stays continues to accept a webhook for an account with no tokens.
@@ -680,10 +691,10 @@ navigation. `StandardSite#connected?` has the same rule, and its comment gives t
   `bluesky:credentials`. ⚠️ **That page is the only method to set them, and there is no environment
   variable.** Thus the integration does nothing in a new environment until a person connects it.
   - ⚠️ **The code encrypts the app password at rest** with `ActiveSupport::MessageEncryptor` and
-    `secret_key_base`. That password is a credential for the full account, it operates from any
-    client, and this Redis also holds the Sidekiq queues. It is the only encrypted value in the
-    app. A failure to decrypt returns nil and does not raise, thus a new `RAILS_MASTER_KEY` gives
-    "not connected" in place of an error on each page that shows the status.
+    `secret_key_base`, through `EncryptedCredentials`. That password is a credential for the full
+    account, it operates from any client, and this Redis also holds the Sidekiq queues. A failure
+    to decrypt returns nil and does not raise, thus a new `RAILS_MASTER_KEY` gives "not connected"
+    in place of an error on each page that shows the status.
   - ⚠️ **`StandardSite#connect!` checks the credentials before it stores them**, and it opens a true
     PDS session. An app password with a mistake, stored with no check, fails with no message at the
     next publish.
@@ -724,7 +735,8 @@ navigation. `StandardSite#connected?` has the same rule, and its comment gives t
     Mastodon**.
   - **`disconnect!` tells the instance to revoke the token, then clears the store.** ⚠️ It clears
     the store whether the revoke works or not: the instance can be away, and a disconnect that the
-    owner asked for must not depend on that.
+    owner asked for must not depend on that. The clear is in an `ensure`, thus a rack-timeout
+    cannot skip it, and the revoke has a timeout of its own.
 - **Threads** does an OAuth round trip with Meta, and the Share page posts to it. Its app
   credentials are `THREADS_APP_ID` and `THREADS_APP_SECRET`, from the Meta dashboard, thus this card
   *does* go off the page without them and the Mastodon card does not. `Admin::ThreadsController` has
@@ -753,8 +765,15 @@ navigation. `StandardSite#connected?` has the same rule, and its comment gives t
   - ⚠️ **Meta gives no endpoint to revoke a token**, thus `disconnect!` is a local removal only. To
     end the access at Meta, the owner must also remove the app at Threads → Settings → Website
     permissions.
-  - The card names the account and the days before the token renews. A refused refresh gives the
-    `:error` state, exactly as a refused Whoop refresh does.
+  - The card names the account. A refused refresh gives the `:error` state, exactly as a refused
+    Whoop refresh does.
+  - ⚠️ **An expired token stays in the store, thus `connected?` stays true.** `Threads#expired?`
+    is the one thing that shows the difference: the card then gives the `:error` state with the
+    date of the expiry, `refresh!` answers `:expired` and the job writes a warning, and the Share
+    page disables the row through `Threads#usable?`. Without those three, a dead token showed a
+    green badge and a post job that retried for 24 hours.
+  - ⚠️ **A token response with no `expires_in` gets `DEFAULT_TOKEN_LIFETIME`.** With `nil.to_i`
+    the token expired at once, and `refresh!` then never touched it.
 
 ### The share composer
 
@@ -784,6 +803,12 @@ at a date and a time. All three post.
   with a **422** and keeps the draft, and it does not redirect. ⚠️ The draft is the expensive part
   of this page, thus a redirect that loses 300 characters is worse than a page that renders again.
   `SharePresenter` takes `body:`, `article_url:`, and `selected:` for that.
+  - ⚠️ **The action strips the body one time, and each service gets that text.** Without that, a
+    body with a newline at its end went to Bluesky as it was and to Mastodon with the newline
+    removed, and the count on the page named a third number.
+- **Each connected row is ticked on the first load.** `SharePresenter` reads `selected: nil` as
+  "tick each connected network", and an array, which is what a submit that fails passes back, as
+  the choice of the owner. Thus an empty array ticks nothing.
 - ⚠️ **The controller makes the record key and gives it to the job.** `Bluesky#post!` writes with
   `putRecord` at that key, thus the 24-hour retry of `ApplicationJob` replaces one post and never
   adds a second one to the feed. **`createRecord` makes its own key, thus each retry there is a new
@@ -791,7 +816,7 @@ at a date and a time. All three post.
   **Posting to Bluesky**.
 - **A switch opens a date and a time, and `perform_at` then schedules the job.** With the switch
   off the action calls `perform_async`. The **label of the submit button** says which of the two the
-  form does — "Share now", or "Schedule for Sep 3 at 9:00 AM" — exactly as the Republish dialog
+  form does — "Share now", or "Schedule for Sep 3, 9:00 AM" — exactly as the Republish dialog
   does, because the switch alone is easy to miss.
   - ⚠️ **The browser sends its own IANA zone in a hidden field, and that is what makes a date field
     safe here.** A date and a time carry **no** zone. The Republish dialog dropped its date field
@@ -801,9 +826,14 @@ at a date and a time. All three post.
     print that zone: it is the zone of the browser, thus the time that the owner picks is already
     the time that they mean.
   - ⚠️ **The action checks that zone against the zones that Rails knows.** That value comes from the
-    browser, thus one with a mistake must give the fallback and never an exception. With no
-    JavaScript the field is empty, and `TimeZoneResolver.default` (`TIME_ZONE`) is the meaning.
-    Thus the form still works with no JavaScript.
+    browser, thus one with a mistake must give the fallback and never an exception. When the
+    Stimulus controller did not run, the field is empty, and `TimeZoneResolver.default`
+    (`TIME_ZONE`) is the meaning. ⚠️ That is a fallback for a script error, and **not** a page that
+    works with no JavaScript: each `wa-*` control needs JavaScript to be part of its form, thus a
+    browser with no JavaScript submits no body and no link at all.
+  - ⚠️ **The action matches the shape of the date and the time before it parses them.**
+    `Time.zone.parse("garbage 09:00")` gives today at 09:00, thus a value with a mistake would
+    schedule a post for today.
   - ⚠️ **`required` on the date and the time follows the switch, and it is not in the markup.** A
     required control inside the hidden block would refuse "Share now", and a browser cannot show
     that message on an element that nobody can see.
@@ -816,8 +846,9 @@ at a date and a time. All three post.
     a new schedule cancels nothing: the owner can line up more than one post, and each is its own
     job with its own record key.
 - ⚠️ **There is ONE JOB FOR EACH NETWORK, and not one job for all of them.**
-  `Admin::ShareController::POST_JOBS` maps a key to its job, and the action adds one job for each
-  network that the owner ticked. **This is the point**: a failure at one service retries that
+  `Admin::ShareController::NETWORKS` is the one table of the networks: the name, the job, and the
+  method that reads the state of each one. The action adds one job for each network that the owner
+  ticked. **This is the point**: a failure at one service retries that
   service alone, and a network that already posted is never sent again. An earlier version had one
   job that posted to each network, and a retry of it went back to every one of them.
 - ⚠️ **One key goes to all three jobs, and each attempt of each job carries it.** `Bluesky.new_tid`
@@ -825,7 +856,9 @@ at a date and a time. All three post.
   and Threads keeps its **media container** below it. That is what makes the retry of each job safe.
 - ⚠️ **The action posts only to a network that has an account.** A row with no account renders
   `disabled`, thus a browser cannot tick it, but a request that a person writes by hand can. Without
-  that check the job would raise "not connected" and retry for 24 hours.
+  that check the job would raise "not connected" and retry for 24 hours. ⚠️ For Threads the check
+  is `usable?` and not `connected?`: an expired token is connected and cannot post, and the row
+  then says so.
 - **The three rows are always on the page**, and a row with no account is `disabled` with a link to
   Connected apps. That is different from Connected apps, which hides such a card: there the card
   offers an action that would fail, and here a disabled row says why one of three names cannot take
@@ -862,12 +895,21 @@ report, and it must inherit `ApplicationService` for `report_upstream_error`.
     alone, and Bluesky renders that.
   - ⚠️ It sends a **User-Agent** of its own. Many hosts give a 403 to the default one, and the card
     is then empty with no reason.
+  - It reads the first `MAX_BYTES` of the page through `download` and stops there. The tags are in
+    the `<head>`. A relative `og:image` resolves against the final URL, after each redirect.
   - Redis caches each card for 15 minutes, thus a retry of the job does not ask the page again.
 - **The thumbnail is the `og:image`, whatever host holds it.** `Bluesky#upload_card_image` gets it
   and uploads it as a blob. ⚠️ A blob past `MAX_BLOB_BYTES` fails at **`putRecord`** and not at the
   upload, thus the whole post would go away and the message would name the embed. For that reason
   the code shrinks an oversized picture to 1200px wide with **libvips**, which this app already
-  needs for the blurhash placeholders.
+  needs for the blurhash placeholders, and it drops a picture that is still past the limit after
+  that.
+  - ⚠️ **The download stops at `MAX_CARD_IMAGE_BYTES`**, through `ApplicationService#download`.
+    The picture belongs to a page that the owner linked to, and the worker is a 512MB VM. A larger
+    picture loses the thumbnail only.
+  - ⚠️ **A body with no image content type goes through libvips before it goes up.** A host with no
+    `Content-Type`, or a 200 that is an HTML error page, must not go up as a picture: the decode is
+    the check.
   - **A card with no picture still renders**, thus each step here fails soft and the post never goes
     away with the image.
   - ⚠️ This is **not** `AtProto#upload_image_blob`, which asks the Contentful Images API for a
@@ -879,6 +921,9 @@ report, and it must inherit `ApplicationService` for `report_upstream_error`.
     1 character and 2 bytes, thus a character offset moves the highlight of each facet after it.
   - ⚠️ **A mention that the PDS cannot resolve is dropped.** A mention facet with no DID makes the
     record invalid, and the whole post then fails.
+  - ⚠️ **A mention or a tag inside a link is not a facet.** `…/profile/@me.bsky.social` and
+    `…/#section` would otherwise get two facets over one range, and a client renders that as a
+    broken link. A tag does not start with a digit, as in the client of Bluesky: `#1` is a number.
 - ⚠️ **It does not send `validate: false`**, and `StandardSite` does. The PDS knows the `app.bsky.*`
   lexicons, thus its own check finds a record with an error before that post reaches a feed. It does
   not know the `site.standard.*` lexicons.
@@ -903,9 +948,10 @@ round trip are in the same class; refer to **Connected apps**.
   `putRecord` of Bluesky. The instance keeps that key and answers with the status that it made
   already. `MastodonPostJob` sends the **same key** that the controller made before it added the
   job, thus each attempt carries one key.
-  ⚠️ **That window is not for ever.** The instance holds the key for a limited time, thus a retry a
-  long time later can still make a second post. It covers the attempts that follow quickly, which is
-  nearly all of them.
+  ⚠️ **That window is approximately an hour, and the Sidekiq retries go on for 24.** Thus `post!`
+  also keeps the URL of the status in Redis at `mastodon:status:<key>` for `STATUS_TTL`, and a
+  later attempt of the same job returns it and posts nothing. The header covers the quick retries,
+  and the Redis key covers the late ones.
 - **Each post is `public` and `en`.** This blog has one author and one language.
 - ⚠️ **This class needs no length check.** Mastodon counts a URL as **23** characters whatever its
   true length, and a default instance permits 500. The body of a draft is at most 300, which is the
@@ -1295,6 +1341,15 @@ The RSpec request specs are in `spec/requests/`, and there are also `spec/servic
 `spec/presenters/`. There is no database and there are no fixtures. Stub a service with
 `allow_any_instance_of(SomeService).to receive(:method).and_return(...)`. A spec asserts the markup
 that the app rendered **and** the cache headers.
+
+⚠️ **The specs use the Redis of `.env.test`, which is database 1 of the local Redis.** The specs
+write and delete real keys with no namespace, and this includes `bluesky:credentials`,
+`mastodon:credentials`, and `threads:credentials`. With the `REDIS_URL` of `.env`, each `rspec` run
+disconnected the accounts that you connected in the admin on your own machine. dotenv reads
+`.env.test` before `.env`, and CI sets `REDIS_URL` in the environment, which wins over both.
+`spec/support/streamed_get.rb` stubs `HTTParty.get` for the code that reads a body through
+`ApplicationService#download`: that method reads in fragments, thus a plain `and_return` gives it
+nothing.
 
 ## Environment variables
 

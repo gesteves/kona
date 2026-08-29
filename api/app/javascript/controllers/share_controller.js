@@ -1,9 +1,8 @@
 import { Controller } from "@hotwired/stimulus";
 
 /**
- * The Share composer: the article picker, the selection card, and the character count.
- *
- * Nothing here submits. The page drafts a post and no code posts one yet.
+ * The Share composer: the character count, the schedule fields, the label of the submit button,
+ * and the time zone of the browser. The form itself posts to POST /share.
  */
 export default class extends Controller {
   static targets = [
@@ -17,8 +16,8 @@ export default class extends Controller {
     this.submitTarget.loading = false;
 
     // ⚠️ The date and the time carry no zone. This is what gives them a meaning, and it is the
-    // reason that a date field is safe here and was not safe in the Republish dialog. With no
-    // JavaScript the field stays empty and the server falls back to TIME_ZONE.
+    // reason that a date field is safe here and was not safe in the Republish dialog. When this
+    // controller does not run, the field stays empty and the server falls back to TIME_ZONE.
     const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (zone) this.timeZoneTarget.value = zone;
 

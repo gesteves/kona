@@ -91,6 +91,17 @@ RSpec.describe Threads do
       )
     end
 
+    # ⚠️ The callback is a request with a 20-second rack-timeout. A Meta that hangs must give the
+    # message of the page and not a 500.
+    it "gives each call a timeout" do
+      stub_flow
+
+      described_class.new.connect!("a-code", redirect_uri: redirect_uri)
+
+      expect(HTTParty).to have_received(:post).with(anything, hash_including(timeout: described_class::REQUEST_TIMEOUT))
+      expect(HTTParty).to have_received(:get).with(anything, hash_including(timeout: described_class::REQUEST_TIMEOUT)).twice
+    end
+
     # ⚠️ The short-lived token lasts an hour. To store it would give a connection that dies the
     # same day.
     it "exchanges the short-lived token for the 60-day one" do
@@ -162,15 +173,24 @@ RSpec.describe Threads do
       expect(HTTParty).not_to have_received(:get)
     end
 
-    # An expired token cannot be renewed, thus a call would only record a failure that the card
-    # already shows.
-    it "does nothing once the token expired" do
+    # ⚠️ An expired token cannot be renewed, thus a call would only record a failure. The answer
+    # names the state, and it is not the same as "no account": the job writes a warning for it.
+    it "answers :expired once the token expired, and calls nobody" do
       connect!(issued_at: 61.days.ago)
       $redis.hset(ThreadsCredentials::REDIS_KEY, "expires_at", 1.day.ago.utc.iso8601)
       allow(HTTParty).to receive(:get)
 
-      expect(described_class.new.refresh!).to eq(:skipped)
+      expect(described_class.new.refresh!).to eq(:expired)
       expect(HTTParty).not_to have_received(:get)
+    end
+
+    it "gives Meta a timeout" do
+      connect!(issued_at: 2.days.ago)
+      allow(HTTParty).to receive(:get).and_return(http_response({ access_token: "a-renewed-token", expires_in: 60.days.to_i }))
+
+      described_class.new.refresh!
+
+      expect(HTTParty).to have_received(:get).with(anything, hash_including(timeout: described_class::REQUEST_TIMEOUT))
     end
 
     it "records a 4xx, so the card can say the connection needs attention" do
@@ -197,6 +217,35 @@ RSpec.describe Threads do
 
       expect(described_class.new.refresh!).to eq(:failed)
       expect(ThreadsCredentials.fetch.access_token).to eq("a-long-lived-token")
+    end
+  end
+
+  # ⚠️ An expired token stays in the store, thus `connected?` stays true. `expired?` and `usable?`
+  # are what show the difference to the card and to the Share page.
+  describe "#expired? and #usable?" do
+    it "is usable while the token is inside its window" do
+      connect!
+
+      service = described_class.new
+      expect(service).to be_connected
+      expect(service).not_to be_expired
+      expect(service).to be_usable
+    end
+
+    it "is connected and not usable once the token expired" do
+      connect!
+      $redis.hset(ThreadsCredentials::REDIS_KEY, "expires_at", 1.hour.ago.utc.iso8601)
+
+      service = described_class.new
+      expect(service).to be_connected
+      expect(service).to be_expired
+      expect(service).not_to be_usable
+    end
+
+    it "is neither with no account" do
+      service = described_class.new
+      expect(service).not_to be_expired
+      expect(service).not_to be_usable
     end
   end
 
@@ -246,6 +295,23 @@ RSpec.describe Threads do
 
     it "refuses a post with no body" do
       expect { post!(text: "  ") }.to raise_error(/empty/)
+    end
+
+    # ⚠️ Meta would refuse the container anyway, and the message here says what to do.
+    it "refuses to post with an expired token, and calls Meta not at all" do
+      $redis.hset(ThreadsCredentials::REDIS_KEY, "expires_at", 1.hour.ago.utc.iso8601)
+
+      expect { post! }.to raise_error(/expired/)
+      expect(HTTParty).not_to have_received(:post)
+    end
+
+    it "sends the body with no space at its ends" do
+      post!(text: "  Read this\n\n")
+
+      expect(HTTParty).to have_received(:post).with(
+        a_string_ending_with("/threads"),
+        hash_including(body: hash_including(text: "Read this"), timeout: described_class::REQUEST_TIMEOUT)
+      )
     end
 
     # ⚠️ The URL is a link_attachment and it is NOT in the text, thus Meta renders its own preview

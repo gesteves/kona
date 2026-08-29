@@ -276,6 +276,21 @@ RSpec.describe "Admin connected apps", type: :request do
           expect(response.body).to include("Disconnect")
         end
       end
+
+      # ⚠️ The dead token stays in the store, thus `connected?` stays true. Without this state the
+      # card showed a green badge for an account that could not post.
+      context "and the token expired" do
+        before { $redis.hset(ThreadsCredentials::REDIS_KEY, "expires_at", Time.utc(2026, 8, 20, 12).iso8601) }
+
+        it "flags it with the date and offers Reconnect" do
+          get "/connected-apps"
+
+          expect(response.body).to include("Needs attention")
+          expect(response.body).to include("token expired on August 20, 2026")
+          expect(response.body).to include("Reconnect")
+          expect(response.body).to include("Disconnect")
+        end
+      end
     end
   end
 
