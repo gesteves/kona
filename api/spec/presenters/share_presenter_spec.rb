@@ -44,6 +44,31 @@ RSpec.describe SharePresenter do
     end
   end
 
+  describe "the ticks" do
+    let(:rows) do
+      [ network, network(key: "mastodon", name: "Mastodon", account: "@me@x.test"),
+        network(key: "threads", name: "Threads", account: nil, connected: false) ]
+    end
+
+    # The owner posts to each connected network nearly always, thus the page must not ask for
+    # three clicks each time.
+    it "ticks each connected network on a first load" do
+      presenter = described_class.new(networks: rows)
+
+      expect(presenter.selected?("bluesky")).to be(true)
+      expect(presenter.selected?("mastodon")).to be(true)
+      expect(presenter.selected?("threads")).to be(false)
+    end
+
+    # ⚠️ A submit that fails passes the choice of the owner back, and an empty choice is a choice.
+    it "ticks nothing when the owner unticked each one" do
+      presenter = described_class.new(networks: rows, selected: [])
+
+      expect(presenter.selected?("bluesky")).to be(false)
+      expect(presenter.selected?("mastodon")).to be(false)
+    end
+  end
+
   describe "the limits" do
     # 300 is the Bluesky limit, which is the shortest of the three, and one body goes to all of
     # them. ⚠️ The view writes both numbers into the markup, and share_controller.js reads them

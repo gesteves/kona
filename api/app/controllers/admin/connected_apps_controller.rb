@@ -30,7 +30,7 @@ module Admin
         description: card_description(
           connected: service.connected?,
           account: ("@#{service.handle}" if service.handle.present?),
-          summary: "Publishes the blog to the AT Protocol as standard.site records."
+          summary: "Publishes the blog to the AT Protocol as standard.site records, and takes a post from the Share page."
         ),
         connected: service.connected?,
         connect_path: bluesky_connection_path,
@@ -48,7 +48,7 @@ module Admin
         description: card_description(
           connected: service.connected?,
           account: service.handle,
-          summary: "Connects a Mastodon account."
+          summary: "Connects a Mastodon account, for the Share page."
         ),
         connected: service.connected?,
         connect_path: mastodon_connection_path,
@@ -67,26 +67,31 @@ module Admin
         description: card_description(
           connected: service.connected?,
           account: ("@#{service.username}" if service.username.present?),
-          summary: "Connects a Threads account."
+          summary: "Connects a Threads account, for the Share page."
         ),
         connected: service.connected?,
         connect_path: threads_authorize_path,
         disconnect_path: threads_connection_path,
-        error: (threads_error_message(service.refresh_error) if service.connected?)
+        error: threads_error_message(service)
       )
     end
 
     # ⚠️ A Threads token that expires is dead for all time, and only a new authorization corrects
-    # that. Thus a refused refresh must reach the owner while the token is still good.
-    # @param error [Hash, nil] ThreadsCredentials refresh_error.
-    # @return [String, nil] A sentence for the card, or nil when the last refresh was successful.
-    def threads_error_message(error)
-      return if error.blank?
+    # that. Thus the card must say two things: that a refresh was refused, while the token is still
+    # good, and that the token expired, because `connected?` stays true with the dead token in the
+    # store.
+    # @param service [Threads]
+    # @return [String, nil] A sentence for the card, or nil when the connection works.
+    def threads_error_message(service)
+      return unless service.connected?
 
-      failed_at = Time.zone.parse(error[:at].to_s)
-      when_it_failed = failed_at ? " on #{failed_at.strftime('%B %-e, %Y at %-I:%M %p %Z')}" : ""
-
-      "Threads refused the last token refresh (HTTP #{error[:code]})#{when_it_failed}. "         "Reconnect before the token expires: an expired Threads token cannot be renewed."
+      if service.expired?
+        "The Threads token expired#{on_date(service.expires_at)}, and an expired token cannot be renewed. " \
+          "Reconnect to post to Threads again."
+      else
+        refresh_error_message(service.refresh_error, name: "Threads",
+                              consequence: "Reconnect before the token expires: an expired Threads token cannot be renewed.")
+      end
     end
 
     # @return [ConnectedAppPresenter, nil] Nil without the Whoop OAuth credentials, thus the page
@@ -107,7 +112,8 @@ module Admin
         connected: connected,
         connect_path: "/whoop/auth",
         disconnect_path: whoop_connection_path,
-        error: (whoop_error_message(service.refresh_error) if connected)
+        error: (refresh_error_message(service.refresh_error, name: "Whoop",
+                                      consequence: "The widget and the Intervals.icu sync stay broken until you reconnect.") if connected)
       )
     end
 
@@ -127,19 +133,24 @@ module Admin
       account.present? ? "Connected as #{account}." : "Connected."
     end
 
-    # Whoop keeps its tokens in Redis after it refuses them, thus `connected?` alone cannot show the
-    # difference between an integration that works and one that does not. WhoopTokenRefreshJob would
-    # continue to fail each six hours below a green badge.
-    # @param error [Hash, nil] Whoop#refresh_error.
+    # Whoop and Threads both keep their tokens in Redis after the service refuses them, thus
+    # `connected?` alone cannot show the difference between an integration that works and one that
+    # does not. The scheduled refresh job would continue to fail below a green badge.
+    # @param error [Hash, nil] The `{ code:, at: }` of the last refused refresh.
+    # @param name [String] The name of the service.
+    # @param consequence [String] What stays broken until the owner reconnects.
     # @return [String, nil] A sentence for the card, or nil when the last refresh was successful.
-    def whoop_error_message(error)
+    def refresh_error_message(error, name:, consequence:)
       return if error.blank?
 
       failed_at = Time.zone.parse(error[:at].to_s)
-      when_it_failed = failed_at ? " on #{failed_at.strftime('%B %-e, %Y at %-I:%M %p %Z')}" : ""
+      "#{name} refused the last token refresh (HTTP #{error[:code]})#{on_date(failed_at)}. #{consequence}"
+    end
 
-      "Whoop rejected the last token refresh (HTTP #{error[:code]})#{when_it_failed}. " \
-        "The widget and the Intervals.icu sync stay broken until you reconnect."
+    # @param time [Time, nil]
+    # @return [String] " on <date>", or an empty string with no time.
+    def on_date(time)
+      time ? " on #{time.in_time_zone.strftime('%B %-e, %Y at %-I:%M %p %Z')}" : ""
     end
   end
 end

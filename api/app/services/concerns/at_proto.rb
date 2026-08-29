@@ -18,6 +18,11 @@ module AtProto
   # @see https://atproto.com/specs/tid
   TID_ALPHABET = "234567abcdefghijklmnopqrstuvwxyz".freeze
 
+  # The seconds that the session call can take. ⚠️ `StandardSite#connect!` opens a session inside
+  # the Bluesky form request, which has a 20-second rack-timeout. A PDS that hangs must give the
+  # message of the form and not a 500.
+  SESSION_TIMEOUT = 10
+
   class_methods do
     # Encodes a 64-bit value as a 13-character TID.
     # @param value [Integer]
@@ -64,7 +69,8 @@ module AtProto
     response = HTTParty.post(
       "#{pds_url}/xrpc/com.atproto.server.createSession",
       body: { identifier: handle, password: app_password }.to_json,
-      headers: { "Content-Type" => "application/json" }
+      headers: { "Content-Type" => "application/json" },
+      timeout: SESSION_TIMEOUT
     )
     unless response.success?
       Rails.logger.warn("#{at_proto_label}: failed to authenticate with the PDS (HTTP #{response.code})")

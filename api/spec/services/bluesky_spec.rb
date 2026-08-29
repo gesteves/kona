@@ -108,14 +108,23 @@ RSpec.describe Bluesky do
       end
 
       before do
-        allow(HTTParty).to receive(:get)
-          .with("https://cdn.test/og.png", anything)
-          .and_return(instance_double(HTTParty::Response, success?: true, body: "bytes", code: 200,
-                                      headers: { "content-type" => "image/png" }))
+        stub_streamed_get("https://cdn.test/og.png", body: "bytes", headers: { "content-type" => "image/png" })
         allow(HTTParty).to receive(:post)
           .with(a_string_including("com.atproto.repo.uploadBlob"), anything)
           .and_return(instance_double(HTTParty::Response, success?: true, code: 200,
                                       body: { blob: { "$type" => "blob" } }.to_json))
+      end
+
+      # Captures the blob that uploadBlob sent, so an example can read it.
+      def stub_upload_blob
+        uploaded = nil
+        allow(HTTParty).to receive(:post)
+          .with(a_string_including("com.atproto.repo.uploadBlob"), anything) do |_url, options|
+            uploaded = options
+            instance_double(HTTParty::Response, success?: true, code: 200,
+                            body: { blob: { "$type" => "blob" } }.to_json)
+          end
+        -> { uploaded }
       end
 
       it "makes an app.bsky.embed.external with the thumbnail" do
@@ -139,13 +148,74 @@ RSpec.describe Bluesky do
 
       # A card with no picture still renders. Thus a failed image must never lose the post.
       it "still posts when the image fails" do
-        allow(HTTParty).to receive(:get)
-          .with("https://cdn.test/og.png", anything)
-          .and_return(instance_double(HTTParty::Response, success?: false, code: 500, body: "",
-                                      headers: {}))
+        stub_streamed_get("https://cdn.test/og.png", body: "", code: 500)
 
         service.post!(rkey: "3kabc", text: "Read this", card: card)
 
+        expect(@sent["record"]["embed"]["external"]).not_to have_key("thumb")
+      end
+
+      it "asks for the picture with its own user agent and a timeout" do
+        service.post!(rkey: "3kabc", text: "Read this", card: card)
+
+        expect(HTTParty).to have_received(:get).with(
+          "https://cdn.test/og.png",
+          hash_including(headers: hash_including("User-Agent" => OpenGraph::USER_AGENT),
+                         open_timeout: OpenGraph::OPEN_TIMEOUT, read_timeout: OpenGraph::READ_TIMEOUT)
+        )
+      end
+
+      # ⚠️ The picture belongs to a page that the owner linked to, and the worker is a 512MB VM. A
+      # picture past the download limit loses the thumbnail, and never the post.
+      it "drops a picture past the download limit and still posts" do
+        stub_streamed_get("https://cdn.test/og.png", body: "x" * (described_class::MAX_CARD_IMAGE_BYTES + 1),
+                          headers: { "content-type" => "image/png" }, fragments: 4)
+        uploaded = stub_upload_blob
+
+        service.post!(rkey: "3kabc", text: "Read this", card: card)
+
+        expect(uploaded.call).to be_nil
+        expect(@sent["record"]["embed"]["external"]).not_to have_key("thumb")
+      end
+
+      # A 200 that is an HTML error page must not go up as a picture.
+      it "drops a body that is not an image" do
+        stub_streamed_get("https://cdn.test/og.png", body: "<html>Not found</html>",
+                          headers: { "content-type" => "text/html" })
+        uploaded = stub_upload_blob
+
+        service.post!(rkey: "3kabc", text: "Read this", card: card)
+
+        expect(uploaded.call).to be_nil
+        expect(@sent["record"]["embed"]["external"]).not_to have_key("thumb")
+      end
+
+      # A host with no Content-Type still serves a true picture. The decode is the check.
+      it "decodes a picture that comes with no content type" do
+        stub_streamed_get("https://cdn.test/og.png", body: "bytes")
+        allow(Vips::Image).to receive(:new_from_buffer).and_return(Vips::Image.black(100, 50))
+        uploaded = stub_upload_blob
+
+        service.post!(rkey: "3kabc", text: "Read this", card: card)
+
+        expect(uploaded.call[:headers]["Content-Type"]).to eq("image/jpeg")
+        expect(@sent["record"]["embed"]["external"]["thumb"]).to eq({ "$type" => "blob" })
+      end
+
+      # ⚠️ A blob past the limit fails at putRecord and takes the whole post with it. A picture
+      # that stays too large after the shrink must go away, and the post must not.
+      it "drops a picture that is still past the blob limit after the shrink" do
+        stub_streamed_get("https://cdn.test/og.png", body: "x" * (described_class::MAX_BLOB_BYTES + 1),
+                          headers: { "content-type" => "image/png" })
+        # A plain double: ruby-vips makes `jpegsave_buffer` at run time, thus an instance_double
+        # cannot see it.
+        still_big = double("Vips::Image", width: 100, jpegsave_buffer: "j" * (described_class::MAX_BLOB_BYTES + 1))
+        allow(Vips::Image).to receive(:new_from_buffer).and_return(still_big)
+        uploaded = stub_upload_blob
+
+        service.post!(rkey: "3kabc", text: "Read this", card: card)
+
+        expect(uploaded.call).to be_nil
         expect(@sent["record"]["embed"]["external"]).not_to have_key("thumb")
       end
 
@@ -164,27 +234,17 @@ RSpec.describe Bluesky do
       # ⚠️ A blob past the limit fails at putRecord and not at the upload, thus the whole post
       # would go away and the message would name the embed.
       it "shrinks a picture that is over the blob limit" do
-        big = "x" * (described_class::MAX_BLOB_BYTES + 1)
-        allow(HTTParty).to receive(:get)
-          .with("https://cdn.test/og.png", anything)
-          .and_return(instance_double(HTTParty::Response, success?: true, body: big, code: 200,
-                                      headers: { "content-type" => "image/png" }))
+        stub_streamed_get("https://cdn.test/og.png", body: "x" * (described_class::MAX_BLOB_BYTES + 1),
+                          headers: { "content-type" => "image/png" })
         # A true image, thus the resize and the JPEG encode really run. The download is the only
-        # stub: `big` stands for a file that is too large, and libvips never decodes it.
+        # stub: the body stands for a file that is too large, and libvips never decodes it.
         allow(Vips::Image).to receive(:new_from_buffer).and_return(Vips::Image.black(2400, 1200))
-
-        uploaded = nil
-        allow(HTTParty).to receive(:post)
-          .with(a_string_including("com.atproto.repo.uploadBlob"), anything) do |_url, options|
-            uploaded = options
-            instance_double(HTTParty::Response, success?: true, code: 200,
-                            body: { blob: { "$type" => "blob" } }.to_json)
-          end
+        uploaded = stub_upload_blob
 
         service.post!(rkey: "3kabc", text: "Read this", card: card)
 
-        expect(uploaded[:body].bytesize).to be < described_class::MAX_BLOB_BYTES
-        expect(uploaded[:headers]["Content-Type"]).to eq("image/jpeg")
+        expect(uploaded.call[:body].bytesize).to be < described_class::MAX_BLOB_BYTES
+        expect(uploaded.call[:headers]["Content-Type"]).to eq("image/jpeg")
         expect(@sent["record"]["embed"]["external"]["thumb"]).to eq({ "$type" => "blob" })
       end
     end
@@ -239,6 +299,32 @@ RSpec.describe Bluesky do
 
       it "sends no facets for plain words" do
         service.post!(rkey: "3kabc", text: "Just some words")
+
+        expect(@sent["record"]).not_to have_key("facets")
+      end
+
+      # ⚠️ Two facets over one range render as a broken link. A mention inside a URL is part of
+      # the URL, and the PDS never hears about it.
+      it "leaves a mention inside a link alone" do
+        allow(HTTParty).to receive(:get).with(a_string_including("resolveHandle"), anything)
+
+        service.post!(rkey: "3kabc", text: "See https://bsky.app/profile/@me.bsky.social now")
+
+        types = @sent["record"]["facets"].map { |facet| facet["features"].first["$type"] }
+        expect(types).to eq([ "app.bsky.richtext.facet#link" ])
+        expect(HTTParty).not_to have_received(:get).with(a_string_including("resolveHandle"), anything)
+      end
+
+      it "leaves a tag inside a link alone" do
+        service.post!(rkey: "3kabc", text: "See https://example.test/#results and #ironman")
+
+        tags = @sent["record"]["facets"].filter_map { |facet| facet["features"].first["tag"] }
+        expect(tags).to eq([ "ironman" ])
+      end
+
+      # The client of Bluesky does not count "#1" as a tag either.
+      it "does not mark a number as a tag" do
+        service.post!(rkey: "3kabc", text: "Finished #1 in my age group")
 
         expect(@sent["record"]).not_to have_key("facets")
       end

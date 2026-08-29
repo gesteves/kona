@@ -57,14 +57,17 @@ RSpec.describe Mastodon do
       expect(credentials.redirect_uri).to eq(redirect_uri)
     end
 
-    it "asks the named instance for a client, with the callback of this app" do
+    # ⚠️ The owner types the hostname, and the form is a request with a 20-second rack-timeout. A
+    # host that accepts the connection and then hangs must give the message of the form.
+    it "asks the named instance for a client, with the callback of this app and a timeout" do
       allow(HTTParty).to receive(:post).and_return(http_response({ client_id: "abc", client_secret: "xyz" }))
 
       described_class.new.register!(instance: "mastodon.social", redirect_uri: redirect_uri)
 
       expect(HTTParty).to have_received(:post).with(
         "https://mastodon.social/api/v1/apps",
-        hash_including(body: hash_including(redirect_uris: redirect_uri, scopes: described_class::SCOPES))
+        hash_including(body: hash_including(redirect_uris: redirect_uri, scopes: described_class::SCOPES),
+                       timeout: described_class::REQUEST_TIMEOUT)
       )
     end
 
@@ -181,16 +184,38 @@ RSpec.describe Mastodon do
 
       expect(MastodonCredentials.connected?).to be(false)
     end
+
+    # ⚠️ A rack-timeout is not a StandardError, thus `rescue_with` does not catch it. The clear is
+    # in an `ensure`, thus it runs anyway.
+    it "clears the store when the revoke raises an exception that is not a StandardError" do
+      stub_const("FakeRequestTimeout", Class.new(Exception))
+      allow(HTTParty).to receive(:post).and_raise(FakeRequestTimeout)
+
+      expect { described_class.new.disconnect! }.to raise_error(FakeRequestTimeout)
+      expect(MastodonCredentials.connected?).to be(false)
+    end
+
+    it "gives the revoke a timeout" do
+      allow(HTTParty).to receive(:post).and_return(http_response({}))
+
+      described_class.new.disconnect!
+
+      expect(HTTParty).to have_received(:post).with(anything, hash_including(timeout: described_class::REQUEST_TIMEOUT))
+    end
   end
 
   describe "#post!" do
     let(:url) { "https://example.test/a-post/" }
+    let(:status_key) { "mastodon:status:3kabc" }
 
     before do
       connect_account!
+      $redis.del(status_key)
       allow(HTTParty).to receive(:post)
         .and_return(http_response({ url: "https://mastodon.social/@me/1" }))
     end
+
+    after { $redis.del(status_key) }
 
     def post!(**overrides)
       described_class.new.post!(**{ text: "Read this", url: url, idempotency_key: "3kabc" }.merge(overrides))
@@ -221,8 +246,8 @@ RSpec.describe Mastodon do
       )
     end
 
-    # ⚠️ This header is what makes a retry safe: the instance answers with the status that it made
-    # already, in place of a second one. SharePostJob sends the same key at each attempt.
+    # ⚠️ This header is what makes a quick retry safe: the instance answers with the status that it
+    # made already, in place of a second one. MastodonPostJob sends the same key at each attempt.
     it "sends the idempotency key and the bearer token" do
       post!
 
@@ -255,11 +280,33 @@ RSpec.describe Mastodon do
       expect(post!).to eq("https://mastodon.social/@me/1")
     end
 
+    # ⚠️ The instance keeps the idempotency key for approximately an hour, and the Sidekiq retries
+    # go on for 24. The URL in Redis is what makes a late retry safe.
+    it "remembers the URL of the status below the key" do
+      post!
+
+      expect($redis.get(status_key)).to eq("https://mastodon.social/@me/1")
+      expect($redis.ttl(status_key)).to be_within(60).of(described_class::STATUS_TTL.to_i)
+    end
+
+    it "answers with the URL of an earlier attempt and posts nothing" do
+      $redis.set(status_key, "https://mastodon.social/@me/1")
+
+      expect(post!).to eq("https://mastodon.social/@me/1")
+      expect(HTTParty).not_to have_received(:post)
+    end
+
+    it "remembers nothing with no key" do
+      post!(idempotency_key: nil)
+
+      expect($redis.get(status_key)).to be_nil
+    end
+
     it "refuses a draft with no body and no link" do
       expect { post!(text: "  ", url: nil) }.to raise_error(/empty/)
     end
 
-    # ⚠️ It raises and does not fail soft, thus SharePostJob does the work again.
+    # ⚠️ It raises and does not fail soft, thus MastodonPostJob does the work again.
     it "raises when the instance refuses the status" do
       allow(HTTParty).to receive(:post).and_return(http_response({ error: "no" }, success: false, code: 422))
 

@@ -7,9 +7,11 @@
 # Ignore bundler config.
 /.bundle
 
-# Ignore all environment files, except the example.
+# Ignore all environment files, except the example and the one of the specs. .env.test holds a
+# localhost Redis URL and no secret.
 /.env*
 !/.env.example
+!/.env.test
 
 # Ignore all logfiles and tempfiles.
 /log/*

@@ -5,13 +5,15 @@
 # class makes no network call. StandardSite checks a credential pair, because it is the class that
 # opens a session.
 #
-# ⚠️ The app password is encrypted in the store. It is an account credential that works from each
-# place, with no connection to one client, and this Redis also holds the Sidekiq queues. Thus the
-# key, which comes from secret_key_base, that is, RAILS_MASTER_KEY, is at a place that Redis access
-# alone cannot reach, on purpose.
+# ⚠️ The app password is encrypted in the store (refer to EncryptedCredentials). It is an account
+# credential that works from each place, with no connection to one client.
 class BlueskyCredentials
+  include EncryptedCredentials
+
   # The Redis hash: "handle" is plain text and "app_password" is encrypted.
   REDIS_KEY = "bluesky:credentials".freeze
+  # ⚠️ Never change this value. Refer to EncryptedCredentials.
+  ENCRYPTION_SALT = "bluesky credentials".freeze
 
   Credentials = Data.define(:handle, :app_password) do
     # @return [Boolean] True if both values are available.
@@ -34,35 +36,7 @@ class BlueskyCredentials
   # @param app_password [String]
   # @return [void]
   def self.store(handle:, app_password:)
-    $redis.hset(REDIS_KEY, "handle", handle.to_s.strip, "app_password", encryptor.encrypt_and_sign(app_password.to_s))
+    $redis.hset(REDIS_KEY, "handle", handle.to_s.strip, "app_password", encrypt(app_password))
     nil
   end
-
-  # Removes the stored pair. The integration then does nothing until the owner enters a new pair.
-  # @return [void]
-  def self.clear
-    $redis.del(REDIS_KEY)
-    nil
-  end
-
-  # ⚠️ This returns nil and does not raise when the code cannot read the message. A new
-  # RAILS_MASTER_KEY must give "not connected", which the owner corrects with new credentials in
-  # the admin. It must not give an exception on each page that shows the status.
-  # @param value [String, nil] The encrypted message.
-  # @return [String, nil]
-  def self.decrypt(value)
-    return if value.blank?
-    encryptor.decrypt_and_verify(value).presence
-  rescue StandardError
-    nil
-  end
-  private_class_method :decrypt
-
-  # @return [ActiveSupport::MessageEncryptor]
-  def self.encryptor
-    @encryptor ||= ActiveSupport::MessageEncryptor.new(
-      Rails.application.key_generator.generate_key("bluesky credentials", ActiveSupport::MessageEncryptor.key_len)
-    )
-  end
-  private_class_method :encryptor
 end

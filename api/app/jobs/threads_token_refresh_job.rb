@@ -15,6 +15,9 @@ class ThreadsTokenRefreshJob < ApplicationJob
     when :refreshed then Rails.logger.info("Threads access token refreshed on schedule")
     when :too_soon  then Rails.logger.info("Threads access token is too new to refresh; trying again tomorrow")
     when :failed    then Rails.logger.warn("Scheduled Threads token refresh failed. Reconnect on the Connected apps page.")
+    # ⚠️ Nothing can renew an expired token. This line is the only record of it in the log, and the
+    # Connected apps page is the only other one.
+    when :expired   then Rails.logger.warn("The Threads access token expired and cannot be renewed. Reconnect on the Connected apps page.")
     end
   end
 end

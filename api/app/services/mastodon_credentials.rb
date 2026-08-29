@@ -4,14 +4,16 @@
 # This is not an ApplicationService, because that base class is for HTTP integrations and this
 # class makes no network call. Mastodon is the class that talks to the instance.
 #
-# ⚠️ The client secret and the access token are encrypted in the store. The token posts as the
-# owner, and this Redis also holds the Sidekiq queues. Thus the key, which comes from
-# secret_key_base, that is, RAILS_MASTER_KEY, is at a place that Redis access alone cannot reach,
-# on purpose.
+# ⚠️ The client secret and the access token are encrypted in the store (refer to
+# EncryptedCredentials). The token posts as the owner.
 class MastodonCredentials
+  include EncryptedCredentials
+
   # The Redis hash. "client_secret" and "access_token" are encrypted, and the other fields are
   # plain text.
   REDIS_KEY = "mastodon:credentials".freeze
+  # ⚠️ Never change this value. Refer to EncryptedCredentials.
+  ENCRYPTION_SALT = "mastodon credentials".freeze
 
   Credentials = Data.define(:instance, :client_id, :client_secret, :redirect_uri, :access_token, :handle) do
     # @return [Boolean] True if the app has a client on the instance, thus it can start the flow.
@@ -56,7 +58,7 @@ class MastodonCredentials
       REDIS_KEY,
       "instance", instance.to_s,
       "client_id", client_id.to_s,
-      "client_secret", encryptor.encrypt_and_sign(client_secret.to_s),
+      "client_secret", encrypt(client_secret),
       "redirect_uri", redirect_uri.to_s
     )
     nil
@@ -69,37 +71,9 @@ class MastodonCredentials
   def self.store_token(access_token:, handle:)
     $redis.hset(
       REDIS_KEY,
-      "access_token", encryptor.encrypt_and_sign(access_token.to_s),
+      "access_token", encrypt(access_token),
       "handle", handle.to_s
     )
     nil
   end
-
-  # Removes the client and the token. The owner must name an instance again to connect.
-  # @return [void]
-  def self.clear
-    $redis.del(REDIS_KEY)
-    nil
-  end
-
-  # ⚠️ This returns nil and does not raise when the code cannot read the message. A new
-  # RAILS_MASTER_KEY must give "not connected", which the owner corrects with a new connection in
-  # the admin. It must not give an exception on each page that shows the status.
-  # @param value [String, nil] The encrypted message.
-  # @return [String, nil]
-  def self.decrypt(value)
-    return if value.blank?
-    encryptor.decrypt_and_verify(value).presence
-  rescue StandardError
-    nil
-  end
-  private_class_method :decrypt
-
-  # @return [ActiveSupport::MessageEncryptor]
-  def self.encryptor
-    @encryptor ||= ActiveSupport::MessageEncryptor.new(
-      Rails.application.key_generator.generate_key("mastodon credentials", ActiveSupport::MessageEncryptor.key_len)
-    )
-  end
-  private_class_method :encryptor
 end
