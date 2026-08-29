@@ -265,6 +265,11 @@ RSpec.describe ImageHelpers do
     # serves the card route, thus this is the only host.
     def root_url = @root_url || 'https://example.com'
 
+    # ⚠️ Each example below reads OG_TEMPLATE_VERSION and never the literal "v1". That constant
+    # goes up at each change to og-render.ts, to the logo, or to the font, and a literal here would
+    # make a correct bump look like a broken helper.
+    let(:template) { ImageHelpers::OG_TEMPLATE_VERSION }
+
     # The card URL comes from the path of the page. Thus the Worker can find the page from the
     # request path, and not from a ?path= parameter. Refer to web/src/og.ts.
     it 'hangs the card off the page’s own path, with a version cache buster' do
@@ -272,23 +277,31 @@ RSpec.describe ImageHelpers do
       parsed = URI.parse(result)
       expect("#{parsed.scheme}://#{parsed.host}#{parsed.path}")
         .to eq('https://example.com/articles/foo/og.png')
-      expect(URI.decode_www_form(parsed.query).to_h).to eq('v' => 'v1-1082')
+      expect(URI.decode_www_form(parsed.query).to_h).to eq('v' => "#{template}-1082")
     end
 
     it 'serves the home page’s card from the root' do
       expect(generate_open_graph_image_url('/', 7))
-        .to eq('https://example.com/og.png?v=v1-7')
+        .to eq("https://example.com/og.png?v=#{template}-7")
     end
 
     it 'trims a trailing slash on root_url' do
       @root_url = 'https://example.com/'
       expect(generate_open_graph_image_url('/', 7))
-        .to eq('https://example.com/og.png?v=v1-7')
+        .to eq("https://example.com/og.png?v=#{template}-7")
     end
 
     it 'busts on OG_TEMPLATE_VERSION alone when version is nil (listing pages have no sys)' do
       result = generate_open_graph_image_url('/blog/', nil)
-      expect(result).to eq('https://example.com/blog/og.png?v=v1')
+      expect(result).to eq("https://example.com/blog/og.png?v=#{template}")
+    end
+
+    # ⚠️ src/og.ts checks `v` against /^v\d+(-\d+)?$/ before it makes the cache key. A value
+    # outside that shape still renders, and each card then uses one cache entry, with no message.
+    # Thus the shape is the thing to pin, and not the number.
+    it 'keeps the v<number> shape that the Worker checks' do
+      expect(template).to match(/\Av\d+\z/)
+      expect(generate_open_graph_image_url('/blog/', 7)).to match(/\?v=v\d+-7\z/)
     end
   end
 
