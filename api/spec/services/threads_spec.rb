@@ -324,7 +324,8 @@ RSpec.describe Threads do
 
       expect(HTTParty).to have_received(:post).with(
         "https://graph.threads.net/v1.0/12345/threads",
-        hash_including(body: { media_type: "TEXT", text: "Read this", link_attachment: url })
+        hash_including(body: hash_including(media_type: "TEXT", text: "Read this",
+                                            link_attachment: url))
       )
     end
 
@@ -342,8 +343,10 @@ RSpec.describe Threads do
 
       expect(HTTParty).to have_received(:post).with(
         a_string_ending_with("/threads"),
-        hash_including(body: { media_type: "TEXT", text: "Read this" })
+        hash_including(body: hash_including(media_type: "TEXT", text: "Read this"))
       )
+      expect(HTTParty).not_to have_received(:post)
+        .with(a_string_ending_with("/threads"), hash_including(body: hash_including(:link_attachment)))
     end
 
     it "publishes the container it made, and answers with the id of the post" do
@@ -351,7 +354,7 @@ RSpec.describe Threads do
 
       expect(HTTParty).to have_received(:post).with(
         "https://graph.threads.net/v1.0/12345/threads_publish",
-        hash_including(body: { creation_id: "container-1" })
+        hash_including(body: hash_including(creation_id: "container-1"))
       )
     end
 
@@ -401,6 +404,32 @@ RSpec.describe Threads do
         # between the two steps cannot leave a new container at each attempt.
         expect(creates).to eq(1)
       end
+    end
+
+    # ⚠️ The token goes in the BODY and never in the query string. A container with a `reply_to_id`
+    # answered 500 with an empty error body while it was in the query, and Meta puts it in the body
+    # in its own example.
+    it "sends the access token in the body of each write" do
+      post!
+
+      expect(HTTParty).to have_received(:post).with(
+        a_string_ending_with("/threads"),
+        hash_including(body: hash_including(access_token: "a-long-lived-token"))
+      )
+      expect(HTTParty).to have_received(:post).with(
+        a_string_ending_with("/threads_publish"),
+        hash_including(body: hash_including(access_token: "a-long-lived-token"))
+      )
+      expect(HTTParty).not_to have_received(:post).with(anything, hash_including(:query))
+    end
+
+    it "names the parent when the post is a reply" do
+      post!(reply_to_id: "17900000000000000")
+
+      expect(HTTParty).to have_received(:post).with(
+        a_string_ending_with("/threads"),
+        hash_including(body: hash_including(reply_to_id: "17900000000000000"))
+      )
     end
 
     describe "the wait for the container" do

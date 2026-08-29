@@ -271,8 +271,12 @@ class Threads < ApplicationService
     # @see https://developers.facebook.com/documentation/threads/reference/publishing
     body[:reply_to_id] = reply_to_id if reply_to_id.present?
 
+    # ⚠️ The token goes in the BODY, with each other field, and not in the query string. That is
+    # the shape of the example of Meta and of the one Ruby client for this API. A container with a
+    # `reply_to_id` answered `500` with an empty error body while the token was in the query, and
+    # a container with no reply answered 200 for that same shape.
     response = HTTParty.post("#{API_URL}/#{@credentials.user_id}/threads",
-                             body: body, query: { access_token: @credentials.access_token },
+                             body: body.merge(access_token: @credentials.access_token),
                              timeout: REQUEST_TIMEOUT)
     unless response.success?
       # ⚠️ It names the fields that it sent, and never their values: the text of a post is content
@@ -329,8 +333,8 @@ class Threads < ApplicationService
   # @return [String] The id of the post.
   def publish_container(container_id)
     response = HTTParty.post("#{API_URL}/#{@credentials.user_id}/threads_publish",
-                             body: { creation_id: container_id },
-                             query: { access_token: @credentials.access_token },
+                             body: { creation_id: container_id,
+                                     access_token: @credentials.access_token },
                              timeout: REQUEST_TIMEOUT)
     raise "Threads refused to publish: #{error_message(response)}" unless response.success?
 
