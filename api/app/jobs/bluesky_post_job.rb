@@ -16,6 +16,10 @@ class BlueskyPostJob < ApplicationJob
     post = posts[index]
     return if post.blank?
 
+    # ⚠️ It logs BEFORE the request. A failure raises, thus without this line the report
+    # names no post of the thread and a thread of five gives five reports that read alike.
+    Rails.logger.info("BlueskyPostJob: posting #{index + 1}/#{posts.length}")
+
     # ⚠️ The card is for Bluesky only, and it reads the page. Mastodon and Threads each make their
     # own preview from the same og: tags. A post with no link reads nothing.
     card = OpenGraph.new.fetch(post["link"]) if post["link"].present?

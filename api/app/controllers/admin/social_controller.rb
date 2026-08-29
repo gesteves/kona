@@ -294,10 +294,9 @@ module Admin
     # @return [String]
     def queued_notice(at)
       names = to_sentence(selected_networks)
-      what = posts.one? ? "a post" : "a thread of #{posts.length} posts"
-      return "Scheduled #{what} to #{names} for #{format_schedule(at)}." if at
+      return "Scheduled a post to #{names} for #{format_schedule(at)}." if at
 
-      posts.one? ? "Sent to #{names}." : "Sent a thread of #{posts.length} posts to #{names}."
+      "Sent to #{names}."
     end
 
     # The moment in the words of the owner, in the zone that they picked it in. To answer in the

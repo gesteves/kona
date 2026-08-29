@@ -332,13 +332,13 @@ RSpec.describe "Admin social media", type: :request do
           expect(payload.map { |p| p["key"] }.uniq.length).to eq(3)
         end
 
-        it "names the thread in the notice" do
+        it "names each network in the notice" do
           connect(bluesky: true, mastodon: true, threads: false)
 
           post "/social", params: { posts: [ { text: "One" }, { text: "Two" } ],
                                     networks: %w[bluesky mastodon] }
 
-          expect(flash[:notice]).to eq("Sent a thread of 2 posts to Bluesky and Mastodon.")
+          expect(flash[:notice]).to eq("Sent to Bluesky and Mastodon.")
         end
 
         # ⚠️ Only the FIRST post of each network is scheduled. That job adds the next one when it
@@ -352,7 +352,7 @@ RSpec.describe "Admin social media", type: :request do
 
           expect(BlueskyPostJob.jobs.size).to eq(1)
           expect(BlueskyPostJob.jobs.first["at"]).to be_present
-          expect(flash[:notice]).to include("Scheduled a thread of 2 posts to Bluesky")
+          expect(flash[:notice]).to include("Scheduled a post to Bluesky")
         end
 
         # An empty block that the owner added and left alone must not refuse the whole draft.

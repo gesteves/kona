@@ -266,7 +266,11 @@ class Threads < ApplicationService
     response = HTTParty.post("#{API_URL}/#{@credentials.user_id}/threads",
                              body: body, query: { access_token: @credentials.access_token },
                              timeout: REQUEST_TIMEOUT)
-    raise "Threads refused the container: #{error_message(response)}" unless response.success?
+    unless response.success?
+      # ⚠️ It names the fields that it sent, and never their values: the text of a post is content
+      # and it does not belong in an error report.
+      raise "Threads refused the container (#{body.keys.join(', ')}): #{error_message(response)}"
+    end
 
     id = parse_json(response)&.dig(:id)
     raise "Threads gave no container id" if id.blank?
@@ -294,13 +298,26 @@ class Threads < ApplicationService
     id
   end
 
+  # The full error of Meta, for the log and for Bugsnag.
+  #
+  # ⚠️ It gives **each field** of that error, and not the message alone. The message of Meta is
+  # very often "An unknown error occurred", which names no cause: the `code`, the `error_subcode`,
+  # and the `fbtrace_id` are the things that a person can look up, and the trace id is the thing
+  # that the support of Meta asks for.
+  #
   # ⚠️ It parses the body itself and does not use `parse_json`. That helper returns nil for a
   # response that failed **and** reports an upstream error, and this method already runs inside one.
   # @param response [HTTParty::Response]
-  # @return [String] The message of Meta, or the status when there is none.
+  # @return [String]
   def error_message(response)
-    JSON.parse(response.body.to_s, symbolize_names: true).dig(:error, :message).presence ||
-      "HTTP #{response.code}"
+    error = JSON.parse(response.body.to_s, symbolize_names: true)[:error] || {}
+    parts = [ "HTTP #{response.code}" ]
+    parts << error[:message] if error[:message].present?
+    parts << "type=#{error[:type]}" if error[:type].present?
+    parts << "code=#{error[:code]}" if error[:code].present?
+    parts << "subcode=#{error[:error_subcode]}" if error[:error_subcode].present?
+    parts << "fbtrace_id=#{error[:fbtrace_id]}" if error[:fbtrace_id].present?
+    parts.join(" ")
   rescue StandardError
     "HTTP #{response.code}"
   end

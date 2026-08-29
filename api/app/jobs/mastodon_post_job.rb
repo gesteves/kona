@@ -15,6 +15,10 @@ class MastodonPostJob < ApplicationJob
     post = posts[index]
     return if post.blank?
 
+    # ⚠️ It logs BEFORE the request. A failure raises, thus without this line the report
+    # names no post of the thread and a thread of five gives five reports that read alike.
+    Rails.logger.info("MastodonPostJob: posting #{index + 1}/#{posts.length}")
+
     # ⚠️ Mastodon renders the link inline and makes its own preview card, thus this reads no og:
     # tags at all.
     status = Mastodon.new.post!(text: post["text"], url: post["link"],

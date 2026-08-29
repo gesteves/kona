@@ -15,6 +15,10 @@ class ThreadsPostJob < ApplicationJob
     post = posts[index]
     return if post.blank?
 
+    # ⚠️ It logs BEFORE the request. A failure raises, thus without this line the report
+    # names no post of the thread and a thread of five gives five reports that read alike.
+    Rails.logger.info("ThreadsPostJob: posting #{index + 1}/#{posts.length}")
+
     # ⚠️ Threads attaches the link itself, thus this reads no og: tags either.
     posted = Threads.new.post!(text: post["text"], url: post["link"],
                                idempotency_key: post["key"], reply_to_id: reply_to_id)
