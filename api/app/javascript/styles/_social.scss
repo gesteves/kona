@@ -17,7 +17,11 @@
   }
 
   &__posts {
-    // The blocks stack, and wa-stack gives the gap.
+    display: flex;
+    flex-direction: column;
+    // ⚠️ No gap. The margins of the divider inside each block are the ONLY space between two
+    // blocks. A gap here would add to the space above each line and not to the space below it.
+    gap: 0;
     width: 100%;
   }
 
@@ -91,24 +95,60 @@
   }
 }
 
-// One post of a thread. It is a block and not a card: a card here would compete with the preview
-// card inside it.
+// One post of a thread. A <wa-divider> separates two of them, thus this block draws no border and
+// keeps no indent of its own.
 .social-post {
-  border-inline-start: 2px solid var(--wa-color-surface-border);
   display: flex;
   flex-direction: column;
-  gap: var(--wa-space-xs);
-  padding-inline-start: var(--wa-space-m);
+
+  // ⚠️ The line is on each block, and the first block hides it. Thus a block that the browser
+  // clones from the template needs no markup of its own.
+  &:first-child > .social-post__divider {
+    display: none;
+  }
+
+  // The same space above the line and below it. The body below owns the gap between the fields,
+  // thus nothing else adds to either side.
+  &__divider {
+    margin-block: var(--wa-space-l);
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-xs);
+  }
 
   &__head {
-    // It keeps its height while the label is empty, thus one post and a thread line up the same.
     align-items: center;
-    min-height: var(--wa-space-xl);
+    position: relative;
   }
 
   &__label {
     color: var(--wa-color-text-quiet);
     margin-inline-end: auto;
+  }
+
+  // ⚠️ <wa-button> makes a square icon button only for a <wa-icon> child, and this app never uses
+  // that element. Thus the square is here: the height of a form control, and an equal width.
+  &__remove {
+    // ⚠️ It is OUT OF THE FLOW, and that is what keeps the two sides of the divider equal. This
+    // button is a form control and it is much taller than the label beside it. In the flow it sets
+    // the height of the flex line, and `align-items: center` then puts the label text half that
+    // difference below the top of the row: the space below the line looks larger than the space
+    // above it, and no margin can correct that. A smaller `block-size` on the row does not help
+    // either, because the line keeps the height of its tallest item. Out of the flow the row is one
+    // line of the label, and the button is centred on it.
+    inset-block-start: 50%;
+    inset-inline-end: 0;
+    position: absolute;
+    transform: translateY(-50%);
+  }
+
+  &__remove::part(button) {
+    aspect-ratio: 1;
+    padding: 0;
+    width: var(--wa-form-control-height);
   }
 
   &__remove[hidden] {

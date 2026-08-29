@@ -70,7 +70,7 @@ export default class extends Controller {
   }
 
   /**
-   * Writes "Post N" into each label, and hides Remove while there is one post.
+   * Writes "N/M" into each label, and hides Remove while there is one post.
    *
    * ⚠️ This is the ONLY numbering, and it is for the reader. The field names carry no index, thus
    * nothing here changes what the form sends. Refer to the note in _post.html.erb.
@@ -83,7 +83,7 @@ export default class extends Controller {
 
     posts.forEach((post, index) => {
       const label = post.querySelector("[data-social-target='postLabel']");
-      if (label) label.textContent = posts.length > 1 ? `Post ${index + 1}` : "";
+      if (label) label.textContent = posts.length > 1 ? `${index + 1}/${posts.length}` : "";
 
       const remove = post.querySelector("[data-social-target='remove']");
       if (remove) remove.hidden = posts.length <= 1;

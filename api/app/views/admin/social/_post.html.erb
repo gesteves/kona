@@ -14,58 +14,74 @@
      data-social-post-limit-value="<%= limit %>"
      data-social-post-warn-at-value="<%= warn_at %>">
 
-  <div class="social-post__head wa-cluster wa-gap-s">
-    <span class="social-post__label wa-heading-s" data-social-target="postLabel"></span>
-    <%# It is hidden while there is one post: a thread of one has nothing to remove. %>
-    <wa-button class="social-post__remove" appearance="plain" size="small"
-               data-social-target="remove" data-action="click->social#removePost">
-      <%= slotted_icon_svg("classic", "light", "trash") %>
-      <span class="wa-visually-hidden">Remove this post</span>
-    </wa-button>
+  <%# A line between two posts. It is on each block and the first one hides it, thus a block that
+      the browser clones needs no extra markup. %>
+  <wa-divider class="social-post__divider"></wa-divider>
+
+  <%# ⚠️ Everything but the divider is in this wrapper, and the wrapper owns the gap between the
+      fields. Without it that gap would also apply below the divider, and the space above the line
+      could never match the space below it. Refer to _social.scss. %>
+  <div class="social-post__body">
+    <div class="social-post__head wa-cluster wa-gap-s">
+      <%# "2/3", and nothing at all while there is one post. %>
+      <span class="social-post__label wa-caption-s" data-social-target="postLabel"></span>
+
+      <%# ⚠️ The icon is in the DEFAULT slot and not in `start`. With `start` and no label, the
+          button keeps the width of a label that is not there and the icon sits off to one side.
+          ⚠️ `<wa-button>` makes a square icon button only for a `<wa-icon>` child, and this app
+          never uses that element (it needs a kit code that this configuration has not). Thus
+          _social.scss gives the square. It is hidden while there is one post: a thread of one has
+          nothing to remove. %>
+      <wa-button class="social-post__remove" appearance="plain" size="small"
+                 data-social-target="remove" data-action="click->social#removePost">
+        <%= raw icon_svg("classic", "light", "circle-xmark") %>
+        <span class="wa-visually-hidden">Remove this post</span>
+      </wa-button>
+    </div>
+
+    <%# ⚠️ No `maxlength` and no `with-count`. Both measure UTF-16 code units, and Bluesky counts
+        graphemes: one emoji is 1 there and 2 or more here. The count line below is ours, and it
+        warns and never stops a keystroke. %>
+    <wa-textarea name="posts[][text]" label="Post" rows="5" resize="auto" required
+                 value="<%= post.text %>"
+                 placeholder="What do you want to say?"
+                 data-social-post-target="body"
+                 data-action="input->social-post#count">
+    </wa-textarea>
+
+    <%# The server writes the first value, thus the line has its height before the JavaScript runs
+        and the page does not move. The controller writes each value after that. %>
+    <p class="social__count wa-caption-s" aria-live="polite"
+       data-social-post-target="count"><%= post.text.scan(/\X/).length %> / <%= limit %></p>
+
+    <%# ⚠️ The link is OPTIONAL and it has no `required`: a post can be words alone. There is no
+        list of the articles here, on purpose: the card comes from the og: tags of whatever page
+        this names, thus a link to another site needs no more code. %>
+    <wa-input type="url" name="posts[][link]" label="Link"
+              value="<%= post.link %>"
+              placeholder="https://"
+              autocomplete="off" spellcheck="false"
+              data-social-post-target="link"
+              data-action="input->social-post#schedulePreview change->social-post#schedulePreview">
+      <%# It spins for the whole wait: the debounce and then the request. ⚠️ It needs a rule for
+          `[hidden]`; refer to _social.scss. %>
+      <wa-spinner slot="end" class="social__spinner" data-social-post-target="spinner" hidden></wa-spinner>
+    </wa-input>
+
+    <%# The card that each network will render. The controller fills it and shows it, thus it is
+        empty and hidden until the owner pastes a link.
+        ⚠️ `with-media` is not in this markup: a page can have no picture, thus the controller sets
+        it with the image. %>
+    <wa-card class="social-card" data-social-post-target="preview" hidden>
+      <img slot="media" class="social-card__image" data-social-post-target="previewImage" alt="" hidden>
+
+      <%# ⚠️ This is the useful part: it says which of the two cards Bluesky will render, and the
+          owner cannot know that until after the post without it. %>
+      <wa-badge class="social-card__kind" appearance="outlined"
+                data-social-post-target="previewKind"></wa-badge>
+      <p class="social-card__host wa-caption-s" data-social-post-target="previewHost"></p>
+      <p class="social-card__title" data-social-post-target="previewTitle"></p>
+      <p class="social-card__description" data-social-post-target="previewDescription"></p>
+    </wa-card>
   </div>
-
-  <%# ⚠️ No `maxlength` and no `with-count`. Both measure UTF-16 code units, and Bluesky counts
-      graphemes: one emoji is 1 there and 2 or more here. The count line below is ours, and it
-      warns and never stops a keystroke. %>
-  <wa-textarea name="posts[][text]" label="Post" rows="5" resize="auto" required
-               value="<%= post.text %>"
-               placeholder="What do you want to say?"
-               data-social-post-target="body"
-               data-action="input->social-post#count">
-  </wa-textarea>
-
-  <%# The server writes the first value, thus the line has its height before the JavaScript runs
-      and the page does not move. The controller writes each value after that. %>
-  <p class="social__count wa-caption-s" aria-live="polite"
-     data-social-post-target="count"><%= post.text.scan(/\X/).length %> / <%= limit %></p>
-
-  <%# ⚠️ The link is OPTIONAL and it has no `required`: a post can be words alone. There is no list
-      of the articles here, on purpose: the card comes from the og: tags of whatever page this
-      names, thus a link to another site needs no more code. %>
-  <wa-input type="url" name="posts[][link]" label="Link (optional)"
-            value="<%= post.link %>"
-            placeholder="https://"
-            autocomplete="off" spellcheck="false"
-            data-social-post-target="link"
-            data-action="input->social-post#schedulePreview change->social-post#schedulePreview">
-    <%# It spins for the whole wait: the debounce and then the request. ⚠️ It needs a rule for
-        `[hidden]`; refer to _social.scss. %>
-    <wa-spinner slot="end" class="social__spinner" data-social-post-target="spinner" hidden></wa-spinner>
-  </wa-input>
-
-  <%# The card that each network will render. The controller fills it and shows it, thus it is
-      empty and hidden until the owner pastes a link.
-      ⚠️ `with-media` is not in this markup: a page can have no picture, thus the controller sets
-      it with the image. %>
-  <wa-card class="social-card" data-social-post-target="preview" hidden>
-    <img slot="media" class="social-card__image" data-social-post-target="previewImage" alt="" hidden>
-
-    <%# ⚠️ This is the useful part: it says which of the two cards Bluesky will render, and the
-        owner cannot know that until after the post without it. %>
-    <wa-badge class="social-card__kind" appearance="outlined"
-              data-social-post-target="previewKind"></wa-badge>
-    <p class="social-card__host wa-caption-s" data-social-post-target="previewHost"></p>
-    <p class="social-card__title" data-social-post-target="previewTitle"></p>
-    <p class="social-card__description" data-social-post-target="previewDescription"></p>
-  </wa-card>
 </div>

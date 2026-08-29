@@ -11,7 +11,7 @@
                       social_max_posts_value: @social.max_posts } do %>
 
   <%# One block for each post of the thread. The Add control below clones the template. %>
-  <div class="social__posts wa-stack wa-gap-l" data-social-target="posts">
+  <div class="social__posts" data-social-target="posts">
     <% @social.posts.each do |post| %>
       <%= render "post", post: post, limit: @social.body_limit, warn_at: @social.warn_at %>
     <% end %>
