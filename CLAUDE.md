@@ -22,6 +22,14 @@ its own test suite.
 Each app has its own Redis, through its own `REDIS_URL`: `api/` uses `kona-redis`, and `web/` uses a
 different Upstash instance. The two keyspaces are separate, and they share no data.
 
+⚠️ **Those two are PRODUCTION values, and a `.env` on your own machine must never hold one.** Use
+the local Redis that `overmind start` runs. The Upstash instance is a **metered** free tier of
+500,000 commands each month, and `overmind start` runs Sidekiq. An idle Sidekiq is not quiet: its
+fetch loop is a `BRPOP` with a 2-second timeout for each of its 5 threads, thus it makes
+approximately 2.5 commands each second, or 9,000 each hour, with no job at all. A development
+machine that points there uses the full month in approximately two days, and the graph shows
+`BRPOP` above each other command. Nothing gives you a message before the quota does.
+
 There is also a **Cloudflare R2 bucket** that holds a copy of each Contentful image asset. Its own
 custom domain in the zone serves it. There is no configuration for it in the repo: it is in the
 dashboard, and the api fills it. Refer to **The image mirror**.
@@ -53,7 +61,7 @@ There are two commands, and **the command that you run selects the API**. There 
 that, on purpose:
 
 ```bash
-overmind start                    # web :4567 + api :3000 + the api's esbuild watch, site → the local api
+overmind start                    # redis :6379 + web :4567 + api :3000 + the api's esbuild watch, site → the local api
 cd web && bundle exec middleman   # web only, site → the deployed api
 ```
 
@@ -64,18 +72,25 @@ is also why the plain `middleman` command still reaches production, from `web/.e
 `overmind restart web` restarts one process. `overmind connect api` gives a true TTY, thus
 `binding.break` works.
 
-⚠️ **Sidekiq starts with the other processes**: `overmind start` runs `web`, `api`, `js`, and
-`worker`. The worker was optional, because no widget endpoint adds a job to a queue. But the Course
-maps page of the admin changed that: a GPX file that a user uploads stays at "Processing" until
-`MapTilesetJob` publishes it. That page says so when it finds no Sidekiq process, but you must not
-need that message on your own machine.
+⚠️ **Sidekiq starts with the other processes**: `overmind start` runs `redis`, `web`, `api`, `js`,
+and `worker`. The worker was optional, because no widget endpoint adds a job to a queue. But the
+Course maps page of the admin changed that: a GPX file that a user uploads stays at "Processing"
+until `MapTilesetJob` publishes it. That page says so when it finds no Sidekiq process, but you must
+not need that message on your own machine.
+
+⚠️ **`redis` is a process of overmind, and not a service of brew and not a container.** It is first
+in `Procfile.dev`, because the api and the worker connect at their boot. It writes its AOF to
+`tmp/redis/`, which git ignores, thus the data of kona is its own. **Stop a Redis that already holds
+6379 before you start**, or that process cannot take the port and overmind stops. That failure is
+loud on purpose, thus `redis` is absent from `OVERMIND_CAN_DIE`.
 
 The `js` process is esbuild, which watches the admin bundle of the api. It applies to the admin
 pages of the api and to `/signin` only. The widgets and the site do not use it. ⚠️ Those pages raise
 `Propshaft::MissingAssetError` when nothing made the bundle. Thus run `npm run build` in `api/` one
 time after a new clone. `bin/setup` does that.
 
-The ports: 4567 for Middleman, 3000 for Rails, 8787 for `wrangler dev`, and 6379 for Redis. The api
+The ports: 4567 for Middleman, 3000 for Rails, 8787 for `wrangler dev`, and 6379 for the Redis of
+overmind. The api
 writes its log to `api/log/development.log`, and **not** to its overmind pane.
 
 Two conditions look like a problem and are not:
