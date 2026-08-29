@@ -30,7 +30,7 @@ module Admin
         description: card_description(
           connected: service.connected?,
           account: ("@#{service.handle}" if service.handle.present?),
-          summary: "Publishes the blog to the AT Protocol as standard.site records, and takes a post from the Share page."
+          summary: "Publishes the blog to the AT Protocol as standard.site records, and takes a post from the Social media page."
         ),
         connected: service.connected?,
         connect_path: bluesky_connection_path,
@@ -48,7 +48,7 @@ module Admin
         description: card_description(
           connected: service.connected?,
           account: service.handle,
-          summary: "Connects a Mastodon account, for the Share page."
+          summary: "Connects a Mastodon account, for the Social media page."
         ),
         connected: service.connected?,
         connect_path: mastodon_connection_path,
@@ -67,7 +67,7 @@ module Admin
         description: card_description(
           connected: service.connected?,
           account: ("@#{service.username}" if service.username.present?),
-          summary: "Connects a Threads account, for the Share page."
+          summary: "Connects a Threads account, for the Social media page."
         ),
         connected: service.connected?,
         connect_path: threads_authorize_path,

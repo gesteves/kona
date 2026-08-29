@@ -1,4 +1,4 @@
-# Posts one draft from the Share page to Mastodon.
+# Posts one draft from the Social media page to Mastodon.
 #
 # ⚠️ You can do this job more than one time. `key` goes in the `Idempotency-Key` header, and the
 # instance then answers with the status that it made already. ⚠️ That window is not for ever, thus

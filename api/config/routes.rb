@@ -142,18 +142,18 @@ Rails.application.routes.draw do
       # type. There is no page here: the nav opens a dialog, and the dialog posts to this path.
       post "republish" => "republish#create", as: :republish
 
-      # The Share composer, which drafts one post for the connected social accounts. The nav
+      # The Social media page, which drafts one post for the connected social accounts. The nav
       # always holds it, and the page renders with no account connected: each row is then disabled.
       # The POST adds one job for each network that the owner ticked.
-      get  "share" => "share#show", as: :share
-      post "share" => "share#create"
+      get  "social" => "social#show", as: :social
+      post "social" => "social#create"
 
-      # The preview of the link that the owner pasted. ⚠️ `share/preview/image` must stay above
-      # `share/preview`, or Rails reads it as part of that path.
+      # The preview of the link that the owner pasted. ⚠️ `social/preview/image` must stay above
+      # `social/preview`, or Rails reads it as part of that path.
       # The image is a proxy, and not a link to the other host: the CSP of the admin has
-      # `img-src :self`. Refer to **The share composer** in CLAUDE.md.
-      get "share/preview/image" => "share#preview_image", as: :share_preview_image
-      get "share/preview"       => "share#preview",       as: :share_preview
+      # `img-src :self`. Refer to **The Social media page** in CLAUDE.md.
+      get "social/preview/image" => "social#preview_image", as: :social_preview_image
+      get "social/preview"       => "social#preview",       as: :social_preview
 
       # The spam quarantine of the contact form. The name says what it holds. It is not `/contact`,
       # on purpose, because that is the path of the public form (POST /api/contact), and nothing

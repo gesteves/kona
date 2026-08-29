@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Admin share", type: :request do
+RSpec.describe "Admin social media", type: :request do
   let(:owner_email) { "owner@example.com" }
 
   before do
@@ -37,9 +37,9 @@ RSpec.describe "Admin share", type: :request do
     allow_any_instance_of(Threads).to receive(:username).and_return("me")
   end
 
-  describe "GET /share" do
+  describe "GET /social" do
     it "needs the owner session" do
-      get "/share"
+      get "/social"
 
       expect(response).to redirect_to("/signin")
     end
@@ -48,7 +48,7 @@ RSpec.describe "Admin share", type: :request do
       before { sign_in_as(email: owner_email) }
 
       it "renders the composer and does not cache it" do
-        get "/share"
+        get "/social"
 
         expect(response).to have_http_status(:ok)
         expect(response.body).to include(%(<wa-input type="url" name="article_url"))
@@ -61,28 +61,28 @@ RSpec.describe "Admin share", type: :request do
       it "reads no articles" do
         expect_any_instance_of(Articles).not_to receive(:list)
 
-        get "/share"
+        get "/social"
 
         expect(response).to have_http_status(:ok)
       end
 
       it "writes the character limit into the markup for the controller to read" do
-        get "/share"
+        get "/social"
 
-        expect(response.body).to include(%(data-share-limit-value="#{SharePresenter::BODY_LIMIT}"))
-        expect(response.body).to include(%(data-share-warn-at-value="#{SharePresenter::WARN_AT}"))
+        expect(response.body).to include(%(data-social-limit-value="#{SocialPresenter::BODY_LIMIT}"))
+        expect(response.body).to include(%(data-social-warn-at-value="#{SocialPresenter::WARN_AT}"))
       end
 
       # The server renders the first count, thus the line has its height before the JavaScript
       # runs and the page does not move.
       it "renders the first count line" do
-        get "/share"
+        get "/social"
 
-        expect(response.body).to include("0 / #{SharePresenter::BODY_LIMIT}")
+        expect(response.body).to include("0 / #{SocialPresenter::BODY_LIMIT}")
       end
 
       it "names the account of a connected network and disables one that is not connected" do
-        get "/share"
+        get "/social"
 
         expect(response.body).to include("Posts as @me.bsky.social.")
         expect(response.body).to include('<wa-checkbox name="networks[]" value="mastodon" disabled>')
@@ -92,7 +92,7 @@ RSpec.describe "Admin share", type: :request do
       it "names the account of each of the three networks" do
         connect(bluesky: true, mastodon: true, threads: true)
 
-        get "/share"
+        get "/social"
 
         expect(response.body).to include("Posts as @me.bsky.social.")
         expect(response.body).to include("Posts as @me@instance.test.")
@@ -104,7 +104,7 @@ RSpec.describe "Admin share", type: :request do
       it "ticks each connected row and not a disabled one" do
         connect(bluesky: true, mastodon: true, threads: false)
 
-        get "/share"
+        get "/social"
 
         expect(response.body).to match(/value="bluesky"[^>]*\schecked>/)
         expect(response.body).to match(/value="mastodon"[^>]*\schecked>/)
@@ -116,7 +116,7 @@ RSpec.describe "Admin share", type: :request do
       it "disables the Threads row when its token expired, and says why" do
         expire_threads
 
-        get "/share"
+        get "/social"
 
         expect(response.body).to include('<wa-checkbox name="networks[]" value="threads" disabled>')
         expect(response.body).to include("The Threads token expired.")
@@ -128,26 +128,26 @@ RSpec.describe "Admin share", type: :request do
         expect(HTTParty).not_to receive(:get)
         expect(HTTParty).not_to receive(:post)
 
-        get "/share"
+        get "/social"
 
         expect(response).to have_http_status(:ok)
       end
 
       # ⚠️ The house rule: every submit is a <wa-button> in a form_with, and never a native button.
       it "renders no native button" do
-        get "/share"
+        get "/social"
 
         expect(response.body).not_to include("<button")
       end
 
       it "puts the item in the nav" do
-        get "/share"
+        get "/social"
 
-        expect(response.body).to include("Share a post")
+        expect(response.body).to include("Social media")
       end
     end
 
-    describe "GET /share/preview" do
+    describe "GET /social/preview" do
       before { sign_in_as(email: owner_email) }
 
       let(:card) do
@@ -159,7 +159,7 @@ RSpec.describe "Admin share", type: :request do
       it "needs the owner session" do
         reset!
 
-        get "/share/preview", params: { url: "https://example.test/a/" }
+        get "/social/preview", params: { url: "https://example.test/a/" }
 
         expect(response).to redirect_to("/signin")
       end
@@ -167,7 +167,7 @@ RSpec.describe "Admin share", type: :request do
       it "gives the card of the link" do
         allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
 
-        get "/share/preview", params: { url: "https://example.test/a/" }
+        get "/social/preview", params: { url: "https://example.test/a/" }
 
         body = response.parsed_body
         expect(body["title"]).to eq("A title")
@@ -180,7 +180,7 @@ RSpec.describe "Admin share", type: :request do
       it "says when the page publishes standard.site records" do
         allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
 
-        get "/share/preview", params: { url: "https://example.test/a/" }
+        get "/social/preview", params: { url: "https://example.test/a/" }
 
         expect(response.parsed_body["standard_site"]).to be(true)
       end
@@ -190,7 +190,7 @@ RSpec.describe "Admin share", type: :request do
           .and_return(OpenGraph::Card.new(url: "https://other.test/", title: "T", description: nil,
                                           image_url: nil))
 
-        get "/share/preview", params: { url: "https://other.test/" }
+        get "/social/preview", params: { url: "https://other.test/" }
 
         expect(response.parsed_body["standard_site"]).to be(false)
       end
@@ -200,9 +200,9 @@ RSpec.describe "Admin share", type: :request do
       it "gives the path of our own proxy and not the og:image" do
         allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
 
-        get "/share/preview", params: { url: "https://example.test/a/" }
+        get "/social/preview", params: { url: "https://example.test/a/" }
 
-        expect(response.parsed_body["image_path"]).to start_with("/share/preview/image")
+        expect(response.parsed_body["image_path"]).to start_with("/social/preview/image")
         expect(response.body).not_to include("cdn.test")
       end
 
@@ -211,7 +211,7 @@ RSpec.describe "Admin share", type: :request do
           .and_return(OpenGraph::Card.new(url: "https://other.test/", title: "T", description: nil,
                                           image_url: nil))
 
-        get "/share/preview", params: { url: "https://other.test/" }
+        get "/social/preview", params: { url: "https://other.test/" }
 
         expect(response.parsed_body["image_path"]).to be_nil
       end
@@ -219,13 +219,13 @@ RSpec.describe "Admin share", type: :request do
       it "refuses a value that is not a link, and reads nothing" do
         expect_any_instance_of(OpenGraph).not_to receive(:fetch)
 
-        get "/share/preview", params: { url: "not a link" }
+        get "/social/preview", params: { url: "not a link" }
 
         expect(response).to have_http_status(:unprocessable_content)
       end
     end
 
-    describe "GET /share/preview/image" do
+    describe "GET /social/preview/image" do
       before { sign_in_as(email: owner_email) }
 
       let(:card) do
@@ -236,7 +236,7 @@ RSpec.describe "Admin share", type: :request do
       it "needs the owner session" do
         reset!
 
-        get "/share/preview/image", params: { url: "https://example.test/a/" }
+        get "/social/preview/image", params: { url: "https://example.test/a/" }
 
         expect(response).to redirect_to("/signin")
       end
@@ -250,7 +250,7 @@ RSpec.describe "Admin share", type: :request do
           .with("https://cdn.test/og.png")
           .and_return({ body: "bytes", content_type: "image/png" })
 
-        get "/share/preview/image", params: { url: "https://example.test/a/" }
+        get "/social/preview/image", params: { url: "https://example.test/a/" }
 
         expect(response).to have_http_status(:ok)
         expect(response.media_type).to eq("image/png")
@@ -262,7 +262,7 @@ RSpec.describe "Admin share", type: :request do
           .and_return(OpenGraph::Card.new(url: "https://other.test/", title: nil, description: nil,
                                           image_url: nil))
 
-        get "/share/preview/image", params: { url: "https://other.test/" }
+        get "/social/preview/image", params: { url: "https://other.test/" }
 
         expect(response).to have_http_status(:not_found)
       end
@@ -271,28 +271,28 @@ RSpec.describe "Admin share", type: :request do
         allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
         allow_any_instance_of(Bluesky).to receive(:card_image).and_return(nil)
 
-        get "/share/preview/image", params: { url: "https://example.test/a/" }
+        get "/social/preview/image", params: { url: "https://example.test/a/" }
 
         expect(response).to have_http_status(:not_found)
       end
 
       it "refuses a value that is not a link" do
-        get "/share/preview/image", params: { url: "javascript:alert(1)" }
+        get "/social/preview/image", params: { url: "javascript:alert(1)" }
 
         expect(response).to have_http_status(:unprocessable_content)
       end
     end
 
-    describe "POST /share" do
+    describe "POST /social" do
       before { sign_in_as(email: owner_email) }
 
       let(:url) { "https://example.test/2026/07/12/ironman-canada/" }
 
 
       it "adds the job of the network, with the link and the body" do
-        post "/share", params: { article_url: url, body: "A long day.", networks: [ "bluesky" ] }
+        post "/social", params: { article_url: url, body: "A long day.", networks: [ "bluesky" ] }
 
-        expect(response).to redirect_to(share_path)
+        expect(response).to redirect_to(social_path)
         expect(flash[:notice]).to include("Sent to Bluesky.")
         expect(BlueskyPostJob.jobs.size).to eq(1)
         rkey, link, body = BlueskyPostJob.jobs.first["args"]
@@ -307,7 +307,7 @@ RSpec.describe "Admin share", type: :request do
       it "adds one job for each network, and gives all three the same key" do
         connect(bluesky: true, mastodon: true, threads: true)
 
-        post "/share", params: { article_url: url, body: "Hi.", networks: %w[bluesky mastodon threads] }
+        post "/social", params: { article_url: url, body: "Hi.", networks: %w[bluesky mastodon threads] }
 
         expect(flash[:notice]).to eq("Sent to Bluesky, Mastodon, and Threads.")
         keys = [ BlueskyPostJob, MastodonPostJob, ThreadsPostJob ].map do |job|
@@ -320,7 +320,7 @@ RSpec.describe "Admin share", type: :request do
       it "adds no job for a network that the owner did not tick" do
         connect(bluesky: true, mastodon: true, threads: true)
 
-        post "/share", params: { article_url: url, body: "Hi.", networks: [ "mastodon" ] }
+        post "/social", params: { article_url: url, body: "Hi.", networks: [ "mastodon" ] }
 
         expect(MastodonPostJob.jobs.size).to eq(1)
         expect(BlueskyPostJob.jobs).to be_empty
@@ -332,7 +332,7 @@ RSpec.describe "Admin share", type: :request do
       it "refuses a network that has no account" do
         connect(bluesky: true, mastodon: false, threads: false)
 
-        post "/share", params: { article_url: url, body: "Hi.", networks: [ "mastodon" ] }
+        post "/social", params: { article_url: url, body: "Hi.", networks: [ "mastodon" ] }
 
         expect(response).to have_http_status(:unprocessable_content)
         expect(MastodonPostJob.jobs).to be_empty
@@ -340,15 +340,15 @@ RSpec.describe "Admin share", type: :request do
 
       # ⚠️ The link field takes any URL, thus the owner can share a page on another site.
       it "takes a link that is not an article of this site" do
-        post "/share", params: { article_url: "https://someone-else.test/a-post/", body: "Good.",
+        post "/social", params: { article_url: "https://someone-else.test/a-post/", body: "Good.",
                                  networks: [ "bluesky" ] }
 
-        expect(response).to redirect_to(share_path)
+        expect(response).to redirect_to(social_path)
         expect(BlueskyPostJob.jobs.first["args"][1]).to eq("https://someone-else.test/a-post/")
       end
 
       it "ignores a network key that this app does not know" do
-        post "/share", params: { article_url: url, body: "Hi.", networks: %w[bluesky myspace] }
+        post "/social", params: { article_url: url, body: "Hi.", networks: %w[bluesky myspace] }
 
         expect(BlueskyPostJob.jobs.size).to eq(1)
         expect(flash[:notice]).to eq("Sent to Bluesky.")
@@ -359,7 +359,7 @@ RSpec.describe "Admin share", type: :request do
       it "refuses the Threads row when its token expired" do
         expire_threads
 
-        post "/share", params: { article_url: url, body: "Hi.", networks: [ "threads" ] }
+        post "/social", params: { article_url: url, body: "Hi.", networks: [ "threads" ] }
 
         expect(response).to have_http_status(:unprocessable_content)
         expect(ThreadsPostJob.jobs).to be_empty
@@ -368,14 +368,14 @@ RSpec.describe "Admin share", type: :request do
       # ⚠️ The body is stripped one time, here. Without that a newline at its end went to Bluesky
       # as it was and to Mastodon with the newline removed.
       it "strips the body before it counts it and before it adds the job" do
-        post "/share", params: { article_url: url, body: "  A long day.\n\n", networks: [ "bluesky" ] }
+        post "/social", params: { article_url: url, body: "  A long day.\n\n", networks: [ "bluesky" ] }
 
-        expect(response).to redirect_to(share_path)
+        expect(response).to redirect_to(social_path)
         expect(BlueskyPostJob.jobs.first["args"].last).to eq("A long day.")
       end
 
       it "refuses a body that is only white space" do
-        post "/share", params: { article_url: url, body: " \n ", networks: [ "bluesky" ] }
+        post "/social", params: { article_url: url, body: " \n ", networks: [ "bluesky" ] }
 
         expect(response).to have_http_status(:unprocessable_content)
         expect(response.body).to include("Write something to post.")
@@ -386,7 +386,7 @@ RSpec.describe "Admin share", type: :request do
       it "keeps the rows unticked after a refusal when the owner unticked them" do
         connect(bluesky: true, mastodon: true, threads: false)
 
-        post "/share", params: { article_url: url, body: "", networks: [] }
+        post "/social", params: { article_url: url, body: "", networks: [] }
 
         expect(response).to have_http_status(:unprocessable_content)
         expect(response.body).not_to match(/value="bluesky"[^>]*\schecked>/)
@@ -402,17 +402,17 @@ RSpec.describe "Admin share", type: :request do
         # one meaning. This is the difference from the Republish dialog, which takes minutes from
         # now for exactly this reason.
         it "reads the date and the time in the zone that the browser sent" do
-          post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+          post "/social", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
                                    schedule: "1", date: on, time: "09:00",
                                    time_zone: "America/New_York" }
 
-          expect(response).to redirect_to(share_path)
+          expect(response).to redirect_to(social_path)
           expected = Time.use_zone("America/New_York") { Time.zone.parse("#{on} 09:00") }
           expect(BlueskyPostJob.jobs.first["at"]).to be_within(1).of(expected.to_f)
         end
 
         it "names the moment in the notice, in that same zone" do
-          post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+          post "/social", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
                                    schedule: "1", date: on, time: "09:00",
                                    time_zone: "America/New_York" }
 
@@ -427,7 +427,7 @@ RSpec.describe "Admin share", type: :request do
         it "falls back to the configured zone with no time zone field" do
           allow(TimeZoneResolver).to receive(:default).and_return("America/Denver")
 
-          post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+          post "/social", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
                                    schedule: "1", date: on, time: "09:00" }
 
           expected = Time.use_zone("America/Denver") { Time.zone.parse("#{on} 09:00") }
@@ -436,16 +436,16 @@ RSpec.describe "Admin share", type: :request do
 
         # That field comes from the browser, thus a value with a mistake must never raise.
         it "falls back for a time zone that Rails does not know" do
-          post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+          post "/social", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
                                    schedule: "1", date: on, time: "09:00",
                                    time_zone: "Mars/Olympus_Mons" }
 
-          expect(response).to redirect_to(share_path)
+          expect(response).to redirect_to(social_path)
           expect(BlueskyPostJob.jobs.size).to eq(1)
         end
 
         it "posts now when the switch is off, and schedules nothing" do
-          post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+          post "/social", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
                                    schedule: "0", date: on, time: "09:00" }
 
           expect(flash[:notice]).to include("Sent to Bluesky.")
@@ -453,7 +453,7 @@ RSpec.describe "Admin share", type: :request do
         end
 
         it "refuses a moment in the past" do
-          post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+          post "/social", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
                                    schedule: "1", date: "2020-01-01", time: "09:00" }
 
           expect(response).to have_http_status(:unprocessable_content)
@@ -466,17 +466,17 @@ RSpec.describe "Admin share", type: :request do
         it "takes a moment years from now" do
           far = 3.years.from_now
 
-          post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+          post "/social", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
                                    schedule: "1", date: far.strftime("%Y-%m-%d"), time: "09:00" }
 
-          expect(response).to redirect_to(share_path)
+          expect(response).to redirect_to(social_path)
           expect(BlueskyPostJob.jobs.size).to eq(1)
         end
 
         # ⚠️ `Time.zone.parse("garbage 09:00")` gives today at 09:00. Without the check of the
         # shape, a value with a mistake would schedule a post for today.
         it "refuses a date that is not a date" do
-          post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+          post "/social", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
                                    schedule: "1", date: "garbage", time: "09:00" }
 
           expect(response).to have_http_status(:unprocessable_content)
@@ -485,7 +485,7 @@ RSpec.describe "Admin share", type: :request do
         end
 
         it "refuses a time that is not a time" do
-          post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+          post "/social", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
                                    schedule: "1", date: on, time: "9 in the morning" }
 
           expect(response).to have_http_status(:unprocessable_content)
@@ -493,7 +493,7 @@ RSpec.describe "Admin share", type: :request do
         end
 
         it "refuses a schedule with no date, and keeps the fields open" do
-          post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+          post "/social", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
                                    schedule: "1", date: "", time: "09:00" }
 
           expect(response).to have_http_status(:unprocessable_content)
@@ -507,7 +507,7 @@ RSpec.describe "Admin share", type: :request do
       # ⚠️ A refusal renders the page again and keeps the draft. A redirect would lose it.
       context "when the draft is not good" do
         it "refuses an empty body and keeps the picker" do
-          post "/share", params: { article_url: url, body: "", networks: [ "bluesky" ] }
+          post "/social", params: { article_url: url, body: "", networks: [ "bluesky" ] }
 
           expect(response).to have_http_status(:unprocessable_content)
           expect(response.body).to include("Write something to post.")
@@ -518,7 +518,7 @@ RSpec.describe "Admin share", type: :request do
         it "refuses a body past the limit and keeps it in the field" do
           long = "a" * (Bluesky::MAX_GRAPHEMES + 1)
 
-          post "/share", params: { article_url: url, body: long, networks: [ "bluesky" ] }
+          post "/social", params: { article_url: url, body: long, networks: [ "bluesky" ] }
 
           expect(response).to have_http_status(:unprocessable_content)
           expect(response.body).to include("301 characters")
@@ -527,7 +527,7 @@ RSpec.describe "Admin share", type: :request do
         end
 
         it "refuses a value that is not a URL" do
-          post "/share", params: { article_url: "not a link", body: "Hi.", networks: [ "bluesky" ] }
+          post "/social", params: { article_url: "not a link", body: "Hi.", networks: [ "bluesky" ] }
 
           expect(response).to have_http_status(:unprocessable_content)
           expect(response.body).to include("Paste a link to share.")
@@ -535,7 +535,7 @@ RSpec.describe "Admin share", type: :request do
         end
 
         it "refuses a draft with no network" do
-          post "/share", params: { article_url: url, body: "Hi.", networks: [] }
+          post "/social", params: { article_url: url, body: "Hi.", networks: [] }
 
           expect(response).to have_http_status(:unprocessable_content)
           expect(response.body).to include("Pick at least one place to post it.")
@@ -553,14 +553,14 @@ RSpec.describe "Admin share", type: :request do
       end
 
       it "still renders the composer" do
-        get "/share"
+        get "/social"
 
         expect(response).to have_http_status(:ok)
         expect(response.body).to include(%(name="article_url"))
       end
 
       it "disables each of the three rows" do
-        get "/share"
+        get "/social"
 
         %w[bluesky mastodon threads].each do |key|
           expect(response.body).to include(%(<wa-checkbox name="networks[]" value="#{key}" disabled>))
@@ -570,7 +570,7 @@ RSpec.describe "Admin share", type: :request do
       it "keeps the item in the nav" do
         get "/connected-apps"
 
-        expect(response.body).to include("Share a post")
+        expect(response.body).to include("Social media")
       end
     end
   end

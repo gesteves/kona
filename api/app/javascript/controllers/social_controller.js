@@ -5,8 +5,8 @@ import { Controller } from "@hotwired/stimulus";
 const PREVIEW_DEBOUNCE = 600;
 
 /**
- * The Share composer: the character count, the schedule fields, the label of the submit button,
- * and the time zone of the browser. The form itself posts to POST /share.
+ * The Social media page: the character count, the schedule fields, the label of the submit button,
+ * and the time zone of the browser. The form itself posts to POST /social.
  */
 export default class extends Controller {
   static targets = [
@@ -50,9 +50,9 @@ export default class extends Controller {
     const length = this.graphemes(this.bodyTarget.value ?? "");
 
     this.countTarget.textContent = `${length} / ${this.limitValue}`;
-    this.countTarget.classList.toggle("share__count--warning",
+    this.countTarget.classList.toggle("social__count--warning",
       length >= this.warnAtValue && length <= this.limitValue);
-    this.countTarget.classList.toggle("share__count--over", length > this.limitValue);
+    this.countTarget.classList.toggle("social__count--over", length > this.limitValue);
   }
 
   /**
@@ -79,7 +79,7 @@ export default class extends Controller {
     this.scheduleFieldsTarget.hidden = !on;
 
     // ⚠️ `required` follows the switch, and it is not in the markup. A required control inside a
-    // hidden block would refuse "Share now", and the browser cannot show that message on an
+    // hidden block would refuse "Post now", and the browser cannot show that message on an
     // element that nobody can see.
     this.dateTarget.required = on;
     this.timeTarget.required = on;
@@ -96,7 +96,7 @@ export default class extends Controller {
    */
   relabel() {
     if (!this.scheduleTarget.checked) {
-      this.labelTarget.textContent = "Share now";
+      this.labelTarget.textContent = "Post now";
       return;
     }
 

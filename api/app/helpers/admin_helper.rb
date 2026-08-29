@@ -42,7 +42,7 @@ module AdminHelper
     [
       { label: "Tools", items: [
         { label: "Course maps",  path: course_maps_path, icon: %w[classic light map] },
-        { label: "Share a post", path: share_path,       icon: %w[classic light paper-plane] }
+        { label: "Social media", path: social_path,       icon: %w[classic light paper-plane] }
       ] },
       { label: "Settings", items: [
         { label: "Location",       path: location_path,       icon: %w[classic light location-dot] },

@@ -1,10 +1,10 @@
 module Admin
-  # The Share composer: the owner pastes a link, drafts one body, and the action adds one post job
+  # The Social media page: the owner pastes a link, drafts one body, and the action adds one post job
   # for each network that they ticked.
   #
   # ⚠️ There is one job for each network, and not one job for all of them. Thus a failure at one
   # service retries that service alone, and a network that already posted is never sent again.
-  class ShareController < BaseController
+  class SocialController < BaseController
     # Each network that this page can post to, in the order of the page. `:job` posts to it, and
     # `:status` names the private method below that reads its state from Redis. ⚠️ This is the one
     # list: a network that is not here cannot take a post.
@@ -19,15 +19,15 @@ module Admin
     DATE_PATTERN = /\A\d{4}-\d{2}-\d{2}\z/
     TIME_PATTERN = /\A\d{2}:\d{2}(:\d{2})?\z/
 
-    # GET /share
+    # GET /social
     #
     # ⚠️ The page renders with no account connected, and each row is then disabled. It is a draft
     # screen, thus it must be available to look at and to change before an account exists.
     def show
-      @share = presenter
+      @social = presenter
     end
 
-    # POST /share
+    # POST /social
     #
     # It checks the draft, then adds the jobs. ⚠️ It makes the record key **here** and gives it to
     # each job. `Bluesky#post!` writes with `putRecord` at that key, thus a Sidekiq retry replaces
@@ -38,7 +38,7 @@ module Admin
       # ⚠️ It renders again and does not redirect. A redirect would lose the words that the owner
       # wrote, and the draft is the expensive part of this page.
       if error
-        @share = presenter(body: body, article_url: params[:article_url],
+        @social = presenter(body: body, article_url: params[:article_url],
                            selected: selected_networks, scheduled: scheduled?,
                            date: params[:date], time: params[:time])
         flash.now[:alert] = error
@@ -56,10 +56,10 @@ module Admin
         at ? job.perform_at(at, key, article_url, body) : job.perform_async(key, article_url, body)
       end
 
-      redirect_to share_path, status: :see_other, notice: queued_notice(at)
+      redirect_to social_path, status: :see_other, notice: queued_notice(at)
     end
 
-    # GET /share/preview
+    # GET /social/preview
     #
     # The card of a link, as JSON, for the preview on the page. ⚠️ The browser cannot read another
     # site by itself: the CSP of the admin has `connect-src :self`, and another host sends no CORS
@@ -79,12 +79,12 @@ module Admin
         description: card.description,
         host: host_of(card.url),
         # ⚠️ The path of our own proxy, and never the og:image itself. Refer to #preview_image.
-        image_path: (share_preview_image_path(url: url) if card.image_url.present?),
+        image_path: (social_preview_image_path(url: url) if card.image_url.present?),
         standard_site: card.document_uri.present?
       }
     end
 
-    # GET /share/preview/image
+    # GET /social/preview/image
     #
     # Proxies the picture of a card.
     #
@@ -124,11 +124,11 @@ module Admin
     # ⚠️ Each answer comes from Redis, and no service makes an HTTP request.
     # `StandardSite#connected?` has that same rule, and its comment gives the reason: an upstream
     # failure must not go into the path of a page load.
-    # @return [Array<SharePresenter::Network>]
+    # @return [Array<SocialPresenter::Network>]
     def social_networks
       @social_networks ||= NETWORKS.map do |key, network|
         connected, account, notice = send(network[:status])
-        SharePresenter::Network.new(key: key, name: network[:name], connected: connected,
+        SocialPresenter::Network.new(key: key, name: network[:name], connected: connected,
                                     account: account, notice: notice)
       end
     end
@@ -157,9 +157,9 @@ module Admin
       [ service.usable?, ("@#{service.username}" if service.username.present?), notice ]
     end
 
-    # @return [SharePresenter]
+    # @return [SocialPresenter]
     def presenter(**overrides)
-      SharePresenter.new(networks: social_networks, **overrides)
+      SocialPresenter.new(networks: social_networks, **overrides)
     end
 
     # The networks that the owner ticked, that this app can post to, **and that have an account**.

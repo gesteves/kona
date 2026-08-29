@@ -55,10 +55,10 @@ edge serves a cached copy before it gets a new one.
 | GET | `/whoop/auth`, `/whoop/callback` | Whoop OAuth (authorize is owner-gated) | — |
 | GET | `/signin`, `/auth/google_oauth2/callback`; POST `/signout` | owner session | `no-store` |
 | GET | `/`, `/spam`, `/location`, `/connected-apps`, `/course-maps`, `/course-maps/:id` | admin UI (owner-session gated) | `no-store` |
-| GET | `/share` | the Share composer | `no-store` |
-| POST | `/share` | checks the draft and adds one post job for each network that the owner ticked, now or at a date and a time; 303, or 422 with the draft still in the form | `no-store` |
-| GET | `/share/preview` | the card of a link, as JSON, for the preview on the page | `no-store` |
-| GET | `/share/preview/image` | proxies the picture of that card. ⚠️ The parameter is the **page**, not the picture | `no-store` |
+| GET | `/social` | the Social media page | `no-store` |
+| POST | `/social` | checks the draft and adds one post job for each network that the owner ticked, now or at a date and a time; 303, or 422 with the draft still in the form | `no-store` |
+| GET | `/social/preview` | the card of a link, as JSON, for the preview on the page | `no-store` |
+| GET | `/social/preview/image` | proxies the picture of that card. ⚠️ The parameter is the **page**, not the picture | `no-store` |
 | POST | `/spam/:id/not-spam`; DELETE `/spam/:id`, `/connected-apps/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
 | GET/POST/DELETE | `/connected-apps/bluesky` | the Bluesky handle + app password form, and disconnect | `no-store` |
 | GET/POST/DELETE | `/connected-apps/mastodon`; GET `/connected-apps/mastodon/callback` | the Mastodon instance form, the OAuth callback, and disconnect | `no-store` |
@@ -622,9 +622,9 @@ build of the web site, after 0 to 60 minutes. The rules of that dialog:
   form-associated and reads that attribute as a native control does.
 - ⚠️ **The delay is minutes from now, and not a date and a time.** Thus the browser sends no time
   zone, and the server needs none: it adds the minutes to the current time. Do not add a date field
-  again. ⚠️ **The Share page *does* take a date and a time, and that is not a contradiction**: it
+  again. ⚠️ **The Social media page *does* take a date and a time, and that is not a contradiction**: it
   sends the IANA zone of the browser in a hidden field. This dialog needs no zone at all, and a
-  republish is never more than an hour away. Refer to **The share composer**. `MIN_MINUTES` and `MAX_MINUTES` bound the delay, and 60 minutes also stops a job that would
+  republish is never more than an hour away. Refer to **The Social media page**. `MIN_MINUTES` and `MAX_MINUTES` bound the delay, and 60 minutes also stops a job that would
   sit in Redis for a long time.
 - ⚠️ **A delay of zero is "now", and the dialog has one control and no radio group.** The **label of
   the submit button** is the only thing that says which of the two the value gives: "Republish now"
@@ -711,7 +711,7 @@ hangs gives a 500 in place of the message of the page, and a disconnect never re
     never syncs to the new repo.
   - ⚠️ **To flush Redis costs a new connection**, because the credentials are only there and no
     other code can make them again.
-- **Mastodon** does an OAuth round trip, and the Share page posts to it. `Admin::MastodonController` has all four of its actions, and
+- **Mastodon** does an OAuth round trip, and the Social media page posts to it. `Admin::MastodonController` has all four of its actions, and
   `MastodonCredentials` keeps the client and the token in the Redis hash `mastodon:credentials`. The
   client secret and the access token are encrypted, for the same reason as the Bluesky app password.
   - ⚠️ **Mastodon has no central developer dashboard, because each instance is a separate server.**
@@ -739,7 +739,7 @@ hangs gives a 500 in place of the message of the page, and a disconnect never re
     the store whether the revoke works or not: the instance can be away, and a disconnect that the
     owner asked for must not depend on that. The clear is in an `ensure`, thus a rack-timeout
     cannot skip it, and the revoke has a timeout of its own.
-- **Threads** does an OAuth round trip with Meta, and the Share page posts to it. Its app
+- **Threads** does an OAuth round trip with Meta, and the Social media page posts to it. Its app
   credentials are `THREADS_APP_ID` and `THREADS_APP_SECRET`, from the Meta dashboard, thus this card
   *does* go off the page without them and the Mastodon card does not. `Admin::ThreadsController` has
   the three actions, and `ThreadsCredentials` keeps the token in the Redis hash
@@ -771,15 +771,15 @@ hangs gives a 500 in place of the message of the page, and a disconnect never re
     Whoop refresh does.
   - ⚠️ **An expired token stays in the store, thus `connected?` stays true.** `Threads#expired?`
     is the one thing that shows the difference: the card then gives the `:error` state with the
-    date of the expiry, `refresh!` answers `:expired` and the job writes a warning, and the Share
+    date of the expiry, `refresh!` answers `:expired` and the job writes a warning, and the Social media
     page disables the row through `Threads#usable?`. Without those three, a dead token showed a
     green badge and a post job that retried for 24 hours.
   - ⚠️ **A token response with no `expires_in` gets `DEFAULT_TOKEN_LIFETIME`.** With `nil.to_i`
     the token expired at once, and `refresh!` then never touched it.
 
-### The share composer
+### The Social media page
 
-**Share a post** (`/share`) drafts one post about a link for Bluesky, Mastodon, and Threads, now or
+**Social media** (`/social`) drafts one post about a link for Bluesky, Mastodon, and Threads, now or
 at a date and a time. All three post.
 
 - **The link is a plain `wa-input type="url"`, and there is NO list of the entries.** The owner
@@ -789,7 +789,7 @@ at a date and a time. All three post.
   - ⚠️ **The result is that this page makes NO request to Contentful when it renders**, and a spec
     pins that. An earlier version read `Articles#list` into a `wa-combobox` of every entry, and it
     also had to leave `ArticleRanking#candidates` alone, because that filter drops each Short.
-- **The page previews the card before the owner posts.** `GET /share/preview` gives the card as
+- **The page previews the card before the owner posts.** `GET /social/preview` gives the card as
   JSON, and the Stimulus controller reads it 600ms after the typing stops. The badge on that card
   says **which of the two Bluesky cards** the post will get, and that is the thing the owner cannot
   know until after the post without it.
@@ -797,7 +797,7 @@ at a date and a time. All three post.
     and another host sends no CORS header. Thus this app reads it. **Do not try to move this into
     the browser.**
   - ⚠️ **The picture is a proxy of ours, and never the `og:image` itself**, because `img-src` is
-    `:self`. `GET /share/preview/image` sends it, exactly as the Course maps page proxies a Mapbox
+    `:self`. `GET /social/preview/image` sends it, exactly as the Course maps page proxies a Mapbox
     render.
   - ⚠️ **The parameter of that proxy is the URL of the PAGE, and not of the picture.** Thus a caller
     cannot name any URL for this app to get: the picture is always the one that the `og:` tags of
@@ -817,7 +817,7 @@ at a date and a time. All three post.
   - `OpenGraph#fetch` caches for 15 minutes, thus a preview also **warms the cache** that the post
     job reads a moment later.
 - **One body goes to the three networks, and the limit is 300**, which is the limit of Bluesky and
-  the shortest of the three. `SharePresenter::BODY_LIMIT` and `WARN_AT` hold the two numbers, the
+  the shortest of the three. `SocialPresenter::BODY_LIMIT` and `WARN_AT` hold the two numbers, the
   view writes them into the markup, and the Stimulus controller reads them there.
   - ⚠️ **Do not use the `maxlength` or the `with-count` of `wa-textarea`.** Both measure UTF-16 code
     units, and Bluesky counts **graphemes**: one emoji is 1 there and 2 or more here. The controller
@@ -828,14 +828,14 @@ at a date and a time. All three post.
   Thus the code that posts decides that, and this page keeps the URL of the entry beside the text.
 - ⚠️ **Do not add a Bluesky threadgate or postgate control.** The owner read those options and
   refused them. This page has no control for one network alone.
-- **`POST /share` adds one post job for each network and answers with a 303.** A refusal renders the page again
+- **`POST /social` adds one post job for each network and answers with a 303.** A refusal renders the page again
   with a **422** and keeps the draft, and it does not redirect. ⚠️ The draft is the expensive part
   of this page, thus a redirect that loses 300 characters is worse than a page that renders again.
-  `SharePresenter` takes `body:`, `article_url:`, and `selected:` for that.
+  `SocialPresenter` takes `body:`, `article_url:`, and `selected:` for that.
   - ⚠️ **The action strips the body one time, and each service gets that text.** Without that, a
     body with a newline at its end went to Bluesky as it was and to Mastodon with the newline
     removed, and the count on the page named a third number.
-- **Each connected row is ticked on the first load.** `SharePresenter` reads `selected: nil` as
+- **Each connected row is ticked on the first load.** `SocialPresenter` reads `selected: nil` as
   "tick each connected network", and an array, which is what a submit that fails passes back, as
   the choice of the owner. Thus an empty array ticks nothing.
 - ⚠️ **The controller makes the record key and gives it to the job.** `Bluesky#post!` writes with
@@ -845,12 +845,12 @@ at a date and a time. All three post.
   **Posting to Bluesky**.
 - **A switch opens a date and a time, and `perform_at` then schedules the job.** With the switch
   off the action calls `perform_async`. The **label of the submit button** says which of the two the
-  form does — "Share now", or "Schedule for Sep 3, 9:00 AM" — exactly as the Republish dialog
+  form does — "Post now", or "Schedule for Sep 3, 9:00 AM" — exactly as the Republish dialog
   does, because the switch alone is easy to miss.
   - ⚠️ **The browser sends its own IANA zone in a hidden field, and that is what makes a date field
     safe here.** A date and a time carry **no** zone. The Republish dialog dropped its date field
     for that reason and takes minutes from now instead, and a reader of that ⚠️ must know why this
-    page is different. `share_controller.js` writes
+    page is different. `social_controller.js` writes
     `Intl.DateTimeFormat().resolvedOptions().timeZone` into a hidden field. The page does **not**
     print that zone: it is the zone of the browser, thus the time that the owner picks is already
     the time that they mean.
@@ -864,7 +864,7 @@ at a date and a time. All three post.
     `Time.zone.parse("garbage 09:00")` gives today at 09:00, thus a value with a mistake would
     schedule a post for today.
   - ⚠️ **`required` on the date and the time follows the switch, and it is not in the markup.** A
-    required control inside the hidden block would refuse "Share now", and a browser cannot show
+    required control inside the hidden block would refuse "Post now", and a browser cannot show
     that message on an element that nobody can see.
   - ⚠️ **There is no limit on how far ahead a post can go, on purpose.** A post about a race can
     wait for the race. Thus the date field has a `min` and no `max`, and the job sits in the
@@ -875,7 +875,7 @@ at a date and a time. All three post.
     a new schedule cancels nothing: the owner can line up more than one post, and each is its own
     job with its own record key.
 - ⚠️ **There is ONE JOB FOR EACH NETWORK, and not one job for all of them.**
-  `Admin::ShareController::NETWORKS` is the one table of the networks: the name, the job, and the
+  `Admin::SocialController::NETWORKS` is the one table of the networks: the name, the job, and the
   method that reads the state of each one. The action adds one job for each network that the owner
   ticked. **This is the point**: a failure at one service retries that
   service alone, and a network that already posted is never sent again. An earlier version had one
@@ -895,7 +895,7 @@ at a date and a time. All three post.
 - ⚠️ **The page renders with no account connected, and the nav always holds it.** Each of the three
   rows is then disabled. It is a draft screen, thus the owner must be able to look at it and change
   it before an account exists. Do not gate it on the connection state.
-  ⚠️ `ShareController#social_networks` reads each state from **Redis**, and no service makes an HTTP
+  ⚠️ `SocialController#social_networks` reads each state from **Redis**, and no service makes an HTTP
   request, for the same reason as the Connected apps page.
 
 ### Posting to Bluesky
@@ -962,9 +962,9 @@ report, and it must inherit `ApplicationService` for `report_upstream_error`.
   lexicons, thus its own check finds a record with an error before that post reaches a feed. It does
   not know the `site.standard.*` lexicons.
 - ⚠️ **`MAX_GRAPHEMES` is 300, and Bluesky counts GRAPHEMES.** `String#length` gives UTF-16 code
-  units, thus it counts one emoji as 2 or more. `share_controller.js` counts the same way in the
+  units, thus it counts one emoji as 2 or more. `social_controller.js` counts the same way in the
   browser with `Intl.Segmenter`, and a spec pins `Bluesky::MAX_GRAPHEMES` to
-  `SharePresenter::BODY_LIMIT`.
+  `SocialPresenter::BODY_LIMIT`.
 - **`post!` raises at each failure**, on purpose, thus `BlueskyPostJob` does the work again. The
   record key is what makes that safe.
 
@@ -999,7 +999,7 @@ round trip are in the same class; refer to **Connected apps**.
 - ⚠️ **The URL goes in the TEXT here, and Bluesky puts it in an embed.** Mastodon renders a link
   inline and makes its own preview card from the `og:` tags of that page. Thus this class needs no
   card and no image upload, and `MastodonPostJob` reads no `OpenGraph` card for it. **This is the
-  concrete reason that the Share page keeps the link out of the body**: each network attaches one
+  concrete reason that the Social media page keeps the link out of the body**: each network attaches one
   differently, thus the page holds the link beside the text and each service composes its own.
 - ⚠️ **`Idempotency-Key` is what makes a retry safe**, and it is the Mastodon answer to the
   `putRecord` of Bluesky. The instance keeps that key and answers with the status that it made
@@ -1025,7 +1025,7 @@ container.
 - ⚠️ **The URL is a `link_attachment`, and it is NOT in the text.** Meta then renders its own
   preview card, and the URL uses none of the 500 characters. **Mastodon is the opposite** and puts
   the link in the text, and Bluesky is a third form again, with an embed that holds an image blob.
-  Those three are the reason that the Share page keeps the link **beside** the body.
+  Those three are the reason that the Social media page keeps the link **beside** the body.
 - ⚠️ **Meta gives NO idempotency header, and the container is the answer to that.** `#post!` keeps
   the id of the container in Redis at `threads:container:<key>`, and it deletes that key only
   **after** Meta publishes. Thus a failure between the two steps leaves the container for the retry,

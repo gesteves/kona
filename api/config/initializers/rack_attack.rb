@@ -27,7 +27,7 @@ Rack::Attack.cache.store =
 # ActionDispatch::Static and Propshaft::Server are above this middleware (positions 3 and 4 against
 # 29 — read `bin/rails middleware`), thus an asset request must not come here at all. This entry
 # stops a throttle on such a request as a scanner probe, if one ever comes here.
-RACK_ATTACK_KNOWN_PREFIXES = %w[/up /api /widgets /webhooks /whoop /sidekiq /signin /signout /auth /connected-apps /spam /location /republish /course-maps /share /assets].freeze
+RACK_ATTACK_KNOWN_PREFIXES = %w[/up /api /widgets /webhooks /whoop /sidekiq /signin /signout /auth /connected-apps /spam /location /republish /course-maps /social /assets].freeze
 RACK_ATTACK_KNOWN_ROUTE = lambda do |path|
   path == "/" || RACK_ATTACK_KNOWN_PREFIXES.any? { |prefix| path == prefix || path.start_with?("#{prefix}/") }
 end

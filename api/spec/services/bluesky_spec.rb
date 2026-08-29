@@ -26,7 +26,7 @@ RSpec.describe Bluesky do
 
   describe ".post_length" do
     # ⚠️ Bluesky counts graphemes. `String#length` gives UTF-16 code units, thus it counts one
-    # emoji as 2 or more. share_controller.js counts the same way with Intl.Segmenter.
+    # emoji as 2 or more. social_controller.js counts the same way with Intl.Segmenter.
     it "counts one emoji as one character" do
       expect(described_class.post_length("👍")).to eq(1)
       expect(described_class.post_length("👨‍👩‍👧‍👦")).to eq(1)
@@ -49,7 +49,7 @@ RSpec.describe Bluesky do
 
     # The admin page and this service must refuse the same drafts.
     it "uses the same limit as the admin page" do
-      expect(described_class::MAX_GRAPHEMES).to eq(SharePresenter::BODY_LIMIT)
+      expect(described_class::MAX_GRAPHEMES).to eq(SocialPresenter::BODY_LIMIT)
     end
   end
 

@@ -47,7 +47,7 @@ class Threads < ApplicationService
 
   # ⚠️ An expired token is dead for all time, and `connected?` stays true because the token is still
   # in the store. This is the one thing that shows the difference, thus the Connected apps card and
-  # the Share page both read it.
+  # the Social media page both read it.
   # @return [Boolean] True if the account is connected and its token passed its expiry time.
   def expired? = connected? && @credentials.expired?
 

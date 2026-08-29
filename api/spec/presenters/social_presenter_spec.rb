@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe SharePresenter do
+RSpec.describe SocialPresenter do
   def network(key: "bluesky", name: "Bluesky", account: "@me.bsky.social", connected: true)
     described_class::Network.new(key: key, name: name, account: account, connected: connected)
   end
@@ -71,7 +71,7 @@ RSpec.describe SharePresenter do
 
   describe "the limits" do
     # 300 is the Bluesky limit, which is the shortest of the three, and one body goes to all of
-    # them. ⚠️ The view writes both numbers into the markup, and share_controller.js reads them
+    # them. ⚠️ The view writes both numbers into the markup, and social_controller.js reads them
     # there.
     it "warns below the limit" do
       expect(described_class::WARN_AT).to be < described_class::BODY_LIMIT

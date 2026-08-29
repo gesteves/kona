@@ -1,4 +1,4 @@
-# Posts one draft from the Share page to Bluesky.
+# Posts one draft from the Social media page to Bluesky.
 #
 # ⚠️ You can do this job more than one time. The caller makes `key` before it adds the job, and
 # `Bluesky#post!` writes with `putRecord` at that key. Thus a retry replaces the same record and

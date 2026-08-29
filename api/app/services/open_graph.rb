@@ -3,7 +3,7 @@ require "nokogiri"
 # Reads the Open Graph tags of a URL, and its standard.site link tags, for the website card of a
 # post.
 #
-# ⚠️ The card of a share comes from **the page itself**, and not from Contentful. The URL can be a
+# ⚠️ The card of a social post comes from **the page itself**, and not from Contentful. The URL can be a
 # Short, which has no cover image, or a page on another site. Thus the page that the owner links to
 # is the only thing that knows its own picture and its own summary.
 #

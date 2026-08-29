@@ -221,7 +221,7 @@ RSpec.describe Threads do
   end
 
   # ⚠️ An expired token stays in the store, thus `connected?` stays true. `expired?` and `usable?`
-  # are what show the difference to the card and to the Share page.
+  # are what show the difference to the card and to the Social media page.
   describe "#expired? and #usable?" do
     it "is usable while the token is inside its window" do
       connect!

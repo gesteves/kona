@@ -44,11 +44,11 @@ import "@web.awesome.me/webawesome-pro/dist/components/option/option.js";
 import "@web.awesome.me/webawesome-pro/dist/components/switch/switch.js";
 // The "Processing" state of a track on the Course maps page.
 import "@web.awesome.me/webawesome-pro/dist/components/spinner/spinner.js";
-// The Share composer.
+// The Social media page.
 import "@web.awesome.me/webawesome-pro/dist/components/textarea/textarea.js";
 import "@web.awesome.me/webawesome-pro/dist/components/checkbox/checkbox.js";
 import "@web.awesome.me/webawesome-pro/dist/components/checkbox-group/checkbox-group.js";
-// The schedule fields of the Share composer.
+// The schedule fields of the Social media page.
 import "@web.awesome.me/webawesome-pro/dist/components/date-input/date-input.js";
 import "@web.awesome.me/webawesome-pro/dist/components/time-input/time-input.js";
 
@@ -59,7 +59,7 @@ import MapStatusController from "./controllers/map_status_controller";
 import MapPreviewController from "./controllers/map_preview_controller";
 import LinkedSidesController from "./controllers/linked_sides_controller";
 import RepublishController from "./controllers/republish_controller";
-import ShareController from "./controllers/share_controller";
+import SocialController from "./controllers/social_controller";
 
 // window.Stimulus stays available for a debug session in the console, but the code registers each
 // controller through the local variable, because a static analysis cannot see the global.
@@ -72,4 +72,4 @@ application.register("map-status", MapStatusController);
 application.register("map-preview", MapPreviewController);
 application.register("linked-sides", LinkedSidesController);
 application.register("republish", RepublishController);
-application.register("share", ShareController);
+application.register("social", SocialController);

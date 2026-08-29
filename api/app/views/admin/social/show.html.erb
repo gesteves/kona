@@ -1,46 +1,46 @@
-<% content_for :title, "Share a post" %>
+<% content_for :title, "Social media" %>
 
-<h1 class="admin-main__title">Share a post</h1>
+<h1 class="admin-main__title">Social media</h1>
 
 <%# ⚠️ A refused submit renders this page again and does not redirect, thus each field below puts
     its value back. To redirect would lose the words that the owner wrote. %>
-<%= form_with url: share_path, method: :post,
-              class: "share wa-stack wa-gap-l",
-              data: { controller: "share",
-                      action: "submit->share#markBusy",
-                      share_preview_url_value: share_preview_path,
-                      share_limit_value: @share.body_limit,
-                      share_warn_at_value: @share.warn_at } do %>
+<%= form_with url: social_path, method: :post,
+              class: "social wa-stack wa-gap-l",
+              data: { controller: "social",
+                      action: "submit->social#markBusy",
+                      social_preview_url_value: social_preview_path,
+                      social_limit_value: @social.body_limit,
+                      social_warn_at_value: @social.warn_at } do %>
 
   <%# A plain URL field. ⚠️ There is no list of the articles here, on purpose: the card of a post
       comes from the og: tags of whatever page this names, thus a link to another site needs no more
       code and a list would only cover this one site. %>
   <div>
     <wa-input type="url" name="article_url" label="Link" required
-              value="<%= @share.article_url %>"
+              value="<%= @social.article_url %>"
               placeholder="https://"
               autocomplete="off" spellcheck="false"
-              data-share-target="link"
-              data-action="input->share#schedulePreview change->share#schedulePreview">
+              data-social-target="link"
+              data-action="input->social#schedulePreview change->social#schedulePreview">
       <%# It spins for the whole wait: the debounce and then the request. ⚠️ It needs a rule for
-          `[hidden]`; refer to _share.scss. %>
-      <wa-spinner slot="end" class="share__spinner" data-share-target="spinner" hidden></wa-spinner>
+          `[hidden]`; refer to _social.scss. %>
+      <wa-spinner slot="end" class="social__spinner" data-social-target="spinner" hidden></wa-spinner>
     </wa-input>
 
     <%# The card that each network will render. The controller fills it and shows it, thus it is
         empty and hidden until the owner pastes a link.
         ⚠️ `with-media` is not in this markup: a page can have no picture, thus the controller sets
         it with the image. %>
-    <wa-card class="share-card" data-share-target="preview" hidden>
-      <img slot="media" class="share-card__image" data-share-target="previewImage" alt="" hidden>
+    <wa-card class="social-card" data-social-target="preview" hidden>
+      <img slot="media" class="social-card__image" data-social-target="previewImage" alt="" hidden>
 
       <%# ⚠️ This is the useful part: it says which of the two cards Bluesky will render, and the
           owner cannot know that until after the post without it. %>
-      <wa-badge class="share-card__kind" appearance="outlined"
-                data-share-target="previewKind"></wa-badge>
-      <p class="share-card__host wa-caption-s" data-share-target="previewHost"></p>
-      <p class="share-card__title" data-share-target="previewTitle"></p>
-      <p class="share-card__description" data-share-target="previewDescription"></p>
+      <wa-badge class="social-card__kind" appearance="outlined"
+                data-social-target="previewKind"></wa-badge>
+      <p class="social-card__host wa-caption-s" data-social-target="previewHost"></p>
+      <p class="social-card__title" data-social-target="previewTitle"></p>
+      <p class="social-card__description" data-social-target="previewDescription"></p>
     </wa-card>
   </div>
 
@@ -49,24 +49,24 @@
         graphemes: one emoji is 1 there and 2 or more here. The count line below is ours, and it
         warns and never stops a keystroke. %>
     <wa-textarea name="body" label="Post" rows="5" resize="auto" required
-                 value="<%= @share.body %>"
+                 value="<%= @social.body %>"
                  placeholder="What do you want to say about it?"
-                 data-share-target="body"
-                 data-action="input->share#count">
+                 data-social-target="body"
+                 data-action="input->social#count">
     </wa-textarea>
 
     <%# The server writes the first value, thus the line has its height before the JavaScript runs
         and the page does not move. The controller writes each value after that. %>
-    <p class="share__count wa-caption-s" aria-live="polite" data-share-target="count">0 / <%= @share.body_limit %></p>
+    <p class="social__count wa-caption-s" aria-live="polite" data-social-target="count">0 / <%= @social.body_limit %></p>
   </div>
 
   <%# Each connected row is ticked on the first load, and a submit that fails keeps the ticks of
-      the owner. SharePresenter#selected? decides. %>
+      the owner. SocialPresenter#selected? decides. %>
   <wa-checkbox-group label="Post to">
-    <% @share.networks.each do |network| %>
+    <% @social.networks.each do |network| %>
       <% if network.connected? %>
         <wa-checkbox name="networks[]" value="<%= network.key %>" hint="<%= network.account_line %>"
-                     <%= "checked" if @share.selected?(network.key) %>>
+                     <%= "checked" if @social.selected?(network.key) %>>
           <%= network.name %>
         </wa-checkbox>
       <% else %>
@@ -85,22 +85,22 @@
     <%# The hidden 0 is what sends "off": a switch that is off submits nothing. The two fields share
         a name, and the server takes the last one. %>
     <input type="hidden" name="schedule" value="0">
-    <wa-switch name="schedule" value="1" <%= "checked" if @share.scheduled? %>
-               data-share-target="schedule" data-action="change->share#toggleSchedule">
+    <wa-switch name="schedule" value="1" <%= "checked" if @social.scheduled? %>
+               data-social-target="schedule" data-action="change->social#toggleSchedule">
       Schedule for later
     </wa-switch>
 
     <%# ⚠️ The date and the time carry no zone. The hidden `time_zone` below is what gives them a
         meaning: the browser writes its own IANA id there. %>
-    <div class="share__schedule" data-share-target="scheduleFields" <%= "hidden" unless @share.scheduled? %>>
+    <div class="social__schedule" data-social-target="scheduleFields" <%= "hidden" unless @social.scheduled? %>>
       <%# There is no `max`, on purpose: a post can wait as long as the owner wants. %>
-      <wa-date-input name="date" label="Date" value="<%= @share.date %>"
-                     min="<%= @share.min_date %>"
-                     data-share-target="date" data-action="change->share#relabel">
+      <wa-date-input name="date" label="Date" value="<%= @social.date %>"
+                     min="<%= @social.min_date %>"
+                     data-social-target="date" data-action="change->social#relabel">
       </wa-date-input>
 
-      <wa-time-input name="time" label="Time" value="<%= @share.time %>" step="300"
-                     data-share-target="time" data-action="change->share#relabel">
+      <wa-time-input name="time" label="Time" value="<%= @social.time %>" step="300"
+                     data-social-target="time" data-action="change->social#relabel">
       </wa-time-input>
 
       <%# ⚠️ The browser writes its own IANA zone here. Without it the server cannot know what
@@ -108,14 +108,14 @@
           When the Stimulus controller did not run, this field stays empty and the server uses
           TIME_ZONE. That is a fallback for a script error only: each wa-* control above needs
           JavaScript to be part of the form, thus this page does not work with no JavaScript. %>
-      <input type="hidden" name="time_zone" data-share-target="timeZone">
+      <input type="hidden" name="time_zone" data-social-target="timeZone">
     </div>
   </div>
 
   <div class="wa-cluster wa-gap-s">
-    <wa-button type="submit" variant="brand" appearance="accent" data-share-target="submit">
+    <wa-button type="submit" variant="brand" appearance="accent" data-social-target="submit">
       <%= slotted_icon_svg("classic", "light", "paper-plane") %>
-      <span data-share-target="label">Share now</span>
+      <span data-social-target="label">Post now</span>
     </wa-button>
   </div>
 <% end %>

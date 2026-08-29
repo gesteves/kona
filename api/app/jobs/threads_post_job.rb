@@ -1,4 +1,4 @@
-# Posts one draft from the Share page to Threads.
+# Posts one draft from the Social media page to Threads.
 #
 # ⚠️ You can do this job more than one time. Meta gives no idempotency header, thus `Threads#post!`
 # keeps the id of the media container in Redis below `key`. A retry then publishes the container

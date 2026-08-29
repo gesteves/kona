@@ -1,6 +1,6 @@
-// The Share composer. The form controls and the layout come from Web Awesome, thus this file holds
+// The Social media page. The form controls and the layout come from Web Awesome, thus this file holds
 // only the selection line below the picker and the states of the count line.
-.share {
+.social {
   &__schedule {
     // ⚠️ This rule is what makes the `hidden` attribute need a rule of its own. `[hidden]` of the
     // browser is `display: none` at the same specificity as this class, and our stylesheet comes
@@ -18,7 +18,7 @@
 
   // ⚠️ A rule of Web Awesome gives <wa-spinner> a display, and an author rule beats the
   // `[hidden] { display: none }` of the browser whatever its layer. Thus the attribute alone hides
-  // nothing, and this rule is what makes it work. `.share__schedule` above needs the same.
+  // nothing, and this rule is what makes it work. `.social__schedule` above needs the same.
   &__spinner[hidden] {
     display: none;
   }
@@ -42,7 +42,7 @@
 
 // The preview of the card that each network will render. <wa-card> draws the border, the corner,
 // and the padding, thus this block holds only the shape of the picture and the type of the body.
-.share-card {
+.social-card {
   // ⚠️ It clears the focus ring of the field above. That ring draws outside the border of the
   // input, thus a smaller gap lets the two touch.
   margin-block-start: var(--wa-space-s);

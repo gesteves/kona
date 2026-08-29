@@ -198,7 +198,7 @@ module AtProto
 
   # Downloads a smaller copy of a **Contentful** image and uploads it as a blob.
   #
-  # ⚠️ `StandardSite` uses this, and `Bluesky` does not: a share card takes its picture from the
+  # ⚠️ `StandardSite` uses this, and `Bluesky` does not: a social card takes its picture from the
   # og:image of any URL, which is not always a Contentful asset.
   # @param url [String] The source image.
   # @param content_type [String, nil] The content type of the source.

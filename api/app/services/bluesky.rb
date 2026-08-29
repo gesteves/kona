@@ -10,7 +10,7 @@ class Bluesky < ApplicationService
 
   COLLECTION = "app.bsky.feed.post".freeze
 
-  # The limit of a post, in grapheme clusters. ⚠️ `SharePresenter::BODY_LIMIT` is the same number on
+  # The limit of a post, in grapheme clusters. ⚠️ `SocialPresenter::BODY_LIMIT` is the same number on
   # the admin page, and `spec/services/bluesky_spec.rb` pins the two together.
   MAX_GRAPHEMES = 300
 
@@ -46,7 +46,7 @@ class Bluesky < ApplicationService
   # The number of grapheme clusters in a post.
   #
   # ⚠️ Bluesky counts graphemes, and `String#length` counts UTF-16 code units. One emoji is 1 there
-  # and 2 or more here. `share_controller.js` counts the same way in the browser, with
+  # and 2 or more here. `social_controller.js` counts the same way in the browser, with
   # `Intl.Segmenter`.
   # @param text [String, nil]
   # @return [Integer]
@@ -120,7 +120,7 @@ class Bluesky < ApplicationService
 
   # Gets the picture of a website card, ready to go up as a blob.
   #
-  # ⚠️ **This is public because the Share preview proxies it.** The admin cannot show an `og:image`
+  # ⚠️ **This is public because the Social media preview proxies it.** The admin cannot show an `og:image`
   # from another host directly: the CSP of the admin has `img-src :self`. Thus the preview asks this
   # app for the picture, and it then shows **the exact bytes that this class uploads** and not the
   # original file.
@@ -233,7 +233,7 @@ class Bluesky < ApplicationService
   def shrink(bytes)
     # ⚠️ The require is **here** and not at the top of the file. libvips is a native library, and a
     # require at the top makes each path of this class need it: a post with a small picture, and
-    # the preview of the Share page, would then both fail where nothing has to shrink anything.
+    # the preview of the Social media page, would then both fail where nothing has to shrink anything.
     # ⚠️ LoadError is not a StandardError, thus the rescue below must name it. Without that, a
     # machine with no libvips gives a 500 in place of a card with no picture.
     require "vips"

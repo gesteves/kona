@@ -1,10 +1,10 @@
-# Presents the Share composer: the draft, and the networks that can take a post.
+# Presents the Social media page: the draft, and the networks that can take a post.
 #
 # ⚠️ The caller gives the state of each network, and this class does not read it, exactly as
 # ConnectedAppPresenter needs. Thus the view makes no service call.
-class SharePresenter
+class SocialPresenter
   # The maximum length of the body, in graphemes. It is the limit of Bluesky, which is the shortest
-  # of the three. ⚠️ The view writes this number into the markup and share_controller.js reads it
+  # of the three. ⚠️ The view writes this number into the markup and social_controller.js reads it
   # there. Do not write it again in the JavaScript or in a stylesheet.
   BODY_LIMIT = 300
 
