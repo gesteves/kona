@@ -1,5 +1,4 @@
-# Presents the Share composer: the entries that the owner can share, and the networks that can take
-# a post.
+# Presents the Share composer: the draft, and the networks that can take a post.
 #
 # ⚠️ The caller gives the state of each network, and this class does not read it, exactly as
 # ConnectedAppPresenter needs. Thus the view makes no service call.
@@ -11,9 +10,6 @@ class SharePresenter
 
   # The length at which the count line changes to the warning color.
   WARN_AT = 270
-
-  # One entry of the article picker.
-  Article = Data.define(:id, :title, :summary, :url, :published_at, :entry_type)
 
   # One row of the "Post to" list.
   Network = Data.define(:key, :name, :account, :connected) do
@@ -27,56 +23,55 @@ class SharePresenter
     end
   end
 
-  # @return [Array<Article>] Each published entry, the newest first.
-  attr_reader :articles
   # @return [Array<Network>] The three networks, in a stable order.
   attr_reader :networks
+  # @return [String] The draft body. It is blank on a first load.
+  attr_reader :body
+  # @return [String] The link to share. It is blank on a first load.
+  attr_reader :article_url
 
-  # @param articles [Array<OpenStruct>] The raw list from Articles#list.
   # @param networks [Array<Network>] The rows that the controller made.
-  # @param site_url [String] The base URL of the public site.
-  def initialize(articles:, networks:, site_url:)
-    @site_url = site_url.to_s.chomp("/")
+  # @param body [String, nil] The draft to put back in the field. ⚠️ A failed submit renders this
+  #   page again, thus the owner must not lose 300 characters that they wrote.
+  # @param article_url [String, nil] The link to put back.
+  # @param selected [Array<String>] The network keys to tick again.
+  # @param scheduled [Boolean] True to open the schedule fields again.
+  # @param date [String, nil] The date to put back, as YYYY-MM-DD.
+  # @param time [String, nil] The time to put back, as HH:mm.
+  def initialize(networks:, body: nil, article_url: nil, selected: [],
+                 scheduled: false, date: nil, time: nil)
     @networks = networks
-    @articles = build_articles(articles)
+    @body = body.to_s
+    @article_url = article_url.to_s
+    @selected = Array(selected).map(&:to_s)
+    @scheduled = scheduled
+    @date = date.to_s
+    @time = time.to_s
   end
 
-  # @return [Boolean] True when no entry is available, which is what a Contentful failure gives.
-  def empty? = @articles.empty?
+  # @return [Boolean] True when the schedule fields are open.
+  def scheduled? = @scheduled
+
+  # @return [String] The date field, as YYYY-MM-DD.
+  attr_reader :date
+  # @return [String] The time field, as HH:mm.
+  attr_reader :time
+
+  # The first day that the date field offers. ⚠️ It is in the zone of the **server**, thus a browser
+  # that is a day ahead can still pick its own today. The action checks that the moment is in the
+  # future, and that check is the one that matters.
+  # @return [String] YYYY-MM-DD.
+  def min_date = Time.use_zone(TimeZoneResolver.default) { Time.zone.today.to_fs(:iso8601) }
+
+  # ⚠️ There is no `max_date`, on purpose. The owner can schedule a post as far ahead as they want.
+
+  # @param key [String] A network key.
+  # @return [Boolean] True when the owner ticked that network.
+  def selected?(key) = @selected.include?(key.to_s)
 
   # @return [Integer]
   def body_limit = BODY_LIMIT
 
   # @return [Integer]
   def warn_at = WARN_AT
-
-  private
-
-  # Keeps each published entry and makes the fields that the picker needs.
-  #
-  # ⚠️ This keeps a Short, thus it is not ArticleRanking#candidates. That method removes a Short,
-  # because the trending widget shows full articles only. A Short is a published entry, and the
-  # owner can share one.
-  # @param articles [Array<OpenStruct>]
-  # @return [Array<Article>]
-  def build_articles(articles)
-    Array(articles)
-      .reject { |article| article.draft || article.path.blank? }
-      .sort_by { |article| article.published_at.to_s }
-      .reverse
-      .map { |article| to_article(article) }
-  end
-
-  # @param article [OpenStruct]
-  # @return [Article]
-  def to_article(article)
-    Article.new(
-      id: article.sys&.id,
-      title: article.title.to_s,
-      summary: article.summary.to_s,
-      url: "#{@site_url}#{article.path}",
-      published_at: article.published_at,
-      entry_type: article.entry_type
-    )
-  end
 end

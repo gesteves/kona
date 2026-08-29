@@ -145,7 +145,8 @@ Rails.application.routes.draw do
       # The Share composer, which drafts one post for the connected social accounts. The nav
       # leaves it out when no account is connected, and #show then redirects.
       # ⚠️ Nothing posts yet: the Share button on that page is inert.
-      get "share" => "share#show", as: :share
+      get  "share" => "share#show", as: :share
+      post "share" => "share#create"
 
       # The spam quarantine of the contact form. The name says what it holds. It is not `/contact`,
       # on purpose, because that is the path of the public form (POST /api/contact), and nothing

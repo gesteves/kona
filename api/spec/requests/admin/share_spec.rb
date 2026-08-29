@@ -3,36 +3,10 @@ require "rails_helper"
 RSpec.describe "Admin share", type: :request do
   let(:owner_email) { "owner@example.com" }
 
-  let(:published) do
-    DeepOstruct.wrap(
-      title: "Ironman Canada", summary: "A long day in Penticton.", slug: "ironman-canada",
-      draft: false, published_at: "2026-07-12T00:00:00Z", entry_type: "Article",
-      path: "/2026/07/12/ironman-canada/", sys: { id: "entry-1" }
-    )
-  end
-
-  let(:short) do
-    DeepOstruct.wrap(
-      title: "A short note", summary: "Small.", slug: "a-short-note",
-      draft: false, published_at: "2026-08-01T00:00:00Z", entry_type: "Short",
-      path: "/2026/08/01/a-short-note/", sys: { id: "entry-2" }
-    )
-  end
-
-  let(:draft) do
-    DeepOstruct.wrap(
-      title: "Not ready yet", summary: "Hidden.", slug: "not-ready-yet",
-      draft: true, published_at: "2026-08-20T00:00:00Z", entry_type: "Article",
-      path: nil, sys: { id: "entry-3" }
-    )
-  end
-
   before do
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
-    allow(ENV).to receive(:[]).with("SITE_URL").and_return("https://example.test")
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
-    allow_any_instance_of(Articles).to receive(:list).and_return([ published, short, draft ])
 
     # The credentials of each network live in Redis. Each example says which ones are connected.
     $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY, ThreadsCredentials::REDIS_KEY)
@@ -40,6 +14,8 @@ RSpec.describe "Admin share", type: :request do
   end
 
   after { $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY, ThreadsCredentials::REDIS_KEY) }
+
+  before { SharePostJob.jobs.clear }
 
   def connect(bluesky:, mastodon:, threads:)
     allow_any_instance_of(StandardSite).to receive(:connected?).and_return(bluesky)
@@ -64,24 +40,19 @@ RSpec.describe "Admin share", type: :request do
         get "/share"
 
         expect(response).to have_http_status(:ok)
-        expect(response.body).to include("<wa-combobox")
+        expect(response.body).to include(%(<wa-input type="url" name="article_url"))
         expect(response.body).to include("<wa-textarea")
         expect(response.headers["Cache-Control"]).to include("no-store")
       end
 
-      # A Short is a published entry, thus the owner can share one. ⚠️ This is why the presenter
-      # does not reuse ArticleRanking#candidates, which removes each Short.
-      it "offers each published entry, and a Short with them" do
+      # ⚠️ The link field is a plain input and there is no list of the entries. Thus this page makes
+      # no request to Contentful when it renders.
+      it "reads no articles" do
+        expect_any_instance_of(Articles).not_to receive(:list)
+
         get "/share"
 
-        expect(response.body).to include("https://example.test/2026/07/12/ironman-canada/")
-        expect(response.body).to include("https://example.test/2026/08/01/a-short-note/")
-      end
-
-      it "leaves a draft out of the picker" do
-        get "/share"
-
-        expect(response.body).not_to include("Not ready yet")
+        expect(response).to have_http_status(:ok)
       end
 
       it "writes the character limit into the markup for the controller to read" do
@@ -121,6 +92,185 @@ RSpec.describe "Admin share", type: :request do
       end
     end
 
+    describe "POST /share" do
+      before { sign_in_as(email: owner_email) }
+
+      let(:url) { "https://example.test/2026/07/12/ironman-canada/" }
+
+
+      it "adds one job with the link, the body, and the networks" do
+        post "/share", params: { article_url: url, body: "A long day.", networks: [ "bluesky" ] }
+
+        expect(response).to redirect_to(share_path)
+        expect(flash[:notice]).to include("Queued a post to Bluesky.")
+        expect(SharePostJob.jobs.size).to eq(1)
+        rkey, link, body, networks = SharePostJob.jobs.first["args"]
+        expect(link).to eq(url)
+        expect(body).to eq("A long day.")
+        expect(networks).to eq([ "bluesky" ])
+        # ⚠️ The controller makes the record key, and the job writes with putRecord at that key.
+        # Thus a Sidekiq retry replaces one post and does not add a second one.
+        expect(rkey).to match(/\A[234567a-z]{13}\z/)
+      end
+
+      # The owner chose to be able to tick a network that no code sends to yet. The notice must
+      # then say so, or a post that never arrives looks like a failure.
+      it "names a network that it cannot post to yet" do
+        connect(bluesky: true, mastodon: true, threads: false)
+
+        post "/share", params: { article_url: url, body: "Hi.", networks: %w[bluesky mastodon] }
+
+        expect(flash[:notice]).to include("Queued a post to Bluesky.")
+        expect(flash[:notice]).to include("Mastodon isn't wired up yet.")
+      end
+
+      # ⚠️ The link field takes any URL, thus the owner can share a page on another site.
+      it "takes a link that is not an article of this site" do
+        post "/share", params: { article_url: "https://someone-else.test/a-post/", body: "Good.",
+                                 networks: [ "bluesky" ] }
+
+        expect(response).to redirect_to(share_path)
+        expect(SharePostJob.jobs.first["args"][1]).to eq("https://someone-else.test/a-post/")
+      end
+
+      it "ignores a network key that this app does not know" do
+        post "/share", params: { article_url: url, body: "Hi.", networks: %w[bluesky myspace] }
+
+        expect(SharePostJob.jobs.first["args"].last).to eq([ "bluesky" ])
+      end
+
+      describe "scheduling" do
+        # Any date in the future. ⚠️ It must not be a constant: a date that a person writes here
+        # becomes the past, and the action then refuses it and the example fails one day.
+        let(:on) { 10.days.from_now.strftime("%Y-%m-%d") }
+
+        # ⚠️ A date and a time carry no zone. The browser sends its own IANA id, thus "09:00" has
+        # one meaning. This is the difference from the Republish dialog, which takes minutes from
+        # now for exactly this reason.
+        it "reads the date and the time in the zone that the browser sent" do
+          post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+                                   schedule: "1", date: on, time: "09:00",
+                                   time_zone: "America/New_York" }
+
+          expect(response).to redirect_to(share_path)
+          expected = Time.use_zone("America/New_York") { Time.zone.parse("#{on} 09:00") }
+          expect(SharePostJob.jobs.first["at"]).to be_within(1).of(expected.to_f)
+        end
+
+        it "names the moment in the notice, in that same zone" do
+          post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+                                   schedule: "1", date: on, time: "09:00",
+                                   time_zone: "America/New_York" }
+
+          expected = Time.use_zone("America/New_York") do
+            Time.zone.parse("#{on} 09:00").strftime("%B %-e at %-I:%M %p %Z")
+          end
+          expect(flash[:notice]).to eq("Scheduled a post to Bluesky for #{expected}.")
+        end
+
+        # ⚠️ With no JavaScript the hidden field is empty. TIME_ZONE is then the meaning, and the
+        # form still works.
+        it "falls back to the configured zone with no time zone field" do
+          allow(TimeZoneResolver).to receive(:default).and_return("America/Denver")
+
+          post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+                                   schedule: "1", date: on, time: "09:00" }
+
+          expected = Time.use_zone("America/Denver") { Time.zone.parse("#{on} 09:00") }
+          expect(SharePostJob.jobs.first["at"]).to be_within(1).of(expected.to_f)
+        end
+
+        # That field comes from the browser, thus a value with a mistake must never raise.
+        it "falls back for a time zone that Rails does not know" do
+          post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+                                   schedule: "1", date: on, time: "09:00",
+                                   time_zone: "Mars/Olympus_Mons" }
+
+          expect(response).to redirect_to(share_path)
+          expect(SharePostJob.jobs.size).to eq(1)
+        end
+
+        it "posts now when the switch is off, and schedules nothing" do
+          post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+                                   schedule: "0", date: on, time: "09:00" }
+
+          expect(flash[:notice]).to include("Queued a post to Bluesky.")
+          expect(SharePostJob.jobs.first["at"]).to be_nil
+        end
+
+        it "refuses a moment in the past" do
+          post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+                                   schedule: "1", date: "2020-01-01", time: "09:00" }
+
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(response.body).to include("Pick a time in the future.")
+          expect(SharePostJob.jobs).to be_empty
+        end
+
+        # ⚠️ There is no limit on how far ahead this can be, on purpose. A post about a race can
+        # wait for the race.
+        it "takes a moment years from now" do
+          far = 3.years.from_now
+
+          post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+                                   schedule: "1", date: far.strftime("%Y-%m-%d"), time: "09:00" }
+
+          expect(response).to redirect_to(share_path)
+          expect(SharePostJob.jobs.size).to eq(1)
+        end
+
+        it "refuses a schedule with no date, and keeps the fields open" do
+          post "/share", params: { article_url: url, body: "Hi.", networks: [ "bluesky" ],
+                                   schedule: "1", date: "", time: "09:00" }
+
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(response.body).to include("Pick a date and a time to schedule it.")
+          expect(response.body).to include(%(value="09:00"))
+          expect(response.body).to include("<wa-switch name=\"schedule\" value=\"1\" checked")
+          expect(SharePostJob.jobs).to be_empty
+        end
+      end
+
+      # ⚠️ A refusal renders the page again and keeps the draft. A redirect would lose it.
+      context "when the draft is not good" do
+        it "refuses an empty body and keeps the picker" do
+          post "/share", params: { article_url: url, body: "", networks: [ "bluesky" ] }
+
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(response.body).to include("Write something to post.")
+          expect(response.body).to include(%(value="#{url}"))
+          expect(SharePostJob.jobs).to be_empty
+        end
+
+        it "refuses a body past the limit and keeps it in the field" do
+          long = "a" * (Bluesky::MAX_GRAPHEMES + 1)
+
+          post "/share", params: { article_url: url, body: long, networks: [ "bluesky" ] }
+
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(response.body).to include("301 characters")
+          expect(response.body).to include(long)
+          expect(SharePostJob.jobs).to be_empty
+        end
+
+        it "refuses a value that is not a URL" do
+          post "/share", params: { article_url: "not a link", body: "Hi.", networks: [ "bluesky" ] }
+
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(response.body).to include("Paste a link to share.")
+          expect(SharePostJob.jobs).to be_empty
+        end
+
+        it "refuses a draft with no network" do
+          post "/share", params: { article_url: url, body: "Hi.", networks: [] }
+
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(response.body).to include("Pick at least one place to post it.")
+          expect(SharePostJob.jobs).to be_empty
+        end
+      end
+    end
+
     # ⚠️ The page is a draft screen, thus it renders with no account at all. Each row is then
     # disabled, and the owner can still look at the page and change it.
     context "when no account is connected" do
@@ -133,7 +283,7 @@ RSpec.describe "Admin share", type: :request do
         get "/share"
 
         expect(response).to have_http_status(:ok)
-        expect(response.body).to include("<wa-combobox")
+        expect(response.body).to include(%(name="article_url"))
       end
 
       it "disables each of the three rows" do

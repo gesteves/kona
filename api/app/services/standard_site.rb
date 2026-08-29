@@ -12,25 +12,23 @@ require "digest"
 # @see https://standard.site
 class StandardSite < ApplicationService
   include ContentfulConsumer
+  include AtProto
 
   # The AT Protocol "sortable base32" alphabet. Each standard.site lexicon needs a TID for each
   # record key. Thus you cannot use a natural id as an rkey.
   # @see https://atproto.com/specs/tid
-  TID_ALPHABET = "234567abcdefghijklmnopqrstuvwxyz"
+  TID_ALPHABET = AtProto::TID_ALPHABET
 
   # Makes a stable TID from a seed: the low 63 bits of its SHA-256 digest, in base32.
   # web's StandardSiteHelpers#document_rkey must use the same algorithm. If it does not, the AT
   # URI that it writes does not agree with the record that this class publishes.
+  #
+  # ⚠️ This is content-addressed and not time-ordered, on purpose: the same entry must always give
+  # the same rkey. `.new_tid` from AtProto is the time-ordered one, for a record with no natural key.
   # @param seed [String]
   # @return [String] A 13-character TID.
   def self.tid(seed)
-    value = Digest::SHA256.hexdigest(seed.to_s).to_i(16) & ((1 << 63) - 1)
-    encoded = +""
-    while value.positive?
-      encoded = TID_ALPHABET[value % 32] + encoded
-      value /= 32
-    end
-    encoded.rjust(13, TID_ALPHABET[0])
+    encode_tid(Digest::SHA256.hexdigest(seed.to_s).to_i(16) & ((1 << 63) - 1))
   end
 
   # Makes a site.standard.theme.color#rgb value.
@@ -59,7 +57,7 @@ class StandardSite < ApplicationService
   PUBLICATION_RKEY = tid("self")
   # The old rkey of the publication, from before the lexicon needed a TID. The backfill deletes it.
   LEGACY_PUBLICATION_RKEY = "self"
-  DEFAULT_PDS_URL = "https://bsky.social"
+  DEFAULT_PDS_URL = AtProto::DEFAULT_PDS_URL
   # A DID stays the same for an account. Thus the cache holds it with no TTL.
   DID_CACHE_KEY = "standard_site:did"
 
@@ -121,7 +119,6 @@ class StandardSite < ApplicationService
   def initialize(credentials: BlueskyCredentials.fetch)
     @handle = credentials.handle
     @app_password = credentials.app_password
-    @pds_url = (ENV["BLUESKY_PDS_URL"].presence || DEFAULT_PDS_URL).chomp("/")
   end
 
   # Syncs the document record of an entry. This method gets the entry again from the delivery
@@ -591,57 +588,21 @@ class StandardSite < ApplicationService
 
   # --- PDS (AT Protocol) --------------------------------------------------------------
 
-  # Opens a session with the PDS. It finds the DID and the service endpoint of the repo, then
-  # caches the DID.
+  # The name of this client in each log line and each error report of AtProto.
+  # @return [String]
+  def at_proto_label = "standard.site"
+
+  # Opens a session with the PDS and caches the DID.
+  #
+  # ⚠️ The PDS lexicons here are site.standard.*, which a PDS does not know. Thus each write sends
+  # `validate: false`, which is the default of `AtProto#put_record`.
   # @return [Boolean] True if a session is available.
   def create_session
     return false unless valid_credentials?
+    return false unless open_session(handle: @handle, app_password: @app_password)
 
-    response = HTTParty.post(
-      "#{@pds_url}/xrpc/com.atproto.server.createSession",
-      body: { identifier: @handle, password: @app_password }.to_json,
-      headers: { "Content-Type" => "application/json" }
-    )
-    unless response.success?
-      Rails.logger.warn("standard.site: failed to authenticate with the PDS (HTTP #{response.code})")
-      report_upstream_error("HTTP #{response.code}", context: "standard.site PDS session", status: response.code)
-      return false
-    end
-    data = JSON.parse(response.body)
-    @access_jwt = data["accessJwt"]
-    @did = data["did"]
-    @service_url = pds_endpoint_from_did_doc(data["didDoc"]) || @pds_url
     $redis.set(DID_CACHE_KEY, @did) if @did.present? && defined?($redis) && $redis
-    @access_jwt.present? && @did.present?
-  rescue StandardError => e
-    Rails.logger.error("standard.site: error creating PDS session: #{e.message}")
-    report_upstream_error(e, context: "standard.site PDS session")
-    false
-  end
-
-  # @param doc [Hash, nil] A DID document.
-  # @return [String, nil] The #atproto_pds service endpoint of the document.
-  def pds_endpoint_from_did_doc(doc)
-    return if doc.blank?
-    service = Array(doc["service"]).find { |s| s["id"].to_s.end_with?("#atproto_pds") }
-    service&.dig("serviceEndpoint")&.chomp("/")
-  end
-
-  # Makes or updates a record. The repo, the collection, and the rkey identify it, thus you can
-  # do this more than one time. It sends validate:false, because the PDS does not know the
-  # site.standard.* lexicons.
-  # @return [Boolean] Whether it succeeded.
-  def put_record(collection, rkey, record)
-    response = HTTParty.post(
-      "#{@service_url}/xrpc/com.atproto.repo.putRecord",
-      body: { repo: @did, collection: collection, rkey: rkey, validate: false, record: record }.to_json,
-      headers: auth_headers
-    )
-    unless response.success?
-      Rails.logger.warn("standard.site: failed to put #{collection}/#{rkey} (HTTP #{response.code}: #{response.body})")
-      report_upstream_error("HTTP #{response.code}", context: "standard.site putRecord #{collection}/#{rkey}", status: response.code)
-    end
-    response.success?
+    true
   end
 
   # Deletes each document record with an rkey that is not in the current set.
@@ -690,65 +651,6 @@ class StandardSite < ApplicationService
     response.success?
   end
 
-  # Downloads a smaller copy of an image and uploads it to the PDS as a blob.
-  # @return [Hash, nil] The blob, or nil if there is a failure or no session. The caller then
-  #   omits the field.
-  def upload_image_blob(url, content_type, w:, h:)
-    return if @access_jwt.blank? || url.blank?
-    bytes, mime = fetch_resized_image(url, content_type, w: w, h: h)
-    return if bytes.blank?
-    response = HTTParty.post(
-      "#{@service_url}/xrpc/com.atproto.repo.uploadBlob",
-      body: bytes,
-      headers: { "Content-Type" => mime, "Authorization" => "Bearer #{@access_jwt}" }
-    )
-    unless response.success?
-      report_upstream_error("HTTP #{response.code}", context: "standard.site uploadBlob", status: response.code)
-      return
-    end
-    JSON.parse(response.body)["blob"]
-  rescue StandardError => e
-    report_upstream_error(e, context: "standard.site uploadBlob")
-    nil
-  end
-
-  # Gets a smaller image as raw bytes from the Contentful Images API. This keeps each blob below
-  # 1MB. A direct request to Contentful is satisfactory here, because this runs only at publish
-  # time.
-  # @return [Array(String, String), nil] [bytes, mime_type], or nil if it fails.
-  def fetch_resized_image(url, content_type, w:, h:)
-    return if url.blank?
-    source = url.to_s.start_with?("//") ? "https:#{url}" : url
-    format = content_type == "image/png" ? "png" : "jpg"
-    mime = format == "png" ? "image/png" : "image/jpeg"
-    image_url = images_api_url(source, w: w, h: h, fm: format)
-    response = HTTParty.get(image_url)
-    unless response.success?
-      report_upstream_error("HTTP #{response.code}", context: "standard.site image fetch", status: response.code, url: image_url)
-      return
-    end
-    [ response.body, mime ]
-  rescue StandardError => e
-    report_upstream_error(e, context: "standard.site image fetch")
-    nil
-  end
-
-  # Makes a Contentful Images API URL. It always uses images.ctfassets.net, because the downloads
-  # host does not do transformations.
-  # @return [String]
-  def images_api_url(url, w:, h:, fm:)
-    uri = URI.parse(url)
-    uri.host = "images.ctfassets.net" if uri.host.to_s.end_with?("ctfassets.net")
-    existing = URI.decode_www_form(uri.query || "").to_h
-    uri.query = URI.encode_www_form(existing.merge("w" => w, "h" => h, "fit" => "fill", "fm" => fm))
-    uri.to_s
-  end
-
-  # @return [Hash] JSON request headers with the bearer token.
-  def auth_headers
-    { "Content-Type" => "application/json", "Authorization" => "Bearer #{@access_jwt}" }
-  end
-
   # Changes Markdown into plain text: no markup, decoded entities, and one space between words.
   # This is not MarkdownHelper#markdown_to_plain_text, on purpose. It does not use SmartyPants.
   # Its output goes into the content fingerprints, thus a change here syncs each record again.
@@ -773,14 +675,5 @@ class StandardSite < ApplicationService
     Time.parse(value.to_s).utc.iso8601(3)
   rescue StandardError
     nil
-  end
-
-  # @param str [String, nil] The string.
-  # @param max [Integer] The maximum number of grapheme clusters.
-  # @return [String, nil] The string, made shorter.
-  def truncate_graphemes(str, max)
-    return str if str.blank?
-    graphemes = str.scan(/\X/)
-    graphemes.length > max ? graphemes.first(max).join : str
   end
 end

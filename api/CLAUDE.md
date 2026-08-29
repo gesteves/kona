@@ -55,7 +55,8 @@ edge serves a cached copy before it gets a new one.
 | GET | `/whoop/auth`, `/whoop/callback` | Whoop OAuth (authorize is owner-gated) | — |
 | GET | `/signin`, `/auth/google_oauth2/callback`; POST `/signout` | owner session | `no-store` |
 | GET | `/`, `/spam`, `/location`, `/connected-apps`, `/course-maps`, `/course-maps/:id` | admin UI (owner-session gated) | `no-store` |
-| GET | `/share` | the Share composer. ⚠️ It drafts only, and nothing posts | `no-store` |
+| GET | `/share` | the Share composer | `no-store` |
+| POST | `/share` | checks the draft and adds a `SharePostJob`, now or at a date and a time; 303, or 422 with the draft still in the form | `no-store` |
 | POST | `/spam/:id/not-spam`; DELETE `/spam/:id`, `/connected-apps/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
 | GET/POST/DELETE | `/connected-apps/bluesky` | the Bluesky handle + app password form, and disconnect | `no-store` |
 | GET/POST/DELETE | `/connected-apps/mastodon`; GET `/connected-apps/mastodon/callback` | the Mastodon instance form, the OAuth callback, and disconnect | `no-store` |
@@ -114,7 +115,8 @@ mount.
 API: Intervals.icu, Apple WeatherKit (with an ES256 JWT), Google Maps (`GoogleMaps` finds an address
 from coordinates, and `GoogleGeocoder` finds coordinates from an address), Google Air Quality, Google
 Pollen, PurpleAir, Whoop (OAuth2), TrainerRoad (iCal), Contentful, Plausible, Font Awesome,
-Goodspeed, Akismet, Resend, Turnstile, Mastodon (OAuth2), Threads (OAuth2), `StandardSite`,
+Goodspeed, Akismet, Resend, Turnstile, Mastodon (OAuth2), Threads (OAuth2), `StandardSite`, `Bluesky`,
+`OpenGraph`,
 `AssetMirror`, and `BlurhashPlaceholder`.
 The two article rankings, `TrendingArticles` and `RelatedArticles`, share `ArticleRanking`. Three
 more classes hold the parts of the "You May Also Like" score: `ArticleIndex` is the BM25 index of
@@ -367,6 +369,7 @@ Thus that shared window is safe.
 | `WhoopWebhookJob(event_type, resource_id, trace_id)` | syncs Whoop metrics to Intervals.icu |
 | `ActivityDescriptionJob(activity_id, whoop_strain = nil)` | (re)generates an activity's Strava description and tidies its name |
 | `LocationSyncJob(latitude, longitude)` | propagates the current location to Intervals.icu |
+| `SharePostJob(rkey, url, text, networks)` | posts one draft from the Share page. ⚠️ The caller makes `rkey`; refer to **The share composer** |
 | `ContactMailJob(name, email, message, context, restored_from_spam = false)` | contact intake: Akismet + compose |
 | `ContactDeliveryJob(payload)` | the one retryable *delivery* unit — sends via Resend |
 | `MapTilesetJob(id)` | publishes an uploaded GPX track to Mapbox as a vector tileset |
@@ -610,7 +613,9 @@ build of the web site, after 0 to 60 minutes. The rules of that dialog:
   form-associated and reads that attribute as a native control does.
 - ⚠️ **The delay is minutes from now, and not a date and a time.** Thus the browser sends no time
   zone, and the server needs none: it adds the minutes to the current time. Do not add a date field
-  again. `MIN_MINUTES` and `MAX_MINUTES` bound the delay, and 60 minutes also stops a job that would
+  again. ⚠️ **The Share page *does* take a date and a time, and that is not a contradiction**: it
+  sends the IANA zone of the browser in a hidden field. This dialog needs no zone at all, and a
+  republish is never more than an hour away. Refer to **The share composer**. `MIN_MINUTES` and `MAX_MINUTES` bound the delay, and 60 minutes also stops a job that would
   sit in Redis for a long time.
 - ⚠️ **A delay of zero is "now", and the dialog has one control and no radio group.** The **label of
   the submit button** is the only thing that says which of the two the value gives: "Republish now"
@@ -752,26 +757,18 @@ navigation. `StandardSite#connected?` has the same rule, and its comment gives t
 
 ### The share composer
 
-**Share a post** (`/share`) drafts one post about a published entry for Bluesky, Mastodon, and
-Threads. ⚠️ **Nothing posts.** The Share button is inert, and `Admin::ShareController` has one read
-action. `Mastodon::SCOPES` already asks for `write:statuses` and `Threads::SCOPES` already asks for
-`threads_content_publish`, thus a later pass adds the write and needs no new authorization.
+**Share a post** (`/share`) drafts one post about a link for Bluesky, Mastodon, and Threads, now or
+at a date and a time. ⚠️ **Only Bluesky posts today.** `Mastodon::SCOPES` already asks for
+`write:statuses` and `Threads::SCOPES` already asks for `threads_content_publish`, thus each later
+pass adds the write and needs no new authorization by the owner.
 
-- **The picker holds each published entry**, from `Articles#list`, and a `wa-combobox` filters them
-  in the browser. There are approximately 60 entries, thus this needs **no search endpoint**.
-  `share_controller.js` widens the filter of the component to the summary and the URL, thus a URL
-  that the owner pastes finds its entry.
-  - ⚠️ **`SharePresenter` does not reuse `ArticleRanking#candidates`.** That method removes each
-    **Short**, because the trending widget shows full articles only. A Short is a published entry
-    and the owner can share one.
-  - ⚠️ **Do not use Pagefind here.** That index is an output of the **web** build, it is gitignored,
-    and the image of this app holds `api/` only. To read it across the origins needs the site host
-    in the CSP of `OwnerFacing` and CORS headers on those assets, and it makes this app depend on
-    the build of `web/`. It also indexes each *page* and not each entry. For a search of the full
-    body, the path is `ArticleIndex`, the BM25 index that this app already has.
-  - ⚠️ **This page reads Contentful at the render, and Connected apps does not.** That rule protects
-    a page whose purpose is not the upstream data, and here the list *is* the page. `Articles#list`
-    gives an empty array after a failure, thus the page renders a callout and never a 500.
+- **The link is a plain `wa-input type="url"`, and there is NO list of the entries.** The owner
+  pastes a link. ⚠️ **Do not add a picker of the articles back.** The card of a post comes from the
+  `og:` tags of whatever page the link names, thus a link to another site needs no more code, and a
+  list would cover this one site only. The action checks only that the value is http or https.
+  - ⚠️ **The result is that this page makes NO request to Contentful when it renders**, and a spec
+    pins that. An earlier version read `Articles#list` into a `wa-combobox` of every entry, and it
+    also had to leave `ArticleRanking#candidates` alone, because that filter drops each Short.
 - **One body goes to the three networks, and the limit is 300**, which is the limit of Bluesky and
   the shortest of the three. `SharePresenter::BODY_LIMIT` and `WARN_AT` hold the two numbers, the
   view writes them into the markup, and the Stimulus controller reads them there.
@@ -784,6 +781,45 @@ action. `Mastodon::SCOPES` already asks for `write:statuses` and `Threads::SCOPE
   Thus the code that posts decides that, and this page keeps the URL of the entry beside the text.
 - ⚠️ **Do not add a Bluesky threadgate or postgate control.** The owner read those options and
   refused them. This page has no control for one network alone.
+- **`POST /share` adds a `SharePostJob` and answers with a 303.** A refusal renders the page again
+  with a **422** and keeps the draft, and it does not redirect. ⚠️ The draft is the expensive part
+  of this page, thus a redirect that loses 300 characters is worse than a page that renders again.
+  `SharePresenter` takes `body:`, `article_url:`, and `selected:` for that.
+- ⚠️ **The controller makes the record key and gives it to the job.** `Bluesky#post!` writes with
+  `putRecord` at that key, thus the 24-hour retry of `ApplicationJob` replaces one post and never
+  adds a second one to the feed. **`createRecord` makes its own key, thus each retry there is a new
+  post.** This is the one thing that makes the job safe to do more than one time. Refer to
+  **Posting to Bluesky**.
+- **A switch opens a date and a time, and `perform_at` then schedules the job.** With the switch
+  off the action calls `perform_async`. The **label of the submit button** says which of the two the
+  form does — "Share now", or "Schedule for Sep 3 at 9:00 AM" — exactly as the Republish dialog
+  does, because the switch alone is easy to miss.
+  - ⚠️ **The browser sends its own IANA zone in a hidden field, and that is what makes a date field
+    safe here.** A date and a time carry **no** zone. The Republish dialog dropped its date field
+    for that reason and takes minutes from now instead, and a reader of that ⚠️ must know why this
+    page is different. `share_controller.js` writes
+    `Intl.DateTimeFormat().resolvedOptions().timeZone` into a hidden field. The page does **not**
+    print that zone: it is the zone of the browser, thus the time that the owner picks is already
+    the time that they mean.
+  - ⚠️ **The action checks that zone against the zones that Rails knows.** That value comes from the
+    browser, thus one with a mistake must give the fallback and never an exception. With no
+    JavaScript the field is empty, and `TimeZoneResolver.default` (`TIME_ZONE`) is the meaning.
+    Thus the form still works with no JavaScript.
+  - ⚠️ **`required` on the date and the time follows the switch, and it is not in the markup.** A
+    required control inside the hidden block would refuse "Share now", and a browser cannot show
+    that message on an element that nobody can see.
+  - ⚠️ **There is no limit on how far ahead a post can go, on purpose.** A post about a race can
+    wait for the race. Thus the date field has a `min` and no `max`, and the job sits in the
+    scheduled set of Sidekiq until it runs. The action refuses only a moment in the **past**, which
+    would fire at once.
+  - **There is no page that lists the scheduled posts.** The **Scheduled** tab of `/sidekiq` shows
+    them, and that is where you delete one. ⚠️ Unlike `SiteBuildJob`, this job keeps **no** jid and
+    a new schedule cancels nothing: the owner can line up more than one post, and each is its own
+    job with its own record key.
+- ⚠️ **Only Bluesky posts today, and the other two rows are still selectable when they are
+  connected.** `SharePostJob::SUPPORTED` names what works, the job logs each skip, and the notice
+  says which network it could not send to. A tick that gives no post and no message would look
+  exactly like a failure.
 - **The three rows are always on the page**, and a row with no account is `disabled` with a link to
   Connected apps. That is different from Connected apps, which hides such a card: there the card
   offers an action that would fail, and here a disabled row says why one of three names cannot take
@@ -793,6 +829,59 @@ action. `Mastodon::SCOPES` already asks for `write:statuses` and `Threads::SCOPE
   it before an account exists. Do not gate it on the connection state.
   ⚠️ `ShareController#social_networks` reads each state from **Redis**, and no service makes an HTTP
   request, for the same reason as the Connected apps page.
+
+### Posting to Bluesky
+
+`Bluesky` writes an `app.bsky.feed.post`. ⚠️ **It is not `StandardSite`**, which writes the
+`site.standard.*` mirror of the blog. The two are different records for different readers, and they
+share the account, the session, and the blob upload through the **`AtProto`** concern.
+
+⚠️ **`AtProto` exists because both classes talk to the same PDS with the same credentials**, from
+`BlueskyCredentials`. Two session implementations would need two edits when the account, the
+endpoint, or the authentication changes, and the copy that a person forgets fails only at the next
+publish. An includer defines `at_proto_label`, which names it in each log line and each error
+report, and it must inherit `ApplicationService` for `report_upstream_error`.
+
+- ⚠️ **`post!` takes the `rkey` from its caller and uses `putRecord`.** `Bluesky.new_tid` makes that
+  key from the clock, thus a later post sorts after an earlier one. `StandardSite.tid(seed)` is the
+  **other** kind of key: it is content-addressed, because the same entry must always give the same
+  rkey.
+- ⚠️ **The link of a post is a website card (`app.bsky.embed.external`), and it is NOT in the
+  text.** Thus the URL uses none of the 300 characters.
+- ⚠️ **The card comes from the `og:` tags of the page, through `OpenGraph`, and NOT from
+  Contentful.** Two reasons, and each one is enough: a **Short has no cover image**, and the link
+  can be a page on **another site**. `OpenGraph#fetch` reads `og:title`, `og:description`, and
+  `og:image`, and it falls back to `<title>`, `meta[name=description]`, and `twitter:image`.
+  - **It never raises.** A page with no tags, or a host that is away, gives a card with the URL
+    alone, and Bluesky renders that.
+  - ⚠️ It sends a **User-Agent** of its own. Many hosts give a 403 to the default one, and the card
+    is then empty with no reason.
+  - Redis caches each card for 15 minutes, thus a retry of the job does not ask the page again.
+- **The thumbnail is the `og:image`, whatever host holds it.** `Bluesky#upload_card_image` gets it
+  and uploads it as a blob. ⚠️ A blob past `MAX_BLOB_BYTES` fails at **`putRecord`** and not at the
+  upload, thus the whole post would go away and the message would name the embed. For that reason
+  the code shrinks an oversized picture to 1200px wide with **libvips**, which this app already
+  needs for the blurhash placeholders.
+  - **A card with no picture still renders**, thus each step here fails soft and the post never goes
+    away with the image.
+  - ⚠️ This is **not** `AtProto#upload_image_blob`, which asks the Contentful Images API for a
+    smaller copy. `StandardSite` uses that one, because its pictures are always Contentful assets.
+- **The body is plain text and not Markdown**, thus the facets come from the same string that the
+  record holds and no code renders anything first. `Bluesky` marks a bare URL, an @mention, and a
+  #hashtag.
+  - ⚠️ **Each offset is in BYTES of the UTF-8 text, and not in characters.** One accented letter is
+    1 character and 2 bytes, thus a character offset moves the highlight of each facet after it.
+  - ⚠️ **A mention that the PDS cannot resolve is dropped.** A mention facet with no DID makes the
+    record invalid, and the whole post then fails.
+- ⚠️ **It does not send `validate: false`**, and `StandardSite` does. The PDS knows the `app.bsky.*`
+  lexicons, thus its own check finds a record with an error before that post reaches a feed. It does
+  not know the `site.standard.*` lexicons.
+- ⚠️ **`MAX_GRAPHEMES` is 300, and Bluesky counts GRAPHEMES.** `String#length` gives UTF-16 code
+  units, thus it counts one emoji as 2 or more. `share_controller.js` counts the same way in the
+  browser with `Intl.Segmenter`, and a spec pins `Bluesky::MAX_GRAPHEMES` to
+  `SharePresenter::BODY_LIMIT`.
+- **`post!` raises at each failure**, on purpose, thus `SharePostJob` does the work again. The
+  record key is what makes that safe.
 
 ### The spam quarantine
 

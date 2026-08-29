@@ -1,22 +1,19 @@
 // The Share composer. The form controls and the layout come from Web Awesome, thus this file holds
 // only the selection line below the picker and the states of the count line.
 .share {
-  &__article {
+  &__schedule {
+    // ⚠️ This rule is what makes the `hidden` attribute need a rule of its own. `[hidden]` of the
+    // browser is `display: none` at the same specificity as this class, and our stylesheet comes
+    // after it. Thus without the line below the date and the time show while the switch is off.
+    &[hidden] {
+      display: none;
+    }
+
     display: flex;
-    flex-direction: column;
-    gap: var(--wa-space-3xs);
-    margin: var(--wa-space-2xs) 0 0;
-  }
-
-  &__article-title {
-    font-weight: var(--wa-font-weight-semibold);
-  }
-
-  &__article-url {
-    color: var(--wa-color-text-quiet);
-    font-size: var(--wa-font-size-s);
-    // A permalink has no space in it, thus it would push the column wider without this.
-    overflow-wrap: anywhere;
+    flex-wrap: wrap;
+    gap: var(--wa-space-m);
+    // The zone line goes below both fields, and not beside them.
+    align-items: start;
   }
 
   &__count {

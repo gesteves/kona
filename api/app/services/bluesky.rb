@@ -1,0 +1,262 @@
+require "vips"
+
+# Posts to Bluesky, as the account that Connected apps holds.
+#
+# ⚠️ This is not `StandardSite`. That class writes `site.standard.*` records, which are a mirror of
+# the blog, and this one writes an `app.bsky.feed.post`, which is a post that a reader sees in a
+# feed. The two share the account, the session, and the blob upload, through `AtProto`.
+#
+# @see https://atproto.com/blog/create-post
+class Bluesky < ApplicationService
+  include AtProto
+
+  COLLECTION = "app.bsky.feed.post".freeze
+
+  # The limit of a post, in grapheme clusters. ⚠️ `SharePresenter::BODY_LIMIT` is the same number on
+  # the admin page, and `spec/services/bluesky_spec.rb` pins the two together.
+  MAX_GRAPHEMES = 300
+
+  # The largest blob that a PDS takes for a card thumbnail. A record with a larger one fails at
+  # `putRecord` and not at the upload, thus the reason arrives late and reads as "blob too big".
+  MAX_BLOB_BYTES = 976_560
+  # The width to shrink an oversized thumbnail to. Bluesky renders a card at approximately this
+  # width, thus a larger picture is only bandwidth.
+  CARD_IMAGE_WIDTH = 1200
+  # The JPEG quality of that shrink.
+  CARD_IMAGE_QUALITY = 80
+
+  # The limits of the text fields of a card.
+  CARD_TITLE_MAX = 300
+  CARD_DESCRIPTION_MAX = 1000
+
+  # The language of each post. This blog is in English.
+  LANGS = [ "en-US" ].freeze
+
+  # An @handle, from the sample in the AT Protocol documentation.
+  MENTION_PATTERN = /(?:^|[$|\W])(@(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)/
+  # A bare URL. It does not take a trailing period or bracket, which is nearly always punctuation
+  # of the sentence and not part of the address.
+  URL_PATTERN = %r{(?:^|[$|\W])(https?://[a-zA-Z0-9\-._~:/?\#\[\]@!$&'()*+,;%=]*[a-zA-Z0-9\-_~/\#@$&*+=])}
+  # A #hashtag.
+  TAG_PATTERN = /(?:^|[$|\W])(\#\w+)/
+
+  # The number of grapheme clusters in a post.
+  #
+  # ⚠️ Bluesky counts graphemes, and `String#length` counts UTF-16 code units. One emoji is 1 there
+  # and 2 or more here. `share_controller.js` counts the same way in the browser, with
+  # `Intl.Segmenter`.
+  # @param text [String, nil]
+  # @return [Integer]
+  def self.post_length(text)
+    text.to_s.scan(/\X/).length
+  end
+
+  # @param text [String, nil]
+  # @return [Boolean] True when the text fits in one post and is not empty.
+  def self.valid_post_length?(text)
+    length = post_length(text)
+    length.positive? && length <= MAX_GRAPHEMES
+  end
+
+  # Makes the public URL of a post from its record key.
+  # @param handle [String] The handle of the account.
+  # @param rkey [String] The record key.
+  # @return [String]
+  def self.post_url(handle, rkey)
+    "https://bsky.app/profile/#{handle}/post/#{rkey}"
+  end
+
+  # @param credentials [BlueskyCredentials::Credentials] The pair that opens the session.
+  def initialize(credentials: BlueskyCredentials.fetch)
+    @handle = credentials.handle
+    @app_password = credentials.app_password
+  end
+
+  # @return [Boolean] True when both credentials are available.
+  def valid_credentials? = @handle.present? && @app_password.present?
+
+  # @return [String, nil] The handle of the connected account.
+  attr_reader :handle
+
+  # Publishes one post.
+  #
+  # ⚠️ The caller gives the `rkey`, and this method uses `putRecord` and not `createRecord`. Thus a
+  # second attempt of the same job replaces the same record and does not add a second post.
+  # `createRecord` makes a new key each time, and each retry there is a new post in the feed.
+  # Use `Bluesky.new_tid` to make that key **before** you add the job.
+  #
+  # @param rkey [String] The record key, from `Bluesky.new_tid`.
+  # @param text [String] The body of the post, as plain text.
+  # @param card [OpenGraph::Card, nil] The card of the link, from `OpenGraph#fetch`. Only its `url`
+  #   is necessary: a card with no title and no picture still renders.
+  # @return [String] The public URL of the post.
+  # @raise [RuntimeError] When the credentials, the length, the session, or the write fails. It
+  #   raises on purpose: `SharePostJob` then does the work again.
+  def post!(rkey:, text:, card: nil)
+    raise "Bluesky is not connected" unless valid_credentials?
+    raise "The post is empty or longer than #{MAX_GRAPHEMES} characters" unless self.class.valid_post_length?(text)
+    raise "Could not open a Bluesky session" unless open_session(handle: @handle, app_password: @app_password)
+
+    record = {
+      "$type" => COLLECTION,
+      "text" => text,
+      "langs" => LANGS,
+      "createdAt" => Time.now.utc.iso8601
+    }
+    facets = build_facets(text)
+    record["facets"] = facets if facets.any?
+    embed = build_card(card)
+    record["embed"] = embed if embed.present?
+
+    # ⚠️ It does not send `validate: false`. The PDS knows the app.bsky.* lexicons, thus its own
+    # check finds a record with an error before the post reaches a feed.
+    raise "Bluesky refused the post" unless put_record(COLLECTION, rkey, record, validate: nil)
+
+    self.class.post_url(@handle, rkey)
+  end
+
+  private
+
+  # @return [String] The name of this client in each log line of AtProto.
+  def at_proto_label = "bluesky"
+
+  # Makes the website card of the link.
+  #
+  # ⚠️ The link of a post is this card, and it is **not** in the text. Thus the URL does not use
+  # part of the 300 characters. A card with no thumbnail still renders, thus a failure of the image
+  # loses the picture only and never the post.
+  # @param card [OpenGraph::Card, nil]
+  # @return [Hash, nil] An app.bsky.embed.external, or nil with no card.
+  def build_card(card)
+    return if card.blank? || card.url.blank?
+
+    external = { "uri" => card.url }
+    external["title"] = truncate_graphemes(card.title.to_s, CARD_TITLE_MAX).to_s
+    external["description"] = truncate_graphemes(card.description.to_s, CARD_DESCRIPTION_MAX).to_s
+
+    thumb = upload_card_image(card.image_url)
+    external["thumb"] = thumb if thumb.present?
+
+    { "$type" => "app.bsky.embed.external", "external" => external }
+  end
+
+  # Downloads the og:image of the link and uploads it as a blob.
+  #
+  # ⚠️ This is not `AtProto#upload_image_blob`, which asks the Contentful Images API for a smaller
+  # copy. The picture here belongs to the page that the owner linked to, which can be another site
+  # and can be a Short, which has no cover image at all.
+  # @param url [String, nil] The og:image.
+  # @return [Hash, nil] The blob, or nil after any failure.
+  def upload_card_image(url)
+    return if url.blank?
+
+    response = HTTParty.get(url, headers: { "User-Agent" => OpenGraph::USER_AGENT },
+                                 timeout: OpenGraph::READ_TIMEOUT, follow_redirects: true, limit: 5)
+    unless response.success?
+      report_upstream_error("HTTP #{response.code}", context: "bluesky card image", status: response.code, url: url)
+      return
+    end
+
+    bytes = response.body.to_s
+    mime = response.headers["content-type"].to_s.split(";").first.presence || "image/jpeg"
+    return if bytes.blank? || !mime.start_with?("image/")
+
+    bytes, mime = shrink(bytes) if bytes.bytesize > MAX_BLOB_BYTES
+    return if bytes.blank?
+
+    upload_blob(bytes, mime)
+  rescue StandardError => e
+    report_upstream_error(e, context: "bluesky card image", url: url)
+    nil
+  end
+
+  # Makes an oversized picture into a JPEG that fits under the blob limit.
+  #
+  # ⚠️ A blob past the limit fails at `putRecord`, and not at the upload. Thus without this step the
+  # whole post fails, and the message names the embed and not the picture. libvips is already a
+  # dependency of this app, for the blurhash placeholders.
+  # @param bytes [String] The original image.
+  # @return [Array(String, String), Array(nil, nil)] [bytes, mime], or [nil, nil] when it cannot.
+  def shrink(bytes)
+    image = Vips::Image.new_from_buffer(bytes, "")
+    image = image.resize(CARD_IMAGE_WIDTH.to_f / image.width) if image.width > CARD_IMAGE_WIDTH
+    [ image.jpegsave_buffer(Q: CARD_IMAGE_QUALITY, strip: true), "image/jpeg" ]
+  rescue StandardError => e
+    report_upstream_error(e, context: "bluesky card image resize")
+    [ nil, nil ]
+  end
+
+  # Makes the rich-text facets of the body: each link, each mention, and each hashtag.
+  #
+  # ⚠️ The body is plain text, and it is not Markdown. Thus this does not render anything first,
+  # and each offset comes from the same string that the record holds.
+  # @param text [String]
+  # @return [Array<Hash>]
+  def build_facets(text)
+    link_facets(text) + mention_facets(text) + tag_facets(text)
+  end
+
+  # @return [Array<Hash>] One app.bsky.richtext.facet#link for each bare URL.
+  def link_facets(text)
+    scan_facets(text, URL_PATTERN) do |match|
+      { "$type" => "app.bsky.richtext.facet#link", "uri" => match }
+    end
+  end
+
+  # Resolves each @handle and drops one that the PDS does not know: a facet with no DID makes the
+  # record invalid.
+  # @return [Array<Hash>]
+  def mention_facets(text)
+    scan_facets(text, MENTION_PATTERN) do |match|
+      did = resolve_handle(match.delete_prefix("@"))
+      next if did.blank?
+
+      { "$type" => "app.bsky.richtext.facet#mention", "did" => did }
+    end
+  end
+
+  # @return [Array<Hash>] One app.bsky.richtext.facet#tag for each #hashtag.
+  def tag_facets(text)
+    scan_facets(text, TAG_PATTERN) do |match|
+      { "$type" => "app.bsky.richtext.facet#tag", "tag" => match.delete_prefix("#") }
+    end
+  end
+
+  # Finds each match of the first group of a pattern and makes a facet from it.
+  #
+  # ⚠️ The offsets are in **bytes** of the UTF-8 text, and not in characters. One accented letter
+  # is 1 character and 2 bytes, thus a character offset moves the highlight of each facet after it.
+  # @param text [String]
+  # @param pattern [Regexp] A pattern whose first group is the thing to mark.
+  # @return [Array<Hash>] The facets. The block returns nil to drop one.
+  def scan_facets(text, pattern)
+    facets = []
+    text.to_s.scan(pattern) do
+      match = Regexp.last_match
+      feature = yield(match[1])
+      next if feature.blank?
+
+      start_char, end_char = match.offset(1)
+      facets << {
+        "index" => {
+          "byteStart" => text[0...start_char].bytesize,
+          "byteEnd" => text[0...end_char].bytesize
+        },
+        "features" => [ feature ]
+      }
+    end
+    facets
+  end
+
+  # @param handle [String] A handle, with no "@".
+  # @return [String, nil] The DID, or nil when the PDS cannot resolve it.
+  def resolve_handle(handle)
+    response = HTTParty.get("#{pds_url}/xrpc/com.atproto.identity.resolveHandle",
+                            query: { "handle" => handle })
+    return unless response.success?
+
+    JSON.parse(response.body)["did"].presence
+  rescue StandardError
+    nil
+  end
+end

@@ -44,11 +44,13 @@ import "@web.awesome.me/webawesome-pro/dist/components/option/option.js";
 import "@web.awesome.me/webawesome-pro/dist/components/switch/switch.js";
 // The "Processing" state of a track on the Course maps page.
 import "@web.awesome.me/webawesome-pro/dist/components/spinner/spinner.js";
-// The Share composer. wa-combobox brings wa-option, wa-popup, wa-tag, and wa-spinner with it.
-import "@web.awesome.me/webawesome-pro/dist/components/combobox/combobox.js";
+// The Share composer.
 import "@web.awesome.me/webawesome-pro/dist/components/textarea/textarea.js";
 import "@web.awesome.me/webawesome-pro/dist/components/checkbox/checkbox.js";
 import "@web.awesome.me/webawesome-pro/dist/components/checkbox-group/checkbox-group.js";
+// The schedule fields of the Share composer.
+import "@web.awesome.me/webawesome-pro/dist/components/date-input/date-input.js";
+import "@web.awesome.me/webawesome-pro/dist/components/time-input/time-input.js";
 
 import FlashController from "./controllers/flash_controller";
 import DialogController from "./controllers/dialog_controller";

@@ -2,53 +2,30 @@
 
 <h1 class="admin-main__title">Share a post</h1>
 
-<% if @share.empty? %>
-  <%# Articles#list gives an empty array after a failure, thus this is what a Contentful outage
-      looks like. The rest of the form still renders, and the picker is then empty. %>
-  <wa-callout variant="warning">
-    <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
-    Couldn't load the articles. Reload the page, or check that Contentful is up.
-  </wa-callout>
-<% end %>
+<%# ⚠️ A refused submit renders this page again and does not redirect, thus each field below puts
+    its value back. To redirect would lose the words that the owner wrote. %>
+<%= form_with url: share_path, method: :post,
+              class: "share wa-stack wa-gap-l",
+              data: { controller: "share",
+                      action: "submit->share#markBusy",
+                      share_limit_value: @share.body_limit,
+                      share_warn_at_value: @share.warn_at } do %>
 
-<%# The form submits nowhere in this pass: the Share button is inert. The field names are already
-    the ones that a later POST needs, thus that pass adds an action and not a new form. %>
-<div class="share wa-stack wa-gap-l"
-     data-controller="share"
-     data-share-limit-value="<%= @share.body_limit %>"
-     data-share-warn-at-value="<%= @share.warn_at %>">
-
-  <%# The combobox filters its own options. The Stimulus controller only widens the match to the
-      summary and the URL, thus a URL that you paste finds its entry. %>
-  <div>
-    <wa-combobox label="Article" name="article_url" with-clear
-                 placeholder="Search by title, or paste a URL"
-                 data-share-target="combobox"
-                 data-action="change->share#pick">
-      <% @share.articles.each do |article| %>
-        <wa-option value="<%= article.url %>"
-                   data-title="<%= article.title %>"
-                   data-summary="<%= article.summary %>"
-                   data-url="<%= article.url %>"
-                   data-published-at="<%= article.published_at %>">
-          <%= article.title %>
-        </wa-option>
-      <% end %>
-    </wa-combobox>
-
-    <%# The controller fills this and shows it. It stays empty until an entry is selected, thus the
-        page never shows an empty card. %>
-    <p class="share__article" data-share-target="selection" hidden>
-      <span class="share__article-title" data-share-target="selectionTitle"></span>
-      <span class="share__article-url" data-share-target="selectionUrl"></span>
-    </p>
-  </div>
+  <%# A plain URL field. ⚠️ There is no list of the articles here, on purpose: the card of a post
+      comes from the og: tags of whatever page this names, thus a link to another site needs no more
+      code and a list would only cover this one site. %>
+  <wa-input type="url" name="article_url" label="Link" required
+            value="<%= @share.article_url %>"
+            placeholder="https://"
+            autocomplete="off" spellcheck="false">
+  </wa-input>
 
   <div>
     <%# ⚠️ No `maxlength` and no `with-count`. Both measure UTF-16 code units, and Bluesky counts
         graphemes: one emoji is 1 there and 2 or more here. The count line below is ours, and it
         warns and never stops a keystroke. %>
-    <wa-textarea name="body" label="Post" rows="5" resize="auto"
+    <wa-textarea name="body" label="Post" rows="5" resize="auto" required
+                 value="<%= @share.body %>"
                  placeholder="What do you want to say about it?"
                  data-share-target="body"
                  data-action="input->share#count">
@@ -62,7 +39,8 @@
   <wa-checkbox-group label="Post to">
     <% @share.networks.each do |network| %>
       <% if network.connected? %>
-        <wa-checkbox name="networks[]" value="<%= network.key %>" hint="<%= network.account_line %>">
+        <wa-checkbox name="networks[]" value="<%= network.key %>" hint="<%= network.account_line %>"
+                     <%= "checked" if @share.selected?(network.key) %>>
           <%= network.name %>
         </wa-checkbox>
       <% else %>
@@ -77,11 +55,39 @@
     <% end %>
   </wa-checkbox-group>
 
-  <%# ⚠️ This button is inert, on purpose. No code posts to a network yet. %>
+  <div class="wa-stack wa-gap-s">
+    <%# The hidden 0 is what sends "off": a switch that is off submits nothing. The two fields share
+        a name, and the server takes the last one. %>
+    <input type="hidden" name="schedule" value="0">
+    <wa-switch name="schedule" value="1" <%= "checked" if @share.scheduled? %>
+               data-share-target="schedule" data-action="change->share#toggleSchedule">
+      Schedule for later
+    </wa-switch>
+
+    <%# ⚠️ The date and the time carry no zone. The hidden `time_zone` below is what gives them a
+        meaning: the browser writes its own IANA id there. %>
+    <div class="share__schedule" data-share-target="scheduleFields" <%= "hidden" unless @share.scheduled? %>>
+      <%# There is no `max`, on purpose: a post can wait as long as the owner wants. %>
+      <wa-date-input name="date" label="Date" value="<%= @share.date %>"
+                     min="<%= @share.min_date %>"
+                     data-share-target="date" data-action="change->share#relabel">
+      </wa-date-input>
+
+      <wa-time-input name="time" label="Time" value="<%= @share.time %>" step="300"
+                     data-share-target="time" data-action="change->share#relabel">
+      </wa-time-input>
+
+      <%# ⚠️ The browser writes its own IANA zone here. Without it the server cannot know what
+          "9:00" means, and that is the reason that the Republish dialog has minutes and no date.
+          With no JavaScript this field stays empty and the server uses TIME_ZONE. %>
+      <input type="hidden" name="time_zone" data-share-target="timeZone">
+    </div>
+  </div>
+
   <div class="wa-cluster wa-gap-s">
-    <wa-button variant="brand" appearance="accent" disabled>
+    <wa-button type="submit" variant="brand" appearance="accent" data-share-target="submit">
       <%= slotted_icon_svg("classic", "light", "paper-plane") %>
-      Share
+      <span data-share-target="label">Share now</span>
     </wa-button>
   </div>
-</div>
+<% end %>
