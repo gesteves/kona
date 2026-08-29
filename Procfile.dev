@@ -10,6 +10,15 @@
 ## context.watch() holds the event loop open by itself — web/'s external pipeline still needs
 ## esbuild's `--watch=forever` flag, because plain `--watch` exits when stdin closes and overmind
 ## spawns processes without one.
+## ⚠️ Redis is a process here, and not a service of brew and not a container. `overmind start` must
+## give the full stack, and this machine had no Redis of its own: the api and the site used the
+## container of a different project, which is up only when that project is up, and whose keyspace
+## they also shared. This process owns `tmp/redis/`, thus the data of kona is separate.
+## ⚠️ It is FIRST, because overmind starts each process in the order of this file and the api and
+## the worker connect at their boot.
+## ⚠️ Stop a Redis that already holds 6379 first, or this process cannot take the port. That failure
+## stops overmind, and it is loud on purpose: `redis` is absent from OVERMIND_CAN_DIE.
+redis:  redis-server --port 6379 --dir tmp/redis --save '' --appendonly yes --appendfsync everysec
 web:    cd web && bundle exec middleman
 api:    cd api && PORT=3000 bin/dev
 js:     cd api && npm run watch
