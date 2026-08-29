@@ -127,6 +127,17 @@ jobs:
       - name: Typecheck the Worker
         run: npm run check
 
+      # Bundle the Worker with wrangler, exactly as the deploy does. --dry-run needs no
+      # credentials and uploads nothing.
+      # ⚠️ This is the ONLY check that resolves the imports of `src/og-render.ts`. `npm test`
+      # cannot load that file (refer to web/CLAUDE.md), and `tsc` reads types and never bundles.
+      # Thus a dependency that the Worker cannot bundle passed each other check and stopped the
+      # deploy after the merge. That is the failure that this step stops.
+      # The script makes `build/` first, because wrangler reads `assets.directory` and this job
+      # does not build the site. The directory is in .gitignore.
+      - name: Bundle the Worker
+        run: npm run check:worker
+
       - name: RuboCop (style)
         run: bundle exec rubocop --no-color
 

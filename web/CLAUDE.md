@@ -286,9 +286,9 @@ The names only. Refer to `.env.example`, and never put a value in the repo.
 
 ## Conventions & gates
 
-**Before each commit** (these are necessary): `bundle exec rake test`, `npm test`, and
-`npm run check` pass. Then `bundle exec rubocop`, `npm run lint:js`, `npm run lint:scss`, and
-`npm run format:check` are clean. Then `bundle exec rake build:verbose` is successful. ⚠️ **`rake
+**Before each commit** (these are necessary): `bundle exec rake test`, `npm test`,
+`npm run check`, and `npm run check:worker` pass. Then `bundle exec rubocop`, `npm run lint:js`,
+`npm run lint:scss`, and `npm run format:check` are clean. Then `bundle exec rake build:verbose` is successful. ⚠️ **`rake
 build` does NOT run the tests**, and it is the one check that renders the templates: a bad partial
 passes each other check and then stops the deploy. ⚠️ Run it with the same environment as CI
 (`READING_TIME_WPM="" TIME_ZONE=""`). A GitHub Actions **variable** with no value arrives as an
@@ -306,10 +306,21 @@ only and needs no credentials.
 `@web.awesome.me/*`), `pagefind`, `wrangler`, and the two packages of the card renderer, `satori`
 and `@resvg/resvg-wasm`. Each test tool and each lint tool stays a `devDependency`.
 
-⚠️ **CI cannot check `satori` and `@resvg/resvg-wasm`.** No test in the suite does a render, and a
-new major version can change the wasm start contract or the text measurements of the card, and give
-no message. Render a card in `wrangler dev` (refer to **The two local loops**) and look at it before
-you merge a Dependabot PR.
+**`npm run check:worker`** bundles the Worker with `wrangler deploy --dry-run`. It needs no
+credentials, it uploads nothing, and it makes `build/` first, because wrangler reads
+`assets.directory`. It is the **only** check that resolves the imports of `src/og-render.ts`: no
+test can load that file, and `tsc` reads types and never bundles. The `checks` job of CI runs it.
+
+⚠️ **That check bundles the card renderer, and it does not RENDER a card.** `satori` and
+`@resvg/resvg-wasm` can bundle correctly and still change the wasm start contract or the text
+measurements of the card, and give no message. Render a card in `wrangler dev` (refer to **The two
+local loops**) and look at it before you merge a Dependabot PR.
+
+⚠️ **`satori` stays below 0.33**, and `.github/dependabot.yml` has an `ignore` entry that keeps it
+there. 0.33 made `harfbuzzjs` a dependency of each render, and the Worker cannot run that package:
+its Emscripten loader reads `fs` and `self.location`, and it compiles the wasm from bytes, which the
+runtime refuses. `nodejs_compat` and an alias make it bundle, but the render still stops at
+`self.location`. Remove the ignore entry only after a card renders in `wrangler dev`.
 
 **The markup of a widget**: an edit to a placeholder partial needs the same edit to the matching
 view in `api/` (refer to the root `CLAUDE.md`).
