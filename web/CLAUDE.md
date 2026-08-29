@@ -176,6 +176,13 @@ uses `open_graph_image_url`, which gives a Cloudflare Images URL.
   a new URL. ⚠️ Increase `OG_TEMPLATE_VERSION` after you change `og-render.ts`,
   `src/assets/logo.png`, or the font. If you do not, the old cards, which the cache holds for a
   year, continue to appear.
+- ⚠️ **`textWrap: 'balance'` goes on a title of MORE THAN ONE WORD only**, and `cardElement`
+  guards it. satori **halves** the width of a title that has no break opportunity: it lays out for
+  two lines, and one word cannot make two. "Blog" then measures 101px in place of its true 168px.
+  `backgroundClip: 'text'` paints the gradient through that box, thus the word is **cut in the
+  middle of a glyph** and only a listing page shows it, because an article title has many words.
+  ⚠️ Never set `textWrap` to `undefined` to turn it off: the CSS parser of satori reads that value
+  and raises. Spread the property, as the code does.
 - ⚠️ **A card of a listing page does NOT change by itself.** The blog index, each tag archive, and
   the home page are not Contentful entries. Thus `v` is `OG_TEMPLATE_VERSION` only, and the URL
   never changes. Today that is 43 of the 73 pages with a card. Their `og:title` comes from

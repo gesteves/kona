@@ -53,6 +53,18 @@ const logoDataUri = `data:image/png;base64,${base64(logoPng)}`;
  * raises in Workers.
  */
 function cardElement(title: string): Element {
+  // ⚠️ `text-wrap: balance` goes on a title of MORE THAN ONE WORD only.
+  //
+  // satori halves the width of a title that has no break opportunity: it lays out for two lines,
+  // and one word cannot make two. "Blog" then measures 101px in place of its true 168px, and
+  // `backgroundClip: 'text'` paints the gradient through that box. Thus the word is cut in the
+  // middle of a glyph, and the card looks broken.
+  //
+  // ⚠️ It spreads the property and never sets it to `undefined`. The CSS parser of satori reads
+  // that value and raises.
+  const balance =
+    title.trim().split(/\s+/).length > 1 ? { textWrap: 'balance' } : {};
+
   return h(
     'div',
     {
@@ -86,7 +98,7 @@ function cardElement(title: string): Element {
             padding: '1rem',
             position: 'relative',
             textAlign: 'center',
-            textWrap: 'balance',
+            ...balance,
           },
         },
         title

@@ -275,7 +275,7 @@ module ImageHelpers
   # against /^v\d+(-\d+)?$/ before it makes the cache key. That check stops `?v=<random>` from
   # making an unlimited number of full satori and resvg renders. A value outside that shape still
   # renders, but each card then uses one cache entry, with no message.
-  OG_TEMPLATE_VERSION = "v1"
+  OG_TEMPLATE_VERSION = "v2"
 
   # Makes the URL of the on-demand Open Graph card for a page. The Worker of this site
   # (web/src/og.ts) renders the card from the og:title of the page. The card URL comes from the
