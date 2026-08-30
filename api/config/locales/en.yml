@@ -341,6 +341,9 @@ en:
         preview: "Preview"
         preview_close: "Close"
         preview_title: "What each network will get"
+        remove_body: "This post isn't empty. Removing it can't be undone."
+        remove_confirm: "Remove"
+        remove_title: "Remove this post?"
         schedule: "Schedule for later"
         time: "Time"
       post:

@@ -19,6 +19,7 @@ export default class extends Controller {
     "schedule", "scheduleFields", "date", "time", "timeZone",
     "mentions", "mentionRows", "mentionTemplate", "mention",
     "preview", "previewSpinner", "previewBody", "previewGroupTemplate", "previewRowTemplate",
+    "removeDialog",
   ];
   static values = { maxPosts: Number, previewUrl: String };
 
@@ -87,14 +88,66 @@ export default class extends Controller {
 
   /**
    * Removes the post that holds the control that was pressed.
+   *
+   * ⚠️ **A post that holds something asks first.** A block is as much as 300 characters and a link,
+   * and nothing here can put it back: there is no undo, and the browser keeps no copy. A block that
+   * is still empty goes at once, because a question about nothing is only noise.
    */
   removePost(event) {
     event.preventDefault();
     if (this.postTargets.length <= 1) return;
 
-    event.target.closest("[data-social-target='post']")?.remove();
+    const post = event.target.closest("[data-social-target='post']");
+    if (!post) return;
+    if (!this.hasContent(post)) return this.dropPost(post);
+
+    this.pendingRemoval = post;
+    this.removeDialogTarget.open = true;
+  }
+
+  /**
+   * Removes the post that the dialog asked about.
+   */
+  confirmRemove() {
+    const post = this.pendingRemoval;
+
+    // ⚠️ It reads the reference BEFORE it closes the dialog. The close fires `wa-hide`, which calls
+    // `clearRemoval`, thus the order here is what keeps the post to remove.
+    this.removeDialogTarget.open = false;
+    if (post) this.dropPost(post);
+  }
+
+  /**
+   * Forgets the post that the dialog asked about.
+   *
+   * ⚠️ It runs at `wa-hide`, thus Cancel, the Escape key, and the close button of the header all
+   * reach it. Without this a post that the owner kept would stay in this reference.
+   *
+   * ⚠️ **It is `wa-hide` and NOT `wa-after-hide`.** The second one waits for the close animation to
+   * be complete, and a measurement in a browser gave a `wa-hide` with no `wa-after-hide` after it.
+   * Thus a handler on that event can never run at all.
+   */
+  clearRemoval() {
+    this.pendingRemoval = null;
+  }
+
+  /**
+   * Takes one post out of the thread.
+   * @param {HTMLElement} post
+   */
+  dropPost(post) {
+    post.remove();
     this.renumber();
     this.validate();
+  }
+
+  /**
+   * @param {HTMLElement} post
+   * @returns {boolean} True when that post holds words or a link.
+   */
+  hasContent(post) {
+    return !!(post.querySelector("wa-textarea")?.value?.trim() ||
+              post.querySelector("wa-input[type='url']")?.value?.trim());
   }
 
   /**
@@ -285,10 +338,7 @@ export default class extends Controller {
    * that opens to say "nothing yet" is worse than a button that is off.
    */
   get canPreview() {
-    return this.postTargets.some((post) =>
-      post.querySelector("wa-textarea")?.value?.trim() ||
-      post.querySelector("wa-input[type='url']")?.value?.trim()
-    );
+    return this.postTargets.some((post) => this.hasContent(post));
   }
 
   /**

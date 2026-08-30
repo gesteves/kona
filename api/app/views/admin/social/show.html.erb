@@ -142,6 +142,27 @@
     </wa-button>
   </div>
 
+  <%# The confirmation of a remove. ⚠️ There is ONE dialog for the whole thread, and not one for
+      each post: a block comes from a <template> that the browser clones, thus a dialog inside it
+      would give more than one element the same id. `social#removePost` remembers which post asked,
+      and it opens this only for a post that holds something.
+      ⚠️ `data-controller="dialog"` closes it before Turbo caches the page. %>
+  <wa-dialog id="social-remove" label="<%= t('.remove_title') %>" data-controller="dialog"
+             data-social-target="removeDialog"
+             data-action="wa-hide->social#clearRemoval">
+    <p><%= t(".remove_body") %></p>
+
+    <%# ⚠️ Both need `type="button"`: <wa-button> is form-associated, thus one in a form with no
+        type submits it. Here that would post the draft in place of removing a block. %>
+    <wa-button slot="footer" type="button" appearance="outlined" data-dialog="close">
+      <%= t("admin.actions.cancel") %>
+    </wa-button>
+    <wa-button slot="footer" type="button" variant="danger" appearance="accent"
+               data-action="click->social#confirmRemove">
+      <%= t(".remove_confirm") %>
+    </wa-button>
+  </wa-dialog>
+
   <%# The draft as each connected network will receive it. It is read-only and it holds no form
       control, thus it is safe inside the form and the controller reaches it with a target.
       ⚠️ `data-controller="dialog"` closes it before Turbo caches the page. Turbo makes its snapshot

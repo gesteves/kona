@@ -1128,6 +1128,19 @@ The owner adds posts below the first, and each one has its own words and its own
   network.
 - A block with **nothing at all** in it is dropped, thus an empty block that the owner added and
   left alone does not refuse the draft.
+- ⚠️ **A remove asks first, for a block that holds something.** A post is as much as 300 characters
+  and a link, and nothing puts it back: there is no undo and the browser keeps no copy. A block that
+  is still empty goes at once, because a question about nothing is only noise. The rule reads text
+  OR link, which is the rule that `#posts` follows.
+  - ⚠️ **There is ONE dialog for the whole thread**, and not one for each post: a block comes from a
+    `<template>` that the browser clones, thus a dialog inside it would give more than one element
+    the same id. `social#removePost` remembers which post asked.
+  - ⚠️ **`clearRemoval` runs at `wa-hide`, and NOT at `wa-after-hide`.** The second one waits for
+    the close animation to be complete, and a measurement in a browser gave a `wa-hide` with **no**
+    `wa-after-hide` after it. Thus a handler on that event never runs at all. This applies to each
+    dialog of the admin, and not to this one alone.
+  - ⚠️ `#confirmRemove` reads the post **before** it closes the dialog, because the close fires
+    `wa-hide`, which forgets it.
 - ⚠️ **A message names the post** — "Post 2 is 301 characters." — because a thread has more than one
   and a plain message does not say which one is wrong. With one post the messages keep their
   singular form.
