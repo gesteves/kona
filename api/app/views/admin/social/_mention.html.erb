@@ -1,0 +1,27 @@
+<%# One person that the draft names, and what they are called at each network.
+
+    ⚠️ **All four fields must render for every row, in the same order.** The names are
+    `mentions[][token]` and one for each network key, and Rails starts a new hash when a key
+    repeats. A row that omits one field would move each field below it by one. It is the rule of
+    `posts[][text]`. The loop below reads the same list for every row, thus the order cannot drift.
+
+    ⚠️ **A field takes a handle OR plain words.** A person with no account at a network still has a
+    name, and the post must be able to say it. The action reads the shape and decides. An empty
+    field posts the token with no "@". Thus no value here can ever tag the wrong account.
+%>
+<div class="social-mention" data-social-target="mention">
+  <%# ⚠️ The token is not editable here: the words of the post are where the owner writes it. The
+      hidden field is what puts it in the form. %>
+  <input type="hidden" name="mentions[][token]" value="<%= mention.token %>" data-mention-token>
+
+  <p class="social-mention__token" data-mention-label><%= mention.token %></p>
+
+  <% networks.each do |network| %>
+    <wa-input name="mentions[][<%= network.key %>]" label="<%= network.name %>"
+              value="<%= mention.value(network.key) %>"
+              placeholder="<%= placeholders[network.key] %>"
+              autocomplete="off" spellcheck="false"
+              data-mention-network="<%= network.key %>">
+    </wa-input>
+  <% end %>
+</div>

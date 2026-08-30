@@ -20,6 +20,29 @@ class SocialPresenter
     def initialize(text: "", link: "") = super(text: text.to_s, link: link.to_s)
   end
 
+  # The example that each mention field shows. ⚠️ It is an example of a HANDLE only. A field also
+  # takes plain words, for a person with no account there, and the hint of the section says so.
+  MENTION_PLACEHOLDERS = {
+    "bluesky"  => "handle.bsky.social",
+    "mastodon" => "user@instance.social",
+    "threads"  => "username"
+  }.freeze
+
+  # One row of the mention map: the token that the owner wrote, and what that person is called at
+  # each network.
+  #
+  # ⚠️ The map is THREAD-LEVEL. There is one map for the whole draft, thus a token means the same
+  # person in every post of it.
+  Mention = Data.define(:token, :values) do
+    def initialize(token:, values: {})
+      super(token: token.to_s, values: values.to_h.transform_keys(&:to_s))
+    end
+
+    # @param key [String] A network key.
+    # @return [String] The field of that network: a handle, plain words, or an empty string.
+    def value(key) = values[key.to_s].to_s
+  end
+
   # One row of the "Post to" list.
   Network = Data.define(:key, :name, :account, :connected, :notice) do
     # @param notice [String, nil] The reason for a row that cannot take a post, for example an
@@ -41,6 +64,8 @@ class SocialPresenter
   # @return [Array<Post>] Each post of the thread, in order. There is always at least one, thus the
   #   view renders one empty block on a first load.
   attr_reader :posts
+  # @return [Array<Mention>] One row for each token of the draft, in the order of the form.
+  attr_reader :mentions
 
   # @param networks [Array<Network>] The rows that the controller made.
   # @param posts [Array<Hash>, nil] The thread to put back, as `[{ text:, link: }, …]`. ⚠️ A failed
@@ -53,10 +78,15 @@ class SocialPresenter
   # @param scheduled [Boolean] True to open the schedule fields again.
   # @param date [String, nil] The date to put back, as YYYY-MM-DD.
   # @param time [String, nil] The time to put back, as HH:mm.
-  def initialize(networks:, posts: nil, selected: nil,
+  # @param mentions [Array<Hash>, nil] The mention map to put back, as
+  #   `[{ token:, values: { "bluesky" => … } }, …]`. ⚠️ Nil gives NO row, and not one empty row:
+  #   a row for nothing would ask the owner to name a person that they did not write about. The
+  #   browser adds a row when it finds a token.
+  def initialize(networks:, posts: nil, mentions: nil, selected: nil,
                  scheduled: false, date: nil, time: nil)
     @networks = networks
     @posts = build_posts(posts)
+    @mentions = Array(mentions).map { |row| Mention.new(token: row[:token], values: row[:values]) }
     @selected = selected.nil? ? networks.select(&:connected?).map(&:key) : Array(selected).map(&:to_s)
     @scheduled = scheduled
     @date = date.to_s
@@ -78,6 +108,49 @@ class SocialPresenter
   def min_date = Time.use_zone(TimeZoneResolver.default) { Time.zone.today.to_fs(:iso8601) }
 
   # ⚠️ There is no `max_date`, on purpose. The owner can schedule a post as far ahead as they want.
+
+  # @return [Boolean] True when the draft names at least one person. The section is hidden when it
+  #   is false, and social_controller.js shows it at the first token.
+  def mentions? = @mentions.any?
+
+  # The networks that a mention row asks about.
+  #
+  # ⚠️ **A network with no account gets NO field.** That is different from the "Post to" list, which
+  # keeps a disabled row to say why one of three names cannot take a post. Here there is nothing to
+  # say: a field for an account that cannot take a post is only noise.
+  #
+  # ⚠️ Each row renders the SAME list, thus the order of `mentions[][…]` cannot drift between two
+  # rows. Refer to the ⚠️ in _mention.html.erb.
+  # @return [Array<Network>]
+  def mention_networks = networks.select(&:connected?)
+
+  # The Bluesky field of each mention, by key, with each blank one dropped.
+  #
+  # ⚠️ The COUNT reads this one, and not the map of another network. Bluesky has the shortest limit
+  # and the longest handles, thus its text is the one that decides if a draft fits.
+  # @return [Hash{String => String}]
+  def bluesky_values
+    @bluesky_values ||= @mentions.each_with_object({}) do |mention, map|
+      value = mention.value("bluesky")
+      map[SocialMentions.key(mention.token)] = value if value.present?
+    end
+  end
+
+  # ⚠️ Each post block carries this in a data attribute, thus the count that the SERVER rendered and
+  # the first count of the browser are the same number. Refer to social_post_controller.js.
+  # @return [String]
+  def bluesky_values_json = bluesky_values.to_json
+
+  # @param post [Post]
+  # @return [Integer] The graphemes that Bluesky will count for that post, after the handles go in.
+  def bluesky_length(post)
+    Bluesky.post_length(SocialMentions.substitute(post.text, values: bluesky_values,
+                                                  network: "bluesky"))
+  end
+
+  # @param key [String] A network key.
+  # @return [String, nil]
+  def mention_placeholder(key) = MENTION_PLACEHOLDERS[key.to_s]
 
   # @return [Boolean] True when the draft is a thread and not one post.
   def thread? = @posts.length > 1

@@ -14,6 +14,12 @@ module Admin
       "threads"  => { name: "Threads",  job: ThreadsPostJob,  status: :threads_status }
     }.freeze
 
+    # The most Bluesky handles that one draft asks the PDS about, and the seconds that all of those
+    # calls together can take. ⚠️ Refer to #bluesky_handle_error: the budget, and not the timeout of
+    # one call, is what keeps this check away from the 20-second rack-timeout.
+    MAX_HANDLE_CHECKS = 8
+    HANDLE_CHECK_BUDGET = 8
+
     # The shape of the two schedule fields, as the browser sends them. ⚠️ `Time.zone.parse` reads
     # "garbage 09:00" as today at 09:00, thus the action must match the shape before it parses.
     DATE_PATTERN = /\A\d{4}-\d{2}-\d{2}\z/
@@ -38,22 +44,27 @@ module Admin
       # ⚠️ It renders again and does not redirect. A redirect would lose the words that the owner
       # wrote, and the draft is the expensive part of this page.
       if error
-        @social = presenter(posts: posts, selected: selected_networks, scheduled: scheduled?,
-                            date: params[:date], time: params[:time])
+        @social = presenter(posts: posts, mentions: mention_rows, selected: selected_networks,
+                            scheduled: scheduled?, date: params[:date], time: params[:time])
         flash.now[:alert] = error
         return render :show, status: :unprocessable_content
       end
 
-      # ⚠️ One key for each POST, and the three networks share those keys: Bluesky writes at that
-      # record key, Mastodon sends it as its Idempotency-Key, and Threads keeps its media container
-      # below it. Each attempt of each job carries the key of its own post, and that is what makes
-      # a retry safe.
-      payload = posts.map { |post| { "key" => Bluesky.new_tid, "text" => post[:text], "link" => post[:link] } }
+      # ⚠️ One key for each POST, made ONE time and OUTSIDE the loop below. The three networks get
+      # a different TEXT now, because a mention reads differently at each one, and they must still
+      # share one key for each post: Bluesky writes at that record key, Mastodon sends it as its
+      # Idempotency-Key, and Threads keeps its media container below it. Each attempt of each job
+      # carries the key of its own post, and that is what makes a retry safe.
+      keys = posts.map { Bluesky.new_tid }
       at = scheduled_at
 
       # ⚠️ Only the FIRST post of each network is scheduled. That job adds the job of the post below
       # it when it succeeds, thus the rest of a thread goes out with it and needs no time of its own.
       selected_networks.each do |network|
+        payload = posts.each_with_index.map do |post, index|
+          { "key" => keys[index], "text" => text_for(network, post[:text]), "link" => post[:link] }
+        end
+
         job = NETWORKS.fetch(network)[:job]
         at ? job.perform_at(at, payload) : job.perform_async(payload)
       end
@@ -192,9 +203,61 @@ module Admin
     # alone must not refuse the whole draft.
     # @return [Array<Hash>] `[{ text:, link: }, …]`
     def posts
-      @posts ||= Array(params[:posts]).map { |post|
-        { text: post[:text].to_s.strip, link: post[:link].to_s.strip }
-      }.reject { |post| post[:text].blank? && post[:link].blank? }
+      # ⚠️ A block that is not a hash is not a block, for the reason that #mention_rows gives.
+      @posts ||= Array(params[:posts])
+                 .select { |post| post.is_a?(ActionController::Parameters) || post.is_a?(Hash) }
+                 .map { |post| { text: post[:text].to_s.strip, link: post[:link].to_s.strip } }
+                 .reject { |post| post[:text].blank? && post[:link].blank? }
+    end
+
+    # The mention map of this draft, as the form sent it.
+    #
+    # ⚠️ The map is THREAD-LEVEL: there is one map for every post, because a token in post 1 and in
+    # post 3 is the same person.
+    #
+    # ⚠️ The form sends `mentions[][token]` and one field for each key of NETWORKS. Rails starts a
+    # new hash when a key repeats, thus all of those fields must render for every row, in the same
+    # order. It is the rule of `posts[][text]`. A row with no token is dropped.
+    # @return [Array<Hash>] `[{ token:, values: { "bluesky" => … } }, …]`, in the order of the form.
+    def mention_rows
+      @mention_rows ||= Array(params[:mentions]).filter_map do |row|
+        # ⚠️ A row that is not a hash is not a row. A form with no row at all sends an empty
+        # `mentions[]`, which arrives as a string, and a request that a person writes by hand can
+        # send anything. Without this guard both give a 500.
+        next unless row.is_a?(ActionController::Parameters) || row.is_a?(Hash)
+
+        token = row[:token].to_s.strip
+        next if token.blank?
+
+        { token: token, values: NETWORKS.keys.to_h { |key| [ key, row[key].to_s.strip ] } }
+      end
+    end
+
+    # The field of one network, by mention key.
+    #
+    # ⚠️ A blank field is absent from this hash, thus SocialMentions reads it as "this person has no
+    # name here" and removes the "@" of the token. That is the fallback, and it is not a mistake.
+    # @param network [String]
+    # @return [Hash{String => String}]
+    def values_for(network)
+      @values_for ||= {}
+      @values_for[network] ||= mention_rows.each_with_object({}) do |row, map|
+        value = row[:values][network]
+        map[SocialMentions.key(row[:token])] = value if value.present?
+      end
+    end
+
+    # The text of one post, as that network will get it.
+    #
+    # ⚠️ **The server finds each token itself, and it reads the map as a lookup only.** It never
+    # trusts the rows that the browser sent. Thus a token with no row still loses its "@", and a
+    # submit with no `mentions` at all turns every mention into a plain name. That is the safe
+    # direction: such a post says a name, and it can never tag a stranger.
+    # @param network [String]
+    # @param text [String]
+    # @return [String]
+    def text_for(network, text)
+      SocialMentions.substitute(text, values: values_for(network), network: network)
     end
 
     # @return [String, nil] The reason to refuse, or nil when the draft is good.
@@ -211,7 +274,11 @@ module Admin
 
       return "Pick at least one place to post it." if selected_networks.empty?
 
-      schedule_error
+      message = mention_shape_error
+      return message if message
+
+      # ⚠️ The handle check is LAST, because it is the one step here that calls another service.
+      schedule_error || bluesky_handle_error
     end
 
     # ⚠️ A message names the post, because a thread has more than one and a plain message does not
@@ -228,10 +295,20 @@ module Admin
         return posts.one? ? "Write something to post." : "#{label} needs something to say."
       end
 
-      unless Bluesky.valid_post_length?(post[:text])
-        return "#{label} is #{Bluesky.post_length(post[:text])} characters. " \
+      # ⚠️ It counts the text that BLUESKY will get, and not the words that the owner can see: a
+      # mention grows into a handle, thus "@tony" can become "@tony.bsky.social". A count of the raw
+      # words would pass a draft that Bluesky then refuses. The message says what it counted.
+      # ⚠️ It counts the Bluesky text even when Bluesky is not ticked. 300 is the limit of this page,
+      # and this check runs before #selected_networks.
+      counted = text_for("bluesky", post[:text])
+      unless Bluesky.valid_post_length?(counted)
+        handles = " with the Bluesky handles" if counted != post[:text]
+        return "#{label} is #{Bluesky.post_length(counted)} characters#{handles}. " \
                "The limit is #{Bluesky::MAX_GRAPHEMES}."
       end
+
+      message = network_length_error(post, label)
+      return message if message
 
       # ⚠️ The link is optional. It is only refused when it is there and it is not http or https.
       if post[:link].present? && !OpenGraph.http_url?(post[:link])
@@ -239,6 +316,99 @@ module Admin
       end
 
       nil
+    end
+
+    # Refuses a field that holds the handle of a DIFFERENT network.
+    #
+    # ⚠️ Without this such a value is mangled with no message: a Mastodon handle is not a Bluesky
+    # domain, thus it becomes plain words and every "@" comes out of the middle of it.
+    #
+    # ⚠️ It reads the ticked networks only. A field of a network that this draft does not post to
+    # changes nothing, and a refusal for one would stop a draft that is correct.
+    #
+    # ⚠️ Plain words are never a mistake here. `SocialMentions::DIAGNOSTIC_SHAPES` holds Bluesky and
+    # Mastodon alone, thus a name in any field passes. Refer to the ⚠️ on that constant.
+    # @return [String, nil]
+    def mention_shape_error
+      mention_rows.each do |row|
+        selected_networks.each do |network|
+          other = SocialMentions.mistaken_network(row[:values][network], network: network)
+          next if other.nil?
+
+          return "The #{network_name(network)} field of #{row[:token]} holds a " \
+                 "#{network_name(other)} handle. Move it, or write a name."
+        end
+      end
+
+      nil
+    end
+
+    # @param key [String] A network key.
+    # @return [String] The name of that network, for a message.
+    def network_name(key) = NETWORKS.fetch(key.to_s)[:name]
+
+    # Checks the text of the other two networks against their own limits.    # Checks the text of the other two networks against their own limits.
+    #
+    # ⚠️ Bluesky has the shortest limit, thus the check above nearly always refuses a long draft
+    # first. But a mention makes the text of each network a DIFFERENT length, and a plain name can
+    # be much longer than a handle. Without this check such a draft raises in the job, which then
+    # retries for 24 hours and posts nothing.
+    # @param post [Hash]
+    # @param label [String]
+    # @return [String, nil]
+    def network_length_error(post, label)
+      # Mastodon counts a URL as URL_WEIGHT, whatever its true length, and #post! joins it with two
+      # newlines.
+      mastodon = text_for("mastodon", post[:text]).length +
+                 (post[:link].present? ? Mastodon::URL_WEIGHT + 2 : 0)
+      if mastodon > Mastodon::DEFAULT_MAX_CHARACTERS
+        return "#{label} is too long for Mastodon with the names that you gave."
+      end
+
+      return nil unless text_for("threads", post[:text]).length > Threads::MAX_CHARACTERS
+
+      "#{label} is too long for Threads with the names that you gave."
+    end
+
+    # Asks Bluesky about each handle of the map, and refuses a draft that names one that the PDS
+    # does not know. Without this, `Bluesky#mention_facets` drops that handle with no message and
+    # the post shows it as plain text.
+    #
+    # ⚠️ It runs only for a value that has the SHAPE of a Bluesky handle. Plain words are the answer
+    # for a person with no Bluesky account, and they are not a mistake.
+    #
+    # ⚠️ **The BUDGET is what makes this fail open, and not the timeout of one call.** Several slow
+    # calls together pass the 20-second rack-timeout, and `Rack::Timeout::RequestTimeoutException`
+    # is not a StandardError. Thus no rescue here would catch it, and the submit would give a 500 in
+    # place of the post. `Bluesky#handle_missing?` is false for each answer but a definite refusal.
+    # @return [String, nil]
+    def bluesky_handle_error
+      handles = bluesky_handles
+      return nil if handles.empty? || handles.length > MAX_HANDLE_CHECKS
+
+      service = Bluesky.new
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + HANDLE_CHECK_BUDGET
+
+      handles.each do |handle|
+        break if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+        next unless service.handle_missing?(handle)
+
+        return "Bluesky does not know @#{handle}. Correct the handle, or clear that field to post " \
+               "the name alone."
+      end
+
+      nil
+    end
+
+    # @return [Array<String>] Each different Bluesky value of the map that is a handle and not a
+    #   name. It is empty when the owner does not post to Bluesky.
+    def bluesky_handles
+      return [] unless selected_networks.include?("bluesky")
+
+      values_for("bluesky").values
+                           .map { |value| SocialMentions.normalize(value) }
+                           .select { |value| SocialMentions.handle?(value, network: "bluesky") }
+                           .uniq
     end
 
     # @return [Boolean] True when the owner opened the schedule fields.

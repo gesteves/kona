@@ -26,6 +26,11 @@ module AtProto
   # message of the form and not a 500.
   SESSION_TIMEOUT = 10
 
+  # The seconds that one handle resolution can take. ⚠️ It is shorter than SESSION_TIMEOUT, because
+  # the Social media action resolves more than one handle inside one 20-second rack-timeout request.
+  # Refer to Admin::SocialController#bluesky_handle_error.
+  RESOLVE_TIMEOUT = 5
+
   class_methods do
     # Encodes a 64-bit value as a 13-character TID.
     # @param value [Integer]

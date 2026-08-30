@@ -9,7 +9,11 @@
     ⚠️ Each block is its own `social-post` controller. That is what keeps the count, the spinner,
     and the preview of one post away from the others.
 %>
+<%# ⚠️ The Bluesky map is a plain data attribute and NOT a Stimulus value. A value arrives through
+    a MutationObserver, thus it is not synchronous, and `social#canPost` reads the count line that
+    this block writes. The button would then follow the keystroke before the current one. %>
 <div class="social-post" data-social-target="post" data-controller="social-post"
+     data-social-post-bluesky-mentions="<%= mentions_json %>"
      data-social-post-preview-url-value="<%= social_preview_path %>"
      data-social-post-limit-value="<%= limit %>"
      data-social-post-warn-at-value="<%= warn_at %>">
@@ -59,9 +63,13 @@
     </wa-textarea>
 
     <%# The server writes the first value, thus the line has its height before the JavaScript runs
-        and the page does not move. The controller writes each value after that. %>
+        and the page does not move. The controller writes each value after that.
+        ⚠️ The number is the length of the text that BLUESKY will get, after the handles go in.
+        Bluesky has the shortest limit and "@tony" grows into a domain, thus a count of the words
+        alone would let a draft through that Bluesky then refuses. SocialPresenter#bluesky_length
+        makes it, and this view holds no count of its own. %>
     <p class="social__count wa-caption-s" aria-live="polite"
-       data-social-post-target="count"><%= post.text.scan(/\X/).length %> / <%= limit %></p>
+       data-social-post-target="count"><%= count %> / <%= limit %></p>
 
     <%# ⚠️ The link is OPTIONAL and it has no `required`: a post can be words alone. There is no
         list of the articles here, on purpose: the card comes from the og: tags of whatever page

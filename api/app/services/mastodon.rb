@@ -24,9 +24,13 @@ class Mastodon < ApplicationService
   LANGUAGE = "en".freeze
 
   # ⚠️ Mastodon counts a URL as this many characters, whatever its true length, and the limit of a
-  # default instance is 500. The body of a draft is at most 300, which is the Bluesky limit. Thus
-  # 300 + 2 newlines + 23 is 325 and a post always fits, and this class needs no length check.
-  # An instance with a limit below 325 would refuse the post, and the job would then run again.
+  # default instance is 500. This class makes no length check of its own.
+  # ⚠️ **The body of a draft is NOT always 300 or less.** Only the BLUESKY text carries that limit,
+  # and a mention grows the text of each network by a different amount: "@tony" becomes
+  # "@tony@hachyderm.io" here. Thus Admin::SocialController#post_error checks this limit against the
+  # text of THIS network, before it adds the job. Without that check a long draft raises here and
+  # retries for 24 hours.
+  # An instance with a limit below this one would refuse the post, and the job would then run again.
   URL_WEIGHT = 23
   DEFAULT_MAX_CHARACTERS = 500
 

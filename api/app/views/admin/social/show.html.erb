@@ -20,7 +20,9 @@
   <div class="social__posts" data-social-target="posts"
        data-action="dragover->social#dragOver drop->social#drop">
     <% @social.posts.each do |post| %>
-      <%= render "post", post: post, limit: @social.body_limit, warn_at: @social.warn_at %>
+      <%= render "post", post: post, limit: @social.body_limit, warn_at: @social.warn_at,
+                         count: @social.bluesky_length(post),
+                         mentions_json: @social.bluesky_values_json %>
     <% end %>
   </div>
 
@@ -28,7 +30,8 @@
       controller clones it. Thus its fields are not in the form and they send nothing. %>
   <template data-social-target="template">
     <%= render "post", post: SocialPresenter::Post.new, limit: @social.body_limit,
-                       warn_at: @social.warn_at %>
+                       warn_at: @social.warn_at, count: 0,
+                       mentions_json: @social.bluesky_values_json %>
   </template>
 
   <div class="wa-cluster wa-gap-s">
@@ -37,6 +40,35 @@
       Add another post
     </wa-button>
   </div>
+
+  <%# The people that this draft names. ⚠️ It belongs to the DRAFT and nothing stores it: the map
+      goes out with the form and it is gone after the post. It is thread-level, thus one row covers
+      a token that more than one post holds.
+
+      ⚠️ It is hidden until the draft names somebody, and social_controller.js shows it. Refer to
+      _social.scss: this block sets a display, thus `[hidden]` needs a rule of its own. %>
+  <section class="social-mentions" data-social-target="mentions" <%= "hidden" unless @social.mentions? %>>
+    <h2 class="social-mentions__title wa-heading-s">Mentions</h2>
+    <p class="social-mentions__hint wa-caption-s">
+      Each network writes a mention in its own way. Give the handle for each one, or a plain name
+      where that person has no account. An empty field posts the name with no &ldquo;@&rdquo;.
+    </p>
+
+    <div class="social-mentions__rows" data-social-target="mentionRows">
+      <% @social.mentions.each do |mention| %>
+        <%= render "mention", mention: mention, networks: @social.mention_networks,
+                              placeholders: SocialPresenter::MENTION_PLACEHOLDERS %>
+      <% end %>
+    </div>
+  </section>
+
+  <%# ⚠️ One empty row, which the controller clones. The browser never renders the content of a
+      template, thus its fields are not in the form and they send nothing. %>
+  <template data-social-target="mentionTemplate">
+    <%= render "mention", mention: SocialPresenter::Mention.new(token: ""),
+                          networks: @social.mention_networks,
+                          placeholders: SocialPresenter::MENTION_PLACEHOLDERS %>
+  </template>
 
   <%# Each connected row is ticked on the first load, and a submit that fails keeps the ticks of
       the owner. SocialPresenter#selected? decides. %>

@@ -926,6 +926,95 @@ Threads, now or at a date and a time. All three post. Each post has an **optiona
   ⚠️ `SocialController#social_networks` reads each state from **Redis**, and no service makes an HTTP
   request, for the same reason as the Connected apps page.
 
+#### Mentions
+
+Each network writes a mention in its own way, and the same person has a different handle at each
+one, or no account at all: Bluesky takes `@handle.tld` and this app resolves it to a DID, Mastodon
+takes `@user@instance` and Threads takes `@username`, and each instance parses its own text. Thus
+one body cannot hold a mention that is correct everywhere.
+
+⚠️ **The danger is not a mention that does nothing, it is a mention that tags a STRANGER.**
+`@tony.bsky.social` is correct at Bluesky, and Threads reads `@tony` in it and tags whoever holds
+that name. Nothing reports that.
+
+The owner writes a short token, and the composer asks what that person is called at each network.
+`SocialMentions` writes those words into the text.
+
+- ⚠️ **The map is part of the DRAFT, and nothing stores it.** It goes out with the form and it is
+  gone after the post. There is no directory, no Redis key, and no admin page: a handle that a store
+  holds goes out of date, and a name is needed for one draft only.
+- ⚠️ **The map is THREAD-LEVEL.** One row covers a token that more than one post holds.
+- ⚠️ **A row asks about the CONNECTED networks only.** That is different from the "Post to" list,
+  which keeps a disabled row to say why one of three names cannot take a post. Here there is nothing
+  to say, thus a field for an account that cannot post is only noise. With no account at all the
+  section stays away, and each token still loses its "@" on the server.
+- ⚠️ **A field takes a handle OR plain words**, and the shape of the value decides which:
+
+  | The field | What goes in the text |
+  |---|---|
+  | Blank | The token as the owner wrote it, with the `@` removed. `@Tony` gives `Tony`. |
+  | The shape of a handle of **that** network | `@` and the handle. |
+  | Anything else | The words, ⚠️ **with every `@` removed**. |
+
+  ⚠️ **The shape check SELECTS, and PLAIN WORDS are never refused.** "Anthony Edwards" is the
+  correct answer for a person with no account there.
+  ⚠️ **The one refusal is a handle of a DIFFERENT network** — a Mastodon handle in the Bluesky
+  field, and so on. Such a value is otherwise mangled with no message: it is not a domain, thus it
+  becomes plain words and every "@" comes out of the middle of it.
+  ⚠️ **`SocialMentions::DIAGNOSTIC_SHAPES` holds Bluesky and Mastodon ALONE, and that is
+  deliberate.** The shape of Threads is letters, digits, a period, and an underscore, thus a plain
+  first name matches it. A check against it would refuse "Tony" in the Mastodon field, which is the
+  thing that this feature exists to permit. The cost is that a Bluesky handle in the Threads field
+  is not named: it is a valid Threads username as well, and no rule can tell it from a real one.
+  ⚠️ The check reads the **ticked** networks only. A field of a network that the draft does not
+  post to changes nothing.
+  ⚠️ **A `@` only ever comes back from the handle branch**, which knows the shape. Plain words carry
+  none: `@Anthony Edwards` would otherwise reach Threads, which reads `@Anthony`.
+  ⚠️ **A blank field gives the spelling of the OCCURRENCE and not the key of the map.** Thus `@Tony`
+  reads as a name, and the owner writes the token as they write the name.
+- ⚠️ **The substitution is in the ACTION, and not in a job and not in a service.** The action makes
+  one payload for each network. Thus the three jobs and the three services need no change, each
+  attempt of a job carries the same text, and the map never goes into Redis.
+  ⚠️ **The record keys are still made ONE time, outside that loop.** The three networks get a
+  different text and they must share one key for each post.
+- ⚠️ **The server finds each token itself and reads the map as a lookup only.** Thus a token with no
+  row still loses its `@`, and a submit with no `mentions` at all turns every mention into a plain
+  name. That is the safe direction.
+- ⚠️ **The count measures the BLUESKY text.** `@tony` is 5 characters and `@tony.bsky.social` is 17,
+  thus a count of the raw words would pass a draft that Bluesky then refuses. `#post_error` and
+  `social_post_controller.js` measure the same string, the message says "with the Bluesky handles",
+  and `SocialPresenter#bluesky_length` writes the first count. The count uses Bluesky even when
+  Bluesky is not ticked: 300 is the limit of this page.
+- ⚠️ **Mastodon and Threads now need a length check of their own.** Only the Bluesky text is capped
+  at 300, and a plain name is longer than a handle. Without that check a long draft raises in the
+  job and retries for 24 hours. The comments in those two services say so.
+- **The action asks Bluesky about each handle** and refuses a draft that names one that the PDS does
+  not know, because `#mention_facets` drops such a handle with no message. It asks about a value
+  with the SHAPE of a handle only.
+  ⚠️ **`Bluesky#handle_missing?` is true for a definite refusal ALONE**, because `#resolve_handle`
+  gives nil for "no such handle" and for "no answer" both.
+  ⚠️ **A BUDGET, and not the timeout of one call, is what makes it fail open.** Several slow calls
+  together pass the 20-second rack-timeout, and `Rack::Timeout::RequestTimeoutException` is not a
+  `StandardError`, thus no rescue would catch it and the submit would give a 500.
+- ⚠️ **The Bluesky map reaches each post block as a plain `data-` attribute, and NOT a Stimulus
+  value.** A value arrives through a MutationObserver, thus it is not synchronous, and
+  `social#canPost` reads the count line that the block writes. The submit button would then follow
+  the keystroke before the current one.
+- **The browser RECONCILES the rows and never renders them again**, after a debounce: a token churns
+  while the owner types it. A row that goes away keeps its values in a Map, thus a token that comes
+  back gets them again. ⚠️ The rows are not put in order while the focus is inside the section,
+  because a node that moves loses the focus.
+- **A token that is already a handle seeds its own field**, thus `@tony.bsky.social` in the body
+  still works at Bluesky with no typing. ⚠️ **Nothing seeds Threads**: a bare `@name` is exactly the
+  ambiguous case.
+
+⚠️ **The token pattern and the URL pattern are in Ruby and in JavaScript**, because the count must
+follow each keystroke. They are **strings** in both files, and not Regexp literals: an interpolated
+Ruby Regexp gives a source with `(?-mix:…)` in it, which JavaScript cannot parse.
+`spec/contracts/social_mentions_contract_spec.rb` compares them.
+⚠️ A difference fails **safe** in both directions: a token that only the browser finds gives a row
+that the action ignores, and a token that only Ruby finds gets no row, thus its `@` comes off.
+
 #### A thread
 
 The owner adds posts below the first, and each one has its own words and its own optional link.

@@ -203,3 +203,47 @@
     display: none;
   }
 }
+
+// The people that the draft names. It is between the posts and the "Post to" list, and
+// social_controller.js shows it at the first token.
+.social-mentions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wa-space-s);
+
+  &[hidden] {
+    // ⚠️ The same rule as the spinner and the remove button above: this block sets a `display`,
+    // thus an author rule beats the `[hidden]` of the browser whatever its layer.
+    display: none;
+  }
+
+  &__title,
+  &__hint {
+    margin: 0;
+  }
+
+  &__hint {
+    color: var(--wa-color-text-quiet);
+  }
+
+  &__rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-m);
+  }
+}
+
+// One person, and what they are called at each network.
+.social-mention {
+  // The token goes on its own line above, and the fields share the width below it. They wrap on a
+  // narrow window, thus the row needs no media query of its own.
+  display: grid;
+  gap: var(--wa-space-s);
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+
+  &__token {
+    font-weight: var(--wa-font-weight-semibold);
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+}

@@ -46,7 +46,7 @@ class Bluesky < ApplicationService
   # The number of grapheme clusters in a post.
   #
   # ⚠️ Bluesky counts graphemes, and `String#length` counts UTF-16 code units. One emoji is 1 there
-  # and 2 or more here. `social_controller.js` counts the same way in the browser, with
+  # and 2 or more here. `social_post_controller.js` counts the same way in the browser, with
   # `Intl.Segmenter`.
   # @param text [String, nil]
   # @return [Integer]
@@ -163,6 +163,26 @@ class Bluesky < ApplicationService
   rescue StandardError => e
     report_upstream_error(e, context: "bluesky card image", url: url)
     nil
+  end
+
+  # Asks the PDS if a handle exists.
+  #
+  # ⚠️ **It answers true ONLY for a definite refusal.** A PDS that is away, slow, or broken gives
+  # false and the draft goes out. An outage there must never stop a post to Mastodon and Threads.
+  #
+  # ⚠️ `#resolve_handle` cannot answer this question: it gives nil for "the PDS does not know that
+  # handle" AND for "the PDS did not answer". Thus the Social media action needs this method, and
+  # fail-open is the branch that falls through and not a rescue that a person can delete.
+  # @param handle [String, nil] A handle, with no "@".
+  # @return [Boolean]
+  def handle_missing?(handle)
+    return false if handle.blank?
+
+    response = resolve_handle_response(handle)
+    # A PDS answers 400 InvalidRequest for a handle that it cannot resolve.
+    response.code == 400
+  rescue StandardError
+    false
   end
 
   private
@@ -336,12 +356,20 @@ class Bluesky < ApplicationService
   # @param handle [String] A handle, with no "@".
   # @return [String, nil] The DID, or nil when the PDS cannot resolve it.
   def resolve_handle(handle)
-    response = HTTParty.get("#{pds_url}/xrpc/com.atproto.identity.resolveHandle",
-                            query: { "handle" => handle })
+    response = resolve_handle_response(handle)
     return unless response.success?
 
     JSON.parse(response.body)["did"].presence
   rescue StandardError
     nil
+  end
+
+  # ⚠️ The timeout is here, thus the two callers above share it. #handle_missing? runs in a request
+  # and more than one time, and RESOLVE_TIMEOUT is short for that reason.
+  # @param handle [String]
+  # @return [HTTParty::Response]
+  def resolve_handle_response(handle)
+    HTTParty.get("#{pds_url}/xrpc/com.atproto.identity.resolveHandle",
+                 query: { "handle" => handle }, timeout: RESOLVE_TIMEOUT)
   end
 end

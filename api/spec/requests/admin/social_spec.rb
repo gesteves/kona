@@ -422,11 +422,23 @@ RSpec.describe "Admin social media", type: :request do
         post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: %w[bluesky mastodon threads] }
 
         expect(flash[:notice]).to eq("Sent to Bluesky, Mastodon, and Threads.")
+        # ⚠️ It compares the KEY of each post and not the whole payload. The three networks get a
+        # different text when the draft names a person, and they must still share one key.
         keys = [ BlueskyPostJob, MastodonPostJob, ThreadsPostJob ].map do |job|
           expect(job.jobs.size).to eq(1)
-          job.jobs.first["args"].first
+          job.jobs.first["args"].first.map { |post| post["key"] }
         end
         expect(keys.uniq.size).to eq(1)
+        expect(keys.first.compact.size).to eq(1)
+      end
+
+      # A request that a person writes by hand, and the shape that an empty `posts[]` sends.
+      it "refuses a body whose posts are not blocks, and does not give a 500" do
+        post "/social", params: { posts: "", mentions: "", networks: [ "bluesky" ] }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(flash[:alert]).to eq("Write something to post.")
+        expect(BlueskyPostJob.jobs).to be_empty
       end
 
       it "adds no job for a network that the owner did not tick" do
@@ -688,6 +700,188 @@ RSpec.describe "Admin social media", type: :request do
         get "/connected-apps"
 
         expect(response.body).to include("Social media")
+      end
+    end
+
+    # The mention map of a draft. ⚠️ It is part of the draft and nothing stores it: the owner says
+    # what one person is called at each network, and the action writes those words into the text of
+    # each network before it adds the jobs.
+    describe "POST /social with mentions" do
+      before do
+        sign_in_as(email: owner_email)
+        connect(bluesky: true, mastodon: true, threads: true)
+        # The handle check must not reach the network in an example that is not about it.
+        allow_any_instance_of(Bluesky).to receive(:handle_missing?).and_return(false)
+      end
+
+      def text_of(job) = job.jobs.first["args"].first.first["text"]
+
+      def post_draft(text:, mentions: [], networks: %w[bluesky mastodon threads])
+        post "/social", params: { posts: [ { text: text, link: "" } ],
+                                  mentions: mentions, networks: networks }
+      end
+
+      it "gives each network its own text from one body" do
+        post_draft(text: "Great ride with @tony.",
+                   mentions: [ { token: "@tony", bluesky: "tony.bsky.social",
+                                 mastodon: "Anthony Edwards", threads: "@tony" } ])
+
+        expect(text_of(BlueskyPostJob)).to eq("Great ride with @tony.bsky.social.")
+        expect(text_of(MastodonPostJob)).to eq("Great ride with Anthony Edwards.")
+        expect(text_of(ThreadsPostJob)).to eq("Great ride with @tony.")
+      end
+
+      # ⚠️ The case of a person with no account at that network. It is a correct answer.
+      it "posts plain words with no @ where the owner gave a name" do
+        post_draft(text: "Great ride with @tony.",
+                   mentions: [ { token: "@tony", bluesky: "", mastodon: "Anthony Edwards",
+                                 threads: "" } ])
+
+        expect(text_of(MastodonPostJob)).to eq("Great ride with Anthony Edwards.")
+      end
+
+      it "keeps the words of the token, with no @, for a field that is empty" do
+        post_draft(text: "Great ride with @Tony.",
+                   mentions: [ { token: "@Tony", bluesky: "", mastodon: "", threads: "" } ])
+
+        [ BlueskyPostJob, MastodonPostJob, ThreadsPostJob ].each do |job|
+          expect(text_of(job)).to eq("Great ride with Tony.")
+        end
+      end
+
+      # ⚠️ The server finds each token itself and reads the map as a lookup only. Thus a token that
+      # the browser sent no row for still loses its "@", and it can never tag a stranger.
+      it "removes the @ of a token that the form sent no row for" do
+        post_draft(text: "Great ride with @tony.", mentions: [])
+
+        expect(text_of(ThreadsPostJob)).to eq("Great ride with tony.")
+      end
+
+      it "reads a handle that the owner wrote with an @" do
+        post_draft(text: "cc @tony", networks: [ "bluesky" ],
+                   mentions: [ { token: "@tony", bluesky: "@tony.bsky.social", mastodon: "",
+                                 threads: "" } ])
+
+        expect(text_of(BlueskyPostJob)).to eq("cc @tony.bsky.social")
+      end
+
+      it "leaves a draft with no mention alone" do
+        post_draft(text: "A long day.")
+
+        expect(text_of(BlueskyPostJob)).to eq("A long day.")
+      end
+
+      describe "the character count" do
+        # 292 words, and the handle adds 13 more. ⚠️ The raw body fits and the Bluesky text does not.
+        let(:body) { "#{'a' * 286} @tony" }
+
+        it "counts the text that Bluesky will get, and says so" do
+          post_draft(text: body, networks: [ "bluesky" ],
+                     mentions: [ { token: "@tony", bluesky: "tony.bsky.social", mastodon: "",
+                                   threads: "" } ])
+
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(flash[:alert]).to include("with the Bluesky handles")
+          expect(BlueskyPostJob.jobs).to be_empty
+        end
+
+        it "takes the same body when the handle is short enough" do
+          post_draft(text: body, networks: [ "bluesky" ],
+                     mentions: [ { token: "@tony", bluesky: "", mastodon: "", threads: "" } ])
+
+          expect(response).to redirect_to(social_path)
+        end
+      end
+
+      # ⚠️ A handle of another network in a field is otherwise mangled with no message.
+      describe "a handle in the field of the wrong network" do
+        it "refuses it, and names the field and the token" do
+          post_draft(text: "cc @tony", networks: [ "bluesky" ],
+                     mentions: [ { token: "@tony", bluesky: "tony@hachyderm.io", mastodon: "",
+                                   threads: "" } ])
+
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(flash[:alert]).to eq("The Bluesky field of @tony holds a Mastodon handle. " \
+                                      "Move it, or write a name.")
+          expect(BlueskyPostJob.jobs).to be_empty
+        end
+
+        # ⚠️ The check reads the ticked networks only.
+        it "says nothing about a field of a network that the draft does not post to" do
+          post_draft(text: "cc @tony", networks: [ "mastodon" ],
+                     mentions: [ { token: "@tony", bluesky: "tony@hachyderm.io",
+                                   mastodon: "tony@hachyderm.io", threads: "" } ])
+
+          expect(response).to redirect_to(social_path)
+        end
+
+        # ⚠️ The case that DIAGNOSTIC_SHAPES protects: a name is not a mistake in any field.
+        it "takes a plain name in every field" do
+          post_draft(text: "cc @tony",
+                     mentions: [ { token: "@tony", bluesky: "Tony", mastodon: "Tony",
+                                   threads: "Tony" } ])
+
+          expect(response).to redirect_to(social_path)
+        end
+      end
+
+      describe "the Bluesky handle check" do
+        let(:draft) do
+          { token: "@tony", bluesky: "nobody.bsky.social", mastodon: "", threads: "" }
+        end
+
+        it "refuses a handle that the PDS does not know, and names it" do
+          allow_any_instance_of(Bluesky).to receive(:handle_missing?).and_return(true)
+
+          post_draft(text: "cc @tony", mentions: [ draft ])
+
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(flash[:alert]).to include("Bluesky does not know @nobody.bsky.social")
+          expect(BlueskyPostJob.jobs).to be_empty
+        end
+
+        # ⚠️ Fail open. An outage of the PDS must never stop a post to Mastodon and Threads.
+        it "posts when the PDS does not answer" do
+          allow_any_instance_of(Bluesky).to receive(:handle_missing?).and_return(false)
+
+          post_draft(text: "cc @tony", mentions: [ draft ])
+
+          expect(response).to redirect_to(social_path)
+          expect(MastodonPostJob.jobs.size).to eq(1)
+        end
+
+        it "asks nothing when the owner does not post to Bluesky" do
+          expect_any_instance_of(Bluesky).not_to receive(:handle_missing?)
+
+          post_draft(text: "cc @tony", networks: %w[mastodon threads], mentions: [ draft ])
+
+          expect(response).to redirect_to(social_path)
+        end
+
+        # Plain words are not a handle, thus there is nothing to ask about.
+        it "asks nothing about a name" do
+          expect_any_instance_of(Bluesky).not_to receive(:handle_missing?)
+
+          post_draft(text: "cc @tony", networks: [ "bluesky" ],
+                     mentions: [ { token: "@tony", bluesky: "Anthony Edwards", mastodon: "",
+                                   threads: "" } ])
+
+          expect(response).to redirect_to(social_path)
+        end
+      end
+
+      # ⚠️ A refusal renders the page again, thus the owner must not lose the map that they filled.
+      it "puts each row back after a refusal" do
+        post "/social", params: {
+          posts: [ { text: "cc @tony", link: "" } ],
+          mentions: [ { token: "@tony", bluesky: "tony.bsky.social", mastodon: "Anthony Edwards",
+                        threads: "" } ],
+          networks: []
+        }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.body).to include("tony.bsky.social")
+        expect(response.body).to include("Anthony Edwards")
       end
     end
   end

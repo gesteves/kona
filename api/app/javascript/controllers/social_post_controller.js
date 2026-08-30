@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { blueskyText } from "../lib/social_mentions";
 
 // How long the link field must be quiet before this reads the card. Each preview is one request of
 // this app, which then reads the page of another host.
@@ -31,10 +32,32 @@ export default class extends Controller {
   }
 
   /**
+   * The Bluesky field of each mention of the draft, by key.
+   *
+   * ⚠️ It is a plain data attribute and NOT a Stimulus value. A value arrives through a
+   * MutationObserver, thus it is not synchronous, and `social#canPost` reads the count line that
+   * this controller writes. The submit button would then follow the keystroke before the current
+   * one. `social#pushMentions` writes this attribute and calls `count()` at once.
+   * @returns {Object<string, string>}
+   */
+  get blueskyMentions() {
+    try {
+      return JSON.parse(this.element.dataset.socialPostBlueskyMentions || "{}");
+    } catch {
+      return {};
+    }
+  }
+
+  /**
    * Writes the length of the body against the limit, and colors that line.
+   *
+   * ⚠️ It counts the text that **Bluesky** will get, and not the words that the owner can see. A
+   * mention grows into a handle, thus "@tony" can become "@tony.bsky.social". A count of the raw
+   * words would say that a draft fits when Bluesky refuses it.
+   * `Admin::SocialController#post_error` measures the same string.
    */
   count() {
-    const length = this.graphemes(this.bodyTarget.value ?? "");
+    const length = this.graphemes(blueskyText(this.bodyTarget.value ?? "", this.blueskyMentions));
 
     this.countTarget.textContent = `${length} / ${this.limitValue}`;
     this.countTarget.classList.toggle("social__count--warning",

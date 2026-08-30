@@ -73,4 +73,17 @@ RSpec.describe SocialPresenter do
       expect(presenter).not_to respond_to(:max_date)
     end
   end
+
+  # ⚠️ A field for an account that cannot take a post is only noise. That is different from the
+  # "Post to" list, which keeps a disabled row to say why a name is not available.
+  describe "#mention_networks" do
+    it "gives the connected networks only" do
+      presenter = described_class.new(networks: [
+        SocialPresenter::Network.new(key: "bluesky", name: "Bluesky", connected: true),
+        SocialPresenter::Network.new(key: "mastodon", name: "Mastodon", connected: false)
+      ])
+
+      expect(presenter.mention_networks.map(&:key)).to eq([ "bluesky" ])
+    end
+  end
 end

@@ -460,4 +460,61 @@ RSpec.describe Bluesky do
       expect { service.post!(rkey: "3kabc", text: "Hi") }.to raise_error(/refused/)
     end
   end
+
+  # ⚠️ This method exists because #resolve_handle cannot tell "the PDS does not know that handle"
+  # from "the PDS did not answer". The Social media action refuses a draft on the first, and it must
+  # never refuse one on the second.
+  describe "#handle_missing?" do
+    def stub_resolve(**answer)
+      allow(HTTParty).to receive(:get)
+        .with(a_string_including("resolveHandle"), anything)
+        .and_return(instance_double(HTTParty::Response, **answer))
+    end
+
+    it "is true for the definite refusal of the PDS" do
+      stub_resolve(code: 400)
+
+      expect(service.handle_missing?("nobody.bsky.social")).to be true
+    end
+
+    it "is false when the PDS knows the handle" do
+      stub_resolve(code: 200)
+
+      expect(service.handle_missing?("friend.bsky.social")).to be false
+    end
+
+    # Each example below is an outage of the PDS, and the draft must still go out: the other two
+    # networks do not need Bluesky to work.
+    it "is false when the PDS answers with a fault" do
+      stub_resolve(code: 500)
+
+      expect(service.handle_missing?("friend.bsky.social")).to be false
+    end
+
+    it "is false when the call times out" do
+      allow(HTTParty).to receive(:get)
+        .with(a_string_including("resolveHandle"), anything)
+        .and_raise(Net::OpenTimeout)
+
+      expect(service.handle_missing?("friend.bsky.social")).to be false
+    end
+
+    it "is false for a blank handle, and it asks the PDS nothing" do
+      allow(HTTParty).to receive(:get)
+
+      expect(service.handle_missing?("")).to be false
+      expect(HTTParty).not_to have_received(:get)
+    end
+
+    # ⚠️ The action calls this more than one time inside a 20-second rack-timeout request.
+    it "gives the call a timeout" do
+      stub_resolve(code: 200)
+
+      service.handle_missing?("friend.bsky.social")
+
+      expect(HTTParty).to have_received(:get)
+        .with(a_string_including("resolveHandle"),
+              hash_including(timeout: Bluesky::RESOLVE_TIMEOUT))
+    end
+  end
 end

@@ -1,4 +1,9 @@
 import { Controller } from "@hotwired/stimulus";
+import { isBlueskyHandle, mentionKey, tokensOf } from "../lib/social_mentions";
+
+// How long the words must be quiet before the rows are reconciled. ⚠️ A token churns while the
+// owner types it — "@t", "@to", "@ton" — and a row for each of those would take the focus.
+const MENTION_DEBOUNCE = 250;
 
 /**
  * The Social media page: the posts of a thread, the schedule fields, the label of the submit
@@ -11,12 +16,17 @@ export default class extends Controller {
   static targets = [
     "submit", "label", "posts", "post", "template", "add", "remove", "handle",
     "schedule", "scheduleFields", "date", "time", "timeZone",
+    "mentions", "mentionRows", "mentionTemplate", "mention",
   ];
   static values = { maxPosts: Number };
 
   connect() {
     // A restoration visit can render a snapshot that holds the button in its busy state.
     this.submitTarget.loading = false;
+
+    // The values of each mention, by key. ⚠️ A value stays here after its row goes away, thus a
+    // token that the owner deletes and writes again gets its handles back.
+    this.mentionValues = new Map();
 
     // ⚠️ The date and the time carry no zone. This is what gives them a meaning, and it is the
     // reason that a date field is safe here and was not safe in the Republish dialog. With no
@@ -29,8 +39,12 @@ export default class extends Controller {
     //
     // A Turbo restoration visit renders a snapshot that holds the values and no controller state.
     // Thus the schedule runs at connect and not at the first event only.
+    // ⚠️ `wa-input` is in this list for the MENTION fields. Before the upgrade their `value` is
+    // undefined, thus a read here would write over each handle that the server rendered with an
+    // empty one. A page that renders again after a refusal holds those values.
     Promise.all(
-      ["wa-switch", "wa-date-input", "wa-time-input"].map((tag) => customElements.whenDefined(tag))
+      ["wa-switch", "wa-date-input", "wa-time-input", "wa-input"]
+        .map((tag) => customElements.whenDefined(tag))
     ).then(() => {
       // This sets `required` as well, thus a page that renders again with the fields open keeps
       // that state.
@@ -51,13 +65,19 @@ export default class extends Controller {
     event.preventDefault();
     if (this.postTargets.length >= this.maxPostsValue) return;
 
-    this.postsTarget.appendChild(this.templateTarget.content.cloneNode(true));
+    // ⚠️ The map goes on the block BEFORE it joins the document, thus the new block counts
+    // correctly at its own `connect()`. The copy in the template is the one that the server
+    // rendered, and the owner can have edited a handle after that.
+    const added = this.templateTarget.content.cloneNode(true);
+    const block = added.querySelector("[data-social-target='post']");
+    if (block) block.dataset.socialPostBlueskyMentions = this.blueskyMentionsJson;
+
+    this.postsTarget.appendChild(added);
     this.renumber();
     this.validate();
 
     // The words are the point of a new post, thus the caret goes there.
-    const added = this.postTargets[this.postTargets.length - 1];
-    added.querySelector("wa-textarea")?.focus();
+    this.postTargets[this.postTargets.length - 1]?.querySelector("wa-textarea")?.focus();
   }
 
   /**
@@ -236,8 +256,181 @@ export default class extends Controller {
    * this one reads the DOM in place of reaching into it.
    */
   validate() {
+    // ⚠️ The order matters. `pushMentions` recounts each post AT ONCE, and `canPost` below reads
+    // the count line that the recount wrote. A push that arrived later would leave the button on
+    // for a draft that is already past the limit.
+    this.readMentionRows();
+    this.pushMentions();
+    this.scheduleMentionScan();
+
     this.submitTarget.disabled = !this.canPost;
     this.relabel();
+  }
+
+  /**
+   * Reads each row of the mention section into the Map.
+   *
+   * ⚠️ It runs BEFORE the scan, thus a row that the scan is about to remove has its values kept.
+   */
+  readMentionRows() {
+    this.mentionTargets.forEach((row) => {
+      const token = row.querySelector("[data-mention-token]")?.value ?? "";
+      if (!token) return;
+
+      const handles = {};
+      row.querySelectorAll("[data-mention-network]").forEach((field) => {
+        handles[field.dataset.mentionNetwork] = field.value ?? "";
+      });
+
+      this.mentionValues.set(mentionKey(token), { token, handles });
+    });
+  }
+
+  /**
+   * Gives the Bluesky map to each post block, and makes it count again.
+   *
+   * ⚠️ Only the BLUESKY map goes out, because the count measures the Bluesky text: that network
+   * has the shortest limit and the longest handles. The server measures the same string.
+   *
+   * ⚠️ A value that this writes fires no `input` event, thus there is no loop back into validate.
+   */
+  pushMentions() {
+    const json = this.blueskyMentionsJson;
+
+    this.postTargets.forEach((post) => {
+      if (post.dataset.socialPostBlueskyMentions === json) return;
+
+      post.dataset.socialPostBlueskyMentions = json;
+      this.application.getControllerForElementAndIdentifier(post, "social-post")?.count();
+    });
+  }
+
+  /** @returns {string} The Bluesky field of each mention, by key, as JSON. */
+  get blueskyMentionsJson() {
+    const map = {};
+    this.mentionValues.forEach((entry, key) => {
+      const value = entry.handles?.bluesky?.trim();
+      if (value) map[key] = value;
+    });
+
+    return JSON.stringify(map);
+  }
+
+  /**
+   * Waits for the typing to stop, then reconciles the rows.
+   */
+  scheduleMentionScan() {
+    clearTimeout(this.mentionTimer);
+    this.mentionTimer = setTimeout(() => this.scanMentions(), MENTION_DEBOUNCE);
+  }
+
+  /**
+   * Makes the rows of the section match the tokens of the draft.
+   *
+   * ⚠️ It RECONCILES and it never renders the section again. A rebuild would take the focus and
+   * lose each value at every keystroke.
+   */
+  scanMentions() {
+    this.readMentionRows();
+
+    // The tokens of the whole draft. ⚠️ The map is thread-level, thus a token in post 1 and in
+    // post 3 is one row. The first spelling wins, and that is the one that a network with no
+    // handle will show.
+    const wanted = new Map();
+    this.postTargets.forEach((post) => {
+      const words = post.querySelector("wa-textarea")?.value ?? "";
+      tokensOf(words).forEach((token) => {
+        const key = mentionKey(token);
+        if (!wanted.has(key)) wanted.set(key, token);
+      });
+    });
+
+    // ⚠️ A row that goes away keeps its values in the Map above, thus a token that comes back gets
+    // them again.
+    this.mentionTargets.forEach((row) => {
+      if (!wanted.has(this.keyOfRow(row))) row.remove();
+    });
+
+    wanted.forEach((token, key) => {
+      if (this.rowFor(key)) return;
+
+      this.mentionRowsTarget.appendChild(this.buildMentionRow(token, key));
+    });
+
+    // ⚠️ A node that moves loses the focus, thus the rows are not put in order while the owner is
+    // typing in one of them. The next scan does it.
+    if (!this.mentionRowsTarget.contains(document.activeElement)) {
+      wanted.forEach((_token, key) => {
+        const row = this.rowFor(key);
+        if (row) this.mentionRowsTarget.appendChild(row);
+      });
+    }
+
+    this.mentionsTarget.hidden = wanted.size === 0 || !this.hasMentionFields;
+    this.pushMentions();
+    this.submitTarget.disabled = !this.canPost;
+  }
+
+  /**
+   * Makes one row from the template, with the values that the owner already gave.
+   * @param {string} token
+   * @param {string} key
+   * @returns {HTMLElement}
+   */
+  buildMentionRow(token, key) {
+    const row = this.mentionTemplateTarget.content.cloneNode(true)
+      .querySelector("[data-social-target='mention']");
+    const stored = this.mentionValues.get(key);
+
+    row.querySelector("[data-mention-token]").value = token;
+    const label = row.querySelector("[data-mention-label]");
+    if (label) label.textContent = token;
+
+    row.querySelectorAll("[data-mention-network]").forEach((field) => {
+      const network = field.dataset.mentionNetwork;
+      field.value = stored?.handles?.[network] || this.seedFor(token, network);
+    });
+
+    return row;
+  }
+
+  /**
+   * The value to put in a field of a new row.
+   *
+   * ⚠️ A token that is ALREADY a handle seeds its own field, thus "@tony.bsky.social" in the body
+   * still works at Bluesky with no typing. **Nothing seeds Threads**: a bare "@name" is exactly the
+   * ambiguous case, and a guess there is what tags a stranger.
+   * @param {string} token
+   * @param {string} network
+   * @returns {string}
+   */
+  seedFor(token, network) {
+    const bare = token.replace(/^@/, "");
+
+    if (network === "bluesky") return isBlueskyHandle(bare) ? bare : "";
+    if (network === "mastodon") return bare.includes("@") ? bare : "";
+
+    return "";
+  }
+
+  /**
+   * ⚠️ With no account connected there is no field to fill, thus the section stays away whatever
+   * the words hold. The server still removes the "@" of each token, thus such a draft posts a name
+   * and it can never tag a stranger.
+   * @returns {boolean}
+   */
+  get hasMentionFields() {
+    return !!this.mentionTemplateTarget.content.querySelector("[data-mention-network]");
+  }
+
+  /** @param {HTMLElement} row @returns {string} */
+  keyOfRow(row) {
+    return mentionKey(row.querySelector("[data-mention-token]")?.value ?? "");
+  }
+
+  /** @param {string} key @returns {HTMLElement|undefined} */
+  rowFor(key) {
+    return this.mentionTargets.find((row) => this.keyOfRow(row) === key);
   }
 
   /**

@@ -48,8 +48,11 @@ class Threads < ApplicationService
     threads_share_to_instagram
   ].join(",").freeze
 
-  # The limit of the text of a post. Meta counts characters, and the body of a draft is at most 300,
-  # thus a post always fits and this class needs no check.
+  # The limit of the text of a post. Meta counts characters, and this class makes no check.
+  # ⚠️ **The body of a draft is NOT always 300 or less.** Only the BLUESKY text carries that limit,
+  # and a mention grows the text of each network by a different amount. Thus
+  # Admin::SocialController#post_error checks this limit against the text of THIS network, before it
+  # adds the job. Without that check a long draft raises here and retries for 24 hours.
   MAX_CHARACTERS = 500
 
   # How long the id of a media container stays in Redis. ⚠️ Meta expires a container after 24 hours,
