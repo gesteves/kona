@@ -22,22 +22,31 @@
       fields. Without it that gap would also apply below the divider, and the space above the line
       could never match the space below it. Refer to _social.scss. %>
   <div class="social-post__body">
-    <div class="social-post__head wa-cluster wa-gap-s">
-      <%# "2/3", and nothing at all while there is one post. %>
-      <span class="social-post__label wa-caption-s" data-social-target="postLabel"></span>
+    <%# ⚠️ The HANDLE carries `draggable`, and never the block. A draggable block takes the pointer
+        away from the fields inside it, thus a person could not select the words of their own post.
+        ⚠️ It is a real button and it takes the keyboard: the arrow keys move the post. A drag needs
+        a pointer, and this page must work without one. It is hidden while there is one post.
+        It sits in the gutter column of the grid, beside the label of the field. Refer to
+        _social.scss. %>
+    <wa-button class="social-post__handle" appearance="plain" size="small" draggable="true"
+               data-social-target="handle"
+               data-action="dragstart->social#dragStart dragend->social#dragEnd
+                            keydown->social#movePostByKey">
+      <%= raw icon_svg("classic", "light", "grip-dots-vertical") %>
+      <span class="wa-visually-hidden">Reorder this post with the arrow keys</span>
+    </wa-button>
 
-      <%# ⚠️ The icon is in the DEFAULT slot and not in `start`. With `start` and no label, the
-          button keeps the width of a label that is not there and the icon sits off to one side.
-          ⚠️ `<wa-button>` makes a square icon button only for a `<wa-icon>` child, and this app
-          never uses that element (it needs a kit code that this configuration has not). Thus
-          _social.scss gives the square. It is hidden while there is one post: a thread of one has
-          nothing to remove. %>
-      <wa-button class="social-post__remove" appearance="plain" size="small"
-                 data-social-target="remove" data-action="click->social#removePost">
-        <%= raw icon_svg("classic", "light", "circle-xmark") %>
-        <span class="wa-visually-hidden">Remove this post</span>
-      </wa-button>
-    </div>
+    <%# ⚠️ The icon is in the DEFAULT slot and not in `start`. With `start` and no label, the button
+        keeps the width of a label that is not there and the icon sits off to one side.
+        ⚠️ `<wa-button>` makes a square icon button only for a `<wa-icon>` child, and this app never
+        uses that element (it needs a kit code that this configuration has not). Thus _social.scss
+        gives the square. It is hidden while there is one post: a thread of one has nothing to
+        remove. %>
+    <wa-button class="social-post__remove" appearance="plain" size="small"
+               data-social-target="remove" data-action="click->social#removePost">
+      <%= raw icon_svg("classic", "light", "circle-xmark") %>
+      <span class="wa-visually-hidden">Remove this post</span>
+    </wa-button>
 
     <%# ⚠️ No `maxlength` and no `with-count`. Both measure UTF-16 code units, and Bluesky counts
         graphemes: one emoji is 1 there and 2 or more here. The count line below is ours, and it

@@ -9,7 +9,7 @@ import { Controller } from "@hotwired/stimulus";
  */
 export default class extends Controller {
   static targets = [
-    "submit", "label", "posts", "post", "postLabel", "template", "add", "remove",
+    "submit", "label", "posts", "post", "template", "add", "remove", "handle",
     "schedule", "scheduleFields", "date", "time", "timeZone",
   ];
   static values = { maxPosts: Number };
@@ -70,23 +70,109 @@ export default class extends Controller {
   }
 
   /**
-   * Writes "N/M" into each label, and hides Remove while there is one post.
+   * Picks up the post that owns the handle.
    *
-   * ⚠️ This is the ONLY numbering, and it is for the reader. The field names carry no index, thus
-   * nothing here changes what the form sends. Refer to the note in _post.html.erb.
+   * ⚠️ Firefox starts no drag at all with no data on the transfer, thus the empty string is
+   * necessary and not decoration.
+   */
+  dragStart(event) {
+    this.dragged = event.target.closest("[data-social-target='post']");
+    if (!this.dragged) return;
+
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", "");
+    this.dragged.classList.add("social-post--dragging");
+  }
+
+  /**
+   * Moves the post that the pointer holds to where the pointer is.
    *
-   * ⚠️ The target is `postLabel` and NOT `label`. The submit button owns `label`, and one name for
-   * both made `labelTarget` find the first post and write "Post now" into it.
+   * ⚠️ It moves the block itself and it never rewrites a field. The names are `posts[][text]` and
+   * `posts[][link]` with no index, thus **the order of the blocks in the document IS the order of
+   * the thread**, and moving one is the whole change.
+   */
+  dragOver(event) {
+    if (!this.dragged) return;
+
+    // ⚠️ Without this the browser refuses the drop and the post springs back.
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+
+    const before = this.postBelow(event.clientY);
+    if (before === this.dragged) return;
+
+    before ? this.postsTarget.insertBefore(this.dragged, before)
+           : this.postsTarget.appendChild(this.dragged);
+  }
+
+  /**
+   * `dragover` already moved the block, thus this only stops the browser from its own default,
+   * which is to open the dragged text as a URL.
+   */
+  drop(event) {
+    event.preventDefault();
+  }
+
+  dragEnd() {
+    this.dragged?.classList.remove("social-post--dragging");
+    this.dragged = null;
+    this.renumber();
+  }
+
+  /**
+   * The first post whose middle is below this point, which is the one to insert before.
+   * @param {number} y
+   * @returns {HTMLElement|undefined} Undefined puts the post at the end.
+   */
+  postBelow(y) {
+    return this.postTargets
+      .filter((post) => post !== this.dragged)
+      .find((post) => {
+        const box = post.getBoundingClientRect();
+        return y < box.top + box.height / 2;
+      });
+  }
+
+  /**
+   * Moves a post with the arrow keys.
+   *
+   * ⚠️ A drag needs a pointer, and this page must work without one. The handle is a button and it
+   * takes the focus, thus the arrow keys are the way in.
+   */
+  movePostByKey(event) {
+    const up = event.key === "ArrowUp";
+    if (!up && event.key !== "ArrowDown") return;
+
+    event.preventDefault();
+    const post = event.target.closest("[data-social-target='post']");
+    const posts = this.postTargets;
+    const to = posts.indexOf(post) + (up ? -1 : 1);
+    if (to < 0 || to >= posts.length) return;
+
+    up ? this.postsTarget.insertBefore(post, posts[to])
+       : this.postsTarget.insertBefore(posts[to], post);
+
+    this.renumber();
+    // ⚠️ A node that moves loses the focus, thus the next arrow key would go to the document.
+    post.querySelector("[data-social-target='handle']")?.focus();
+  }
+
+  /**
+   * Shows the two controls of a post while there is more than one, and hides them at one.
+   *
+   * ⚠️ It writes no number. The field names carry no index, and the ORDER OF THE BLOCKS in the
+   * document is the order of the thread. Refer to the note in _post.html.erb.
    */
   renumber() {
     const posts = this.postTargets;
 
-    posts.forEach((post, index) => {
-      const label = post.querySelector("[data-social-target='postLabel']");
-      if (label) label.textContent = posts.length > 1 ? `${index + 1}/${posts.length}` : "";
-
+    posts.forEach((post) => {
       const remove = post.querySelector("[data-social-target='remove']");
       if (remove) remove.hidden = posts.length <= 1;
+
+      // There is nothing to reorder while there is one post.
+      const handle = post.querySelector("[data-social-target='handle']");
+      if (handle) handle.hidden = posts.length <= 1;
     });
 
     this.addTarget.disabled = posts.length >= this.maxPostsValue;

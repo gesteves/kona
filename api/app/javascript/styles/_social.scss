@@ -113,10 +113,27 @@
     margin-block: var(--wa-space-l);
   }
 
+  // ⚠️ THREE columns: a gutter for the handle, the fields, and a gutter for the remove control.
+  // Both controls are in the flow and in a gutter of their own, thus neither can sit on top of a
+  // field. The remove control was absolute before, at the right edge of this block, and it covered
+  // the corner of the first field.
   &__body {
-    display: flex;
-    flex-direction: column;
-    gap: var(--wa-space-xs);
+    align-items: start;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    row-gap: var(--wa-space-xs);
+
+    // ⚠️ There is NO `column-gap`, and the space beside each control is a margin on that control
+    // instead. A gap stays behind when a track is empty: with one post both controls are hidden,
+    // the two gutter tracks collapse to nothing, and two gaps would still inset the fields by a
+    // few pixels away from every other row of this form.
+
+    // ⚠️ Each field goes in the middle column, one to a row, and the rule NAMES the two controls
+    // that it leaves out. A plain `> *` would take them as well, and each would then win or lose on
+    // source order alone, because the selectors have the same weight.
+    > :not(.social-post__handle):not(.social-post__remove) {
+      grid-column: 2;
+    }
   }
 
   &__head {
@@ -131,18 +148,48 @@
 
   // ⚠️ <wa-button> makes a square icon button only for a <wa-icon> child, and this app never uses
   // that element. Thus the square is here: the height of a form control, and an equal width.
+  &__handle {
+    // ⚠️ The gutter, beside the label of the first field. `align-items: start` on the grid keeps it
+    // level with that label, and the negative margin takes the height of a form control off the
+    // top so the grip itself lines up with the words and not with the box below them.
+    grid-column: 1;
+    grid-row: 1;
+    margin-block-start: calc((1lh - var(--wa-form-control-height)) / 2);
+    margin-inline-end: var(--wa-space-2xs);
+
+    cursor: grab;
+
+    &:active {
+      cursor: grabbing;
+    }
+
+    &[hidden] {
+      // ⚠️ The same rule as the spinner: an author rule beats the `[hidden]` of the browser.
+      display: none;
+    }
+  }
+
+  &__handle::part(button) {
+    // The same square as the remove control. Refer to the note there.
+    aspect-ratio: 1;
+    padding: 0;
+    width: var(--wa-form-control-height);
+  }
+
+  // The block that the pointer holds. It stays in the flow, thus the others move around it.
+  &--dragging {
+    opacity: 0.4;
+  }
+
   &__remove {
-    // ⚠️ It is OUT OF THE FLOW, and that is what keeps the two sides of the divider equal. This
-    // button is a form control and it is much taller than the label beside it. In the flow it sets
-    // the height of the flex line, and `align-items: center` then puts the label text half that
-    // difference below the top of the row: the space below the line looks larger than the space
-    // above it, and no margin can correct that. A smaller `block-size` on the row does not help
-    // either, because the line keeps the height of its tallest item. Out of the flow the row is one
-    // line of the label, and the button is centred on it.
-    inset-block-start: 50%;
-    inset-inline-end: 0;
-    position: absolute;
-    transform: translateY(-50%);
+    // The right gutter, level with the label of the first field. ⚠️ The negative margin is what
+    // keeps this button from setting the height of its row: it is a form control and it is much
+    // taller than that label, thus in a row of its own height it would push the fields down. The
+    // handle above carries the same offset for the same reason.
+    grid-column: 3;
+    grid-row: 1;
+    margin-block-start: calc((1lh - var(--wa-form-control-height)) / 2);
+    margin-inline-start: var(--wa-space-2xs);
   }
 
   &__remove::part(button) {
