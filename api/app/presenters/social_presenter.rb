@@ -156,9 +156,13 @@ class SocialPresenter
 
   # @param post [Post]
   # @return [Integer] The graphemes that Bluesky will count for that post, after the handles go in.
+  # ⚠️ The steps and their order are the ones of `Admin::SocialController#text_for`. Thus the count
+  # that the server renders and the first count of the browser are the same number.
   def bluesky_length(post)
-    Bluesky.post_length(SocialMentions.substitute(post.text, values: bluesky_values,
-                                                  network: "bluesky"))
+    Bluesky.post_length(
+      Typography.apply(SocialMentions.substitute(post.text, values: bluesky_values,
+                                                 network: "bluesky"))
+    )
   end
 
   # @param key [String] A network key.

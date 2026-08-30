@@ -287,6 +287,23 @@ module Admin
 
     # The text of one post, as that network will get it.
     #
+    # ⚠️ **The two steps are in THIS ORDER.** The mentions go in first, and the typography second:
+    # a handle can hold no quotation mark and no dash pair, thus nothing that the first step writes
+    # can be read as punctuation by the second. `social_post_controller.js` counts in that order.
+    #
+    # ⚠️ **The typography is here, and not in `Bluesky#post!`.** Each of the three networks gets it,
+    # because a curly quotation mark is a character and not rich text. It must also run BEFORE the
+    # Markdown parse, and that parse makes the byte offsets of each facet: a `...` that became `…`
+    # after those offsets were made would move every facet after it.
+    # @param network [String]
+    # @param text [String]
+    # @return [String]
+    def text_for(network, text)
+      Typography.apply(mentioned(network, text))
+    end
+
+    # The text with the mentions in place, and with no typography.
+    #
     # ⚠️ **The server finds each token itself, and it reads the map as a lookup only.** It never
     # trusts the rows that the browser sent. Thus a token with no row still loses its "@", and a
     # submit with no `mentions` at all turns every mention into a plain name. That is the safe
@@ -294,7 +311,7 @@ module Admin
     # @param network [String]
     # @param text [String]
     # @return [String]
-    def text_for(network, text)
+    def mentioned(network, text)
       SocialMentions.substitute(text, values: values_for(network), network: network)
     end
 
@@ -337,9 +354,13 @@ module Admin
       # words would pass a draft that Bluesky then refuses. The message says what it counted.
       # ⚠️ It counts the Bluesky text even when Bluesky is not ticked. 300 is the limit of this page,
       # and this check runs before #selected_networks.
+      # ⚠️ The MENTIONS decide which message it is, and the typography never does. The typography
+      # runs on every draft, thus a count of the finished text would say "with the Bluesky handles"
+      # for a post that names nobody.
+      substituted = mentioned("bluesky", post[:text])
       counted = text_for("bluesky", post[:text])
       unless Bluesky.valid_post_length?(counted)
-        key = counted == post[:text] ? "too_long" : "too_long_handles"
+        key = substituted == post[:text] ? "too_long" : "too_long_handles"
         return post_message(key, index, count: Bluesky.post_length(counted),
                                         limit: Bluesky::MAX_GRAPHEMES)
       end

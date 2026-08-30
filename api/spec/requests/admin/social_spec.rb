@@ -888,6 +888,65 @@ RSpec.describe "Admin social media", type: :request do
 
     # The preview dialog. ⚠️ It reads the same fields as POST /social and it calls the same private
     # methods, thus it cannot show a text that the post does not send.
+    # ⚠️ The typography is a matter of CHARACTERS and not of rich text, thus each of the three
+    # networks gets it. That is the difference from a Markdown link, which Bluesky alone can take.
+    describe "POST /social with the typography" do
+      before do
+        sign_in_as(email: owner_email)
+        connect(bluesky: true, mastodon: true, threads: true)
+      end
+
+      it "curls the quotation marks of every network" do
+        post "/social", params: { posts: [ { text: %q(It's a "big" day... really), link: "" } ],
+                                  networks: %w[bluesky mastodon threads] }
+
+        expect(response).to redirect_to(social_path)
+        [ BlueskyPostJob, MastodonPostJob, ThreadsPostJob ].each do |job|
+          expect(job.jobs.first["args"].first.first["text"])
+            .to eq("It’s a “big” day… really"), "#{job} did not get the typography"
+        end
+      end
+
+      # ⚠️ This is the failure that this whole step is built around: SmartyPants reads the
+      # characters of an address as punctuation, and the link then goes nowhere.
+      it "leaves an address exactly as the owner wrote it" do
+        draft = %q(It's here: https://example.test/a--b... really)
+
+        post "/social", params: { posts: [ { text: draft, link: "" } ], networks: [ "bluesky" ] }
+
+        expect(BlueskyPostJob.jobs.first["args"].first.first["text"])
+          .to eq("It’s here: https://example.test/a--b… really")
+      end
+
+      it "counts the text that it will post" do
+        # 298 characters as the owner types it, and 296 after the ellipsis.
+        draft = "#{'a' * 295}..."
+
+        post "/social", params: { posts: [ { text: draft, link: "" } ], networks: [ "bluesky" ] }
+
+        expect(response).to redirect_to(social_path)
+        expect(Bluesky.post_length(BlueskyPostJob.jobs.first["args"].first.first["text"])).to eq(296)
+      end
+
+      # ⚠️ The message names the handles only when a MENTION made the text longer. The typography
+      # runs on every draft, thus a count of the finished text would name them for a post that
+      # mentions nobody.
+      it "does not name the handles when only the typography changed the text" do
+        post "/social", params: { posts: [ { text: "#{'a' * 300}..." } ], networks: [ "bluesky" ] }
+
+        expect(flash[:alert]).to eq(I18n.t("admin.social.errors.too_long.single", count: 301,
+                                                                                  limit: 300))
+      end
+
+      it "shows the typographic text in the preview" do
+        post "/social/preview/text", params: { posts: [ { text: %q(It's "big"...), link: "" } ] }
+
+        row = JSON.parse(response.body)["posts"].first["networks"].first
+        expect(row["text"]).to eq("It’s “big”…")
+        expect(row["length"]).to eq(11)
+      end
+    end
+
     # ⚠️ Only Bluesky has rich text. The composer unticks and disables the other two rows, and this
     # is not a repeat of that: a row that a browser cannot tick, a hand-written request can.
     describe "POST /social with a Markdown link" do

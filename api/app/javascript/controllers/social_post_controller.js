@@ -2,6 +2,7 @@ import { Controller } from "@hotwired/stimulus";
 import { i18nTable, t } from "../lib/i18n";
 import { render } from "../lib/markdown_links";
 import { blueskyText } from "../lib/social_mentions";
+import { applyLengthRules } from "../lib/typography";
 
 // How long the link field must be quiet before this reads the card. Each preview is one request of
 // this app, which then reads the page of another host.
@@ -61,12 +62,17 @@ export default class extends Controller {
    * "[my post](https://example.com/a)" is 7 characters and not 30.
    * `Admin::SocialController#post_error` and `Bluesky.post_length` measure the same string.
    *
-   * ⚠️ The two steps are in THIS ORDER, as they are on the server: the mentions go in first, and
-   * the Markdown is rendered second. A handle can hold no bracket, thus nothing that the first step
-   * writes can make a link that the second step then reads.
+   * And the typography shortens the words: `...` becomes one character and `--` becomes one.
+   *
+   * ⚠️ The three steps are in THIS ORDER, as they are on the server: the mentions, then the
+   * typography, then the Markdown. A handle can hold no bracket and no dash pair, thus no step can
+   * make work for the step below it.
+   *
+   * ⚠️ `applyLengthRules` writes NO quotation mark, and that is correct: a curly quotation mark is
+   * one character in place of one, thus it cannot change a count. Refer to that file.
    */
   count() {
-    const text = render(blueskyText(this.bodyTarget.value ?? "", this.blueskyMentions));
+    const text = render(applyLengthRules(blueskyText(this.bodyTarget.value ?? "", this.blueskyMentions)));
     const length = this.graphemes(text);
 
     this.countTarget.textContent = `${length} / ${this.limitValue}`;

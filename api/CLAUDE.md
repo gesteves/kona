@@ -1020,8 +1020,9 @@ The owner writes a short token, and the composer asks what that person is called
 - ⚠️ **The server finds each token itself and reads the map as a lookup only.** Thus a token with no
   row still loses its `@`, and a submit with no `mentions` at all turns every mention into a plain
   name. That is the safe direction.
-- ⚠️ **The count measures the BLUESKY text.** `@tony` is 5 characters and `@tony.bsky.social` is 17,
-  thus a count of the raw words would pass a draft that Bluesky then refuses. `#post_error` and
+- ⚠️ **The count measures the BLUESKY text**, after all three steps. `@tony` is 5 characters and
+  `@tony.bsky.social` is 17, thus a count of the raw words would pass a draft that Bluesky then
+  refuses. `#post_error` and
   `social_post_controller.js` measure the same string, the message says "with the Bluesky handles",
   and `SocialPresenter#bluesky_length` writes the first count. The count uses Bluesky even when
   Bluesky is not ticked: 300 is the limit of this page.
@@ -1054,6 +1055,63 @@ Ruby Regexp gives a source with `(?-mix:…)` in it, which JavaScript cannot par
 `spec/contracts/social_mentions_contract_spec.rb` compares them.
 ⚠️ A difference fails **safe** in both directions: a token that only the browser finds gives a row
 that the action ignores, and a token that only Ruby finds gets no row, thus its `@` comes off.
+
+#### Typography
+
+The body of a post gets the **SmartyPants typography**: `It's a "big" day...` posts as
+`It's a "big" day…`. The owner writes on a keyboard, and the post carries the marks that the
+sentence needs.
+
+⚠️ **It is the SAME typography as the blog.** `Typography` extends `MarkdownHelper` and calls its
+`#smartypants`, thus a post and the article that it links to cannot use a different apostrophe.
+**Do not write a second set of rules.**
+
+⚠️ **A curly quotation mark is a CHARACTER and not rich text, thus each of the three networks gets
+it.** That is the difference from a Markdown link, which Bluesky alone can take.
+
+⚠️ **An address goes through with NO change, and that is why this class exists** and the helper is
+not called directly. SmartyPants reads the characters of a URL as punctuation:
+`example.com/a--b` becomes an en dash, `/a...b` becomes an ellipsis, and `?q="a"` becomes curly
+quotation marks. Each of those is a link that is dead, and nothing reports it.
+
+- ⚠️ **It MASKS each address, and it does not split the text at one.** SmartyPants decides the
+  direction of a quotation mark from the characters at each side of it, thus it must read the whole
+  sentence at one time. With a split, `He said "see <link> now"` opens the quotation and never
+  closes it: the two marks are in different pieces. `Typography::PLACEHOLDER` is U+FFFC, and the
+  method **gives the words back with no typography at all** when a mask goes missing — a straight
+  apostrophe is a small thing, and an address that another address replaced is a link to the wrong
+  page.
+- ⚠️ **SmartyPants writes HTML entities**, because it is a renderer of HTML: `&rsquo;` and not `’`.
+  A post holds characters, thus the `HTMLEntities` decode is necessary and not decoration.
+- ⚠️ `Bluesky::URL_PATTERN` is the rule for what an address is, as it is for `SocialMentions`. It
+  also covers the `](https://…)` of a Markdown link and a `[name]: https://…` definition, because
+  each of those puts the address after a character that is not a word character.
+- The order of the whole pipeline is **the mentions, then the typography, then the Markdown**.
+  ⚠️ A handle can hold no quotation mark and no dash pair, thus nothing that the first step writes
+  is read as punctuation by the second. ⚠️ The typography must run **before** the Markdown parse,
+  because that parse makes the byte offsets of each facet: a `...` that became `…` afterwards would
+  move every facet after it.
+- ⚠️ **The message of a post that is too long names the handles only when a MENTION made it
+  longer.** `#post_error` reads `#mentioned` and not `#text_for` to decide that, because the
+  typography runs on every draft.
+
+⚠️ **The browser needs its own copy for the count**, and `app/javascript/lib/typography.js` holds
+the part of the rules that changes a LENGTH. **It writes no quotation mark, and that is correct**:
+`"` becomes `“` and `'` becomes `’`, and each is one character in place of one, thus the direction
+of a quotation mark cannot change a count. That is the hard half of SmartyPants and the half that no
+small copy could match, and it does not have to be matched.
+
+What is left is context-free, and `spec/contracts/typography_contract_spec.rb` runs both files with
+node and compares the lengths:
+
+```
+...  or  . . .   ->  …      three dots, or three with ONE space between each
+---              ->  —      the dashes run longest first: four give "—-" and five give "—–"
+--               ->  –
+```
+
+⚠️ **That file is for the COUNT and it must never render text that a person reads.** It would give
+a post with straight quotation marks.
 
 #### Markdown links
 
@@ -1100,9 +1158,8 @@ row that a browser cannot tick, a request that a person writes by hand can.
   refuse a draft that Bluesky takes.
 - ⚠️ **The offsets of `MarkdownLinks::Link` are CHARACTERS**, and `Bluesky#link_facet` makes the
   bytes that a record needs. One accented letter is 1 character and 2 bytes.
-- ⚠️ **The two steps run in this order: the mentions first, and the Markdown second.** A handle can
-  hold no bracket, thus nothing that the substitution writes can make a link that the render then
-  reads. `social_post_controller.js` counts in that same order.
+- ⚠️ **The Markdown is the LAST of the three steps**: the mentions, then the typography, then this.
+  Refer to **Typography** above for the reason that the order cannot change.
 
 ⚠️ **The grammar is in Ruby and in JavaScript**, because the count must follow each keystroke and
 the two checkboxes must go off at the keystroke that makes the first link.
