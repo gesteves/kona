@@ -35,6 +35,7 @@ export default class extends Controller {
       // This sets `required` as well, thus a page that renders again with the fields open keeps
       // that state.
       this.toggleSchedule();
+      this.validate();
     });
 
     this.renumber();
@@ -52,6 +53,7 @@ export default class extends Controller {
 
     this.postsTarget.appendChild(this.templateTarget.content.cloneNode(true));
     this.renumber();
+    this.validate();
 
     // The words are the point of a new post, thus the caret goes there.
     const added = this.postTargets[this.postTargets.length - 1];
@@ -67,6 +69,7 @@ export default class extends Controller {
 
     event.target.closest("[data-social-target='post']")?.remove();
     this.renumber();
+    this.validate();
   }
 
   /**
@@ -191,7 +194,7 @@ export default class extends Controller {
     this.dateTarget.required = on;
     this.timeTarget.required = on;
 
-    this.relabel();
+    this.validate();
   }
 
   /**
@@ -202,13 +205,67 @@ export default class extends Controller {
    * plain word, and the `required` of the fields then stops the submit.
    */
   relabel() {
-    if (!this.scheduleTarget.checked) {
-      this.labelTarget.textContent = "Post now";
-      return;
-    }
+    this.labelTarget.textContent = this.submitLabel;
+  }
 
-    const when = this.scheduledAt;
-    this.labelTarget.textContent = when ? `Schedule for ${when}` : "Schedule";
+  /**
+   * What the button will do, in its own words.
+   *
+   * ⚠️ **A moment that has passed is NOT a schedule**, thus the label goes back to "Post now" and
+   * the action posts at once. A label of "Schedule for" over a date in the past would promise
+   * something that cannot happen. `Admin::SocialController#scheduled_at` reads it the same way.
+   * @returns {string}
+   */
+  get submitLabel() {
+    if (!this.scheduleTarget.checked) return "Post now";
+
+    const at = this.scheduledAt;
+    if (!at) return "Schedule";
+    if (at.getTime() <= Date.now()) return "Post now";
+
+    return `Schedule for ${at.toLocaleString(undefined, {
+      month: "short", day: "numeric", hour: "numeric", minute: "2-digit"
+    })}`;
+  }
+
+  /**
+   * Turns the submit button off while the draft cannot go out, and writes the label.
+   *
+   * ⚠️ It runs from `input` and `change` on the **form**, thus one action covers each field of
+   * each post and each network. A field of a post belongs to the `social-post` controller, and
+   * this one reads the DOM in place of reaching into it.
+   */
+  validate() {
+    this.submitTarget.disabled = !this.canPost;
+    this.relabel();
+  }
+
+  /**
+   * @returns {boolean} True while the draft is one that the server will take.
+   */
+  get canPost() {
+    // Every post needs words. ⚠️ This is stricter than the server, which drops a block with nothing
+    // at all in it. A block that the owner added and left empty turns the button off instead, thus
+    // the page never asks them to guess which post is the problem.
+    const posts = this.postTargets;
+    if (posts.some((post) => !post.querySelector("wa-textarea")?.value?.trim())) return false;
+
+    // ⚠️ It reads the count line of each post in place of counting again. That line belongs to the
+    // `social-post` controller, which writes it from the same `input` event: the field is the
+    // target of that event and this form is above it, thus the count is already up to date here.
+    if (posts.some((post) => post.querySelector(".social__count--over"))) return false;
+
+    if (!this.networks.some((box) => box.checked && !box.disabled)) return false;
+
+    // ⚠️ The switch is on and the two fields name no moment, thus there is nothing to schedule.
+    // A moment that has **passed** is not this case: it is a complete answer, and it means "post
+    // now". `#submitLabel` reads the two the same way.
+    return !(this.scheduleTarget.checked && !this.scheduledAt);
+  }
+
+  /** @returns {HTMLElement[]} */
+  get networks() {
+    return [ ...this.element.querySelectorAll("wa-checkbox[name='networks[]']") ];
   }
 
   /**
@@ -234,10 +291,6 @@ export default class extends Controller {
     // The value of each field is local wire format, thus this parses as local time and it does no
     // conversion. The zone of the browser is what the hidden field sends.
     const at = new Date(`${date}T${time}`);
-    if (Number.isNaN(at.valueOf())) return null;
-
-    return at.toLocaleString(undefined, {
-      month: "short", day: "numeric", hour: "numeric", minute: "2-digit"
-    });
+    return Number.isNaN(at.valueOf()) ? null : at;
   }
 }

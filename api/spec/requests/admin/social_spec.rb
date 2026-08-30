@@ -565,13 +565,17 @@ RSpec.describe "Admin social media", type: :request do
           expect(BlueskyPostJob.jobs.first["at"]).to be_nil
         end
 
-        it "refuses a moment in the past" do
+        # ⚠️ A moment that has PASSED is not an error: it is not a schedule, thus the post goes out
+        # at once. The label of the submit button says "Post now" for that same draft, and a
+        # refusal here would make that button a liar.
+        it "posts at once for a moment that has passed" do
           post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
                                    schedule: "1", date: "2020-01-01", time: "09:00" }
 
-          expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include("Pick a time in the future.")
-          expect(BlueskyPostJob.jobs).to be_empty
+          expect(response).to redirect_to(social_path)
+          expect(flash[:notice]).to eq("Sent to Bluesky.")
+          expect(BlueskyPostJob.jobs.size).to eq(1)
+          expect(BlueskyPostJob.jobs.first["at"]).to be_nil
         end
 
         # ⚠️ There is no limit on how far ahead this can be, on purpose. A post about a race can

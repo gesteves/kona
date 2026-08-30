@@ -247,9 +247,12 @@ module Admin
     # @return [String, nil] The reason to refuse the schedule, or nil.
     def schedule_error
       return nil unless scheduled?
-      return "Pick a date and a time to schedule it." if scheduled_at.blank?
-      return "Pick a time in the future." if scheduled_at <= Time.current
+      return "Pick a date and a time to schedule it." if picked_moment.blank?
 
+      # ⚠️ A moment that has PASSED is not an error: it is not a schedule, thus the post goes out at
+      # once. The label of the submit button says "Post now" for that same draft, and a refusal here
+      # would make that button a liar.
+      #
       # ⚠️ There is no limit on how far ahead this can be. The owner asked for that: a post about a
       # race can wait for the race. The job then sits in the scheduled set of Sidekiq until it runs.
       nil
@@ -261,12 +264,23 @@ module Admin
     # field, thus "9:00" has one meaning. That is the difference from the Republish dialog, which
     # takes minutes from now for exactly this reason. When the Stimulus controller did not run, the
     # field is empty and `TIME_ZONE` is the fallback.
-    # @return [ActiveSupport::TimeWithZone, nil] The moment, or nil when a field is empty or has a
-    #   value that cannot be read.
+    # The moment to schedule for.
+    #
+    # ⚠️ It is nil for a moment that has **passed**, thus that draft takes the path of a post with
+    # no schedule and goes out at once. `#picked_moment` is the raw value, and `#schedule_error`
+    # reads that one to tell "no date at all" from "a date that went by".
+    # @return [ActiveSupport::TimeWithZone, nil]
     def scheduled_at
-      return @scheduled_at if defined?(@scheduled_at)
+      moment = picked_moment
+      moment if moment && moment > Time.current
+    end
 
-      @scheduled_at = parse_scheduled_at
+    # @return [ActiveSupport::TimeWithZone, nil] The moment that the two fields name, or nil when a
+    #   field is empty or has a value that cannot be read.
+    def picked_moment
+      return @picked_moment if defined?(@picked_moment)
+
+      @picked_moment = parse_scheduled_at
     end
 
     # @return [ActiveSupport::TimeWithZone, nil]

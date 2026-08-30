@@ -883,6 +883,17 @@ Threads, now or at a date and a time. All three post. Each post has an **optiona
   - ⚠️ **`required` on the date and the time follows the switch, and it is not in the markup.** A
     required control inside the hidden block would refuse "Post now", and a browser cannot show
     that message on an element that nobody can see.
+  - ⚠️ **A moment that has PASSED is not a schedule, and it is not an error either**: the draft goes
+    out at once. `#scheduled_at` gives nil for it, thus it takes the path of a post with no
+    schedule, and `#picked_moment` is the raw value that `#schedule_error` reads to tell "no date at
+    all" from "a date that went by". The label of the submit button says **"Post now"** for that
+    same draft, and a refusal here would make that button a liar.
+  - **The submit button is off while the draft cannot go out**: a post with no words, a post past
+    the limit, no network ticked, or the schedule switch on with no moment in its two fields.
+    ⚠️ A moment that has **passed** is not that last case: it is a complete answer that means "post
+    now", thus the button stays on and its label says so. ⚠️ That check is **stricter than the server**, which drops a
+    block with nothing at all in it. A block that the owner added and left empty turns the button
+    off instead, thus the page never asks them to guess which post is the problem.
   - ⚠️ **There is no limit on how far ahead a post can go, on purpose.** A post about a race can
     wait for the race. Thus the date field has a `min` and no `max`, and the job sits in the
     scheduled set of Sidekiq until it runs. The action refuses only a moment in the **past**, which

@@ -3,11 +3,15 @@
 <h1 class="admin-main__title">Social media</h1>
 
 <%# ⚠️ A refused submit renders this page again and does not redirect, thus each field below puts
-    its value back. To redirect would lose the words that the owner wrote. %>
+    its value back. To redirect would lose the words that the owner wrote.
+
+    ⚠️ `input` and `change` are on the FORM, and one action there covers each field of each post and
+    each network: both events bubble out of the components. A rule on each field would have to go
+    into the template of a post as well, and the two would drift. %>
 <%= form_with url: social_path, method: :post,
               class: "social wa-stack wa-gap-l",
               data: { controller: "social",
-                      action: "submit->social#markBusy",
+                      action: "submit->social#markBusy input->social#validate change->social#validate",
                       social_max_posts_value: @social.max_posts } do %>
 
   <%# One block for each post of the thread. The Add control below clones the template. %>
@@ -70,11 +74,11 @@
       <%# There is no `max`, on purpose: a post can wait as long as the owner wants. %>
       <wa-date-input name="date" label="Date" value="<%= @social.date %>"
                      min="<%= @social.min_date %>"
-                     data-social-target="date" data-action="change->social#relabel">
+                     data-social-target="date" data-action="change->social#validate">
       </wa-date-input>
 
       <wa-time-input name="time" label="Time" value="<%= @social.time %>" step="300"
-                     data-social-target="time" data-action="change->social#relabel">
+                     data-social-target="time" data-action="change->social#validate">
       </wa-time-input>
 
       <%# ⚠️ The browser writes its own IANA zone here. Without it the server cannot know what
