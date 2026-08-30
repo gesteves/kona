@@ -58,6 +58,7 @@ edge serves a cached copy before it gets a new one.
 | GET | `/social` | the Social media page | `no-store` |
 | POST | `/social` | checks the draft and adds the FIRST post job of each network that the owner ticked, now or at a date and a time; 303, or 422 with the draft still in the form | `no-store` |
 | GET | `/social/preview` | the card of a link, as JSON, for the preview on the page | `no-store` |
+| POST | `/social/preview/text` | the draft as each connected network will receive it, as JSON, for the Preview dialog. ⚠️ A POST, because a draft is much larger than a query string should carry | `no-store` |
 | GET | `/social/preview/image` | proxies the picture of that card. ⚠️ The parameter is the **page**, not the picture | `no-store` |
 | POST | `/spam/:id/not-spam`; DELETE `/spam/:id`, `/connected-apps/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
 | GET/POST/DELETE | `/connected-apps/bluesky` | the Bluesky handle + app password form, and disconnect | `no-store` |
@@ -1053,6 +1054,58 @@ Ruby Regexp gives a source with `(?-mix:…)` in it, which JavaScript cannot par
 `spec/contracts/social_mentions_contract_spec.rb` compares them.
 ⚠️ A difference fails **safe** in both directions: a token that only the browser finds gives a row
 that the action ignores, and a token that only Ruby finds gets no row, thus its `@` comes off.
+
+#### The preview
+
+A **Preview** button beside "Post now" opens a dialog that shows the draft as each connected network
+will receive it, with the count and the limit of that network. It posts nothing.
+
+Two things make the three texts different, and the owner could see neither one before this dialog:
+
+- **A mention.** Refer to the part above.
+- **The link.** `Mastodon#post!` joins it into the **text**. Bluesky makes an embed of it and
+  Threads makes an attachment, thus it is not in the text of either one. The dialog says where the
+  link went for those two.
+
+⚠️ **The value of the dialog is that it CANNOT be wrong, thus it copies nothing:**
+
+- `#preview_text` calls the same `#posts`, `#mention_rows`, and `#text_for` that `#create` calls,
+  and the dialog posts the same field names as a real submit. Thus a change to the substitution
+  reaches both.
+- **`Mastodon.compose` makes the status**, and `Mastodon#post!` calls that same method.
+- **`NETWORKS` holds the `limit` of each network**, and `#length_for` holds the count rule of each
+  one: graphemes for Bluesky, characters for the other two, and a URL at `Mastodon::URL_WEIGHT`.
+  `#network_length_error` and the preview both read them. Without one place the page could call a
+  draft correct and the action could then refuse it. A spec pins that agreement in both directions.
+
+The rules of the dialog:
+
+- ⚠️ **The Preview button and the Close button need `type="button"`.** `<wa-button>` is
+  form-associated, thus a button in a form with no type **submits** it. A Preview button that posts
+  the draft is the worst failure that this page could have, and a request spec cannot catch it.
+- ⚠️ **It sends the CSRF token in a header.** The admin does not skip the forgery protection, and
+  `config.action_controller.allow_forgery_protection` is **off in the test environment**. Thus each
+  ordinary example passes with no token and none of them proves this. One example turns that
+  protection on and posts with the token of the page, and a second one checks that the same request
+  with no token is refused. Without the header the dialog would fail in production alone.
+- ⚠️ **The dialog carries `data-controller="dialog"`**, as each dialog of the admin does. Turbo makes
+  its snapshot of the DOM as it is, thus one that is open when the owner navigates away comes back
+  open on a restoration visit.
+- The markup opens it with `data-dialog="open <id>"`, thus no code of ours opens it and the action
+  only fills it. It reads the draft **at the click**, thus it needs no debounce: that is the
+  difference from the link preview, which follows the typing.
+- ⚠️ The Republish dialog is a **sibling of `<wa-page>`** because the nav holds it, and that
+  component moves its `slot="navigation"` content. This one is in the page and holds no form
+  control, thus it is safe inside the `<form>` and the controller reaches it with a target.
+- A draft of one post gets **no label**: a number for a thread of one says nothing.
+- ⚠️ **The button is OFF while the draft holds nothing**, and it is `disabled` in the markup as
+  well, thus it is off before Stimulus connects. A dialog that opens to say "nothing yet" is worse
+  than a button that is off. The rule reads text OR link, which is the rule that `#posts` follows.
+  ⚠️ It is **not** `canPost`: a draft that is past the limit, or that ticks no network, is exactly
+  the draft that the owner wants to look at.
+- A request that fails writes **one line** in the dialog, and a dialog that opens and stays blank
+  says nothing at all. The line for an answer with no post stays as a fallback, and the button
+  above is what keeps it off the ordinary path.
 
 #### A thread
 

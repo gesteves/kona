@@ -152,6 +152,8 @@ Rails.application.routes.draw do
       # `social/preview`, or Rails reads it as part of that path.
       # The image is a proxy, and not a link to the other host: the CSP of the admin has
       # `img-src :self`. Refer to **The Social media page** in CLAUDE.md.
+      # ⚠️ It is a POST, and not a GET: a draft is much larger than a query string should carry.
+      post "social/preview/text"  => "social#preview_text",  as: :social_preview_text
       get "social/preview/image" => "social#preview_image", as: :social_preview_image
       get "social/preview"       => "social#preview",       as: :social_preview
 

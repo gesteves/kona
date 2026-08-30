@@ -8,11 +8,20 @@ module Admin
     # Each network that this page can post to, in the order of the page. `:job` posts to it, and
     # `:status` names the private method below that reads its state from Redis. ⚠️ This is the one
     # list: a network that is not here cannot take a post.
+    # ⚠️ `limit` is here and not in the check that reads it, because the PREVIEW reads it as well.
+    # In two places the page could call a draft correct and the action could then refuse it.
     NETWORKS = {
-      "bluesky"  => { job: BlueskyPostJob,  status: :bluesky_status },
-      "mastodon" => { job: MastodonPostJob, status: :mastodon_status },
-      "threads"  => { job: ThreadsPostJob,  status: :threads_status }
+      "bluesky"  => { job: BlueskyPostJob,  status: :bluesky_status,
+                      limit: Bluesky::MAX_GRAPHEMES },
+      "mastodon" => { job: MastodonPostJob, status: :mastodon_status,
+                      limit: Mastodon::DEFAULT_MAX_CHARACTERS },
+      "threads"  => { job: ThreadsPostJob,  status: :threads_status,
+                      limit: Threads::MAX_CHARACTERS }
     }.freeze
+
+    # Where the link goes for a network that keeps it OUT of the text, for the note of the preview.
+    # ⚠️ Mastodon is absent on purpose: its text holds the link, thus the owner can see it.
+    LINK_NOTES = { "bluesky" => "card", "threads" => "attachment" }.freeze
 
     # The most Bluesky handles that one draft asks the PDS about, and the seconds that all of those
     # calls together can take. ⚠️ Refer to #bluesky_handle_error: the budget, and not the timeout of
@@ -94,6 +103,30 @@ module Admin
         # ⚠️ The path of our own proxy, and never the og:image itself. Refer to #preview_image.
         image_path: (social_preview_image_path(url: url) if card.image_url.present?),
         standard_site: card.document_uri.present?
+      }
+    end
+
+    # POST /social/preview/text
+    #
+    # The draft as each connected network will receive it, as JSON.
+    #
+    # ⚠️ **It reads the same fields as #create and it calls the same private methods.** Thus the
+    # preview cannot show a text that the post does not send, and a change to the substitution
+    # reaches both. It writes nothing, it adds no job, and it calls no other service.
+    #
+    # ⚠️ It is a POST, and the two previews below are GET. A draft is as much as MAX_POSTS posts of
+    # 300 characters and a mention map, thus a query string is the wrong shape for it.
+    def preview_text
+      networks = social_networks.select(&:connected?)
+      # ⚠️ One post needs no label. The composer hides its own controls at one post for the same
+      # reason: a number for a thread of one says nothing.
+      labelled = posts.length > 1
+
+      render json: {
+        posts: posts.each_with_index.map { |post, index|
+          { label: (t("admin.social.preview.post", index: index + 1) if labelled),
+            networks: networks.map { |network| preview_row(network, post) } }
+        }
       }
     end
 
@@ -356,7 +389,56 @@ module Admin
     # @return [String] The name of that network, for a message.
     def network_name(key) = t("admin.networks.#{key}")
 
-    # Checks the text of the other two networks against their own limits.    # Checks the text of the other two networks against their own limits.
+    # One network of one post, for the preview.
+    # @param network [SocialPresenter::Network]
+    # @param post [Hash]
+    # @return [Hash]
+    def preview_row(network, post)
+      limit = NETWORKS.fetch(network.key)[:limit]
+      length = length_for(network.key, post)
+
+      { key: network.key, name: network.name, text: composed_text(network.key, post),
+        length: length, limit: limit, over: length > limit, note: link_note(network.key, post) }
+    end
+
+    # The text that one network will receive.
+    #
+    # ⚠️ **Mastodon is the one network whose text holds the LINK**, and `Mastodon.compose` is the
+    # method that `Mastodon#post!` calls. Bluesky makes an embed of the link and Threads makes an
+    # attachment, thus neither text holds it.
+    # @return [String]
+    def composed_text(network, post)
+      text = text_for(network, post[:text])
+      return text unless network == "mastodon"
+
+      Mastodon.compose(text: text, url: post[:link])
+    end
+
+    # The length of one post at one network, by the rule of that network.
+    #
+    # ⚠️ Bluesky counts GRAPHEMES and the other two count characters, and Mastodon counts a URL as
+    # `URL_WEIGHT` whatever its true length. This is ONE method, thus the preview and the check
+    # below cannot disagree about whether a draft fits.
+    # @return [Integer]
+    def length_for(network, post)
+      text = text_for(network, post[:text])
+
+      case network
+      when "bluesky"  then Bluesky.post_length(text)
+      when "mastodon" then Mastodon.post_length(text: text, url: post[:link])
+      else                 text.length
+      end
+    end
+
+    # @return [String, nil] Where the link went, for a network that keeps it out of the text.
+    def link_note(network, post)
+      note = LINK_NOTES[network]
+      return nil if note.nil? || post[:link].blank?
+
+      t("admin.social.preview.#{note}")
+    end
+
+    # Checks the text of the other two networks against their own limits.
     #
     # ⚠️ Bluesky has the shortest limit, thus the check above nearly always refuses a long draft
     # first. But a mention makes the text of each network a DIFFERENT length, and a plain name can
@@ -366,14 +448,15 @@ module Admin
     # @param index [Integer]
     # @return [String, nil]
     def network_length_error(post, index)
-      # Mastodon counts a URL as URL_WEIGHT, whatever its true length, and #post! joins it with two
-      # newlines.
-      mastodon = text_for("mastodon", post[:text]).length +
-                 (post[:link].present? ? Mastodon::URL_WEIGHT + 2 : 0)
-      return post_message("too_long_mastodon", index) if mastodon > Mastodon::DEFAULT_MAX_CHARACTERS
-      return nil unless text_for("threads", post[:text]).length > Threads::MAX_CHARACTERS
+      return post_message("too_long_mastodon", index) if over_limit?("mastodon", post)
+      return nil unless over_limit?("threads", post)
 
       post_message("too_long_threads", index)
+    end
+
+    # @return [Boolean] True when a post is past the limit of that network.
+    def over_limit?(network, post)
+      length_for(network, post) > NETWORKS.fetch(network)[:limit]
     end
 
     # Asks Bluesky about each handle of the map, and refuses a draft that names one that the PDS

@@ -169,7 +169,7 @@ class Mastodon < ApplicationService
   def post!(text:, url: nil, idempotency_key: nil, in_reply_to_id: nil)
     raise "Mastodon is not connected" unless connected?
 
-    status = [ text.to_s.strip, url.to_s.strip ].reject(&:blank?).join("\n\n")
+    status = self.class.compose(text: text, url: url)
     raise "The post is empty" if status.blank?
 
     posted = posted_status(idempotency_key)
@@ -193,6 +193,37 @@ class Mastodon < ApplicationService
     }
     remember_status(idempotency_key, result)
     result
+  end
+
+  # The status that this instance will receive.
+  #
+  # ⚠️ **The URL goes in the TEXT here**, and Bluesky makes an embed of it and Threads makes an
+  # attachment. Thus this is the one network whose text holds the link.
+  #
+  # ⚠️ `#post!` and the preview of the Social media page both call this. Without one method the
+  # preview would show a text that the post does not send.
+  # @param text [String, nil] The body of the post.
+  # @param url [String, nil] The link to add below the body.
+  # @return [String]
+  def self.compose(text:, url: nil)
+    [ text.to_s.strip, url.to_s.strip ].reject(&:blank?).join("\n\n")
+  end
+
+  # The length that this instance counts for a post.
+  #
+  # ⚠️ **Mastodon counts a URL as URL_WEIGHT, whatever its true length.** Thus this is not the
+  # length of the composed status, and `String#length` on that text would give a larger number for
+  # a long link.
+  # @param text [String, nil]
+  # @param url [String, nil]
+  # @return [Integer]
+  def self.post_length(text:, url: nil)
+    body = text.to_s.strip
+    link = url.to_s.strip
+    return body.length if link.blank?
+
+    # The two newlines that #compose writes, and then the weight of the link.
+    body.length + 2 + URL_WEIGHT
   end
 
   # Tells the instance to forget the token, then removes the stored credentials.

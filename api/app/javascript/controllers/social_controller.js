@@ -18,8 +18,9 @@ export default class extends Controller {
     "submit", "label", "posts", "post", "template", "add", "remove", "handle",
     "schedule", "scheduleFields", "date", "time", "timeZone",
     "mentions", "mentionRows", "mentionTemplate", "mention",
+    "preview", "previewSpinner", "previewBody", "previewGroupTemplate", "previewRowTemplate",
   ];
-  static values = { maxPosts: Number };
+  static values = { maxPosts: Number, previewUrl: String };
 
   connect() {
     // ⚠️ The words come from the locale file, through the `data-admin-i18n` attribute. Read the
@@ -270,7 +271,24 @@ export default class extends Controller {
     this.scheduleMentionScan();
 
     this.submitTarget.disabled = !this.canPost;
+    // ⚠️ This is NOT `canPost`. A draft that is past the limit, or that ticks no network, is exactly
+    // the draft that the owner wants to look at.
+    this.previewTarget.disabled = !this.canPreview;
     this.relabel();
+  }
+
+  /**
+   * @returns {boolean} True while the draft holds something to show.
+   *
+   * ⚠️ It reads text OR link, which is the rule that `Admin::SocialController#posts` follows: that
+   * method drops a block with nothing at all in it. Thus an empty draft gives no post, and a dialog
+   * that opens to say "nothing yet" is worse than a button that is off.
+   */
+  get canPreview() {
+    return this.postTargets.some((post) =>
+      post.querySelector("wa-textarea")?.value?.trim() ||
+      post.querySelector("wa-input[type='url']")?.value?.trim()
+    );
   }
 
   /**
@@ -465,6 +483,132 @@ export default class extends Controller {
   /** @returns {HTMLElement[]} */
   get networks() {
     return [ ...this.element.querySelectorAll("wa-checkbox[name='networks[]']") ];
+  }
+
+  /**
+   * Fills the preview dialog with the draft as each network will receive it.
+   *
+   * ⚠️ The markup opens the dialog, thus this only fills it. It reads the draft AT THE CLICK, thus
+   * it needs no debounce and no `input` action: that is the difference from the link preview,
+   * which follows the typing.
+   *
+   * ⚠️ `FormData(this.element)` sends every field that a real submit sends, thus the request needs
+   * no list of the fields and cannot go out of date when one is added.
+   *
+   * ⚠️ **It sends the CSRF token in a header of its own.** The admin does not skip the forgery
+   * protection, thus this POST needs that token. The body of the form carries one as well, and the
+   * header does not depend on it: neither the test environment nor a page that a spec renders has
+   * a token at all, thus no spec here can prove that the body alone would pass.
+   */
+  async preview() {
+    this.previewBodyTarget.replaceChildren();
+    this.previewSpinnerTarget.hidden = false;
+
+    // ⚠️ A second click while one request is out must not let the older answer write. It is the
+    // rule that `social-post#preview` follows for the card of a link.
+    this.previewSeq = (this.previewSeq ?? 0) + 1;
+    const seq = this.previewSeq;
+
+    try {
+      const response = await fetch(this.previewUrlValue, {
+        method: "POST",
+        headers: { Accept: "application/json", ...this.csrfHeader },
+        body: new FormData(this.element),
+      });
+      if (seq !== this.previewSeq) return;
+
+      if (!response.ok) return this.showPreviewMessage("preview_failed");
+      this.showPreview(await response.json());
+    } catch {
+      if (seq === this.previewSeq) this.showPreviewMessage("preview_failed");
+    } finally {
+      if (seq === this.previewSeq) this.previewSpinnerTarget.hidden = true;
+    }
+  }
+
+  /**
+   * The CSRF token of the page, as a header.
+   *
+   * ⚠️ `csrf_meta_tags` renders nothing where the forgery protection is off, which is the test
+   * environment. Thus this gives an empty object there and the header is absent, and the request
+   * still passes.
+   * @returns {object}
+   */
+  get csrfHeader() {
+    const token = document.querySelector("meta[name='csrf-token']")?.content;
+
+    return token ? { "X-CSRF-Token": token } : {};
+  }
+
+  /**
+   * Writes one group for each post, and one row for each network below it.
+   * @param {object} draft The answer of the preview action.
+   */
+  showPreview(draft) {
+    // ⚠️ The Preview button is off for a draft with nothing in it, thus this is a fallback and not
+    // the ordinary path. It stays because a dialog that opens and stays blank says nothing at all.
+    const posts = draft?.posts ?? [];
+    if (posts.length === 0) return this.showPreviewMessage("preview_empty");
+
+    const body = this.previewBodyTarget;
+    body.replaceChildren();
+
+    posts.forEach((post) => {
+      const group = this.cloneTemplate(this.previewGroupTemplateTarget, ".social-preview__group");
+      const label = group.querySelector("[data-preview-label]");
+
+      // A draft of one post gets no label: the action sends none for it.
+      if (post.label) {
+        label.textContent = post.label;
+        label.hidden = false;
+      }
+
+      const rows = group.querySelector("[data-preview-rows]");
+      post.networks.forEach((network) => rows.appendChild(this.previewRow(network)));
+      body.appendChild(group);
+    });
+  }
+
+  /**
+   * @param {object} network One network of one post.
+   * @returns {HTMLElement}
+   */
+  previewRow(network) {
+    const row = this.cloneTemplate(this.previewRowTemplateTarget, ".social-preview__row");
+    const count = row.querySelector("[data-preview-count]");
+
+    row.querySelector("[data-preview-name]").textContent = network.name;
+    count.textContent = `${network.length} / ${network.limit}`;
+    count.classList.toggle("social-preview__count--over", network.over);
+    row.querySelector("[data-preview-text]").textContent = network.text;
+
+    // The note says where the link went, for a network that keeps it out of the text.
+    const note = row.querySelector("[data-preview-note]");
+    if (network.note) {
+      note.textContent = network.note;
+      note.hidden = false;
+    }
+
+    return row;
+  }
+
+  /**
+   * Writes one line in the dialog. ⚠️ A dialog that opens and stays empty says nothing at all.
+   * @param {string} key A key below `admin.js.social`.
+   */
+  showPreviewMessage(key) {
+    const line = document.createElement("p");
+    line.textContent = t(this.words, key);
+    this.previewBodyTarget.replaceChildren(line);
+  }
+
+  /**
+   * @param {HTMLTemplateElement} template
+   * @param {string} selector
+   * @returns {HTMLElement}
+   */
+  cloneTemplate(template, selector) {
+    return template.content.cloneNode(true).querySelector(selector);
   }
 
   /**

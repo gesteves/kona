@@ -338,6 +338,9 @@ en:
         not_connected: "Not connected."
         post_now: "Post now"
         post_to: "Post to"
+        preview: "Preview"
+        preview_close: "Close"
+        preview_title: "What each network will get"
         schedule: "Schedule for later"
         time: "Time"
       post:
@@ -351,6 +354,14 @@ en:
       account:
         named: "Posts as %{account}."
         unnamed: "Connected."
+      # The dialog that shows the draft as each network will receive it.
+      # ⚠️ Mastodon has no note here, on purpose: its text holds the link and the owner can see it.
+      # The other two keep the link out of the text, thus a note says where it went.
+      preview:
+        attachment: "The link becomes an attachment."
+        card: "The link becomes a card."
+        post: "Post %{index}"
+
       # The example value of each mention field.
       mention_placeholder:
         bluesky: "handle.bsky.social"
@@ -427,6 +438,8 @@ en:
         # The two fields are not complete yet, thus the label cannot name a moment.
         incomplete: "Schedule"
         post_now: "Post now"
+        preview_empty: "There is nothing to preview yet."
+        preview_failed: "The preview couldn't be loaded."
         scheduled: "Schedule for %{at}"
       social_post:
         open_graph: "Open Graph"

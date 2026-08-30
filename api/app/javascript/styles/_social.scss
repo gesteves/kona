@@ -247,3 +247,62 @@
     margin: 0;
   }
 }
+
+// The preview dialog: the draft as each network will receive it.
+.social-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wa-space-l);
+
+  &__spinner[hidden] {
+    // ⚠️ The same rule as the spinner of a link: an author rule beats the `[hidden]` of the
+    // browser whatever its layer.
+    display: none;
+  }
+
+  &__group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-s);
+  }
+
+  &__post {
+    margin: 0;
+  }
+
+  &__rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-m);
+  }
+
+  &__network {
+    display: flex;
+    gap: var(--wa-space-xs);
+    justify-content: space-between;
+    margin: 0;
+    color: var(--wa-color-text-quiet);
+  }
+
+  &__count--over {
+    color: var(--wa-color-danger-on-quiet);
+  }
+
+  // ⚠️ The text keeps its line breaks and it wraps a long word. A post can hold a newline and a
+  // link with no space in it.
+  &__text {
+    margin: 0;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+
+  &__note {
+    margin: 0;
+    color: var(--wa-color-text-quiet);
+  }
+
+  &__note[hidden],
+  &__post[hidden] {
+    display: none;
+  }
+}

@@ -885,5 +885,220 @@ RSpec.describe "Admin social media", type: :request do
         expect(response.body).to include("Anthony Edwards")
       end
     end
+
+    # The preview dialog. ⚠️ It reads the same fields as POST /social and it calls the same private
+    # methods, thus it cannot show a text that the post does not send.
+    describe "POST /social/preview/text" do
+      before do
+        sign_in_as(email: owner_email)
+        connect(bluesky: true, mastodon: true, threads: true)
+      end
+
+      let(:url) { "https://example.test/2026/07/12/ironman-canada/" }
+
+      def preview(posts:, mentions: [])
+        post "/social/preview/text", params: { posts: posts, mentions: mentions }
+        JSON.parse(response.body)
+      end
+
+      def rows(body, index = 0) = body["posts"][index]["networks"].index_by { |row| row["key"] }
+
+      it "gives each network its own text from one body" do
+        body = preview(posts: [ { text: "Great ride with @tony.", link: "" } ],
+                       mentions: [ { token: "@tony", bluesky: "tony.bsky.social",
+                                     mastodon: "Anthony Edwards", threads: "@tony" } ])
+
+        expect(rows(body)["bluesky"]["text"]).to eq("Great ride with @tony.bsky.social.")
+        expect(rows(body)["mastodon"]["text"]).to eq("Great ride with Anthony Edwards.")
+        expect(rows(body)["threads"]["text"]).to eq("Great ride with @tony.")
+      end
+
+      # ⚠️ Mastodon joins the link into the TEXT, and the other two keep it out. This is the second
+      # thing that makes the three different, and the owner cannot see it before this dialog.
+      describe "the link" do
+        let(:body) { preview(posts: [ { text: "A long day.", link: url } ]) }
+
+        it "is in the Mastodon text and in no other one" do
+          expect(rows(body)["mastodon"]["text"]).to eq("A long day.\n\n#{url}")
+          expect(rows(body)["bluesky"]["text"]).to eq("A long day.")
+          expect(rows(body)["threads"]["text"]).to eq("A long day.")
+        end
+
+        it "says where it went, for the two that keep it out of the text" do
+          expect(rows(body)["bluesky"]["note"]).to eq(I18n.t("admin.social.preview.card"))
+          expect(rows(body)["threads"]["note"]).to eq(I18n.t("admin.social.preview.attachment"))
+          expect(rows(body)["mastodon"]["note"]).to be_nil
+        end
+
+        it "says nothing about a post with no link" do
+          plain = preview(posts: [ { text: "A long day.", link: "" } ])
+
+          expect(rows(plain).values.map { |row| row["note"] }).to all(be_nil)
+        end
+      end
+
+      # ⚠️ The composition is Mastodon.compose, which Mastodon#post! calls. Without one method the
+      # preview would show a text that the post does not send.
+      it "composes the Mastodon text the way that the service does" do
+        body = preview(posts: [ { text: "A long day.", link: url } ])
+
+        expect(rows(body)["mastodon"]["text"])
+          .to eq(Mastodon.compose(text: "A long day.", url: url))
+      end
+
+      describe "the counts" do
+        it "counts graphemes for Bluesky and characters for the other two" do
+          body = preview(posts: [ { text: "Ride 🚴‍♂️", link: "" } ])
+
+          # The emoji is one grapheme at Bluesky and more than one UTF-16 unit here.
+          expect(rows(body)["bluesky"]["length"]).to eq(6)
+          expect(rows(body)["threads"]["length"]).to eq("Ride 🚴‍♂️".length)
+        end
+
+        # ⚠️ Mastodon counts a URL as URL_WEIGHT, whatever its true length.
+        it "counts a Mastodon link at its weight and not its length" do
+          long = "https://example.test/#{'a' * 200}"
+          body = preview(posts: [ { text: "Hi", link: long } ])
+
+          expect(rows(body)["mastodon"]["length"]).to eq(2 + 2 + Mastodon::URL_WEIGHT)
+        end
+
+        it "gives the limit of each network" do
+          body = preview(posts: [ { text: "Hi", link: "" } ])
+
+          expect(rows(body)["bluesky"]["limit"]).to eq(Bluesky::MAX_GRAPHEMES)
+          expect(rows(body)["mastodon"]["limit"]).to eq(Mastodon::DEFAULT_MAX_CHARACTERS)
+          expect(rows(body)["threads"]["limit"]).to eq(Threads::MAX_CHARACTERS)
+        end
+
+        # ⚠️ This is the check that stops the dialog and the action from drifting: a draft that the
+        # action refuses must be `over` in the preview, and one that it takes must not be.
+        it "marks over exactly when the action refuses the draft" do
+          draft = { text: "#{'a' * 286} @tony", link: "" }
+          mentions = [ { token: "@tony", bluesky: "tony.bsky.social", mastodon: "", threads: "" } ]
+
+          expect(rows(preview(posts: [ draft ], mentions: mentions))["bluesky"]["over"]).to be true
+
+          post "/social", params: { posts: [ draft ], mentions: mentions, networks: [ "bluesky" ] }
+          expect(response).to have_http_status(:unprocessable_content)
+        end
+
+        it "does not mark over a draft that the action takes" do
+          draft = { text: "a" * 290, link: "" }
+
+          expect(rows(preview(posts: [ draft ]))["bluesky"]["over"]).to be false
+
+          post "/social", params: { posts: [ draft ], networks: [ "bluesky" ] }
+          expect(response).to redirect_to(social_path)
+        end
+      end
+
+      it "gives the connected networks only" do
+        connect(bluesky: true, mastodon: false, threads: false)
+
+        body = preview(posts: [ { text: "Hi", link: "" } ])
+
+        expect(rows(body).keys).to eq([ "bluesky" ])
+      end
+
+      describe "a thread" do
+        let(:body) do
+          preview(posts: [ { text: "One", link: "" }, { text: "Two", link: "" } ])
+        end
+
+        it "gives one group for each post, in order" do
+          expect(body["posts"].length).to eq(2)
+          expect(rows(body, 0)["bluesky"]["text"]).to eq("One")
+          expect(rows(body, 1)["bluesky"]["text"]).to eq("Two")
+        end
+
+        it "names each post" do
+          expect(body["posts"].map { |post| post["label"] })
+            .to eq([ I18n.t("admin.social.preview.post", index: 1),
+                     I18n.t("admin.social.preview.post", index: 2) ])
+        end
+
+        # A draft of one post needs no number.
+        it "names nothing when there is one post" do
+          one = preview(posts: [ { text: "One", link: "" } ])
+
+          expect(one["posts"].first["label"]).to be_nil
+        end
+      end
+
+      it "gives no post for an empty draft" do
+        expect(preview(posts: [])["posts"]).to eq([])
+      end
+
+      # ⚠️ It is a preview and not a submit: it must add no job and it must write nothing.
+      it "adds no job" do
+        preview(posts: [ { text: "Hi", link: url } ])
+
+        expect(BlueskyPostJob.jobs).to be_empty
+        expect(MastodonPostJob.jobs).to be_empty
+        expect(ThreadsPostJob.jobs).to be_empty
+      end
+
+      it "writes nothing to Redis" do
+        allow($redis).to receive(:set).and_raise("the preview must not write")
+        allow($redis).to receive(:hset).and_raise("the preview must not write")
+
+        expect { preview(posts: [ { text: "Hi", link: url } ]) }.not_to raise_error
+      end
+
+      it "asks Bluesky about no handle" do
+        # The handle check belongs to the submit. A preview must call no other service.
+        expect_any_instance_of(Bluesky).not_to receive(:handle_missing?)
+
+        preview(posts: [ { text: "cc @tony", link: "" } ],
+                mentions: [ { token: "@tony", bluesky: "nobody.bsky.social", mastodon: "",
+                              threads: "" } ])
+      end
+
+      it "needs the owner session" do
+        reset!
+
+        post "/social/preview/text", params: { posts: [ { text: "Hi", link: "" } ] }
+
+        expect(response).to redirect_to("/signin")
+      end
+
+      # ⚠️ The admin does not skip the forgery protection, thus this POST needs the CSRF token, and
+      # `social_controller.js` sends it in a header. The test environment turns that protection OFF,
+      # thus each example above passes with no token and none of them can prove this. This one turns
+      # it on: without the header the action would give a 422 in production alone, and the dialog
+      # would say only that the preview could not be loaded.
+      context "when the forgery protection is on" do
+        around do |example|
+          was = ActionController::Base.allow_forgery_protection
+          ActionController::Base.allow_forgery_protection = true
+          example.run
+          ActionController::Base.allow_forgery_protection = was
+        end
+
+        it "takes the token of the page in a header" do
+          get "/social"
+          token = Nokogiri::HTML(response.body).at("meta[name=csrf-token]")&.[]("content")
+          expect(token).to be_present, "the page renders no CSRF token for the browser to send"
+
+          post "/social/preview/text", params: { posts: [ { text: "Hi", link: "" } ] },
+                                       headers: { "X-CSRF-Token" => token }
+
+          expect(response).to have_http_status(:ok)
+        end
+
+        it "refuses the same request with no token" do
+          post "/social/preview/text", params: { posts: [ { text: "Hi", link: "" } ] }
+
+          expect(response).not_to have_http_status(:ok)
+        end
+      end
+
+      it "does not store the response" do
+        preview(posts: [ { text: "Hi", link: "" } ])
+
+        expect(response.headers["Cache-Control"]).to include("no-store")
+      end
+    end
   end
 end
