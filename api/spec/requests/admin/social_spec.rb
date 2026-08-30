@@ -84,9 +84,9 @@ RSpec.describe "Admin social media", type: :request do
       it "names the account of a connected network and disables one that is not connected" do
         get "/social"
 
-        expect(response.body).to include("Posts as @me.bsky.social.")
+        expect(response.body).to include(I18n.t("admin.social.account.named", account: "@me.bsky.social"))
         expect(response.body).to include('<wa-checkbox name="networks[]" value="mastodon" disabled>')
-        expect(response.body).to include("Not connected.")
+        expect(response.body).to include(I18n.t("admin.social.show.not_connected"))
       end
 
       it "names the account of each of the three networks" do
@@ -94,9 +94,9 @@ RSpec.describe "Admin social media", type: :request do
 
         get "/social"
 
-        expect(response.body).to include("Posts as @me.bsky.social.")
-        expect(response.body).to include("Posts as @me@instance.test.")
-        expect(response.body).to include("Posts as @me.")
+        expect(response.body).to include(I18n.t("admin.social.account.named", account: "@me.bsky.social"))
+        expect(response.body).to include(I18n.t("admin.social.account.named", account: "@me@instance.test"))
+        expect(response.body).to include(I18n.t("admin.social.account.named", account: "@me"))
       end
 
       # The owner posts to each connected network nearly always, thus the page must not ask for
@@ -119,7 +119,7 @@ RSpec.describe "Admin social media", type: :request do
         get "/social"
 
         expect(response.body).to include('<wa-checkbox name="networks[]" value="threads" disabled>')
-        expect(response.body).to include("The Threads token expired.")
+        expect(response.body).to include(I18n.t("admin.social.status.threads_expired"))
       end
 
       # ⚠️ Each state comes from Redis. An upstream failure must not go into the path of a page
@@ -143,7 +143,7 @@ RSpec.describe "Admin social media", type: :request do
       it "puts the item in the nav" do
         get "/social"
 
-        expect(response.body).to include("Social media")
+        expect(response.body).to include(I18n.t("admin.pages.social"))
       end
     end
 
@@ -293,7 +293,7 @@ RSpec.describe "Admin social media", type: :request do
         post "/social", params: { posts: [ { text: "A long day.", link: url } ], networks: [ "bluesky" ] }
 
         expect(response).to redirect_to(social_path)
-        expect(flash[:notice]).to include("Sent to Bluesky.")
+        expect(flash[:notice]).to eq(I18n.t("admin.social.flash.sent", networks: "Bluesky"))
         expect(BlueskyPostJob.jobs.size).to eq(1)
         payload = BlueskyPostJob.jobs.first["args"].first
         expect(payload.length).to eq(1)
@@ -338,7 +338,7 @@ RSpec.describe "Admin social media", type: :request do
           post "/social", params: { posts: [ { text: "One" }, { text: "Two" } ],
                                     networks: %w[bluesky mastodon] }
 
-          expect(flash[:notice]).to eq("Sent to Bluesky and Mastodon.")
+          expect(flash[:notice]).to eq(I18n.t("admin.social.flash.sent", networks: "Bluesky and Mastodon"))
         end
 
         # ⚠️ Only the FIRST post of each network is scheduled. That job adds the next one when it
@@ -352,7 +352,7 @@ RSpec.describe "Admin social media", type: :request do
 
           expect(BlueskyPostJob.jobs.size).to eq(1)
           expect(BlueskyPostJob.jobs.first["at"]).to be_present
-          expect(flash[:notice]).to include("Scheduled a post to Bluesky")
+          expect(flash[:notice]).to include(t_before("admin.social.flash.scheduled", :at, networks: "Bluesky"))
         end
 
         # An empty block that the owner added and left alone must not refuse the whole draft.
@@ -371,7 +371,7 @@ RSpec.describe "Admin social media", type: :request do
                                     networks: [ "bluesky" ] }
 
           expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include("Post 2 is 301 characters.")
+          expect(response.body).to include(I18n.t("admin.social.errors.too_long.numbered", index: 2, count: 301, limit: Bluesky::MAX_GRAPHEMES))
           expect(BlueskyPostJob.jobs).to be_empty
         end
 
@@ -380,7 +380,7 @@ RSpec.describe "Admin social media", type: :request do
                                     networks: [ "bluesky" ] }
 
           expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include("Post 2 needs a link that starts with http://")
+          expect(response.body).to include(I18n.t("admin.social.errors.bad_link.numbered", index: 2))
         end
 
         it "refuses a post of the thread that has a link and no words" do
@@ -390,7 +390,7 @@ RSpec.describe "Admin social media", type: :request do
           }
 
           expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include("Post 2 needs something to say.")
+          expect(response.body).to include(I18n.t("admin.social.errors.text_missing.numbered", index: 2))
         end
 
         it "refuses a thread past the limit" do
@@ -400,7 +400,7 @@ RSpec.describe "Admin social media", type: :request do
           }
 
           expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include("at most #{SocialPresenter::MAX_POSTS} posts")
+          expect(response.body).to include(I18n.t("admin.social.errors.too_many_posts", count: SocialPresenter::MAX_POSTS))
           expect(BlueskyPostJob.jobs).to be_empty
         end
 
@@ -421,7 +421,7 @@ RSpec.describe "Admin social media", type: :request do
 
         post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: %w[bluesky mastodon threads] }
 
-        expect(flash[:notice]).to eq("Sent to Bluesky, Mastodon, and Threads.")
+        expect(flash[:notice]).to eq(I18n.t("admin.social.flash.sent", networks: "Bluesky, Mastodon, and Threads"))
         # ⚠️ It compares the KEY of each post and not the whole payload. The three networks get a
         # different text when the draft names a person, and they must still share one key.
         keys = [ BlueskyPostJob, MastodonPostJob, ThreadsPostJob ].map do |job|
@@ -437,7 +437,7 @@ RSpec.describe "Admin social media", type: :request do
         post "/social", params: { posts: "", mentions: "", networks: [ "bluesky" ] }
 
         expect(response).to have_http_status(:unprocessable_content)
-        expect(flash[:alert]).to eq("Write something to post.")
+        expect(flash[:alert]).to eq(I18n.t("admin.social.errors.empty"))
         expect(BlueskyPostJob.jobs).to be_empty
       end
 
@@ -476,7 +476,7 @@ RSpec.describe "Admin social media", type: :request do
         post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: %w[bluesky myspace] }
 
         expect(BlueskyPostJob.jobs.size).to eq(1)
-        expect(flash[:notice]).to eq("Sent to Bluesky.")
+        expect(flash[:notice]).to eq(I18n.t("admin.social.flash.sent", networks: "Bluesky"))
       end
 
       # ⚠️ A dead Threads token is connected and cannot post. Without this check the job would
@@ -503,7 +503,7 @@ RSpec.describe "Admin social media", type: :request do
         post "/social", params: { posts: [ { text: " \n ", link: url } ], networks: [ "bluesky" ] }
 
         expect(response).to have_http_status(:unprocessable_content)
-        expect(response.body).to include("Write something to post.")
+        expect(response.body).to include(I18n.t("admin.social.errors.text_missing.single"))
       end
 
       # ⚠️ A submit that fails keeps the ticks of the owner, and an empty choice is a choice. The
@@ -544,7 +544,7 @@ RSpec.describe "Admin social media", type: :request do
           expected = Time.use_zone("America/New_York") do
             Time.zone.parse("#{on} 09:00").strftime("%B %-e at %-I:%M %p %Z")
           end
-          expect(flash[:notice]).to eq("Scheduled a post to Bluesky for #{expected}.")
+          expect(flash[:notice]).to eq(I18n.t("admin.social.flash.scheduled", networks: "Bluesky", at: expected))
         end
 
         # ⚠️ With no JavaScript the hidden field is empty. TIME_ZONE is then the meaning, and the
@@ -573,7 +573,7 @@ RSpec.describe "Admin social media", type: :request do
           post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
                                    schedule: "0", date: on, time: "09:00" }
 
-          expect(flash[:notice]).to include("Sent to Bluesky.")
+          expect(flash[:notice]).to eq(I18n.t("admin.social.flash.sent", networks: "Bluesky"))
           expect(BlueskyPostJob.jobs.first["at"]).to be_nil
         end
 
@@ -585,7 +585,7 @@ RSpec.describe "Admin social media", type: :request do
                                    schedule: "1", date: "2020-01-01", time: "09:00" }
 
           expect(response).to redirect_to(social_path)
-          expect(flash[:notice]).to eq("Sent to Bluesky.")
+          expect(flash[:notice]).to eq(I18n.t("admin.social.flash.sent", networks: "Bluesky"))
           expect(BlueskyPostJob.jobs.size).to eq(1)
           expect(BlueskyPostJob.jobs.first["at"]).to be_nil
         end
@@ -609,7 +609,7 @@ RSpec.describe "Admin social media", type: :request do
                                    schedule: "1", date: "garbage", time: "09:00" }
 
           expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include("Pick a date and a time to schedule it.")
+          expect(response.body).to include(I18n.t("admin.social.errors.no_moment"))
           expect(BlueskyPostJob.jobs).to be_empty
         end
 
@@ -626,7 +626,7 @@ RSpec.describe "Admin social media", type: :request do
                                    schedule: "1", date: "", time: "09:00" }
 
           expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include("Pick a date and a time to schedule it.")
+          expect(response.body).to include(I18n.t("admin.social.errors.no_moment"))
           expect(response.body).to include(%(value="09:00"))
           expect(response.body).to include("<wa-switch name=\"schedule\" value=\"1\" checked")
           expect(BlueskyPostJob.jobs).to be_empty
@@ -639,7 +639,7 @@ RSpec.describe "Admin social media", type: :request do
           post "/social", params: { posts: [ { text: "", link: url } ], networks: [ "bluesky" ] }
 
           expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include("Write something to post.")
+          expect(response.body).to include(I18n.t("admin.social.errors.text_missing.single"))
           expect(response.body).to include(%(value="#{url}"))
           expect(BlueskyPostJob.jobs).to be_empty
         end
@@ -650,7 +650,7 @@ RSpec.describe "Admin social media", type: :request do
           post "/social", params: { posts: [ { text: long, link: url } ], networks: [ "bluesky" ] }
 
           expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include("301 characters")
+          expect(response.body).to include(I18n.t("admin.social.errors.too_long.single", count: 301, limit: Bluesky::MAX_GRAPHEMES))
           expect(response.body).to include(long)
           expect(BlueskyPostJob.jobs).to be_empty
         end
@@ -659,7 +659,7 @@ RSpec.describe "Admin social media", type: :request do
           post "/social", params: { posts: [ { text: "Hi.", link: "not a link" } ], networks: [ "bluesky" ] }
 
           expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include("needs a link that starts with http://")
+          expect(response.body).to include(I18n.t("admin.social.errors.bad_link.single"))
           expect(BlueskyPostJob.jobs).to be_empty
         end
 
@@ -667,7 +667,7 @@ RSpec.describe "Admin social media", type: :request do
           post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [] }
 
           expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include("Pick at least one place to post it.")
+          expect(response.body).to include(I18n.t("admin.social.errors.no_network"))
           expect(BlueskyPostJob.jobs).to be_empty
         end
       end
@@ -699,7 +699,7 @@ RSpec.describe "Admin social media", type: :request do
       it "keeps the item in the nav" do
         get "/connected-apps"
 
-        expect(response.body).to include("Social media")
+        expect(response.body).to include(I18n.t("admin.pages.social"))
       end
     end
 
@@ -781,7 +781,7 @@ RSpec.describe "Admin social media", type: :request do
                                    threads: "" } ])
 
           expect(response).to have_http_status(:unprocessable_content)
-          expect(flash[:alert]).to include("with the Bluesky handles")
+          expect(flash[:alert]).to include(t_before("admin.social.errors.too_long_handles.single", :count, limit: Bluesky::MAX_GRAPHEMES))
           expect(BlueskyPostJob.jobs).to be_empty
         end
 
@@ -801,8 +801,9 @@ RSpec.describe "Admin social media", type: :request do
                                    threads: "" } ])
 
           expect(response).to have_http_status(:unprocessable_content)
-          expect(flash[:alert]).to eq("The Bluesky field of @tony holds a Mastodon handle. " \
-                                      "Move it, or write a name.")
+          expect(flash[:alert]).to eq(I18n.t("admin.social.errors.mistaken_network", network: I18n.t("admin.networks.bluesky"),
+                                                            token: "@tony",
+                                                            other: I18n.t("admin.networks.mastodon")))
           expect(BlueskyPostJob.jobs).to be_empty
         end
 
@@ -836,7 +837,7 @@ RSpec.describe "Admin social media", type: :request do
           post_draft(text: "cc @tony", mentions: [ draft ])
 
           expect(response).to have_http_status(:unprocessable_content)
-          expect(flash[:alert]).to include("Bluesky does not know @nobody.bsky.social")
+          expect(flash[:alert]).to include(I18n.t("admin.social.errors.bad_handle", handle: "nobody.bsky.social"))
           expect(BlueskyPostJob.jobs).to be_empty
         end
 

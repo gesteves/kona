@@ -105,7 +105,7 @@ RSpec.describe "Admin home", type: :request do
 
       expect(sidekiq_link).to include('target="_blank"')
       expect(sidekiq_link).to include('rel="noopener"')
-      expect(response.body).to include("(opens in a new tab)")
+      expect(response.body).to include(I18n.t("admin.nav.new_tab"))
       # A link in the app must not have the external mark.
       expect(response.body.scan('target="_blank"').length).to eq(1)
     end
@@ -116,7 +116,9 @@ RSpec.describe "Admin home", type: :request do
 
         get "/"
 
-        expect(response.body).to match(%r{<wa-badge[^>]*>\s*3\s*<span class="wa-visually-hidden">waiting</span>}m)
+        expect(response.body).to match(
+          %r{<wa-badge[^>]*>\s*3\s*<span class="wa-visually-hidden">#{Regexp.escape(I18n.t("admin.nav.waiting"))}</span>}m
+        )
       end
 
       # A badge with a zero gives no information.
@@ -152,8 +154,11 @@ RSpec.describe "Admin home", type: :request do
       it "labels each group and points its list at that label" do
         get "/"
 
-        %w[Tools Settings More].each do |label|
-          id = "admin-nav-#{label.downcase}"
+        # ⚠️ The id comes from the :key of the group, and NOT from the label. Thus a change to a
+        # word cannot move an id, and this spec keeps the id as a literal.
+        %w[tools settings more].each do |key|
+          id = "admin-nav-#{key}"
+          label = I18n.t("admin.nav.groups.#{key}")
           expect(response.body).to include(%(<div class="admin-nav__group-label wa-caption-s" id="#{id}">#{label}</div>))
           expect(response.body).to include(%(aria-labelledby="#{id}"))
         end

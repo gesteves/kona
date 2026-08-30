@@ -44,7 +44,7 @@ class MapTrackPresenter
 
   # @return [String] The label of the badge for the current status.
   def status_label
-    { "processing" => "Processing", "ready" => "Ready", "failed" => "Failed" }.fetch(status)
+    I18n.t("admin.course_maps.status.#{status}")
   end
 
   # @return [String] The Web Awesome badge variant for the current status.

@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { i18nTable, t } from "../lib/i18n";
 import { isBlueskyHandle, mentionKey, tokensOf } from "../lib/social_mentions";
 
 // How long the words must be quiet before the rows are reconciled. ⚠️ A token churns while the
@@ -21,6 +22,9 @@ export default class extends Controller {
   static values = { maxPosts: Number };
 
   connect() {
+    // ⚠️ The words come from the locale file, through the `data-admin-i18n` attribute. Read the
+    // table here: `submitLabel` runs at each keystroke and it must be synchronous.
+    this.words = i18nTable(this.element);
     // A restoration visit can render a snapshot that holds the button in its busy state.
     this.submitTarget.loading = false;
 
@@ -237,15 +241,17 @@ export default class extends Controller {
    * @returns {string}
    */
   get submitLabel() {
-    if (!this.scheduleTarget.checked) return "Post now";
+    if (!this.scheduleTarget.checked) return t(this.words, "post_now");
 
     const at = this.scheduledAt;
-    if (!at) return "Schedule";
-    if (at.getTime() <= Date.now()) return "Post now";
+    if (!at) return t(this.words, "incomplete");
+    if (at.getTime() <= Date.now()) return t(this.words, "post_now");
 
-    return `Schedule for ${at.toLocaleString(undefined, {
-      month: "short", day: "numeric", hour: "numeric", minute: "2-digit"
-    })}`;
+    return t(this.words, "scheduled", {
+      at: at.toLocaleString(undefined, {
+        month: "short", day: "numeric", hour: "numeric", minute: "2-digit"
+      })
+    });
   }
 
   /**

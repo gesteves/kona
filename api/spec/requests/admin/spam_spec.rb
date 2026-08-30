@@ -86,7 +86,7 @@ RSpec.describe "Admin spam quarantine", type: :request do
 
       get "/spam"
 
-      expect(response.body).to include('<wa-details summary="Show full message"')
+      expect(response.body).to include(%(<wa-details summary="#{I18n.t("admin.spam.index.show_full")}"))
     end
 
     # ⚠️ These fields are the only input from an attacker that this app renders as HTML with no
@@ -109,7 +109,7 @@ RSpec.describe "Admin spam quarantine", type: :request do
 
       get "/spam"
 
-      expect(response.body).to include("Nothing flagged")
+      expect(response.body).to include(I18n.t("admin.spam.index.empty"))
       # The layout always holds the Republish dialog, thus this looks for a delete confirmation.
       expect(response.body).not_to include('id="spam-delete-')
     end
@@ -143,7 +143,7 @@ RSpec.describe "Admin spam quarantine", type: :request do
       )
       expect(response).to have_http_status(:see_other)
       expect(response).to redirect_to("/spam")
-      expect(flash[:notice]).to include("released")
+      expect(flash[:notice]).to eq(I18n.t("admin.spam_flash.released"))
     end
 
     # ⚠️ SpamQuarantine#take reads and deletes in one step, thus two submissions cannot send the
@@ -155,7 +155,7 @@ RSpec.describe "Admin spam quarantine", type: :request do
 
       expect(ContactMailJob.jobs).to be_empty
       expect(response).to have_http_status(:see_other)
-      expect(flash[:alert]).to include("no longer in the queue")
+      expect(flash[:alert]).to eq(I18n.t("admin.spam_flash.gone"))
     end
   end
 
@@ -170,7 +170,7 @@ RSpec.describe "Admin spam quarantine", type: :request do
       expect(ContactMailJob.jobs).to be_empty
       expect(response).to have_http_status(:see_other)
       expect(response).to redirect_to("/spam")
-      expect(flash[:notice]).to eq("Message deleted.")
+      expect(flash[:notice]).to eq(I18n.t("admin.spam_flash.deleted"))
     end
   end
 

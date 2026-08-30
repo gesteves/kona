@@ -204,6 +204,10 @@ tab icon. Copy the files again when the mark changes.
   is, a contract between the two apps, a configuration in a dashboard, and a rule that the code does
   not show. Keep each one short.
 - Never write a production host name in the code. Refer to the text below.
+- ⚠️ **In `api/`, each user-facing word of the admin UI goes in `config/locales/en.yml`**, and
+  never in an ERB file, a Ruby method, or a JS file. The rule, and what stays out of it, is in
+  [`api/CLAUDE.md`](api/CLAUDE.md). This applies to the admin of `api/` only: `web/` is Middleman
+  and has no Rails i18n.
 
 ## Production domains — never hardcode
 

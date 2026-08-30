@@ -1,20 +1,18 @@
-<% content_for :title, "Course maps" %>
+<% content_for :title, t("admin.pages.course_maps") %>
 
-<h1 class="admin-main__title">Course maps</h1>
+<h1 class="admin-main__title"><%= t("admin.pages.course_maps") %></h1>
 
 <% unless @configured %>
   <wa-callout variant="warning" class="track-upload__notice">
     <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
-    Set <code>MAPBOX_USERNAME</code> and <code>MAPBOX_SECRET_TOKEN</code> in the environment to
-    upload tracks.
+    <%= t(".unconfigured_html", username: tag.code("MAPBOX_USERNAME"), token: tag.code("MAPBOX_SECRET_TOKEN")) %>
   </wa-callout>
 <% end %>
 
 <% if @worker_running == false %>
   <wa-callout variant="warning" class="track-upload__notice">
     <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
-    No Sidekiq worker is running, so nothing is publishing these tracks. Locally, <code>overmind
-    start</code> runs one; they'll pick up where they left off.
+    <%= t(".no_worker_html", command: tag.code("overmind start")) %>
   </wa-callout>
 <% end %>
 
@@ -22,19 +20,19 @@
     writes a native <button>. <wa-file-input> is also part of the form, thus the files go with the
     submission. %>
 <%= form_with url: course_maps_path, method: :post, multipart: true, class: "track-upload" do %>
-  <wa-file-input name="gpx_files[]" multiple accept=".gpx" label="GPX files"
-                 hint="Each track is published to Mapbox as a private vector tileset, which takes a minute or two.">
+  <wa-file-input name="gpx_files[]" multiple accept=".gpx" label="<%= t(".files") %>"
+                 hint="<%= t(".files_hint") %>">
   </wa-file-input>
   <wa-button type="submit" variant="brand" appearance="accent">
     <%= slotted_icon_svg("classic", "light", "arrow-up-from-bracket") %>
-    Upload
+    <%= t(".upload") %>
   </wa-button>
 <% end %>
 
 <% if @tracks.empty? %>
   <wa-callout variant="neutral">
     <%= slotted_icon_svg("classic", "light", "route", slot: "icon") %>
-    No tracks yet. Upload a GPX file and it'll show up here once Mapbox has published it.
+    <%= t(".empty") %>
   </wa-callout>
 <% else %>
   <%# The list reads the status while a track publishes, and then it stops. The tiling service of
@@ -62,12 +60,12 @@
               <% if track.ready? %>
                 <wa-button href="<%= track.show_path %>" variant="brand" appearance="accent">
                   <%= slotted_icon_svg("classic", "light", "sliders") %>
-                  Open
+                  <%= t(".open") %>
                 </wa-button>
               <% elsif track.processing? %>
                 <span class="wa-cluster wa-gap-xs wa-caption-s">
                   <wa-spinner></wa-spinner>
-                  Publishing to Mapbox…
+                  <%= t(".publishing") %>
                 </span>
               <% end %>
 
@@ -77,7 +75,7 @@
                   the dialog only. %>
               <wa-button variant="neutral" appearance="outlined" data-dialog="open <%= track.dialog_id %>">
                 <%= slotted_icon_svg("classic", "light", "trash") %>
-                Delete
+                <%= t(".delete") %>
               </wa-button>
             </div>
           </div>
@@ -86,15 +84,12 @@
         <%# The markup opens the dialog: wa-dialog listens on the full document for
             [data-dialog="open <id>"] and [data-dialog="close"]. The `dialog` controller only closes
             it before Turbo caches the page. %>
-        <wa-dialog id="<%= track.dialog_id %>" label="Delete this track?" data-controller="dialog">
-          <p>
-            This deletes <strong><%= track.title %></strong> here and removes its tileset and
-            source from Mapbox. It can't be undone.
-          </p>
+        <wa-dialog id="<%= track.dialog_id %>" label="<%= t(".delete_title") %>" data-controller="dialog">
+          <p><%= t(".delete_body_html", title: tag.strong(track.title)) %></p>
 
-          <wa-button slot="footer" appearance="outlined" data-dialog="close">Cancel</wa-button>
+          <wa-button slot="footer" appearance="outlined" data-dialog="close"><%= t("admin.actions.cancel") %></wa-button>
           <%= form_with url: track.delete_path, method: :delete, html: { slot: "footer" } do %>
-            <wa-button type="submit" variant="danger" appearance="accent">Delete forever</wa-button>
+            <wa-button type="submit" variant="danger" appearance="accent"><%= t("admin.actions.delete_forever") %></wa-button>
           <% end %>
         </wa-dialog>
       </li>

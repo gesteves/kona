@@ -35,7 +35,7 @@ Rails.application.configure do
   config.action_dispatch.verbose_redirect_logs = true
 
   # Raise an error for a translation that is absent.
-  # config.i18n.raise_on_missing_translations = true
+  config.i18n.raise_on_missing_translations = true
 
   # Do not add the file names to a rendered view. This app serves markup for a machine, and those
   # HTML comments would make the output different from the production output.

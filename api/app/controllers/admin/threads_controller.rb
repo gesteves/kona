@@ -19,7 +19,7 @@ module Admin
 
       if url.nil?
         redirect_to connected_apps_path, status: :see_other,
-                    alert: "Threads is not configured. Set THREADS_APP_ID and THREADS_APP_SECRET."
+                    alert: t("admin.threads.flash.unconfigured")
       else
         redirect_to url, allow_other_host: true
       end
@@ -27,22 +27,22 @@ module Admin
 
     # GET /connected-apps/threads/callback
     def callback
-      return connection_denied("Threads didn't authorize the app (#{params[:error_description] || params[:error]}).") if params[:error].present?
-      return connection_denied("That authorization is not valid or it expired. Connect the account again.") unless valid_state?(params[:state])
+      return connection_denied(t("admin.threads.flash.unauthorized", error: params[:error_description] || params[:error])) if params[:error].present?
+      return connection_denied(t("admin.oauth.invalid_state")) unless valid_state?(params[:state])
 
       $redis.del(STATE_CACHE_KEY)
 
       if params[:code].present? && Threads.new.connect!(params[:code], redirect_uri: threads_callback_url)
-        redirect_to connected_apps_path, notice: "Threads connected."
+        redirect_to connected_apps_path, notice: t("admin.threads.flash.connected")
       else
-        connection_denied("Threads didn't give an access token. Connect the account again.")
+        connection_denied(t("admin.threads.flash.no_token"))
       end
     end
 
     # DELETE /connected-apps/threads
     def destroy
       Threads.new.disconnect!
-      redirect_to connected_apps_path, status: :see_other, notice: "Threads disconnected."
+      redirect_to connected_apps_path, status: :see_other, notice: t("admin.threads.flash.disconnected")
     end
 
     private

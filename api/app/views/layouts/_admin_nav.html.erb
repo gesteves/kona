@@ -7,7 +7,9 @@
   </ul>
 
   <% admin_nav_groups.each do |group| %>
-    <% label_id = "admin-nav-#{group[:label].parameterize}" %>
+    <%# ⚠️ The id comes from :key, and NOT from the label. The label is a translation, thus an id
+        from it would change with a change to a word, and `aria-labelledby` points at that id. %>
+    <% label_id = "admin-nav-#{group[:key]}" %>
     <div class="wa-stack wa-gap-3xs">
       <%# ⚠️ This is a <div>, and not a heading element. It names a list of links, and a true heading
           here would come before the <h1> of the page. `aria-labelledby` gives the connection to the

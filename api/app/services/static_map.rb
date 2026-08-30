@@ -19,27 +19,41 @@ class StaticMap
   # The Mapbox styles, in a dropdown. A custom style is a text field, and it replaces the style
   # that the user selects here.
   # @see https://docs.mapbox.com/api/maps/styles/#mapbox-styles
+  # ⚠️ The value is the name of a translation and NOT the words on the screen. Each user-facing
+  # word of the admin is in config/locales/en.yml. Use `.style_options` to render the dropdown.
   STYLE_PRESETS = {
-    "mapbox://styles/mapbox/outdoors-v12" => "Outdoors",
-    "mapbox://styles/mapbox/streets-v12" => "Streets",
-    "mapbox://styles/mapbox/light-v11" => "Light",
-    "mapbox://styles/mapbox/dark-v11" => "Dark",
-    "mapbox://styles/mapbox/satellite-v9" => "Satellite",
-    "mapbox://styles/mapbox/satellite-streets-v12" => "Satellite streets",
-    "mapbox://styles/mapbox/navigation-day-v1" => "Navigation, day",
-    "mapbox://styles/mapbox/navigation-night-v1" => "Navigation, night"
+    "mapbox://styles/mapbox/outdoors-v12" => "outdoors",
+    "mapbox://styles/mapbox/streets-v12" => "streets",
+    "mapbox://styles/mapbox/light-v11" => "light",
+    "mapbox://styles/mapbox/dark-v11" => "dark",
+    "mapbox://styles/mapbox/satellite-v9" => "satellite",
+    "mapbox://styles/mapbox/satellite-streets-v12" => "satellite_streets",
+    "mapbox://styles/mapbox/navigation-day-v1" => "navigation_day",
+    "mapbox://styles/mapbox/navigation-night-v1" => "navigation_night"
   }.freeze
 
   # The marker icons that are available. The name says what each icon marks, and it is not the
   # Maki id.
   # @see https://labs.mapbox.com/maki-icons/
+  # ⚠️ The value is the name of a translation and NOT the words on the screen. Use `.icon_options`
+  # to render the dropdown.
   MARKER_ICONS = {
-    "pitch" => "Running",
-    "bicycle-share" => "Cycling",
-    "swimming" => "Swimming",
-    "racetrack" => "Finish",
-    "danger" => "DNF"
+    "pitch" => "running",
+    "bicycle-share" => "cycling",
+    "swimming" => "swimming",
+    "racetrack" => "finish",
+    "danger" => "dnf"
   }.freeze
+
+  # @return [Hash{String=>String}] Each style URL, and the name of that style on the screen.
+  def self.style_options
+    STYLE_PRESETS.transform_values { |name| I18n.t("admin.course_maps.styles.#{name}") }
+  end
+
+  # @return [Hash{String=>String}] Each Maki icon id, and what that icon marks on the screen.
+  def self.icon_options
+    MARKER_ICONS.transform_values { |name| I18n.t("admin.course_maps.icons.#{name}") }
+  end
 
   # The padding and the extra map apply to each side, in the Mapbox order.
   SIDES = %w[top right bottom left].freeze

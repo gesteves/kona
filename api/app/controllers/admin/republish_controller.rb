@@ -16,12 +16,12 @@ module Admin
     # POST /republish
     def create
       minutes = delay_minutes
-      return redirect_with(alert: "Pick between #{MIN_MINUTES} and #{MAX_MINUTES} minutes.") if minutes.nil?
+      return redirect_with(alert: t("admin.republish.flash.out_of_range", min: MIN_MINUTES, max: MAX_MINUTES)) if minutes.nil?
       return build_now if minutes.zero?
 
       replaced = SiteBuildJob.schedule_in(minutes.minutes, SiteBuildJob::ADMIN_EVENT_TYPE)
-      verb = replaced ? "rescheduled" : "scheduled"
-      redirect_with(notice: "Republish #{verb} in #{minutes} #{'minute'.pluralize(minutes)}.")
+      key = replaced ? "rescheduled" : "scheduled"
+      redirect_with(notice: t("admin.republish.flash.#{key}", count: minutes))
     end
 
     private
@@ -36,14 +36,12 @@ module Admin
     def build_now
       unless SiteBuildJob.claim_trigger_lock
         seconds = SiteBuildJob::TRIGGER_LOCK_TTL.to_i
-        return redirect_with(alert: "A republish already started in the last #{seconds} seconds.")
+        return redirect_with(alert: t("admin.republish.flash.already_started", count: seconds))
       end
 
       cancelled = SiteBuildJob.cancel_scheduled
       SiteBuildJob.perform_async(SiteBuildJob::ADMIN_EVENT_TYPE)
-      notice = "Republishing the site now."
-      notice += " The republish that was scheduled is cancelled." if cancelled
-      redirect_with(notice: notice)
+      redirect_with(notice: t("admin.republish.flash.#{cancelled ? "now_cancelled" : "now"}"))
     end
 
     # Reads the delay of the form.

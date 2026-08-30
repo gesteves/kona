@@ -25,7 +25,7 @@
     <%= slotted_icon_svg(*item[:icon]) %>
     <%= item[:label] %>
     <% if current %>
-      <span class="wa-visually-hidden">, current page</span>
+      <span class="wa-visually-hidden"><%= t("admin.nav.current_page") %></span>
     <% end %>
     <% if item[:badge] %>
       <%# ⚠️ This is in a span. A <wa-badge> in a slot of a <wa-button> becomes a small dot at a
@@ -33,13 +33,13 @@
       <span slot="end">
         <wa-badge pill>
           <%= item[:badge] %>
-          <span class="wa-visually-hidden">waiting</span>
+          <span class="wa-visually-hidden"><%= t("admin.nav.waiting") %></span>
         </wa-badge>
       </span>
     <% end %>
     <% if item[:external] %>
       <span slot="end" class="admin-nav__hint wa-caption-s"><%= raw icon_svg("classic", "light", "arrow-up-right-from-square") %></span>
-      <span class="wa-visually-hidden">(opens in a new tab)</span>
+      <span class="wa-visually-hidden"><%= t("admin.nav.new_tab") %></span>
     <% end %>
   <% end %>
 </li>

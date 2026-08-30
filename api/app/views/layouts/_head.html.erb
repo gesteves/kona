@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title><%= [ title.presence, "Given to Tri" ].compact.join(" · ") %></title>
+<title><%= [ title.presence, t("admin.site_name") ].compact.join(" · ") %></title>
 <%# ⚠️ This is here, and public/ serves it, and not Propshaft. With no declaration, the browser
     keeps the last icon that it saw for this origin, which is the icon of Sidekiq, because
     Sidekiq::Web has one and the admin had none. An /assets path with a fingerprint would not

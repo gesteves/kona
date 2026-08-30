@@ -81,13 +81,13 @@ class LocationPresenter
   # as a blank, and this page must not be blank about it.
   # @return [String]
   def heading
-    @place.presence || summary || "Nowhere yet"
+    @place.presence || summary || I18n.t("admin.location.empty_heading")
   end
 
   # @return [String] The line below the heading: the location. The tag beside it says if the app
   #   stored that location.
   def details
-    return "Drop a pin on the map to set your location." unless set?
+    return I18n.t("admin.location.prompt") unless set?
 
     summary
   end
@@ -95,11 +95,11 @@ class LocationPresenter
   # The state of the tag at the first render. It is always "saved" when there is a location,
   # because nothing can be staged before the page loads.
   #
-  # ⚠️ Its equivalent is STATES in location_map_controller.js, which controls each change after
-  # that. The two sets of words must agree.
+  # ⚠️ location_map_controller.js renders each state after this one, and it reads the SAME
+  # `admin.location.state.*` keys through `admin_i18n_data`. Thus the two cannot become different.
   # @return [String]
   def state_label
-    set? ? "Saved" : "Not set"
+    I18n.t("admin.location.state.#{set? ? "saved" : "not_set"}")
   end
 
   # @return [String] The wa-badge variant for {#state_label}, as on the Connected apps page and

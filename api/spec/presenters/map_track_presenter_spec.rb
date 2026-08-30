@@ -20,11 +20,11 @@ RSpec.describe MapTrackPresenter do
 
   describe "status" do
     it "labels and colors each state" do
-      expect(present).to have_attributes(status_label: "Ready", status_variant: "success", ready?: true)
+      expect(present).to have_attributes(status_label: I18n.t("admin.course_maps.status.ready"), status_variant: "success", ready?: true)
       expect(present("status" => "processing"))
-        .to have_attributes(status_label: "Processing", status_variant: "neutral", processing?: true)
+        .to have_attributes(status_label: I18n.t("admin.course_maps.status.processing"), status_variant: "neutral", processing?: true)
       expect(present("status" => "failed"))
-        .to have_attributes(status_label: "Failed", status_variant: "danger", failed?: true)
+        .to have_attributes(status_label: I18n.t("admin.course_maps.status.failed"), status_variant: "danger", failed?: true)
     end
 
     # A record from an older version, and a record with an incorrect shape, must still render a

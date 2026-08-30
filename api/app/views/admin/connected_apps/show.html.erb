@@ -1,6 +1,6 @@
-<% content_for :title, "Connected apps" %>
+<% content_for :title, t("admin.pages.connected_apps") %>
 
-<h1 class="admin-main__title">Connected apps</h1>
+<h1 class="admin-main__title"><%= t("admin.pages.connected_apps") %></h1>
 
 <ul class="plain-list wa-stack wa-gap-m">
   <% @apps.each do |app| %>
@@ -48,7 +48,7 @@
               <%= form_with url: app.disconnect_path, method: :delete do %>
                 <wa-button type="submit" variant="danger" appearance="outlined">
                   <%= slotted_icon_svg("classic", "light", "link-slash") %>
-                  Disconnect
+                  <%= t(".disconnect") %>
                 </wa-button>
               <% end %>
             <% end %>

@@ -1,23 +1,22 @@
-<% content_for :title, "Mastodon" %>
+<% content_for :title, t("admin.networks.mastodon") %>
 
-<p class="connected-app__back"><%= link_to "← Connected apps", connected_apps_path %></p>
+<p class="connected-app__back"><%= link_to t("admin.back_to_connected_apps"), connected_apps_path %></p>
 
-<h1 class="admin-main__title">Mastodon</h1>
+<h1 class="admin-main__title"><%= t("admin.networks.mastodon") %></h1>
 
 <p class="connected-app__description">
-  Connects a Mastodon account. Name the instance that holds the account, and Mastodon asks you
-  there to authorize this app.
+  <%= t(".description") %>
 </p>
 
 <%# ⚠️ `turbo: false` is necessary. This form gives a redirect to the instance, which is another
     origin, and Turbo Drive cannot follow one. %>
 <%= form_with url: mastodon_connection_path, method: :post, class: "wa-stack wa-gap-l", data: { turbo: false } do %>
-  <wa-input name="instance" label="Instance" value="<%= @instance %>" autocomplete="off"
-            placeholder="mastodon.social" required
-            hint="<%= @handle.present? ? "#{@handle} is connected. Authorizing again replaces it." : 'The hostname of your server, with no https://.' %>">
+  <wa-input name="instance" label="<%= t(".instance") %>" value="<%= @instance %>" autocomplete="off"
+            placeholder="<%= t(".instance_placeholder") %>" required
+            hint="<%= @handle.present? ? t(".connected_hint", handle: @handle) : t(".instance_hint") %>">
   </wa-input>
 
   <div class="wa-cluster wa-gap-s">
-    <wa-button type="submit" variant="brand" appearance="accent">Connect</wa-button>
+    <wa-button type="submit" variant="brand" appearance="accent"><%= t(".connect") %></wa-button>
   </div>
 <% end %>

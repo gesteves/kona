@@ -13,7 +13,7 @@ RSpec.describe "Owner sessions", type: :request do
     it "renders the Google sign-in button" do
       get "/signin"
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Sign in with Google")
+      expect(response.body).to include(I18n.t("admin.sign_in.google"))
     end
 
     # The page renders through layouts/auth, thus it needs the esbuild output that Propshaft gives a

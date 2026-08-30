@@ -1,4 +1,4 @@
-<% content_for :title, "Sign in" %>
+<% content_for :title, t("admin.pages.sign_in") %>
 
 <%# ⚠️ `turbo: false` is necessary. Turbo Drive takes each same-origin form submission and follows
     the response itself, but this response is a 302 to Google, which is a redirect to another
@@ -8,6 +8,6 @@
 <%= form_with url: "/auth/google_oauth2", method: :post, data: { turbo: false }, class: "signin__form" do %>
   <wa-button type="submit" variant="brand" appearance="accent" size="large">
     <%= slotted_icon_svg("classic", "brands", "google") %>
-    Sign in with Google
+    <%= t("admin.sign_in.google") %>
   </wa-button>
 <% end %>

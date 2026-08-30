@@ -53,7 +53,7 @@ RSpec.describe "Admin Bluesky connection", type: :request do
       it "says a password is saved" do
         get "/connected-apps/bluesky"
 
-        expect(response.body).to include("A password is saved")
+        expect(response.body).to include(I18n.t("admin.bluesky.show.password_hint"))
       end
     end
 
@@ -61,7 +61,7 @@ RSpec.describe "Admin Bluesky connection", type: :request do
       it "does not claim a password is saved" do
         get "/connected-apps/bluesky"
 
-        expect(response.body).not_to include("A password is saved")
+        expect(response.body).not_to include(I18n.t("admin.bluesky.show.password_hint"))
       end
     end
   end
@@ -80,7 +80,7 @@ RSpec.describe "Admin Bluesky connection", type: :request do
 
         expect(response).to have_http_status(:see_other)
         expect(response).to redirect_to("/connected-apps")
-        expect(flash[:notice]).to eq("Bluesky connected.")
+        expect(flash[:notice]).to eq(I18n.t("admin.bluesky.flash.connected"))
         expect(BlueskyCredentials.fetch.handle).to eq("me.bsky.social")
         expect(BlueskyCredentials.fetch.app_password).to eq("abcd-efgh")
       end
@@ -99,7 +99,7 @@ RSpec.describe "Admin Bluesky connection", type: :request do
         post "/connected-apps/bluesky", params: { handle: "me.bsky.social", app_password: "wrong" }
 
         expect(response).to have_http_status(:unprocessable_content)
-        expect(response.body).to include("open a Bluesky session")
+        expect(response.body).to include(ERB::Util.html_escape(I18n.t("admin.bluesky.flash.refused")))
         expect(BlueskyCredentials.stored?).to be(false)
       end
 
@@ -130,7 +130,7 @@ RSpec.describe "Admin Bluesky connection", type: :request do
 
       expect(response).to have_http_status(:see_other)
       expect(response).to redirect_to("/connected-apps")
-      expect(flash[:notice]).to eq("Bluesky disconnected.")
+      expect(flash[:notice]).to eq(I18n.t("admin.bluesky.flash.disconnected"))
       expect(BlueskyCredentials.stored?).to be(false)
     end
 

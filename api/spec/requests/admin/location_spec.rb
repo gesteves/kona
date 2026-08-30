@@ -62,7 +62,9 @@ RSpec.describe "Admin location", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("43.48, -110.76")
-      expect(response.body).to match(/<wa-badge[^>]*variant="success"[^>]*>Saved</m)
+      expect(response.body).to match(
+        /<wa-badge[^>]*variant="success"[^>]*>#{Regexp.escape(I18n.t("admin.location.state.saved"))}</m
+      )
       # ⚠️ Mapbox needs the longitude first. With the latitude first, the pin goes into the sea.
       expect(response.body).to include('data-location-map-center-value="[-110.76,43.48]"')
     end
@@ -80,7 +82,7 @@ RSpec.describe "Admin location", type: :request do
 
       get "/location"
 
-      expect(response.body).not_to include("Nowhere yet")
+      expect(response.body).not_to include(I18n.t("admin.location.empty_heading"))
       expect(response.body).to include("43.48, -110.76")
     end
 
@@ -118,7 +120,7 @@ RSpec.describe "Admin location", type: :request do
 
       get "/location"
 
-      expect(response.body).to include("Drop a pin on the map")
+      expect(response.body).to include(I18n.t("admin.location.prompt"))
       expect(response.body).to match(/<wa-badge[^>]*variant="neutral"[^>]*>Not set</m)
       expect(response.body).to include("data-location-map-center-value=\"#{LocationPresenter::WORLD_CENTER.to_json}\"")
     end
@@ -127,8 +129,8 @@ RSpec.describe "Admin location", type: :request do
     it "renders Save and Undo disabled, and the lookup it stages through" do
       get "/location"
 
-      expect(response.body).to include("Save")
-      expect(response.body).to include("Undo")
+      expect(response.body).to include(I18n.t("admin.location.show.save"))
+      expect(response.body).to include(I18n.t("admin.location.show.undo"))
       expect(response.body.scan(/<wa-button[^>]*\sdisabled/m).size).to eq(2)
       expect(response.body).to include('data-location-map-lookup-url-value="/location/lookup"')
     end
@@ -146,6 +148,26 @@ RSpec.describe "Admin location", type: :request do
 
       expect(response.headers["Cache-Control"]).to eq("no-store")
       expect(response.headers["CDN-Cache-Control"]).to be_nil
+    end
+  end
+
+  # ⚠️ The badge of the server and the badge of the browser must say the same words.
+  # `LocationPresenter#state_label` renders the first state, and location_map_controller.js renders
+  # each state after that. Both read `admin.location.state`, and this spec is what keeps them
+  # together: the words reach the browser in this attribute and nowhere else.
+  describe "the words that the map controller renders" do
+    before { sign_in! }
+
+    it "hands the browser the same state words that the presenter uses" do
+      get "/location"
+
+      table = JSON.parse(
+        Nokogiri::HTML(response.body).at_css("[data-controller='location-map']")["data-admin-i18n"]
+      )
+
+      expect(table["state"]).to eq(I18n.t("admin.location.state").deep_stringify_keys)
+      expect(table["state"]["saved"]).to eq(I18n.t("admin.location.state.saved"))
+      expect(table["map_failed"]).to eq(I18n.t("admin.js.location.map_failed"))
     end
   end
 
@@ -174,7 +196,7 @@ RSpec.describe "Admin location", type: :request do
     it "leaves the section out when there's nothing ahead" do
       get "/location"
 
-      expect(response.body).not_to include("Upcoming races")
+      expect(response.body).not_to include(I18n.t("admin.location.show.races"))
     end
 
     # Contentful is one more upstream service, and this page works without it.

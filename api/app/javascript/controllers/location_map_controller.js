@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { i18nTable, t } from "../lib/i18n";
 
 // This is the only place with the version. The code loads Mapbox GL JS from the CDN of Mapbox and
 // does not put it in the bundle: it is several times the size of the full admin bundle, this is
@@ -32,16 +33,9 @@ const LOCATED_ZOOM = 14;
 
 // The saved or unsaved badge. ⚠️ LocationPresenter#state_label and #state_variant also render its
 // "saved" half on the server. The two must agree.
-const STATES = {
-  saved: { label: "Saved", variant: "success" },
-  unsaved: { label: "Unsaved", variant: "warning" }
-};
-
-const GEOLOCATION_ERRORS = {
-  1: "Location permission was denied.",
-  2: "Your location isn't available right now.",
-  3: "Getting your location timed out."
-};
+// ⚠️ Only the VARIANT is here. The words come from `admin.location.state.*`, which
+// `LocationPresenter#state_label` also reads, thus the two cannot become different.
+const STATE_VARIANTS = { saved: "success", unsaved: "warning" };
 
 // This is at the module level, thus the code gets the script one time for each full page load,
 // for any number of Turbo visits through this page. ⚠️ Do not use `content_for :head`: Turbo adds
@@ -104,6 +98,11 @@ export default class extends Controller {
     this.teardown = this.teardown.bind(this);
     document.addEventListener("turbo:before-cache", this.teardown);
 
+    // ⚠️ The words come from the locale file, through the `data-admin-i18n` attribute. `state`
+    // holds the SAME keys that `LocationPresenter#state_label` reads, thus the badge of the server
+    // and the badge of the browser cannot become different.
+    this.i18n = i18nTable(this.element);
+
     // The value in Redis, and the value that the page would write. They are the same at the first
     // render, which is why the server renders the Save and Undo buttons in the off state.
     this.stored = this.pair(this.latitudeValue, this.longitudeValue);
@@ -142,7 +141,7 @@ export default class extends Controller {
     try {
       mapboxgl = await loadMapbox();
     } catch {
-      this.report("The map couldn't be loaded.");
+      this.report(this.words("map_failed"));
       return;
     }
 
@@ -195,7 +194,7 @@ export default class extends Controller {
     // code would stop its animation.
     control.on("geolocate", ({ coords }) => this.stage(coords.latitude, coords.longitude));
     control.on("error", (error) =>
-      this.report(GEOLOCATION_ERRORS[error.code] ?? "Your location couldn't be read.")
+      this.report(this.words(`geolocation.${error.code}`) || this.words("geolocation.unknown"))
     );
 
     return control;
@@ -211,10 +210,10 @@ export default class extends Controller {
     event.preventDefault();
 
     const address = this.hasAddressTarget ? this.addressTarget.value.trim() : "";
-    if (!address) return this.report("Type an address first.");
+    if (!address) return this.report(this.words("need_address"));
 
-    this.report("Looking that up…");
-    const result = await this.read({ address }, "That address couldn't be found.");
+    this.report(this.words("searching"));
+    const result = await this.read({ address }, this.words("address_not_found"));
     if (!result) return;
 
     this.stage(result.latitude, result.longitude, { fly: true, place: result.place });
@@ -256,9 +255,9 @@ export default class extends Controller {
     if (!this.staged || !this.changed) return;
 
     const staged = this.staged;
-    this.report("Saving…");
+    this.report(this.words("saving"));
 
-    const result = await this.write(staged, "Those coordinates were refused.");
+    const result = await this.write(staged, this.words("refused"));
     if (!result) return;
 
     // ⚠️ Compare with `staged`, not with `this.staged`. The pin can move again during the request,
@@ -312,16 +311,32 @@ export default class extends Controller {
     // rendered, and there are no coordinates to write over it.
     if (!this.staged) return;
 
-    this.flag(pending ? STATES.unsaved : STATES.saved);
+    this.flag(pending ? "unsaved" : "saved");
     this.report(this.format(this.staged));
   }
 
-  /** @param {object} state One of STATES. */
+  /**
+   * Writes the badge of one state.
+   * @param {string|object} state A name of STATE_VARIANTS, or the `{label, variant}` that the
+   *   server rendered, which Undo puts back when there is no stored location.
+   */
   flag(state) {
     if (!this.hasStateTarget) return;
 
-    this.stateTarget.textContent = state.label;
-    this.stateTarget.variant = state.variant;
+    const label = typeof state === "string" ? this.words(`state.${state}`) : state.label;
+    const variant = typeof state === "string" ? STATE_VARIANTS[state] : state.variant;
+
+    this.stateTarget.textContent = label;
+    this.stateTarget.variant = variant;
+  }
+
+  /**
+   * One line of words from the locale file.
+   * @param {string} key A key below the table of this controller.
+   * @returns {string}
+   */
+  words(key) {
+    return t(this.i18n, key);
   }
 
   /** @returns {boolean} True if the staged location is different from the stored one. */
@@ -360,7 +375,7 @@ export default class extends Controller {
 
       return await response.json();
     } catch {
-      if (refusal) this.report("Couldn't reach the server.");
+      if (refusal) this.report(this.words("unreachable"));
       return null;
     }
   }
@@ -388,7 +403,7 @@ export default class extends Controller {
 
       return await response.json();
     } catch {
-      this.report("Couldn't reach the server. Nothing was saved.");
+      this.report(this.words("unreachable_save"));
       return null;
     }
   }

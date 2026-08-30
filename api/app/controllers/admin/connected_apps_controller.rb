@@ -15,7 +15,7 @@ module Admin
     # DELETE /connected-apps/whoop
     def whoop
       Whoop.new.disconnect!
-      redirect_to connected_apps_path, status: :see_other, notice: "Whoop disconnected."
+      redirect_to connected_apps_path, status: :see_other, notice: t("admin.connected_apps.flash.whoop_disconnected")
     end
 
     private
@@ -26,11 +26,11 @@ module Admin
       # There is no deploy configuration to make incorrect: the credentials are the connection,
       # thus this card is always on the page.
       ConnectedAppPresenter.new(
-        name: "Bluesky",
+        name: t("admin.networks.bluesky"),
         description: card_description(
           connected: service.connected?,
           account: ("@#{service.handle}" if service.handle.present?),
-          summary: "Publishes the blog to the AT Protocol as standard.site records, and takes a post from the Social media page."
+          summary: t("admin.connected_apps.summary.bluesky")
         ),
         connected: service.connected?,
         connect_path: bluesky_connection_path,
@@ -44,11 +44,11 @@ module Admin
       # The registration and the token are the connection, and each one comes from the round trip.
       # Thus there is no deploy configuration and this card is always on the page.
       ConnectedAppPresenter.new(
-        name: "Mastodon",
+        name: t("admin.networks.mastodon"),
         description: card_description(
           connected: service.connected?,
           account: service.handle,
-          summary: "Connects a Mastodon account, for the Social media page."
+          summary: t("admin.connected_apps.summary.mastodon")
         ),
         connected: service.connected?,
         connect_path: mastodon_connection_path,
@@ -63,11 +63,11 @@ module Admin
       return unless service.valid_credentials?
 
       ConnectedAppPresenter.new(
-        name: "Threads",
+        name: t("admin.networks.threads"),
         description: card_description(
           connected: service.connected?,
           account: ("@#{service.username}" if service.username.present?),
-          summary: "Connects a Threads account, for the Social media page."
+          summary: t("admin.connected_apps.summary.threads")
         ),
         connected: service.connected?,
         connect_path: threads_authorize_path,
@@ -86,11 +86,17 @@ module Admin
       return unless service.connected?
 
       if service.expired?
-        "The Threads token expired#{on_date(service.expires_at)}, and an expired token cannot be renewed. " \
-          "Reconnect to post to Threads again."
+        # ⚠️ Two complete keys, and not one sentence with a fragment in the middle of it. The date
+        # is optional, thus the code selects a whole sentence.
+        date = formatted_date(service.expires_at)
+        if date
+          t("admin.connected_apps.threads.expired_on", date: date)
+        else
+          t("admin.connected_apps.threads.expired")
+        end
       else
-        refresh_error_message(service.refresh_error, name: "Threads",
-                              consequence: "Reconnect before the token expires: an expired Threads token cannot be renewed.")
+        refresh_error_message(service.refresh_error, name: t("admin.networks.threads"),
+                              consequence: t("admin.connected_apps.threads.consequence"))
       end
     end
 
@@ -103,17 +109,17 @@ module Admin
       connected = service.connected?
 
       ConnectedAppPresenter.new(
-        name: "Whoop",
+        name: t("admin.networks.whoop"),
         description: card_description(
           connected: connected,
           account: service.account_email,
-          summary: "Syncs strain, sleep, and recovery to Intervals.icu, and powers the Whoop widget."
+          summary: t("admin.connected_apps.summary.whoop")
         ),
         connected: connected,
         connect_path: "/whoop/auth",
         disconnect_path: whoop_connection_path,
-        error: (refresh_error_message(service.refresh_error, name: "Whoop",
-                                      consequence: "The widget and the Intervals.icu sync stay broken until you reconnect.") if connected)
+        error: (refresh_error_message(service.refresh_error, name: t("admin.networks.whoop"),
+                                      consequence: t("admin.connected_apps.whoop.consequence")) if connected)
       )
     end
 
@@ -130,7 +136,11 @@ module Admin
     def card_description(connected:, account:, summary:)
       return summary unless connected
 
-      account.present? ? "Connected as #{account}." : "Connected."
+      if account.present?
+        t("admin.connected_apps.account.named", account: account)
+      else
+        t("admin.connected_apps.account.unnamed")
+      end
     end
 
     # Whoop and Threads both keep their tokens in Redis after the service refuses them, thus
@@ -143,14 +153,16 @@ module Admin
     def refresh_error_message(error, name:, consequence:)
       return if error.blank?
 
-      failed_at = Time.zone.parse(error[:at].to_s)
-      "#{name} refused the last token refresh (HTTP #{error[:code]})#{on_date(failed_at)}. #{consequence}"
+      date = formatted_date(Time.zone.parse(error[:at].to_s))
+      key = date ? "on_date" : "plain"
+      t("admin.connected_apps.refresh_error.#{key}",
+        name: name, code: error[:code], date: date, consequence: consequence)
     end
 
     # @param time [Time, nil]
-    # @return [String] " on <date>", or an empty string with no time.
-    def on_date(time)
-      time ? " on #{time.in_time_zone.strftime('%B %-e, %Y at %-I:%M %p %Z')}" : ""
+    # @return [String, nil] The date to name in a sentence, or nil with no time.
+    def formatted_date(time)
+      time&.in_time_zone&.strftime("%B %-e, %Y at %-I:%M %p %Z")
     end
   end
 end

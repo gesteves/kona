@@ -21,8 +21,8 @@ RSpec.describe ConnectedAppPresenter do
 
     it "offers connect only" do
       expect(app.state).to eq(:disconnected)
-      expect(app.status_label).to eq("Not connected")
-      expect(app.connect_label).to eq("Connect")
+      expect(app.status_label).to eq(I18n.t("admin.connected_apps.status.disconnected"))
+      expect(app.connect_label).to eq(I18n.t("admin.connected_apps.connect.new"))
       expect(app).to be_connectable
       expect(app).not_to be_disconnectable
     end
@@ -31,7 +31,7 @@ RSpec.describe ConnectedAppPresenter do
   context "when attached and healthy" do
     it "offers disconnect only" do
       expect(app.state).to eq(:connected)
-      expect(app.status_label).to eq("Connected")
+      expect(app.status_label).to eq(I18n.t("admin.connected_apps.status.connected"))
       expect(app.status_variant).to eq("success")
       expect(app).not_to be_connectable
       expect(app).to be_disconnectable
@@ -45,14 +45,14 @@ RSpec.describe ConnectedAppPresenter do
 
     it "reports it as needing attention" do
       expect(app.state).to eq(:error)
-      expect(app.status_label).to eq("Needs attention")
+      expect(app.status_label).to eq(I18n.t("admin.connected_apps.status.error"))
       expect(app.status_variant).to eq("danger")
     end
 
     it "offers reconnect as well as disconnect, since reconnecting is the fix" do
       expect(app).to be_connectable
       expect(app).to be_disconnectable
-      expect(app.connect_label).to eq("Reconnect")
+      expect(app.connect_label).to eq(I18n.t("admin.connected_apps.connect.again"))
     end
   end
 

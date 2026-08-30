@@ -1,31 +1,433 @@
-# Rails uses the files in the config/locales directory for the languages, and it
-# loads them automatically. To use a language other than English, add the
-# necessary files to this directory.
+# Each user-facing word of the admin UI is here, below `en.admin`.
 #
-# To use the languages, call `I18n.t`:
+# ⚠️ This file is for ONE place for the copy, and not for a second language. A spec asserts
+# `I18n.t(...)` and never the words, thus a change to a word breaks no spec.
 #
-#     I18n.t "hello"
+# The rules:
+#   - A view uses the lazy key of its own path: `t(".title")` in
+#     app/views/admin/spam/index.html.erb reads `en.admin.spam.index.title`.
+#   - A file below app/views/layouts/ renders from more than one page, thus it uses the full key.
+#   - A presenter, a controller, and a helper use the full key. ⚠️ A presenter has no view context,
+#     thus it calls `I18n.t` and not the bare `t`.
+#   - Only the WORDS are here. An icon id, a path, a CSS class, a `data-` hook, a DOM id, and a Web
+#     Awesome `variant` stay in the code.
+#   - The widget views and the widget presenters are NOT here. Their copy is part of the markup
+#     contract with the web app.
 #
-# In a view, the shorter name `t` does the same:
-#
-#     <%= t("hello") %>
-#
-# To use a different language, set `I18n.locale`:
-#
-#     I18n.locale = :es
-#
-# That uses the data in config/locales/es.yml.
-#
-# For more data about the API, read the Rails Internationalization guide at
-# https://guides.rubyonrails.org/i18n.html.
-#
-# Note that YAML reads these strings as booleans, in each case: `true`, `false`,
-# `on`, `off`, `yes`, and `no`. Thus you must put quotation marks around such a
-# string to make it a string. For example:
-#
-#     en:
-#       "yes": yup
-#       enabled: "ON"
-
+# ⚠️ YAML reads `yes`, `no`, `on`, `off`, `true`, and `false` as booleans. Put quotation marks
+# around such a word to keep it a string.
 en:
-  hello: "Hello world"
+  admin:
+    # The name of the site, which each page title ends with.
+    site_name: "Given to Tri"
+
+    # The name of each page. ⚠️ One key for each page, because the nav item, the <title>, and the
+    # <h1> are the same words. A page name is NOT below its own lazy key, for that reason.
+    pages:
+      bluesky: "Bluesky"
+      connected_apps: "Connected apps"
+      course_maps: "Course maps"
+      home: "Home"
+      location: "Location"
+      mastodon: "Mastodon"
+      sidekiq: "Sidekiq"
+      sign_in: "Sign in"
+      social: "Social media"
+      spam: "Spam"
+
+    # The shell: the header, the sidebar, and the sign-out button.
+    layout:
+      home: "Home"          # The accessible name of the wordmark link.
+      nav_label: "Admin"    # The accessible name of the <nav>.
+      open_menu: "Open menu"
+      sign_out: "Sign out"
+
+    # The sidebar. `groups` names a caption above a list of links.
+    nav:
+      current_page: ", current page"      # Visually hidden, and it follows the label.
+      groups:
+        more: "More"
+        settings: "Settings"
+        tools: "Tools"
+      new_tab: "(opens in a new tab)"     # Visually hidden.
+      republish: "Republish site"         # An action, thus it is not a page name.
+      waiting: "waiting"                  # Visually hidden, and it follows a count.
+
+    # The Republish dialog, which the layout renders one time.
+    republish_dialog:
+      cancel: "Cancel"
+      minutes: "Delay in minutes"
+      submit: "Republish"                 # ⚠️ republish_controller.js replaces this label.
+      title: "Republish the site"
+
+    # The words that more than one page uses.
+    actions:
+      cancel: "Cancel"
+      delete_forever: "Delete forever"
+
+    # The sign-in page, which uses layouts/auth.
+    sign_in:
+      google: "Sign in with Google"
+
+    home:
+      show:
+        intro: "The owner-facing side of the Kona API. Nothing lives here yet — use the navigation
+          to reach the course map renderer, the settings pages, and the Sidekiq queue."
+
+    spam:
+      index:
+        badge: "Spam"
+        delete_body: "This deletes the message from Redis immediately. It can't be undone."
+        delete_title: "Delete this message?"
+        empty: "Nothing flagged. Anything Akismet catches shows up here, and is dropped after a
+          month."
+        ip: "IP"
+        location: "Location"
+        not_spam: "Not spam"
+        show_full: "Show full message"
+        submitted: "Submitted"
+        user_agent: "User agent"
+
+    # The flash messages of the Spam page.
+    spam_flash:
+      deleted: "Message deleted."
+      gone: "That message is no longer in the queue."
+      released: "Message released — it's on its way to your inbox."
+
+    # The name of each network. ⚠️ Connected apps and the Social media page both read these, thus a
+    # name is in one place.
+    networks:
+      bluesky: "Bluesky"
+      mastodon: "Mastodon"
+      threads: "Threads"
+      whoop: "Whoop"
+
+    connected_apps:
+      show:
+        disconnect: "Disconnect"
+      # The badge, from ConnectedAppPresenter#status_label.
+      status:
+        connected: "Connected"
+        disconnected: "Not connected"
+        error: "Needs attention"
+      # The connect action. ⚠️ An app in the :error state offers a NEW authorization, thus the word
+      # is different.
+      connect:
+        again: "Reconnect"
+        new: "Connect"
+      # The one line of a card. A connected card names its account, and each other card says what
+      # the integration does.
+      account:
+        named: "Connected as %{account}."
+        unnamed: "Connected."
+      summary:
+        bluesky: "Shares posts in Bluesky and publishes the site to the AT Protocol as
+          Standard.site records."
+        mastodon: "Shares posts in Mastodon."
+        threads: "Shares posts in Threads."
+        whoop: "Syncs strain, sleep, and recovery to Intervals.icu, and powers the Whoop widget."
+      # ⚠️ Each of these is a COMPLETE sentence, and the code does not join one from parts. The
+      # date is optional, thus there are two keys and not one key with a fragment in it.
+      threads:
+        consequence: "Reconnect before the token expires: an expired Threads token cannot be
+          renewed."
+        expired: "The Threads token expired, and an expired token cannot be renewed. Reconnect to
+          post to Threads again."
+        expired_on: "The Threads token expired on %{date}, and an expired token cannot be renewed.
+          Reconnect to post to Threads again."
+      whoop:
+        consequence: "The widget and the Intervals.icu sync stay broken until you reconnect."
+      refresh_error:
+        on_date: "%{name} refused the last token refresh (HTTP %{code}) on %{date}. %{consequence}"
+        plain: "%{name} refused the last token refresh (HTTP %{code}). %{consequence}"
+      flash:
+        whoop_disconnected: "Whoop disconnected."
+
+    # The back link that the Bluesky page and the Mastodon page share.
+    back_to_connected_apps: "← Connected apps"
+
+    bluesky:
+      show:
+        connect: "Connect"
+        description: "Publishes the blog to the AT Protocol as standard.site records. Create an app
+          password in Bluesky's settings."
+        handle: "Handle"
+        handle_placeholder: "you.bsky.social"
+        password: "App password"
+        password_hint: "A password is saved. Entering one replaces it."
+        password_placeholder: "xxxx-xxxx-xxxx-xxxx"
+      flash:
+        connected: "Bluesky connected."
+        disconnected: "Bluesky disconnected."
+        refused: "Those credentials didn't open a Bluesky session. Check the handle and app
+          password."
+
+    mastodon:
+      show:
+        connect: "Connect"
+        description: "Connects a Mastodon account. Name the instance that holds the account, and
+          Mastodon asks you there to authorize this app."
+        instance: "Instance"
+        instance_hint: "The hostname of your server, with no https://."
+        instance_placeholder: "mastodon.social"
+        connected_hint: "%{handle} is connected. Authorizing again replaces it."
+      flash:
+        connected: "Mastodon connected."
+        disconnected: "Mastodon disconnected."
+        no_token: "Mastodon didn't give an access token. Connect the account again."
+        not_an_instance: "That doesn't look like a Mastodon instance. Give its hostname, like
+          mastodon.social."
+        refused: "%{instance} didn't accept the app registration. Check the hostname and try
+          again."
+        unauthorized: "Mastodon didn't authorize the app (%{error})."
+
+    threads:
+      flash:
+        connected: "Threads connected."
+        disconnected: "Threads disconnected."
+        no_token: "Threads didn't give an access token. Connect the account again."
+        unconfigured: "Threads is not configured. Set THREADS_APP_ID and THREADS_APP_SECRET."
+        unauthorized: "Threads didn't authorize the app (%{error})."
+
+    # ⚠️ Mastodon and Threads both use this one. The two messages were the same words in two
+    # places, thus a change to one of them left the other one behind.
+    oauth:
+      invalid_state: "That authorization is not valid or it expired. Connect the account again."
+
+    # The flash messages of the Republish dialog.
+    # ⚠️ Each key is a COMPLETE sentence. An earlier version made one from a verb and a plural word,
+    # thus no reader could find the words of the message in the code.
+    republish:
+      flash:
+        already_started:
+          one: "A republish already started in the last second."
+          other: "A republish already started in the last %{count} seconds."
+        now: "Republishing the site now."
+        now_cancelled: "Republishing the site now. The republish that was scheduled is cancelled."
+        out_of_range: "Pick between %{min} and %{max} minutes."
+        rescheduled:
+          one: "Republish rescheduled in 1 minute."
+          other: "Republish rescheduled in %{count} minutes."
+        scheduled:
+          one: "Republish scheduled in 1 minute."
+          other: "Republish scheduled in %{count} minutes."
+
+    location:
+      show:
+        address: "Address"
+        address_placeholder: "An address, or the name of a place"
+        go: "Go there"
+        # ⚠️ An `_html` key is html_safe, and Rails escapes each value that goes into it. Thus the
+        # <code> element is a value and the sentence stays one string.
+        no_token_html: "Set %{variable} in the environment to show the map."
+        overridden_html: "%{variable} is set to %{value} in the environment, and outranks anything
+          set here. Unset it to use this page."
+        races: "Upcoming races"
+        save: "Save"
+        undo: "Undo"
+      # The line below the heading, and the heading when the geocode finds no name.
+      empty_heading: "Nowhere yet"
+      prompt: "Drop a pin on the map to set your location."
+      # ⚠️ The server renders the FIRST state and location_map_controller.js renders each state
+      # after that. Both read these keys, thus the two cannot become different.
+      state:
+        not_set: "Not set"
+        saved: "Saved"
+        unsaved: "Unsaved"
+
+    course_maps:
+      index:
+        delete: "Delete"
+        delete_body_html: "This deletes %{title} here and removes its tileset and source from
+          Mapbox. It can't be undone."
+        delete_title: "Delete this track?"
+        empty: "No tracks yet. Upload a GPX file and it'll show up here once Mapbox has published
+          it."
+        files: "GPX files"
+        files_hint: "Each track is published to Mapbox as a private vector tileset, which takes a
+          minute or two."
+        no_worker_html: "No Sidekiq worker is running, so nothing is publishing these tracks.
+          Locally, %{command} runs one; they'll pick up where they left off."
+        open: "Open"
+        publishing: "Publishing to Mapbox…"
+        unconfigured_html: "Set %{username} and %{token} in the environment to upload tracks."
+        upload: "Upload"
+      show:
+        back: "← All course maps"
+        base_style: "Base style"
+        custom_style: "Custom style"
+        custom_style_hint: "A style of your own. Overrides the base style above whenever it's set."
+        custom_style_placeholder: "mapbox://styles/…"
+        download: "Download PNG"
+        end_color: "Finish color"
+        end_icon: "Finish icon"
+        extra_map: "Extra map"
+        extra_map_hint: "Kilometers of map added around the track. Widens the view rather than the
+          border."
+        finish_on_top: "Draw the finish pin on top"
+        finish_on_top_hint: "Only matters when the two pins overlap, as on an out-and-back. The
+          start pin is on top by default."
+        framing: "Framing"
+        height: "Height"
+        # ⚠️ The width is an interpolation, thus the number is in StaticMap and not in a sentence.
+        height_hint: "Leave blank to derive it from the track's shape. The image is always %{width}
+          wide, and doubled on download."
+        height_placeholder: "Auto"
+        image_alt: "Map of %{title}"
+        markers: "Markers"
+        padding: "Padding"
+        padding_hint: "Pixels between the track and the edge of the image."
+        start_color: "Start color"
+        start_icon: "Start icon"
+        style: "Style"
+        track: "Track"
+        track_color: "Line color"
+        track_opacity: "Line opacity"
+        track_width: "Line width"
+        zoom: "View at full size"
+      # The four sides of the padding and of the extra map.
+      sides:
+        bottom: "Bottom"
+        left: "Left"
+        linked: "Same on all sides"
+        right: "Right"
+        top: "Top"
+      # The status of a track, from MapTrackPresenter#status_label.
+      status:
+        failed: "Failed"
+        processing: "Processing"
+        ready: "Ready"
+      # The dropdown of the marker icons. ⚠️ The name says what the icon MARKS, and it is not the
+      # Maki id of the icon.
+      icons:
+        cycling: "Cycling"
+        dnf: "DNF"
+        finish: "Finish"
+        running: "Running"
+        swimming: "Swimming"
+      # The dropdown of the map styles.
+      styles:
+        dark: "Dark"
+        light: "Light"
+        navigation_day: "Navigation, day"
+        navigation_night: "Navigation, night"
+        outdoors: "Outdoors"
+        satellite: "Satellite"
+        satellite_streets: "Satellite streets"
+        streets: "Streets"
+      flash:
+        deleted: "%{title} deleted."
+        delete_failed: "Couldn't delete that track from Mapbox: %{error}"
+        gone: "That track is no longer in the library."
+        no_files: "Choose at least one GPX file."
+        not_gpx: "%{files} isn't a GPX file."
+        too_large: "That's %{size} of GPX; the limit is %{limit}."
+        too_many: "Upload at most %{count} files at a time."
+        unreadable: "%{file}: %{error}"
+        uploading: "Uploading %{files} to Mapbox. This takes a minute."
+
+    social:
+      show:
+        add_post: "Add another post"
+        connect_it: "Connect it"
+        date: "Date"
+        mentions: "Mentions"
+        mentions_hint_html: "Each network writes a mention in its own way. Give the handle for each
+          one, or a plain name where that person has no account. An empty field posts the name with
+          no &ldquo;@&rdquo;."
+        not_connected: "Not connected."
+        post_now: "Post now"
+        post_to: "Post to"
+        schedule: "Schedule for later"
+        time: "Time"
+      post:
+        body: "Post"
+        body_placeholder: "What do you want to say?"
+        link: "Link"
+        link_placeholder: "https://"
+        remove: "Remove this post"
+        reorder: "Reorder this post with the arrow keys"
+      # The account line of a row of the "Post to" list.
+      account:
+        named: "Posts as %{account}."
+        unnamed: "Connected."
+      # The example value of each mention field.
+      mention_placeholder:
+        bluesky: "handle.bsky.social"
+        mastodon: "user@instance.social"
+        threads: "username"
+      status:
+        threads_expired: "The Threads token expired."
+      flash:
+        scheduled: "Scheduled a post to %{networks} for %{at}."
+        sent: "Sent to %{networks}."
+      # ⚠️ Each message here is a COMPLETE sentence. `single` is a draft of one post, and `numbered`
+      # names the post, because a thread has more than one and a plain message does not say which
+      # one is wrong. The code selects a whole sentence and never joins one from a label.
+      errors:
+        bad_handle: "Bluesky does not know @%{handle}. Correct the handle, or clear that field to
+          post the name alone."
+        bad_link:
+          numbered: "Post %{index} needs a link that starts with http:// or https://."
+          single: "That post needs a link that starts with http:// or https://."
+        empty: "Write something to post."
+        mistaken_network: "The %{network} field of %{token} holds a %{other} handle. Move it, or
+          write a name."
+        no_moment: "Pick a date and a time to schedule it."
+        no_network: "Pick at least one place to post it."
+        not_a_link: "That is not a link."
+        text_missing:
+          numbered: "Post %{index} needs something to say."
+          single: "Write something to post."
+        too_long:
+          numbered: "Post %{index} is %{count} characters. The limit is %{limit}."
+          single: "That post is %{count} characters. The limit is %{limit}."
+        # ⚠️ A mention grows into a handle, thus the message says what it counted.
+        too_long_handles:
+          numbered: "Post %{index} is %{count} characters with the Bluesky handles. The limit is
+            %{limit}."
+          single: "That post is %{count} characters with the Bluesky handles. The limit is
+            %{limit}."
+        too_long_mastodon:
+          numbered: "Post %{index} is too long for Mastodon with the names that you gave."
+          single: "That post is too long for Mastodon with the names that you gave."
+        too_long_threads:
+          numbered: "Post %{index} is too long for Threads with the names that you gave."
+          single: "That post is too long for Threads with the names that you gave."
+        too_many_posts: "A thread takes at most %{count} posts."
+
+    # The words that a Stimulus controller renders in the browser.
+    #
+    # ⚠️ JavaScript cannot read this file. `AdminHelper#admin_i18n_data` writes the subtree into a
+    # `data-admin-i18n` attribute, and `app/javascript/lib/i18n.js` reads it. Thus a word of the
+    # admin is still in one place.
+    js:
+      location:
+        address_not_found: "That address couldn't be found."
+        geolocation:
+          "1": "Location permission was denied."
+          "2": "Your location isn't available right now."
+          "3": "Getting your location timed out."
+          unknown: "Your location couldn't be read."
+        map_failed: "The map couldn't be loaded."
+        need_address: "Type an address first."
+        refused: "Those coordinates were refused."
+        saving: "Saving…"
+        searching: "Looking that up…"
+        unreachable: "Couldn't reach the server."
+        unreachable_save: "Couldn't reach the server. Nothing was saved."
+      republish:
+        now: "Republish now"
+        # The value is outside the limits, thus the label says only what the button does.
+        plain: "Republish"
+        scheduled:
+          one: "Republish in 1 minute"
+          other: "Republish in %{count} minutes"
+      social:
+        # The two fields are not complete yet, thus the label cannot name a moment.
+        incomplete: "Schedule"
+        post_now: "Post now"
+        scheduled: "Schedule for %{at}"
+      social_post:
+        open_graph: "Open Graph"
+        standard_site: "Standard.site"

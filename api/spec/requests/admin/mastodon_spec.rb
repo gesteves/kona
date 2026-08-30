@@ -116,7 +116,7 @@ RSpec.describe "Admin Mastodon connection", type: :request do
       post "/connected-apps/mastodon", params: { instance: "not a host" }
 
       expect(response).to have_http_status(:unprocessable_content)
-      expect(response.body).to include("doesn&#39;t look like a Mastodon instance")
+      expect(response.body).to include(ERB::Util.html_escape(I18n.t("admin.mastodon.flash.not_an_instance")))
     end
 
     it "re-renders the form when the instance refuses the registration" do
@@ -125,7 +125,7 @@ RSpec.describe "Admin Mastodon connection", type: :request do
       post "/connected-apps/mastodon", params: { instance: "mastodon.social" }
 
       expect(response).to have_http_status(:unprocessable_content)
-      expect(response.body).to include("didn&#39;t accept the app registration")
+      expect(response.body).to include(ERB::Util.html_escape(I18n.t("admin.mastodon.flash.refused", instance: "mastodon.social")))
       expect(MastodonCredentials.connected?).to be(false)
     end
   end
@@ -143,7 +143,7 @@ RSpec.describe "Admin Mastodon connection", type: :request do
       get "/connected-apps/mastodon/callback", params: { code: "a-code", state: "the-state" }
 
       expect(response).to redirect_to("/connected-apps")
-      expect(flash[:notice]).to eq("Mastodon connected.")
+      expect(flash[:notice]).to eq(I18n.t("admin.mastodon.flash.connected"))
     end
 
     it "spends the state, thus a replay cannot connect again" do
@@ -160,7 +160,7 @@ RSpec.describe "Admin Mastodon connection", type: :request do
       get "/connected-apps/mastodon/callback", params: { code: "a-code", state: "another-state" }
 
       expect(response).to redirect_to("/connected-apps/mastodon")
-      expect(flash[:alert]).to include("not valid")
+      expect(flash[:alert]).to include(ERB::Util.html_escape(I18n.t("admin.oauth.invalid_state")))
     end
 
     it "sends the owner back to the form when the instance denied the app" do
@@ -176,7 +176,7 @@ RSpec.describe "Admin Mastodon connection", type: :request do
       get "/connected-apps/mastodon/callback", params: { code: "a-code", state: "the-state" }
 
       expect(response).to redirect_to("/connected-apps/mastodon")
-      expect(flash[:alert]).to include("didn't give an access token")
+      expect(flash[:alert]).to eq(I18n.t("admin.mastodon.flash.no_token"))
     end
   end
 
@@ -196,7 +196,7 @@ RSpec.describe "Admin Mastodon connection", type: :request do
 
       expect(response).to have_http_status(:see_other)
       expect(response).to redirect_to("/connected-apps")
-      expect(flash[:notice]).to eq("Mastodon disconnected.")
+      expect(flash[:notice]).to eq(I18n.t("admin.mastodon.flash.disconnected"))
       expect(MastodonCredentials.connected?).to be(false)
     end
   end

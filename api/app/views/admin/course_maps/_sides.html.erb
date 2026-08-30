@@ -14,7 +14,7 @@
     <% StaticMap::SIDES.each_with_index do |side, index| %>
       <wa-number-input class="sides__field<%= " sides__field--primary" if index.zero? %>"
                        name="settings[<%= prefix %>_<%= side %>]"
-                       label="<%= side.capitalize %>"
+                       label="<%= t("admin.course_maps.sides.#{side}") %>"
                        value="<%= track.setting("#{prefix}_#{side}") %>"
                        min="0" max="<%= max %>" step="<%= step %>"
                        data-linked-sides-target="<%= index.zero? ? "primary" : "extra" %>">
@@ -24,7 +24,7 @@
 
   <wa-switch class="sides__toggle" size="small" data-linked-sides-target="toggle"
              <%= "checked" if StaticMap::SIDES.map { |side| track.setting("#{prefix}_#{side}") }.uniq.one? %>>
-    Same on all sides
+    <%= t("admin.course_maps.sides.linked") %>
   </wa-switch>
 
   <p class="sides__hint wa-caption-s"><%= hint %></p>

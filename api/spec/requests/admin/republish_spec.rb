@@ -60,7 +60,7 @@ RSpec.describe "Admin republish", type: :request do
       expect(SiteBuildJob.jobs.first["at"]).to be_nil
       expect(response).to have_http_status(:see_other)
       expect(response).to redirect_to("/")
-      expect(flash[:notice]).to include("now")
+      expect(flash[:notice]).to eq(I18n.t("admin.republish.flash.now"))
     end
 
     it "goes back to the page that opened the dialog" do
@@ -75,7 +75,7 @@ RSpec.describe "Admin republish", type: :request do
       post "/republish", params: { minutes: "0" }
 
       expect(SiteBuildJob.jobs).to be_empty
-      expect(flash[:alert]).to include("already started")
+      expect(flash[:alert]).to eq(I18n.t("admin.republish.flash.already_started", count: SiteBuildJob::TRIGGER_LOCK_TTL.to_i))
     end
 
     # ⚠️ The lock comes first. In the other order, a click inside the window of the lock would
@@ -93,13 +93,13 @@ RSpec.describe "Admin republish", type: :request do
       end
 
       expect(SiteBuildJob).to have_enqueued_sidekiq_job("admin-republish").at(Time.utc(2026, 8, 24, 12, 15, 0))
-      expect(flash[:notice]).to include("scheduled in 15 minutes")
+      expect(flash[:notice]).to eq(I18n.t("admin.republish.flash.scheduled", count: 15))
     end
 
     it "says one minute in the singular" do
       post "/republish", params: { minutes: "1" }
 
-      expect(flash[:notice]).to include("in 1 minute.")
+      expect(flash[:notice]).to eq(I18n.t("admin.republish.flash.scheduled", count: 1))
     end
 
     it "says that it replaced the build that was scheduled" do
@@ -107,7 +107,7 @@ RSpec.describe "Admin republish", type: :request do
 
       post "/republish", params: { minutes: "10" }
 
-      expect(flash[:notice]).to include("rescheduled")
+      expect(flash[:notice]).to eq(I18n.t("admin.republish.flash.rescheduled", count: 10))
     end
 
     it "says that an immediate build cancelled the one that was scheduled" do
@@ -115,21 +115,21 @@ RSpec.describe "Admin republish", type: :request do
 
       post "/republish", params: { minutes: "0" }
 
-      expect(flash[:notice]).to include("cancelled")
+      expect(flash[:notice]).to eq(I18n.t("admin.republish.flash.now_cancelled"))
     end
 
     it "refuses a number of minutes above the maximum" do
       post "/republish", params: { minutes: "61" }
 
       expect(SiteBuildJob.jobs).to be_empty
-      expect(flash[:alert]).to include("between 0 and 60 minutes")
+      expect(flash[:alert]).to eq(I18n.t("admin.republish.flash.out_of_range", min: Admin::RepublishController::MIN_MINUTES, max: Admin::RepublishController::MAX_MINUTES))
     end
 
     it "refuses a negative number" do
       post "/republish", params: { minutes: "-1" }
 
       expect(SiteBuildJob.jobs).to be_empty
-      expect(flash[:alert]).to include("between 0 and 60 minutes")
+      expect(flash[:alert]).to eq(I18n.t("admin.republish.flash.out_of_range", min: Admin::RepublishController::MIN_MINUTES, max: Admin::RepublishController::MAX_MINUTES))
     end
 
     # ⚠️ `to_i` reads "5.9" as 5 and "soon" as 0, and 0 starts a build.
@@ -137,21 +137,21 @@ RSpec.describe "Admin republish", type: :request do
       post "/republish", params: { minutes: "5.9" }
 
       expect(SiteBuildJob.jobs).to be_empty
-      expect(flash[:alert]).to include("between 0 and 60 minutes")
+      expect(flash[:alert]).to eq(I18n.t("admin.republish.flash.out_of_range", min: Admin::RepublishController::MIN_MINUTES, max: Admin::RepublishController::MAX_MINUTES))
     end
 
     it "refuses a value that is not a number" do
       post "/republish", params: { minutes: "soon" }
 
       expect(SiteBuildJob.jobs).to be_empty
-      expect(flash[:alert]).to include("between 0 and 60 minutes")
+      expect(flash[:alert]).to eq(I18n.t("admin.republish.flash.out_of_range", min: Admin::RepublishController::MIN_MINUTES, max: Admin::RepublishController::MAX_MINUTES))
     end
 
     it "refuses a value that is absent" do
       post "/republish", params: {}
 
       expect(SiteBuildJob.jobs).to be_empty
-      expect(flash[:alert]).to include("between 0 and 60 minutes")
+      expect(flash[:alert]).to eq(I18n.t("admin.republish.flash.out_of_range", min: Admin::RepublishController::MIN_MINUTES, max: Admin::RepublishController::MAX_MINUTES))
     end
   end
 

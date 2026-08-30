@@ -29,9 +29,9 @@
             win against, and the wordmark then moves to the side at the load. %>
         <wa-button data-toggle-nav appearance="plain">
           <%= raw icon_svg("classic", "light", "bars") %>
-          <span class="wa-visually-hidden">Open menu</span>
+          <span class="wa-visually-hidden"><%= t("admin.layout.open_menu") %></span>
         </wa-button>
-        <%= link_to root_path, class: "admin-header__home", aria: { label: "Home" } do %>
+        <%= link_to root_path, class: "admin-header__home", aria: { label: t("admin.layout.home") } do %>
           <%= render "layouts/logo" %>
         <% end %>
       </header>
@@ -39,7 +39,7 @@
       <%# This markup is here one time. <wa-page> renders it as the desktop sidebar and moves the
           same copy into a drawer on a mobile screen. It never shows both at the same time, thus do
           not put a copy in the header. %>
-      <nav slot="navigation" class="admin-nav" aria-label="Admin">
+      <nav slot="navigation" class="admin-nav" aria-label="<%= t("admin.layout.nav_label") %>">
         <%= render "layouts/admin_nav" %>
       </nav>
 
@@ -50,7 +50,7 @@
         <%= form_with url: "/signout", method: :post do %>
           <wa-button type="submit" appearance="outlined" variant="neutral">
             <%= slotted_icon_svg("classic", "light", "arrow-right-from-bracket") %>
-            Sign out
+            <%= t("admin.layout.sign_out") %>
           </wa-button>
         <% end %>
       </div>

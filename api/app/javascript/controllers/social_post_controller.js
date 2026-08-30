@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { i18nTable, t } from "../lib/i18n";
 import { blueskyText } from "../lib/social_mentions";
 
 // How long the link field must be quiet before this reads the card. Each preview is one request of
@@ -20,6 +21,8 @@ export default class extends Controller {
   static values = { limit: Number, warnAt: Number, previewUrl: String };
 
   connect() {
+    // ⚠️ The words come from the locale file, through the `data-admin-i18n` attribute.
+    this.words = i18nTable(this.element);
     // ⚠️ It waits for the definitions: `value` is undefined on these components until the browser
     // upgrades them. A Turbo restoration visit, and a page that renders again after a refusal, both
     // hold values with no controller state.
@@ -153,7 +156,7 @@ export default class extends Controller {
     if (card.image_path) this.previewImageTarget.src = card.image_path;
 
     // This is the thing that the owner cannot know until after the post without it.
-    this.previewKindTarget.textContent = card.standard_site ? "Standard.site" : "Open Graph";
+    this.previewKindTarget.textContent = t(this.words, card.standard_site ? "standard_site" : "open_graph");
     this.previewKindTarget.variant = card.standard_site ? "success" : "neutral";
 
     this.previewTarget.hidden = false;

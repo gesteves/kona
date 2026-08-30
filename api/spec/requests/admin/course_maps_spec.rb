@@ -44,7 +44,7 @@ RSpec.describe "Admin course maps", type: :request do
       get "/course-maps"
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("No tracks yet")
+      expect(response.body).to include(ERB::Util.html_escape(I18n.t("admin.course_maps.index.empty")))
     end
 
     # A page in a group marks itself in the sidebar in the same way as a page that is not in a
@@ -61,7 +61,7 @@ RSpec.describe "Admin course maps", type: :request do
 
       get "/course-maps"
 
-      expect(response.body).to include("2026 Morning Run", "Ready", "Running")
+      expect(response.body).to include("2026 Morning Run", I18n.t("admin.course_maps.status.ready"), "Running")
       expect(response.body).to include('<wa-button href="/course-maps/morning_run_abc"')
     end
 
@@ -91,7 +91,7 @@ RSpec.describe "Admin course maps", type: :request do
 
       get "/course-maps"
 
-      expect(response.body).to include("No Sidekiq worker is running")
+      expect(response.body).to include(t_before("admin.course_maps.index.no_worker_html", :command))
     end
 
     it "stays quiet about the worker when one is running" do
@@ -100,7 +100,7 @@ RSpec.describe "Admin course maps", type: :request do
 
       get "/course-maps"
 
-      expect(response.body).not_to include("No Sidekiq worker is running")
+      expect(response.body).not_to include(t_before("admin.course_maps.index.no_worker_html", :command))
     end
 
     # No track is in the publish state, thus the worker does not matter. Do not do the Redis read.
@@ -164,20 +164,20 @@ RSpec.describe "Admin course maps", type: :request do
       post "/course-maps", params: { gpx_files: [ gpx_upload("notes.txt") ] }
 
       expect(library).not_to have_received(:stage)
-      expect(flash[:alert]).to include("isn't a GPX file")
+      expect(flash[:alert]).to eq(I18n.t("admin.course_maps.flash.not_gpx", files: "notes.txt"))
     end
 
     it "refuses more files than it will take at once" do
       post "/course-maps", params: { gpx_files: Array.new(11) { gpx_upload } }
 
       expect(library).not_to have_received(:stage)
-      expect(flash[:alert]).to include("at most 10")
+      expect(flash[:alert]).to include(I18n.t("admin.course_maps.flash.too_many", count: Admin::CourseMapsController::MAX_FILES))
     end
 
     it "asks for a file when none was chosen" do
       post "/course-maps", params: {}
 
-      expect(flash[:alert]).to include("at least one GPX file")
+      expect(flash[:alert]).to include(I18n.t("admin.course_maps.flash.no_files"))
     end
 
     # An empty file field posts a blank string, and a request that a person makes can post each
@@ -186,7 +186,7 @@ RSpec.describe "Admin course maps", type: :request do
       post "/course-maps", params: { gpx_files: [ "", "not-a-file" ] }
 
       expect(library).not_to have_received(:stage)
-      expect(flash[:alert]).to include("at least one GPX file")
+      expect(flash[:alert]).to include(I18n.t("admin.course_maps.flash.no_files"))
     end
 
     # One track in a batch that the code cannot parse must not remove the other tracks.
@@ -200,7 +200,7 @@ RSpec.describe "Admin course maps", type: :request do
 
       expect(library).to have_received(:stage).once
       expect(flash[:alert]).to include("bad.gpx")
-      expect(flash[:notice]).to include("Uploading")
+      expect(flash[:notice]).to eq(I18n.t("admin.course_maps.flash.uploading", files: "2026 Ironman 70.3 Boise – Bike"))
     end
   end
 
@@ -283,7 +283,7 @@ RSpec.describe "Admin course maps", type: :request do
       get "/course-maps/nope"
 
       expect(response).to redirect_to("/course-maps")
-      expect(flash[:alert]).to include("no longer in the library")
+      expect(flash[:alert]).to include(I18n.t("admin.course_maps.flash.gone"))
     end
   end
 

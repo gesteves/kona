@@ -30,11 +30,11 @@ module Admin
 
       if @instance.blank?
         @instance = params[:instance]
-        return connection_failed("That doesn't look like a Mastodon instance. Give its hostname, like mastodon.social.")
+        return connection_failed(t("admin.mastodon.flash.not_an_instance"))
       end
 
       unless Mastodon.new.register!(instance: @instance, redirect_uri: mastodon_callback_url)
-        return connection_failed("#{@instance} didn't accept the app registration. Check the hostname and try again.")
+        return connection_failed(t("admin.mastodon.flash.refused", instance: @instance))
       end
 
       # A new instance of the service, because the registration above is what stored the client
@@ -44,22 +44,22 @@ module Admin
 
     # GET /connected-apps/mastodon/callback
     def callback
-      return connection_denied("Mastodon didn't authorize the app (#{params[:error]}).") if params[:error].present?
-      return connection_denied("That authorization is not valid or it expired. Connect the account again.") unless valid_state?(params[:state])
+      return connection_denied(t("admin.mastodon.flash.unauthorized", error: params[:error])) if params[:error].present?
+      return connection_denied(t("admin.oauth.invalid_state")) unless valid_state?(params[:state])
 
       $redis.del(STATE_CACHE_KEY)
 
       if params[:code].present? && Mastodon.new.connect!(params[:code])
-        redirect_to connected_apps_path, notice: "Mastodon connected."
+        redirect_to connected_apps_path, notice: t("admin.mastodon.flash.connected")
       else
-        connection_denied("Mastodon didn't give an access token. Connect the account again.")
+        connection_denied(t("admin.mastodon.flash.no_token"))
       end
     end
 
     # DELETE /connected-apps/mastodon
     def destroy
       Mastodon.new.disconnect!
-      redirect_to connected_apps_path, status: :see_other, notice: "Mastodon disconnected."
+      redirect_to connected_apps_path, status: :see_other, notice: t("admin.mastodon.flash.disconnected")
     end
 
     private

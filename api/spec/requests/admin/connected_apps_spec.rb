@@ -30,7 +30,7 @@ RSpec.describe "Admin connected apps", type: :request do
         get "/connected-apps"
 
         expect(response).to have_http_status(:ok)
-        expect(response.body).not_to include("Whoop")
+        expect(response.body).not_to include(I18n.t("admin.networks.whoop"))
         expect(response.body).not_to include("/whoop/auth")
       end
 
@@ -38,8 +38,8 @@ RSpec.describe "Admin connected apps", type: :request do
       it "still renders the cards that need no configuration" do
         get "/connected-apps"
 
-        expect(response.body).to include("Bluesky")
-        expect(response.body).to include("Mastodon")
+        expect(response.body).to include(I18n.t("admin.networks.bluesky"))
+        expect(response.body).to include(I18n.t("admin.networks.mastodon"))
       end
     end
 
@@ -52,7 +52,7 @@ RSpec.describe "Admin connected apps", type: :request do
       it "offers a Connect link that opts out of Turbo" do
         get "/connected-apps"
 
-        expect(response.body).to include("Not connected")
+        expect(response.body).to include(I18n.t("admin.connected_apps.status.disconnected"))
         expect(response.body).to include("/whoop/auth")
         # ⚠️ /whoop/auth is same-origin, but it gives a 302 to Whoop, and Turbo Drive cannot
         # follow that.
@@ -70,8 +70,8 @@ RSpec.describe "Admin connected apps", type: :request do
       it "offers Disconnect instead of Connect" do
         get "/connected-apps"
 
-        expect(response.body).to include("Connected")
-        expect(response.body).to include("Disconnect")
+        expect(response.body).to include(I18n.t("admin.connected_apps.status.connected"))
+        expect(response.body).to include(I18n.t("admin.connected_apps.show.disconnect"))
         expect(response.body).not_to include("/whoop/auth")
       end
 
@@ -80,7 +80,7 @@ RSpec.describe "Admin connected apps", type: :request do
 
         get "/connected-apps"
 
-        expect(response.body).to include("Connected as athlete@example.com")
+        expect(response.body).to include(I18n.t("admin.connected_apps.account.named", account: "athlete@example.com"))
       end
 
       # The label arrives with the next scheduled refresh for a connection that this app made
@@ -90,8 +90,8 @@ RSpec.describe "Admin connected apps", type: :request do
 
         get "/connected-apps"
 
-        expect(response.body).to include("Connected.")
-        expect(response.body).not_to include("Connected as")
+        expect(response.body).to include(I18n.t("admin.connected_apps.account.unnamed"))
+        expect(response.body).not_to include(t_before("admin.connected_apps.account.named", :account))
       end
 
       # ⚠️ Use a Web Awesome component in place of a native element. A plain <button> means that a
@@ -120,17 +120,18 @@ RSpec.describe "Admin connected apps", type: :request do
       it "flags it and says what went wrong" do
         get "/connected-apps"
 
-        expect(response.body).to include("Needs attention")
-        expect(response.body).to include("HTTP 401")
+        expect(response.body).to include(I18n.t("admin.connected_apps.status.error"))
+        expect(response.body).to include(I18n.t("admin.connected_apps.whoop.consequence"))
+        expect(response.body).to include("401")
         expect(response.body).to include("August 18, 2026")
       end
 
       it "offers Reconnect alongside Disconnect, so the fix doesn't need a disconnect first" do
         get "/connected-apps"
 
-        expect(response.body).to include("Reconnect")
+        expect(response.body).to include(I18n.t("admin.connected_apps.connect.again"))
         expect(response.body).to include("/whoop/auth")
-        expect(response.body).to include("Disconnect")
+        expect(response.body).to include(I18n.t("admin.connected_apps.show.disconnect"))
       end
     end
 
@@ -152,7 +153,7 @@ RSpec.describe "Admin connected apps", type: :request do
     it "offers a link to the credentials form when nothing is attached" do
       get "/connected-apps"
 
-      expect(response.body).to include("Bluesky")
+      expect(response.body).to include(I18n.t("admin.networks.bluesky"))
       expect(response.body).to include("/connected-apps/bluesky")
     end
 
@@ -162,7 +163,7 @@ RSpec.describe "Admin connected apps", type: :request do
       it "reports it as connected and offers Disconnect" do
         get "/connected-apps"
 
-        expect(response.body).to include("Connected as @me.bsky.social")
+        expect(response.body).to include(I18n.t("admin.connected_apps.account.named", account: "@me.bsky.social"))
         expect(response.body).to match(%r{<form[^>]*action="/connected-apps/bluesky"}m)
         expect(response.body).to include('name="_method" value="delete"')
       end
@@ -184,9 +185,9 @@ RSpec.describe "Admin connected apps", type: :request do
     it "offers a link to the instance form when no account is attached" do
       get "/connected-apps"
 
-      expect(response.body).to include("Mastodon")
+      expect(response.body).to include(I18n.t("admin.networks.mastodon"))
       expect(response.body).to include("/connected-apps/mastodon")
-      expect(response.body).to include("Not connected")
+      expect(response.body).to include(I18n.t("admin.connected_apps.status.disconnected"))
     end
 
     context "when an account is connected" do
@@ -201,7 +202,7 @@ RSpec.describe "Admin connected apps", type: :request do
       it "names the account and offers Disconnect" do
         get "/connected-apps"
 
-        expect(response.body).to include("Connected as @me@mastodon.social")
+        expect(response.body).to include(I18n.t("admin.connected_apps.account.named", account: "@me@mastodon.social"))
         expect(response.body).to match(%r{<form[^>]*action="/connected-apps/mastodon"}m)
         expect(response.body).to include('name="_method" value="delete"')
       end
@@ -225,7 +226,7 @@ RSpec.describe "Admin connected apps", type: :request do
     it "offers the authorize link when no account is attached" do
       get "/connected-apps"
 
-      expect(response.body).to include("Threads")
+      expect(response.body).to include(I18n.t("admin.networks.threads"))
       expect(response.body).to include("/connected-apps/threads/authorize")
     end
 
@@ -235,7 +236,7 @@ RSpec.describe "Admin connected apps", type: :request do
 
       get "/connected-apps"
 
-      expect(response.body).not_to include("Threads")
+      expect(response.body).not_to include(I18n.t("admin.networks.threads"))
       expect(response.body).not_to include("/connected-apps/threads/authorize")
     end
 
@@ -250,7 +251,7 @@ RSpec.describe "Admin connected apps", type: :request do
       it "names the account and offers Disconnect" do
         get "/connected-apps"
 
-        expect(response.body).to include("Connected as @me")
+        expect(response.body).to include(I18n.t("admin.connected_apps.account.named", account: "@me"))
         expect(response.body).to match(%r{<form[^>]*action="/connected-apps/threads"}m)
         expect(response.body).to include('name="_method" value="delete"')
       end
@@ -269,11 +270,11 @@ RSpec.describe "Admin connected apps", type: :request do
         it "flags it and offers Reconnect alongside Disconnect" do
           get "/connected-apps"
 
-          expect(response.body).to include("Needs attention")
-          expect(response.body).to include("HTTP 400")
-          expect(response.body).to include("cannot be renewed")
-          expect(response.body).to include("Reconnect")
-          expect(response.body).to include("Disconnect")
+          expect(response.body).to include(I18n.t("admin.connected_apps.status.error"))
+          expect(response.body).to include(I18n.t("admin.connected_apps.threads.consequence"))
+          expect(response.body).to include("400")
+          expect(response.body).to include(I18n.t("admin.connected_apps.connect.again"))
+          expect(response.body).to include(I18n.t("admin.connected_apps.show.disconnect"))
         end
       end
 
@@ -285,10 +286,12 @@ RSpec.describe "Admin connected apps", type: :request do
         it "flags it with the date and offers Reconnect" do
           get "/connected-apps"
 
-          expect(response.body).to include("Needs attention")
-          expect(response.body).to include("token expired on August 20, 2026")
-          expect(response.body).to include("Reconnect")
-          expect(response.body).to include("Disconnect")
+          expect(response.body).to include(I18n.t("admin.connected_apps.status.error"))
+          expect(response.body).to include(
+            "#{t_before("admin.connected_apps.threads.expired_on", :date)}August 20, 2026"
+          )
+          expect(response.body).to include(I18n.t("admin.connected_apps.connect.again"))
+          expect(response.body).to include(I18n.t("admin.connected_apps.show.disconnect"))
         end
       end
     end
@@ -304,7 +307,7 @@ RSpec.describe "Admin connected apps", type: :request do
 
       expect(response).to have_http_status(:see_other)
       expect(response).to redirect_to("/connected-apps")
-      expect(flash[:notice]).to eq("Whoop disconnected.")
+      expect(flash[:notice]).to eq(I18n.t("admin.connected_apps.flash.whoop_disconnected"))
     end
   end
 

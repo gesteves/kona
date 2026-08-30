@@ -21,7 +21,7 @@ module Admin
     # that path also tells Akismet that its mark was incorrect.
     def not_spam
       message = SpamQuarantine.new.take(params[:id])
-      return redirect_to(spam_path, status: :see_other, alert: "That message is no longer in the queue.") if message.nil?
+      return redirect_to(spam_path, status: :see_other, alert: t("admin.spam_flash.gone")) if message.nil?
 
       ContactMailJob.perform_async(
         message["name"],
@@ -33,13 +33,13 @@ module Admin
         true
       )
 
-      redirect_to spam_path, status: :see_other, notice: "Message released — it's on its way to your inbox."
+      redirect_to spam_path, status: :see_other, notice: t("admin.spam_flash.released")
     end
 
     # DELETE /spam/:id
     def destroy
       SpamQuarantine.new.delete(params[:id])
-      redirect_to spam_path, status: :see_other, notice: "Message deleted."
+      redirect_to spam_path, status: :see_other, notice: t("admin.spam_flash.deleted")
     end
   end
 end

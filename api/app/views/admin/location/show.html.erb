@@ -1,19 +1,18 @@
-<% content_for :title, "Location" %>
+<% content_for :title, t("admin.pages.location") %>
 
-<h1 class="admin-main__title">Location</h1>
+<h1 class="admin-main__title"><%= t("admin.pages.location") %></h1>
 
 <% unless @location.configured? %>
   <wa-callout variant="warning" class="location__notice">
     <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
-    Set <code>MAPBOX_ACCESS_TOKEN</code> in the environment to show the map.
+    <%= t(".no_token_html", variable: tag.code("MAPBOX_ACCESS_TOKEN")) %>
   </wa-callout>
 <% end %>
 
 <% if @location.overridden? %>
   <wa-callout variant="warning" class="location__notice">
     <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
-    <code>LOCATION</code> is set to <%= @location.override_summary %> in the environment, and
-    outranks anything set here. Unset it to use this page.
+    <%= t(".overridden_html", variable: tag.code("LOCATION"), value: @location.override_summary) %>
   </wa-callout>
 <% end %>
 
@@ -21,6 +20,7 @@
     a location. Save is the one control that writes, and it stays off until the staged location is
     different from the stored one. %>
 <div class="location" data-controller="location-map"
+     data-admin-i18n="<%= admin_i18n_data("admin.js.location", state: "admin.location.state") %>"
      data-location-map-token-value="<%= @location.map_token %>"
      data-location-map-style-value="<%= @location.map_style %>"
      data-location-map-latitude-value="<%= @location.latitude %>"
@@ -54,13 +54,13 @@
         <wa-button class="location__save" variant="brand" appearance="accent" disabled
                    data-location-map-target="save" data-action="click->location-map#save">
           <%= slotted_icon_svg("classic", "light", "floppy-disk") %>
-          Save
+          <%= t(".save") %>
         </wa-button>
 
         <wa-button appearance="outlined" disabled
                    data-location-map-target="undo" data-action="click->location-map#undo">
           <%= slotted_icon_svg("classic", "light", "arrow-rotate-left") %>
-          Undo
+          <%= t(".undo") %>
         </wa-button>
       </div>
     </div>
@@ -72,7 +72,7 @@
         uses. There is no path with no JavaScript to keep, because without JavaScript this page has
         no map. %>
     <form class="location__search" data-action="submit->location-map#search">
-      <wa-input name="address" label="Address" placeholder="An address, or the name of a place"
+      <wa-input name="address" label="<%= t(".address") %>" placeholder="<%= t(".address_placeholder") %>"
                 autocomplete="off" enterkeyhint="go" data-location-map-target="address">
       </wa-input>
 
@@ -80,7 +80,7 @@
           and the one accent button on the page must be the button that writes. %>
       <wa-button class="location__go" type="submit" appearance="outlined">
         <%= slotted_icon_svg("classic", "light", "magnifying-glass") %>
-        Go there
+        <%= t(".go") %>
       </wa-button>
     </form>
 
@@ -89,7 +89,7 @@
       <wa-divider></wa-divider>
 
       <section class="location__races" aria-labelledby="hed-races">
-        <h2 class="location__races-heading wa-heading-s" id="hed-races">Upcoming races</h2>
+        <h2 class="location__races-heading wa-heading-s" id="hed-races"><%= t(".races") %></h2>
 
         <%# The coordinates are on the button, and the code does not make them again: they come from
             Contentful, thus a shortcut puts the pin at the exact place that the race card gives. %>

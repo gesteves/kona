@@ -24,7 +24,7 @@ module Admin
       # The code removes each item that is not an upload and does not examine it. An empty file
       # field posts a blank string, and a request that a person makes can post any content.
       files = Array(params[:gpx_files]).grep(ActionDispatch::Http::UploadedFile)
-      return redirect_to(course_maps_path, status: :see_other, alert: "Choose at least one GPX file.") if files.empty?
+      return redirect_to(course_maps_path, status: :see_other, alert: t("admin.course_maps.flash.no_files")) if files.empty?
 
       error = rejection_reason(files)
       return redirect_to(course_maps_path, status: :see_other, alert: error) if error
@@ -52,8 +52,8 @@ module Admin
       return if performed?
 
       @track = present(record.merge("settings" => render_settings(record)))
-      @icons = StaticMap::MARKER_ICONS
-      @styles = StaticMap::STYLE_PRESETS
+      @icons = StaticMap.icon_options
+      @styles = StaticMap.style_options
     end
 
     # PATCH /course-maps/:id
@@ -75,10 +75,10 @@ module Admin
       MapboxTileset.new.destroy!(record["id"]) if MapboxTileset.configured?
       library.delete(record["id"])
 
-      redirect_to course_maps_path, status: :see_other, notice: "#{record['title']} deleted."
+      redirect_to course_maps_path, status: :see_other, notice: t("admin.course_maps.flash.deleted", title: record["title"])
     rescue StandardError => e
       Rails.logger.error("Maps: could not delete #{params[:id]} (#{e.class}: #{e.message})")
-      redirect_to course_maps_path, status: :see_other, alert: "Couldn't delete that track from Mapbox: #{e.message}"
+      redirect_to course_maps_path, status: :see_other, alert: t("admin.course_maps.flash.delete_failed", error: e.message)
     end
 
     # GET /course-maps/:id/preview
@@ -127,7 +127,7 @@ module Admin
       record = library.find(params[:id])
       return record if record
 
-      redirect_to course_maps_path, status: :see_other, alert: "That track is no longer in the library."
+      redirect_to course_maps_path, status: :see_other, alert: t("admin.course_maps.flash.gone")
       nil
     end
 
@@ -148,13 +148,17 @@ module Admin
 
     # @return [String, nil] The cause of a refusal of the batch, or nil if the batch is correct.
     def rejection_reason(files)
-      return "Upload at most #{MAX_FILES} files at a time." if files.length > MAX_FILES
+      return t("admin.course_maps.flash.too_many", count: MAX_FILES) if files.length > MAX_FILES
 
       bad = files.reject { |file| File.extname(file.original_filename.to_s).casecmp?(".gpx") }
-      return "#{bad.map(&:original_filename).to_sentence} isn't a GPX file." if bad.any?
+      return t("admin.course_maps.flash.not_gpx", files: bad.map(&:original_filename).to_sentence) if bad.any?
 
       total = files.sum { |file| file.size.to_i }
-      return "That's #{ActiveSupport::NumberHelper.number_to_human_size(total)} of GPX; the limit is #{ActiveSupport::NumberHelper.number_to_human_size(MAX_BYTES)}." if total > MAX_BYTES
+      if total > MAX_BYTES
+        return t("admin.course_maps.flash.too_large",
+                 size: ActiveSupport::NumberHelper.number_to_human_size(total),
+                 limit: ActiveSupport::NumberHelper.number_to_human_size(MAX_BYTES))
+      end
 
       nil
     end
@@ -171,7 +175,7 @@ module Admin
         MapTilesetJob.perform_async(library.stage(track))
         accepted << track.title
       rescue GpxTrack::ParseError => e
-        failures << "#{file.original_filename}: #{e.message}"
+        failures << t("admin.course_maps.flash.unreadable", file: file.original_filename, error: e.message)
       end
 
       [ accepted, failures ]
@@ -180,7 +184,7 @@ module Admin
     def upload_flash(accepted, failures)
       return { alert: failures.to_sentence } if accepted.empty?
 
-      notice = "Uploading #{accepted.to_sentence} to Mapbox. This takes a minute."
+      notice = t("admin.course_maps.flash.uploading", files: accepted.to_sentence)
       failures.any? ? { notice: notice, alert: failures.to_sentence } : { notice: notice }
     end
 

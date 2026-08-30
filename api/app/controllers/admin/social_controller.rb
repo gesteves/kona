@@ -9,9 +9,9 @@ module Admin
     # `:status` names the private method below that reads its state from Redis. ⚠️ This is the one
     # list: a network that is not here cannot take a post.
     NETWORKS = {
-      "bluesky"  => { name: "Bluesky",  job: BlueskyPostJob,  status: :bluesky_status },
-      "mastodon" => { name: "Mastodon", job: MastodonPostJob, status: :mastodon_status },
-      "threads"  => { name: "Threads",  job: ThreadsPostJob,  status: :threads_status }
+      "bluesky"  => { job: BlueskyPostJob,  status: :bluesky_status },
+      "mastodon" => { job: MastodonPostJob, status: :mastodon_status },
+      "threads"  => { job: ThreadsPostJob,  status: :threads_status }
     }.freeze
 
     # The most Bluesky handles that one draft asks the PDS about, and the seconds that all of those
@@ -82,7 +82,7 @@ module Admin
     # job reads a moment later.
     def preview
       url = params[:url].to_s.strip
-      return render json: { error: "That is not a link." }, status: :unprocessable_content unless
+      return render json: { error: t("admin.social.errors.not_a_link") }, status: :unprocessable_content unless
         OpenGraph.http_url?(url)
 
       card = OpenGraph.new.fetch(url)
@@ -141,7 +141,7 @@ module Admin
     def social_networks
       @social_networks ||= NETWORKS.map do |key, network|
         connected, account, notice = send(network[:status])
-        SocialPresenter::Network.new(key: key, name: network[:name], connected: connected,
+        SocialPresenter::Network.new(key: key, name: network_name(key), connected: connected,
                                     account: account, notice: notice)
       end
     end
@@ -166,7 +166,7 @@ module Admin
     # @return [Array]
     def threads_status
       service = Threads.new
-      notice = "The Threads token expired." if service.expired?
+      notice = t("admin.social.status.threads_expired") if service.expired?
       [ service.usable?, ("@#{service.username}" if service.username.present?), notice ]
     end
 
@@ -262,9 +262,9 @@ module Admin
 
     # @return [String, nil] The reason to refuse, or nil when the draft is good.
     def validation_error
-      return "Write something to post." if posts.empty?
+      return t("admin.social.errors.empty") if posts.empty?
       if posts.length > SocialPresenter::MAX_POSTS
-        return "A thread takes at most #{SocialPresenter::MAX_POSTS} posts."
+        return t("admin.social.errors.too_many_posts", count: SocialPresenter::MAX_POSTS)
       end
 
       posts.each_with_index do |post, index|
@@ -272,7 +272,7 @@ module Admin
         return message if message
       end
 
-      return "Pick at least one place to post it." if selected_networks.empty?
+      return t("admin.social.errors.no_network") if selected_networks.empty?
 
       message = mention_shape_error
       return message if message
@@ -287,13 +287,9 @@ module Admin
     # @param index [Integer]
     # @return [String, nil]
     def post_error(post, index)
-      label = posts.one? ? "That post" : "Post #{index + 1}"
-
       # ⚠️ Every post needs words. Each of the three networks refuses a body that is empty, thus a
       # link with no words is not a post.
-      if post[:text].blank?
-        return posts.one? ? "Write something to post." : "#{label} needs something to say."
-      end
+      return post_message("text_missing", index) if post[:text].blank?
 
       # ⚠️ It counts the text that BLUESKY will get, and not the words that the owner can see: a
       # mention grows into a handle, thus "@tony" can become "@tony.bsky.social". A count of the raw
@@ -302,20 +298,32 @@ module Admin
       # and this check runs before #selected_networks.
       counted = text_for("bluesky", post[:text])
       unless Bluesky.valid_post_length?(counted)
-        handles = " with the Bluesky handles" if counted != post[:text]
-        return "#{label} is #{Bluesky.post_length(counted)} characters#{handles}. " \
-               "The limit is #{Bluesky::MAX_GRAPHEMES}."
+        key = counted == post[:text] ? "too_long" : "too_long_handles"
+        return post_message(key, index, count: Bluesky.post_length(counted),
+                                        limit: Bluesky::MAX_GRAPHEMES)
       end
 
-      message = network_length_error(post, label)
+      message = network_length_error(post, index)
       return message if message
 
       # ⚠️ The link is optional. It is only refused when it is there and it is not http or https.
-      if post[:link].present? && !OpenGraph.http_url?(post[:link])
-        return "#{label} needs a link that starts with http:// or https://."
-      end
+      return post_message("bad_link", index) if post[:link].present? && !OpenGraph.http_url?(post[:link])
 
       nil
+    end
+
+    # One message about one post.
+    #
+    # ⚠️ Each form is a COMPLETE sentence in the locale file, and this method selects one. It does
+    # not join a label to a fragment: a draft of one post says "That post", and a thread names the
+    # post by its number.
+    # @param key [String] The name of the message below `admin.social.errors`.
+    # @param index [Integer] The index of the post, counted from zero.
+    # @param options [Hash] Each interpolation that the message needs.
+    # @return [String]
+    def post_message(key, index, **options)
+      form = posts.one? ? "single" : "numbered"
+      t("admin.social.errors.#{key}.#{form}", index: index + 1, **options)
     end
 
     # Refuses a field that holds the handle of a DIFFERENT network.
@@ -335,8 +343,9 @@ module Admin
           other = SocialMentions.mistaken_network(row[:values][network], network: network)
           next if other.nil?
 
-          return "The #{network_name(network)} field of #{row[:token]} holds a " \
-                 "#{network_name(other)} handle. Move it, or write a name."
+          return t("admin.social.errors.mistaken_network", network: network_name(network),
+                                                            token: row[:token],
+                                                            other: network_name(other))
         end
       end
 
@@ -345,7 +354,7 @@ module Admin
 
     # @param key [String] A network key.
     # @return [String] The name of that network, for a message.
-    def network_name(key) = NETWORKS.fetch(key.to_s)[:name]
+    def network_name(key) = t("admin.networks.#{key}")
 
     # Checks the text of the other two networks against their own limits.    # Checks the text of the other two networks against their own limits.
     #
@@ -354,20 +363,17 @@ module Admin
     # be much longer than a handle. Without this check such a draft raises in the job, which then
     # retries for 24 hours and posts nothing.
     # @param post [Hash]
-    # @param label [String]
+    # @param index [Integer]
     # @return [String, nil]
-    def network_length_error(post, label)
+    def network_length_error(post, index)
       # Mastodon counts a URL as URL_WEIGHT, whatever its true length, and #post! joins it with two
       # newlines.
       mastodon = text_for("mastodon", post[:text]).length +
                  (post[:link].present? ? Mastodon::URL_WEIGHT + 2 : 0)
-      if mastodon > Mastodon::DEFAULT_MAX_CHARACTERS
-        return "#{label} is too long for Mastodon with the names that you gave."
-      end
-
+      return post_message("too_long_mastodon", index) if mastodon > Mastodon::DEFAULT_MAX_CHARACTERS
       return nil unless text_for("threads", post[:text]).length > Threads::MAX_CHARACTERS
 
-      "#{label} is too long for Threads with the names that you gave."
+      post_message("too_long_threads", index)
     end
 
     # Asks Bluesky about each handle of the map, and refuses a draft that names one that the PDS
@@ -393,8 +399,7 @@ module Admin
         break if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
         next unless service.handle_missing?(handle)
 
-        return "Bluesky does not know @#{handle}. Correct the handle, or clear that field to post " \
-               "the name alone."
+        return t("admin.social.errors.bad_handle", handle: handle)
       end
 
       nil
@@ -417,7 +422,7 @@ module Admin
     # @return [String, nil] The reason to refuse the schedule, or nil.
     def schedule_error
       return nil unless scheduled?
-      return "Pick a date and a time to schedule it." if picked_moment.blank?
+      return t("admin.social.errors.no_moment") if picked_moment.blank?
 
       # ⚠️ A moment that has PASSED is not an error: it is not a schedule, thus the post goes out at
       # once. The label of the submit button says "Post now" for that same draft, and a refusal here
@@ -478,9 +483,9 @@ module Admin
     # @return [String]
     def queued_notice(at)
       names = to_sentence(selected_networks)
-      return "Scheduled a post to #{names} for #{format_schedule(at)}." if at
+      return t("admin.social.flash.scheduled", networks: names, at: format_schedule(at)) if at
 
-      "Sent to #{names}."
+      t("admin.social.flash.sent", networks: names)
     end
 
     # The moment in the words of the owner, in the zone that they picked it in. To answer in the

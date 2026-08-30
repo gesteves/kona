@@ -22,11 +22,10 @@ class SocialPresenter
 
   # The example that each mention field shows. ⚠️ It is an example of a HANDLE only. A field also
   # takes plain words, for a person with no account there, and the hint of the section says so.
-  MENTION_PLACEHOLDERS = {
-    "bluesky"  => "handle.bsky.social",
-    "mastodon" => "user@instance.social",
-    "threads"  => "username"
-  }.freeze
+  # @return [Hash{String=>String}] Each network key, and its example.
+  def self.mention_placeholders
+    %w[bluesky mastodon threads].index_with { |key| I18n.t("admin.social.mention_placeholder.#{key}") }
+  end
 
   # One row of the mention map: the token that the owner wrote, and what that person is called at
   # each network.
@@ -55,7 +54,11 @@ class SocialPresenter
     # a link, for a network that is not connected.
     # @return [String]
     def account_line
-      account.present? ? "Posts as #{account}." : "Connected."
+      if account.present?
+        I18n.t("admin.social.account.named", account: account)
+      else
+        I18n.t("admin.social.account.unnamed")
+      end
     end
   end
 
@@ -150,7 +153,7 @@ class SocialPresenter
 
   # @param key [String] A network key.
   # @return [String, nil]
-  def mention_placeholder(key) = MENTION_PLACEHOLDERS[key.to_s]
+  def mention_placeholder(key) = self.class.mention_placeholders[key.to_s]
 
   # @return [Boolean] True when the draft is a thread and not one post.
   def thread? = @posts.length > 1

@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { i18nTable, t } from "../lib/i18n";
 
 /**
  * The Republish dialog: one delay in minutes, where zero is "now".
@@ -10,6 +11,9 @@ export default class extends Controller {
   static targets = ["form", "minutes", "submit", "label"];
 
   connect() {
+    // ⚠️ The words come from the locale file, through the `data-admin-i18n` attribute. Read the
+    // table here: it is synchronous, and `relabel` runs at each keystroke.
+    this.words = i18nTable(this.element);
     // A restoration visit of Turbo can render a snapshot that has the button in its busy state.
     this.submitTarget.loading = false;
     // ⚠️ It waits for the definition. Before the upgrade, `value` of the field is undefined, and the
@@ -27,11 +31,11 @@ export default class extends Controller {
     const minutes = this.minutes;
 
     if (minutes === null) {
-      this.labelTarget.textContent = "Republish";
+      this.labelTarget.textContent = t(this.words, "plain");
     } else if (minutes === 0) {
-      this.labelTarget.textContent = "Republish now";
+      this.labelTarget.textContent = t(this.words, "now");
     } else {
-      this.labelTarget.textContent = `Republish in ${minutes} minute${minutes === 1 ? "" : "s"}`;
+      this.labelTarget.textContent = t(this.words, "scheduled", { count: minutes });
     }
   }
 

@@ -9,11 +9,11 @@ RSpec.describe SocialPresenter do
 
   describe "a network row" do
     it "names the account when one is connected" do
-      expect(network.account_line).to eq("Posts as @me.bsky.social.")
+      expect(network.account_line).to eq(I18n.t("admin.social.account.named", account: "@me.bsky.social"))
     end
 
     it "says only Connected when the service gives no name" do
-      expect(network(account: nil).account_line).to eq("Connected.")
+      expect(network(account: nil).account_line).to eq(I18n.t("admin.social.account.unnamed"))
     end
 
     it "answers connected?" do

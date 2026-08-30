@@ -35,9 +35,10 @@ class ConnectedAppPresenter
     @error.present? ? :error : :connected
   end
 
+  # ⚠️ This class has no view context, thus it calls `I18n.t` and not the bare `t`.
   # @return [String] The label of the badge for the current state.
   def status_label
-    { disconnected: "Not connected", connected: "Connected", error: "Needs attention" }.fetch(state)
+    I18n.t("admin.connected_apps.status.#{state}")
   end
 
   # @return [String] The Web Awesome badge variant for the current state.
@@ -59,6 +60,6 @@ class ConnectedAppPresenter
 
   # @return [String] The label of the connect action.
   def connect_label
-    state == :error ? "Reconnect" : "Connect"
+    I18n.t("admin.connected_apps.connect.#{state == :error ? "again" : "new"}")
   end
 end

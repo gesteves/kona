@@ -1,6 +1,6 @@
 <% content_for :title, @track.title %>
 
-<p class="map-editor__back"><%= link_to "← All course maps", course_maps_path %></p>
+<p class="map-editor__back"><%= link_to t(".back"), course_maps_path %></p>
 
 <h1 class="admin-main__title"><%= @track.title %></h1>
 <p class="map-editor__summary"><%= @track.summary %></p>
@@ -13,54 +13,54 @@
   <%= form_with url: @track.show_path, method: :get, class: "map-editor__settings",
                 data: { map_preview_target: "form", turbo_action: "replace" } do %>
 
-    <wa-details summary="Framing" open>
+    <wa-details summary="<%= t(".framing") %>" open>
       <div class="wa-stack wa-gap-l">
-        <%= render "sides", track: @track, prefix: "padding", linked_label: "Padding",
+        <%= render "sides", track: @track, prefix: "padding", linked_label: t(".padding"),
                             max: StaticMap::MAX_PADDING, step: 1,
-                            hint: "Pixels between the track and the edge of the image." %>
+                            hint: t(".padding_hint") %>
 
-        <%= render "sides", track: @track, prefix: "margin", linked_label: "Extra map",
+        <%= render "sides", track: @track, prefix: "margin", linked_label: t(".extra_map"),
                             max: StaticMap::MAX_MARGIN_KM, step: 0.5,
-                            hint: "Kilometers of map added around the track. Widens the view rather than the border." %>
+                            hint: t(".extra_map_hint") %>
 
-        <wa-input type="number" name="settings[height]" label="Height" value="<%= @track.setting('height') %>"
-                  min="800" max="1280" step="1" placeholder="Auto"
-                  hint="Leave blank to derive it from the track's shape. The image is always 1280 wide, and doubled on download.">
+        <wa-input type="number" name="settings[height]" label="<%= t(".height") %>" value="<%= @track.setting('height') %>"
+                  min="800" max="1280" step="1" placeholder="<%= t(".height_placeholder") %>"
+                  hint="<%= t(".height_hint", width: StaticMap::WIDTH) %>">
         </wa-input>
       </div>
     </wa-details>
 
-    <wa-details summary="Track">
+    <wa-details summary="<%= t(".track") %>">
       <div class="wa-stack wa-gap-m">
-        <wa-color-picker name="settings[track_color]" label="Line color"
+        <wa-color-picker name="settings[track_color]" label="<%= t(".track_color") %>"
                          value="<%= @track.setting('track_color') %>" format="hex">
         </wa-color-picker>
-        <wa-number-input name="settings[track_width]" label="Line width"
+        <wa-number-input name="settings[track_width]" label="<%= t(".track_width") %>"
                          value="<%= @track.setting('track_width') %>" min="1" max="20" step="0.5">
         </wa-number-input>
-        <wa-slider name="settings[track_opacity]" label="Line opacity"
+        <wa-slider name="settings[track_opacity]" label="<%= t(".track_opacity") %>"
                    value="<%= @track.setting('track_opacity') %>" min="0" max="1" step="0.05" with-tooltip>
         </wa-slider>
       </div>
     </wa-details>
 
-    <wa-details summary="Markers">
+    <wa-details summary="<%= t(".markers") %>">
       <div class="wa-stack wa-gap-m">
-        <wa-select name="settings[start_icon]" label="Start icon" value="<%= @track.setting('start_icon') %>">
+        <wa-select name="settings[start_icon]" label="<%= t(".start_icon") %>" value="<%= @track.setting('start_icon') %>">
           <% @icons.each do |id, name| %>
             <wa-option value="<%= id %>"><%= name %></wa-option>
           <% end %>
         </wa-select>
-        <wa-color-picker name="settings[start_color]" label="Start color"
+        <wa-color-picker name="settings[start_color]" label="<%= t(".start_color") %>"
                          value="<%= @track.setting('start_color') %>" format="hex">
         </wa-color-picker>
 
-        <wa-select name="settings[end_icon]" label="Finish icon" value="<%= @track.setting('end_icon') %>">
+        <wa-select name="settings[end_icon]" label="<%= t(".end_icon") %>" value="<%= @track.setting('end_icon') %>">
           <% @icons.each do |id, name| %>
             <wa-option value="<%= id %>"><%= name %></wa-option>
           <% end %>
         </wa-select>
-        <wa-color-picker name="settings[end_color]" label="Finish color"
+        <wa-color-picker name="settings[end_color]" label="<%= t(".end_color") %>"
                          value="<%= @track.setting('end_color') %>" format="hex">
         </wa-color-picker>
 
@@ -69,22 +69,22 @@
         <input type="hidden" name="settings[finish_on_top]" value="0">
         <wa-switch name="settings[finish_on_top]" value="1"
                    <%= "checked" if ActiveModel::Type::Boolean.new.cast(@track.setting("finish_on_top")) %>
-                   hint="Only matters when the two pins overlap, as on an out-and-back. The start pin is on top by default.">
-          Draw the finish pin on top
+                   hint="<%= t(".finish_on_top_hint") %>">
+          <%= t(".finish_on_top") %>
         </wa-switch>
       </div>
     </wa-details>
 
-    <wa-details summary="Style">
+    <wa-details summary="<%= t(".style") %>">
       <div class="wa-stack wa-gap-m">
-        <wa-select name="settings[style_preset]" label="Base style" value="<%= @track.setting('style_preset') %>">
+        <wa-select name="settings[style_preset]" label="<%= t(".base_style") %>" value="<%= @track.setting('style_preset') %>">
           <% @styles.each do |url, name| %>
             <wa-option value="<%= url %>"><%= name %></wa-option>
           <% end %>
         </wa-select>
-        <wa-input name="settings[style_url]" label="Custom style" value="<%= @track.setting('style_url') %>"
-                  placeholder="mapbox://styles/…"
-                  hint="A style of your own. Overrides the base style above whenever it's set.">
+        <wa-input name="settings[style_url]" label="<%= t(".custom_style") %>" value="<%= @track.setting('style_url') %>"
+                  placeholder="<%= t(".custom_style_placeholder") %>"
+                  hint="<%= t(".custom_style_hint") %>">
         </wa-input>
       </div>
     </wa-details>
@@ -96,14 +96,14 @@
         response in its cache, at the same 2x size as the download. %>
     <wa-button class="map-editor__zoom" appearance="plain" data-dialog="open map-preview-full">
       <img class="map-editor__image" data-map-preview-target="image"
-           src="<%= @track.preview_path %>" alt="Map of <%= @track.title %>">
-      <span class="wa-visually-hidden">View at full size</span>
+           src="<%= @track.preview_path %>" alt="<%= t(".image_alt", title: @track.title) %>">
+      <span class="wa-visually-hidden"><%= t(".zoom") %></span>
     </wa-button>
 
     <wa-button data-map-preview-target="download" href="<%= @track.download_path %>" download
                variant="brand" appearance="accent">
       <%= slotted_icon_svg("classic", "light", "arrow-down-to-bracket") %>
-      Download PNG
+      <%= t(".download") %>
     </wa-button>
   </div>
 
@@ -111,6 +111,6 @@
       with the image in the page when a setting changes. %>
   <wa-dialog id="map-preview-full" class="map-zoom" label="<%= @track.title %>" data-controller="dialog">
     <img class="map-zoom__image" data-map-preview-target="image"
-         src="<%= @track.preview_path %>" alt="Map of <%= @track.title %>">
+         src="<%= @track.preview_path %>" alt="<%= t(".image_alt", title: @track.title) %>">
   </wa-dialog>
 </div>

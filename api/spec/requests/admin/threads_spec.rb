@@ -57,7 +57,7 @@ RSpec.describe "Admin Threads connection", type: :request do
       get "/connected-apps/threads/authorize"
 
       expect(response).to redirect_to("/connected-apps")
-      expect(flash[:alert]).to include("not configured")
+      expect(flash[:alert]).to include(ERB::Util.html_escape(I18n.t("admin.threads.flash.unconfigured")))
     end
   end
 
@@ -74,7 +74,7 @@ RSpec.describe "Admin Threads connection", type: :request do
       get "/connected-apps/threads/callback", params: { code: "a-code", state: "the-state" }
 
       expect(response).to redirect_to("/connected-apps")
-      expect(flash[:notice]).to eq("Threads connected.")
+      expect(flash[:notice]).to eq(I18n.t("admin.threads.flash.connected"))
     end
 
     it "spends the state, thus a replay cannot connect again" do
@@ -91,7 +91,7 @@ RSpec.describe "Admin Threads connection", type: :request do
       get "/connected-apps/threads/callback", params: { code: "a-code", state: "another-state" }
 
       expect(response).to redirect_to("/connected-apps")
-      expect(flash[:alert]).to include("not valid")
+      expect(flash[:alert]).to include(ERB::Util.html_escape(I18n.t("admin.oauth.invalid_state")))
     end
 
     it "sends the owner back when Meta denied the app" do
@@ -108,7 +108,7 @@ RSpec.describe "Admin Threads connection", type: :request do
       get "/connected-apps/threads/callback", params: { code: "a-code", state: "the-state" }
 
       expect(response).to redirect_to("/connected-apps")
-      expect(flash[:alert]).to include("didn't give an access token")
+      expect(flash[:alert]).to eq(I18n.t("admin.threads.flash.no_token"))
     end
   end
 
@@ -123,7 +123,7 @@ RSpec.describe "Admin Threads connection", type: :request do
 
       expect(response).to have_http_status(:see_other)
       expect(response).to redirect_to("/connected-apps")
-      expect(flash[:notice]).to eq("Threads disconnected.")
+      expect(flash[:notice]).to eq(I18n.t("admin.threads.flash.disconnected"))
       expect(ThreadsCredentials.connected?).to be(false)
     end
   end

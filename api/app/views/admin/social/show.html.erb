@@ -1,6 +1,6 @@
-<% content_for :title, "Social media" %>
+<% content_for :title, t("admin.pages.social") %>
 
-<h1 class="admin-main__title">Social media</h1>
+<h1 class="admin-main__title"><%= t("admin.pages.social") %></h1>
 
 <%# ⚠️ A refused submit renders this page again and does not redirect, thus each field below puts
     its value back. To redirect would lose the words that the owner wrote.
@@ -12,6 +12,7 @@
               class: "social wa-stack wa-gap-l",
               data: { controller: "social",
                       action: "submit->social#markBusy input->social#validate change->social#validate",
+                      admin_i18n: admin_i18n_data("admin.js.social"),
                       social_max_posts_value: @social.max_posts } do %>
 
   <%# One block for each post of the thread. The Add control below clones the template. %>
@@ -37,7 +38,7 @@
   <div class="wa-cluster wa-gap-s">
     <wa-button appearance="outlined" data-social-target="add" data-action="click->social#addPost">
       <%= slotted_icon_svg("classic", "light", "plus") %>
-      Add another post
+      <%= t(".add_post") %>
     </wa-button>
   </div>
 
@@ -48,16 +49,15 @@
       ⚠️ It is hidden until the draft names somebody, and social_controller.js shows it. Refer to
       _social.scss: this block sets a display, thus `[hidden]` needs a rule of its own. %>
   <section class="social-mentions" data-social-target="mentions" <%= "hidden" unless @social.mentions? %>>
-    <h2 class="social-mentions__title wa-heading-s">Mentions</h2>
+    <h2 class="social-mentions__title wa-heading-s"><%= t(".mentions") %></h2>
     <p class="social-mentions__hint wa-caption-s">
-      Each network writes a mention in its own way. Give the handle for each one, or a plain name
-      where that person has no account. An empty field posts the name with no &ldquo;@&rdquo;.
+      <%= t(".mentions_hint_html") %>
     </p>
 
     <div class="social-mentions__rows" data-social-target="mentionRows">
       <% @social.mentions.each do |mention| %>
         <%= render "mention", mention: mention, networks: @social.mention_networks,
-                              placeholders: SocialPresenter::MENTION_PLACEHOLDERS %>
+                              placeholders: SocialPresenter.mention_placeholders %>
       <% end %>
     </div>
   </section>
@@ -67,12 +67,12 @@
   <template data-social-target="mentionTemplate">
     <%= render "mention", mention: SocialPresenter::Mention.new(token: ""),
                           networks: @social.mention_networks,
-                          placeholders: SocialPresenter::MENTION_PLACEHOLDERS %>
+                          placeholders: SocialPresenter.mention_placeholders %>
   </template>
 
   <%# Each connected row is ticked on the first load, and a submit that fails keeps the ticks of
       the owner. SocialPresenter#selected? decides. %>
-  <wa-checkbox-group label="Post to">
+  <wa-checkbox-group label="<%= t(".post_to") %>">
     <% @social.networks.each do |network| %>
       <% if network.connected? %>
         <wa-checkbox name="networks[]" value="<%= network.key %>" hint="<%= network.account_line %>"
@@ -85,7 +85,7 @@
             row says why one of three names is not available. %>
         <wa-checkbox name="networks[]" value="<%= network.key %>" disabled>
           <%= network.name %>
-          <span slot="hint"><%= network.notice || "Not connected." %> <%= link_to "Connect it", connected_apps_path %>.</span>
+          <span slot="hint"><%= network.notice || t(".not_connected") %> <%= link_to t(".connect_it"), connected_apps_path %>.</span>
         </wa-checkbox>
       <% end %>
     <% end %>
@@ -97,19 +97,19 @@
     <input type="hidden" name="schedule" value="0">
     <wa-switch name="schedule" value="1" <%= "checked" if @social.scheduled? %>
                data-social-target="schedule" data-action="change->social#toggleSchedule">
-      Schedule for later
+      <%= t(".schedule") %>
     </wa-switch>
 
     <%# ⚠️ The date and the time carry no zone. The hidden `time_zone` below is what gives them a
         meaning: the browser writes its own IANA id there. %>
     <div class="social__schedule" data-social-target="scheduleFields" <%= "hidden" unless @social.scheduled? %>>
       <%# There is no `max`, on purpose: a post can wait as long as the owner wants. %>
-      <wa-date-input name="date" label="Date" value="<%= @social.date %>"
+      <wa-date-input name="date" label="<%= t(".date") %>" value="<%= @social.date %>"
                      min="<%= @social.min_date %>"
                      data-social-target="date" data-action="change->social#validate">
       </wa-date-input>
 
-      <wa-time-input name="time" label="Time" value="<%= @social.time %>" step="300"
+      <wa-time-input name="time" label="<%= t(".time") %>" value="<%= @social.time %>" step="300"
                      data-social-target="time" data-action="change->social#validate">
       </wa-time-input>
 
@@ -125,7 +125,7 @@
   <div class="wa-cluster wa-gap-s">
     <wa-button type="submit" variant="brand" appearance="accent" data-social-target="submit">
       <%= slotted_icon_svg("classic", "light", "paper-plane") %>
-      <span data-social-target="label">Post now</span>
+      <span data-social-target="label"><%= t(".post_now") %></span>
     </wa-button>
   </div>
 <% end %>

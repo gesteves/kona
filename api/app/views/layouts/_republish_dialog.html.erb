@@ -5,13 +5,14 @@
 <%# ⚠️ The two footer buttons are outside the <form>, because a slot takes a direct child of the
     dialog only. `form="republish-form"` is what makes the submit button part of that form: a
     form-associated element reads that attribute, as a native control does. %>
-<wa-dialog id="<%= AdminHelper::REPUBLISH_DIALOG_ID %>" label="Republish the site"
-           data-controller="dialog republish">
+<wa-dialog id="<%= AdminHelper::REPUBLISH_DIALOG_ID %>" label="<%= t("admin.republish_dialog.title") %>"
+           data-controller="dialog republish"
+           data-admin-i18n="<%= admin_i18n_data("admin.js.republish") %>">
   <%# One control, and no radio group: a delay of zero minutes is "now". The label of the submit
       button says which of the two the value gives. %>
   <%= form_with url: republish_path, method: :post, id: "republish-form",
                 data: { republish_target: "form", action: "submit->republish#markBusy" } do %>
-    <wa-number-input name="minutes" label="Delay in minutes" required
+    <wa-number-input name="minutes" label="<%= t("admin.republish_dialog.minutes") %>" required
                      value="<%= Admin::RepublishController::DEFAULT_MINUTES %>"
                      min="<%= Admin::RepublishController::MIN_MINUTES %>"
                      max="<%= Admin::RepublishController::MAX_MINUTES %>" step="1"
@@ -21,10 +22,10 @@
     </wa-number-input>
   <% end %>
 
-  <wa-button slot="footer" appearance="outlined" data-dialog="close">Cancel</wa-button>
+  <wa-button slot="footer" appearance="outlined" data-dialog="close"><%= t("admin.republish_dialog.cancel") %></wa-button>
   <wa-button slot="footer" type="submit" form="republish-form" variant="brand" appearance="accent"
              data-republish-target="submit">
     <%= slotted_icon_svg("classic", "light", "arrows-rotate") %>
-    <span data-republish-target="label">Republish</span>
+    <span data-republish-target="label"><%= t("admin.republish_dialog.submit") %></span>
   </wa-button>
 </wa-dialog>

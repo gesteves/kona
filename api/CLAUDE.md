@@ -458,11 +458,49 @@ there are also `EventWeatherPresenter`, `UpcomingRacesPresenter`, and `WhoopPres
 presenter takes its data as constructor keyword arguments. When the body of a controller needs a
 helper, it calls that helper through the `helpers` object and it does not `include` the module.
 
+⚠️ A presenter of the **admin** has no view context, thus it calls `I18n.t` and not the bare `t`.
+Refer to **The admin UI** for the rule that puts each admin word in `config/locales/en.yml`.
+
 ### The admin UI
 
 An admin UI for the owner, with **Web Awesome Pro** components. It is the one part of this app with
 an asset pipeline, a layout, and JavaScript in the browser. Each other part still renders a
 `layout false` fragment.
+
+⚠️ **Each user-facing word of the admin is in `config/locales/en.yml`, below `en.admin.*`.**
+A view uses the lazy key of its own path (`t(".title")` in `admin/spam/index.html.erb` reads
+`en.admin.spam.index.title`), and a file below `app/views/layouts/` uses the full key, because it
+renders from more than one page. A presenter, a controller, and a helper use the full key, and a
+presenter calls `I18n.t` and not the bare `t`. **Write no user-facing word in an ERB file, in a Ruby
+method, or in a JS file.**
+
+- ⚠️ **This is for ONE place for the copy, and not for a second language.** A spec asserts
+  `I18n.t("admin.…")` and never the words, thus a change to a word breaks no spec. That is the
+  purpose. `spec/support/translation_helpers.rb` has `t_before`, for a message where an
+  interpolated value — a date, a count — is the thing that the spec must prove.
+- ⚠️ **Only the WORDS move.** An icon id, a path, a CSS class, a `data-` hook, a DOM id, and a Web
+  Awesome `variant` stay in the code. `ConnectedAppPresenter#status_variant` stays beside
+  `#status_label`, which left.
+- ⚠️ **A DOM id must never come from a translated word.** The caption of a nav group takes its id
+  from the `:key` of that group, and `aria-labelledby` points at it. An id from the label would
+  move when a person changes a word.
+- ⚠️ **Each key is a COMPLETE sentence.** Do not join one from a label and a fragment. Where a part
+  is optional — a date, the "with the Bluesky handles" clause — there are **two keys** and the code
+  selects one. `admin.social.errors.*` has a `single` form and a `numbered` form for that reason.
+- **`config.i18n.raise_on_missing_translations` is on in development and in test**, thus a key with
+  a spelling mistake fails a spec and never renders `translation missing:` on a live page.
+- A sentence with an element in it uses an `_html` key and an interpolation, for example
+  `t(".no_token_html", variable: tag.code("MAPBOX_ACCESS_TOKEN"))`. Rails escapes each value that
+  goes into such a key.
+- ⚠️ **The widget views and the widget presenters are NOT part of this rule.** `WeatherSummaryPresenter`,
+  `WhoopPresenter`, `EventWeatherPresenter`, and `UpcomingRacesPresenter` render public-site copy,
+  which is part of the markup contract with `web/` and which the edge caches. Leave it in the code.
+- **The words that a Stimulus controller renders come from the same file.** JavaScript cannot read
+  `en.yml`, thus `AdminHelper#admin_i18n_data(scope, **nested)` writes the subtree into a
+  `data-admin-i18n` attribute and `app/javascript/lib/i18n.js` reads it, does the `one`/`other`
+  choice, and puts each `%{name}` value in. ⚠️ It is a plain `data-` attribute and **not** a
+  Stimulus value: a value arrives through a MutationObserver, thus it is not synchronous, and a
+  controller reads this table at `connect()`.
 
 ⚠️ **Its routes are at the ROOT, and not below `/admin`.** Rails draws them on the admin host only,
 where that prefix would repeat the host name. `scope module: "admin"` in `config/routes.rb` keeps the
@@ -903,8 +941,9 @@ Threads, now or at a date and a time. All three post. Each post has an **optiona
     a new schedule cancels nothing: the owner can line up more than one post, and each is its own
     job with its own record key.
 - ⚠️ **There is ONE JOB FOR EACH NETWORK, and not one job for all of them.**
-  `Admin::SocialController::NETWORKS` is the one table of the networks: the name, the job, and the
-  method that reads the state of each one. The action adds one job for each network that the owner
+  `Admin::SocialController::NETWORKS` is the one table of the networks: the job, and the
+  method that reads the state of each one. ⚠️ The **name** is not in that table: it is
+  `admin.networks.*` in the locale file, which the Connected apps page reads as well. The action adds one job for each network that the owner
   ticked. **This is the point**: a failure at one service retries that
   service alone, and a network that already posted is never sent again. An earlier version had one
   job that posted to each network, and a retry of it went back to every one of them.
@@ -1248,8 +1287,11 @@ shortcut list. **Save**, below the place name and the coordinates, is the only c
 stored values. Both controls are disabled when the staged pair is equal to the stored pair. A
 `wa-badge` beside the coordinates gives that state — Saved, Unsaved, or "Not set" before a location
 exists — in the same outlined form that Connected apps and Course maps use.
-⚠️ `LocationPresenter#state_label` and `#state_variant` render the first state, and `STATES` in
-`location_map_controller.js` renders each state after that. The two lists of words must agree.
+⚠️ `LocationPresenter#state_label` and `#state_variant` render the first state, and
+`location_map_controller.js` renders each state after that. **Both read the same
+`admin.location.state.*` keys**, through the `data-admin-i18n` attribute, thus the words cannot
+become different. `location_map_controller.js` holds the `variant` of each state and no words, and
+`spec/requests/admin/location_spec.rb` pins that the browser gets those same keys.
 
 - **The page writes through `Location.store`**, which is the method that `POST /api/location` uses.
   Thus the two cannot become different in their order (Redis first, then the sync) or in their check
@@ -1378,9 +1420,11 @@ and `StaticMap` makes the render URL and gets the image.
   `style_url` holds a custom style and wins when it has a value. `MapTrackPresenter#settings` moves
   a preset that it finds in `style_url` back into the dropdown, and that is also how a record from
   before this split corrects itself.
-- **The name of a marker icon says what it marks** (`MARKER_ICONS`), and it is not the Maki id. The
-  first icon for a sport comes from `GpxTrack::SPORT_ICONS`, whose fallback is running and not a
-  neutral icon.
+- **The name of a marker icon says what it marks** (`MARKER_ICONS`), and it is not the Maki id.
+  ⚠️ The value of that constant is the **name of a translation** and not the words: `StaticMap.icon_options`
+  and `.style_options` render the two dropdowns from `admin.course_maps.icons.*` and
+  `admin.course_maps.styles.*`. The first icon for a sport comes from `GpxTrack::SPORT_ICONS`, whose
+  fallback is running and not a neutral icon.
 - ⚠️ **Mapbox draws the last overlay on top**, thus the default order of the markers is
   `[finish, start]`, which puts the start on top. A finish pin above the start of an out-and-back
   course hides the start point. `finish_on_top` changes the order. The name of the setting says
@@ -1570,6 +1614,21 @@ disconnected the accounts that you connected in the admin on your own machine. d
 `spec/support/streamed_get.rb` stubs `HTTParty.get` for the code that reads a body through
 `ApplicationService#download`: that method reads in fragments, thus a plain `and_return` gives it
 nothing.
+
+⚠️ **An admin spec asserts `I18n.t("admin.…")`, and never the words.** Each user-facing word of the
+admin is in `config/locales/en.yml`, thus a change to the copy must break no spec. Refer to **The
+admin UI**.
+
+- A literal stays only where that literal is the thing that the spec proves: a path, a piece of
+  markup, `<button`, a secret that must be absent, and the escaped `<script>` payload of the spam
+  page.
+- ⚠️ **A body assertion escapes the translation** (`ERB::Util.html_escape(I18n.t(…))`), because ERB
+  escaped the apostrophe of "didn't". A `flash` assertion compares the raw string.
+- `t_before(key, :placeholder)` in `spec/support/translation_helpers.rb` gives the words before an
+  interpolation. Use it where the value — a date, a count — is behaviour that the spec must prove
+  and the words around it are copy.
+- ⚠️ **Never assert that a translation equals its own key.** Such a spec proves nothing and it puts
+  the copy back in two files.
 
 ## Environment variables
 

@@ -90,16 +90,16 @@ RSpec.describe LocationPresenter do
     it "asks for a first pin when there's no location at all" do
       subject = presenter(place: nil)
 
-      expect(subject.heading).to eq("Nowhere yet")
-      expect(subject.details).to include("Drop a pin")
+      expect(subject.heading).to eq(I18n.t("admin.location.empty_heading"))
+      expect(subject.details).to eq(I18n.t("admin.location.prompt"))
     end
 
     # The badge says if the app stored the coordinates beside it. Nothing can be staged before the
     # page loads, thus a stored location is always "Saved" here.
     it "tags a stored location as saved, and no location as unset" do
-      expect(presenter(stored: [ 43.48, -110.76 ]).state_label).to eq("Saved")
+      expect(presenter(stored: [ 43.48, -110.76 ]).state_label).to eq(I18n.t("admin.location.state.saved"))
       expect(presenter(stored: [ 43.48, -110.76 ]).state_variant).to eq("success")
-      expect(presenter.state_label).to eq("Not set")
+      expect(presenter.state_label).to eq(I18n.t("admin.location.state.not_set"))
       expect(presenter.state_variant).to eq("neutral")
     end
   end
