@@ -888,6 +888,73 @@ RSpec.describe "Admin social media", type: :request do
 
     # The preview dialog. ⚠️ It reads the same fields as POST /social and it calls the same private
     # methods, thus it cannot show a text that the post does not send.
+    # ⚠️ Only Bluesky has rich text. The composer unticks and disables the other two rows, and this
+    # is not a repeat of that: a row that a browser cannot tick, a hand-written request can.
+    describe "POST /social with a Markdown link" do
+      before do
+        sign_in_as(email: owner_email)
+        connect(bluesky: true, mastodon: true, threads: true)
+      end
+
+      let(:draft) { "Read [my post](https://example.test/a) today" }
+
+      it "posts to Bluesky" do
+        post "/social", params: { posts: [ { text: draft, link: "" } ], networks: [ "bluesky" ] }
+
+        expect(response).to redirect_to(social_path)
+        # ⚠️ The job carries the words that the OWNER wrote. `Bluesky#post!` renders them, thus each
+        # attempt of that job makes the same record text and the same facets.
+        expect(BlueskyPostJob.jobs.first["args"].first.first["text"]).to eq(draft)
+      end
+
+      it "refuses a draft that also posts to a network with no rich text" do
+        post "/social", params: { posts: [ { text: draft, link: "" } ],
+                                  networks: %w[bluesky mastodon threads] }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(flash[:alert]).to eq(I18n.t("admin.social.errors.markdown_network",
+                                           networks: "Mastodon and Threads"))
+        expect(BlueskyPostJob.jobs).to be_empty
+        expect(MastodonPostJob.jobs).to be_empty
+      end
+
+      # ⚠️ One link in one post decides the whole thread: a thread goes to a network as one unit.
+      it "reads a link in any post of the thread" do
+        post "/social", params: { posts: [ { text: "Plain words", link: "" },
+                                           { text: draft, link: "" } ],
+                                  networks: %w[bluesky mastodon] }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(flash[:alert]).to eq(I18n.t("admin.social.errors.markdown_network",
+                                           networks: "Mastodon"))
+      end
+
+      # ⚠️ A bare URL is not Markdown. Each of the three networks makes a link of one.
+      it "takes a bare URL at each network" do
+        post "/social", params: { posts: [ { text: "Read https://example.test/a today", link: "" } ],
+                                  networks: %w[bluesky mastodon threads] }
+
+        expect(response).to redirect_to(social_path)
+      end
+
+      it "takes brackets that are not a link at each network" do
+        post "/social", params: { posts: [ { text: "That was [wild] today", link: "" } ],
+                                  networks: %w[bluesky mastodon threads] }
+
+        expect(response).to redirect_to(social_path)
+      end
+
+      # ⚠️ The count measures the RECORD text: the address is in a facet and it uses none of the
+      # 300 characters. A count of the raw words would refuse this draft.
+      it "counts the words of a link and not its address" do
+        long = "#{'a' * 280} [words](https://example.test/#{'b' * 100})"
+
+        post "/social", params: { posts: [ { text: long, link: "" } ], networks: [ "bluesky" ] }
+
+        expect(response).to redirect_to(social_path)
+      end
+    end
+
     describe "POST /social/preview/text" do
       before do
         sign_in_as(email: owner_email)
@@ -1053,6 +1120,83 @@ RSpec.describe "Admin social media", type: :request do
         preview(posts: [ { text: "cc @tony", link: "" } ],
                 mentions: [ { token: "@tony", bluesky: "nobody.bsky.social", mastodon: "",
                               threads: "" } ])
+      end
+
+      # ⚠️ **A link must be a LINK in the dialog.** A Markdown link shows its words and never its
+      # address, thus an `<a>` is the only thing that says where those words point. A bare URL that
+      # the owner pasted is a link at each of the three networks, and it is one here as well.
+      describe "the links of a text" do
+        it "marks the words of a Markdown link, and holds its address" do
+          body = preview(posts: [ { text: "Read [my post](https://example.test/a) today", link: "" } ])
+
+          expect(rows(body)["bluesky"]["text"]).to eq("Read my post today")
+          expect(rows(body)["bluesky"]["segments"]).to eq([
+            { "text" => "Read " },
+            { "text" => "my post", "url" => "https://example.test/a" },
+            { "text" => " today" }
+          ])
+        end
+
+        it "marks a bare URL for each of the three networks" do
+          body = preview(posts: [ { text: "See https://example.test/x now", link: "" } ])
+
+          %w[bluesky mastodon threads].each do |key|
+            expect(rows(body)[key]["segments"]).to eq([
+              { "text" => "See " },
+              { "text" => "https://example.test/x", "url" => "https://example.test/x" },
+              { "text" => " now" }
+            ]), "#{key} does not mark a bare URL"
+          end
+        end
+
+        # ⚠️ Mastodon joins the link of the field into its TEXT, thus that URL is a link of the
+        # text as well. The other two keep it out, and their note says where it went.
+        it "marks the link that Mastodon joins into the text" do
+          body = preview(posts: [ { text: "A long day.", link: url } ])
+
+          expect(rows(body)["mastodon"]["segments"].last).to eq({ "text" => url, "url" => url })
+          expect(rows(body)["bluesky"]["segments"]).to eq([ { "text" => "A long day." } ])
+        end
+
+        it "gives one piece and no address to a text with no link" do
+          body = preview(posts: [ { text: "A long day.", link: "" } ])
+
+          expect(rows(body)["bluesky"]["segments"]).to eq([ { "text" => "A long day." } ])
+        end
+
+        # ⚠️ The browser writes each `url` into an `href`. Both patterns start with the scheme, thus
+        # no draft can ever make a `javascript:` link in the admin.
+        it "gives every address an http or https scheme" do
+          body = preview(posts: [ { text: "[x](javascript:alert(1)) and [y](https://ok.test)", link: "" } ])
+
+          addresses = rows(body)["bluesky"]["segments"].filter_map { |piece| piece["url"] }
+          expect(addresses).to all(start_with("http"))
+        end
+      end
+
+      # ⚠️ A Markdown link can go to Bluesky alone, thus the dialog must not show a Mastodon text
+      # that this app refuses to post.
+      describe "a draft with a Markdown link" do
+        let(:body) { preview(posts: [ { text: "Read [my post](https://example.test/a)", link: "" } ]) }
+
+        it "shows Bluesky alone" do
+          expect(body["posts"].first["networks"].map { |row| row["key"] }).to eq([ "bluesky" ])
+        end
+
+        it "shows each connected network for a draft with no Markdown" do
+          plain = preview(posts: [ { text: "Read https://example.test/a", link: "" } ])
+
+          expect(plain["posts"].first["networks"].map { |row| row["key"] })
+            .to eq(%w[bluesky mastodon threads])
+        end
+
+        # ⚠️ One link in one post decides the whole thread: a thread goes to a network as one unit.
+        it "reads a link in any post of the thread" do
+          thread = preview(posts: [ { text: "Plain words", link: "" },
+                                    { text: "Read [my post](https://example.test/a)", link: "" } ])
+
+          expect(thread["posts"].map { |post| post["networks"].length }).to eq([ 1, 1 ])
+        end
       end
 
       it "needs the owner session" do

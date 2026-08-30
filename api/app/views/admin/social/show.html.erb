@@ -76,9 +76,20 @@
   <wa-checkbox-group label="<%= t(".post_to") %>">
     <% @social.networks.each do |network| %>
       <% if network.connected? %>
-        <wa-checkbox name="networks[]" value="<%= network.key %>" hint="<%= network.account_line %>"
+        <%# ⚠️ The hint is a SLOT and not the `hint` attribute, because a Markdown link REPLACES that
+            line. Only Bluesky can take one, thus the composer unticks and disables the other two
+            rows, and the second line below says why.
+            ⚠️ The `markdownNetwork` target marks exactly those two rows. A row with no account is
+            disabled in the branch below, and social#applyMarkdown must never turn one of those
+            back on. %>
+        <wa-checkbox name="networks[]" value="<%= network.key %>"
+                     <% unless network.markdown? %>data-social-target="markdownNetwork"<% end %>
                      <%= "checked" if @social.selected?(network.key) %>>
           <%= network.name %>
+          <span slot="hint">
+            <span class="social__hint-line" data-network-account><%= network.account_line %></span>
+            <span class="social__hint-line" data-network-markdown hidden><%= t(".markdown_disabled") %></span>
+          </span>
         </wa-checkbox>
       <% else %>
         <%# A network with no account keeps its row and is disabled. The Connected apps page hides

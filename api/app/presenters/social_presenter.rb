@@ -11,6 +11,13 @@ class SocialPresenter
   # The length at which the count line changes to the warning color.
   WARN_AT = 270
 
+  # The one network with rich text. ⚠️ A Markdown link becomes a facet there: the words carry the
+  # address and the URL uses none of the 300 characters. Mastodon and Threads post plain words,
+  # thus a link there would reach a reader as its own syntax with the address gone. The composer
+  # unticks and disables those two rows, and `Admin::SocialController#markdown_network_error`
+  # refuses a request that ticks one anyway.
+  MARKDOWN_NETWORK = "bluesky".freeze
+
   # The most posts in one thread. ⚠️ It is a guard against a runaway form and not a rule of any
   # network: Bluesky and Mastodon set no limit, and the limit of Threads is a rate of 250 each day.
   MAX_POSTS = 25
@@ -49,6 +56,9 @@ class SocialPresenter
     def initialize(key:, name:, account: nil, connected: false, notice: nil) = super
 
     def connected? = connected
+
+    # @return [Boolean] True for the one network that takes a Markdown link.
+    def markdown? = key == MARKDOWN_NETWORK
 
     # The line below the name, for a network that is connected. The view renders its own line, with
     # a link, for a network that is not connected.

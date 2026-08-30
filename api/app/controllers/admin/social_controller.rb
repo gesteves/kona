@@ -117,7 +117,12 @@ module Admin
     # ⚠️ It is a POST, and the two previews below are GET. A draft is as much as MAX_POSTS posts of
     # 300 characters and a mention map, thus a query string is the wrong shape for it.
     def preview_text
+      # ⚠️ A draft with a Markdown link shows BLUESKY alone, because it can go nowhere else. To
+      # render the other two would show a text that this app refuses to post. The composer turns
+      # their checkboxes off by the same rule, thus the page and the dialog agree.
       networks = social_networks.select(&:connected?)
+      networks = networks.select { |network| network.markdown? } if markdown?
+
       # ⚠️ One post needs no label. The composer hides its own controls at one post for the same
       # reason: a number for a thread of one says nothing.
       labelled = posts.length > 1
@@ -307,6 +312,9 @@ module Admin
 
       return t("admin.social.errors.no_network") if selected_networks.empty?
 
+      message = markdown_network_error
+      return message if message
+
       message = mention_shape_error
       return message if message
 
@@ -389,6 +397,32 @@ module Admin
     # @return [String] The name of that network, for a message.
     def network_name(key) = t("admin.networks.#{key}")
 
+    # @return [Boolean] True when the draft holds at least one Markdown link.
+    #
+    # ⚠️ It is THREAD-LEVEL: a thread goes to a network as one unit, thus one link in one post
+    # decides the whole draft. `social_controller.js` turns the two checkboxes off by that same
+    # rule.
+    def markdown?
+      return @markdown if defined?(@markdown)
+
+      @markdown = posts.any? { |post| MarkdownLinks.links?(post[:text]) }
+    end
+
+    # Refuses a draft with a Markdown link that goes to a network with no rich text.
+    #
+    # ⚠️ **The composer already unticks and disables those two rows, and this is not a repeat of
+    # that.** A row that a browser cannot tick, a request that a person writes by hand can. Without
+    # this the post would reach a reader as `[my post](https://…)`, with the address in the words.
+    # @return [String, nil]
+    def markdown_network_error
+      return nil unless markdown?
+
+      others = selected_networks - [ SocialPresenter::MARKDOWN_NETWORK ]
+      return nil if others.empty?
+
+      t("admin.social.errors.markdown_network", networks: to_sentence(others))
+    end
+
     # One network of one post, for the preview.
     # @param network [SocialPresenter::Network]
     # @param post [Hash]
@@ -396,22 +430,59 @@ module Admin
     def preview_row(network, post)
       limit = NETWORKS.fetch(network.key)[:limit]
       length = length_for(network.key, post)
+      text, links = composed(network.key, post)
 
-      { key: network.key, name: network.name, text: composed_text(network.key, post),
+      { key: network.key, name: network.name, text: text, segments: segments(text, links),
         length: length, limit: limit, over: length > limit, note: link_note(network.key, post) }
     end
 
-    # The text that one network will receive.
+    # The text that one network will receive, and each link in it.
     #
     # ⚠️ **Mastodon is the one network whose text holds the LINK**, and `Mastodon.compose` is the
     # method that `Mastodon#post!` calls. Bluesky makes an embed of the link and Threads makes an
     # attachment, thus neither text holds it.
-    # @return [String]
-    def composed_text(network, post)
+    #
+    # ⚠️ **Bluesky gets the RENDERED text**, because `Bluesky#post!` renders the Markdown itself.
+    # ONE parse makes the text and the offsets: a second parse for the links could answer
+    # differently after an edit to the grammar, and the dialog would then mark the wrong words.
+    #
+    # ⚠️ `Bluesky.link_ranges` is the rule for the three networks, and not for Bluesky alone. Each
+    # instance linkifies a bare URL with a rule of its own, thus this says "these words are an
+    # address" and not "Mastodon will make exactly this a link". `SocialMentions` reads that same
+    # pattern for the same reason.
+    # @return [Array(String, Array<MarkdownLinks::Link>)]
+    def composed(network, post)
       text = text_for(network, post[:text])
-      return text unless network == "mastodon"
 
-      Mastodon.compose(text: text, url: post[:link])
+      if network == SocialPresenter::MARKDOWN_NETWORK
+        rendered = MarkdownLinks.parse(text)
+        return [ rendered.text, Bluesky.link_ranges(rendered.text, rendered.links) ]
+      end
+
+      text = Mastodon.compose(text: text, url: post[:link]) if network == "mastodon"
+      [ text, Bluesky.link_ranges(text) ]
+    end
+
+    # The text in pieces, so that the dialog can render each link as a link.
+    #
+    # ⚠️ **A `url` is always http or https**, because `MarkdownLinks::URL_PATTERN` and
+    # `Bluesky::URL_PATTERN` both start with that scheme. Thus the browser can write one into an
+    # `href` with no check of its own, and no draft can make a `javascript:` link in the admin.
+    # @param text [String]
+    # @param links [Array<MarkdownLinks::Link>] In order, and with no overlap.
+    # @return [Array<Hash>] `[{ text: }, { text:, url: }, …]`, in order and with no gap.
+    def segments(text, links)
+      pieces = []
+      last = 0
+
+      links.each do |link|
+        pieces << { text: text[last...link.start] } if link.start > last
+        pieces << { text: text[link.start...link.finish], url: link.url }
+        last = link.finish
+      end
+
+      pieces << { text: text[last..] } if last < text.length
+      pieces
     end
 
     # The length of one post at one network, by the rule of that network.

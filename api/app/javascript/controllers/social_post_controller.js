@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus";
 import { i18nTable, t } from "../lib/i18n";
+import { render } from "../lib/markdown_links";
 import { blueskyText } from "../lib/social_mentions";
 
 // How long the link field must be quiet before this reads the card. Each preview is one request of
@@ -54,13 +55,19 @@ export default class extends Controller {
   /**
    * Writes the length of the body against the limit, and colors that line.
    *
-   * ⚠️ It counts the text that **Bluesky** will get, and not the words that the owner can see. A
-   * mention grows into a handle, thus "@tony" can become "@tony.bsky.social". A count of the raw
-   * words would say that a draft fits when Bluesky refuses it.
-   * `Admin::SocialController#post_error` measures the same string.
+   * ⚠️ It counts the text that **Bluesky** will get, and not the words that the owner can see. Two
+   * things make those different. A mention grows into a handle, thus "@tony" can become
+   * "@tony.bsky.social". And a Markdown link keeps its address in a facet, thus
+   * "[my post](https://example.com/a)" is 7 characters and not 30.
+   * `Admin::SocialController#post_error` and `Bluesky.post_length` measure the same string.
+   *
+   * ⚠️ The two steps are in THIS ORDER, as they are on the server: the mentions go in first, and
+   * the Markdown is rendered second. A handle can hold no bracket, thus nothing that the first step
+   * writes can make a link that the second step then reads.
    */
   count() {
-    const length = this.graphemes(blueskyText(this.bodyTarget.value ?? "", this.blueskyMentions));
+    const text = render(blueskyText(this.bodyTarget.value ?? "", this.blueskyMentions));
+    const length = this.graphemes(text);
 
     this.countTarget.textContent = `${length} / ${this.limitValue}`;
     this.countTarget.classList.toggle("social__count--warning",

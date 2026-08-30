@@ -1055,17 +1055,99 @@ Ruby Regexp gives a source with `(?-mix:…)` in it, which JavaScript cannot par
 ⚠️ A difference fails **safe** in both directions: a token that only the browser finds gives a row
 that the action ignores, and a token that only Ruby finds gets no row, thus its `@` comes off.
 
+#### Markdown links
+
+The body of a post takes a **Markdown link**, in three forms:
+
+```
+[words](https://example.com)          inline
+[words][name] … [name]: https://…     a reference, and its definition on a line of its own
+[name] … [name]: https://…            a short reference, where the words are the name
+```
+
+⚠️ **Only Bluesky can take one, and that is the reason for the whole feature.** Its rich text puts
+the address in a **facet**, thus the words carry the link and the URL uses **none** of the 300
+characters. Mastodon and Threads post plain words: the same draft would reach a reader as
+`[my post](https://…)`, with the address in the middle of the sentence.
+
+Thus **a Markdown link in any post turns the other two networks off**. `social_controller.js`
+unticks and disables those two rows at the keystroke that makes the first link, and their hint says
+why. ⚠️ **The action refuses such a request as well**, and that is not a repeat of the composer: a
+row that a browser cannot tick, a request that a person writes by hand can.
+
+- ⚠️ **It is THREAD-LEVEL.** A thread goes to a network as one unit, thus one link in one post
+  decides the whole draft. The action and the composer read it the same way.
+- ⚠️ **The composer keeps the ticks that the owner had**, thus a link that they write and then
+  remove gives the draft its networks back. It restores them **only at the change**, and not at each
+  keystroke: a restore at every one of them would put back a tick that the owner had just taken off.
+- ⚠️ **`MarkdownLinks` is a small grammar and NOT a Markdown renderer.** It knows a link and nothing
+  else: no emphasis, no heading, no code, and no escape. A post is 300 characters of a person
+  writing a sentence, and each other rule of Markdown would only turn plain words into markup that
+  the owner did not ask for. **Do not add a Markdown library for this.**
+- ⚠️ **The address must be http or https, and a span with anything else stays exactly as it is**,
+  brackets and parentheses and all. Thus "I ate [a lot](really)" is a sentence, `[wild]` with no
+  definition is a word in brackets, and `.links?` answers false for both. That test is what turns
+  the two checkboxes off, thus it must never fire on an ordinary sentence.
+- ⚠️ **A bare URL is not Markdown.** Each of the three networks makes a link of one, thus a draft
+  that holds one still goes to all of them.
+- ⚠️ **`Bluesky#post!` renders the Markdown, and the action does NOT.** The job carries the words
+  that the owner wrote, thus each attempt of that job makes the same record text and the same
+  facets from one parse. `Bluesky.link_ranges` is the one list of the links of a post: `#build_facets`
+  makes a facet from each entry, and the preview renders each entry as an `<a>`. Thus the dialog
+  cannot show a link that the post does not make.
+- ⚠️ **`Bluesky.post_length` renders first**, thus the count measures what the **record** will hold:
+  `[my post](https://example.com/a)` is 7 characters and not 30. Without that the action would
+  refuse a draft that Bluesky takes.
+- ⚠️ **The offsets of `MarkdownLinks::Link` are CHARACTERS**, and `Bluesky#link_facet` makes the
+  bytes that a record needs. One accented letter is 1 character and 2 bytes.
+- ⚠️ **The two steps run in this order: the mentions first, and the Markdown second.** A handle can
+  hold no bracket, thus nothing that the substitution writes can make a link that the render then
+  reads. `social_post_controller.js` counts in that same order.
+
+⚠️ **The grammar is in Ruby and in JavaScript**, because the count must follow each keystroke and
+the two checkboxes must go off at the keystroke that makes the first link.
+⚠️ **A difference does NOT fail safe here**, and that is the difference from the mention contract: a
+browser that renders a link that Ruby does not shows a count that is too small, and the action then
+refuses a draft that the page called correct. Thus
+`spec/contracts/markdown_links_contract_spec.rb` does not compare the patterns alone — it **runs the
+JavaScript file with node** over the same drafts and compares the answers. The grammar is an
+algorithm and not one regular expression. **Add a row to `DRAFTS` there for each rule that you add.**
+⚠️ **The browser copy carries no offsets, on purpose.** Ruby counts code points and JavaScript counts
+UTF-16 code units: one emoji of a family is 5 and 8. An offset from that file would be a number that
+looks correct and is not, and nothing in the browser needs one.
+
 #### The preview
 
 A **Preview** button beside "Post now" opens a dialog that shows the draft as each connected network
 will receive it, with the count and the limit of that network. It posts nothing.
 
-Two things make the three texts different, and the owner could see neither one before this dialog:
+Three things make the texts different, and the owner could see none of them before this dialog:
 
 - **A mention.** Refer to the part above.
 - **The link.** `Mastodon#post!` joins it into the **text**. Bluesky makes an embed of it and
   Threads makes an attachment, thus it is not in the text of either one. The dialog says where the
   link went for those two.
+- **A Markdown link.** The Bluesky row shows the **rendered** text, thus the owner reads the words
+  that a post will hold. ⚠️ A draft that holds one shows **Bluesky alone**: to render the other two
+  would show a text that this app refuses to post. The dialog says nothing about that, on purpose —
+  the two rows of "Post to" are already off, and their hint gives the reason.
+
+**Each link is a link in the dialog.** The action sends the text in `segments`
+(`[{ text: }, { text:, url: }, …]`) and the browser writes an `<a>` for a piece that has a `url`.
+
+- ⚠️ **A Markdown link shows its WORDS and never its address**, thus an `<a>` is the only thing that
+  says where those words point. Without it the owner cannot check a link at all.
+- A **bare URL** that the owner pasted is a link at each of the three networks, and it is one here
+  as well. For Mastodon that includes the link of the field, which `Mastodon.compose` joins into the
+  text.
+- ⚠️ **`Bluesky.link_ranges` is the rule for the three networks, and not for Bluesky alone.** Each
+  instance linkifies a bare URL with a rule of its own, thus the dialog says "these words are an
+  address" and not "Mastodon will make exactly this a link". `SocialMentions` reads that same
+  pattern for the same reason.
+- ⚠️ **The browser writes each piece with `textContent` and `href`, and never with HTML.** Both URL
+  patterns start with `https?://`, thus no draft can make a `javascript:` link in the admin.
+- ⚠️ **The `<a>` needs no style of its own.** Web Awesome gives a bare anchor the brand color and an
+  underline, and a measurement in a browser gave the same color for a styled one and a plain one.
 
 ⚠️ **The value of the dialog is that it CANNOT be wrong, thus it copies nothing:**
 

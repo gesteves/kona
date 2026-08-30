@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus";
 import { i18nTable, t } from "../lib/i18n";
+import { hasLinks } from "../lib/markdown_links";
 import { isBlueskyHandle, mentionKey, tokensOf } from "../lib/social_mentions";
 
 // How long the words must be quiet before the rows are reconciled. ⚠️ A token churns while the
@@ -18,8 +19,8 @@ export default class extends Controller {
     "submit", "label", "posts", "post", "template", "add", "remove", "handle",
     "schedule", "scheduleFields", "date", "time", "timeZone",
     "mentions", "mentionRows", "mentionTemplate", "mention",
-    "preview", "previewSpinner", "previewBody", "previewGroupTemplate", "previewRowTemplate",
-    "removeDialog",
+    "preview", "previewSpinner", "previewBody", "previewGroupTemplate",
+    "previewRowTemplate", "removeDialog", "markdownNetwork",
   ];
   static values = { maxPosts: Number, previewUrl: String };
 
@@ -33,6 +34,11 @@ export default class extends Controller {
     // The values of each mention, by key. ⚠️ A value stays here after its row goes away, thus a
     // token that the owner deletes and writes again gets its handles back.
     this.mentionValues = new Map();
+
+    // ⚠️ It starts at false and not undefined, thus the first `validate()` of a draft with no
+    // Markdown does nothing at all. Without that the else branch below would run at connect and
+    // untick each row that the server rendered as ticked.
+    this.markdownOn = false;
 
     // ⚠️ The date and the time carry no zone. This is what gives them a meaning, and it is the
     // reason that a date field is safe here and was not safe in the Republish dialog. With no
@@ -322,12 +328,65 @@ export default class extends Controller {
     this.readMentionRows();
     this.pushMentions();
     this.scheduleMentionScan();
+    // ⚠️ It runs BEFORE `canPost`, which reads the ticks that this method can change.
+    this.applyMarkdown();
 
     this.submitTarget.disabled = !this.canPost;
     // ⚠️ This is NOT `canPost`. A draft that is past the limit, or that ticks no network, is exactly
     // the draft that the owner wants to look at.
     this.previewTarget.disabled = !this.canPreview;
     this.relabel();
+  }
+
+  /**
+   * Turns the rows of Mastodon and Threads off while the draft holds a Markdown link.
+   *
+   * ⚠️ **Only Bluesky has rich text.** There a link is a facet: the words carry the address, and
+   * the URL uses none of the 300 characters. The other two post plain words, thus the same draft
+   * would reach a reader as `[my post](https://…)`. `Admin::SocialController#markdown_network_error`
+   * refuses such a request as well, because a row that a browser cannot tick a hand-written request
+   * can.
+   *
+   * ⚠️ **It does nothing while the state has not changed**, and that is not only an optimisation:
+   * this runs at each keystroke, thus a restore at every one of them would put back a tick that the
+   * owner had just taken off.
+   *
+   * ⚠️ It reads the `markdownNetwork` targets, which the view puts on the CONNECTED rows of those
+   * two networks alone. A row with no account is disabled for its own reason, and it must never
+   * come back on.
+   */
+  applyMarkdown() {
+    const on = this.hasMarkdown;
+    if (on === this.markdownOn) return;
+
+    this.markdownOn = on;
+    this.markdownNetworkTargets.forEach((box) => {
+      if (on) {
+        // ⚠️ It keeps the tick that the owner had, thus a link that they write and then remove
+        // gives the draft its networks back.
+        box.dataset.wasChecked = box.checked ? "true" : "false";
+        box.checked = false;
+      } else if ("wasChecked" in box.dataset) {
+        box.checked = box.dataset.wasChecked === "true";
+      }
+      box.disabled = on;
+
+      // The hint says why the row is off. One of the two lines shows at a time.
+      const account = box.querySelector("[data-network-account]");
+      const reason = box.querySelector("[data-network-markdown]");
+      if (account) account.hidden = on;
+      if (reason) reason.hidden = !on;
+    });
+  }
+
+  /**
+   * @returns {boolean} True when any post of the thread holds a Markdown link.
+   *
+   * ⚠️ It is THREAD-LEVEL: a thread goes to a network as one unit, thus one link in one post
+   * decides the whole draft. `Admin::SocialController#markdown?` reads it the same way.
+   */
+  get hasMarkdown() {
+    return this.postTargets.some((post) => hasLinks(post.querySelector("wa-textarea")?.value ?? ""));
   }
 
   /**
@@ -630,7 +689,7 @@ export default class extends Controller {
     row.querySelector("[data-preview-name]").textContent = network.name;
     count.textContent = `${network.length} / ${network.limit}`;
     count.classList.toggle("social-preview__count--over", network.over);
-    row.querySelector("[data-preview-text]").textContent = network.text;
+    row.querySelector("[data-preview-text]").replaceChildren(...this.textNodes(network.segments));
 
     // The note says where the link went, for a network that keeps it out of the text.
     const note = row.querySelector("[data-preview-note]");
@@ -640,6 +699,33 @@ export default class extends Controller {
     }
 
     return row;
+  }
+
+  /**
+   * The text of one network, in pieces, with each link as a link.
+   *
+   * ⚠️ **A Markdown link shows its WORDS and never its address**, thus the owner cannot check one
+   * without this: an `<a>` is the only thing that says where those words point. A bare URL that
+   * the owner pasted becomes a link at each of the three networks, and it is a link here as well.
+   *
+   * ⚠️ It writes each piece with `textContent` and `href`, and never with HTML. The action gives
+   * a `url` that is http or https and nothing else, thus no draft can make a `javascript:` link.
+   * @param {Array<{text: string, url?: string}>} segments
+   * @returns {Node[]}
+   */
+  textNodes(segments) {
+    return (segments ?? []).map((segment) => {
+      if (!segment.url) return document.createTextNode(segment.text);
+
+      const link = document.createElement("a");
+      link.href = segment.url;
+      link.textContent = segment.text;
+      // ⚠️ The dialog holds the draft. A link that replaced this page would lose it.
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+
+      return link;
+    });
   }
 
   /**

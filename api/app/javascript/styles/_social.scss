@@ -32,6 +32,14 @@
     display: none;
   }
 
+  // ⚠️ The two lines of a "Post to" hint, of which one shows at a time. A rule of Web Awesome can
+  // give slotted content a display, and an author rule beats the `[hidden]` of the browser
+  // whatever its layer. Thus the attribute alone hides nothing, and this rule is what makes it
+  // work. `.social__schedule` above has the same note.
+  &__hint-line[hidden] {
+    display: none;
+  }
+
   &__count {
     color: var(--wa-color-text-quiet);
     margin: var(--wa-space-2xs) 0 0;
@@ -290,6 +298,9 @@
 
   // ⚠️ The text keeps its line breaks and it wraps a long word. A post can hold a newline and a
   // link with no space in it.
+  // ⚠️ The <a> of a link in this text needs NO rule of its own. Web Awesome styles a bare anchor
+  // with the brand color and an underline, and a measurement in a browser gave the same color for
+  // the two. A rule here would only make the underline of the theme more solid.
   &__text {
     margin: 0;
     overflow-wrap: anywhere;

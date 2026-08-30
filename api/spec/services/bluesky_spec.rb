@@ -39,6 +39,26 @@ RSpec.describe Bluesky do
     end
   end
 
+  # ⚠️ The count measures what the RECORD will hold. The address of a link is in a facet, thus a
+  # count of the words that the owner typed would refuse a draft that Bluesky takes.
+  describe ".post_length with a Markdown link" do
+    it "counts the words of a link and not its address" do
+      expect(described_class.post_length("Read [my post](https://example.test/a) today")).to eq(18)
+    end
+
+    it "counts nothing for a definition line" do
+      expect(described_class.post_length("Read [my post][a]\n\n[a]: https://example.test/a")).to eq(12)
+    end
+
+    # A draft that a count of the raw words would refuse, and that Bluesky takes.
+    it "takes a draft whose Markdown is longer than the limit" do
+      draft = "#{'a' * 280} [words](https://example.test/#{'b' * 100})"
+
+      expect(described_class.post_length(draft)).to eq(286)
+      expect(described_class.valid_post_length?(draft)).to be(true)
+    end
+  end
+
   describe ".valid_post_length?" do
     it "refuses an empty post and one past the limit" do
       expect(described_class.valid_post_length?("")).to be(false)
@@ -449,6 +469,60 @@ RSpec.describe Bluesky do
         service.post!(rkey: "3kabc", text: "Finished #1 in my age group")
 
         expect(@sent["record"]).not_to have_key("facets")
+      end
+
+      # ⚠️ The record holds the PLAIN words and the address is in the facet. Thus the URL uses none
+      # of the 300 characters, and that is the whole point of a Markdown link here.
+      describe "a Markdown link" do
+        it "writes the words in the record and the address in the facet" do
+          service.post!(rkey: "3kabc", text: "Read [my post](https://example.test/a) today")
+
+          expect(@sent["record"]["text"]).to eq("Read my post today")
+          facet = @sent["record"]["facets"].first
+          expect(facet["features"].first)
+            .to eq({ "$type" => "app.bsky.richtext.facet#link", "uri" => "https://example.test/a" })
+          expect(facet["index"]).to eq({ "byteStart" => 5, "byteEnd" => 12 })
+        end
+
+        it "takes the definition line of a reference out of the record" do
+          service.post!(rkey: "3kabc", text: "Read [my post][a] today\n\n[a]: https://example.test/a")
+
+          expect(@sent["record"]["text"]).to eq("Read my post today")
+          expect(@sent["record"]["facets"].first["features"].first["uri"])
+            .to eq("https://example.test/a")
+        end
+
+        # ⚠️ The offsets come from the PLAIN text, thus an accented letter before a link moves it.
+        it "counts the offsets in bytes of the plain text" do
+          service.post!(rkey: "3kabc", text: "café [ünïcode](https://example.test/a)")
+
+          expect(@sent["record"]["text"]).to eq("café ünïcode")
+          expect(@sent["record"]["facets"].first["index"]).to eq({ "byteStart" => 6, "byteEnd" => 15 })
+        end
+
+        # ⚠️ Two facets over one range render as a broken link, and the words of a link can hold an
+        # address of their own.
+        it "does not mark a bare URL inside the words of a link a second time" do
+          service.post!(rkey: "3kabc", text: "[https://a.test](https://b.test)")
+
+          uris = @sent["record"]["facets"].map { |facet| facet["features"].first["uri"] }
+          expect(uris).to eq([ "https://b.test" ])
+        end
+
+        it "gives two links with the same words their own facet" do
+          service.post!(rkey: "3kabc", text: "[one](https://a.test) and [one](https://b.test)")
+
+          expect(@sent["record"]["text"]).to eq("one and one")
+          expect(@sent["record"]["facets"].map { |facet| facet["index"] })
+            .to eq([ { "byteStart" => 0, "byteEnd" => 3 }, { "byteStart" => 8, "byteEnd" => 11 } ])
+        end
+
+        it "leaves words that are not a link exactly as they are" do
+          service.post!(rkey: "3kabc", text: "I ate [a lot](really) today")
+
+          expect(@sent["record"]["text"]).to eq("I ate [a lot](really) today")
+          expect(@sent["record"]).not_to have_key("facets")
+        end
       end
     end
 

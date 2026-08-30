@@ -48,10 +48,15 @@ class Bluesky < ApplicationService
   # ⚠️ Bluesky counts graphemes, and `String#length` counts UTF-16 code units. One emoji is 1 there
   # and 2 or more here. `social_post_controller.js` counts the same way in the browser, with
   # `Intl.Segmenter`.
+  #
+  # ⚠️ **It counts the text that the RECORD will hold, thus it renders the Markdown first.** The
+  # address of a link is in a facet and not in the text, thus `[my post](https://example.com/a)` is
+  # 7 characters and not 30. A count of the words that the owner typed would refuse a draft that
+  # Bluesky takes.
   # @param text [String, nil]
   # @return [Integer]
   def self.post_length(text)
-    text.to_s.scan(/\X/).length
+    MarkdownLinks.render(text).scan(/\X/).length
   end
 
   # @param text [String, nil]
@@ -59,6 +64,34 @@ class Bluesky < ApplicationService
   def self.valid_post_length?(text)
     length = post_length(text)
     length.positive? && length <= MAX_GRAPHEMES
+  end
+
+  # Each link of a post, in order, as CHARACTER offsets into the plain text.
+  #
+  # ⚠️ **This is the ONE list.** `#build_facets` makes a facet from each entry, and the preview of
+  # the Social media page renders each entry as an `<a>`. Thus the dialog cannot show a link that
+  # the post does not make, and it cannot miss one that it does.
+  #
+  # ⚠️ A bare URL inside the words of a Markdown link is not a second link. `[https://a](https://b)`
+  # would otherwise get two facets over one range, and a client renders that as a broken link.
+  # @param text [String, nil] The PLAIN text, which `MarkdownLinks.render` makes.
+  # @param markdown [Array<MarkdownLinks::Link>] The links that the Markdown made, from the same
+  #   parse that made the text.
+  # @return [Array<MarkdownLinks::Link>]
+  def self.link_ranges(text, markdown = [])
+    text = text.to_s
+    taken = markdown.map { |link| link.start...link.finish }
+    bare = []
+
+    text.scan(URL_PATTERN) do
+      start_char, end_char = Regexp.last_match.offset(1)
+      next if taken.any? { |range| range.cover?(start_char) }
+
+      bare << MarkdownLinks::Link.new(start: start_char, finish: end_char,
+                                      url: text[start_char...end_char])
+    end
+
+    (markdown + bare).sort_by(&:start)
   end
 
   # Makes the public URL of a post from its record key.
@@ -105,9 +138,14 @@ class Bluesky < ApplicationService
     raise "The post is empty or longer than #{MAX_GRAPHEMES} characters" unless self.class.valid_post_length?(text)
     raise "Could not open a Bluesky session" unless open_session(handle: @handle, app_password: @app_password)
 
+    # ⚠️ **The Markdown is rendered HERE, and not in the action.** The record holds the plain words
+    # and the address of each link is in a facet, thus the two must be made from one parse. The
+    # action sends the words that the owner wrote, and each retry of the job renders them again.
+    post = MarkdownLinks.parse(text)
+
     record = {
       "$type" => COLLECTION,
-      "text" => text,
+      "text" => post.text,
       "langs" => LANGS,
       # ⚠️ MILLISECONDS. `iso8601` with no argument gives whole seconds, and two posts of one thread
       # go out inside the same second: both then carry the same createdAt. The AppView sorts an
@@ -115,7 +153,7 @@ class Bluesky < ApplicationService
       # its reply stayed. Each other client writes milliseconds, and `StandardSite` does as well.
       "createdAt" => Time.now.utc.iso8601(3)
     }
-    facets = build_facets(text)
+    facets = build_facets(post.text, links: post.links)
     record["facets"] = facets if facets.any?
     embed = build_card(card)
     record["embed"] = embed if embed.present?
@@ -279,26 +317,37 @@ class Bluesky < ApplicationService
 
   # Makes the rich-text facets of the body: each link, each mention, and each hashtag.
   #
-  # ⚠️ The body is plain text, and it is not Markdown. Thus this does not render anything first,
-  # and each offset comes from the same string that the record holds.
+  # ⚠️ **Each offset comes from the PLAIN text that the record holds**, and never from the words
+  # that the owner typed. `#post!` renders the Markdown one time and gives that text to this method
+  # with the links of the same parse.
   #
   # ⚠️ The links come first, and a mention or a tag inside a link is not a facet. A URL such as
   # `…/profile/@me.bsky.social` or `…/#section` would otherwise get two facets over one range, and
   # a client renders that as a broken link.
-  # @param text [String]
+  # @param text [String] The plain text.
+  # @param links [Array<MarkdownLinks::Link>] The links that the Markdown made.
   # @return [Array<Hash>]
-  def build_facets(text)
-    links = link_facets(text)
-    inside_link = links.map { |facet| facet["index"]["byteStart"]...facet["index"]["byteEnd"] }
+  def build_facets(text, links: [])
+    facets = self.class.link_ranges(text, links).map { |link| link_facet(text, link) }
+    inside_link = facets.map { |facet| facet["index"]["byteStart"]...facet["index"]["byteEnd"] }
 
-    links + mention_facets(text, skip: inside_link) + tag_facets(text, skip: inside_link)
+    facets + mention_facets(text, skip: inside_link) + tag_facets(text, skip: inside_link)
   end
 
-  # @return [Array<Hash>] One app.bsky.richtext.facet#link for each bare URL.
-  def link_facets(text)
-    scan_facets(text, URL_PATTERN) do |match|
-      { "$type" => "app.bsky.richtext.facet#link", "uri" => match }
-    end
+  # ⚠️ The offsets of the record are in **bytes** of the UTF-8 text, and `MarkdownLinks::Link`
+  # holds characters. One accented letter is 1 character and 2 bytes, thus a character offset moves
+  # the highlight of each facet after it.
+  # @param text [String]
+  # @param link [MarkdownLinks::Link]
+  # @return [Hash] One app.bsky.richtext.facet#link.
+  def link_facet(text, link)
+    {
+      "index" => {
+        "byteStart" => text[0...link.start].bytesize,
+        "byteEnd" => text[0...link.finish].bytesize
+      },
+      "features" => [ { "$type" => "app.bsky.richtext.facet#link", "uri" => link.url } ]
+    }
   end
 
   # Resolves each @handle and drops one that the PDS does not know: a facet with no DID makes the

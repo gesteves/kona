@@ -331,6 +331,9 @@ en:
         add_post: "Add another post"
         connect_it: "Connect it"
         date: "Date"
+        # The hint of a row that a Markdown link turned off. It replaces the account line while a
+        # link is in the draft.
+        markdown_disabled: "Only Bluesky takes a Markdown link."
         mentions: "Mentions"
         mentions_hint_html: "Each network writes a mention in its own way. Give the handle for each
           one, or a plain name where that person has no account. An empty field posts the name with
@@ -385,6 +388,8 @@ en:
           numbered: "Post %{index} needs a link that starts with http:// or https://."
           single: "That post needs a link that starts with http:// or https://."
         empty: "Write something to post."
+        markdown_network: "Only Bluesky takes a Markdown link. Remove the link, or do not post to
+          %{networks}."
         mistaken_network: "The %{network} field of %{token} holds a %{other} handle. Move it, or
           write a name."
         no_moment: "Pick a date and a time to schedule it."
