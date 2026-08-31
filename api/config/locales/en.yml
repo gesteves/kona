@@ -356,8 +356,6 @@ en:
         add_link: "Add a link"
         body: "Post"
         body_placeholder: "What do you want to say?"
-        # The two controls in the actions slot of the card of a link, which are icons alone.
-        edit_link: "Edit the link"
         link: "Link"
         link_placeholder: "https://"
         remove: "Remove this post"
