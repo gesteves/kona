@@ -240,8 +240,8 @@ class Threads < ApplicationService
   # @param url [String, nil] The link to attach.
   # @param idempotency_key [String] A value that is the same for each attempt.
   # @param reply_to_id [String, nil] The media id of the post above this one, for a thread.
-  # @param topic [String, nil] The topic tag, with no "#". ⚠️ The composer sends it with the FIRST
-  #   post of a thread alone: one on a reply costs that reply its place in the thread.
+  # @param topic [String, nil] The topic tag, with no "#". ⚠️ Meta takes one topic for each post,
+  #   thus the composer sends the same one with every post of a thread.
   # @return [String] The id of the post that Meta made.
   # @raise [RuntimeError] It raises at each failure, thus the job does the work again.
   def post!(text:, url: nil, idempotency_key:, reply_to_id: nil, topic: nil)

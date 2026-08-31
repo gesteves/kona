@@ -1178,18 +1178,30 @@ looks correct and is not, and nothing in the browser needs one.
 A **Threads topic** field below the "Post to" list. Meta calls it `topic_tag`, and it is the
 parameter that puts a post under a topic in the Threads app.
 
-⚠️ **One field names the whole draft, and `#create` puts the topic on the FIRST post alone.**
+⚠️ **One field names the whole draft, and EVERY post of a thread carries the topic.** Meta takes
+one topic for each post, and no documentation says that a reply inherits the topic of its root, thus
+`#create` sends it with each post.
 
-⚠️ **A `topic_tag` on a REPLY costs that post its place in the thread**, and a measurement gave
-that. A thread of two that carried the topic on both posts rendered the second one as a reply of
-the author ("· Author") and not as the next part ("2/2"). The root still said "1/2", thus the
-chain itself was correct and the second post alone lost its number. The same thread from the
-composer of Threads numbers both. **Do not send it with each post again.**
-A reply shows the topic of its root by itself, thus nothing is lost.
+⚠️ **A REPLY DOES NOT INHERIT THE TOPIC OF ITS ROOT**, and two threads of two posts measured it:
 
-⚠️ **The number of a post in a thread is a display of Threads and it is not in the API.**
-`reply_to_id` is the one way to chain a post, there is no endpoint that takes a whole thread, and
-no parameter asks for that badge. Thus the only control over it is what this app does NOT send.
+| What `#create` sent | The root | The second post |
+|---|---|---|
+| The topic on **each** post | the topic, and "1/2" | the topic, and "· Author" |
+| The topic on the **first** post | the topic, and **no** number | **no topic**, and "· Author" |
+
+Thus the topic goes on every post. The second row is the reason: the reply lost the topic
+completely, **and the root lost its number as well**. Threads appears to read a chain of posts that
+carry one topic as one thread, thus a topic on the first post alone makes two posts that are only a
+post and a reply. **Do not send it on the first post alone again.**
+
+⚠️ **The "2/2" of a reply is not reachable from the API**, and it was absent in both of those
+tests. The composer of Threads numbers both posts. `reply_to_id` is the one way to chain a post,
+there is no endpoint that takes a whole thread, and no parameter asks for that number. Accept it.
+
+⚠️ Meta takes `topic_tag` on a reply container with no complaint. If that ever changes, the
+container fails and the job retries for 24 hours; `#create_container` names the fields that it sent
+in the message that it raises, thus such a failure reports `topic_tag` and does not read as an
+empty 500.
 
 ⚠️ **Bluesky and Mastodon have no equivalent**, thus the field shows only while the Threads row can
 take a post **and** is ticked. `social#applyTopic` reads `disabled` as well as `checked`, thus one
@@ -1207,8 +1219,8 @@ rule covers a network with no account **and** a row that a Markdown link turned 
   **container** and `ThreadsPostJob` would then retry a draft that can never work, for 24 hours.
 - ⚠️ **`Threads.normalize_topic` removes a leading `#`.** The parameter takes the words alone: a
   hash sign belongs to a tag that is IN the text, and one here would become part of the topic.
-- The preview shows the topic on the **Threads row of the first post**, which is the same place
-  that the post carries it.
+- The preview shows the topic on the **Threads row of every post**, which is where each post
+  carries it.
 
 ⚠️ **There is NO way to look up a topic, and there is no list to pick one from.** The Threads
 keyword search (`/keyword_search`, with `search_mode=TAG`) searches **posts** that carry a topic,
