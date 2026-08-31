@@ -845,12 +845,48 @@ Threads, now or at a date and a time. All three post. Each post has an **optiona
   - ⚠️ **The result is that this page makes NO request to Contentful when it renders**, and a spec
     pins that. An earlier version read `Articles#list` into a `wa-combobox` of every entry, and it
     also had to leave `ArticleRanking#candidates` alone, because that filter drops each Short.
+- **The link has THREE states, and exactly one control of the three is on the page at a time.**
+  `social_post_controller.js` holds them, and `_post.html.erb` renders the first one:
+
+  | State | What shows | What moves it on |
+  |---|---|---|
+  | `IDLE` | The **link button** of the toolbar, below the words | A click opens the field |
+  | `EDITING` | The **link field**, with an X in it | A URL that the app can read a page for; the X and the Escape key go back to `IDLE` |
+  | `ATTACHED` | The **card** of that link, with an X in its corner | The X, which goes back to `IDLE` |
+
+  - ⚠️ **The toolbar is a ROW of controls and not one button.** A control for a photo, and each
+    other kind of attachment, goes beside the link button. The **count sits at the end of that same
+    line**, with `margin-inline-start: auto` and **not** `space-between`: the button is hidden in
+    two of the three states, and `space-between` would move the count each time it goes away.
+  - ⚠️ **The SERVER renders the state**, from `post.link`: a post with a link gets the field open
+    and no button, and a post with none gets the button. Thus a page that renders again after a
+    refusal shows the link that the owner wrote, and the controller moves nothing when it connects.
+  - ⚠️ **EACH of the two later states needs its own way back**, and all three call `removeLink`.
+    The X on the card cannot serve `EDITING`: a field that the owner opened and left empty never
+    becomes a card, thus that field carries an X of its own and takes the Escape key.
+  - ⚠️ **Going back CLEARS the value, and it does not only close the field.** The field is the
+    link, thus a field that closes with a value in it would still send that value with the form.
+  - ⚠️ **`removeLink` sends an `input` event of its own.** A value that code writes fires none, and
+    the form validates on `input`; without it the submit button would keep the state of a draft
+    that the click emptied. That event also stops the timer, the spinner, and the request that is
+    still out.
 - **The page previews the card before the owner posts.** `GET /social/preview` gives the card as
   JSON, and the Stimulus controller reads it 600ms after the typing stops. A **`Standard.site`
   badge** on that card says that the post will get the enhanced card, and that is the thing the
   owner cannot know until after the post without it. ⚠️ **There is ONE badge, and no badge means
   the ordinary card from the og: tags.** A badge for each of the two states named the ordinary card
   on nearly every draft and said nothing.
+  - ⚠️ **That card shows for EVERY link that this app read a page for, and it is not the card of
+    Bluesky.** The field is hidden by then, thus this card is the only thing that says which link
+    the post carries. A page with **no og: tags** still gets one, with its **address in place of a
+    title**: a host name alone reads the same for two links to one site.
+  - ⚠️ **The Preview panel is the opposite, on purpose**, and `#preview_card` sends it nothing for
+    such a page: that panel shows what each network will RENDER, and Bluesky renders no embed. The
+    link is in the words of the Bluesky row there. Both read `#card_json`, thus the two can never
+    describe one page differently; only the decision to draw one differs.
+  - ⚠️ **The X is inside the `<wa-card>`, in its body slot, and `.social-card` carries
+    `position: relative`.** `<wa-card>` sets no `position` in its own shadow root, thus the control
+    resolves against that host and it draws over the picture.
   - ⚠️ **The browser cannot read the page itself.** The CSP of the admin has `connect-src :self`,
     and another host sends no CORS header. Thus this app reads it. **Do not try to move this into
     the browser.**
@@ -897,10 +933,9 @@ Threads, now or at a date and a time. All three post. Each post has an **optiona
     minutes and the preview warms that cache, thus it nearly always reads a copy from Redis. A read
     that fails gives a blank card, which is not `embeddable?`; thus a failure puts the link in the
     words, which is the same answer that the job reaches at that moment.
-  - **The card below the link field goes away for such a page**, and nothing takes its place. ⚠️ No
-    card IS the message, and a line that says so only repeats what the empty space already says.
-    The Preview panel says nothing either: the link is in the words of the post, which that panel
-    already shows.
+  - ⚠️ **Nothing on the page says this in words.** The Preview panel shows the link inside the
+    words of the Bluesky row, and that is the whole message. A line that says "this page has no
+    preview card" only repeats what the card already shows.
 - ⚠️ **Do not add a Bluesky threadgate or postgate control.** The owner read those options and
   refused them. This page has no control for one network alone.
 - **`POST /social` adds one post job for each network and answers with a 303.** A refusal renders the page again

@@ -352,11 +352,15 @@ en:
         # is beside it and this label does not repeat it.
         topic: "Topic"
       post:
+        # The label of the link button of the toolbar, which is an icon alone.
+        add_link: "Add a link"
         body: "Post"
         body_placeholder: "What do you want to say?"
         link: "Link"
         link_placeholder: "https://"
         remove: "Remove this post"
+        # The X in the corner of the card of a link.
+        remove_link: "Remove the link"
         reorder: "Reorder this post with the arrow keys"
       # The account line of a row of the "Post to" list.
       account:

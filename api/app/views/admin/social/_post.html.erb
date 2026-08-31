@@ -63,43 +63,89 @@
                  data-action="input->social-post#count">
     </wa-textarea>
 
-    <%# The server writes the first value, thus the line has its height before the JavaScript runs
-        and the page does not move. The controller writes each value after that.
-        ⚠️ The number is the length of the text that BLUESKY will get, after the handles go in.
-        Bluesky has the shortest limit and "@tony" grows into a domain, thus a count of the words
-        alone would let a draft through that Bluesky then refuses. SocialPresenter#bluesky_length
-        makes it, and this view holds no count of its own. %>
-    <%# ⚠️ The ring is `aria-hidden`: the words beside it say the same thing, and that span is the
-        live region. Two announcements of one number is worse than none. %>
-    <%# ⚠️ The ring is LAST, thus it sits at the edge of the line and it does not move when the
-        number beside it gets a digit. The whole line is at the end of its own row. %>
-    <div class="social__count wa-caption-s" data-social-post-target="count">
-      <span aria-live="polite" data-social-post-target="countText"><%= count %> / <%= limit %></span>
-      <wa-progress-ring class="social__ring" aria-hidden="true"
-                        value="<%= [ (count * 100.0 / limit).round, 100 ].min %>"
-                        data-social-post-target="ring"></wa-progress-ring>
+    <%# The toolbar and the count, on one line below the words.
+        ⚠️ It is a ROW of controls and not one button: a control for a photo, and each other kind of
+        attachment, goes beside the link button. Thus the button is not in the count line itself. %>
+    <div class="social-post__toolbar">
+      <%# ⚠️ The icon is in the DEFAULT slot and _social.scss gives the square, for the reason that
+          the remove control above gives.
+          ⚠️ It shows ONLY while the post has no link: the field takes its place, and then the card
+          does. The X on that card is what brings it back. %>
+      <wa-button class="social-post__tool" appearance="plain" size="small"
+                 data-social-post-target="linkButton"
+                 data-action="click->social-post#showLink"
+                 <%= "hidden" if post.link.present? %>>
+        <%= raw icon_svg("classic", "light", "link") %>
+        <span class="wa-visually-hidden"><%= t(".add_link") %></span>
+      </wa-button>
+
+      <%# The server writes the first value, thus the line has its height before the JavaScript runs
+          and the page does not move. The controller writes each value after that.
+          ⚠️ The number is the length of the text that BLUESKY will get, after the handles go in.
+          Bluesky has the shortest limit and "@tony" grows into a domain, thus a count of the words
+          alone would let a draft through that Bluesky then refuses. SocialPresenter#bluesky_length
+          makes it, and this view holds no count of its own. %>
+      <%# ⚠️ The ring is `aria-hidden`: the words beside it say the same thing, and that span is the
+          live region. Two announcements of one number is worse than none. %>
+      <%# ⚠️ The ring is LAST, thus it sits at the edge of the line and it does not move when the
+          number beside it gets a digit. The count sits at the end of the row with `margin-inline-
+          start: auto`, and NOT with `space-between`: it must stay there with the button hidden. %>
+      <div class="social__count wa-caption-s" data-social-post-target="count">
+        <span aria-live="polite" data-social-post-target="countText"><%= count %> / <%= limit %></span>
+        <wa-progress-ring class="social__ring" aria-hidden="true"
+                          value="<%= [ (count * 100.0 / limit).round, 100 ].min %>"
+                          data-social-post-target="ring"></wa-progress-ring>
+      </div>
     </div>
 
     <%# ⚠️ The link is OPTIONAL and it has no `required`: a post can be words alone. There is no
         list of the articles here, on purpose: the card comes from the og: tags of whatever page
-        this names, thus a link to another site needs no more code. %>
-    <wa-input type="url" name="posts[][link]" label="<%= t(".link") %>"
+        this names, thus a link to another site needs no more code.
+        ⚠️ **The server renders it open for a post that already holds a link**, thus a page that
+        renders again after a refusal shows that link, and the controller needs no state before the
+        browser upgrades these elements.
+        ⚠️ It needs a rule for `[hidden]`; refer to _social.scss. %>
+    <wa-input class="social-post__link" type="url" name="posts[][link]" label="<%= t(".link") %>"
               value="<%= post.link %>"
               placeholder="<%= t(".link_placeholder") %>"
               autocomplete="off" spellcheck="false"
               data-social-post-target="link"
-              data-action="input->social-post#schedulePreview change->social-post#schedulePreview">
+              data-action="input->social-post#schedulePreview change->social-post#schedulePreview
+                           keydown.esc->social-post#removeLink"
+              <%= "hidden" if post.link.blank? %>>
       <%# It spins for the whole wait: the debounce and then the request. ⚠️ It needs a rule for
           `[hidden]`; refer to _social.scss. %>
       <wa-spinner slot="end" class="social__spinner" data-social-post-target="spinner" hidden></wa-spinner>
+
+      <%# ⚠️ **This is the one way out of the field**, and it calls the same method as the X on the
+          card. The card can only take the owner back from a link that this app read a page for;
+          without this control a field that they opened and left empty would stay open for the rest
+          of the draft. The Escape key above does the same thing. %>
+      <wa-button slot="end" class="social-post__link-remove" appearance="plain" size="small"
+                 data-action="click->social-post#removeLink">
+        <%= raw icon_svg("classic", "light", "xmark") %>
+        <span class="wa-visually-hidden"><%= t(".remove_link") %></span>
+      </wa-button>
     </wa-input>
 
-    <%# The card that each network will render. The controller fills it and shows it, thus it is
-        empty and hidden until the owner pastes a link.
+    <%# The card of the link. The controller fills it and shows it, and it takes the place of the
+        field above.
+        ⚠️ **It shows for EVERY link that this app could read a page for**, and not for a link that
+        Bluesky will draw a card from. The field is hidden by then, thus this card is the only thing
+        that says which link the post carries. A page with no og: tags gets its address in place of
+        a title.
         ⚠️ `with-media` is not in this markup: a page can have no picture, thus the controller sets
         it with the image. %>
     <wa-card class="social-card" data-social-post-target="preview" hidden>
       <img slot="media" class="social-card__image" data-social-post-target="previewImage" alt="" hidden>
+
+      <%# ⚠️ It is ABSOLUTE inside the card, thus it sits over the picture and not below it. Refer
+          to _social.scss for the positioned ancestor. %>
+      <wa-button class="social-card__remove" appearance="outlined" size="small"
+                 data-action="click->social-post#removeLink">
+        <%= raw icon_svg("classic", "light", "xmark") %>
+        <span class="wa-visually-hidden"><%= t(".remove_link") %></span>
+      </wa-button>
 
       <%# ⚠️ This is the useful part: it says that Bluesky will render the standard.site card, and
           the owner cannot know that until after the post without it. A card with NO badge is the

@@ -807,8 +807,11 @@ export default class extends Controller {
    * `Admin::SocialController#card_json` answers both. Thus the two cannot describe one page
    * differently.
    *
-   * ⚠️ **The action sends NO card for a page that gives no og: tags**, because Bluesky then makes
-   * no embed. That link is in the words of the post, which the row above already shows.
+   * ⚠️ **The two do NOT draw the same set of cards, on purpose.** This one is what the network will
+   * render, thus the action sends none for a page with no og: tags: Bluesky makes no embed from
+   * one. The card of the composer says which link the post CARRIES, thus it draws one for that
+   * same page, with the address in place of a title. The link is in the words of the Bluesky row,
+   * which this panel already shows.
    * @param {HTMLElement} card The preview card of the post.
    * @param {object|null} link The website card, from the action.
    */

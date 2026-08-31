@@ -63,14 +63,18 @@
     display: none;
   }
 
-  // The count below the words of a post, at the end of the line with its ring.
+  // The count below the words of a post, at the end of its line with its ring.
+  //
+  // ⚠️ **`margin-inline-start: auto` and NOT `space-between` on the row above.** The link button is
+  // hidden in two of the three states, and with `space-between` the count would move to the left
+  // edge each time that button goes away.
   &__count {
     display: flex;
     align-items: center;
     gap: var(--wa-space-2xs);
     justify-content: flex-end;
     color: var(--wa-color-text-quiet);
-    margin: var(--wa-space-2xs) 0 0;
+    margin: 0 0 0 auto;
   }
 
   // ⚠️ The ring is sized in `em`, thus it follows the words beside it and not a fixed number of
@@ -110,6 +114,10 @@
   // input, thus a smaller gap lets the two touch.
   margin-block-start: var(--wa-space-s);
   max-width: 32rem;
+  // ⚠️ **The remove control is absolute, and this is its positioned ancestor.** <wa-card> sets no
+  // `position` in its own shadow root, thus that control resolves against this host and it can sit
+  // over the picture.
+  position: relative;
 
   &[hidden] {
     display: none;
@@ -146,6 +154,27 @@
   &__title {
     font-weight: var(--wa-font-weight-semibold);
     margin: 0;
+    // ⚠️ A page with no og: tags gets its ADDRESS here, and an address has no space to break at.
+    overflow-wrap: anywhere;
+  }
+
+  // The X in the corner, which takes the link off the post.
+  //
+  // ⚠️ It is in the BODY slot and it draws over the media slot above it, because the body comes
+  // second in the shadow tree. The background is its own: an outlined button is not readable over
+  // a photograph.
+  &__remove {
+    inset-block-start: var(--wa-space-xs);
+    inset-inline-end: var(--wa-space-xs);
+    position: absolute;
+  }
+
+  &__remove::part(button) {
+    aspect-ratio: 1;
+    background-color: var(--wa-color-surface-default);
+    border-radius: var(--wa-border-radius-pill);
+    padding: 0;
+    width: var(--wa-form-control-height);
   }
 
   &__description {
@@ -261,6 +290,45 @@
   &__remove[hidden] {
     // ⚠️ The same rule as the spinner above: an author rule beats the `[hidden]` of the browser.
     display: none;
+  }
+
+  // The controls below the words, with the count at the end of the same line. ⚠️ It is a ROW and
+  // not one button: a control for a photo, and each other kind of attachment, goes beside the link
+  // button.
+  &__toolbar {
+    align-items: center;
+    display: flex;
+    gap: var(--wa-space-2xs);
+    margin-block-start: var(--wa-space-2xs);
+  }
+
+  // ⚠️ <wa-button> makes a square icon button only for a <wa-icon> child, and this app never uses
+  // that element. Thus the square is here, as it is for the handle and the remove control above.
+  &__tool::part(button) {
+    aspect-ratio: 1;
+    padding: 0;
+    width: var(--wa-form-control-height);
+  }
+
+  &__tool[hidden] {
+    // ⚠️ The same rule as the spinner above: an author rule beats the `[hidden]` of the browser.
+    display: none;
+  }
+
+  &__link[hidden] {
+    // ⚠️ The same rule as the spinner above: <wa-input> gives its own host a display, thus the
+    // attribute alone hides nothing.
+    display: none;
+  }
+
+  // The X inside the link field, which takes the owner back to the button of the toolbar.
+  //
+  // ⚠️ It is sized in `em` and not with `--wa-form-control-height`, which is the height of the
+  // FIELD that holds it. A control of that height fills the box from edge to edge.
+  &__link-remove::part(button) {
+    aspect-ratio: 1;
+    padding: 0;
+    width: 1.5em;
   }
 }
 

@@ -18,6 +18,18 @@ RSpec.describe "Admin social media", type: :request do
   # One job for each network, thus each example clears all three.
   before { [ BlueskyPostJob, MastodonPostJob, ThreadsPostJob ].each { |job| job.jobs.clear } }
 
+  # The OPENING tag of one element of the body, and not its children.
+  #
+  # ⚠️ These examples read the `hidden` attribute, and a child of the link field and of the toolbar
+  # button holds that word as well: the spinner is hidden, and the label is `wa-visually-hidden`.
+  # An attribute value can hold ">" and never "<", thus the match stops at the first child.
+  # @param tag [String] The element name.
+  # @param klass [String] The value of its class attribute.
+  # @return [String, nil]
+  def open_tag(tag, klass)
+    response.body[/<#{tag} class="#{Regexp.escape(klass)}"[^<]*>/m]
+  end
+
   def connect(bluesky:, mastodon:, threads:)
     allow_any_instance_of(StandardSite).to receive(:connected?).and_return(bluesky)
     allow_any_instance_of(StandardSite).to receive(:handle).and_return(bluesky ? "me.bsky.social" : nil)
@@ -51,9 +63,29 @@ RSpec.describe "Admin social media", type: :request do
         get "/social"
 
         expect(response).to have_http_status(:ok)
-        expect(response.body).to include(%(<wa-input type="url" name="posts[][link]"))
+        expect(response.body).to include(%(type="url" name="posts[][link]"))
         expect(response.body).to include("<wa-textarea")
         expect(response.headers["Cache-Control"]).to include("no-store")
+      end
+
+      # ⚠️ The link field is CLOSED on a first load, and the button of the toolbar opens it. The
+      # field still renders, thus it is in the form and `social-post` needs no template for it.
+      it "hides the link field and shows the button that opens it" do
+        get "/social"
+
+        expect(open_tag("wa-input", "social-post__link")).to include("hidden")
+        expect(open_tag("wa-button", "social-post__tool")).not_to include("hidden")
+      end
+
+      # ⚠️ The X on the card takes the owner back from a link that this app read a page for, and it
+      # can do nothing for a field that they opened and left empty. Thus the field carries its own
+      # way out, and that field is the one state with no card to close.
+      it "gives the link field its own way back to the button" do
+        get "/social"
+
+        field = response.body[%r{<wa-input class="social-post__link".*?</wa-input>}m]
+        expect(field).to include("keydown.esc->social-post#removeLink")
+        expect(field).to include(%(class="social-post__link-remove"))
       end
 
       # ⚠️ The link field is a plain input and there is no list of the entries. Thus this page makes
@@ -719,6 +751,19 @@ RSpec.describe "Admin social media", type: :request do
           post "/social", params: { posts: [ { text: "a" * 290, link: url } ], networks: [ "bluesky" ] }
 
           expect(response).to redirect_to(social_path)
+        end
+
+        # ⚠️ The field is closed on a first load, thus a refusal must render it OPEN for a post that
+        # already holds a link. Without this the owner cannot see the link that they wrote, and the
+        # button would offer to add a second one.
+        it "puts the link field back open after a refusal, with no button beside it" do
+          post "/social", params: { posts: [ { text: "", link: url } ], networks: [ "bluesky" ] }
+
+          expect(response).to have_http_status(:unprocessable_content)
+          field = open_tag("wa-input", "social-post__link")
+          expect(field).to include(%(value="#{url}"))
+          expect(field).not_to include("hidden")
+          expect(open_tag("wa-button", "social-post__tool")).to include("hidden")
         end
 
         it "refuses a draft with no network" do

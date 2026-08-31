@@ -8,6 +8,12 @@ import { applyLengthRules } from "../lib/typography";
 // this app, which then reads the page of another host.
 const PREVIEW_DEBOUNCE = 600;
 
+// The three states of the link of a post, and each one shows one control: the button of the
+// toolbar, the field, or the card. ⚠️ The X on the card is the one way back to IDLE.
+const IDLE = "idle";
+const EDITING = "editing";
+const ATTACHED = "attached";
+
 /**
  * One post of the thread: its character count and the preview of its link.
  *
@@ -18,22 +24,78 @@ const PREVIEW_DEBOUNCE = 600;
 export default class extends Controller {
   static targets = [
     "body", "count", "countText", "ring", "link", "spinner", "preview", "previewImage",
-    "previewHost", "previewTitle", "previewDescription", "previewKind",
+    "previewHost", "previewTitle", "previewDescription", "previewKind", "linkButton",
   ];
   static values = { limit: Number, warnAt: Number, previewUrl: String };
 
   connect() {
     // ⚠️ The words come from the locale file, through the `data-admin-i18n` attribute.
     this.words = i18nTable(this.element);
+    this.linkState = IDLE;
     // ⚠️ It waits for the definitions: `value` is undefined on these components until the browser
     // upgrades them. A Turbo restoration visit, and a page that renders again after a refusal, both
     // hold values with no controller state.
     Promise.all(
       ["wa-textarea", "wa-input"].map((tag) => customElements.whenDefined(tag))
     ).then(() => {
+      // ⚠️ The state comes from the FIELD, thus it is the state that the server already rendered
+      // and nothing moves. `preview()` below promotes it to ATTACHED when the page reads.
+      this.linkState = this.linkTarget.value?.trim() ? EDITING : IDLE;
       this.count();
       this.preview();
     });
+  }
+
+  /**
+   * Shows the link field, from the button of the toolbar.
+   *
+   * ⚠️ The button is hidden by then: there is one link for each post, thus "add a link" has no
+   * meaning while one is being written or is already attached.
+   */
+  showLink() {
+    this.setLinkState(EDITING);
+    this.linkTarget.focus();
+  }
+
+  /**
+   * Takes the link off the post and goes back to the button of the toolbar.
+   *
+   * ⚠️ **Three controls call this**: the X in the corner of the card, the X inside the field, and
+   * the Escape key in that field. EDITING has its own way out because the card cannot give it one:
+   * a field that the owner opened and left empty never becomes a card.
+   *
+   * ⚠️ It clears the value and does not only close the field. The field IS the link, thus a field
+   * that closes with a value in it would still send that value with the form.
+   */
+  removeLink() {
+    this.linkTarget.value = "";
+    this.setLinkState(IDLE);
+    // ⚠️ A value that code writes fires no event, and the form validates on `input`. Thus the
+    // submit button would stay as it was for a draft that this click emptied. The handler of that
+    // event also stops the timer, the spinner, and the request that is still out.
+    this.linkTarget.dispatchEvent(new Event("input", { bubbles: true }));
+    this.linkButtonTarget.focus();
+  }
+
+  /**
+   * Shows the one control of the three that this state has.
+   *
+   * ⚠️ Exactly ONE of them is on the page at a time: the button asks for a link, the field takes
+   * it, and the card shows the link that the post carries. Each of the last two carries an X that
+   * goes back to the first.
+   */
+  renderLinkState() {
+    this.linkButtonTarget.hidden = this.linkState !== IDLE;
+    this.linkTarget.hidden = this.linkState !== EDITING;
+    this.previewTarget.hidden = this.linkState !== ATTACHED;
+  }
+
+  /**
+   * @param {string} state
+   */
+  setLinkState(state) {
+    this.linkState = state;
+    this.renderLinkState();
   }
 
   /**
@@ -132,10 +194,7 @@ export default class extends Controller {
     clearTimeout(this.previewTimer);
 
     // An empty field asks for nothing, thus it waits for nothing either.
-    if (!this.linkTarget.value?.trim()) {
-      this.busy(false);
-      return this.hidePreview();
-    }
+    if (!this.linkTarget.value?.trim()) return this.clearPreview();
 
     // ⚠️ It spins from the keystroke and not from the request. The debounce is most of the wait,
     // and a field that does nothing for 600ms reads as a field that is broken.
@@ -152,10 +211,7 @@ export default class extends Controller {
    */
   async preview() {
     const url = this.linkTarget.value?.trim() ?? "";
-    if (!url) {
-      this.busy(false);
-      return this.hidePreview();
-    }
+    if (!url) return this.clearPreview();
 
     // ⚠️ Each call takes the next number, and only the newest one may write. A request that is
     // still out when the owner types again must not describe a link that they already replaced,
@@ -182,13 +238,11 @@ export default class extends Controller {
    * @param {object} card The answer of the preview action.
    */
   showPreview(card) {
-    // ⚠️ A page with no og: tags draws no card at all: Bluesky makes no embed from it, and the link
-    // goes in the words instead. The empty space says that on its own, and the count then holds
-    // that link.
-    if (!card.embeddable) return this.showNoCard();
-
     this.previewHostTarget.textContent = card.host ?? "";
-    this.previewTitleTarget.textContent = card.title ?? "";
+    // ⚠️ **The ADDRESS takes the place of a title for a page with no og: tags.** The field is
+    // hidden by now, thus this card is the only thing that says which link the post carries, and a
+    // host name alone reads the same for two links to one site.
+    this.previewTitleTarget.textContent = card.title ?? card.url ?? "";
     this.previewDescriptionTarget.textContent = card.description ?? "";
 
     // ⚠️ `withMedia` follows the picture. <wa-card> has no `:has-slotted` to read, thus that flag
@@ -203,35 +257,46 @@ export default class extends Controller {
     this.previewKindTarget.hidden = !card.standard_site;
     if (card.standard_site) this.previewKindTarget.textContent = t(this.words, "standard_site");
 
-    this.previewTarget.hidden = false;
-    this.setLinkInText(false);
+    this.setLinkState(ATTACHED);
+    // ⚠️ **This card is not the card of Bluesky.** A page with no og: tags gets no embed there, and
+    // its link goes in the WORDS instead, thus the count holds it. Refer to
+    // `Admin::SocialController#bluesky_text`.
+    this.setLinkInText(!card.embeddable);
   }
 
   /**
-   * Hides the card, for a page that gives Bluesky nothing to draw. The link then goes in the words.
+   * Stops the wait and the request, and takes the card away. It is the empty field.
+   *
+   * ⚠️ **It takes the next sequence number**, thus a request that is still out cannot draw the card
+   * of a link that the field no longer holds.
    */
-  showNoCard() {
-    this.hideCard();
-    this.setLinkInText(true);
+  clearPreview() {
+    this.previewSeq = (this.previewSeq ?? 0) + 1;
+    this.busy(false);
+    this.hidePreview();
   }
 
   /**
-   * Hides the card, for an empty field and for a request that failed.
+   * Takes the card away, for an empty field and for a request that failed.
+   *
+   * ⚠️ It puts the FIELD back for a card that went away, thus the owner can correct a link that
+   * this app could not read. A field that is still being typed stays as it is, and the X of the
+   * card is the only way back to the button.
    *
    * ⚠️ It also takes the link out of the count. The action answers with a card for each http URL,
    * even for a page that it could not read, thus this path means "there is no link here" or "we do
    * not know yet", and neither one may count characters that the post may not hold.
    */
   hidePreview() {
-    this.hideCard();
+    this.dropCardImage();
+    if (this.linkState === ATTACHED) this.setLinkState(EDITING);
     this.setLinkInText(false);
   }
 
   /**
-   * Hides the card, and drops the picture so a stale one never shows with a new link.
+   * Drops the picture of the card, so a stale one never shows with a new link.
    */
-  hideCard() {
-    this.previewTarget.hidden = true;
+  dropCardImage() {
     this.previewTarget.withMedia = false;
     this.previewImageTarget.hidden = true;
     this.previewImageTarget.removeAttribute("src");
