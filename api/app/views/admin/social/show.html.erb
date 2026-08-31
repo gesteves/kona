@@ -264,7 +264,9 @@
           link field. %>
       <wa-card class="social-card" data-preview-card hidden>
         <img slot="media" class="social-card__image" data-preview-card-image alt="" hidden>
-        <wa-badge class="social-card__kind" appearance="outlined" data-preview-card-kind></wa-badge>
+        <%# ⚠️ No badge means the ordinary card from the og: tags. There is one badge only. %>
+        <wa-badge class="social-card__kind" appearance="outlined" variant="success"
+                  data-preview-card-kind hidden></wa-badge>
         <p class="social-card__host wa-caption-s" data-preview-card-host></p>
         <p class="social-card__title" data-preview-card-title></p>
         <p class="social-card__description" data-preview-card-description></p>

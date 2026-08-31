@@ -7,8 +7,8 @@ require "nokogiri"
 # Short, which has no cover image, or a page on another site. Thus the page that the owner links to
 # is the only thing that knows its own picture and its own summary.
 #
-# It never raises: a page with no tags, or a host that is away, gives a card with the URL alone, and
-# Bluesky renders that.
+# It never raises: a page with no tags, or a host that is away, gives a card with the URL alone.
+# Such a card is not `embeddable?`, and the caller then puts the link in the words of the post.
 class OpenGraph < ApplicationService
   # A card that this app read.
   #
@@ -20,6 +20,15 @@ class OpenGraph < ApplicationService
     # that makes an ordinary card must not have to name them.
     def initialize(document_uri: nil, publication_uri: nil, **rest)
       super
+    end
+
+    # ⚠️ **This is the rule that decides where the link of a post goes.** Bluesky draws a card
+    # from the title, the description, and the picture. A page that gives none of the three makes
+    # an empty box with a host name in it, thus the caller puts the link in the words instead, as
+    # Mastodon does. `Admin::SocialController` and `BlueskyPostJob` both read this.
+    # @return [Boolean] True when the page gives enough tags to draw a card.
+    def embeddable?
+      title.present? || description.present? || image_url.present?
     end
   end
 

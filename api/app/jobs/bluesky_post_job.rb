@@ -23,7 +23,15 @@ class BlueskyPostJob < ApplicationJob
     # ⚠️ The card is for Bluesky only, and it reads the page. Mastodon and Threads each make their
     # own preview from the same og: tags. A post with no link reads nothing.
     card = OpenGraph.new.fetch(post["link"]) if post["link"].present?
-    written = Bluesky.new.post!(rkey: post["key"], text: post["text"], card: card, reply: reply)
+
+    # ⚠️ **A page with no og: tags gets NO embed, and its link goes in the words**, as it does at
+    # Mastodon. An embed from such a page is an empty box with a host name in it.
+    # `Admin::SocialController` reads the same `embeddable?` rule, thus the count on the page holds
+    # this link as well.
+    embed = card if card&.embeddable?
+    text = Bluesky.compose(text: post["text"], url: (post["link"] if card && embed.nil?))
+
+    written = Bluesky.new.post!(rkey: post["key"], text: text, card: embed, reply: reply)
     Rails.logger.info("BlueskyPostJob: posted #{index + 1}/#{posts.length} at #{written['url']}")
 
     self.class.perform_async(posts, index + 1, next_reply(reply, written)) if posts[index + 1]

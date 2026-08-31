@@ -846,9 +846,11 @@ Threads, now or at a date and a time. All three post. Each post has an **optiona
     pins that. An earlier version read `Articles#list` into a `wa-combobox` of every entry, and it
     also had to leave `ArticleRanking#candidates` alone, because that filter drops each Short.
 - **The page previews the card before the owner posts.** `GET /social/preview` gives the card as
-  JSON, and the Stimulus controller reads it 600ms after the typing stops. The badge on that card
-  says **which of the two Bluesky cards** the post will get, and that is the thing the owner cannot
-  know until after the post without it.
+  JSON, and the Stimulus controller reads it 600ms after the typing stops. A **`Standard.site`
+  badge** on that card says that the post will get the enhanced card, and that is the thing the
+  owner cannot know until after the post without it. ⚠️ **There is ONE badge, and no badge means
+  the ordinary card from the og: tags.** A badge for each of the two states named the ordinary card
+  on nearly every draft and said nothing.
   - ⚠️ **The browser cannot read the page itself.** The CSP of the admin has `connect-src :self`,
     and another host sends no CORS header. Thus this app reads it. **Do not try to move this into
     the browser.**
@@ -882,6 +884,22 @@ Threads, now or at a date and a time. All three post. Each post has an **optiona
 - **The link is not part of the body, and the count does not hold it.** Each network attaches a link
   differently: Threads makes an attachment, Bluesky makes an embed, and Mastodon renders it inline.
   Thus the code that posts decides that, and this page keeps the URL of the entry beside the text.
+  - ⚠️ **The one exception: a page that gives NO og: tags.** Bluesky draws its card from the title,
+    the description, and the picture, thus a page with none of the three makes an empty box with a
+    host name in it. `OpenGraph::Card#embeddable?` is the rule, and a card that fails it gets **no
+    embed**: the link goes in the words instead, exactly as it does at Mastodon.
+    `Admin::SocialController#bluesky_text` and `BlueskyPostJob` compose the same string, thus the
+    count and the post cannot disagree.
+  - ⚠️ **That link then uses characters, thus `#post_error` counts it.** Without that check the job
+    composes a longer text than the page measured, `Bluesky#post!` raises, and the job retries for
+    24 hours. `admin.social.errors.too_long_link` is the message, and it says what it counted.
+  - ⚠️ **The length check therefore READS the page at the submit.** `OpenGraph` caches for 15
+    minutes and the preview warms that cache, thus it nearly always reads a copy from Redis. A read
+    that fails gives a blank card, which is not `embeddable?`; thus a failure puts the link in the
+    words, which is the same answer that the job reaches at that moment.
+  - **The card below the link field goes away for such a page**, and one line takes its place to
+    say where the link went. The Preview panel needs no line: the link is in the words of the post,
+    which that panel already shows.
 - ⚠️ **Do not add a Bluesky threadgate or postgate control.** The owner read those options and
   refused them. This page has no control for one network alone.
 - **`POST /social` adds one post job for each network and answers with a 303.** A refusal renders the page again
@@ -1263,7 +1281,8 @@ Three things make the texts different, and the owner could see none of them befo
 - **A mention.** Refer to the part above.
 - **The link.** `Mastodon#post!` joins it into the **text**. Bluesky makes an embed of it and
   Threads makes an attachment, thus it is not in the text of either one. The dialog says where the
-  link went for those two.
+  link went for those two. ⚠️ A page with no og: tags gives Bluesky no embed, thus its link is in
+  the words there as well, and the Bluesky row then carries no card.
 - **A Markdown link.** The Bluesky row shows the **rendered** text, thus the owner reads the words
   that a post will hold. ⚠️ A draft that holds one shows **Bluesky alone**: to render the other two
   would show a text that this app refuses to post. The dialog says nothing about that, on purpose —
@@ -1409,7 +1428,9 @@ report, and it must inherit `ApplicationService` for `report_upstream_error`.
   **other** kind of key: it is content-addressed, because the same entry must always give the same
   rkey.
 - ⚠️ **The link of a post is a website card (`app.bsky.embed.external`), and it is NOT in the
-  text.** Thus the URL uses none of the 300 characters.
+  text.** Thus the URL uses none of the 300 characters. ⚠️ **A page that gives no og: tags is the
+  exception**: `#post!` gets no card, and the caller puts that link in the text with
+  `Bluesky.compose`. Refer to **The Social media page**.
 - ⚠️ **A card of a post of THIS site is a standard.site card, and each other one is an ordinary
   link card.** The embed stays an `app.bsky.embed.external` in both conditions, and
   **`associatedRefs`** is the one thing that makes the difference: a list of
@@ -1420,7 +1441,8 @@ report, and it must inherit `ApplicationService` for `report_upstream_error`.
   can be a page on **another site**. `OpenGraph#fetch` reads `og:title`, `og:description`, and
   `og:image`, and it falls back to `<title>`, `meta[name=description]`, and `twitter:image`.
   - **It never raises.** A page with no tags, or a host that is away, gives a card with the URL
-    alone, and Bluesky renders that.
+    alone. ⚠️ Such a card is not `embeddable?`, thus the post gets no embed and its link goes in
+    the words.
   - ⚠️ It sends a **User-Agent** of its own. Many hosts give a 403 to the default one, and the card
     is then empty with no reason.
   - It reads the first `MAX_BYTES` of the page through `download` and stops there. The tags are in

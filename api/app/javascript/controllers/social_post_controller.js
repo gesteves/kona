@@ -18,7 +18,7 @@ const PREVIEW_DEBOUNCE = 600;
 export default class extends Controller {
   static targets = [
     "body", "count", "countText", "ring", "link", "spinner", "preview", "previewImage",
-    "previewHost", "previewTitle", "previewDescription", "previewKind",
+    "previewHost", "previewTitle", "previewDescription", "previewKind", "previewNote",
   ];
   static values = { limit: Number, warnAt: Number, previewUrl: String };
 
@@ -70,9 +70,15 @@ export default class extends Controller {
    *
    * ⚠️ `applyLengthRules` writes NO quotation mark, and that is correct: a curly quotation mark is
    * one character in place of one, thus it cannot change a count. Refer to that file.
+   *
+   * ⚠️ **The LINK is part of this count when the page it names gives no card.** Bluesky then makes
+   * no embed and the link goes in the words, thus it uses characters.
+   * `Admin::SocialController#bluesky_text` composes the same string on the server. The link goes in
+   * between the typography and the Markdown, exactly as it does there.
    */
   count() {
-    const text = render(applyLengthRules(blueskyText(this.bodyTarget.value ?? "", this.blueskyMentions)));
+    const body = applyLengthRules(blueskyText(this.bodyTarget.value ?? "", this.blueskyMentions));
+    const text = render(this.withLink(body));
     const length = this.graphemes(text);
 
     this.countTextTarget.textContent = `${length} / ${this.limitValue}`;
@@ -99,6 +105,21 @@ export default class extends Controller {
 
     this.segmenter ||= new Intl.Segmenter("en", { granularity: "grapheme" });
     return [...this.segmenter.segment(text)].length;
+  }
+
+  /**
+   * Adds the link below the words when that link goes in the post.
+   *
+   * ⚠️ It is false until the preview answers, thus the first count of a page that renders again
+   * with a draft in it can be short by the length of a link. `connect()` reads the card at once and
+   * writes the count again, and `SocialPresenter#bluesky_length` makes no request at all.
+   * @param {string} text
+   * @returns {string}
+   */
+  withLink(text) {
+    const url = this.linkInText ? (this.linkTarget.value?.trim() ?? "") : "";
+
+    return [ text.trim(), url ].filter(Boolean).join("\n\n");
   }
 
   /**
@@ -161,6 +182,11 @@ export default class extends Controller {
    * @param {object} card The answer of the preview action.
    */
   showPreview(card) {
+    // ⚠️ A page with no og: tags draws no card at all: Bluesky makes no embed from it, and the link
+    // goes in the words instead. The note below says so, and the count then holds that link.
+    if (!card.embeddable) return this.showNoCard();
+
+    this.previewNoteTarget.hidden = true;
     this.previewHostTarget.textContent = card.host ?? "";
     this.previewTitleTarget.textContent = card.title ?? "";
     this.previewDescriptionTarget.textContent = card.description ?? "";
@@ -172,21 +198,56 @@ export default class extends Controller {
     this.previewTarget.withMedia = !!card.image_path;
     if (card.image_path) this.previewImageTarget.src = card.image_path;
 
-    // This is the thing that the owner cannot know until after the post without it.
-    this.previewKindTarget.textContent = t(this.words, card.standard_site ? "standard_site" : "open_graph");
-    this.previewKindTarget.variant = card.standard_site ? "success" : "neutral";
+    // ⚠️ The badge shows for the standard.site card ALONE, which the owner cannot know until after
+    // the post without it. No badge means the ordinary card from the og: tags.
+    this.previewKindTarget.hidden = !card.standard_site;
+    if (card.standard_site) this.previewKindTarget.textContent = t(this.words, "standard_site");
 
     this.previewTarget.hidden = false;
+    this.setLinkInText(false);
+  }
+
+  /**
+   * Hides the card and says that the link goes in the words of the post.
+   */
+  showNoCard() {
+    this.hideCard();
+    this.previewNoteTarget.hidden = false;
+    this.setLinkInText(true);
+  }
+
+  /**
+   * Hides the card and the note, for an empty field and for a request that failed.
+   *
+   * ⚠️ It also takes the link out of the count. The action answers with a card for each http URL,
+   * even for a page that it could not read, thus this path means "there is no link here" or "we do
+   * not know yet", and neither one may count characters that the post may not hold.
+   */
+  hidePreview() {
+    this.hideCard();
+    this.previewNoteTarget.hidden = true;
+    this.setLinkInText(false);
   }
 
   /**
    * Hides the card, and drops the picture so a stale one never shows with a new link.
    */
-  hidePreview() {
+  hideCard() {
     this.previewTarget.hidden = true;
     this.previewTarget.withMedia = false;
     this.previewImageTarget.hidden = true;
     this.previewImageTarget.removeAttribute("src");
+  }
+
+  /**
+   * ⚠️ It writes the count again, because that count holds the link only in this state.
+   * @param {boolean} on
+   */
+  setLinkInText(on) {
+    if (this.linkInText === on) return;
+
+    this.linkInText = on;
+    this.count();
   }
 
   /**

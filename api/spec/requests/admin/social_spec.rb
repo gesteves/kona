@@ -206,6 +206,26 @@ RSpec.describe "Admin social media", type: :request do
         expect(response.body).not_to include("cdn.test")
       end
 
+      # ⚠️ False means that Bluesky draws NO card: the browser then hides the card, says where the
+      # link goes, and adds that link to its count.
+      it "says when the page gives no card at all" do
+        allow_any_instance_of(OpenGraph).to receive(:fetch)
+          .and_return(OpenGraph::Card.new(url: "https://other.test/", title: nil, description: nil,
+                                          image_url: nil))
+
+        get "/social/preview", params: { url: "https://other.test/" }
+
+        expect(response.parsed_body["embeddable"]).to be(false)
+      end
+
+      it "says when the page gives a card" do
+        allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
+
+        get "/social/preview", params: { url: "https://example.test/a/" }
+
+        expect(response.parsed_body["embeddable"]).to be(true)
+      end
+
       it "gives no image path for a page with no picture" do
         allow_any_instance_of(OpenGraph).to receive(:fetch)
           .and_return(OpenGraph::Card.new(url: "https://other.test/", title: "T", description: nil,
@@ -285,6 +305,16 @@ RSpec.describe "Admin social media", type: :request do
 
     describe "POST /social" do
       before { sign_in_as(email: owner_email) }
+
+      # ⚠️ The length check reads the card of the link, because a page with NO og: tags puts its
+      # link in the words of the Bluesky post. Refer to `#bluesky_text`. Thus each example here
+      # links to a page that gives a card, which is the ordinary condition.
+      before do
+        allow_any_instance_of(OpenGraph).to receive(:fetch) do |_service, link|
+          OpenGraph::Card.new(url: link, title: "A title", description: "A summary.",
+                              image_url: "https://cdn.test/og.png")
+        end
+      end
 
       let(:url) { "https://example.test/2026/07/12/ironman-canada/" }
 
@@ -661,6 +691,34 @@ RSpec.describe "Admin social media", type: :request do
           expect(response).to have_http_status(:unprocessable_content)
           expect(response.body).to include(I18n.t("admin.social.errors.bad_link.single"))
           expect(BlueskyPostJob.jobs).to be_empty
+        end
+
+        # ⚠️ A page with no og: tags puts its link in the WORDS of the Bluesky post. Without this
+        # check the job composes a longer text than the page counted, `Bluesky#post!` raises, and
+        # the job retries for 24 hours.
+        it "counts the link when the page gives no card, and says so" do
+          allow_any_instance_of(OpenGraph).to receive(:fetch)
+            .and_return(OpenGraph::Card.new(url: url, title: nil, description: nil, image_url: nil))
+          text = "a" * 290
+
+          post "/social", params: { posts: [ { text: text, link: url } ], networks: [ "bluesky" ] }
+
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(response.body).to include(
+            ERB::Util.html_escape(
+              I18n.t("admin.social.errors.too_long_link.single",
+                     count: 290 + 2 + url.length, limit: Bluesky::MAX_GRAPHEMES)
+            )
+          )
+          expect(BlueskyPostJob.jobs).to be_empty
+        end
+
+        # The same draft fits when the page draws a card: that link is an embed and it uses none of
+        # the 300 characters.
+        it "counts no link when the page gives a card" do
+          post "/social", params: { posts: [ { text: "a" * 290, link: url } ], networks: [ "bluesky" ] }
+
+          expect(response).to redirect_to(social_path)
         end
 
         it "refuses a draft with no network" do
@@ -1212,6 +1270,34 @@ RSpec.describe "Admin social media", type: :request do
           plain = preview(posts: [ { text: "A long day.", link: "" } ])
 
           expect(rows(plain).values.map { |row| row["note"] }).to all(be_nil)
+        end
+
+        # ⚠️ An embed from a page with no og: tags is an empty box. Thus Bluesky gets the link in
+        # the WORDS, as Mastodon does, and `BlueskyPostJob` composes that same text.
+        describe "when the page gives no card" do
+          let(:card) do
+            OpenGraph::Card.new(url: url, title: nil, description: nil, image_url: nil)
+          end
+
+          it "puts the link in the Bluesky text" do
+            expect(rows(body)["bluesky"]["text"]).to eq("A long day.\n\n#{url}")
+          end
+
+          it "gives Bluesky no card to draw" do
+            expect(rows(body)["bluesky"]["card"]).to be_nil
+          end
+
+          # ⚠️ The link is in the words now, thus it uses characters. Without this the count on the
+          # page would be smaller than the post that goes out.
+          it "counts the link for Bluesky" do
+            expect(rows(body)["bluesky"]["length"]).to eq("A long day.\n\n#{url}".length)
+          end
+
+          # Threads still makes an attachment of it, and Mastodon already held it.
+          it "changes nothing for the other two networks" do
+            expect(rows(body)["threads"]["text"]).to eq("A long day.")
+            expect(rows(body)["mastodon"]["text"]).to eq("A long day.\n\n#{url}")
+          end
         end
       end
 

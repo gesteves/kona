@@ -359,15 +359,15 @@ module Admin
       # words would pass a draft that Bluesky then refuses. The message says what it counted.
       # ⚠️ It counts the Bluesky text even when Bluesky is not ticked. 300 is the limit of this page,
       # and this check runs before #selected_networks.
-      # ⚠️ The MENTIONS decide which message it is, and the typography never does. The typography
-      # runs on every draft, thus a count of the finished text would say "with the Bluesky handles"
-      # for a post that names nobody.
+      # ⚠️ It counts the LINK as well, but only when that link goes in the words: a page with no
+      # og: tags gets no embed. Refer to #bluesky_text. Without this the job composes a longer
+      # string than this check measured, `Bluesky#post!` raises, and it retries for 24 hours.
+      # #too_long_key selects the message.
       substituted = mentioned("bluesky", post[:text])
-      counted = text_for("bluesky", post[:text])
+      counted = bluesky_text(post)
       unless Bluesky.valid_post_length?(counted)
-        key = substituted == post[:text] ? "too_long" : "too_long_handles"
-        return post_message(key, index, count: Bluesky.post_length(counted),
-                                        limit: Bluesky::MAX_GRAPHEMES)
+        return post_message(too_long_key(post, substituted), index,
+                            count: Bluesky.post_length(counted), limit: Bluesky::MAX_GRAPHEMES)
       end
 
       message = network_length_error(post, index)
@@ -377,6 +377,20 @@ module Admin
       return post_message("bad_link", index) if post[:link].present? && !OpenGraph.http_url?(post[:link])
 
       nil
+    end
+
+    # Which "that post is too long" message names the reason.
+    #
+    # ⚠️ **The MENTIONS and the LINK decide it, and the typography never does.** The typography runs
+    # on every draft, thus a count of the finished text would say "with the Bluesky handles" for a
+    # post that names nobody.
+    # @param post [Hash]
+    # @param substituted [String] The text with the mentions in place and no typography.
+    # @return [String] The name of the message below `admin.social.errors`.
+    def too_long_key(post, substituted)
+      return "too_long_link" if bluesky_link_in_text(post).present?
+
+      substituted == post[:text] ? "too_long" : "too_long_handles"
     end
 
     # One message about one post.
@@ -507,6 +521,9 @@ module Admin
     def preview_card(network, post)
       return nil unless network == "bluesky" && post[:link].present?
       return nil unless OpenGraph.http_url?(post[:link])
+      # ⚠️ A page with no og: tags gets no card at all, thus the panel draws none. Its link is in
+      # the words of the post, which the row above already shows.
+      return nil unless card_for(post[:link]).embeddable?
 
       card_json(post[:link])
     end
@@ -524,7 +541,7 @@ module Admin
     def card_json(url)
       @card_json ||= {}
       @card_json[url] ||= begin
-        card = OpenGraph.new.fetch(url)
+        card = card_for(url)
         {
           url: card.url,
           title: card.title,
@@ -532,9 +549,46 @@ module Admin
           host: host_of(card.url),
           # ⚠️ The path of our own proxy, and never the og:image itself. Refer to #preview_image.
           image_path: (social_preview_image_path(url: url) if card.image_url.present?),
-          standard_site: card.document_uri.present?
+          standard_site: card.document_uri.present?,
+          # ⚠️ False means that Bluesky renders NO card and the link goes in the words. The browser
+          # reads this to add the link to its count.
+          embeddable: card.embeddable?
         }
       end
+    end
+
+    # The card of a page, read one time for each URL in this request.
+    #
+    # ⚠️ The length check, the panel, and the card below the link field all read it. `OpenGraph`
+    # caches for 15 minutes as well, thus the check at the submit nearly always reads the copy that
+    # the preview stored a moment before.
+    # @param url [String]
+    # @return [OpenGraph::Card]
+    def card_for(url)
+      @card_for ||= {}
+      @card_for[url] ||= OpenGraph.new.fetch(url)
+    end
+
+    # The text that Bluesky will get for one post.
+    #
+    # ⚠️ **The link is in this text when the page gives no card.** Bluesky renders an
+    # `app.bsky.embed.external` from the og: tags, thus a page with none makes an empty box and the
+    # link goes in the words instead, as it does at Mastodon. `BlueskyPostJob` composes the same
+    # string, thus the count on this page and the post that goes out cannot disagree.
+    # @param post [Hash]
+    # @return [String]
+    def bluesky_text(post)
+      Bluesky.compose(text: text_for("bluesky", post[:text]), url: bluesky_link_in_text(post))
+    end
+
+    # ⚠️ It reads a link that is http or https only. A link with another scheme goes nowhere, and
+    # `#post_error` refuses it with a message of its own.
+    # @param post [Hash]
+    # @return [String, nil] The link of a post when that link goes in the Bluesky text.
+    def bluesky_link_in_text(post)
+      return nil unless OpenGraph.http_url?(post[:link])
+
+      post[:link] unless card_for(post[:link]).embeddable?
     end
 
     # The text that one network will receive, and each link in it.
@@ -556,7 +610,7 @@ module Admin
       text = text_for(network, post[:text])
 
       if network == SocialPresenter::MARKDOWN_NETWORK
-        rendered = MarkdownLinks.parse(text)
+        rendered = MarkdownLinks.parse(bluesky_text(post))
         return [ rendered.text, Bluesky.link_ranges(rendered.text, rendered.links) ]
       end
 
@@ -596,7 +650,7 @@ module Admin
       text = text_for(network, post[:text])
 
       case network
-      when "bluesky"  then Bluesky.post_length(text)
+      when "bluesky"  then Bluesky.post_length(bluesky_text(post))
       when "mastodon" then Mastodon.post_length(text: text, url: post[:link])
       else                 text.length
       end

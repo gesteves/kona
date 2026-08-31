@@ -356,6 +356,9 @@ en:
         body_placeholder: "What do you want to say?"
         link: "Link"
         link_placeholder: "https://"
+        # ⚠️ The line that takes the place of the card when a page gives no og: tags. Bluesky then
+        # makes no embed, and the link goes in the words as it does at Mastodon.
+        no_card: "That page has no preview card, so the link goes in the post."
         remove: "Remove this post"
         reorder: "Reorder this post with the arrow keys"
       # The account line of a row of the "Post to" list.
@@ -403,6 +406,11 @@ en:
             %{limit}."
           single: "That post is %{count} characters with the Bluesky handles. The limit is
             %{limit}."
+        # ⚠️ A link that a page gives no card for goes in the WORDS, thus it uses characters. The
+        # message says what it counted.
+        too_long_link:
+          numbered: "Post %{index} is %{count} characters with its link. The limit is %{limit}."
+          single: "That post is %{count} characters with its link. The limit is %{limit}."
         too_long_mastodon:
           numbered: "Post %{index} is too long for Mastodon with the names that you gave."
           single: "That post is too long for Mastodon with the names that you gave."
@@ -441,15 +449,16 @@ en:
       social:
         # The two fields are not complete yet, thus the label cannot name a moment.
         incomplete: "Schedule"
-        # The badge on the website card of a link, which says which card Bluesky will render.
-        open_graph: "Open Graph"
         post_now: "Post now"
         preview_empty: "There is nothing to preview yet."
         preview_failed: "The preview couldn't be loaded."
         # The line for a draft that ticks no network at all.
         preview_no_network: "Pick a place to post it, and the draft shows here."
+        # The badge on the website card of a link. ⚠️ There is no badge for an ordinary Open Graph
+        # card: no badge means that the card comes from the og: tags.
         standard_site: "Standard.site"
         scheduled: "Schedule for %{at}"
       social_post:
-        open_graph: "Open Graph"
+        # ⚠️ There is no badge for an ordinary Open Graph card: no badge means that the card comes
+        # from the og: tags.
         standard_site: "Standard.site"

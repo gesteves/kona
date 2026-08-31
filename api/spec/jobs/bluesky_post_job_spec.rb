@@ -44,6 +44,29 @@ RSpec.describe BlueskyPostJob do
     expect(bluesky).to have_received(:post!).with(hash_including(card: nil))
   end
 
+  # ⚠️ An embed from a page with no og: tags is an empty box with a host name in it. Thus the link
+  # goes in the words, as it does at Mastodon.
+  it "puts the link in the text and sends no card when the page gives no tags" do
+    allow(open_graph).to receive(:fetch)
+      .and_return(OpenGraph::Card.new(url: url, title: nil, description: nil, image_url: nil))
+
+    described_class.new.perform([ post("3kabc", "Read this", url) ])
+
+    expect(bluesky).to have_received(:post!)
+      .with(rkey: "3kabc", text: "Read this\n\n#{url}", card: nil, reply: nil)
+  end
+
+  # A page that gives one of the three fields still draws a card, thus its link stays out of the
+  # words and uses none of the 300 characters.
+  it "keeps the link out of the text when the page gives a title alone" do
+    allow(open_graph).to receive(:fetch)
+      .and_return(OpenGraph::Card.new(url: url, title: "A title", description: nil, image_url: nil))
+
+    described_class.new.perform([ post("3kabc", "Read this", url) ])
+
+    expect(bluesky).to have_received(:post!).with(hash_including(text: "Read this"))
+  end
+
   # The 24-hour retry only stays safe because the key comes from the caller: Bluesky writes with
   # putRecord at that key.
   it "gives the same record key to each attempt" do

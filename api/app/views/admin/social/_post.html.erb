@@ -101,13 +101,21 @@
     <wa-card class="social-card" data-social-post-target="preview" hidden>
       <img slot="media" class="social-card__image" data-social-post-target="previewImage" alt="" hidden>
 
-      <%# ⚠️ This is the useful part: it says which of the two cards Bluesky will render, and the
-          owner cannot know that until after the post without it. %>
-      <wa-badge class="social-card__kind" appearance="outlined"
-                data-social-post-target="previewKind"></wa-badge>
+      <%# ⚠️ This is the useful part: it says that Bluesky will render the standard.site card, and
+          the owner cannot know that until after the post without it. A card with NO badge is the
+          ordinary card from the og: tags. %>
+      <wa-badge class="social-card__kind" appearance="outlined" variant="success"
+                data-social-post-target="previewKind" hidden></wa-badge>
       <p class="social-card__host wa-caption-s" data-social-post-target="previewHost"></p>
       <p class="social-card__title" data-social-post-target="previewTitle"></p>
       <p class="social-card__description" data-social-post-target="previewDescription"></p>
     </wa-card>
+
+    <%# The card above stays hidden for a page that gives no og: tags, because Bluesky can draw
+        nothing from it. This line takes its place and says where the link goes.
+        ⚠️ It needs a rule for `[hidden]`; refer to _social.scss. %>
+    <p class="social-card__note wa-caption-s" data-social-post-target="previewNote" hidden>
+      <%= t(".no_card") %>
+    </p>
   </div>
 </div>

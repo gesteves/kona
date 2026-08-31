@@ -806,6 +806,9 @@ export default class extends Controller {
    * ⚠️ It is the same shape that `social-post#showPreview` writes below the link field, because
    * `Admin::SocialController#card_json` answers both. Thus the two cannot describe one page
    * differently.
+   *
+   * ⚠️ **The action sends NO card for a page that gives no og: tags**, because Bluesky then makes
+   * no embed. That link is in the words of the post, which the row above already shows.
    * @param {HTMLElement} card The preview card of the post.
    * @param {object|null} link The website card, from the action.
    */
@@ -823,10 +826,11 @@ export default class extends Controller {
     element.withMedia = !!link.image_path;
     if (link.image_path) picture.src = link.image_path;
 
-    // Which of the two cards Bluesky will render, which the owner cannot know without it.
+    // ⚠️ The badge shows for the standard.site card ALONE, which the owner cannot know without it.
+    // No badge means the ordinary card from the og: tags.
     const kind = card.querySelector("[data-preview-card-kind]");
-    kind.textContent = t(this.words, link.standard_site ? "standard_site" : "open_graph");
-    kind.variant = link.standard_site ? "success" : "neutral";
+    kind.hidden = !link.standard_site;
+    if (link.standard_site) kind.textContent = t(this.words, "standard_site");
 
     element.hidden = false;
   }

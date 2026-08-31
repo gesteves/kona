@@ -130,6 +130,25 @@
   &__kind {
     align-self: start;
     margin-block-end: var(--wa-space-2xs);
+
+    // ⚠️ It needs a rule of its own: `[hidden] { display: none }` of the browser is at the same
+    // specificity as this class, and <wa-badge> gives its own host a display as well.
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  // The line that takes the place of the card for a page with no og: tags. It sits where the card
+  // would, thus it keeps the same gap above it.
+  &__note {
+    color: var(--wa-color-text-quiet);
+    margin-block: var(--wa-space-s) 0;
+    max-width: 32rem;
+
+    // ⚠️ The same rule as the spinner: an author rule beats the `[hidden]` of the browser.
+    &[hidden] {
+      display: none;
+    }
   }
 
   &__host {

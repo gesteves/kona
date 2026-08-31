@@ -94,6 +94,19 @@ class Bluesky < ApplicationService
     (markdown + bare).sort_by(&:start)
   end
 
+  # The text that one post will hold.
+  #
+  # ⚠️ **The link is in the WORDS only when the page gives no card**, that is, when
+  # `OpenGraph::Card#embeddable?` is false. An embed keeps the URL out of the 300 characters, thus
+  # a page with og: tags never comes here with a `url`. `Mastodon.compose` is the same method, and
+  # a Mastodon status always holds its link.
+  # @param text [String, nil] The body of the post.
+  # @param url [String, nil] The link to add below the body.
+  # @return [String]
+  def self.compose(text:, url: nil)
+    [ text.to_s.strip, url.to_s.strip ].reject(&:blank?).join("\n\n")
+  end
+
   # Makes the public URL of a post from its record key.
   # @param handle [String] The handle of the account.
   # @param rkey [String] The record key.
@@ -123,9 +136,10 @@ class Bluesky < ApplicationService
   #
   # @param rkey [String] The record key, from `Bluesky.new_tid`.
   # @param text [String] The body of the post, as plain text.
-  # @param card [OpenGraph::Card, nil] The card of the link, from `OpenGraph#fetch`. Only its `url`
-  #   is necessary: a card with no title and no picture still renders. Nil gives a post with no
-  #   card at all.
+  # @param card [OpenGraph::Card, nil] The card of the link, from `OpenGraph#fetch`. Nil gives a
+  #   post with no card at all. ⚠️ **Give a card that is `embeddable?` only.** A card with no
+  #   title, no description, and no picture renders as an empty box, thus the caller puts that link
+  #   in `text` with `Bluesky.compose` and sends no card.
   # @param reply [Hash, nil] `{ "root" =>, "parent" => }`, each a reference from an earlier call.
   #   ⚠️ The **root** is the first post of the thread, and the **parent** is the one just above.
   #   The caller carries the root through the chain and never makes it again.
@@ -231,7 +245,9 @@ class Bluesky < ApplicationService
   # Makes the website card of the link.
   #
   # ⚠️ The link of a post is this card, and it is **not** in the text. Thus the URL does not use
-  # part of the 300 characters. A card with no thumbnail still renders, thus a failure of the image
+  # part of the 300 characters. ⚠️ The caller gives an `embeddable?` card only: a page with no
+  # tags makes an empty box, and the link goes in the words instead. A card with no thumbnail still
+  # renders, thus a failure of the image
   # loses the picture only and never the post.
   # @param card [OpenGraph::Card, nil]
   # @return [Hash, nil] An app.bsky.embed.external, or nil with no card.

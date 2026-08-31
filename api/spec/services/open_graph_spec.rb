@@ -173,4 +173,35 @@ RSpec.describe OpenGraph do
       expect(HTTParty).not_to have_received(:get)
     end
   end
+
+  # ⚠️ This is the rule that decides where the link of a post goes: Bluesky draws a card from these
+  # three fields, and a card with none of them is an empty box.
+  describe OpenGraph::Card do
+    def card(**fields)
+      described_class.new(**{ url: "https://example.test/a/", title: nil, description: nil,
+                              image_url: nil }.merge(fields))
+    end
+
+    it "is not embeddable when the page gives no title, no description, and no picture" do
+      expect(card).not_to be_embeddable
+    end
+
+    it "is embeddable with a title alone" do
+      expect(card(title: "A title")).to be_embeddable
+    end
+
+    it "is embeddable with a description alone" do
+      expect(card(description: "A summary.")).to be_embeddable
+    end
+
+    it "is embeddable with a picture alone" do
+      expect(card(image_url: "https://cdn.test/og.png")).to be_embeddable
+    end
+
+    # ⚠️ A standard.site tag makes the card richer and it draws nothing by itself. Bluesky renders
+    # an app.bsky.embed.external in both conditions, and `associatedRefs` only adds to it.
+    it "is not embeddable for a standard.site tag alone" do
+      expect(card(document_uri: "at://did:plc:abc/site.standard.document/d1")).not_to be_embeddable
+    end
+  end
 end
