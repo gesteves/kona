@@ -114,10 +114,13 @@
   // input, thus a smaller gap lets the two touch.
   margin-block-start: var(--wa-space-s);
   max-width: 32rem;
-  // ⚠️ **The remove control is absolute, and this is its positioned ancestor.** <wa-card> sets no
-  // `position` in its own shadow root, thus that control resolves against this host and it can sit
-  // over the picture.
-  position: relative;
+
+  // ⚠️ The footer of the component takes the same `--spacing` as its body, and that is too much
+  // room around two icon buttons. The card of the Preview panel has no footer, thus this reaches
+  // the card of the composer alone.
+  &::part(footer) {
+    padding: var(--wa-space-xs) var(--wa-space-s);
+  }
 
   &[hidden] {
     display: none;
@@ -158,23 +161,22 @@
     overflow-wrap: anywhere;
   }
 
-  // The X in the corner, which takes the link off the post.
+  // The two controls of the footer. <wa-card> draws the line above them and the room around them.
   //
-  // ⚠️ It is in the BODY slot and it draws over the media slot above it, because the body comes
-  // second in the shadow tree. The background is its own: an outlined button is not readable over
-  // a photograph.
-  &__remove {
-    inset-block-start: var(--wa-space-xs);
-    inset-inline-end: var(--wa-space-xs);
-    position: absolute;
+  // ⚠️ They go in ONE element, in the `footer` slot. Refer to the ⚠️ in _post.html.erb: the
+  // `footer-actions` slot of the component renders nothing by itself.
+  &__actions {
+    display: flex;
+    gap: var(--wa-space-2xs);
+    justify-content: flex-end;
   }
 
-  &__remove::part(button) {
+  // ⚠️ <wa-button> makes a square icon button only for a <wa-icon> child, and this app never uses
+  // that element. Thus the square is here, as it is for each other icon button of this page.
+  &__action::part(button) {
     aspect-ratio: 1;
-    background-color: var(--wa-color-surface-default);
-    border-radius: var(--wa-border-radius-pill);
     padding: 0;
-    width: var(--wa-form-control-height);
+    width: 1.75em;
   }
 
   &__description {

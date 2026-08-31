@@ -47,14 +47,32 @@ export default class extends Controller {
   }
 
   /**
-   * Shows the link field, from the button of the toolbar.
+   * Opens the link field: the button of the toolbar asks for a link, and Edit in the footer of the
+   * card takes the owner back to the one that the post carries.
    *
-   * ⚠️ The button is hidden by then: there is one link for each post, thus "add a link" has no
-   * meaning while one is being written or is already attached.
+   * ⚠️ The button of the toolbar is disabled by then. There is one link for each post, thus "add a
+   * link" has no meaning while one is being written or is already attached.
    */
   showLink() {
     this.setLinkState(EDITING);
     this.linkTarget.focus();
+  }
+
+  /**
+   * Reads the card at once, when the field loses the focus.
+   *
+   * ⚠️ **This is what closes the round trip of the Edit control.** That control opens the field
+   * with a URL already in it, thus a person who changes nothing fires no `input` and no `change`,
+   * and the card would never come back. It is nearly always a Redis hit: `OpenGraph` caches each
+   * page for 15 minutes.
+   *
+   * ⚠️ It runs for the X of the field as well, because a click blurs before it fires. That read
+   * takes the next sequence number and `removeLink` takes the one after it, thus the answer of the
+   * blur cannot draw the card of a link that the click removed.
+   */
+  commitLink() {
+    clearTimeout(this.previewTimer);
+    this.preview();
   }
 
   /**

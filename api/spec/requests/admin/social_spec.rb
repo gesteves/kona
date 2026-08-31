@@ -77,7 +77,7 @@ RSpec.describe "Admin social media", type: :request do
         expect(open_tag("wa-button", "social-post__tool")).not_to include("disabled")
       end
 
-      # ⚠️ The X on the card takes the owner back from a link that this app read a page for, and it
+      # ⚠️ Remove on the card takes the owner back from a link that this app read a page for, and it
       # can do nothing for a field that they opened and left empty. Thus the field carries its own
       # way out, and that field is the one state with no card to close.
       it "gives the link field its own way back to the button" do
@@ -86,6 +86,19 @@ RSpec.describe "Admin social media", type: :request do
         field = response.body[%r{<wa-input class="social-post__link".*?</wa-input>}m]
         expect(field).to include("keydown.esc->social-post#removeLink")
         expect(field).to include(%(class="social-post__link-remove"))
+      end
+
+      # ⚠️ The two controls are in the `footer` slot and NOT in `footer-actions`. The card asks
+      # whether the `footer` slot holds anything to decide if it draws a footer at all, thus
+      # `footer-actions` with no `footer` hides both controls and gives no message.
+      it "gives the card of a link an Edit control and a Remove control, in its footer" do
+        get "/social"
+
+        card = response.body[%r{<wa-card class="social-card" data-social-post-target="preview".*?</wa-card>}m]
+        expect(card).to include(%(<div slot="footer"))
+        expect(card).not_to include("footer-actions")
+        expect(card).to include("social-post#showLink")
+        expect(card).to include("social-post#removeLink")
       end
 
       # ⚠️ The link field is a plain input and there is no list of the entries. Thus this page makes

@@ -852,7 +852,7 @@ Threads, now or at a date and a time. All three post. Each post has an **optiona
   |---|---|---|
   | `IDLE` | Nothing; the **link button** of the toolbar is live | A click opens the field |
   | `EDITING` | The **link field**, with an X in it | A URL that the app can read a page for; the X and the Escape key go back to `IDLE` |
-  | `ATTACHED` | The **card** of that link, with an X in its corner | The X, which goes back to `IDLE` |
+  | `ATTACHED` | The **card** of that link, with Edit and Remove in its footer | Edit goes back to `EDITING`; Remove goes back to `IDLE` |
 
   - ⚠️ **The toolbar is a ROW of controls and not one button.** A control for a photo, and each
     other kind of attachment, goes beside the link button. The **count sits at the end of that same
@@ -865,9 +865,14 @@ Threads, now or at a date and a time. All three post. Each post has an **optiona
     and the button disabled, and a post with none gets a live button. Thus a page that renders
     again after a refusal shows the link that the owner wrote, and the controller moves nothing
     when it connects.
-  - ⚠️ **EACH of the two later states needs its own way back**, and all three call `removeLink`.
-    The X on the card cannot serve `EDITING`: a field that the owner opened and left empty never
-    becomes a card, thus that field carries an X of its own and takes the Escape key.
+  - ⚠️ **EACH of the two later states needs its own way back to `IDLE`**, and all three controls
+    call `removeLink`. Remove on the card cannot serve `EDITING`: a field that the owner opened and
+    left empty never becomes a card, thus that field carries an X of its own and takes the Escape
+    key.
+  - ⚠️ **The field reads the page again when it loses the focus** (`commitLink`). Edit opens it with
+    a URL already in it, thus a person who changes nothing fires no `input` and no `change`, and the
+    card would never come back. `OpenGraph` caches for 15 minutes, thus that read is nearly always a
+    Redis hit.
   - ⚠️ **Going back CLEARS the value, and it does not only close the field.** The field is the
     link, thus a field that closes with a value in it would still send that value with the form.
   - ⚠️ **`removeLink` sends an `input` event of its own.** A value that code writes fires none, and
@@ -888,9 +893,12 @@ Threads, now or at a date and a time. All three post. Each post has an **optiona
     such a page: that panel shows what each network will RENDER, and Bluesky renders no embed. The
     link is in the words of the Bluesky row there. Both read `#card_json`, thus the two can never
     describe one page differently; only the decision to draw one differs.
-  - ⚠️ **The X is inside the `<wa-card>`, in its body slot, and `.social-card` carries
-    `position: relative`.** `<wa-card>` sets no `position` in its own shadow root, thus the control
-    resolves against that host and it draws over the picture.
+  - ⚠️ **Edit and Remove go in the `footer` slot of the card, and NOT in `footer-actions`**, which
+    is the slot that the component names for exactly this. `HasSlotController#test` asks whether the
+    **`footer`** slot holds anything to decide if the card draws a footer at all, and the
+    `with-footer` attribute does not survive the first update. Thus a card with `footer-actions` and
+    no `footer` hides **both** controls, and it gives no message. The two buttons also go in ONE
+    element, because the footer lays its own children out.
   - ⚠️ **The browser cannot read the page itself.** The CSP of the admin has `connect-src :self`,
     and another host sends no CORS header. Thus this app reads it. **Do not try to move this into
     the browser.**
