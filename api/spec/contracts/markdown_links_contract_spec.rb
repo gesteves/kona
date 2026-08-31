@@ -45,7 +45,7 @@ RSpec.describe "MarkdownLinks Ruby ↔ JavaScript contract" do
 
   # Each shape that a draft can hold. ⚠️ Add a row here for each rule that you add to the grammar:
   # this table is the thing that keeps the two files together.
-  DRAFTS = [
+  MARKDOWN_DRAFTS = [
     "Read [my post](https://example.test/a) today",
     "Read [my post][a] today\n\n[a]: https://example.test/a",
     "See [kona] soon\n\n[kona]: https://example.test/k",
@@ -87,12 +87,12 @@ RSpec.describe "MarkdownLinks Ruby ↔ JavaScript contract" do
     skip "node is not on the PATH; `npm run build` needs it as well." if node.nil?
 
     from_js = run_javascript(node, js_path)
-    from_ruby = DRAFTS.map do |draft|
+    from_ruby = MARKDOWN_DRAFTS.map do |draft|
       result = MarkdownLinks.parse(draft)
       { "text" => result.text, "urls" => result.links.map(&:url) }
     end
 
-    DRAFTS.each_with_index do |draft, index|
+    MARKDOWN_DRAFTS.each_with_index do |draft, index|
       expect(from_js[index]).to eq(from_ruby[index]),
         "The two files read #{draft.inspect} differently. " \
         "Ruby gives #{from_ruby[index].inspect} and the browser gives #{from_js[index].inspect}."
@@ -105,7 +105,7 @@ RSpec.describe "MarkdownLinks Ruby ↔ JavaScript contract" do
     path.presence
   end
 
-  # Runs the browser file over DRAFTS.
+  # Runs the browser file over MARKDOWN_DRAFTS.
   #
   # ⚠️ It copies the file to a **.mjs**, because `package.json` has no `"type": "module"`. Node
   # reads a plain `.js` as CommonJS, and the `export` of that file is then a syntax error.
@@ -116,7 +116,7 @@ RSpec.describe "MarkdownLinks Ruby ↔ JavaScript contract" do
     Dir.mktmpdir do |dir|
       module_path = File.join(dir, "markdown_links.mjs")
       FileUtils.cp(js_path, module_path)
-      File.write(File.join(dir, "drafts.json"), JSON.generate(DRAFTS))
+      File.write(File.join(dir, "drafts.json"), JSON.generate(MARKDOWN_DRAFTS))
       File.write(File.join(dir, "run.mjs"), <<~JS)
         import { readFileSync } from "node:fs";
         import { parse } from "./markdown_links.mjs";

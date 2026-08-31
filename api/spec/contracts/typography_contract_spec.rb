@@ -23,7 +23,7 @@ RSpec.describe "Typography Ruby ↔ JavaScript contract" do
   # ⚠️ **No character above the BMP here**, and an emoji spec below covers that. Ruby counts code
   # points and JavaScript counts UTF-16 code units, thus only text where the two agree can compare
   # `.length` directly. Every rule of this file is ASCII punctuation, thus nothing is lost.
-  DRAFTS = [
+  TYPOGRAPHY_DRAFTS = [
     %q(It's a "big" day),
     %q(He said "she said 'no'" loudly),
     %q(5'10" tall),
@@ -59,7 +59,7 @@ RSpec.describe "Typography Ruby ↔ JavaScript contract" do
 
     from_js = run_javascript(node, js_path)
 
-    DRAFTS.each_with_index do |draft, index|
+    TYPOGRAPHY_DRAFTS.each_with_index do |draft, index|
       from_ruby = Typography.apply(draft)
 
       expect(from_js[index]).to eq(from_ruby.length),
@@ -81,7 +81,7 @@ RSpec.describe "Typography Ruby ↔ JavaScript contract" do
     `command -v node 2>/dev/null`.strip.presence
   end
 
-  # Runs the browser file over DRAFTS and gives the length of each answer.
+  # Runs the browser file over TYPOGRAPHY_DRAFTS and gives the length of each answer.
   #
   # ⚠️ It copies the two files to **.mjs**, because `package.json` has no `"type": "module"`. Node
   # reads a plain `.js` as CommonJS, and the `export` of those files is then a syntax error.
@@ -96,7 +96,7 @@ RSpec.describe "Typography Ruby ↔ JavaScript contract" do
                                          "./social_mentions.mjs"))
       FileUtils.cp(Rails.root.join("app/javascript/lib/social_mentions.js"),
                    File.join(dir, "social_mentions.mjs"))
-      File.write(File.join(dir, "drafts.json"), JSON.generate(DRAFTS))
+      File.write(File.join(dir, "drafts.json"), JSON.generate(TYPOGRAPHY_DRAFTS))
       File.write(File.join(dir, "run.mjs"), <<~JS)
         import { readFileSync } from "node:fs";
         import { applyLengthRules } from "./typography.mjs";

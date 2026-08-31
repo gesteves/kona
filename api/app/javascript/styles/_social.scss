@@ -363,10 +363,22 @@
     white-space: pre-wrap;
   }
 
-  &__note,
   &__empty {
     margin: 0;
     color: var(--wa-color-text-quiet);
+  }
+
+  // The topic of a Threads post, above its words.
+  &__topic {
+    align-self: start;
+    margin-block-end: var(--wa-space-xs);
+  }
+
+  // The link of a post that keeps it out of the text. It reads as the link of a Mastodon text
+  // does, one line below the words.
+  &__link {
+    margin: var(--wa-space-s) 0 0;
+    overflow-wrap: anywhere;
   }
 
   // ⚠️ **Each of these needs a rule of its own**, and the `hidden` attribute alone does nothing for
@@ -374,9 +386,14 @@
   // our stylesheet comes after it. `&__group` sets a display above, thus `social#filterPreview`
   // would mark a network as hidden and the owner would still see it. `.social__schedule` carries
   // the same note.
+  // ⚠️ **Each of these needs a rule of its own.** `[hidden] { display: none }` of the browser is at
+  // the same specificity as a class and our stylesheet comes after it, and <wa-badge> gives its own
+  // host a display as well. Without them `social#previewCard` would mark an element as hidden and
+  // the owner would still see it.
   &__group[hidden],
   &__empty[hidden],
-  &__note[hidden] {
+  &__topic[hidden],
+  &__link[hidden] {
     display: none;
   }
 }

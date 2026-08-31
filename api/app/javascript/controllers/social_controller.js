@@ -778,23 +778,24 @@ export default class extends Controller {
       Math.min(100, Math.round((post.length / post.limit) * 100));
     card.querySelector("[data-preview-text]").replaceChildren(...this.textNodes(post.segments));
 
-    // The topic, for the one network that takes one.
+    // The topic, above the words, as a badge. Only one network takes one.
     const topic = card.querySelector("[data-preview-topic]");
     if (post.topic) {
       topic.textContent = post.topic;
       topic.hidden = false;
     }
 
+    // The link of a network that keeps it out of the text and whose card this app cannot draw.
+    // ⚠️ It reuses `textNodes`, thus this address opens in the same way as one inside a text.
+    const link = card.querySelector("[data-preview-link]");
+    if (post.link) {
+      link.replaceChildren(...this.textNodes([ { text: post.link, url: post.link } ]));
+      link.hidden = false;
+    }
+
     // The website card that Bluesky renders for the link. ⚠️ Only that network carries one: this
     // app builds its embed, and Meta renders its own attachment for Threads.
     this.fillLinkCard(card, post.card);
-
-    // The note says where the link went, for a network whose card this app does not draw.
-    const note = card.querySelector("[data-preview-note]");
-    if (post.note) {
-      note.textContent = post.note;
-      note.hidden = false;
-    }
 
     return card;
   }

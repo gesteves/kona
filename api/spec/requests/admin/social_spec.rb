@@ -975,9 +975,9 @@ RSpec.describe "Admin social media", type: :request do
 
         body = JSON.parse(response.body)
         by_key = body["networks"].index_by { |row| row["key"] }
-        line = I18n.t("admin.social.preview.topic", topic: "Cycling")
 
-        expect(by_key["threads"]["posts"].map { |post| post["topic"] }).to eq([ line, line ])
+        # ⚠️ It is the topic ITSELF and not a sentence about it: the panel renders it as a badge.
+        expect(by_key["threads"]["posts"].map { |post| post["topic"] }).to eq(%w[Cycling Cycling])
         # ⚠️ Bluesky and Mastodon have no equivalent, thus their cards never carry one.
         expect(by_key["bluesky"]["posts"].map { |post| post["topic"] }).to all(be_nil)
         expect(by_key["mastodon"]["posts"].map { |post| post["topic"] }).to all(be_nil)
@@ -1178,12 +1178,18 @@ RSpec.describe "Admin social media", type: :request do
           expect(rows(body)["threads"]["text"]).to eq("A long day.")
         end
 
-        # ⚠️ Bluesky has no note: the panel draws its card. Threads gets one, because Meta renders
-        # its own attachment and this app has nothing to show for it.
-        it "says where it went, for the network whose card it cannot draw" do
-          expect(rows(body)["threads"]["note"]).to eq(I18n.t("admin.social.preview.attachment"))
-          expect(rows(body)["bluesky"]["note"]).to be_nil
-          expect(rows(body)["mastodon"]["note"]).to be_nil
+        # ⚠️ Threads makes an ATTACHMENT of the link and keeps it out of the text, thus the panel
+        # shows the address itself. Bluesky draws the card instead, and the link of a Mastodon post
+        # is already a segment of its text.
+        it "shows the address, for the network whose card it cannot draw" do
+          expect(rows(body)["threads"]["link"]).to eq(url)
+          expect(rows(body)["bluesky"]["link"]).to be_nil
+          expect(rows(body)["mastodon"]["link"]).to be_nil
+        end
+
+        # ⚠️ An attachment uses none of the 500 characters, thus the count must not hold it.
+        it "counts no link for Threads" do
+          expect(rows(body)["threads"]["length"]).to eq("A long day.".length)
         end
 
         # ⚠️ **Bluesky alone carries a card**, because this app BUILDS that embed from these same

@@ -362,13 +362,6 @@ en:
       account:
         named: "Posts as %{account}."
         unnamed: "Connected."
-      # The dialog that shows the draft as each network will receive it.
-      # ⚠️ Mastodon has no note here, on purpose: its text holds the link and the owner can see it.
-      # The other two keep the link out of the text, thus a note says where it went.
-      preview:
-        attachment: "The link becomes an attachment."
-        topic: "Topic: %{topic}"
-
       # The example value of each mention field.
       mention_placeholder:
         bluesky: "handle.bsky.social"

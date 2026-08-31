@@ -248,7 +248,15 @@
       only for those flags, and a card with a flag and an empty slot draws an empty band. %>
   <template data-social-target="previewRowTemplate">
     <wa-card class="social-preview__card">
+      <%# The topic, above the words, which is where the Threads app shows it. ⚠️ <wa-badge> gives
+          its own host a display, thus `[hidden]` needs a rule of its own in _social.scss. %>
+      <wa-badge class="social-preview__topic" appearance="outlined" data-preview-topic hidden></wa-badge>
+
       <p class="social-preview__text" data-preview-text></p>
+
+      <%# The link of a post that keeps it OUT of the text. ⚠️ It uses none of the characters of
+          that network, thus the count beside it does not hold it. %>
+      <p class="social-preview__link" data-preview-link hidden></p>
 
       <%# The website card that Bluesky will render for the link. ⚠️ `with-media` follows the
           picture and it is not in the markup: <wa-card> has no `:has-slotted` to read, thus a card
@@ -261,9 +269,6 @@
         <p class="social-card__title" data-preview-card-title></p>
         <p class="social-card__description" data-preview-card-description></p>
       </wa-card>
-
-      <p class="social-preview__note wa-caption-s" data-preview-topic hidden></p>
-      <p class="social-preview__note wa-caption-s" data-preview-note hidden></p>
 
       <%# ⚠️ The count is LAST, thus it sits at the foot of the card and below the card of a link.
           The ring is `aria-hidden` for the reason that the count of the Write panel gives. %>

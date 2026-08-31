@@ -21,9 +21,13 @@ module Admin
 
     # Where the link goes for a network that keeps it OUT of the text, for the note of the preview.
     # ⚠️ Mastodon is absent on purpose: its text holds the link, thus the owner can see it.
-    # ⚠️ Bluesky is absent: the preview draws its card, thus a line that describes one would only
-    # repeat what the owner can see. Refer to #preview_card.
-    LINK_NOTES = { "threads" => "attachment" }.freeze
+    # The network whose preview shows the LINK below the words.
+    #
+    # ⚠️ Bluesky is absent because the panel draws its card, and Mastodon is absent because
+    # `Mastodon.compose` puts the link in the text, thus it is already a segment there. Threads
+    # makes an attachment that Meta renders and this app cannot draw, thus the panel shows the
+    # address itself.
+    LINK_SHOWN = "threads".freeze
 
     # The most Bluesky handles that one draft asks the PDS about, and the seconds that all of those
     # calls together can take. ⚠️ Refer to #bluesky_handle_error: the budget, and not the timeout of
@@ -480,8 +484,18 @@ module Admin
       text, links = composed(network.key, post)
 
       { text: text, segments: segments(text, links), length: length, limit: limit,
-        over: length > limit, note: link_note(network.key, post),
-        topic: preview_topic(network.key), card: preview_card(network.key, post) }
+        over: length > limit, topic: preview_topic(network.key),
+        link: preview_link(network.key, post), card: preview_card(network.key, post) }
+    end
+
+    # ⚠️ It is NOT part of the text and it uses none of the characters of that network: Threads
+    # makes an attachment of it. The panel shows it below the words, because a post with a link
+    # that nothing shows reads as a post with no link.
+    # @return [String, nil]
+    def preview_link(network, post)
+      return nil unless network == LINK_SHOWN && post[:link].present?
+
+      post[:link]
     end
 
     # The website card that Bluesky will render for the link of a post.
@@ -588,22 +602,14 @@ module Admin
       end
     end
 
-    # ⚠️ Each post carries the topic, exactly as `#create` sends it. Thus the dialog shows the same
-    # thing that each post will carry.
-    # @return [String, nil] The line that names the topic, for a Threads row.
+    # ⚠️ It is the topic ITSELF and not a sentence about it: the panel renders it as a badge above
+    # the words, which is where the Threads app shows it. Each post carries it, exactly as
+    # `#create` sends it.
+    # @return [String, nil]
     def preview_topic(network)
       return nil unless network == SocialPresenter::TOPIC_NETWORK && topic.present?
 
-      t("admin.social.preview.topic", topic: topic)
-    end
-
-    # ⚠️ Bluesky has no note any more: the panel draws the card itself. Refer to #preview_card.
-    # @return [String, nil] Where the link went, for a network that keeps it out of the text.
-    def link_note(network, post)
-      note = LINK_NOTES[network]
-      return nil if note.nil? || post[:link].blank?
-
-      t("admin.social.preview.#{note}")
+      topic
     end
 
     # Checks the text of the other two networks against their own limits.
