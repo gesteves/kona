@@ -17,8 +17,8 @@ const PREVIEW_DEBOUNCE = 600;
  */
 export default class extends Controller {
   static targets = [
-    "body", "count", "link", "spinner", "preview", "previewImage", "previewHost",
-    "previewTitle", "previewDescription", "previewKind",
+    "body", "count", "countText", "ring", "link", "spinner", "preview", "previewImage",
+    "previewHost", "previewTitle", "previewDescription", "previewKind",
   ];
   static values = { limit: Number, warnAt: Number, previewUrl: String };
 
@@ -75,7 +75,11 @@ export default class extends Controller {
     const text = render(applyLengthRules(blueskyText(this.bodyTarget.value ?? "", this.blueskyMentions)));
     const length = this.graphemes(text);
 
-    this.countTarget.textContent = `${length} / ${this.limitValue}`;
+    this.countTextTarget.textContent = `${length} / ${this.limitValue}`;
+    // ⚠️ The ring stops at 100: a draft past the limit must not draw more than a full circle. The
+    // words beside it are what say how far past it is.
+    this.ringTarget.value = Math.min(100, Math.round((length / this.limitValue) * 100));
+
     this.countTarget.classList.toggle("social__count--warning",
       length >= this.warnAtValue && length <= this.limitValue);
     this.countTarget.classList.toggle("social__count--over", length > this.limitValue);

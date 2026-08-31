@@ -1284,18 +1284,10 @@ RSpec.describe "Admin social media", type: :request do
           expect(rows(body, 1)["bluesky"]["text"]).to eq("Two")
         end
 
-        # ⚠️ It is the "1/2" of Threads, which names a post by its place in the thread.
-        it "names the place of each post in its thread" do
-          expect(body["networks"].first["posts"].map { |post| post["label"] })
-            .to eq([ I18n.t("admin.social.preview.position", index: 1, count: 2),
-                     I18n.t("admin.social.preview.position", index: 2, count: 2) ])
-        end
-
-        # A draft of one post needs no number.
-        it "names nothing when there is one post" do
-          one = preview(posts: [ { text: "One", link: "" } ])
-
-          expect(one["networks"].first["posts"].first["label"]).to be_nil
+        # ⚠️ A card carries no number of its own. The order of the cards is the order of the
+        # thread, and the count line of each one names its length and no place.
+        it "names no place for a post" do
+          expect(body["networks"].first["posts"].first).not_to have_key("label")
         end
       end
 

@@ -123,18 +123,12 @@ module Admin
       networks = social_networks.select(&:connected?)
       networks = networks.select { |network| network.markdown? } if markdown?
 
-      # ⚠️ One post needs no label. The composer hides its own controls at one post for the same
-      # reason: a number for a thread of one says nothing.
-      labelled = posts.length > 1
-
       # ⚠️ It groups by NETWORK and not by post, thus the panel reads as the thread reads: each
       # network in turn, and its posts in the order that they go out.
       render json: {
         networks: networks.map { |network|
           { key: network.key, name: network.name,
-            posts: posts.each_with_index.map { |post, index|
-              preview_post(network, post, index, labelled)
-            } }
+            posts: posts.map { |post| preview_post(network, post) } }
         }
       }
     end
@@ -479,16 +473,14 @@ module Admin
     # One post of one network, for the preview.
     # @param network [SocialPresenter::Network]
     # @param post [Hash]
-    # @param index [Integer] The place of the post in the thread, counted from zero.
-    # @param labelled [Boolean] False for a draft of one post, which needs no number.
     # @return [Hash]
-    def preview_post(network, post, index, labelled)
+    def preview_post(network, post)
       limit = NETWORKS.fetch(network.key)[:limit]
       length = length_for(network.key, post)
       text, links = composed(network.key, post)
 
-      { label: (position_label(index) if labelled), text: text, segments: segments(text, links),
-        length: length, limit: limit, over: length > limit, note: link_note(network.key, post),
+      { text: text, segments: segments(text, links), length: length, limit: limit,
+        over: length > limit, note: link_note(network.key, post),
         topic: preview_topic(network.key), card: preview_card(network.key, post) }
     end
 
@@ -529,13 +521,6 @@ module Admin
           standard_site: card.document_uri.present?
         }
       end
-    end
-
-    # ⚠️ It is the "1/2" of Threads, which names a post by its place in the thread.
-    # @param index [Integer] Counted from zero.
-    # @return [String]
-    def position_label(index)
-      t("admin.social.preview.position", index: index + 1, count: posts.length)
     end
 
     # The text that one network will receive, and each link in it.

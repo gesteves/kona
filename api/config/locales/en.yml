@@ -367,8 +367,6 @@ en:
       # The other two keep the link out of the text, thus a note says where it went.
       preview:
         attachment: "The link becomes an attachment."
-        # ⚠️ The place of a post in its thread, as Threads writes it. A draft of one post gets none.
-        position: "%{index}/%{count}"
         topic: "Topic: %{topic}"
 
       # The example value of each mention field.

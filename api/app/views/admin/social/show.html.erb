@@ -248,11 +248,6 @@
       only for those flags, and a card with a flag and an empty slot draws an empty band. %>
   <template data-social-target="previewRowTemplate">
     <wa-card class="social-preview__card">
-      <p class="social-preview__meta wa-caption-s">
-        <%# The place of the post in the thread, as "1/2". A draft of one post gets none. %>
-        <span data-preview-label hidden></span>
-        <span class="social-preview__count" data-preview-count></span>
-      </p>
       <p class="social-preview__text" data-preview-text></p>
 
       <%# The website card that Bluesky will render for the link. ⚠️ `with-media` follows the
@@ -269,6 +264,13 @@
 
       <p class="social-preview__note wa-caption-s" data-preview-topic hidden></p>
       <p class="social-preview__note wa-caption-s" data-preview-note hidden></p>
+
+      <%# ⚠️ The count is LAST, thus it sits at the foot of the card and below the card of a link.
+          The ring is `aria-hidden` for the reason that the count of the Write panel gives. %>
+      <p class="social-preview__meta wa-caption-s">
+        <span class="social-preview__count" data-preview-count></span>
+        <wa-progress-ring class="social__ring" aria-hidden="true" data-preview-ring></wa-progress-ring>
+      </p>
     </wa-card>
   </template>
 <% end %>

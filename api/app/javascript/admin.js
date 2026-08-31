@@ -44,6 +44,8 @@ import "@web.awesome.me/webawesome-pro/dist/components/option/option.js";
 import "@web.awesome.me/webawesome-pro/dist/components/switch/switch.js";
 // The "Processing" state of a track on the Course maps page.
 import "@web.awesome.me/webawesome-pro/dist/components/spinner/spinner.js";
+// The ring beside the character count of the Social media page.
+import "@web.awesome.me/webawesome-pro/dist/components/progress-ring/progress-ring.js";
 // The Social media page.
 import "@web.awesome.me/webawesome-pro/dist/components/textarea/textarea.js";
 import "@web.awesome.me/webawesome-pro/dist/components/checkbox/checkbox.js";

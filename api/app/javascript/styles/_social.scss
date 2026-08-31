@@ -63,20 +63,43 @@
     display: none;
   }
 
+  // The count below the words of a post, at the end of the line with its ring.
   &__count {
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-2xs);
+    justify-content: flex-end;
     color: var(--wa-color-text-quiet);
     margin: var(--wa-space-2xs) 0 0;
+  }
+
+  // ⚠️ The ring is sized in `em`, thus it follows the words beside it and not a fixed number of
+  // pixels. Both counts use this one class, and in both it comes LAST: at the end of a line that
+  // is itself at the end of its row, thus it stays still while the number gains a digit.
+  &__ring {
+    --size: 1.15em;
+    --track-width: 2px;
+
+    flex: 0 0 auto;
   }
 
   // The two states of the count line. The controller adds them, and the words in the line say the
   // same thing, thus the color is not the only signal.
   &__count--warning {
     color: var(--wa-color-warning-on-quiet);
+
+    .social__ring {
+      --indicator-color: var(--wa-color-warning-on-quiet);
+    }
   }
 
   &__count--over {
     color: var(--wa-color-danger-on-quiet);
     font-weight: var(--wa-font-weight-semibold);
+
+    .social__ring {
+      --indicator-color: var(--wa-color-danger-on-quiet);
+    }
   }
 }
 
@@ -308,19 +331,25 @@
     gap: var(--wa-space-s);
   }
 
-  // The line above the words of a post: its place in the thread, and its count.
-  // ⚠️ It keeps `space-between` with one child as well: a draft of one post has no number, and the
-  // count must stay at the end of the line.
+  // The count at the foot of a card, with its ring.
   &__meta {
     display: flex;
-    gap: var(--wa-space-xs);
-    justify-content: space-between;
-    margin: 0 0 var(--wa-space-2xs);
+    align-items: center;
+    gap: var(--wa-space-2xs);
+    justify-content: flex-end;
+    margin: var(--wa-space-s) 0 0;
     color: var(--wa-color-text-quiet);
   }
 
-  &__count--over {
+  // ⚠️ The modifier is on the LINE and not on the number, thus one rule colors the words and the
+  // ring together whatever their order.
+  &__meta--over {
     color: var(--wa-color-danger-on-quiet);
+    font-weight: var(--wa-font-weight-semibold);
+
+    .social__ring {
+      --indicator-color: var(--wa-color-danger-on-quiet);
+    }
   }
 
   // ⚠️ The text keeps its line breaks and it wraps a long word. A post can hold a newline and a

@@ -767,16 +767,15 @@ export default class extends Controller {
     const card = this.cloneTemplate(this.previewRowTemplateTarget, ".social-preview__card");
     const count = card.querySelector("[data-preview-count]");
 
-    // The place of the post in its thread, as "1/2". A draft of one post gets none: the action
-    // sends no label for it.
-    const label = card.querySelector("[data-preview-label]");
-    if (post.label) {
-      label.textContent = post.label;
-      label.hidden = false;
-    }
-
     count.textContent = `${post.length} / ${post.limit}`;
-    count.classList.toggle("social-preview__count--over", post.over);
+    // ⚠️ The modifier goes on the LINE and not on the number, thus one rule colors the words and
+    // the ring together.
+    card.querySelector(".social-preview__meta")
+        .classList.toggle("social-preview__meta--over", post.over);
+    // ⚠️ It stops at 100, as the ring of the Write panel does: a post past the limit must not draw
+    // more than a full circle.
+    card.querySelector("[data-preview-ring]").value =
+      Math.min(100, Math.round((post.length / post.limit) * 100));
     card.querySelector("[data-preview-text]").replaceChildren(...this.textNodes(post.segments));
 
     // The topic, for the one network that takes one.
