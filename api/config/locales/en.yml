@@ -356,9 +356,6 @@ en:
         body_placeholder: "What do you want to say?"
         link: "Link"
         link_placeholder: "https://"
-        # ⚠️ The line that takes the place of the card when a page gives no og: tags. Bluesky then
-        # makes no embed, and the link goes in the words as it does at Mastodon.
-        no_card: "That page has no preview card, so the link goes in the post."
         remove: "Remove this post"
         reorder: "Reorder this post with the arrow keys"
       # The account line of a row of the "Post to" list.

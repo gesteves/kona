@@ -18,7 +18,7 @@ const PREVIEW_DEBOUNCE = 600;
 export default class extends Controller {
   static targets = [
     "body", "count", "countText", "ring", "link", "spinner", "preview", "previewImage",
-    "previewHost", "previewTitle", "previewDescription", "previewKind", "previewNote",
+    "previewHost", "previewTitle", "previewDescription", "previewKind",
   ];
   static values = { limit: Number, warnAt: Number, previewUrl: String };
 
@@ -183,10 +183,10 @@ export default class extends Controller {
    */
   showPreview(card) {
     // ⚠️ A page with no og: tags draws no card at all: Bluesky makes no embed from it, and the link
-    // goes in the words instead. The note below says so, and the count then holds that link.
+    // goes in the words instead. The empty space says that on its own, and the count then holds
+    // that link.
     if (!card.embeddable) return this.showNoCard();
 
-    this.previewNoteTarget.hidden = true;
     this.previewHostTarget.textContent = card.host ?? "";
     this.previewTitleTarget.textContent = card.title ?? "";
     this.previewDescriptionTarget.textContent = card.description ?? "";
@@ -208,16 +208,15 @@ export default class extends Controller {
   }
 
   /**
-   * Hides the card and says that the link goes in the words of the post.
+   * Hides the card, for a page that gives Bluesky nothing to draw. The link then goes in the words.
    */
   showNoCard() {
     this.hideCard();
-    this.previewNoteTarget.hidden = false;
     this.setLinkInText(true);
   }
 
   /**
-   * Hides the card and the note, for an empty field and for a request that failed.
+   * Hides the card, for an empty field and for a request that failed.
    *
    * ⚠️ It also takes the link out of the count. The action answers with a card for each http URL,
    * even for a page that it could not read, thus this path means "there is no link here" or "we do
@@ -225,7 +224,6 @@ export default class extends Controller {
    */
   hidePreview() {
     this.hideCard();
-    this.previewNoteTarget.hidden = true;
     this.setLinkInText(false);
   }
 

@@ -897,9 +897,10 @@ Threads, now or at a date and a time. All three post. Each post has an **optiona
     minutes and the preview warms that cache, thus it nearly always reads a copy from Redis. A read
     that fails gives a blank card, which is not `embeddable?`; thus a failure puts the link in the
     words, which is the same answer that the job reaches at that moment.
-  - **The card below the link field goes away for such a page**, and one line takes its place to
-    say where the link went. The Preview panel needs no line: the link is in the words of the post,
-    which that panel already shows.
+  - **The card below the link field goes away for such a page**, and nothing takes its place. ⚠️ No
+    card IS the message, and a line that says so only repeats what the empty space already says.
+    The Preview panel says nothing either: the link is in the words of the post, which that panel
+    already shows.
 - ⚠️ **Do not add a Bluesky threadgate or postgate control.** The owner read those options and
   refused them. This page has no control for one network alone.
 - **`POST /social` adds one post job for each network and answers with a 303.** A refusal renders the page again

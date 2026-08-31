@@ -110,12 +110,5 @@
       <p class="social-card__title" data-social-post-target="previewTitle"></p>
       <p class="social-card__description" data-social-post-target="previewDescription"></p>
     </wa-card>
-
-    <%# The card above stays hidden for a page that gives no og: tags, because Bluesky can draw
-        nothing from it. This line takes its place and says where the link goes.
-        ⚠️ It needs a rule for `[hidden]`; refer to _social.scss. %>
-    <p class="social-card__note wa-caption-s" data-social-post-target="previewNote" hidden>
-      <%= t(".no_card") %>
-    </p>
   </div>
 </div>
