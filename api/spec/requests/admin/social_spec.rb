@@ -900,13 +900,14 @@ RSpec.describe "Admin social media", type: :request do
         post "/social", params: { posts: posts, networks: networks, topic: topic }
       end
 
-      it "gives the topic to the first post of the thread and to no other one" do
+      # ⚠️ **Every post of a thread carries it**, and not the first one alone. Meta takes one topic
+      # for each post, and no documentation says that a reply inherits the topic of its root.
+      it "gives the topic to each post of the thread" do
         submit(topic: "Cycling", posts: [ { text: "One", link: "" }, { text: "Two", link: "" } ])
 
         expect(response).to redirect_to(social_path)
         payload = ThreadsPostJob.jobs.first["args"].first
-        expect(payload.first["topic"]).to eq("Cycling")
-        expect(payload.last).not_to have_key("topic")
+        expect(payload.map { |entry| entry["topic"] }).to eq(%w[Cycling Cycling])
       end
 
       # ⚠️ The parameter of Meta takes the words alone. A "#" belongs to a tag that is IN the text.
@@ -968,16 +969,19 @@ RSpec.describe "Admin social media", type: :request do
         end
       end
 
-      it "shows the topic in the preview, on the Threads row of the first post" do
+      it "shows the topic in the preview, on the Threads row of each post" do
         post "/social/preview/text", params: { posts: [ { text: "One" }, { text: "Two" } ],
                                                topic: "Cycling" }
 
         body = JSON.parse(response.body)
         rows = ->(index) { body["posts"][index]["networks"].index_by { |row| row["key"] } }
-        expect(rows.call(0)["threads"]["topic"])
-          .to eq(I18n.t("admin.social.preview.topic", topic: "Cycling"))
+        line = I18n.t("admin.social.preview.topic", topic: "Cycling")
+
+        expect(rows.call(0)["threads"]["topic"]).to eq(line)
+        expect(rows.call(1)["threads"]["topic"]).to eq(line)
+        # ⚠️ Bluesky and Mastodon have no equivalent, thus their rows never carry one.
         expect(rows.call(0)["bluesky"]["topic"]).to be_nil
-        expect(rows.call(1)["threads"]["topic"]).to be_nil
+        expect(rows.call(0)["mastodon"]["topic"]).to be_nil
       end
     end
 

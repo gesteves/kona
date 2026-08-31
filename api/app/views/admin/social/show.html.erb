@@ -119,7 +119,6 @@
     <%# ⚠️ No `maxlength`: it measures UTF-16 code units, and the limit of Meta is characters. The
         action checks the length, for the reason that the body field gives. %>
     <wa-input name="topic" label="<%= t('.topic') %>" value="<%= @social.topic %>"
-              hint="<%= t('.topic_hint') %>"
               autocomplete="off" spellcheck="false">
     </wa-input>
   </div>

@@ -1173,6 +1173,54 @@ algorithm and not one regular expression. **Add a row to `DRAFTS` there for each
 UTF-16 code units: one emoji of a family is 5 and 8. An offset from that file would be a number that
 looks correct and is not, and nothing in the browser needs one.
 
+#### The Threads topic
+
+A **Threads topic** field below the "Post to" list. Meta calls it `topic_tag`, and it is the
+parameter that puts a post under a topic in the Threads app.
+
+⚠️ **One field names the whole draft, and EVERY post of a thread carries the topic.** Meta takes
+one topic for each post, and no documentation says that a reply inherits the topic of its root, thus
+`#create` sends it with each post.
+
+⚠️ **Whether a reply needs its own topic is NOT settled**, and the owner chose to send it every
+time. The native composer of Threads shows the topic on each post of a thread, greyed after the
+first, and that reads as either "a reply inherits it" or "the composer copies it down". The
+documentation answers neither: it says only that one topic is permitted for each post, and
+`topic_tag` is a **readable** field on a reply, which leans toward a property of each post.
+To settle it: post a thread of two, then read `topic_tag` of the second post
+(`GET /{media-id}?fields=id,text,topic_tag,is_reply`). `ThreadsPostJob` logs each media id.
+⚠️ If Meta ever refuses `topic_tag` on a reply, the container fails and the job retries for 24
+hours. `#create_container` names the fields that it sent in the message that it raises, thus such a
+failure reports `topic_tag` and does not read as an empty 500.
+
+⚠️ **Bluesky and Mastodon have no equivalent**, thus the field shows only while the Threads row can
+take a post **and** is ticked. `social#applyTopic` reads `disabled` as well as `checked`, thus one
+rule covers a network with no account **and** a row that a Markdown link turned off. It runs after
+`applyMarkdown`, which is what disables that row.
+
+- **The server renders the field hidden when the rule says so** (`SocialPresenter#topic?`), thus it
+  does not show for a moment before the Stimulus controller runs.
+- ⚠️ **Nothing clears the field while it is hidden.** A topic that the owner wrote survives an
+  untick and a tick again, and the action reads the value only while the Threads row is ticked. A
+  topic that Meta would refuse is therefore **not** an error for a draft that goes nowhere near
+  Threads.
+- **The limits are `Threads::TOPIC_MAX_CHARACTERS` (50) and `TOPIC_FORBIDDEN`**, which is a period
+  and an ampersand. ⚠️ The action refuses a topic outside those, because Meta refuses the
+  **container** and `ThreadsPostJob` would then retry a draft that can never work, for 24 hours.
+- ⚠️ **`Threads.normalize_topic` removes a leading `#`.** The parameter takes the words alone: a
+  hash sign belongs to a tag that is IN the text, and one here would become part of the topic.
+- The preview shows the topic on the **Threads row of every post**, which is where each post
+  carries it.
+
+⚠️ **There is NO way to look up a topic, and there is no list to pick one from.** The Threads
+keyword search (`/keyword_search`, with `search_mode=TAG`) searches **posts** that carry a topic,
+and it takes a `q` that you must already know. Meta publishes no endpoint that gives the topics
+themselves. Thus the field is a plain text input and the owner types the words.
+⚠️ Do not add a picker or a suggestion list without an endpoint that answers "which topics exist".
+`threads_trending_topics` is a permission that the Meta dashboard offers and that the owner did not
+enable, and it is **not** in `Threads::SCOPES`; what it returns was not confirmed, and a list of
+*trending* topics is not a search in any case.
+
 #### The preview
 
 A **Preview** button beside "Post now" opens a dialog that shows the draft as each connected network

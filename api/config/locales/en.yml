@@ -350,9 +350,6 @@ en:
         schedule: "Schedule for later"
         time: "Time"
         topic: "Threads topic"
-        # ⚠️ There is no list of the topics to pick from. The Threads API searches POSTS by a topic
-        # and it has no endpoint that gives the topics, thus the owner types the words.
-        topic_hint: "Optional. Threads adds one topic to the first post."
       post:
         body: "Post"
         body_placeholder: "What do you want to say?"

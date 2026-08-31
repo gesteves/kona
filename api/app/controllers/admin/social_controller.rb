@@ -74,9 +74,10 @@ module Admin
         payload = posts.each_with_index.map do |post, index|
           entry = { "key" => keys[index], "text" => text_for(network, post[:text]),
                     "link" => post[:link] }
-          # ⚠️ The topic goes on the FIRST post alone. Meta takes one for each post, and the field
-          # names the DRAFT: a topic on each reply of a thread would repeat it down the feed.
-          entry["topic"] = topic if network == SocialPresenter::TOPIC_NETWORK && index.zero? && topic.present?
+          # ⚠️ **Each post of a thread carries the topic**, and not the first one alone. Meta takes
+          # one topic for each post, and no documentation says that a reply inherits the topic of
+          # its root. Thus the composer sends it with every post.
+          entry["topic"] = topic if network == SocialPresenter::TOPIC_NETWORK && topic.present?
           entry
         end
 
@@ -489,7 +490,7 @@ module Admin
 
       { key: network.key, name: network.name, text: text, segments: segments(text, links),
         length: length, limit: limit, over: length > limit, note: link_note(network.key, post),
-        topic: preview_topic(network.key, post) }
+        topic: preview_topic(network.key) }
     end
 
     # The text that one network will receive, and each link in it.
@@ -557,12 +558,11 @@ module Admin
       end
     end
 
-    # ⚠️ The topic is on the FIRST post alone, exactly as `#create` sends it. Thus the dialog shows
-    # the same thing that the post will carry.
-    # @return [String, nil] The line that names the topic, for the Threads row of the first post.
-    def preview_topic(network, post)
+    # ⚠️ Each post carries the topic, exactly as `#create` sends it. Thus the dialog shows the same
+    # thing that each post will carry.
+    # @return [String, nil] The line that names the topic, for a Threads row.
+    def preview_topic(network)
       return nil unless network == SocialPresenter::TOPIC_NETWORK && topic.present?
-      return nil unless posts.first.equal?(post)
 
       t("admin.social.preview.topic", topic: topic)
     end
