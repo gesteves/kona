@@ -43,6 +43,8 @@
     </wa-button>
   </div>
 
+  <wa-divider></wa-divider>
+
   <%# The people that this draft names. ⚠️ It belongs to the DRAFT and nothing stores it: the map
       goes out with the form and it is gone after the post. It is thread-level, thus one row covers
       a token that more than one post holds.
@@ -131,6 +133,8 @@
     <% end %>
   </wa-checkbox-group>
 
+  <wa-divider></wa-divider>
+
   <div class="wa-stack wa-gap-s">
     <%# The hidden 0 is what sends "off": a switch that is off submits nothing. The two fields share
         a name, and the server takes the last one. %>
@@ -161,6 +165,8 @@
       <input type="hidden" name="time_zone" data-social-target="timeZone">
     </div>
   </div>
+
+  <wa-divider></wa-divider>
 
   <div class="wa-cluster wa-gap-s">
     <wa-button type="submit" variant="brand" appearance="accent" data-social-target="submit">
