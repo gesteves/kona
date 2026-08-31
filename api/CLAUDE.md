@@ -637,9 +637,9 @@ on the dark theme. `_admin-header.scss` changes that to `currentColor`, and that
 for the inline SVG in place of an image: an `<img>` cannot take the color of the text. A difference
 between the two copies costs no more than an old admin logo.
 
-The sidebar comes from `AdminHelper`: `#admin_nav_items` gives the three items with no group, which
-are Home, Republish site, and Spam, and `#admin_nav_groups` gives the groups with a caption, which
-are Tools, Settings, and More. Both render through `layouts/_admin_nav_item`, thus the code for the
+The sidebar comes from `AdminHelper`: `#admin_nav_items` gives the two items with no group, which
+are Home and Republish site, and `#admin_nav_groups` gives the groups with a caption, which are
+Tools, Messages, Settings, and More. Both render through `layouts/_admin_nav_item`, thus the code for the
 drawer, the active state, and the icons is written one time. Each item is a
 `<wa-button appearance="plain" href>` with an icon at its start, and the item of the current page is
 `filled`. Thus the active state is a step of Web Awesome, and not a background color that a person

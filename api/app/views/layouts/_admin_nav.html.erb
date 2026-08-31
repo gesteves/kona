@@ -2,11 +2,10 @@
     a caption. Both come from AdminHelper, and layouts/_admin_nav_item renders both. %>
 <div class="wa-stack wa-gap-m">
   <ul class="plain-list wa-stack wa-gap-3xs">
-    <%= render partial: "layouts/admin_nav_item",
-               collection: admin_nav_items(quarantine_count: @quarantine_count), as: :item %>
+    <%= render partial: "layouts/admin_nav_item", collection: admin_nav_items, as: :item %>
   </ul>
 
-  <% admin_nav_groups.each do |group| %>
+  <% admin_nav_groups(quarantine_count: @quarantine_count).each do |group| %>
     <%# ⚠️ The id comes from :key, and NOT from the label. The label is a translation, thus an id
         from it would change with a change to a word, and `aria-labelledby` points at that id. %>
     <% label_id = "admin-nav-#{group[:key]}" %>

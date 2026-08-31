@@ -13,17 +13,12 @@ module AdminHelper
   # `dialog:` marks an item that is an action and not a destination: it opens a dialog of the
   # layout, and it has no :path.
   #
-  # @param quarantine_count [Integer] The number of messages in the spam quarantine. The caller
-  #   gives it, and this method does not read an instance variable. Thus this method uses only its
-  #   arguments, as each other helper here does.
   # @return [Array<Hash>] Each item has :label, :icon, and either :path or :dialog. :icon holds the
   #   three arguments of icon_svg. An item can also have :badge and :external.
-  def admin_nav_items(quarantine_count: 0)
+  def admin_nav_items
     [
       { label: t("admin.pages.home"), path: root_path, icon: %w[classic light house] },
-      { label: t("admin.nav.republish"), dialog: REPUBLISH_DIALOG_ID, icon: %w[classic light arrows-rotate] },
-      { label: t("admin.pages.spam"), path: spam_path, icon: %w[classic light envelopes-bulk],
-        badge: quarantine_count.to_i.positive? ? quarantine_count.to_i : nil }
+      { label: t("admin.nav.republish"), dialog: REPUBLISH_DIALOG_ID, icon: %w[classic light arrows-rotate] }
     ]
   end
 
@@ -31,21 +26,28 @@ module AdminHelper
   # same shape as in #admin_nav_items.
   #
   # A group with one item is still correct: the groups come from *the purpose of the page*. Tools is
-  # for a page that makes something, Settings is for a page that you configure, and More is for a
-  # page that you operate. Thus a new page has a clear place, and one flat list does not become
-  # longer.
+  # for a page that makes something. Messages is for the mail that a reader sends. Settings is for a
+  # page that you configure. More is for a page that you operate. Thus a new page has a clear place,
+  # and one flat list does not become longer.
   #
   # ⚠️ The group is a caption, and not a link. Thus it has no :icon. Each of its items has one, in
   # the same column as the items above that are not in a group.
   # ⚠️ :key gives the DOM id of the caption, and the label does NOT. The label is a translation,
   # thus an id from it would change when a person changes a word, and `aria-labelledby` points at
   # that id.
+  # @param quarantine_count [Integer] The number of messages in the spam quarantine. The caller
+  #   gives it, and this method does not read an instance variable. Thus this method uses only its
+  #   arguments, as each other helper here does.
   # @return [Array<Hash>] Each group has :key, :label, and :items.
-  def admin_nav_groups
+  def admin_nav_groups(quarantine_count: 0)
     [
       { key: "tools", label: t("admin.nav.groups.tools"), items: [
         { label: t("admin.pages.course_maps"), path: course_maps_path, icon: %w[classic light map] },
         { label: t("admin.pages.social"),      path: social_path,      icon: %w[classic light paper-plane] }
+      ] },
+      { key: "messages", label: t("admin.nav.groups.messages"), items: [
+        { label: t("admin.pages.spam"), path: spam_path, icon: %w[classic light envelopes-bulk],
+          badge: quarantine_count.to_i.positive? ? quarantine_count.to_i : nil }
       ] },
       { key: "settings", label: t("admin.nav.groups.settings"), items: [
         { label: t("admin.pages.location"),       path: location_path,       icon: %w[classic light location-dot] },

@@ -46,6 +46,7 @@ en:
     nav:
       current_page: ", current page"      # Visually hidden, and it follows the label.
       groups:
+        messages: "Messages"
         more: "More"
         settings: "Settings"
         tools: "Tools"
