@@ -96,7 +96,7 @@ class SocialPresenter
   # @param date [String, nil] The date to put back, as YYYY-MM-DD.
   # @param time [String, nil] The time to put back, as HH:mm.
   # @param topic [String, nil] The Threads topic to put back. ⚠️ It belongs to the DRAFT and not to
-  #   one post: Meta takes one topic for each post, and every post of a thread carries this one.
+  #   one post: Meta takes one topic for each post, and the composer puts it on the first alone.
   # @param mentions [Array<Hash>, nil] The mention map to put back, as
   #   `[{ token:, values: { "bluesky" => … } }, …]`. ⚠️ Nil gives NO row, and not one empty row:
   #   a row for nothing would ask the owner to name a person that they did not write about. The

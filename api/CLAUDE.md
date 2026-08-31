@@ -1178,20 +1178,18 @@ looks correct and is not, and nothing in the browser needs one.
 A **Threads topic** field below the "Post to" list. Meta calls it `topic_tag`, and it is the
 parameter that puts a post under a topic in the Threads app.
 
-⚠️ **One field names the whole draft, and EVERY post of a thread carries the topic.** Meta takes
-one topic for each post, and no documentation says that a reply inherits the topic of its root, thus
-`#create` sends it with each post.
+⚠️ **One field names the whole draft, and `#create` puts the topic on the FIRST post alone.**
 
-⚠️ **Whether a reply needs its own topic is NOT settled**, and the owner chose to send it every
-time. The native composer of Threads shows the topic on each post of a thread, greyed after the
-first, and that reads as either "a reply inherits it" or "the composer copies it down". The
-documentation answers neither: it says only that one topic is permitted for each post, and
-`topic_tag` is a **readable** field on a reply, which leans toward a property of each post.
-To settle it: post a thread of two, then read `topic_tag` of the second post
-(`GET /{media-id}?fields=id,text,topic_tag,is_reply`). `ThreadsPostJob` logs each media id.
-⚠️ If Meta ever refuses `topic_tag` on a reply, the container fails and the job retries for 24
-hours. `#create_container` names the fields that it sent in the message that it raises, thus such a
-failure reports `topic_tag` and does not read as an empty 500.
+⚠️ **A `topic_tag` on a REPLY costs that post its place in the thread**, and a measurement gave
+that. A thread of two that carried the topic on both posts rendered the second one as a reply of
+the author ("· Author") and not as the next part ("2/2"). The root still said "1/2", thus the
+chain itself was correct and the second post alone lost its number. The same thread from the
+composer of Threads numbers both. **Do not send it with each post again.**
+A reply shows the topic of its root by itself, thus nothing is lost.
+
+⚠️ **The number of a post in a thread is a display of Threads and it is not in the API.**
+`reply_to_id` is the one way to chain a post, there is no endpoint that takes a whole thread, and
+no parameter asks for that badge. Thus the only control over it is what this app does NOT send.
 
 ⚠️ **Bluesky and Mastodon have no equivalent**, thus the field shows only while the Threads row can
 take a post **and** is ticked. `social#applyTopic` reads `disabled` as well as `checked`, thus one
@@ -1209,8 +1207,8 @@ rule covers a network with no account **and** a row that a Markdown link turned 
   **container** and `ThreadsPostJob` would then retry a draft that can never work, for 24 hours.
 - ⚠️ **`Threads.normalize_topic` removes a leading `#`.** The parameter takes the words alone: a
   hash sign belongs to a tag that is IN the text, and one here would become part of the topic.
-- The preview shows the topic on the **Threads row of every post**, which is where each post
-  carries it.
+- The preview shows the topic on the **Threads row of the first post**, which is the same place
+  that the post carries it.
 
 ⚠️ **There is NO way to look up a topic, and there is no list to pick one from.** The Threads
 keyword search (`/keyword_search`, with `search_mode=TAG`) searches **posts** that carry a topic,

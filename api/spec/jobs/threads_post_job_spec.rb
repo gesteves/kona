@@ -26,8 +26,8 @@ RSpec.describe ThreadsPostJob do
     expect(open_graph).not_to have_received(:fetch)
   end
 
-  # ⚠️ Meta takes one topic for each post, thus the composer sends the same one with every post of
-  # a thread and this job passes what its own post carries.
+  # ⚠️ The composer puts the topic on the FIRST post alone, and this job passes what its own post
+  # carries.
   it "gives the topic of a post to Threads" do
     described_class.new.perform([ post("3kabc", "Read this").merge("topic" => "Cycling") ])
 

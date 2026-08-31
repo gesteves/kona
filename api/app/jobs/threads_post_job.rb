@@ -8,8 +8,8 @@
 # `Threads#post!` keeps the id of the media container in Redis below `key`. A retry then publishes
 # the container that it made already, in place of a second one.
 class ThreadsPostJob < ApplicationJob
-  # @param posts [Array<Hash>] `[{ "key" =>, "text" =>, "link" => }, …]`, the whole thread. ⚠️ Each holds the
-  #   same `"topic"`, when the owner gave one.
+  # @param posts [Array<Hash>] `[{ "key" =>, "text" =>, "link" => }, …]`, the whole thread. ⚠️ Only
+  #   the FIRST holds a `"topic"`, and only when the owner gave one.
   # @param index [Integer] Which post of that list this job writes.
   # @param reply_to_id [String, nil] The media id of the post above, or nil for the first.
   def perform(posts, index = 0, reply_to_id = nil)
