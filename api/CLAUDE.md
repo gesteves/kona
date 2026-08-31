@@ -1233,8 +1233,30 @@ enable, and it is **not** in `Threads::SCOPES`; what it returns was not confirme
 
 #### The preview
 
-A **Preview** button beside "Post now" opens a dialog that shows the draft as each connected network
-will receive it, with the count and the limit of that network. It posts nothing.
+A **Write** and a **Preview** tab. The Preview panel shows the draft as each network will receive
+it, with the count and the limit of that network. It posts nothing.
+
+⚠️ **The thread is the only thing inside those panels.** The mentions, the "Post to" list, the
+schedule, and the submit button stay below them and show in both, because each one changes what a
+preview shows. `social#tabShown` reads the draft when the owner opens the Preview tab, and
+`social#schedulePreviewRefresh` reads it again after a change to a mention or to the topic — the
+two things that change the TEXT and that only the server can write. The words of a post cannot
+change while that panel is on screen: they are in the Write panel.
+
+⚠️ **Unticking a network hides its row AT ONCE and asks for nothing.** The action answers with each
+**connected** network, and `social#filterPreview` hides the rows of the ones that the owner did not
+tick. Thus the panel shows the draft as it will be sent. With no network ticked it shows one line
+that says so.
+
+⚠️ **The Preview TAB is off while the draft holds nothing**, and that is `canPreview` and NOT
+`canPost`: a draft that is past the limit, or that ticks no network, is exactly the one that the
+owner wants to look at.
+
+⚠️ **`wa-tab-group`, `wa-tab`, and `wa-tab-panel` are three separate imports** in
+`app/javascript/admin.js`. A group imports neither its tabs nor its panels, and a page with only
+the group renders the words of every panel one after the other, with no tab at all.
+⚠️ A panel that is not active is `display: none`, thus its fields are still in the form and a
+submit sends them.
 
 Three things make the texts different, and the owner could see none of them before this dialog:
 
@@ -1267,8 +1289,15 @@ Three things make the texts different, and the owner could see none of them befo
 ⚠️ **The value of the dialog is that it CANNOT be wrong, thus it copies nothing:**
 
 - `#preview_text` calls the same `#posts`, `#mention_rows`, and `#text_for` that `#create` calls,
-  and the dialog posts the same field names as a real submit. Thus a change to the substitution
+  and the panel posts the same field names as a real submit. Thus a change to the substitution
   reaches both.
+- ⚠️ **The Bluesky rows carry the website CARD, and not a line that describes one.** This app builds
+  that embed (`Bluesky#build_card`) from the same og: tags, thus it can draw it. `#card_json`
+  answers the card below the link field **and** this one, thus the two cannot describe one page
+  differently, and it is memoized by URL for a thread that names one link twice. Threads keeps its
+  note: Meta renders its own attachment and this app has nothing to show.
+  ⚠️ This is the one other service that the action calls. `OpenGraph#fetch` caches for 15 minutes,
+  thus a preview also warms the cache that the post job reads.
 - **`Mastodon.compose` makes the status**, and `Mastodon#post!` calls that same method.
 - **`NETWORKS` holds the `limit` of each network**, and `#length_for` holds the count rule of each
   one: graphemes for Bluesky, characters for the other two, and a URL at `Mastodon::URL_WEIGHT`.
@@ -1277,9 +1306,9 @@ Three things make the texts different, and the owner could see none of them befo
 
 The rules of the dialog:
 
-- ⚠️ **The Preview button and the Close button need `type="button"`.** `<wa-button>` is
-  form-associated, thus a button in a form with no type **submits** it. A Preview button that posts
-  the draft is the worst failure that this page could have, and a request spec cannot catch it.
+- ⚠️ There is no Preview **button** any more, and that removes the old trap: `<wa-button>` is
+  form-associated, thus one in a form with no `type="button"` submits it. A `<wa-tab>` is not a
+  button and it cannot submit. The buttons of the remove dialog still carry that attribute.
 - ⚠️ **It sends the CSRF token in a header.** The admin does not skip the forgery protection, and
   `config.action_controller.allow_forgery_protection` is **off in the test environment**. Thus each
   ordinary example passes with no token and none of them proves this. One example turns that

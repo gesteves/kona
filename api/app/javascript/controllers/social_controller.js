@@ -7,6 +7,10 @@ import { isBlueskyHandle, mentionKey, tokensOf } from "../lib/social_mentions";
 // owner types it — "@t", "@to", "@ton" — and a row for each of those would take the focus.
 const MENTION_DEBOUNCE = 250;
 
+// How long a change must be quiet before the open preview is read again. ⚠️ Only the mentions and
+// the topic can change while that panel is on screen, thus this is rare and it can be short.
+const PREVIEW_DEBOUNCE = 300;
+
 /**
  * The Social media page: the posts of a thread, the schedule fields, the label of the submit
  * button, and the time zone of the browser. The form posts to POST /social.
@@ -19,8 +23,8 @@ export default class extends Controller {
     "submit", "label", "posts", "post", "template", "add", "remove", "handle",
     "schedule", "scheduleFields", "date", "time", "timeZone",
     "mentions", "mentionRows", "mentionTemplate", "mention",
-    "preview", "previewSpinner", "previewBody", "previewGroupTemplate",
-    "previewRowTemplate", "removeDialog", "markdownNetwork", "topicField",
+    "previewTab", "previewPanel", "previewSpinner", "previewBody", "previewEmpty",
+    "previewGroupTemplate", "previewRowTemplate", "removeDialog", "markdownNetwork", "topicField",
   ];
   static values = { maxPosts: Number, previewUrl: String };
 
@@ -336,7 +340,14 @@ export default class extends Controller {
     this.submitTarget.disabled = !this.canPost;
     // ⚠️ This is NOT `canPost`. A draft that is past the limit, or that ticks no network, is exactly
     // the draft that the owner wants to look at.
-    this.previewTarget.disabled = !this.canPreview;
+    this.previewTabTarget.disabled = !this.canPreview;
+
+    // ⚠️ A network goes away AT ONCE and it needs no request: the answer holds each connected
+    // network, and this hides the rows of the ones that the owner unticked. The refresh below is
+    // for the mentions and the topic, which change the TEXT and which only the server can write.
+    this.filterPreview();
+    if (this.previewActive) this.schedulePreviewRefresh();
+
     this.relabel();
   }
 
@@ -613,7 +624,57 @@ export default class extends Controller {
   }
 
   /**
-   * Fills the preview dialog with the draft as each network will receive it.
+   * Reads the draft when the owner opens the Preview tab.
+   *
+   * ⚠️ It reads `detail.name`, which `<wa-tab-group>` sets to the panel of the tab that it showed.
+   * The event bubbles, thus a check of the name is what keeps the Write tab from asking.
+   */
+  tabShown(event) {
+    if (event.detail?.name !== "preview") return;
+
+    this.preview();
+  }
+
+  /** @returns {boolean} True while the Preview panel is the one on screen. */
+  get previewActive() {
+    return this.previewPanelTarget.hasAttribute("active");
+  }
+
+  /**
+   * Reads the draft again after the owner changes something while the preview is open.
+   *
+   * ⚠️ The words of a post cannot change here: they are in the Write panel. This is for the
+   * mentions and the topic, which the server writes into the text.
+   */
+  schedulePreviewRefresh() {
+    clearTimeout(this.previewTimer);
+    this.previewTimer = setTimeout(() => this.preview(), PREVIEW_DEBOUNCE);
+  }
+
+  /**
+   * Hides the row of each network that the owner did not tick.
+   *
+   * ⚠️ The action answers with every CONNECTED network, and the ticks decide what a post goes to.
+   * Thus this filter is what makes the panel show the draft as it will be sent, and it needs no
+   * request of its own.
+   */
+  filterPreview() {
+    const wanted = this.networks.filter((box) => box.checked && !box.disabled)
+                       .map((box) => box.value);
+    const groups = [ ...this.previewBodyTarget.querySelectorAll("[data-preview-network]") ];
+    groups.forEach((group) => {
+      group.hidden = !wanted.includes(group.dataset.previewNetwork);
+    });
+
+    // ⚠️ The line shows only when the panel HOLDS a group and none of them is wanted. An empty
+    // draft has its own message, and the two must not both appear.
+    const empty = groups.length > 0 && groups.every((group) => group.hidden);
+    this.previewEmptyTarget.textContent = empty ? t(this.words, "preview_no_network") : "";
+    this.previewEmptyTarget.hidden = !empty;
+  }
+
+  /**
+   * Fills the preview panel with the draft as each network will receive it.
    *
    * ⚠️ The markup opens the dialog, thus this only fills it. It reads the draft AT THE CLICK, thus
    * it needs no debounce and no `input` action: that is the difference from the link preview,
@@ -629,6 +690,7 @@ export default class extends Controller {
    */
   async preview() {
     this.previewBodyTarget.replaceChildren();
+    this.previewEmptyTarget.hidden = true;
     this.previewSpinnerTarget.hidden = false;
 
     // ⚠️ A second click while one request is out must not let the older answer write. It is the
@@ -674,56 +736,99 @@ export default class extends Controller {
   showPreview(draft) {
     // ⚠️ The Preview button is off for a draft with nothing in it, thus this is a fallback and not
     // the ordinary path. It stays because a dialog that opens and stays blank says nothing at all.
-    const posts = draft?.posts ?? [];
-    if (posts.length === 0) return this.showPreviewMessage("preview_empty");
+    const networks = draft?.networks ?? [];
+    if (networks.length === 0) return this.showPreviewMessage("preview_empty");
 
     const body = this.previewBodyTarget;
     body.replaceChildren();
 
-    posts.forEach((post) => {
+    networks.forEach((network) => {
       const group = this.cloneTemplate(this.previewGroupTemplateTarget, ".social-preview__group");
-      const label = group.querySelector("[data-preview-label]");
 
-      // A draft of one post gets no label: the action sends none for it.
-      if (post.label) {
-        label.textContent = post.label;
-        label.hidden = false;
-      }
+      // ⚠️ `filterPreview` reads this to hide the group of a network that the owner unticks.
+      group.dataset.previewNetwork = network.key;
+      group.querySelector("[data-preview-name]").textContent = network.name;
 
-      const rows = group.querySelector("[data-preview-rows]");
-      post.networks.forEach((network) => rows.appendChild(this.previewRow(network)));
+      const cards = group.querySelector("[data-preview-cards]");
+      network.posts.forEach((post) => cards.appendChild(this.previewCard(post)));
       body.appendChild(group);
     });
+
+    // ⚠️ The answer holds each connected network, thus the new groups need the filter at once.
+    this.filterPreview();
   }
 
   /**
-   * @param {object} network One network of one post.
+   * One card: one post of one network.
+   * @param {object} post
    * @returns {HTMLElement}
    */
-  previewRow(network) {
-    const row = this.cloneTemplate(this.previewRowTemplateTarget, ".social-preview__row");
-    const count = row.querySelector("[data-preview-count]");
+  previewCard(post) {
+    const card = this.cloneTemplate(this.previewRowTemplateTarget, ".social-preview__card");
+    const count = card.querySelector("[data-preview-count]");
 
-    row.querySelector("[data-preview-name]").textContent = network.name;
-    count.textContent = `${network.length} / ${network.limit}`;
-    count.classList.toggle("social-preview__count--over", network.over);
-    row.querySelector("[data-preview-text]").replaceChildren(...this.textNodes(network.segments));
+    // The place of the post in its thread, as "1/2". A draft of one post gets none: the action
+    // sends no label for it.
+    const label = card.querySelector("[data-preview-label]");
+    if (post.label) {
+      label.textContent = post.label;
+      label.hidden = false;
+    }
+
+    count.textContent = `${post.length} / ${post.limit}`;
+    count.classList.toggle("social-preview__count--over", post.over);
+    card.querySelector("[data-preview-text]").replaceChildren(...this.textNodes(post.segments));
 
     // The topic, for the one network that takes one.
-    const topic = row.querySelector("[data-preview-topic]");
-    if (network.topic) {
-      topic.textContent = network.topic;
+    const topic = card.querySelector("[data-preview-topic]");
+    if (post.topic) {
+      topic.textContent = post.topic;
       topic.hidden = false;
     }
 
-    // The note says where the link went, for a network that keeps it out of the text.
-    const note = row.querySelector("[data-preview-note]");
-    if (network.note) {
-      note.textContent = network.note;
+    // The website card that Bluesky renders for the link. ⚠️ Only that network carries one: this
+    // app builds its embed, and Meta renders its own attachment for Threads.
+    this.fillLinkCard(card, post.card);
+
+    // The note says where the link went, for a network whose card this app does not draw.
+    const note = card.querySelector("[data-preview-note]");
+    if (post.note) {
+      note.textContent = post.note;
       note.hidden = false;
     }
 
-    return row;
+    return card;
+  }
+
+  /**
+   * Fills the website card of a post, or leaves it away.
+   *
+   * ⚠️ It is the same shape that `social-post#showPreview` writes below the link field, because
+   * `Admin::SocialController#card_json` answers both. Thus the two cannot describe one page
+   * differently.
+   * @param {HTMLElement} card The preview card of the post.
+   * @param {object|null} link The website card, from the action.
+   */
+  fillLinkCard(card, link) {
+    const element = card.querySelector("[data-preview-card]");
+    if (!link) return;
+
+    card.querySelector("[data-preview-card-host]").textContent = link.host ?? "";
+    card.querySelector("[data-preview-card-title]").textContent = link.title ?? "";
+    card.querySelector("[data-preview-card-description]").textContent = link.description ?? "";
+
+    // ⚠️ `withMedia` follows the picture, for the reason that the markup gives.
+    const picture = card.querySelector("[data-preview-card-image]");
+    picture.hidden = !link.image_path;
+    element.withMedia = !!link.image_path;
+    if (link.image_path) picture.src = link.image_path;
+
+    // Which of the two cards Bluesky will render, which the owner cannot know without it.
+    const kind = card.querySelector("[data-preview-card-kind]");
+    kind.textContent = t(this.words, link.standard_site ? "standard_site" : "open_graph");
+    kind.variant = link.standard_site ? "success" : "neutral";
+
+    element.hidden = false;
   }
 
   /**

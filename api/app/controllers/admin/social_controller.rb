@@ -21,7 +21,9 @@ module Admin
 
     # Where the link goes for a network that keeps it OUT of the text, for the note of the preview.
     # ⚠️ Mastodon is absent on purpose: its text holds the link, thus the owner can see it.
-    LINK_NOTES = { "bluesky" => "card", "threads" => "attachment" }.freeze
+    # ⚠️ Bluesky is absent: the preview draws its card, thus a line that describes one would only
+    # repeat what the owner can see. Refer to #preview_card.
+    LINK_NOTES = { "threads" => "attachment" }.freeze
 
     # The most Bluesky handles that one draft asks the PDS about, and the seconds that all of those
     # calls together can take. ⚠️ Refer to #bluesky_handle_error: the budget, and not the timeout of
@@ -101,16 +103,7 @@ module Admin
       return render json: { error: t("admin.social.errors.not_a_link") }, status: :unprocessable_content unless
         OpenGraph.http_url?(url)
 
-      card = OpenGraph.new.fetch(url)
-      render json: {
-        url: card.url,
-        title: card.title,
-        description: card.description,
-        host: host_of(card.url),
-        # ⚠️ The path of our own proxy, and never the og:image itself. Refer to #preview_image.
-        image_path: (social_preview_image_path(url: url) if card.image_url.present?),
-        standard_site: card.document_uri.present?
-      }
+      render json: card_json(url)
     end
 
     # POST /social/preview/text
@@ -134,10 +127,14 @@ module Admin
       # reason: a number for a thread of one says nothing.
       labelled = posts.length > 1
 
+      # ⚠️ It groups by NETWORK and not by post, thus the panel reads as the thread reads: each
+      # network in turn, and its posts in the order that they go out.
       render json: {
-        posts: posts.each_with_index.map { |post, index|
-          { label: (t("admin.social.preview.post", index: index + 1) if labelled),
-            networks: networks.map { |network| preview_row(network, post) } }
+        networks: networks.map { |network|
+          { key: network.key, name: network.name,
+            posts: posts.each_with_index.map { |post, index|
+              preview_post(network, post, index, labelled)
+            } }
         }
       }
     end
@@ -479,18 +476,66 @@ module Admin
       t("admin.social.errors.markdown_network", networks: to_sentence(others))
     end
 
-    # One network of one post, for the preview.
+    # One post of one network, for the preview.
     # @param network [SocialPresenter::Network]
     # @param post [Hash]
+    # @param index [Integer] The place of the post in the thread, counted from zero.
+    # @param labelled [Boolean] False for a draft of one post, which needs no number.
     # @return [Hash]
-    def preview_row(network, post)
+    def preview_post(network, post, index, labelled)
       limit = NETWORKS.fetch(network.key)[:limit]
       length = length_for(network.key, post)
       text, links = composed(network.key, post)
 
-      { key: network.key, name: network.name, text: text, segments: segments(text, links),
+      { label: (position_label(index) if labelled), text: text, segments: segments(text, links),
         length: length, limit: limit, over: length > limit, note: link_note(network.key, post),
-        topic: preview_topic(network.key) }
+        topic: preview_topic(network.key), card: preview_card(network.key, post) }
+    end
+
+    # The website card that Bluesky will render for the link of a post.
+    #
+    # ⚠️ **Bluesky alone**, because this app BUILDS that card: `Bluesky#build_card` makes an
+    # `app.bsky.embed.external` from these same og: tags. Threads gets a `link_attachment` and Meta
+    # renders a preview of its own, thus this app has nothing to show for it and the note stays.
+    # @return [Hash, nil]
+    def preview_card(network, post)
+      return nil unless network == "bluesky" && post[:link].present?
+      return nil unless OpenGraph.http_url?(post[:link])
+
+      card_json(post[:link])
+    end
+
+    # One website card, as JSON.
+    #
+    # ⚠️ **`#preview` and the panel read the same method**, thus the card below a link and the card
+    # in the preview cannot describe one page differently.
+    #
+    # ⚠️ It is memoized by URL: a thread that names one link in two posts reads that page one time.
+    # `OpenGraph#fetch` also caches for 15 minutes, thus a preview warms the cache that the post job
+    # reads a moment later.
+    # @param url [String]
+    # @return [Hash]
+    def card_json(url)
+      @card_json ||= {}
+      @card_json[url] ||= begin
+        card = OpenGraph.new.fetch(url)
+        {
+          url: card.url,
+          title: card.title,
+          description: card.description,
+          host: host_of(card.url),
+          # ⚠️ The path of our own proxy, and never the og:image itself. Refer to #preview_image.
+          image_path: (social_preview_image_path(url: url) if card.image_url.present?),
+          standard_site: card.document_uri.present?
+        }
+      end
+    end
+
+    # ⚠️ It is the "1/2" of Threads, which names a post by its place in the thread.
+    # @param index [Integer] Counted from zero.
+    # @return [String]
+    def position_label(index)
+      t("admin.social.preview.position", index: index + 1, count: posts.length)
     end
 
     # The text that one network will receive, and each link in it.
@@ -567,6 +612,7 @@ module Admin
       t("admin.social.preview.topic", topic: topic)
     end
 
+    # ⚠️ Bluesky has no note any more: the panel draws the card itself. Refer to #preview_card.
     # @return [String, nil] Where the link went, for a network that keeps it out of the text.
     def link_note(network, post)
       note = LINK_NOTES[network]

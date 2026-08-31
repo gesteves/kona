@@ -342,13 +342,12 @@ en:
         post_now: "Post now"
         post_to: "Post to"
         preview: "Preview"
-        preview_close: "Close"
-        preview_title: "What each network will get"
         remove_body: "This post isn't empty. Removing it can't be undone."
         remove_confirm: "Remove"
         remove_title: "Remove this post?"
         schedule: "Schedule for later"
         time: "Time"
+        write: "Write"
         # ⚠️ The field is below the Threads row of the "Post to" list, thus the name of the network
         # is beside it and this label does not repeat it.
         topic: "Topic"
@@ -368,8 +367,8 @@ en:
       # The other two keep the link out of the text, thus a note says where it went.
       preview:
         attachment: "The link becomes an attachment."
-        card: "The link becomes a card."
-        post: "Post %{index}"
+        # ⚠️ The place of a post in its thread, as Threads writes it. A draft of one post gets none.
+        position: "%{index}/%{count}"
         topic: "Topic: %{topic}"
 
       # The example value of each mention field.
@@ -451,9 +450,14 @@ en:
       social:
         # The two fields are not complete yet, thus the label cannot name a moment.
         incomplete: "Schedule"
+        # The badge on the website card of a link, which says which card Bluesky will render.
+        open_graph: "Open Graph"
         post_now: "Post now"
         preview_empty: "There is nothing to preview yet."
         preview_failed: "The preview couldn't be loaded."
+        # The line for a draft that ticks no network at all.
+        preview_no_network: "Pick a place to post it, and the draft shows here."
+        standard_site: "Standard.site"
         scheduled: "Schedule for %{at}"
       social_post:
         open_graph: "Open Graph"

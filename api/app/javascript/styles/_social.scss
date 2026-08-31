@@ -291,27 +291,31 @@
     display: none;
   }
 
+  // One network, and the posts that go to it.
   &__group {
     display: flex;
     flex-direction: column;
     gap: var(--wa-space-s);
   }
 
-  &__post {
+  &__name {
     margin: 0;
   }
 
-  &__rows {
+  &__cards {
     display: flex;
     flex-direction: column;
-    gap: var(--wa-space-m);
+    gap: var(--wa-space-s);
   }
 
-  &__network {
+  // The line above the words of a post: its place in the thread, and its count.
+  // ⚠️ It keeps `space-between` with one child as well: a draft of one post has no number, and the
+  // count must stay at the end of the line.
+  &__meta {
     display: flex;
     gap: var(--wa-space-xs);
     justify-content: space-between;
-    margin: 0;
+    margin: 0 0 var(--wa-space-2xs);
     color: var(--wa-color-text-quiet);
   }
 
@@ -330,13 +334,20 @@
     white-space: pre-wrap;
   }
 
-  &__note {
+  &__note,
+  &__empty {
     margin: 0;
     color: var(--wa-color-text-quiet);
   }
 
-  &__note[hidden],
-  &__post[hidden] {
+  // ⚠️ **Each of these needs a rule of its own**, and the `hidden` attribute alone does nothing for
+  // them. `[hidden] { display: none }` of the browser is at the same specificity as a class, and
+  // our stylesheet comes after it. `&__group` sets a display above, thus `social#filterPreview`
+  // would mark a network as hidden and the owner would still see it. `.social__schedule` carries
+  // the same note.
+  &__group[hidden],
+  &__empty[hidden],
+  &__note[hidden] {
     display: none;
   }
 }

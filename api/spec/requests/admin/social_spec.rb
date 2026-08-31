@@ -974,14 +974,13 @@ RSpec.describe "Admin social media", type: :request do
                                                topic: "Cycling" }
 
         body = JSON.parse(response.body)
-        rows = ->(index) { body["posts"][index]["networks"].index_by { |row| row["key"] } }
+        by_key = body["networks"].index_by { |row| row["key"] }
         line = I18n.t("admin.social.preview.topic", topic: "Cycling")
 
-        expect(rows.call(0)["threads"]["topic"]).to eq(line)
-        expect(rows.call(1)["threads"]["topic"]).to eq(line)
-        # ⚠️ Bluesky and Mastodon have no equivalent, thus their rows never carry one.
-        expect(rows.call(0)["bluesky"]["topic"]).to be_nil
-        expect(rows.call(0)["mastodon"]["topic"]).to be_nil
+        expect(by_key["threads"]["posts"].map { |post| post["topic"] }).to eq([ line, line ])
+        # ⚠️ Bluesky and Mastodon have no equivalent, thus their cards never carry one.
+        expect(by_key["bluesky"]["posts"].map { |post| post["topic"] }).to all(be_nil)
+        expect(by_key["mastodon"]["posts"].map { |post| post["topic"] }).to all(be_nil)
       end
     end
 
@@ -1061,7 +1060,7 @@ RSpec.describe "Admin social media", type: :request do
       it "shows the typographic text in the preview" do
         post "/social/preview/text", params: { posts: [ { text: %q(It's "big"...), link: "" } ] }
 
-        row = JSON.parse(response.body)["posts"].first["networks"].first
+        row = JSON.parse(response.body)["networks"].first["posts"].first
         expect(row["text"]).to eq("It’s “big”…")
         expect(row["length"]).to eq(11)
       end
@@ -1138,16 +1137,25 @@ RSpec.describe "Admin social media", type: :request do
       before do
         sign_in_as(email: owner_email)
         connect(bluesky: true, mastodon: true, threads: true)
+        # ⚠️ The action reads the og: tags of a link, for the Bluesky card. Without this stub each
+        # example here would make a true request.
+        allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
       end
 
       let(:url) { "https://example.test/2026/07/12/ironman-canada/" }
+      let(:card) do
+        OpenGraph::Card.new(url: url, title: "A title", description: "A summary.",
+                            image_url: "https://cdn.test/og.png")
+      end
 
       def preview(posts:, mentions: [])
         post "/social/preview/text", params: { posts: posts, mentions: mentions }
         JSON.parse(response.body)
       end
 
-      def rows(body, index = 0) = body["posts"][index]["networks"].index_by { |row| row["key"] }
+      # ⚠️ The answer groups by NETWORK, and each group holds the posts of the thread in order.
+      # This gives one post of every network, by key, which is how most of these read it.
+      def rows(body, index = 0) = body["networks"].to_h { |row| [ row["key"], row["posts"][index] ] }
 
       it "gives each network its own text from one body" do
         body = preview(posts: [ { text: "Great ride with @tony.", link: "" } ],
@@ -1170,10 +1178,28 @@ RSpec.describe "Admin social media", type: :request do
           expect(rows(body)["threads"]["text"]).to eq("A long day.")
         end
 
-        it "says where it went, for the two that keep it out of the text" do
-          expect(rows(body)["bluesky"]["note"]).to eq(I18n.t("admin.social.preview.card"))
+        # ⚠️ Bluesky has no note: the panel draws its card. Threads gets one, because Meta renders
+        # its own attachment and this app has nothing to show for it.
+        it "says where it went, for the network whose card it cannot draw" do
           expect(rows(body)["threads"]["note"]).to eq(I18n.t("admin.social.preview.attachment"))
+          expect(rows(body)["bluesky"]["note"]).to be_nil
           expect(rows(body)["mastodon"]["note"]).to be_nil
+        end
+
+        # ⚠️ **Bluesky alone carries a card**, because this app BUILDS that embed from these same
+        # og: tags. `#card_json` answers the card below the link field as well, thus the two cannot
+        # describe one page differently.
+        it "gives Bluesky the website card of the link" do
+          expect(rows(body)["bluesky"]["card"]).to include("title" => card.title,
+                                                           "host" => "example.test")
+          expect(rows(body)["threads"]["card"]).to be_nil
+          expect(rows(body)["mastodon"]["card"]).to be_nil
+        end
+
+        it "gives no card to a post with no link" do
+          plain = preview(posts: [ { text: "A long day.", link: "" } ])
+
+          expect(rows(plain)["bluesky"]["card"]).to be_nil
         end
 
         it "says nothing about a post with no link" do
@@ -1252,28 +1278,29 @@ RSpec.describe "Admin social media", type: :request do
           preview(posts: [ { text: "One", link: "" }, { text: "Two", link: "" } ])
         end
 
-        it "gives one group for each post, in order" do
-          expect(body["posts"].length).to eq(2)
+        it "gives each network the posts of the thread, in order" do
+          expect(body["networks"].map { |row| row["posts"].length }).to all(eq(2))
           expect(rows(body, 0)["bluesky"]["text"]).to eq("One")
           expect(rows(body, 1)["bluesky"]["text"]).to eq("Two")
         end
 
-        it "names each post" do
-          expect(body["posts"].map { |post| post["label"] })
-            .to eq([ I18n.t("admin.social.preview.post", index: 1),
-                     I18n.t("admin.social.preview.post", index: 2) ])
+        # ⚠️ It is the "1/2" of Threads, which names a post by its place in the thread.
+        it "names the place of each post in its thread" do
+          expect(body["networks"].first["posts"].map { |post| post["label"] })
+            .to eq([ I18n.t("admin.social.preview.position", index: 1, count: 2),
+                     I18n.t("admin.social.preview.position", index: 2, count: 2) ])
         end
 
         # A draft of one post needs no number.
         it "names nothing when there is one post" do
           one = preview(posts: [ { text: "One", link: "" } ])
 
-          expect(one["posts"].first["label"]).to be_nil
+          expect(one["networks"].first["posts"].first["label"]).to be_nil
         end
       end
 
       it "gives no post for an empty draft" do
-        expect(preview(posts: [])["posts"]).to eq([])
+        expect(preview(posts: [])["networks"].map { |row| row["posts"] }).to all(eq([]))
       end
 
       # ⚠️ It is a preview and not a submit: it must add no job and it must write nothing.
@@ -1359,14 +1386,13 @@ RSpec.describe "Admin social media", type: :request do
         let(:body) { preview(posts: [ { text: "Read [my post](https://example.test/a)", link: "" } ]) }
 
         it "shows Bluesky alone" do
-          expect(body["posts"].first["networks"].map { |row| row["key"] }).to eq([ "bluesky" ])
+          expect(body["networks"].map { |row| row["key"] }).to eq([ "bluesky" ])
         end
 
         it "shows each connected network for a draft with no Markdown" do
           plain = preview(posts: [ { text: "Read https://example.test/a", link: "" } ])
 
-          expect(plain["posts"].first["networks"].map { |row| row["key"] })
-            .to eq(%w[bluesky mastodon threads])
+          expect(plain["networks"].map { |row| row["key"] }).to eq(%w[bluesky mastodon threads])
         end
 
         # ⚠️ One link in one post decides the whole thread: a thread goes to a network as one unit.
@@ -1374,7 +1400,8 @@ RSpec.describe "Admin social media", type: :request do
           thread = preview(posts: [ { text: "Plain words", link: "" },
                                     { text: "Read [my post](https://example.test/a)", link: "" } ])
 
-          expect(thread["posts"].map { |post| post["networks"].length }).to eq([ 1, 1 ])
+          expect(thread["networks"].map { |row| row["key"] }).to eq([ "bluesky" ])
+          expect(thread["networks"].first["posts"].length).to eq(2)
         end
       end
 

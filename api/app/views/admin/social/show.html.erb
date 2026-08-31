@@ -16,32 +16,69 @@
                       social_max_posts_value: @social.max_posts,
                       social_preview_url_value: social_preview_text_path } do %>
 
-  <%# One block for each post of the thread. The Add control below clones the template. %>
-  <%# The drop target of a drag. ⚠️ `dragover` must stop its own default, or the browser refuses
-      the drop and the post springs back. %>
-  <div class="social__posts" data-social-target="posts"
-       data-action="dragover->social#dragOver drop->social#drop">
-    <% @social.posts.each do |post| %>
-      <%= render "post", post: post, limit: @social.body_limit, warn_at: @social.warn_at,
-                         count: @social.bluesky_length(post),
-                         mentions_json: @social.bluesky_values_json %>
-    <% end %>
-  </div>
+  <%# The draft, and the draft as each network will receive it.
 
-  <%# ⚠️ The template holds ONE empty block, and the browser never renders its content until the
-      controller clones it. Thus its fields are not in the form and they send nothing. %>
-  <template data-social-target="template">
-    <%= render "post", post: SocialPresenter::Post.new, limit: @social.body_limit,
-                       warn_at: @social.warn_at, count: 0,
-                       mentions_json: @social.bluesky_values_json %>
-  </template>
+      ⚠️ **The thread is the only thing in these panels.** Each control below the first divider —
+      the mentions, the "Post to" list, the schedule, and the submit — stays visible in both,
+      because each one changes what a preview shows.
 
-  <div class="wa-cluster wa-gap-s">
-    <wa-button appearance="outlined" data-social-target="add" data-action="click->social#addPost">
-      <%= slotted_icon_svg("classic", "light", "plus") %>
-      <%= t(".add_post") %>
-    </wa-button>
-  </div>
+      ⚠️ A panel that is not active is `display: none`, thus its fields are still in the form and a
+      submit sends them. %>
+  <wa-tab-group data-action="wa-tab-show->social#tabShown">
+    <wa-tab panel="write"><%= t(".write") %></wa-tab>
+    <%# ⚠️ It is off while the draft holds nothing to show. `social#canPreview` decides, and that is
+        NOT `canPost`: a draft that is past the limit, or that ticks no network, is exactly the one
+        that the owner wants to look at. %>
+    <wa-tab panel="preview" disabled data-social-target="previewTab"><%= t(".preview") %></wa-tab>
+
+    <wa-tab-panel name="write" active>
+      <%# ⚠️ The stack is a div INSIDE the panel, and it is not a class on the panel itself. Those
+          utilities set `display: flex`, and an author rule on the host beats the
+          `:host { display: none }` that hides a panel that is not active. Thus the two panels would
+          both show. Without the stack the fields have no gap at all: a panel is a plain block, and
+          the gap of the form reaches its own children only. %>
+      <div class="wa-stack wa-gap-l">
+        <%# One block for each post of the thread. The Add control below clones the template. %>
+        <%# The drop target of a drag. ⚠️ `dragover` must stop its own default, or the browser
+            refuses the drop and the post springs back. %>
+        <div class="social__posts" data-social-target="posts"
+             data-action="dragover->social#dragOver drop->social#drop">
+          <% @social.posts.each do |post| %>
+            <%= render "post", post: post, limit: @social.body_limit, warn_at: @social.warn_at,
+                               count: @social.bluesky_length(post),
+                               mentions_json: @social.bluesky_values_json %>
+          <% end %>
+        </div>
+
+        <%# ⚠️ The template holds ONE empty block, and the browser never renders its content until
+            the controller clones it. Thus its fields are not in the form and they send nothing. %>
+        <template data-social-target="template">
+          <%= render "post", post: SocialPresenter::Post.new, limit: @social.body_limit,
+                             warn_at: @social.warn_at, count: 0,
+                             mentions_json: @social.bluesky_values_json %>
+        </template>
+
+        <div class="wa-cluster wa-gap-s">
+          <wa-button appearance="outlined" data-social-target="add" data-action="click->social#addPost">
+            <%= slotted_icon_svg("classic", "light", "plus") %>
+            <%= t(".add_post") %>
+          </wa-button>
+        </div>
+      </div>
+    </wa-tab-panel>
+
+    <%# It is read-only and it holds no form control. `social#tabShown` fills it when the owner
+        opens it, and `social#filterPreview` hides the row of a network that they then untick. %>
+    <wa-tab-panel name="preview" data-social-target="previewPanel">
+      <div class="wa-stack wa-gap-l">
+        <wa-spinner class="social-preview__spinner" data-social-target="previewSpinner" hidden></wa-spinner>
+        <div class="social-preview" data-social-target="previewBody"></div>
+        <%# The line for a draft that ticks no network at all. The action sends no words for it, thus
+            the controller writes them from the locale file. %>
+        <p class="social-preview__empty" data-social-target="previewEmpty" hidden></p>
+      </div>
+    </wa-tab-panel>
+  </wa-tab-group>
 
   <wa-divider></wa-divider>
 
@@ -173,18 +210,6 @@
       <%= slotted_icon_svg("classic", "light", "paper-plane") %>
       <span data-social-target="label"><%= t(".post_now") %></span>
     </wa-button>
-
-    <%# ⚠️ **`type="button"` is necessary.** <wa-button> is form-associated, thus a button in a form
-        with no type SUBMITS that form, and a Preview button that posts the draft is the worst
-        failure that this page could have.
-        The markup opens the dialog: wa-dialog listens on the document for
-        [data-dialog="open <id>"], thus no JavaScript of ours opens it and the action only fills
-        it. %>
-    <wa-button type="button" appearance="outlined" disabled data-dialog="open social-preview"
-               data-social-target="preview" data-action="click->social#preview">
-      <%= slotted_icon_svg("classic", "light", "eye") %>
-      <%= t(".preview") %>
-    </wa-button>
   </div>
 
   <%# The confirmation of a remove. ⚠️ There is ONE dialog for the whole thread, and not one for
@@ -208,39 +233,42 @@
     </wa-button>
   </wa-dialog>
 
-  <%# The draft as each connected network will receive it. It is read-only and it holds no form
-      control, thus it is safe inside the form and the controller reaches it with a target.
-      ⚠️ `data-controller="dialog"` closes it before Turbo caches the page. Turbo makes its snapshot
-      of the DOM as it is, thus a dialog that is open when the owner navigates away comes back open
-      on a restoration visit. %>
-  <wa-dialog id="social-preview" label="<%= t('.preview_title') %>" data-controller="dialog">
-    <wa-spinner class="social-preview__spinner" data-social-target="previewSpinner" hidden></wa-spinner>
-    <div class="social-preview" data-social-target="previewBody"></div>
-
-    <%# ⚠️ `type="button"`, for the same reason as the Preview button above. %>
-    <wa-button slot="footer" type="button" appearance="outlined" data-dialog="close">
-      <%= t(".preview_close") %>
-    </wa-button>
-  </wa-dialog>
-
   <%# The two shells that the controller clones. They hold no words: the action sends each one,
       already in the words of the locale file. ⚠️ The browser renders none of a <template>. %>
+  <%# One network, and its posts below it. ⚠️ `social#filterPreview` hides the whole group when the
+      owner unticks that network, thus the group carries the key. %>
   <template data-social-target="previewGroupTemplate">
     <div class="social-preview__group">
-      <h3 class="social-preview__post wa-heading-s" data-preview-label hidden></h3>
-      <div class="social-preview__rows" data-preview-rows></div>
+      <h3 class="social-preview__name wa-heading-s" data-preview-name></h3>
+      <div class="social-preview__cards" data-preview-cards></div>
     </div>
   </template>
 
+  <%# One post of a thread. ⚠️ No `with-header` and no `with-footer`: <wa-card> draws those bands
+      only for those flags, and a card with a flag and an empty slot draws an empty band. %>
   <template data-social-target="previewRowTemplate">
-    <div class="social-preview__row">
-      <p class="social-preview__network wa-caption-s">
-        <span data-preview-name></span>
+    <wa-card class="social-preview__card">
+      <p class="social-preview__meta wa-caption-s">
+        <%# The place of the post in the thread, as "1/2". A draft of one post gets none. %>
+        <span data-preview-label hidden></span>
         <span class="social-preview__count" data-preview-count></span>
       </p>
       <p class="social-preview__text" data-preview-text></p>
+
+      <%# The website card that Bluesky will render for the link. ⚠️ `with-media` follows the
+          picture and it is not in the markup: <wa-card> has no `:has-slotted` to read, thus a card
+          with the flag and no picture draws an empty band. It is the rule of the card below the
+          link field. %>
+      <wa-card class="social-card" data-preview-card hidden>
+        <img slot="media" class="social-card__image" data-preview-card-image alt="" hidden>
+        <wa-badge class="social-card__kind" appearance="outlined" data-preview-card-kind></wa-badge>
+        <p class="social-card__host wa-caption-s" data-preview-card-host></p>
+        <p class="social-card__title" data-preview-card-title></p>
+        <p class="social-card__description" data-preview-card-description></p>
+      </wa-card>
+
       <p class="social-preview__note wa-caption-s" data-preview-topic hidden></p>
       <p class="social-preview__note wa-caption-s" data-preview-note hidden></p>
-    </div>
+    </wa-card>
   </template>
 <% end %>

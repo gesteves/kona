@@ -48,6 +48,12 @@ import "@web.awesome.me/webawesome-pro/dist/components/spinner/spinner.js";
 import "@web.awesome.me/webawesome-pro/dist/components/textarea/textarea.js";
 import "@web.awesome.me/webawesome-pro/dist/components/checkbox/checkbox.js";
 import "@web.awesome.me/webawesome-pro/dist/components/checkbox-group/checkbox-group.js";
+// The Write and Preview tabs of the Social media page. ⚠️ All THREE are necessary: a tab group
+// imports neither its tabs nor its panels, and a page with only the group renders the words of
+// each panel one after the other, with no tab at all.
+import "@web.awesome.me/webawesome-pro/dist/components/tab-group/tab-group.js";
+import "@web.awesome.me/webawesome-pro/dist/components/tab/tab.js";
+import "@web.awesome.me/webawesome-pro/dist/components/tab-panel/tab-panel.js";
 // The schedule fields of the Social media page.
 import "@web.awesome.me/webawesome-pro/dist/components/date-input/date-input.js";
 import "@web.awesome.me/webawesome-pro/dist/components/time-input/time-input.js";
