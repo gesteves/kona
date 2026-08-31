@@ -55,6 +55,30 @@ class Threads < ApplicationService
   # adds the job. Without that check a long draft raises here and retries for 24 hours.
   MAX_CHARACTERS = 500
 
+  # The limit of a topic tag. ⚠️ Meta permits **ONE for each post**, of 1 to 50 characters, and it
+  # refuses a period and an ampersand. `Admin::SocialController` checks a draft against these
+  # before it adds the job, exactly as it does for MAX_CHARACTERS above.
+  # @see https://developers.facebook.com/documentation/threads/posts
+  TOPIC_MAX_CHARACTERS = 50
+  # ⚠️ The two characters that Meta names. A topic that holds one is refused at the container, thus
+  # the job would retry it for 24 hours.
+  TOPIC_FORBIDDEN = /[.&]/
+
+  # @param value [String, nil] The topic as the owner wrote it.
+  # @return [String] The topic with no leading "#" and no space at either end. ⚠️ The parameter of
+  #   Meta takes the words alone: a "#" belongs to a tag that is IN the text, and one here would
+  #   become part of the topic.
+  def self.normalize_topic(value)
+    value.to_s.strip.sub(/\A#+/, "").strip
+  end
+
+  # @param value [String, nil] A topic that .normalize_topic made.
+  # @return [Boolean] True when Meta will take it.
+  def self.valid_topic?(value)
+    value = value.to_s
+    value.length.between?(1, TOPIC_MAX_CHARACTERS) && !value.match?(TOPIC_FORBIDDEN)
+  end
+
   # How long the id of a media container stays in Redis. ⚠️ Meta expires a container after 24 hours,
   # thus a value above that would name a container that is gone.
   CONTAINER_TTL = 20 * 60 * 60
@@ -216,16 +240,19 @@ class Threads < ApplicationService
   # @param url [String, nil] The link to attach.
   # @param idempotency_key [String] A value that is the same for each attempt.
   # @param reply_to_id [String, nil] The media id of the post above this one, for a thread.
+  # @param topic [String, nil] The topic tag, with no "#". ⚠️ The composer puts it on the FIRST
+  #   post of a thread alone: it names the draft, and Meta takes one for each post.
   # @return [String] The id of the post that Meta made.
   # @raise [RuntimeError] It raises at each failure, thus the job does the work again.
-  def post!(text:, url: nil, idempotency_key:, reply_to_id: nil)
+  def post!(text:, url: nil, idempotency_key:, reply_to_id: nil, topic: nil)
     raise "Threads is not connected" unless connected?
     raise "The Threads token expired; connect the account again" if expired?
 
     text = text.to_s.strip
     raise "The post is empty" if text.blank?
 
-    container_id = container_for(text: text, url: url, key: idempotency_key, reply_to_id: reply_to_id)
+    container_id = container_for(text: text, url: url, key: idempotency_key,
+                                 reply_to_id: reply_to_id, topic: topic)
     wait_for_container(container_id)
     published = publish_container(container_id)
 
@@ -285,20 +312,21 @@ class Threads < ApplicationService
 
   # Gets the container that a previous attempt made, or makes one.
   # @return [String] The container id.
-  def container_for(text:, url:, key:, reply_to_id: nil)
+  def container_for(text:, url:, key:, reply_to_id: nil, topic: nil)
     stored = $redis.get(container_key(key))
     return stored if stored.present?
 
-    container_id = create_container(text: text, url: url, reply_to_id: reply_to_id)
+    container_id = create_container(text: text, url: url, reply_to_id: reply_to_id, topic: topic)
     $redis.set(container_key(key), container_id, ex: CONTAINER_TTL)
     container_id
   end
 
   # Makes a TEXT media container.
   # @return [String] The container id.
-  def create_container(text:, url:, reply_to_id: nil)
+  def create_container(text:, url:, reply_to_id: nil, topic: nil)
     body = { media_type: "TEXT", text: text }
     body[:link_attachment] = url if url.present?
+    body[:topic_tag] = topic if topic.present?
     # ⚠️ The reply goes on the CONTAINER and not on the publish. Meta reads it only here.
     # @see https://developers.facebook.com/documentation/threads/reference/publishing
     body[:reply_to_id] = reply_to_id if reply_to_id.present?

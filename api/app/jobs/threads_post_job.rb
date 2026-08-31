@@ -8,7 +8,8 @@
 # `Threads#post!` keeps the id of the media container in Redis below `key`. A retry then publishes
 # the container that it made already, in place of a second one.
 class ThreadsPostJob < ApplicationJob
-  # @param posts [Array<Hash>] `[{ "key" =>, "text" =>, "link" => }, …]`, the whole thread.
+  # @param posts [Array<Hash>] `[{ "key" =>, "text" =>, "link" => }, …]`, the whole thread. ⚠️ Only
+  #   the FIRST holds a `"topic"`, and only when the owner gave one.
   # @param index [Integer] Which post of that list this job writes.
   # @param reply_to_id [String, nil] The media id of the post above, or nil for the first.
   def perform(posts, index = 0, reply_to_id = nil)
@@ -21,7 +22,8 @@ class ThreadsPostJob < ApplicationJob
 
     # ⚠️ Threads attaches the link itself, thus this reads no og: tags either.
     posted = Threads.new.post!(text: post["text"], url: post["link"],
-                               idempotency_key: post["key"], reply_to_id: reply_to_id)
+                               idempotency_key: post["key"], reply_to_id: reply_to_id,
+                               topic: post["topic"])
     Rails.logger.info("ThreadsPostJob: posted #{index + 1}/#{posts.length} as #{posted}")
 
     # ⚠️ It adds the next post at once. A delay of 30 seconds went in here for a `500` on a reply

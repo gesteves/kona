@@ -349,6 +349,10 @@ en:
         remove_title: "Remove this post?"
         schedule: "Schedule for later"
         time: "Time"
+        topic: "Threads topic"
+        # ⚠️ There is no list of the topics to pick from. The Threads API searches POSTS by a topic
+        # and it has no endpoint that gives the topics, thus the owner types the words.
+        topic_hint: "Optional. Threads adds one topic to the first post."
       post:
         body: "Post"
         body_placeholder: "What do you want to say?"
@@ -367,6 +371,7 @@ en:
         attachment: "The link becomes an attachment."
         card: "The link becomes a card."
         post: "Post %{index}"
+        topic: "Topic: %{topic}"
 
       # The example value of each mention field.
       mention_placeholder:
@@ -384,6 +389,8 @@ en:
       errors:
         bad_handle: "Bluesky does not know @%{handle}. Correct the handle, or clear that field to
           post the name alone."
+        bad_topic: "A Threads topic is 1 to %{limit} characters, and it takes no period and no
+          ampersand."
         bad_link:
           numbered: "Post %{index} needs a link that starts with http:// or https://."
           single: "That post needs a link that starts with http:// or https://."

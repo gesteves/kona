@@ -16,6 +16,18 @@
     align-items: start;
   }
 
+  // ⚠️ This rule is what makes the `hidden` attribute work here, for the reason that
+  // `.social__schedule` above gives: `[hidden]` of the browser is at the same specificity as this
+  // class, and our stylesheet comes after it.
+  &__topic {
+    &[hidden] {
+      display: none;
+    }
+
+    display: block;
+    max-width: 32rem;
+  }
+
   &__posts {
     display: flex;
     flex-direction: column;

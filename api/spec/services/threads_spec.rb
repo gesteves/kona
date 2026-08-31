@@ -1,6 +1,43 @@
 require "rails_helper"
 
 RSpec.describe Threads do
+  # ⚠️ Meta takes ONE topic for each post, of 1 to 50 characters, and it refuses a period and an
+  # ampersand. Admin::SocialController checks a draft against these before it adds the job.
+  describe ".normalize_topic" do
+    it "removes a leading hash and the space at each end" do
+      expect(described_class.normalize_topic("  #Cycling ")).to eq("Cycling")
+      expect(described_class.normalize_topic("##Cycling")).to eq("Cycling")
+    end
+
+    it "keeps the words of a topic that has more than one" do
+      expect(described_class.normalize_topic("Bike Racing")).to eq("Bike Racing")
+    end
+
+    it "takes nil" do
+      expect(described_class.normalize_topic(nil)).to eq("")
+    end
+  end
+
+  describe ".valid_topic?" do
+    it "takes an ordinary topic" do
+      expect(described_class.valid_topic?("Cycling")).to be(true)
+      expect(described_class.valid_topic?("a" * described_class::TOPIC_MAX_CHARACTERS)).to be(true)
+    end
+
+    it "refuses an empty topic and one past the limit" do
+      expect(described_class.valid_topic?("")).to be(false)
+      expect(described_class.valid_topic?(nil)).to be(false)
+      expect(described_class.valid_topic?("a" * (described_class::TOPIC_MAX_CHARACTERS + 1))).to be(false)
+    end
+
+    # ⚠️ The two characters that Meta names. A container that holds one is refused, and the job
+    # would then retry a draft that can never work.
+    it "refuses a period and an ampersand" do
+      expect(described_class.valid_topic?("bikes.and.things")).to be(false)
+      expect(described_class.valid_topic?("bikes & things")).to be(false)
+    end
+  end
+
   let(:redirect_uri) { "https://admin.example.test/connected-apps/threads/callback" }
 
   before do
@@ -347,6 +384,24 @@ RSpec.describe Threads do
       )
       expect(HTTParty).not_to have_received(:post)
         .with(a_string_ending_with("/threads"), hash_including(body: hash_including(:link_attachment)))
+    end
+
+    # ⚠️ `topic_tag` is the parameter of Meta, and it takes the words with NO "#": a hash sign
+    # belongs to a tag that is in the text.
+    it "sends the topic as topic_tag" do
+      post!(topic: "Cycling")
+
+      expect(HTTParty).to have_received(:post).with(
+        a_string_ending_with("/threads"),
+        hash_including(body: hash_including(topic_tag: "Cycling"))
+      )
+    end
+
+    it "sends no topic_tag for a post with no topic" do
+      post!
+
+      expect(HTTParty).not_to have_received(:post)
+        .with(a_string_ending_with("/threads"), hash_including(body: hash_including(:topic_tag)))
     end
 
     it "publishes the container it made, and answers with the id of the post" do

@@ -18,6 +18,10 @@ class SocialPresenter
   # refuses a request that ticks one anyway.
   MARKDOWN_NETWORK = "bluesky".freeze
 
+  # The one network that takes a topic. ⚠️ `topic_tag` is a parameter of Meta and it has no
+  # equivalent at Bluesky or Mastodon, thus the field shows only while that row is ticked.
+  TOPIC_NETWORK = "threads".freeze
+
   # The most posts in one thread. ⚠️ It is a guard against a runaway form and not a rule of any
   # network: Bluesky and Mastodon set no limit, and the limit of Threads is a rate of 250 each day.
   MAX_POSTS = 25
@@ -91,12 +95,14 @@ class SocialPresenter
   # @param scheduled [Boolean] True to open the schedule fields again.
   # @param date [String, nil] The date to put back, as YYYY-MM-DD.
   # @param time [String, nil] The time to put back, as HH:mm.
+  # @param topic [String, nil] The Threads topic to put back. ⚠️ It belongs to the DRAFT and not to
+  #   one post: Meta takes one for each post, and the composer puts it on the first post alone.
   # @param mentions [Array<Hash>, nil] The mention map to put back, as
   #   `[{ token:, values: { "bluesky" => … } }, …]`. ⚠️ Nil gives NO row, and not one empty row:
   #   a row for nothing would ask the owner to name a person that they did not write about. The
   #   browser adds a row when it finds a token.
   def initialize(networks:, posts: nil, mentions: nil, selected: nil,
-                 scheduled: false, date: nil, time: nil)
+                 scheduled: false, date: nil, time: nil, topic: nil)
     @networks = networks
     @posts = build_posts(posts)
     @mentions = Array(mentions).map { |row| Mention.new(token: row[:token], values: row[:values]) }
@@ -104,6 +110,7 @@ class SocialPresenter
     @scheduled = scheduled
     @date = date.to_s
     @time = time.to_s
+    @topic = topic.to_s
   end
 
   # @return [Boolean] True when the schedule fields are open.
@@ -113,6 +120,8 @@ class SocialPresenter
   attr_reader :date
   # @return [String] The time field, as HH:mm.
   attr_reader :time
+  # @return [String] The Threads topic field.
+  attr_reader :topic
 
   # The first day that the date field offers. ⚠️ It is in the zone of the **server**, thus a browser
   # that is a day ahead can still pick its own today. The action checks that the moment is in the
@@ -168,6 +177,16 @@ class SocialPresenter
   # @param key [String] A network key.
   # @return [String, nil]
   def mention_placeholder(key) = self.class.mention_placeholders[key.to_s]
+
+  # ⚠️ The server renders the field hidden when the Threads row is not ticked, thus it does not
+  # show for a moment before the Stimulus controller runs. `social#applyTopic` follows each change
+  # after that, and it reads the same rule.
+  # @return [Boolean] True when the topic field shows.
+  def topic?
+    network = networks.find { |row| row.key == TOPIC_NETWORK }
+
+    network&.connected? && selected?(TOPIC_NETWORK) || false
+  end
 
   # @return [Boolean] True when the draft is a thread and not one post.
   def thread? = @posts.length > 1

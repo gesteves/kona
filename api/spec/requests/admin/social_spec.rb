@@ -888,6 +888,122 @@ RSpec.describe "Admin social media", type: :request do
 
     # The preview dialog. ⚠️ It reads the same fields as POST /social and it calls the same private
     # methods, thus it cannot show a text that the post does not send.
+    # ⚠️ The topic is THREAD-LEVEL and it belongs to Threads alone: `topic_tag` is a parameter of
+    # Meta, and Bluesky and Mastodon have no equivalent.
+    describe "POST /social with a Threads topic" do
+      before do
+        sign_in_as(email: owner_email)
+        connect(bluesky: true, mastodon: true, threads: true)
+      end
+
+      def submit(topic:, networks: [ "threads" ], posts: [ { text: "Read this", link: "" } ])
+        post "/social", params: { posts: posts, networks: networks, topic: topic }
+      end
+
+      it "gives the topic to the first post of the thread and to no other one" do
+        submit(topic: "Cycling", posts: [ { text: "One", link: "" }, { text: "Two", link: "" } ])
+
+        expect(response).to redirect_to(social_path)
+        payload = ThreadsPostJob.jobs.first["args"].first
+        expect(payload.first["topic"]).to eq("Cycling")
+        expect(payload.last).not_to have_key("topic")
+      end
+
+      # ⚠️ The parameter of Meta takes the words alone. A "#" belongs to a tag that is IN the text.
+      it "removes a leading hash" do
+        submit(topic: " #Cycling ")
+
+        expect(ThreadsPostJob.jobs.first["args"].first.first["topic"]).to eq("Cycling")
+      end
+
+      it "gives the topic to Threads alone" do
+        submit(topic: "Cycling", networks: %w[bluesky mastodon threads])
+
+        expect(BlueskyPostJob.jobs.first["args"].first.first).not_to have_key("topic")
+        expect(MastodonPostJob.jobs.first["args"].first.first).not_to have_key("topic")
+        expect(ThreadsPostJob.jobs.first["args"].first.first["topic"]).to eq("Cycling")
+      end
+
+      it "sends no topic when the field is empty" do
+        submit(topic: "")
+
+        expect(response).to redirect_to(social_path)
+        expect(ThreadsPostJob.jobs.first["args"].first.first).not_to have_key("topic")
+      end
+
+      # ⚠️ Without this the container is refused at Meta, and the job then retries a draft that can
+      # never work, for 24 hours.
+      describe "a topic that Meta will not take" do
+        it "refuses a period and an ampersand" do
+          [ "bikes.and.things", "bikes & things" ].each do |bad|
+            ThreadsPostJob.jobs.clear
+            submit(topic: bad)
+
+            expect(response).to have_http_status(:unprocessable_content)
+            expect(flash[:alert])
+              .to eq(I18n.t("admin.social.errors.bad_topic", limit: Threads::TOPIC_MAX_CHARACTERS))
+            expect(ThreadsPostJob.jobs).to be_empty
+          end
+        end
+
+        it "refuses a topic past the limit" do
+          submit(topic: "a" * (Threads::TOPIC_MAX_CHARACTERS + 1))
+
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(ThreadsPostJob.jobs).to be_empty
+        end
+
+        it "keeps the topic in the form after a refusal" do
+          submit(topic: "bikes & things")
+
+          expect(response.body).to include(%(value="bikes &amp; things"))
+        end
+
+        # ⚠️ The field stays in the form while the Threads row is not ticked, thus a value that the
+        # owner left there must not refuse a draft that goes nowhere near Threads.
+        it "ignores a topic that Threads will not see" do
+          submit(topic: "bikes & things", networks: [ "bluesky" ])
+
+          expect(response).to redirect_to(social_path)
+        end
+      end
+
+      it "shows the topic in the preview, on the Threads row of the first post" do
+        post "/social/preview/text", params: { posts: [ { text: "One" }, { text: "Two" } ],
+                                               topic: "Cycling" }
+
+        body = JSON.parse(response.body)
+        rows = ->(index) { body["posts"][index]["networks"].index_by { |row| row["key"] } }
+        expect(rows.call(0)["threads"]["topic"])
+          .to eq(I18n.t("admin.social.preview.topic", topic: "Cycling"))
+        expect(rows.call(0)["bluesky"]["topic"]).to be_nil
+        expect(rows.call(1)["threads"]["topic"]).to be_nil
+      end
+    end
+
+    # ⚠️ The field shows only while the Threads row can take a post and is ticked. The server
+    # renders that state, thus it does not show for a moment before the Stimulus controller runs.
+    describe "GET /social with the topic field" do
+      before { sign_in_as(email: owner_email) }
+
+      it "shows the field when Threads is connected" do
+        connect(bluesky: false, mastodon: false, threads: true)
+
+        get "/social"
+
+        expect(response.body).to include(%(<wa-input name="topic"))
+        expect(response.body).not_to match(/class="social__topic"[^>]*hidden/)
+      end
+
+      it "hides the field when Threads has no account" do
+        connect(bluesky: true, mastodon: false, threads: false)
+
+        get "/social"
+
+        expect(response.body).to match(/class="social__topic"[^>]*hidden/)
+      end
+    end
+
     # ⚠️ The typography is a matter of CHARACTERS and not of rich text, thus each of the three
     # networks gets it. That is the difference from a Markdown link, which Bluesky alone can take.
     describe "POST /social with the typography" do

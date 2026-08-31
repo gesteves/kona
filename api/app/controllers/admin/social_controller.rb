@@ -54,7 +54,8 @@ module Admin
       # wrote, and the draft is the expensive part of this page.
       if error
         @social = presenter(posts: posts, mentions: mention_rows, selected: selected_networks,
-                            scheduled: scheduled?, date: params[:date], time: params[:time])
+                            scheduled: scheduled?, date: params[:date], time: params[:time],
+                            topic: params[:topic])
         flash.now[:alert] = error
         return render :show, status: :unprocessable_content
       end
@@ -71,7 +72,12 @@ module Admin
       # it when it succeeds, thus the rest of a thread goes out with it and needs no time of its own.
       selected_networks.each do |network|
         payload = posts.each_with_index.map do |post, index|
-          { "key" => keys[index], "text" => text_for(network, post[:text]), "link" => post[:link] }
+          entry = { "key" => keys[index], "text" => text_for(network, post[:text]),
+                    "link" => post[:link] }
+          # ⚠️ The topic goes on the FIRST post alone. Meta takes one for each post, and the field
+          # names the DRAFT: a topic on each reply of a thread would repeat it down the feed.
+          entry["topic"] = topic if network == SocialPresenter::TOPIC_NETWORK && index.zero? && topic.present?
+          entry
         end
 
         job = NETWORKS.fetch(network)[:job]
@@ -332,6 +338,9 @@ module Admin
       message = markdown_network_error
       return message if message
 
+      message = topic_error
+      return message if message
+
       message = mention_shape_error
       return message if message
 
@@ -418,6 +427,31 @@ module Admin
     # @return [String] The name of that network, for a message.
     def network_name(key) = t("admin.networks.#{key}")
 
+    # The Threads topic of this draft.
+    #
+    # ⚠️ It is THREAD-LEVEL, and it is not a field of a post. Meta takes one topic for each post,
+    # and this one names the draft.
+    # @return [String] The topic with no "#", or an empty string.
+    def topic
+      @topic ||= Threads.normalize_topic(params[:topic])
+    end
+
+    # Refuses a topic that Meta will not take.
+    #
+    # ⚠️ **It reads the ticked networks only.** The field stays in the form while the Threads row is
+    # not ticked, thus a value that the owner left there must not refuse a draft that goes nowhere
+    # near Threads.
+    #
+    # ⚠️ Without this the container is refused at Meta, and `ThreadsPostJob` then retries a draft
+    # that can never work, for 24 hours.
+    # @return [String, nil]
+    def topic_error
+      return nil unless selected_networks.include?(SocialPresenter::TOPIC_NETWORK)
+      return nil if topic.blank? || Threads.valid_topic?(topic)
+
+      t("admin.social.errors.bad_topic", limit: Threads::TOPIC_MAX_CHARACTERS)
+    end
+
     # @return [Boolean] True when the draft holds at least one Markdown link.
     #
     # ⚠️ It is THREAD-LEVEL: a thread goes to a network as one unit, thus one link in one post
@@ -454,7 +488,8 @@ module Admin
       text, links = composed(network.key, post)
 
       { key: network.key, name: network.name, text: text, segments: segments(text, links),
-        length: length, limit: limit, over: length > limit, note: link_note(network.key, post) }
+        length: length, limit: limit, over: length > limit, note: link_note(network.key, post),
+        topic: preview_topic(network.key, post) }
     end
 
     # The text that one network will receive, and each link in it.
@@ -520,6 +555,16 @@ module Admin
       when "mastodon" then Mastodon.post_length(text: text, url: post[:link])
       else                 text.length
       end
+    end
+
+    # ⚠️ The topic is on the FIRST post alone, exactly as `#create` sends it. Thus the dialog shows
+    # the same thing that the post will carry.
+    # @return [String, nil] The line that names the topic, for the Threads row of the first post.
+    def preview_topic(network, post)
+      return nil unless network == SocialPresenter::TOPIC_NETWORK && topic.present?
+      return nil unless posts.first.equal?(post)
+
+      t("admin.social.preview.topic", topic: topic)
     end
 
     # @return [String, nil] Where the link went, for a network that keeps it out of the text.

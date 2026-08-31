@@ -22,8 +22,23 @@ RSpec.describe ThreadsPostJob do
     described_class.new.perform([ post("3kabc", "Read this", url) ])
 
     expect(threads).to have_received(:post!)
-      .with(text: "Read this", url: url, idempotency_key: "3kabc", reply_to_id: nil)
+      .with(text: "Read this", url: url, idempotency_key: "3kabc", reply_to_id: nil, topic: nil)
     expect(open_graph).not_to have_received(:fetch)
+  end
+
+  # ⚠️ The composer puts the topic on the FIRST post alone: Meta takes one for each post, and the
+  # field names the draft.
+  it "gives the topic of a post to Threads" do
+    described_class.new.perform([ post("3kabc", "Read this").merge("topic" => "Cycling"),
+                                  post("3kdef", "And this") ])
+
+    expect(threads).to have_received(:post!).with(hash_including(topic: "Cycling"))
+  end
+
+  it "sends no topic for a post that has none" do
+    described_class.new.perform([ post("3kabc", "Read this") ])
+
+    expect(threads).to have_received(:post!).with(hash_including(topic: nil))
   end
 
   it "posts with no link at all" do

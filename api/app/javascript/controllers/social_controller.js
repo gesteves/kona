@@ -20,7 +20,7 @@ export default class extends Controller {
     "schedule", "scheduleFields", "date", "time", "timeZone",
     "mentions", "mentionRows", "mentionTemplate", "mention",
     "preview", "previewSpinner", "previewBody", "previewGroupTemplate",
-    "previewRowTemplate", "removeDialog", "markdownNetwork",
+    "previewRowTemplate", "removeDialog", "markdownNetwork", "topicField",
   ];
   static values = { maxPosts: Number, previewUrl: String };
 
@@ -330,6 +330,8 @@ export default class extends Controller {
     this.scheduleMentionScan();
     // ⚠️ It runs BEFORE `canPost`, which reads the ticks that this method can change.
     this.applyMarkdown();
+    // ⚠️ And AFTER it, because a Markdown link unticks and disables the Threads row.
+    this.applyTopic();
 
     this.submitTarget.disabled = !this.canPost;
     // ⚠️ This is NOT `canPost`. A draft that is past the limit, or that ticks no network, is exactly
@@ -377,6 +379,22 @@ export default class extends Controller {
       if (account) account.hidden = on;
       if (reason) reason.hidden = !on;
     });
+  }
+
+  /**
+   * Shows the topic field only while the Threads row can take a post and is ticked.
+   *
+   * ⚠️ **It reads `disabled` as well as `checked`.** A row with no account is disabled, and a
+   * Markdown link disables that row too, thus one rule covers both and `applyMarkdown` above runs
+   * first.
+   *
+   * ⚠️ It never clears the field. A topic that the owner wrote survives an untick and a tick
+   * again, and the action reads the value only while the row is ticked.
+   */
+  applyTopic() {
+    const box = this.networks.find((row) => row.value === this.topicFieldTarget.dataset.network);
+
+    this.topicFieldTarget.hidden = !(box && !box.disabled && box.checked);
   }
 
   /**
@@ -690,6 +708,13 @@ export default class extends Controller {
     count.textContent = `${network.length} / ${network.limit}`;
     count.classList.toggle("social-preview__count--over", network.over);
     row.querySelector("[data-preview-text]").replaceChildren(...this.textNodes(network.segments));
+
+    // The topic, for the one network that takes one.
+    const topic = row.querySelector("[data-preview-topic]");
+    if (network.topic) {
+      topic.textContent = network.topic;
+      topic.hidden = false;
+    }
 
     // The note says where the link went, for a network that keeps it out of the text.
     const note = row.querySelector("[data-preview-note]");
