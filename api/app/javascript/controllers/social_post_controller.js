@@ -78,14 +78,16 @@ export default class extends Controller {
   }
 
   /**
-   * Shows the one control of the three that this state has.
+   * Shows the one control of this state, and disables the button of the toolbar outside IDLE.
    *
-   * ⚠️ Exactly ONE of them is on the page at a time: the button asks for a link, the field takes
-   * it, and the card shows the link that the post carries. Each of the last two carries an X that
-   * goes back to the first.
+   * ⚠️ The field and the card take turns, and each one carries an X that goes back to IDLE.
+   *
+   * ⚠️ **The button is DISABLED and never hidden.** It is a form control and it is taller than the
+   * count beside it, thus a button that goes away takes the height of the toolbar with it and the
+   * count moves up at the click that opened the field.
    */
   renderLinkState() {
-    this.linkButtonTarget.hidden = this.linkState !== IDLE;
+    this.linkButtonTarget.disabled = this.linkState !== IDLE;
     this.linkTarget.hidden = this.linkState !== EDITING;
     this.previewTarget.hidden = this.linkState !== ATTACHED;
   }

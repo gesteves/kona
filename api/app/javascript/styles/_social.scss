@@ -310,11 +310,6 @@
     width: var(--wa-form-control-height);
   }
 
-  &__tool[hidden] {
-    // ⚠️ The same rule as the spinner above: an author rule beats the `[hidden]` of the browser.
-    display: none;
-  }
-
   &__link[hidden] {
     // ⚠️ The same rule as the spinner above: <wa-input> gives its own host a display, thus the
     // attribute alone hides nothing.

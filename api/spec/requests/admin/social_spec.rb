@@ -70,11 +70,11 @@ RSpec.describe "Admin social media", type: :request do
 
       # ⚠️ The link field is CLOSED on a first load, and the button of the toolbar opens it. The
       # field still renders, thus it is in the form and `social-post` needs no template for it.
-      it "hides the link field and shows the button that opens it" do
+      it "hides the link field and offers the button that opens it" do
         get "/social"
 
         expect(open_tag("wa-input", "social-post__link")).to include("hidden")
-        expect(open_tag("wa-button", "social-post__tool")).not_to include("hidden")
+        expect(open_tag("wa-button", "social-post__tool")).not_to include("disabled")
       end
 
       # ⚠️ The X on the card takes the owner back from a link that this app read a page for, and it
@@ -756,14 +756,17 @@ RSpec.describe "Admin social media", type: :request do
         # ⚠️ The field is closed on a first load, thus a refusal must render it OPEN for a post that
         # already holds a link. Without this the owner cannot see the link that they wrote, and the
         # button would offer to add a second one.
-        it "puts the link field back open after a refusal, with no button beside it" do
+        #
+        # ⚠️ That button is DISABLED and it is never hidden: it is taller than the count beside it,
+        # thus a button that goes away moves that count up.
+        it "puts the link field back open after a refusal, and disables the button beside it" do
           post "/social", params: { posts: [ { text: "", link: url } ], networks: [ "bluesky" ] }
 
           expect(response).to have_http_status(:unprocessable_content)
           field = open_tag("wa-input", "social-post__link")
           expect(field).to include(%(value="#{url}"))
           expect(field).not_to include("hidden")
-          expect(open_tag("wa-button", "social-post__tool")).to include("hidden")
+          expect(open_tag("wa-button", "social-post__tool")).to include("disabled")
         end
 
         it "refuses a draft with no network" do

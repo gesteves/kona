@@ -848,19 +848,23 @@ Threads, now or at a date and a time. All three post. Each post has an **optiona
 - **The link has THREE states, and exactly one control of the three is on the page at a time.**
   `social_post_controller.js` holds them, and `_post.html.erb` renders the first one:
 
-  | State | What shows | What moves it on |
+  | State | What shows below the toolbar | What moves it on |
   |---|---|---|
-  | `IDLE` | The **link button** of the toolbar, below the words | A click opens the field |
+  | `IDLE` | Nothing; the **link button** of the toolbar is live | A click opens the field |
   | `EDITING` | The **link field**, with an X in it | A URL that the app can read a page for; the X and the Escape key go back to `IDLE` |
   | `ATTACHED` | The **card** of that link, with an X in its corner | The X, which goes back to `IDLE` |
 
   - ⚠️ **The toolbar is a ROW of controls and not one button.** A control for a photo, and each
     other kind of attachment, goes beside the link button. The **count sits at the end of that same
-    line**, with `margin-inline-start: auto` and **not** `space-between`: the button is hidden in
-    two of the three states, and `space-between` would move the count each time it goes away.
+    line**, with `margin-inline-start: auto` and **not** `space-between`.
+  - ⚠️ **The link button is DISABLED outside `IDLE`, and it is NEVER hidden.** It is a form control
+    and it is taller than the count beside it, thus a button that goes away takes the height of the
+    row with it and the count moves up at the click that opened the field. There is one link for
+    each post, thus a live button in the other two states could do nothing anyway.
   - ⚠️ **The SERVER renders the state**, from `post.link`: a post with a link gets the field open
-    and no button, and a post with none gets the button. Thus a page that renders again after a
-    refusal shows the link that the owner wrote, and the controller moves nothing when it connects.
+    and the button disabled, and a post with none gets a live button. Thus a page that renders
+    again after a refusal shows the link that the owner wrote, and the controller moves nothing
+    when it connects.
   - ⚠️ **EACH of the two later states needs its own way back**, and all three call `removeLink`.
     The X on the card cannot serve `EDITING`: a field that the owner opened and left empty never
     becomes a card, thus that field carries an X of its own and takes the Escape key.

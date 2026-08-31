@@ -69,12 +69,14 @@
     <div class="social-post__toolbar">
       <%# ⚠️ The icon is in the DEFAULT slot and _social.scss gives the square, for the reason that
           the remove control above gives.
-          ⚠️ It shows ONLY while the post has no link: the field takes its place, and then the card
-          does. The X on that card is what brings it back. %>
+          ⚠️ **It is DISABLED while the post has a link, and it is never hidden.** There is one link
+          for each post, thus it can do nothing then. It is a form control and it is taller than the
+          count beside it: a button that goes away takes the height of the row with it, and the
+          count moves up at the click that opened the field. %>
       <wa-button class="social-post__tool" appearance="plain" size="small"
                  data-social-post-target="linkButton"
                  data-action="click->social-post#showLink"
-                 <%= "hidden" if post.link.present? %>>
+                 <%= "disabled" if post.link.present? %>>
         <%= raw icon_svg("classic", "light", "link") %>
         <span class="wa-visually-hidden"><%= t(".add_link") %></span>
       </wa-button>
