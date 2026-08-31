@@ -114,10 +114,16 @@
   // input, thus a smaller gap lets the two touch.
   margin-block-start: var(--wa-space-s);
   max-width: 32rem;
-  // ⚠️ **The remove control is absolute, and this is its positioned ancestor.** <wa-card> sets no
-  // `position` in its own shadow root, thus that control resolves against this host and it can sit
-  // over the picture.
-  position: relative;
+
+  // The composer draws this card HORIZONTAL, and the Preview panel draws it vertical. ⚠️ The two
+  // are different things: the first is a chip that says which link the post carries, and the second
+  // is a picture of what Bluesky renders, which is a wide image above the words.
+  //
+  // ⚠️ It is smaller than the default of the component, which is `--wa-space-l`. That card is a
+  // panel of a page, and this one sits beside a form field.
+  &[orientation="horizontal"] {
+    --spacing: var(--wa-space-m);
+  }
 
   &[hidden] {
     display: none;
@@ -130,13 +136,46 @@
     object-fit: cover;
     width: 100%;
 
+    // ⚠️ **The component asks the page to give the media a width, and it gives none of its own.**
+    // The picture is a column at the start of the chip and it takes the height of the words.
+    [orientation="horizontal"] & {
+      aspect-ratio: auto;
+      block-size: 100%;
+      inline-size: 8rem;
+    }
+
     &[hidden] {
       display: none;
     }
   }
 
+  // ⚠️ **ONE element goes in the `actions` slot.** The component gives each slotted element of that
+  // slot its own `display: flex` and its own `--spacing` padding, thus two buttons would be two
+  // columns of the card with that padding between them.
+  //
+  // ⚠️ The `padding` here beats the one of the component. A rule of the PAGE wins over a
+  // `::slotted()` rule of a shadow root, whatever the specificity of the two.
+  &__actions {
+    align-items: center;
+    display: flex;
+    gap: var(--wa-space-2xs);
+    padding: var(--wa-space-xs);
+  }
+
+  // ⚠️ <wa-button> makes a square icon button only for a <wa-icon> child, and this app never uses
+  // that element. Thus the square is here, as it is for each other icon button of this page.
+  &__action::part(button) {
+    aspect-ratio: 1;
+    padding: 0;
+    width: 1.75em;
+  }
+
   &__kind {
     align-self: start;
+    // ⚠️ It is the display that <wa-badge> gives its own host, and it is written again here on
+    // purpose: the horizontal card gives each element of its body slot `display: block`, which
+    // would draw this badge across the full width.
+    display: inline-flex;
     margin-block-end: var(--wa-space-2xs);
 
     // ⚠️ It needs a rule of its own: `[hidden] { display: none }` of the browser is at the same
@@ -156,25 +195,6 @@
     margin: 0;
     // ⚠️ A page with no og: tags gets its ADDRESS here, and an address has no space to break at.
     overflow-wrap: anywhere;
-  }
-
-  // The X in the corner, which takes the link off the post.
-  //
-  // ⚠️ It is in the BODY slot and it draws over the media slot above it, because the body comes
-  // second in the shadow tree. The background is its own: an outlined button is not readable over
-  // a photograph.
-  &__remove {
-    inset-block-start: var(--wa-space-xs);
-    inset-inline-end: var(--wa-space-xs);
-    position: absolute;
-  }
-
-  &__remove::part(button) {
-    aspect-ratio: 1;
-    background-color: var(--wa-color-surface-default);
-    border-radius: var(--wa-border-radius-pill);
-    padding: 0;
-    width: var(--wa-form-control-height);
   }
 
   &__description {

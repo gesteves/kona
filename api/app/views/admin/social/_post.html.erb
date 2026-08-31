@@ -113,7 +113,7 @@
               autocomplete="off" spellcheck="false"
               data-social-post-target="link"
               data-action="input->social-post#schedulePreview change->social-post#schedulePreview
-                           keydown.esc->social-post#removeLink"
+                           keydown.esc->social-post#removeLink blur->social-post#commitLink"
               <%= "hidden" if post.link.blank? %>>
       <%# It spins for the whole wait: the debounce and then the request. ⚠️ It needs a rule for
           `[hidden]`; refer to _social.scss. %>
@@ -138,16 +138,12 @@
         a title.
         ⚠️ `with-media` is not in this markup: a page can have no picture, thus the controller sets
         it with the image. %>
-    <wa-card class="social-card" data-social-post-target="preview" hidden>
+    <%# ⚠️ **It is HORIZONTAL**, and the card of the Preview panel is not. This one is a chip beside
+        a form field that says which link the post carries, and that one is a picture of what
+        Bluesky renders, which is a wide image above the words. `actions` is a slot of the
+        horizontal orientation alone. %>
+    <wa-card class="social-card" orientation="horizontal" data-social-post-target="preview" hidden>
       <img slot="media" class="social-card__image" data-social-post-target="previewImage" alt="" hidden>
-
-      <%# ⚠️ It is ABSOLUTE inside the card, thus it sits over the picture and not below it. Refer
-          to _social.scss for the positioned ancestor. %>
-      <wa-button class="social-card__remove" appearance="outlined" size="small"
-                 data-action="click->social-post#removeLink">
-        <%= raw icon_svg("classic", "light", "xmark") %>
-        <span class="wa-visually-hidden"><%= t(".remove_link") %></span>
-      </wa-button>
 
       <%# ⚠️ This is the useful part: it says that Bluesky will render the standard.site card, and
           the owner cannot know that until after the post without it. A card with NO badge is the
@@ -157,6 +153,24 @@
       <p class="social-card__host wa-caption-s" data-social-post-target="previewHost"></p>
       <p class="social-card__title" data-social-post-target="previewTitle"></p>
       <p class="social-card__description" data-social-post-target="previewDescription"></p>
+
+      <%# ⚠️ **ONE element goes in the `actions` slot, and not two buttons.** The component gives
+          EACH slotted element of that slot its own `display: flex` and its own `--spacing` padding.
+          Thus two buttons would be two columns of the card, with that padding between them. %>
+      <div slot="actions" class="social-card__actions">
+        <%# Edit puts the field back, with the link still in it, and Remove takes the link off the
+            post. Refer to the three states in the controller. %>
+        <wa-button class="social-card__action" appearance="plain" size="small"
+                   data-action="click->social-post#showLink">
+          <%= raw icon_svg("classic", "light", "pen-to-square") %>
+          <span class="wa-visually-hidden"><%= t(".edit_link") %></span>
+        </wa-button>
+        <wa-button class="social-card__action" appearance="plain" size="small"
+                   data-action="click->social-post#removeLink">
+          <%= raw icon_svg("classic", "light", "xmark") %>
+          <span class="wa-visually-hidden"><%= t(".remove_link") %></span>
+        </wa-button>
+      </div>
     </wa-card>
   </div>
 </div>

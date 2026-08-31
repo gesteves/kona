@@ -88,6 +88,29 @@ RSpec.describe "Admin social media", type: :request do
         expect(field).to include(%(class="social-post__link-remove"))
       end
 
+      # ⚠️ `actions` is a slot of the HORIZONTAL orientation alone, and ONE element goes in it: the
+      # component gives each slotted element of that slot its own padding, thus two buttons would
+      # be two columns of the card.
+      it "gives the card of a link an Edit control and a Remove control, in one actions element" do
+        get "/social"
+
+        card = response.body[%r{<wa-card class="social-card" orientation="horizontal".*?</wa-card>}m]
+        expect(card).to include("social-post#showLink")
+        expect(card).to include("social-post#removeLink")
+        expect(card.scan(%r{slot="actions"}).length).to eq(1)
+      end
+
+      # ⚠️ The two cards are different things: the composer draws a chip that says which link the
+      # post carries, and the panel draws a picture of what Bluesky renders, which is a wide image
+      # above the words.
+      it "keeps the card of the Preview panel vertical" do
+        get "/social"
+
+        template = response.body[%r{<wa-card class="social-card" data-preview-card.*?</wa-card>}m]
+        expect(template).to be_present
+        expect(template).not_to include("orientation")
+      end
+
       # ⚠️ The link field is a plain input and there is no list of the entries. Thus this page makes
       # no request to Contentful when it renders.
       it "reads no articles" do
