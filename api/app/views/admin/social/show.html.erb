@@ -100,28 +100,36 @@
           <span slot="hint"><%= network.notice || t(".not_connected") %> <%= link_to t(".connect_it"), connected_apps_path %>.</span>
         </wa-checkbox>
       <% end %>
+
+      <%# The topic of a Threads post, below the row that it belongs to.
+
+          ⚠️ It is INSIDE the group and beside its own network, thus a change to the order of
+          `@social.networks` cannot separate the two. The group reads only
+          `:is(wa-checkbox, wa-switch)`, thus this element is not a control of it.
+
+          ⚠️ It is THREAD-LEVEL and not a field of a post: Meta takes one topic for each post, and
+          `#create` sends this one with every post of the thread.
+
+          ⚠️ It is hidden until the row is ticked AND able to take a post, and `social#applyTopic`
+          does that. A network with no account is disabled, and a Markdown link disables this row as
+          well, thus one rule covers each of those. Refer to _social.scss: this block sets a
+          display, thus `[hidden]` needs a rule of its own.
+
+          ⚠️ The field stays in the form while it is hidden, thus a topic that the owner wrote
+          survives an untick and a tick again. The action reads it only while the row is ticked. %>
+      <% if network.key == SocialPresenter::TOPIC_NETWORK %>
+        <div class="social__topic" data-social-target="topicField"
+             data-network="<%= network.key %>"
+             <%= "hidden" unless @social.topic? %>>
+          <%# ⚠️ No `maxlength`: it measures UTF-16 code units, and the limit of Meta is characters.
+              The action checks the length, for the reason that the body field gives. %>
+          <wa-input name="topic" label="<%= t('.topic') %>" value="<%= @social.topic %>"
+                    size="small" autocomplete="off" spellcheck="false">
+          </wa-input>
+        </div>
+      <% end %>
     <% end %>
   </wa-checkbox-group>
-
-  <%# The topic of a Threads post. ⚠️ It is THREAD-LEVEL and not a field of a post: Meta takes one
-      topic for each post, and this one names the draft. `#create` puts it on the first post alone.
-
-      ⚠️ It is hidden until the Threads row is ticked AND able to take a post, and
-      `social#applyTopic` does that. A network with no account is disabled, and a Markdown link
-      disables this row as well, thus one rule covers each of those. Refer to _social.scss: this
-      block sets a display, thus `[hidden]` needs a rule of its own.
-
-      ⚠️ The field stays in the form while it is hidden, thus a topic that the owner wrote survives
-      an untick and a tick again. The action reads it only when the Threads row is ticked. %>
-  <div class="social__topic" data-social-target="topicField"
-       data-network="<%= SocialPresenter::TOPIC_NETWORK %>"
-       <%= "hidden" unless @social.topic? %>>
-    <%# ⚠️ No `maxlength`: it measures UTF-16 code units, and the limit of Meta is characters. The
-        action checks the length, for the reason that the body field gives. %>
-    <wa-input name="topic" label="<%= t('.topic') %>" value="<%= @social.topic %>"
-              autocomplete="off" spellcheck="false">
-    </wa-input>
-  </div>
 
   <div class="wa-stack wa-gap-s">
     <%# The hidden 0 is what sends "off": a switch that is off submits nothing. The two fields share

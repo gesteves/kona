@@ -349,7 +349,9 @@ en:
         remove_title: "Remove this post?"
         schedule: "Schedule for later"
         time: "Time"
-        topic: "Threads topic"
+        # ⚠️ The field is below the Threads row of the "Post to" list, thus the name of the network
+        # is beside it and this label does not repeat it.
+        topic: "Topic"
       post:
         body: "Post"
         body_placeholder: "What do you want to say?"

@@ -19,13 +19,24 @@
   // ⚠️ This rule is what makes the `hidden` attribute work here, for the reason that
   // `.social__schedule` above gives: `[hidden]` of the browser is at the same specificity as this
   // class, and our stylesheet comes after it.
+  // The topic field, below the row of its own network inside the "Post to" group.
   &__topic {
+    // ⚠️ This rule is what makes the `hidden` attribute work here, for the reason that
+    // `.social__schedule` above gives.
     &[hidden] {
       display: none;
     }
 
-    display: block;
-    max-width: 32rem;
+    // ⚠️ `align-items: start` on the group sizes each row to its content, on purpose: it keeps the
+    // clickable label of a checkbox off the full width. Thus this field needs to stretch itself,
+    // or the input collapses to the width of its own label.
+    align-self: stretch;
+    max-width: 24rem;
+    // ⚠️ It lines up with the LABEL of the checkbox above it, and not with the box. The two values
+    // are the ones that <wa-checkbox> gives its own control: the size of the box, and the
+    // `margin-inline-end: 0.5em` that separates it from the label. Thus the field follows the
+    // tokens of the theme and this file holds no measurement of its own.
+    margin-inline-start: calc(var(--wa-form-control-toggle-size) + 0.5em);
   }
 
   &__posts {
