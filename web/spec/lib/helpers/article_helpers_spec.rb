@@ -235,8 +235,8 @@ RSpec.describe ArticleHelpers do
     end
 
     describe '#tag_chain_links' do
-      it 'renders each chain as slash-separated listitem links, joining chains the same way' do
-        html = tag_chain_links([ [ [ 'Triathlon', '/tagged/triathlon/' ], [ 'Half Distance', '/tagged/triathlon/half-distance/' ] ], [ [ 'Race Reports', '/tagged/race-reports/' ] ] ])
+      it 'renders slash-separated listitem links' do
+        html = tag_chain_links([ [ 'Triathlon', '/tagged/triathlon/' ], [ 'Half Distance', '/tagged/triathlon/half-distance/' ], [ 'Race Reports', '/tagged/race-reports/' ] ])
         separator = '<span class="entry__tag-separator" aria-hidden="true">/</span>'
         expect(html).to eq(
           '<span role="listitem"><a href="/tagged/triathlon/">Triathlon</a></span>' + separator +
@@ -564,7 +564,10 @@ RSpec.describe ArticleHelpers do
         concept('news', 'News', path: '/tagged/news/', scheme: 'topics', count: 18),
         concept('reviews', 'Reviews', path: '/tagged/reviews/', scheme: 'topics', count: 1),
         concept('tech', 'Tech', path: '/tagged/tech/', scheme: 'topics', count: 6),
-        concept('gear', 'Gear', path: '/tagged/tech/gear/', parent_id: 'tech', scheme: 'topics', count: 3)
+        concept('gear', 'Gear', path: '/tagged/tech/gear/', parent_id: 'tech', scheme: 'topics', count: 3),
+        concept('apps', 'Apps', path: '/tagged/tech/apps/', parent_id: 'tech', scheme: 'topics', count: 4),
+        concept('trainerroad', 'TrainerRoad', path: '/tagged/tech/apps/trainerroad/', parent_id: 'apps', scheme: 'topics', count: 2),
+        concept('zwift', 'Zwift', path: '/tagged/tech/apps/zwift/', parent_id: 'apps', scheme: 'topics', count: 2)
       ].map { |c| OpenStruct.new(tag: c) }
       OpenStruct.new(articles: @corpus || [], tags: tags)
     end
@@ -739,6 +742,47 @@ RSpec.describe ArticleHelpers do
 
       it 'is empty when the article has no taxonomy' do
         expect(tag_breadcrumb_chains(article(slug: 'x'))).to eq([])
+      end
+    end
+
+    describe '#tag_breadcrumb_concepts' do
+      it 'gives a shared parent one time and keeps its children together' do
+        art = tagged_article(slug: 'tr-zwift', concepts: [
+          concept('tech', 'Tech', path: '/tagged/tech/', scheme: 'topics'),
+          concept('apps', 'Apps', path: '/tagged/tech/apps/', parent_id: 'tech', scheme: 'topics'),
+          concept('trainerroad', 'TrainerRoad', path: '/tagged/tech/apps/trainerroad/', parent_id: 'apps', scheme: 'topics'),
+          concept('zwift', 'Zwift', path: '/tagged/tech/apps/zwift/', parent_id: 'apps', scheme: 'topics'),
+          concept('running', 'Running', path: '/tagged/running/', scheme: 'sports'),
+          concept('news', 'News', path: '/tagged/news/', scheme: 'topics')
+        ])
+        expect(tag_breadcrumb_concepts(art).map(&:name)).to eq([ 'Tech', 'Apps', 'TrainerRoad', 'Zwift', 'Running', 'News' ])
+      end
+
+      it 'keeps the branches of a shared root together' do
+        art = tagged_article(slug: 'branches', concepts: [
+          concept('tech', 'Tech', path: '/tagged/tech/', scheme: 'topics'),
+          concept('apps', 'Apps', path: '/tagged/tech/apps/', parent_id: 'tech', scheme: 'topics'),
+          concept('zwift', 'Zwift', path: '/tagged/tech/apps/zwift/', parent_id: 'apps', scheme: 'topics'),
+          concept('gear', 'Gear', path: '/tagged/tech/gear/', parent_id: 'tech', scheme: 'topics'),
+          concept('running', 'Running', path: '/tagged/running/', scheme: 'sports')
+        ])
+        expect(tag_breadcrumb_concepts(art).map(&:name)).to eq([ 'Tech', 'Apps', 'Zwift', 'Gear', 'Running' ])
+      end
+
+      it 'gives every concept of the article one time' do
+        art = tagged_article(slug: 'tr-zwift', concepts: [
+          concept('tech', 'Tech', path: '/tagged/tech/', scheme: 'topics'),
+          concept('apps', 'Apps', path: '/tagged/tech/apps/', parent_id: 'tech', scheme: 'topics'),
+          concept('trainerroad', 'TrainerRoad', path: '/tagged/tech/apps/trainerroad/', parent_id: 'apps', scheme: 'topics'),
+          concept('zwift', 'Zwift', path: '/tagged/tech/apps/zwift/', parent_id: 'apps', scheme: 'topics')
+        ])
+        names = tag_breadcrumb_concepts(art).map(&:name)
+        expect(names.uniq).to eq(names)
+        expect(names.size).to eq(4)
+      end
+
+      it 'is empty when the article has no taxonomy' do
+        expect(tag_breadcrumb_concepts(article(slug: 'x'))).to eq([])
       end
     end
 

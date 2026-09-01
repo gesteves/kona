@@ -26,7 +26,7 @@
     <span>
       <%= tag_list_icon(article.contentful_metadata.tags.size) %>
       <span class="entry__tags" role="list" aria-label="Tags">
-        <%= tag_chain_links(tag_breadcrumb_chains(article).map { |chain| chain.map { |tag| [tag.short_name, tag.path] } }) %>
+        <%= tag_chain_links(tag_breadcrumb_concepts(article).map { |tag| [tag.short_name, tag.path] }) %>
       </span>
     </span>
   <% end %>

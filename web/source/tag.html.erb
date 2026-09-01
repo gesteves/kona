@@ -13,7 +13,7 @@
         <span>
           <%= tag_list_icon(ancestors.size) %>
           <span role="list" aria-label="Category">
-            <%= tag_chain_links([ancestors.map { |node| [node[:name], node[:path]] }]) %>
+            <%= tag_chain_links(ancestors.map { |node| [node[:name], node[:path]] }) %>
           </span>
         </span>
       <% end %>

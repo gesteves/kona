@@ -323,15 +323,13 @@ module ArticleHelpers
     icon_svg("classic", "light", count == 1 ? "tag" : "tags")
   end
 
-  # Renders breadcrumb chains of tag links, that is, [label, path] pairs. Each link is a
-  # role="listitem" span, and a slash goes between the spans in a chain and between the chains.
-  # The article meta line and the tag-archive header both use this.
-  # @param chains [Array<Array<Array(String, String)>>] The chains of [label, path] pairs.
+  # Renders a list of tag links, that is, [label, path] pairs. Each link is a role="listitem"
+  # span, and a slash goes between the spans. The article meta line and the tag-archive header
+  # both use this.
+  # @param links [Array<Array(String, String)>] The [label, path] pairs.
   # @return [String] The markup, joined.
-  def tag_chain_links(chains)
-    chains.map do |chain|
-      chain.map { |label, path| content_tag(:span, link_to(label, path), role: "listitem") }.join(TAG_SEPARATOR)
-    end.join(TAG_SEPARATOR)
+  def tag_chain_links(links)
+    links.map { |label, path| content_tag(:span, link_to(label, path), role: "listitem") }.join(TAG_SEPARATOR)
   end
 
   # The "Draft" badge on the meta line of an unpublished entry.
@@ -459,5 +457,27 @@ module ArticleHelpers
 
     chains = leaves.map { |leaf| chain_ids[leaf.id].filter_map { |id| by_id[id] } }
     chains.sort_by { |chain| [ -chain.length, chain.first.scheme == "sports" ? 0 : 1, chain.last.short_name.to_s ] }
+  end
+
+  # The concepts of the article for the meta line: the breadcrumb chains as one flat list, with
+  # each concept one time. Two chains that share a parent give that parent one time, and the
+  # children of that parent stay together.
+  # @param article [Object] The article.
+  # @return [Array<Object>] The tags, a parent before its children.
+  def tag_breadcrumb_concepts(article)
+    flatten_concept_chains(tag_breadcrumb_chains(article))
+  end
+
+  private
+
+  # Walks the chains as a tree and gives the concepts at one depth and below, a parent before its
+  # children. A concept that more than one chain holds goes into the list one time.
+  # @param chains [Array<Array>] The chains, from the root to the leaf.
+  # @param depth [Integer] The position in a chain to group on.
+  # @return [Array<Object>] The tags.
+  def flatten_concept_chains(chains, depth = 0)
+    chains.reject { |chain| chain.length <= depth }
+          .group_by { |chain| chain[depth].id }
+          .flat_map { |_id, group| [ group.first[depth] ] + flatten_concept_chains(group, depth + 1) }
   end
 end
