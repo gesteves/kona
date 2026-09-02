@@ -22,6 +22,12 @@ RSpec.describe MarkupHelper do
     it "takes more attributes, for example a class" do
       expect(helper.units_tag("10 km", "6.2 mi", class: "stats__number")).to include('class="stats__number"')
     end
+
+    it "takes a title in place of the default one" do
+      result = helper.units_tag("10", "6.2", title: "10 km | 6.2 mi")
+      expect(result).to include('title="10 km | 6.2 mi"')
+      expect(result).not_to include('title="10 | 6.2"')
+    end
   end
 
   describe "#render_summary_body" do

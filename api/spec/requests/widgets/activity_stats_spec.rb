@@ -40,6 +40,10 @@ RSpec.describe "Activity stats", type: :request do
     expect(response.body).to include("Swimming")
     expect(response.body).to include("<svg")       # icon markup is rendered unescaped
     expect(response.body).to include('Intervals.icu<span class="sr-only"> (opens in a new tab)</span></a>')
+    # The tooltip of a number names its unit as well: "17.4 km | 10.8 mi", on the number and on
+    # the unit.
+    expect(response.body.scan(/title="[\d.,]+ [a-z]+ \| [\d.,]+ [a-z]+"/).size).to be >= 6
+    expect(response.body).not_to match(/title="[\d.,]+ \| [\d.,]+"/)
   end
 
   it "sets the caching headers" do

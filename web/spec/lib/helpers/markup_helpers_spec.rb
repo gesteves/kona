@@ -194,6 +194,14 @@ RSpec.describe MarkupHelpers do
     end
   end
 
+  describe '#units_tag' do
+    it 'takes a title in place of the default one' do
+      result = units_tag('10', '6.2', title: '10 km | 6.2 mi')
+      expect(result).to include('title="10 km | 6.2 mi"')
+      expect(result).not_to include('title="10 | 6.2"')
+    end
+  end
+
   describe '#render_markup' do
     # ⚠️ data-original-url names the Contentful host, which the image mirror keeps off the page.
     it 'removes the scratch attributes of the image transforms from the output' do

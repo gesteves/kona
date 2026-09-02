@@ -4,6 +4,8 @@
 <% imperial_value, imperial_unit = distance_parts(distance, units: "imperial") %>
 <div class="stats__stat">
   <span class="stats__meta"><% if local_assigns[:icon] %><%= raw icon_svg("classic", "light", icon) %> <% end %><%= activity %></span>
-  <%= units_tag(metric_value, imperial_value, class: "stats__number") %>
-  <%= units_tag(metric_unit, imperial_unit, class: "stats__meta") %>
+  <%# The number and its unit are two elements, thus the tooltip of each names both. %>
+  <% title = "#{metric_value} #{metric_unit} | #{imperial_value} #{imperial_unit}" %>
+  <%= units_tag(metric_value, imperial_value, class: "stats__number", title: title) %>
+  <%= units_tag(metric_unit, imperial_unit, class: "stats__meta", title: title) %>
 </div>

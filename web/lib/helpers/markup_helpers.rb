@@ -536,10 +536,12 @@ module MarkupHelpers
   # @param metric [String] The metric text.
   # @param imperial [String] The imperial text.
   # @param tag [Symbol] The element to render.
-  # @param attrs [Hash] More attributes for the element, for example a class.
+  # @param attrs [Hash] More attributes for the element, for example a class. A `title` replaces
+  #   the default "metric | imperial", for a number whose unit is in another element.
   # @return [String] An HTML tag.
   def units_tag(metric, imperial, tag = :span, **attrs)
-    content_tag tag.to_sym, 'data-controller': "units", 'data-units-imperial-value': imperial, 'data-units-metric-value': metric, title: "#{metric} | #{imperial}", **attrs do
+    title = attrs.delete(:title) || "#{metric} | #{imperial}"
+    content_tag tag.to_sym, 'data-controller': "units", 'data-units-imperial-value': imperial, 'data-units-metric-value': metric, title: title, **attrs do
       metric
     end
   end
