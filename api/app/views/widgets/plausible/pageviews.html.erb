@@ -1,1 +1,1 @@
-<span data-nosnippet <%= live_update_attrs %>><%= raw icon_svg("classic", "light", "eye") %> <%= link_to raw(ERB::Util.html_escape(pageviews_label(@pageviews)) + '<span class="sr-only"> (opens in a new tab)</span>'), @plausible_url, rel: "noopener noreferrer nofollow", target: "_blank" %></span>
+<span data-nosnippet <%= live_update_attrs %>><%= raw icon_svg("classic", "light", "eye") %> <%= link_to safe_join([ pageviews_label(@pageviews), tag.span(" (opens in a new tab)", class: "sr-only") ]), @plausible_url, rel: "noopener noreferrer nofollow", target: "_blank" %></span>

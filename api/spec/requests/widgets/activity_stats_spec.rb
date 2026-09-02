@@ -39,6 +39,7 @@ RSpec.describe "Activity stats", type: :request do
     expect(response.body).to include("46")        # total activities, delimited
     expect(response.body).to include("Swimming")
     expect(response.body).to include("<svg")       # icon markup is rendered unescaped
+    expect(response.body).to include('Intervals.icu<span class="sr-only"> (opens in a new tab)</span></a>')
   end
 
   it "sets the caching headers" do

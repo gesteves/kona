@@ -112,6 +112,8 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
     expect(response.body).to include("data-units-metric-value") # the <span data-imperial> conversion
     expect(response.body).to include('target="_blank"')         # external description link
     expect(response.body).to include("the site")
+    # The title of the featured event is a link to the race, with the hidden new-tab hint in it.
+    expect(response.body).to match(%r{<a[^>]*href="https://example.com/race"[^>]*>[^<]+<span class="sr-only"> \(opens in a new tab\)</span></a>})
   end
 
   it "sets a one-hour edge caching header" do

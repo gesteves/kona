@@ -67,6 +67,13 @@ RSpec.describe "Widgets::Plausible pageviews", type: :request do
     expect(response.body).to include("Viewed 5 times")
   end
 
+  it "puts the new-tab hint in a hidden span, as markup and not as text" do
+    get "/widgets/plausible/pageviews/abc123", headers: auth_headers
+
+    expect(response.body).to include('Viewed 1,234 times<span class="sr-only"> (opens in a new tab)</span></a>')
+    expect(response.body).not_to include("&lt;span")
+  end
+
   it "renders 'Never viewed' for an article absent from the results" do
     allow_any_instance_of(Plausible).to receive(:pageviews_by_path).and_return("/2026/05/01/another-post/" => 900)
 

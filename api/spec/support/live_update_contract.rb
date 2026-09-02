@@ -15,6 +15,14 @@ RSpec.shared_examples "a live-update fragment" do |path|
     expect(response.body).to include('data-action="visibilitychange@document->live-update#handleVisibilityChange"')
   end
 
+  # A hidden hint, an icon, or a title goes into a link through a helper, and a SafeBuffer escapes
+  # a plain string that a caller adds to it. The page then shows the markup as text.
+  it "renders no escaped markup" do
+    get path, headers: auth_headers
+
+    expect(response.body).not_to match(/&lt;(span|svg|i|a)\b/)
+  end
+
   it "is not marked as a placeholder" do
     get path, headers: auth_headers
 

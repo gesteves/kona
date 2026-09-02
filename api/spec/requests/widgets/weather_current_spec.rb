@@ -120,6 +120,7 @@ RSpec.describe "Weather", type: :request do
       expect(response.body).to include("weather__alert")
       expect(response.body).to include("Heat advisory")
       expect(response.body).to include('href="https://example.com/alert"')
+      expect(response.body).to include('Heat advisory<span class="sr-only"> (opens in a new tab)</span>')
     end
   end
 
