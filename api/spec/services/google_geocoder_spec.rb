@@ -90,6 +90,6 @@ RSpec.describe GoogleGeocoder do
     described_class.new("Kona").coordinates
     described_class.new("kona").coordinates
 
-    expect(keys.uniq).to contain_exactly(a_string_matching(/\Agoogle:maps:address:[0-9a-f]{8}\z/))
+    expect(keys.uniq).to contain_exactly(a_string_matching(/\Agoogle:maps:address:[0-9a-f]{16}\z/))
   end
 end

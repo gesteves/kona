@@ -22,7 +22,7 @@ module Widgets
       # `safely` separates each upstream call. Thus a timeout or a raise gives "no data", and the
       # widget then goes away through render_empty or omits one section. It does not give a 500.
       gmaps = GoogleMaps.new(location.latitude, location.longitude)
-      time_zone = safely("GoogleMaps") { gmaps.time_zone_id } || TimeZoneResolver.default
+      time_zone = time_zone_of(location)
       country = safely("GoogleMaps") { gmaps.country_code }
       weather = safely("WeatherKit") { WeatherKit.new(location.latitude, location.longitude, time_zone, country).data }
 
@@ -37,7 +37,7 @@ module Widgets
         pollen: -> { safely("GooglePollen") { GooglePollen.new(location.latitude, location.longitude).data } },
         events: -> { safely("Events", []) { Events.new.all } },
         goodspeed: -> { safely("Goodspeed") { Goodspeed.new.data } },
-        workouts: -> { safely("TrainerRoad", []) { TrainerRoad.new(time_zone).workouts } }
+        workouts: -> { planned_workouts(time_zone) }
       )
 
       @summary = WeatherSummaryPresenter.new(

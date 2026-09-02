@@ -1,4 +1,3 @@
-require "json"
 require "time"
 
 # The GPX tracks that a user uploads on the Maps page of the admin, and their Mapbox tilesets.
@@ -11,9 +10,7 @@ require "time"
 # It is not an ApplicationService, because that base class is for HTTP integrations and this class
 # makes no network call.
 #
-# ⚠️ There is one hash, and not one key for each track, for the same reason as in SpamQuarantine:
-# no other code in this app reads the full keyspace, and this Redis also holds the Sidekiq queues.
-# Thus a SCAN here would be the first one.
+# One Redis hash holds the records (refer to JsonHashStore), with the track id as the field.
 class TrackLibrary
   # The Redis hash: the field is the track id, and the value is the JSON record.
   REDIS_KEY = "maps:tracks".freeze
@@ -79,16 +76,13 @@ class TrackLibrary
   # All the tracks, the newest first.
   # @return [Array<Hash>]
   def all
-    entries = $redis.hgetall(REDIS_KEY)
-    return [] if entries.blank?
-
-    entries.values.filter_map { |raw| parse(raw) }.sort_by { |record| record["uploaded_at"].to_s }.reverse
+    records.read_all.values.sort_by { |record| record["uploaded_at"].to_s }.reverse
   end
 
   # @param id [String]
   # @return [Hash, nil]
   def find(id)
-    parse($redis.hget(REDIS_KEY, id))
+    records.read(id)
   end
 
   # id => status, for the poll endpoint of the page. It is not the full records, on purpose,
@@ -131,19 +125,22 @@ class TrackLibrary
   # @return [Boolean] True if the code removed a record.
   def delete(id)
     discard_pending(id)
-    $redis.hdel(REDIS_KEY, id).to_i.positive?
+    records.delete(id).positive?
   end
 
   # @return [Integer]
   def count
-    $redis.hlen(REDIS_KEY).to_i
+    records.count
   end
 
   private
 
+  def records
+    @records ||= JsonHashStore.new(REDIS_KEY)
+  end
+
   def write(id, record)
-    $redis.hset(REDIS_KEY, id, record.to_json)
-    record
+    records.write(id, record)
   end
 
   def pending_key(id)
@@ -153,33 +150,6 @@ class TrackLibrary
   # Removes the oldest tracks if the library becomes too large. The spam quarantine is different:
   # there is no age limit here, because the owner can render an old track again.
   def prune
-    entries = $redis.hgetall(REDIS_KEY)
-    return if entries.blank?
-
-    doomed = []
-    live = []
-
-    entries.each do |field, raw|
-      record = parse(raw)
-      record.nil? ? doomed << field : live << [ field, record["uploaded_at"].to_s ]
-    end
-
-    # The oldest is first, thus the tracks to remove are at the start of the list.
-    live.sort_by!(&:last)
-    doomed.concat(live.first([ live.size - MAX_ENTRIES, 0 ].max).map(&:first))
-
-    $redis.hdel(REDIS_KEY, *doomed) if doomed.any?
-  end
-
-  # The code removes a record with an incorrect shape and does not raise. One bad entry must not
-  # stop the full page. SpamQuarantine#parse has the same rule.
-  # @return [Hash, nil]
-  def parse(raw)
-    return nil if raw.blank?
-
-    record = JSON.parse(raw.to_s)
-    record.is_a?(Hash) ? record : nil
-  rescue JSON::ParserError
-    nil
+    records.prune(max: MAX_ENTRIES, sort_by: ->(record) { record["uploaded_at"].to_s })
   end
 end

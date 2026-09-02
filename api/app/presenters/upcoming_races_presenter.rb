@@ -18,13 +18,15 @@ class UpcomingRacesPresenter
 
   # @param events [Array<OpenStruct>] The raw Contentful events.
   # @param time_zone [String] An IANA timezone id.
-  def initialize(events:, time_zone:)
+  # @param weather_for [#call] Gives the EventWeatherPresenter of an event, or nil. The caller
+  #   gives it, thus this class makes no upstream request of its own and a spec needs no stub.
+  def initialize(events:, time_zone:, weather_for: RaceDayWeather.method(:for))
     @time_zone = time_zone
     @races = upcoming_races(events, time_zone)
     return if @races.blank?
 
     @featured = @races.first if featured?(@races.first, @races, time_zone)
-    @event_weather = RaceDayWeather.new(@featured).presenter if @featured
+    @event_weather = weather_for.call(@featured) if @featured
 
     @todays_race = @featured if @featured && today?(@featured, time_zone)
 

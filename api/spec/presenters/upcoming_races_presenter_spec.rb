@@ -4,7 +4,7 @@ require "rails_helper"
 # a featured race and gets the race-day weather, when it is the race of today, and the rule that
 # removes the featured state when the weather of a featured event is not available. The date
 # calculations, that is, upcoming_races, featured?, and today?, are in events_helper_spec. This file
-# stubs RaceDayWeather, thus no upstream fetch occurs.
+# gives the weather fetch as a double, thus no upstream fetch occurs.
 RSpec.describe UpcomingRacesPresenter do
   include ActiveSupport::Testing::TimeHelpers
 
@@ -13,10 +13,8 @@ RSpec.describe UpcomingRacesPresenter do
 
   let(:time_zone) { "America/Denver" }
   let(:weather) { instance_double(EventWeatherPresenter, forecast: DeepOstruct.wrap(condition_code: "Clear")) }
-
-  before do
-    allow(RaceDayWeather).to receive(:new) { instance_double(RaceDayWeather, presenter: weather) }
-  end
+  # The caller gives the weather fetch, thus no stub of RaceDayWeather is necessary.
+  let(:weather_for) { instance_double(Proc, call: weather) }
 
   def build_event(days_from_today:, **overrides)
     date = (Time.current.in_time_zone(time_zone) + days_from_today.days).change(hour: 9).iso8601
@@ -29,13 +27,13 @@ RSpec.describe UpcomingRacesPresenter do
   end
 
   def presenter_for(events)
-    described_class.new(events: events, time_zone: time_zone)
+    described_class.new(events: events, time_zone: time_zone, weather_for: weather_for)
   end
 
   it "is empty (and fetches no weather) when nothing is upcoming" do
     presenter = presenter_for([ build_event(days_from_today: -5) ])
     expect(presenter.races).to eq([])
-    expect(RaceDayWeather).not_to have_received(:new)
+    expect(weather_for).not_to have_received(:call)
   end
 
   context "when the next race is close but not today" do
@@ -95,7 +93,7 @@ RSpec.describe UpcomingRacesPresenter do
 
       expect(presenter.featured).to be_nil
       expect(presenter.races.size).to eq(2)
-      expect(RaceDayWeather).not_to have_received(:new)
+      expect(weather_for).not_to have_received(:call)
       expect(presenter.variant).to eq("halves")
     end
   end

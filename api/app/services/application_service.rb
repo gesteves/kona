@@ -79,9 +79,10 @@ class ApplicationService
   # give the same digest. The escape is necessary because git counts a file with a raw zero byte
   # as binary, and that stops each line diff, each blame, and each PR review in the file.
   # @param inputs [Array<#to_s>] The things that must invalidate the cache when they change.
-  # @return [String] An 8-character hex digest.
+  # @return [String] A 16-character hex digest. GoogleGeocoder keys free text with it, thus it is
+  #   wider than a version number needs.
   def cache_version(*inputs)
-    Digest::SHA256.hexdigest(inputs.join("\x00"))[0, 8]
+    Digest::SHA256.hexdigest(inputs.join("\x00"))[0, 16]
   end
 
   # GETs a URL.

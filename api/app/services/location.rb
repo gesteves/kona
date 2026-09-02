@@ -53,6 +53,17 @@ class Location
     parse_pair($redis.get(LOCATION_CACHE_KEY))
   end
 
+  # Parses a pair of coordinates and, when it is correct, stores it as the current location. The
+  # two write endpoints call this, thus they cannot differ in their check or in their write.
+  # @return [Array(Float, Float), nil] The stored pair, or nil for a pair that is incorrect.
+  def self.save(latitude, longitude)
+    coordinates = parse(latitude, longitude)
+    return if coordinates.nil?
+
+    store(*coordinates)
+    coordinates
+  end
+
   # Stores a pair of coordinates as the current location and sends it to Intervals.icu.
   #
   # ⚠️ Write to Redis first, then add the job. The widgets read the stored value, thus it must not

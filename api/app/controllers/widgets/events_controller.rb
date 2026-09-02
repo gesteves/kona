@@ -13,7 +13,8 @@ module Widgets
         # the race list. This widget does not follow the current location of the owner. The presenter
         # selects the races and decides the featured one, and the view reads each value through
         # @races.
-        @races = UpcomingRacesPresenter.new(events: Events.new.all, time_zone: TimeZoneResolver.default)
+        @races = UpcomingRacesPresenter.new(events: Events.new.all, time_zone: TimeZoneResolver.default,
+                                            weather_for: RaceDayWeather.method(:for))
         @races.races
       end
     end

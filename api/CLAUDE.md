@@ -1636,9 +1636,10 @@ container.
 `SpamQuarantine`. **Not spam** enqueues that job again with `restored_from_spam`, which does not do
 the check and which calls `Akismet#submit_ham`.
 
-- **There is one Redis hash**, `contact:spam`, and each field name is an id that the code makes.
-  There is no key for each message, on purpose: no other code here reads the full keyspace, and this
-  Redis also holds the Sidekiq queues, thus a `SCAN` would be the first one. ⚠️ The result is that
+- **There is one Redis hash**, `contact:spam`, through `JsonHashStore`, and each field name is an
+  id that the code makes. There is no key for each message, on purpose: no other code here reads the
+  full keyspace, and this Redis also holds the Sidekiq queues, thus a `SCAN` would be the first one.
+  ⚠️ The result is that
   Ruby applies the 30-day retention. Thus `#store` removes old messages, and `#all` also does.
   **The removal on the write path is what keeps the size small when nobody opens the page.**
 - ⚠️ **`SpamQuarantine#take` reads and removes, and the return value of `HDEL` is the guard.** Turbo,
@@ -1767,8 +1768,8 @@ and `StaticMap` makes the render URL and gets the image.
   in a Puma thread with a budget of 20 seconds for the request. The code rounds each coordinate to
   six decimals, which is approximately 11cm, at the input. Garmin writes 26 significant digits,
   which makes the Redis data and the Mapbox upload three times larger for no result.
-- **There is one Redis hash**, `maps:tracks`, and each field name is the tileset id. The reason is
-  the same as for the spam quarantine. A record holds the bounding box, both end points, the sport,
+- **There is one Redis hash**, `maps:tracks`, through `JsonHashStore`, and each field name is the
+  tileset id. The reason is the same as for the spam quarantine. A record holds the bounding box, both end points, the sport,
   and the render settings, because **the code discards the GPX after the upload**, and the settings
   page must still put the pins on a track from last week. `MAX_ENTRIES` is a guard against a runaway
   loop and it is not a retention rule: a track goes away only when the owner deletes it.

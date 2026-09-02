@@ -47,10 +47,9 @@ module Admin
     # It answers with the place and not with a redirect: the only caller is the fetch of the page,
     # and that fetch changes the heading in place and does not load the page again.
     def create
-      coordinates = Location.parse(params[:latitude], params[:longitude])
+      coordinates = Location.save(params[:latitude], params[:longitude])
       return head :unprocessable_content if coordinates.nil?
 
-      Location.store(*coordinates)
       render json: located(coordinates)
     end
 

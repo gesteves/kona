@@ -12,6 +12,12 @@ class RaceDayWeather < ApplicationService
     @event = event
   end
 
+  # @param event [OpenStruct] A Contentful event object.
+  # @return [EventWeatherPresenter, nil]
+  def self.for(event)
+    new(event).presenter
+  end
+
   # Makes the race-day weather presenter of the event, or nil when the coordinates are not
   # available.
   # @return [EventWeatherPresenter, nil]
@@ -23,7 +29,7 @@ class RaceDayWeather < ApplicationService
     return if @event.date.blank?
 
     gmaps = GoogleMaps.new(lat, lon)
-    time_zone = safely("GoogleMaps") { gmaps.time_zone_id } || TimeZoneResolver.default
+    time_zone = safely("GoogleMaps") { TimeZoneResolver.call(lat, lon) } || TimeZoneResolver.default
     country = safely("GoogleMaps") { gmaps.country_code }
 
     event_datetime = begin

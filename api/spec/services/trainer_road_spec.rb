@@ -138,6 +138,14 @@ RSpec.describe TrainerRoad do
     it "returns nil for an event that isn't a workout" do
       expect(service.send(:parse_workout, double(summary: "Rest Day", description: ""))).to be_nil
     end
+
+    # One grammar reads each summary, thus a dash that is not a hyphen reads the same everywhere.
+    it "reads an en dash and a summary with no space around the dash, as the planned reader does" do
+      expect(service.send(:parse_workout, double(summary: "1:00 – Petit", description: ""))).to include(duration: "1:00", name: "Petit")
+      expect(service.send(:parse_workout, double(summary: "1:00-Petit", description: ""))).to include(duration: "1:00", name: "Petit")
+      expect(service.send(:strip_duration_prefix, "1:00 – Petit")).to eq("Petit")
+      expect(service.send(:parse_duration_prefix, "1:30 — Gibbs")).to eq(90)
+    end
   end
 
   describe "#planned_workouts" do

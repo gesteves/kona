@@ -186,19 +186,35 @@ class TrainerRoad < ApplicationService
     description&.to_s
   end
 
-  # Changes the "H:MM - " duration at the start into minutes, or gives nil if it is absent.
-  def parse_duration_prefix(name)
-    match = name.match(/\A(\d{1,2}):(\d{2})\s*[-–—]/)
+  # The "H:MM - Name" form of a TrainerRoad summary. The dash can be a hyphen, an en dash, or an
+  # em dash, with any space around it. This is the one grammar: each reader of a summary uses it.
+  DURATION_PREFIX = /\A(\d{1,2}):(\d{2})\s*[-–—]\s*(.+)\z/m
+
+  # Splits a summary into its duration and its name.
+  # @param summary [String, nil]
+  # @return [Array(String, String), nil] The "H:MM" duration and the name, or nil for a summary
+  #   with no duration at its start.
+  def split_duration_prefix(summary)
+    match = summary.to_s.strip.match(DURATION_PREFIX)
     return if match.nil?
 
-    (match[1].to_i * 60) + match[2].to_i
+    [ "#{match[1]}:#{match[2]}", match[3] ]
+  end
+
+  # Changes the "H:MM - " duration at the start into minutes, or gives nil if it is absent.
+  def parse_duration_prefix(name)
+    duration, _name = split_duration_prefix(name)
+    return if duration.nil?
+
+    hours, minutes = duration.split(":").map(&:to_i)
+    (hours * 60) + minutes
   end
 
   # Removes the "H:MM - " duration from the start of a workout name. For example, "2:00 - Gibbs"
   # becomes "Gibbs".
   def strip_duration_prefix(name)
-    match = name.match(/\A(\d{1,2}):(\d{2})\s*[-–—]\s*(.+)\z/m)
-    match ? match[3] : name
+    _duration, rest = split_duration_prefix(name)
+    rest || name
   end
 
   # Removes the TrainerRoad "Description:" label from an event description.
@@ -234,11 +250,9 @@ class TrainerRoad < ApplicationService
   # @return [Hash, nil] A hash with the data of the workout, or nil if the summary of the event
   #   does not have the correct format.
   def parse_workout(event)
-    match_data = /(\d+:\d+) - (.+)/.match(event.summary)
-    return nil if match_data.blank?
+    duration, name = split_duration_prefix(event.summary)
+    return nil if duration.nil?
 
-    duration = match_data[1]
-    name = match_data[2]
     discipline = determine_discipline(name)
 
     summary = human_readable_summary(duration, discipline)

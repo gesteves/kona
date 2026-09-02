@@ -13,6 +13,15 @@ module FontAwesomeClient
   # cache.
   TOKEN_EXPIRY_MARGIN = 60
 
+  # The limits of one call. The client makes the schema at its first use, in a request, thus the
+  # introspection needs a limit as each other call does.
+  OPEN_TIMEOUT = 5
+  READ_TIMEOUT = 15
+
+  # ⚠️ The first use makes the client and parses the query, and more than one Puma thread can
+  # reach that point at the same time. The lock makes it one client and one constant.
+  CLIENT_LOCK = Mutex.new
+
   ICONS_QUERY = <<-'GRAPHQL'
     query Icons ($version: String!, $query: String!) {
       search(version: $version, query: $query) {
@@ -39,7 +48,7 @@ module FontAwesomeClient
         "Content-Type" => "application/json"
       }
 
-      response = HTTParty.post("#{FONT_AWESOME_API_URL}/token", headers: headers)
+      response = HTTParty.post("#{FONT_AWESOME_API_URL}/token", headers: headers, timeout: READ_TIMEOUT)
       unless response.success?
         ErrorReporter.report_upstream("HTTP #{response.code}", service: "FontAwesomeClient", context: "Font Awesome token", status: response.code, url: "#{FONT_AWESOME_API_URL}/token")
         return
@@ -62,16 +71,25 @@ module FontAwesomeClient
     end
 
     def client
-      @client ||= begin
-        http = GraphQL::Client::HTTP.new(FONT_AWESOME_API_URL) do
-          def headers(_context)
-            { "Authorization": "Bearer #{FontAwesomeClient.get_access_token(ENV['FONT_AWESOME_API_TOKEN'])}" }
+      CLIENT_LOCK.synchronize do
+        @client ||= begin
+          http = GraphQL::Client::HTTP.new(FONT_AWESOME_API_URL) do
+            def headers(_context)
+              { "Authorization": "Bearer #{FontAwesomeClient.get_access_token(ENV['FONT_AWESOME_API_TOKEN'])}" }
+            end
+
+            def connection
+              super.tap do |http|
+                http.open_timeout = FontAwesomeClient::OPEN_TIMEOUT
+                http.read_timeout = FontAwesomeClient::READ_TIMEOUT
+              end
+            end
           end
+          schema = GraphQL::Client.load_schema(http)
+          graphql_client = GraphQL::Client.new(schema: schema, execute: http)
+          graphql_client.allow_dynamic_queries = true
+          graphql_client
         end
-        schema = GraphQL::Client.load_schema(http)
-        graphql_client = GraphQL::Client.new(schema: schema, execute: http)
-        graphql_client.allow_dynamic_queries = true
-        graphql_client
       end
     end
 
@@ -80,7 +98,8 @@ module FontAwesomeClient
       # `query Icons`. The code must give that module a *name*: graphql-client makes the operation
       # name that it sends from the name of the module, thus a module with no name gives incorrect
       # GraphQL ("query #<Module:0x..>__Icons").
-      const_set(:Queries, client.parse(ICONS_QUERY)) unless const_defined?(:Queries, false)
+      parsed = client.parse(ICONS_QUERY) unless const_defined?(:Queries, false)
+      CLIENT_LOCK.synchronize { const_set(:Queries, parsed) unless const_defined?(:Queries, false) }
       self::Queries::Icons
     end
   end

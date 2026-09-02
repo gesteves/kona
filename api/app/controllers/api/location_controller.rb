@@ -18,12 +18,11 @@ module Api
         return render json: { error: "Missing coordinates" }, status: :unprocessable_content
       end
 
-      coordinates = Location.parse(params[:latitude], params[:longitude])
+      coordinates = Location.save(params[:latitude], params[:longitude])
       if coordinates.nil?
         return render json: { error: "Invalid coordinates" }, status: :unprocessable_content
       end
 
-      Location.store(*coordinates)
       head :no_content
     end
   end

@@ -3,8 +3,9 @@ require "nokogiri"
 module MarkupHelper
   # Renders a tag that is connected to the units Stimulus controller. It uses the content_tag form
   # with no block, on purpose: the block form needs an output buffer, and a presenter has none.
-  def units_tag(metric, imperial, tag = :span)
-    content_tag tag.to_sym, metric, "data-controller": "units", "data-units-imperial-value": imperial, "data-units-metric-value": metric, title: "#{metric} | #{imperial}"
+  # @param attrs [Hash] More attributes for the element, for example a class.
+  def units_tag(metric, imperial, tag = :span, **attrs)
+    content_tag tag.to_sym, metric, "data-controller": "units", "data-units-imperial-value": imperial, "data-units-metric-value": metric, title: "#{metric} | #{imperial}", **attrs
   end
 
   # Renders the Markdown body of a card into HTML. This is a small part of the render_body of the

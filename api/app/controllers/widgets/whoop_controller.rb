@@ -8,13 +8,11 @@ module Widgets
       # `safely` separates each upstream call. Thus a timeout or a raise gives "no data", and the
       # widget goes away or omits one section. It does not give a 500. Widgets::WeatherController
       # does the same.
-      location = Location.new
-      time_zone = safely("GoogleMaps") { TimeZoneResolver.call(location.latitude, location.longitude) } ||
-                  TimeZoneResolver.default
+      time_zone = time_zone_of(Location.new)
       stats = safely("Whoop") { Whoop.new.stats }
       return render_empty if stats.nil?
 
-      workouts = safely("TrainerRoad", []) { TrainerRoad.new(time_zone).workouts } || []
+      workouts = planned_workouts(time_zone)
       @whoop = WhoopPresenter.new(stats: stats, workouts: workouts, time_zone: time_zone)
       render :show
     end
