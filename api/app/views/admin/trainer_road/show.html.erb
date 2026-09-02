@@ -1,0 +1,22 @@
+<% content_for :title, t("admin.networks.trainer_road") %>
+
+<p class="connected-app__back"><%= link_to t("admin.back_to_connected_apps"), connected_apps_path %></p>
+
+<h1 class="admin-main__title"><%= t("admin.networks.trainer_road") %></h1>
+
+<p class="connected-app__description">
+  <%= t(".description") %>
+</p>
+
+<%= form_with url: trainer_road_connection_path, method: :post, class: "wa-stack wa-gap-l" do %>
+  <%# ⚠️ The page never renders the stored URL into the field. The GUID at its end is the %>
+  <%# credential. It only says if a URL exists. %>
+  <wa-input type="url" name="calendar_url" label="<%= t(".calendar_url") %>" autocomplete="off"
+            placeholder="<%= t(".calendar_url_placeholder") %>" required
+            hint="<%= @stored ? t(".calendar_url_hint") : t(".calendar_url_help") %>">
+  </wa-input>
+
+  <div class="wa-cluster wa-gap-s">
+    <wa-button type="submit" variant="brand" appearance="accent"><%= t(".connect") %></wa-button>
+  </div>
+<% end %>

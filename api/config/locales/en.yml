@@ -101,6 +101,7 @@ en:
       bluesky: "Bluesky"
       mastodon: "Mastodon"
       threads: "Threads"
+      trainer_road: "TrainerRoad"
       whoop: "Whoop"
 
     connected_apps:
@@ -126,6 +127,7 @@ en:
           Standard.site records."
         mastodon: "Shares posts in Mastodon."
         threads: "Shares posts in Threads."
+        trainer_road: "Reads planned workouts from your TrainerRoad calendar."
         whoop: "Syncs strain, sleep, and recovery to Intervals.icu, and powers the Whoop widget."
       # ⚠️ Each of these is a COMPLETE sentence, and the code does not join one from parts. The
       # date is optional, thus there are two keys and not one key with a fragment in it.
@@ -192,6 +194,20 @@ en:
 
     # ⚠️ Mastodon and Threads both use this one. The two messages were the same words in two
     # places, thus a change to one of them left the other one behind.
+    trainer_road:
+      show:
+        connect: "Connect"
+        description: "Reads the planned workouts of your TrainerRoad calendar. Copy the calendar
+          sync URL from your TrainerRoad calendar settings."
+        calendar_url: "Calendar URL"
+        calendar_url_help: "The iCalendar feed of your TrainerRoad calendar."
+        calendar_url_hint: "A calendar URL is saved. Entering one replaces it."
+        calendar_url_placeholder: "https://www.trainerroad.com/app/calendar/…"
+      flash:
+        connected: "TrainerRoad connected."
+        disconnected: "TrainerRoad disconnected."
+        refused: "That URL didn't give a calendar. Check the calendar sync URL in TrainerRoad."
+
     oauth:
       invalid_state: "That authorization is not valid or it expired. Connect the account again."
 

@@ -7,12 +7,16 @@ RSpec.describe "Admin connected apps", type: :request do
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
-    # Bluesky and Mastodon each have their own card on this page. Remove their credentials, thus
-    # the Whoop examples do not depend on the credentials that are available.
-    $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY, ThreadsCredentials::REDIS_KEY)
+    # Bluesky, Mastodon, and TrainerRoad each have their own card on this page. Remove their
+    # credentials, thus the Whoop examples do not depend on the credentials that are available.
+    $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY, ThreadsCredentials::REDIS_KEY,
+               TrainerRoadCredentials::REDIS_KEY)
   end
 
-  after { $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY, ThreadsCredentials::REDIS_KEY) }
+  after do
+    $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY, ThreadsCredentials::REDIS_KEY,
+               TrainerRoadCredentials::REDIS_KEY)
+  end
 
   def sign_in!
     sign_in_as(email: owner_email)
@@ -34,12 +38,13 @@ RSpec.describe "Admin connected apps", type: :request do
         expect(response.body).not_to include("/whoop/auth")
       end
 
-      # Bluesky and Mastodon need no configuration, thus the page is never empty.
+      # Bluesky, Mastodon, and TrainerRoad need no configuration, thus the page is never empty.
       it "still renders the cards that need no configuration" do
         get "/connected-apps"
 
         expect(response.body).to include(I18n.t("admin.networks.bluesky"))
         expect(response.body).to include(I18n.t("admin.networks.mastodon"))
+        expect(response.body).to include(I18n.t("admin.networks.trainer_road"))
       end
     end
 
@@ -211,6 +216,45 @@ RSpec.describe "Admin connected apps", type: :request do
         get "/connected-apps"
 
         expect(response.body).not_to include("tok-en")
+      end
+    end
+  end
+
+  describe "the TrainerRoad card" do
+    before do
+      sign_in!
+      allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(false)
+    end
+
+    it "offers a link to the calendar form when no feed is connected" do
+      get "/connected-apps"
+
+      expect(response.body).to include(I18n.t("admin.networks.trainer_road"))
+      expect(response.body).to include("/connected-apps/trainerroad")
+      expect(response.body).to include(I18n.t("admin.connected_apps.status.disconnected"))
+    end
+
+    context "when a feed is connected" do
+      before do
+        TrainerRoadCredentials.store(
+          calendar_url: "https://www.trainerroad.com/app/calendar/00000000-0000-4000-8000-000000000000"
+        )
+      end
+
+      # A calendar feed has no account, thus the card says only that it is connected.
+      it "reports it as connected and offers Disconnect" do
+        get "/connected-apps"
+
+        expect(response.body).to include(I18n.t("admin.connected_apps.account.unnamed"))
+        expect(response.body).to match(%r{<form[^>]*action="/connected-apps/trainerroad"}m)
+        expect(response.body).to include('name="_method" value="delete"')
+      end
+
+      # ⚠️ The GUID at the end of the URL is the credential.
+      it "never renders the stored URL" do
+        get "/connected-apps"
+
+        expect(response.body).not_to include("00000000-0000-4000-8000-000000000000")
       end
     end
   end

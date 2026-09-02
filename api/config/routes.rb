@@ -129,6 +129,12 @@ Rails.application.routes.draw do
       get    "connected-apps/threads/callback"  => "threads#callback",  as: :threads_callback
       delete "connected-apps/threads"           => "threads#destroy",   as: :threads_connection
 
+      # TrainerRoad is a calendar feed and not an account with an OAuth flow: the URL is the
+      # connection. Thus it needs a form of its own, as Bluesky does.
+      get    "connected-apps/trainerroad" => "trainer_road#show",    as: :trainer_road_connection
+      post   "connected-apps/trainerroad" => "trainer_road#create",  as: nil
+      delete "connected-apps/trainerroad" => "trainer_road#destroy", as: nil
+
       # The current location, on a map. The POST writes the same Redis key as the
       # POST /api/location that needs a bearer token, through Location.store. The lookup finds an
       # address or names a pair of coordinates and writes **nothing**, which is what lets the page

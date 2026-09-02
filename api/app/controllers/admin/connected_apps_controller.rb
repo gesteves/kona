@@ -6,10 +6,11 @@ module Admin
     #
     # ⚠️ A card is on the page only when its integration can operate. Whoop and Threads need
     # credentials in the environment, thus without those the page hides the card and does not offer
-    # an action that cannot work. Bluesky and Mastodon have no such configuration — their
-    # credentials *are* the connection — thus they are always here and the list is never empty.
+    # an action that cannot work. Bluesky, Mastodon, and TrainerRoad have no such configuration —
+    # their credentials *are* the connection — thus they are always here and the list is never
+    # empty.
     def show
-      @apps = [ bluesky_app, mastodon_app, threads_app, whoop_app ].compact
+      @apps = [ bluesky_app, mastodon_app, threads_app, trainer_road_app, whoop_app ].compact
     end
 
     # DELETE /connected-apps/whoop
@@ -98,6 +99,25 @@ module Admin
         refresh_error_message(service.refresh_error, name: t("admin.networks.threads"),
                               consequence: t("admin.connected_apps.threads.consequence"))
       end
+    end
+
+    # ⚠️ The calendar URL *is* the connection: there is no deploy configuration, thus this card is
+    # always on the page. It names no account, because a feed has none, and a request to read the
+    # name of the calendar is what the rule below stops.
+    def trainer_road_app
+      service = TrainerRoad.new
+
+      ConnectedAppPresenter.new(
+        name: t("admin.networks.trainer_road"),
+        description: card_description(
+          connected: service.connected?,
+          account: nil,
+          summary: t("admin.connected_apps.summary.trainer_road")
+        ),
+        connected: service.connected?,
+        connect_path: trainer_road_connection_path,
+        disconnect_path: trainer_road_connection_path
+      )
     end
 
     # @return [ConnectedAppPresenter, nil] Nil without the Whoop OAuth credentials, thus the page

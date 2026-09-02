@@ -64,6 +64,7 @@ edge serves a cached copy before it gets a new one.
 | GET/POST/DELETE | `/connected-apps/bluesky` | the Bluesky handle + app password form, and disconnect | `no-store` |
 | GET/POST/DELETE | `/connected-apps/mastodon`; GET `/connected-apps/mastodon/callback` | the Mastodon instance form, the OAuth callback, and disconnect | `no-store` |
 | GET | `/connected-apps/threads/authorize`, `/connected-apps/threads/callback`; DELETE `/connected-apps/threads` | Threads OAuth, and disconnect | `no-store` |
+| GET/POST/DELETE | `/connected-apps/trainerroad` | the TrainerRoad calendar-URL form, and disconnect | `no-store` |
 | GET | `/location/lookup` | resolves an `address` or a coordinate pair to `{latitude, longitude, place}`. ⚠️ **Never writes** | `no-store` |
 | POST | `/location` | same write as `POST /api/location`, coordinates only; answers with the coordinates and the geocoded place | `no-store` |
 | POST | `/republish` | starts a build of the web site after the minutes that the owner picks, where zero is now. The Republish dialog of the nav posts here | `no-store` |
@@ -125,10 +126,11 @@ The two article rankings, `TrendingArticles` and `RelatedArticles`, share `Artic
 more classes hold the parts of the "You May Also Like" score: `ArticleIndex` is the BM25 index of
 the article text, `ArticleTaxonomy` is the concept overlap, and `RelatedInspector` makes the two
 reports of `rake related:*`. Refer to **The article rankings**.
-Seven more are not subclasses of `ApplicationService`, because they are not cacheable reads:
-`SpamQuarantine`, `TrackLibrary`, `BlueskyCredentials`, `MastodonCredentials`, and
-`ThreadsCredentials` use Redis only and no HTTP; `GpxTrack` parses only; and `MapboxTileset` and `StaticMap` are different (refer to **The
-course-map renderer**). The three credential stores share the `EncryptedCredentials` concern,
+Eight more are not subclasses of `ApplicationService`, because they are not cacheable reads:
+`SpamQuarantine`, `TrackLibrary`, `BlueskyCredentials`, `MastodonCredentials`,
+`ThreadsCredentials`, and `TrainerRoadCredentials` use Redis only and no HTTP; `GpxTrack` parses
+only; and `MapboxTileset` and `StaticMap` are different (refer to **The
+course-map renderer**). The four credential stores share the `EncryptedCredentials` concern,
 which encrypts each secret field. ⚠️ **Never change the `ENCRYPTION_SALT` of a store**: the salt is
 part of the key, thus a new salt makes each stored secret unreadable and each card says "not
 connected".
@@ -687,8 +689,8 @@ A group is only a caption above its own `<ul>` of those same links:
   `_base.scss` gives to each inline SVG. The viewBox of a Font Awesome icon is not always square,
   thus at an automatic width no two labels in the column start at the same x.
 
-**Connected apps** (`/connected-apps`) connects Whoop, Bluesky, Mastodon, and Threads, and
-disconnects them.
+**Connected apps** (`/connected-apps`) connects Whoop, Bluesky, Mastodon, Threads, and
+TrainerRoad, and disconnects them.
 `ConnectedAppPresenter` renders three states from `connected?` and an optional `error:` string. The
 third state, `:error`, means connected but broken, and it gives **both** Reconnect and Disconnect. A
 new authorization is the correction, and a rule to disconnect first would remove the one thing that
@@ -697,11 +699,12 @@ makes this state different from a new setup.
 ⚠️ **A card is on the page only when its integration can operate.** `#show` calls `valid_credentials?`
 and leaves out the card of an integration whose credentials are absent from the environment, thus
 there is no `:unconfigured` state and no card that offers no action. Today that applies to **Whoop**
-and **Threads**. Bluesky and Mastodon have no such configuration — their credentials *are* the
-connection — thus their cards are always there and the page is never empty.
+and **Threads**. Bluesky, Mastodon, and TrainerRoad have no such configuration — their credentials
+*are* the connection — thus their cards are always there and the page is never empty.
 
 **A card that is connected names its account** — "Connected as …" — and a card that is not connected
-says what the integration does. `#card_description` makes that one line for each of the four.
+says what the integration does. `#card_description` makes that one line for each of the five.
+TrainerRoad names none: a calendar feed has no account, thus its connected card says "Connected."
 ⚠️ **Each of those names comes from Redis, and no card makes a request to get one.** That page
 renders on each load of the admin, thus a fetch would put an upstream failure in the path of the
 navigation. `StandardSite#connected?` has the same rule, and its comment gives the reason.
@@ -829,6 +832,22 @@ hangs gives a 500 in place of the message of the page, and a disconnect never re
     green badge and a post job that retried for 24 hours.
   - ⚠️ **A token response with no `expires_in` gets `DEFAULT_TOKEN_LIFETIME`.** With `nil.to_i`
     the token expired at once, and `refresh!` then never touched it.
+- **TrainerRoad** is a calendar feed and not an account: the iCalendar URL *is* the connection.
+  Thus it connects with a form at `/connected-apps/trainerroad`, as Bluesky does, and
+  `Admin::TrainerRoadController` has all three of its actions. `TrainerRoadCredentials` keeps the
+  URL in the Redis hash `trainerroad:credentials`. ⚠️ **That page is the only method to set it, and
+  there is no environment variable.** Thus the rest-day check and the 🗓️ planned-workout line do
+  nothing in a new environment until a person connects the feed.
+  - ⚠️ **The code encrypts the URL at rest**, through `EncryptedCredentials`, because a TrainerRoad
+    iCal URL ends with a GUID that *is* the credential: it gives the full calendar to each person
+    who has the URL. `TrainerRoad#calendar_version`, which is the digest that each cache key holds,
+    exists for the same reason.
+  - ⚠️ **`TrainerRoad#connect!` gets the feed and parses it before it stores the URL**, with
+    `CONNECT_TIMEOUT`. A URL with a typing error, stored with no check, makes each rest-day check
+    and each planned-workout line fail with no message.
+  - The card names no account, because a feed has none, thus a connected card says "Connected."
+    A request to read the name of the calendar would put an upstream failure in the path of the
+    navigation, which is the rule above.
 
 ### The Social media page
 
@@ -2015,7 +2034,7 @@ value is a secret of fly.io, and Rails also uses `config/credentials.yml.enc` an
   check; with a value the check fails closed), `TURNSTILE_SECRET` (use it with the
   `TURNSTILE_SITE_KEY` of the web app; set both or set neither),
   `CSP_ENFORCE` (any value enforces the CSP for the owner; with no value the CSP is Report-Only),
-  `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`, `TRAINERROAD_CALENDAR_URL`, `ANTHROPIC_API_KEY` with
+  `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`, `ANTHROPIC_API_KEY` with
   `ANTHROPIC_DESCRIPTION_MODEL` and `ANTHROPIC_CONTACT_SUBJECT_MODEL` (the default of both is
   `claude-sonnet-5`), `PURPLEAIR_API_KEY`, `GOODSPEED_API_URL` (with no value the bay-conditions
   integration is off, and the app omits the sentence about the water temperature and the bay
@@ -2023,7 +2042,8 @@ value is a secret of fly.io, and Rails also uses `config/credentials.yml.enc` an
   app password of Bluesky are **not** environment variables: a person sets them on the Connected
   apps page of the admin, and the app stores them in Redis. ⚠️ **Mastodon has no environment
   variable at all**: the app registers itself on the instance that the owner names, and the same
-  page is the only method to connect it), `THREADS_APP_ID` and `THREADS_APP_SECRET` (the Threads app
+  page is the only method to connect it. ⚠️ **The TrainerRoad calendar URL is not an environment
+  variable either**: the same page is the only method to set it), `THREADS_APP_ID` and `THREADS_APP_SECRET` (the Threads app
   of the Meta dashboard. ⚠️ There is no redirect-URI variable: the callback URL comes from the
   request, and the dashboard must list `https://<your-admin-host>/connected-apps/threads/callback`.
   ⚠️ The *account* is connected on the admin page, and its token lives 60 days and cannot be renewed

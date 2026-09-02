@@ -1,7 +1,9 @@
 require "rails_helper"
 
 RSpec.describe TrainerRoad do
-  subject(:service) { described_class.new("America/Denver") }
+  subject(:service) { described_class.new("America/Denver", calendar_url: calendar_url) }
+
+  let(:calendar_url) { "https://example.test/calendar.ics" }
 
   # #planned_workouts and #workouts share this, because both parse the same feed.
   def ics(events)
@@ -26,6 +28,79 @@ RSpec.describe TrainerRoad do
     allow(HTTParty).to receive(:get).and_return(
       instance_double(HTTParty::Response, success?: true, body: ics(events))
     )
+  end
+
+  describe "#connected?" do
+    it "is true with a stored feed" do
+      expect(service).to be_connected
+    end
+
+    context "when no feed is connected" do
+      let(:calendar_url) { nil }
+
+      it "is false" do
+        expect(service).not_to be_connected
+      end
+    end
+  end
+
+  # ⚠️ A URL with a typing error, stored with no check, makes each rest-day check and each
+  # planned-workout line fail with no message. The admin form exists to show that failure.
+  describe "#connect!" do
+    before { allow(TrainerRoadCredentials).to receive(:store) }
+
+    it "stores the URL when the feed parses as a calendar" do
+      stub_calendar([ { all_day: true, summary: "1:00 - Petit" } ])
+
+      expect(service.connect!).to be(true)
+      expect(TrainerRoadCredentials).to have_received(:store).with(calendar_url: calendar_url)
+    end
+
+    it "stores nothing when the feed answers with a failure" do
+      allow(HTTParty).to receive(:get).and_return(
+        instance_double(HTTParty::Response, success?: false, code: 404, body: "")
+      )
+
+      expect(service.connect!).to be(false)
+      expect(TrainerRoadCredentials).not_to have_received(:store)
+    end
+
+    it "stores nothing when the body is not a calendar" do
+      allow(HTTParty).to receive(:get).and_return(
+        instance_double(HTTParty::Response, success?: true, body: "<html>Sign in</html>")
+      )
+
+      expect(service.connect!).to be(false)
+      expect(TrainerRoadCredentials).not_to have_received(:store)
+    end
+
+    it "stores nothing when the host cannot be reached" do
+      allow(HTTParty).to receive(:get).and_raise(SocketError)
+
+      expect(service.connect!).to be(false)
+      expect(TrainerRoadCredentials).not_to have_received(:store)
+    end
+
+    context "when the form was empty" do
+      let(:calendar_url) { nil }
+
+      it "makes no request" do
+        allow(HTTParty).to receive(:get)
+
+        expect(service.connect!).to be(false)
+        expect(HTTParty).not_to have_received(:get)
+      end
+    end
+  end
+
+  describe "#disconnect!" do
+    it "clears the stored URL" do
+      allow(TrainerRoadCredentials).to receive(:clear)
+
+      service.disconnect!
+
+      expect(TrainerRoadCredentials).to have_received(:clear)
+    end
   end
 
   describe "#determine_discipline" do
@@ -70,7 +145,6 @@ RSpec.describe TrainerRoad do
     before do
       allow($redis).to receive(:get).and_return(nil)
       allow($redis).to receive(:setex)
-      stub_const("TrainerRoad::CALENDAR_URL", "https://example.test/calendar.ics")
     end
 
     it "returns all-day workouts with the duration prefix stripped and the description cleaned" do
@@ -125,10 +199,12 @@ RSpec.describe TrainerRoad do
       expect(sports).to contain_exactly("Swimming", "Running", "Cycling")
     end
 
-    it "returns [] when no feed is configured" do
-      stub_const("TrainerRoad::CALENDAR_URL", nil)
+    context "when no feed is connected" do
+      let(:calendar_url) { nil }
 
-      expect(service.planned_workouts(date)).to eq([])
+      it "returns []" do
+        expect(service.planned_workouts(date)).to eq([])
+      end
     end
 
     it "raises on an HTTP failure so callers can degrade explicitly" do
@@ -153,13 +229,14 @@ RSpec.describe TrainerRoad do
     before do
       allow($redis).to receive(:get).and_return(nil)
       allow($redis).to receive(:setex)
-      stub_const("TrainerRoad::CALENDAR_URL", "https://example.test/calendar.ics")
     end
 
-    it "returns nil when no feed is configured" do
-      stub_const("TrainerRoad::CALENDAR_URL", nil)
+    context "when no feed is connected" do
+      let(:calendar_url) { nil }
 
-      expect(service.workouts).to be_nil
+      it "returns nil" do
+        expect(service.workouts).to be_nil
+      end
     end
 
     it "returns today's workouts, sorted swim then bike then run" do

@@ -21,7 +21,7 @@ Copy `.env.example` to `.env` for local development; in production set these as 
 ### Optional services
 
 - **Purple Air** — hyperlocal AQI from the nearest sensor (falls back to Google). Set `PURPLEAIR_API_KEY`.
-- **TrainerRoad** — checks whether today is a rest day to adjust messaging. Set `TRAINERROAD_CALENDAR_URL` (the calendar-sync iCalendar feed).
+- **TrainerRoad** — checks whether today is a rest day to adjust messaging. Connect the calendar-sync iCalendar feed on the admin's Connected apps page; there's no environment variable.
 - **Plausible** — per-article pageview counts and the trending-articles ranking. Set `PLAUSIBLE_API_KEY`, `PLAUSIBLE_SITE_ID`.
 - **Location** — set `LOCATION` to a `"latitude,longitude"` pair, or leave it unset and POST the coordinates instead. `LOCATION` takes precedence; otherwise the value set via POST (stored in Redis) is used:
 

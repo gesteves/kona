@@ -3,22 +3,52 @@ require "icalendar"
 # Reads the planned workouts from a TrainerRoad iCalendar feed, for the rest-day check and for the
 # planned-workout line that the description generator writes.
 class TrainerRoad < ApplicationService
-  CALENDAR_URL = ENV["TRAINERROAD_CALENDAR_URL"]
   DISCIPLINE_ORDER = { "Swim" => 1, "Bike" => 2, "Run" => 3 }
 
+  # The timeout of the check that #connect! makes. That action runs in a request with a 20-second
+  # rack-timeout, and that timeout raises an exception that `rescue_with` does not catch.
+  CONNECT_TIMEOUT = 10
+
+  # The feed that the owner connected. The Connected apps page reads it.
+  # @return [String, nil]
+  attr_reader :calendar_url
+
   # @param timezone [String] The timezone for "today".
-  def initialize(timezone = "America/Denver")
+  # @param calendar_url [String, nil] The feed. The default is the URL that the admin stored.
+  def initialize(timezone = "America/Denver", calendar_url: TrainerRoadCredentials.fetch)
     @timezone = timezone
+    @calendar_url = calendar_url
   end
+
+  # @return [Boolean] True if a feed is connected.
+  def connected? = @calendar_url.present?
+
+  # Checks the feed of this instance and stores its URL.
+  #
+  # ⚠️ It gets the feed and parses it before it stores the URL. A URL with a typing error, that the
+  # code stores with no check, makes each rest-day check and each planned-workout line fail, and it
+  # gives no message.
+  # @return [Boolean] True if the feed answered with a calendar and the code stored the URL.
+  def connect!
+    return false if @calendar_url.blank?
+    return false unless calendar_feed?
+
+    TrainerRoadCredentials.store(calendar_url: @calendar_url)
+    true
+  end
+
+  # Removes the stored feed.
+  # @return [void]
+  def disconnect! = TrainerRoadCredentials.clear
 
   # The workouts of today. The cache holds them for 5 minutes.
   # @return [Array<Hash>, nil] The workouts, or nil if there is no feed in the configuration.
   def workouts
-    return if CALENDAR_URL.blank?
+    return if @calendar_url.blank?
 
     cache_key = "trainerroad:workouts:#{@timezone}:#{calendar_version}"
     cached_json(cache_key, expires_in: 5.minutes) do
-      response = HTTParty.get(CALENDAR_URL)
+      response = HTTParty.get(@calendar_url)
       unless response.success?
         report_upstream_error("HTTP #{response.code}", context: "TrainerRoad calendar", status: response.code)
         next []
@@ -48,7 +78,7 @@ class TrainerRoad < ApplicationService
   # @param timezone [String] The IANA timezone for a timed event.
   # @return [Array<Hash>] Hashes with :name, :sport, and :description.
   def planned_workouts(date, timezone: @timezone)
-    return [] if CALENDAR_URL.blank?
+    return [] if @calendar_url.blank?
 
     cache_key = "trainerroad:planned:#{date}:#{timezone}:#{calendar_version}"
     cached_json(cache_key, expires_in: 5.minutes) do
@@ -74,7 +104,18 @@ class TrainerRoad < ApplicationService
   # key can show. A digest also changes the cache when the URL changes.
   # @return [String] An 8-character digest of the calendar URL.
   def calendar_version
-    cache_version(CALENDAR_URL)
+    cache_version(@calendar_url)
+  end
+
+  # Gets the feed one time, to know that the URL names a true calendar.
+  # @return [Boolean] True if the feed answered and it parses as an iCalendar.
+  def calendar_feed?
+    response = HTTParty.get(@calendar_url, timeout: CONNECT_TIMEOUT)
+    return false unless response.success?
+
+    !Icalendar::Calendar.parse(response.body).first.nil?
+  rescue StandardError
+    false
   end
 
   # Gets and parses each VEVENT in the feed.
@@ -82,10 +123,10 @@ class TrainerRoad < ApplicationService
   # @raise [ApplicationService::HttpError] If it fails. The caller counts that as "no planned
   #   workouts" and does not stop the job.
   def fetch_calendar_events
-    response = HTTParty.get(CALENDAR_URL)
+    response = HTTParty.get(@calendar_url)
     unless response.success?
       report_upstream_error("HTTP #{response.code}", context: "TrainerRoad calendar", status: response.code)
-      raise ApplicationService::HttpError.new(response.code, response.body, CALENDAR_URL)
+      raise ApplicationService::HttpError.new(response.code, response.body, @calendar_url)
     end
 
     calendar = Icalendar::Calendar.parse(response.body).first
