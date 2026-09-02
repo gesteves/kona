@@ -77,8 +77,9 @@ module Admin
 
       redirect_to course_maps_path, status: :see_other, notice: t("admin.course_maps.flash.deleted", title: record["title"])
     rescue StandardError => e
+      # The log holds the message of Mapbox. The page names the class only.
       Rails.logger.error("Maps: could not delete #{params[:id]} (#{e.class}: #{e.message})")
-      redirect_to course_maps_path, status: :see_other, alert: t("admin.course_maps.flash.delete_failed", error: e.message)
+      redirect_to course_maps_path, status: :see_other, alert: t("admin.course_maps.flash.delete_failed", error: e.class.name)
     end
 
     # GET /course-maps/:id/preview

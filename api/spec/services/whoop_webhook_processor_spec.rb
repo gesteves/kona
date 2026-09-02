@@ -136,6 +136,16 @@ RSpec.describe WhoopWebhookProcessor do
       expect(intervals).to have_received(:update_wellness!).with("2026-01-02", WhoopSleepPerformance: 88).twice
     end
 
+    # A retry cannot make this payload parse, thus the code reports it and writes nothing.
+    it "reports an offset that it cannot read and skips the write, and does not raise" do
+      allow(whoop).to receive(:get_sleep).and_return(sleep_data.merge(timezone_offset: "PST"))
+      allow(ErrorReporter).to receive(:report_upstream)
+
+      expect { processor.process("sleep.updated", "s1") }.not_to raise_error
+      expect(intervals).not_to have_received(:update_wellness!)
+      expect(ErrorReporter).to have_received(:report_upstream).with(a_string_including("PST"), hash_including(service: "WhoopWebhookProcessor"))
+    end
+
     it "skips naps" do
       allow(whoop).to receive(:get_sleep).and_return(sleep_data.merge(nap: true))
 
@@ -264,13 +274,10 @@ RSpec.describe WhoopWebhookProcessor do
   end
 
   describe "offset parsing" do
-    it "raises on an unrecognized offset" do
-      allow(whoop).to receive(:raw_cycles).and_return([])
-      allow(whoop).to receive(:get_sleep).and_return(
-        { id: "s1", cycle_id: 1, nap: false, end: "2026-01-02T04:30:00Z", timezone_offset: "EST", score_state: "SCORED", score: { sleep_performance_percentage: 90 } }
-      )
-
-      expect { processor.process("sleep.updated", "s1") }.to raise_error(ArgumentError, /Unrecognized fixed timezone offset/)
+    it "gives nil for an unrecognized offset, and reports it" do
+      allow(ErrorReporter).to receive(:report_upstream)
+      expect(processor.send(:local_date_from_offset, "2026-01-01T12:00:00Z", "PST")).to be_nil
+      expect(ErrorReporter).to have_received(:report_upstream)
     end
   end
 end

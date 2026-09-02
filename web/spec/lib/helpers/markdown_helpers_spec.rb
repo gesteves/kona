@@ -1,6 +1,14 @@
 require 'spec_helper'
 
 RSpec.describe MarkdownHelpers do
+  describe '#heading_text' do
+    it 'applies the typography and removes or escapes the markup of a title' do
+      expect(heading_text(%q(It's a <b>big</b> "race" & more))).to eq('It’s a big “race” &amp; more')
+      expect(heading_text('<script>x</script>')).to eq('')
+      expect(heading_text('')).to be_nil
+    end
+  end
+
   describe '#markdown_to_html' do
     context 'when text is provided' do
       let(:markdown) { '**bold** _italic_ [link](http://example.com)' }

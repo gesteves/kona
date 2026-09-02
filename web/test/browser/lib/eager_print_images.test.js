@@ -73,4 +73,28 @@ describe('eager_print_images', () => {
       'eager',
     ]);
   });
+
+  // ⚠️ Without this, one print makes each image on a long list load at once for the life of the
+  // page. An image that was eager before the print stays eager.
+  it('puts the images that it made eager back to lazy after the print', async () => {
+    const listeners = stubPrintMedia();
+    vi.resetModules();
+    await import(MODULE);
+
+    window.dispatchEvent(new Event('beforeprint'));
+    window.dispatchEvent(new Event('afterprint'));
+    expect(images().map((i) => i.getAttribute('loading'))).toEqual([
+      'lazy',
+      'lazy',
+      'eager',
+    ]);
+
+    listeners.forEach((handler) => handler({ matches: true }));
+    listeners.forEach((handler) => handler({ matches: false }));
+    expect(images().map((i) => i.getAttribute('loading'))).toEqual([
+      'lazy',
+      'lazy',
+      'eager',
+    ]);
+  });
 });

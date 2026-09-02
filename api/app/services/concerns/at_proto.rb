@@ -44,6 +44,16 @@ module AtProto
       encoded.rjust(13, TID_ALPHABET[0])
     end
 
+    # Reads the time of a TID that `new_tid` made.
+    # @param tid [String] A 13-character TID.
+    # @return [Time, nil] The time, or nil for a value with another shape.
+    def tid_time(tid)
+      return unless tid.to_s.match?(/\A[#{TID_ALPHABET}]{13}\z/)
+
+      value = tid.each_char.reduce(0) { |acc, char| (acc * 32) + TID_ALPHABET.index(char) }
+      Time.at(Rational(value >> 10, 1_000_000)).utc
+    end
+
     # Makes a record key for a new record, from the current time.
     #
     # ⚠️ The caller makes this **before** it adds a job, and the job then uses `putRecord`. Thus a
@@ -144,6 +154,14 @@ module AtProto
     # The keys are strings, thus the reference survives a round trip through the arguments of a
     # Sidekiq job with no change.
     written = JSON.parse(response.body.to_s) rescue {}
+    # ⚠️ A reply names this record by its uri AND its cid. A reference with no cid is not valid,
+    # and the PDS would refuse the next post of the thread with a message that names that post.
+    if written["cid"].blank?
+      Rails.logger.warn("#{at_proto_label}: putRecord #{collection}/#{rkey} gave no cid")
+      report_upstream_error("putRecord gave no cid", context: "#{at_proto_label} putRecord #{collection}/#{rkey}")
+      return
+    end
+
     { "uri" => written["uri"].presence || "at://#{@did}/#{collection}/#{rkey}", "cid" => written["cid"] }
   end
 

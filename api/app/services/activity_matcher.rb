@@ -70,7 +70,11 @@ module ActivityMatcher
     return false if strava_only?(icu_activity)
     return false if icu_activity[:start_date_local].blank?
 
-    icu_start = Time.find_zone!(timezone).parse(icu_activity[:start_date_local])
+    # A zone that Rails does not know, or a date that it cannot parse, is no match and no error.
+    zone = Time.find_zone(timezone)
+    icu_start = zone&.parse(icu_activity[:start_date_local])
+    return false if icu_start.nil? || whoop_workout[:start_time].nil?
+
     minutes_apart = ((icu_start - whoop_workout[:start_time]).abs / 60).to_i
 
     minutes_apart <= MAX_START_DIFF_MINUTES &&

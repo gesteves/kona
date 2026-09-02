@@ -42,9 +42,14 @@ class ArticleIndex
     b = @vectors[b_id]
     return 0.0 if a.blank? || b.blank?
 
-    # Walk the smaller vector, thus the cost follows the shorter of the two articles.
-    a, b = b, a if a.size > b.size
-    a.sum { |term, weight| weight * b.fetch(term, 0.0) }
+    # The value is symmetric, and RelatedArticles asks for each pair from both sides. One walk
+    # serves both.
+    @similarities ||= {}
+    @similarities[[ a_id, b_id ].sort] ||= begin
+      # Walk the smaller vector, thus the cost follows the shorter of the two articles.
+      a, b = b, a if a.size > b.size
+      a.sum { |term, weight| weight * b.fetch(term, 0.0) }
+    end
   end
 
   # The terms that give the similarity of two articles most of its value. `rake related:inspect`

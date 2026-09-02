@@ -42,24 +42,37 @@ RSpec.describe ActivityDescription::Generator do
     it "takes and releases a per-activity Redis lock" do
       generator.generate!("i1")
 
-      expect($redis).to have_received(:set).with("whoop:description_lock:i1", "1", nx: true, ex: 600)
-      expect($redis).to have_received(:del).with("whoop:description_lock:i1")
+      expect($redis).to have_received(:set).with("activity:description_lock:i1", "1", nx: true, ex: 600)
+      expect($redis).to have_received(:del).with("activity:description_lock:i1")
     end
 
     it "skips (and doesn't release the other run's lock) when the lock is held" do
       allow($redis).to receive(:set).and_return(false)
+      allow($redis).to receive(:get).with("activity:description_lock:i1").and_return("another-job")
 
-      generator.generate!("i1")
+      generator.generate!("i1", lock_token: "job-1")
 
       expect(intervals).not_to have_received(:activity!)
       expect($redis).not_to have_received(:del)
+    end
+
+    # ⚠️ A process that dies leaves the lock, and the retry comes some seconds later. Without this
+    # the retry would read its own lock as another run and skip with no error.
+    it "enters the lock that its own earlier attempt left" do
+      allow($redis).to receive(:set).and_return(false)
+      allow($redis).to receive(:get).with("activity:description_lock:i1").and_return("job-1")
+
+      generator.generate!("i1", lock_token: "job-1")
+
+      expect(intervals).to have_received(:activity!)
+      expect($redis).to have_received(:del).with("activity:description_lock:i1")
     end
 
     it "releases the lock even when the run raises" do
       allow(intervals).to receive(:activity!).and_raise("boom")
 
       expect { generator.generate!("i1") }.to raise_error("boom")
-      expect($redis).to have_received(:del).with("whoop:description_lock:i1")
+      expect($redis).to have_received(:del).with("activity:description_lock:i1")
     end
   end
 

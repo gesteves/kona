@@ -176,17 +176,10 @@ class SocialMentions
       end
     end
 
-    # ⚠️ It uses the URL pattern of Bluesky, which is the one that decides a link facet. Thus a
-    # string that becomes a link there is a link here, and one pattern holds that rule.
     # @param text [String]
     # @return [Array<Range>] The character ranges of each bare URL.
     def url_ranges(text)
-      ranges = []
-      text.scan(Bluesky::URL_PATTERN) do
-        start_char, end_char = Regexp.last_match.offset(1)
-        ranges << (start_char...end_char)
-      end
-      ranges
+      SocialText.url_ranges(text)
     end
   end
 end

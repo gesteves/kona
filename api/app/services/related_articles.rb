@@ -97,7 +97,7 @@ class RelatedArticles < ApplicationService
 
     scored = score_rows(article, pool, context)
     floor = floor_for(scored)
-    selected = select_by_mmr(mmr_pool(scored, count), count, context[:index]).map { |row| row[:id] }.to_set
+    selected = select_by_mmr(mmr_pool(scored, count, floor: floor), count, context[:index]).map { |row| row[:id] }.to_set
 
     rows = scored.sort_by { |row| -row[:score] }.map do |row|
       row.merge(above_floor: above_floor?(row, floor), selected: selected.include?(row[:id]))
@@ -145,9 +145,9 @@ class RelatedArticles < ApplicationService
   # candidates are all below the floor still gets a full list, and the best of a weak group is at
   # its start.
   # @return [Array<Hash>] The pool, the best first.
-  def mmr_pool(scored, count)
+  def mmr_pool(scored, count, floor: nil)
     ranked = scored.sort_by { |row| -row[:score] }
-    floor = floor_for(scored)
+    floor ||= floor_for(scored)
     above, below = ranked.partition { |row| above_floor?(row, floor) }
 
     preferred = above.first(MMR_POOL)

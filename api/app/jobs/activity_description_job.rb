@@ -11,7 +11,9 @@ class ActivityDescriptionJob < ApplicationJob
   # @param whoop_strain [Float, nil] The Whoop strain for the 🔥 line. Omit it when there is no Whoop
   #   data, and the description then has no such line.
   def perform(activity_id, whoop_strain = nil)
-    ActivityDescription::Generator.new.generate!(activity_id, whoop_strain: whoop_strain)
+    # The jid is the token of the lock, thus a retry of this job can enter the lock that its own
+    # attempt left.
+    ActivityDescription::Generator.new.generate!(activity_id, whoop_strain: whoop_strain, lock_token: jid)
     Rails.logger.info("Activity description generated for activity #{activity_id}")
   end
 end

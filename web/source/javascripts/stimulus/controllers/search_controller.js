@@ -26,7 +26,9 @@ export default class extends Controller {
     event.preventDefault();
     await loadPagefind();
     const modal = document.querySelector('pagefind-modal');
-    if (!modal?.open) return;
+    // ⚠️ Pagefind gives `open` as a method. A component whose `open` is a state property would
+    // read as closed here, thus the test names the type.
+    if (typeof modal?.open !== 'function') return;
 
     modal.open();
     initSearchTracking();

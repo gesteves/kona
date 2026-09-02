@@ -52,4 +52,16 @@ RSpec.describe MemoizationHelpers do
       expect(calls).to eq(2)
     end
   end
+
+  # ⚠️ A nil collection is a helper with no data, for example in a spec. The first call must still
+  # yield: `nil.equal?(nil)` is true, and a store with no entry gave nil back with no call.
+  it 'yields on the first call for a nil collection, then keeps the value' do
+    calls = 0
+    first = memoize_by_collection(:nil_collection, nil) { calls += 1; { a: 1 } }
+    second = memoize_by_collection(:nil_collection, nil) { calls += 1; { a: 2 } }
+
+    expect(first).to eq(a: 1)
+    expect(second).to equal(first)
+    expect(calls).to eq(1)
+  end
 end

@@ -81,7 +81,15 @@ class Threads < ApplicationService
 
   # How long the id of a media container stays in Redis. ⚠️ Meta expires a container after 24 hours,
   # thus a value above that would name a container that is gone.
-  CONTAINER_TTL = 20 * 60 * 60
+  # ⚠️ Longer than the 24-hour retry window of ApplicationJob. A shorter TTL leaves the last
+  # retries with no container, and each of those would make a new post.
+  CONTAINER_TTL = 25 * 60 * 60
+  # The time that the id of a published post stays, for a retry that comes after the publish.
+  PUBLISHED_TTL = 25 * 60 * 60
+
+  # The seconds that one token refresh holds the lock. A refresh and a reconnect at the same time
+  # would each write a token, and the second write resets the issue time of the first.
+  REFRESH_LOCK_TTL = 60
 
   # ⚠️ Meta needs time to process a container, and it answers `400 subcode 4279009` ("The requested
   # resource does not exist") for a publish that comes too early. Its documentation asks a caller to
@@ -189,6 +197,9 @@ class Threads < ApplicationService
     return :skipped unless connected?
     return :expired if @credentials.expired?
     return :too_soon unless @credentials.refreshable?
+    # ⚠️ One refresh at a time, as Whoop does. A refresh and a reconnect at the same time would
+    # each write a token, and the second write resets the issue time of the first.
+    return :busy unless $redis.set(REFRESH_LOCK_KEY, "1", nx: true, ex: REFRESH_LOCK_TTL)
 
     response = HTTParty.get(
       "#{GRAPH_URL}/refresh_access_token",
@@ -204,7 +215,11 @@ class Threads < ApplicationService
     end
 
     token = JSON.parse(response.body, symbolize_names: true)
-    return :failed if token[:access_token].blank?
+    if token[:access_token].blank?
+      # A 200 with no token is a failure that the Connected apps card would never show.
+      report_upstream_error("Threads gave no token", context: "Threads token refresh", status: response.code)
+      return :failed
+    end
 
     ThreadsCredentials.store_access_token(access_token: token[:access_token], expires_in: token[:expires_in])
     :refreshed
@@ -212,6 +227,8 @@ class Threads < ApplicationService
     Rails.logger.error("Error refreshing the Threads token: #{e}")
     report_upstream_error(e, context: "Threads token refresh")
     :failed
+  ensure
+    $redis.del(REFRESH_LOCK_KEY) if defined?(response)
   end
 
   # Removes the stored token and the account.
@@ -245,19 +262,25 @@ class Threads < ApplicationService
   # @return [String] The id of the post that Meta made.
   # @raise [RuntimeError] It raises at each failure, thus the job does the work again.
   def post!(text:, url: nil, idempotency_key:, reply_to_id: nil, topic: nil)
-    raise "Threads is not connected" unless connected?
-    raise "The Threads token expired; connect the account again" if expired?
+    raise ApplicationJob::PermanentError, "Threads is not connected" unless connected?
+    raise ApplicationJob::PermanentError, "The Threads token expired; connect the account again" if expired?
 
     text = text.to_s.strip
-    raise "The post is empty" if text.blank?
+    raise ApplicationJob::PermanentError, "The post is empty" if text.blank?
+
+    # ⚠️ A retry can come AFTER the publish: Sidekiq redelivers a job whose process died before the
+    # acknowledgement. The id of the published post is the answer, and no second post.
+    published = $redis.get(published_key(idempotency_key))
+    return published if published.present?
 
     container_id = container_for(text: text, url: url, key: idempotency_key,
                                  reply_to_id: reply_to_id, topic: topic)
     wait_for_container(container_id)
     published = publish_container(container_id)
 
-    # ⚠️ It forgets the container only after Meta published it. To forget it earlier would let a
-    # retry make a second post.
+    # ⚠️ It remembers the post and forgets the container only after Meta published it. To forget
+    # the container earlier would let a retry make a second post.
+    $redis.set(published_key(idempotency_key), published, ex: PUBLISHED_TTL)
     $redis.del(container_key(idempotency_key))
     published
   end
@@ -306,9 +329,15 @@ class Threads < ApplicationService
     profile if profile.present? && profile[:username].present?
   end
 
+  REFRESH_LOCK_KEY = "threads:refresh_lock".freeze
+
   # The Redis key that holds the container of one attempt.
   # @return [String]
   def container_key(key) = "threads:container:#{key}"
+
+  # The Redis key that holds the id of the post that an attempt published.
+  # @return [String]
+  def published_key(key) = "threads:published:#{key}"
 
   # Gets the container that a previous attempt made, or makes one.
   # @return [String] The container id.
@@ -362,12 +391,20 @@ class Threads < ApplicationService
   # @param container_id [String]
   # @return [void]
   def wait_for_container(container_id)
+    failures = 0
     CONTAINER_POLL_ATTEMPTS.times do |attempt|
-      case container_status(container_id)
+      status = container_status(container_id)
+      case status
       when "FINISHED", "PUBLISHED" then return
       when "ERROR"   then raise "Threads could not process the container #{container_id}"
       when "EXPIRED" then raise "The Threads container #{container_id} expired"
       end
+
+      # ⚠️ A read that fails is not "not ready". Meta that is away must not cost the full poll of
+      # 33 seconds at each attempt: three failures in a row end the poll, and the retry of the
+      # job is the wait.
+      failures = status.nil? ? failures + 1 : 0
+      raise "Threads did not answer for the container #{container_id}" if failures >= MAX_STATUS_FAILURES
 
       sleep CONTAINER_POLL_SECONDS unless Rails.env.test? || attempt == CONTAINER_POLL_ATTEMPTS - 1
     end
@@ -375,17 +412,23 @@ class Threads < ApplicationService
     raise "The Threads container #{container_id} is still not ready"
   end
 
+  MAX_STATUS_FAILURES = 3
+
   # @param container_id [String]
   # @return [String, nil] FINISHED, IN_PROGRESS, ERROR, EXPIRED, PUBLISHED, or nil when the read
-  #   fails. A read that fails counts as "not ready" and the caller tries again.
+  #   fails. The caller counts the failures.
   def container_status(container_id)
     response = HTTParty.get("#{API_URL}/#{container_id}",
                             query: { fields: "status", access_token: @credentials.access_token },
                             timeout: REQUEST_TIMEOUT)
-    return unless response.success?
+    unless response.success?
+      report_upstream_error("HTTP #{response.code}", context: "Threads container status", status: response.code)
+      return
+    end
 
     parse_json(response)&.dig(:status)
-  rescue StandardError
+  rescue StandardError => e
+    report_upstream_error(e, context: "Threads container status")
     nil
   end
 

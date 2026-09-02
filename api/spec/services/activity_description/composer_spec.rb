@@ -74,17 +74,13 @@ RSpec.describe ActivityDescription::Composer do
 
   describe ".heat_block" do
     it "rounds the adaptation score to a whole percentage" do
-      expect(described_class.heat_block(heat_adaptation_score: 72.4, swim: false)).to eq("🌡️ 72% heat adapted")
+      expect(described_class.heat_block(heat_adaptation_score: 72.4)).to eq("🌡️ 72% heat adapted")
     end
 
     it "suppresses a zero, sub-1% or nil adaptation score" do
-      expect(described_class.heat_block(heat_adaptation_score: 0, swim: false)).to be_nil
-      expect(described_class.heat_block(heat_adaptation_score: 0.4, swim: false)).to be_nil
-      expect(described_class.heat_block(heat_adaptation_score: nil, swim: false)).to be_nil
-    end
-
-    it "is suppressed entirely for swims" do
-      expect(described_class.heat_block(heat_adaptation_score: 72, swim: true)).to be_nil
+      expect(described_class.heat_block(heat_adaptation_score: 0)).to be_nil
+      expect(described_class.heat_block(heat_adaptation_score: 0.4)).to be_nil
+      expect(described_class.heat_block(heat_adaptation_score: nil)).to be_nil
     end
   end
 

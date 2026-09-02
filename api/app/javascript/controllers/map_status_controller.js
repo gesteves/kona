@@ -17,21 +17,33 @@ export default class extends Controller {
     this.poll();
   }
 
+  /**
+   * Stops the timer and the request that is out. ⚠️ Without the abort, a response that lands
+   * after a navigation reads the detached element, finds its rows still in the publish state, and
+   * later loads whatever page the owner moved to.
+   */
   disconnect() {
     this.stop();
+    this.aborter?.abort();
   }
 
   /** Starts the timer for the next check, or stops if no upload is in progress. */
   poll() {
     this.stop();
-    if (!this.pendingIds().length) return;
+    if (!this.element.isConnected || !this.pendingIds().length) return;
 
     this.timer = setTimeout(() => this.check(), INTERVAL);
   }
 
   async check() {
+    this.aborter?.abort();
+    this.aborter = new AbortController();
     try {
-      const response = await fetch(this.urlValue, { headers: { Accept: "application/json" } });
+      const response = await fetch(this.urlValue, {
+        headers: { Accept: "application/json" },
+        signal: this.aborter.signal,
+      });
+      if (!this.element.isConnected) return;
       if (!response.ok) return this.poll();
 
       const statuses = await response.json();

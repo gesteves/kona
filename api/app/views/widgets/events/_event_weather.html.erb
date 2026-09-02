@@ -120,10 +120,10 @@
     <% if event_day&.sunrise.present? || event_day&.sunset.present? %>
       <div class="event__weather-stat-group">
         <% if event_weather.sunrise.present? && event_weather.time_zone_id.present? %>
-          <span class="event__weather-stat" title="Sunrise"><span class="sr-only">Sunrise:</span> <%= raw icon_svg("classic", "light", "sunrise") %> <%= raw time_with_meridiem_abbr(event_weather.sunrise, event_weather.time_zone_id) %></span>
+          <span class="event__weather-stat" title="Sunrise"><span class="sr-only">Sunrise:</span> <%= raw icon_svg("classic", "light", "sunrise") %> <time datetime="<%= event_weather.sunrise %>"><%= raw time_with_meridiem_abbr(event_weather.sunrise, event_weather.time_zone_id) %></time></span>
         <% end %>
         <% if event_weather.sunset.present? && event_weather.time_zone_id.present? %>
-          <span class="event__weather-stat" title="Sunset"><span class="sr-only">Sunset:</span> <%= raw icon_svg("classic", "light", "sunset") %> <%= raw time_with_meridiem_abbr(event_weather.sunset, event_weather.time_zone_id) %></span>
+          <span class="event__weather-stat" title="Sunset"><span class="sr-only">Sunset:</span> <%= raw icon_svg("classic", "light", "sunset") %> <time datetime="<%= event_weather.sunset %>"><%= raw time_with_meridiem_abbr(event_weather.sunset, event_weather.time_zone_id) %></time></span>
         <% end %>
       </div>
     <% end %>

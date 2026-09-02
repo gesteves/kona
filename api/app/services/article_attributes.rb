@@ -2,6 +2,10 @@
 # that decides the canonical article path, and that path must stay the same as the permalink from
 # the web build.
 module ArticleAttributes
+  # ⚠️ Increase this when `derive` or `path` changes what it writes. Articles#list caches the
+  # result below a key that holds it, and the value would otherwise stay for its TTL.
+  VERSION = 1
+
   module_function
 
   # Makes the shared fields of a raw article item.

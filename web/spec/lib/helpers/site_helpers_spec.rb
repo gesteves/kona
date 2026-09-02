@@ -113,19 +113,17 @@ RSpec.describe SiteHelpers do
       ])
     end
 
-    it "adds every tag's feed on an article page" do
+    # ⚠️ Feed autodiscovery has no order of preference, thus a tag feed on an article page can send
+    # a reader to a narrow feed.
+    it 'advertises only the main site feed on an article page, whatever its tags' do
       @pc = OpenStruct.new(
         template: '/article.html', entry_type: 'Article', draft: false,
         contentful_metadata: OpenStruct.new(tags: [
-          OpenStruct.new(name: 'Triathlon', path: '/tagged/triathlon/'),
-          OpenStruct.new(name: 'Race Reports', path: '/tagged/race-reports/')
+          OpenStruct.new(id: 'triathlon', name: 'Triathlon', path: '/tagged/triathlon/'),
+          OpenStruct.new(id: 'half-distance', name: 'Half Distance', path: '/tagged/triathlon/half-distance/')
         ])
       )
-      expect(alternate_feed_links).to eq([
-        { href: 'https://example.com/feed.xml', title: 'My Site' },
-        { href: 'https://example.com/tagged/triathlon/feed.xml', title: 'My Site: Triathlon' },
-        { href: 'https://example.com/tagged/race-reports/feed.xml', title: 'My Site: Race Reports' }
-      ])
+      expect(alternate_feed_links).to eq([ { href: 'https://example.com/feed.xml', title: 'My Site' } ])
     end
 
     it 'advertises only the main site feed on a non-tag, non-post page' do
@@ -300,6 +298,20 @@ RSpec.describe SiteHelpers do
 
   # page_title tests `content.is_a?(Hash)`, and each true proxied content object is a Middleman
   # Mash, which is a Hash subclass with dot access. Hashie::Mash replaces one here.
+  describe '#content_summary' do
+    def data = OpenStruct.new(site: OpenStruct.new(meta_description: 'Site'))
+
+    # ⚠️ The Atom summary is plain text, thus the omission must be the character and not "...",
+    # which smartypants turns into `&hellip;`.
+    it 'cuts a long summary with a single ellipsis character' do
+      long = OpenStruct.new(summary: 'word ' * 100, entry_type: 'Article', intro: nil)
+      text = content_summary(long)
+      expect(text.length).to be <= SiteHelpers::SUMMARY_LENGTH
+      expect(text).to end_with('…')
+      expect(text).not_to include('...')
+    end
+  end
+
   describe '#title_tag' do
     include Padrino::Helpers
 

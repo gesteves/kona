@@ -22,7 +22,7 @@
   <header class="entry__header">
     <%= partial 'partials/article/meta', locals: { article: article, show_draft: false, show_tags: false, tracking_section: tracking_section } %>
     <h3 class="entry__hed" id="<%= entry_heading_id(article, scope: id_scope) %>">
-      <%= link_to smartypants(article.title), article.path, class: article_click_classes(tracking_section) %>
+      <%= link_to heading_text(article.title), article.path, class: article_click_classes(tracking_section) %>
     </h3>
   </header>
   <% if !defined?(show_body) || show_body %>

@@ -100,6 +100,15 @@ function badGateway(): Response {
   });
 }
 
+/** True when `location`, read against `base`, is on the origin of `base`. */
+function sameOrigin(location: string, base: URL): boolean {
+  try {
+    return new URL(location, base).origin === base.origin;
+  } catch {
+    return false;
+  }
+}
+
 const ALLOWED_METHODS = ['GET', 'HEAD'];
 const ALLOWED_CONTACT_METHODS = ['POST'];
 
@@ -219,7 +228,11 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
   // headers, thus it must copy Location.
   if (isContact) {
     const location = upstream.headers.get('location');
-    if (location) headers.set('location', location);
+    // The origin sends the visitor to a page of the site. A Location on another host is not a
+    // page of the site, whatever sent it.
+    if (location && sameOrigin(location, incoming)) {
+      headers.set('location', location);
+    }
   }
 
   return new Response(upstream.body, {

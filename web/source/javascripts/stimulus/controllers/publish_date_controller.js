@@ -1,5 +1,37 @@
 import { Controller } from '@hotwired/stimulus';
 
+// One formatter for each timezone, for the whole page. A listing page has one controller for each
+// card, and each render made two formatters.
+const dateFormatters = new Map();
+
+/**
+ * @param {string} timeZone - An IANA timezone id, or an empty string for the zone of the viewer.
+ * @returns {Intl.DateTimeFormat}
+ */
+function dateFormatter(timeZone) {
+  if (!dateFormatters.has(timeZone)) {
+    let formatter;
+    try {
+      formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timeZone || undefined,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+    } catch {
+      // ⚠️ A TIME_ZONE with a mistake raises here, and that would remove each badge and each
+      // clock on the site. The zone of the viewer is the fallback.
+      formatter = new Intl.DateTimeFormat('en-CA', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+    }
+    dateFormatters.set(timeZone, formatter);
+  }
+  return dateFormatters.get(timeZone);
+}
+
 /**
  * Renders in the browser the parts of the meta line of an article that depend on the publish date.
  * Thus they stay correct with no new build: the "New" badge, the clock icon or the calendar icon,
@@ -22,7 +54,13 @@ export default class extends Controller {
     if (!this.hasDatetimeValue) {
       return;
     }
-    if (this.hasTimestampTarget) {
+    // ⚠️ A Turbo restoration visit renders a snapshot that holds the <wa-relative-time>, whose
+    // text is in a shadow root. Thus the text is empty there, and the absolute date must come
+    // from the value instead.
+    if (
+      this.hasTimestampTarget &&
+      !this.timestampTarget.querySelector('wa-relative-time')
+    ) {
       this.absoluteTimestamp = this.timestampTarget.textContent;
     }
     this.render();
@@ -66,7 +104,8 @@ export default class extends Controller {
    */
   renderTimestamp(relative) {
     if (!relative) {
-      this.timestampTarget.textContent = this.absoluteTimestamp;
+      this.timestampTarget.textContent =
+        this.absoluteTimestamp || this.absoluteDate();
       return;
     }
     if (!this.timestampTarget.querySelector('wa-relative-time')) {
@@ -100,6 +139,31 @@ export default class extends Controller {
     return published >= weekAgo;
   }
 
+  /**
+   * The absolute date, in the words of the server: "Saturday, August 1, 2026".
+   * @returns {string}
+   */
+  absoluteDate() {
+    let formatter;
+    try {
+      formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: this.timeZoneValue || undefined,
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      });
+    } catch {
+      formatter = new Intl.DateTimeFormat('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      });
+    }
+    return formatter.format(new Date(this.datetimeValue));
+  }
+
   publishedOn() {
     return this.dateInTimeZone(new Date(this.datetimeValue));
   }
@@ -115,11 +179,6 @@ export default class extends Controller {
    * @returns {string}
    */
   dateInTimeZone(date) {
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: this.timeZoneValue || undefined,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(date);
+    return dateFormatter(this.timeZoneValue || '').format(date);
   }
 }

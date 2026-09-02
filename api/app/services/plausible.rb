@@ -102,6 +102,8 @@ class Plausible < ApplicationService
 
   # Does a Plausible query. The request body is the cache key.
   # @return [Hash, nil] The parsed response, or nil if it is not available.
+  # ⚠️ One page only. `limit` is far above the number of pages of this site, and the code writes a
+  # warning when an answer reaches it: a row past the limit would score zero with no message.
   def query(metrics: [], date_range: "all", dimensions: [ "event:page" ], filters: nil, order_by: nil, offset: 0, limit: 10000)
     return if @access_token.blank? || @site_id.blank?
 
@@ -124,7 +126,11 @@ class Plausible < ApplicationService
         "Authorization" => "Bearer #{@access_token}",
         "Content-Type" => "application/json"
       }
-      post_json(PLAUSIBLE_API_URL, headers: headers, body: body.to_json)
+      result = post_json(PLAUSIBLE_API_URL, headers: headers, body: body.to_json)
+      if result && Array(result[:results]).size >= limit
+        Rails.logger.warn("Plausible: an answer reached the page limit of #{limit} rows; rows past it are absent")
+      end
+      result
     end
   end
 

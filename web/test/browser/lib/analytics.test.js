@@ -39,27 +39,13 @@ describe('trackPageView', () => {
     expect(window.plausible.mock.calls[0][1]).not.toHaveProperty('props');
   });
 
-  it('reports the ?q= search query as a prop', () => {
+  it('sends no props for a page with a query and no caller props', () => {
     window.plausible = vi.fn();
     window.history.replaceState({}, '', '/search?q=marathon');
 
     analytics.trackPageView();
 
-    expect(window.plausible.mock.calls[0][1].props).toEqual({
-      search_query: 'marathon',
-    });
-  });
-
-  it('merges caller-supplied props with the search query', () => {
-    window.plausible = vi.fn();
-    window.history.replaceState({}, '', '/search?q=marathon');
-
-    analytics.trackPageView({ source: 'nav' });
-
-    expect(window.plausible.mock.calls[0][1].props).toEqual({
-      source: 'nav',
-      search_query: 'marathon',
-    });
+    expect(window.plausible.mock.calls[0][1].props).toBeUndefined();
   });
 
   it('reads the query before scrubbing the URL', () => {

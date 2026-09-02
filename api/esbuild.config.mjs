@@ -17,7 +17,8 @@ const context = await esbuild.context({
   bundle: true,
   outdir: "app/assets/builds",
   publicPath: "/assets",
-  target: "es2020",
+  // ⚠️ es2022: the source uses Object.hasOwn and replaceAll, which esbuild never rewrites.
+  target: "es2022",
   minify: !watch,
   sourcemap: watch,
   logLevel: "info",

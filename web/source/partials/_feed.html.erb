@@ -2,7 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
   <%# max and min are nil for an empty feed, and .rfc3339 and .strftime below would then raise. %>
   <% updated = articles.map { |e| DateTime.parse(e.updated_at) }.max || DateTime.now %>
-  <id><%= atom_tag(full_url(html_path), articles.map { |e| published_datetime(e) }.min || updated) %></id>
+  <%# ⚠️ An Atom id is permanent. The date is the first publish of the Site entry, which never
+      changes. The oldest entry would move when a person retags or unpublishes a post, and a reader
+      then shows the full feed as new. %>
+  <id><%= atom_tag(full_url(html_path), DateTime.parse(data.site.sys.first_published_at)) %></id>
   <title><%=h title %></title>
   <% if subtitle.present? %><subtitle><%=h subtitle %></subtitle><% end %>
   <updated><%= updated.rfc3339 %></updated>

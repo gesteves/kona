@@ -7,10 +7,18 @@ module AffiliateLinksHelpers
   # disclosure partial reads it more than one time on each page.
   # @param content [Object] The entry.
   # @return [Boolean]
+  #
+  # ⚠️ The store is at the module level, by collection, and not an instance variable. Each rendered
+  # file has its own template context, and the disclosure partial of a feed reads this for each
+  # entry of each of the ~40 feeds: an instance variable made the full parse run again in each.
   def has_amazon_associates_links?(content)
-    memoize_by_key(:@has_amazon_associates_links, content.sys&.id) do
-      scan_for_amazon_associates_links(content)
-    end
+    id = content.sys&.id
+    return scan_for_amazon_associates_links(content) if id.blank?
+
+    store = memoize_by_collection(:amazon_associates_links, (data.articles if respond_to?(:data))) { {} }
+    return store[id] if store.key?(id)
+
+    store[id] = scan_for_amazon_associates_links(content)
   end
 
   # @see #has_amazon_associates_links?

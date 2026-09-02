@@ -96,8 +96,7 @@ module ActivityDescription
     # code omits it for a swim, because the CORE sensor is not accurate in water. For example,
     # "🌡️ 72% heat adapted".
     # @return [String, nil]
-    def heat_block(heat_adaptation_score:, swim:)
-      return if swim
+    def heat_block(heat_adaptation_score:)
       return unless heat_adaptation_score.is_a?(Numeric) && heat_adaptation_score.finite?
       return unless heat_adaptation_score.round.positive?
 

@@ -72,6 +72,18 @@ export default class extends Controller {
   }
 
   /**
+   * Stops the timers and the request that is out. ⚠️ Each controller of the admin does this: a
+   * Turbo visit disconnects the controller, and a timer or a response that lands after it would
+   * write into a page that is gone.
+   */
+  disconnect() {
+    clearTimeout(this.mentionTimer);
+    clearTimeout(this.previewTimer);
+    this.previewSeq = (this.previewSeq ?? 0) + 1;
+    this.previewAborter?.abort();
+  }
+
+  /**
    * Adds one empty post at the end of the thread, from the template.
    *
    * ⚠️ The content of a <template> is inert: the browser renders none of it and its fields are not
@@ -146,9 +158,26 @@ export default class extends Controller {
    * @param {HTMLElement} post
    */
   dropPost(post) {
+    const index = this.postTargets.indexOf(post);
     post.remove();
     this.renumber();
     this.validate();
+    this.focusAfterRemoval(index);
+  }
+
+  /**
+   * Puts the focus on a control that is still there. ⚠️ The post that held the focused control is
+   * gone, and a focus that falls to the body sends the next Tab to the top of the page.
+   * @param {number} index The index that the removed post had.
+   */
+  focusAfterRemoval(index) {
+    const posts = this.postTargets;
+    const next = posts[Math.min(index, posts.length - 1)];
+    const control =
+      next?.querySelector("[data-social-target='handle']:not([hidden])") ||
+      next?.querySelector("wa-textarea") ||
+      this.addTarget;
+    control?.focus();
   }
 
   /**
@@ -376,11 +405,16 @@ export default class extends Controller {
     this.markdownNetworkTargets.forEach((box) => {
       if (on) {
         // ⚠️ It keeps the tick that the owner had, thus a link that they write and then remove
-        // gives the draft its networks back.
-        box.dataset.wasChecked = box.checked ? "true" : "false";
+        // gives the draft its networks back. It keeps a value that is already there: Turbo puts
+        // this attribute in its snapshot, and a fresh controller on a restoration visit would
+        // otherwise read the boxes after the untick and remember "false".
+        if (!("wasChecked" in box.dataset)) {
+          box.dataset.wasChecked = box.checked ? "true" : "false";
+        }
         box.checked = false;
       } else if ("wasChecked" in box.dataset) {
         box.checked = box.dataset.wasChecked === "true";
+        delete box.dataset.wasChecked;
       }
       box.disabled = on;
 
@@ -698,11 +732,14 @@ export default class extends Controller {
     this.previewSeq = (this.previewSeq ?? 0) + 1;
     const seq = this.previewSeq;
 
+    this.previewAborter?.abort();
+    this.previewAborter = new AbortController();
     try {
       const response = await fetch(this.previewUrlValue, {
         method: "POST",
         headers: { Accept: "application/json", ...this.csrfHeader },
         body: new FormData(this.element),
+        signal: this.previewAborter.signal,
       });
       if (seq !== this.previewSeq) return;
 

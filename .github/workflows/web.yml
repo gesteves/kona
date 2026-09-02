@@ -380,7 +380,9 @@ jobs:
           name: web-html
           path: web/build/**/*.html
           retention-days: 1
-          if-no-files-found: warn
+          # An error here stops the check with a message, and not a check that finds no page and
+          # reports "violations".
+          if-no-files-found: error
 
       - name: Deploy to Cloudflare
         run: npx wrangler deploy

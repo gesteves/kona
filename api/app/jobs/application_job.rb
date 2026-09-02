@@ -6,5 +6,14 @@
 class ApplicationJob
   include Sidekiq::Job
 
+  # A failure that no retry can correct: an account that is not connected, a token that expired, a
+  # post with no words. A service raises it, and the job goes to the Dead set at once and does not
+  # use the 24-hour retry budget.
+  class PermanentError < StandardError; end
+
   sidekiq_options retry_for: 24.hours
+
+  sidekiq_retry_in do |_count, exception|
+    :kill if exception.is_a?(PermanentError)
+  end
 end

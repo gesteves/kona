@@ -92,6 +92,17 @@ RSpec.describe SiteBuildJob do
       described_class.schedule_in(10.minutes, described_class::ADMIN_EVENT_TYPE)
     end
 
+    # ⚠️ A scheduled job with no jid in the key is one that cancel_scheduled can never find.
+    it "removes the job that it scheduled when it cannot keep the jid, and raises" do
+      allow(described_class).to receive(:perform_in).and_return("abc123")
+      allow($redis).to receive(:set).and_raise(RedisClient::CannotConnectError)
+      allow(scheduled_set).to receive(:find_job).with("abc123").and_return(scheduled_job)
+      allow(scheduled_job).to receive(:delete)
+
+      expect { described_class.schedule_in(10.minutes, described_class::ADMIN_EVENT_TYPE) }.to raise_error(RedisClient::CannotConnectError)
+      expect(scheduled_job).to have_received(:delete)
+    end
+
     it "cancels the build that is scheduled before it schedules the next one" do
       allow($redis).to receive(:getdel).with("build:scheduled_jid").and_return("old-jid")
       allow(scheduled_set).to receive(:find_job).with("old-jid").and_return(scheduled_job)

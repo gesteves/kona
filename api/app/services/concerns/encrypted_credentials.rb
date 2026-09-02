@@ -37,7 +37,8 @@ module EncryptedCredentials
     def decrypt(value)
       return if value.blank?
       encryptor.decrypt_and_verify(value).presence
-    rescue StandardError
+    rescue ActiveSupport::MessageEncryptor::InvalidMessage, ActiveSupport::MessageVerifier::InvalidSignature
+      # A message from another key. Each other error is a bug, and it must show.
       nil
     end
 

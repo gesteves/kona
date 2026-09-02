@@ -41,7 +41,9 @@ export default class extends Controller {
     this.imageTargets.forEach((img) => {
       img.src = this.withQuery(img.src, query);
     });
-    this.downloadTarget.href = this.withQuery(this.downloadTarget.href, query);
+    if (this.hasDownloadTarget) {
+      this.downloadTarget.href = this.withQuery(this.downloadTarget.href, query);
+    }
     this.save(query);
   }
 

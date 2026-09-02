@@ -46,18 +46,26 @@ class ContentfulClient < ApplicationService
   def paginate(gql, collection:, page_size: PAGE_SIZE, strict: false)
     all = []
     skip = 0
-    loop do
+    MAX_PAGES.times do
       page = items(gql, { skip: skip, limit: page_size }, collection: collection)
       if page.nil?
         return nil if strict
-        break
+        return all
       end
       all.concat(page)
-      break if page.size < page_size
+      return all if page.size < page_size
+
       skip += page_size
     end
-    all
+
+    # ⚠️ A query that omits `skip` from its arguments gives a full page for all time. The loop
+    # ends here, with a report, and does not grow the list until the worker runs out of memory.
+    report_upstream_error("pagination did not end after #{MAX_PAGES} pages", context: "ContentfulClient #{collection}")
+    strict ? nil : all
   end
+
+  # The most pages of one collection. The largest collection is the assets, at some hundreds.
+  MAX_PAGES = 100
 
   private
 

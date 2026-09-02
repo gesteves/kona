@@ -26,6 +26,10 @@ class GpxTrack
   SLUG_LENGTH = 23
   DIGEST_LENGTH = 8
 
+  # The most track points. A Garmin export of a long race has approximately 9,000, and each point
+  # goes into Redis and to Mapbox. A file far past this is not a race track.
+  MAX_POINTS = 100_000
+
   # The code does not add the activity type to a title that already names its sport.
   SPORT_KEYWORDS = /swim|run|bike|biking|cycling|marathon|5k|10k|10-miler|ten-miler|carrera/i
 
@@ -145,6 +149,8 @@ class GpxTrack
     return false if lat.blank? || lon.blank?
 
     @coordinates << [ lon.to_f.round(COORDINATE_PRECISION), lat.to_f.round(COORDINATE_PRECISION) ]
+    raise ParseError, "The GPX file has more than #{MAX_POINTS} track points" if @coordinates.length > MAX_POINTS
+
     @coordinates.length == 1 && !node.self_closing?
   end
 

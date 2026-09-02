@@ -24,7 +24,7 @@ const ATTACHED = "attached";
 export default class extends Controller {
   static targets = [
     "body", "count", "countText", "ring", "link", "spinner", "preview", "previewImage",
-    "previewHost", "previewTitle", "previewDescription", "previewKind", "linkButton",
+    "previewHost", "previewTitle", "previewDescription", "previewKind", "linkButton", "countNotice",
   ];
   static values = { limit: Number, warnAt: Number, previewUrl: String };
 
@@ -44,6 +44,13 @@ export default class extends Controller {
       this.count();
       this.preview();
     });
+  }
+
+  /** Stops the preview timer and the request that is out. */
+  disconnect() {
+    clearTimeout(this.previewTimer);
+    this.previewSeq = (this.previewSeq ?? 0) + 1;
+    this.previewAborter?.abort();
   }
 
   /**
@@ -164,6 +171,7 @@ export default class extends Controller {
     const length = this.graphemes(text);
 
     this.countTextTarget.textContent = `${length} / ${this.limitValue}`;
+    this.announceCount(length);
     // ⚠️ The ring stops at 100: a draft past the limit must not draw more than a full circle. The
     // words beside it are what say how far past it is.
     this.ringTarget.value = Math.min(100, Math.round((length / this.limitValue) * 100));
@@ -171,6 +179,22 @@ export default class extends Controller {
     this.countTarget.classList.toggle("social__count--warning",
       length >= this.warnAtValue && length <= this.limitValue);
     this.countTarget.classList.toggle("social__count--over", length > this.limitValue);
+  }
+
+  /**
+   * Tells a screen reader about the count when it crosses the warning or the limit, and not at
+   * each keystroke. ⚠️ The count line is not a live region itself: a region that changes at each
+   * character reads every number aloud.
+   * @param {number} length
+   */
+  announceCount(length) {
+    if (!this.hasCountNoticeTarget) return;
+
+    const state = length > this.limitValue ? "over" : length >= this.warnAtValue ? "warning" : "ok";
+    if (state === this.announcedState) return;
+
+    this.announcedState = state;
+    this.countNoticeTarget.textContent = state === "ok" ? "" : `${length} / ${this.limitValue}`;
   }
 
   /**
@@ -239,9 +263,12 @@ export default class extends Controller {
     this.previewSeq = (this.previewSeq ?? 0) + 1;
     const seq = this.previewSeq;
 
+    this.previewAborter?.abort();
+    this.previewAborter = new AbortController();
     try {
       const response = await fetch(`${this.previewUrlValue}?${new URLSearchParams({ url })}`, {
-        headers: { Accept: "application/json" }
+        headers: { Accept: "application/json" },
+        signal: this.previewAborter.signal,
       });
       if (seq !== this.previewSeq) return;
 

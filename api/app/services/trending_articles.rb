@@ -83,7 +83,7 @@ class TrendingArticles < ApplicationService
   # raise.
   def ranked
     rescue_with([], context: self.class.name) do
-      t_end = Time.now.beginning_of_hour
+      t_end = Time.current.utc.beginning_of_hour
       # ⚠️ An empty list means a failure, and it also means "nothing is trending". rank() costs
       # Plausible queries. Without the negative TTL, each request does all of them during a
       # Plausible failure. `(items || [])` below already accepts the nil from a blank cache.

@@ -59,8 +59,7 @@ export default class extends Controller {
     this.updateButtonAttributes();
 
     if (!wasOpen) return;
-    document.body.style.top = '';
-    window.scrollTo(0, this.scrollY ?? 0);
+    this.releaseBody();
 
     // Do this only while the focus is in the nav. This code also runs on turbo:before-cache and
     // on search:close, where a move of the focus back to the menu button would be incorrect.
@@ -71,9 +70,16 @@ export default class extends Controller {
 
   /** Removes each inert attribute and the fixed body when the element goes away. */
   disconnect() {
+    const wasOpen = this.isNavOpen();
     document.body.classList.remove(this.openClass);
-    document.body.style.top = '';
     this.setBackgroundInert(false);
+    if (wasOpen) this.releaseBody();
+  }
+
+  /** Puts the body back at the scroll position from before the menu opened. */
+  releaseBody() {
+    document.body.style.top = '';
+    window.scrollTo(0, this.scrollY ?? 0);
   }
 
   /**

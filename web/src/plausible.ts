@@ -15,6 +15,9 @@ const EVENT_UPSTREAM = 'https://plausible.io/api/event';
 /** The analytics must never keep a request open. A stop goes to the fallback with no message. */
 const UPSTREAM_TIMEOUT_MS = 10_000;
 
+/** The most bytes of an event body. The script sends a few hundred. */
+const MAX_EVENT_BYTES = 8_192;
+
 /**
  * Sends a /pa/* request to the script handler or to the event handler.
  * @returns A 404 if there is no analytics configuration. In all other conditions, the response of
@@ -138,11 +141,25 @@ async function postEvent(request: Request): Promise<Response> {
   if (request.method !== 'POST') {
     return securedResponse(null, { status: 405, headers: { allow: 'POST' } });
   }
-  const upstream = new Request(EVENT_UPSTREAM, request);
-  upstream.headers.delete('cookie');
+  // An event is a small JSON body. A larger one is not from the script, and the relay would
+  // only pay to send it.
+  const length = Number(request.headers.get('content-length') ?? 0);
+  if (length > MAX_EVENT_BYTES) {
+    return securedResponse(null, { status: 413 });
+  }
+  // ⚠️ The headers go upstream from a list, as the script response comes back from one. The
+  // request of a client can carry anything, and only these three have a use at Plausible.
+  const headers = new Headers();
+  for (const name of ['content-type', 'user-agent']) {
+    const value = request.headers.get(name);
+    if (value) headers.set(name, value);
+  }
   const clientIp = request.headers.get('CF-Connecting-IP');
-  if (clientIp) upstream.headers.set('X-Forwarded-For', clientIp);
-  const response = await fetch(upstream, {
+  if (clientIp) headers.set('X-Forwarded-For', clientIp);
+  const response = await fetch(EVENT_UPSTREAM, {
+    method: 'POST',
+    headers,
+    body: request.body,
     signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
   });
   // Give the status only. The upstream response with no change would send the Set-Cookie and the

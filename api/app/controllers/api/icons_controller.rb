@@ -51,15 +51,21 @@ module Api
     # @param requested [Hash] The { family => { style => [ids] } } tree from the request.
     # @return [Array<Array(String, String, String)>]
     def wanted_triples(requested)
-      requested.flat_map do |family, styles|
-        next [] unless styles.is_a?(Hash) && segment?(family)
+      triples = []
+      requested.each do |family, styles|
+        next unless styles.is_a?(Hash) && segment?(family)
 
-        styles.flat_map do |style, ids|
-          next [] unless segment?(style)
+        styles.each do |style, ids|
+          next unless segment?(style)
 
-          Array(ids).uniq.filter_map { |id| [ family, style, id ] if segment?(id) }
+          Array(ids).uniq.each do |id|
+            triples << [ family, style, id ] if segment?(id)
+            # One past the limit is enough for the refusal, thus a very large tree costs nothing.
+            return triples if triples.size > MAX_ICONS
+          end
         end
       end
+      triples
     end
 
     # @return [Boolean] True if a family, a style, or an icon id can name a true Font Awesome

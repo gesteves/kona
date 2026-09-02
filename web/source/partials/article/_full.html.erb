@@ -2,7 +2,7 @@
   <header class="entry__header">
     <%= partial 'partials/article/meta', locals: { article: article } %>
     <h1 class="entry__hed" id="<%= entry_heading_id(article) %>" data-pagefind-meta="title">
-      <%= smartypants(article.title) %>
+      <%= heading_text(article.title) %>
     </h1>
     <p class="entry__meta">
       <span><%= icon_svg("classic", "light", "stopwatch") %> <%= reading_time(article) %></span>

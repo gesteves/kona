@@ -48,8 +48,15 @@ class SiteBuildJob < ApplicationJob
   def self.schedule_in(delay, event_type)
     replaced = cancel_scheduled
     jid = perform_in(delay, event_type)
-    # The key must outlive the job, thus the TTL adds a margin to the delay.
-    $redis.set(SCHEDULED_JID_KEY, jid, ex: delay.to_i + TRIGGER_LOCK_TTL.to_i)
+    begin
+      # The key must outlive the job, thus the TTL adds a margin to the delay.
+      $redis.set(SCHEDULED_JID_KEY, jid, ex: delay.to_i + TRIGGER_LOCK_TTL.to_i)
+    rescue StandardError
+      # ⚠️ A job with no jid in the key is one that cancel_scheduled can never find. Remove it,
+      # then let the caller see the failure.
+      Sidekiq::ScheduledSet.new.find_job(jid)&.delete
+      raise
+    end
     replaced
   end
 

@@ -56,7 +56,7 @@ class Typography
       masked = +""
       last = 0
 
-      url_ranges(text).each do |range|
+      masked_ranges(text).each do |range|
         masked << text[last...range.begin] << PLACEHOLDER
         urls << text[range]
         last = range.end
@@ -76,22 +76,25 @@ class Typography
       HTMLEntities.new.decode(smartypants(chunk).to_s)
     end
 
-    # ⚠️ It uses the URL pattern of Bluesky, which is the one that decides a link facet. Thus a
-    # string that becomes a link there is an address here, and one pattern holds that rule.
-    # `SocialMentions` reads it for the same reason.
-    #
-    # ⚠️ It covers the address of a Markdown link as well. `](https://…)` and a `[name]: https://…`
-    # definition each put the address after a character that is not a word character, thus the
-    # pattern finds both.
+    # Each address and each mention token, in order. ⚠️ A handle can hold `--` (an IDN handle
+    # starts with `xn--`), and SmartyPants would make that an en dash. The mentions go in before
+    # the typography, thus a token that is still in the text is a handle, and it must not change.
+    # @param text [String]
+    # @return [Array<Range>]
+    def masked_ranges(text)
+      urls = url_ranges(text)
+      tokens = []
+      text.scan(SocialMentions::TOKEN_PATTERN) do
+        start_char, end_char = Regexp.last_match.offset(1)
+        tokens << (start_char...end_char) unless urls.any? { |range| range.cover?(start_char) }
+      end
+      (urls + tokens).sort_by(&:begin)
+    end
+
     # @param text [String]
     # @return [Array<Range>] The character ranges of each address, in order.
     def url_ranges(text)
-      ranges = []
-      text.scan(Bluesky::URL_PATTERN) do
-        start_char, end_char = Regexp.last_match.offset(1)
-        ranges << (start_char...end_char)
-      end
-      ranges
+      SocialText.url_ranges(text)
     end
   end
 end

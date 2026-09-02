@@ -97,7 +97,7 @@ class WeatherSummaryPresenter
   end
 
   def current_location
-    location = "I'm currently in **#{format_location(@location)}**"
+    location = "I'm currently in **#{location_name}**"
     race = todays_race(@events, @time_zone)
     the = race&.title&.downcase&.start_with?("ironman") ? "" : "the"
     location << ", racing #{the} **#{race.title}**" if race_day?(@events, @time_zone) && !evening?(@weather, @time_zone)
@@ -192,17 +192,26 @@ class WeatherSummaryPresenter
   # ⚠️ The sun times are absent above the polar circles, and weather_data_is_current?, the check
   # that lets the rest of the summary use its data, does not test them. Remove the line, and do not
   # remove the full widget.
+  # The name of the location, one time for each summary. Three sentences read it.
+  # @return [String, nil]
+  def location_name
+    return @location_name if defined?(@location_name)
+
+    @location_name = format_location(@location)
+  end
+
   def sunrise_or_sunset
     now = Time.now
     todays_sunrise = sunrise(@weather, @time_zone)
     todays_sunset = sunset(@weather, @time_zone)
     return if todays_sunrise.blank? || todays_sunset.blank?
 
-    return "Sunrise will be at #{format_time(todays_sunrise)}" if now <= todays_sunrise.beginning_of_hour
-    return "Sunset will be at #{format_time(todays_sunset)}" if now >= todays_sunrise.beginning_of_hour && now < todays_sunset.beginning_of_hour
+    # The exact times: "Sunset will be at 7:45" holds until 7:45, and not until 7:00.
+    return "Sunrise will be at #{format_time(todays_sunrise)}" if now < todays_sunrise
+    return "Sunset will be at #{format_time(todays_sunset)}" if now < todays_sunset
 
     tomorrow = tomorrows_sunrise(@weather, @time_zone)
-    "Sunrise will be at #{format_time(tomorrow)}" if tomorrow.present? && now >= todays_sunset.beginning_of_hour
+    "Sunrise will be at #{format_time(tomorrow)}" if tomorrow.present?
   end
 
   def activities

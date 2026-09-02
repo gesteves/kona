@@ -197,6 +197,23 @@ describe('re-rendering', () => {
     expect(visible('badge')).toBe(true); // still inside the seven-day window
   });
 
+  // ⚠️ A Turbo restoration visit renders a snapshot that holds the <wa-relative-time>, whose
+  // text is in a shadow root. The text of the target is then empty, and the absolute date must
+  // come from the value.
+  it('writes a formatted absolute date after a restore whose snapshot holds the relative time', async () => {
+    vi.setSystemTime(new Date('2026-08-02T03:59:30Z'));
+    const html = markup({ datetime: '2026-08-01T16:00:00Z' }).replace(
+      ABSOLUTE,
+      '<wa-relative-time date="2026-08-01T16:00:00.000Z" sync></wa-relative-time>'
+    );
+    await mount('publish-date', PublishDateController, html);
+
+    vi.advanceTimersByTime(60_000);
+    await flushDom();
+
+    expect(target('timestamp').textContent).toBe('Saturday, August 1, 2026');
+  });
+
   it('reuses the existing relative-time element rather than recreating it each minute', async () => {
     // A new element would start its own updates again and the text would move.
     await mountAt('2026-08-01T22:00:00Z', {

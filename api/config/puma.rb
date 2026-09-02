@@ -1,6 +1,6 @@
 # The configuration DSL of Puma. @see https://puma.io/puma/Puma/DSL.html
-# WEB_CONCURRENCY gives the number of workers, and RAILS_MAX_THREADS gives the number of threads in
-# each worker.
+# One process, with RAILS_MAX_THREADS threads. There are no workers: the machine has one shared
+# CPU and 512MB.
 threads_count = ENV.fetch("RAILS_MAX_THREADS", 3)
 threads threads_count, threads_count
 

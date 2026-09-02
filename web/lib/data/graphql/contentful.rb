@@ -97,6 +97,8 @@ module ContentfulClient
       }
     }
 
+    # No `preview: true`, on purpose: a draft of the Site entry must not ship, and the newest
+    # published one is the site.
     query Sites {
       sites: siteCollection(limit: 1, order: [sys_publishedAt_DESC]) {
         items {
@@ -143,6 +145,7 @@ module ContentfulClient
       }
     }
 
+    # No `preview: true`, on purpose: a draft redirect must not go into _redirects.
     query Redirects($skip: Int, $limit: Int) {
       redirects: redirectCollection(skip: $skip, limit: $limit, order: [sys_publishedAt_DESC]) {
         items {
@@ -156,6 +159,9 @@ module ContentfulClient
       }
     }
 
+    # No `preview: true`, on purpose: a draft race must not show on the home page. ⚠️ Articles,
+    # Pages, and Assets DO use it, thus a draft entry renders at /id/<id>/. A draft asset points at
+    # the mirror, which holds published assets only, thus its image on that preview gives a 404.
     query Events($skip: Int, $limit: Int) {
       events: eventCollection(skip: $skip, limit: $limit) {
         items {

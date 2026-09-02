@@ -132,6 +132,12 @@ post. This is acceptable at 58 entries and it will not be at 300. When it become
 first step is to render the inline blurhash for the first cards only, and pagination is the last
 step, not the first.
 
+⚠️ **The feeds are the larger cost, and they grow with the tags as well as with the entries.** Each
+tag has an Atom feed, and each entry of a feed renders its intro and its body through Markdown and
+Nokogiri. At 58 entries the 40 feeds were 3.9MB, and `feed.xml` alone was larger than `/blog/`. Thus
+each feed holds the 25 newest entries (`feed_articles` and `tag_feed.xml.erb`), and a larger number
+there costs more than a larger blog list.
+
 ### Render-blocking budget
 
 **Only `stylesheets/site.css` can stop the first render.** `_head.html.erb` has an order that makes

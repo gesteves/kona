@@ -75,9 +75,20 @@ class BlurhashPlaceholder < ApplicationService
   # mirror fetch would make this job wait for AssetSyncJob first. Each fetch is about 2 kB.
   # @param asset_id [String] The sys.id of the asset.
   # @return [Symbol] :stored, :present, or :skipped.
+  #
+  # ⚠️ It fails soft: a placeholder is an improvement, and a failure here must not put the job into
+  # the retry set for a day. `rake blurhash:backfill` is the reconciliation path.
   def generate(asset_id)
     return log_skip(asset_id, "no asset id") if asset_id.blank?
 
+    generate!(asset_id)
+  rescue StandardError => e
+    report_upstream_error(e, context: "blurhash placeholder #{asset_id}")
+    log_skip(asset_id, "#{e.class}: #{e.message}")
+  end
+
+  # @see #generate
+  def generate!(asset_id)
     asset = fetch_asset(asset_id)
     return log_skip(asset_id, "no published asset in Contentful") if asset.blank?
     return log_skip(asset_id, "not an image with dimensions") unless dimensions?(asset)

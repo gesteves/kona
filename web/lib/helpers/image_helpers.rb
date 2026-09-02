@@ -313,8 +313,16 @@ module ImageHelpers
     svg = blurhash_svg(asset_id)
     return if svg.blank?
 
-    encoded_svg = ERB::Util.url_encode(svg.gsub(/\s+/, " "))
-    "data:image/svg+xml;charset=utf-8,#{encoded_svg}"
+    "data:image/svg+xml;charset=utf-8,#{escape_svg_for_url(svg.gsub(/\s+/, " "))}"
+  end
+
+  # Escapes the few characters that an SVG in a `url()` cannot hold. `url_encode` escapes `/` and
+  # `+` as well, and those are legal there: a listing page holds one placeholder for each card,
+  # thus each byte here is on the page some tens of times.
+  # @param svg [String]
+  # @return [String]
+  def escape_svg_for_url(svg)
+    svg.gsub(/[#%"<> ]/) { |char| format("%%%02X", char.ord) }
   end
 
   # Makes an SVG that blurs the blurhash thumbnail of the asset to the aspect ratio of the asset.
@@ -347,12 +355,47 @@ module ImageHelpers
   # @param asset_id [String] The ID of the asset.
   # @param width [Integer] The width of the JPEG in pixels.
   # @return [String, nil] The data URI, or nil for a GIF or if the encode fails.
+  # ⚠️ `middleman build` renders in forked worker processes, and each one has its own copy of that
+  # store. Thus `before_build` in config.rb reads each placeholder from Redis one time, in the
+  # parent, into `ImageHelpers.warm_blurhashes`, and the forks inherit it. Without that, each
+  # worker asked Redis for each asset again, and a cold cache made each worker get and encode the
+  # same asset.
   def blurhash_jpeg_data_uri(asset_id, width: 32)
     store = memoize_by_collection(:blurhash_jpegs, data.assets) { {} }
     key = [ asset_id, width ]
     return store[key] if store.key?(key)
 
-    store[key] = build_blurhash_jpeg_data_uri(asset_id, width)
+    warm = ImageHelpers.warm_blurhashes[key]
+    store[key] = warm.nil? ? build_blurhash_jpeg_data_uri(asset_id, width) : warm
+  end
+
+  class << self
+    # @return [Hash{Array => String}] The placeholders that `before_build` read, by [asset id,
+    #   width].
+    def warm_blurhashes
+      @warm_blurhashes ||= {}
+    end
+
+    # Reads the placeholder of each asset from Redis in one call, before the build forks. A miss
+    # stays absent, and the worker that renders it makes it.
+    # @param assets [Array<Object>] `data.assets`.
+    # @param redis [Redis]
+    # @param width [Integer]
+    # @return [Integer] The number of placeholders found.
+    def warm_blurhashes!(assets, redis, width: 32)
+      entries = Array(assets).filter_map do |asset|
+        id = asset.sys&.id
+        version = asset.sys&.published_version
+        next if id.blank? || version.blank?
+
+        [ [ id, width ], "blurhash:jpeg:#{id}:#{version}:#{width}" ]
+      end
+      return 0 if entries.empty?
+
+      values = redis.mget(*entries.map(&:last))
+      entries.zip(values).each { |(key, _), value| warm_blurhashes[key] = value if value.present? }
+      values.count(&:present?)
+    end
   end
 
   # @param asset_id [String] The ID of the asset.
@@ -382,7 +425,8 @@ module ImageHelpers
                        .copy(interpretation: :srgb)
                        .extract_band(0, n: 3)
 
-    jpeg = "data:image/jpeg;base64,#{Base64.strict_encode64(image.write_to_buffer('.jpg'))}"
+    # `strip` removes the Exif block, which was a fifth of each placeholder.
+    jpeg = "data:image/jpeg;base64,#{Base64.strict_encode64(image.jpegsave_buffer(strip: true))}"
     # The key contains the published_version of the asset. Thus each new publish makes a new key
     # and nothing can read the old entry again. With no TTL, the Redis of the build, a metered
     # Upstash instance, becomes larger for all time.

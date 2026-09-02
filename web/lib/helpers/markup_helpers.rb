@@ -525,7 +525,8 @@ module MarkupHelpers
         link_host = URI.parse(href).host rescue next
         next if link_host.blank? || link_host == current_host
 
-        a["rel"] = "noopener"
+        # Add to the rel that the author wrote: a `nofollow` or a `ugc` must stay.
+        a["rel"] = (a["rel"].to_s.split + [ "noopener" ]).uniq.join(" ")
         a["target"] = "_blank"
       end
     end
@@ -634,7 +635,19 @@ module MarkupHelpers
     html = markdown_to_html(degrees ? fix_degrees(text) : text)
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
     yield doc
+    strip_scratch_attributes(doc)
     doc.to_html
+  end
+
+  # Removes the attributes that add_image_data_attributes writes for the transforms. ⚠️ They must
+  # not reach the build: `data-original-url` names the Contentful host, which the image mirror
+  # exists to keep off the page and out of the feed.
+  # @param doc [Nokogiri::XML::Node] The parsed body.
+  def strip_scratch_attributes(doc)
+    doc.css("img[data-asset-id], img[data-original-url]").each do |img|
+      img.remove_attribute("data-asset-id")
+      img.remove_attribute("data-original-url")
+    end
   end
 
   # Gives each <img> that add_image_data_attributes marked. It does not give an <img> that has

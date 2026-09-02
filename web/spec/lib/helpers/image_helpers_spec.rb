@@ -319,7 +319,7 @@ RSpec.describe ImageHelpers do
 
     describe '#blurhash_jpeg_data_uri' do
       let(:fake_redis) { double('redis', get: nil, set: nil) }
-      let(:fake_image) { double('image', write_to_buffer: 'JPEGBYTES') }
+      let(:fake_image) { double('image', jpegsave_buffer: 'JPEGBYTES') }
 
       before do
         allow(self).to receive(:redis).and_return(fake_redis)
@@ -453,7 +453,8 @@ RSpec.describe ImageHelpers do
     describe '#blurhash_svg_data_uri' do
       it 'collapses whitespace and percent-encodes the SVG into a data URI' do
         allow(self).to receive(:blurhash_svg).with('asset-1').and_return("<svg>  <g/>\n</svg>")
-        expect(blurhash_svg_data_uri('asset-1')).to eq('data:image/svg+xml;charset=utf-8,%3Csvg%3E%20%3Cg%2F%3E%20%3C%2Fsvg%3E')
+        # `/` stays: it is legal in a url(), and a listing page holds one placeholder for each card.
+        expect(blurhash_svg_data_uri('asset-1')).to eq('data:image/svg+xml;charset=utf-8,%3Csvg%3E%20%3Cg/%3E%20%3C/svg%3E')
       end
 
       it 'is nil when there is no SVG' do

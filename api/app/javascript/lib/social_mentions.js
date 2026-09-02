@@ -84,8 +84,13 @@ export function mentionKey(token) {
  * @param {string|undefined} value
  * @returns {string}
  */
+// ⚠️ It names each character, as markdown_links.js does. `trim()` reads Unicode space and
+// `String#strip` reads ASCII space, thus a value with a no-break space at its end would be a
+// handle in one file and words in the other.
+const TRIM = /^[ \t\r\n\f\v]+|[ \t\r\n\f\v]+$/g;
+
 function replacement(token, value) {
-  const raw = (value ?? "").trim();
+  const raw = (value ?? "").replace(TRIM, "");
   if (!raw) return token.replace(/^@/, "");
 
   const handle = raw.replace(/^@+/, "");

@@ -176,7 +176,9 @@ module ArticleHelpers
   # The most recent published entries, for the Atom feed.
   # @param count [Integer] The number to return.
   # @return [Array<Object>]
-  def feed_articles(count: 100)
+  # ⚠️ The feeds are the largest part of the build: each entry renders its intro and its body,
+  # and each tag has a feed of its own. Twenty-five is what a reader needs from a feed.
+  def feed_articles(count: 25)
     published_articles.take(count)
   end
 
@@ -343,9 +345,14 @@ module ArticleHelpers
   # @param article [Object] The article.
   # @return [Integer] The number of words.
   def article_word_count(article)
-    memoize_by_key(:@article_word_counts, article.sys&.id) do
-      compute_article_word_count(article)
-    end
+    id = article.sys&.id
+    return compute_article_word_count(article) if id.blank?
+
+    # The store is by collection, thus one count serves each page that renders the entry.
+    store = memoize_by_collection(:article_word_counts, (data.articles if respond_to?(:data))) { {} }
+    return store[id] if store.key?(id)
+
+    store[id] = compute_article_word_count(article)
   end
 
   # @see #article_word_count
@@ -384,13 +391,22 @@ module ArticleHelpers
     race_id = race_concept_id(article)
     return [] if race_id.nil?
 
-    memoize_by_key(:@related_race_reports, [ article.slug, count ]) do
+    Array(race_reports_by_race[race_id])
+      .reject { |a| a.slug == article.slug }
+      .take(count)
+  end
+
+  # Each full race report, by its race concept, the newest first. The build makes it one time:
+  # each article page reads it, and a scan of the archive for each page grows with the square of
+  # the archive.
+  # @return [Hash{String => Array<Object>}]
+  def race_reports_by_race
+    memoize_by_collection(:race_reports_by_race, (data.articles if respond_to?(:data))) do
       published_articles
-        .select { |a| race_report?(a) && race_concept_id(a) == race_id }
-        .reject { |a| a.slug == article.slug }
-        .reject { |a| a.entry_type == "Short" }
-        .sort_by { |a| -published_datetime(a).to_i }
-        .take(count)
+        .select { |a| race_report?(a) && a.entry_type != "Short" }
+        .group_by { |a| race_concept_id(a) }
+        .tap { |index| index.delete(nil) }
+        .transform_values { |reports| reports.sort_by { |a| -published_datetime(a).to_i } }
     end
   end
 

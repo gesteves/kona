@@ -219,6 +219,18 @@ RSpec.describe Contentful do
         expect(taxo['triathlon'][:short_name]).to eq('Triathlon')    # no synonyms → the name
       end
 
+      # ⚠️ The archive follows the first parent only, thus the build log must say so.
+      it 'warns about a concept with two parents, and follows the first' do
+        two = concept_fixture + [
+          { 'sys' => { 'id' => 'duathlon' }, 'prefLabel' => { 'en-US' => 'Duathlon' }, 'conceptSchemes' => sports,
+            'broader' => [ { 'sys' => { 'id' => 'triathlon' } }, { 'sys' => { 'id' => 'running' } } ] }
+        ]
+        taxo = nil
+        expect { taxo = importer_with(concepts: two).send(:taxonomy) }
+          .to output(/"Duathlon" \(duathlon\) has 2 parents/).to_stderr
+        expect(taxo['duathlon'][:parent_id]).to eq('triathlon')
+      end
+
       it 'is empty when the endpoint yields no concepts' do
         expect(importer_with(concepts: []).send(:taxonomy)).to eq({})
       end

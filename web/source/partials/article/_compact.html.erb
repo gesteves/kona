@@ -3,7 +3,7 @@
   <header class="entry__header">
     <%= partial 'partials/article/meta', locals: { article: article, tracking_section: tracking_section } %>
     <h2 class="entry__hed" id="<%= entry_heading_id(article) %>">
-      <%= link_to smartypants(article.title), article.path, class: article_click_classes(tracking_section) %>
+      <%= link_to heading_text(article.title), article.path, class: article_click_classes(tracking_section) %>
     </h2>
   </header>
   <%# ⚠️ The link is aria-hidden and it is not a tab stop, and the image has an empty alt. The

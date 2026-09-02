@@ -32,4 +32,14 @@ module MarkdownHelpers
     return if text.blank?
     Redcarpet::Render::SmartyPants.render(text)
   end
+
+  # The text of a heading, with the typography and with no markup. ⚠️ SmartyPants is a typography
+  # pass and not an escape: a `<` or a `&` in a title goes through as it is. Sanitize removes each
+  # element and escapes the text, thus the result is safe in an element. The api has a copy.
+  # @param text [String, nil] The title.
+  # @return [String, nil]
+  def heading_text(text)
+    return if text.blank?
+    Sanitize.fragment(smartypants(text))
+  end
 end

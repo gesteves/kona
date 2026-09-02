@@ -109,7 +109,8 @@ describe('clipboard controller', () => {
     await flushDom();
     vi.advanceTimersByTime(5000);
 
-    expect(link.classList.contains('hidden')).toBe(true); // never reverted
+    // The disconnect puts the icon back, thus a Turbo snapshot never holds the check.
+    expect(link.classList.contains('hidden')).toBe(false);
   });
 
   it('reports failure when the clipboard write is rejected', async () => {

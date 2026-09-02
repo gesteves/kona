@@ -248,6 +248,29 @@ RSpec.describe Threads do
       expect(ThreadsCredentials.fetch.refresh_error).to be_nil
     end
 
+    it "reports a 200 with no token, which the card would otherwise never show" do
+      connect!(issued_at: 2.days.ago)
+      allow(HTTParty).to receive(:get).and_return(http_response({ access_token: "" }))
+      allow(ErrorReporter).to receive(:report_upstream)
+
+      expect(described_class.new.refresh!).to eq(:failed)
+      expect(ErrorReporter).to have_received(:report_upstream).with("Threads gave no token", hash_including(context: "Threads token refresh"))
+    end
+
+    # A refresh and a reconnect at the same time would each write a token, and the second write
+    # resets the issue time of the first.
+    it "answers :busy while another refresh holds the lock, and releases the lock at its end" do
+      connect!(issued_at: 2.days.ago)
+      allow(HTTParty).to receive(:get).and_return(http_response({ access_token: "a-renewed-token", expires_in: 60.days.to_i }))
+
+      $redis.set(described_class::REFRESH_LOCK_KEY, "1", nx: true, ex: 60)
+      expect(described_class.new.refresh!).to eq(:busy)
+      $redis.del(described_class::REFRESH_LOCK_KEY)
+
+      expect(described_class.new.refresh!).to eq(:refreshed)
+      expect($redis.exists?(described_class::REFRESH_LOCK_KEY)).to be(false)
+    end
+
     it "keeps the stored token when the call raises" do
       connect!(issued_at: 2.days.ago)
       allow(HTTParty).to receive(:get).and_raise(SocketError)
@@ -305,10 +328,11 @@ RSpec.describe Threads do
     let(:url) { "https://example.test/a-post/" }
     let(:key) { "3kabc" }
     let(:container_key) { "threads:container:#{key}" }
+    let(:published_key) { "threads:published:#{key}" }
 
     before do
       connect!
-      $redis.del(container_key)
+      $redis.del(container_key, published_key)
       # ⚠️ The publish waits for the status of the container. Meta answers 400 subcode 4279009 for
       # a publish that comes too early.
       allow(HTTParty).to receive(:get).and_return(http_response({ status: "FINISHED" }))
@@ -321,7 +345,7 @@ RSpec.describe Threads do
       end
     end
 
-    after { $redis.del(container_key) }
+    after { $redis.del(container_key, published_key) }
 
     def post!(**overrides)
       described_class.new.post!(**{ text: "Read this", url: url, idempotency_key: key }.merge(overrides))
@@ -411,6 +435,27 @@ RSpec.describe Threads do
         "https://graph.threads.net/v1.0/12345/threads_publish",
         hash_including(body: hash_including(creation_id: "container-1"))
       )
+    end
+
+    # ⚠️ Sidekiq redelivers a job whose process died between the publish and the acknowledgement.
+    # The id of the post is the answer to that attempt, and no second post.
+    it "remembers the published post, thus a retry after the publish posts nothing" do
+      expect(post!).to eq("post-1")
+      expect($redis.get(published_key)).to eq("post-1")
+      expect($redis.ttl(published_key)).to be > 24 * 60 * 60
+
+      expect(HTTParty).to have_received(:post).twice
+      expect(post!).to eq("post-1")
+      expect(HTTParty).to have_received(:post).twice
+    end
+
+    it "keeps a container for longer than the retry window of the job" do
+      expect(described_class::CONTAINER_TTL).to be > 24 * 60 * 60
+    end
+
+    it "refuses with a permanent error when no token can post, thus the job does not retry" do
+      ThreadsCredentials.clear
+      expect { post! }.to raise_error(ApplicationJob::PermanentError, /not connected/)
     end
 
     it "forgets the container after Meta published it" do
@@ -506,6 +551,18 @@ RSpec.describe Threads do
         expect(post!).to eq("post-1")
       end
 
+      # A crash between the publish and the mark leaves a PUBLISHED container. Meta can refuse a
+      # second publish of it, and that refusal must reach the retry as an error and not as a post.
+      it "raises when Meta refuses to publish a container that it already published" do
+        allow(HTTParty).to receive(:get).and_return(http_response({ status: "PUBLISHED" }))
+        allow(HTTParty).to receive(:post) do |endpoint, _options|
+          endpoint.end_with?("/threads") ? http_response({ id: "container-1" }) : http_response({ error: { message: "already published" } }, success: false, code: 400)
+        end
+
+        expect { post! }.to raise_error(/already published|refused/)
+        expect($redis.get(published_key)).to be_nil
+      end
+
       it "raises for a container that Meta could not process" do
         allow(HTTParty).to receive(:get).and_return(http_response({ status: "ERROR" }))
 
@@ -529,12 +586,23 @@ RSpec.describe Threads do
         expect(HTTParty).not_to have_received(:post).with(a_string_ending_with("threads_publish"), anything)
       end
 
-      # A read that fails is not an answer, thus it counts as "not ready" and never as an error of
-      # its own.
-      it "treats a status that it cannot read as not ready" do
+      # A read that fails is not an answer. One or two count as "not ready"; three in a row mean
+      # that Meta is away, and the retry of the job is the wait.
+      it "ends the poll after three reads that fail in a row, and keeps the container" do
         allow(HTTParty).to receive(:get).and_return(http_response({}, success: false, code: 500))
+        allow(ErrorReporter).to receive(:report_upstream)
 
-        expect { post! }.to raise_error(/still not ready/)
+        expect { post! }.to raise_error(/did not answer/)
+        expect(HTTParty).to have_received(:get).exactly(3).times
+        expect($redis.get(container_key)).to eq("container-1")
+      end
+
+      it "goes on after a read that fails when the next one answers" do
+        answers = [ http_response({}, success: false, code: 500), http_response({}, success: false, code: 500), http_response({ status: "FINISHED" }) ]
+        allow(HTTParty).to receive(:get) { answers.shift }
+        allow(ErrorReporter).to receive(:report_upstream)
+
+        expect(post!).to eq("post-1")
       end
     end
 

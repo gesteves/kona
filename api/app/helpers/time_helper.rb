@@ -7,7 +7,9 @@ module TimeHelper
   def time_with_meridiem_abbr(time, time_zone)
     return if time.blank? || time_zone.blank?
 
-    meridiem_abbr(Time.parse(time.to_s).in_time_zone(time_zone).strftime("%I:%M %p"))
+    # `%-I`: no zero at the start, as WeatherHelper#format_time writes it. The two render into
+    # one fragment.
+    meridiem_abbr(Time.parse(time.to_s).in_time_zone(time_zone).strftime("%-I:%M %p"))
   end
 
   # Puts the AM or the PM in an <abbr> tag. The time formatter and the weather formatter share it.

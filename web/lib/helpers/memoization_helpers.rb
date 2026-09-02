@@ -16,8 +16,10 @@ module MemoizationHelpers
   # @yieldreturn The value.
   def memoize_by_collection(name, collection)
     store = MemoizationHelpers.collection_store
-    cached_collection, value = store[name]
-    return value if cached_collection.equal?(collection)
+    if store.key?(name)
+      cached_collection, value = store[name]
+      return value if cached_collection.equal?(collection)
+    end
 
     value = yield
     store[name] = [ collection, value ]

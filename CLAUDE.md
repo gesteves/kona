@@ -127,7 +127,7 @@ a link, in the middle of a page:
 
 | Logic | api | web |
 |---|---|---|
-| `markdown_to_html` + `smartypants` | `helpers/markdown_helper.rb` | `helpers/markdown_helpers.rb` |
+| `markdown_to_html` + `smartypants` + `heading_text` | `helpers/markdown_helper.rb` | `helpers/markdown_helpers.rb` |
 | `clock_icon_svg` | `helpers/icons_helper.rb` | `helpers/icon_helpers.rb` |
 | `article_permalink_timestamp` | `helpers/articles_helper.rb` | `helpers/article_helpers.rb` |
 | Canonical article path | `services/article_attributes.rb` | `lib/data/contentful.rb` |

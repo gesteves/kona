@@ -87,13 +87,15 @@
           Bluesky has the shortest limit and "@tony" grows into a domain, thus a count of the words
           alone would let a draft through that Bluesky then refuses. SocialPresenter#bluesky_length
           makes it, and this view holds no count of its own. %>
-      <%# ⚠️ The ring is `aria-hidden`: the words beside it say the same thing, and that span is the
-          live region. Two announcements of one number is worse than none. %>
+      <%# ⚠️ The ring is `aria-hidden`: the words beside it say the same thing. The live region is
+          a hidden span of its own, which the controller writes only when the count crosses the
+          warning or the limit: a region that changes at each keystroke reads every number aloud. %>
       <%# ⚠️ The ring is LAST, thus it sits at the edge of the line and it does not move when the
           number beside it gets a digit. The count sits at the end of the row with `margin-inline-
           start: auto`, and NOT with `space-between`: it must stay there with the button hidden. %>
       <div class="social__count wa-caption-s" data-social-post-target="count">
-        <span aria-live="polite" data-social-post-target="countText"><%= count %> / <%= limit %></span>
+        <span data-social-post-target="countText"><%= count %> / <%= limit %></span>
+        <span class="wa-visually-hidden" aria-live="polite" data-social-post-target="countNotice"></span>
         <wa-progress-ring class="social__ring" aria-hidden="true"
                           value="<%= [ (count * 100.0 / limit).round, 100 ].min %>"
                           data-social-post-target="ring"></wa-progress-ring>

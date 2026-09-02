@@ -83,23 +83,23 @@ export default class extends Controller {
   }
 
   /**
-   * Records a share link, then goes to it. A mailto: link and an sms: link navigate the current
-   * window, thus the code must send the event first. An HTTP or HTTPS link opens in a new tab and
-   * cannot stop the event.
+   * Records a share link. A mailto: link and an sms: link navigate the current window, thus the
+   * code stops the event and sends the event first. An HTTP or HTTPS link has `target="_blank"`
+   * in the markup, thus the browser opens it, and a popup blocker treats that navigation better
+   * than a `window.open` from code.
    * @param {Event} event - The event that started the share action.
    */
   trackShare(event) {
-    event.preventDefault();
     const linkURL = this.element.href;
     const props = { url: this.getShareUrl(), via: this.viaValue };
 
     if (linkURL.startsWith('mailto:') || linkURL.startsWith('sms:')) {
+      event.preventDefault();
       trackEventThen('Share', props, () => {
         window.location.href = linkURL;
       });
     } else {
       trackEvent('Share', props);
-      window.open(linkURL, '_blank', 'noopener,noreferrer');
     }
   }
 }

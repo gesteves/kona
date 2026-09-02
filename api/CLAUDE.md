@@ -1619,10 +1619,15 @@ container.
   would make one more container, and a person would get more than one post.
   - The TTL is 20 hours. ⚠️ Meta expires a container after 24 hours, thus a longer TTL would name a
     container that is gone.
-- ⚠️ **It publishes at once, and it does not wait 30 seconds.** Meta asks a caller to wait for its
-  servers to process an **upload**, and a TEXT post uploads nothing. If Meta refuses because the
-  container is not ready, `#post!` raises and **the retry of Sidekiq is the wait**. The container
-  stays in Redis, thus that retry costs no new container.
+- ⚠️ **It waits for the container before the publish**, with a poll of `CONTAINER_POLL_ATTEMPTS`
+  reads at `CONTAINER_POLL_SECONDS`. A publish that comes too early gets `400 subcode 4279009`,
+  which reads as a container that was never made. Meta processes a TEXT container as well. Three
+  reads that fail in a row end the poll, and the retry of Sidekiq is the wait; the container stays
+  in Redis, thus that retry costs no new container.
+- ⚠️ **The id of a published post stays in Redis** at `threads:published:<key>` for `PUBLISHED_TTL`.
+  Sidekiq redelivers a job whose process died between the publish and the acknowledgement, and
+  that attempt answers with the id and makes no second post. Both TTLs are longer than the
+  24-hour retry window, on purpose.
 - **`MAX_CHARACTERS` is 500 and this class checks nothing.** The body of a draft is at most 300,
   which is the Bluesky limit, thus a post always fits.
 - ⚠️ **`error_message` parses the body itself and does not use `parse_json`.** That helper returns

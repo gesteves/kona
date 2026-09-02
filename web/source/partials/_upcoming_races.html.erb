@@ -30,9 +30,9 @@
                   </p>
                   <h3 class="entry__hed" id="hed-<%= id %>">
                     <% if event.url.present? %>
-                      <%= link_to smartypants(event.title) + '<span class="sr-only"> (opens in a new tab)</span>', event.url, rel: "noopener", target: "_blank" %>
+                      <%= link_to heading_text(event.title) + '<span class="sr-only"> (opens in a new tab)</span>', event.url, rel: "noopener", target: "_blank" %>
                     <% else %>
-                      <%= smartypants(event.title) %>
+                      <%= heading_text(event.title) %>
                     <% end %>
                   </h3>
                 </header>

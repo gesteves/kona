@@ -167,7 +167,12 @@ end
 # failure it writes nothing: the file from the last run stays, and the build reads it.
 def import_schema
   safely_perform do
-    GraphQL::Client.dump_schema(ContentfulClient::HTTP, ContentfulClient::SCHEMA_PATH)
+    # ⚠️ Write beside the file, then move it into place. A network drop in the middle of the write
+    # would leave a file of half a schema, and each rake task then dies at its start.
+    temporary = "#{ContentfulClient::SCHEMA_PATH}.tmp"
+    GraphQL::Client.dump_schema(ContentfulClient::HTTP, temporary)
+    JSON.parse(File.read(temporary))
+    File.rename(temporary, ContentfulClient::SCHEMA_PATH)
   end
 end
 

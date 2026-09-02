@@ -29,7 +29,11 @@ def build_site(verbose: false)
   sh middleman_command
   # A file in source/ with an underscore at the start of its name is a partial. Thus these files have
   # no underscore, and this code renames them.
-  File.rename("#{BUILD_DIRECTORY}/redirects", "#{BUILD_DIRECTORY}/_redirects")
-  File.rename("#{BUILD_DIRECTORY}/headers", "#{BUILD_DIRECTORY}/_headers")
+  %w[redirects headers].each do |name|
+    source = "#{BUILD_DIRECTORY}/#{name}"
+    raise "The build made no #{source}: source/#{name}.erb did not render, and Cloudflare needs _#{name}." unless File.exist?(source)
+
+    File.rename(source, "#{BUILD_DIRECTORY}/_#{name}")
+  end
   sh "npm run pagefind"
 end

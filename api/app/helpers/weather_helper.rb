@@ -67,7 +67,8 @@ module WeatherHelper
       sunrise_time = sunrise(weather, time_zone)
       sunset_time = sunset(weather, time_zone)
       return now.hour >= 6 && now.hour < 18 unless sunrise_time && sunset_time
-      now >= sunrise_time.beginning_of_hour && now <= sunset_time.beginning_of_hour
+      # The exact times. An hour that starts before the sunset is not the evening.
+      now >= sunrise_time && now < sunset_time
     else
       now.hour >= 6 && now.hour < 18
     end
@@ -80,7 +81,7 @@ module WeatherHelper
     if weather.present?
       sunset_time = sunset(weather, time_zone)
       return now.hour >= 18 unless sunset_time
-      now >= sunset_time.beginning_of_hour
+      now >= sunset_time
     else
       now.hour >= 18
     end
@@ -235,7 +236,7 @@ module WeatherHelper
   end
 
   def format_time(time)
-    meridiem_abbr(remove_widows(time.strftime("%l:%M %p")))
+    meridiem_abbr(remove_widows(time.strftime("%-I:%M %p")))
   end
 
   # The icon id for a condition code. :auto selects the day icon or the night icon from the given

@@ -56,6 +56,18 @@ RSpec.describe BlueskyPostJob do
       .with(rkey: "3kabc", text: "Read this\n\n#{url}", card: nil, reply: nil)
   end
 
+  # ⚠️ A scheduled post runs days after the check on the page. A page that lost its og: tags puts
+  # the link in the words, and a long post then passes 300.
+  it "drops the link, and does not fail, when the page lost its card and the words no longer fit" do
+    allow(open_graph).to receive(:fetch)
+      .and_return(OpenGraph::Card.new(url: url, title: nil, description: nil, image_url: nil))
+    words = "a" * 290
+
+    described_class.new.perform([ post("3kabc", words, url) ])
+
+    expect(bluesky).to have_received(:post!).with(rkey: "3kabc", text: words, card: nil, reply: nil)
+  end
+
   # A page that gives one of the three fields still draws a card, thus its link stays out of the
   # words and uses none of the 300 characters.
   it "keeps the link out of the text when the page gives a title alone" do

@@ -140,6 +140,8 @@ class WhoopWebhookProcessor
     end
 
     date = local_date_from_offset(sleep_data[:end], sleep_data[:timezone_offset])
+    return log_info("sleep #{sleep_id} has an offset that the code cannot read — skipping") if date.nil?
+
     write_wellness(date, :WhoopSleepPerformance, performance)
   end
 
@@ -159,6 +161,8 @@ class WhoopWebhookProcessor
     end
 
     date = local_date_from_offset(sleep_data[:end], sleep_data[:timezone_offset])
+    return log_info("sleep #{sleep_id} has an offset that the code cannot read — skipping WhoopRecovery") if date.nil?
+
     write_wellness(date, :WhoopRecovery, recovery.dig(:score, :recovery_score))
   end
 
@@ -194,7 +198,10 @@ class WhoopWebhookProcessor
       case offset
       when "Z" then 0
       when /\A([+-])(\d{2}):?(\d{2})\z/ then (Regexp.last_match(1) == "-" ? -1 : 1) * (Regexp.last_match(2).to_i * 3600 + Regexp.last_match(3).to_i * 60)
-      else raise ArgumentError, "Unrecognized fixed timezone offset: #{offset}"
+      else
+        # A retry cannot make this payload parse. Report it and skip the write.
+        ErrorReporter.report_upstream("Unrecognized fixed timezone offset: #{offset.inspect}", service: "WhoopWebhookProcessor", context: "sleep timezone offset")
+        return
       end
 
     (Time.iso8601(utc_timestamp) + seconds).utc.to_date

@@ -26,6 +26,18 @@ RSpec.describe Bluesky do
       end
   end
 
+  describe ".tid_time" do
+    it "reads the time that new_tid encoded, to the microsecond" do
+      tid = described_class.new_tid
+      expect(described_class.tid_time(tid)).to be_within(0.001).of(Time.now)
+    end
+
+    it "gives nil for a value that is not a TID" do
+      expect(described_class.tid_time("not-a-tid")).to be_nil
+      expect(described_class.tid_time(nil)).to be_nil
+    end
+  end
+
   describe ".post_length" do
     # ⚠️ Bluesky counts graphemes. `String#length` gives UTF-16 code units, thus it counts one
     # emoji as 2 or more. social_controller.js counts the same way with Intl.Segmenter.
@@ -94,10 +106,31 @@ RSpec.describe Bluesky do
       stub_put_record
     end
 
-    it "refuses when there are no credentials" do
+    it "refuses when there are no credentials, with an error that no retry can correct" do
       service = described_class.new(credentials: BlueskyCredentials::Credentials.new(handle: nil, app_password: nil))
 
-      expect { service.post!(rkey: "abc", text: "Hi") }.to raise_error(/not connected/)
+      expect { service.post!(rkey: "abc", text: "Hi") }.to raise_error(ApplicationJob::PermanentError, /not connected/)
+    end
+
+    # ⚠️ Each attempt must write the same bytes. A new createdAt gives a new CID, and the `parent`
+    # of a reply that is already out then names a version that is gone.
+    it "takes createdAt from the record key, thus each attempt writes the same record" do
+      rkey = described_class.new_tid
+      service.post!(rkey: rkey, text: "A long day.")
+      first = @sent["record"]["createdAt"]
+
+      service.post!(rkey: rkey, text: "A long day.")
+      expect(@sent["record"]["createdAt"]).to eq(first)
+      expect(Time.iso8601(first)).to be_within(1).of(Time.now)
+    end
+
+    it "refuses the post when the PDS answers with no cid, thus the next post cannot name it" do
+      allow(HTTParty).to receive(:post)
+        .with(a_string_including("com.atproto.repo.putRecord"), anything)
+        .and_return(instance_double(HTTParty::Response, success?: true, body: { uri: "at://did:plc:abc/app.bsky.feed.post/3kabc" }.to_json, code: 200))
+      allow(ErrorReporter).to receive(:report_upstream)
+
+      expect { service.post!(rkey: "3kabc", text: "Hi") }.to raise_error(/refused the post/)
     end
 
     it "refuses a post past the limit before it opens a session" do
@@ -316,7 +349,7 @@ RSpec.describe Bluesky do
       # A host with no Content-Type still serves a true picture. The decode is the check.
       it "decodes a picture that comes with no content type" do
         stub_streamed_get("https://cdn.test/og.png", body: "bytes")
-        allow(Vips::Image).to receive(:new_from_buffer).and_return(Vips::Image.black(100, 50))
+        allow(Vips::Image).to receive(:thumbnail_buffer).and_return(Vips::Image.black(100, 50))
         uploaded = stub_upload_blob
 
         service.post!(rkey: "3kabc", text: "Read this", card: card)
@@ -333,7 +366,7 @@ RSpec.describe Bluesky do
         # A plain double: ruby-vips makes `jpegsave_buffer` at run time, thus an instance_double
         # cannot see it.
         still_big = double("Vips::Image", width: 100, jpegsave_buffer: "j" * (described_class::MAX_BLOB_BYTES + 1))
-        allow(Vips::Image).to receive(:new_from_buffer).and_return(still_big)
+        allow(Vips::Image).to receive(:thumbnail_buffer).and_return(still_big)
         uploaded = stub_upload_blob
 
         service.post!(rkey: "3kabc", text: "Read this", card: card)
@@ -378,9 +411,12 @@ RSpec.describe Bluesky do
       it "shrinks a picture that is over the blob limit" do
         stub_streamed_get("https://cdn.test/og.png", body: "x" * (described_class::MAX_BLOB_BYTES + 1),
                           headers: { "content-type" => "image/png" })
-        # A true image, thus the resize and the JPEG encode really run. The download is the only
-        # stub: the body stands for a file that is too large, and libvips never decodes it.
-        allow(Vips::Image).to receive(:new_from_buffer).and_return(Vips::Image.black(2400, 1200))
+        # A true image, thus the JPEG encode really runs. The download is the only stub: the body
+        # stands for a file that is too large, and libvips never decodes it. The shrink is at the
+        # decode, thus the stub answers with the small picture that thumbnail_buffer would give.
+        allow(Vips::Image).to receive(:thumbnail_buffer)
+          .with(anything, described_class::CARD_IMAGE_WIDTH, size: :down)
+          .and_return(Vips::Image.black(described_class::CARD_IMAGE_WIDTH, 600))
         uploaded = stub_upload_blob
 
         service.post!(rkey: "3kabc", text: "Read this", card: card)

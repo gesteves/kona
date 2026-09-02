@@ -125,6 +125,9 @@ class Contentful
   def process_site
     @content[:site] = @content[:sites].first
     @content.delete(:sites)
+    # Each template reads data.site. Without this, the build dies in the head partial with a
+    # message that names no cause.
+    raise "No Site entry is published in Contentful. The build needs one." if @content[:site].nil?
   end
 
   # Makes the taxonomy, the entry fields, and the path of each article.
@@ -307,18 +310,18 @@ class Contentful
   # empty subtree gets no page.
   def generate_tags
     taxo = taxonomy
-    children = Hash.new { |h, k| h[k] = [] }
-    taxo.each_value { |c| children[c[:parent_id]] << c[:id] if c[:parent_id] }
 
-    # This is outside the loop, because published_articles makes the array again at each call and
-    # this loop runs one time for each concept. The set does not change in the loop.
-    candidates = published_articles
+    # One pass over the articles: each article goes into the archive of each tag and of each
+    # ancestor of that tag. A scan of every article for each concept grows with the product of
+    # the two.
+    by_concept = Hash.new { |h, k| h[k] = [] }
+    published_articles.each do |a|
+      ids = Array(a.dig(:contentful_metadata, :tags)).flat_map { |t| [ t[:id] ] + ancestor_ids(t[:id], taxo) }.uniq
+      ids.each { |id| by_concept[id] << a }
+    end
 
     @content[:tags] = taxo.values.filter_map do |concept|
-      id_set = ([ concept[:id] ] + descendant_ids(concept[:id], children)).to_set
-      tagged = candidates.select do |a|
-        Array(a.dig(:contentful_metadata, :tags)).any? { |t| id_set.include?(t[:id]) }
-      end
+      tagged = by_concept[concept[:id]]
       next if tagged.empty?
 
       description = concept[:description].presence
@@ -334,6 +337,20 @@ class Contentful
       # Use entry_count, not count: `count` is Hash#count on the Hashie::Mash.
       { tag: concept.slice(:id, :name, :path, :scheme, :parent_id, :description, :synonyms).merge(entry_count: tagged.size), pages: pages }
     end
+  end
+
+  # @return [Array<String>] The parent of a concept, then its parent, up to the root. A cycle ends
+  #   the walk.
+  def ancestor_ids(id, taxo)
+    result = []
+    seen = Set.new([ id ])
+    cur = taxo.dig(id, :parent_id)
+    while cur && !seen.include?(cur)
+      result << cur
+      seen << cur
+      cur = taxo.dig(cur, :parent_id)
+    end
+    result
   end
 
   # @return [Array<String>] All the child concept ids, in depth-first order.
@@ -413,6 +430,11 @@ class Contentful
       next if id.blank?
       name = localized(c["prefLabel"])
       synonyms = Array(localized(c["altLabels"]))
+      # ⚠️ The archive tree follows the FIRST parent only. A concept with two parents is absent
+      # from the archive of the second one, with no message but this line.
+      if Array(c["broader"]).size > 1
+        warn "Taxonomy: the concept #{name.inspect} (#{id}) has #{Array(c['broader']).size} parents; the archive follows the first one only."
+      end
       by_id[id] = {
         id: id,
         name: name,

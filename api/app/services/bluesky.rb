@@ -56,7 +56,7 @@ class Bluesky < ApplicationService
   # @param text [String, nil]
   # @return [Integer]
   def self.post_length(text)
-    MarkdownLinks.render(text).scan(/\X/).length
+    SocialText.graphemes(MarkdownLinks.render(text))
   end
 
   # @param text [String, nil]
@@ -83,12 +83,10 @@ class Bluesky < ApplicationService
     taken = markdown.map { |link| link.start...link.finish }
     bare = []
 
-    text.scan(URL_PATTERN) do
-      start_char, end_char = Regexp.last_match.offset(1)
-      next if taken.any? { |range| range.cover?(start_char) }
+    SocialText.url_ranges(text).each do |range|
+      next if taken.any? { |other| other.cover?(range.begin) }
 
-      bare << MarkdownLinks::Link.new(start: start_char, finish: end_char,
-                                      url: text[start_char...end_char])
+      bare << MarkdownLinks::Link.new(start: range.begin, finish: range.end, url: text[range])
     end
 
     (markdown + bare).sort_by(&:start)
@@ -104,7 +102,7 @@ class Bluesky < ApplicationService
   # @param url [String, nil] The link to add below the body.
   # @return [String]
   def self.compose(text:, url: nil)
-    [ text.to_s.strip, url.to_s.strip ].reject(&:blank?).join("\n\n")
+    SocialText.compose(text: text, url: url)
   end
 
   # Makes the public URL of a post from its record key.
@@ -148,8 +146,8 @@ class Bluesky < ApplicationService
   # @raise [RuntimeError] When the credentials, the length, the session, or the write fails. It
   #   raises on purpose: `BlueskyPostJob` then does the work again.
   def post!(rkey:, text:, card: nil, reply: nil)
-    raise "Bluesky is not connected" unless valid_credentials?
-    raise "The post is empty or longer than #{MAX_GRAPHEMES} characters" unless self.class.valid_post_length?(text)
+    raise ApplicationJob::PermanentError, "Bluesky is not connected" unless valid_credentials?
+    raise ApplicationJob::PermanentError, "The post is empty or longer than #{MAX_GRAPHEMES} characters" unless self.class.valid_post_length?(text)
     raise "Could not open a Bluesky session" unless open_session(handle: @handle, app_password: @app_password)
 
     # ⚠️ **The Markdown is rendered HERE, and not in the action.** The record holds the plain words
@@ -165,7 +163,10 @@ class Bluesky < ApplicationService
       # go out inside the same second: both then carry the same createdAt. The AppView sorts an
       # author feed by that value, and the root of the thread went missing from the Posts tab while
       # its reply stayed. Each other client writes milliseconds, and `StandardSite` does as well.
-      "createdAt" => Time.now.utc.iso8601(3)
+      # ⚠️ The time comes from the record key, thus each attempt writes the same bytes and the CID
+      # does not change. A new CID would make the `parent` of a published reply point at a version
+      # that is gone.
+      "createdAt" => (self.class.tid_time(rkey) || Time.now).utc.iso8601(3)
     }
     facets = build_facets(post.text, links: post.links)
     record["facets"] = facets if facets.any?
@@ -323,8 +324,11 @@ class Bluesky < ApplicationService
     # machine with no libvips gives a 500 in place of a card with no picture.
     require "vips"
 
-    image = Vips::Image.new_from_buffer(bytes, "")
-    image = image.resize(CARD_IMAGE_WIDTH.to_f / image.width) if image.width > CARD_IMAGE_WIDTH
+    # ⚠️ `thumbnail_buffer` shrinks at the decode. `new_from_buffer` + `resize` decodes the full
+    # picture first, and an 8000×6000 og:image is then ~144MB of pixels on a 512MB machine, in the
+    # request path of the preview as well as in the job. It still decodes, thus it is still the
+    # check that the bytes are a picture.
+    image = Vips::Image.thumbnail_buffer(bytes, CARD_IMAGE_WIDTH, size: :down)
     [ image.jpegsave_buffer(Q: CARD_IMAGE_QUALITY, strip: true), "image/jpeg" ]
   rescue StandardError, LoadError => e
     report_upstream_error(e, context: "bluesky card image resize")

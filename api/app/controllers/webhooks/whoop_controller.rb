@@ -31,6 +31,14 @@ module Webhooks
         return render(json: { error: "user_id does not match configured athlete" }, status: :forbidden)
       end
 
+      # The signature check accepts a timestamp of some minutes, thus a replay inside that window
+      # would add the job again. The job can run more than one time, but each run makes a new
+      # description with a new text. This id stays for the window.
+      unless $redis.set("whoop:webhook:#{payload['type']}:#{payload['id']}", "1", nx: true, ex: WhoopRequestVerification::MAX_TIMESTAMP_SKEW.to_i)
+        Rails.logger.info("Whoop webhook repeated: #{payload['type']} (id=#{payload['id']})")
+        return render json: { ok: true, duplicate: true }
+      end
+
       Rails.logger.info("Whoop webhook received: #{payload['type']} (id=#{payload['id']}, trace=#{payload['trace_id']})")
       WhoopWebhookJob.perform_async(payload["type"], payload["id"], payload["trace_id"])
       render json: { ok: true }

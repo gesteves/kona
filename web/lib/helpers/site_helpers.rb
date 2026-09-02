@@ -140,7 +140,9 @@ module SiteHelpers
     else
       data.site.meta_description
     end
-    sanitize(summary)&.truncate(SUMMARY_LENGTH)
+    # ⚠️ The omission is the one character, and not "...": smartypants would make the three dots
+    # into `&hellip;`, and the Atom summary, which is plain text, would then show that entity.
+    sanitize(summary)&.truncate(SUMMARY_LENGTH, omission: "…")
   end
 
   # @return [DateTime] The latest publish time of the pages, the articles, and the site entry.
@@ -168,7 +170,8 @@ module SiteHelpers
   end
 
   # The Atom feeds for the <head>: the main site feed, and also the feed of the tag on an archive
-  # page, or the feed of each tag of the article on a post.
+  # page. ⚠️ An article page advertises the main feed only. Feed autodiscovery has no order of
+  # preference, thus a tag feed there can send a reader to a narrow feed.
   # @return [Array<Hash>] Items of { href:, title: }.
   def alternate_feed_links
     links = [ { href: full_url("/feed.xml"), title: sanitize(data.site.meta_title) } ]
@@ -178,8 +181,6 @@ module SiteHelpers
     elsif pc.template == "/tag.html" && pc.tag_id
       node = taxonomy_index[pc.tag_id] # the tag itself
       node ? [ node ] : []
-    elsif published_post?(pc)
-      Array(pc.contentful_metadata&.tags).map { |t| { name: t.name, path: t.path } }
     else
       []
     end

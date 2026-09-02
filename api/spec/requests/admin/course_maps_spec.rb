@@ -423,7 +423,9 @@ RSpec.describe "Admin course maps", type: :request do
       delete "/course-maps/morning_run_abc"
 
       expect(library).not_to have_received(:delete)
-      expect(flash[:alert]).to include("Forbidden")
+      # The page names the class of the error. The message of Mapbox goes to the log only.
+      expect(flash[:alert]).to include("RuntimeError")
+      expect(flash[:alert]).not_to include("Forbidden")
     end
   end
 

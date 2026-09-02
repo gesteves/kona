@@ -37,6 +37,31 @@ describe StandardSite do
     allow(ENV).to receive(:[]).with("SITE_URL").and_return("https://www.giventotri.com")
   end
 
+  describe "#list_record_rkeys" do
+    def page(rkeys, cursor)
+      instance_double(HTTParty::Response, success?: true, code: 200,
+                                          body: { records: rkeys.map { |k| { uri: "at://did/site.standard.document/#{k}" } }, cursor: cursor }.to_json)
+    end
+
+    it "follows the cursor to the end" do
+      pages = [ page(%w[a b], "c1"), page(%w[c], nil) ]
+      allow(HTTParty).to receive(:get) { pages.shift }
+
+      expect(client.send(:list_record_rkeys, "site.standard.document")).to eq(%w[a b c])
+    end
+
+    # ⚠️ A backfill runs this. A PDS that answers with the same cursor for all time must not make
+    # the loop grow the list until the worker runs out of memory.
+    it "stops at a cursor that repeats, and at the page limit" do
+      allow(HTTParty).to receive(:get).and_return(page(%w[a], "same"))
+      expect(client.send(:list_record_rkeys, "site.standard.document")).to eq(%w[a a])
+
+      pages = 0
+      allow(HTTParty).to receive(:get) { page(%w[a], "c#{pages += 1}") }
+      expect(client.send(:list_record_rkeys, "site.standard.document").length).to eq(described_class::MAX_LIST_PAGES)
+    end
+  end
+
   describe "#build_publication_record" do
     subject(:record) { client.build_publication_record(site) }
 

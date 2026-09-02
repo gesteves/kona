@@ -32,7 +32,7 @@
       </span>
     </p>
     <h3 class="entry__hed" id="hed-<%= entry_id %>">
-      <%= link_to raw(smartypants(article.title)), article.path, class: article_click_classes(tracking_section) %>
+      <%= link_to raw(heading_text(article.title)), article.path, class: article_click_classes(tracking_section) %>
     </h3>
   </header>
   <div class="entry__body">

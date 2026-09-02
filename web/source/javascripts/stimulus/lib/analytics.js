@@ -14,15 +14,10 @@ function track(...args) {
  */
 export function trackPageView(additionalProps = {}) {
   const currentUrl = new URL(window.location.href);
-  const searchQuery = currentUrl.searchParams.get('q');
-
   const params = { u: currentUrl.href };
 
-  if (searchQuery || Object.keys(additionalProps).length > 0) {
+  if (Object.keys(additionalProps).length > 0) {
     params.props = { ...additionalProps };
-    if (searchQuery) {
-      params.props.search_query = searchQuery;
-    }
   }
 
   track('pageview', params);

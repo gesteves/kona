@@ -73,7 +73,9 @@ class Articles < ApplicationService
     items = rescue_with([], context: "Error fetching articles") do
       # A digest of the query goes at the end. Thus a change to its fields makes a new cache key,
       # and no person needs to remember to increase a version number.
-      cached_json("contentful:articles:list:#{cache_version(LIST_QUERY)}", expires_in: 5.minutes) do
+      # ⚠️ The cached value also holds what ArticleAttributes.derive makes from each item, thus
+      # that class is part of the digest through its version.
+      cached_json("contentful:articles:list:#{cache_version(LIST_QUERY, ArticleAttributes::VERSION)}", expires_in: 5.minutes) do
         fetch_all.map { |item| decorate(underscore_keys(item)) }
       end
     end
@@ -88,6 +90,13 @@ class Articles < ApplicationService
   # Only the related section reads this text, and it runs one time for each build.
   # @return [Hash{String=>Hash}] Contentful id => { title:, summary:, intro:, body: }.
   def corpus
+    return @corpus if defined?(@corpus)
+
+    @corpus = read_corpus
+  end
+
+  # @see #corpus
+  def read_corpus
     items = rescue_with([], context: "Error fetching the article corpus") do
       # A digest of the query goes at the end, thus a change to its fields makes a new cache key.
       cached_json("contentful:articles:corpus:#{cache_version(CORPUS_QUERY)}", expires_in: 5.minutes) do

@@ -298,15 +298,6 @@ RSpec.describe Mastodon do
       expect(HTTParty).not_to have_received(:post)
     end
 
-    # ⚠️ An earlier version of this code kept the URL alone. That value has no id, thus a reply
-    # cannot name it, and the post is already out. It must not post a second time.
-    it "reads a remembered value from before the id, and posts nothing" do
-      $redis.set(status_key, "https://mastodon.social/@me/1")
-
-      expect(post!).to eq({ "id" => nil, "url" => "https://mastodon.social/@me/1" })
-      expect(HTTParty).not_to have_received(:post)
-    end
-
     it "remembers nothing with no key" do
       post!(idempotency_key: nil)
 

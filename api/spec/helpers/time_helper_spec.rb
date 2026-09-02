@@ -6,7 +6,8 @@ RSpec.describe TimeHelper do
   describe "#time_with_meridiem_abbr" do
     it "formats the time and wraps the meridiem in an <abbr>" do
       result = helper.time_with_meridiem_abbr("2024-01-01T14:30:00Z", "America/Denver")
-      expect(result).to eq("07:30 <abbr title=\"ante meridiem\">AM</abbr>")
+      # No zero at the start: WeatherHelper#format_time writes the same shape into the same fragment.
+      expect(result).to eq("7:30 <abbr title=\"ante meridiem\">AM</abbr>")
     end
 
     it "returns nil when the time or zone is blank" do

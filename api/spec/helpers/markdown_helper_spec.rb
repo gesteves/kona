@@ -3,6 +3,14 @@ require "rails_helper"
 RSpec.describe MarkdownHelper do
   subject(:helper) { Class.new { include MarkdownHelper }.new }
 
+  describe "#heading_text" do
+    it "applies the typography and removes or escapes the markup of a title" do
+      expect(helper.heading_text(%q(It's a <b>big</b> "race" & more))).to eq("It’s a big “race” &amp; more")
+      expect(helper.heading_text("<script>x</script>")).to eq("")
+      expect(helper.heading_text(nil)).to be_nil
+    end
+  end
+
   describe "#markdown_to_html" do
     it "renders Markdown bold as <strong>" do
       expect(helper.markdown_to_html("**bold**")).to eq("<p><strong>bold</strong></p>\n")

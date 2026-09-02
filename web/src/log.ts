@@ -17,6 +17,21 @@ export function requestLogLine(
     geo || undefined,
     request.headers.get('CF-Ray'),
   ]
-    .filter(Boolean)
+    .filter((value): value is string => Boolean(value))
+    .map(field)
     .join(' | ');
+}
+
+/** The most characters of one field. A header is client text and can be very long. */
+const MAX_FIELD_LENGTH = 200;
+
+/**
+ * Makes one field safe for the line: no pipe, which is the separator, and a length limit. A
+ * User-Agent of `x | 1.2.3.4` could otherwise write a false IP field.
+ */
+function field(value: string): string {
+  const clean = value.replace(/[|\r\n]/g, ' ');
+  return clean.length > MAX_FIELD_LENGTH
+    ? `${clean.slice(0, MAX_FIELD_LENGTH)}…`
+    : clean;
 }

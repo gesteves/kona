@@ -60,6 +60,14 @@ RSpec.describe MastodonPostJob do
       expect(in_reply_to_id).to eq("101")
     end
 
+    # ⚠️ A reply names the status above it. With no id the next post would be a new toot.
+    it "raises, and adds no job, when the status has no id and a post follows" do
+      allow(mastodon).to receive(:post!).and_return({ "id" => nil, "url" => "https://instance.test/@me/101" })
+
+      expect { described_class.new.perform(thread, 0, nil) }.to raise_error(/no status id/)
+      expect(described_class.jobs).to be_empty
+    end
+
     it "adds no job after the last post" do
       described_class.new.perform(thread, 1, "101")
 

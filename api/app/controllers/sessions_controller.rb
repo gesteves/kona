@@ -32,7 +32,8 @@ class SessionsController < ActionController::Base
       session[:owner_email] = email
       redirect_to(destination)
     else
-      Rails.logger.warn("Owner auth rejected: email=#{email.inspect} verified=#{verified.inspect}")
+      # The address is data about a person, thus the log holds a digest of it and not the address.
+      Rails.logger.warn("Owner auth rejected: email_digest=#{Digest::SHA256.hexdigest(email.to_s)[0, 12]} verified=#{verified.inspect}")
       render plain: "Not authorized.", status: :forbidden
     end
   end
@@ -56,6 +57,9 @@ class SessionsController < ActionController::Base
   # but not with "//". Thus an old value, or a value that an attacker writes, cannot send the browser
   # to another site.
   def safe_return_path(path)
-    path.present? && path.start_with?("/") && !path.start_with?("//") ? path : "/"
+    # ⚠️ A browser reads `/\host` as `//host`. Both shapes name another site.
+    return "/" if path.blank? || !path.start_with?("/") || path.start_with?("//", "/\\")
+
+    path
   end
 end

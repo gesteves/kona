@@ -167,10 +167,10 @@ class Mastodon < ApplicationService
   # @raise [ApplicationService::HttpError, RuntimeError] It raises at each failure, thus
   #   MastodonPostJob does the work again.
   def post!(text:, url: nil, idempotency_key: nil, in_reply_to_id: nil)
-    raise "Mastodon is not connected" unless connected?
+    raise ApplicationJob::PermanentError, "Mastodon is not connected" unless connected?
 
     status = self.class.compose(text: text, url: url)
-    raise "The post is empty" if status.blank?
+    raise ApplicationJob::PermanentError, "The post is empty" if status.blank?
 
     posted = posted_status(idempotency_key)
     return posted if posted.present?
@@ -206,7 +206,7 @@ class Mastodon < ApplicationService
   # @param url [String, nil] The link to add below the body.
   # @return [String]
   def self.compose(text:, url: nil)
-    [ text.to_s.strip, url.to_s.strip ].reject(&:blank?).join("\n\n")
+    SocialText.compose(text: text, url: url)
   end
 
   # The length that this instance counts for a post.
@@ -220,10 +220,11 @@ class Mastodon < ApplicationService
   def self.post_length(text:, url: nil)
     body = text.to_s.strip
     link = url.to_s.strip
-    return body.length if link.blank?
+    # Graphemes, as Bluesky counts: an emoji is one character to a reader and to an instance.
+    return SocialText.graphemes(body) if link.blank?
 
     # The two newlines that #compose writes, and then the weight of the link.
-    body.length + 2 + URL_WEIGHT
+    SocialText.graphemes(body) + 2 + URL_WEIGHT
   end
 
   # Tells the instance to forget the token, then removes the stored credentials.
@@ -283,11 +284,7 @@ class Mastodon < ApplicationService
     return if raw.blank?
 
     parsed = JSON.parse(raw) rescue nil
-    return parsed if parsed.is_a?(Hash) && parsed["id"].present?
-
-    # A value that an earlier version of this code wrote is the URL alone. It has no id, thus a
-    # reply cannot name it, and the post itself is already out.
-    { "id" => nil, "url" => raw }
+    parsed if parsed.is_a?(Hash) && parsed["id"].present?
   end
 
   # @return [void]

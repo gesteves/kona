@@ -12,8 +12,17 @@ export default class extends Controller {
     },
   };
 
+  /**
+   * Stops the revert timer and puts the link icon back. ⚠️ Turbo makes its snapshot before the
+   * disconnect, thus without the revert a copy that is less than two seconds old comes back from
+   * the cache with a check that stays for all time.
+   */
   disconnect() {
     clearTimeout(this.revertTimer);
+    if (this.hasLinkTarget && this.hasCheckTarget) {
+      this.linkTarget.classList.remove(this.hiddenClass);
+      this.checkTarget.classList.add(this.hiddenClass);
+    }
   }
 
   /**

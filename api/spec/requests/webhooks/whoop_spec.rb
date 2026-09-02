@@ -43,6 +43,21 @@ RSpec.describe "Webhooks::Whoop", type: :request do
   end
 
   context "with a valid signature and payload" do
+    # The controller keeps the id of each event for the signature window, thus each example starts
+    # with no record of its event.
+    before { $redis.del("whoop:webhook:workout.updated:workout-uuid-1", "whoop:webhook:recovery.updated:sleep-uuid-9") }
+
+    # ⚠️ The signature accepts a timestamp of some minutes, and a replay inside that window must not
+    # add the job again: each run makes a new description with a new text.
+    it "acknowledges a repeated event and adds no second job" do
+      post_webhook(payload)
+      post_webhook(payload)
+
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)).to eq("ok" => true, "duplicate" => true)
+      expect(WhoopWebhookJob.jobs.size).to eq(1)
+    end
+
     it "acks with 200 {ok: true} and enqueues the processing job" do
       post_webhook(payload)
       expect(response).to have_http_status(:ok)

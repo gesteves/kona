@@ -20,11 +20,17 @@
 // ⚠️ An address goes through with NO change, exactly as `Typography` leaves it alone: a link that
 // holds `--` must keep it, and a count that shortened one would be smaller than the server's.
 
-import { URL_SOURCE } from "./social_mentions";
+import { TOKEN_SOURCE, URL_SOURCE } from "./social_mentions";
 
 const ELLIPSIS = /\.\.\.|\. \. \./g;
 const EM_DASH = /---/g;
 const EN_DASH = /--/g;
+// The marks and the fractions that SmartyPants writes as one character.
+const COPYRIGHT = /\(c\)/gi;
+const REGISTERED = /\(r\)/gi;
+const TRADEMARK = /\(tm\)/gi;
+const FRACTIONS = /(?<![\d/])(1\/4|1\/2|3\/4)(?![\d/])/g;
+const FRACTION_CHARS = { "1/4": "¼", "1/2": "½", "3/4": "¾" };
 
 /**
  * Applies the rules that change the length of a post.
@@ -40,7 +46,7 @@ export function applyLengthRules(text) {
   let out = "";
   let last = 0;
 
-  for (const [start, end] of urlRanges(body)) {
+  for (const [start, end] of maskedRanges(body)) {
     out += convert(body.slice(last, start)) + body.slice(start, end);
     last = end;
   }
@@ -53,17 +59,38 @@ export function applyLengthRules(text) {
  * @returns {string}
  */
 function convert(chunk) {
-  return chunk.replace(ELLIPSIS, "…").replace(EM_DASH, "—").replace(EN_DASH, "–");
+  return chunk
+    .replace(ELLIPSIS, "…")
+    .replace(EM_DASH, "—")
+    .replace(EN_DASH, "–")
+    .replace(COPYRIGHT, "©")
+    .replace(REGISTERED, "®")
+    .replace(TRADEMARK, "™")
+    .replace(FRACTIONS, (match) => FRACTION_CHARS[match]);
 }
 
 /**
- * The character ranges of each address. ⚠️ It is the URL pattern of Bluesky, which is the one that
- * `Typography#url_ranges` reads on the server.
+ * Each address and each mention token, in order. ⚠️ A handle can hold `--`, and the server keeps
+ * it: `Typography#masked_ranges` masks the same two shapes.
  * @param {string} text
  * @returns {Array<[number, number]>}
  */
-function urlRanges(text) {
-  const pattern = new RegExp(URL_SOURCE, "g");
+function maskedRanges(text) {
+  const urls = groupRanges(text, URL_SOURCE);
+  const tokens = groupRanges(text, TOKEN_SOURCE).filter(
+    ([start]) => !urls.some(([from, to]) => start >= from && start < to)
+  );
+  return [...urls, ...tokens].sort((a, b) => a[0] - b[0]);
+}
+
+/**
+ * The character ranges of group 1 of a pattern.
+ * @param {string} text
+ * @param {string} source
+ * @returns {Array<[number, number]>}
+ */
+function groupRanges(text, source) {
+  const pattern = new RegExp(source, "g");
   const ranges = [];
   let match;
 

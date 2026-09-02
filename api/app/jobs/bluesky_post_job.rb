@@ -31,6 +31,14 @@ class BlueskyPostJob < ApplicationJob
     embed = card if card&.embeddable?
     text = Bluesky.compose(text: post["text"], url: (post["link"] if card && embed.nil?))
 
+    # ⚠️ The page measured at the submit had a card, and a scheduled post can run days later. A
+    # page that lost its og: tags puts the link in the words, and the words can then pass 300. The
+    # post goes out with no link, which is the degraded answer, and not a retry of one day.
+    if embed.nil? && text != post["text"] && !Bluesky.valid_post_length?(text)
+      Rails.logger.warn("BlueskyPostJob: post #{index + 1}/#{posts.length} drops its link, which no longer fits")
+      text = post["text"]
+    end
+
     written = Bluesky.new.post!(rkey: post["key"], text: text, card: embed, reply: reply)
     Rails.logger.info("BlueskyPostJob: posted #{index + 1}/#{posts.length} at #{written['url']}")
 

@@ -25,6 +25,12 @@ class MastodonPostJob < ApplicationJob
                                 idempotency_key: post["key"], in_reply_to_id: in_reply_to_id)
     Rails.logger.info("MastodonPostJob: posted #{index + 1}/#{posts.length} at #{status['url']}")
 
-    self.class.perform_async(posts, index + 1, status["id"]) if posts[index + 1]
+    return if posts[index + 1].blank?
+
+    # ⚠️ A reply names the status above it by its id. With no id, the next post would go out as a
+    # new toot and not as a reply, with no message.
+    raise "Mastodon gave no status id for post #{index + 1}, thus the thread cannot continue" if status["id"].blank?
+
+    self.class.perform_async(posts, index + 1, status["id"])
   end
 end

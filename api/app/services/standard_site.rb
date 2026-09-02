@@ -615,10 +615,14 @@ class StandardSite < ApplicationService
 
   # @param collection [String] The collection to list.
   # @return [Array<String>] All the rkeys in it. The cursor gives one page at a time.
+  # The most pages of records to read. A PDS that gives the same cursor for all time, or a cursor
+  # that never ends, must not make this loop for all time inside a backfill.
+  MAX_LIST_PAGES = 200
+
   def list_record_rkeys(collection)
     rkeys = []
     cursor = nil
-    loop do
+    MAX_LIST_PAGES.times do
       query = { repo: @did, collection: collection, limit: 100 }
       query[:cursor] = cursor if cursor.present?
       response = HTTParty.get("#{@service_url}/xrpc/com.atproto.repo.listRecords", query: query, headers: auth_headers)
@@ -629,8 +633,10 @@ class StandardSite < ApplicationService
       body = JSON.parse(response.body)
       records = Array(body["records"])
       rkeys.concat(records.map { |r| r["uri"].to_s.split("/").last })
-      cursor = body["cursor"]
-      break if cursor.blank? || records.empty?
+      next_cursor = body["cursor"]
+      break if next_cursor.blank? || records.empty? || next_cursor == cursor
+
+      cursor = next_cursor
     end
     rkeys
   end

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import NavController from '../../../source/javascripts/stimulus/controllers/nav_controller';
-import { mount } from '../helpers';
+import { flushDom, mount } from '../helpers';
 
 // A class on <body> holds the open or closed state, because the menu covers the full screen on a
 // mobile device. Thus the work of the controller is to keep that class and the ARIA state of the
@@ -100,6 +100,22 @@ describe('nav controller', () => {
     element.querySelector('button').click();
     expect(document.body.style.top).toBe('');
     expect(scrollTo).toHaveBeenCalledWith(0, 1200);
+  });
+
+  // A disconnect that comes by another route than turbo:before-cache, for example a morph of
+  // the header, must not leave the reader at the top of the page.
+  it('restores the scroll position when the element goes away while the menu is open', async () => {
+    const { element } = await mountNav();
+    window.scrollY = 800;
+    const scrollTo = vi.fn();
+    window.scrollTo = scrollTo;
+
+    element.querySelector('button').click();
+    element.remove();
+    await flushDom();
+
+    expect(document.body.style.top).toBe('');
+    expect(scrollTo).toHaveBeenCalledWith(0, 800);
   });
 
   it('does not scroll when closing a menu that was never open', async () => {

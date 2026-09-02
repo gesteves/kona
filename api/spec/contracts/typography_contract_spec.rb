@@ -50,7 +50,15 @@ RSpec.describe "Typography Ruby ↔ JavaScript contract" do
     %q(He said "see https://example.test/x now" loudly),
     %q{Read [my post](https://example.test/a--b) -- it's good},
     "Ref [a][x]... good\n\n[x]: https://example.test/a--b",
-    "It's here: https://example.test/a--b... really"
+    "It's here: https://example.test/a--b... really",
+    "Copyright (c) 2026 (r) (tm)",
+    "(C) (R) (TM)",
+    "a 1/2 mile and 1/4 of a 3/4",
+    "11/2 and 1/22 and 1/2/3",
+    "https://example.test/(c)/1/2 and (c)",
+    "cc @xn--80ak6aa92e.com now -- really",
+    "@a--b.test and a--b",
+    "see https://example.test/@x--y and @me@a--b.social"
   ].freeze
 
   it "shortens each draft to the same length as the browser" do

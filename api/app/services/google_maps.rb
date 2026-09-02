@@ -93,7 +93,9 @@ class GoogleMaps < ApplicationService
   def get_time_zone
     return unless coordinates?
 
-    cached_json("google:maps:time_zone:#{@latitude}:#{@longitude}", expires_in: 1.day) do
+    # The date is in the key: the answer holds the DST offset of the moment of the request, and a
+    # day after a change it would be wrong for the rest of the TTL.
+    cached_json("google:maps:time_zone:#{@latitude}:#{@longitude}:#{Date.current.iso8601}", expires_in: 1.day) do
       query = {
         location: "#{@latitude},#{@longitude}",
         key: google_api_key,

@@ -62,6 +62,17 @@ end
 # The standard.site verification endpoint. It has no layout and no directory index.
 page "/.well-known/site.standard.publication", layout: false, directory_index: false
 
+# ⚠️ The build renders in forked workers, and a memo in a helper is copied into each one. This reads
+# each blurhash placeholder from Redis one time, here in the parent, and the forks inherit the
+# result. Refer to ImageHelpers#blurhash_jpeg_data_uri.
+before_build do |_builder|
+  require_relative "lib/utils/redis_connection"
+  found = ImageHelpers.warm_blurhashes!(app.data.assets, RedisConnection.connection)
+  puts "== Blurhash placeholders: #{found} of #{app.data.assets.size} from the cache"
+rescue StandardError => e
+  puts "== Blurhash placeholders: not warmed (#{e.class}: #{e.message})"
+end
+
 configure :development do
   activate :relative_assets
 

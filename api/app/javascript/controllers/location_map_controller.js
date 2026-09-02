@@ -57,7 +57,10 @@ function loadMapbox() {
     script.src = SCRIPT_URL;
     script.addEventListener("load", () => resolve(window.mapboxgl));
     script.addEventListener("error", () => {
+      // The next attempt adds both elements again, thus this one takes its own away.
       loading = null;
+      stylesheet.remove();
+      script.remove();
       reject(new Error("Mapbox GL JS failed to load"));
     });
     document.head.appendChild(script);
@@ -213,8 +216,11 @@ export default class extends Controller {
     if (!address) return this.report(this.words("need_address"));
 
     this.report(this.words("searching"));
+    // ⚠️ Two searches in a row must not let the slower answer win. It is the rule of preview().
+    this.searchSeq = (this.searchSeq ?? 0) + 1;
+    const seq = this.searchSeq;
     const result = await this.read({ address }, this.words("address_not_found"));
-    if (!result) return;
+    if (!result || seq !== this.searchSeq) return;
 
     this.stage(result.latitude, result.longitude, { fly: true, place: result.place });
   }

@@ -28,8 +28,8 @@ module ActivityDescription
     # @param whoop_strain [Float, nil] The Whoop strain for the 🔥 line, which is optional, or nil.
     #   The code then makes the description without that line, for example when the trigger is not
     #   Whoop.
-    def generate!(activity_id, whoop_strain: nil)
-      with_dedup_lock(activity_id) do
+    def generate!(activity_id, whoop_strain: nil, lock_token: nil)
+      with_dedup_lock(activity_id, lock_token) do
         run(activity_id, whoop_strain)
       end
     end
@@ -126,7 +126,7 @@ module ActivityDescription
     def weather_line(activity)
       return if indoor?(activity)
 
-      text = @intervals.activity_weather_summary(activity[:id])
+      text = swallow("weather summary") { @intervals.activity_weather_summary(activity[:id]) }
       return if text.blank?
 
       result = swallow("weather sentence") { Llm.weather_sentence(text) }
@@ -156,7 +156,7 @@ module ActivityDescription
       date = activity_date(activity)
       score = date && @intervals.wellness(date)&.dig(:CoreHeatAdaptationScore)
 
-      Composer.heat_block(heat_adaptation_score: score, swim: swim)
+      Composer.heat_block(heat_adaptation_score: score)
     end
 
     # @return [Array<Numeric>, nil] The numeric samples of the stream with that name.
@@ -213,9 +213,14 @@ module ActivityDescription
       fallback
     end
 
-    def with_dedup_lock(activity_id)
-      key = "whoop:description_lock:#{activity_id}"
-      unless $redis.set(key, "1", nx: true, ex: LOCK_TTL.to_i)
+    # ⚠️ The token lets a RETRY of the same job enter its own lock. A process that dies leaves
+    # the lock for LOCK_TTL, and the retry comes some seconds later: without the token it would
+    # read the lock as another run, skip with no error, and the activity would never get its
+    # description.
+    def with_dedup_lock(activity_id, token)
+      key = "activity:description_lock:#{activity_id}"
+      token = token.presence || "1"
+      unless $redis.set(key, token, nx: true, ex: LOCK_TTL.to_i) || $redis.get(key) == token
         log_info("activity #{activity_id}: description already being generated — skipping duplicate")
         return
       end

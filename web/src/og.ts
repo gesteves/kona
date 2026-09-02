@@ -242,7 +242,10 @@ export async function handleOg(
 
   const cached = await caches.default.match(cacheKey);
   if (cached) {
-    return request.method === 'HEAD' ? new Response(null, cached) : cached;
+    // A copy: the body of a Response is one stream, and a second read of the same object raises.
+    return request.method === 'HEAD'
+      ? new Response(null, cached)
+      : new Response(cached.body, cached);
   }
 
   // The page comes from the static assets of this deployment, thus there is no network request

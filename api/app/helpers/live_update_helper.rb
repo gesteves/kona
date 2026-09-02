@@ -25,6 +25,8 @@ module LiveUpdateHelper
   # The URL is always the request path of this app, and never user input, thus it needs no escape.
   # @return [String] The attributes, marked as HTML-safe.
   def live_update_attrs
-    %(data-controller="live-update" data-live-update-url-value="#{live_update_url}" data-action="visibilitychange@document->live-update#handleVisibilityChange").html_safe
+    # The escape changes no byte of a true path. It is here for the case that no controller
+    # checks its `:id` first.
+    %(data-controller="live-update" data-live-update-url-value="#{ERB::Util.html_escape(live_update_url)}" data-action="visibilitychange@document->live-update#handleVisibilityChange").html_safe
   end
 end

@@ -194,6 +194,18 @@ RSpec.describe MarkupHelpers do
     end
   end
 
+  describe '#render_markup' do
+    # ⚠️ data-original-url names the Contentful host, which the image mirror keeps off the page.
+    it 'removes the scratch attributes of the image transforms from the output' do
+      html = render_markup('![a](https://images.ctfassets.net/space/asset-1/token/photo.jpg)') do |doc|
+        add_image_data_attributes(doc)
+        expect(doc.at_css('img')['data-asset-id']).to eq('asset-1')
+      end
+      expect(html).not_to include('data-asset-id')
+      expect(html).not_to include('data-original-url')
+    end
+  end
+
   describe '#prepend_title' do
     context 'when the body starts with a paragraph' do
       it 'prepends the bold title inline into the first paragraph' do

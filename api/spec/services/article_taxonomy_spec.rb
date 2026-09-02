@@ -52,6 +52,25 @@ RSpec.describe ArticleTaxonomy do
   end
 
   describe "#race_concept_id" do
+    # ⚠️ Two parents give a concept more ancestors than its chain is long.
+    it "measures the length of the chain, and not the number of ancestors" do
+      dag = tree.merge(
+        "running" => { broader: [], scheme: "sports" },
+        # A distance below two disciplines: three ancestors, and a chain of two.
+        "duathlon" => { broader: [ "triathlon", "running" ], scheme: "sports" }
+      )
+      taxonomy = described_class.new(articles: corpus, tree: dag)
+
+      expect(taxonomy.race_concept_id(article(id: "d", concept_ids: %w[duathlon]))).to be_nil
+    end
+
+    it "does not raise on a cycle" do
+      loop = tree.merge("a" => { broader: [ "b" ], scheme: "sports" }, "b" => { broader: [ "a" ], scheme: "sports" })
+      taxonomy = described_class.new(articles: corpus, tree: loop)
+
+      expect { taxonomy.race_concept_id(article(id: "x", concept_ids: %w[a])) }.not_to raise_error
+    end
+
     it "gives the deepest sports concept at the race level" do
       expect(taxonomy.race_concept_id(corpus.first)).to eq("kona")
     end

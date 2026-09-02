@@ -14,6 +14,6 @@ archive lives at <%= full_url('/blog/') %>.
 
 ## Articles
 <% llms_articles.each do |article| %>
-- [<%= article.title %>](<%= full_url(article.path) %>)<%= ": #{article.summary}" if article.summary.present? %>
+- [<%= sanitize(article.title) %>](<%= full_url(article.path) %>)<% if article.summary.present? %>: <%= sanitize(article.summary)&.truncate(200, omission: "…")&.tr("\n", " ") %><% end %>
 <% end %>
 - [Browse the full archive](<%= full_url('/blog/') %>) for older articles not listed here.

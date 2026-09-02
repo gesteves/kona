@@ -135,7 +135,10 @@ module ImagesHelper
     uri.scheme = "https"
     uri.host = ENV["IMAGE_HOST"]
     uri.to_s
-  rescue URI::InvalidURIError
+  rescue URI::Error
+    # ⚠️ `host=` raises InvalidComponentError for an IMAGE_HOST with a scheme or a slash, and that
+    # is a sibling of InvalidURIError. This method must never raise: a raise here is a 500 on each
+    # trending render.
     nil
   end
 
@@ -170,7 +173,8 @@ module ImagesHelper
   # @return [Array<Integer>] The widths, in order, with no duplicate.
   def card_widths(asset_width)
     candidates = CARD_WIDTHS.dup
-    if asset_width.present?
+    # A width of 0 is present, and it would leave [0] as the only candidate.
+    if asset_width.to_i.positive?
       candidates << asset_width if asset_width < candidates.max
       candidates = candidates.reject { |w| w > asset_width }
     end

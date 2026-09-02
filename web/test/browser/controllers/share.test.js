@@ -235,25 +235,9 @@ describe('trackShare', () => {
     expect(analytics.trackEventThen).toHaveBeenCalled();
   });
 
-  it('opens an http(s) link in a new tab, where the beacon is not interrupted', async () => {
-    const { element } = await mount(
-      'share',
-      ShareController,
-      shareLink('https://example.com/share', 'data-action="share#trackShare"')
-    );
-
-    element.click();
-
-    expect(analytics.trackEvent).toHaveBeenCalled();
-    expect(analytics.trackEventThen).not.toHaveBeenCalled();
-    expect(open).toHaveBeenCalledWith(
-      'https://example.com/share',
-      '_blank',
-      'noopener,noreferrer'
-    );
-  });
-
-  it('suppresses the default navigation so the click is not double-counted', async () => {
+  // ⚠️ The link has target="_blank" in the markup. The browser opens it, and a popup blocker
+  // treats that better than a window.open from code. The beacon of a new tab is not interrupted.
+  it('records an http(s) link and lets the browser open its new tab', async () => {
     const { element } = await mount(
       'share',
       ShareController,
@@ -263,6 +247,9 @@ describe('trackShare', () => {
 
     element.dispatchEvent(event);
 
-    expect(event.defaultPrevented).toBe(true);
+    expect(analytics.trackEvent).toHaveBeenCalled();
+    expect(analytics.trackEventThen).not.toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
   });
 });

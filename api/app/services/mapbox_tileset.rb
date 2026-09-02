@@ -185,7 +185,7 @@ class MapboxTileset
 
   # Reads the publish job status until the job is successful, fails, or reaches the timeout.
   def wait_for_job(id, job_id)
-    waited = 0
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     loop do
       response = HTTParty.get(
         "#{API}/#{@username}.#{id}/jobs/#{job_id}",
@@ -202,10 +202,11 @@ class MapboxTileset
         raise "Mapbox tileset publish failed: #{Array(job['errors']).join('; ').presence || 'unknown error'}"
       end
 
-      raise "Mapbox tileset publish timed out after #{POLL_TIMEOUT}s" if waited >= POLL_TIMEOUT
+      # The clock, and not a count of the waits: each read above can take HTTP_TIMEOUT as well.
+      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+      raise "Mapbox tileset publish timed out after #{POLL_TIMEOUT}s" if elapsed >= POLL_TIMEOUT
 
       sleep(POLL_INTERVAL)
-      waited += POLL_INTERVAL
     end
   end
 
