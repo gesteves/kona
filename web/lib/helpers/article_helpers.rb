@@ -455,7 +455,9 @@ module ArticleHelpers
     ancestor_ids = chain_ids.values.flat_map { |ids| ids[0...-1] }.to_set
     leaves = tags.reject { |t| ancestor_ids.include?(t.id) }
 
-    chains = leaves.map { |leaf| chain_ids[leaf.id].filter_map { |id| by_id[id] } }
+    # ⚠️ Reject the empty chains. A concept with no published article gets no tag page, thus it is
+    # absent from the taxonomy and `concept_chain` gives []. A draft can hold such a concept.
+    chains = leaves.map { |leaf| chain_ids[leaf.id].filter_map { |id| by_id[id] } }.reject(&:empty?)
     chains.sort_by { |chain| [ -chain.length, chain.first.scheme == "sports" ? 0 : 1, chain.last.short_name.to_s ] }
   end
 

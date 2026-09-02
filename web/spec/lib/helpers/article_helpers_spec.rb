@@ -740,6 +740,26 @@ RSpec.describe ArticleHelpers do
         expect(chains).to eq([ [ 'Triathlon', 'Escape from Alcatraz' ], [ 'Race Reports' ] ])
       end
 
+      it 'skips a concept that has no tag page, and does not raise' do
+        # A concept with no published article gets no page, thus data.tags has no entry for it. A
+        # draft can hold such a concept.
+        art = tagged_article(slug: 'rouvy', concepts: [
+          concept('tech', 'Tech', path: '/tagged/tech/', scheme: 'topics'),
+          concept('apps', 'Apps', path: '/tagged/tech/apps/', parent_id: 'tech', scheme: 'topics'),
+          concept('rouvy', 'Rouvy', path: '/tagged/tech/apps/rouvy/', parent_id: 'apps', scheme: 'topics'),
+          concept('running', 'Running', path: '/tagged/running/', scheme: 'sports')
+        ])
+        chains = tag_breadcrumb_chains(art).map { |c| c.map(&:name) }
+        expect(chains).to eq([ [ 'Tech', 'Apps' ], [ 'Running' ] ])
+      end
+
+      it 'is empty when every concept of the article has no tag page' do
+        art = tagged_article(slug: 'unknown', concepts: [
+          concept('rouvy', 'Rouvy', path: '/tagged/tech/apps/rouvy/', parent_id: 'apps', scheme: 'topics')
+        ])
+        expect(tag_breadcrumb_chains(art)).to eq([])
+      end
+
       it 'is empty when the article has no taxonomy' do
         expect(tag_breadcrumb_chains(article(slug: 'x'))).to eq([])
       end
@@ -779,6 +799,16 @@ RSpec.describe ArticleHelpers do
         names = tag_breadcrumb_concepts(art).map(&:name)
         expect(names.uniq).to eq(names)
         expect(names.size).to eq(4)
+      end
+
+      it 'omits a concept that has no tag page' do
+        art = tagged_article(slug: 'rouvy', concepts: [
+          concept('tech', 'Tech', path: '/tagged/tech/', scheme: 'topics'),
+          concept('apps', 'Apps', path: '/tagged/tech/apps/', parent_id: 'tech', scheme: 'topics'),
+          concept('trainerroad', 'TrainerRoad', path: '/tagged/tech/apps/trainerroad/', parent_id: 'apps', scheme: 'topics'),
+          concept('rouvy', 'Rouvy', path: '/tagged/tech/apps/rouvy/', parent_id: 'apps', scheme: 'topics')
+        ])
+        expect(tag_breadcrumb_concepts(art).map(&:name)).to eq([ 'Tech', 'Apps', 'TrainerRoad' ])
       end
 
       it 'is empty when the article has no taxonomy' do

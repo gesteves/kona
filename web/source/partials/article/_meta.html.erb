@@ -22,11 +22,14 @@
     <span data-publish-date-target="calendar"><%= icon_svg("classic", "light", "calendar") %></span>
     <%= article_permalink_timestamp(article, link_class: article_click_classes(tracking_section)) %>
   </span>
-  <% if render_tags && article.contentful_metadata.tags.present? %>
+  <%# The concepts, and not `contentful_metadata.tags`: a concept with no tag page renders no link,
+      thus an article can have tags and no link. %>
+  <% concepts = render_tags ? tag_breadcrumb_concepts(article) : [] %>
+  <% if concepts.any? %>
     <span>
-      <%= tag_list_icon(article.contentful_metadata.tags.size) %>
+      <%= tag_list_icon(concepts.size) %>
       <span class="entry__tags" role="list" aria-label="Tags">
-        <%= tag_chain_links(tag_breadcrumb_concepts(article).map { |tag| [tag.short_name, tag.path] }) %>
+        <%= tag_chain_links(concepts.map { |tag| [tag.short_name, tag.path] }) %>
       </span>
     </span>
   <% end %>
