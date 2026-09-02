@@ -10,6 +10,7 @@ RSpec.describe ApplicationService do
       def underscore(obj) = underscore_keys(obj)
       def retrying(...) = with_retries(...)
       def guarded(*args, **kwargs, &block) = rescue_with(*args, **kwargs, &block)
+      def fetch_body(*args, **kwargs) = download(*args, **kwargs)
     end
   end
   let(:service) { service_class.new }
@@ -310,6 +311,46 @@ RSpec.describe ApplicationService do
           expect(error.body).to eq("no such field")
           expect(error.message).to include("HTTP 422")
         end
+    end
+  end
+
+  describe "#download" do
+    it "refuses a URL that is not public before any request" do
+      allow(HTTParty).to receive(:get)
+      expect(service.fetch_body("http://127.0.0.1:80/x", max_bytes: 100)).to be_nil
+      expect(HTTParty).not_to have_received(:get)
+    end
+
+    it "follows a redirect, checks the hop, and names the final URL" do
+      stub_streamed_get("https://a.test/", body: "", code: 302, headers: { "location" => "/moved" })
+      stub_streamed_get("https://a.test/moved", body: "hello", headers: { "content-type" => "text/plain" })
+
+      expect(service.fetch_body("https://a.test/", max_bytes: 100)).to include(body: "hello", url: "https://a.test/moved")
+    end
+
+    it "stops at a redirect to a private address" do
+      stub_streamed_get("https://a.test/", body: "", code: 302, headers: { "location" => "http://10.0.0.5/" })
+
+      expect(service.fetch_body("https://a.test/", max_bytes: 100)).to be_nil
+      expect(HTTParty).not_to have_received(:get).with("http://10.0.0.5/", anything)
+    end
+
+    it "stops after the redirect limit" do
+      stub_streamed_get("https://a.test/", body: "", code: 302, headers: { "location" => "https://a.test/" })
+
+      expect(service.fetch_body("https://a.test/", max_bytes: 100, limit: 2)).to be_nil
+      expect(HTTParty).to have_received(:get).exactly(3).times
+    end
+
+    # ⚠️ A relative og:image resolves against this URL, thus a capped body must keep it.
+    it "keeps the final URL of a body past the limit, after a redirect" do
+      stub_streamed_get("https://a.test/", body: "", code: 301, headers: { "location" => "https://b.test/page" })
+      stub_streamed_get("https://b.test/page", body: "x" * 50, headers: { "content-type" => "text/html" }, fragments: 5)
+
+      result = service.fetch_body("https://a.test/", max_bytes: 20, keep_head: true)
+      expect(result[:url]).to eq("https://b.test/page")
+      expect(result[:body].bytesize).to eq(20)
+      expect(service.fetch_body("https://a.test/", max_bytes: 20)).to be_nil
     end
   end
 end

@@ -38,3 +38,8 @@
 
 # Ignore docs.
 README.md
+
+# Ignore a local Redis snapshot. `overmind start` writes one here, and it can hold credentials.
+dump.rdb
+*.rdb
+appendonly*

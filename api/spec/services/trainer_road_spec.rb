@@ -107,7 +107,8 @@ RSpec.describe TrainerRoad do
     it { expect(service.send(:determine_discipline, "Run - Easy")).to eq("Run") }
     it { expect(service.send(:determine_discipline, "Swim Endurance")).to eq("Swim") }
     it { expect(service.send(:determine_discipline, "Sweet Spot Base")).to eq("Bike") }
-    it { expect(service.send(:determine_discipline, nil)).to be_nil }
+    # A name with no discipline is a ride, thus the formatter never gets a nil.
+    it { expect(service.send(:determine_discipline, nil)).to eq("Bike") }
   end
 
   describe "#human_readable_summary" do
@@ -237,6 +238,20 @@ RSpec.describe TrainerRoad do
       it "returns nil" do
         expect(service.workouts).to be_nil
       end
+    end
+
+    # ⚠️ "Today" is decided inside the read, thus the key must name the day, or the list of the day
+    # before stays for the TTL after midnight.
+    it "keys the cache on the day in the timezone, and reads the feed with a timeout" do
+      stub_calendar([ { all_day: true, date: "20260709", summary: "0:30 - Easy Run" } ])
+
+      service.workouts
+      expect($redis).to have_received(:get).with(a_string_starting_with("trainerroad:workouts:America/Denver:2026-07-09:"))
+      expect(HTTParty).to have_received(:get).with(calendar_url, hash_including(timeout: described_class::CONNECT_TIMEOUT))
+
+      travel_to(Time.utc(2026, 7, 10, 7, 0, 0))
+      service.workouts
+      expect($redis).to have_received(:get).with(a_string_starting_with("trainerroad:workouts:America/Denver:2026-07-10:"))
     end
 
     it "returns today's workouts, sorted swim then bike then run" do

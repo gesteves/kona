@@ -15,7 +15,7 @@
       </p>
       <h3 class="entry__hed" id="hed-<%= event.sys.id.parameterize %>">
         <% if event.url.present? %>
-          <%= link_to raw(smartypants(event.title)), event.url, rel: "noopener", target: "_blank" %>
+          <%= link_to raw(smartypants(event.title) + '<span class="sr-only"> (opens in a new tab)</span>'), event.url, rel: "noopener", target: "_blank" %>
         <% else %>
           <%= raw smartypants(event.title) %>
         <% end %>

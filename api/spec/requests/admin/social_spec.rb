@@ -332,6 +332,20 @@ RSpec.describe "Admin social media", type: :request do
         expect(response).to have_http_status(:not_found)
       end
 
+      # ⚠️ The page names the picture, and the page is not ours. A picture on a private address
+      # must not be read, and the answer is the same as for a picture that cannot be read.
+      it "answers 404 for a picture on a private address, and does not read it" do
+        allow_any_instance_of(OpenGraph).to receive(:fetch)
+          .and_return(OpenGraph::Card.new(url: "https://example.test/a/", title: "T", description: nil,
+                                          image_url: "http://169.254.169.254/latest/meta-data/"))
+        allow(HTTParty).to receive(:get)
+
+        get "/social/preview/image", params: { url: "https://example.test/a/" }
+
+        expect(response).to have_http_status(:not_found)
+        expect(HTTParty).not_to have_received(:get)
+      end
+
       it "answers 404 when the picture cannot be read" do
         allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
         allow_any_instance_of(Bluesky).to receive(:card_image).and_return(nil)

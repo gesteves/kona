@@ -59,6 +59,11 @@
     animation-duration: 0s;
   }
 
+  // The skip link is the first control that a keyboard user reaches.
+  .skip-link {
+    transition: none;
+  }
+
   // ⚠️ <wa-scroller> has `scroll-behavior: smooth` in its shadow scroll container and it has no code
   // for a reduced-motion setting. This rule covers the share row, the social links in the footer,
   // and the tables in an entry.

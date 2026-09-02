@@ -68,6 +68,8 @@ class Articles < ApplicationService
   # main layer for freshness, and this cache only stops many requests to Contentful at one time.
   # @return [Array<OpenStruct>]
   def list
+    return @list if defined?(@list)
+
     items = rescue_with([], context: "Error fetching articles") do
       # A digest of the query goes at the end. Thus a change to its fields makes a new cache key,
       # and no person needs to remember to increase a version number.
@@ -76,7 +78,7 @@ class Articles < ApplicationService
       end
     end
 
-    (items || []).map { |item| DeepOstruct.wrap(item) }
+    @list = (items || []).map { |item| DeepOstruct.wrap(item) }
   end
 
   # The text of each article, by Contentful id, for the lexical index of RelatedArticles.

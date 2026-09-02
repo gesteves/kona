@@ -35,6 +35,7 @@ RSpec.describe "Api::Related", type: :request do
     get "/api/related", headers: auth_headers
 
     expect(response.headers["CDN-Cache-Control"]).to be_nil
+    expect(response.headers["Cache-Control"]).to eq("no-store")
   end
 
   it "returns an empty object rather than failing when nothing is ranked" do

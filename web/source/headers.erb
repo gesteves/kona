@@ -12,7 +12,7 @@
 # use this file and must set the headers itself. They all do that through withSecurityHeaders in
 # src/headers.ts. Keep that function the same as the /* block below.
 /*
-  Referrer-Policy: no-referrer-when-downgrade
+  Referrer-Policy: strict-origin-when-cross-origin
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Cross-Origin-Opener-Policy: same-origin-allow-popups
@@ -22,14 +22,13 @@
   # from the Rails `force_ssl` (api/config/environments/production.rb), thus www is the only host
   # that needs this. Do not add `preload`: you cannot remove a host from the preload list.
   Strict-Transport-Security: max-age=31536000; includeSubDomains
-  # This is Report-Only, on purpose. The article bodies come from Contentful, thus a post can add
-  # a new embed host. The frame-src below comes from the hosts in the build TODAY: YouTube, Apple
-  # Podcasts, and Spotify. A policy that stops a load would break such a post with no message. Each
-  # violation appears in the browser console. Change this to `Content-Security-Policy` after you
-  # read the pages with many embeds and the console is clean. Also read frame-src again each time
-  # someone uses a new type of embed.
-  # 'unsafe-inline' in script-src is necessary: the JSON-LD blocks (partials/schema/*) and the
-  # Plausible init code (partials/_analytics.html.erb) are inline. style-src needs it for the
+  # This is Report-Only, on purpose. Each violation appears in the browser console. Change this
+  # to `Content-Security-Policy` after you read the pages with many embeds and the console is
+  # clean.
+  # The frame-src and the script-src hosts come from the iframes and the scripts in the Contentful
+  # bodies, at each build (lib/helpers/csp_helpers.rb). Thus a new embed host needs no edit here.
+  # The one inline script, the Plausible init code, has its hash in script-src. A JSON-LD block is
+  # data and not a script, thus it needs nothing. style-src needs 'unsafe-inline' for the
   # shadow-DOM styles of Web Awesome and for the inline style attributes on the embed iframes.
   # ⚠️ img-src names IMAGES_URL, the host that Cloudflare Images serves each transformation from.
   # Each image on the site is a transformation. It named *.ctfassets.net, which is old, because the
@@ -37,7 +36,7 @@
   # an image source. The mirror host is absent, on purpose: Cloudflare gets it on the server and
   # the browser never does. connect-src has Turnstile, which sends an XHR to
   # challenges.cloudflare.com.
-  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: <%= ENV['IMAGES_URL'] %>; font-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com https://www.youtube-nocookie.com https://embed.podcasts.apple.com https://open.spotify.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src <%= csp_script_src.join(' ') %>; style-src 'self' 'unsafe-inline'; img-src 'self' data: <%= ENV['IMAGES_URL'] %>; font-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-src <%= csp_frame_src.join(' ') %>; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
 
 /.well-known/site.standard.publication
   Content-Type: text/plain; charset=utf-8

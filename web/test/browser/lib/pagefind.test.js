@@ -107,6 +107,25 @@ describe('loadPagefind', () => {
     await expect(loading).resolves.toBe(false);
   });
 
+  // ⚠️ Without this, one flaky request during the idle preload stops the search for the life of
+  // the page: `search#open` reads the false result for all time.
+  it('loads again after a failure, with new elements', async () => {
+    const first = pagefind.loadPagefind();
+    injectedCss().dispatchEvent(new Event('load'));
+    injectedJs().dispatchEvent(new Event('error'));
+    await expect(first).resolves.toBe(false);
+    expect(
+      document.head.querySelectorAll('script[src$="pagefind-component-ui.js"]')
+    ).toHaveLength(0);
+
+    const second = pagefind.loadPagefind();
+    expect(second).not.toBe(first);
+    injectedCss().dispatchEvent(new Event('load'));
+    injectedJs().dispatchEvent(new Event('load'));
+    definePagefindModal();
+    await expect(second).resolves.toBe(true);
+  });
+
   it('resolves false when the stylesheet fails but the module loads', async () => {
     const loading = pagefind.loadPagefind();
 

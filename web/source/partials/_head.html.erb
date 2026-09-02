@@ -18,7 +18,7 @@
   <% end %>
   <link rel="canonical" href="<%= canonical_url %>">
   <% alternate_feed_links.each do |feed| %>
-    <link rel="alternate" type="application/atom+xml" title="<%= feed[:title] %>" href="<%= feed[:href] %>" />
+    <link rel="alternate" type="application/atom+xml" title="<%= h feed[:title] %>" href="<%= feed[:href] %>" />
   <% end %>
   <link rel="icon" href="/favicon.ico" sizes="32x32">
   <% if data.site.logo.present? %>

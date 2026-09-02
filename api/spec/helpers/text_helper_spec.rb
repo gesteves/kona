@@ -20,7 +20,7 @@ RSpec.describe TextHelper do
 
   describe "#comma_join_with_and" do
     it { expect(helper.comma_join_with_and(%w[a])).to eq("a") }
-    it { expect(helper.comma_join_with_and(%w[a b])).to eq("a, and b") }
+    it { expect(helper.comma_join_with_and(%w[a b])).to eq("a and b") }
     it { expect(helper.comma_join_with_and(%w[a b c])).to eq("a, b, and c") }
     it { expect(helper.comma_join_with_and(%w[a b], false)).to eq("a and b") }
     it { expect(helper.comma_join_with_and(%w[a b c], false)).to eq("a, b and c") }

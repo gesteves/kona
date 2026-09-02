@@ -6,8 +6,10 @@
         Hashie::Mash, thus `==` compares the full article at each level, and this includes the body,
         one time for each item. That test is also incorrect: two entries with the same field values
         would both omit their separator. %>
-    <% last_index = content.items.size - 1 %>
-    <% content.items.each_with_index do |item, index| %>
+    <%# The list holds the blog posts only, as partials/_collection does. %>
+    <% items = content.items.select { |item| blog_post?(item) } %>
+    <% last_index = items.size - 1 %>
+    <% items.each_with_index do |item, index| %>
       <li class="blog__list-item">
         <% if item.entry_type == 'Short' %>
           <%= partial 'partials/article/short', locals: { article: item, tracking_section: "Blog List" } %>

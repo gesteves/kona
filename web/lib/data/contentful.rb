@@ -213,6 +213,11 @@ class Contentful
   # @param item [Hash] The item to change.
   # @param type [String, nil] A fixed type.
   # @return [Hash] The item.
+  #
+  # ⚠️ An entry with a body and no intro is not an Article and not a Short. Such an entry got no
+  # type, went to the page template, and rendered an empty card in the blog list, the feed, and the
+  # sitemap. The build is the gate, thus it stops here and names the entry.
+  # @raise [ArgumentError] For an entry with no fixed type, a body, and no intro.
   def set_entry_type(item, type = nil)
     item[:entry_type] = if type.present?
       type
@@ -220,6 +225,8 @@ class Contentful
       "Article"
     elsif item[:intro].present?
       "Short"
+    elsif item[:body].present?
+      raise ArgumentError, "The entry #{item[:slug].inspect} has a body and no intro. Give it an intro, or remove the body."
     end
     item
   end

@@ -17,12 +17,16 @@ require "action_view/railtie"
 # that you put in the :test, :development, or :production group.
 Bundler.require(*Rails.groups)
 
+# A Rack middleware, with a plain require: the autoload of lib/ is not active at this point, and
+# `autoload_lib` below ignores this directory for that reason.
+require_relative "../lib/middleware/request_body_limit"
+
 module Api
   class Application < Rails::Application
     # Set the default configuration values of the Rails version that made this app.
     config.load_defaults 8.1
 
-    config.autoload_lib(ignore: %w[assets tasks])
+    config.autoload_lib(ignore: %w[assets middleware tasks])
 
     # The test suite is in spec/, and not in test/.
     config.generators do |g|
@@ -34,9 +38,11 @@ module Api
     # autoload of lib/ is active.
     config.exceptions_app = ->(env) { PlainTextExceptions.call(env) }
 
-    # Blocks a bad request that goes directly to the origin, and limits its rate, before the
-    # routing. The configuration is in config/initializers/rack_attack.rb, and it does nothing in
-    # the test environment.
-    config.middleware.use Rack::Attack
+    # Refuses a body that is too large before rack-attack and before the routing. Refer to
+    # lib/middleware/request_body_limit.rb. The railtie of rack-attack adds its own middleware
+    # after this one, from an initializer. That middleware blocks a bad request that goes directly
+    # to the origin, and limits its rate. Its configuration is in
+    # config/initializers/rack_attack.rb, and it does nothing in the test environment.
+    config.middleware.use RequestBodyLimit
   end
 end

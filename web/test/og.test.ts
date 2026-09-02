@@ -20,6 +20,12 @@ const withTitle = (title: string) =>
     `<html><head><meta property="og:title" content="${title}"></head></html>`
   );
 
+// A page that names this card as its og:image, with the `v` that the build wrote.
+const withCard = (title: string, cardPath = '/post/', v = 'v1-9') =>
+  page(
+    `<html><head><meta property="og:title" content="${title}"><meta property="og:image" content="https://www.example.com${cardPath}og.png?v=${v}"></head></html>`
+  );
+
 const envWith = (response: () => Response) =>
   ({ ASSETS: assetsReturning(response) }) as unknown as Env;
 
@@ -173,11 +179,34 @@ describe('handleOg', () => {
       expect(await res.text()).toBe('404 Not Found');
     });
 
+    // ⚠️ A page decides its own card. A page with a cover image names that image, and a page
+    // with no og:image names nothing. Neither one has a card to render.
+    it.each([
+      ['no og:image', withTitle('Hello')],
+      [
+        'a cover image as its og:image',
+        page(
+          '<meta property="og:title" content="Hello"><meta property="og:image" content="https://images.example.com/cdn-cgi/image/w=1200/x.jpg">'
+        ),
+      ],
+      ['the card of another page', withCard('Hello', '/other/', 'v1')],
+    ])('404s a page with %s, without rendering', async (_label, response) => {
+      const render = renderStub();
+      const res = await handleOg(
+        request('/post/og.png?v=v1'),
+        envWith(() => response),
+        makeCtx(),
+        render
+      );
+      expect(res.status).toBe(404);
+      expect(render).not.toHaveBeenCalled();
+    });
+
     it('renders the page’s own og:title, entity-decoded', async () => {
       const render = renderStub();
       await handleOg(
         request('/post/og.png?v=v1'),
-        envWith(() => withTitle('Salt &amp; Vinegar')),
+        envWith(() => withCard('Salt &amp; Vinegar', '/post/', 'v1')),
         makeCtx(),
         render
       );
@@ -189,7 +218,7 @@ describe('handleOg', () => {
     const ok = () =>
       handleOg(
         request('/post/og.png?v=v1-9'),
-        envWith(() => withTitle('Hello')),
+        envWith(() => withCard('Hello')),
         makeCtx(),
         renderStub()
       );
@@ -208,7 +237,7 @@ describe('handleOg', () => {
     it('answers a HEAD with the same headers and no body', async () => {
       const res = await handleOg(
         request('/post/og.png?v=v1-9', { method: 'HEAD' }),
-        envWith(() => withTitle('Hello')),
+        envWith(() => withCard('Hello')),
         makeCtx(),
         renderStub()
       );
@@ -223,7 +252,7 @@ describe('handleOg', () => {
       });
       const res = await handleOg(
         request('/post/og.png?v=v1'),
-        envWith(() => withTitle('Hello')),
+        envWith(() => withCard('Hello', '/post/', 'v1')),
         makeCtx(),
         render as unknown as () => Promise<Uint8Array<ArrayBuffer>>
       );
@@ -238,7 +267,7 @@ describe('handleOg', () => {
     it('keys on the card path and v only, dropping unknown params', async () => {
       await handleOg(
         request('/post/og.png?v=v1-9&utm_source=slack&x=random'),
-        envWith(() => withTitle('Hello')),
+        envWith(() => withCard('Hello')),
         makeCtx(),
         renderStub()
       );
@@ -254,44 +283,76 @@ describe('handleOg', () => {
       expect((stored as Request).url).toBe(expected);
     });
 
-    // ⚠️ The caller supplies `v`, thus an attacker can write a cache key. Without a correction of
-    // the value, each different value is a miss that costs a full satori and resvg render and a
-    // PNG in the cache. To remove the *other* parameters is not sufficient.
+    // ⚠️ The caller supplies `v`, thus an attacker can write a cache key. Each different value is
+    // a miss, and a miss must not cost a full satori and resvg render. Thus a value that is not the
+    // one the page declares goes to the declared one, and only that one renders. A value with no
+    // known shape reads the cache under one key first, thus junk cannot make many entries.
     it.each([
-      ['?v=' + 'a'.repeat(200), 'a long junk value'],
-      ['?v=v1-9-extra', 'a value that only looks like a version'],
-      ['?v=../../etc', 'a traversal-shaped value'],
-      ['', 'no v at all'],
-    ])('collapses %s onto the unversioned key (%s)', async (query) => {
-      await handleOg(
-        request(`/post/og.png${query}`),
-        envWith(() => withTitle('Hello')),
-        makeCtx(),
-        renderStub()
-      );
-
-      const [matched] = vi.mocked(caches.default.match).mock.calls[0];
-      expect((matched as Request).url).toBe(
-        'https://www.example.com/post/og.png?v='
-      );
-    });
-
-    it.each(['v1', 'v1-9', 'v12-345'])(
-      'keeps a real version (%s)',
-      async (v) => {
-        await handleOg(
-          request(`/post/og.png?v=${v}`),
-          envWith(() => withTitle('Hello')),
+      ['?v=' + 'a'.repeat(200), 'a long junk value', ''],
+      ['?v=v1-9-extra', 'a value that only looks like a version', ''],
+      ['?v=../../etc', 'a traversal-shaped value', ''],
+      ['', 'no v at all', ''],
+      ['?v=v1-8', 'an old version', 'v1-8'],
+      ['?v=v1-99999', 'a version that looks real', 'v1-99999'],
+    ])(
+      'redirects %s (%s) to the version the page declares, without rendering',
+      async (query, _label, key) => {
+        const render = renderStub();
+        const res = await handleOg(
+          request(`/post/og.png${query}`),
+          envWith(() => withCard('Hello')),
           makeCtx(),
-          renderStub()
+          render
         );
 
         const [matched] = vi.mocked(caches.default.match).mock.calls[0];
         expect((matched as Request).url).toBe(
-          `https://www.example.com/post/og.png?v=${v}`
+          `https://www.example.com/post/og.png?v=${key}`
         );
+        expect(res.status).toBe(301);
+        expect(res.headers.get('location')).toBe(
+          'https://www.example.com/post/og.png?v=v1-9'
+        );
+        expect(res.headers.get('cache-control')).toBe('public, max-age=300');
+        expect(render).not.toHaveBeenCalled();
+        expect(caches.default.put).not.toHaveBeenCalled();
       }
     );
+
+    it.each(['v1', 'v1-9', 'v12-345'])(
+      'renders and keys a version that the page declares (%s)',
+      async (v) => {
+        const render = renderStub();
+        await handleOg(
+          request(`/post/og.png?v=${v}`),
+          envWith(() => withCard('Hello', '/post/', v)),
+          makeCtx(),
+          render
+        );
+
+        const [matched] = vi.mocked(caches.default.match).mock.calls[0];
+        const [stored] = vi.mocked(caches.default.put).mock.calls[0];
+        expect((matched as Request).url).toBe(
+          `https://www.example.com/post/og.png?v=${v}`
+        );
+        expect((stored as Request).url).toBe(
+          `https://www.example.com/post/og.png?v=${v}`
+        );
+        expect(render).toHaveBeenCalledOnce();
+      }
+    );
+
+    it('renders the card of the home page, whose og:image has no page path', async () => {
+      const render = renderStub();
+      const res = await handleOg(
+        request('/og.png?v=v2'),
+        envWith(() => withCard('Home', '/', 'v2')),
+        makeCtx(),
+        render
+      );
+      expect(res.status).toBe(200);
+      expect(render).toHaveBeenCalledWith('Home');
+    });
 
     it('serves a cache hit without rendering', async () => {
       vi.mocked(caches.default.match).mockResolvedValue(
@@ -300,7 +361,7 @@ describe('handleOg', () => {
       const render = renderStub();
       const res = await handleOg(
         request('/post/og.png?v=v1-9'),
-        envWith(() => withTitle('Hello')),
+        envWith(() => withCard('Hello')),
         makeCtx(),
         render
       );

@@ -137,6 +137,19 @@ describe('submitting', () => {
     );
   });
 
+  it('says to wait when the API limits the rate, and keeps what was typed', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 429 });
+    await mountForm();
+
+    await submitForm();
+
+    expect(lastToast().variant).toBe('danger');
+    expect(lastToast().message).toMatch(/wait/);
+    expect(document.querySelector('[name="message"]').value).toBe(
+      'Hello there'
+    );
+  });
+
   it('falls back to the generic message when a 422 carries no usable body', async () => {
     fetchMock.mockResolvedValue({
       ok: false,

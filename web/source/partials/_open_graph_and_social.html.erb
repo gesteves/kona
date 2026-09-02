@@ -50,9 +50,9 @@
   <% end %>
 <% end %>
 
-<meta property="og:site_name" content="<%= data.site.title %>">
+<meta property="og:site_name" content="<%= h data.site.title %>">
 <meta property="og:locale" content="en_US">
 
 <% if defined?(content) && content&.author&.mastodon.present? %>
-  <meta name="fediverse:creator" content="@<%= content.author.mastodon.gsub(/^@/, '') %>">
+  <meta name="fediverse:creator" content="@<%= h content.author.mastodon.gsub(/^@/, '') %>">
 <% end %>

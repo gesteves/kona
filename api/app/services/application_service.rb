@@ -119,22 +119,31 @@ class ApplicationService
   # ⚠️ The worker is a 512MB VM at concurrency 5, and a body that goes into memory with no limit
   # has killed it before (refer to AssetMirror). This method reads the body in fragments and stops
   # at the limit, thus a page or a picture of any size costs at most `max_bytes` of memory.
+  #
+  # ⚠️ It follows each redirect itself, and it checks each hop with PublicAddress. Another site
+  # names the URL, thus a public page can send this code to a private address.
   # @param url [String]
   # @param max_bytes [Integer] The most bytes to keep.
   # @param keep_head [Boolean] True to return the first `max_bytes` of a body that is longer. False,
   #   the default, returns nil for such a body.
+  # @param limit [Integer] The most redirects to follow.
   # @param options [Hash] The options that go to HTTParty.
   # @return [Hash, nil] `{ body:, content_type:, url: }` for a 2xx, where `url` is the final URL
-  #   after each redirect. Nil for each other status, for an empty body, and for a body past the
-  #   limit when `keep_head` is false.
-  def download(url, max_bytes:, keep_head: false, **options)
+  #   after each redirect. Nil for each other status, for an empty body, for a body past the
+  #   limit when `keep_head` is false, and for a URL that is not public.
+  def download(url, max_bytes:, keep_head: false, limit: 5, **options)
+    unless PublicAddress.public_url?(url)
+      Rails.logger.info("#{self.class.name}: refused a download from a URL that is not public")
+      return
+    end
+
     body = String.new(encoding: Encoding::BINARY)
     content_type = nil
     received = false
     response = nil
 
     catch(:capped) do
-      response = HTTParty.get(url, **options, stream_body: true) do |fragment|
+      response = HTTParty.get(url, **options, follow_redirects: false, stream_body: true) do |fragment|
         next unless (200..299).cover?(fragment.code)
 
         received = true
@@ -142,6 +151,14 @@ class ApplicationService
         body << fragment.to_s.b
         throw :capped if body.bytesize > max_bytes
       end
+    end
+
+    if response && (300..399).cover?(response.code.to_i)
+      location = response.headers["location"].to_s
+      return if location.blank? || limit <= 0
+
+      next_url = URI.join(url, location).to_s
+      return download(next_url, max_bytes: max_bytes, keep_head: keep_head, limit: limit - 1, **options)
     end
 
     return unless received
@@ -161,8 +178,7 @@ class ApplicationService
       nil
     end
 
-    final_url = response&.request&.last_uri&.to_s.presence || url.to_s
-    { body: body, content_type: content_type.to_s, url: final_url }
+    { body: body, content_type: content_type.to_s, url: url.to_s }
   end
 
   # PUTs to a URL. There is no method that returns nil on a failure, on purpose. A PUT is a

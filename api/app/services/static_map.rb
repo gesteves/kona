@@ -73,8 +73,12 @@ class StaticMap
   # this value multiplied by the cosine of the latitude.
   KM_PER_DEGREE = 111.32
 
-  HTTP_TIMEOUT = 30
+  # ⚠️ The render runs in a request with a 20-second rack-timeout, and that timeout is not a
+  # StandardError that the controller can catch. Thus the attempts, the waits, and the timeouts
+  # together must stay below it. An attempt starts only when it can end before the deadline.
+  HTTP_TIMEOUT = 6
   HTTP_MAX_ATTEMPTS = 3
+  RENDER_DEADLINE = 15
 
   # All the settings, with the value that the Rake task contained. The sport of each track gives
   # its `start_icon`. Refer to .defaults_for.
@@ -287,6 +291,7 @@ class StaticMap
   # Does the request again after a temporary failure (a network error or a 5xx), a maximum number
   # of times.
   def get_with_retries(url)
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     attempt = 0
     begin
       attempt += 1
@@ -296,6 +301,9 @@ class StaticMap
       raise RenderError, "Mapbox returned status #{response.code}"
     rescue Net::OpenTimeout, Net::ReadTimeout, SocketError, Errno::ECONNRESET, HTTParty::Error, RenderError => e
       raise e if attempt >= HTTP_MAX_ATTEMPTS
+
+      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+      raise e if elapsed + attempt + HTTP_TIMEOUT > RENDER_DEADLINE
 
       sleep(attempt)
       retry

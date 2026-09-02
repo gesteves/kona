@@ -131,11 +131,14 @@ Eight more are not subclasses of `ApplicationService`, because they are not cach
 `ThreadsCredentials`, and `TrainerRoadCredentials` use Redis only and no HTTP; `GpxTrack` parses
 only; and `MapboxTileset` and `StaticMap` are different (refer to **The
 course-map renderer**). The four credential stores share the `EncryptedCredentials` concern,
-which encrypts each secret field. ⚠️ **Never change the `ENCRYPTION_SALT` of a store**: the salt is
+which encrypts each secret field, and `WhoopCredentials` gives the Whoop tokens, which keep their
+own keys with a TTL, the same encryption. ⚠️ **Never change the `ENCRYPTION_SALT` of a store**: the salt is
 part of the key, thus a new salt makes each stored secret unreadable and each card says "not
 connected".
 `ApplicationService#download` reads a URL in fragments and stops at a byte limit. ⚠️ Use it for
 each body whose size another site decides, for example an `og:image`: the worker is a 512MB VM.
+It also refuses a URL that is not public, and it checks each redirect hop (`PublicAddress`): a page
+that another site names can send the app to the private network of fly.
 `cached_json(key, expires_in:)` gives the read-through Redis cache. HTTParty makes each request, and
 it tries again after a failure. `DeepOstruct` gives dot access.
 
@@ -770,9 +773,9 @@ hangs gives a 500 in place of the message of the page, and a disconnect never re
   - ⚠️ **`Mastodon#connect!` reads the account before it stores the token.** A token that cannot
     read its own account is not a connection, and the card must not show one.
   - ⚠️ **The callback is an admin page, thus the owner session controls it**, and the one-time state
-    in `mastodon:oauth:state` controls it a second time. The Whoop callback cannot use the session,
-    because Whoop redirects to a public host. Mastodon redirects the browser of the owner back to
-    this host, and that browser has the session.
+    controls it a second time. The state is in the session (`OauthState`), thus only the browser
+    that started the flow can complete it, and it goes away after a successful exchange only.
+    Whoop, Mastodon, and Threads share that concern.
   - ⚠️ **The instance ties the scope to the token that it gives.** Thus a change to
     `Mastodon::SCOPES` needs a new registration and a new authorization, and the owner must connect
     the account again. `write:statuses` is what `Mastodon#post!` needs; refer to **Posting to
@@ -1917,6 +1920,10 @@ it needs an edit in the dashboard. The full reason, and the manual `widgets` tag
   `ApplicationController#route_not_found`. Thus a probe from a scanner gives one clean
   `status=404` lograge line and not a backtrace. ⚠️ That catch-all **must stay the last route**, and
   `spec/routing/routes_guard_spec.rb` checks that.
+- **The body limit** (`lib/middleware/request_body_limit.rb`) answers 413 from `CONTENT_LENGTH`
+  before rack-attack and before any code reads a body. Each path prefix has its own limit, and the
+  default is small. Without it, the webhook path read a body of any size into memory two times
+  before the signature check.
 - **rack-attack** (`config/initializers/rack_attack.rb`) blocks each probe path with a flat 403 by
   **path pattern**, before the routing, and it throttles a request **to a path outside the known
   route prefixes**. The key is `Request#client_ip`, which is `CF-Connecting-IP`, then
@@ -1927,7 +1934,9 @@ it needs an edit in the dashboard. The full reason, and the manual `widgets` tag
   made the site fail one time. For the same reason, use no throttle for each IP.
   ⚠️ **When you add a top-level route, add its prefix to `RACK_ATTACK_KNOWN_PREFIXES`**, or the code
   limits its rate. A prefix that is not there fails `spec/routing/routes_guard_spec.rb`.
-  There is also a `contact/ip` throttle with a small scope (5 each hour). That is the one place
+  There is also a `webhooks/ip` throttle, with a high limit: Contentful sends one webhook for each
+  entry of a bulk publish and never sends a delivery again, thus the limit must stay far above a
+  true burst. There is also a `contact/ip` throttle with a small scope (5 each hour). That is the one place
   where an IP for each visitor is safe: it uses the `X-Kona-Client-IP` that the proxy forwards,
   which is the true visitor and not the shared egress, and it is a throttle and never a ban. There
   is also a `signin/ip` throttle (30 each 5 min) over `/signin` and `/auth/`. ⚠️ Those two prefixes

@@ -51,7 +51,8 @@ class LocationSync
     updates = resolved.compact
     return false if updates.empty?
 
-    current = @intervals.athlete_profile
+    # An empty answer from Intervals.icu is a profile with no value in each field.
+    current = @intervals.athlete_profile || {}
     return false if resolved.all? { |field, value| value == current[field] }
 
     @intervals.update_athlete_profile(**updates)
@@ -72,7 +73,7 @@ class LocationSync
       lon: context.lon,
       enabled: true
     } ]
-    return if forecasts_equal?(@intervals.weather_config, next_forecasts)
+    return if forecasts_equal?(Array(@intervals.weather_config), next_forecasts)
 
     @intervals.update_weather_config(next_forecasts)
     log_info("updated weather config to #{context.label} (#{context.lat}, #{context.lon})")

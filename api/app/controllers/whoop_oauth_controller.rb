@@ -10,14 +10,13 @@ require "securerandom"
 class WhoopOauthController < ActionController::Base
   include Authentication
   include OwnerFacing
-
-  STATE_CACHE_KEY = "whoop:oauth:state"
+  include OauthState
 
   before_action :require_owner!, only: :authorize
 
   # Starts the flow: stores a one-time state in Redis and redirects to Whoop.
   def authorize
-    url = Whoop.new.get_authorization_url(issue_state)
+    url = Whoop.new.get_authorization_url(issue_oauth_state(:whoop))
 
     if url.nil?
       render plain: "Whoop OAuth is not configured.", status: :service_unavailable
@@ -32,13 +31,12 @@ class WhoopOauthController < ActionController::Base
       return render plain: "Whoop authorization was denied (#{params[:error]}).", status: :bad_request
     end
 
-    unless valid_state?(params[:state])
+    unless valid_oauth_state?(:whoop, params[:state])
       return render plain: "Invalid or expired OAuth state. Start again at /whoop/auth.", status: :unprocessable_content
     end
 
-    $redis.del(STATE_CACHE_KEY)
-
     if params[:code].present? && Whoop.new.exchange_code_for_tokens(params[:code])
+      consume_oauth_state(:whoop)
       # Back to the page the owner started from, so the status badge reflects the new state.
       # The error branches below stay plain text: they're reachable without a session (Whoop
       # redirects here directly), and the admin layout would imply one.
@@ -46,18 +44,5 @@ class WhoopOauthController < ActionController::Base
     else
       render plain: "Failed to exchange the authorization code for tokens.", status: :bad_gateway
     end
-  end
-
-  private
-
-  def issue_state
-    state = SecureRandom.hex(16)
-    $redis.setex(STATE_CACHE_KEY, 10.minutes, state)
-    state
-  end
-
-  def valid_state?(state)
-    expected = $redis.get(STATE_CACHE_KEY)
-    state.present? && expected.present? && ActiveSupport::SecurityUtils.secure_compare(state, expected)
   end
 end

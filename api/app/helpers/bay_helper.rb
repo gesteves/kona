@@ -20,14 +20,6 @@ module BayHelper
     closest
   end
 
-  # Gives the bay current a type: :slack, :flood, or :ebb.
-  def bay_current_state(entry)
-    return :slack if entry.current_speed_kt < BAY_SLACK_CURRENT_KT
-    delta = (entry.current_bearing_deg - BAY_FLOOD_BEARING_DEG).abs % 360
-    delta = 360 - delta if delta > 180
-    delta <= 90 ? :flood : :ebb
-  end
-
   # Formats the speed of the bay current, from m/s into km/h. It uses the metric and imperial
   # control of the wind speed.
   def format_bay_current_speed(speed_ms)

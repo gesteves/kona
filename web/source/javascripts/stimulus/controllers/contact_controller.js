@@ -4,6 +4,8 @@ import { sendNotification } from '../lib/utils';
 const SUCCESS_MESSAGE = 'Thanks! Your message is on its way.';
 const ERROR_MESSAGE =
   "Sorry, something went wrong and your message wasn't sent. Please try again.";
+const RATE_LIMIT_MESSAGE =
+  'You have sent a few messages already. Please wait an hour and try again.';
 
 // This uses the explicit-render mode. Thus connect and disconnect control the life of the widget,
 // and the widget continues through a Turbo navigation. The `onload` parameter of Turnstile says
@@ -97,6 +99,13 @@ export default class extends Controller {
       if (response.status === 422) {
         this.resetTurnstile();
         sendNotification(await this.errorMessage(response), 'error');
+        return;
+      }
+      // The API permits a few messages each hour from one visitor. "Try again" is the one thing
+      // that does not help here, thus the message says what to do.
+      if (response.status === 429) {
+        this.resetTurnstile();
+        sendNotification(RATE_LIMIT_MESSAGE, 'error');
         return;
       }
       if (!response.ok) {

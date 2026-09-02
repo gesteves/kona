@@ -4,7 +4,7 @@
 <section data-nosnippet class="stats stats--has-three" <%= live_update_attrs(url) %> aria-labelledby="hed-whoop">
   <%# "Today’s" is the usual output of the api view, which uses the time of the last wakeup for its %>
   <%# label. Thus the swap does not change the text. The stats placeholder has the same rule. %>
-  <h2 class="stats__heading" id="hed-whoop">Today’s Metrics <i>from</i> <a href="https://www.whoop.com" target="_blank" rel="nofollow noopener">Whoop</a></h2>
+  <h2 class="stats__heading" id="hed-whoop">Today’s Metrics <i>from</i> <a href="https://www.whoop.com" target="_blank" rel="nofollow noopener">Whoop<span class="sr-only"> (opens in a new tab)</span></a></h2>
   <div class="stats__container">
     <%= partial 'partials/placeholders/stat_skeleton', locals: { icon: 'moon',              top: 'Sleep' } %>
     <%= partial 'partials/placeholders/stat_skeleton', locals: { icon: 'person-meditating', top: 'Recovery' } %>

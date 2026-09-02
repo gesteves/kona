@@ -2,10 +2,8 @@
   <%# Set the Plausible configuration here, before the deferred script loads. Thus our settings, %>
   <%# which are the manual page views and the first-party endpoint, apply before the script can %>
   <%# start with its own defaults, which are autoCapturePageviews:true and the public endpoint. %>
-  <script>
-    window.plausible = window.plausible || function () { (window.plausible.q = window.plausible.q || []).push(arguments) };
-    window.plausible.init = window.plausible.init || function (i) { window.plausible.o = i || {} };
-    plausible.init({ autoCapturePageviews: false, endpoint: '<%= plausible_event_path %>' });
-  </script>
+  <%# ⚠️ The text is in CspHelpers#plausible_init_script, and the CSP names its hash. Thus the %>
+  <%# element must hold that text alone, with no space around it. %>
+  <script><%= plausible_init_script %></script>
   <script defer src="<%= plausible_script_path %>"></script>
 <% end %>

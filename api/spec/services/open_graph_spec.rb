@@ -55,10 +55,20 @@ RSpec.describe OpenGraph do
     # ⚠️ The page can redirect to another host. A relative picture belongs to the host that
     # answered, and not to the URL that the owner typed.
     it "resolves a relative og:image against the final URL after a redirect" do
-      stub_page('<html><head><meta property="og:image" content="/img/og.png"></head></html>',
-                final_url: "https://moved.test/posts/a-post/")
+      stub_streamed_get(url, body: "", code: 301, headers: { "location" => "https://moved.test/posts/a-post/" })
+      stub_streamed_get("https://moved.test/posts/a-post/",
+                        body: '<html><head><meta property="og:image" content="/img/og.png"></head></html>',
+                        headers: { "content-type" => "text/html; charset=utf-8" })
 
       expect(service.fetch(url).image_url).to eq("https://moved.test/img/og.png")
+    end
+
+    # ⚠️ Another site names the page, and a public page can redirect to a private address.
+    it "gives a blank card for a page that redirects to a private address, and does not read it" do
+      stub_streamed_get(url, body: "", code: 302, headers: { "location" => "http://169.254.169.254/latest/" })
+
+      expect(service.fetch(url)).not_to be_embeddable
+      expect(HTTParty).not_to have_received(:get).with("http://169.254.169.254/latest/", anything)
     end
 
     # Some pages use `name` where the tag should use `property`.

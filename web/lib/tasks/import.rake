@@ -27,6 +27,11 @@ namespace :import do
     measure_and_output(:import_standard_site, "Fetching standard.site verification data")
   end
 
+  desc "Writes the Contentful GraphQL schema to lib/data/graphql/contentful_schema.json"
+  task schema: [ :dotenv ] do
+    measure_and_output(:import_schema, "Writing the Contentful schema")
+  end
+
   desc "Fetches the related-articles ranking from the api"
   task related: [ :dotenv ] do
     setup_data_directory
@@ -53,7 +58,8 @@ task import: [ :dotenv, :clobber ] do
     [ :import_contentful, "Importing site content" ],
     [ :import_font_awesome, "Importing icons" ],
     [ :import_standard_site, "Fetching standard.site verification data" ],
-    [ :import_related, "Fetching related articles" ]
+    [ :import_related, "Fetching related articles" ],
+    [ :import_schema, "Writing the Contentful schema" ]
   ].map do |method, description|
     Thread.new do
       measure_and_output(method, description, mutex: output_mutex)
@@ -157,6 +163,14 @@ def fetch_icons_batch(base, tree)
   end
 end
 
+# Writes the Contentful GraphQL schema to the file that lib/data/graphql/contentful.rb reads. On a
+# failure it writes nothing: the file from the last run stays, and the build reads it.
+def import_schema
+  safely_perform do
+    GraphQL::Client.dump_schema(ContentfulClient::HTTP, ContentfulClient::SCHEMA_PATH)
+  end
+end
+
 # Gets the standard.site DID and the publication URI from the api and writes them to
 # data/standard_site.json, for the .well-known endpoint and for the verification link tags.
 # On a failure it writes nothing and gives no message, and the templates then omit the markup.
@@ -164,7 +178,7 @@ def import_standard_site
   safely_perform do
     base = ENV["KONA_API_URL"].to_s.chomp("/")
     next if base.blank?
-    response = HTTParty.get("#{base}/api/standard-site")
+    response = HTTParty.get("#{base}/api/standard-site", timeout: 15)
     next unless response.success? && response.body.present?
     data = JSON.parse(response.body)
     next if data["publication_uri"].blank?
@@ -184,7 +198,7 @@ def import_related
   safely_perform do
     base = ENV["KONA_API_URL"].to_s.chomp("/")
     next if base.blank?
-    response = HTTParty.get("#{base}/api/related", headers: { "Authorization" => "Bearer #{ENV['API_TOKEN']}" })
+    response = HTTParty.get("#{base}/api/related", headers: { "Authorization" => "Bearer #{ENV['API_TOKEN']}" }, timeout: 15)
     next unless response.success? && response.body.present?
     related = JSON.parse(response.body)
     next unless related.is_a?(Hash) && related.present?

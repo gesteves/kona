@@ -1,5 +1,3 @@
-require "securerandom"
-
 module Admin
   # Connects a Mastodon account with the OAuth2 authorization code flow.
   #
@@ -13,7 +11,7 @@ module Admin
   # public host. Mastodon redirects the browser of the owner back to this host, and that browser
   # has the session.
   class MastodonController < BaseController
-    STATE_CACHE_KEY = "mastodon:oauth:state".freeze
+    include OauthState
 
     # GET /connected-apps/mastodon
     def show
@@ -39,17 +37,16 @@ module Admin
 
       # A new instance of the service, because the registration above is what stored the client
       # that this URL needs.
-      redirect_to Mastodon.new.authorization_url(issue_state), allow_other_host: true
+      redirect_to Mastodon.new.authorization_url(issue_oauth_state(:mastodon)), allow_other_host: true
     end
 
     # GET /connected-apps/mastodon/callback
     def callback
       return connection_denied(t("admin.mastodon.flash.unauthorized", error: params[:error])) if params[:error].present?
-      return connection_denied(t("admin.oauth.invalid_state")) unless valid_state?(params[:state])
-
-      $redis.del(STATE_CACHE_KEY)
+      return connection_denied(t("admin.oauth.invalid_state")) unless valid_oauth_state?(:mastodon, params[:state])
 
       if params[:code].present? && Mastodon.new.connect!(params[:code])
+        consume_oauth_state(:mastodon)
         redirect_to connected_apps_path, notice: t("admin.mastodon.flash.connected")
       else
         connection_denied(t("admin.mastodon.flash.no_token"))
@@ -75,20 +72,6 @@ module Admin
     # @param message [String]
     def connection_denied(message)
       redirect_to mastodon_connection_path, status: :see_other, alert: message
-    end
-
-    # @return [String] A one-time value for the round trip.
-    def issue_state
-      state = SecureRandom.hex(16)
-      $redis.setex(STATE_CACHE_KEY, 10.minutes, state)
-      state
-    end
-
-    # @param state [String, nil] The value that came back from the instance.
-    # @return [Boolean]
-    def valid_state?(state)
-      expected = $redis.get(STATE_CACHE_KEY)
-      state.present? && expected.present? && ActiveSupport::SecurityUtils.secure_compare(state, expected)
     end
   end
 end

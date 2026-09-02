@@ -11,7 +11,10 @@ module ContentfulClient
     end
   end
 
-  Schema = GraphQL::Client.load_schema(HTTP)
+  # `rake import:schema` writes the schema to this file, and `rake import` includes that. With the
+  # file, `rake test` needs no request to Contentful. With no file, the code reads the live schema.
+  SCHEMA_PATH = File.expand_path("contentful_schema.json", __dir__)
+  Schema = GraphQL::Client.load_schema(File.exist?(SCHEMA_PATH) ? SCHEMA_PATH : HTTP)
   Client = GraphQL::Client.new(schema: Schema, execute: HTTP)
 
   QUERIES = Client.parse <<-'GRAPHQL'

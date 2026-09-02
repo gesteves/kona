@@ -98,6 +98,19 @@ RSpec.describe LocationSync do
     end
   end
 
+  # ⚠️ get_json! gives nil for a 200 with an empty body. That is "nothing is set", and not an error.
+  context "when Intervals.icu answers with nothing" do
+    let(:profile) { nil }
+    let(:forecasts) { nil }
+
+    it "writes the profile and the weather config" do
+      sync.call(39.7, -104.9)
+
+      expect(intervals).to have_received(:update_athlete_profile)
+      expect(intervals).to have_received(:update_weather_config)
+    end
+  end
+
   it "skips the profile write entirely when nothing resolved" do
     allow(context).to receive_messages(city: nil, state: nil, country: nil, timezone: nil)
 

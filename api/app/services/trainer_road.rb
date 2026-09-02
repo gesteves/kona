@@ -46,16 +46,18 @@ class TrainerRoad < ApplicationService
   def workouts
     return if @calendar_url.blank?
 
-    cache_key = "trainerroad:workouts:#{@timezone}:#{calendar_version}"
+    # ⚠️ The date is part of the key. "Today" is decided below, thus without it the list of the
+    # day before stays for the TTL after midnight, and rest_day? changes with it.
+    today = Time.current.in_time_zone(@timezone).to_date
+    cache_key = "trainerroad:workouts:#{@timezone}:#{today.iso8601}:#{calendar_version}"
     cached_json(cache_key, expires_in: 5.minutes) do
-      response = HTTParty.get(@calendar_url)
+      response = HTTParty.get(@calendar_url, timeout: CONNECT_TIMEOUT)
       unless response.success?
         report_upstream_error("HTTP #{response.code}", context: "TrainerRoad calendar", status: response.code)
         next []
       end
 
       calendar = Icalendar::Calendar.parse(response.body).first
-      today = Time.current.in_time_zone(@timezone).to_date
 
       # ⚠️ This goes through event_on_date?, which changes a timed event into @timezone first. A
       # comparison of `event.dtstart.to_datetime.to_date` uses the stored offset of the event, thus
@@ -123,7 +125,7 @@ class TrainerRoad < ApplicationService
   # @raise [ApplicationService::HttpError] If it fails. The caller counts that as "no planned
   #   workouts" and does not stop the job.
   def fetch_calendar_events
-    response = HTTParty.get(@calendar_url)
+    response = HTTParty.get(@calendar_url, timeout: CONNECT_TIMEOUT)
     unless response.success?
       report_upstream_error("HTTP #{response.code}", context: "TrainerRoad calendar", status: response.code)
       raise ApplicationService::HttpError.new(response.code, response.body, @calendar_url)
@@ -224,8 +226,6 @@ class TrainerRoad < ApplicationService
       return keyword_normalized if keyword_normalized != "Other"
     end
 
-    return "Cycling" if description.to_s.start_with?("TSS")
-
     "Cycling"
   end
 
@@ -268,13 +268,13 @@ class TrainerRoad < ApplicationService
     "#{description_duration} #{suffix}"
   end
 
-  # Finds the discipline of the workout from its name.
-  # @param name [String] The name of the workout.
+  # Finds the discipline of the workout from its name. A name with no discipline is a ride, which
+  # is what TrainerRoad is for.
+  # @param name [String, nil] The name of the workout.
   # @return [String] The discipline: 'Bike', 'Run', or 'Swim'.
   def determine_discipline(name)
-    return if name.blank?
-    return "Run" if name.include?("Run")
-    return "Swim" if name.include?("Swim")
+    return "Run" if name.to_s.include?("Run")
+    return "Swim" if name.to_s.include?("Swim")
     "Bike"
   end
 end

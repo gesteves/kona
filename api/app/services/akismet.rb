@@ -12,6 +12,10 @@ class Akismet < ApplicationService
   # The API key is part of the request host of Akismet: https://<key>.rest.akismet.com/1.1/…
   AKISMET_API_HOST = "rest.akismet.com"
 
+  # ⚠️ The key goes into a host name. A key with another character would send the request, with
+  # the message and the visitor IP in it, to another host. A key outside this shape raises.
+  API_KEY_FORMAT = /\A[a-z0-9-]+\z/i
+
   # @param api_key [String] The Akismet API key.
   # @param blog [String] The home URL of the site, which Akismet needs.
   def initialize(api_key: ENV["AKISMET_API_KEY"], blog: ENV["SITE_URL"])
@@ -39,7 +43,7 @@ class Akismet < ApplicationService
     return false unless configured?
 
     response = HTTParty.post(
-      "https://#{@api_key}.#{AKISMET_API_HOST}/1.1/comment-check",
+      endpoint("comment-check"),
       body: comment_params(content, author, author_email, user_ip, user_agent),
       headers: { "Content-Type" => "application/x-www-form-urlencoded" }
     )
@@ -70,7 +74,7 @@ class Akismet < ApplicationService
     return false unless configured?
 
     response = HTTParty.post(
-      "https://#{@api_key}.#{AKISMET_API_HOST}/1.1/submit-ham",
+      endpoint("submit-ham"),
       body: comment_params(content, author, author_email, user_ip, user_agent),
       headers: { "Content-Type" => "application/x-www-form-urlencoded" }
     )
@@ -79,6 +83,15 @@ class Akismet < ApplicationService
   end
 
   private
+
+  # @param path [String] The name of the Akismet call.
+  # @return [String] The URL of that call, with the key in the host.
+  # @raise [ArgumentError] If the key cannot be part of a host name.
+  def endpoint(path)
+    raise ArgumentError, "AKISMET_API_KEY has an incorrect shape" unless @api_key.to_s.match?(API_KEY_FORMAT)
+
+    "https://#{@api_key}.#{AKISMET_API_HOST}/1.1/#{path}"
+  end
 
   # The comment fields that both endpoints take. The code removes each blank field.
   # @return [Hash]

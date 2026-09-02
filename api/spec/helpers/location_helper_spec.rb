@@ -19,6 +19,16 @@ RSpec.describe LocationHelper do
   end
 
   describe "#format_location" do
+    it "ignores a component with no types" do
+      location = location_at(
+        { long_name: "Somewhere" },
+        component(%w[locality], "Boulder"),
+        component(%w[administrative_area_level_1], "Colorado"),
+        component(%w[country], "United States")
+      )
+      expect(helper.format_location(location)).to eq("Boulder, Colorado")
+    end
+
     it "formats a US location as City, State" do
       location = location_at(
         component(%w[locality], "Boulder"),

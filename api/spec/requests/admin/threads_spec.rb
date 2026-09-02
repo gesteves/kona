@@ -10,10 +10,10 @@ RSpec.describe "Admin Threads connection", type: :request do
     allow(ENV).to receive(:[]).with("THREADS_APP_ID").and_return("app-id")
     allow(ENV).to receive(:[]).with("THREADS_APP_SECRET").and_return("app-secret")
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
-    $redis.del(ThreadsCredentials::REDIS_KEY, Admin::ThreadsController::STATE_CACHE_KEY)
+    $redis.del(ThreadsCredentials::REDIS_KEY)
   end
 
-  after { $redis.del(ThreadsCredentials::REDIS_KEY, Admin::ThreadsController::STATE_CACHE_KEY) }
+  after { $redis.del(ThreadsCredentials::REDIS_KEY) }
 
   def sign_in! = sign_in_as(email: owner_email)
 
@@ -38,7 +38,7 @@ RSpec.describe "Admin Threads connection", type: :request do
     it "issues a one-time state and carries it in the URL" do
       get "/connected-apps/threads/authorize"
 
-      state = $redis.get(Admin::ThreadsController::STATE_CACHE_KEY)
+      state = session["threads_oauth_state"]["value"]
       expect(state).to be_present
       expect(response.location).to include("state=#{state}")
     end
@@ -62,16 +62,20 @@ RSpec.describe "Admin Threads connection", type: :request do
   end
 
   describe "GET /connected-apps/threads/callback" do
-    before do
-      sign_in!
-      $redis.setex(Admin::ThreadsController::STATE_CACHE_KEY, 600, "the-state")
+    before { sign_in! }
+
+    # The state that Meta must send back. The flow puts it in the session.
+    # @return [String]
+    let(:the_state) do
+      get "/connected-apps/threads/authorize"
+      session["threads_oauth_state"]["value"]
     end
 
     it "exchanges the code and returns to the Connected apps page" do
       expect_any_instance_of(Threads).to receive(:connect!)
         .with("a-code", redirect_uri: redirect_uri).and_return(true)
 
-      get "/connected-apps/threads/callback", params: { code: "a-code", state: "the-state" }
+      get "/connected-apps/threads/callback", params: { code: "a-code", state: the_state }
 
       expect(response).to redirect_to("/connected-apps")
       expect(flash[:notice]).to eq(I18n.t("admin.threads.flash.connected"))
@@ -80,9 +84,21 @@ RSpec.describe "Admin Threads connection", type: :request do
     it "spends the state, thus a replay cannot connect again" do
       allow_any_instance_of(Threads).to receive(:connect!).and_return(true)
 
-      get "/connected-apps/threads/callback", params: { code: "a-code", state: "the-state" }
+      get "/connected-apps/threads/callback", params: { code: "a-code", state: the_state }
+      get "/connected-apps/threads/callback", params: { code: "a-code", state: the_state }
 
-      expect($redis.get(Admin::ThreadsController::STATE_CACHE_KEY)).to be_nil
+      expect(flash[:alert]).to include(ERB::Util.html_escape(I18n.t("admin.oauth.invalid_state")))
+    end
+
+    it "keeps the state after a failed exchange, thus the owner can try again" do
+      # Each request makes a new Threads, thus the answers are counted here and not on one instance.
+      attempts = 0
+      allow_any_instance_of(Threads).to receive(:connect!) { (attempts += 1) > 1 }
+
+      get "/connected-apps/threads/callback", params: { code: "a-code", state: the_state }
+      get "/connected-apps/threads/callback", params: { code: "a-code", state: the_state }
+
+      expect(response).to redirect_to("/connected-apps")
     end
 
     it "refuses a code with the wrong state" do
@@ -96,7 +112,7 @@ RSpec.describe "Admin Threads connection", type: :request do
 
     it "sends the owner back when Meta denied the app" do
       get "/connected-apps/threads/callback",
-          params: { error: "access_denied", error_description: "The user denied the request", state: "the-state" }
+          params: { error: "access_denied", error_description: "The user denied the request", state: the_state }
 
       expect(response).to redirect_to("/connected-apps")
       expect(flash[:alert]).to include("denied the request")
@@ -105,7 +121,7 @@ RSpec.describe "Admin Threads connection", type: :request do
     it "sends the owner back when the exchange fails" do
       allow_any_instance_of(Threads).to receive(:connect!).and_return(false)
 
-      get "/connected-apps/threads/callback", params: { code: "a-code", state: "the-state" }
+      get "/connected-apps/threads/callback", params: { code: "a-code", state: the_state }
 
       expect(response).to redirect_to("/connected-apps")
       expect(flash[:alert]).to eq(I18n.t("admin.threads.flash.no_token"))

@@ -99,7 +99,8 @@
     color: var(--color-link);
   }
 
-  a.current {
+  // shortcut_link writes aria-current="page" on the link of the current page.
+  a[aria-current="page"] {
     @include nav-underline(var(--color-link));
   }
 

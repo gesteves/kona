@@ -17,6 +17,19 @@ RSpec.describe "Activity stats", type: :request do
 
   it_behaves_like "a live-update fragment", "/widgets/activity-stats"
 
+  # The live-update contract: an upstream that fails gives an empty fragment, and never a 500.
+  it "renders the empty body, with no stale-while-revalidate for the browser, when Intervals.icu times out" do
+    allow_any_instance_of(Intervals).to receive(:stats).and_raise(Net::ReadTimeout)
+
+    get "/widgets/activity-stats", headers: auth_headers
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to eq("")
+    expect(response.headers["Cache-Control"]).to include("must-revalidate")
+    expect(response.headers["Cache-Control"]).not_to include("stale-while-revalidate")
+    expect(response.headers["CDN-Cache-Control"]).to eq("public, max-age=60")
+  end
+
   it "renders the stats markup" do
     get "/widgets/activity-stats", headers: auth_headers
 

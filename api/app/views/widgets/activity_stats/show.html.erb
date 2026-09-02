@@ -1,5 +1,5 @@
 <section data-nosnippet class="stats stats--has-four" <%= live_update_attrs %> aria-labelledby="hed-stats">
-  <h2 class="stats__heading" id="hed-stats">Monthly Totals <i>from</i> <a href="https://intervals.icu" target="_blank" rel="nofollow noopener">Intervals.icu</a></h2>
+  <h2 class="stats__heading" id="hed-stats">Monthly Totals <i>from</i> <a href="https://intervals.icu" target="_blank" rel="nofollow noopener">Intervals.icu<span class="sr-only"> (opens in a new tab)</span></a></h2>
   <div class="stats__container">
     <%= render "stat",     icon: "wave-pulse",      top: "Activity".pluralize(@stats[:total_activities]), value: number_to_delimited(@stats[:total_activities]), bottom: "in the past month" %>
     <%= render "activity", icon: "person-swimming", activity: "Swimming", distance: @stats[:swim_distance] %>

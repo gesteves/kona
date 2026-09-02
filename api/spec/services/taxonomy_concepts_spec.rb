@@ -36,6 +36,24 @@ RSpec.describe TaxonomyConcepts do
     expect(service.names).to eq("a" => "A", "b" => "B")
   end
 
+  # ⚠️ The result goes into the cache for an hour. A tree with a part absent must not.
+  it "gives an empty map, and caches nothing, when a later page fails" do
+    page1 = { items: [ { sys: { id: "a" }, prefLabel: { "en-US": "A" } } ], pages: { next: "/next" } }
+    allow(service).to receive(:get_json).and_return(page1, nil)
+
+    expect(service.names).to eq({})
+    expect($redis).not_to have_received(:setex)
+  end
+
+  it "stops a cursor that never ends" do
+    page = { items: [ { sys: { id: "a" }, prefLabel: { "en-US": "A" } } ], pages: { next: "/next" } }
+    allow(service).to receive(:get_json).and_return(page)
+    allow(ErrorReporter).to receive(:report_upstream)
+
+    expect(service.names).to eq({})
+    expect(service).to have_received(:get_json).exactly(described_class::MAX_PAGES).times
+  end
+
   it "returns an empty map when the fetch fails (so callers fall back to legacy tags)" do
     allow(service).to receive(:get_json).and_return(nil)
     expect(service.names).to eq({})

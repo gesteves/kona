@@ -75,6 +75,16 @@ RSpec.describe WeatherHelper, type: :helper do
   # ---------------------------------------------------------------------------
   # The number format and the unit format
   # ---------------------------------------------------------------------------
+  # ⚠️ WeatherKit omits a field at times, and a nil here gave the full widget a 500.
+  describe "nil fields" do
+    it "gives nil, and does not raise, for a condition, an amount, or a type that is absent" do
+      expect(helper.format_forecasted_condition(nil)).to be_nil
+      expect(helper.format_condition(nil)).to be_nil
+      expect(helper.format_precipitation_amount(nil)).to be_nil
+      expect(helper.format_precipitation_type(nil)).to be_nil
+    end
+  end
+
   describe "#format_temperature" do
     it "renders both Celsius and Fahrenheit with the unit toggle" do
       html = helper.format_temperature(18.0)
@@ -170,6 +180,11 @@ RSpec.describe WeatherHelper, type: :helper do
   end
 
   describe "#aqi_icon" do
+    it "puts a fraction between two bands in the lower band" do
+      expect(helper.aqi_icon(50.5)).to eq("smog")
+      expect(helper.aqi_icon(150.4)).to eq("smoke")
+    end
+
     it "picks an icon by AQI band" do
       expect(helper.aqi_icon(30)).to eq("sun-haze")
       expect(helper.aqi_icon(100)).to eq("smog")

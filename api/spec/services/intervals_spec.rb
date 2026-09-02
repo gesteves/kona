@@ -30,9 +30,10 @@ RSpec.describe Intervals do
       expect(service.stats[:run_distance]).to eq(0)
     end
 
-    it "returns nil when activities can't be fetched" do
+    it "returns nil when activities can't be fetched, and keeps that failure for a minute" do
       allow(service).to receive(:get_json).and_return(nil)
       expect(service.stats).to be_nil
+      expect($redis).to have_received(:setex).with("intervals.icu:stats:#{service.instance_variable_get(:@athlete_id)}", 60, ApplicationService::EMPTY_SENTINEL)
     end
   end
 

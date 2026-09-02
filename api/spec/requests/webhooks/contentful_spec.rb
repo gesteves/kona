@@ -17,9 +17,10 @@ RSpec.describe "Webhooks::Contentful", type: :request do
 
   # Posts a Contentful webhook with a signature. The canonical request contains the timestamp header
   # only, as ContentfulRequestVerification#canonical_request does.
-  def post_webhook(payload, topic:, secret: webhook_secret, timestamp: now_ms, signature: nil)
+  def post_webhook(payload, topic:, secret: webhook_secret, timestamp: now_ms, signature: nil, signed_headers: "x-contentful-timestamp")
     body = payload.to_json
-    canonical = [ "POST", "/webhooks/contentful", "x-contentful-timestamp:#{timestamp}", body ].join("\n")
+    signed = signed_headers.split(",").map { |name| "#{name}:#{timestamp}" }.join(";")
+    canonical = [ "POST", "/webhooks/contentful", signed, body ].join("\n")
     signature ||= OpenSSL::HMAC.hexdigest("SHA256", secret, canonical)
 
     post "/webhooks/contentful",
@@ -28,7 +29,7 @@ RSpec.describe "Webhooks::Contentful", type: :request do
         "Content-Type" => "application/json",
         "X-Contentful-Topic" => topic,
         "x-contentful-signature" => signature,
-        "x-contentful-signed-headers" => "x-contentful-timestamp",
+        "x-contentful-signed-headers" => signed_headers,
         "x-contentful-timestamp" => timestamp.to_s
       }
   end
@@ -178,6 +179,14 @@ RSpec.describe "Webhooks::Contentful", type: :request do
 
     it "rejects a signature computed with the wrong secret" do
       post_webhook(entry_payload("entry123", "article"), topic: "ContentManagement.Entry.publish", secret: "b" * 64)
+      expect(response).to have_http_status(:unauthorized)
+      expect(StandardSiteSyncJob.jobs).to be_empty
+    end
+
+    # A signature that does not cover the timestamp would let a captured request replay with a
+    # new timestamp for all time.
+    it "rejects a valid signature whose signed-headers list omits the timestamp" do
+      post_webhook(entry_payload("entry123", "article"), topic: "ContentManagement.Entry.publish", signed_headers: "")
       expect(response).to have_http_status(:unauthorized)
       expect(StandardSiteSyncJob.jobs).to be_empty
     end

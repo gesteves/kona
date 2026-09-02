@@ -196,7 +196,8 @@ class Intervals < ApplicationService
   # because the summary reads a["type"].
   # @return [Array<Hash>, nil] The activities, or nil if it fails.
   def fetch_activities
-    cached_json("intervals.icu:stats:#{@athlete_id}", expires_in: 5.minutes, symbolize: false) do
+    # The negative TTL is a delay: without it, an outage costs a full request on each page.
+    cached_json("intervals.icu:stats:#{@athlete_id}", expires_in: 5.minutes, empty_expires_in: 1.minute, symbolize: false) do
       # Use the zone of the athlete, not the zone of the server. If you do not, the limits of the
       # window move by one day.
       today = Time.current.in_time_zone(athlete_timezone).to_date

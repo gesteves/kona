@@ -43,15 +43,19 @@ RSpec.describe SiteHelpers do
       )
     end
 
-    it 'maps synonym slugs to the canonical concept page' do
+    it 'maps synonym slugs to the canonical concept page, with and without a slash at the end' do
       expect(taxonomy_synonym_redirects).to include(
         { from: '/tagged/half-ironman', to: '/tagged/triathlon/ironman-703/', status: 301 },
-        { from: '/tagged/70-3', to: '/tagged/triathlon/ironman-703/', status: 301 }
+        { from: '/tagged/half-ironman/', to: '/tagged/triathlon/ironman-703/', status: 301 },
+        { from: '/tagged/70-3', to: '/tagged/triathlon/ironman-703/', status: 301 },
+        { from: '/tagged/70-3/', to: '/tagged/triathlon/ironman-703/', status: 301 }
       )
     end
 
     it 'skips synonyms that collide with a configured redirect' do
-      expect(taxonomy_synonym_redirects.map { |r| r[:from] }).not_to include('/tagged/multisport')
+      froms = taxonomy_synonym_redirects.map { |r| r[:from] }
+      expect(froms).not_to include('/tagged/multisport')
+      expect(froms).not_to include('/tagged/multisport/')
     end
   end
 
@@ -296,6 +300,18 @@ RSpec.describe SiteHelpers do
 
   # page_title tests `content.is_a?(Hash)`, and each true proxied content object is a Middleman
   # Mash, which is a Hash subclass with dot access. Hashie::Mash replaces one here.
+  describe '#title_tag' do
+    include Padrino::Helpers
+
+    def data = OpenStruct.new(site: OpenStruct.new(meta_title: 'Swim & Bike'))
+
+    # Middleman's content_tag never escapes its content, and page_title decodes each entity. Thus
+    # the escape must be in title_tag itself.
+    it 'escapes the title, because content_tag does not' do
+      expect(title_tag('Ironman "70.3" <3')).to eq('<title>Ironman &quot;70.3&quot; &lt;3 · Swim &amp; Bike</title>')
+    end
+  end
+
   describe '#page_title' do
     def data = OpenStruct.new(site: OpenStruct.new(meta_title: 'My Site'))
 
@@ -575,6 +591,19 @@ RSpec.describe SiteHelpers do
       expect(static_rules.map { |r| r[:from] }).to eq([ '/tagged/half-ironman', '/exact-one', '/exact-two' ])
       expect(dynamic_rules.map { |r| r[:from] })
         .to eq([ '/.well-known/host-meta*', '/.well-known/webfinger*', '/old-splat/*', '/with/:placeholder' ])
+    end
+
+    # A person writes each redirect in Contentful, and the deploy must not break for it.
+    it 'drops a redirect from a path to itself, and keeps the first of two rules with one source' do
+      @redirects = [
+        redirect('/blog', '/blog/'),
+        redirect('/old', '/new-one'),
+        redirect('/old', '/new-two')
+      ]
+
+      static_rules, _ = partitioned_redirects
+      rules = static_rules.select { |r| %w[/blog /old].include?(r[:from]) }
+      expect(rules).to eq([ { from: '/old', to: '/new-one', status: 301 } ])
     end
 
     it 'counts the taxonomy synonym redirects as static' do

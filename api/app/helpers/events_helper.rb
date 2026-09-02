@@ -52,16 +52,38 @@ module EventsHelper
 
   # @return [OpenStruct, nil] The forecast day for the date of the event, which also has its
   #   sunrise and its sunset.
+  #
+  # ⚠️ WeatherKit writes `forecastStart` as the local midnight of the location, in UTC. Thus each
+  # date here is in the timezone of the location of the event. With the UTC date, a race east of
+  # UTC got the forecast of the next day. Without a timezone, the UTC date is the only option.
   def event_forecast_day(event)
     return nil if event.blank? || event.weather&.forecast_daily&.days.blank?
-    event_date = parse_event_date(event)
+    # The location of a raw event is its name. The record that RaceDayWeather makes holds the
+    # GoogleMaps data of the location, and its timezone.
+    location = event.location
+    zone = location.time_zone&.time_zone_id.presence unless location.blank? || location.is_a?(String)
+    event_date = parse_event_date(event, zone)
     return nil if event_date.nil?
 
     event.weather.forecast_daily.days.find do |day|
-      day_start = Date.parse(day.forecast_start)
-      day_end = Date.parse(day.forecast_end)
-      event_date >= day_start && event_date < day_end
+      day_start = parse_forecast_date(day.forecast_start, zone)
+      day_end = parse_forecast_date(day.forecast_end, zone)
+      day_start && day_end && event_date >= day_start && event_date < day_end
     end
+  end
+
+  # @param value [String, nil] An ISO 8601 instant from WeatherKit.
+  # @param zone [String, nil] An IANA timezone id.
+  # @return [Date, nil] The date of that instant in the zone, or its UTC date with no zone.
+  def parse_forecast_date(value, zone)
+    return if value.blank?
+    # A plain date names its day already.
+    return Date.parse(value) if value.match?(/\A\d{4}-\d{2}-\d{2}\z/)
+
+    parsed = Time.parse(value)
+    (zone ? parsed.in_time_zone(zone) : parsed.utc).to_date
+  rescue ArgumentError, TypeError
+    nil
   end
 
   # The upcoming races to show: the confirmed events of today or later, the first one soonest.

@@ -83,8 +83,7 @@ class OpenGraph < ApplicationService
   def read(url)
     page = download(url, max_bytes: MAX_BYTES, keep_head: true,
                          headers: { "User-Agent" => USER_AGENT, "Accept" => "text/html" },
-                         open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT,
-                         follow_redirects: true, limit: 5)
+                         open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT, limit: 5)
     return {} if page.nil?
 
     # ⚠️ A relative og:image resolves against the final URL, after each redirect, and not against

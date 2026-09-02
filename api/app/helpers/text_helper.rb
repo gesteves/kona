@@ -19,10 +19,12 @@ module TextHelper
     words.append(last_words).join(" ")
   end
 
-  # Joins the items into a string, with a comma between them and "and" before the last one.
+  # Joins the items into a string, with a comma between them and "and" before the last one. Two
+  # items take no comma.
   def comma_join_with_and(items, oxford = true)
-    last_separator = oxford ? ", and " : " and "
-    items.size <= 2 ? items.join(last_separator) : [ items[0..-2].join(", "), items[-1] ].join(last_separator)
+    return items.join(" and ") if items.size <= 2
+
+    [ items[0..-2].join(", "), items[-1] ].join(oxford ? ", and " : " and ")
   end
 
   # Puts the correct article, "a" or "an", before a word.

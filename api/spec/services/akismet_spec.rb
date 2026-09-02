@@ -49,6 +49,13 @@ RSpec.describe Akismet do
     expect { service.spam?(**check_args) }.to raise_error(StandardError, "boom")
   end
 
+  it "raises for a key that cannot be part of a host name, and does not call it" do
+    allow(HTTParty).to receive(:post)
+    bad = described_class.new(api_key: "evil.example/?x=", blog: "https://example.test")
+    expect { bad.spam?(**check_args) }.to raise_error(ArgumentError)
+    expect(HTTParty).not_to have_received(:post)
+  end
+
   it "fails open (ham) when unconfigured, without calling Akismet" do
     allow(HTTParty).to receive(:post)
     unconfigured = described_class.new(api_key: nil, blog: "https://example.test")

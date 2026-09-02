@@ -1,1 +1,10 @@
-<%= { icons: [192, 512].map { |w| { src: site_icon_url(w: w), type: data.site.logo.content_type, sizes: "#{w}x#{w}" } } }.to_json %>
+<%# The fields that make the manifest one that a browser can install. theme_color is the same as
+    the meta tag in partials/_meta.html.erb. %>
+<%= {
+  name: sanitize(data.site.title),
+  start_url: "/",
+  display: "minimal-ui",
+  theme_color: "#BF0222",
+  background_color: "#FFFFFF",
+  icons: [192, 512].map { |w| { src: site_icon_url(w: w), type: data.site.logo.content_type, sizes: "#{w}x#{w}" } }
+}.to_json %>

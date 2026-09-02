@@ -18,6 +18,8 @@ module Api
     COUNT = 8
 
     def show
+      # ⚠️ Say it, and do not depend on the default of the edge for a path with no extension.
+      response.headers["Cache-Control"] = "no-store"
       render json: RelatedArticles.new.all(count: COUNT)
     end
   end

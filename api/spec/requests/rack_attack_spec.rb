@@ -129,6 +129,20 @@ RSpec.describe "Rack::Attack", type: :request do
   # The contact form has a throttle for each TRUE visitor IP, which the web proxy sends as
   # X-Kona-Client-IP. It is not the shared proxy egress. It is a throttle, which gives a 429, and
   # never a ban. Thus it cannot stop the shared proxy IP, and an IP ban would.
+  it "throttles a flood on the webhook paths, far above a bulk publish, without touching the known routes" do
+    600.times { post "/webhooks/contentful", headers: { "CF-Connecting-IP" => "203.0.113.9" } }
+    expect(response).to have_http_status(:unauthorized)
+
+    post "/webhooks/contentful", headers: { "CF-Connecting-IP" => "203.0.113.9" }
+    expect(response).to have_http_status(:too_many_requests)
+
+    # Another sender and another path are not in that count.
+    post "/webhooks/contentful", headers: { "CF-Connecting-IP" => "203.0.113.10" }
+    expect(response).to have_http_status(:unauthorized)
+    get "/up", headers: { "CF-Connecting-IP" => "203.0.113.9" }
+    expect(response).to have_http_status(:ok)
+  end
+
   it "throttles contact submissions per forwarded visitor IP, isolating distinct visitors" do
     5.times do
       post "/api/contact", headers: { "X-Kona-Client-IP" => "9.9.9.9" }

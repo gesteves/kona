@@ -54,13 +54,23 @@ export function loadPagefind() {
   // navigation, which is correct here, because no rendered page contains them.
   document.head.appendChild(js);
 
+  // A load that fails forgets its result and removes its elements. Thus the next call, from a
+  // pointer, a focus, or `search#open`, loads again, and one short network problem does not stop
+  // the search for the life of the page.
+  const forget = () => {
+    loading = null;
+    css.remove();
+    js.remove();
+    return false;
+  };
+
   loading = Promise.all([cssSettled, jsSettled]).then(([cssOk, jsOk]) => {
     // `whenDefined` for a script that gave a 404 never resolves, and that would stop
     // `search#open`.
-    if (!jsOk) return false;
+    if (!jsOk) return forget();
     return customElements
       .whenDefined('pagefind-modal')
-      .then(() => cssOk && jsOk);
+      .then(() => (cssOk ? true : forget()));
   });
 
   return loading;

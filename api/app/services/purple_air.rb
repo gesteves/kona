@@ -58,7 +58,7 @@ class PurpleAir < ApplicationService
     query = bounding_box.merge(location_type: 0, max_age: 1.hour, fields: "pm2.5_atm,latitude,longitude,humidity,confidence")
 
     cache_key = "purple_air:sensors:#{query.values.map(&:to_s).join(':')}"
-    cached_json(cache_key, expires_in: 5.minutes, symbolize: false) do
+    cached_json(cache_key, expires_in: 5.minutes, empty_expires_in: 1.minute, symbolize: false) do
       get_json(PURPLE_AIR_API_URL, symbolize: false, query: query, headers: { "X-API-Key" => ENV["PURPLEAIR_API_KEY"] })
     end
   end

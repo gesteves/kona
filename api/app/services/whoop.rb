@@ -363,7 +363,7 @@ class Whoop < ApplicationService
   def get_access_token
     return unless valid_credentials?
 
-    cached_token = $redis.get(access_token_key)
+    cached_token = read_secret(access_token_key)
     return cached_token if cached_token.present?
 
     refresh_access_token
@@ -384,11 +384,11 @@ class Whoop < ApplicationService
     begin
       unless force
         # Another request can complete a refresh between the cache miss and the lock.
-        cached_token = $redis.get(access_token_key)
+        cached_token = read_secret(access_token_key)
         return cached_token if cached_token.present?
       end
 
-      refresh_token = $redis.get(refresh_token_key)
+      refresh_token = read_secret(refresh_token_key)
       if refresh_token.blank?
         Rails.logger.warn("No Whoop refresh token found. Visit /whoop/auth to authorize.")
         return
@@ -432,7 +432,7 @@ class Whoop < ApplicationService
   def wait_for_refreshed_token(attempts: 10, interval: 0.3)
     attempts.times do
       sleep(interval)
-      token = $redis.get(access_token_key)
+      token = read_secret(access_token_key)
       return token if token.present?
     end
 
@@ -452,9 +452,10 @@ class Whoop < ApplicationService
     # rescue of the caller hides the raise. Thus an expires_in that is absent or less than 60s
     # stopped the integration with no message. The code stores the refresh token in all
     # conditions, which lets the next attempt recover.
+    # ⚠️ Both tokens are encrypted at rest, as each other credential is. Refer to WhoopCredentials.
     access_cache_duration = expires_in - 60
-    $redis.setex(access_token_key, access_cache_duration, access_token) if access_cache_duration.positive?
-    $redis.set(refresh_token_key, refresh_token) if refresh_token.present?
+    $redis.setex(access_token_key, access_cache_duration, WhoopCredentials.seal(access_token)) if access_cache_duration.positive?
+    $redis.set(refresh_token_key, WhoopCredentials.seal(refresh_token)) if refresh_token.present?
 
     # This also covers the re-authorization path, because exchange_code_for_tokens comes here.
     $redis.del(refresh_error_key)
@@ -474,6 +475,18 @@ class Whoop < ApplicationService
     return unless code.to_i.between?(400, 499)
 
     $redis.set(refresh_error_key, { code: code.to_i, at: Time.current.utc.iso8601 }.to_json)
+  end
+
+  # Reads an encrypted token. A value from before the encryption reads as it is, and the next
+  # refresh stores it encrypted. Whoop rotates the refresh token at each refresh, thus such a value
+  # goes away by itself.
+  # @param key [String] The Redis key.
+  # @return [String, nil]
+  def read_secret(key)
+    raw = $redis.get(key)
+    return if raw.blank?
+
+    WhoopCredentials.open(raw) || raw
   end
 
   def access_token_key

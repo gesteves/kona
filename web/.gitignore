@@ -17,6 +17,10 @@ build/
 /data/*
 !/data/font_awesome.yml
 !/data/srcsets.yml
+
+# `rake import:schema` writes the Contentful schema here, thus `rake test` needs no network after
+# one import. With no file, the data layer reads the live schema.
+/lib/data/graphql/contentful_schema.json
 node_modules
 
 # Local Wrangler state (created by `wrangler dev`)

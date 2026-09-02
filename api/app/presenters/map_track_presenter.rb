@@ -66,10 +66,13 @@ class MapTrackPresenter
   # before the dropdown, when each style was in `style_url`, changes itself at the first read.
   # @return [Hash]
   def settings
-    merged = StaticMap.defaults_for(nil).merge(@settings)
-    return merged unless StaticMap::STYLE_PRESETS.key?(merged["style_url"])
+    return @merged_settings if defined?(@merged_settings)
 
-    merged.merge("style_preset" => merged["style_url"], "style_url" => "")
+    merged = StaticMap.defaults_for(nil).merge(@settings)
+    if StaticMap::STYLE_PRESETS.key?(merged["style_url"])
+      merged = merged.merge("style_preset" => merged["style_url"], "style_url" => "")
+    end
+    @merged_settings = merged
   end
 
   # @param key [String] The name of a setting.

@@ -25,12 +25,12 @@
                   <p class="entry__meta">
                     <%= event_timestamp_tag(event) %>
                     <% if event.location.present? %>
-                      <span><%= icon_svg("classic", "light", "location-dot") %> <%= event.location %></span>
+                      <span><%= icon_svg("classic", "light", "location-dot") %> <%= h event.location %></span>
                     <% end %>
                   </p>
                   <h3 class="entry__hed" id="hed-<%= id %>">
                     <% if event.url.present? %>
-                      <%= link_to smartypants(event.title), event.url, rel: "noopener", target: "_blank" %>
+                      <%= link_to smartypants(event.title) + '<span class="sr-only"> (opens in a new tab)</span>', event.url, rel: "noopener", target: "_blank" %>
                     <% else %>
                       <%= smartypants(event.title) %>
                     <% end %>

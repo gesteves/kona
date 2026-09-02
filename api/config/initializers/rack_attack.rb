@@ -94,6 +94,14 @@ Rack::Attack.throttle("signin/ip", limit: 30, period: 5.minutes) do |req|
   req.client_ip if req.path == "/signin" || req.path.start_with?("/auth/")
 end
 
+# Throttles the two webhook paths, which are outside the known-route throttle above. The limit
+# is high, on purpose: Contentful sends one webhook for each entry of a bulk publish, from a shared
+# egress, and it never sends a delivery again. Thus a limit near a true burst would lose a publish
+# with no message. This stops a flood only.
+Rack::Attack.throttle("webhooks/ip", limit: 600, period: 1.minute) do |req|
+  req.client_ip if req.path.start_with?("/webhooks/")
+end
+
 # Throttles the contact-form submissions for each visitor. The key is the IP that the web proxy
 # sends, and not client_ip. For proxy traffic, client_ip is the shared egress, and it would
 # throttle each person at the same time. A direct request to the origin has no forwarded header and

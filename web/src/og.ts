@@ -1,7 +1,8 @@
 // The on-demand Open Graph card route: <page path>og.png?v=<template ver>-<published ver>.
 // The path of the card identifies the page, and not a query parameter. Thus /2026/06/26/post/
-// gets /2026/06/26/post/og.png, and the home page gets /og.png. `v` is only a cache buster, and
-// this code ignores it, on purpose. Thus a card never needs a purge.
+// gets /2026/06/26/post/og.png, and the home page gets /og.png. The page names its own `v` in
+// its og:image, and this code renders that version only: a request with another `v` gets a
+// redirect to it. Thus each page has one card in the cache, and a card never needs a purge.
 // This renders the og:image for a page with no cover image. Refer to web/CLAUDE.md.
 
 import { withSecurityHeaders } from './headers';
@@ -65,16 +66,22 @@ function fromCodePoint(raw: string, radix: number, match: string): string {
   return String.fromCodePoint(n);
 }
 
+/** The og:title and the og:image of a page. Each is null when the page has no such tag. */
+export type OgMeta = { title: string | null; image: string | null };
+
 /**
- * Reads the og:title of a page from its markup.
+ * Reads the og:title and the og:image of a page from its markup.
  *
  * This uses HTMLRewriter on a stream. It does not buffer the page and match a regex, because an
- * article page is a few hundred KB, this route is already near the Worker CPU limit, and the tag
- * is in `<head>`. Thus the read stops when it finds the tag, usually in the first chunk.
- * @returns The decoded title, or null if the page has no og:title.
+ * article page is a few hundred KB, this route is already near the Worker CPU limit, and the tags
+ * are in `<head>`. Thus the read stops when it has both tags, or at the end of `<head>`, usually
+ * in the first chunk.
+ * @returns The decoded title and the image URL as the source writes it.
  */
-export async function readOgTitle(response: Response): Promise<string | null> {
+export async function readOgMeta(response: Response): Promise<OgMeta> {
   let title: string | null = null;
+  let image: string | null = null;
+  let headEnded = false;
 
   const transformed = new HTMLRewriter()
     .on('meta[property="og:title"]', {
@@ -82,13 +89,25 @@ export async function readOgTitle(response: Response): Promise<string | null> {
         title ??= element.getAttribute('content');
       },
     })
+    .on('meta[property="og:image"]', {
+      element(element) {
+        image ??= element.getAttribute('content');
+      },
+    })
+    .on('head', {
+      element(element) {
+        element.onEndTag(() => {
+          headEnded = true;
+        });
+      },
+    })
     .transform(response);
 
   const reader = transformed.body?.getReader();
-  if (!reader) return null;
+  if (!reader) return { title: null, image: null };
 
   try {
-    while (title === null) {
+    while (!headEnded && (title === null || image === null)) {
       const { done } = await reader.read();
       if (done) break;
     }
@@ -96,7 +115,43 @@ export async function readOgTitle(response: Response): Promise<string | null> {
     await reader.cancel();
   }
 
-  return title === null ? null : decodeEntities(title);
+  return {
+    title: title === null ? null : decodeEntities(title),
+    image: image === null ? null : decodeEntities(image),
+  };
+}
+
+/**
+ * Reads the og:title of a page from its markup.
+ * @returns The decoded title, or null if the page has no og:title.
+ */
+export async function readOgTitle(response: Response): Promise<string | null> {
+  return (await readOgMeta(response)).title;
+}
+
+/**
+ * The `v` that a page declares for this card, from its og:image.
+ *
+ * ⚠️ This is what limits the route. A well-formed `v` that the page does not declare would
+ * otherwise be a cache miss that costs a full render, and there is no end to those values. A page
+ * with a cover image names another image, and it has no card at all.
+ * @param image The og:image of the page, as the source writes it.
+ * @param cardPathname The path of this card.
+ * @returns The value for the cache key, or null when the page does not name this card.
+ */
+function declaredVersion(
+  image: string | null,
+  cardPathname: string
+): string | null {
+  if (!image) return null;
+  let url: URL;
+  try {
+    url = new URL(image);
+  } catch {
+    return null;
+  }
+  if (url.pathname !== cardPathname) return null;
+  return cacheVersion(url.searchParams.get('v'));
 }
 
 /**
@@ -207,12 +262,29 @@ export async function handleOg(
     return statusResponse(404);
   }
 
-  const title = await readOgTitle(page);
-  if (!title) return statusResponse(404);
+  const meta = await readOgMeta(page);
+  if (!meta.title) return statusResponse(404);
+
+  // Render the version that the page declares, and no other. A request with another `v`, or with
+  // none, goes to the declared one, thus each page has one card in the cache.
+  const declared = declaredVersion(meta.image, incoming.pathname);
+  if (declared === null) return statusResponse(404);
+  if (declared !== version) {
+    const canonical = new URL(incoming);
+    canonical.search = '';
+    canonical.hash = '';
+    canonical.searchParams.set('v', declared);
+    return new Response(null, {
+      status: 301,
+      headers: withSecurityHeaders(
+        new Headers({ location: canonical.toString(), 'cache-control': SHORT })
+      ),
+    });
+  }
 
   let png: Uint8Array<ArrayBuffer>;
   try {
-    png = await render(title);
+    png = await render(meta.title);
   } catch (error) {
     // This is the only record of a render failure. The response is only a status line, and a
     // bad template shows only as a social embed with no image.

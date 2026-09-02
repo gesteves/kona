@@ -62,8 +62,16 @@ class TaxonomyConcepts < ApplicationService
     cached_json(CACHE_KEY, expires_in: CACHE_TTL) { fetch_concepts } || []
   end
 
+  # The most cursor pages to read. The taxonomy is small, and this stops a cursor that names
+  # itself.
+  MAX_PAGES = 20
+
   # Gets each concept from the delivery taxonomy endpoint, one cursor page at a time.
-  # @return [Array<Hash>]
+  #
+  # ⚠️ A page that fails gives nil, and not the pages before it. The caller caches the result for
+  # an hour, and a tree with a part absent would score each related list on a different taxonomy
+  # for that hour, with no message. `cached_json` does not store nil.
+  # @return [Array<Hash>, nil] The items, or nil when a page cannot be read.
   def fetch_concepts
     space = ENV["CONTENTFUL_SPACE"]
     token = ENV["CONTENTFUL_TOKEN"]
@@ -72,16 +80,19 @@ class TaxonomyConcepts < ApplicationService
     headers = { "Authorization" => "Bearer #{token}" }
     url = "#{DELIVERY_API_URL}/#{space}/environments/master/taxonomy/concepts?limit=1000"
     items = []
-    loop do
+    MAX_PAGES.times do
       body = get_json(url, headers: headers)
-      break if body.nil?
+      return nil if body.nil?
 
       items.concat(Array(body[:items]))
       nxt = body.dig(:pages, :next)
-      break if nxt.blank?
+      return items if nxt.blank?
+
       url = nxt.start_with?("http") ? nxt : "https://cdn.contentful.com#{nxt}"
     end
-    items
+
+    report_upstream_error("taxonomy pagination did not end", context: "TaxonomyConcepts pages")
+    nil
   end
 
   # Changes a localized field into its one value. A plain value does not change.

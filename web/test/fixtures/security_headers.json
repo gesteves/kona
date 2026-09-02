@@ -1,0 +1,8 @@
+{
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY",
+  "cross-origin-opener-policy": "same-origin-allow-popups",
+  "permissions-policy": "accelerometer=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()",
+  "strict-transport-security": "max-age=31536000; includeSubDomains"
+}

@@ -17,15 +17,18 @@ module ParallelUpstreams
   # @return [Hash{Symbol => Object}] The value of each block, under its key.
   def in_parallel(**blocks)
     threads = blocks.map do |key, block|
-      thread = Thread.new { Rails.application.executor.wrap { block.call } }
-      # The join below gets the failure, thus the stderr report of Ruby is a second copy.
-      thread.report_on_exception = false
+      thread = Thread.new do
+        # Thread#value below raises the error again, thus the stderr report of Ruby is a second
+        # copy. Set it in the thread, before the block can raise.
+        Thread.current.report_on_exception = false
+        Rails.application.executor.wrap { block.call }
+      end
       [ key, thread ]
     end
 
     # Join each thread before you read a value. Thread#value raises the error again, thus a read
     # first would leave the other threads in progress after the first failure.
-    threads.each { |(_, thread)| thread.join rescue nil }
+    threads.each { |(_, thread)| thread.join }
     threads.to_h { |key, thread| [ key, thread.value ] }
   end
 end

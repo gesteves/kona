@@ -4,5 +4,5 @@
     destination for a browser with no JavaScript. `wrapper_class`, which is a necessary local, is
     the list-item class of the menu that contains it. %>
 <li class="<%= wrapper_class %>">
-  <button type="button" data-controller="search" data-action="click->search#open pointerenter->search#preload focus->search#preload">Search</button>
+  <button type="button" aria-haspopup="dialog" data-controller="search" data-action="click->search#open pointerenter->search#preload focus->search#preload">Search</button>
 </li>

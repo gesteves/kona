@@ -53,6 +53,41 @@ RSpec.describe EventsHelper, type: :helper do
     DeepOstruct.wrap(sunrise: sunrise&.utc&.iso8601, sunset: sunset&.utc&.iso8601)
   end
 
+  describe "#event_forecast_day" do
+    # A WeatherKit day: `forecastStart` is the local midnight of the location, in UTC.
+    def forecast_days(zone, *dates)
+      dates.map do |date|
+        start = Time.find_zone!(zone).parse(date)
+        { forecast_start: start.utc.iso8601, forecast_end: (start + 1.day).utc.iso8601,
+          daytime_forecast: { condition_code: date } }
+      end
+    end
+
+    # ⚠️ For a race east of UTC, the UTC date of the local midnight is the day before. With that
+    # date, the race got the forecast of the next day, and a race west of UTC hid the mistake.
+    it "selects the day of the race in the timezone of its location, east and west of UTC" do
+      berlin = build_event(
+        date: "2026-06-05T09:00:00+02:00",
+        location: { time_zone: { time_zone_id: "Europe/Berlin" } },
+        weather: { forecast_daily: { days: forecast_days("Europe/Berlin", "2026-06-04", "2026-06-05", "2026-06-06") } }
+      )
+      expect(helper.event_forecast(berlin).condition_code).to eq("2026-06-05")
+
+      denver = build_event(
+        date: "2026-06-05T09:00:00-06:00",
+        location: { time_zone: { time_zone_id: "America/Denver" } },
+        weather: { forecast_daily: { days: forecast_days("America/Denver", "2026-06-04", "2026-06-05", "2026-06-06") } }
+      )
+      expect(helper.event_forecast(denver).condition_code).to eq("2026-06-05")
+    end
+
+    it "gives nil for an event with no weather, and for a day with no start" do
+      expect(helper.event_forecast_day(build_event)).to be_nil
+      broken = build_event(weather: { forecast_daily: { days: [ { forecast_end: "2026-06-06T06:00:00Z" } ] } })
+      expect(helper.event_forecast_day(broken)).to be_nil
+    end
+  end
+
   describe "#today?" do
     it "is false for a blank event" do
       expect(helper.today?(nil, time_zone)).to be(false)

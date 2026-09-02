@@ -35,6 +35,7 @@ interface CacheStorage {
 // character reference, and that is why og.ts also calls decodeEntities on the result.
 interface HTMLRewriterElement {
   getAttribute(name: string): string | null;
+  onEndTag(handler: (endTag: unknown) => void | Promise<void>): void;
 }
 
 interface HTMLRewriterElementHandlers {

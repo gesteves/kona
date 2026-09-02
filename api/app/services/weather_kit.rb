@@ -20,6 +20,10 @@ class WeatherKit < ApplicationService
   # One quick second attempt gets past a short problem and does not use much of the budget.
   RETRY_OPTIONS = { max: 1, base_delay: 0.25 }.freeze
 
+  # The time that a failure stays in the cache. It is a delay, and not a cache: without it, an
+  # outage costs the full retry budget on each request.
+  EMPTY_TTL = 1.minute
+
   # @param latitude [Float]
   # @param longitude [Float]
   # @param time_zone [String] An IANA timezone id.
@@ -47,7 +51,7 @@ class WeatherKit < ApplicationService
     return if @time_zone.blank? || @country.blank?
 
     cache_key = "weatherkit:weather:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
-    cached_json(cache_key, expires_in: 5.minutes) do
+    cached_json(cache_key, expires_in: 5.minutes, empty_expires_in: EMPTY_TTL) do
       with_retries(**RETRY_OPTIONS, deadline: remaining_budget) do
         datasets = availability
         next if datasets.blank?
@@ -58,10 +62,14 @@ class WeatherKit < ApplicationService
           timezone: @time_zone
         }
 
+        # A token that the code cannot sign gives a 401 on each attempt. Stop before the request.
+        jwt = token
+        next if jwt.blank?
+
         get_json!(
           "#{WEATHERKIT_API_URL}weather/en/#{@latitude}/#{@longitude}",
           query: query,
-          headers: { "Authorization" => "Bearer #{token}" },
+          headers: { "Authorization" => "Bearer #{jwt}" },
           timeout: HTTP_TIMEOUT
         )
       end
@@ -73,12 +81,16 @@ class WeatherKit < ApplicationService
   # @return [Array, nil]
   def availability
     cache_key = "weatherkit:availability:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
-    cached_json(cache_key, expires_in: 5.minutes) do
+    cached_json(cache_key, expires_in: 5.minutes, empty_expires_in: EMPTY_TTL) do
       with_retries(**RETRY_OPTIONS, deadline: remaining_budget) do
+        # A token that the code cannot sign gives a 401 on each attempt. Stop before the request.
+        jwt = token
+        next if jwt.blank?
+
         get_json!(
           "#{WEATHERKIT_API_URL}availability/#{@latitude}/#{@longitude}",
           query: { country: @country },
-          headers: { "Authorization" => "Bearer #{token}" },
+          headers: { "Authorization" => "Bearer #{jwt}" },
           timeout: HTTP_TIMEOUT
         )
       end

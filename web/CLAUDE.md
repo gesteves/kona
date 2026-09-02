@@ -84,12 +84,14 @@ the same time.
 
 ### Import subtasks
 
-`rake import` runs all four at the same time. `import:content` reads Contentful. `import:icons`
+`rake import` runs all five at the same time. `import:content` reads Contentful. `import:icons`
 posts the list in `data/font_awesome.yml` to the `/api/icons` of the api and writes
 `data/icons.json`. `import:standard_site` gets the DID and the publication URI from the api.
 `import:related` gets the order of the related articles, which the api makes from a BM25 index of
 the article text, and writes it to `data/related.json`. Each article uses that order for its "You May Also Like"
-section. There is also `rake redis:clear`.
+section. `import:schema` writes the Contentful GraphQL schema to
+`lib/data/graphql/contentful_schema.json`, which the data layer reads at its start. Git ignores that
+file, and with no file the data layer reads the live schema. There is also `rake redis:clear`.
 
 ⚠️ A failure in `import:icons` **raises**. Each page needs the icons, thus the build stops with a
 message and it does not send pages with an icon absent. `import:standard_site` and `import:related`
@@ -172,6 +174,9 @@ uses `open_graph_image_url`, which gives a Cloudflare Images URL.
 - **The title comes from the `og:title` of the page, through the `ASSETS` binding.** The Worker does
   not get it over HTTP. Thus the renderer can draw only a title that is in the deployment, and no
   text from a caller is in this path.
+- **The page names its own `v` in its og:image, and the Worker renders that version only.** A
+  request with another `v`, or with none, gets a 301 to the declared one, and a page whose og:image
+  is not this card gets a 404. Thus each page has one card in the cache, whatever a caller sends.
 - **The content addresses each article card**: a new publish increases `published_version` and gives
   a new URL. ⚠️ Increase `OG_TEMPLATE_VERSION` after you change `og-render.ts`,
   `src/assets/logo.png`, or the font. If you do not, the old cards, which the cache holds for a
@@ -304,8 +309,9 @@ path than production. Obey `.editorconfig`.
 
 The `checks` job of `.github/workflows/web.yml` does these same checks at each push to `main` and at
 each PR, and it **controls the deploy**. It runs **`bundle exec rspec`** directly, and not
-`rake test`: the Rakefile reads the live Contentful schema at its start, and rspec loads the specs
-only and needs no credentials.
+`rake test`: the Rakefile loads the data layer, and rspec loads the specs only and needs no
+credentials. After one `rake import`, the data layer reads the Contentful schema from
+`lib/data/graphql/contentful_schema.json` and `rake test` needs no network either.
 
 **`dependencies` against `devDependencies`**: the deploy job of CI installs with
 **`npm ci --omit=dev`**. Thus each package that the build or the deploy needs must be a

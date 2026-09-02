@@ -36,6 +36,13 @@ RSpec.describe Contentful do
       expect(transform(:set_entry_type, { intro: 'i', body: nil })[:entry_type]).to eq('Short')
     end
 
+    # The build is the gate: such an entry rendered an empty card in the list, the feed, and the
+    # sitemap, with no message.
+    it 'stops the build for an entry with a body and no intro, and names the entry' do
+      expect { transform(:set_entry_type, { slug: 'no-intro', intro: nil, body: 'b' }) }
+        .to raise_error(ArgumentError, /"no-intro"/)
+    end
+
     it 'uses an explicit type when given' do
       expect(transform(:set_entry_type, { intro: 'i', body: 'b' }, 'Page')[:entry_type]).to eq('Page')
     end

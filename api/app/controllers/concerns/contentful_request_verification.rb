@@ -11,6 +11,8 @@ module ContentfulRequestVerification
   # timestamp in the future. It is the same as the default of Contentful.
   TIMESTAMP_TTL = 30_000 # milliseconds
 
+  TIMESTAMP_HEADER = "x-contentful-timestamp".freeze
+
   private
 
   def verify_contentful_signature!
@@ -21,6 +23,9 @@ module ContentfulRequestVerification
     signed_headers = request.headers["x-contentful-signed-headers"].to_s
     timestamp = request.headers["x-contentful-timestamp"].to_s
     return head(:unauthorized) if signature.blank? || timestamp.blank?
+    # ⚠️ The signature must cover the timestamp. Without this, a captured request whose list omits
+    # it replays with a new timestamp for all time, and each replay is a deploy.
+    return head(:unauthorized) unless signed_header_names(signed_headers).include?(TIMESTAMP_HEADER)
     return head(:unauthorized) unless fresh_timestamp?(timestamp)
 
     expected = OpenSSL::HMAC.hexdigest("SHA256", secret, canonical_request(signed_headers))
@@ -40,10 +45,16 @@ module ContentfulRequestVerification
   # @param signed_headers [String] The header names to include, with a comma between them.
   # @return [String]
   def canonical_request(signed_headers)
-    headers = signed_headers.split(",").map(&:strip).reject(&:blank?).map do |name|
-      "#{name.downcase}:#{request.headers[name]}"
+    headers = signed_header_names(signed_headers).map do |name|
+      "#{name}:#{request.headers[name]}"
     end.join(";")
 
     [ request.request_method, request.fullpath, headers, request.raw_post ].join("\n")
+  end
+
+  # @param signed_headers [String] The x-contentful-signed-headers value.
+  # @return [Array<String>] The header names, in lower case and in the order of the list.
+  def signed_header_names(signed_headers)
+    signed_headers.split(",").map { |name| name.strip.downcase }.reject(&:blank?)
   end
 end

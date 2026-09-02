@@ -50,7 +50,7 @@ class GoogleMaps < ApplicationService
   # The country code of the coordinates.
   # @return [String, nil] The country code, or nil if it is not available.
   def country_code
-    geocoded&.dig(:address_components)&.find { |component| component[:types].include?("country") }&.dig(:short_name)
+    geocoded&.dig(:address_components)&.find { |component| component[:types]&.include?("country") }&.dig(:short_name)
   end
 
   private

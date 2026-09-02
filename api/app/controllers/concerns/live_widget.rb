@@ -46,6 +46,12 @@ module LiveWidget
   # placeholder and the widget goes away.
   def render_empty
     response.headers["CDN-Cache-Control"] = "public, max-age=#{EMPTY_TTL.to_i}"
+    # ⚠️ Replace the browser policy of cache_widget as well. With its stale-while-revalidate, a
+    # browser that holds an empty body shows it again for the full data TTL, and removes the widget
+    # while the revalidation gets content that nothing displays. Rails writes the header from
+    # `cache_control` at the end of the request, thus a direct write to the header does nothing.
+    response.cache_control.clear
+    expires_in 0, public: true, must_revalidate: true
     render plain: ""
   end
 

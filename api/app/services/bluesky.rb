@@ -198,7 +198,7 @@ class Bluesky < ApplicationService
     picture = download(url, max_bytes: MAX_CARD_IMAGE_BYTES,
                             headers: { "User-Agent" => OpenGraph::USER_AGENT },
                             open_timeout: OpenGraph::OPEN_TIMEOUT, read_timeout: OpenGraph::READ_TIMEOUT,
-                            follow_redirects: true, limit: 5)
+                            limit: 5)
     return if picture.nil?
 
     bytes = picture[:body]

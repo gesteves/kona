@@ -44,6 +44,14 @@ describe('units controller', () => {
     expect(element.textContent).toBe('42.2 km');
   });
 
+  it('reads the region through an extension subtag', async () => {
+    stubProperty(navigator, 'language', 'en-US-u-ca-gregory');
+
+    const { element } = await mountUnits();
+
+    expect(element.textContent).toBe('26.2 miles');
+  });
+
   it('renders metric for a bare language with no region', async () => {
     // 'en' is not 'en-us', thus an English locale with no region gets the metric units. That is
     // correct: only the region gives the answer.

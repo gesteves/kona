@@ -24,24 +24,6 @@ RSpec.describe BayHelper do
     end
   end
 
-  describe "#bay_current_state" do
-    def state_for(speed:, bearing:)
-      bay_helper.bay_current_state(DeepOstruct.wrap(current_speed_kt: speed, current_bearing_deg: bearing))
-    end
-
-    it "is slack below the slack-current threshold" do
-      expect(state_for(speed: 0.1, bearing: 110)).to eq(:slack)
-    end
-
-    it "is flood when the current sets toward the flood bearing" do
-      expect(state_for(speed: 1.0, bearing: 110)).to eq(:flood)
-    end
-
-    it "is ebb when the current sets opposite the flood bearing" do
-      expect(state_for(speed: 1.0, bearing: 290)).to eq(:ebb)
-    end
-  end
-
   describe "#format_bay_current_speed" do
     it "converts m/s to km/h and reuses the wind-speed unit toggle" do
       # 5 m/s is 18 km/h. format_wind_speed needs the view helpers, thus this uses a helper

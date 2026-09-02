@@ -8,10 +8,10 @@ RSpec.describe "Admin Mastodon connection", type: :request do
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
-    $redis.del(MastodonCredentials::REDIS_KEY, Admin::MastodonController::STATE_CACHE_KEY)
+    $redis.del(MastodonCredentials::REDIS_KEY)
   end
 
-  after { $redis.del(MastodonCredentials::REDIS_KEY, Admin::MastodonController::STATE_CACHE_KEY) }
+  after { $redis.del(MastodonCredentials::REDIS_KEY) }
 
   def sign_in! = sign_in_as(email: owner_email)
 
@@ -97,7 +97,7 @@ RSpec.describe "Admin Mastodon connection", type: :request do
       it "issues a one-time state and carries it in the URL" do
         post "/connected-apps/mastodon", params: { instance: "mastodon.social" }
 
-        state = $redis.get(Admin::MastodonController::STATE_CACHE_KEY)
+        state = session["mastodon_oauth_state"]["value"]
         expect(state).to be_present
         expect(response.location).to include("state=#{state}")
       end
@@ -134,13 +134,20 @@ RSpec.describe "Admin Mastodon connection", type: :request do
     before do
       sign_in!
       register_client!
-      $redis.setex(Admin::MastodonController::STATE_CACHE_KEY, 600, "the-state")
+    end
+
+    # The state that the instance must send back. The flow puts it in the session.
+    # @return [String]
+    let(:the_state) do
+      allow_any_instance_of(Mastodon).to receive(:register!).and_return(true)
+      post "/connected-apps/mastodon", params: { instance: "mastodon.social" }
+      session["mastodon_oauth_state"]["value"]
     end
 
     it "exchanges the code and returns to the Connected apps page" do
       expect_any_instance_of(Mastodon).to receive(:connect!).with("a-code").and_return(true)
 
-      get "/connected-apps/mastodon/callback", params: { code: "a-code", state: "the-state" }
+      get "/connected-apps/mastodon/callback", params: { code: "a-code", state: the_state }
 
       expect(response).to redirect_to("/connected-apps")
       expect(flash[:notice]).to eq(I18n.t("admin.mastodon.flash.connected"))
@@ -149,9 +156,21 @@ RSpec.describe "Admin Mastodon connection", type: :request do
     it "spends the state, thus a replay cannot connect again" do
       allow_any_instance_of(Mastodon).to receive(:connect!).and_return(true)
 
-      get "/connected-apps/mastodon/callback", params: { code: "a-code", state: "the-state" }
+      get "/connected-apps/mastodon/callback", params: { code: "a-code", state: the_state }
+      get "/connected-apps/mastodon/callback", params: { code: "a-code", state: the_state }
 
-      expect($redis.get(Admin::MastodonController::STATE_CACHE_KEY)).to be_nil
+      expect(flash[:alert]).to include(ERB::Util.html_escape(I18n.t("admin.oauth.invalid_state")))
+    end
+
+    it "keeps the state after a failed exchange, thus the owner can try again" do
+      # Each request makes a new Mastodon, thus the answers are counted here and not on one instance.
+      attempts = 0
+      allow_any_instance_of(Mastodon).to receive(:connect!) { (attempts += 1) > 1 }
+
+      get "/connected-apps/mastodon/callback", params: { code: "a-code", state: the_state }
+      get "/connected-apps/mastodon/callback", params: { code: "a-code", state: the_state }
+
+      expect(response).to redirect_to("/connected-apps")
     end
 
     it "refuses a code with the wrong state" do
@@ -164,7 +183,7 @@ RSpec.describe "Admin Mastodon connection", type: :request do
     end
 
     it "sends the owner back to the form when the instance denied the app" do
-      get "/connected-apps/mastodon/callback", params: { error: "access_denied", state: "the-state" }
+      get "/connected-apps/mastodon/callback", params: { error: "access_denied", state: the_state }
 
       expect(response).to redirect_to("/connected-apps/mastodon")
       expect(flash[:alert]).to include("access_denied")
@@ -173,7 +192,7 @@ RSpec.describe "Admin Mastodon connection", type: :request do
     it "sends the owner back to the form when the exchange fails" do
       allow_any_instance_of(Mastodon).to receive(:connect!).and_return(false)
 
-      get "/connected-apps/mastodon/callback", params: { code: "a-code", state: "the-state" }
+      get "/connected-apps/mastodon/callback", params: { code: "a-code", state: the_state }
 
       expect(response).to redirect_to("/connected-apps/mastodon")
       expect(flash[:alert]).to eq(I18n.t("admin.mastodon.flash.no_token"))

@@ -677,6 +677,30 @@ RSpec.describe MarkupHelpers do
     end
   end
 
+  describe '#prepend_title' do
+    it 'puts the title, with a full stop, at the start of the first paragraph' do
+      expect(prepend_title('Race day', '<p>It was hot.</p>')).to eq('<p><b>Race day.</b> It was hot.</p>')
+    end
+
+    it 'adds no full stop after punctuation and can hide the run-in from assistive technology' do
+      expect(prepend_title('Really?', '<p>Yes.</p>', hidden_from_at: true)).to eq('<p><b aria-hidden="true">Really?</b> Yes.</p>')
+    end
+
+    it 'makes a paragraph when the body does not start with one' do
+      expect(prepend_title('Race day', '<ul><li>A</li></ul>')).to eq('<p><b>Race day.</b></p><ul><li>A</li></ul>')
+    end
+
+    it 'makes a paragraph when the body is empty' do
+      expect(prepend_title('Race day', '')).to eq('<p><b>Race day.</b></p>')
+    end
+
+    # The title comes from smartypants, thus it holds entities and no escape.
+    it 'keeps the entities of smartypants and escapes the markup characters of the title' do
+      expect(prepend_title('It&rsquo;s "big" <b>x</b> &amp; y', '<p>Body.</p>'))
+        .to eq('<p><b>It’s "big" &lt;b&gt;x&lt;/b&gt; &amp; y.</b> Body.</p>')
+    end
+  end
+
   describe '#copy_feed_links' do
     it 'wires feed links to the clipboard controller with the success message' do
       html = '<a href="https://example.com/feed.xml">Subscribe</a>'

@@ -7,10 +7,11 @@ module LocationHelper
     components = location.geocoded&.address_components
     return if components.blank?
 
-    city = components.find { |c| c.types.include?("locality") }&.long_name || components.find { |c| c.types.include?("sublocality") }&.long_name
-    region = components.find { |c| c.types.include?("administrative_area_level_1") }&.long_name
-    county = components.find { |c| c.types.include?("administrative_area_level_2") }&.long_name
-    country = components.find { |c| c.types.include?("country") }&.long_name
+    # A component can have no `types`, thus the safe call.
+    city = components.find { |c| c.types&.include?("locality") }&.long_name || components.find { |c| c.types&.include?("sublocality") }&.long_name
+    region = components.find { |c| c.types&.include?("administrative_area_level_1") }&.long_name
+    county = components.find { |c| c.types&.include?("administrative_area_level_2") }&.long_name
+    country = components.find { |c| c.types&.include?("country") }&.long_name
 
     # Use a curly apostrophe, thus a name such as "Coeur d'Alene" is correct.
     city = city&.gsub("'", "’")

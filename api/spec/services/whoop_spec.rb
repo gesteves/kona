@@ -25,6 +25,11 @@ RSpec.describe Whoop do
     service.send(:get_access_token)
   end
 
+  # Matches a Redis value that holds the given token, encrypted.
+  def sealed(token)
+    satisfy("an encrypted #{token}") { |value| value != token && WhoopCredentials.open(value) == token }
+  end
+
   describe "#connected?" do
     it "is true when a refresh token is stored" do
       allow($redis).to receive(:exists?).with(refresh_token_key).and_return(true)
@@ -129,12 +134,22 @@ RSpec.describe Whoop do
         allow(HTTParty).to receive(:post).and_return(token_response)
       end
 
+      it "sends the stored refresh token, decrypted, and reads one stored before the encryption as it is" do
+        allow($redis).to receive(:get).with(refresh_token_key).and_return(WhoopCredentials.seal("current-refresh"))
+        get_access_token
+        expect(HTTParty).to have_received(:post).with(anything, hash_including(body: hash_including("refresh_token" => "current-refresh")))
+
+        allow($redis).to receive(:get).with(refresh_token_key).and_return("plain-refresh")
+        get_access_token
+        expect(HTTParty).to have_received(:post).with(anything, hash_including(body: hash_including("refresh_token" => "plain-refresh")))
+      end
+
       it "takes the lock, refreshes, stores the rotated tokens, and releases the lock" do
         expect(get_access_token).to eq("fresh-token")
 
         expect($redis).to have_received(:set).with(lock_key, "1", nx: true, ex: kind_of(Integer))
-        expect($redis).to have_received(:setex).with(access_token_key, 3540, "fresh-token")
-        expect($redis).to have_received(:set).with(refresh_token_key, "rotated-refresh")
+        expect($redis).to have_received(:setex).with(access_token_key, 3540, sealed("fresh-token"))
+        expect($redis).to have_received(:set).with(refresh_token_key, sealed("rotated-refresh"))
         expect($redis).to have_received(:del).with(lock_key)
       end
 
@@ -198,7 +213,7 @@ RSpec.describe Whoop do
 
       expect(service.refresh_tokens!).to eq("fresh-token")
       expect(HTTParty).to have_received(:post)
-      expect($redis).to have_received(:set).with(refresh_token_key, "rotated-refresh")
+      expect($redis).to have_received(:set).with(refresh_token_key, sealed("rotated-refresh"))
       expect($redis).to have_received(:del).with(lock_key)
     end
 

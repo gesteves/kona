@@ -1,4 +1,5 @@
 require "cgi"
+require "htmlentities"
 require "nokogiri"
 
 # Renders Markdown bodies and does the HTML transformations that the Contentful editor cannot
@@ -99,19 +100,22 @@ module MarkupHelpers
   def prepend_title(title, html, hidden_from_at: false)
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
 
+    # ⚠️ The title arrives from `smartypants`, thus it holds entities and no escape. Decode them,
+    # then escape the text: a `<` or a `"` in a Contentful title must not become markup.
+    plain = HTMLEntities.new.decode(title.to_s)
+    plain = "#{plain}." if plain.match?(/[a-zA-Z0-9]\z/)
     aria = hidden_from_at ? ' aria-hidden="true"' : ""
-    if title.match?(/[a-zA-Z0-9]$/)
-      formatted_title = "<b#{aria}>#{title}.</b>"
-    else
-      formatted_title = "<b#{aria}>#{title}</b>"
-    end
+    formatted_title = "<b#{aria}>#{CGI.escapeHTML(plain)}</b>"
 
-    if doc.children.first.name == "p"
-      first_p = doc.children.first
-      first_p.inner_html = "#{formatted_title} #{first_p.inner_html}"
+    first = doc.children.first
+    if first.nil?
+      # An intro that renders nothing gives an empty fragment. The run-in is then the full body.
+      doc = Nokogiri::HTML::DocumentFragment.parse("<p>#{formatted_title}</p>")
+    elsif first.name == "p"
+      first.inner_html = "#{formatted_title} #{first.inner_html}"
     else
       new_p = Nokogiri::HTML::DocumentFragment.parse("<p>#{formatted_title}</p>").children.first
-      doc.children.first.add_previous_sibling(new_p)
+      first.add_previous_sibling(new_p)
     end
 
     doc.to_html

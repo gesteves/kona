@@ -175,6 +175,26 @@ RSpec.describe StaticMap do
       expect(HTTParty).to have_received(:get).exactly(3).times
     end
 
+    # ⚠️ The request has a 20-second budget, and its timeout is not a StandardError. Thus the
+    # attempts must end before it.
+    it "gives up before the render deadline instead of starting an attempt that cannot end in time" do
+      response = instance_double(HTTParty::Response, success?: false, code: 502, body: "{}")
+      allow(HTTParty).to receive(:get).and_return(response)
+      allow_any_instance_of(described_class).to receive(:sleep)
+      clock = [ 0, described_class::RENDER_DEADLINE - 1 ]
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC) { clock.shift || clock.last }
+
+      expect { map.render }.to raise_error(described_class::RenderError)
+      expect(HTTParty).to have_received(:get).once
+    end
+
+    # The deadline check counts the timeout of the next attempt, thus the deadline itself is the
+    # most time that a render can take.
+    it "keeps its deadline below the request timeout" do
+      expect(described_class::RENDER_DEADLINE).to be < 20
+      expect(described_class::HTTP_TIMEOUT + 1).to be < described_class::RENDER_DEADLINE
+    end
+
     it "surfaces Mapbox's own message on a client error" do
       response = instance_double(HTTParty::Response, success?: false, code: 422,
         body: { message: "Tileset not found" }.to_json)

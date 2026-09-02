@@ -96,12 +96,18 @@ module WeatherHelper
     CONDITIONS.dig(condition_code.to_sym, :phrases, :currently) || "it's #{condition_code.underscore.gsub('_', ' ')}"
   end
 
+  # ⚠️ This accepts nil, for the same reason as format_temperature.
   def format_forecasted_condition(condition_code)
-    CONDITIONS.dig(condition_code&.to_sym, :phrases, :forecast) || "calls for #{condition_code.underscore.gsub('_', ' ')}"
+    return if condition_code.blank?
+
+    CONDITIONS.dig(condition_code.to_sym, :phrases, :forecast) || "calls for #{condition_code.underscore.gsub('_', ' ')}"
   end
 
+  # ⚠️ This accepts nil, for the same reason as format_temperature.
   def format_condition(condition_code)
-    CONDITIONS.dig(condition_code&.to_sym, :phrases, :simplified) || condition_code.underscore.gsub("_", " ")
+    return if condition_code.blank?
+
+    CONDITIONS.dig(condition_code.to_sym, :phrases, :simplified) || condition_code.underscore.gsub("_", " ")
   end
 
   # ⚠️ This returns nil for a reading that is absent, and it does not raise. Each upstream service
@@ -115,7 +121,10 @@ module WeatherHelper
     units_tag(celsius, fahrenheit)
   end
 
+  # ⚠️ This accepts nil, for the same reason as format_temperature.
   def format_precipitation_amount(mm)
+    return if mm.blank?
+
     metric = if mm < 10
       "less than a centimeter"
     else
@@ -127,7 +136,7 @@ module WeatherHelper
     imperial = if inches < 1
       "less than an inch"
     else
-      human_inches = number_to_human(inches, precision: (inches < 1 ? 1 : 0), strip_insignificant_zeros: true, significant: false, delimiter: ",")
+      human_inches = number_to_human(inches, precision: 0, strip_insignificant_zeros: true, significant: false, delimiter: ",")
       amount = human_inches == "1" ? "#{human_inches} inch" : "#{human_inches} inches"
       "about #{amount}"
     end
@@ -135,7 +144,10 @@ module WeatherHelper
     units_tag(metric, imperial)
   end
 
+  # ⚠️ This accepts nil, for the same reason as format_temperature.
   def format_precipitation_type(type)
+    return if type.blank?
+
     case type.downcase
     when "clear"
       "precipitation"
@@ -181,23 +193,24 @@ module WeatherHelper
     gusts_knots >= 16 && gusts_knots >= wind_speed_knots + 9
   end
 
+  # Each band is half open, thus a value on a boundary goes to the next point of the compass.
   def wind_direction(degrees, abbreviated = false)
     case degrees
-    when 0..22.5, 337.5..360
+    when 0...22.5, 337.5..360
       abbreviated ? "N" : "North"
-    when 22.5..67.5
+    when 22.5...67.5
       abbreviated ? "NE" : "Northeast"
-    when 67.5..112.5
+    when 67.5...112.5
       abbreviated ? "E" : "East"
-    when 112.5..157.5
+    when 112.5...157.5
       abbreviated ? "SE" : "Southeast"
-    when 157.5..202.5
+    when 157.5...202.5
       abbreviated ? "S" : "South"
-    when 202.5..247.5
+    when 202.5...247.5
       abbreviated ? "SW" : "Southwest"
-    when 247.5..292.5
+    when 247.5...292.5
       abbreviated ? "W" : "West"
-    when 292.5..337.5
+    when 292.5...337.5
       abbreviated ? "NW" : "Northwest"
     end
   end
@@ -252,12 +265,13 @@ module WeatherHelper
     # Without this, an AQI that is absent goes to the `else` and shows as dangerous air.
     return "sun-haze" if aqi.blank?
 
+    # The bands take a fraction: an AQI can be a float.
     case aqi
-    when 0..50
+    when ..50
       "sun-haze"
-    when 51..150
+    when ..150
       "smog"
-    when 151..200
+    when ..200
       "smoke"
     else
       "fire-smoke"
