@@ -16,12 +16,12 @@ module Admin
     # POST /republish
     def create
       minutes = delay_minutes
-      return redirect_with(alert: t("admin.republish.flash.out_of_range", min: MIN_MINUTES, max: MAX_MINUTES)) if minutes.nil?
+      return refuse(t("admin.republish.toast.out_of_range", min: MIN_MINUTES, max: MAX_MINUTES)) if minutes.nil?
       return build_now if minutes.zero?
 
       replaced = SiteBuildJob.schedule_in(minutes.minutes, SiteBuildJob::ADMIN_EVENT_TYPE)
       key = replaced ? "rescheduled" : "scheduled"
-      redirect_with(notice: t("admin.republish.flash.#{key}", count: minutes))
+      accept(t("admin.republish.toast.#{key}", count: minutes))
     end
 
     private
@@ -36,12 +36,12 @@ module Admin
     def build_now
       unless SiteBuildJob.claim_trigger_lock
         seconds = SiteBuildJob::TRIGGER_LOCK_TTL.to_i
-        return redirect_with(alert: t("admin.republish.flash.already_started", count: seconds))
+        return refuse(t("admin.republish.toast.already_started", count: seconds))
       end
 
       cancelled = SiteBuildJob.cancel_scheduled
       SiteBuildJob.perform_async(SiteBuildJob::ADMIN_EVENT_TYPE)
-      redirect_with(notice: t("admin.republish.flash.#{cancelled ? "now_cancelled" : "now"}"))
+      accept(t("admin.republish.toast.#{cancelled ? "now_cancelled" : "now"}"))
     end
 
     # Reads the delay of the form.
@@ -57,9 +57,14 @@ module Admin
       minutes.between?(MIN_MINUTES, MAX_MINUTES) ? minutes : nil
     end
 
-    # Goes back to the page that holds the dialog, because the nav is on each admin page.
-    def redirect_with(**flash_options)
-      redirect_back_or_to root_path, status: :see_other, **flash_options
+    # @param message [String] The words of the toast.
+    def accept(message)
+      render json: { message: message }
+    end
+
+    # @param message [String] The words of the toast.
+    def refuse(message)
+      render json: { message: message }, status: :unprocessable_content
     end
   end
 end

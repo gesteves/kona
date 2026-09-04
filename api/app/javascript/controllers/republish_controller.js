@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus";
 import { i18nTable, t } from "../lib/i18n";
+import { toast } from "../lib/toast";
 
 /**
  * The Republish dialog: one delay in minutes, where zero is "now".
@@ -8,14 +9,15 @@ import { i18nTable, t } from "../lib/i18n";
  * that tells the owner "now" from "later", thus it must follow each edit of the field.
  */
 export default class extends Controller {
-  static targets = ["form", "minutes", "submit", "label"];
+  static targets = ["form", "minutes", "label"];
 
   connect() {
     // ⚠️ The words come from the locale file, through the `data-admin-i18n` attribute. Read the
     // table here: it is synchronous, and `relabel` runs at each keystroke.
     this.words = i18nTable(this.element);
-    // A restoration visit of Turbo can render a snapshot that has the button in its busy state.
-    this.submitTarget.loading = false;
+    // ⚠️ The attribute, and not the property: it is the value that the server rendered, thus a
+    // submit can put it back after the owner picked another delay.
+    this.defaultMinutes = this.minutesTarget.getAttribute("value");
     // ⚠️ It waits for the definition. Before the upgrade, `value` of the field is undefined, and the
     // label would then stay at the plain word for a value that is correct.
     customElements.whenDefined("wa-number-input").then(() => this.relabel());
@@ -54,10 +56,55 @@ export default class extends Controller {
   }
 
   /**
-   * Makes the submit button busy, because the POST goes on to a full page load.
+   * Starts the republish with fetch, closes the dialog, and puts the answer in a toast.
+   *
+   * ⚠️ **It stops the native submit.** A submit that goes through navigates the admin, and the page
+   * below the dialog renders again. The owner opens this dialog from each admin page, thus that
+   * navigation would take away a draft of the Social media page that nothing has saved.
+   *
+   * ⚠️ It sends the CSRF token in a header. The admin does not skip the forgery protection.
+   * @param {SubmitEvent} event
    */
-  markBusy() {
-    this.submitTarget.loading = true;
+  async submit(event) {
+    event.preventDefault();
+    this.close();
+
+    try {
+      const response = await fetch(this.formTarget.action, {
+        method: "POST",
+        headers: { Accept: "application/json", ...this.csrfHeader },
+        body: new FormData(this.formTarget),
+      });
+      const answer = await response.json().catch(() => ({}));
+      toast(answer.message || t(this.words, "unreachable"), response.ok ? "success" : "danger");
+    } catch {
+      toast(t(this.words, "unreachable"), "danger");
+    }
+  }
+
+  /**
+   * Closes the dialog and puts the delay back to the value of the server.
+   *
+   * ⚠️ The dialog stays in the DOM after a submit, thus a delay that the owner picked one time
+   * would still be there the next time that they open it.
+   */
+  close() {
+    this.element.open = false;
+    this.minutesTarget.value = this.defaultMinutes;
+    this.relabel();
+  }
+
+  /**
+   * The CSRF token of the page, as a header.
+   *
+   * ⚠️ `csrf_meta_tags` renders nothing where the forgery protection is off, which is the test
+   * environment. Thus this gives an empty object there and the header is absent.
+   * @returns {object}
+   */
+  get csrfHeader() {
+    const token = document.querySelector("meta[name='csrf-token']")?.content;
+
+    return token ? { "X-CSRF-Token": token } : {};
   }
 
   /**

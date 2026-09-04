@@ -19,6 +19,11 @@ RSpec.describe "Admin republish", type: :request do
     sign_in_as(email: owner_email)
   end
 
+  # The words that the dialog puts in a toast.
+  def message
+    response.parsed_body["message"]
+  end
+
   describe "the nav item and the dialog" do
     before { sign_in! }
 
@@ -42,6 +47,8 @@ RSpec.describe "Admin republish", type: :request do
       expect(response.body).to include('form="republish-form"')
       # One control, and no radio group: a delay of zero is "now".
       expect(response.body).to include('<wa-number-input name="minutes"')
+      # ⚠️ The submit is a fetch, thus the page below the dialog stays.
+      expect(response.body).to include(ERB::Util.html_escape("submit->republish#submit"))
       expect(response.body).not_to include("<wa-radio")
       # wa-button renders its own button in a shadow root, thus no code here has a native one.
       expect(response.body).not_to include("<button")
@@ -51,6 +58,8 @@ RSpec.describe "Admin republish", type: :request do
   describe "POST /republish" do
     before { sign_in! }
 
+    # ⚠️ The dialog posts with fetch and the page below it stays. Thus the answer is JSON and there
+    # is no redirect and no flash: a flash would appear at the next navigation of that page.
     it "builds now for a delay of zero, and takes the shared lock" do
       expect($redis).to receive(:set).with("build:trigger_lock", "1", nx: true, ex: 60).and_return(true)
 
@@ -58,15 +67,16 @@ RSpec.describe "Admin republish", type: :request do
 
       expect(SiteBuildJob).to have_enqueued_sidekiq_job("admin-republish")
       expect(SiteBuildJob.jobs.first["at"]).to be_nil
-      expect(response).to have_http_status(:see_other)
-      expect(response).to redirect_to("/")
-      expect(flash[:notice]).to eq(I18n.t("admin.republish.flash.now"))
+      expect(response).to have_http_status(:ok)
+      expect(message).to eq(I18n.t("admin.republish.toast.now"))
     end
 
-    it "goes back to the page that opened the dialog" do
+    it "answers with JSON and never a redirect, thus the page below the dialog stays" do
       post "/republish", params: { minutes: "0" }, headers: { "HTTP_REFERER" => "http://www.example.com/spam" }
 
-      expect(response).to redirect_to("http://www.example.com/spam")
+      expect(response.media_type).to eq("application/json")
+      expect(response).not_to have_http_status(:redirect)
+      expect(flash).to be_empty
     end
 
     it "queues nothing while another build holds the lock" do
@@ -75,7 +85,8 @@ RSpec.describe "Admin republish", type: :request do
       post "/republish", params: { minutes: "0" }
 
       expect(SiteBuildJob.jobs).to be_empty
-      expect(flash[:alert]).to eq(I18n.t("admin.republish.flash.already_started", count: SiteBuildJob::TRIGGER_LOCK_TTL.to_i))
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(message).to eq(I18n.t("admin.republish.toast.already_started", count: SiteBuildJob::TRIGGER_LOCK_TTL.to_i))
     end
 
     # ⚠️ The lock comes first. In the other order, a click inside the window of the lock would
@@ -93,13 +104,13 @@ RSpec.describe "Admin republish", type: :request do
       end
 
       expect(SiteBuildJob).to have_enqueued_sidekiq_job("admin-republish").at(Time.utc(2026, 8, 24, 12, 15, 0))
-      expect(flash[:notice]).to eq(I18n.t("admin.republish.flash.scheduled", count: 15))
+      expect(message).to eq(I18n.t("admin.republish.toast.scheduled", count: 15))
     end
 
     it "says one minute in the singular" do
       post "/republish", params: { minutes: "1" }
 
-      expect(flash[:notice]).to eq(I18n.t("admin.republish.flash.scheduled", count: 1))
+      expect(message).to eq(I18n.t("admin.republish.toast.scheduled", count: 1))
     end
 
     it "says that it replaced the build that was scheduled" do
@@ -107,7 +118,7 @@ RSpec.describe "Admin republish", type: :request do
 
       post "/republish", params: { minutes: "10" }
 
-      expect(flash[:notice]).to eq(I18n.t("admin.republish.flash.rescheduled", count: 10))
+      expect(message).to eq(I18n.t("admin.republish.toast.rescheduled", count: 10))
     end
 
     it "says that an immediate build cancelled the one that was scheduled" do
@@ -115,21 +126,23 @@ RSpec.describe "Admin republish", type: :request do
 
       post "/republish", params: { minutes: "0" }
 
-      expect(flash[:notice]).to eq(I18n.t("admin.republish.flash.now_cancelled"))
+      expect(message).to eq(I18n.t("admin.republish.toast.now_cancelled"))
     end
 
     it "refuses a number of minutes above the maximum" do
       post "/republish", params: { minutes: "61" }
 
       expect(SiteBuildJob.jobs).to be_empty
-      expect(flash[:alert]).to eq(I18n.t("admin.republish.flash.out_of_range", min: Admin::RepublishController::MIN_MINUTES, max: Admin::RepublishController::MAX_MINUTES))
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(message).to eq(I18n.t("admin.republish.toast.out_of_range", min: Admin::RepublishController::MIN_MINUTES, max: Admin::RepublishController::MAX_MINUTES))
     end
 
     it "refuses a negative number" do
       post "/republish", params: { minutes: "-1" }
 
       expect(SiteBuildJob.jobs).to be_empty
-      expect(flash[:alert]).to eq(I18n.t("admin.republish.flash.out_of_range", min: Admin::RepublishController::MIN_MINUTES, max: Admin::RepublishController::MAX_MINUTES))
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(message).to eq(I18n.t("admin.republish.toast.out_of_range", min: Admin::RepublishController::MIN_MINUTES, max: Admin::RepublishController::MAX_MINUTES))
     end
 
     # ⚠️ `to_i` reads "5.9" as 5 and "soon" as 0, and 0 starts a build.
@@ -137,21 +150,24 @@ RSpec.describe "Admin republish", type: :request do
       post "/republish", params: { minutes: "5.9" }
 
       expect(SiteBuildJob.jobs).to be_empty
-      expect(flash[:alert]).to eq(I18n.t("admin.republish.flash.out_of_range", min: Admin::RepublishController::MIN_MINUTES, max: Admin::RepublishController::MAX_MINUTES))
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(message).to eq(I18n.t("admin.republish.toast.out_of_range", min: Admin::RepublishController::MIN_MINUTES, max: Admin::RepublishController::MAX_MINUTES))
     end
 
     it "refuses a value that is not a number" do
       post "/republish", params: { minutes: "soon" }
 
       expect(SiteBuildJob.jobs).to be_empty
-      expect(flash[:alert]).to eq(I18n.t("admin.republish.flash.out_of_range", min: Admin::RepublishController::MIN_MINUTES, max: Admin::RepublishController::MAX_MINUTES))
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(message).to eq(I18n.t("admin.republish.toast.out_of_range", min: Admin::RepublishController::MIN_MINUTES, max: Admin::RepublishController::MAX_MINUTES))
     end
 
     it "refuses a value that is absent" do
       post "/republish", params: {}
 
       expect(SiteBuildJob.jobs).to be_empty
-      expect(flash[:alert]).to eq(I18n.t("admin.republish.flash.out_of_range", min: Admin::RepublishController::MIN_MINUTES, max: Admin::RepublishController::MAX_MINUTES))
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(message).to eq(I18n.t("admin.republish.toast.out_of_range", min: Admin::RepublishController::MIN_MINUTES, max: Admin::RepublishController::MAX_MINUTES))
     end
   end
 

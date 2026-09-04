@@ -72,5 +72,10 @@
     <%# The Republish dialog, which the nav item of the same name opens. It is outside <wa-page>, on
         purpose: refer to the comment at the top of the partial. %>
     <%= render "layouts/republish_dialog" %>
+
+    <%# The toast stack. It is a sibling of <wa-page> for the same reason as the dialog, and the
+        layout renders it one time, thus each page and the Republish dialog write into this stack.
+        app/javascript/lib/toast.js finds it by this id. %>
+    <wa-toast id="notifications" placement="bottom-end" data-controller="toast"></wa-toast>
   </body>
 </html>

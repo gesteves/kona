@@ -44,6 +44,8 @@ import "@web.awesome.me/webawesome-pro/dist/components/option/option.js";
 import "@web.awesome.me/webawesome-pro/dist/components/switch/switch.js";
 // The "Processing" state of a track on the Course maps page.
 import "@web.awesome.me/webawesome-pro/dist/components/spinner/spinner.js";
+// The messages of the admin, in the corner. wa-toast imports wa-toast-item.
+import "@web.awesome.me/webawesome-pro/dist/components/toast/toast.js";
 // The ring beside the character count of the Social media page.
 import "@web.awesome.me/webawesome-pro/dist/components/progress-ring/progress-ring.js";
 // The Social media page.
@@ -67,6 +69,7 @@ import MapStatusController from "./controllers/map_status_controller";
 import MapPreviewController from "./controllers/map_preview_controller";
 import LinkedSidesController from "./controllers/linked_sides_controller";
 import RepublishController from "./controllers/republish_controller";
+import ToastController from "./controllers/toast_controller";
 import SocialController from "./controllers/social_controller";
 import SocialPostController from "./controllers/social_post_controller";
 
@@ -81,5 +84,6 @@ application.register("map-status", MapStatusController);
 application.register("map-preview", MapPreviewController);
 application.register("linked-sides", LinkedSidesController);
 application.register("republish", RepublishController);
+application.register("toast", ToastController);
 application.register("social", SocialController);
 application.register("social-post", SocialPostController);

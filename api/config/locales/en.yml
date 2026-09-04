@@ -215,7 +215,9 @@ en:
     # ⚠️ Each key is a COMPLETE sentence. An earlier version made one from a verb and a plural word,
     # thus no reader could find the words of the message in the code.
     republish:
-      flash:
+      # The dialog posts with fetch and shows each of these in a toast. Refer to
+      # app/javascript/controllers/republish_controller.js.
+      toast:
         already_started:
           one: "A republish already started in the last second."
           other: "A republish already started in the last %{count} seconds."
@@ -466,6 +468,8 @@ en:
         scheduled:
           one: "Republish in 1 minute"
           other: "Republish in %{count} minutes"
+        # The POST did not reach the server, thus nothing started.
+        unreachable: "Couldn't reach the server. Nothing was republished."
       social:
         # The two fields are not complete yet, thus the label cannot name a moment.
         incomplete: "Schedule"

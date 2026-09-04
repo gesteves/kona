@@ -11,7 +11,7 @@
   <%# One control, and no radio group: a delay of zero minutes is "now". The label of the submit
       button says which of the two the value gives. %>
   <%= form_with url: republish_path, method: :post, id: "republish-form",
-                data: { republish_target: "form", action: "submit->republish#markBusy" } do %>
+                data: { republish_target: "form", action: "submit->republish#submit" } do %>
     <wa-number-input name="minutes" label="<%= t("admin.republish_dialog.minutes") %>" required
                      value="<%= Admin::RepublishController::DEFAULT_MINUTES %>"
                      min="<%= Admin::RepublishController::MIN_MINUTES %>"
@@ -23,8 +23,7 @@
   <% end %>
 
   <wa-button slot="footer" appearance="outlined" data-dialog="close"><%= t("admin.republish_dialog.cancel") %></wa-button>
-  <wa-button slot="footer" type="submit" form="republish-form" variant="brand" appearance="accent"
-             data-republish-target="submit">
+  <wa-button slot="footer" type="submit" form="republish-form" variant="brand" appearance="accent">
     <%= slotted_icon_svg("classic", "light", "arrows-rotate") %>
     <span data-republish-target="label"><%= t("admin.republish_dialog.submit") %></span>
   </wa-button>

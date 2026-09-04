@@ -67,7 +67,7 @@ edge serves a cached copy before it gets a new one.
 | GET/POST/DELETE | `/connected-apps/trainerroad` | the TrainerRoad calendar-URL form, and disconnect | `no-store` |
 | GET | `/location/lookup` | resolves an `address` or a coordinate pair to `{latitude, longitude, place}`. ⚠️ **Never writes** | `no-store` |
 | POST | `/location` | same write as `POST /api/location`, coordinates only; answers with the coordinates and the geocoded place | `no-store` |
-| POST | `/republish` | starts a build of the web site after the minutes that the owner picks, where zero is now. The Republish dialog of the nav posts here | `no-store` |
+| POST | `/republish` | starts a build of the web site after the minutes that the owner picks, where zero is now. The Republish dialog of the nav posts here with fetch, and the answer is JSON | `no-store` |
 | POST | `/course-maps`; PATCH/DELETE `/course-maps/:id`; GET `/course-maps/status` | upload GPX tracks, save render settings, delete a track, poll publish status | `no-store` |
 | GET | `/course-maps/:id/preview`, `/course-maps/:id/download` | the rendered PNG, proxied from Mapbox; same render, only the disposition differs | `no-store` |
 | — | `/sidekiq` | job dashboard (owner-session gated) | — |
@@ -612,6 +612,14 @@ surfaces, to the exact firebrick. That color is also the color of the Turbo prog
 logo on hover. ⚠️ Do not write the other ten steps of the ramp by hand, because the palette gives
 the correct values.
 
+**The messages.** There are two, and each one has its own place. A **flash** is a `<wa-callout>` at
+the top of the page, for an action that navigates. A **toast** is a `<wa-toast-item>` in the corner,
+for an action that fetches and leaves the page as it is. The layout renders the stack one time, as
+`<wa-toast id="notifications">`, and `app/javascript/lib/toast.js` writes into it. Today the
+Republish dialog is the one caller. ⚠️ **The `toast` Stimulus controller empties that stack before
+Turbo caches the page**, because the countdown of an item stops when Turbo disconnects the DOM and
+never starts again. The flash controller and the dialog controller exist for the same problem.
+
 **The layouts** are `layouts/admin.html.erb`, which is the `<wa-page>` shell, and
 `layouts/auth.html.erb`, which is the sign-in page and has the Google button only, with no heading
 and no text. Both use `layouts/_head.html.erb`. ⚠️ **Neither one has the name `application`**,
@@ -681,6 +689,12 @@ build of the web site, after 0 to 60 minutes. The rules of that dialog:
 - **The field submits the form on Enter**, because the submit button is in a slot outside that form.
   The controller stops the default action first, thus one Enter gives one submit whether or not the
   browser finds the button through its `form` attribute.
+- ⚠️ **The submit is a fetch, and the action answers with JSON and never a redirect.** The dialog
+  closes and the page below it stays. That page can hold work that nothing saved — a draft of the
+  Social media page is 300 characters and a link — and a navigation would take it away. Thus there
+  is also **no flash**: the words go in a toast, which is the answer of that one request.
+  `republish_controller.js` sends the CSRF token in a header, because the admin does not skip the
+  forgery protection.
 
 A group is only a caption above its own `<ul>` of those same links:
 
