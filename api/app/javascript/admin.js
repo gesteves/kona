@@ -62,7 +62,6 @@ import "@web.awesome.me/webawesome-pro/dist/components/tab-panel/tab-panel.js";
 import "@web.awesome.me/webawesome-pro/dist/components/date-input/date-input.js";
 import "@web.awesome.me/webawesome-pro/dist/components/time-input/time-input.js";
 
-import FlashController from "./controllers/flash_controller";
 import DialogController from "./controllers/dialog_controller";
 import LocationMapController from "./controllers/location_map_controller";
 import MapStatusController from "./controllers/map_status_controller";
@@ -77,7 +76,6 @@ import SocialPostController from "./controllers/social_post_controller";
 // controller through the local variable, because a static analysis cannot see the global.
 const application = Application.start();
 window.Stimulus = application;
-application.register("flash", FlashController);
 application.register("dialog", DialogController);
 application.register("location-map", LocationMapController);
 application.register("map-status", MapStatusController);

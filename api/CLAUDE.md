@@ -612,13 +612,30 @@ surfaces, to the exact firebrick. That color is also the color of the Turbo prog
 logo on hover. ⚠️ Do not write the other ten steps of the ramp by hand, because the palette gives
 the correct values.
 
-**The messages.** There are two, and each one has its own place. A **flash** is a `<wa-callout>` at
-the top of the page, for an action that navigates. A **toast** is a `<wa-toast-item>` in the corner,
-for an action that fetches and leaves the page as it is. The layout renders the stack one time, as
-`<wa-toast id="notifications">`, and `app/javascript/lib/toast.js` writes into it. Today the
-Republish dialog is the one caller. ⚠️ **The `toast` Stimulus controller empties that stack before
-Turbo caches the page**, because the countdown of an item stops when Turbo disconnects the DOM and
-never starts again. The flash controller and the dialog controller exist for the same problem.
+**The messages.** ⚠️ **Each message that an action gives is a TOAST, and there is no flash callout.**
+The layout renders the stack one time, as `<wa-toast id="notifications">`, outside `<wa-page>` for
+the same reason as the dialog. Two things write into it, and the Rails `flash` continues to carry
+the words of an action that redirects:
+
+- **The server**, for a redirect. The layout renders one `<wa-toast-item>` for each flash entry, and
+  `notice` gives `success` and `alert` gives `danger`. ⚠️ `<wa-toast>` starts the timer of each item
+  that its slot receives, thus an item that the server renders shows itself and needs no code of
+  ours. ⚠️ It carries `wa-cloak`, or the words show as plain text at the end of the page until
+  `<wa-toast-item>` has a definition.
+- **`app/javascript/lib/toast.js`**, for an action that fetches and leaves the page as it is. The
+  Republish dialog is the one caller today.
+
+⚠️ **The `toast` Stimulus controller empties the stack before Turbo caches the page.** The countdown
+of an item stops when Turbo disconnects the DOM and never starts again, thus an item in a snapshot
+appears again and does not go away. The dialog controller exists for the same problem.
+
+⚠️ **Neither side sets a `duration`.** The default of `<wa-toast-item>` is the time on screen for
+both, thus one value covers them.
+
+⚠️ **A `<wa-callout>` that stays on a page is a different thing, and it is correct.** An empty state
+(Spam, Course maps), a warning about the configuration (Location, Course maps), and the error of one
+card or one row (Connected apps, a failed track) are all true at each load of that page. A toast goes
+away after some seconds and never comes back, thus **do not change one of those into a toast**.
 
 **The layouts** are `layouts/admin.html.erb`, which is the `<wa-page>` shell, and
 `layouts/auth.html.erb`, which is the sign-in page and has the Google button only, with no heading

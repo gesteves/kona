@@ -5,9 +5,6 @@
  * can show a message and nothing on the page moves.
  */
 
-// The time that a message stays on the screen, in milliseconds.
-const TOAST_DURATION_MS = 5000;
-
 // The id of the stack in the admin layout.
 const TOAST_STACK_ID = "notifications";
 
@@ -21,5 +18,7 @@ export function toast(message, variant = "success") {
   // The stack is a custom element, thus `create` is absent until the browser upgrades it.
   if (!message || !stack?.create) return;
 
-  stack.create(message, { variant, duration: TOAST_DURATION_MS });
+  // ⚠️ It sends no `duration`. The default of <wa-toast-item> is the time on screen, and the flash
+  // that the layout renders takes that same default. Thus one value covers both.
+  stack.create(message, { variant });
 }

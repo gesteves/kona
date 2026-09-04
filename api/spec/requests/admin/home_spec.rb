@@ -9,6 +9,15 @@ RSpec.describe "Admin home", type: :request do
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
   end
 
+  # The variant and the words of each item of the toast stack.
+  def toast_items
+    stack = response.body[%r{<wa-toast\b.*?</wa-toast>}m].to_s
+
+    stack.scan(%r{<wa-toast-item variant="([^"]+)">(.*?)</wa-toast-item>}m).map do |variant, message|
+      [ variant, CGI.unescapeHTML(message) ]
+    end
+  end
+
   it "redirects to the login screen when signed out, remembering where we were headed" do
     get "/"
 
@@ -108,6 +117,36 @@ RSpec.describe "Admin home", type: :request do
       expect(response.body).to include(I18n.t("admin.nav.new_tab"))
       # A link in the app must not have the external mark.
       expect(response.body.scan('target="_blank"').length).to eq(1)
+    end
+
+    # ⚠️ The flash is a TOAST and no longer a callout at the top of the page. It renders as a
+    # <wa-toast-item> in the stack that the layout puts outside <wa-page>, and <wa-toast> starts the
+    # timer of each item that its slot receives. Thus the server needs no code to show one.
+    describe "the flash" do
+      it "renders a notice as a success item of the toast stack" do
+        delete "/connected-apps/bluesky"
+        follow_redirect!
+
+        expect(toast_items).to eq([ [ "success", I18n.t("admin.bluesky.flash.disconnected") ] ])
+      end
+
+      it "renders an alert as a danger item" do
+        allow_any_instance_of(SpamQuarantine).to receive(:take).and_return(nil)
+        allow_any_instance_of(SpamQuarantine).to receive(:all).and_return([])
+
+        post "/spam/missing/not-spam"
+        follow_redirect!
+
+        expect(toast_items).to eq([ [ "danger", I18n.t("admin.spam_flash.gone") ] ])
+      end
+
+      it "renders an empty stack, and never a callout, when there is nothing to say" do
+        get "/"
+
+        expect(toast_items).to be_empty
+        expect(response.body).to include("<wa-toast ")
+        expect(response.body).not_to include("<wa-callout")
+      end
     end
 
     describe "the Spam badge" do

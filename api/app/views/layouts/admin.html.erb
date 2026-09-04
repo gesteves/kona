@@ -56,15 +56,6 @@
       </div>
 
       <main class="admin-main">
-        <% if flash.any? %>
-          <% flash.each do |type, message| %>
-            <wa-callout class="admin-flash" variant="<%= type.to_s == "alert" ? "danger" : "success" %>"
-                        data-controller="flash">
-              <%= message %>
-            </wa-callout>
-          <% end %>
-        <% end %>
-
         <%= yield %>
       </main>
     </wa-page>
@@ -75,7 +66,15 @@
 
     <%# The toast stack. It is a sibling of <wa-page> for the same reason as the dialog, and the
         layout renders it one time, thus each page and the Republish dialog write into this stack.
-        app/javascript/lib/toast.js finds it by this id. %>
-    <wa-toast id="notifications" placement="bottom-end" data-controller="toast"></wa-toast>
+        app/javascript/lib/toast.js finds it by this id.
+        ⚠️ `wa-cloak` hides it until <wa-toast-item> has a definition. Without it, the words of a
+        flash show as plain text at the end of the page for the time of that upgrade. %>
+    <wa-toast id="notifications" class="wa-cloak" placement="bottom-end" data-controller="toast">
+      <%# The flash of a redirect. <wa-toast> starts the timer of each item that its slot receives,
+          thus an item that the server renders shows itself and needs no code of ours. %>
+      <% flash.each do |type, message| %>
+        <wa-toast-item variant="<%= type.to_s == "alert" ? "danger" : "success" %>"><%= message %></wa-toast-item>
+      <% end %>
+    </wa-toast>
   </body>
 </html>
