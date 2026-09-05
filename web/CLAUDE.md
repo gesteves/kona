@@ -208,6 +208,34 @@ uses `open_graph_image_url`, which gives a Cloudflare Images URL.
 - `src/assets/` holds the font and the logo of the card, as Data modules. That is the reason for the
   `rules` entry in `wrangler.jsonc`.
 
+### IndexNow
+
+The deploy pushes the URLs that changed to IndexNow, which gives them to Bing, Yandex, Seznam, and
+Naver. Google does not participate. `lib/utils/index_now.rb` holds the logic, `rake indexnow:submit`
+is the entry point, and `web.yml` runs it in the `deploy` job after the edge purge. The protocol
+needs a key file at the root of the site, and `source/indexnow.txt.erb` renders `INDEXNOW_KEY` into
+`/indexnow.txt`.
+
+- **The sitemap is the list of URLs, and Redis holds the list of the last submission.** The task
+  reads `build/sitemap.xml`, compares it with the `indexnow:sitemap` key, and submits the URLs that
+  are new and the URLs whose `lastmod` moved. Thus a code-only deploy submits nothing, and a publish
+  submits approximately five: the entry, the home page, `/blog/`, and its tag archives.
+- ⚠️ **The task stores the sitemap only after a successful POST.** A store after a failure would
+  lose that change for all time, because the next deploy would then find no difference. For the same
+  reason a 429, a 5xx, and a network error only log a warning and store nothing, and the next deploy
+  submits the same URLs again. A 400, a 403, and a 422 **raise**: they mean that the key, the
+  `keyLocation`, or the host does not match `/indexnow.txt`, and nothing corrects that by itself.
+- ⚠️ **The first run submits nothing.** With no `indexnow:sitemap` key, the task stores the sitemap
+  and stops, because the protocol asks for the URLs that changed and each URL of a site that exists
+  already is not that. `rake indexnow:submit[all]` sends the full sitemap one time.
+  `DRY_RUN=1 rake indexnow:submit` prints the URLs and posts nothing.
+- ⚠️ **The step is after the purge and after the two Slack messages, on purpose.** The purge already
+  waits 40 seconds, thus each URL and the key file are live at every PoP. Nothing waits for this
+  step.
+- ⚠️ **Keep the name `indexnow.txt`.** The protocol also permits `<key>.txt` at the root, but custom
+  rule 2 of the zone blocks the file names of secret material across the full zone. A plain `.txt`
+  at the root is safe, as `robots.txt` and `llms.txt` show.
+
 ### `_headers` and `_redirects`
 
 The build makes these from `source/headers` and `source/redirects.erb`, and it then renames them. A
@@ -291,6 +319,9 @@ The names only. Refer to `.env.example`, and never put a value in the repo.
   [`CLAUDE.md`](../CLAUDE.md).
 - **Optional**: `TURNSTILE_SITE_KEY`. Use it with the `TURNSTILE_SECRET` of the api: set both, or
   set neither.
+  `INDEXNOW_KEY` is the IndexNow key. The build renders it into `/indexnow.txt`, and the deploy
+  submits the URLs that changed. Refer to **IndexNow**. With no value, the file is empty and the
+  submission does nothing.
   `TIME_ZONE` is the IANA zone of the publish dates. The publish-date controller reads it for
   "published today", for the clock icon or the calendar icon, and for the "New" badge. ⚠️ With no
   value, each reader gets their *own* browser timezone. Thus a post that a person publishes at 9pm

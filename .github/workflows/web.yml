@@ -362,6 +362,10 @@ jobs:
           IMAGE_HOST: ${{ secrets.IMAGE_HOST }}
           PLAUSIBLE_SCRIPT_URL: ${{ secrets.PLAUSIBLE_SCRIPT_URL }}
           TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
+          # source/indexnow.txt.erb renders this into /indexnow.txt, which is the file that an
+          # engine reads to check that we own the host. With no value the file is empty, and the
+          # submit step below then does nothing.
+          INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
           # ⚠️ This is a repository *variable*, not a secret. A variable with no value becomes an
           # EMPTY STRING, and not an absent env var. Thus each reader of this value must count a
           # blank value as no value. With no value, a publish date uses the browser timezone of
@@ -513,6 +517,36 @@ jobs:
           text: "Web cache purge <${{ secrets.URL }}|successful> :broom:"
           color: "#439FE0"
           fallback: "Web cache purge successful"
+
+      # IndexNow is a push: it takes the URLs that changed and gives them to each participating
+      # search engine (Bing, Yandex, Seznam, Naver, but NOT Google). Without it, robots.txt names
+      # the sitemap and each crawler comes when it decides to come.
+      #
+      # The task reads build/sitemap.xml, compares it with the sitemap of the last submission,
+      # which one Redis key holds, and submits the URLs that are new and the URLs whose lastmod
+      # moved. Thus a code-only deploy submits nothing, and a publish submits approximately five:
+      # the entry, the home page, /blog/, and its tag archives.
+      #
+      # ⚠️ This step is AFTER the purge, on purpose. The purge already waits 40 seconds, thus each
+      # URL and /indexnow.txt are live at every PoP before an engine reads them. It is also after
+      # the two Slack messages, thus a failure here cannot stop a report of a deploy that was
+      # successful. Nothing waits for this step.
+      #
+      # It fails the run on a 400, a 403, or a 422, which all mean that the key, the keyLocation,
+      # or the host does not match /indexnow.txt. A 429, a 5xx, and a network error only log a
+      # warning: the task stores no sitemap, thus the next deploy finds the same difference and
+      # submits it again.
+      - name: Submit the changed URLs to IndexNow
+        env:
+          INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
+          URL: ${{ secrets.URL }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          # The Rakefile loads the data layer, which reads the Contentful schema at its boot. The
+          # build step above wrote that file, thus this makes no request to Contentful. These two
+          # are here for the condition where that file is absent.
+          CONTENTFUL_SPACE: ${{ secrets.CONTENTFUL_SPACE }}
+          CONTENTFUL_TOKEN: ${{ secrets.CONTENTFUL_TOKEN }}
+        run: bundle exec rake indexnow:submit
 
       # This has its own message, because the success message already went out. A plain "deploy
       # failed" after "deploy successful" would look like a contradiction and would send you to

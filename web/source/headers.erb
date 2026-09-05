@@ -73,6 +73,11 @@
 /llms.txt
   Cache-Control: public, max-age=0, must-revalidate
 
+# The IndexNow key file. An engine reads it to check that we own the host that the submission
+# names, thus it must stay reachable. Its content changes only when a person rotates INDEXNOW_KEY.
+/indexnow.txt
+  Cache-Control: public, max-age=0, must-revalidate
+
 /favicon.ico
   Cache-Control: public, max-age=0, must-revalidate
 
