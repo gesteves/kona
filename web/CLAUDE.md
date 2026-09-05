@@ -88,7 +88,8 @@ the same time.
 posts the list in `data/font_awesome.yml` to the `/api/icons` of the api and writes
 `data/icons.json`. `import:standard_site` gets the DID and the publication URI from the api.
 `import:related` gets the order of the related articles, which the api makes from a BM25 index of
-the article text, and writes it to `data/related.json`. Each article uses that order for its "You May Also Like"
+the article text, the links between the entries, and the concepts, and writes it to
+`data/related.json`. Each article uses that order for its "You May Also Like"
 section. `import:schema` writes the Contentful GraphQL schema to
 `lib/data/graphql/contentful_schema.json`, which the data layer reads at its start. Git ignores that
 file, and with no file the data layer reads the live schema. There is also `rake redis:clear`.

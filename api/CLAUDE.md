@@ -49,7 +49,7 @@ edge serves a cached copy before it gets a new one.
 | POST | `/api/build` | enqueues `SiteBuildJob`; 202, or 429 inside the 60s dedupe lock, which `POST /republish` shares | — |
 | POST | `/api/icons` | resolves the web build's Font Awesome allowlist to SVGs | — |
 | GET | `/api/standard-site` | `{did, publication_uri}` for the build's verification markup | 1 hr |
-| GET | `/api/related` | `{contentful id => [related ids]}` from the BM25 index of the article text, for the build's static "You May Also Like" section | — |
+| GET | `/api/related` | `{contentful id => [related ids]}` from the BM25 index of the article text, the links between the entries, and the concepts, for the build's static "You May Also Like" section | — |
 | POST | `/webhooks/contentful` | enqueues PDS sync, asset-mirror, and site-build jobs; 204 | — |
 | POST | `/webhooks/whoop` | enqueues `WhoopWebhookJob`; 200 `{ok: true}` | — |
 | GET | `/whoop/auth`, `/whoop/callback` | Whoop OAuth (authorize is owner-gated) | — |
@@ -122,10 +122,11 @@ Pollen, PurpleAir, Whoop (OAuth2), TrainerRoad (iCal), Contentful, Plausible, Fo
 Goodspeed, Akismet, Resend, Turnstile, Mastodon (OAuth2), Threads (OAuth2), `StandardSite`, `Bluesky`,
 `OpenGraph`,
 `AssetMirror`, and `BlurhashPlaceholder`.
-The two article rankings, `TrendingArticles` and `RelatedArticles`, share `ArticleRanking`. Three
+The two article rankings, `TrendingArticles` and `RelatedArticles`, share `ArticleRanking`. Four
 more classes hold the parts of the "You May Also Like" score: `ArticleIndex` is the BM25 index of
-the article text, `ArticleTaxonomy` is the concept overlap, and `RelatedInspector` makes the two
-reports of `rake related:*`. Refer to **The article rankings**.
+the article text, `ArticleTaxonomy` is the concept overlap, `ArticleLinks` is the links between
+the entries, and `RelatedInspector` makes the reports of `rake related:*`. `TrendingInspector`
+makes the reports of `rake trending:*`. Refer to **The article rankings**.
 Eight more are not subclasses of `ApplicationService`, because they are not cacheable reads:
 `SpamQuarantine`, `TrackLibrary`, `BlueskyCredentials`, `MastodonCredentials`,
 `ThreadsCredentials`, and `TrainerRoadCredentials` use Redis only and no HTTP; `GpxTrack` parses
@@ -149,35 +150,22 @@ never one query for each article. A query for each article would make one key fo
 the number of calls would then grow with the number of articles and go past the limit. **Do not add
 a query for each article, and do the calculation again before you make either TTL shorter.**
 
-There are **five different query bodies**, which is 60 calls each hour:
+There are **three different query bodies**, which is 36 calls each hour at the most:
 
-| Method | Dimension | Metrics | Who reads it |
+| Method | Dimensions | Metrics | Who reads it |
 |---|---|---|---|
 | `totals_by_path(date_range: "all")` | `event:page` | `visitors`, `pageviews` | the pageviews widget reads the pageviews; `TrendingArticles` and `RelatedArticles` read the visitors |
-| `page_visitors_by_path` (the recent window) | `event:page` | `visitors`, `pageviews` | `TrendingArticles` |
-| `page_visitors_by_path` (the baseline window) | `event:page` | `visitors`, `pageviews` | `TrendingArticles` |
-| `entry_visitors_by_path` (the recent window) | `visit:entry_page` | `visitors` | `TrendingArticles` |
-| `entry_visitors_by_path` (the baseline window) | `visit:entry_page` | `visitors` | `TrendingArticles` |
+| `daily_visitors_by_path(days:)` | `time:day`, `event:page` | `visitors` | `TrendingArticles`, one time each clock hour |
+| `covisit_visitors` | `visit:entry_page`, `event:page` | `visitors` | `rake related:evaluate` only, and never the request path |
 
-⚠️ **`TrendingArticles` blends the two dimensions, and it never reads the pageviews.** A reader who
-arrives on the home page and then selects one article is a true signal, and `visit:entry_page` alone
-cannot see it. But the trending widget renders on the home page and on each Page, thus its own
-clicks are part of `event:page`, and a rank on that dimension alone puts the output of the module
-back into its own input. At the traffic of this site that loop can supply most of the recent traffic
-of an article.
+⚠️ **`TrendingArticles` reads one daily series and calculates each window from it.** The date in
+that body changes one time each day, and the hourly cache of the ranking limits the calls. Keep the
+metric at `visitors` and not `pageviews`: the visitors metric counts a reader one time however many
+times they load the page, thus a reload cannot raise it.
 
-The blend keeps both properties: `visit:entry_page` is the demand from **outside** the site and gets
-the full weight, and the difference between the two dimensions is the arrivals from **inside** the
-site and gets `TRENDING_INTERNAL_WEIGHT` (default 0.5). Refer to `TrendingArticles#heat_by_path`.
-
-⚠️ **Keep that weight below 1**, and keep the metric at `visitors` and not `pageviews`. The visitors
-metric counts a reader one time however many times they load the page, thus a reload cannot raise
-it.
-
-⚠️ **The recent window and the baseline must use the same blend.** The score is a ratio of the two,
-and a different blend on each side gives a number with no meaning. ⚠️ `heat_by_path` returns an
-empty hash when **either** query is not available. A blend of one good query and one empty query
-would score each article on its internal traffic alone, and that list looks correct.
+⚠️ **The daily series has one row for each day and each page with traffic**, approximately 100
+days by 50 pages today, below the page limit of `query`. The warning in `query` reports an answer
+at that limit. Read it before you make `TRENDING_BASELINE_DAYS` much larger.
 
 ⚠️ **`totals_by_path` gives two metrics from one query body, on purpose.** Two queries would cost two
 keys for the same data. `pageviews_by_path` is a small wrapper over it.
@@ -266,43 +254,70 @@ colour until a person publishes its asset again.
 
 ### The article rankings
 
-Two modules put articles in order, and each one has its own rules.
+Two modules put articles in order, and each one has its own rules. ⚠️ **No A/B test can operate at
+the traffic of this site**, approximately 23 visitors each day. Thus each rule below came from a
+measurement against the real data, and the `rake related:*` and `rake trending:*` reports are the
+only method to know if a change helped.
 
-**`TrendingArticles`** reads the blended visitors of two moving windows and gives each article a
-score. Read the ⚠️ above about the blend of `visit:entry_page` and `event:page`.
+**`TrendingArticles`** reads one Plausible series of daily visitors and gives each article a
+significance test: the surprise `−log10 P(X ≥ k)` of its visitors `k` in a window, against a
+Poisson mean from its own rate in the `BASELINE_DAYS` before that window.
 
-- ⚠️ **The prior goes on BOTH sides of the surge ratio** (`(recent + PRIOR) / (expected + PRIOR)`).
-  It moves a ratio from a small count toward 1, which is "no surge". With the prior on the divisor
-  alone, an article with no baseline and 5 visitors got a surge of 5, and a true surge looked
-  exactly the same. This is the one change that makes the score correct at the traffic of this site.
-- ⚠️ **The floor is adaptive**: it is a percentile of the articles that got any traffic, and never
-  less than `ABSOLUTE_MIN`. Thus no person tunes a number when the traffic changes. It drops back to
-  `ABSOLUTE_MIN` when fewer than `MIN_ABOVE_FLOOR` articles go past it, because a quiet week must
-  not empty the widget.
-- ⚠️ **`MIN_ABOVE_FLOOR` is a constant and not the `count` of the caller.** The cache holds one list
-  for each hour and each caller shares it. A `count` there would make that list different for each
-  caller below one key.
-- ⚠️ **The group with a score of 0 goes in the order of the visitors of all time, and not the date.**
-  The widget renders on the home page, which already lists the new posts. Thus a fallback by date
-  made the widget a copy of that list. The date stays as the last key only because `sort_by` is not
-  stable.
+- ⚠️ **It is a significance test and not a ratio.** At the counts of this site, 2 to 10 visitors
+  in two days, a ratio with a prior gave approximately 1 for each article, and the volume then
+  decided. The widget was a "most read in the last two days" list, and its fourth slot changed
+  each day among articles with 2 visitors.
+- ⚠️ **`ALPHA` is a Gamma prior on the daily rate**, one visitor on one day. It is what stops an
+  article with a baseline of 0 from an infinite surprise. `MIN_VISITORS` is what stops two
+  visitors from a trend, whatever the baseline. `MIN_BASELINE_DAYS` keeps a new article out of the
+  trends: it has no usual rate, and its launch traffic is not a trend.
+- ⚠️ **The baseline is 90 days, and not 30.** A race report gets its traffic in the weeks before
+  the race, and a 30-day baseline held that ramp already. Thus the ratio was 1 for the one thing
+  that a reader of this site would call a trend.
+- ⚠️ **Two windows, 2 days and 7 days.** The short one finds a spike of one day, and the long one
+  finds a ramp whose daily count is below `MIN_VISITORS`.
+- ⚠️ **The trends come first, then the fill by the visitors of the last `FILL_DAYS`, then the
+  visitors of all time, then the date.** On approximately one half of the days nothing is a
+  trend, and the widget then shows the most-read articles. The date stays as the last key only
+  because `sort_by` is not stable.
+- ⚠️ **The `RECENT_EXCLUDED` newest Articles are never in the list.** The home page lists them as
+  "Recent Articles" directly above the widget, and the widget repeated one of them. **That number
+  must stay equal to the `count: 4` of `recent_articles` in `web/lib/helpers/article_helpers.rb`,
+  and no check compares the two.** The widget is one shared edge-cache entry, thus the exclusion
+  is the same on a Page.
+- ⚠️ **There is no blend of `visit:entry_page` and `event:page` any more.** A measurement gave
+  the loop that it protected against as absent: internal navigation is 16% of the visits, and the
+  widget had no recorded click. The blend cost four query bodies.
 - ⚠️ **Each new setting must go into `#ranking_version`.** That digest is the cache key. A setting
   outside it leaves the previous list in the cache for its full hour, below a key that looks
   correct.
 
 **`RelatedArticles`** makes a BM25 index of the text of each article and gives each candidate a
-score. It calls no external API: the text comes from `Articles#corpus`, which is the same Contentful
-read that each other list uses.
+score: the relevance from the text and the concepts, a bonus for a link between the two entries,
+and a prior for the popularity and the season. It calls no external API for the text: it comes
+from `Articles#corpus`, which is the same Contentful read that each other list uses.
 
 - ⚠️ **Do not change this into a neural embedding.** This corpus is approximately 60 entries by one
   author in one domain. An embedding of it puts most of its magnitude into the one direction that
   each entry shares: a measurement gave a mean similarity of a pair of **+0.48**. The scores then
   group into a narrow band where the order is near to noise, and the code needs a correction to
   operate at all. The IDF of BM25 removes that shared vocabulary by design.
-- ⚠️ **A person can read the words that two articles share.** No A/B test can operate at this
-  traffic, thus a person must read the order and judge it. `terms_in_common` gives those words, and
-  `rake related:inspect` prints them. That is not possible with a vector, and it is a large part of
-  the reason for this design.
+- ⚠️ **A person can read the words that two articles share.** `terms_in_common` gives those words,
+  and `rake related:inspect` prints them. That is not possible with a vector, and it is a large
+  part of the reason for this design.
+- ⚠️ **The links are a signal of their own, from `ArticleLinks`.** The author writes a link
+  between two entries when they are related, and the index cannot see it: `markdown_to_plain_text`
+  removes each URL before the tokens. Thus `ArticleLinks` reads the raw Markdown. **It reads the
+  host of the site from `SITE_URL`**, and it counts a root-relative path as well. With no
+  `SITE_URL` an absolute link is not a link, and the ranking then loses that signal with no
+  message.
+- ⚠️ **The prior is large enough to select inside a flat band.** For a race report, the candidates
+  are twenty other race reports, their relevance is a flat band, and the words that they share are
+  noise. In that band the popularity and the season are what predict a click: a reader of a 2025
+  report goes to the other 2025 reports. An earlier prior of 0.02 could not select anything.
+- ⚠️ **There is no floor any more.** A floor from the mean and the standard deviation read the
+  position in the distribution, and it could not tell "flat and all related" from "flat and none
+  related". The measurement gave a lower recall with it.
 - ⚠️ **The BM25 length normalization is necessary and not a refinement.** The median Article is
   approximately 18,000 characters and the median Short is approximately 1,000. At `B = 0`, each long
   article would win against each Short at every query.
@@ -313,38 +328,37 @@ read that each other list uses.
 - ⚠️ **The concept overlap uses an IDF weight.** "Race Reports" is on most articles and gives almost
   no information, and "Ironman Canada" is very specific. A plain Jaccard would let the common
   concepts control the result, and each article would look related to each other article.
-- ⚠️ **The floor reads the relevance and not the score.** The score holds the small addition for the
-  date and the popularity. A new or a popular article that is not related must never go past the
-  floor because of that addition.
-- ⚠️ **`MIN_SCORE` must stay above zero.** A BM25 similarity and a concept overlap are both never
-  negative, thus a floor at zero would mark each candidate as related. `LEXICAL_WEIGHT` moves that
-  distribution, thus read `rake related:inspect` after a change to it.
-- ⚠️ **The floor selects which candidates to PREFER, and it never makes the list short.** `mmr_pool`
-  takes each candidate above the floor, then fills the rest from the best of the others. The section
-  renders a two-column grid, thus a list of three leaves a hole. An earlier version made the section
-  short, or absent, when each candidate was below the floor. A Short with few near articles then
-  showed three cards.
 - ⚠️ **The same-race demotion is a demotion and never an exclusion.** A Short renders
   `_related.html.erb` with no "More Reports From This Race" section above it. It is also small on
   purpose: a shared rare concept is true relatedness, and it wins against the demotion. **MMR** does
   most of the work to go wider, because four reports of one race are near-copies of each other.
+- ⚠️ **The build removes more cards than the reports of the same race.** `related_section` in
+  `web/lib/helpers/article_helpers.rb` also removes the two adjacent entries, which the read-next
+  section renders on the same page. `Api::RelatedController::COUNT` is 10 for that reason: 4
+  cards, at most 4 reports, and 2 adjacent entries.
 - ⚠️ **`TaxonomyConcepts.ancestor_ids` is not named `ancestors`.** That name is a method of Module,
   and Rails and RSpec both call it on a class. It also copies the `broader` list, because `Array()`
   gives the same object back and the queue changed the tree of the caller.
 
-**The inspection tools.** ⚠️ No A/B test can operate at the traffic of this site. Thus
-`rake related:inspect[slug]` and `rake related:audit` are the only method to know if a change to the
-ranking helped. `inspect` prints each candidate with its BM25 similarity, its concept overlap, its
-score, and **the words that the two articles share**. `audit` gives the coverage of the index, the
-number of entries with a short list, and the spread of the similarity of a pair.
+**The inspection tools.** `rake related:inspect[slug]` prints each candidate with its BM25
+similarity, its concept overlap, its link, its prior, its score, and **the words that the two
+articles share**. `rake related:audit` gives the coverage of the index and the spread of the
+similarity of a pair. `rake related:evaluate` gives the **recall@4 of the section against the real
+navigation**: of the readers who went from one entry to another one in one visit (the
+`covisit_visitors` body), the share that went to a card. It makes the list as the build does. The
+lists of 2026-09-05 gave 0.389 before the links and the prior, and 0.44 after. ⚠️ The transitions
+come from the modules of the past, thus the metric prefers what those modules showed; a change
+that raises it is still evidence, and one that lowers it is a warning. `rake trending:inspect`
+prints each candidate with its visitors, its expected visitors, and its surprise for each window,
+and `rake trending:replay[days]` prints the list as of each past day and how much it changed.
 
 ### Webhooks
 
 `Webhooks::ContentfulController` takes each publish, unpublish, and delete event, and
 `ContentfulRequestVerification` checks its HMAC. That controller **only adds jobs to the queue** and
 returns a 204, and the Sidekiq worker does the work. At each publish it adds the standard.site sync,
-the article embedding, the R2 asset copy, the blurhash placeholder, and **`SiteBuildJob`**, which
-builds the web site again.
+the R2 asset copy, the blurhash placeholder, and **`SiteBuildJob`**, which builds the web site
+again.
 Set the Contentful webhook to a publish, an unpublish, and a delete of an **Entry and an Asset**,
 thus a change to an image also starts a build. Do **not** include an automatic save. ⚠️ Contentful
 does **not** send a delivery again. `rake standard_site:backfill`, `rake assets:backfill`, and
@@ -2112,9 +2126,9 @@ value is a secret of fly.io, and Rails also uses `config/credentials.yml.enc` an
   the Location page needs it. With no value that page changes to a form for the coordinates),
   `MAPBOX_STYLE_URL` (the default style for a new track. Each track can use a different style, and
   the Location page ignores this value), `REDIS_POOL_SIZE` (the default is 10. Make it as large as
-  the largest consumer, which is the concurrency of Sidekiq), the seven `TRENDING_*` values for the
+  the largest consumer, which is the concurrency of Sidekiq), the five `TRENDING_*` values for the
   trending ranking (read `.env.example`. They are part of the cache key of that ranking, thus a
-  change to one makes the cache invalid), and the three `RELATED_*` values for the "You May Also
+  change to one makes the cache invalid), and the five `RELATED_*` values for the "You May Also
   Like" ranking (no cache holds that ranking, thus a change applies at the next build).
 
 ## Conventions & gates

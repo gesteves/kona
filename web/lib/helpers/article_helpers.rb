@@ -145,8 +145,8 @@ module ArticleHelpers
 
   # The entries with the nearest meaning to this one, for the static "You May Also Like" section.
   # The order comes from data/related.json, which `rake import:related` gets from the api. The api
-  # makes it from a BM25 index of the article text and from the concepts. It is the one part of the
-  # section that this build cannot make from its own data.
+  # makes it from a BM25 index of the article text, from the links between the entries, and from
+  # the concepts. It is the one part of the section that this build cannot make from its own data.
   #
   # ⚠️ An empty result removes the section. This is correct for the three causes of an empty
   # result: the import did not run (no api, or no token), the api could not read Contentful, or
@@ -425,12 +425,30 @@ module ArticleHelpers
     reports = related_race_reports(article, count: count)
 
     seen = reports.filter_map { |a| a.sys&.id }.to_set
-    seen << article.sys&.id
-    related = related_articles(article, count: count + reports.size)
-      .reject { |a| seen.include?(a.sys&.id) }
-      .take(count)
+    related = related_section(article, count: count, seen: seen)
 
     { reports: reports, related: related }
+  end
+
+  # The entries of the "You May Also Like" section, without the entries that the page already
+  # shows: the entry itself, the two adjacent entries of the read-next section, and each entry in
+  # `seen`.
+  #
+  # ⚠️ An entry with a near meaning is frequently also the adjacent entry in time. Without this
+  # removal the same card renders two times on the page. The api sends more neighbors than the
+  # section shows (RelatedController::COUNT), thus the removal does not make the section short.
+  # @param article [Object] The entry.
+  # @param count [Integer] The number of cards.
+  # @param seen [Set<String>] The ids of the entries that another section already shows.
+  # @return [Array<Object>]
+  def related_section(article, count: 4, seen: Set.new)
+    adjacent = adjacent_articles(article).values.compact
+    removed = seen | adjacent.filter_map { |a| a.sys&.id }
+    removed << article.sys&.id
+
+    related_articles(article, count: count + removed.size)
+      .reject { |a| removed.include?(a.sys&.id) }
+      .take(count)
   end
 
   # The id of the race concept of an article: its most deeply nested Sports concept at the race

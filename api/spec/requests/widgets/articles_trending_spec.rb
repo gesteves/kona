@@ -28,11 +28,13 @@ RSpec.describe "Widgets::Articles trending", type: :request do
 
   let(:corpus) { [ art_newest, art_april, art_march, art_february, art_spiking, art_steady, art_short ] }
 
-  # a5 has a surge: a small recent count on a very small baseline. a6 is always popular: it has much
-  # traffic, and that traffic agrees with its own high baseline. Each other article has no traffic.
+  # a5 has a spike: a few visitors today on a baseline of zero. a6 is always popular: it has the
+  # same traffic each day, which agrees with its own baseline. Each other article has no traffic.
   # Thus the order is a5, then a6, then the other articles by date.
-  def rows(by_path)
-    by_path.map { |path, total| { dimensions: [ path ], metrics: [ total ] } }
+  let(:today) { Date.new(2025, 1, 15) }
+
+  def daily_rows(path, by_days_ago)
+    by_days_ago.map { |ago, visitors| { dimensions: [ (today - ago).iso8601, path ], metrics: [ visitors ] } }
   end
 
   # The all-time query asks for the visitors and the pageviews, thus each of its rows holds two
@@ -42,20 +44,17 @@ RSpec.describe "Widgets::Articles trending", type: :request do
   end
 
   before do
+    # The fixture has few articles, thus the exclusion of the newest ones is off here. One example
+    # below turns it on.
+    stub_const("TrendingArticles::RECENT_EXCLUDED", 0)
     allow_any_instance_of(Articles).to receive(:list).and_return(corpus)
-    recent = rows(art_spiking.path => 15, art_steady.path => 72)
-    baseline = rows(art_spiking.path => 30, art_steady.path => 2000)
+    allow_any_instance_of(Plausible).to receive(:site_today).and_return(today)
+    series = daily_rows(art_spiking.path, 0 => 6) + daily_rows(art_steady.path, (0..96).to_h { |ago| [ ago, 3 ] })
     all_time = total_rows(art_steady.path => 900)
-    # The recent window and the baseline are two visit:entry_page queries over two ranges. The
-    # length of the range selects the answer: the recent range is short, and the baseline range is
-    # approximately one month. The all-time query gives the order of the group with no traffic.
+    # The daily series is the one query with a [from, to] range. The all-time query gives the
+    # order of the group with no traffic.
     allow_any_instance_of(Plausible).to receive(:query) do |**kwargs|
-      range = kwargs[:date_range]
-      next { results: all_time } unless range.is_a?(Array)
-
-      first, last = range
-      span_hours = (Time.parse(last) - Time.parse(first)) / 3600.0
-      { results: span_hours <= (TrendingArticles::RECENT_WINDOW_HOURS + 1) ? recent : baseline }
+      { results: kwargs[:date_range].is_a?(Array) ? series : all_time }
     end
     allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
     # cached_json puts the order in the cache. This stubs Redis, thus the suite needs no Redis and no
@@ -119,9 +118,19 @@ RSpec.describe "Widgets::Articles trending", type: :request do
 
       expect(response.body).to include("Spiking Article")
       expect(response.body).to include("Steady Article")
-      expect(response.body).to include("Newest Article") # recent articles are NOT excluded here
+      expect(response.body).to include("Newest Article")
       expect(response.body).not_to include("A Short Post") # Shorts are excluded
       expect(response.body.index("Spiking Article")).to be < response.body.index("Steady Article")
+    end
+
+    # ⚠️ The home page lists the newest Articles as "Recent Articles" directly above the widget.
+    it "excludes the newest articles" do
+      stub_const("TrendingArticles::RECENT_EXCLUDED", 1)
+
+      get "/widgets/articles/trending", headers: auth_headers
+
+      expect(response.body).not_to include("Newest Article")
+      expect(response.body).to include("Spiking Article")
     end
 
     it "links each card to the article's computed path" do

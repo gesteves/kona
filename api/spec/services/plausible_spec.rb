@@ -20,11 +20,6 @@ RSpec.describe Plausible do
     end
   end
 
-  # The rows of the entry-page query, which asks for the visitors only.
-  def entry_rows(by_path)
-    by_path.map { |path, total| { dimensions: [ path ], metrics: [ total ] } }
-  end
-
   describe "#pageviews_by_path" do
     it "folds event:page rows into { path => pageviews }" do
       allow(service).to receive(:post_json)
@@ -102,74 +97,87 @@ RSpec.describe Plausible do
     end
   end
 
-  describe "#page_visitors_by_path" do
-    # ⚠️ This is the visitors, and it is not the pageviews. Thus a reader who reloads a page, or
-    # who reads it again, counts one time, and nobody can raise it by a reload.
-    it "takes the visitors out of the event:page query" do
-      allow(service).to receive(:post_json)
-        .and_return(results: rows({ "/2026/05/01/a/" => 300 }, { "/2026/05/01/a/" => 9 }))
+  describe "#daily_visitors_by_path" do
+    let(:today) { Date.new(2026, 6, 15) }
 
-      expect(service.page_visitors_by_path).to eq("/2026/05/01/a/" => 9)
-    end
-
-    # ⚠️ It sends the query body of totals_by_path, word for word. The body is the cache key, thus
-    # the two share one entry and the blend of TrendingArticles adds no call for a range that the
-    # pageviews widget already asks for.
-    it "sends the same query body as the pageviews of the same range" do
-      bodies = []
-      allow(service).to receive(:post_json) do |_url, **options|
-        bodies << options[:body]
+    # One row for each day and each page, and today is a partial day inside the range.
+    it "asks for the visitors of each day and each page in a single query" do
+      expect(service).to receive(:post_json).once do |_url, **options|
+        body = JSON.parse(options[:body])
+        expect(body["dimensions"]).to eq([ "time:day", "event:page" ])
+        expect(body["metrics"]).to eq([ "visitors" ])
+        expect(body["date_range"]).to eq([ "2026-03-10", "2026-06-15" ])
+        expect(body["filters"]).to eq([ [ "matches", "event:page", [ "^/20\\d{2}/" ] ] ])
         { results: [] }
       end
 
-      service.page_visitors_by_path(date_range: "all")
-      service.pageviews_by_path(date_range: "all")
+      service.daily_visitors_by_path(days: 97, today: today)
+    end
 
-      expect(bodies.uniq.size).to eq(1)
+    it "folds the rows into { path => { day => visitors } }" do
+      allow(service).to receive(:post_json).and_return(results: [
+        { dimensions: [ "2026-06-14", "/2026/05/01/a/" ], metrics: [ 4 ] },
+        { dimensions: [ "2026-06-15", "/2026/05/01/a/" ], metrics: [ 6 ] },
+        { dimensions: [ "2026-06-15", "/2026/05/02/b/" ], metrics: [ 1 ] }
+      ])
+
+      expect(service.daily_visitors_by_path(days: 7, today: today)).to eq(
+        "/2026/05/01/a/" => { Date.new(2026, 6, 14) => 4, Date.new(2026, 6, 15) => 6 },
+        "/2026/05/02/b/" => { Date.new(2026, 6, 15) => 1 }
+      )
+    end
+
+    it "sums the trailing-index.html form into the clean path" do
+      allow(service).to receive(:post_json).and_return(results: [
+        { dimensions: [ "2026-06-15", "/2026/05/01/a/" ], metrics: [ 4 ] },
+        { dimensions: [ "2026-06-15", "/2026/05/01/a/index.html" ], metrics: [ 2 ] }
+      ])
+
+      expect(service.daily_visitors_by_path(days: 7, today: today)).to eq("/2026/05/01/a/" => { Date.new(2026, 6, 15) => 6 })
+    end
+
+    it "skips a row with a day that it cannot parse" do
+      allow(service).to receive(:post_json).and_return(results: [
+        { dimensions: [ "never", "/2026/05/01/a/" ], metrics: [ 4 ] }
+      ])
+
+      expect(service.daily_visitors_by_path(days: 7, today: today)).to eq({})
     end
 
     it "returns nil when the query is unavailable" do
       allow(service).to receive(:post_json).and_return(nil)
 
-      expect(service.page_visitors_by_path).to be_nil
+      expect(service.daily_visitors_by_path(days: 7, today: today)).to be_nil
     end
   end
 
-  describe "#entry_visitors_by_path" do
-    # ⚠️ A session that starts on the article measures the demand from OUTSIDE the site. No click
-    # inside the site can change it, thus the trending widget cannot raise it with its own clicks.
-    it "asks for the visitors of each entry page in a single query" do
+  describe "#covisit_visitors" do
+    it "asks for the entry page and the page in a single query" do
       expect(service).to receive(:post_json).once do |_url, **options|
         body = JSON.parse(options[:body])
-        expect(body["dimensions"]).to eq([ "visit:entry_page" ])
+        expect(body["dimensions"]).to eq([ "visit:entry_page", "event:page" ])
         expect(body["metrics"]).to eq([ "visitors" ])
-        expect(body["filters"]).to eq([ [ "matches", "visit:entry_page", [ "^/20\\d{2}/" ] ] ])
+        expect(body["date_range"]).to eq("all")
         { results: [] }
       end
 
-      service.entry_visitors_by_path
+      service.covisit_visitors
     end
 
-    it "folds the rows into { path => visitors }" do
-      allow(service).to receive(:post_json)
-        .and_return(results: entry_rows("/2026/05/01/a/" => 4, "/2026/05/02/b/" => 9))
+    it "folds the rows into { entry path => { path => visitors } } and omits the same page" do
+      allow(service).to receive(:post_json).and_return(results: [
+        { dimensions: [ "/2026/05/01/a/", "/2026/05/01/a/" ], metrics: [ 40 ] },
+        { dimensions: [ "/2026/05/01/a/", "/2026/05/02/b" ], metrics: [ 3 ] },
+        { dimensions: [ "/2026/05/01/a/", "/2026/05/02/b/" ], metrics: [ 2 ] }
+      ])
 
-      expect(service.entry_visitors_by_path).to eq("/2026/05/01/a/" => 4, "/2026/05/02/b/" => 9)
-    end
-
-    # ⚠️ ArticleAttributes.path always writes the slash at the end. Thus a path with no slash would
-    # never join to an article, and it would count as zero.
-    it "adds the slash at the end of a path that has none" do
-      allow(service).to receive(:post_json)
-        .and_return(results: entry_rows("/2026/05/01/a" => 4, "/2026/05/01/a/" => 1))
-
-      expect(service.entry_visitors_by_path).to eq("/2026/05/01/a/" => 5)
+      expect(service.covisit_visitors).to eq("/2026/05/01/a/" => { "/2026/05/02/b/" => 5 })
     end
 
     it "returns nil when the query is unavailable" do
       allow(service).to receive(:post_json).and_return(nil)
 
-      expect(service.entry_visitors_by_path).to be_nil
+      expect(service.covisit_visitors).to be_nil
     end
   end
 end

@@ -3,8 +3,6 @@ class Plausible < ApplicationService
   PLAUSIBLE_API_URL = "https://plausible.io/api/v2/query"
   # This matches an article page only. ArticleAttributes.path decides the format of that path.
   ARTICLE_PATH_FILTER = [ [ "matches", "event:page", [ "^/20\\d{2}/" ] ] ].freeze
-  # The same match against the page where a session started.
-  ENTRY_PATH_FILTER = [ [ "matches", "visit:entry_page", [ "^/20\\d{2}/" ] ] ].freeze
   # The metrics of the all-time query. One query body gives both, thus the pageviews widget and
   # the fallback of TrendingArticles share one call.
   TOTAL_METRICS = %w[visitors pageviews].freeze
@@ -64,40 +62,63 @@ class Plausible < ApplicationService
     )
   end
 
-  # The unique visitors of each article page over a date range, and it counts each one time however
-  # they arrived.
+  # The unique visitors of each article page on each day of the last `days` days, and today. One
+  # query body gives the full series, and TrendingArticles calculates each window from it.
   #
-  # ⚠️ A click inside the site goes into this number, and the trending widget renders on the home
-  # page and on each Page. Thus the widget can put its own clicks here, and its output would then
-  # order its own input. TrendingArticles gives this part of the signal a weight below 1 for that
-  # reason. Refer to TrendingArticles::INTERNAL_WEIGHT.
-  # @param date_range [String, Array] A Plausible date range: "all", or a [from, to] pair.
-  # @return [Hash, nil] { path => visitors }, or nil if the query is not available.
-  def page_visitors_by_path(date_range: "all")
-    column(totals_by_path(date_range: date_range), :visitors)
+  # ⚠️ The metric is the visitors and not the pageviews. It counts a reader one time however many
+  # times they load the page, thus a reload cannot raise it.
+  # ⚠️ The answer has one row for each day and each page with traffic: approximately 100 days by 50
+  # pages today, below the page limit of `query`. Read the warning of `query` before you make
+  # `days` much larger.
+  # @param days [Integer] The number of days before today.
+  # @param today [Date] The last day of the series. It is a partial day, on purpose.
+  # @return [Hash{String=>Hash{Date=>Integer}}, nil] { path => { day => visitors } }, or nil if the
+  #   query is not available. A day with no row is absent, and a caller reads it as 0.
+  def daily_visitors_by_path(days:, today: site_today)
+    result = query(
+      metrics: [ "visitors" ],
+      date_range: [ (today - days).iso8601, today.iso8601 ],
+      dimensions: [ "time:day", "event:page" ],
+      filters: ARTICLE_PATH_FILTER
+    )
+    return if result.nil?
+
+    (result[:results] || []).each_with_object({}) do |row, series|
+      day_text, page = row[:dimensions]
+      path = normalize_path(page)
+      day = parse_day(day_text)
+      next if path.blank? || day.nil?
+
+      (series[path] ||= Hash.new(0))[day] += Array(row[:metrics]).first.to_i
+    end
   end
 
-  # The unique visitors whose session STARTED on each article page.
-  #
-  # ⚠️ A session that starts on the article measures the demand from OUTSIDE the site, and no click
-  # inside the site can change it. TrendingArticles reads this together with
-  # page_visitors_by_path, and it gives this part the full weight.
-  #
+  # The unique visitors who went from one article page to another one in the same visit.
+  # `rake related:evaluate` reads it, and the request path never does.
   # @param date_range [String, Array] A Plausible date range: "all", or a [from, to] pair.
-  # @return [Hash, nil] { path => visitors }, or nil if the query is not available. That is what
-  #   shows the difference between "the analytics are down" and "nobody read the page".
-  def entry_visitors_by_path(date_range: "all")
-    totals = fold(
-      query(
-        metrics: [ "visitors" ],
-        date_range: date_range,
-        dimensions: [ "visit:entry_page" ],
-        filters: ENTRY_PATH_FILTER
-      ),
-      [ "visitors" ]
+  # @return [Hash{String=>Hash{String=>Integer}}, nil] { entry path => { path => visitors } }, or
+  #   nil if the query is not available. The pair with the same path on both sides is absent.
+  def covisit_visitors(date_range: "all")
+    result = query(
+      metrics: [ "visitors" ],
+      date_range: date_range,
+      dimensions: [ "visit:entry_page", "event:page" ],
+      filters: ARTICLE_PATH_FILTER
     )
+    return if result.nil?
 
-    column(totals, :visitors)
+    (result[:results] || []).each_with_object({}) do |row, transitions|
+      from, to = Array(row[:dimensions]).map { |page| normalize_path(page) }
+      next if from.blank? || to.blank? || from == to
+
+      (transitions[from] ||= Hash.new(0))[to] += Array(row[:metrics]).first.to_i
+    end
+  end
+
+  # Today in the zone of the site, which is the zone that Plausible reports each day in.
+  # @return [Date]
+  def site_today
+    Time.now.in_time_zone(TimeZoneResolver.default).to_date
   end
 
   # Does a Plausible query. The request body is the cache key.
@@ -171,6 +192,13 @@ class Plausible < ApplicationService
 
     normalized = path.to_s.sub(/index\.html\z/, "")
     normalized.end_with?("/") ? normalized : "#{normalized}/"
+  end
+
+  # @return [Date, nil] The day of a `time:day` dimension, or nil for a value with an error.
+  def parse_day(text)
+    Date.iso8601(text.to_s)
+  rescue Date::Error
+    nil
   end
 
   # ⚠️ This is a digest of the query, and not the query in a URL-safe form. That form removed the

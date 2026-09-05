@@ -724,8 +724,8 @@ content. Refer to the `placeholder: false` note above.
 
 ‡ The home page and a Page render this one. An **entry page does not**, on purpose: it already has
 "More Reports From This Race", "You May Also Like", and the Previous and Next cards. A Page cannot
-show "You May Also Like", which comes from the embeddings of an entry, thus the trending list is the
-recirculation of a Page. ⚠️ The endpoint had a `/:id` form that removed the current article, for an
+show "You May Also Like", which comes from the text, the links, and the concepts of an entry, thus
+the trending list is the recirculation of a Page. ⚠️ The endpoint had a `/:id` form that removed the current article, for an
 entry page. That page no longer shows the section, thus the route, `ArticlesController#trending_excluding`,
 and `TrendingArticles#excluding` are all gone. Do not add them again for an entry page.
 

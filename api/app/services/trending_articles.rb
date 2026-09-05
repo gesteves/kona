@@ -1,49 +1,44 @@
-require "set"
-
-# Puts the articles of the "Trending Articles" widget in order: the articles that people read more
-# than their usual amount in approximately the last day or two. The code calculates this one time
-# each clock hour from a moving Plausible window, and each viewer sees the same result. Thus the
-# widget changes through the day, and it does not move as much as a "right now" signal would on a
-# site with low traffic.
+# Puts the articles of the "Trending Articles" widget in order: first each article that people
+# read much more than its usual amount in the last days, and then the articles that people read
+# the most in the last FILL_DAYS. The code calculates this one time each clock hour from one
+# Plausible series of daily visitors, and each viewer sees the same result.
 #
-# The score of each article comes from Plausible queries that start at the current clock hour:
-#   * heat          = the blended visitors in the last RECENT_WINDOW_HOURS. Refer to heat_by_path.
-#   * baseline_rate = the blended visitors for each hour in the BASELINE_DAYS *before* the recent
-#                     window, divided by the hours that the article existed. Thus a surge cannot
-#                     make its own baseline larger.
-#   * surge         = (heat + PRIOR) / (baseline_rate · RECENT_WINDOW_HOURS + PRIOR).
-#   * score         = log(surge + 1) · relative_weight + log(heat + 1) · absolute_weight
+# The score of an article is a significance test and not a ratio, because the counts of this site
+# are small. For each window of WINDOWS days:
+#   * k        = the visitors in the window, with today as a partial day.
+#   * rate     = (the visitors in the BASELINE_DAYS before the window + ALPHA) / (days + ALPHA).
+#   * expected = rate · the days of the window.
+#   * surprise = −log10 P(X ≥ k), where X is Poisson with the mean `expected`.
+# The trend of the article is its largest surprise, and it is a trend when that is at least
+# SIGNIFICANCE. ⚠️ ALPHA is a Gamma prior on the daily rate. It is what stops an article with a
+# baseline of 0 from an infinite surprise. MIN_VISITORS is what stops two visitors from a trend.
 #
-# An article below the adaptive floor gets a score of 0 and goes into the group at the end, which
-# the visitors of all time order. An article that is too new for a baseline gets its position from
-# its volume.
+# ⚠️ The RECENT_EXCLUDED newest Articles are never in the list. The home page lists them as
+# "Recent Articles" directly above this widget, and the traffic of a new post is not a trend.
 class TrendingArticles < ApplicationService
   include ArticleRanking # candidates + payload, shared with RelatedArticles
 
-  # The moving recent window, in hours. It is short, thus it means "today", and it is long, thus
-  # it collects a signal that the code can use on a site with low traffic.
-  RECENT_WINDOW_HOURS = Integer(ENV.fetch("TRENDING_RECENT_WINDOW_HOURS", 48))
-  # The length of the baseline, in days. It ends where the recent window starts.
-  BASELINE_DAYS = Integer(ENV.fetch("TRENDING_BASELINE_DAYS", 30))
-  # The weight of a visitor who reached the article from inside the site. ⚠️ It must stay below 1.
-  # This widget renders on the home page and on each Page, thus its own clicks are part of that
-  # number, and a weight of 1 would let the widget order its own output. A weight of 0 counts the
-  # demand from outside the site alone. Refer to heat_by_path.
-  INTERNAL_WEIGHT = ENV.fetch("TRENDING_INTERNAL_WEIGHT", 0.5).to_f
-  # ⚠️ The prior goes on BOTH sides of the surge ratio, on purpose. It moves a ratio from a small
-  # count toward 1, which is "no surge". With the prior on the divisor alone, an article with no
-  # baseline and 5 visitors got a surge of 5, and a true surge looked exactly the same.
-  PRIOR = ENV.fetch("TRENDING_SURGE_PRIOR", 3).to_f
-  # The code ignores an article below the floor, because its surge ratio has no meaning. The floor
-  # is a percentile of the articles that got any traffic, and never less than this.
-  ABSOLUTE_MIN = 2
-  # The percentile of the floor, over the articles with traffic in the recent window.
-  FLOOR_PERCENTILE = ENV.fetch("TRENDING_FLOOR_PERCENTILE", 0.5).to_f
-  # The number of articles that must go past the floor. Below that number the floor drops to
-  # ABSOLUTE_MIN. ⚠️ It is a constant and not the `count` of the caller, because the cache holds
-  # one list for each hour and each caller shares it. A `count` here would make that list
-  # different for each caller under one key.
-  MIN_ABOVE_FLOOR = 4
+  # The windows, in days. A short one finds a spike of one day, and a long one finds a ramp.
+  WINDOWS = ENV.fetch("TRENDING_WINDOWS", "2,7").split(",").map { |days| Integer(days.strip) }.freeze
+  # The length of the baseline, in days. It ends where the window starts.
+  BASELINE_DAYS = Integer(ENV.fetch("TRENDING_BASELINE_DAYS", 90))
+  # An article with a shorter baseline cannot be a trend: its expected rate has no meaning.
+  MIN_BASELINE_DAYS = 14
+  # The visitors that a window needs before it can be a trend.
+  MIN_VISITORS = Integer(ENV.fetch("TRENDING_MIN_VISITORS", 3))
+  # The prior on the daily rate: one visitor on one day.
+  ALPHA = 1.0
+  # The surprise that makes a trend. 2.0 is a probability of 1 in 100.
+  SIGNIFICANCE = ENV.fetch("TRENDING_SIGNIFICANCE", 2.0).to_f
+  # The window of the fill: the articles below SIGNIFICANCE go in the order of their visitors in
+  # these days.
+  FILL_DAYS = Integer(ENV.fetch("TRENDING_FILL_DAYS", 30))
+  # The newest Articles, which the list never holds.
+  # ⚠️ This must stay equal to the `count: 4` of `recent_articles` in
+  # web/lib/helpers/article_helpers.rb, and no check compares the two.
+  RECENT_EXCLUDED = 4
+  # The days of the series: the baseline and the longest window.
+  SERIES_DAYS = BASELINE_DAYS + WINDOWS.max
   # The part of the list that the cache holds and the code serves. It keeps the cached JSON small
   # and the parse for each request short.
   MAX_POOL = 12
@@ -57,9 +52,51 @@ class TrendingArticles < ApplicationService
     @plausible = plausible
   end
 
-  # @return [Array<OpenStruct>] The first `count` hot articles.
+  # @return [Array<OpenStruct>] The first `count` articles of the list.
   def all(count: 4)
     ranked.first(count)
+  end
+
+  # Each candidate with its numbers, in the order of the list, for `rake trending:*`. The ranking
+  # calls this same method, thus the report can never describe a different list.
+  # @param today [Date] The last day of the windows.
+  # @param series [Hash, nil] A series from Plausible#daily_visitors_by_path that reaches `today`.
+  #   With no value, the code gets one.
+  # @return [Array<Hash>] { article:, status:, trend:, windows:, recent:, popularity: }. The
+  #   status is :trend, :fill, or :recent, and the :recent rows are at the end.
+  def evaluate(today: @plausible.site_today, series: nil)
+    articles = candidates
+    return [] if articles.blank?
+
+    series ||= @plausible.daily_visitors_by_path(days: SERIES_DAYS, today: today)
+    warn_if_no_analytics(articles, series)
+    excluded = newest_ids(articles)
+    popularity = all_time_visitors
+
+    # ⚠️ The parse is in its own rescue for each article. One bad date made the full widget empty
+    # for a full hour.
+    rows = articles.filter_map do |article|
+      published = published_on(article)
+      next if published.nil?
+
+      per_path = series&.fetch(article.path, nil) || {}
+      windows = WINDOWS.to_h { |days| [ days, window_stats(per_path, published, today, days) ] }
+      best = windows.values.select { |stats| stats[:surprise] }.max_by { |stats| [ stats[:surprise], stats[:visitors] ] }
+      trend = best ? best[:surprise] : 0.0
+
+      {
+        article: article,
+        status: status_of(article, trend, excluded, series),
+        trend: trend,
+        peak: best ? best[:visitors] : 0,
+        windows: windows,
+        recent: visitors_between(per_path, today - (FILL_DAYS - 1), today),
+        popularity: popularity[article.path].to_i,
+        published: published
+      }
+    end
+
+    order(rows)
   end
 
   private
@@ -68,13 +105,12 @@ class TrendingArticles < ApplicationService
   #
   # ⚠️ The settings are in here, on purpose. You can change them with an env var. With a version
   # number that a person writes, a change to a TRENDING_* var left the previous list in the cache
-  # for its full hour, under a key that looked correct. The list was then old, and nothing showed
-  # it.
+  # for its full hour, under a key that looked correct.
   # @return [String]
   def ranking_version
     @ranking_version ||= cache_version(
-      PAYLOAD_VERSION, RECENT_WINDOW_HOURS, BASELINE_DAYS, PRIOR, ABSOLUTE_MIN, FLOOR_PERCENTILE,
-      MIN_ABOVE_FLOOR, MAX_POOL, INTERNAL_WEIGHT, relative_weight, absolute_weight
+      PAYLOAD_VERSION, WINDOWS.join(","), BASELINE_DAYS, MIN_BASELINE_DAYS, MIN_VISITORS, ALPHA,
+      SIGNIFICANCE, FILL_DAYS, RECENT_EXCLUDED, MAX_POOL
     )
   end
 
@@ -88,86 +124,79 @@ class TrendingArticles < ApplicationService
       # Plausible queries. Without the negative TTL, each request does all of them during a
       # Plausible failure. `(items || [])` below already accepts the nil from a blank cache.
       items = cached_json("trending:articles:ranked:#{ranking_version}:#{t_end.utc.iso8601}", expires_in: RESULT_TTL, empty_expires_in: 1.minute) do
-        rank(t_end).map { |article| payload(article) }
+        rank.map { |article| payload(article) }
       end
       (items || []).map { |item| DeepOstruct.wrap(item) }
     end
   end
 
-  # Puts each candidate in order, the hottest first.
-  # @param t_end [Time] The clock hour where the windows start.
-  def rank(t_end)
-    articles = candidates
-    return [] if articles.blank?
-
-    recent = heat_by_path(date_range: [ (t_end - (RECENT_WINDOW_HOURS * 3600)).iso8601, t_end.iso8601 ])
-    baseline = heat_by_path(date_range: [ (t_end - (BASELINE_DAYS * 86_400)).iso8601, (t_end - (RECENT_WINDOW_HOURS * 3600)).iso8601 ])
-    warn_if_no_analytics(articles, recent)
-
-    baseline_end = t_end - (RECENT_WINDOW_HOURS * 3600)
-    baseline_start = t_end - (BASELINE_DAYS * 86_400)
-    floor = recent_floor(recent)
-    popularity = all_time_visitors
-
-    # ⚠️ The parse is in its own rescue for each article. One bad date made the full widget empty
-    # for a full hour.
-    evaluated = articles.filter_map do |article|
-      published = published_at(article)
-      next if published.nil?
-
-      score, heat = evaluate(recent[article.path].to_f, baseline[article.path].to_f, published, baseline_start, baseline_end, floor)
-      { article: article, score: score, heat: heat, popularity: popularity[article.path].to_i, published: published }
-    end
-
-    # ⚠️ The popularity of all time comes before the date. Thus the group with a score of 0 shows
-    # the articles that people read the most, and the widget is not a copy of the list of new posts
-    # on the home page. ⚠️ The date stays as the last key, because sort_by is not stable. Without
-    # it, a corpus with no analytics gives a different order at each call.
-    evaluated
-      .sort_by { |e| [ -e[:score], -e[:heat], -e[:popularity], -e[:published].to_time.to_i ] }
-      .first(MAX_POOL)
-      .map { |e| e[:article] }
+  # @return [Array<OpenStruct>] The list, without the newest articles.
+  def rank
+    evaluate.reject { |row| row[:status] == :recent }.first(MAX_POOL).map { |row| row[:article] }
   end
 
-  # The smallest number of recent visitors that gives a meaningful ratio. It comes from the
-  # distribution of the site itself, thus no person tunes a number when the traffic changes.
-  # @return [Integer]
-  def recent_floor(recent)
-    nonzero = recent.values.reject(&:zero?).sort
-    return ABSOLUTE_MIN if nonzero.empty?
-
-    floor = [ nonzero[(nonzero.size * FLOOR_PERCENTILE).floor].to_f, ABSOLUTE_MIN ].max
-    # ⚠️ A quiet week must not empty the widget. Go back to the absolute minimum when too few
-    # articles go past the percentile.
-    return ABSOLUTE_MIN if nonzero.count { |value| value >= floor } < MIN_ABOVE_FLOOR
-
-    floor
+  # The trends first, the largest surprise first. Then the others by the visitors of the last
+  # FILL_DAYS, then the visitors of all time, then the date.
+  #
+  # ⚠️ The popularity of all time comes before the date. Thus with no analytics the list shows the
+  # articles that people read the most, and the widget is not a copy of the list of new posts on
+  # the home page. ⚠️ The date stays as the last key, because sort_by is not stable.
+  def order(rows)
+    rank_of = { trend: 0, fill: 1, recent: 2 }
+    rows.sort_by do |row|
+      trend = row[:status] == :trend
+      [ rank_of[row[:status]], trend ? -row[:trend] : 0, trend ? -row[:peak] : 0, -row[:recent], -row[:popularity], -row[:published].jd ]
+    end
   end
 
-  # The heat of each article over a date range: the visitors who arrived from outside the site, at
-  # the full weight, plus the visitors who arrived from inside it, at INTERNAL_WEIGHT.
-  #
-  # ⚠️ The caller uses this for the recent window AND for the baseline. The two must use the same
-  # blend, or the ratio between them has no meaning.
-  #
-  # ⚠️ A nil from either query means "not available", and this gives an empty hash for that. A
-  # blend of one good query and one empty query would give a list that looks correct and is not:
-  # with no entry visitors, each article would score on its internal traffic alone.
-  # @param date_range [Array] A Plausible [from, to] pair.
-  # @return [Hash] { path => heat }, with a default of 0.0.
-  def heat_by_path(date_range:)
-    entry = @plausible.entry_visitors_by_path(date_range: date_range)
-    page = @plausible.page_visitors_by_path(date_range: date_range)
-    return {} if entry.nil? || page.nil?
+  def status_of(article, trend, excluded, series)
+    return :recent if excluded.include?(article.sys&.id)
+    return :fill if series.nil?
 
-    (entry.keys | page.keys).each_with_object(Hash.new(0.0)) do |path, heat|
-      external = entry[path].to_f
-      # ⚠️ Clamp at zero. Plausible counts a visitor of an entry page in both numbers, thus the
-      # difference is the internal arrivals. A small difference in the two queries must never make
-      # this negative.
-      internal = [ page[path].to_f - external, 0.0 ].max
-      heat[path] = external + (INTERNAL_WEIGHT * internal)
+    trend >= SIGNIFICANCE ? :trend : :fill
+  end
+
+  # The numbers of one window: the visitors in it, the expected visitors from the baseline, and
+  # the surprise. The last two are nil when the window cannot be a trend.
+  # @return [Hash] { visitors:, expected:, surprise: }
+  def window_stats(per_path, published, today, days)
+    window_start = today - (days - 1)
+    visitors = visitors_between(per_path, window_start, today)
+    baseline_end = window_start - 1
+    baseline_start = [ published, baseline_end - (BASELINE_DAYS - 1) ].max
+    baseline_days = (baseline_end - baseline_start).to_i + 1
+    return { visitors: visitors, expected: nil, surprise: nil } if baseline_days < MIN_BASELINE_DAYS || visitors < MIN_VISITORS
+
+    rate = (visitors_between(per_path, baseline_start, baseline_end) + ALPHA) / (baseline_days + ALPHA)
+    expected = rate * days
+
+    { visitors: visitors, expected: expected, surprise: -Math.log10(poisson_tail(visitors, expected)) }
+  end
+
+  # P(X ≥ k) for a Poisson X with the mean `expected`.
+  #
+  # ⚠️ This sums the terms one after the other, and it never calls a factorial: 171! is larger
+  # than a Float.
+  # @return [Float] Never below 1e-15, thus the surprise is never infinite.
+  def poisson_tail(k, expected)
+    term = Math.exp(-expected)
+    sum = 0.0
+    k.to_i.times do |i|
+      sum += term
+      term *= expected / (i + 1)
     end
+
+    [ 1.0 - sum, 1e-15 ].max
+  end
+
+  # @return [Integer] The visitors from `from` to `to`, both inclusive.
+  def visitors_between(per_path, from, to)
+    per_path.sum { |day, visitors| from <= day && day <= to ? visitors.to_i : 0 }
+  end
+
+  # @return [Set<String>] The ids of the RECENT_EXCLUDED newest articles.
+  def newest_ids(articles)
+    articles.sort_by { |a| -(published_on(a) || Date.new(1970)).jd }.first(RECENT_EXCLUDED).filter_map { |a| a.sys&.id }.to_set
   end
 
   # ⚠️ The pageviews widget already caches this query body. Thus the fallback order costs no more
@@ -178,58 +207,20 @@ class TrendingArticles < ApplicationService
     totals.each_with_object(Hash.new(0)) { |(path, values), acc| acc[path] = values[:visitors].to_i }
   end
 
-  # @return [DateTime, nil] The publish date, or nil when the code cannot parse it.
-  def published_at(article)
-    DateTime.parse(article.published_at)
+  # @return [Date, nil] The publish day in the zone of the site, or nil when the code cannot
+  #   parse it.
+  def published_on(article)
+    DateTime.parse(article.published_at).in_time_zone(TimeZoneResolver.default).to_date
   rescue Date::Error, TypeError
     Rails.logger.info("TrendingArticles: cannot parse the date of #{article.path.inspect}; the code omits it")
     nil
   end
 
-  # Calculates the score of one article.
-  # @return [Array(Float, Float)] Its [score, heat]. heat selects between two equal scores. Below
-  #   the floor this is [0, 0], which goes into the group that the popularity orders.
-  def evaluate(recent_visitors, baseline_total, published, baseline_start, baseline_end, floor)
-    return [ 0.0, 0.0 ] if recent_visitors < floor
-
-    volume = Math.log(recent_visitors + 1)
-
-    # The hours that the article existed in the baseline window. Thus a new post does not get a
-    # lower score for the days before its publication.
-    existed_from = [ published.to_time, baseline_start ].max
-    baseline_hours = (baseline_end - existed_from) / 3600.0
-
-    score =
-      if baseline_hours <= 0
-        # The article is too new for a dependable baseline, thus the volume alone gives its
-        # position. A burst at the start still appears, and the surge ratio is not infinite.
-        volume * absolute_weight
-      else
-        baseline_rate = baseline_total / baseline_hours
-        expected = baseline_rate * RECENT_WINDOW_HOURS
-        surge = (recent_visitors + PRIOR) / (expected + PRIOR)
-        Math.log(surge + 1) * relative_weight + volume * absolute_weight
-      end
-
-    [ score, recent_visitors.to_f ]
-  end
-
-  def relative_weight
-    @relative_weight ||= ENV.fetch("TRENDING_SCORE_RELATIVE_WEIGHT", 1).to_f
-  end
-
-  # The defaults are less than 1. Thus the volume part stops a small change from a position above
-  # a true surge, and the surge part has the most importance. The widget shows what is popular
-  # now, and not what people read the most at any time.
-  def absolute_weight
-    @absolute_weight ||= ENV.fetch("TRENDING_SCORE_ABSOLUTE_WEIGHT", 0.5).to_f
-  end
-
   # Writes a log line for the one condition that changes the list to popularity order with no
-  # message: there are candidates but each one has zero recent visitors. That means that Plausible
-  # is down or that the paths changed.
-  def warn_if_no_analytics(articles, recent)
-    return if articles.any? { |a| recent[a.path].to_f.positive? }
-    Rails.logger.info("TrendingArticles: no visitors for any of #{articles.size} candidates over #{RECENT_WINDOW_HOURS}h (Plausible down or path mismatch?)")
+  # message: there are candidates but the series holds no visitor for any of them. That means that
+  # Plausible is down or that the paths changed.
+  def warn_if_no_analytics(articles, series)
+    return if series.nil? || articles.any? { |a| series[a.path].present? }
+    Rails.logger.info("TrendingArticles: no visitors for any of #{articles.size} candidates over #{SERIES_DAYS} days (Plausible down or path mismatch?)")
   end
 end

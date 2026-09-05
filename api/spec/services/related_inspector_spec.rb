@@ -1,15 +1,18 @@
 require "rails_helper"
 
 RSpec.describe RelatedInspector do
-  subject(:inspector) { described_class.new(articles: articles, related: related) }
+  subject(:inspector) { described_class.new(articles: articles, related: related, plausible: plausible, taxonomy: taxonomy) }
 
   let(:articles) { instance_double(Articles) }
   let(:related) { instance_double(RelatedArticles) }
+  let(:plausible) { instance_double(Plausible, covisit_visitors: nil) }
+  let(:taxonomy) { instance_double(TaxonomyConcepts, tree: {}) }
 
-  def article(id:, slug:)
+  def article(id:, slug:, published_at: "2024-05-01T10:00:00Z", entry_type: "Article")
+    path = "/#{DateTime.parse(published_at).strftime('%Y/%m/%d')}/#{slug}/"
     DeepOstruct.wrap(
-      title: slug.capitalize, slug: slug, published_at: "2024-05-01T10:00:00Z",
-      entry_type: "Article", draft: false, path: "/2024/05/01/#{slug}/",
+      title: slug.capitalize, slug: slug, published_at: published_at,
+      entry_type: entry_type, draft: false, path: path, concept_ids: [],
       sys: { id: id, published_version: 2 }
     )
   end
@@ -32,15 +35,14 @@ RSpec.describe RelatedInspector do
   describe "#inspect_article" do
     it "gives the report of the ranking of that article" do
       allow(related).to receive(:explain).with("a1").and_return(
-        floor: 0.1,
-        rows: [ { id: "a2", title: "Two", score: 0.4, above_floor: true, selected: true } ]
+        rows: [ { id: "a2", title: "Two", score: 0.4, link: false, prior: 0.1, selected: true } ]
       )
 
       report = inspector.inspect_article("one")
 
       expect(report[:title]).to eq("One")
       expect(report[:total]).to eq(1)
-      expect(report[:above_floor]).to eq(1)
+      expect(report[:rows].first[:selected]).to be(true)
     end
 
     it "says so for a slug that no entry has" do
@@ -91,6 +93,54 @@ RSpec.describe RelatedInspector do
       allow(related).to receive(:all).and_return({})
 
       expect { inspector.audit }.not_to raise_error
+    end
+  end
+
+  # ⚠️ The metric makes the list as the build does: it removes the adjacent entries and the entry
+  # itself, and it does not count a transition to an entry that can never be a card.
+  describe "#evaluate" do
+    let(:list) do
+      [
+        article(id: "a1", slug: "one", published_at: "2024-05-01T10:00:00Z"),
+        article(id: "a2", slug: "two", published_at: "2024-04-01T10:00:00Z"),
+        article(id: "a3", slug: "three", published_at: "2024-03-01T10:00:00Z"),
+        article(id: "a4", slug: "four", published_at: "2024-02-01T10:00:00Z"),
+        article(id: "s1", slug: "short", published_at: "2024-01-01T10:00:00Z", entry_type: "Short")
+      ]
+    end
+
+    before do
+      allow(related).to receive(:all).with(count: RelatedInspector::FETCH_COUNT).and_return("a1" => %w[a3 a4])
+    end
+
+    it "gives the share of the real transitions that go to a card of the section" do
+      allow(plausible).to receive(:covisit_visitors).and_return(
+        "/2024/05/01/one/" => { "/2024/03/01/three/" => 4, "/2024/02/01/four/" => 2 }
+      )
+
+      report = inspector.evaluate(count: 1)
+
+      expect(report).to include(pages: 1, hits: 4, total: 6, recall: 0.667)
+    end
+
+    it "does not count a transition to an adjacent entry or to a Short" do
+      allow(plausible).to receive(:covisit_visitors).and_return(
+        "/2024/05/01/one/" => { "/2024/04/01/two/" => 10, "/2024/01/01/short/" => 10, "/2024/03/01/three/" => 5 }
+      )
+
+      expect(inspector.evaluate).to include(hits: 5, total: 5, recall: 1.0)
+    end
+
+    it "skips a page with too few transitions" do
+      allow(plausible).to receive(:covisit_visitors).and_return(
+        "/2024/05/01/one/" => { "/2024/03/01/three/" => RelatedInspector::MIN_TRANSITIONS - 1 }
+      )
+
+      expect(inspector.evaluate).to include(pages: 0, recall: nil)
+    end
+
+    it "gives a nil recall when Plausible is not available" do
+      expect(inspector.evaluate[:recall]).to be_nil
     end
   end
 end

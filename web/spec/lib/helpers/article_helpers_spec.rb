@@ -527,6 +527,42 @@ RSpec.describe ArticleHelpers do
     end
   end
 
+  # The section of a Short: the related entries without the two adjacent entries, which the
+  # read-next section already shows, and without the entry itself.
+  describe '#related_section' do
+    def data
+      OpenStruct.new(articles: @corpus || [], related: @related || {})
+    end
+
+    def entry(slug, id, published_at)
+      a = article(slug: slug, published_at: published_at)
+      a.sys = OpenStruct.new(id: id)
+      a
+    end
+
+    let(:newer) { entry('newer', 'id-newer', '2024-04-01T00:00:00Z') }
+    let(:short) { entry('short', 'id-a', '2024-03-01T00:00:00Z') }
+    let(:older) { entry('older', 'id-older', '2024-02-01T00:00:00Z') }
+    let(:other) { entry('other', 'id-o', '2024-01-01T00:00:00Z') }
+
+    before { stub_corpus([ newer, short, older, other ]) }
+
+    it 'removes the adjacent entries and the entry itself, and fills the section from the rest' do
+      @related = { 'id-a' => %w[id-older id-a id-newer id-o] }
+      expect(related_section(short).map(&:slug)).to eq([ 'other' ])
+    end
+
+    it 'keeps the order of the api' do
+      @related = { 'id-a' => %w[id-o id-older] }
+      expect(related_section(short, count: 1).map(&:slug)).to eq([ 'other' ])
+    end
+
+    it 'returns nothing when the entry has no neighbor' do
+      @related = {}
+      expect(related_section(short)).to eq([])
+    end
+  end
+
   # The helpers that read the taxonomy need tags with path and parent_id, and not only id and name,
   # and they need a data.tags tree. Thus this group defines larger builders that replace the ones
   # above.
@@ -688,14 +724,28 @@ RSpec.describe ArticleHelpers do
       end
 
       it 'gives the related entries only when the article has no race' do
-        a = entry('post', 'id-a')
-        other = entry('other', 'id-o')
-        stub_corpus([ a, other ])
+        a = entry('post', 'id-a', published_at: '2024-03-01T00:00:00Z')
+        adjacent = entry('adjacent', 'id-adj', published_at: '2024-02-01T00:00:00Z')
+        other = entry('other', 'id-o', published_at: '2024-01-01T00:00:00Z')
+        stub_corpus([ a, adjacent, other ])
         @related = { 'id-a' => [ 'id-o' ] }
 
         sections = recirculation_sections(a)
         expect(sections[:reports]).to eq([])
         expect(sections[:related].map(&:slug)).to eq([ 'other' ])
+      end
+
+      # ⚠️ The read-next section renders the two adjacent entries on the same page, and an entry
+      # with a near meaning is frequently also the adjacent one.
+      it 'never lists an adjacent entry, which the read-next section already shows' do
+        newer = entry('newer', 'id-newer', published_at: '2024-04-01T00:00:00Z')
+        a = entry('post', 'id-a', published_at: '2024-03-01T00:00:00Z')
+        older = entry('older', 'id-older', published_at: '2024-02-01T00:00:00Z')
+        other = entry('other', 'id-o', published_at: '2024-01-01T00:00:00Z')
+        stub_corpus([ newer, a, older, other ])
+        @related = { 'id-a' => %w[id-older id-newer id-o] }
+
+        expect(recirculation_sections(a)[:related].map(&:slug)).to eq([ 'other' ])
       end
 
       # Two empty lists render no section at all.

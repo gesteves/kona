@@ -1,10 +1,10 @@
 # The inspection tools for the "You May Also Like" ranking.
 #
 # ⚠️ These exist because no A/B test can operate at the traffic of this site. Thus a person reads
-# these two reports to know if a change to the ranking helped.
+# these reports to know if a change to the ranking helped.
 namespace :related do
-  desc "Prints the ranking of one article: the BM25 similarity, the taxonomy overlap, the final " \
-       "score, the floor, the MMR selection, and the shared terms. Give the slug."
+  desc "Prints the ranking of one article: the BM25 similarity, the taxonomy overlap, the link, " \
+       "the prior, the final score, the MMR selection, and the shared terms. Give the slug."
   task :inspect, [ :slug ] => :environment do |_task, args|
     slug = args[:slug].to_s
     abort("Give a slug: rake related:inspect[my-article]") if slug.blank?
@@ -13,17 +13,16 @@ namespace :related do
     abort(report[:error]) if report[:error].present?
 
     puts "#{report[:title]}  (#{report[:path]})"
-    puts "floor #{format('%.4f', report[:floor])}   candidates #{report[:total]}   past the floor #{report[:above_floor]}"
+    puts "candidates #{report[:total]}"
     puts
-    puts format("%-4s %-8s %-8s %-8s %-5s %-5s %-30s %s",
-                "#", "lexical", "overlap", "score", "keep", "MMR", "shared terms", "title")
+    puts format("%-4s %-8s %-8s %-5s %-8s %-8s %-5s %-30s %s",
+                "#", "lexical", "overlap", "link", "prior", "score", "MMR", "shared terms", "title")
 
     report[:rows].each_with_index do |row, index|
       puts format(
-        "%-4d %-8.4f %-8.4f %-8.4f %-5s %-5s %-30.30s %s",
-        index + 1, row[:lexical], row[:overlap], row[:score],
-        row[:above_floor] ? "yes" : "no", row[:selected] ? "yes" : "no",
-        Array(row[:terms]).join(", "), row[:title]
+        "%-4d %-8.4f %-8.4f %-5s %-8.4f %-8.4f %-5s %-30.30s %s",
+        index + 1, row[:lexical], row[:overlap], row[:link] ? "yes" : "no", row[:prior], row[:score],
+        row[:selected] ? "yes" : "no", Array(row[:terms]).join(", "), row[:title]
       )
     end
   end
@@ -40,10 +39,18 @@ namespace :related do
     puts
     puts "the similarity of each pair:"
     puts format("  mean %+.4f   sd %.4f", report[:spread][:mean], report[:spread][:sd])
+  end
 
-    next unless report[:short].positive?
+  desc "Prints the recall of the section against the real navigation of the readers, from " \
+       "Plausible. The lists of 2026-09-05 gave 0.389 before the links and the prior."
+  task evaluate: :environment do
+    report = RelatedInspector.new.evaluate
 
-    puts
-    puts "⚠️ A short list leaves a hole in the two-column grid. Read `mmr_pool` in RelatedArticles."
+    if report[:recall].nil?
+      abort("No transitions. Plausible is not configured, or it is not available.")
+    end
+
+    puts "pages     #{report[:pages]}"
+    puts "recall@#{RelatedInspector::SECTION_COUNT}  #{report[:hits]}/#{report[:total]} = #{report[:recall]}"
   end
 end

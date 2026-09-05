@@ -99,14 +99,6 @@ RSpec.describe RelatedArticles do
       service.all
     end
 
-    # ⚠️ The section renders a two-column grid, thus a short list leaves a hole. The floor selects
-    # which candidates to prefer, and it never makes the list short.
-    it "gives a full list even when no candidate goes past the floor" do
-      stub_const("RelatedArticles::FLOOR_SIGMAS", 100.0)
-
-      expect(service.all(count: 3)["q1"]).to eq(%w[near mid far])
-    end
-
     it "gives every candidate it has when the corpus is smaller than count" do
       expect(service.all(count: 10)["q1"]).to eq(%w[near mid far])
     end
@@ -118,35 +110,95 @@ RSpec.describe RelatedArticles do
     end
   end
 
-  # A BM25 similarity is never negative, thus MIN_SCORE and not zero is what says "not related".
-  # The floor puts each such candidate below the others, and the list still fills.
-  describe "the floor" do
+  # ⚠️ The prior is what selects inside a group of candidates with a near-equal relevance. The
+  # candidates have the same text, thus the prior alone decides the order.
+  describe "the prior" do
     let(:corpus) do
       texts(
         "q1" => "alpha bravo charlie",
-        "a" => "delta echo foxtrot",
-        "b" => "golf hotel india"
+        "a" => "alpha bravo charlie",
+        "b" => "alpha bravo charlie"
       )
     end
 
     let(:list) do
       [
         article(id: "q1", slug: "self", published_at: "2024-05-01T10:00:00Z"),
-        article(id: "a", slug: "a", published_at: "2024-04-01T10:00:00Z"),
-        article(id: "b", slug: "b", published_at: "2024-03-01T10:00:00Z")
+        article(id: "a", slug: "a", published_at: "2023-05-01T10:00:00Z"),
+        article(id: "b", slug: "b", published_at: "2023-05-01T10:00:00Z")
       ]
     end
 
-    it "still fills the list when nothing is truly related" do
-      expect(service.all(count: 2)["q1"].size).to eq(2)
+    it "puts the more popular candidate first" do
+      allow(plausible).to receive(:totals_by_path).and_return(
+        "/2023/05/01/a/" => { visitors: 5, pageviews: 5 },
+        "/2023/05/01/b/" => { visitors: 500, pageviews: 600 }
+      )
+
+      expect(service.all["q1"]).to eq(%w[b a])
     end
 
-    # The floor keeps its meaning in the report, thus a person can see a weak group.
-    it "marks each candidate as below the floor in the report" do
-      rows = service.explain("q1")[:rows]
+    # A reader of a race report goes to the other reports of that season.
+    it "puts the candidate from the same season first" do
+      allow(articles).to receive(:list).and_return([
+        article(id: "q1", slug: "self", published_at: "2024-05-01T10:00:00Z"),
+        article(id: "a", slug: "a", published_at: "2023-05-01T10:00:00Z"),
+        article(id: "b", slug: "b", published_at: "2024-04-15T10:00:00Z")
+      ])
 
-      expect(rows.map { |row| row[:above_floor] }).to all(be(false))
-      expect(rows.map { |row| row[:selected] }).to include(true)
+      expect(service.all["q1"]).to eq(%w[b a])
+    end
+
+    it "gives the prior in the report" do
+      allow(plausible).to receive(:totals_by_path).and_return("/2023/05/01/b/" => { visitors: 500, pageviews: 600 })
+      rows = service.explain("q1")[:rows].index_by { |row| row[:id] }
+
+      expect(rows["b"][:prior]).to be > rows["a"][:prior]
+    end
+  end
+
+  # ⚠️ A link that the author wrote is a strong sign that two entries are related, and the index
+  # cannot see it: the plain text of the corpus holds no URL.
+  describe "the links" do
+    let(:corpus) do
+      texts(
+        "q1" => "alpha bravo charlie [see](/2024/04/01/linked/)",
+        "linked" => "alpha bravo charlie",
+        "plain" => "alpha bravo charlie"
+      )
+    end
+
+    let(:list) do
+      [
+        article(id: "q1", slug: "self", published_at: "2024-05-01T10:00:00Z"),
+        article(id: "linked", slug: "linked", published_at: "2024-04-01T10:00:00Z"),
+        article(id: "plain", slug: "plain", published_at: "2024-04-01T10:00:00Z")
+      ]
+    end
+
+    it "puts the entry that the query article links to first" do
+      expect(service.all["q1"]).to eq(%w[linked plain])
+    end
+
+    # The two candidates have one link each, thus their text is the same length. The link of
+    # `plain` goes to no entry.
+    it "counts a link in the other direction" do
+      allow(articles).to receive(:corpus).and_return(
+        texts(
+          "q1" => "alpha bravo charlie",
+          "linked" => "alpha bravo charlie [back](/2024/05/01/self/)",
+          "plain" => "alpha bravo charlie [away](/2019/01/01/nowhere/)"
+        )
+      )
+
+      expect(service.all["q1"].first).to eq("linked")
+    end
+
+    it "marks the link in the report" do
+      rows = service.explain("q1")[:rows].index_by { |row| row[:id] }
+
+      expect(rows["linked"][:link]).to be(true)
+      expect(rows["plain"][:link]).to be(false)
     end
   end
 
@@ -196,8 +248,7 @@ RSpec.describe RelatedArticles do
       report = service.explain("q1")
       row = report[:rows].first
 
-      expect(report[:floor]).to be_a(Float)
-      expect(row).to include(:id, :title, :lexical, :overlap, :relevance, :score, :above_floor, :selected)
+      expect(row).to include(:id, :title, :lexical, :overlap, :link, :relevance, :prior, :score, :selected)
       expect(row[:id]).to eq("near")
       expect(row[:selected]).to be(true)
     end
@@ -218,9 +269,6 @@ RSpec.describe RelatedArticles do
   # ⚠️ MMR is what makes the section go wider. The nearest four articles are frequently
   # near-copies of each other, thus the reader got one direction and not four.
   describe "the MMR diversity" do
-    # The floor is off, thus this example measures MMR alone.
-    before { stub_const("RelatedArticles::FLOOR_SIGMAS", -10.0) }
-
     # Each candidate shares the same three words with the query. But c1, c2, and c3 also share
     # three words with each other, and `other` shares none. Thus the four are equally relevant and
     # only the diversity separates them.

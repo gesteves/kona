@@ -1,14 +1,17 @@
 # Puts the articles of the "You May Also Like" section in order. It makes a BM25 index of the text
-# of each article, gives each candidate a score, and returns the nearest ones.
+# of each article, gives each candidate a score, and lets MMR select the final list.
 #
-# The score of one candidate has two parts:
+# The score of one candidate has three parts:
 #   * relevance = (LEXICAL_WEIGHT · BM25 similarity + taxonomy weight · concept overlap), with a
 #                 demotion when the candidate reports the same race as the query article.
-#   * score     = relevance + a small addition for a recent article and for one that people read.
+#   * evidence  = relevance + LINK_BONUS when the author linked the two entries.
+#   * prior     = an addition for the popularity of the candidate and for a publish date near the
+#                 date of the query article.
 #
-# A floor over the **relevance** marks each candidate that is truly related. MMR then selects the
-# final list from those candidates first. ⚠️ The floor selects which candidates to prefer, and it
-# never makes the list short: the section renders a two-column grid, thus it must always be full.
+# ⚠️ The prior is large enough to select inside a group of candidates with a near-equal relevance.
+# For a race report, the candidates are twenty other race reports and their relevance forms a flat
+# band, and the words that they share are noise. In that band, the popularity and the season are
+# what predict a click. `rake related:evaluate` measures this against the real navigation.
 class RelatedArticles < ApplicationService
   include ArticleRanking # candidates, shared with TrendingArticles
 
@@ -19,23 +22,17 @@ class RelatedArticles < ApplicationService
   LEXICAL_WEIGHT = ENV.fetch("RELATED_LEXICAL_WEIGHT", 0.65).to_f
   # The balance of MMR: 1.0 is relevance only, and 0.0 is diversity only.
   MMR_LAMBDA = ENV.fetch("RELATED_MMR_LAMBDA", 0.7).to_f
-  # The floor, in standard deviations above the mean relevance of that query.
-  FLOOR_SIGMAS = ENV.fetch("RELATED_FLOOR_SIGMAS", 0.5).to_f
-  # The absolute part of the floor. Two articles of this corpus that share no rare word and no
-  # concept score near zero, thus a relevance below this value means "not truly related".
-  #
-  # ⚠️ This value must stay above zero. A BM25 similarity and a concept overlap are both never
-  # negative, thus a floor at zero would mark each candidate as related. Read `rake related:inspect`
-  # after a change to LEXICAL_WEIGHT, because that weight moves this distribution.
-  MIN_SCORE = 0.02
+  # The addition for a link between the two entries, in either direction.
+  LINK_BONUS = ENV.fetch("RELATED_LINK_BONUS", 0.15).to_f
+  # The largest addition for the popularity of a candidate.
+  POPULARITY_WEIGHT = ENV.fetch("RELATED_POPULARITY_WEIGHT", 0.1).to_f
+  # The largest addition for a publish date near the date of the query article.
+  SEASON_WEIGHT = ENV.fetch("RELATED_SEASON_WEIGHT", 0.1).to_f
+  # The width of the season, in days. The addition is one half of SEASON_WEIGHT at 1.18 sigma.
+  SEASON_SIGMA_DAYS = 120.0
   # The candidates that go into MMR. A larger pool gives MMR more to select from, and it costs one
   # similarity for each pair inside the pool.
   MMR_POOL = 24
-  # The largest addition from the date and the popularity. It is small, thus it moves only a
-  # near-equal pair and it never wins against the topic.
-  PRIOR_WEIGHT = 0.02
-  # The age at which the addition for the date is one half of its value, in days.
-  AGE_HALF_LIFE_DAYS = 730.0
   # The factor that a candidate of the same race gets. MMR does most of this work, because four
   # reports of the same race are near-copies of each other and MMR takes one of them.
   SAME_RACE_FACTOR = 0.85
@@ -83,7 +80,7 @@ class RelatedArticles < ApplicationService
   # same methods as `all`, thus the report can never describe a different ranking.
   # @param id [String] The Contentful id of the query article.
   # @param count [Integer] The number of neighbors that the section shows.
-  # @return [Hash, nil] { floor:, rows: }, or nil when the corpus or the text is absent.
+  # @return [Hash, nil] { rows: }, or nil when the corpus or the text is absent.
   def explain(id, count: 4)
     pool = candidates
     published = @articles.list.reject(&:draft)
@@ -96,36 +93,35 @@ class RelatedArticles < ApplicationService
     return unless context[:index].key?(id)
 
     scored = score_rows(article, pool, context)
-    floor = floor_for(scored)
-    selected = select_by_mmr(mmr_pool(scored, count, floor: floor), count, context[:index]).map { |row| row[:id] }.to_set
+    selected = select_by_mmr(mmr_pool(scored), count, context[:index]).map { |row| row[:id] }.to_set
 
-    rows = scored.sort_by { |row| -row[:score] }.map do |row|
-      row.merge(above_floor: above_floor?(row, floor), selected: selected.include?(row[:id]))
-    end
-
-    { floor: floor, rows: rows }
+    { rows: mmr_pool(scored, limit: nil).map { |row| row.merge(selected: selected.include?(row[:id])) } }
   end
 
   private
 
-  # Everything that each query article reads: the lexical index, the taxonomy scorer, the
-  # popularity, and the race of each candidate. The code makes it one time for the full corpus.
+  # Everything that each query article reads: the lexical index, the taxonomy scorer, the links,
+  # the popularity, the dates, and the race of each candidate. The code makes it one time for the
+  # full corpus.
   # @param detailed [Boolean] True to also give the shared terms of each pair, for the report.
   def build_context(published, pool, detailed: false)
     ids = (published + pool).filter_map { |article| article.sys&.id }.uniq
     taxonomy = ArticleTaxonomy.new(articles: published, tree: taxonomy_tree)
+    corpus = @articles.corpus.slice(*ids)
 
     {
       # ⚠️ The index reads the published entries alone. A draft in it would change the IDF of each
       # term and the mean document length, thus it would move a score that no person can explain.
-      index: ArticleIndex.new(@articles.corpus.slice(*ids)),
+      index: ArticleIndex.new(corpus),
+      links: ArticleLinks.new(corpus, published.to_h { |a| [ a.sys&.id, a.path ] }),
       detailed: detailed,
       titles: published.each_with_object({}) { |a, acc| acc[a.sys&.id] = a.title },
+      dates: published.each_with_object({}) { |a, acc| acc[a.sys&.id] = published_time(a) },
       taxonomy: taxonomy,
       # ⚠️ One time for each article, and not one time for each pair. This loop compares each
       # article against each other article.
       races: published.each_with_object({}) { |a, acc| acc[a.sys&.id] = taxonomy.race_concept_id(a) },
-      priors: priors(pool)
+      popularity: popularity(pool)
     }
   end
 
@@ -134,24 +130,13 @@ class RelatedArticles < ApplicationService
   def neighbors_for(article, pool, context, count)
     scored = score_rows(article, pool, context)
 
-    select_by_mmr(mmr_pool(scored, count), count, context[:index]).map { |row| row[:id] }
+    select_by_mmr(mmr_pool(scored), count, context[:index]).map { |row| row[:id] }
   end
 
-  # The candidates that go into MMR: each one above the floor, and then the best of the others when
-  # too few go past it.
-  #
-  # ⚠️ The floor selects which candidates to PREFER, and it never makes the section short. The
-  # section renders a two-column grid, thus a list of three leaves a hole. An article whose
-  # candidates are all below the floor still gets a full list, and the best of a weak group is at
-  # its start.
-  # @return [Array<Hash>] The pool, the best first.
-  def mmr_pool(scored, count, floor: nil)
+  # @return [Array<Hash>] The candidates by score, the best first, and the first `limit` of them.
+  def mmr_pool(scored, limit: MMR_POOL)
     ranked = scored.sort_by { |row| -row[:score] }
-    floor ||= floor_for(scored)
-    above, below = ranked.partition { |row| above_floor?(row, floor) }
-
-    preferred = above.first(MMR_POOL)
-    preferred + below.first([ count - preferred.size, 0 ].max)
+    limit ? ranked.first(limit) : ranked
   end
 
   # The score of each candidate against one query article.
@@ -170,14 +155,18 @@ class RelatedArticles < ApplicationService
       overlap = context[:taxonomy].overlap(id, other_id)
       penalty = same_race_penalty(other_id, query_race, context)
       relevance = ((LEXICAL_WEIGHT * lexical) + ((1.0 - LEXICAL_WEIGHT) * overlap)) * penalty
+      link = context[:links].linked?(id, other_id)
+      prior = context[:popularity][other_id].to_f + season(context[:dates][id], context[:dates][other_id])
 
       {
         id: other_id,
         title: context[:titles][other_id],
         lexical: lexical,
         overlap: overlap,
+        link: link,
         relevance: relevance,
-        score: relevance + context[:priors][other_id].to_f,
+        prior: prior,
+        score: relevance + (link ? LINK_BONUS : 0.0) + prior,
         terms: context[:detailed] ? index.terms_in_common(id, other_id) : []
       }
     end
@@ -189,29 +178,6 @@ class RelatedArticles < ApplicationService
   def same_race_penalty(other_id, query_race, context)
     return 1.0 if query_race.blank?
     context[:races][other_id] == query_race ? SAME_RACE_FACTOR : 1.0
-  end
-
-  # The larger of two floors: the mean relevance plus FLOOR_SIGMAS standard deviations, and
-  # MIN_SCORE. Each candidate below it is not truly related, and `mmr_pool` prefers the others.
-  #
-  # ⚠️ The floor reads the relevance and not the score, on purpose. The score holds the addition
-  # for the date and the popularity. A new or a popular article that is not related must never go
-  # past the floor because of that addition.
-  def floor_for(scored)
-    return MIN_SCORE if scored.size < 2
-
-    values = scored.map { |row| row[:relevance] }
-    mean = values.sum / values.size
-    variance = values.sum { |value| (value - mean)**2 } / values.size
-
-    [ mean + (FLOOR_SIGMAS * Math.sqrt(variance)), MIN_SCORE ].max
-  end
-
-  # ⚠️ MIN_SCORE is exclusive, and the floor from the standard deviation is not. A candidate at
-  # exactly MIN_SCORE is not related, and it must go. But each candidate is at the floor from the
-  # standard deviation when every score is equal, and to remove all of them would be incorrect.
-  def above_floor?(row, floor)
-    row[:relevance] > MIN_SCORE && row[:relevance] >= floor
   end
 
   # Maximal marginal relevance. It selects a candidate that is relevant to the query and that is
@@ -240,37 +206,42 @@ class RelatedArticles < ApplicationService
     selected
   end
 
-  # The small addition for each candidate, from its date and from the visitors of all time. It is
-  # never more than PRIOR_WEIGHT.
+  # The addition for the popularity of each candidate, from the visitors of all time. It is never
+  # more than POPULARITY_WEIGHT.
   #
   # ⚠️ The code adds this and does not multiply by it. A multiplier would give the largest lift to
   # the candidate that is already the most relevant, and almost none to the others. Thus it would
   # make the first position stronger and it would not select between two near-equal candidates,
   # which is the one purpose of this addition.
   # @return [Hash{String=>Float}] id => the addition.
-  def priors(pool)
+  def popularity(pool)
     visitors = all_time_visitors
     largest = visitors.values.max.to_f
-    now = Time.now
+    return Hash.new(0.0) unless largest.positive?
 
     pool.each_with_object(Hash.new(0.0)) do |article, acc|
       id = article.sys&.id
       next if id.blank?
 
-      popularity = largest.positive? ? Math.log(1 + visitors[article.path].to_i) / Math.log(1 + largest) : 0.0
-      acc[id] = PRIOR_WEIGHT * ((popularity + freshness(article, now)) / 2.0)
+      acc[id] = POPULARITY_WEIGHT * Math.log(1 + visitors[article.path].to_i) / Math.log(1 + largest)
     end
   end
 
-  # @return [Float] 1.0 for an article of today, and one half at AGE_HALF_LIFE_DAYS.
-  def freshness(article, now)
-    published = DateTime.parse(article.published_at).to_time
-    age_days = (now - published) / 86_400.0
-    return 0.0 if age_days.negative?
+  # The addition for a candidate from the same season as the query article. A reader of a race
+  # report goes to the other reports of that season.
+  # @return [Float] SEASON_WEIGHT for the same day, and less as the two dates separate.
+  def season(query_time, other_time)
+    return 0.0 if query_time.nil? || other_time.nil?
 
-    0.5**(age_days / AGE_HALF_LIFE_DAYS)
+    days = (query_time - other_time).abs / 86_400.0
+    SEASON_WEIGHT * Math.exp(-((days / SEASON_SIGMA_DAYS)**2) / 2.0)
+  end
+
+  # @return [Time, nil] The publish time, or nil when the code cannot parse it.
+  def published_time(article)
+    DateTime.parse(article.published_at).to_time
   rescue Date::Error, TypeError
-    0.0
+    nil
   end
 
   # ⚠️ The pageviews widget already caches this query body. Thus this costs no more Plausible

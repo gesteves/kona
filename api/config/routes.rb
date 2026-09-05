@@ -42,15 +42,15 @@ Rails.application.routes.draw do
     # Changes the Font Awesome list that the web build posts into rendered SVGs.
     post "icons" => "icons#create"
 
-    # The nearest neighbors of each entry, by the similarity of the embeddings. The web build
-    # renders them as the static "You May Also Like" section of each article.
+    # The nearest neighbors of each entry, from the BM25 index of the article text, the links, and
+    # the concepts. The web build renders them as the static "You May Also Like" section of each
+    # article.
     get "related" => "related#show"
   end
 
   # The inbound webhooks, with one controller for each service.
   scope "webhooks", module: "webhooks", as: "webhooks" do
-    # Syncs the PDS records, the embeddings, the image mirror, and the static site. It needs an
-    # HMAC.
+    # Syncs the PDS records, the image mirror, and the static site. It needs an HMAC.
     post "contentful" => "contentful#create"
 
     # Syncs the strain, the sleep, and the recovery to Intervals.icu. It needs an HMAC.
