@@ -293,6 +293,14 @@ A deploy does **not** invalidate the edge by itself. Thus the invalidation is a 
 rule gives each response the tag `Cache-Tag: site`, and `.github/workflows/web.yml` purges that tag
 at each deploy.
 
+⚠️ **That workflow purges the tag TWO times, and both are necessary.** `wrangler deploy` returns at
+the activation, but the new version needs some seconds to reach each PoP. The first purge has no
+wait, and it gives the new pages at once at each PoP that is already current. Then the workflow
+reads `/build-id.txt` until the edge answers with the id of that run, and it purges again. That
+second purge removes the old content that a slow PoP put in the cache again. One purge after a wait
+leaves the current PoPs on the previous copy for the full wait, and it gives nothing more. Refer to
+`web/CLAUDE.md` for `/build-id.txt`.
+
 ```
 (http.host eq "<site host>" and not starts_with(http.request.uri.path, "/cdn-cgi/"))
 or

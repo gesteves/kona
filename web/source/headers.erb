@@ -78,6 +78,15 @@
 /indexnow.txt
   Cache-Control: public, max-age=0, must-revalidate
 
+# The id of the build that is live. The deploy job of .github/workflows/web.yml reads this file
+# after `wrangler deploy`, and it waits until the edge answers with the id of that run. Then it
+# purges the `site` tag. A person can also read it to know which build a host serves now.
+# ⚠️ no-store, and NOT max-age=0. A cached copy would name a build that the PoP does not serve
+# yet, thus the deploy would purge too early. This also keeps the 404 of the first deploy, which
+# has no such file, out of the cache.
+/build-id.txt
+  Cache-Control: no-store
+
 /favicon.ico
   Cache-Control: public, max-age=0, must-revalidate
 

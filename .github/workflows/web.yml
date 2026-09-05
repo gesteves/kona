@@ -284,6 +284,14 @@ jobs:
     # gems that no step installed, and stops the deploy with Bundler::GemNotFound.
     env:
       BUNDLE_WITHOUT: development:test
+      # The id of this build. source/build-id.txt.erb renders it into /build-id.txt, and the purge
+      # step below waits until the edge answers with it.
+      # ⚠️ It is the run id, and NOT the commit SHA alone. A Contentful publish builds the same
+      # commit again, thus two deploys can have one SHA and the wait would end on the OLD build.
+      # The SHA is at the end for a person who asks which code is live.
+      # ⚠️ Keep this at the job level. The build step writes the value and the purge step reads it,
+      # thus one definition is what keeps the two the same.
+      BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
 
     steps:
       - name: Checkout code
@@ -372,6 +380,23 @@ jobs:
           # each reader, and the "New" badge changes at a different moment for each reader.
           TIME_ZONE: ${{ vars.TIME_ZONE }}
 
+      # The purge step below waits until the edge answers with BUILD_ID. A build that writes no id
+      # makes that wait end in a warning at each deploy, and nothing else names the cause. This step
+      # stops the deploy at the correct moment, with the correct message.
+      - name: Check the build id in the build
+        run: |
+          set -euo pipefail
+          if [ ! -f build/build-id.txt ]; then
+            echo "::error::The build made no build/build-id.txt. Check that web/source/build-id.txt.erb exists."
+            exit 1
+          fi
+          built=$(tr -d '[:space:]' < build/build-id.txt)
+          if [ "$built" != "$BUILD_ID" ]; then
+            echo "::error::build/build-id.txt holds \"$built\" and not \"$BUILD_ID\". Check that web/source/build-id.txt.erb reads BUILD_ID."
+            exit 1
+          fi
+          echo "The build has build id $BUILD_ID."
+
       # keep_vars:true, and wrangler.jsonc has no `routes`. Thus this never replaces the vars and
       # secrets in the dashboard or the www custom domain. It runs with no user, thus the drift
       # question does not occur. It uploads build/ (assets.directory).
@@ -396,8 +421,8 @@ jobs:
 
       # ⚠️ This message goes out BEFORE the purge below, on purpose. `wrangler deploy` returns
       # after the activation of the new version, thus the site is live at this point. The purge
-      # only stops the edge from old copies, and its 30s wait for propagation would delay this
-      # message by half a minute after the event that it reports. Keep the message here. If
+      # only stops the edge from old copies, and its wait for the propagation would delay this
+      # message by some seconds after the event that it reports. Keep the message here. If
       # someone adds a step that the site is not live without, move this message below that step.
       - name: Notify Slack (deploy successful)
         if: success()
@@ -441,17 +466,28 @@ jobs:
       # problem, but it needs a zone Cloudflare token on the api, and it gives a Bugsnag report 24
       # hours later in place of an immediate CI failure.
       #
-      # ⚠️ The sleep comes FIRST, and there is only one purge, on purpose. `wrangler deploy`
-      # returns at the activation, but the propagation to all the PoPs takes some seconds. A
-      # request that a PoP with the old version answers immediately after a purge puts OLD content
-      # in the cache again. A deploy does not invalidate the edge by itself, thus that content
-      # stays until the purge of the NEXT deploy. A purge after the propagation is complete makes
-      # that race impossible. A first purge before the sleep gives nothing that the purge after
-      # the sleep does not also give.
-      # The cost is that the edge can serve the previous copy for the length of the sleep. That is
-      # the correct choice: the time is short and the condition corrects itself, but old content
-      # in the cache again stays until the next deploy. Nothing waits for this step, because the
-      # success message above already went out.
+      # ⚠️ There are TWO purges, and the FIRST one has no wait, on purpose. `wrangler deploy` returns
+      # at the activation, but the propagation to all the PoPs takes some seconds. A request that a
+      # PoP with the old version answers after a purge puts OLD content in the cache again. A deploy
+      # does not invalidate the edge by itself, thus that content stays until the purge of the NEXT
+      # deploy. The SECOND purge, after the propagation, is what removes it. The first purge gives
+      # the new pages at once at each PoP that is already current, which is almost all of them. One
+      # purge after a wait leaves those PoPs on the previous copy for the full wait, and it gives
+      # nothing more. Nothing waits for this step, because the success message above already went
+      # out.
+      #
+      # ⚠️ The wait between the two purges is a MEASUREMENT, and not a fixed number. The loop reads
+      # /build-id.txt, which the build renders from BUILD_ID, until the edge answers with the id of
+      # this run. A cache-buster query makes each try read the asset layer. Thus the second purge
+      # comes after the propagation, and not after a number that a person chose.
+      #
+      # ⚠️ A timeout of that loop gives a WARNING and does not stop this step. The loop reads ONE
+      # PoP, thus it is evidence and not proof, and a slow Cloudflare is not an error. A stop there
+      # would leave NO second purge, and the pages would stay at the edge for a year. The check
+      # below is what decides, and it runs in each condition.
+      #
+      # Two purges for each deploy stay well below the purge limit of the account. Do not add a
+      # third.
       #
       # ⚠️ The check below is the important half, because the API call above cannot fail for the
       # most probable problem. A purge for a tag that matches NOTHING returns 200 success. This
@@ -480,12 +516,50 @@ jobs:
           SITE_URL: ${{ secrets.URL }}
         run: |
           set -euo pipefail
-          sleep 30
-          curl -sS --fail-with-body --retry 3 --retry-all-errors -X POST \
-            "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data '{"tags":["site"]}'
+
+          purge() {
+            curl -sS --fail-with-body --retry 3 --retry-all-errors -X POST \
+              "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data '{"tags":["site"]}'
+          }
+
+          purge
+
+          # ⚠️ URL can end with a slash or with no slash. Remove it: "<url>//build-id.txt" is a
+          # different cache entry.
+          base="${SITE_URL%/}"
+          # curl writes this file at each try. Make it here also: a curl that stops before it
+          # opens the file would make the read below fail, and `set -e` would stop the step.
+          probe_headers="$RUNNER_TEMP/build-id-headers"
+          : > "$probe_headers"
+          deadline=$(( SECONDS + 45 ))
+          live=""
+          colo=""
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            # cb makes a new cache key at each try, thus this reads the asset layer and never a
+            # cached copy.
+            # ⚠️ No --fail-with-body and no --retry here, on purpose. A 404 and an old id are the
+            # EXPECTED answers in this window, and a retry would make each try three times longer.
+            # This loop is the retry.
+            body=$(curl -s --max-time 10 -D "$probe_headers" "$base/build-id.txt?cb=$SECONDS" || true)
+            live=$(printf '%s' "$body" | tr -d '[:space:]')
+            colo=$(tr -d '\r' < "$probe_headers" | awk 'tolower($1) == "cf-ray:" { print $2; exit }')
+            if [ "$live" = "$BUILD_ID" ]; then
+              echo "The edge serves build $BUILD_ID after ${SECONDS}s (cf-ray ${colo:-none})."
+              break
+            fi
+            sleep 2
+          done
+
+          if [ "$live" != "$BUILD_ID" ]; then
+            echo "::warning::After 45s the edge still serves build \"${live:-none}\" (cf-ray ${colo:-none}). The second purge continues."
+          fi
+
+          # A margin for the PoPs that this runner does not reach.
+          sleep 5
+          purge
 
           # Wait for the propagation of the removal before you ask a PoP what it has.
           sleep 10
@@ -527,8 +601,8 @@ jobs:
       # moved. Thus a code-only deploy submits nothing, and a publish submits approximately five:
       # the entry, the home page, /blog/, and its tag archives.
       #
-      # ⚠️ This step is AFTER the purge, on purpose. The purge already waits 40 seconds, thus each
-      # URL and /indexnow.txt are live at every PoP before an engine reads them. It is also after
+      # ⚠️ This step is AFTER the purge, on purpose. That step waits until the edge serves this
+      # build, thus each URL and /indexnow.txt are live before an engine reads them. It is also after
       # the two Slack messages, thus a failure here cannot stop a report of a deploy that was
       # successful. Nothing waits for this step.
       #

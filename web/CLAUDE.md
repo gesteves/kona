@@ -229,12 +229,28 @@ needs a key file at the root of the site, and `source/indexnow.txt.erb` renders 
   and stops, because the protocol asks for the URLs that changed and each URL of a site that exists
   already is not that. `rake indexnow:submit[all]` sends the full sitemap one time.
   `DRY_RUN=1 rake indexnow:submit` prints the URLs and posts nothing.
-- ⚠️ **The step is after the purge and after the two Slack messages, on purpose.** The purge already
-  waits 40 seconds, thus each URL and the key file are live at every PoP. Nothing waits for this
-  step.
+- ⚠️ **The step is after the purge and after the two Slack messages, on purpose.** The purge step
+  waits until the edge serves this build, thus each URL and the key file are live. Nothing waits for
+  this step.
 - ⚠️ **Keep the name `indexnow.txt`.** The protocol also permits `<key>.txt` at the root, but custom
   rule 2 of the zone blocks the file names of secret material across the full zone. A plain `.txt`
   at the root is safe, as `robots.txt` and `llms.txt` show.
+
+### `/build-id.txt`
+
+`source/build-id.txt.erb` renders the `BUILD_ID` of the deploy into `/build-id.txt`. `web.yml` gives
+it the run id, the run attempt, and the commit SHA. Thus `curl <site>/build-id.txt` answers "which
+build does this host serve now", and that stays correct after a manual rollback.
+
+- **The deploy gates on it.** After `wrangler deploy`, the purge step reads this file with a
+  cache-buster query until the edge answers with the id of that run. Only then does it purge the
+  `site` tag a second time. Refer to the root `CLAUDE.md`.
+- ⚠️ **`_headers` gives it `no-store`.** A cached copy would name a build that the PoP does not serve
+  yet, and the deploy would then purge too early.
+- ⚠️ **Keep the name `build-id.txt`.** Custom rule 2 of the zone blocks the prefix `/deploy/` and the
+  file names of secret material, across the full zone. `build-id` clears each of those families.
+- A local build renders an empty file, because `BUILD_ID` has no value. That is correct: the gate
+  runs in CI only.
 
 ### `_headers` and `_redirects`
 
