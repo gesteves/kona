@@ -683,6 +683,25 @@ RSpec.describe SiteHelpers do
       expect(feed_subtitle).to be_nil
     end
   end
+
+  describe '#sitemap_lastmod' do
+    it 'keeps the time of a Contentful timestamp' do
+      expect(sitemap_lastmod('2026-09-05T18:57:14.843Z')).to eq('2026-09-05T18:57:14+00:00')
+    end
+
+    it 'takes the DateTime that site_updated_at gives' do
+      expect(sitemap_lastmod(DateTime.parse('2026-09-05T18:57:14Z'))).to eq('2026-09-05T18:57:14+00:00')
+    end
+
+    # ⚠️ IndexNow compares this string. With a date alone, a second edit of the same day
+    # gives the same value, and no URL goes to the engines.
+    it 'gives two values for two times of the same day' do
+      morning = sitemap_lastmod('2026-09-05T08:00:00Z')
+      evening = sitemap_lastmod('2026-09-05T20:00:00Z')
+      expect(morning).not_to eq(evening)
+    end
+  end
+
   describe '#article_click_classes' do
     it 'makes the name class and the section class' do
       expect(article_click_classes('Recent Articles'))

@@ -154,6 +154,15 @@ module SiteHelpers
     ].flatten.max
   end
 
+  # The value of <lastmod> in the sitemap.
+  # ⚠️ Keep the time. IndexNow compares this string, thus a date alone makes a second edit of the
+  # same day invisible, and no URL goes to the engines.
+  # @param value [String, DateTime] A timestamp, or the DateTime that site_updated_at gives.
+  # @return [String] A W3C datetime, for example 2026-09-05T18:57:14+00:00.
+  def sitemap_lastmod(value)
+    (value.is_a?(String) ? DateTime.parse(value) : value).iso8601
+  end
+
   # The year of the first non-draft article. The app keeps the value, because it renders in the
   # footer of each page and each calculation parses the publish date of each article.
   # @return [String] A four-digit year.

@@ -10,8 +10,8 @@ RSpec.describe IndexNow do
   # The two entries that each example starts from.
   let(:sitemap) do
     {
-      'https://example.com/' => '2026-09-05',
-      'https://example.com/2026/09/01/a-post/' => '2026-09-01'
+      'https://example.com/' => '2026-09-05T18:57:14+00:00',
+      'https://example.com/2026/09/01/a-post/' => '2026-09-01T12:00:00+00:00'
     }
   end
 
@@ -66,7 +66,7 @@ RSpec.describe IndexNow do
 
   context 'with a previous submission' do
     it 'submits a URL that is new and a URL whose lastmod moved, and no other one' do
-      stored('https://example.com/' => '2026-09-05', 'https://example.com/old/' => '2026-01-01')
+      stored('https://example.com/' => '2026-09-05T18:57:14+00:00', 'https://example.com/old/' => '2026-01-01T00:00:00+00:00')
       allow(HTTParty).to receive(:post).and_return(response(200))
 
       # The home page did not move, the post is new, and /old/ is gone from the sitemap.
@@ -90,6 +90,16 @@ RSpec.describe IndexNow do
           )
         )
       )
+    end
+
+    # ⚠️ The lastmod of the sitemap holds the time, and not the date alone. Without it, a second
+    # edit of the same day gives the same string and no URL goes to the engines.
+    it 'submits a URL whose lastmod moved inside one day' do
+      stored(sitemap)
+      allow(HTTParty).to receive(:post).and_return(response(200))
+      entries = sitemap.merge('https://example.com/' => '2026-09-05T21:30:00+00:00')
+
+      expect(submit(entries)).to eq([ 'https://example.com/' ])
     end
 
     it 'submits nothing when no URL changed' do
@@ -148,7 +158,7 @@ RSpec.describe IndexNow do
     it 'leaves it out and submits the others' do
       stored({})
       allow(HTTParty).to receive(:post).and_return(response(200))
-      entries = sitemap.merge('http://localhost:4567/' => '2026-09-05')
+      entries = sitemap.merge('http://localhost:4567/' => '2026-09-05T18:57:14+00:00')
 
       expect(submit(entries)).to match_array(sitemap.keys)
       expect(logged.join).to include('not on example.com')
@@ -156,7 +166,7 @@ RSpec.describe IndexNow do
 
     it 'raises when no URL is on that host' do
       stored({})
-      expect { submit({ 'http://localhost:4567/' => '2026-09-05' }) }
+      expect { submit({ 'http://localhost:4567/' => '2026-09-05T18:57:14+00:00' }) }
         .to raise_error(described_class::ConfigurationError, /is on the host/)
     end
   end

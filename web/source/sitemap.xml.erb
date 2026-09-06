@@ -4,26 +4,26 @@
     <url>
       <loc><%= full_url(page.path) %></loc>
       <% if page.is_home_page %>
-        <lastmod><%= site_updated_at.strftime('%Y-%m-%d') %></lastmod>
+        <lastmod><%= sitemap_lastmod(site_updated_at) %></lastmod>
       <% else %>
-        <lastmod><%= DateTime.parse(page.updated_at).strftime('%Y-%m-%d') %></lastmod>
+        <lastmod><%= sitemap_lastmod(page.updated_at) %></lastmod>
       <% end %>
     </url>
   <% end %>
   <% indexable_articles.each do |article| %>
     <url>
       <loc><%= full_url(article.path) %></loc>
-      <lastmod><%= DateTime.parse(article.updated_at).strftime('%Y-%m-%d') %></lastmod>
+      <lastmod><%= sitemap_lastmod(article.updated_at) %></lastmod>
     </url>
   <% end %>
   <%# The list pages: the blog index and each tag page. They have no updated_at of their own, thus
-      lastmod is the date of the newest entry on each page. %>
+      lastmod is the time of the newest entry on each page. %>
   <% (data.blog + data.tags.flat_map(&:pages)).select { |p| p.index_in_search_engines }.each do |page| %>
     <url>
       <loc><%= full_url(page.path) %></loc>
       <% latest = Array(page.items).filter_map { |i| DateTime.parse(i.updated_at) if i.updated_at.present? }.max %>
       <% if latest %>
-        <lastmod><%= latest.strftime('%Y-%m-%d') %></lastmod>
+        <lastmod><%= sitemap_lastmod(latest) %></lastmod>
       <% end %>
     </url>
   <% end %>

@@ -220,6 +220,10 @@ needs a key file at the root of the site, and `source/indexnow.txt.erb` renders 
   reads `build/sitemap.xml`, compares it with the `indexnow:sitemap` key, and submits the URLs that
   are new and the URLs whose `lastmod` moved. Thus a code-only deploy submits nothing, and a publish
   submits approximately five: the entry, the home page, `/blog/`, and its tag archives.
+- ⚠️ **`<lastmod>` holds the time, and not the date alone.** `sitemap_lastmod` in
+  `lib/helpers/site_helpers.rb` writes a W3C datetime, and the task compares that string. With a
+  date, a second edit of the same entry on the same day gives the same value, thus the diff finds
+  nothing and the engines keep the first version until an edit on another day. Do not truncate it.
 - ⚠️ **The task stores the sitemap only after a successful POST.** A store after a failure would
   lose that change for all time, because the next deploy would then find no difference. For the same
   reason a 429, a 5xx, and a network error only log a warning and store nothing, and the next deploy
