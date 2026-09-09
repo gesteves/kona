@@ -78,7 +78,7 @@ class TrainerRoad < ApplicationService
   # race. A timed event must have a duration that is possible. The cache holds this for 5 minutes.
   # @param date [Date] The calendar date.
   # @param timezone [String] The IANA timezone for a timed event.
-  # @return [Array<Hash>] Hashes with :name, :sport, and :description.
+  # @return [Array<Hash>] Hashes with :name, :sport, :description, and :duration_minutes.
   def planned_workouts(date, timezone: @timezone)
     return [] if @calendar_url.blank?
 
@@ -168,15 +168,27 @@ class TrainerRoad < ApplicationService
     end
   end
 
-  # @return [Hash] The :name, the :sport, and the :description of the planned workout.
+  # @return [Hash] The :name, the :sport, the :description, and the :duration_minutes of the
+  #   planned workout.
   def normalize_planned_workout(event)
     summary = event.summary.to_s.strip
 
     {
       name: strip_duration_prefix(summary),
       sport: detect_sport(summary, raw_description(event)),
-      description: clean_description(raw_description(event))
+      description: clean_description(raw_description(event)),
+      duration_minutes: planned_duration_minutes(event)
     }
+  end
+
+  # The planned duration of an event: the "H:MM - " prefix of an all-day event, or the length of a
+  # timed event.
+  # @return [Integer, nil] The minutes, or nil when the event gives no duration.
+  def planned_duration_minutes(event)
+    return parse_duration_prefix(event.summary.to_s.strip) if all_day?(event)
+    return if event.dtend.blank?
+
+    ((event.dtend.to_time - event.dtstart.to_time) / 60).round
   end
 
   # @return [String, nil] The description of the event. It accepts the array values of

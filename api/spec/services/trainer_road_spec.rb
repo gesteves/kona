@@ -161,7 +161,13 @@ RSpec.describe TrainerRoad do
 
       workouts = service.planned_workouts(date)
 
-      expect(workouts).to eq([ { name: "Gibbs", sport: "Cycling", description: "TSS 120. Two hours of sweet spot." } ])
+      expect(workouts).to eq([ { name: "Gibbs", sport: "Cycling", description: "TSS 120. Two hours of sweet spot.", duration_minutes: 120 } ])
+    end
+
+    it "reads the duration of a timed event from its start and its end" do
+      stub_calendar([ { summary: "Evening Run Intervals", start: "20260709T170000Z", end: "20260709T181500Z" } ])
+
+      expect(service.planned_workouts(date).first[:duration_minutes]).to eq(75)
     end
 
     it "excludes all-day events without a duration prefix (annotations, races)" do

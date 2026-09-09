@@ -155,6 +155,36 @@ RSpec.describe ActivityDescription::Generator do
       expect(intervals).to have_received(:update_activity!).with("i1", description: a_string_starting_with("🗓️ 2 hours of sweet spot"))
     end
 
+    it "skips the headline when the activity is shorter than the workout" do
+      allow(intervals).to receive(:activity!).and_return(activity.merge(name: "Gibbs on the trainer", moving_time: 3600))
+      allow(trainer_road).to receive(:planned_workouts)
+        .and_return([ { name: "Gibbs", sport: "Cycling", description: "2x20 @ 90%", duration_minutes: 90 } ])
+
+      generator.generate!("i1")
+
+      expect(ActivityDescription::Llm).not_to have_received(:planned_summary)
+    end
+
+    it "keeps the headline when the activity stops in the 5-minute cooldown buffer" do
+      allow(intervals).to receive(:activity!).and_return(activity.merge(name: "Gibbs on the trainer", moving_time: 3600))
+      allow(trainer_road).to receive(:planned_workouts)
+        .and_return([ { name: "Gibbs", sport: "Cycling", description: "2x20 @ 90%", duration_minutes: 65 } ])
+
+      generator.generate!("i1")
+
+      expect(ActivityDescription::Llm).to have_received(:planned_summary).with("2x20 @ 90%")
+    end
+
+    it "keeps the headline when the activity is longer than the workout" do
+      allow(intervals).to receive(:activity!).and_return(activity.merge(name: "Gibbs on the trainer", moving_time: 7200))
+      allow(trainer_road).to receive(:planned_workouts)
+        .and_return([ { name: "Gibbs", sport: "Cycling", description: "2x20 @ 90%", duration_minutes: 60 } ])
+
+      generator.generate!("i1")
+
+      expect(ActivityDescription::Llm).to have_received(:planned_summary).with("2x20 @ 90%")
+    end
+
     it "is case-sensitive about the name match" do
       allow(intervals).to receive(:activity!).and_return(activity.merge(name: "gibbs on the trainer"))
       allow(trainer_road).to receive(:planned_workouts)

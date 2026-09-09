@@ -13,6 +13,11 @@ module ActivityDescription
     # The sports that can get the planned-workout headline from the LLM, that is, the 🗓️ line.
     HEADLINE_SPORTS = %w[Cycling Running].freeze
 
+    # The most that a planned workout can be longer than the activity, and the code still counts
+    # the workout as complete. The cooldown at the end is optional, thus a ride that stops in it is
+    # still the full workout.
+    WORKOUT_COMPLETION_BUFFER_MINUTES = 5
+
     # Removes a second quick trigger for one activity. Without this, the code would use two times
     # the LLM tokens and two runs would race at the final PUT. The TTL limits the time that a
     # worker that stops holds the lock.
@@ -77,8 +82,8 @@ module ActivityDescription
 
     # The 🗓️ planned-workout summary: the one TrainerRoad workout whose name is in the name of the
     # activity, with the same characters and the same case. The LLM writes the summary. With no
-    # match, or with more than one match, there is no headline. This applies to a bike ride and to
-    # a run only.
+    # match, with more than one match, or with an activity that is too short for the workout, there
+    # is no headline. This applies to a bike ride and to a run only.
     # @return [String, nil]
     def planned_summary_line(activity, sport)
       return unless HEADLINE_SPORTS.include?(sport)
@@ -101,10 +106,27 @@ module ActivityDescription
         return
       end
 
-      description = matches.first[:description]
+      workout = matches.first
+      return unless completed?(activity, workout)
+
+      description = workout[:description]
       return if description.blank?
 
       swallow("planned summary") { Llm.planned_summary(description) }
+    end
+
+    # Tells if the activity is long enough to be the full planned workout. An activity that is
+    # longer is fine: the athlete continued after the workout ended. It gives true when either
+    # duration is absent, thus a workout with no duration keeps its headline.
+    # @return [Boolean]
+    def completed?(activity, workout)
+      planned_minutes = workout[:duration_minutes]
+      actual_seconds = activity[:moving_time] || activity[:elapsed_time]
+      return true if planned_minutes.nil? || actual_seconds.nil?
+      return true if actual_seconds >= (planned_minutes - WORKOUT_COMPLETION_BUFFER_MINUTES) * 60
+
+      log_info("activity #{activity[:id]} is #{(actual_seconds / 60.0).round} min against the #{planned_minutes} min workout #{workout[:name].inspect} — no headline")
+      false
     end
 
     # @return [Array<Hash>] The planned workouts for the local date of the activity. It is empty
