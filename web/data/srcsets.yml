@@ -12,6 +12,8 @@
 #
 # The devices are the current iPhones, and a desktop at 1280px and above:
 #   390, 402, 420, 440 at 3x  — iPhone 17e, iPhone 17 and 17 Pro, iPhone Air, iPhone 17 Pro Max
+#   466, 626 at 3x            — iPhone Duo, the outer screen and the inner screen
+#   890 at 3x                 — iPhone Duo, the inner screen in landscape
 #
 # ⚠️ The FIRST width of a variant must be its 1x desktop width. `cover_image_tag` reads
 # `widths.first` for the `src`, in both apps.
@@ -40,6 +42,9 @@ entry: &entry
     - 1014
     - 1068
     - 1128
+    - 1206
+    - 1620
+    - 1686
 full:
   sizes:
     - auto
@@ -53,6 +58,9 @@ full:
     - 1206
     - 1260
     - 1320
+    - 1398
+    - 1878
+    - 2049
 # ⚠️ This variant has NO `auto`, and each other variant has one. The home page hero is the LCP
 # element of that page, thus it is the one image that renders EAGER (refer to render_home_body).
 # `auto` is valid on a lazy image only, and a browser ignores it on an eager image. The list below
@@ -69,6 +77,9 @@ home:
     - 396
     - 417
     - 441
+    - 474
+    - 675
+    - 978
 card:
   # The shape of a card cover, as width:height. ⚠️ A card variant of this file is the ONE source of
   # that shape. Both apps read it for the `h` of each candidate, and both write it into the markup
@@ -89,6 +100,9 @@ card:
     - 1014
     - 1068
     - 1128
+    - 1191
+    - 1206
+    - 1686
 # The cover image of an entry in the blog list and in a tag archive. That element is the centered
 # text column, which is the element that `entry` describes. Thus this variant merges the `sizes`
 # and the `widths` of `entry`, and the two can never become different.
