@@ -126,7 +126,7 @@ module AtProto
     # Bluesky session" and then tries again for 24 hours.
     return true if load_cached_session
 
-    create_session
+    open_new_session
   end
 
   # Removes the session that the cache holds and opens a new one.
@@ -137,7 +137,7 @@ module AtProto
   # @return [Boolean] True when a session is available.
   def renew_session!
     $redis.del(session_cache_key)
-    create_session
+    open_new_session
   end
 
   # Runs a request that needs the token, and runs it one time more with a new session when the PDS
@@ -178,9 +178,16 @@ module AtProto
     false
   end
 
-  # Opens a new session with the PDS and finds the service endpoint of the repo.
+  # Opens a new session with the PDS and finds the service endpoint of the repo. It is the half of
+  # `#open_session` that makes a request, thus a caller that has an empty cache comes here.
+  #
+  # ⚠️ **Do not give this method a name that an includer also uses.** `StandardSite` has its own
+  # `create_session`, which calls `open_session`. With this method named `create_session`, Ruby sent
+  # the call above to that copy, which called `open_session` again: the pair made a loop with no end
+  # and each cold cache gave a `SystemStackError`. The specs of `StandardSite` each replace
+  # `create_session`, thus no example found it.
   # @return [Boolean] True when a session is available.
-  def create_session
+  def open_new_session
     handle = @session_handle
     app_password = @session_password
 

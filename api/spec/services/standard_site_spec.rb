@@ -348,6 +348,41 @@ describe StandardSite do
     end
   end
 
+  # ⚠️ This is the ONE example that does not replace `#create_session`. `StandardSite` has a method
+  # of that name, and `AtProto` had one also: the call inside `open_session` went to the copy of
+  # this class, which called `open_session` again, thus a cold cache made a loop with no end. Each
+  # other example here replaces the method, thus nothing found it. The `AtProto` half is now
+  # `#open_new_session`.
+  describe "#create_session" do
+    subject(:client) do
+      described_class.new(credentials: BlueskyCredentials::Credentials.new(handle: "me.bsky.social", app_password: "pw"))
+    end
+
+    after { $redis.del(StandardSite::DID_CACHE_KEY) }
+
+    def stub_session(response)
+      allow(HTTParty).to receive(:post)
+        .with(a_string_including("com.atproto.server.createSession"), anything)
+        .and_return(response)
+    end
+
+    it "opens one session against the PDS when the cache is empty" do
+      stub_session(instance_double(HTTParty::Response, success?: true,
+                                                       body: { accessJwt: "jwt", did: "did:plc:abc123" }.to_json))
+
+      expect(client.send(:create_session)).to be(true)
+      expect(HTTParty).to have_received(:post)
+        .with(a_string_including("com.atproto.server.createSession"), anything).once
+      expect($redis.get(StandardSite::DID_CACHE_KEY)).to eq("did:plc:abc123")
+    end
+
+    it "reports a failure rather than trying for ever when the PDS refuses the pair" do
+      stub_session(instance_double(HTTParty::Response, success?: false, code: 401, body: "no"))
+
+      expect(client.send(:create_session)).to be(false)
+    end
+  end
+
   describe "#connect!" do
     let(:client) do
       described_class.new(credentials: BlueskyCredentials::Credentials.new(handle: "me.bsky.social", app_password: "pw"))
