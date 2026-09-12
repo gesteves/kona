@@ -138,6 +138,18 @@ describe StandardSite do
       expect(record["textContent"]).to eq("Some bold intro with a link. The body of the post.")
     end
 
+    # ⚠️ `tags` has a limit for EACH item (maxGraphemes 128), and nothing capped one. A long tag
+    # makes the full record invalid, thus one tag would take the whole document away with it.
+    it "cuts a tag to the limit of the lexicon and drops one that is empty" do
+      post["contentful_metadata"] = { "tags" => [ { "name" => "é" * 140 }, { "name" => "  " }, { "name" => "Ironman" } ] }
+
+      tags = client.build_document_record(post, publication_uri)["tags"]
+
+      expect(tags.length).to eq(2)
+      expect(tags.first.scan(/\X/).length).to eq(described_class::MAX_TAG_GRAPHEMES)
+      expect(tags.last).to eq("Ironman")
+    end
+
     it "maps tag names without hashtags" do
       expect(record["tags"]).to eq(%w[Ironman News])
     end
@@ -322,6 +334,7 @@ describe StandardSite do
       allow(client).to receive(:do_sync_publication)
       allow(client).to receive(:prune_legacy_publication)
       allow(client).to receive(:prune_documents).and_return(0)
+      allow(client).to receive(:own_repo?).and_return(true)
     end
 
     it "enqueues one document sync job per publishable post (skipping drafts) and still prunes" do
@@ -345,6 +358,47 @@ describe StandardSite do
       client.backfill
 
       expect(StandardSiteSyncJob.jobs).to be_empty
+    end
+
+    # ⚠️ PUBLICATION_RKEY is tid("self"), thus each installation of this code writes the publication
+    # at the SAME record key. Two sites that share one account overwrite each other's publication
+    # and then delete each other's documents as orphans, and a document names no site of its own.
+    it "does not prune a repo whose publication belongs to another site" do
+      allow(client).to receive(:fetch_all_articles).and_return([ raw_article("AAA111") ])
+      allow(client).to receive(:own_repo?).and_return(false)
+      expect(client).not_to receive(:prune_documents)
+
+      expect(client.backfill).to eq(:skipped)
+    end
+  end
+
+  describe "#own_repo?" do
+    def stub_publication(value)
+      allow(HTTParty).to receive(:get)
+        .with(a_string_including("com.atproto.repo.getRecord"), anything)
+        .and_return(value)
+    end
+
+    def record_response(url)
+      instance_double(HTTParty::Response, success?: true, body: { value: { url: url } }.to_json)
+    end
+
+    it "is true for a repo whose publication names this site" do
+      stub_publication(record_response("https://www.giventotri.com/"))
+
+      expect(client.send(:own_repo?)).to be(true)
+    end
+
+    it "is true for a repo with no publication record yet" do
+      stub_publication(instance_double(HTTParty::Response, success?: false, code: 404, body: ""))
+
+      expect(client.send(:own_repo?)).to be(true)
+    end
+
+    it "is false for a repo whose publication names another site" do
+      stub_publication(record_response("https://someone-else.example"))
+
+      expect(client.send(:own_repo?)).to be(false)
     end
   end
 

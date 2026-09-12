@@ -53,6 +53,22 @@ module AtProto
   # The seconds that one blob upload can take. It is longer, because a blob is as much as 1MB.
   UPLOAD_TIMEOUT = 30
 
+  # The most bytes of a source image that this file downloads. ⚠️ The worker is a 512MB VM at
+  # concurrency 5, thus a request with no cap can end the process.
+  MAX_SOURCE_IMAGE_BYTES = 10 * 1024 * 1024
+
+  # The steps of the shrink, in order. ⚠️ One shrink is not always enough: a picture at 1200px and
+  # Q80 can stay above a limit, and the record then lost its picture. This walks down the steps and
+  # takes the first result that fits. It makes the quality lower first, because a person sees a
+  # smaller picture before they see a lower quality.
+  SHRINK_STEPS = [
+    { width: 1200, quality: 80 },
+    { width: 1200, quality: 65 },
+    { width: 1200, quality: 50 },
+    { width: 900, quality: 50 },
+    { width: 700, quality: 45 }
+  ].freeze
+
   class_methods do
     # Encodes a 64-bit value as a 13-character TID.
     # @param value [Integer]
@@ -278,6 +294,110 @@ module AtProto
     { "uri" => written["uri"].presence || "at://#{@did}/#{collection}/#{rkey}", "cid" => written["cid"] }
   end
 
+  # Removes a record. A record that is absent is not an error, thus you can do this more than one
+  # time.
+  #
+  # ⚠️ It lives here and not in `StandardSite`, where it was, for the three things that a copy there
+  # did not have: a timeout, the retry after a refused token, and a rescue. Each write of this file
+  # needs all three.
+  # @param collection [String] The lexicon id.
+  # @param rkey [String] The record key.
+  # @return [Boolean] Whether it succeeded.
+  def delete_record(collection, rkey)
+    with_valid_session { delete_record_once(collection, rkey) } || false
+  rescue StandardError => e
+    # ⚠️ A rescue, and not a raise. The prune of a backfill calls this for each record that is no
+    # longer current, and one host that cannot be reached must not stop a full reconciliation.
+    Rails.logger.warn("#{at_proto_label}: error deleting #{collection}/#{rkey}: #{e.message}")
+    report_upstream_error(e, context: "#{at_proto_label} deleteRecord #{collection}/#{rkey}")
+    false
+  end
+
+  # One attempt of `#delete_record`. ⚠️ It raises UnauthorizedError for a 401, as
+  # `#put_record_once` does.
+  # @return [Boolean, nil]
+  def delete_record_once(collection, rkey)
+    response = HTTParty.post(
+      "#{@service_url}/xrpc/com.atproto.repo.deleteRecord",
+      body: { repo: @did, collection: collection, rkey: rkey }.to_json,
+      headers: auth_headers,
+      timeout: REQUEST_TIMEOUT
+    )
+    raise UnauthorizedError if response.code == 401
+
+    unless response.success?
+      Rails.logger.warn("#{at_proto_label}: failed to delete #{collection}/#{rkey} (HTTP #{response.code}: #{response.body})")
+      report_upstream_error("HTTP #{response.code}", context: "#{at_proto_label} deleteRecord #{collection}/#{rkey}", status: response.code)
+      return false
+    end
+
+    true
+  end
+
+  # The most pages of records to read. A PDS that gives the same cursor for all time, or a cursor
+  # that never ends, must not make this loop for all time inside a backfill.
+  MAX_LIST_PAGES = 200
+
+  # Each record key of a collection of this repo.
+  # @param collection [String] The collection to list.
+  # @return [Array<String>] The rkeys. One page comes at a time, through the cursor.
+  def list_record_rkeys(collection)
+    rkeys = []
+    cursor = nil
+
+    MAX_LIST_PAGES.times do
+      body = list_records_page(collection, cursor)
+      break if body.nil?
+
+      records = Array(body["records"])
+      # ⚠️ `compact_blank`: a row with no uri gives "", and the prune would then ask the PDS to
+      # delete a record key with no characters.
+      rkeys.concat(records.map { |record| record["uri"].to_s.split("/").last }.compact_blank)
+      next_cursor = body["cursor"]
+      break if next_cursor.blank? || records.empty? || next_cursor == cursor
+
+      cursor = next_cursor
+    end
+
+    rkeys
+  end
+
+  # One page of `#list_record_rkeys`.
+  # @return [Hash, nil] The body, or nil when the page could not be read.
+  def list_records_page(collection, cursor)
+    with_valid_session do
+      query = { repo: @did, collection: collection, limit: 100 }
+      query[:cursor] = cursor if cursor.present?
+
+      response = HTTParty.get("#{@service_url}/xrpc/com.atproto.repo.listRecords",
+                              query: query, headers: auth_headers, timeout: REQUEST_TIMEOUT)
+      raise UnauthorizedError if response.code == 401
+
+      unless response.success?
+        report_upstream_error("HTTP #{response.code}", context: "#{at_proto_label} listRecords #{collection}", status: response.code)
+        next nil
+      end
+
+      JSON.parse(response.body)
+    end
+  rescue StandardError => e
+    report_upstream_error(e, context: "#{at_proto_label} listRecords #{collection}")
+    nil
+  end
+
+  # Reads one record of this repo.
+  # @return [Hash, nil] The `value` of the record, or nil when it is absent or cannot be read.
+  def get_own_record(collection, rkey)
+    response = HTTParty.get("#{@service_url}/xrpc/com.atproto.repo.getRecord",
+                            query: { repo: @did, collection: collection, rkey: rkey },
+                            headers: auth_headers, timeout: REQUEST_TIMEOUT)
+    return unless response.success?
+
+    JSON.parse(response.body)["value"]
+  rescue StandardError
+    nil
+  end
+
   # Splits an `at://` URI into its three parts.
   # @param uri [String, nil]
   # @return [Array(String, String, String), nil] [did, collection, rkey], or nil for a URI with
@@ -371,13 +491,47 @@ module AtProto
   # @param content_type [String, nil] The content type of the source.
   # @param w [Integer] The width to ask for.
   # @param h [Integer] The height to ask for.
+  # @param limit [Integer] The most bytes that the blob can hold.
   # @return [Hash, nil] The blob, or nil after a failure.
-  def upload_image_blob(url, content_type, w:, h:)
+  def upload_image_blob(url, content_type, w:, h:, limit:)
     return if @access_jwt.blank? || url.blank?
     bytes, mime = fetch_resized_image(url, content_type, w: w, h: h)
     return if bytes.blank?
 
+    # ⚠️ The transformation of the source asks for a size and never promises one in bytes. A
+    # picture with much detail comes back above the limit, the PDS refuses the record, and the job
+    # then tries again for 24 hours for a reason that cannot change. Thus the shrink is here.
+    bytes, mime = shrink_image(bytes, limit: limit) if bytes.bytesize > limit
+    return if bytes.blank? || bytes.bytesize > limit
+
     upload_blob(bytes, mime)
+  end
+
+  # Makes a picture smaller until it is below a limit.
+  # @param bytes [String] The picture.
+  # @param limit [Integer] The most bytes that the result can hold.
+  # @return [Array(String, String)] [bytes, mime], or [nil, nil] after a failure. ⚠️ The bytes can
+  #   still be above the limit when each step was too large; the caller drops the picture.
+  def shrink_image(bytes, limit:)
+    # ⚠️ The require is **here** and not at the top of the file. libvips is a native library, thus a
+    # require at the top makes each path of this file need it, and a record with a small picture
+    # would fail where nothing has to shrink anything.
+    # ⚠️ LoadError is not a StandardError, thus the rescue below must name it.
+    require "vips"
+
+    # ⚠️ `thumbnail_buffer` shrinks at the decode. `new_from_buffer` + `resize` decodes the full
+    # picture first, and an 8000×6000 source is then ~144MB of pixels on a 512MB machine.
+    smallest = nil
+    SHRINK_STEPS.each do |step|
+      image = Vips::Image.thumbnail_buffer(bytes, step[:width], size: :down)
+      smallest = image.jpegsave_buffer(Q: step[:quality], strip: true)
+      return [ smallest, "image/jpeg" ] if smallest.bytesize <= limit
+    end
+
+    [ smallest, "image/jpeg" ]
+  rescue StandardError, LoadError => e
+    report_upstream_error(e, context: "#{at_proto_label} image resize")
+    [ nil, nil ]
   end
 
   # Gets a smaller image as raw bytes from the Contentful Images API. This keeps each blob below
@@ -391,12 +545,15 @@ module AtProto
     mime = format == "png" ? "image/png" : "image/jpeg"
     image_url = images_api_url(source, w: w, h: h, fm: format)
 
-    response = HTTParty.get(image_url, timeout: REQUEST_TIMEOUT)
-    unless response.success?
-      report_upstream_error("HTTP #{response.code}", context: "#{at_proto_label} image fetch", status: response.code, url: image_url)
+    # ⚠️ `download` stops at MAX_SOURCE_IMAGE_BYTES. A plain `get` reads the full body into memory,
+    # and the size of that body belongs to another host.
+    picture = download(image_url, max_bytes: MAX_SOURCE_IMAGE_BYTES, timeout: REQUEST_TIMEOUT)
+    if picture.blank?
+      report_upstream_error("no picture", context: "#{at_proto_label} image fetch", url: image_url)
       return
     end
-    [ response.body, mime ]
+
+    [ picture[:body], picture[:content_type].presence || mime ]
   rescue StandardError => e
     report_upstream_error(e, context: "#{at_proto_label} image fetch")
     nil

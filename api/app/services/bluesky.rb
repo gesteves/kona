@@ -32,25 +32,14 @@ class Bluesky < ApplicationService
   # the owner linked to, and the worker is a 512MB VM at concurrency 5. A picture past this limit
   # loses the thumbnail and never the post.
   MAX_CARD_IMAGE_BYTES = 10 * 1024 * 1024
-  # The width to shrink an oversized thumbnail to. Bluesky renders a card at approximately this
-  # width, thus a larger picture is only bandwidth.
-  CARD_IMAGE_WIDTH = 1200
-  # The JPEG quality of that shrink.
-  CARD_IMAGE_QUALITY = 80
-
-  # The steps of the shrink, in order.
+  # The width that an oversized thumbnail shrinks to first. Bluesky renders a card at approximately
+  # this width, thus a larger picture is only bandwidth.
   #
-  # ⚠️ One shrink is not always enough: a picture of 1200px at Q80 can stay above the limit, and the
-  # card then lost its thumbnail. This walks down the steps and takes the first result that fits.
-  # It makes the quality lower first, because a person sees a smaller picture before they see a
-  # lower quality.
-  CARD_IMAGE_STEPS = [
-    { width: CARD_IMAGE_WIDTH, quality: CARD_IMAGE_QUALITY },
-    { width: CARD_IMAGE_WIDTH, quality: 65 },
-    { width: CARD_IMAGE_WIDTH, quality: 50 },
-    { width: 900, quality: 50 },
-    { width: 700, quality: 45 }
-  ].freeze
+  # ⚠️ The two are the first step of `AtProto::SHRINK_STEPS`, where the full ladder lives, because
+  # `StandardSite` shrinks the cover image of a document against the same kind of limit.
+  CARD_IMAGE_WIDTH = AtProto::SHRINK_STEPS.first[:width]
+  # The JPEG quality of that first step.
+  CARD_IMAGE_QUALITY = AtProto::SHRINK_STEPS.first[:quality]
 
   # The limits of the text fields of a card.
   CARD_TITLE_MAX = 300
@@ -393,37 +382,14 @@ class Bluesky < ApplicationService
     upload_blob(picture[:body], picture[:content_type])
   end
 
-  # Makes a picture into a JPEG that fits under the blob limit.
+  # Makes a picture into a JPEG that fits under the blob limit of a card thumbnail.
   #
   # ⚠️ A blob past the limit fails at `putRecord`, and not at the upload. Thus without this step the
-  # whole post fails, and the message names the embed and not the picture. libvips is already a
-  # dependency of this app, for the blurhash placeholders.
+  # whole post fails, and the message names the embed and not the picture.
   # @param bytes [String] The original image.
   # @return [Array(String, String), Array(nil, nil)] [bytes, mime], or [nil, nil] when it cannot.
   def shrink(bytes)
-    # ⚠️ The require is **here** and not at the top of the file. libvips is a native library, and a
-    # require at the top makes each path of this class need it: a post with a small picture, and
-    # the preview of the Social media page, would then both fail where nothing has to shrink anything.
-    # ⚠️ LoadError is not a StandardError, thus the rescue below must name it. Without that, a
-    # machine with no libvips gives a 500 in place of a card with no picture.
-    require "vips"
-
-    # ⚠️ `thumbnail_buffer` shrinks at the decode. `new_from_buffer` + `resize` decodes the full
-    # picture first, and an 8000×6000 og:image is then ~144MB of pixels on a 512MB machine, in the
-    # request path of the preview as well as in the job. It still decodes, thus it is still the
-    # check that the bytes are a picture.
-    smallest = nil
-    CARD_IMAGE_STEPS.each do |step|
-      image = Vips::Image.thumbnail_buffer(bytes, step[:width], size: :down)
-      smallest = image.jpegsave_buffer(Q: step[:quality], strip: true)
-      return [ smallest, "image/jpeg" ] if smallest.bytesize <= MAX_BLOB_BYTES
-    end
-
-    # Each step was too large. The caller drops the thumbnail, and the card renders without it.
-    [ smallest, "image/jpeg" ]
-  rescue StandardError, LoadError => e
-    report_upstream_error(e, context: "bluesky card image resize")
-    [ nil, nil ]
+    shrink_image(bytes, limit: MAX_BLOB_BYTES)
   end
 
   # Makes the rich-text facets of the body: each link, each mention, and each hashtag.

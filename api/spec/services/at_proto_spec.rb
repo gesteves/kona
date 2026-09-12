@@ -76,6 +76,117 @@ RSpec.describe AtProto do
     end
   end
 
+  # ⚠️ These two were private to `StandardSite`, where they used `auth_headers` with no timeout, no
+  # retry after a refused token, and no rescue. The session cache made the second one necessary: the
+  # token now comes from Redis and a person can revoke it inside its 55 minutes.
+  # ⚠️ The Images API takes a size in PIXELS and promises nothing in BYTES. A cover image with much
+  # detail came back above the blob limit, the PDS refused the record, and the job then tried again
+  # for 24 hours for a reason that cannot change.
+  describe "#upload_image_blob" do
+    let(:limit) { StandardSite::MAX_BLOB_BYTES }
+
+    before do
+      allow(HTTParty).to receive(:post)
+        .with(a_string_including("com.atproto.server.createSession"), anything)
+        .and_return(instance_double(HTTParty::Response, success?: true, body: session_body))
+      open_session
+      allow(service).to receive(:download).and_return({ body: oversized, content_type: "image/jpeg" })
+    end
+
+    let(:oversized) { "x" * (StandardSite::MAX_BLOB_BYTES + 1) }
+
+    def upload
+      service.send(:upload_image_blob, "https://images.ctfassets.net/a/b/c.jpg", "image/jpeg",
+                   w: 1200, h: 630, limit: limit)
+    end
+
+    it "shrinks a picture that is above the limit, rather than losing it" do
+      small = "j" * (limit - 1)
+      allow(service).to receive(:shrink_image).with(oversized, limit: limit).and_return([ small, "image/jpeg" ])
+      allow(HTTParty).to receive(:post)
+        .with(a_string_including("com.atproto.repo.uploadBlob"), anything)
+        .and_return(instance_double(HTTParty::Response, success?: true, code: 200,
+                                    body: { blob: { "$type" => "blob" } }.to_json))
+
+      expect(upload).to eq({ "$type" => "blob" })
+      expect(service).to have_received(:shrink_image)
+    end
+
+    it "drops the picture, and not the record, when no step of the shrink fits" do
+      allow(service).to receive(:shrink_image).and_return([ oversized, "image/jpeg" ])
+
+      expect(upload).to be_nil
+    end
+
+    # ⚠️ The worker is a 512MB VM at concurrency 5, and the size of that body belongs to another host.
+    it "caps the download" do
+      allow(service).to receive(:shrink_image).and_return([ "small", "image/jpeg" ])
+      allow(HTTParty).to receive(:post)
+        .with(a_string_including("com.atproto.repo.uploadBlob"), anything)
+        .and_return(instance_double(HTTParty::Response, success?: true, code: 200, body: { blob: {} }.to_json))
+
+      upload
+
+      expect(service).to have_received(:download)
+        .with(anything, hash_including(max_bytes: described_class::MAX_SOURCE_IMAGE_BYTES))
+    end
+  end
+
+  describe "#delete_record" do
+    before do
+      allow(HTTParty).to receive(:post)
+        .with(a_string_including("com.atproto.server.createSession"), anything)
+        .and_return(instance_double(HTTParty::Response, success?: true, body: session_body))
+      open_session
+    end
+
+    def delete = service.send(:delete_record, "site.standard.document", "3kabc")
+
+    it "opens a new session and deletes one time more when the PDS refuses the token" do
+      responses = [
+        instance_double(HTTParty::Response, success?: false, code: 401, body: "expired"),
+        instance_double(HTTParty::Response, success?: true, code: 200, body: "{}")
+      ]
+      allow(HTTParty).to receive(:post)
+        .with(a_string_including("com.atproto.repo.deleteRecord"), anything) { responses.shift }
+
+      expect(delete).to be(true)
+      expect(HTTParty).to have_received(:post)
+        .with(a_string_including("com.atproto.server.createSession"), anything).twice
+    end
+
+    it "gives false when the second attempt is also refused" do
+      allow(HTTParty).to receive(:post)
+        .with(a_string_including("com.atproto.repo.deleteRecord"), anything)
+        .and_return(instance_double(HTTParty::Response, success?: false, code: 401, body: "expired"))
+
+      expect(delete).to be(false)
+    end
+
+    # ⚠️ The prune of a backfill calls this for each record that is no longer current. A raise there
+    # would stop a full reconciliation because of one record, which is what the comment on
+    # `StandardSite#remove_document!` says must not happen.
+    it "gives false and does not raise when the host cannot be reached" do
+      allow(HTTParty).to receive(:post)
+        .with(a_string_including("com.atproto.repo.deleteRecord"), anything)
+        .and_raise(SocketError.new("getaddrinfo"))
+
+      expect(delete).to be(false)
+    end
+
+    it "sends a timeout, so a host that hangs cannot hold a worker thread" do
+      allow(HTTParty).to receive(:post)
+        .with(a_string_including("com.atproto.repo.deleteRecord"), anything)
+        .and_return(instance_double(HTTParty::Response, success?: true, code: 200, body: "{}"))
+
+      delete
+
+      expect(HTTParty).to have_received(:post)
+        .with(a_string_including("com.atproto.repo.deleteRecord"),
+              hash_including(timeout: described_class::REQUEST_TIMEOUT))
+    end
+  end
+
   describe "#put_record" do
     before do
       allow(HTTParty).to receive(:post)
