@@ -70,10 +70,11 @@ module AtProto
     # @param tid [String] A 13-character TID.
     # @return [Time, nil] The time, or nil for a value with another shape.
     def tid_time(tid)
-      # ⚠️ The first character must be in the first half of the alphabet, because the high bit of a
-      # TID is always zero. Without that check, a content-addressed key from `StandardSite.tid`
-      # gives a Time that means nothing in place of nil.
-      return unless tid.to_s.match?(/\A[#{TID_ALPHABET[0, 16]}][#{TID_ALPHABET}]{12}\z/)
+      # ⚠️ 13 characters of base32 hold 65 bits and a TID holds 64 with its high bit zero, thus the
+      # value is below 2**63 and the first character is one of the first EIGHT of the alphabet.
+      # Without that check, a content-addressed key from `StandardSite.tid` gives a Time that means
+      # nothing in place of nil, and `Bluesky#post!` would write it into createdAt.
+      return unless tid.to_s.match?(/\A[#{TID_ALPHABET[0, 8]}][#{TID_ALPHABET}]{12}\z/)
 
       value = tid.each_char.reduce(0) { |acc, char| (acc * 32) + TID_ALPHABET.index(char) }
       Time.at(Rational(value >> 10, 1_000_000)).utc

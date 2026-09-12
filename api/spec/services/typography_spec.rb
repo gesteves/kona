@@ -42,6 +42,13 @@ RSpec.describe Typography do
 
       # ⚠️ The mask is what makes this work. With a split at each address, SmartyPants reads two
       # pieces, opens the quotation in the first and never closes it.
+      # ⚠️ The pattern takes each character up to a space, thus the mark that closes was inside the
+      # mask and never curled, and the post carried an unbalanced pair.
+      it "leaves the mark that closes around an address outside the mask" do
+        expect(described_class.apply(%(Read "https://example.test/a" now)))
+          .to eq("Read “https://example.test/a” now")
+      end
+
       it "does not stop a quotation from closing" do
         expect(described_class.apply(%q(He said "see https://example.test/x now" loudly)))
           .to eq("He said “see https://example.test/x now” loudly")

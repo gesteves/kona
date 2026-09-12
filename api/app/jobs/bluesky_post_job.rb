@@ -73,10 +73,23 @@ class BlueskyPostJob < ApplicationJob
     post = posts[index]
     return if post.blank?
 
-    key = post["key"].presence || index.to_s
+    # ⚠️ The record key is the lock, thus a post with none cannot take one. A fallback to the index
+    # would make one key — `…:1` — that EVERY thread shares, and the second post of each other
+    # thread would then go away for 36 hours. `Admin::SocialController` always makes the keys, and
+    # `Bluesky#post!` cannot write without one.
+    key = post["key"].presence
+    return if key.blank?
     return unless $redis.set("#{ENQUEUE_LOCK_PREFIX}#{key}", "1", nx: true, ex: ENQUEUE_LOCK_TTL)
 
-    self.class.perform_async(posts, index, reply)
+    begin
+      self.class.perform_async(posts, index, reply)
+    rescue StandardError
+      # ⚠️ Give the lock back. The lock is above the enqueue, thus a Redis failure here would leave
+      # it for 36 hours: the retry of this job posts again at the same rkey, finds the lock, and
+      # SUCCEEDS with the rest of the thread never sent and nothing to report it.
+      $redis.del("#{ENQUEUE_LOCK_PREFIX}#{key}")
+      raise
+    end
   end
 
   def next_reply(reply, written)

@@ -519,6 +519,26 @@ RSpec.describe Bluesky do
         expect(@sent["record"]).not_to have_key("facets")
       end
 
+      # ⚠️ A pattern of `\S+` swept up the quotation mark that closes, and the facet then named an
+      # address that does not exist.
+      it "gives up a quotation mark that closes around an address" do
+        service.post!(rkey: "3kabc", text: %(Read "https://example.test/a" now))
+
+        expect(@sent["record"]["facets"].first["features"].first["uri"]).to eq("https://example.test/a")
+      end
+
+      # ⚠️ The bare address continues into the words of the link. Two link facets over one range
+      # make a client render a broken link.
+      it "makes one facet when a bare address runs into the words of a link" do
+        service.post!(rkey: "3kabc", text: "https://example.test/[docs](https://b.example/x)")
+        facets = @sent["record"]["facets"]
+
+        ranges = facets.map { |f| f["index"]["byteStart"]...f["index"]["byteEnd"] }
+        ranges.combination(2) do |a, b|
+          expect(a.begin < b.end && b.begin < a.end).to be(false)
+        end
+      end
+
       # ⚠️ A list of the permitted characters cut this back to "https://example.test/", which is a
       # link to the WRONG page and not a short one.
       it "keeps a path that is not ASCII" do

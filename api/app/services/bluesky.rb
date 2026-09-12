@@ -69,11 +69,14 @@ class Bluesky < ApplicationService
   # with a character outside ASCII — `https://example.com/日本` — became `https://example.com/`.
   URL_PATTERN = %r{(?:^|[$|\W])(https?://\S+)}
 
-  # The punctuation of a sentence at the end of an address.
-  URL_TRAILING_PUNCTUATION = /[.,;:!?]+\z/
+  # The characters that an address can end with. ⚠️ Each character after the last one of these
+  # belongs to the sentence and not to the address: a full stop, a comma, a quotation mark that
+  # closes. `\p{Alnum}` and not `a-z0-9`, thus a path outside ASCII ends where it must.
+  URL_TERMINAL = /[\p{Alnum}\-_~\/\#@$&*+=%]/
 
-  # The characters that close something that holds the address, and are not part of it.
-  URL_TRAILING_WRAPPERS = { ")" => "(", "]" => "[", ">" => "<" }.freeze
+  # The characters that close something that holds the address. One of them ends an address only
+  # when the address opened it.
+  URL_WRAPPERS = { ")" => "(", "]" => "[", ">" => "<", "}" => "{" }.freeze
   # The zero-width and formatting characters that a tag cannot hold, from the tag rule of the
   # Bluesky client.
   TAG_EXCLUDED = "\u00AD\u2060\u200A\u200B\u200C\u200D\u20E2".freeze
@@ -136,7 +139,10 @@ class Bluesky < ApplicationService
     bare = []
 
     SocialText.url_ranges(text).each do |range|
-      next if taken.any? { |other| other.cover?(range.begin) }
+      # ⚠️ Compare the FULL range and not its start alone. In `https://example.test/[docs](url)`
+      # the bare address continues into the words of the link, and two link facets over one range
+      # make a client render a broken link.
+      next if taken.any? { |other| range.begin < other.end && other.begin < range.end }
 
       # `SocialText.url_ranges` removed the punctuation of the sentence already.
       bare << MarkdownLinks::Link.new(start: range.begin, finish: range.end, url: text[range])
@@ -153,14 +159,21 @@ class Bluesky < ApplicationService
   # @param url [String]
   # @return [String]
   def self.trim_url(url)
-    url = url.to_s.sub(URL_TRAILING_PUNCTUATION, "")
-
-    while (opener = URL_TRAILING_WRAPPERS[url[-1]]) && !url.include?(opener)
-      url = url[0...-1]
-      url = url.sub(URL_TRAILING_PUNCTUATION, "")
-    end
-
+    url = url.to_s
+    url = url[0...-1] while url.present? && !url_ends_here?(url)
     url
+  end
+
+  # @param url [String] The candidate address.
+  # @return [Boolean] True when the last character belongs to the address.
+  def self.url_ends_here?(url)
+    last = url[-1]
+    return true if URL_TERMINAL.match?(last)
+
+    # ⚠️ A closing bracket belongs to the address only when the address opened it, thus
+    # `…/Kona_(Hawaii)` keeps its bracket and `(see …/a)` gives up the one that closes the aside.
+    opener = URL_WRAPPERS[last]
+    opener.present? && url.count(opener) >= url.count(last)
   end
 
   # The text that one post will hold.
@@ -427,12 +440,21 @@ class Bluesky < ApplicationService
   # @return [Array<Hash>]
   def build_facets(text, links: [])
     facets = self.class.link_ranges(text, links).map { |link| link_facet(text, link) }
-    inside_link = facets.map { |facet| facet["index"]["byteStart"]...facet["index"]["byteEnd"] }
 
-    all = facets + mention_facets(text, skip: inside_link) + tag_facets(text, skip: inside_link)
-    # ⚠️ In order of the byte offset, as the client of Bluesky writes them. The links are in order
-    # already, thus a tag at byte 5 came after a link at byte 200.
-    all.sort_by { |facet| facet["index"]["byteStart"] }
+    # ⚠️ Each kind gives way to the kinds before it, thus no two facets cover one byte. A mention
+    # comes before a tag because `#tag.@example.com` matches the two patterns, and a mention is
+    # the more specific claim.
+    facets += mention_facets(text, skip: byte_ranges(facets))
+    facets += tag_facets(text, skip: byte_ranges(facets))
+
+    # ⚠️ In order of the byte offset, as the client of Bluesky writes them.
+    facets.sort_by { |facet| facet["index"]["byteStart"] }
+  end
+
+  # @param facets [Array<Hash>] The facets so far.
+  # @return [Array<Range>] Their byte ranges.
+  def byte_ranges(facets)
+    facets.map { |facet| facet["index"]["byteStart"]...facet["index"]["byteEnd"] }
   end
 
   # ⚠️ The offsets of the record are in **bytes** of the UTF-8 text, and `MarkdownLinks::Link`
