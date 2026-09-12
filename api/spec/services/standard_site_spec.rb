@@ -337,6 +337,28 @@ describe StandardSite do
       allow(client).to receive(:own_repo?).and_return(true)
     end
 
+    # ⚠️ The check must come BEFORE `#do_sync_publication`, which puts the URL of this site into the
+    # publication record. A check after it reads what we wrote, thus it can never fail, and the
+    # publication of the other site is already gone. This example does not replace `#own_repo?`.
+    context "when the repo belongs to another site" do
+      before do
+        allow(client).to receive(:own_repo?).and_call_original
+        allow(HTTParty).to receive(:get)
+          .with(a_string_including("com.atproto.repo.getRecord"), anything)
+          .and_return(instance_double(HTTParty::Response, success?: true,
+                                      body: { value: { url: "https://someone-else.example" } }.to_json))
+        allow(client).to receive(:fetch_all_articles).and_return([ raw_article("AAA111") ])
+      end
+
+      it "writes no publication record and adds no job" do
+        expect(client).not_to receive(:do_sync_publication)
+        expect(client).not_to receive(:prune_documents)
+
+        expect(client.backfill).to eq(:skipped)
+        expect(StandardSiteSyncJob.jobs).to be_empty
+      end
+    end
+
     it "enqueues one document sync job per publishable post (skipping drafts) and still prunes" do
       allow(client).to receive(:fetch_all_articles).and_return([
         raw_article("AAA111"), raw_article("BBB222"),

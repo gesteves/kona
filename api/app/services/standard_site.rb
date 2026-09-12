@@ -194,6 +194,13 @@ class StandardSite < ApplicationService
     log("backfill starting")
     site = fetch_site
     return log_skip("backfill", "no site data") if site.blank?
+    # ⚠️ The check comes FIRST, before anything writes. `#do_sync_publication` puts the URL of THIS
+    # site into the publication record, thus a check after it reads what we wrote and can never
+    # fail — and the publication of the other site is already gone.
+    unless own_repo?
+      return log("backfill: the publication in this repo belongs to another site; stopping", :skipped)
+    end
+
     do_sync_publication(site)
     prune_legacy_publication
 
@@ -211,10 +218,6 @@ class StandardSite < ApplicationService
       next if sys_id.blank? || !ENTRY_ID_PATTERN.match?(sys_id)
       StandardSiteSyncJob.perform_in((current.length * spacing).seconds, "sync_document", sys_id)
       current << document_rkey(sys_id)
-    end
-
-    unless own_repo?
-      return log("backfill: the publication in this repo belongs to another site; not pruning", :skipped)
     end
 
     pruned = prune_documents(current)
