@@ -32,14 +32,18 @@ RSpec.describe AtProto do
       expect(tids.uniq.length).to eq(tids.length)
     end
 
-    it "gives nil for a key whose high bit is not zero" do
-      # ⚠️ `StandardSite.tid` makes a key from a digest, thus its high bit is not always zero and
-      # the time that such a key holds means nothing. A Time that means nothing is worse than nil:
-      # `Bluesky#post!` would write it into createdAt.
+    it "gives nil for 13 characters that are not a TID" do
       high_bit_set = "z" + ("2" * 12)
 
       expect(Bluesky.tid_time(high_bit_set)).to be_nil
       expect(Bluesky.tid_time(Bluesky.new_tid)).to be_a(Time)
+    end
+
+    # ⚠️ This is what the check above CANNOT do, and the comment there used to claim it could.
+    # `StandardSite.tid` keeps the low 63 bits of a digest, thus its high bit is zero and it looks
+    # exactly like a time-ordered key. Nothing can tell the two apart by reading them.
+    it "cannot tell a content-addressed key from a time-ordered one" do
+      expect(Bluesky.tid_time(StandardSite.tid("an entry"))).to be_a(Time)
     end
   end
 
@@ -129,6 +133,64 @@ RSpec.describe AtProto do
 
       expect(service).to have_received(:download)
         .with(anything, hash_including(max_bytes: described_class::MAX_SOURCE_IMAGE_BYTES))
+    end
+  end
+
+  # ⚠️ A 429 went through `unless response.success?`, which answers nil. `StandardSite` then wrote
+  # "putRecord failed" to the log and the JOB ENDED WITH NO ERROR, thus Sidekiq did it no more times
+  # and the record never reached the PDS. A limit that lifts by itself lost a record for ever.
+  describe "a 429 from the PDS" do
+    before do
+      allow(HTTParty).to receive(:post)
+        .with(a_string_including("com.atproto.server.createSession"), anything)
+        .and_return(instance_double(HTTParty::Response, success?: true, body: session_body))
+      open_session
+    end
+
+    def limited(headers)
+      instance_double(HTTParty::Response, success?: false, code: 429, body: "slow down", headers: headers)
+    end
+
+    it "raises with the time that the PDS gave" do
+      allow(HTTParty).to receive(:post)
+        .with(a_string_including("com.atproto.repo.putRecord"), anything)
+        .and_return(limited("ratelimit-reset" => 5.minutes.from_now.to_i.to_s))
+
+      expect { service.send(:put_record, "site.standard.document", "3kabc", {}) }
+        .to raise_error(AtProto::RateLimitedError) { |e| expect(e.retry_after).to be_within(5).of(300) }
+    end
+
+    it "waits a time that makes sense when the header is absent" do
+      allow(HTTParty).to receive(:post)
+        .with(a_string_including("com.atproto.repo.putRecord"), anything)
+        .and_return(limited({}))
+
+      expect { service.send(:put_record, "site.standard.document", "3kabc", {}) }
+        .to raise_error(AtProto::RateLimitedError) { |e| expect(e.retry_after).to eq(60) }
+    end
+
+    it "raises from a delete also, and does not report it as a delete that failed" do
+      allow(HTTParty).to receive(:post)
+        .with(a_string_including("com.atproto.repo.deleteRecord"), anything)
+        .and_return(limited({}))
+
+      expect { service.send(:delete_record, "site.standard.document", "3kabc") }
+        .to raise_error(AtProto::RateLimitedError)
+    end
+
+    it "raises from a blob upload also" do
+      allow(HTTParty).to receive(:post)
+        .with(a_string_including("com.atproto.repo.uploadBlob"), anything)
+        .and_return(limited({}))
+
+      expect { service.send(:upload_blob, "bytes", "image/jpeg") }
+        .to raise_error(AtProto::RateLimitedError)
+    end
+
+    it "makes a job wait that long in place of using its budget" do
+      limit = AtProto::RateLimitedError.new("slow down", retry_after: 420)
+
+      expect(ApplicationJob.sidekiq_retry_in_block.call(1, limit, {})).to eq(420)
     end
   end
 

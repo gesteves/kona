@@ -351,6 +351,20 @@ describe StandardSite do
       expect(StandardSiteSyncJob.jobs.size).to eq(2)
     end
 
+    # ⚠️ A PDS counts the writes of an account: 3 points for a make against 5,000 each hour is 1,666
+    # records each hour. The corpus is small today and it grows, thus the jobs are spaced.
+    it "spaces the sync jobs to stay inside the write budget" do
+      allow(client).to receive(:fetch_all_articles).and_return([
+        raw_article("AAA111"), raw_article("BBB222"), raw_article("CCC333")
+      ])
+
+      client.backfill
+
+      queued = StandardSiteSyncJob.jobs.map { |job| job["at"] }.compact.sort
+      expect(queued.length).to eq(2) # the first one goes out at once
+      expect((queued.last - queued.first).round).to eq(AtProto.seconds_between_writes.round)
+    end
+
     it "does not prune (or enqueue) when the article fetch fails" do
       allow(client).to receive(:fetch_all_articles).and_return(nil)
       expect(client).not_to receive(:prune_documents)

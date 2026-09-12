@@ -42,6 +42,37 @@ module AtProto
   # The PDS refused the token. The caller opens a new session and does the request one time more.
   class UnauthorizedError < StandardError; end
 
+  # The PDS takes no more writes for now. It carries the moment that it takes them again, thus a job
+  # waits that long and not a time that somebody guessed.
+  class RateLimitedError < StandardError
+    # @return [Integer] The seconds to wait.
+    attr_reader :retry_after
+
+    def initialize(message, retry_after:)
+      @retry_after = retry_after
+      super(message)
+    end
+  end
+
+  # A PDS counts the writes of an account in points: 3 for a make, 2 for a change, and 1 for a
+  # delete, against 5,000 each hour and 35,000 each day. Thus an account writes 1,666 records each
+  # hour at the most.
+  #
+  # ⚠️ A backfill must go slowly to stay below it. The corpus is small today, and it grows.
+  # @see https://docs.bsky.app/docs/advanced-guides/rate-limits
+  WRITE_POINTS_PER_HOUR = 5_000
+  # What one putRecord costs. It is 2 for a record that exists, and a backfill of an empty repo
+  # makes each one, thus the larger number is the correct one to plan with.
+  WRITE_POINTS_PER_RECORD = 3
+  # The part of the budget that a backfill can use. The rest is for the posts of the same account.
+  WRITE_BUDGET_FRACTION = 0.5
+
+  # The seconds to leave between two record writes, to stay inside the budget.
+  # @return [Float]
+  def self.seconds_between_writes
+    3600.0 / ((WRITE_POINTS_PER_HOUR / WRITE_POINTS_PER_RECORD) * WRITE_BUDGET_FRACTION)
+  end
+
   # The seconds that a record write or a record read can take.
   #
   # ⚠️ **Each call of this file needs a timeout.** `Bluesky#card_image` and `#build_card` also run
@@ -86,10 +117,15 @@ module AtProto
     # @param tid [String] A 13-character TID.
     # @return [Time, nil] The time, or nil for a value with another shape.
     def tid_time(tid)
-      # ⚠️ 13 characters of base32 hold 65 bits and a TID holds 64 with its high bit zero, thus the
-      # value is below 2**63 and the first character is one of the first EIGHT of the alphabet.
-      # Without that check, a content-addressed key from `StandardSite.tid` gives a Time that means
-      # nothing in place of nil, and `Bluesky#post!` would write it into createdAt.
+      # 13 characters of base32 hold 65 bits and a TID holds 64 with its high bit zero, thus the
+      # value is below 2**63 and the first character is one of the first EIGHT of the alphabet. A
+      # string of 13 characters of the alphabet that fails that is not a TID.
+      #
+      # ⚠️ It does NOT tell a time-ordered key from a content-addressed one. `StandardSite.tid`
+      # keeps the low 63 bits of a digest, thus its high bit is zero also and it gives a Time here
+      # that means nothing. A measurement gave the first eight characters for each of 20,000 keys.
+      # No caller gives a standard.site key to this method today; do not make one, because no check
+      # here can find it.
       return unless tid.to_s.match?(/\A[#{TID_ALPHABET[0, 8]}][#{TID_ALPHABET}]{12}\z/)
 
       value = tid.each_char.reduce(0) { |acc, char| (acc * 32) + TID_ALPHABET.index(char) }
@@ -244,6 +280,30 @@ module AtProto
     service&.dig("serviceEndpoint")&.chomp("/")
   end
 
+  # Makes a 429 into an error that holds the time to wait.
+  #
+  # ⚠️ Without this a 429 went through `unless response.success?`, which reports an upstream error
+  # and answers nil. `#do_sync_document` then wrote "putRecord failed" to the log and the job ENDED
+  # WITH NO ERROR, thus Sidekiq did it no more times and the record never reached the PDS.
+  #
+  # The PDS sends `ratelimit-reset` as a unix time. Thus a job waits the correct time, and it does
+  # not use its attempts against a limit that is still there.
+  # @param response [HTTParty::Response] The response.
+  # @param doing [String] The operation, for the message.
+  # @return [void]
+  # @raise [RateLimitedError] For a 429.
+  def raise_if_rate_limited(response, doing)
+    return unless response.code == 429
+
+    reset = response.headers["ratelimit-reset"].to_i
+    wait = reset.positive? ? (Time.at(reset) - Time.now).ceil : 0
+    # One minute at the least and one hour at the most: a header that is absent, in the past, or
+    # very large must still give a time that makes sense.
+    wait = wait.clamp(60, 3600)
+
+    raise RateLimitedError.new("#{at_proto_label} limits the rate of #{doing}; waits #{wait}s", retry_after: wait)
+  end
+
   # @return [Hash] JSON request headers with the bearer token.
   def auth_headers
     { "Content-Type" => "application/json", "Authorization" => "Bearer #{@access_jwt}" }
@@ -273,6 +333,7 @@ module AtProto
     response = HTTParty.post("#{@service_url}/xrpc/com.atproto.repo.putRecord",
                              body: body.to_json, headers: auth_headers, timeout: REQUEST_TIMEOUT)
     raise UnauthorizedError if response.code == 401
+    raise_if_rate_limited(response, "a write of #{collection}/#{rkey}")
 
     unless response.success?
       Rails.logger.warn("#{at_proto_label}: failed to put #{collection}/#{rkey} (HTTP #{response.code}: #{response.body})")
@@ -305,6 +366,8 @@ module AtProto
   # @return [Boolean] Whether it succeeded.
   def delete_record(collection, rkey)
     with_valid_session { delete_record_once(collection, rkey) } || false
+  rescue RateLimitedError
+    raise
   rescue StandardError => e
     # ⚠️ A rescue, and not a raise. The prune of a backfill calls this for each record that is no
     # longer current, and one host that cannot be reached must not stop a full reconciliation.
@@ -324,6 +387,9 @@ module AtProto
       timeout: REQUEST_TIMEOUT
     )
     raise UnauthorizedError if response.code == 401
+    # ⚠️ Raised and not answered as false. A 429 means "come back later", and a report that
+    # the delete did not work sends the caller to look for a cause that it cannot find.
+    raise_if_rate_limited(response, "a delete of #{collection}/#{rkey}")
 
     unless response.success?
       Rails.logger.warn("#{at_proto_label}: failed to delete #{collection}/#{rkey} (HTTP #{response.code}: #{response.body})")
@@ -470,13 +536,14 @@ module AtProto
       timeout: UPLOAD_TIMEOUT
     )
     raise UnauthorizedError if response.code == 401
+    raise_if_rate_limited(response, "a blob upload")
 
     unless response.success?
       report_upstream_error("HTTP #{response.code}", context: "#{at_proto_label} uploadBlob", status: response.code)
       return
     end
     JSON.parse(response.body)["blob"]
-  rescue UnauthorizedError
+  rescue UnauthorizedError, RateLimitedError
     raise
   rescue StandardError => e
     report_upstream_error(e, context: "#{at_proto_label} uploadBlob")

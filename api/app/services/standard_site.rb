@@ -201,12 +201,16 @@ class StandardSite < ApplicationService
     # Stop before the delete step, thus a temporary fetch error cannot delete all the live records.
     return log_skip("backfill", "article fetch failed; not pruning") if items.nil?
 
+    # ⚠️ The jobs are SPACED and not queued at one time. A PDS counts the writes of an account, and
+    # 3 points for a make against 5,000 each hour is 1,666 records each hour. The corpus is small
+    # today and it grows, and a backfill that reaches that limit gets a 429 for each job after it.
+    spacing = AtProto.seconds_between_writes
     current = []
     publishable_posts(items.map { |item| decorate_post(item) }).each do |post|
       sys_id = post.dig("sys", "id")
       next if sys_id.blank? || !ENTRY_ID_PATTERN.match?(sys_id)
+      StandardSiteSyncJob.perform_in((current.length * spacing).seconds, "sync_document", sys_id)
       current << document_rkey(sys_id)
-      StandardSiteSyncJob.perform_async("sync_document", sys_id)
     end
 
     unless own_repo?
@@ -214,7 +218,8 @@ class StandardSite < ApplicationService
     end
 
     pruned = prune_documents(current)
-    log("backfill complete: #{current.size} document sync job(s) enqueued, #{pruned} record(s) pruned")
+    log("backfill complete: #{current.size} document sync job(s) enqueued, one each " \
+        "#{spacing.round(1)}s, #{pruned} record(s) pruned")
   end
 
   # The DID of the account, from the Redis cache. If the cache is empty, this opens a session.
