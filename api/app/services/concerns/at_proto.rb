@@ -31,6 +31,28 @@ module AtProto
   # Refer to Admin::SocialController#bluesky_handle_error.
   RESOLVE_TIMEOUT = 5
 
+  # How long a session stays in Redis. ⚠️ An access token of Bluesky lives approximately 2 hours,
+  # thus this is well below it.
+  SESSION_TTL = 55.minutes
+
+  # The prefix of each session key. ⚠️ `spec/support/at_proto_session.rb` removes these keys before
+  # each example, thus a session cannot go from one example to the next one.
+  SESSION_KEY_PREFIX = "atproto:session:".freeze
+
+  # The PDS refused the token. The caller opens a new session and does the request one time more.
+  class UnauthorizedError < StandardError; end
+
+  # The seconds that a record write or a record read can take.
+  #
+  # ⚠️ **Each call of this file needs a timeout.** `Bluesky#card_image` and `#build_card` also run
+  # in the request of `/social/preview`, which has a 20-second rack-timeout, and
+  # `Rack::Timeout::RequestTimeoutException` is not a `StandardError`. Thus a host that hangs gives
+  # a 500 in place of a card with no picture, and no rescue here can catch it.
+  REQUEST_TIMEOUT = 15
+
+  # The seconds that one blob upload can take. It is longer, because a blob is as much as 1MB.
+  UPLOAD_TIMEOUT = 30
+
   class_methods do
     # Encodes a 64-bit value as a 13-character TID.
     # @param value [Integer]
@@ -48,7 +70,10 @@ module AtProto
     # @param tid [String] A 13-character TID.
     # @return [Time, nil] The time, or nil for a value with another shape.
     def tid_time(tid)
-      return unless tid.to_s.match?(/\A[#{TID_ALPHABET}]{13}\z/)
+      # ⚠️ The first character must be in the first half of the alphabet, because the high bit of a
+      # TID is always zero. Without that check, a content-addressed key from `StandardSite.tid`
+      # gives a Time that means nothing in place of nil.
+      return unless tid.to_s.match?(/\A[#{TID_ALPHABET[0, 16]}][#{TID_ALPHABET}]{12}\z/)
 
       value = tid.each_char.reduce(0) { |acc, char| (acc * 32) + TID_ALPHABET.index(char) }
       Time.at(Rational(value >> 10, 1_000_000)).utc
@@ -91,6 +116,73 @@ module AtProto
   # @param app_password [String]
   # @return [Boolean] True when a session is available.
   def open_session(handle:, app_password:)
+    @session_handle = handle
+    @session_password = app_password
+
+    # ⚠️ `com.atproto.server.createSession` permits 30 calls each 5 minutes and 300 each day, FOR
+    # EACH ACCOUNT. One job posts one post of a thread, thus a thread of 25 posts made 25 sessions
+    # before its first retry, and a bulk publish adds more. A 429 there reads as "Could not open a
+    # Bluesky session" and then tries again for 24 hours.
+    return true if load_cached_session
+
+    create_session
+  end
+
+  # Removes the session that the cache holds and opens a new one.
+  #
+  # ⚠️ This is what makes the cache safe. A token can stop working before its key expires: a person
+  # can revoke it, or change the app password. Without this, each request for the rest of the TTL
+  # fails against the same dead token.
+  # @return [Boolean] True when a session is available.
+  def renew_session!
+    $redis.del(session_cache_key)
+    create_session
+  end
+
+  # Runs a request that needs the token, and runs it one time more with a new session when the PDS
+  # refuses that token.
+  # @yield The request.
+  # @return [Object, nil] What the block gives, or nil when the second attempt is also refused.
+  def with_valid_session
+    yield
+  rescue UnauthorizedError
+    return unless renew_session!
+
+    begin
+      yield
+    rescue UnauthorizedError
+      Rails.logger.warn("#{at_proto_label}: the PDS refused a token from a new session")
+      report_upstream_error("HTTP 401", context: "#{at_proto_label} session", status: 401)
+      nil
+    end
+  end
+
+  # @return [String] The Redis key of this account's session.
+  def session_cache_key
+    "#{SESSION_KEY_PREFIX}#{@session_handle}"
+  end
+
+  # Reads a session that an earlier job opened.
+  # @return [Boolean] True when the cache held one.
+  def load_cached_session
+    raw = $redis.get(session_cache_key)
+    return false if raw.blank?
+
+    data = JSON.parse(raw)
+    @access_jwt = data["accessJwt"]
+    @did = data["did"]
+    @service_url = data["serviceUrl"]
+    @access_jwt.present? && @did.present?
+  rescue StandardError
+    false
+  end
+
+  # Opens a new session with the PDS and finds the service endpoint of the repo.
+  # @return [Boolean] True when a session is available.
+  def create_session
+    handle = @session_handle
+    app_password = @session_password
+
     response = HTTParty.post(
       "#{pds_url}/xrpc/com.atproto.server.createSession",
       body: { identifier: handle, password: app_password }.to_json,
@@ -109,7 +201,11 @@ module AtProto
     # The DID document names the true host of the repo, which is not always the host that answered
     # the session. Each write goes to that host.
     @service_url = pds_endpoint_from_did_doc(data["didDoc"]) || pds_url
-    @access_jwt.present? && @did.present?
+    return false if @access_jwt.blank? || @did.blank?
+
+    $redis.setex(session_cache_key, SESSION_TTL.to_i,
+                 { "accessJwt" => @access_jwt, "did" => @did, "serviceUrl" => @service_url }.to_json)
+    true
   rescue StandardError => e
     Rails.logger.error("#{at_proto_label}: error creating PDS session: #{e.message}")
     report_upstream_error(e, context: "#{at_proto_label} PDS session")
@@ -140,11 +236,20 @@ module AtProto
   # @param validate [Boolean, nil] False where the PDS does not know the lexicon. Nil omits it.
   # @return [Hash, nil] `{ "uri" =>, "cid" => }`, or nil after a failure.
   def put_record(collection, rkey, record, validate: false)
+    with_valid_session { put_record_once(collection, rkey, record, validate: validate) }
+  end
+
+  # One attempt of `#put_record`. ⚠️ It raises UnauthorizedError for a 401, thus
+  # `#with_valid_session` opens a new session and does it one time more.
+  # @return [Hash, nil]
+  def put_record_once(collection, rkey, record, validate: false)
     body = { repo: @did, collection: collection, rkey: rkey, record: record }
     body[:validate] = validate unless validate.nil?
 
     response = HTTParty.post("#{@service_url}/xrpc/com.atproto.repo.putRecord",
-                             body: body.to_json, headers: auth_headers)
+                             body: body.to_json, headers: auth_headers, timeout: REQUEST_TIMEOUT)
+    raise UnauthorizedError if response.code == 401
+
     unless response.success?
       Rails.logger.warn("#{at_proto_label}: failed to put #{collection}/#{rkey} (HTTP #{response.code}: #{response.body})")
       report_upstream_error("HTTP #{response.code}", context: "#{at_proto_label} putRecord #{collection}/#{rkey}", status: response.code)
@@ -191,7 +296,8 @@ module AtProto
     return if service.blank?
 
     record = get_json("#{service}/xrpc/com.atproto.repo.getRecord",
-                      query: { repo: did, collection: collection, rkey: rkey })
+                      query: { repo: did, collection: collection, rkey: rkey },
+                      timeout: REQUEST_TIMEOUT)
     return if record.blank? || record[:cid].blank?
 
     { "uri" => record[:uri].presence || uri, "cid" => record[:cid] }
@@ -211,7 +317,7 @@ module AtProto
     return @service_url if did == @did && @service_url.present?
     return unless did.start_with?("did:plc:")
 
-    doc = get_json("https://plc.directory/#{did}", symbolize: false)
+    doc = get_json("https://plc.directory/#{did}", symbolize: false, timeout: REQUEST_TIMEOUT)
     pds_endpoint_from_did_doc(doc)
   end
 
@@ -222,16 +328,28 @@ module AtProto
   def upload_blob(bytes, mime)
     return if @access_jwt.blank? || bytes.blank?
 
+    with_valid_session { upload_blob_once(bytes, mime) }
+  end
+
+  # One attempt of `#upload_blob`. ⚠️ It raises UnauthorizedError for a 401, as
+  # `#put_record_once` does.
+  # @return [Hash, nil]
+  def upload_blob_once(bytes, mime)
     response = HTTParty.post(
       "#{@service_url}/xrpc/com.atproto.repo.uploadBlob",
       body: bytes,
-      headers: { "Content-Type" => mime, "Authorization" => "Bearer #{@access_jwt}" }
+      headers: { "Content-Type" => mime, "Authorization" => "Bearer #{@access_jwt}" },
+      timeout: UPLOAD_TIMEOUT
     )
+    raise UnauthorizedError if response.code == 401
+
     unless response.success?
       report_upstream_error("HTTP #{response.code}", context: "#{at_proto_label} uploadBlob", status: response.code)
       return
     end
     JSON.parse(response.body)["blob"]
+  rescue UnauthorizedError
+    raise
   rescue StandardError => e
     report_upstream_error(e, context: "#{at_proto_label} uploadBlob")
     nil
@@ -265,7 +383,7 @@ module AtProto
     mime = format == "png" ? "image/png" : "image/jpeg"
     image_url = images_api_url(source, w: w, h: h, fm: format)
 
-    response = HTTParty.get(image_url)
+    response = HTTParty.get(image_url, timeout: REQUEST_TIMEOUT)
     unless response.success?
       report_upstream_error("HTTP #{response.code}", context: "#{at_proto_label} image fetch", status: response.code, url: image_url)
       return

@@ -9,6 +9,14 @@
 # the first job, and `Bluesky#post!` writes with `putRecord` at that key. Thus a retry replaces the
 # same record. The reply reference travels in the arguments, thus it is the same at each attempt.
 class BlueskyPostJob < ApplicationJob
+  # How long the lock of one post stays. ⚠️ It is longer than the 24-hour retry window of
+  # ApplicationJob, thus a late retry cannot add the same post a second time.
+  ENQUEUE_LOCK_TTL = 36.hours.to_i
+
+  # The prefix of each lock key. ⚠️ `spec/support/at_proto_session.rb` removes these keys before
+  # each example, thus a lock cannot go from one example to the next one.
+  ENQUEUE_LOCK_PREFIX = "bluesky:thread:".freeze
+
   # @param posts [Array<Hash>] `[{ "key" =>, "text" =>, "link" => }, …]`, the whole thread.
   # @param index [Integer] Which post of that list this job writes.
   # @param reply [Hash, nil] `{ "root" =>, "parent" => }` of the post above, or nil for the first.
@@ -42,7 +50,7 @@ class BlueskyPostJob < ApplicationJob
     written = Bluesky.new.post!(rkey: post["key"], text: text, card: embed, reply: reply)
     Rails.logger.info("BlueskyPostJob: posted #{index + 1}/#{posts.length} at #{written['url']}")
 
-    self.class.perform_async(posts, index + 1, next_reply(reply, written)) if posts[index + 1]
+    enqueue_next(posts, index + 1, next_reply(reply, written))
   end
 
   private
@@ -50,6 +58,27 @@ class BlueskyPostJob < ApplicationJob
   # ⚠️ The **root** of a thread is the first post, and the **parent** is the one just above. This
   # carries the root through the chain and never makes it again.
   # @return [Hash] The reply of the next post.
+  # Adds the job of the next post, one time only.
+  #
+  # ⚠️ This enqueue is INSIDE the job of the post above it. When the process dies after the enqueue
+  # and before Sidekiq acknowledges the job, the retry does that post again — which is safe, the
+  # rkey is the same — AND it adds the next job a second time. The tail of the thread then goes out
+  # two times: two sessions, two blob uploads, and two jobs for each post below this one. The
+  # record key of the next post is the thing that is the same across both, thus it is the lock.
+  # @param posts [Array<Hash>]
+  # @param index [Integer] The post to add.
+  # @param reply [Hash] The reference of its parent.
+  # @return [void]
+  def enqueue_next(posts, index, reply)
+    post = posts[index]
+    return if post.blank?
+
+    key = post["key"].presence || index.to_s
+    return unless $redis.set("#{ENQUEUE_LOCK_PREFIX}#{key}", "1", nx: true, ex: ENQUEUE_LOCK_TTL)
+
+    self.class.perform_async(posts, index, reply)
+  end
+
   def next_reply(reply, written)
     { "root" => reply&.dig("root") || written.slice("uri", "cid"),
       "parent" => written.slice("uri", "cid") }
