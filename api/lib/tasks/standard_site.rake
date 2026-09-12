@@ -35,8 +35,12 @@ namespace :standard_site do
 
         # The old key is "standard_site:fingerprint:<collection>:<rkey>", thus what is left after
         # the prefix is exactly the field that `fingerprint_field` makes.
+        #
+        # ⚠️ HSETNX, and NOT HSET. A publish between the deploy and this task makes the live code
+        # write a NEW fingerprint into the hash. HSET would put the older value on top of it, and
+        # that entry would then sync again for no result. HSETNX keeps the newer value.
         unless dry_run
-          $redis.hset(StandardSite::FINGERPRINTS_KEY, key.delete_prefix(prefix), value)
+          $redis.hsetnx(StandardSite::FINGERPRINTS_KEY, key.delete_prefix(prefix), value)
           $redis.del(key)
         end
         moved += 1
