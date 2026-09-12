@@ -100,6 +100,18 @@ RSpec.describe Bluesky do
     end
   end
 
+  describe ".valid_post_length?" do
+    # ⚠️ `app.bsky.feed.post#text` has a limit in graphemes AND a limit in bytes. A family emoji is
+    # one grapheme and approximately 25 bytes, thus 250 of them pass the first and fail the second.
+    it "refuses text that fits in the graphemes and not in the bytes" do
+      text = "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}" * 250
+
+      expect(described_class.post_length(text)).to be <= described_class::MAX_GRAPHEMES
+      expect(text.bytesize).to be > described_class::MAX_BYTES
+      expect(described_class.valid_post_length?(text)).to be false
+    end
+  end
+
   describe "#post!" do
     before do
       stub_session
@@ -505,6 +517,96 @@ RSpec.describe Bluesky do
         service.post!(rkey: "3kabc", text: "Finished #1 in my age group")
 
         expect(@sent["record"]).not_to have_key("facets")
+      end
+
+      # ⚠️ A pattern of `\S+` swept up the quotation mark that closes, and the facet then named an
+      # address that does not exist.
+      it "gives up a quotation mark that closes around an address" do
+        service.post!(rkey: "3kabc", text: %(Read "https://example.test/a" now))
+
+        expect(@sent["record"]["facets"].first["features"].first["uri"]).to eq("https://example.test/a")
+      end
+
+      # ⚠️ The bare address continues into the words of the link. Two link facets over one range
+      # make a client render a broken link.
+      it "makes one facet when a bare address runs into the words of a link" do
+        service.post!(rkey: "3kabc", text: "https://example.test/[docs](https://b.example/x)")
+        facets = @sent["record"]["facets"]
+
+        ranges = facets.map { |f| f["index"]["byteStart"]...f["index"]["byteEnd"] }
+        ranges.combination(2) do |a, b|
+          expect(a.begin < b.end && b.begin < a.end).to be(false)
+        end
+      end
+
+      # ⚠️ A list of the permitted characters cut this back to "https://example.test/", which is a
+      # link to the WRONG page and not a short one.
+      it "keeps a path that is not ASCII" do
+        service.post!(rkey: "3kabc", text: "Read https://example.test/日本 today")
+
+        expect(@sent["record"]["facets"].first["features"].first["uri"])
+          .to eq("https://example.test/日本")
+      end
+
+      # ⚠️ The pattern took no closing bracket before, thus this link got a facet over
+      # "…/Kona_(Hawaii" alone, which goes nowhere.
+      it "keeps the closing bracket of an address that holds an opening one" do
+        service.post!(rkey: "3kabc", text: "Read https://en.wikipedia.org/wiki/Kona_(Hawaii) today")
+
+        expect(@sent["record"]["facets"].first["features"].first["uri"])
+          .to eq("https://en.wikipedia.org/wiki/Kona_(Hawaii)")
+      end
+
+      # ⚠️ And the other direction: the bracket that closes an aside is not part of the address.
+      it "gives up a closing bracket when the address holds no opening one" do
+        service.post!(rkey: "3kabc", text: "An aside (see https://example.test/a) and more")
+        facet = @sent["record"]["facets"].first
+
+        expect(facet["features"].first["uri"]).to eq("https://example.test/a")
+        expect(@sent["record"]["text"].byteslice(
+          facet["index"]["byteStart"], facet["index"]["byteEnd"] - facet["index"]["byteStart"]
+        )).to eq("https://example.test/a")
+      end
+
+      # ⚠️ Ruby reads `\w` as ASCII, thus this gave the tag "caf" and a facet over one part of a
+      # word.
+      it "marks a tag that holds a character which is not ASCII" do
+        service.post!(rkey: "3kabc", text: "Morning #café run")
+
+        expect(@sent["record"]["facets"].first["features"].first["tag"]).to eq("café")
+      end
+
+      it "keeps a hyphen inside a tag" do
+        service.post!(rkey: "3kabc", text: "A #trail-run today")
+
+        expect(@sent["record"]["facets"].first["features"].first["tag"]).to eq("trail-run")
+      end
+
+      # ⚠️ The client removes the punctuation at the end, thus the facet must become shorter too or
+      # it covers a character that the tag does not hold.
+      it "removes the punctuation at the end of a tag" do
+        service.post!(rkey: "3kabc", text: "Done #ironman!")
+        facet = @sent["record"]["facets"].first
+        text = @sent["record"]["text"]
+
+        expect(facet["features"].first["tag"]).to eq("ironman")
+        expect(text.byteslice(facet["index"]["byteStart"],
+                              facet["index"]["byteEnd"] - facet["index"]["byteStart"])).to eq("#ironman")
+      end
+
+      # ⚠️ A tag past the limit makes the full record invalid, thus it would take the post with it.
+      it "drops a tag that is longer than the limit" do
+        service.post!(rkey: "3kabc", text: "Hello ##{'a' * (described_class::MAX_TAG_GRAPHEMES + 1)}")
+
+        expect(@sent["record"]).not_to have_key("facets")
+      end
+
+      # ⚠️ In order of the byte offset, as the client of Bluesky writes them.
+      it "puts the facets in order of where they start" do
+        service.post!(rkey: "3kabc", text: "#early then [a link](https://example.test/a) after")
+
+        starts = @sent["record"]["facets"].map { |facet| facet["index"]["byteStart"] }
+        expect(starts).to eq(starts.sort)
       end
 
       # ⚠️ The record holds the PLAIN words and the address is in the facet. Thus the URL uses none

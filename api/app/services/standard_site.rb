@@ -64,6 +64,18 @@ class StandardSite < ApplicationService
   # A check on a Contentful sys.id before it becomes a record key.
   ENTRY_ID_PATTERN = /\A[a-zA-Z0-9._~:-]{1,512}\z/
 
+  # The largest blob that the lexicon takes for an icon or a cover image: it must be below 1MB.
+  # ⚠️ It is not the 2MB of `app.bsky.embed.images`. The two limits belong to two lexicons and they
+  # are different on purpose.
+  MAX_BLOB_BYTES = 976_560
+
+  # The limits of the text fields of the two lexicons, in grapheme clusters.
+  MAX_NAME_GRAPHEMES = 500
+  MAX_DESCRIPTION_GRAPHEMES = 3000
+  # ⚠️ `tags` has a limit **for each item**, and nothing capped one. A long tag makes the whole
+  # record invalid, thus one tag takes the document away with it.
+  MAX_TAG_GRAPHEMES = 128
+
   # Makes the at:// URI of the publication. This is the only source of the format. The sync
   # paths and the /api/standard-site endpoint use it.
   # @param did [String]
@@ -189,16 +201,25 @@ class StandardSite < ApplicationService
     # Stop before the delete step, thus a temporary fetch error cannot delete all the live records.
     return log_skip("backfill", "article fetch failed; not pruning") if items.nil?
 
+    # ⚠️ The jobs are SPACED and not queued at one time. A PDS counts the writes of an account, and
+    # 3 points for a make against 5,000 each hour is 1,666 records each hour. The corpus is small
+    # today and it grows, and a backfill that reaches that limit gets a 429 for each job after it.
+    spacing = AtProto.seconds_between_writes
     current = []
     publishable_posts(items.map { |item| decorate_post(item) }).each do |post|
       sys_id = post.dig("sys", "id")
       next if sys_id.blank? || !ENTRY_ID_PATTERN.match?(sys_id)
+      StandardSiteSyncJob.perform_in((current.length * spacing).seconds, "sync_document", sys_id)
       current << document_rkey(sys_id)
-      StandardSiteSyncJob.perform_async("sync_document", sys_id)
+    end
+
+    unless own_repo?
+      return log("backfill: the publication in this repo belongs to another site; not pruning", :skipped)
     end
 
     pruned = prune_documents(current)
-    log("backfill complete: #{current.size} document sync job(s) enqueued, #{pruned} record(s) pruned")
+    log("backfill complete: #{current.size} document sync job(s) enqueued, one each " \
+        "#{spacing.round(1)}s, #{pruned} record(s) pruned")
   end
 
   # The DID of the account, from the Redis cache. If the cache is empty, this opens a session.
@@ -276,12 +297,12 @@ class StandardSite < ApplicationService
     record = {
       "$type" => PUBLICATION_COLLECTION,
       "url" => publication_url,
-      "name" => truncate_graphemes(site["title"].to_s, 500),
+      "name" => truncate_graphemes(site["title"].to_s, MAX_NAME_GRAPHEMES),
       "basicTheme" => BASIC_THEME,
       "preferences" => { "showInDiscover" => true }
     }
     description = plain_text(site["meta_description"])
-    record["description"] = truncate_graphemes(description, 3000) if description.present?
+    record["description"] = truncate_graphemes(description, MAX_DESCRIPTION_GRAPHEMES) if description.present?
     record["icon"] = icon if icon.present?
     record
   end
@@ -297,7 +318,7 @@ class StandardSite < ApplicationService
     record = {
       "$type" => DOCUMENT_COLLECTION,
       "site" => publication_uri,
-      "title" => truncate_graphemes(post["title"].to_s, 500),
+      "title" => truncate_graphemes(post["title"].to_s, MAX_NAME_GRAPHEMES),
       "publishedAt" => iso8601(post["published_at"])
     }
     path = document_path(post["path"])
@@ -306,12 +327,13 @@ class StandardSite < ApplicationService
     record["updatedAt"] = updated if updated.present?
 
     description = plain_text(post["summary"].presence || post["intro"])
-    record["description"] = truncate_graphemes(description, 3000) if description.present?
+    record["description"] = truncate_graphemes(description, MAX_DESCRIPTION_GRAPHEMES) if description.present?
 
     text = plain_text([ post["intro"], post["body"] ].reject(&:blank?).join("\n\n"))
     record["textContent"] = text if text.present?
 
-    tags = Array(post.dig("contentful_metadata", "tags")).map { |t| t["name"] }.compact_blank
+    tags = Array(post.dig("contentful_metadata", "tags"))
+             .map { |t| truncate_graphemes(t["name"].to_s, MAX_TAG_GRAPHEMES) }.compact_blank
     record["tags"] = tags if tags.present?
 
     record["coverImage"] = cover_image if cover_image.present?
@@ -392,7 +414,8 @@ class StandardSite < ApplicationService
     if fingerprint == stored_fingerprint(PUBLICATION_COLLECTION, PUBLICATION_RKEY)
       return log("publication unchanged; skipping", :unchanged)
     end
-    icon = upload_image_blob(site.dig("logo", "url"), site.dig("logo", "content_type"), w: 512, h: 512)
+    icon = upload_image_blob(site.dig("logo", "url"), site.dig("logo", "content_type"),
+                             w: 512, h: 512, limit: MAX_BLOB_BYTES)
     record = build_publication_record(site, icon: icon)
     unless put_record(PUBLICATION_COLLECTION, PUBLICATION_RKEY, record)
       return log("publication putRecord failed", :error)
@@ -419,7 +442,8 @@ class StandardSite < ApplicationService
     if fingerprint == stored_fingerprint(DOCUMENT_COLLECTION, rkey)
       return log("document #{rkey} unchanged; skipping", :unchanged)
     end
-    cover = upload_image_blob(post.dig("cover_image", "url"), post.dig("cover_image", "content_type"), w: 1200, h: 630)
+    cover = upload_image_blob(post.dig("cover_image", "url"), post.dig("cover_image", "content_type"),
+                              w: 1200, h: 630, limit: MAX_BLOB_BYTES)
     record = build_document_record(post, publication_uri, cover_image: cover)
     unless put_record(DOCUMENT_COLLECTION, rkey, record)
       return log("document #{rkey} putRecord failed", :error)
@@ -605,56 +629,29 @@ class StandardSite < ApplicationService
     true
   end
 
+  # Says whether the repo holds the publication of THIS site.
+  #
+  # ⚠️ `PUBLICATION_RKEY` is `tid("self")`, thus it is the same 13 characters in each installation of
+  # this code. Two sites that share one account overwrite each other's publication record, and each
+  # backfill then deletes the documents of the other one as orphans. A `site.standard.document`
+  # holds no field that names its site, thus nothing can undo that. This turns it into a message.
+  #
+  # It answers true for a repo with no publication record, which is a first run.
+  # @return [Boolean]
+  def own_repo?
+    record = get_own_record(PUBLICATION_COLLECTION, PUBLICATION_RKEY)
+    stored = record&.dig("url").to_s.chomp("/")
+    return true if stored.blank?
+
+    stored == publication_url
+  end
+
   # Deletes each document record with an rkey that is not in the current set.
   # @param current_rkeys [Array<String>] The rkeys that must stay.
   # @return [Integer] The number of records that it deleted.
   def prune_documents(current_rkeys)
     stale = rkeys_to_prune(list_record_rkeys(DOCUMENT_COLLECTION), current_rkeys)
     stale.count { |rkey| remove_document(rkey) == :deleted }
-  end
-
-  # @param collection [String] The collection to list.
-  # @return [Array<String>] All the rkeys in it. The cursor gives one page at a time.
-  # The most pages of records to read. A PDS that gives the same cursor for all time, or a cursor
-  # that never ends, must not make this loop for all time inside a backfill.
-  MAX_LIST_PAGES = 200
-
-  def list_record_rkeys(collection)
-    rkeys = []
-    cursor = nil
-    MAX_LIST_PAGES.times do
-      query = { repo: @did, collection: collection, limit: 100 }
-      query[:cursor] = cursor if cursor.present?
-      response = HTTParty.get("#{@service_url}/xrpc/com.atproto.repo.listRecords", query: query, headers: auth_headers)
-      unless response.success?
-        report_upstream_error("HTTP #{response.code}", context: "standard.site listRecords #{collection}", status: response.code)
-        break
-      end
-      body = JSON.parse(response.body)
-      records = Array(body["records"])
-      rkeys.concat(records.map { |r| r["uri"].to_s.split("/").last })
-      next_cursor = body["cursor"]
-      break if next_cursor.blank? || records.empty? || next_cursor == cursor
-
-      cursor = next_cursor
-    end
-    rkeys
-  end
-
-  # @param collection [String]
-  # @param rkey [String]
-  # @return [Boolean] Whether it succeeded.
-  def delete_record(collection, rkey)
-    response = HTTParty.post(
-      "#{@service_url}/xrpc/com.atproto.repo.deleteRecord",
-      body: { repo: @did, collection: collection, rkey: rkey }.to_json,
-      headers: auth_headers
-    )
-    unless response.success?
-      Rails.logger.warn("standard.site: failed to delete #{collection}/#{rkey} (HTTP #{response.code}: #{response.body})")
-      report_upstream_error("HTTP #{response.code}", context: "standard.site deleteRecord #{collection}/#{rkey}", status: response.code)
-    end
-    response.success?
   end
 
   # Changes Markdown into plain text: no markup, decoded entities, and one space between words.

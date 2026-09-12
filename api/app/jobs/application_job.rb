@@ -14,6 +14,11 @@ class ApplicationJob
   sidekiq_options retry_for: 24.hours
 
   sidekiq_retry_in do |_count, exception|
-    :kill if exception.is_a?(PermanentError)
+    case exception
+    when PermanentError then :kill
+    # The PDS said when it takes writes again. Thus the job waits that long, and it does not use
+    # its 24-hour budget against a limit that is still there.
+    when AtProto::RateLimitedError then exception.retry_after
+    end
   end
 end

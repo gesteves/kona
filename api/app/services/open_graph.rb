@@ -45,6 +45,14 @@ class OpenGraph < ApplicationService
   # The cache is short. The owner can edit a title and share the post again a minute later.
   CACHE_TTL = 15.minutes
 
+  # How long a read that gave nothing stays in the cache.
+  #
+  # ⚠️ `#read` gives `{}` after a failure, which is blank, thus the cache held nothing and a host
+  # that is away was read again at EACH attempt of a job and at each preview. 24 hours of retries
+  # against a host that hangs is many waits of 15 seconds. It is short, because the usual cause is
+  # a host that comes back.
+  EMPTY_CACHE_TTL = 1.minute
+
   # @param url [String, nil]
   # @return [Boolean] True for an http or https URL.
   def self.http_url?(url)
@@ -60,7 +68,8 @@ class OpenGraph < ApplicationService
   def fetch(url)
     return blank_card(url) unless self.class.http_url?(url)
 
-    data = cached_json("open_graph:#{Digest::SHA256.hexdigest(url)}", expires_in: CACHE_TTL) do
+    data = cached_json("open_graph:#{Digest::SHA256.hexdigest(url)}", expires_in: CACHE_TTL,
+                       empty_expires_in: EMPTY_CACHE_TTL) do
       read(url)
     end
     data ||= {}

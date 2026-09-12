@@ -20,7 +20,7 @@
 // ⚠️ An address goes through with NO change, exactly as `Typography` leaves it alone: a link that
 // holds `--` must keep it, and a count that shortened one would be smaller than the server's.
 
-import { TOKEN_SOURCE, URL_SOURCE } from "./social_mentions";
+import { TOKEN_SOURCE, urlRanges } from "./social_mentions";
 
 const ELLIPSIS = /\.\.\.|\. \. \./g;
 const EM_DASH = /---/g;
@@ -76,7 +76,7 @@ function convert(chunk) {
  * @returns {Array<[number, number]>}
  */
 function maskedRanges(text) {
-  const urls = groupRanges(text, URL_SOURCE);
+  const urls = urlRanges(text);
   const tokens = groupRanges(text, TOKEN_SOURCE).filter(
     ([start]) => !urls.some(([from, to]) => start >= from && start < to)
   );

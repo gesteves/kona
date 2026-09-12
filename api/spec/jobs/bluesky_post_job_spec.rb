@@ -126,6 +126,17 @@ RSpec.describe BlueskyPostJob do
       expect(reply["parent"]).to eq({ "uri" => "at://did/app.bsky.feed.post/2", "cid" => "cid2" })
     end
 
+    # ⚠️ The enqueue of the next post is INSIDE the job of the post above it. When the process dies
+    # after that enqueue and before Sidekiq acknowledges the job, the retry does this post again —
+    # which is safe, the rkey is the same — and it would add the next job a second time. The tail
+    # of the thread then goes out two times.
+    it "adds the job of the next post one time only, however many times this job runs" do
+      described_class.new.perform(thread)
+      described_class.new.perform(thread)
+
+      expect(described_class.jobs.size).to eq(1)
+    end
+
     it "adds no job after the last post" do
       described_class.new.perform(thread, 2, { "root" => {}, "parent" => {} })
 

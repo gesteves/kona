@@ -14,12 +14,12 @@
 // thus it has no value, thus the action removes its "@" and keeps the word. Neither one can tag
 // the wrong account.
 //
-// ⚠️ No `u` flag on any of these. URL_SOURCE holds `\#`, which is an ordinary identity escape in
-// a plain RegExp and a SyntaxError under `u`.
+// ⚠️ No `u` flag on any of these. These patterns index by UTF-16 code unit, as the ranges that
+// read them do, and `u` would change that.
 
 export const TOKEN_SOURCE = "(?:^|[$|\\W])(@[a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?(?:@[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?)?)";
 export const DOMAIN_SOURCE = "(?:[a-zA-Z0-9](?:[a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z](?:[a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?";
-export const URL_SOURCE = "(?:^|[$|\\W])(https?://[a-zA-Z0-9\\-._~:/?\\#\\[\\]@!$\u0026'()*+,;%=]*[a-zA-Z0-9\\-_~/\\#@$\u0026*+=])";
+export const URL_SOURCE = "(?:^|[$|\\W])(https?://\\S+)";
 
 // A Bluesky handle is a domain. ⚠️ It is the ONE shape that this file knows, because the count
 // only ever measures the Bluesky text. The other two networks are the concern of the server.
@@ -31,6 +31,51 @@ const BLUESKY_HANDLE = new RegExp(`^${DOMAIN_SOURCE}$`);
  */
 export function isBlueskyHandle(value) {
   return BLUESKY_HANDLE.test(value ?? "");
+}
+
+// The punctuation of a sentence at the end of an address, and the characters that close something
+// that holds it. ⚠️ They are the copy of `Bluesky::URL_TRAILING_PUNCTUATION` and
+// `Bluesky::URL_TRAILING_WRAPPERS`, because `URL_SOURCE` takes each character up to a space and
+// `Bluesky.trim_url` is what decides where an address ends.
+const URL_TRAILING_PUNCTUATION = /[.,;:!?]+$/;
+const URL_TRAILING_WRAPPERS = { ")": "(", "]": "[", ">": "<" };
+
+/**
+ * Removes the punctuation of the sentence from the end of an address.
+ *
+ * ⚠️ A closing bracket comes off only when the address holds no opening one, thus
+ * `…/Kona_(Hawaii)` keeps its bracket and `(see …/a)` gives up the one that closes the aside.
+ * @param {string} url The address, as the pattern matched it.
+ * @returns {string} The address alone.
+ */
+export function trimUrl(url) {
+  let out = String(url ?? "").replace(URL_TRAILING_PUNCTUATION, "");
+
+  while (URL_TRAILING_WRAPPERS[out.at(-1)] && !out.includes(URL_TRAILING_WRAPPERS[out.at(-1)])) {
+    out = out.slice(0, -1).replace(URL_TRAILING_PUNCTUATION, "");
+  }
+
+  return out;
+}
+
+/**
+ * The character ranges of each address, with the punctuation of the sentence outside them.
+ *
+ * ⚠️ `SocialText.url_ranges` trims the same way. Thus the mask of the typography, the mentions
+ * that it skips, and the facets of a post all agree about where an address ends.
+ * @param {string} text
+ * @returns {Array<[number, number]>}
+ */
+export function urlRanges(text) {
+  const ranges = [];
+
+  for (const [start, end] of groupRanges(text ?? "", URL_SOURCE)) {
+    const url = trimUrl(String(text ?? "").slice(start, end));
+    if (url === "") continue;
+
+    ranges.push([start, start + url.length]);
+  }
+  return ranges;
 }
 
 /**
@@ -62,7 +107,7 @@ function groupRanges(text, source) {
  */
 export function tokensOf(text) {
   const body = text ?? "";
-  const skip = groupRanges(body, URL_SOURCE);
+  const skip = urlRanges(body);
 
   return groupRanges(body, TOKEN_SOURCE)
     .filter(([start]) => !skip.some(([from, to]) => start >= from && start < to))
@@ -111,7 +156,7 @@ function replacement(token, value) {
  */
 export function blueskyText(text, values) {
   const body = text ?? "";
-  const skip = groupRanges(body, URL_SOURCE);
+  const skip = urlRanges(body);
   let out = "";
   let last = 0;
 

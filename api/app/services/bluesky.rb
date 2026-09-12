@@ -14,6 +14,17 @@ class Bluesky < ApplicationService
   # the admin page, and `spec/services/bluesky_spec.rb` pins the two together.
   MAX_GRAPHEMES = 300
 
+  # The limit of a post in BYTES. ⚠️ `app.bsky.feed.post#text` has two limits, and this is the
+  # second one. 300 family emoji is 300 graphemes and approximately 7,500 bytes: the PDS refuses
+  # that record, thus a check of the graphemes alone permits a post that can never go out, and
+  # `BlueskyPostJob` then tries it again for 24 hours.
+  MAX_BYTES = 3_000
+
+  # The limits of one `app.bsky.richtext.facet#tag`. ⚠️ A tag past one of them makes the full
+  # record invalid, thus a long hashtag takes the post away with it.
+  MAX_TAG_GRAPHEMES = 64
+  MAX_TAG_BYTES = 640
+
   # The largest blob that a PDS takes for a card thumbnail. A record with a larger one fails at
   # `putRecord` and not at the upload, thus the reason arrives late and reads as "blob too big".
   MAX_BLOB_BYTES = 976_560
@@ -21,11 +32,14 @@ class Bluesky < ApplicationService
   # the owner linked to, and the worker is a 512MB VM at concurrency 5. A picture past this limit
   # loses the thumbnail and never the post.
   MAX_CARD_IMAGE_BYTES = 10 * 1024 * 1024
-  # The width to shrink an oversized thumbnail to. Bluesky renders a card at approximately this
-  # width, thus a larger picture is only bandwidth.
-  CARD_IMAGE_WIDTH = 1200
-  # The JPEG quality of that shrink.
-  CARD_IMAGE_QUALITY = 80
+  # The width that an oversized thumbnail shrinks to first. Bluesky renders a card at approximately
+  # this width, thus a larger picture is only bandwidth.
+  #
+  # ⚠️ The two are the first step of `AtProto::SHRINK_STEPS`, where the full ladder lives, because
+  # `StandardSite` shrinks the cover image of a document against the same kind of limit.
+  CARD_IMAGE_WIDTH = AtProto::SHRINK_STEPS.first[:width]
+  # The JPEG quality of that first step.
+  CARD_IMAGE_QUALITY = AtProto::SHRINK_STEPS.first[:quality]
 
   # The limits of the text fields of a card.
   CARD_TITLE_MAX = 300
@@ -36,12 +50,39 @@ class Bluesky < ApplicationService
 
   # An @handle, from the sample in the AT Protocol documentation.
   MENTION_PATTERN = /(?:^|[$|\W])(@(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)/
-  # A bare URL. It does not take a trailing period or bracket, which is nearly always punctuation
-  # of the sentence and not part of the address.
-  URL_PATTERN = %r{(?:^|[$|\W])(https?://[a-zA-Z0-9\-._~:/?\#\[\]@!$&'()*+,;%=]*[a-zA-Z0-9\-_~/\#@$&*+=])}
-  # A #hashtag. ⚠️ It does not start with a digit, as in the client of Bluesky: "#1" is a number
-  # and not a tag.
-  TAG_PATTERN = /(?:^|[$|\W])(\#(?!\d)\w+)/
+  # A bare URL: each character up to a space, and `.trim_url` then removes what belongs to the
+  # sentence.
+  #
+  # ⚠️ A list of the permitted characters got two cases wrong, and each one made a link to the
+  # WRONG page and not a short one: `…/Kona_(Hawaii)` lost the bracket that it opened, and a path
+  # with a character outside ASCII — `https://example.com/日本` — became `https://example.com/`.
+  URL_PATTERN = %r{(?:^|[$|\W])(https?://\S+)}
+
+  # The characters that an address can end with. ⚠️ Each character after the last one of these
+  # belongs to the sentence and not to the address: a full stop, a comma, a quotation mark that
+  # closes. `\p{Alnum}` and not `a-z0-9`, thus a path outside ASCII ends where it must.
+  URL_TERMINAL = /[\p{Alnum}\-_~\/\#@$&*+=%]/
+
+  # The characters that close something that holds the address. One of them ends an address only
+  # when the address opened it.
+  URL_WRAPPERS = { ")" => "(", "]" => "[", ">" => "<", "}" => "{" }.freeze
+  # The zero-width and formatting characters that a tag cannot hold, from the tag rule of the
+  # Bluesky client.
+  TAG_EXCLUDED = "\u00AD\u2060\u200A\u200B\u200C\u200D\u20E2".freeze
+
+  # A #hashtag, from the rule of the Bluesky client, thus a facet covers the same characters that a
+  # reader sees tagged.
+  #
+  # ⚠️ It does not use `\w`. Ruby reads `\w` as ASCII, thus "#café" gave the tag "caf" and a facet
+  # over one part of a word. It needs one character that is not a digit and not punctuation, which
+  # is what keeps "#1" a number, and it starts at a space or at the start of the text, as the
+  # client does.
+  TAG_PATTERN = /(?:^|\s)([#＃](?!\uFE0F)[^\s#{TAG_EXCLUDED}]*[^\d\s\p{P}#{TAG_EXCLUDED}]+[^\s#{TAG_EXCLUDED}]*)/
+
+  TAG_PREFIX = /\A[#＃]/
+
+  # The client removes the punctuation at the end of a tag, thus "#trail." tags "trail".
+  TRAILING_PUNCTUATION = /\p{P}+\z/
 
   # The number of grapheme clusters in a post.
   #
@@ -59,11 +100,14 @@ class Bluesky < ApplicationService
     SocialText.graphemes(MarkdownLinks.render(text))
   end
 
+  # ⚠️ It reads the GRAPHEMES and the BYTES. The lexicon has both limits, and emoji-heavy words
+  # pass the first one and fail the second one.
   # @param text [String, nil]
   # @return [Boolean] True when the text fits in one post and is not empty.
   def self.valid_post_length?(text)
-    length = post_length(text)
-    length.positive? && length <= MAX_GRAPHEMES
+    plain = MarkdownLinks.render(text)
+    length = SocialText.graphemes(plain)
+    length.positive? && length <= MAX_GRAPHEMES && plain.bytesize <= MAX_BYTES
   end
 
   # Each link of a post, in order, as CHARACTER offsets into the plain text.
@@ -84,12 +128,41 @@ class Bluesky < ApplicationService
     bare = []
 
     SocialText.url_ranges(text).each do |range|
-      next if taken.any? { |other| other.cover?(range.begin) }
+      # ⚠️ Compare the FULL range and not its start alone. In `https://example.test/[docs](url)`
+      # the bare address continues into the words of the link, and two link facets over one range
+      # make a client render a broken link.
+      next if taken.any? { |other| range.begin < other.end && other.begin < range.end }
 
+      # `SocialText.url_ranges` removed the punctuation of the sentence already.
       bare << MarkdownLinks::Link.new(start: range.begin, finish: range.end, url: text[range])
     end
 
     (markdown + bare).sort_by(&:start)
+  end
+
+  # Removes the punctuation of the sentence from the end of an address, as the client of Bluesky
+  # does.
+  #
+  # ⚠️ A closing bracket comes off only when the address holds no opening one. Thus
+  # `…/Kona_(Hawaii)` keeps its bracket and `(see …/a)` gives up the one that closes the aside.
+  # @param url [String]
+  # @return [String]
+  def self.trim_url(url)
+    url = url.to_s
+    url = url[0...-1] while url.present? && !url_ends_here?(url)
+    url
+  end
+
+  # @param url [String] The candidate address.
+  # @return [Boolean] True when the last character belongs to the address.
+  def self.url_ends_here?(url)
+    last = url[-1]
+    return true if URL_TERMINAL.match?(last)
+
+    # ⚠️ A closing bracket belongs to the address only when the address opened it, thus
+    # `…/Kona_(Hawaii)` keeps its bracket and `(see …/a)` gives up the one that closes the aside.
+    opener = URL_WRAPPERS[last]
+    opener.present? && url.count(opener) >= url.count(last)
   end
 
   # The text that one post will hold.
@@ -203,7 +276,7 @@ class Bluesky < ApplicationService
     return if picture.nil?
 
     bytes = picture[:body]
-    mime = picture[:content_type].split(";").first.to_s.strip
+    mime = picture[:content_type].to_s.split(";").first.to_s.strip
 
     # ⚠️ A host with no content type, or a 200 that is an HTML error page, must not go up as a
     # picture. The shrink decodes the bytes with libvips, thus it is also the check that they are
@@ -309,30 +382,14 @@ class Bluesky < ApplicationService
     upload_blob(picture[:body], picture[:content_type])
   end
 
-  # Makes a picture into a JPEG that fits under the blob limit.
+  # Makes a picture into a JPEG that fits under the blob limit of a card thumbnail.
   #
   # ⚠️ A blob past the limit fails at `putRecord`, and not at the upload. Thus without this step the
-  # whole post fails, and the message names the embed and not the picture. libvips is already a
-  # dependency of this app, for the blurhash placeholders.
+  # whole post fails, and the message names the embed and not the picture.
   # @param bytes [String] The original image.
   # @return [Array(String, String), Array(nil, nil)] [bytes, mime], or [nil, nil] when it cannot.
   def shrink(bytes)
-    # ⚠️ The require is **here** and not at the top of the file. libvips is a native library, and a
-    # require at the top makes each path of this class need it: a post with a small picture, and
-    # the preview of the Social media page, would then both fail where nothing has to shrink anything.
-    # ⚠️ LoadError is not a StandardError, thus the rescue below must name it. Without that, a
-    # machine with no libvips gives a 500 in place of a card with no picture.
-    require "vips"
-
-    # ⚠️ `thumbnail_buffer` shrinks at the decode. `new_from_buffer` + `resize` decodes the full
-    # picture first, and an 8000×6000 og:image is then ~144MB of pixels on a 512MB machine, in the
-    # request path of the preview as well as in the job. It still decodes, thus it is still the
-    # check that the bytes are a picture.
-    image = Vips::Image.thumbnail_buffer(bytes, CARD_IMAGE_WIDTH, size: :down)
-    [ image.jpegsave_buffer(Q: CARD_IMAGE_QUALITY, strip: true), "image/jpeg" ]
-  rescue StandardError, LoadError => e
-    report_upstream_error(e, context: "bluesky card image resize")
-    [ nil, nil ]
+    shrink_image(bytes, limit: MAX_BLOB_BYTES)
   end
 
   # Makes the rich-text facets of the body: each link, each mention, and each hashtag.
@@ -349,9 +406,21 @@ class Bluesky < ApplicationService
   # @return [Array<Hash>]
   def build_facets(text, links: [])
     facets = self.class.link_ranges(text, links).map { |link| link_facet(text, link) }
-    inside_link = facets.map { |facet| facet["index"]["byteStart"]...facet["index"]["byteEnd"] }
 
-    facets + mention_facets(text, skip: inside_link) + tag_facets(text, skip: inside_link)
+    # ⚠️ Each kind gives way to the kinds before it, thus no two facets cover one byte. A mention
+    # comes before a tag because `#tag.@example.com` matches the two patterns, and a mention is
+    # the more specific claim.
+    facets += mention_facets(text, skip: byte_ranges(facets))
+    facets += tag_facets(text, skip: byte_ranges(facets))
+
+    # ⚠️ In order of the byte offset, as the client of Bluesky writes them.
+    facets.sort_by { |facet| facet["index"]["byteStart"] }
+  end
+
+  # @param facets [Array<Hash>] The facets so far.
+  # @return [Array<Range>] Their byte ranges.
+  def byte_ranges(facets)
+    facets.map { |facet| facet["index"]["byteStart"]...facet["index"]["byteEnd"] }
   end
 
   # ⚠️ The offsets of the record are in **bytes** of the UTF-8 text, and `MarkdownLinks::Link`
@@ -383,12 +452,38 @@ class Bluesky < ApplicationService
     end
   end
 
+  # One app.bsky.richtext.facet#tag for each #hashtag.
+  #
+  # ⚠️ It does not use `#scan_facets`. The facet of a tag can be SHORTER than its match: the client
+  # removes the punctuation at the end, thus "#trail." tags "trail" and the facet must become
+  # shorter with it, or it covers a character that the tag does not hold.
+  # @param text [String]
   # @param skip [Array<Range>] The byte ranges to leave alone.
-  # @return [Array<Hash>] One app.bsky.richtext.facet#tag for each #hashtag.
+  # @return [Array<Hash>]
   def tag_facets(text, skip: [])
-    scan_facets(text, TAG_PATTERN, skip: skip) do |match|
-      { "$type" => "app.bsky.richtext.facet#tag", "tag" => match.delete_prefix("#") }
+    facets = []
+
+    text.to_s.scan(TAG_PATTERN) do
+      match = Regexp.last_match
+      start_char, = match.offset(1)
+      byte_start = text[0...start_char].bytesize
+
+      tag = match[1].sub(TRAILING_PUNCTUATION, "")
+      byte_end = byte_start + tag.bytesize
+      next if overlaps?(byte_start, byte_end, skip)
+
+      # The facet covers the "#", and the value of the tag does not.
+      name = tag.sub(TAG_PREFIX, "")
+      next if name.blank?
+      next if SocialText.graphemes(name) > MAX_TAG_GRAPHEMES || name.bytesize > MAX_TAG_BYTES
+
+      facets << {
+        "index" => { "byteStart" => byte_start, "byteEnd" => byte_end },
+        "features" => [ { "$type" => "app.bsky.richtext.facet#tag", "tag" => name } ]
+      }
     end
+
+    facets
   end
 
   # Finds each match of the first group of a pattern and makes a facet from it.
@@ -406,20 +501,29 @@ class Bluesky < ApplicationService
       match = Regexp.last_match
       start_char, end_char = match.offset(1)
       byte_start = text[0...start_char].bytesize
-      next if skip.any? { |range| range.cover?(byte_start) }
+      byte_end = text[0...end_char].bytesize
+      next if overlaps?(byte_start, byte_end, skip)
 
       feature = yield(match[1])
       next if feature.blank?
 
       facets << {
-        "index" => {
-          "byteStart" => byte_start,
-          "byteEnd" => text[0...end_char].bytesize
-        },
+        "index" => { "byteStart" => byte_start, "byteEnd" => byte_end },
         "features" => [ feature ]
       }
     end
     facets
+  end
+
+  # ⚠️ It compares the FULL range, and not the start byte alone. A mention or a tag that starts
+  # before a link and continues into it is an overlap, and two facets over one range make a client
+  # render a broken link.
+  # @param byte_start [Integer]
+  # @param byte_end [Integer] The end of the range, not included.
+  # @param skip [Array<Range>] The byte ranges to avoid.
+  # @return [Boolean] True when the range touches one of them.
+  def overlaps?(byte_start, byte_end, skip)
+    skip.any? { |range| byte_start < range.end && range.begin < byte_end }
   end
 
   # @param handle [String] A handle, with no "@".
