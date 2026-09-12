@@ -1,5 +1,11 @@
 .DS_Store
 
+# Editor swap and backup files. ⚠️ `git difftool` with no `diff.tool` set opens **vimdiff**, which
+# writes a `.swp` beside each file that it compares. Thus these appear even if you use no editor
+# that makes them.
+*.sw[a-p]
+*~
+
 # Overmind's control socket, created by `overmind start`
 .overmind.sock
 

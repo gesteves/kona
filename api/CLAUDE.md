@@ -794,6 +794,13 @@ hangs gives a 500 in place of the message of the page, and a disconnect never re
     credential, and `GET /api/standard-site` gives the verification `<link>` tags of each page of
     the static site. To clear it removes those tags from the full site at the next build, below a
     60s cache, and that never looks like a problem at the edge.
+  - **The sync fingerprints are ONE Redis hash**, `standard_site:fingerprints`, with
+    `<collection>:<rkey>` as the field. ⚠️ It is one hash, and not one key for each record, thus the
+    code can count the records and can find an entry whose Contentful entry is gone. A missed
+    delete webhook would otherwise leave a key that nothing can reach.
+    `rake standard_site:migrate_fingerprints` moves the keys of the earlier shape, one time.
+    ⚠️ That task is the **one** place that a SCAN is permitted: it runs by hand and one time. Do
+    not copy it into a service, because the Sidekiq queues share this keyspace.
   - ⚠️ **A change of the DID makes the fingerprint of the publication record incorrect.** The
     fingerprint of a document covers the `at://` URI of the publication, which contains the DID,
     thus each document fingerprint becomes invalid by itself when the account changes. The
@@ -2002,6 +2009,31 @@ it needs an edit in the dashboard. The full reason, and the manual `widgets` tag
 - **Redis** — the global `$redis` comes from `config/initializers/redis.rb` and from `REDIS_URL`.
   The same Redis holds the Sidekiq queues.
 
+### What Redis holds, and what a person must back up
+
+That one instance holds three kinds of data, and only the first kind comes back by itself:
+
+1. **The cache.** `ApplicationService#cached_json` writes each key, and `font-awesome:icon:*` and
+   `blurhash:svg:*` are the two large families. Each key has a TTL.
+2. **The locks and the idempotency records**, for example `build:trigger_lock`,
+   `threads:published:*`, and `mastodon:status:*`. Each key has a TTL.
+3. **The durable records. This Redis is their only copy**: `contact:spam`, `maps:tracks`, the four
+   `*:credentials` hashes, `whoop:<client id>:refresh_token`, `location:current`,
+   `standard_site:did`, and `standard_site:fingerprints`. **None of them has a TTL.**
+
+⚠️ **`maxmemory-policy` is `volatile-lru` for that reason**, and `redis/fly.toml` gives the full
+text. `noeviction` refuses each write at the cap, and that includes the credential write that a
+reconnect needs. `volatile-lru` removes a key with a TTL only, thus it cannot touch group 3.
+⚠️ `maxmemory` applies to the full instance and not to one logical database. Thus a second `db`
+index is **not** a way to give the cache its own limit.
+
+⚠️ **`rake redis:export` is the only backup.** Nothing runs it for you, and the fly volume has no
+replica. It names each key of group 3 from a constant and it uses no SCAN. `rake redis:import`
+reads the file back, and it refuses a key that already holds data unless you give `FORCE=1`.
+⚠️ **The file holds each secret as Redis holds it, that is, encrypted with `secret_key_base`.** Thus
+an import needs the same `RAILS_MASTER_KEY`. With a different key each card says "not connected"
+and nothing raises. Keep the file off the repository.
+
 ## Commands
 
 Run `nvm use` before each `npm` command, as you do in `web/`. There is one native dependency:
@@ -2019,6 +2051,11 @@ bin/ci                                                           # setup, the sp
 bundle exec rubocop                                              # add -a to correct each offense
 bundle exec brakeman -q --no-pager
 bundle exec bundle-audit check --update
+
+# ⚠️ The only backup of the durable records. Refer to "What Redis holds" above. The file holds each
+# secret, encrypted, thus keep it off the repository.
+bundle exec rake redis:export                     # FILE=<path>; the default is tmp/redis-durable.json
+bundle exec rake redis:import                     # FORCE=1 replaces a key that already holds data
 
 # ⚠️ --build-secret is necessary: --remote-only makes the build on the builder of fly. Thus the
 # token for the private registry must go with the build, or `npm ci` gets a 401 and the deploy fails.

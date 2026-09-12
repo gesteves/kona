@@ -16,7 +16,7 @@ its own test suite.
 |---|---|---|
 | `web/` | The Middleman 4 static site (Ruby 4.0.6). It builds the blog, whose content comes from Contentful. | Cloudflare Workers (`kona-web`) |
 | `api/` | The Rails 8.1 API (Ruby 4.0.6). It serves the HTML "widget" fragments that go into the static pages at run time. It also has a Sidekiq `worker` process and an admin UI for the owner, at the root of the admin host. | fly.io (`kona-api`: `app` and `worker`), behind Cloudflare |
-| `redis/` | The `fly.toml` of `kona-redis`, which is the Redis of the API: the cache and the Sidekiq queues. | fly.io |
+| `redis/` | The `fly.toml` of `kona-redis`: the cache of the API, its Sidekiq queues, and the durable records whose only copy is there. Refer to [`api/CLAUDE.md`](api/CLAUDE.md). | fly.io |
 | `utilities/` | The local-only tools. They never go to production. Refer to the text below. | — |
 
 Each app has its own Redis, through its own `REDIS_URL`: `api/` uses `kona-redis`, and `web/` uses a

@@ -477,11 +477,11 @@ describe StandardSite do
     let(:client) do
       described_class.new(credentials: BlueskyCredentials::Credentials.new(handle: "me.bsky.social", app_password: "pw"))
     end
-    let(:publication_fingerprint_key) do
-      "standard_site:fingerprint:#{StandardSite::PUBLICATION_COLLECTION}:#{StandardSite::PUBLICATION_RKEY}"
+    let(:publication_fingerprint_field) do
+      "#{StandardSite::PUBLICATION_COLLECTION}:#{StandardSite::PUBLICATION_RKEY}"
     end
 
-    def reset_keys = $redis.del(StandardSite::DID_CACHE_KEY, publication_fingerprint_key, BlueskyCredentials::REDIS_KEY)
+    def reset_keys = $redis.del(StandardSite::DID_CACHE_KEY, StandardSite::FINGERPRINTS_KEY, BlueskyCredentials::REDIS_KEY)
 
     before { reset_keys }
     after { reset_keys }
@@ -515,7 +515,7 @@ describe StandardSite do
     # sync to the new repo.
     it "drops the publication fingerprint when the account changed" do
       $redis.set(StandardSite::DID_CACHE_KEY, "did:plc:old")
-      $redis.set(publication_fingerprint_key, "stale")
+      $redis.hset(StandardSite::FINGERPRINTS_KEY, publication_fingerprint_field, "stale")
       allow(client).to receive(:create_session) do
         client.instance_variable_set(:@did, "did:plc:new")
         true
@@ -523,12 +523,12 @@ describe StandardSite do
 
       client.connect!
 
-      expect($redis.get(publication_fingerprint_key)).to be_nil
+      expect($redis.hget(StandardSite::FINGERPRINTS_KEY, publication_fingerprint_field)).to be_nil
     end
 
     it "keeps the publication fingerprint when reconnecting the same account" do
       $redis.set(StandardSite::DID_CACHE_KEY, "did:plc:same")
-      $redis.set(publication_fingerprint_key, "current")
+      $redis.hset(StandardSite::FINGERPRINTS_KEY, publication_fingerprint_field, "current")
       allow(client).to receive(:create_session) do
         client.instance_variable_set(:@did, "did:plc:same")
         true
@@ -536,7 +536,7 @@ describe StandardSite do
 
       client.connect!
 
-      expect($redis.get(publication_fingerprint_key)).to eq("current")
+      expect($redis.hget(StandardSite::FINGERPRINTS_KEY, publication_fingerprint_field)).to eq("current")
     end
   end
 

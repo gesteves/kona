@@ -61,6 +61,13 @@ class StandardSite < ApplicationService
   # A DID stays the same for an account. Thus the cache holds it with no TTL.
   DID_CACHE_KEY = "standard_site:did"
 
+  # One Redis hash of the sync fingerprints: the field is "<collection>:<rkey>", and the value is
+  # the fingerprint of the last sync.
+  # ⚠️ It is one hash, and not one key for each record, on purpose. Thus the code can count the
+  # records and can find an entry whose Contentful entry is gone. No other code here reads the full
+  # keyspace, and this Redis also holds the Sidekiq queues, thus a SCAN would be the first one.
+  FINGERPRINTS_KEY = "standard_site:fingerprints"
+
   # A check on a Contentful sys.id before it becomes a record key.
   ENTRY_ID_PATTERN = /\A[a-zA-Z0-9._~:-]{1,512}\z/
 
@@ -266,7 +273,9 @@ class StandardSite < ApplicationService
     previous_did = $redis.get(DID_CACHE_KEY)
     return false unless create_session
 
-    $redis.del(fingerprint_key(PUBLICATION_COLLECTION, PUBLICATION_RKEY)) if previous_did.present? && previous_did != @did
+    if previous_did.present? && previous_did != @did
+      $redis.hdel(FINGERPRINTS_KEY, fingerprint_field(PUBLICATION_COLLECTION, PUBLICATION_RKEY))
+    end
     BlueskyCredentials.store(handle: @handle, app_password: @app_password)
     true
   end
@@ -572,30 +581,30 @@ class StandardSite < ApplicationService
     }
   end
 
-  # --- Fingerprint cache (the Redis of this app; the web app does not read it) --------
+  # --- The fingerprint store (the Redis of this app; the web app does not read it) --------
 
-  # The Redis key for the fingerprint of a record. The collection is part of the key, thus a
+  # The field of a record in FINGERPRINTS_KEY. The collection is part of the field, thus a
   # document and the publication cannot have the same rkey.
-  def fingerprint_key(collection, rkey)
-    "standard_site:fingerprint:#{collection}:#{rkey}"
+  def fingerprint_field(collection, rkey)
+    "#{collection}:#{rkey}"
   end
 
   # @return [String, nil] The fingerprint from the last sync, or nil if it is absent.
   def stored_fingerprint(collection, rkey)
     return unless defined?($redis) && $redis
-    $redis.get(fingerprint_key(collection, rkey))
+    $redis.hget(FINGERPRINTS_KEY, fingerprint_field(collection, rkey))
   end
 
   # Stores the fingerprint of a record with no TTL. It stays after each sync.
   def store_fingerprint(collection, rkey, value)
     return unless defined?($redis) && $redis
-    $redis.set(fingerprint_key(collection, rkey), value)
+    $redis.hset(FINGERPRINTS_KEY, fingerprint_field(collection, rkey), value)
   end
 
-  # Removes the cached fingerprint of a deleted record, thus it syncs again if it comes back.
+  # Removes the fingerprint of a deleted record, thus it syncs again if it comes back.
   def forget_fingerprint(rkey)
     return unless defined?($redis) && $redis
-    $redis.del(fingerprint_key(DOCUMENT_COLLECTION, rkey))
+    $redis.hdel(FINGERPRINTS_KEY, fingerprint_field(DOCUMENT_COLLECTION, rkey))
   end
 
   # @return [String] The production site root, with no slash at the end.
