@@ -61,9 +61,19 @@ class Bluesky < ApplicationService
 
   # An @handle, from the sample in the AT Protocol documentation.
   MENTION_PATTERN = /(?:^|[$|\W])(@(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)/
-  # A bare URL. It does not take a trailing period or bracket, which is nearly always punctuation
-  # of the sentence and not part of the address.
-  URL_PATTERN = %r{(?:^|[$|\W])(https?://[a-zA-Z0-9\-._~:/?\#\[\]@!$&'()*+,;%=]*[a-zA-Z0-9\-_~/\#@$&*+=])}
+  # A bare URL: each character up to a space, and `.trim_url` then removes what belongs to the
+  # sentence.
+  #
+  # ⚠️ A list of the permitted characters got two cases wrong, and each one made a link to the
+  # WRONG page and not a short one: `…/Kona_(Hawaii)` lost the bracket that it opened, and a path
+  # with a character outside ASCII — `https://example.com/日本` — became `https://example.com/`.
+  URL_PATTERN = %r{(?:^|[$|\W])(https?://\S+)}
+
+  # The punctuation of a sentence at the end of an address.
+  URL_TRAILING_PUNCTUATION = /[.,;:!?]+\z/
+
+  # The characters that close something that holds the address, and are not part of it.
+  URL_TRAILING_WRAPPERS = { ")" => "(", "]" => "[", ">" => "<" }.freeze
   # The zero-width and formatting characters that a tag cannot hold, from the tag rule of the
   # Bluesky client.
   TAG_EXCLUDED = "\u00AD\u2060\u200A\u200B\u200C\u200D\u20E2".freeze
@@ -128,10 +138,29 @@ class Bluesky < ApplicationService
     SocialText.url_ranges(text).each do |range|
       next if taken.any? { |other| other.cover?(range.begin) }
 
+      # `SocialText.url_ranges` removed the punctuation of the sentence already.
       bare << MarkdownLinks::Link.new(start: range.begin, finish: range.end, url: text[range])
     end
 
     (markdown + bare).sort_by(&:start)
+  end
+
+  # Removes the punctuation of the sentence from the end of an address, as the client of Bluesky
+  # does.
+  #
+  # ⚠️ A closing bracket comes off only when the address holds no opening one. Thus
+  # `…/Kona_(Hawaii)` keeps its bracket and `(see …/a)` gives up the one that closes the aside.
+  # @param url [String]
+  # @return [String]
+  def self.trim_url(url)
+    url = url.to_s.sub(URL_TRAILING_PUNCTUATION, "")
+
+    while (opener = URL_TRAILING_WRAPPERS[url[-1]]) && !url.include?(opener)
+      url = url[0...-1]
+      url = url.sub(URL_TRAILING_PUNCTUATION, "")
+    end
+
+    url
   end
 
   # The text that one post will hold.

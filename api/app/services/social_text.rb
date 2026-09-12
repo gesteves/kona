@@ -9,11 +9,20 @@ module SocialText
   # @param text [String]
   # @return [Array<Range>]
   def url_ranges(text)
+    text = text.to_s
     ranges = []
-    text.to_s.scan(Bluesky::URL_PATTERN) do
+
+    text.scan(Bluesky::URL_PATTERN) do
       start_char, end_char = Regexp.last_match.offset(1)
-      ranges << (start_char...end_char)
+      # ⚠️ The range is TRIMMED, thus the punctuation of the sentence after an address is outside
+      # it and still gets its typography. Each reader of this method — the mask, the mentions, and
+      # the facets — then agrees about where an address ends.
+      url = Bluesky.trim_url(text[start_char...end_char])
+      next if url.blank?
+
+      ranges << (start_char...(start_char + url.length))
     end
+
     ranges
   end
 

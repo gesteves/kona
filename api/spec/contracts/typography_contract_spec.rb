@@ -51,6 +51,12 @@ RSpec.describe "Typography Ruby ↔ JavaScript contract" do
     %q{Read [my post](https://example.test/a--b) -- it's good},
     "Ref [a][x]... good\n\n[x]: https://example.test/a--b",
     "It's here: https://example.test/a--b... really",
+    # ⚠️ The pattern takes each character up to a space, thus `.trim_url` is the thing that decides
+    # where an address ends, and the two files must decide the same way.
+    "Wiki https://en.wikipedia.org/wiki/Kona_(Hawaii)... nice",
+    "An aside (see https://example.test/a--b)... ok",
+    "Path https://example.test/\u65E5\u672C--a... ok",
+    "Bracket https://example.test/a[b]--c... ok",
     "Copyright (c) 2026 (r) (tm)",
     "(C) (R) (TM)",
     "a 1/2 mile and 1/4 of a 3/4",

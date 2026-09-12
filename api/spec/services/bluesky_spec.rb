@@ -519,6 +519,35 @@ RSpec.describe Bluesky do
         expect(@sent["record"]).not_to have_key("facets")
       end
 
+      # ⚠️ A list of the permitted characters cut this back to "https://example.test/", which is a
+      # link to the WRONG page and not a short one.
+      it "keeps a path that is not ASCII" do
+        service.post!(rkey: "3kabc", text: "Read https://example.test/日本 today")
+
+        expect(@sent["record"]["facets"].first["features"].first["uri"])
+          .to eq("https://example.test/日本")
+      end
+
+      # ⚠️ The pattern took no closing bracket before, thus this link got a facet over
+      # "…/Kona_(Hawaii" alone, which goes nowhere.
+      it "keeps the closing bracket of an address that holds an opening one" do
+        service.post!(rkey: "3kabc", text: "Read https://en.wikipedia.org/wiki/Kona_(Hawaii) today")
+
+        expect(@sent["record"]["facets"].first["features"].first["uri"])
+          .to eq("https://en.wikipedia.org/wiki/Kona_(Hawaii)")
+      end
+
+      # ⚠️ And the other direction: the bracket that closes an aside is not part of the address.
+      it "gives up a closing bracket when the address holds no opening one" do
+        service.post!(rkey: "3kabc", text: "An aside (see https://example.test/a) and more")
+        facet = @sent["record"]["facets"].first
+
+        expect(facet["features"].first["uri"]).to eq("https://example.test/a")
+        expect(@sent["record"]["text"].byteslice(
+          facet["index"]["byteStart"], facet["index"]["byteEnd"] - facet["index"]["byteStart"]
+        )).to eq("https://example.test/a")
+      end
+
       # ⚠️ Ruby reads `\w` as ASCII, thus this gave the tag "caf" and a facet over one part of a
       # word.
       it "marks a tag that holds a character which is not ASCII" do
