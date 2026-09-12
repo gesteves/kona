@@ -30,14 +30,14 @@
     "@cloudflare/workers-types": "^5.20260812.1",
     "@eslint/js": "^10.0.1",
     "axe-core": "4.13.0",
-    "eslint": "^10.9.1",
+    "eslint": "^10.10.0",
     "globals": "^17.12.0",
     "jsdom": "^30.0.1",
     "prettier": "^3.9.5",
-    "stylelint": "^17.14.0",
+    "stylelint": "^17.15.0",
     "stylelint-config-standard-scss": "^17.0.0",
     "stylelint-scss": "^7.2.0",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.0"
   }
 }
