@@ -457,6 +457,20 @@ RSpec.describe ImageHelpers do
         expect(blurhash_svg_data_uri('asset-1')).to eq('data:image/svg+xml;charset=utf-8,%3Csvg%3E%20%3Cg/%3E%20%3C/svg%3E')
       end
 
+      # ⚠️ The caller puts this value in `url('...')`, thus a raw `'` closes that CSS string and
+      # the browser paints no placeholder. It is also what makes `minify_html` read the SVG
+      # attributes as HTML attributes and remove some of their quotes. Use the TRUE output of
+      # `blurhash_svg` here: a fixture with no attribute hid this fault for weeks.
+      it 'percent-encodes each quote, thus the value cannot close the CSS string' do
+        allow(self).to receive(:blurhash_jpeg_data_uri).with('asset-1').and_return('data:image/jpeg;base64,abc123')
+
+        uri = blurhash_svg_data_uri('asset-1')
+
+        expect(uri).not_to include("'")
+        expect(uri).not_to include('"')
+        expect(uri).to include('xmlns=%27http://www.w3.org/2000/svg%27')
+      end
+
       it 'is nil when there is no SVG' do
         allow(self).to receive(:blurhash_svg).with('asset-1').and_return(nil)
         expect(blurhash_svg_data_uri('asset-1')).to be_nil

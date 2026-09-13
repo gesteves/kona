@@ -319,10 +319,16 @@ module ImageHelpers
   # Escapes the few characters that an SVG in a `url()` cannot hold. `url_encode` escapes `/` and
   # `+` as well, and those are legal there: a listing page holds one placeholder for each card,
   # thus each byte here is on the page some tens of times.
+  #
+  # ⚠️ **The two quote characters must stay in this set.** `blurhash_svg` writes each
+  # attribute with `'`, and the caller puts the result in `url('...')`. A raw `'` closes that CSS
+  # string, thus `background` becomes invalid and the browser paints NO placeholder and NO fallback
+  # color. `minify_html` then reads those same quotes as attributes and removes some of them, thus
+  # the SVG is not valid XML either. Both faults give no message.
   # @param svg [String]
   # @return [String]
   def escape_svg_for_url(svg)
-    svg.gsub(/[#%"<> ]/) { |char| format("%%%02X", char.ord) }
+    svg.gsub(/[#%"'<> ]/) { |char| format("%%%02X", char.ord) }
   end
 
   # Makes an SVG that blurs the blurhash thumbnail of the asset to the aspect ratio of the asset.
