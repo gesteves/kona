@@ -21,6 +21,7 @@ Copy `.env.example` to `.env` and fill in the credentials below (deploys read th
 - **Redis** — caches API responses to speed up builds. Set `REDIS_URL`.
 - **Kona API** — set `KONA_API_URL` to the deployed [`api/`](../api/README.md) app. The home-page weather/stats/Whoop widgets load from it at runtime.
 - **Cloudflare R2** — a bucket mirroring Contentful's image assets, so Cloudflare Images fetches its source from a hostname inside the zone rather than from Contentful. A source outside the zone can't use Tiered Cache or Cache Reserve, so every Cloudflare PoP otherwise pulls the full-size original from Contentful and re-pulls it on eviction — which is what this is for. Attach a custom domain to the bucket and set `IMAGE_HOST` to that hostname, then allowlist **that host and only that host** as a Transformations source. ⚠️ Don't allowlist `*.ctfassets.net`: with the mirror host as the only allowed source, a missing or wrong `IMAGE_HOST` 403s loudly instead of silently falling back to Contentful and billing its metered bandwidth. That's also why `IMAGE_HOST` is required rather than optional. ⚠️ The **api** app populates the bucket, webhook-driven; run its `rake assets:backfill` before setting `IMAGE_HOST`, or every image 404s.
+- **Known Agents** _(optional)_ — the [AI agent catalogue](https://knownagents.com/) that was Dark Visitors. `rake import` posts the "AI Data Scraper" agent type to its API and the build writes the `Disallow` rules it returns into `/robots.txt`, so the blocklist tracks the agent landscape without an edit here. Make an account to get an access token and set `KNOWN_AGENTS_ACCESS_TOKEN`, locally and in the build environment. Unset, the import writes nothing and `/robots.txt` keeps its catch-all rule only.
 
 ## Running locally
 
@@ -53,6 +54,7 @@ npx wrangler dev              # http://localhost:8787
 | `bundle exec rake import:content` | Import Contentful content only |
 | `bundle exec rake import:icons` | Import Font Awesome icons only |
 | `bundle exec rake import:standard_site` | Fetch standard.site verification data from the API |
+| `bundle exec rake import:known_agents` | Fetch the AI-scraper robots.txt rules from Known Agents |
 | `bundle exec rake test` | Run the test suite |
 | `bundle exec rake build:verbose` | Full build: test → import → Middleman (which runs the JS build) |
 | `bundle exec rake build:fast` | Build from the existing `data/`, skipping the import |

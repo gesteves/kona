@@ -39,6 +39,12 @@ namespace :import do
     measure_and_output(:import_related, "Fetching related articles")
     report_related_coverage
   end
+
+  desc "Fetches the robots.txt rules that block the AI scrapers from Known Agents"
+  task known_agents: [ :dotenv ] do
+    setup_data_directory
+    measure_and_output(:import_known_agents, "Importing robots.txt directives")
+  end
 end
 
 desc "Imports all content for the site"
@@ -59,6 +65,7 @@ task import: [ :dotenv, :clobber ] do
     [ :import_font_awesome, "Importing icons" ],
     [ :import_standard_site, "Fetching standard.site verification data" ],
     [ :import_related, "Fetching related articles" ],
+    [ :import_known_agents, "Importing robots.txt directives" ],
     [ :import_schema, "Writing the Contentful schema" ]
   ].map do |method, description|
     Thread.new do
@@ -208,6 +215,39 @@ def import_related
     related = JSON.parse(response.body)
     next unless related.is_a?(Hash) && related.present?
     File.write("data/related.json", related.to_json)
+  end
+end
+
+# The Known Agents endpoint that makes the robots.txt rules, and the agent types that we block.
+# "AI Data Scraper" is the family that takes the text of a page to train a model. The list of the
+# agents in that family changes, thus the build gets the rules again each time.
+KNOWN_AGENTS_API_URL = "https://api.knownagents.com/robots-txts".freeze
+KNOWN_AGENTS_AGENT_TYPES = [ "AI Data Scraper" ].freeze
+
+# Gets the robots.txt rules of the AI scrapers from Known Agents and writes them to
+# data/known_agents.json. source/robots.txt.erb renders them between the rule for each other
+# crawler and the Sitemap line.
+#
+# On a failure, and with no access token, it writes nothing, as import_standard_site does, and the
+# rules are then absent from robots.txt. ⚠️ This does NOT stop the build, on purpose: a third party
+# that is unavailable must not stop a content deploy.
+def import_known_agents
+  safely_perform do
+    token = ENV["KNOWN_AGENTS_ACCESS_TOKEN"].to_s
+    next if token.blank?
+    response = HTTParty.post(
+      KNOWN_AGENTS_API_URL,
+      headers: {
+        "Authorization" => "Bearer #{token}",
+        "Content-Type" => "application/json"
+      },
+      body: { agent_types: KNOWN_AGENTS_AGENT_TYPES, disallow: "/" }.to_json,
+      timeout: 15
+    )
+    next unless response.success? && response.body.present?
+    rules = response.body.strip
+    next if rules.blank?
+    File.write("data/known_agents.json", { robots_txt: rules }.to_json)
   end
 end
 

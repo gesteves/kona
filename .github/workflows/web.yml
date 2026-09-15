@@ -374,6 +374,10 @@ jobs:
           # engine reads to check that we own the host. With no value the file is empty, and the
           # submit step below then does nothing.
           INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
+          # The access token of Known Agents. `rake import` gets the robots.txt rules that block
+          # the AI scrapers, and the build writes them into /robots.txt. With no value the import
+          # writes nothing, and robots.txt holds the rule for each other crawler only.
+          KNOWN_AGENTS_ACCESS_TOKEN: ${{ secrets.KNOWN_AGENTS_ACCESS_TOKEN }}
           # ⚠️ This is a repository *variable*, not a secret. A variable with no value becomes an
           # EMPTY STRING, and not an absent env var. Thus each reader of this value must count a
           # blank value as no value. With no value, a publish date uses the browser timezone of

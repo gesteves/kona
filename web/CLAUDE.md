@@ -84,7 +84,7 @@ the same time.
 
 ### Import subtasks
 
-`rake import` runs all five at the same time. `import:content` reads Contentful. `import:icons`
+`rake import` runs all six at the same time. `import:content` reads Contentful. `import:icons`
 posts the list in `data/font_awesome.yml` to the `/api/icons` of the api and writes
 `data/icons.json`. `import:standard_site` gets the DID and the publication URI from the api.
 `import:related` gets the order of the related articles, which the api makes from a BM25 index of
@@ -92,11 +92,15 @@ the article text, the links between the entries, and the concepts, and writes it
 `data/related.json`. Each article uses that order for its "You May Also Like"
 section. `import:schema` writes the Contentful GraphQL schema to
 `lib/data/graphql/contentful_schema.json`, which the data layer reads at its start. Git ignores that
-file, and with no file the data layer reads the live schema. There is also `rake redis:clear`.
+file, and with no file the data layer reads the live schema. `import:known_agents` posts the
+"AI Data Scraper" agent type to the API of Known Agents and writes `data/known_agents.json`, which
+`robots.txt.erb` renders through `known_agent_rules`. There is also `rake redis:clear`.
 
 ⚠️ A failure in `import:icons` **raises**. Each page needs the icons, thus the build stops with a
-message and it does not send pages with an icon absent. `import:standard_site` and `import:related`
-are different: they write nothing on a failure, and the markup that they supply is then absent.
+message and it does not send pages with an icon absent. `import:standard_site`, `import:related`,
+and `import:known_agents` are different: they write nothing on a failure, and the markup that they
+supply is then absent. For Known Agents, `robots.txt` then holds the rule for each other crawler
+only, and it blocks no AI scraper.
 
 ⚠️ In `data/related.json`, a **key** says that the api ranked that entry. Thus
 `report_related_coverage` counts the keys and never the lists that have an entry. The api makes its
@@ -346,6 +350,11 @@ The names only. Refer to `.env.example`, and never put a value in the repo.
   "published today", for the clock icon or the calendar icon, and for the "New" badge. ⚠️ With no
   value, each reader gets their *own* browser timezone. Thus a post that a person publishes at 9pm
   Pacific reads as "not today" in Europe immediately. The build environment must have it, or it does
+  not reach production.
+  `KNOWN_AGENTS_ACCESS_TOKEN` is the token of Known Agents, which was Dark Visitors. `rake import`
+  gets the robots.txt rules that block each AI data scraper, and `robots.txt.erb` renders them
+  between the rule for each other crawler and the `Sitemap:` line. With no value, the import writes
+  nothing and `robots.txt` blocks no scraper. The build environment must have it, or the rules do
   not reach production.
   `READING_TIME_WPM` has a default of 200. `DEBUG_EVENT_DATE` is for your own machine only: it moves
   the date of each event from the import, to let you test the race-day states.

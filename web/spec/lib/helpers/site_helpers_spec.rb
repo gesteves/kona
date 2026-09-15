@@ -721,4 +721,32 @@ RSpec.describe SiteHelpers do
       expect(article_click_classes('')).to be_nil
     end
   end
+
+  describe '#known_agent_rules' do
+    let(:rules) { "User-agent: GPTBot\nDisallow: /" }
+
+    def data = OpenStruct.new(@known_agents ? { known_agents: @known_agents } : {})
+
+    it 'gives the rules and a blank line after them' do
+      @known_agents = OpenStruct.new(robots_txt: rules)
+      expect(known_agent_rules).to eq("#{rules}\n\n")
+    end
+
+    it 'removes the whitespace around the rules of the API' do
+      @known_agents = OpenStruct.new(robots_txt: "\n#{rules}\n\n")
+      expect(known_agent_rules).to eq("#{rules}\n\n")
+    end
+
+    # ⚠️ A failed import writes no data/known_agents.json, and `rake clobber` removes the file of
+    # the last run. Without the guard, robots.txt.erb stops the build.
+    it 'gives an empty string when the import wrote no file' do
+      @known_agents = nil
+      expect(known_agent_rules).to eq('')
+    end
+
+    it 'gives an empty string when the file holds no rules' do
+      @known_agents = OpenStruct.new(robots_txt: '')
+      expect(known_agent_rules).to eq('')
+    end
+  end
 end

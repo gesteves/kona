@@ -163,6 +163,16 @@ module SiteHelpers
     (value.is_a?(String) ? DateTime.parse(value) : value).iso8601
   end
 
+  # The robots.txt rules that block the AI scrapers, for source/robots.txt.erb. `rake import` gets
+  # them from Known Agents and writes data/known_agents.json.
+  # ⚠️ A failed import writes no file, and `rake clobber` removes the file of the last run. Thus
+  # the guard here is necessary: a bare data.known_agents is nil, and it stops the build.
+  # @return [String] The rules and a blank line after them, or "" when the file is absent.
+  def known_agent_rules
+    rules = data.respond_to?(:known_agents) ? data.known_agents&.robots_txt.to_s.strip : ""
+    rules.present? ? "#{rules}\n\n" : ""
+  end
+
   # The year of the first non-draft article. The app keeps the value, because it renders in the
   # footer of each page and each calculation parses the publish date of each article.
   # @return [String] A four-digit year.
