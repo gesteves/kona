@@ -7,7 +7,6 @@
     "scss/selector-no-redundant-nesting-selector": null,
     "selector-class-pattern": null,
     "no-descending-specificity": null,
-    "scss/no-global-function-names": null,
     "scss/at-extend-no-missing-placeholder": null,
     "no-duplicate-selectors": null,
     "selector-pseudo-element-no-unknown": null,

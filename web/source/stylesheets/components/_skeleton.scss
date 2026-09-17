@@ -1,12 +1,16 @@
 // The loading skeletons for the live-update widgets, which are Web Awesome `<wa-skeleton>`
 // elements. These rules change the `--wa-*` defaults of Web Awesome into the placeholder colors of
 // the site.
-// ⚠️ These rules win because of the ENCAPSULATION CONTEXT, and not because of the specificity or the
-// layers. CSS Cascade 5 §6.1 compares the context before the other two, and for a normal
-// declaration the outer context, which is the document, wins over a `:host` rule in a shadow tree,
-// at each specificity and in each layer. Thus the `:root ` prefixes and the unlayered import in
-// site.css.scss are extra protection: they apply only against an `!important` in the shadow tree,
-// which changes the context rule.
+// ⚠️ The rules that reach the shadow tree win because of the ENCAPSULATION CONTEXT, and not because
+// of the specificity or the layers: the `--color` and `--sheen-color` tokens, `min-height`, and each
+// `::part(indicator)` rule. CSS Cascade 5 §6.1 compares the context before the other two, and for a
+// normal declaration the outer context, which is the document, wins over a `:host` rule in a shadow
+// tree, at each specificity and in each layer. The shadow stylesheet of `<wa-skeleton>` has no
+// `!important`, thus this file is safe in `@layer components`. The `:root ` prefixes are extra
+// protection only: they apply against an `!important` in the shadow tree, which changes the context
+// rule.
+// ⚠️ site.css.scss imports this file LAST in `@layer components`. Each other rule here is a plain
+// document rule, and at the same specificity the later rule wins.
 
 // The inline meta skeletons: one short line at the font size of the eyebrow and the footer, with a
 // height for one text line. Each use sets the width, and each other value is the same.

@@ -2,12 +2,7 @@
 @import 'base/variables';
 @import 'base/mixins';
 
-// The code imports these with no layer, and with a specificity above `:host`. Thus these rules win
-// over the unlayered shadow-DOM styles of Web Awesome for `<wa-skeleton>` and `<wa-toast>`.
-@import 'components/skeleton';
-@import 'components/toast';
-
-// This also has no layer. It changes the `--pf-*` variables of the Pagefind modal for the dark mode,
+// This has no layer. It changes the `--pf-*` variables of the Pagefind modal for the dark mode,
 // and those rules must win over the unlayered `:root` defaults of Pagefind, because a rule in a
 // layer always loses to an unlayered rule. Refer to the top of that partial for the full
 // explanation.
@@ -46,6 +41,11 @@
   @import 'components/stats';
   @import 'components/share';
   @import 'components/weather';
+
+  // ⚠️ These two are LAST, on purpose. Each rule in them must win over a rule with the same
+  // specificity in a file above. Refer to the header of each file.
+  @import 'components/skeleton';
+  @import 'components/toast';
 }
 
 @layer utilities {

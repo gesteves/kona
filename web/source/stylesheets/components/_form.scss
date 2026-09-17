@@ -12,24 +12,42 @@
     margin: 0 0 2rem;
     width: 100%;
 
-    // The label and the character count take their color from the theme of Web Awesome. Those
-    // tokens go to their dark values only with a `.wa-dark` class, and the app never sets that
-    // class, because the site controls the dark mode with `prefers-color-scheme` (refer to the note
-    // at the top of base/_props.scss). Thus the label stayed almost black on a black page. Give the
-    // two tokens the text colors of the site.
-    // ⚠️ Change these two tokens only, and not `--wa-color-text-normal`: that token also colors the
-    // value in the control, and the control keeps its light background. Light text would then go on
-    // a white field.
+    // The theme of Web Awesome gives each `--wa-*` token its dark value only with a `.wa-dark`
+    // class. The app never sets that class, because the site controls the dark mode with
+    // `prefers-color-scheme` (refer to the note at the top of base/_props.scss). Thus each control
+    // keeps its light colors on a black page.
+    // The label and the character count sit on the page, beside the field, thus they take the text
+    // colors of the site. Each other part is inside the box of the control, thus it takes the dark
+    // value of the palette of Web Awesome.
     @include dark-mode {
       --wa-form-control-label-color: var(--color-text);
       --wa-form-control-hint-color: var(--color-text-secondary);
+      --wa-form-control-background-color: var(--wa-color-neutral-05);
+      --wa-form-control-value-color: var(--wa-color-neutral-95);
+
+      // ⚠️ Use `--wa-color-neutral-60` for the border, and NOT the `--wa-color-neutral-40` of the
+      // dark theme of Web Awesome. The field is #101219 on a black page, and those two colors
+      // differ by 1.2:1. Thus the border is the only edge of the control. The value of Web Awesome
+      // gives 2.65:1 against the field, and it fails WCAG 1.4.11. This value gives 6.2:1.
+      --wa-form-control-border-color: var(--wa-color-neutral-60);
+
+      // The glyph of the clear button. Web Awesome gives it no `--wa-form-control-*` alias.
+      --wa-color-neutral-on-quiet: var(--wa-color-neutral-60);
+
+      // ⚠️ The background that Chrome paints on a field that it fills. Web Awesome writes it with
+      // an `!important` in the shadow tree, thus a `::part()` rule cannot change it. But that
+      // declaration reads this token, thus a new value here does change it.
+      --wa-color-brand-fill-quiet: var(--wa-color-brand-10);
+
+      // ⚠️ Do NOT set `--wa-color-mix-active` here. Web Awesome mixes the pressed state toward
+      // `--wa-color-surface-default`. The light value is white, thus a pressed control becomes
+      // lighter, and that is correct on a black page. The dark value makes it darker.
     }
   }
 
   // ⚠️ <wa-textarea> gives its control `color: inherit`, and <wa-input> gives its control
-  // `--wa-form-control-value-color`. Thus the text that a user writes took the text color of the
-  // page, which is almost white in the dark mode, and the field keeps its light background. Give
-  // the host the same token that the input uses, in the two modes.
+  // `--wa-form-control-value-color`. Thus the text that a user writes takes the color of the page,
+  // and not the color of the value. Give the host the same token that the input uses.
   wa-textarea {
     color: var(--wa-form-control-value-color);
   }

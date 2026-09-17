@@ -134,6 +134,14 @@
   --z-nav-overlay:   2;
   --z-above-overlay: 3;
 
+  // Web Awesome makes each brand surface from the `--wa-color-brand-NN` set: the fill of an accent
+  // button, a border, and the focus ring. Thus there is no one "brand color" to set. This gives the
+  // firebrick of the site to the step that each *loud* surface uses. Today that is the fill of the
+  // submit button of the contact form.
+  // ⚠️ Set `-50` only. `--wa-color-focus` is `--wa-color-brand-60`, and it stays blue, because that
+  // blue gives 7:1 on black and the firebrick gives 3.25:1. That is deliberate.
+  --wa-color-brand-50: var(--color-firebrick);
+
   @include bp-medium {
     --column-gap:          2rem;
     --font-x-large:        clamp(36px, 10vw, 108px);

@@ -3,9 +3,10 @@
 // its shadow text takes the document default, which is a serif font, and not the font of the site.
 // `<wa-toast-item>` sets no font of its own, thus a font family on the host elements goes into the
 // shadow DOM of the item.
-// ⚠️ The `--wa-color-*` tokens below are in the `@layer wa-theme` of Web Awesome, and each site
-// layer already wins over each `wa-*` layer. Thus the unlayered import and the `:root ` prefix are
-// extra protection and are not necessary. Refer to the note in _skeleton.scss.
+// ⚠️ The `--wa-color-*` tokens below are in the `@layer wa-theme` of Web Awesome, on a
+// `:where(:root)` rule. That rule matches `<html>`, and not these elements, thus it is not a
+// competitor: a declaration on the element wins over an inherited value. No other rule of the site
+// matches `wa-toast`. Thus the `:root ` prefix is extra protection only.
 
 :root wa-toast,
 :root wa-toast-item {

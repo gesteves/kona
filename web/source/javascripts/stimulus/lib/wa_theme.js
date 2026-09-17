@@ -38,9 +38,9 @@ export function loadWebAwesomeTheme() {
   const css = document.createElement('link');
   css.rel = 'stylesheet';
   css.setAttribute('href', href);
-  // Put it before the first stylesheet of the site. The theme gives the default values of the
-  // `--wa-*` tokens, and stylesheets/components/_toast.scss and _skeleton.scss replace some of
-  // them. Those files win only when they are later in the source order.
+  // Put it before the first stylesheet of the site. Thus each `wa-*` layer of Web Awesome sorts
+  // before each layer of the site, and a rule in a site layer wins. stylesheets/base/_props.scss
+  // needs that for `color-scheme` and for `--wa-color-brand-50`.
   document.head.insertBefore(
     css,
     document.head.querySelector('link[rel="stylesheet"]')
