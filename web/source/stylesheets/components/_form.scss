@@ -11,6 +11,19 @@
     font-family: var(--lato);
     margin: 0 0 2rem;
     width: 100%;
+
+    // The label and the character count take their color from the theme of Web Awesome. Those
+    // tokens go to their dark values only with a `.wa-dark` class, and the app never sets that
+    // class, because the site controls the dark mode with `prefers-color-scheme` (refer to the note
+    // at the top of base/_props.scss). Thus the label stayed almost black on a black page. Give the
+    // two tokens the text colors of the site.
+    // ⚠️ Change these two tokens only, and not `--wa-color-text-normal`: that token also colors the
+    // value in the control, and the control keeps its light background. Light text would then go on
+    // a white field.
+    @include dark-mode {
+      --wa-form-control-label-color: var(--color-text);
+      --wa-form-control-hint-color: var(--color-text-tertiary);
+    }
   }
 
   wa-button[type="submit"] {
