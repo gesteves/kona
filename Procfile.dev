@@ -18,7 +18,9 @@
 ## the worker connect at their boot.
 ## ⚠️ Stop a Redis that already holds 6379 first, or this process cannot take the port. That failure
 ## stops overmind, and it is loud on purpose: `redis` is absent from OVERMIND_CAN_DIE.
-redis:  redis-server --port 6379 --dir tmp/redis --save '' --appendonly yes --appendfsync everysec
+## ⚠️ The `mkdir` is necessary. redis-server does not make its `--dir`, and it stops with a fatal
+## config error when that directory is absent. Git ignores `tmp/redis/`, thus a new clone has none.
+redis:  mkdir -p tmp/redis && redis-server --port 6379 --dir tmp/redis --save '' --appendonly yes --appendfsync everysec
 web:    cd web && bundle exec middleman
 api:    cd api && PORT=3000 bin/dev
 js:     cd api && npm run watch
