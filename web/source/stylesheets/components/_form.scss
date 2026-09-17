@@ -26,6 +26,14 @@
     }
   }
 
+  // ⚠️ <wa-textarea> gives its control `color: inherit`, and <wa-input> gives its control
+  // `--wa-form-control-value-color`. Thus the text that a user writes took the text color of the
+  // page, which is almost white in the dark mode, and the field keeps its light background. Give
+  // the host the same token that the input uses, in the two modes.
+  wa-textarea {
+    color: var(--wa-form-control-value-color);
+  }
+
   wa-button[type="submit"] {
     align-self: flex-start;
     font-family: var(--lato);
