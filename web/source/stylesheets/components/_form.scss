@@ -22,7 +22,7 @@
     // a white field.
     @include dark-mode {
       --wa-form-control-label-color: var(--color-text);
-      --wa-form-control-hint-color: var(--color-text-tertiary);
+      --wa-form-control-hint-color: var(--color-text-secondary);
     }
   }
 
