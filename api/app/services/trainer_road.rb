@@ -51,21 +51,17 @@ class TrainerRoad < ApplicationService
     today = Time.current.in_time_zone(@timezone).to_date
     cache_key = "trainerroad:workouts:#{@timezone}:#{today.iso8601}:#{calendar_version}"
     cached_json(cache_key, expires_in: 5.minutes) do
-      response = HTTParty.get(@calendar_url, timeout: CONNECT_TIMEOUT)
-      unless response.success?
-        report_upstream_error("HTTP #{response.code}", context: "TrainerRoad calendar", status: response.code)
-        next []
-      end
-
-      calendar = Icalendar::Calendar.parse(response.body).first
-
       # ⚠️ This goes through event_on_date?, which changes a timed event into @timezone first. A
       # comparison of `event.dtstart.to_datetime.to_date` uses the stored offset of the event, thus
       # an event in the evening goes to the next day. Both consumers read only `workouts.any?`,
       # thus that changes workout_scheduled? and rest_day? with no message.
-      todays_events = calendar.events.select do |event|
-        event.dtstart.present? && event_on_date?(event, today, @timezone)
+      events = begin
+        fetch_calendar_events
+      rescue ApplicationService::HttpError
+        # The fetch reported the failure already. The widget counts no events as a rest day.
+        next []
       end
+      todays_events = events.select { |event| event_on_date?(event, today, @timezone) }
 
       todays_events.map { |event| parse_workout(event) }
                    .compact
@@ -121,6 +117,10 @@ class TrainerRoad < ApplicationService
   end
 
   # Gets and parses each VEVENT in the feed.
+  #
+  # ⚠️ A 200 whose body is not a calendar, for example a sign-in page from a stale feed URL, gives
+  # no events and a report. It must not raise: `Icalendar::Calendar.parse` gives an empty list for
+  # such a body, and a nil dereference here reads as "rest day" on the public site.
   # @return [Array<Icalendar::Event>]
   # @raise [ApplicationService::HttpError] If it fails. The caller counts that as "no planned
   #   workouts" and does not stop the job.
@@ -132,7 +132,12 @@ class TrainerRoad < ApplicationService
     end
 
     calendar = Icalendar::Calendar.parse(response.body).first
-    calendar ? calendar.events.select { |event| event.dtstart.present? && event.summary.present? } : []
+    if calendar.nil?
+      report_upstream_error("The feed is not a calendar", context: "TrainerRoad calendar", status: response.code)
+      return []
+    end
+
+    calendar.events.select { |event| event.dtstart.present? && event.summary.present? }
   end
 
   # Tells if an event is on a date. An all-day event has a date with no zone. The code changes a

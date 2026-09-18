@@ -84,6 +84,15 @@ RSpec.describe ThreadsPostJob do
       expect(described_class.jobs.first["at"]).to be_nil
     end
 
+    # ⚠️ Meta has no idempotency on its side. A retry that comes after the enqueue would add the
+    # next job a second time, and two jobs below one key there are two true posts.
+    it "adds the job of the next post one time only, however many times this job runs" do
+      described_class.new.perform(thread)
+      described_class.new.perform(thread)
+
+      expect(described_class.jobs.size).to eq(1)
+    end
+
     it "adds no job after the last post" do
       described_class.new.perform(thread, 1, "17900000000000000")
 

@@ -245,6 +245,17 @@ RSpec.describe WeatherHelper, type: :helper do
     it "finds tomorrow's forecast" do
       expect(helper.tomorrows_forecast(build_weather).temperature_max).to eq(22.0)
     end
+
+    # ⚠️ The controller reads weather_data_is_current? before its `safely` blocks, thus a raise here
+    # is a 500 on the widget.
+    it "is stale, and does not raise, when a forecast time is absent or broken" do
+      weather = build_weather
+      weather.forecast_daily.days.first.forecast_start = nil
+      weather.forecast_daily.days.last.forecast_start = "not a time"
+
+      expect(helper.weather_data_is_current?(weather, time_zone)).to be(false)
+      expect(helper.tomorrows_forecast(weather)).to be_nil
+    end
   end
 
   # ---------------------------------------------------------------------------

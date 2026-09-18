@@ -21,7 +21,12 @@ module Widgets
       published_at = article.published.presence || article.sys&.first_published_at
       return render_empty if published_at.blank? || plausible.site_id.blank?
 
-      published = DateTime.parse(published_at)
+      # A date that does not parse names no path and no dashboard range, thus the widget goes away
+      # and does not raise. ⚠️ This check is before the path: ArticleAttributes.path parses the same
+      # date and raises on a bad one.
+      published = helpers.parse_time(published_at)
+      return render_empty if published.nil?
+
       path = ArticleAttributes.path(slug: article.slug, published_at: published_at)
       return render_empty if path.blank?
 

@@ -68,6 +68,13 @@ RSpec.describe MastodonPostJob do
       expect(described_class.jobs).to be_empty
     end
 
+    it "adds the job of the next post one time only, however many times this job runs" do
+      described_class.new.perform(thread)
+      described_class.new.perform(thread)
+
+      expect(described_class.jobs.size).to eq(1)
+    end
+
     it "adds no job after the last post" do
       described_class.new.perform(thread, 1, "101")
 

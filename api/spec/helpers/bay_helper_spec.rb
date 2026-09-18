@@ -22,6 +22,14 @@ RSpec.describe BayHelper do
     it "returns nil when there's no bay data" do
       expect(bay_helper.bay_conditions_at(nil, target)).to be_nil
     end
+
+    it "passes over an entry whose time does not parse" do
+      goodspeed = DeepOstruct.wrap(timeseries: [
+        { t: "not a time", current_speed_kt: 9.0 },
+        { t: (target - 300).iso8601, current_speed_kt: 1.0 }
+      ])
+      expect(bay_helper.bay_conditions_at(goodspeed, target).current_speed_kt).to eq(1.0)
+    end
   end
 
   describe "#format_bay_current_speed" do

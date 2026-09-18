@@ -396,7 +396,7 @@ Thus that shared window is safe.
 | `WhoopWebhookJob(event_type, resource_id, trace_id)` | syncs Whoop metrics to Intervals.icu |
 | `ActivityDescriptionJob(activity_id, whoop_strain = nil)` | (re)generates an activity's Strava description and tidies its name |
 | `LocationSyncJob(latitude, longitude)` | propagates the current location to Intervals.icu |
-| `BlueskyPostJob(posts, index, reply)` | posts one post of a thread to Bluesky, then adds the job of the next |
+| `BlueskyPostJob(posts, index, reply)` | posts one post of a thread to Bluesky, then adds the job of the next. ⚠️ The three post jobs inherit from `SocialPostJob`, which holds the enqueue lock: a retry after the enqueue must not add the next job a second time, and Threads has no idempotency on its side |
 | `MastodonPostJob(posts, index, in_reply_to_id)` | the same, for Mastodon |
 | `ThreadsPostJob(posts, index, reply_to_id)` | the same, for Threads |
 | `ContactMailJob(name, email, message, context, restored_from_spam = false)` | contact intake: Akismet + compose |
@@ -1669,8 +1669,10 @@ container.
   **after** Meta publishes. Thus a failure between the two steps leaves the container for the retry,
   and that retry publishes the same container in place of a second post. Without this, each attempt
   would make one more container, and a person would get more than one post.
-  - The TTL is 20 hours. ⚠️ Meta expires a container after 24 hours, thus a longer TTL would name a
-    container that is gone.
+  - The TTL is 25 hours, longer than the retry window of the job. ⚠️ Meta expires a container
+    after 24 hours, thus a late retry can find one in the `EXPIRED` state. The wait removes the id
+    of a container in the `ERROR` state or the `EXPIRED` state before it raises, and the next
+    attempt makes a new container. With the id in place, each retry would poll a dead container.
 - ⚠️ **It waits for the container before the publish**, with a poll of `CONTAINER_POLL_ATTEMPTS`
   reads at `CONTAINER_POLL_SECONDS`. A publish that comes too early gets `400 subcode 4279009`,
   which reads as a container that was never made. Meta processes a TEXT container as well. Three

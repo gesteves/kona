@@ -79,10 +79,11 @@ class Threads < ApplicationService
     value.length.between?(1, TOPIC_MAX_CHARACTERS) && !value.match?(TOPIC_FORBIDDEN)
   end
 
-  # How long the id of a media container stays in Redis. ⚠️ Meta expires a container after 24 hours,
-  # thus a value above that would name a container that is gone.
+  # How long the id of a media container stays in Redis.
   # ⚠️ Longer than the 24-hour retry window of ApplicationJob. A shorter TTL leaves the last
-  # retries with no container, and each of those would make a new post.
+  # retries with no container, and each of those would make a new post. Meta expires a container
+  # after 24 hours, thus a late retry can find one in the EXPIRED state: #wait_for_container
+  # removes that id, and the next attempt makes a new container.
   CONTAINER_TTL = 25 * 60 * 60
   # The time that the id of a published post stays, for a retry that comes after the publish.
   PUBLISHED_TTL = 25 * 60 * 60
@@ -200,6 +201,7 @@ class Threads < ApplicationService
     # ⚠️ One refresh at a time, as Whoop does. A refresh and a reconnect at the same time would
     # each write a token, and the second write resets the issue time of the first.
     return :busy unless $redis.set(REFRESH_LOCK_KEY, "1", nx: true, ex: REFRESH_LOCK_TTL)
+    holding = true
 
     response = HTTParty.get(
       "#{GRAPH_URL}/refresh_access_token",
@@ -228,7 +230,9 @@ class Threads < ApplicationService
     report_upstream_error(e, context: "Threads token refresh")
     :failed
   ensure
-    $redis.del(REFRESH_LOCK_KEY) if defined?(response)
+    # ⚠️ Only the holder removes the lock. `holding` is nil on the :busy path, and a test on
+    # `defined?(response)` is true on each path, because the parser declares that local.
+    $redis.del(REFRESH_LOCK_KEY) if holding
   end
 
   # Removes the stored token and the account.
@@ -275,7 +279,7 @@ class Threads < ApplicationService
 
     container_id = container_for(text: text, url: url, key: idempotency_key,
                                  reply_to_id: reply_to_id, topic: topic)
-    wait_for_container(container_id)
+    wait_for_container(container_id, key: idempotency_key)
     published = publish_container(container_id)
 
     # ⚠️ It remembers the post and forgets the container only after Meta published it. To forget
@@ -388,16 +392,25 @@ class Threads < ApplicationService
   #
   # It raises when the container never becomes ready. The id stays in Redis, thus the retry of the
   # job waits for the same container and makes no second one.
+  #
+  # ⚠️ A container in the ERROR state or the EXPIRED state can never publish. The code removes its
+  # id before it raises, thus the retry makes a new container. With the id in place, each retry
+  # would poll the same dead container for the full 24 hours.
   # @param container_id [String]
+  # @param key [String] The idempotency key that holds the container.
   # @return [void]
-  def wait_for_container(container_id)
+  def wait_for_container(container_id, key:)
     failures = 0
     CONTAINER_POLL_ATTEMPTS.times do |attempt|
       status = container_status(container_id)
       case status
       when "FINISHED", "PUBLISHED" then return
-      when "ERROR"   then raise "Threads could not process the container #{container_id}"
-      when "EXPIRED" then raise "The Threads container #{container_id} expired"
+      when "ERROR"
+        $redis.del(container_key(key))
+        raise "Threads could not process the container #{container_id}"
+      when "EXPIRED"
+        $redis.del(container_key(key))
+        raise "The Threads container #{container_id} expired"
       end
 
       # ⚠️ A read that fails is not "not ready". Meta that is away must not cost the full poll of

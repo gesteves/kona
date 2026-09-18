@@ -263,8 +263,11 @@ RSpec.describe Threads do
       connect!(issued_at: 2.days.ago)
       allow(HTTParty).to receive(:get).and_return(http_response({ access_token: "a-renewed-token", expires_in: 60.days.to_i }))
 
+      # ⚠️ The :busy answer must leave the lock of the other process in place.
       $redis.set(described_class::REFRESH_LOCK_KEY, "1", nx: true, ex: 60)
       expect(described_class.new.refresh!).to eq(:busy)
+      expect($redis.exists?(described_class::REFRESH_LOCK_KEY)).to be(true)
+      expect(HTTParty).not_to have_received(:get)
       $redis.del(described_class::REFRESH_LOCK_KEY)
 
       expect(described_class.new.refresh!).to eq(:refreshed)
@@ -563,16 +566,20 @@ RSpec.describe Threads do
         expect($redis.get(published_key)).to be_nil
       end
 
-      it "raises for a container that Meta could not process" do
+      # ⚠️ A container in one of these two states can never publish. The id must go, or each retry
+      # polls the same dead container for the full 24 hours.
+      it "raises for a container that Meta could not process, and forgets it" do
         allow(HTTParty).to receive(:get).and_return(http_response({ status: "ERROR" }))
 
         expect { post! }.to raise_error(/could not process/)
+        expect($redis.get(container_key)).to be_nil
       end
 
-      it "raises for a container that expired" do
+      it "raises for a container that expired, and forgets it" do
         allow(HTTParty).to receive(:get).and_return(http_response({ status: "EXPIRED" }))
 
         expect { post! }.to raise_error(/expired/)
+        expect($redis.get(container_key)).to be_nil
       end
 
       # ⚠️ It raises and does not publish. The container id stays in Redis, thus the retry of the

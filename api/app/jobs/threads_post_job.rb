@@ -1,13 +1,15 @@
 # Posts one post of a draft from the Social media page to Threads, then adds the job of the next
-# one.
-#
-# ⚠️ **There is one job for each POST, and not one job for the whole thread.** Refer to
-# BlueskyPostJob for the reason.
+# one. Refer to SocialPostJob for the one-job-for-each-post rule and the enqueue lock.
 #
 # ⚠️ You can do each attempt more than one time. Meta gives no idempotency header, thus
 # `Threads#post!` keeps the id of the media container in Redis below `key`. A retry then publishes
 # the container that it made already, in place of a second one.
-class ThreadsPostJob < ApplicationJob
+class ThreadsPostJob < SocialPostJob
+  # The prefix of each lock key. `spec/support/at_proto_session.rb` removes these keys before each
+  # example. ⚠️ Threads has no idempotency on its side, thus this lock is the one thing that stops
+  # a second post below a key.
+  ENQUEUE_LOCK_PREFIX = "threads:thread:".freeze
+
   # @param posts [Array<Hash>] `[{ "key" =>, "text" =>, "link" => }, …]`, the whole thread. ⚠️ Each holds the
   #   same `"topic"`, when the owner gave one.
   # @param index [Integer] Which post of that list this job writes.
@@ -30,6 +32,6 @@ class ThreadsPostJob < ApplicationJob
     # container, on the reasoning that Meta was not ready for the parent. **That was wrong**: the
     # delay changed nothing, and the token in the query string was the difference. Do not add a
     # wait here again without evidence for it.
-    self.class.perform_async(posts, index + 1, posted) if posts[index + 1]
+    enqueue_next(posts, index + 1, posted)
   end
 end

@@ -147,6 +147,19 @@ RSpec.describe "Widgets::Plausible pageviews", type: :request do
     end
   end
 
+  context "when the publish date does not parse" do
+    before do
+      broken = DeepOstruct.wrap(slug: "draft", published: "soon", sys: { id: "abc123", first_published_at: nil })
+      allow_any_instance_of(Articles).to receive(:find).and_return(broken)
+    end
+
+    it "returns an empty body and does not raise" do
+      get "/widgets/plausible/pageviews/abc123", headers: auth_headers
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to eq("")
+    end
+  end
+
   context "when PLAUSIBLE_SITE_ID is unset" do
     before do
       allow(ENV).to receive(:[]).and_call_original

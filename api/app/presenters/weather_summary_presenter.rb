@@ -96,11 +96,13 @@ class WeatherSummaryPresenter
     "**It's race day!**" if race_day?(@events, @time_zone) && !evening?(@weather, @time_zone)
   end
 
+  # ⚠️ The place name and the race title go through heading_text. The summary renders as Markdown
+  # with no escape, thus a `<` or an `&` in either value would go into the page as markup.
   def current_location
-    location = "I'm currently in **#{location_name}**"
+    location = "I'm currently in **#{heading_text(location_name)}**"
     race = todays_race(@events, @time_zone)
     the = race&.title&.downcase&.start_with?("ironman") ? "" : "the"
-    location << ", racing #{the} **#{race.title}**" if race_day?(@events, @time_zone) && !evening?(@weather, @time_zone)
+    location << ", racing #{the} **#{heading_text(race.title)}**" if race_day?(@events, @time_zone) && !evening?(@weather, @time_zone)
     location
   end
 
@@ -159,9 +161,15 @@ class WeatherSummaryPresenter
     end
   end
 
+  # ⚠️ This returns nil for a reading with no category, and it does not raise.
   def format_pollen_level
-    return if pollen_index_value(@pollen).zero?
-    "Pollen levels are #{pollen_index_category(@pollen).downcase}"
+    value = pollen_index_value(@pollen)
+    return if value.zero?
+
+    category = pollen_index_category(@pollen, value)
+    return if category.blank?
+
+    "Pollen levels are #{category.downcase}"
   end
 
   def forecast

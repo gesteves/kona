@@ -1,11 +1,14 @@
 module BayHelper
+  include TimeHelper # parse_time
+
   # The approximate direction of the flood current at SFB1204. It goes into the bay, at
   # approximately ESE.
   BAY_FLOOD_BEARING_DEG = 110
   # Below this speed in knots, the code counts the current as slack.
   BAY_SLACK_CURRENT_KT = 0.15
 
-  # Finds the Goodspeed entry that is nearest to the given time, in the `freshness` window.
+  # Finds the Goodspeed entry that is nearest to the given time, in the `freshness` window. An
+  # entry whose time does not parse is not a candidate.
   # @param goodspeed [OpenStruct, nil] The Goodspeed bay-conditions data.
   # @return [OpenStruct, nil]
   def bay_conditions_at(goodspeed, time, freshness: 30.minutes)
@@ -13,9 +16,13 @@ module BayHelper
     return nil if series.blank?
 
     target = time.to_time
-    closest = series.min_by { |e| (Time.parse(e.t) - target).abs }
+    timed = series.filter_map do |entry|
+      at = parse_time(entry.t)
+      [ entry, at ] if at
+    end
+    closest, at = timed.min_by { |_entry, entry_at| (entry_at - target).abs }
     return nil if closest.blank?
-    return nil if (Time.parse(closest.t) - target).abs > freshness.to_i
+    return nil if (at - target).abs > freshness.to_i
 
     closest
   end

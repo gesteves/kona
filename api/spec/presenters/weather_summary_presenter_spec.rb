@@ -177,6 +177,19 @@ RSpec.describe WeatherSummaryPresenter do
       expect(result).to include("**Ironman World Championship**")
       expect(result).not_to include("racing the")
     end
+
+    # ⚠️ The summary renders as Markdown with no escape, thus markup in a title or a place name
+    # must arrive as text.
+    it "escapes markup in the place name and the race title" do
+      allow(presenter).to receive(:format_location).and_return("Boulder <b>CO</b>")
+      allow(presenter).to receive(:race_day?).and_return(true)
+      allow(presenter).to receive(:evening?).and_return(false)
+      allow(presenter).to receive(:todays_race).and_return(DeepOstruct.wrap(title: "Tri & <b>Run</b>"))
+      result = presenter.current_location
+      expect(result).to include("Boulder CO")
+      expect(result).to include("Tri &amp; Run")
+      expect(result).not_to include("<")
+    end
   end
 
   describe "#elevation" do
@@ -267,6 +280,12 @@ RSpec.describe WeatherSummaryPresenter do
       ]))
 
       expect(presenter.format_pollen_level).to eq("Pollen levels are moderate")
+    end
+
+    it "emits no sentence for a reading with a value and no category" do
+      presenter.instance_variable_set(:@pollen, DeepOstruct.wrap(pollen_type_info: [ { index_info: { value: 3 } } ]))
+
+      expect(presenter.format_pollen_level).to be_nil
     end
 
     it "emits no sentence when pollen is zero/missing" do

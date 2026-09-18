@@ -299,6 +299,18 @@ RSpec.describe TrainerRoad do
       expect(service.workouts).to eq([])
     end
 
+    # ⚠️ A stale feed URL can answer 200 with a sign-in page. That must not raise: the raise reads
+    # as "rest day" on the public site.
+    it "gives no workouts, and a report, for a 200 that is not a calendar" do
+      allow(HTTParty).to receive(:get).and_return(
+        instance_double(HTTParty::Response, success?: true, code: 200, body: "<html><body>Sign in</body></html>")
+      )
+      allow(service).to receive(:report_upstream_error)
+
+      expect(service.workouts).to eq([])
+      expect(service).to have_received(:report_upstream_error).with("The feed is not a calendar", hash_including(context: "TrainerRoad calendar"))
+    end
+
     it "returns [] and reports when the calendar fetch fails" do
       allow(HTTParty).to receive(:get).and_return(
         instance_double(HTTParty::Response, success?: false, code: 500, body: "boom")

@@ -5,6 +5,8 @@
 # The text summary and its rules are in WeatherSummaryPresenter, which includes this module and
 # gives it the data of the request.
 module WeatherHelper
+  include TimeHelper # parse_time
+
   PRECIPITATION_METRIC_UNITS = {
     unit: "mm",
     ten: "cm",
@@ -26,9 +28,16 @@ module WeatherHelper
     weather&.current_weather
   end
 
+  # ⚠️ The forecast times go through parse_time, which gives nil for a value that is absent or
+  # broken. `Time.parse` raises on those, and the widget then gives a 500 in place of an empty
+  # body: the controller calls this before its `safely` blocks.
   def todays_forecast(weather)
     now = Time.now
-    weather&.forecast_daily&.days&.find { |d| d.rest_of_day_forecast.present? && Time.parse(d.forecast_start) <= now && Time.parse(d.forecast_end) >= now }
+    weather&.forecast_daily&.days&.find do |d|
+      start_at = parse_time(d.forecast_start)
+      end_at = parse_time(d.forecast_end)
+      d.rest_of_day_forecast.present? && start_at && end_at && start_at <= now && end_at >= now
+    end
   end
 
   def rest_of_day_forecast(weather, time_zone)
@@ -38,25 +47,25 @@ module WeatherHelper
 
   def tomorrows_forecast(weather)
     now = Time.now
-    weather&.forecast_daily&.days&.find { |d| Time.parse(d.forecast_start) > now }
+    weather&.forecast_daily&.days&.find do |d|
+      start_at = parse_time(d.forecast_start)
+      start_at && start_at > now
+    end
   end
 
   def sunrise(weather, time_zone)
     forecast = todays_forecast(weather)
-    return nil unless forecast&.sunrise
-    Time.parse(forecast.sunrise).in_time_zone(time_zone)
+    parse_time(forecast&.sunrise)&.in_time_zone(time_zone)
   end
 
   def tomorrows_sunrise(weather, time_zone)
     forecast = tomorrows_forecast(weather)
-    return nil unless forecast&.sunrise
-    Time.parse(forecast.sunrise).in_time_zone(time_zone)
+    parse_time(forecast&.sunrise)&.in_time_zone(time_zone)
   end
 
   def sunset(weather, time_zone)
     forecast = todays_forecast(weather)
-    return nil unless forecast&.sunset
-    Time.parse(forecast.sunset).in_time_zone(time_zone)
+    parse_time(forecast&.sunset)&.in_time_zone(time_zone)
   end
 
   # Tells if it is daytime: between the sunrise and the sunset of today, when the payload has those
@@ -230,9 +239,14 @@ module WeatherHelper
     pollen&.pollen_type_info&.select { |p| p&.index_info&.value.to_i > 0 }&.map { |p| p.index_info.value }&.max.to_i
   end
 
-  def pollen_index_category(pollen)
-    return "None" if pollen_index_value(pollen).zero?
-    pollen.pollen_type_info&.find { |p| p&.index_info&.value.to_i == pollen_index_value(pollen) }&.index_info&.category
+  # @param pollen [OpenStruct, nil]
+  # @param value [Integer] The index value, from pollen_index_value. The caller can give it, thus
+  #   the scan of the readings runs one time.
+  # @return [String, nil] The category of the reading with that value, or nil when the reading has
+  #   none.
+  def pollen_index_category(pollen, value = pollen_index_value(pollen))
+    return "None" if value.zero?
+    pollen.pollen_type_info&.find { |p| p&.index_info&.value.to_i == value }&.index_info&.category
   end
 
   def format_time(time)

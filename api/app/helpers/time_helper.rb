@@ -1,4 +1,19 @@
 module TimeHelper
+  # Parses a time from another service.
+  #
+  # ⚠️ It returns nil for a value that is absent or broken, and it does not raise. `Time.parse`
+  # raises on those, and a raise in a helper that a widget calls outside its `safely` blocks gives a
+  # 500 in place of an empty body.
+  # @param value [String, nil]
+  # @return [Time, nil]
+  def parse_time(value)
+    return if value.blank?
+
+    Time.parse(value.to_s)
+  rescue ArgumentError, TypeError
+    nil
+  end
+
   # Formats a timestamp in the given timezone as "HH:MM <abbr>AM</abbr>". It puts the AM or the PM
   # in an <abbr> tag. It returns a string that is not HTML-safe, thus render it with `raw`.
   # @param time [String, Time, nil] The time to format.

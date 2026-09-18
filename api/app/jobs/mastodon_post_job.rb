@@ -1,13 +1,14 @@
 # Posts one post of a draft from the Social media page to Mastodon, then adds the job of the next
-# one.
-#
-# ⚠️ **There is one job for each POST, and not one job for the whole thread.** Refer to
-# BlueskyPostJob for the reason.
+# one. Refer to SocialPostJob for the one-job-for-each-post rule and the enqueue lock.
 #
 # ⚠️ You can do each attempt more than one time. `key` goes in the `Idempotency-Key` header, and the
 # instance then answers with the status that it made already. That window is not for ever, thus the
 # service also keeps the status in Redis for the length of the retries.
-class MastodonPostJob < ApplicationJob
+class MastodonPostJob < SocialPostJob
+  # The prefix of each lock key. `spec/support/at_proto_session.rb` removes these keys before each
+  # example.
+  ENQUEUE_LOCK_PREFIX = "mastodon:thread:".freeze
+
   # @param posts [Array<Hash>] `[{ "key" =>, "text" =>, "link" => }, …]`, the whole thread.
   # @param index [Integer] Which post of that list this job writes.
   # @param in_reply_to_id [String, nil] The id of the status above, or nil for the first.
@@ -31,6 +32,6 @@ class MastodonPostJob < ApplicationJob
     # new toot and not as a reply, with no message.
     raise "Mastodon gave no status id for post #{index + 1}, thus the thread cannot continue" if status["id"].blank?
 
-    self.class.perform_async(posts, index + 1, status["id"])
+    enqueue_next(posts, index + 1, status["id"])
   end
 end
