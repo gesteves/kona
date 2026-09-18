@@ -336,6 +336,14 @@ RSpec.describe MarkupHelpers do
         transformed_html = wrap_figcaption_emoji(html)
         expect(transformed_html).to eq('<figcaption>Great shot <span class="emoji">📷 ✨ 🎯</span></figcaption>')
       end
+
+      # ⚠️ The text of a caption is plain text. A parse of it as HTML would make an element from a
+      # "<", and the words after it would go away.
+      it 'keeps markup-like text as text' do
+        html = '<figcaption>Under &lt;2:30 &lt;b&gt;today&lt;/b&gt; 😀</figcaption>'
+        transformed_html = wrap_figcaption_emoji(html)
+        expect(transformed_html).to eq('<figcaption>Under &lt;2:30 &lt;b&gt;today&lt;/b&gt; <span class="emoji">😀</span></figcaption>')
+      end
     end
 
     context 'when given a figcaption without emojis' do
@@ -442,11 +450,26 @@ RSpec.describe MarkupHelpers do
     let(:iframe_html) { '<iframe src="https://player.example/embed/1"></iframe>' }
 
     context 'with a base class' do
-      # Note the difference from add_figure_elements_to_images: the figure replaces the iframe *in*
-      # its parent, thus the <p> around it stays and the code does not replace it.
-      it 'wraps the iframe in a figure with the base and iframe modifier classes, inside the original parent' do
+      # ⚠️ The figure replaces the paragraph, as it does for an image. A <figure> inside a <p> is
+      # not valid HTML, and the browser would close the paragraph at the figure.
+      it 'replaces the paragraph with a figure that has the base and iframe modifier classes' do
         transformed_html = add_figure_elements_to_iframes("<p>#{iframe_html}</p>", base_class: 'entry')
-        expect(transformed_html).to eq(%(<p><figure class="entry__figure entry__figure--iframe">#{iframe_html}</figure></p>))
+        expect(transformed_html).to eq(%(<figure class="entry__figure entry__figure--iframe">#{iframe_html}</figure>))
+      end
+
+      it 'puts the other content of the paragraph in a figcaption' do
+        transformed_html = add_figure_elements_to_iframes("<p>Watch this: #{iframe_html} <em>live</em></p>", base_class: 'entry')
+        expect(transformed_html).to eq(%(<figure class="entry__figure entry__figure--iframe">#{iframe_html}<figcaption>Watch this:  <em>live</em></figcaption></figure>))
+      end
+
+      it 'keeps the figure in place for a paragraph with two iframes' do
+        transformed_html = add_figure_elements_to_iframes("<p>#{iframe_html}#{iframe_html}</p>", base_class: 'entry')
+        expect(transformed_html).to eq(%(<p><figure class="entry__figure entry__figure--iframe">#{iframe_html}</figure><figure class="entry__figure entry__figure--iframe">#{iframe_html}</figure></p>))
+      end
+
+      it 'wraps an iframe outside a paragraph in place' do
+        transformed_html = add_figure_elements_to_iframes("<div>#{iframe_html}</div>", base_class: 'entry')
+        expect(transformed_html).to eq(%(<div><figure class="entry__figure entry__figure--iframe">#{iframe_html}</figure></div>))
       end
 
       it 'reuses an existing figure parent, replacing its class instead of nesting a new figure' do
@@ -458,7 +481,7 @@ RSpec.describe MarkupHelpers do
     context 'without a base class' do
       it 'wraps the iframe in a classless figure' do
         transformed_html = add_figure_elements_to_iframes("<p>#{iframe_html}</p>")
-        expect(transformed_html).to eq(%(<p><figure>#{iframe_html}</figure></p>))
+        expect(transformed_html).to eq(%(<figure>#{iframe_html}</figure>))
       end
     end
   end

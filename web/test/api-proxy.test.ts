@@ -342,6 +342,20 @@ describe('handleApi — contact (POST)', () => {
   // The timeout was in the branch for the routes that are not the contact route, with
   // cacheEverything. Thus the one route that a visitor waits for was the one route with no
   // limit.
+  it('413s a body past the limit, without touching the origin', async () => {
+    // There is no intercept. A request to the origin would raise an unmocked-fetch error.
+    const res = await handleApi(
+      new Request('https://www.example.com/api/contact', {
+        method: 'POST',
+        headers: { 'content-length': String(64 * 1024) },
+        body: 'x',
+      }),
+      env
+    );
+    expect(res.status).toBe(413);
+    expect(await res.text()).toBe('');
+  });
+
   it('bounds the upstream request with a timeout', async () => {
     const upstream = interceptFetch(
       'POST',

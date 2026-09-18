@@ -15,7 +15,8 @@ index_in_search_engines: false
       <%= smartypants(current_page.data.title) %>
     </h1>
     <div class="home__body">
-      <%= smartypants(markdown_to_html(current_page.data.body)) %>
+      <%# markdown_to_html runs SmartyPants itself. A second pass would change an entity again. %>
+      <%= markdown_to_html(current_page.data.body) %>
     </div>
     </section>
     <% recent = recent_articles %>

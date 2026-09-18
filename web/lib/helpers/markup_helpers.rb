@@ -272,17 +272,30 @@ module MarkupHelpers
       doc.css("figcaption").each do |figcaption|
         figcaption.xpath(".//text()").each do |text_node|
           text_content = text_node.content
-          next if text_content.empty?
+          next unless text_content.match?(EMOJI_REGEX)
 
-          if text_content.match?(EMOJI_REGEX)
-            # Adjacent emoji, and the spaces between them, go in one span.
-            new_content = text_content.gsub(EMOJI_RUN_REGEX) do |match|
-              "<span class=\"emoji\">#{match}</span>"
-            end
-
-            new_fragment = Nokogiri::HTML::DocumentFragment.parse(new_content)
-            text_node.replace(new_fragment)
+          # ⚠️ This makes nodes, and it does not parse a string as HTML. The content of a text node
+          # is plain text, thus a "<" in a caption would become an element in a parse. Adjacent
+          # emoji, and the spaces between them, go in one span.
+          document = text_node.document
+          add_text = lambda do |part|
+            text_node.add_previous_sibling(Nokogiri::XML::Text.new(part, document)) unless part.empty?
           end
+
+          # `scan` with the match offsets, and not `split`: the run pattern has a group inside its
+          # group, thus `split` gives each run two times.
+          last = 0
+          text_content.scan(EMOJI_RUN_REGEX) do
+            match = Regexp.last_match
+            add_text.call(text_content[last...match.begin(0)])
+            span = Nokogiri::XML::Node.new("span", document)
+            span["class"] = "emoji"
+            span.content = match[0]
+            text_node.add_previous_sibling(span)
+            last = match.end(0)
+          end
+          add_text.call(text_content[last..])
+          text_node.remove
         end
       end
     end
@@ -607,6 +620,13 @@ module MarkupHelpers
 
   # Puts a node in a <figure>, but not if its parent is already a <figure>. Then it adds the
   # figure classes.
+  # Puts a node in a <figure>.
+  #
+  # ⚠️ A node in a paragraph replaces that paragraph, as an image does, and the other content of
+  # the paragraph goes into a <figcaption>. A <figure> inside a <p> is not valid HTML: the browser
+  # closes the paragraph at the figure, and the text after it becomes a sibling. A paragraph with
+  # more than one such node keeps the figure in place, as the image path gives such a paragraph
+  # no figure.
   # @param doc [Nokogiri::XML::Document] The document that contains the node.
   # @param node [Nokogiri::XML::Node] The node to put in the figure.
   # @param base_class [String, nil] The base class for the figure.
@@ -618,9 +638,20 @@ module MarkupHelpers
 
     if parent.name != "figure"
       figure = Nokogiri::XML::Node.new("figure", doc)
-      node.replace(figure)
+      caption = nil
+
+      if parent.name == "p" && parent.css(node.name).size == 1
+        node.remove
+        trailing&.remove
+        caption = parent.inner_html.strip
+        parent.replace(figure)
+      else
+        node.replace(figure)
+      end
+
       figure.add_child(node)
       figure.add_child(trailing) if trailing
+      figure.add_child("<figcaption>#{caption}</figcaption>") if caption.present?
       parent = figure
     end
 

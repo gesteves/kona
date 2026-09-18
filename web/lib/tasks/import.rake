@@ -289,10 +289,17 @@ def report_related_coverage
   puts "⚠️  The api ranked #{covered} of #{expected} entries. Run `rake related:audit` in the api."
 end
 
+# Runs an import that must not stop the build.
+#
+# ⚠️ It gives the exception back, and it prints nothing: measure_and_output prints the result
+# through its mutex, with the name of the import. A print here would go between the lines of the
+# other threads, and the import would still show as complete.
+# @return [StandardError, nil] The failure, or nil when the block completed.
 def safely_perform
   yield
+  nil
 rescue => e
-  puts "Error occurred: #{e.message}"
+  e
 end
 
 def measure_and_output(method, description, mutex: nil)
@@ -302,9 +309,16 @@ def measure_and_output(method, description, mutex: nil)
   start_time = Time.now
 
   begin
-    send(method)
+    result = send(method)
     duration = Time.now - start_time
-    log.call("✅ #{description} completed in #{format_duration(duration)}")
+    if result.is_a?(StandardError)
+      # An import that catches its own failure with safely_perform. The build goes on, and this
+      # line is what says that the data of that import is absent.
+      log.call("⚠️  #{description} did not complete after #{format_duration(duration)}")
+      log.call("   Error: #{result.class}: #{result.message}")
+    else
+      log.call("✅ #{description} completed in #{format_duration(duration)}")
+    end
   rescue => e
     duration = Time.now - start_time
     log.call("❎ #{description} failed after #{format_duration(duration)}")

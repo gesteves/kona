@@ -28,6 +28,13 @@ const WIDGET_UPSTREAM_TIMEOUT_MS = 15_000;
  */
 const CONTACT_UPSTREAM_TIMEOUT_MS = 25_000;
 
+/**
+ * The most bytes of a contact POST that goes upstream. The form is three short fields and a
+ * Turnstile token, and the origin has its own length limits. A larger body is not from the form,
+ * and the relay would only pay to send it and wake the origin for it.
+ */
+const MAX_CONTACT_BYTES = 32 * 1024;
+
 /** The approximate visitor location from `request.cf`. It goes on the contact path only. */
 type ClientGeo = { city?: string; region?: string; country?: string };
 
@@ -130,6 +137,17 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
   }
 
   const hasBody = request.method !== 'GET' && request.method !== 'HEAD';
+
+  // A check of the header, and not a read of the body: the body stays a stream below.
+  if (
+    isContact &&
+    Number(request.headers.get('content-length') ?? 0) > MAX_CONTACT_BYTES
+  ) {
+    return new Response('', {
+      status: 413,
+      headers: withSecurityHeaders(new Headers()),
+    });
+  }
 
   const cf = (request as { cf?: ClientGeo }).cf;
   const contactGeo: ClientGeo | undefined = isContact

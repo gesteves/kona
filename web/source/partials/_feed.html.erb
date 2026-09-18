@@ -20,8 +20,10 @@
       <link rel="alternate" type="text/html" href="<%=h full_url(entry.path) %>"/>
       <published><%= entry_published.rfc3339 %></published>
       <updated><%= DateTime.parse(entry.updated_at).rfc3339 %></updated>
+      <%# ⚠️ Contentful gives a null item for a link that it cannot resolve, thus the author can be
+          nil. Atom needs a name, and the author of the site is the one for each entry today. %>
       <author>
-        <name><%=h entry.author.name %></name>
+        <name><%=h entry.author&.name.presence || data.site.author.name %></name>
       </author>
       <%# ⚠️ This uses content_summary, and not entry.summary: a Short has no summary field, and Atom
           needs content in this element. The `sanitize` at the end is also what escapes each entity
