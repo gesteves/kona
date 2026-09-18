@@ -40,25 +40,32 @@ RSpec.describe MemoizationHelpers do
     end
   end
 
-  describe '#memoize_by_key' do
+  describe '#memoize_entry' do
+    let(:collection) { [ 1 ] }
+
     it 'computes once per key, including false values' do
       calls = 0
 
-      2.times { memoize_by_key(:@test_memo, 'id-1') { calls += 1; false } }
+      2.times { memoize_entry(:test_memo, 'id-1', collection) { calls += 1; false } }
 
       expect(calls).to eq(1)
-      expect(memoize_by_key(:@test_memo, 'id-1') { raise 'should not recompute' }).to be(false)
+      expect(memoize_entry(:test_memo, 'id-1', collection) { raise 'should not recompute' }).to be(false)
     end
 
     it 'caches different keys separately' do
-      expect(memoize_by_key(:@test_memo, 'id-1') { 1 }).to eq(1)
-      expect(memoize_by_key(:@test_memo, 'id-2') { 2 }).to eq(2)
+      expect(memoize_entry(:test_memo, 'id-1', collection) { 1 }).to eq(1)
+      expect(memoize_entry(:test_memo, 'id-2', collection) { 2 }).to eq(2)
+    end
+
+    it 'starts a new store when the collection is a different object' do
+      expect(memoize_entry(:test_memo, 'id-1', [ 1 ]) { 'first' }).to eq('first')
+      expect(memoize_entry(:test_memo, 'id-1', [ 1 ]) { 'second' }).to eq('second')
     end
 
     it 'computes fresh (uncached) when the key is blank' do
       calls = 0
 
-      2.times { memoize_by_key(:@test_memo, nil) { calls += 1 } }
+      2.times { memoize_entry(:test_memo, nil, collection) { calls += 1 } }
 
       expect(calls).to eq(2)
     end

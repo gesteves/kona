@@ -352,7 +352,10 @@ en:
     social:
       show:
         add_post: "Add another post"
-        connect_it: "Connect it"
+        # The hint of a row with no account. ⚠️ Two complete sentences, and the code selects one: a
+        # network can give a notice of its own, and the link goes in as a value.
+        connect_link: "Connect it"
+        connect_hint_html: "%{notice} %{link}."
         date: "Date"
         # The hint of a row that a Markdown link turned off. It replaces the account line while a
         # link is in the draft.
@@ -361,7 +364,7 @@ en:
         mentions_hint_html: "Each network writes a mention in its own way. Give the handle for each
           one, or a plain name where that person has no account. An empty field posts the name with
           no &ldquo;@&rdquo;."
-        not_connected: "Not connected."
+        not_connected_hint_html: "Not connected. %{link}."
         post_now: "Post now"
         post_to: "Post to"
         preview: "Preview"
@@ -482,11 +485,10 @@ en:
         preview_failed: "The preview couldn't be loaded."
         # The line for a draft that ticks no network at all.
         preview_no_network: "Pick a place to post it, and the draft shows here."
+        scheduled: "Schedule for %{at}"
+      # The words that more than one controller renders. A view gives this scope to each of them
+      # as `shared:`, through admin_i18n_data.
+      shared:
         # The badge on the website card of a link. ⚠️ There is no badge for an ordinary Open Graph
         # card: no badge means that the card comes from the og: tags.
-        standard_site: "Standard.site"
-        scheduled: "Schedule for %{at}"
-      social_post:
-        # ⚠️ There is no badge for an ordinary Open Graph card: no badge means that the card comes
-        # from the og: tags.
         standard_site: "Standard.site"

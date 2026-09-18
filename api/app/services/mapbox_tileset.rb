@@ -61,26 +61,6 @@ class MapboxTileset
     "#{@username}.#{id}"
   end
 
-  # Finds a tileset that is already published.
-  # @param id [String] The Mapbox tileset id, with no user name at the start.
-  # @return [Array(String, String), nil] [full_id, source_layer] if the tileset exists and the code
-  #   can render it, or nil.
-  def find(id)
-    response = HTTParty.get(
-      "https://api.mapbox.com/v4/#{@username}.#{id}.json",
-      query: { access_token: @token },
-      timeout: HTTP_TIMEOUT
-    )
-    return nil unless response.success?
-
-    layer = Array(JSON.parse(response.body)["vector_layers"]).first&.dig("id")
-    return nil if layer.blank?
-
-    [ "#{@username}.#{id}", layer ]
-  rescue JSON::ParserError
-    nil
-  end
-
   # Removes a tileset and the source that it comes from.
   #
   # ⚠️ It removes both, on purpose. A delete of the tileset alone leaves its source, which still

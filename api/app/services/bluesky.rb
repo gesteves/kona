@@ -32,14 +32,6 @@ class Bluesky < ApplicationService
   # the owner linked to, and the worker is a 512MB VM at concurrency 5. A picture past this limit
   # loses the thumbnail and never the post.
   MAX_CARD_IMAGE_BYTES = 10 * 1024 * 1024
-  # The width that an oversized thumbnail shrinks to first. Bluesky renders a card at approximately
-  # this width, thus a larger picture is only bandwidth.
-  #
-  # ⚠️ The two are the first step of `AtProto::SHRINK_STEPS`, where the full ladder lives, because
-  # `StandardSite` shrinks the cover image of a document against the same kind of limit.
-  CARD_IMAGE_WIDTH = AtProto::SHRINK_STEPS.first[:width]
-  # The JPEG quality of that first step.
-  CARD_IMAGE_QUALITY = AtProto::SHRINK_STEPS.first[:quality]
 
   # The limits of the text fields of a card.
   CARD_TITLE_MAX = 300
@@ -303,6 +295,8 @@ class Bluesky < ApplicationService
   # @return [Boolean]
   def handle_missing?(handle)
     return false if handle.blank?
+    # A handle whose DID is in the cache resolved a moment ago, and the PDS needs no question.
+    return false if $redis.exists?(did_key(handle))
 
     response = resolve_handle_response(handle)
     # A PDS answers 400 InvalidRequest for a handle that it cannot resolve.
@@ -526,16 +520,28 @@ class Bluesky < ApplicationService
     skip.any? { |range| byte_start < range.end && range.begin < byte_end }
   end
 
+  # ⚠️ The DID of a handle stays in Redis for a day. A thread names one person in many posts, a
+  # retry of a job resolves each mention again, and the submit checks each handle as well. A handle
+  # that moves to another DID inside that day tags the old account, and that is rare.
+  DID_CACHE_TTL = 1.day
+
   # @param handle [String] A handle, with no "@".
   # @return [String, nil] The DID, or nil when the PDS cannot resolve it.
   def resolve_handle(handle)
-    response = resolve_handle_response(handle)
-    return unless response.success?
+    cached_json(did_key(handle), expires_in: DID_CACHE_TTL) do
+      response = resolve_handle_response(handle)
+      next unless response.success?
 
-    JSON.parse(response.body)["did"].presence
+      did = JSON.parse(response.body)["did"].presence
+      { did: did } if did
+    end&.dig(:did)
   rescue StandardError
     nil
   end
+
+  # @param handle [String]
+  # @return [String] The Redis key of the DID of a handle.
+  def did_key(handle) = "bluesky:did:#{handle.to_s.downcase}"
 
   # ⚠️ The timeout is here, thus the two callers above share it. #handle_missing? runs in a request
   # and more than one time, and RESOLVE_TIMEOUT is short for that reason.

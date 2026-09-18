@@ -302,7 +302,7 @@ export default class extends Controller {
     // ⚠️ The badge shows for the standard.site card ALONE, which the owner cannot know until after
     // the post without it. No badge means the ordinary card from the og: tags.
     this.previewKindTarget.hidden = !card.standard_site;
-    if (card.standard_site) this.previewKindTarget.textContent = t(this.words, "standard_site");
+    if (card.standard_site) this.previewKindTarget.textContent = t(this.words, "shared.standard_site");
 
     this.setLinkState(ATTACHED);
     // ⚠️ **This card is not the card of Bluesky.** A page with no og: tags gets no embed there, and

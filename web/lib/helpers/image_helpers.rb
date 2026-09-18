@@ -367,12 +367,10 @@ module ImageHelpers
   # worker asked Redis for each asset again, and a cold cache made each worker get and encode the
   # same asset.
   def blurhash_jpeg_data_uri(asset_id, width: 32)
-    store = memoize_by_collection(:blurhash_jpegs, data.assets) { {} }
     key = [ asset_id, width ]
-    return store[key] if store.key?(key)
-
-    warm = ImageHelpers.warm_blurhashes[key]
-    store[key] = warm.nil? ? build_blurhash_jpeg_data_uri(asset_id, width) : warm
+    memoize_entry(:blurhash_jpegs, key, data.assets) do
+      ImageHelpers.warm_blurhashes[key] || build_blurhash_jpeg_data_uri(asset_id, width)
+    end
   end
 
   class << self

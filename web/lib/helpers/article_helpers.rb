@@ -24,12 +24,6 @@ module ArticleHelpers
     memoize_by_collection(:published_articles, data.articles) { data.articles.reject(&:draft) }
   end
 
-  # All the non-draft pages.
-  # @return [Array<Object>]
-  def published_pages
-    memoize_by_collection(:published_pages, data.pages) { data.pages.reject(&:draft) }
-  end
-
   # The non-draft articles that a search engine can index.
   # @return [Array<Object>]
   def indexable_articles
@@ -304,14 +298,15 @@ module ArticleHelpers
   end
 
   # Concept id => { name:, path:, parent_id:, scheme:, count: }, from the tag pages that the
-  # build makes. Each parent has a page, thus each chain is always complete. The app keeps the
-  # value for each render.
+  # build makes. Each parent has a page, thus each chain is always complete.
   # @return [Hash{String=>Hash}]
   def taxonomy_index
-    @taxonomy_index ||= Array(data.tags).each_with_object({}) do |entry, index|
-      tag = entry.tag
-      # Use entry_count, not count: `count` is Hash#count on the Mash, the number of keys.
-      index[tag.id] = { name: tag.name, path: tag.path, parent_id: tag.parent_id, scheme: tag.scheme, count: tag.entry_count }
+    memoize_by_collection(:taxonomy_index, data.tags) do
+      Array(data.tags).each_with_object({}) do |entry, index|
+        tag = entry.tag
+        # Use entry_count, not count: `count` is Hash#count on the Mash, the number of keys.
+        index[tag.id] = { name: tag.name, path: tag.path, parent_id: tag.parent_id, scheme: tag.scheme, count: tag.entry_count }
+      end
     end
   end
 
@@ -345,14 +340,9 @@ module ArticleHelpers
   # @param article [Object] The article.
   # @return [Integer] The number of words.
   def article_word_count(article)
-    id = article.sys&.id
-    return compute_article_word_count(article) if id.blank?
-
-    # The store is by collection, thus one count serves each page that renders the entry.
-    store = memoize_by_collection(:article_word_counts, (data.articles if respond_to?(:data))) { {} }
-    return store[id] if store.key?(id)
-
-    store[id] = compute_article_word_count(article)
+    memoize_entry(:article_word_counts, article.sys&.id, (data.articles if respond_to?(:data))) do
+      compute_article_word_count(article)
+    end
   end
 
   # @see #article_word_count

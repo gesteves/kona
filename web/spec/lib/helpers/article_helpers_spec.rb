@@ -907,7 +907,10 @@ RSpec.describe ArticleHelpers do
         )
       end
 
-      it 'memoizes the index within a render context' do
+      it 'memoizes the index for one tags collection' do
+        same = data
+        allow(self).to receive(:data).and_return(same)
+
         expect(taxonomy_index).to equal(taxonomy_index)
       end
     end

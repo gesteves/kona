@@ -201,14 +201,6 @@ class TrendingArticles < ApplicationService
     articles.sort_by { |a| -(published_on(a) || Date.new(1970)).jd }.first(RECENT_EXCLUDED).filter_map { |a| a.sys&.id }.to_set
   end
 
-  # ⚠️ The pageviews widget already caches this query body. Thus the fallback order costs no more
-  # Plausible calls.
-  # @return [Hash] { path => visitors of all time }.
-  def all_time_visitors
-    totals = @plausible.totals_by_path(date_range: "all") || {}
-    totals.each_with_object(Hash.new(0)) { |(path, values), acc| acc[path] = values[:visitors].to_i }
-  end
-
   # @return [Date, nil] The publish day in the zone of the site, or nil when the code cannot
   #   parse it.
   def published_on(article)

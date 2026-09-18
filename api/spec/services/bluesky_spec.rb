@@ -427,8 +427,8 @@ RSpec.describe Bluesky do
         # stands for a file that is too large, and libvips never decodes it. The shrink is at the
         # decode, thus the stub answers with the small picture that thumbnail_buffer would give.
         allow(Vips::Image).to receive(:thumbnail_buffer)
-          .with(anything, described_class::CARD_IMAGE_WIDTH, size: :down)
-          .and_return(Vips::Image.black(described_class::CARD_IMAGE_WIDTH, 600))
+          .with(anything, AtProto::SHRINK_STEPS.first[:width], size: :down)
+          .and_return(Vips::Image.black(AtProto::SHRINK_STEPS.first[:width], 600))
         uploaded = stub_upload_blob
 
         service.post!(rkey: "3kabc", text: "Read this", card: card)

@@ -221,10 +221,7 @@ class Whoop < ApplicationService
   # true while nothing works. This is the only thing that shows the difference.
   # @return [Hash, nil] `{ code:, at: }`, or nil if the last refresh was successful.
   def refresh_error
-    raw = $redis.get(refresh_error_key)
-    return if raw.blank?
-
-    JSON.parse(raw, symbolize_names: true)
+    RefreshError.decode($redis.get(refresh_error_key))
   end
 
   # Does a token refresh even when the cached access token is still good. Thus the app continues
@@ -476,20 +473,14 @@ class Whoop < ApplicationService
     $redis.del(refresh_error_key)
   end
 
-  # Records a refused refresh. Thus the Connected apps page of the admin can say that the
-  # integration needs a new authorization, and it does not show the integration as good for all
-  # time.
-  #
-  # ⚠️ Record a 4xx only. A 5xx or a timeout means that Whoop is not available, and not that the
-  # refresh token is dead. A mark for those would tell the owner to authorize again while the
-  # stored token is good, and the next scheduled refresh recovers by itself. This has no TTL:
-  # only a successful refresh (store_tokens) or disconnect! removes it, because the problem is
-  # real until one of those happens.
+  # Records a refused refresh. Refer to RefreshError for the rule. This has no TTL: only a
+  # successful refresh (store_tokens) or disconnect! removes it, because the problem is real until
+  # one of those happens.
   # @param code [Integer, String] The HTTP status from the Whoop token endpoint.
   def record_refresh_error(code)
-    return unless code.to_i.between?(400, 499)
+    return unless RefreshError.refused?(code)
 
-    $redis.set(refresh_error_key, { code: code.to_i, at: Time.current.utc.iso8601 }.to_json)
+    $redis.set(refresh_error_key, RefreshError.encode(code))
   end
 
   # Reads an encrypted token. A value from before the encryption reads as it is, and the next
@@ -501,7 +492,7 @@ class Whoop < ApplicationService
     raw = $redis.get(key)
     return if raw.blank?
 
-    WhoopCredentials.open(raw) || raw
+    WhoopCredentials.unseal(raw) || raw
   end
 
   def access_token_key

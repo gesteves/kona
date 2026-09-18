@@ -27,7 +27,7 @@ RSpec.describe Whoop do
 
   # Matches a Redis value that holds the given token, encrypted.
   def sealed(token)
-    satisfy("an encrypted #{token}") { |value| value != token && WhoopCredentials.open(value) == token }
+    satisfy("an encrypted #{token}") { |value| value != token && WhoopCredentials.unseal(value) == token }
   end
 
   describe "#connected?" do

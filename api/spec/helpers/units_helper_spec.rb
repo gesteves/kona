@@ -32,8 +32,7 @@ RSpec.describe UnitsHelper do
     end
 
     it "splits the value and the unit" do
-      expect(helper.distance_value(5000, units: "metric")).to eq("5")
-      expect(helper.distance_unit(5000, units: "metric")).to eq("kilometers")
+      expect(helper.distance_parts(5000, units: "metric")).to eq([ "5", "kilometers" ])
     end
 
     it "defaults to SI (metric) units" do

@@ -8,6 +8,14 @@ module ArticleRanking
 
   private
 
+  # ⚠️ The pageviews widget already caches this query body. Thus this costs no more Plausible
+  # calls. A failure gives an empty hash, and each article then counts 0.
+  # @return [Hash] { path => visitors of all time }.
+  def all_time_visitors
+    totals = @plausible.totals_by_path(date_range: "all") || {}
+    totals.each_with_object(Hash.new(0)) { |(path, values), acc| acc[path] = values[:visitors].to_i }
+  end
+
   # The published articles that are not a Short and that have a path. This does not include a draft
   # and a Short, and web does the same.
   def candidates

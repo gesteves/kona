@@ -53,7 +53,7 @@ class ThreadsCredentials
       username: stored["username"].presence,
       issued_at: parse_time(stored["issued_at"]),
       expires_at: parse_time(stored["expires_at"]),
-      refresh_error: parse_json(stored["refresh_error"])
+      refresh_error: RefreshError.decode(stored["refresh_error"])
     )
   end
 
@@ -93,18 +93,13 @@ class ThreadsCredentials
     nil
   end
 
-  # Records a refused refresh. Thus the Connected apps page can say that the connection needs
-  # attention, and it does not show a green badge for a token that is dead.
-  #
-  # ⚠️ Record a 4xx only. A 5xx or a timeout means that Meta is not available, and not that the
-  # token is dead. A mark for those sends the owner to authorize a connection that is good, and the
-  # next scheduled run recovers by itself.
+  # Records a refused refresh. Refer to RefreshError for the rule.
   # @param code [Integer, String] The HTTP status from the Threads token endpoint.
   # @return [void]
   def self.record_refresh_error(code)
-    return unless code.to_i.between?(400, 499)
+    return unless RefreshError.refused?(code)
 
-    $redis.hset(REDIS_KEY, "refresh_error", { code: code.to_i, at: Time.current.utc.iso8601 }.to_json)
+    $redis.hset(REDIS_KEY, "refresh_error", RefreshError.encode(code))
     nil
   end
 
@@ -116,13 +111,4 @@ class ThreadsCredentials
     nil
   end
   private_class_method :parse_time
-
-  # @param value [String, nil] A JSON object.
-  # @return [Hash, nil]
-  def self.parse_json(value)
-    JSON.parse(value, symbolize_names: true) if value.present?
-  rescue JSON::ParserError
-    nil
-  end
-  private_class_method :parse_json
 end

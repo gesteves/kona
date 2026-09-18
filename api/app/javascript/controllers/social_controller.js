@@ -585,7 +585,12 @@ export default class extends Controller {
 
     row.querySelector("[data-mention-token]").value = token;
     const label = row.querySelector("[data-mention-label]");
-    if (label) label.textContent = token;
+    if (label) {
+      label.textContent = token;
+      // The same id that the server renders: the row is a group that the token names.
+      label.id = `mention-${key}`;
+      row.setAttribute("aria-labelledby", label.id);
+    }
 
     row.querySelectorAll("[data-mention-network]").forEach((field) => {
       const network = field.dataset.mentionNetwork;
@@ -875,7 +880,7 @@ export default class extends Controller {
     // No badge means the ordinary card from the og: tags.
     const kind = card.querySelector("[data-preview-card-kind]");
     kind.hidden = !link.standard_site;
-    if (link.standard_site) kind.textContent = t(this.words, "standard_site");
+    if (link.standard_site) kind.textContent = t(this.words, "shared.standard_site");
 
     element.hidden = false;
   }

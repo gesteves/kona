@@ -37,39 +37,6 @@ RSpec.describe MapboxTileset do
     end
   end
 
-  describe "#find" do
-    it "returns the full id and source layer of a published tileset" do
-      allow(HTTParty).to receive(:get).and_return(
-        response(success: true, body: { vector_layers: [ { id: "track" } ] }.to_json)
-      )
-
-      expect(described_class.new.find("abc")).to eq([ "testuser.abc", "track" ])
-      expect(HTTParty).to have_received(:get).with(
-        "https://api.mapbox.com/v4/testuser.abc.json",
-        query: { access_token: "sk.test-token" },
-        timeout: 30
-      )
-    end
-
-    it "is nil when the tileset doesn't exist" do
-      allow(HTTParty).to receive(:get).and_return(response(success: false, code: 404))
-
-      expect(described_class.new.find("abc")).to be_nil
-    end
-
-    it "is nil when the tileset has no renderable layer" do
-      allow(HTTParty).to receive(:get).and_return(response(success: true, body: { vector_layers: [] }.to_json))
-
-      expect(described_class.new.find("abc")).to be_nil
-    end
-
-    it "is nil rather than raising on a body that isn't JSON" do
-      allow(HTTParty).to receive(:get).and_return(response(success: true, body: "<html>"))
-
-      expect(described_class.new.find("abc")).to be_nil
-    end
-  end
-
   describe "#create_from_coordinates!" do
     let(:coordinates) { [ [ 10.0, 50.0 ], [ 11.0, 51.0 ] ] }
 

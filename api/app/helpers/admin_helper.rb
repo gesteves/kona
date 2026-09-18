@@ -68,12 +68,14 @@ module AdminHelper
   # ⚠️ It is a plain `data-` attribute and NOT a Stimulus value. A value arrives through a
   # MutationObserver, thus it is not synchronous, and a controller reads this table at `connect()`.
   #
-  # @param scope [String] The translation scope of the words of that controller.
+  # @param scope [String] The translation scope of the words of that controller. A scope with no
+  #   key of its own gives the nested scopes alone.
   # @param nested [Hash{Symbol=>String}] A name, and one more scope to put below it. The Location
-  #   page uses it to carry `admin.location.state`, which the presenter reads as well.
+  #   page uses it to carry `admin.location.state`, which the presenter reads as well, and the two
+  #   social views carry `admin.js.shared`.
   # @return [String] The JSON of those words.
   def admin_i18n_data(scope, **nested)
-    t(scope).merge(nested.transform_values { |other| t(other) }).to_json
+    t(scope, default: {}).merge(nested.transform_values { |other| t(other) }).to_json
   end
 
   # Tells if a nav item points at the page that the code renders.

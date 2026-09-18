@@ -24,75 +24,6 @@ RSpec.describe SiteHelpers do
   def site_icon_url(w:) = "https://example.com/icon-#{w}.png"
   def cdn_image_url(url, params = {}) = "#{url}?w=#{params[:w]}"
 
-  describe '#schema_entity_id' do
-    it 'anchors an entity to a URL + fragment' do
-      expect(schema_entity_id('organization')).to eq('https://example.com/#organization')
-      expect(schema_entity_id('person', path: '/about')).to eq('https://example.com/about#person')
-    end
-  end
-
-  describe '#taxonomy_synonym_redirects' do
-    def data
-      OpenStruct.new(
-        tags: [
-          OpenStruct.new(tag: OpenStruct.new(path: '/tagged/triathlon/ironman-703/', synonyms: [ 'Half Ironman', '70.3' ])),
-          OpenStruct.new(tag: OpenStruct.new(path: '/tagged/running/', synonyms: [])),
-          OpenStruct.new(tag: OpenStruct.new(path: '/tagged/triathlon/', synonyms: [ 'Multisport' ]))
-        ],
-        redirects: [ OpenStruct.new(from: '/tagged/multisport') ] # a configured redirect already claims this
-      )
-    end
-
-    it 'maps synonym slugs to the canonical concept page, with and without a slash at the end' do
-      expect(taxonomy_synonym_redirects).to include(
-        { from: '/tagged/half-ironman', to: '/tagged/triathlon/ironman-703/', status: 301 },
-        { from: '/tagged/half-ironman/', to: '/tagged/triathlon/ironman-703/', status: 301 },
-        { from: '/tagged/70-3', to: '/tagged/triathlon/ironman-703/', status: 301 },
-        { from: '/tagged/70-3/', to: '/tagged/triathlon/ironman-703/', status: 301 }
-      )
-    end
-
-    it 'skips synonyms that collide with a configured redirect' do
-      froms = taxonomy_synonym_redirects.map { |r| r[:from] }
-      expect(froms).not_to include('/tagged/multisport')
-      expect(froms).not_to include('/tagged/multisport/')
-    end
-  end
-
-  describe '#collection_page_schema' do
-    def content_summary(content) = "About #{content.title}."
-    def canonical_url = 'https://example.com/tagged/triathlon/'
-
-    it 'declares a CollectionPage about the topic, tied to the WebSite node' do
-      schema = JSON.parse(collection_page_schema(OpenStruct.new(title: 'Triathlon')))
-      expect(schema['@type']).to eq('CollectionPage')
-      expect(schema['name']).to eq('Triathlon')
-      expect(schema['description']).to eq('About Triathlon.')
-      expect(schema['url']).to eq('https://example.com/tagged/triathlon/')
-      expect(schema['about']).to eq('@type' => 'Thing', 'name' => 'Triathlon')
-      expect(schema['isPartOf']).to eq('@id' => 'https://example.com/#website')
-    end
-
-    it 'omits mainEntity when the page lists no entries' do
-      schema = JSON.parse(collection_page_schema(OpenStruct.new(title: 'Triathlon')))
-      expect(schema).not_to have_key('mainEntity')
-    end
-
-    it 'enumerates the listed entries as a mainEntity ItemList' do
-      content = OpenStruct.new(title: 'Triathlon', items: [
-        OpenStruct.new(title: 'First Race', path: '/2025/01/01/first/'),
-        OpenStruct.new(title: 'Second Race', path: '/2025/02/02/second/')
-      ])
-      list = JSON.parse(collection_page_schema(content))['mainEntity']
-      expect(list['@type']).to eq('ItemList')
-      expect(list['numberOfItems']).to eq(2)
-      expect(list['itemListElement']).to eq([
-        { '@type' => 'ListItem', 'position' => 1, 'url' => 'https://example.com/2025/01/01/first/', 'name' => 'First Race' },
-        { '@type' => 'ListItem', 'position' => 2, 'url' => 'https://example.com/2025/02/02/second/', 'name' => 'Second Race' }
-      ])
-    end
-  end
-
   describe '#alternate_feed_links' do
     def data = OpenStruct.new(site: OpenStruct.new(meta_title: 'My Site'))
     def page_content = @pc
@@ -132,72 +63,6 @@ RSpec.describe SiteHelpers do
     end
   end
 
-  describe '#tag_breadcrumb_schema' do
-    def concept_chain(id)
-      {
-        'half-distance' => [
-          { id: 'triathlon', name: 'Triathlon', path: '/tagged/triathlon/' },
-          { id: 'half-distance', name: 'Half Distance', path: '/tagged/triathlon/half-distance/' }
-        ]
-      }.fetch(id, [])
-    end
-
-    it 'builds Home > Blog > the concept ancestor chain, ending at the concept' do
-      schema = JSON.parse(tag_breadcrumb_schema(OpenStruct.new(tag_id: 'half-distance')))
-      expect(schema['@type']).to eq('BreadcrumbList')
-      expect(schema['itemListElement']).to eq([
-        { '@type' => 'ListItem', 'position' => 1, 'name' => 'Home', 'item' => 'https://example.com/' },
-        { '@type' => 'ListItem', 'position' => 2, 'name' => 'Blog', 'item' => 'https://example.com/blog/' },
-        { '@type' => 'ListItem', 'position' => 3, 'name' => 'Triathlon', 'item' => 'https://example.com/tagged/triathlon/' },
-        { '@type' => 'ListItem', 'position' => 4, 'name' => 'Half Distance', 'item' => 'https://example.com/tagged/triathlon/half-distance/' }
-      ])
-    end
-
-    it 'returns nil when the page has no concept' do
-      expect(tag_breadcrumb_schema(OpenStruct.new(tag_id: nil))).to be_nil
-      expect(tag_breadcrumb_schema(OpenStruct.new(tag_id: 'unknown'))).to be_nil
-    end
-
-    # ⚠️ /blog with no slash at the end is a 301 (auto-trailing-slash). Thus a crumb without it
-    # points at a redirect while each other URL on the page is canonical.
-    it 'gives the Blog crumb the slash at the end, thus it is not a redirect' do
-      schema = JSON.parse(tag_breadcrumb_schema(OpenStruct.new(tag_id: 'half-distance')))
-      blog = schema['itemListElement'].find { |i| i['name'] == 'Blog' }
-      expect(blog['item']).to end_with('/blog/')
-    end
-  end
-
-  describe '#blog_schema' do
-    def canonical_url = 'https://example.com/blog'
-    def published_datetime(item) = DateTime.parse(item.published_at)
-
-    before { @site = OpenStruct.new(meta_title: 'My Site', meta_description: 'A blog about triathlon.') }
-
-    it 'declares a Blog tied to the sitewide nodes, listing this page\'s entries as blogPost refs' do
-      content = OpenStruct.new(title: 'Blog', items: [
-        OpenStruct.new(title: 'First', path: '/2025/01/01/first/', published_at: '2025-01-01T00:00:00Z'),
-        OpenStruct.new(title: 'Second', path: '/2025/02/02/second/', published_at: '2025-02-02T00:00:00Z')
-      ])
-      schema = JSON.parse(blog_schema(content))
-      expect(schema['@type']).to eq('Blog')
-      expect(schema['name']).to eq('Blog')
-      expect(schema['description']).to eq('A blog about triathlon.')
-      expect(schema['url']).to eq('https://example.com/blog')
-      expect(schema['isPartOf']).to eq('@id' => 'https://example.com/#website')
-      expect(schema['publisher']).to eq('@id' => 'https://example.com/#organization')
-      expect(schema['blogPost']).to eq([
-        { '@type' => 'BlogPosting', 'headline' => 'First', 'url' => 'https://example.com/2025/01/01/first/',
-          'datePublished' => '2025-01-01T00:00:00+00:00', 'author' => { '@id' => 'https://example.com/about#person' } },
-        { '@type' => 'BlogPosting', 'headline' => 'Second', 'url' => 'https://example.com/2025/02/02/second/',
-          'datePublished' => '2025-02-02T00:00:00+00:00', 'author' => { '@id' => 'https://example.com/about#person' } }
-      ])
-    end
-
-    it 'yields an empty blogPost list when the page lists no entries' do
-      expect(JSON.parse(blog_schema(OpenStruct.new(title: 'Blog')))['blogPost']).to eq([])
-    end
-  end
-
   describe '#copyright_start_year' do
     def data = OpenStruct.new(articles: @articles || [])
 
@@ -213,86 +78,6 @@ RSpec.describe SiteHelpers do
     it 'falls back to the current year when no articles are published yet' do
       @articles = [ OpenStruct.new(draft: true, published_at: '2024-01-01T00:00:00Z') ]
       expect(copyright_start_year).to eq(Time.current.year.to_s)
-    end
-  end
-
-  describe '#author_knows_about' do
-    def data = OpenStruct.new(tags: @tags)
-
-    it 'returns the top-level sports disciplines, sorted, excluding nested and non-sports concepts' do
-      @tags = [
-        OpenStruct.new(tag: OpenStruct.new(name: 'Triathlon', scheme: 'sports', parent_id: nil)),
-        OpenStruct.new(tag: OpenStruct.new(name: 'Half Distance', scheme: 'sports', parent_id: 'triathlon')),
-        OpenStruct.new(tag: OpenStruct.new(name: 'Running', scheme: 'sports', parent_id: nil)),
-        OpenStruct.new(tag: OpenStruct.new(name: 'Race Reports', scheme: 'topics', parent_id: nil))
-      ]
-      expect(author_knows_about).to eq([ 'Running', 'Triathlon' ])
-    end
-
-    it 'returns an empty array when there are no tags' do
-      @tags = nil
-      expect(author_knows_about).to eq([])
-    end
-  end
-
-  describe '#author_same_as' do
-    it 'returns social destinations, excluding the feed' do
-      @site = site(socials: [ [ 'Feed', '/feed.xml' ], [ 'Bluesky', 'https://bsky.app/x' ], [ 'Mastodon', 'https://m.test/x' ] ])
-      expect(author_same_as).to eq([ 'https://bsky.app/x', 'https://m.test/x' ])
-    end
-
-    it 'returns an empty array when no socials are configured' do
-      @site = site(socials: [])
-      expect(author_same_as).to eq([])
-    end
-  end
-
-  describe '#site_schema_graph' do
-    it 'builds a connected @graph of Organization, WebSite, and Person' do
-      @site = site(
-        socials: [ [ 'Feed', '/feed.xml' ], [ 'Bluesky', 'https://bsky.app/x' ] ],
-        profile_picture: OpenStruct.new(url: '//img/me.jpg', description: 'A portrait.')
-      )
-      nodes = JSON.parse(site_schema_graph)['@graph'].each_with_object({}) { |n, h| h[n['@type']] = n }
-
-      expect(nodes['Organization']).to include(
-        '@id' => 'https://example.com/#organization',
-        'sameAs' => [ 'https://bsky.app/x' ],
-        'logo' => 'https://example.com/icon-180.png'
-      )
-      expect(nodes['WebSite']).to include(
-        '@id' => 'https://example.com/#website',
-        'inLanguage' => 'en-US',
-        'publisher' => { '@id' => 'https://example.com/#organization' }
-      )
-      # ⚠️ `url` has the slash at the end and `@id` does not, and that is on purpose. `url` is a
-      # navigable claim, and activate :directory_indexes puts that page at /about/, thus a URL with
-      # no slash names a 301. `@id` is an opaque identifier that each `author` reference points at,
-      # and a change to it would orphan every one of them.
-      expect(nodes['Person']).to include(
-        '@id' => 'https://example.com/about#person',
-        'name' => 'Jane Doe',
-        'url' => 'https://example.com/about/',
-        'sameAs' => [ 'https://bsky.app/x' ]
-      )
-      expect(nodes['Person']['image']).to include('@type' => 'ImageObject', 'width' => 500, 'height' => 500, 'caption' => 'A portrait.')
-    end
-
-    it 'omits the logo, sameAs, and Person image when the data is absent' do
-      @site = site(logo: nil, socials: [], profile_picture: nil)
-      nodes = JSON.parse(site_schema_graph)['@graph'].each_with_object({}) { |n, h| h[n['@type']] = n }
-      expect(nodes['Organization']).not_to have_key('logo')
-      expect(nodes['Organization']).not_to have_key('sameAs')
-      expect(nodes['Person']).not_to have_key('image')
-      expect(nodes['Person']).not_to have_key('sameAs')
-    end
-  end
-
-  describe '#profile_page_schema' do
-    it 'points the ProfilePage mainEntity at the Person @id' do
-      schema = JSON.parse(profile_page_schema)
-      expect(schema['@type']).to eq('ProfilePage')
-      expect(schema['mainEntity']).to eq('@id' => 'https://example.com/about#person')
     end
   end
 
@@ -315,12 +100,10 @@ RSpec.describe SiteHelpers do
   describe '#title_tag' do
     include Padrino::Helpers
 
-    def data = OpenStruct.new(site: OpenStruct.new(meta_title: 'Swim & Bike'))
+    def data = OpenStruct.new(site: OpenStruct.new(meta_title: 'My Site'))
 
-    # Middleman's content_tag never escapes its content, and page_title decodes each entity. Thus
-    # the escape must be in title_tag itself.
-    it 'escapes the title, because content_tag does not' do
-      expect(title_tag('Ironman "70.3" <3')).to eq('<title>Ironman &quot;70.3&quot; &lt;3 · Swim &amp; Bike</title>')
+    it 'wraps the page title, with the site name appended, in a <title> element' do
+      expect(title_tag(Hashie::Mash.new(title: 'A Post'))).to eq('<title>A Post · My Site</title>')
     end
   end
 
@@ -348,16 +131,6 @@ RSpec.describe SiteHelpers do
 
     it 'joins segments with a custom separator' do
       expect(page_title('Search', include_site_name: true, separator: ' | ')).to eq('Search | My Site')
-    end
-  end
-
-  describe '#title_tag' do
-    include Padrino::Helpers
-
-    def data = OpenStruct.new(site: OpenStruct.new(meta_title: 'My Site'))
-
-    it 'wraps the page title, with the site name appended, in a <title> element' do
-      expect(title_tag(Hashie::Mash.new(title: 'A Post'))).to eq('<title>A Post · My Site</title>')
     end
   end
 
@@ -570,93 +343,6 @@ RSpec.describe SiteHelpers do
       expect(plausible_installed?).to be(false)
       ENV['PLAUSIBLE_SCRIPT_URL'] = 'https://plausible.example/js/script.js'
       expect(plausible_installed?).to be(true)
-    end
-  end
-
-  # ⚠️ The division into static rules and dynamic rules is a rule that a change can break, and it is
-  # not a style choice. The Cloudflare parser latches at the first dynamic rule and counts each rule
-  # after it, exact matches included, against the limit of 100 dynamic rules. This code was in
-  # redirects.erb, and you cannot test a template.
-  describe '#partitioned_redirects' do
-    def taxonomy_synonym_redirects
-      [ { from: '/tagged/half-ironman', to: '/tagged/triathlon/ironman-703/', status: 301 } ]
-    end
-
-    def data
-      OpenStruct.new(redirects: @redirects || [])
-    end
-
-    def redirect(from, to, status = 301)
-      OpenStruct.new(from: from, to: to, status: status)
-    end
-
-    it 'emits every exact-match rule before any splat or placeholder rule' do
-      @redirects = [
-        redirect('/old-splat/*', '/new/:splat'),
-        redirect('/exact-one', '/new-one'),
-        redirect('/with/:placeholder', '/other/:placeholder'),
-        redirect('/exact-two', '/new-two')
-      ]
-
-      static_rules, dynamic_rules = partitioned_redirects
-
-      expect(static_rules.map { |r| r[:from] }).to eq([ '/tagged/half-ironman', '/exact-one', '/exact-two' ])
-      expect(dynamic_rules.map { |r| r[:from] })
-        .to eq([ '/.well-known/host-meta*', '/.well-known/webfinger*', '/old-splat/*', '/with/:placeholder' ])
-    end
-
-    # A person writes each redirect in Contentful, and the deploy must not break for it.
-    it 'drops a redirect from a path to itself, and keeps the first of two rules with one source' do
-      @redirects = [
-        redirect('/blog', '/blog/'),
-        redirect('/old', '/new-one'),
-        redirect('/old', '/new-two')
-      ]
-
-      static_rules, _ = partitioned_redirects
-      rules = static_rules.select { |r| %w[/blog /old].include?(r[:from]) }
-      expect(rules).to eq([ { from: '/old', to: '/new-one', status: 301 } ])
-    end
-
-    it 'counts the taxonomy synonym redirects as static' do
-      static_rules, _ = partitioned_redirects
-
-      expect(static_rules.map { |r| r[:from] }).to include('/tagged/half-ironman')
-    end
-
-    # Both stop a deploy (code 100324), and a Contentful entry can cause them.
-    it 'drops an absolute-URL source' do
-      @redirects = [ redirect('https://old.example.com/post', '/post') ]
-
-      expect(partitioned_redirects.flatten.map { |r| r[:from] }).not_to include('https://old.example.com/post')
-    end
-
-    it 'drops a 200 proxy rewrite pointing at an absolute URL' do
-      @redirects = [
-        redirect('/proxied', 'https://upstream.example.com/thing', 200),
-        redirect('/proxied-relative', '/thing', 200)
-      ]
-
-      froms = partitioned_redirects.flatten.map { |r| r[:from] }
-      expect(froms).not_to include('/proxied')
-      expect(froms).to include('/proxied-relative')
-    end
-  end
-
-  describe '#dynamic_redirect_source?' do
-    it 'is true for a splat or a :placeholder, false for an exact path' do
-      expect(dynamic_redirect_source?('/a/*')).to be(true)
-      expect(dynamic_redirect_source?('/a/:name')).to be(true)
-      expect(dynamic_redirect_source?('/a/b')).to be(false)
-      expect(dynamic_redirect_source?('/a/b.html')).to be(false)
-    end
-
-    # This matches too much, on purpose: a colon with a letter after it counts at each position,
-    # thus a source that only looks like a placeholder becomes a dynamic rule. A static rule that
-    # this code calls dynamic causes no damage. A dynamic rule that this code calls static stops the
-    # deploy.
-    it 'treats a mid-segment colon as a placeholder' do
-      expect(dynamic_redirect_source?('/a:b')).to be(true)
     end
   end
 

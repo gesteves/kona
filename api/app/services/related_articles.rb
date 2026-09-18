@@ -244,13 +244,6 @@ class RelatedArticles < ApplicationService
     nil
   end
 
-  # ⚠️ The pageviews widget already caches this query body. Thus this costs no more Plausible
-  # calls. A failure gives an empty hash, and the addition is then 0 for each article.
-  def all_time_visitors
-    totals = @plausible.totals_by_path(date_range: "all") || {}
-    totals.each_with_object(Hash.new(0)) { |(path, values), acc| acc[path] = values[:visitors].to_i }
-  end
-
   # A failure here gives an empty tree, thus the taxonomy part of the score becomes 0 and the BM25
   # similarity alone puts the articles in order.
   def taxonomy_tree

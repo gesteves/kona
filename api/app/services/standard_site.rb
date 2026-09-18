@@ -14,11 +14,6 @@ class StandardSite < ApplicationService
   include ContentfulConsumer
   include AtProto
 
-  # The AT Protocol "sortable base32" alphabet. Each standard.site lexicon needs a TID for each
-  # record key. Thus you cannot use a natural id as an rkey.
-  # @see https://atproto.com/specs/tid
-  TID_ALPHABET = AtProto::TID_ALPHABET
-
   # Makes a stable TID from a seed: the low 63 bits of its SHA-256 digest, in base32.
   # web's StandardSiteHelpers#document_rkey must use the same algorithm. If it does not, the AT
   # URI that it writes does not agree with the record that this class publishes.
@@ -57,7 +52,6 @@ class StandardSite < ApplicationService
   PUBLICATION_RKEY = tid("self")
   # The old rkey of the publication, from before the lexicon needed a TID. The backfill deletes it.
   LEGACY_PUBLICATION_RKEY = "self"
-  DEFAULT_PDS_URL = AtProto::DEFAULT_PDS_URL
   # A DID stays the same for an account. Thus the cache holds it with no TTL.
   DID_CACHE_KEY = "standard_site:did"
 
@@ -439,7 +433,6 @@ class StandardSite < ApplicationService
   # Deletes the publication record at the old "self" rkey, which the lexicon does not accept.
   # It is safe to run this on each backfill.
   def prune_legacy_publication
-    return if PUBLICATION_RKEY == LEGACY_PUBLICATION_RKEY
     delete_record(PUBLICATION_COLLECTION, LEGACY_PUBLICATION_RKEY)
   end
 

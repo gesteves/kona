@@ -10,6 +10,8 @@ require "uri"
 # It is not an ApplicationService, because the response is an image and not cacheable JSON.
 # @see https://docs.mapbox.com/api/maps/static-images/
 class StaticMap
+  include Retryable
+
   DEFAULT_STYLE_URL = "mapbox://styles/mapbox/outdoors-v12".freeze
 
   # A style URL comes to this class from a form field and goes into a URL that the server gets.
@@ -192,6 +194,11 @@ class StaticMap
   # degrees. A longitude becomes shorter near the poles, by the cosine of the latitude.
   # @return [Hash{Symbol => Float}]
   def bounds
+    @bounds ||= compute_bounds
+  end
+
+  # @see #bounds. The URL, the height, and the aspect ratio each read it, thus the memo.
+  def compute_bounds
     raw = @track["bounds"] || {}
     min_lon, max_lon = raw["min_lon"].to_f, raw["max_lon"].to_f
     min_lat, max_lat = raw["min_lat"].to_f, raw["max_lat"].to_f
@@ -288,25 +295,21 @@ class StaticMap
     ActiveModel::Type::Boolean.new.cast(value) || false
   end
 
-  # Does the request again after a temporary failure (a network error or a 5xx), a maximum number
-  # of times.
+  # The failures that permit another attempt: a network error and a 5xx.
+  RETRYABLE_ERRORS = [ Net::OpenTimeout, Net::ReadTimeout, SocketError, Errno::ECONNRESET, HTTParty::Error, RenderError ].freeze
+
+  # Does the request again after a temporary failure, a maximum number of times. It raises the last
+  # error, and it does not give nil: the caller shows that error on the page.
+  #
+  # ⚠️ The deadline counts the timeout of the next attempt, thus RENDER_DEADLINE is the most time
+  # that a render can take. The request has a 20-second rack-timeout, and its exception is not a
+  # StandardError.
   def get_with_retries(url)
-    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    attempt = 0
-    begin
-      attempt += 1
+    with_retries(max: HTTP_MAX_ATTEMPTS - 1, base_delay: 1, deadline: RENDER_DEADLINE - HTTP_TIMEOUT, on: RETRYABLE_ERRORS) do
       response = HTTParty.get(url, timeout: HTTP_TIMEOUT)
-      return response if response.success? || response.code < 500
+      raise RenderError, "Mapbox returned status #{response.code}" unless response.success? || response.code < 500
 
-      raise RenderError, "Mapbox returned status #{response.code}"
-    rescue Net::OpenTimeout, Net::ReadTimeout, SocketError, Errno::ECONNRESET, HTTParty::Error, RenderError => e
-      raise e if attempt >= HTTP_MAX_ATTEMPTS
-
-      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
-      raise e if elapsed + attempt + HTTP_TIMEOUT > RENDER_DEADLINE
-
-      sleep(attempt)
-      retry
+      response
     end
   end
 

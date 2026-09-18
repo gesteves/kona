@@ -24,16 +24,6 @@ module UnitsHelper
     distance(meters, units: units).split(/\s+/, 2)
   end
 
-  # Gets the number from the distance after the conversion.
-  def distance_value(meters, units: "si")
-    distance_parts(meters, units: units).first
-  end
-
-  # Gets the unit of the distance after the conversion.
-  def distance_unit(meters, units: "si")
-    distance_parts(meters, units: units).last
-  end
-
   # Formats a distance number with the given unit and the given number of decimals.
   def formatted_distance(distance, units, precision)
     number_to_human(distance, units: units, precision: precision,

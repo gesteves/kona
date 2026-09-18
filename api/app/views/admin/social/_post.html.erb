@@ -13,7 +13,7 @@
     a MutationObserver, thus it is not synchronous, and `social#canPost` reads the count line that
     this block writes. The button would then follow the keystroke before the current one. %>
 <div class="social-post" data-social-target="post" data-controller="social-post"
-     data-admin-i18n="<%= admin_i18n_data("admin.js.social_post") %>"
+     data-admin-i18n="<%= admin_i18n_data("admin.js.social_post", shared: "admin.js.shared") %>"
      data-social-post-bluesky-mentions="<%= mentions_json %>"
      data-social-post-preview-url-value="<%= social_preview_path %>"
      data-social-post-limit-value="<%= limit %>"

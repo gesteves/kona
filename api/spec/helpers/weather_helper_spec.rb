@@ -224,12 +224,10 @@ RSpec.describe WeatherHelper, type: :helper do
       expect(helper.current_weather(weather).condition_code).to eq("PartlyCloudy")
       expect(helper.todays_forecast(weather).temperature_max).to eq(24.0)
       expect(helper.weather_data_is_current?(weather, time_zone)).to be(true)
-      expect(helper.weather_data_is_stale?(weather, time_zone)).to be(false)
     end
 
     it "is stale when there's no weather" do
       expect(helper.weather_data_is_current?(nil, time_zone)).to be(false)
-      expect(helper.weather_data_is_stale?(nil, time_zone)).to be(true)
     end
 
     it "returns the daytime forecast during the day and the overnight one in the evening" do

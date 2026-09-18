@@ -12,13 +12,9 @@ module AffiliateLinksHelpers
   # file has its own template context, and the disclosure partial of a feed reads this for each
   # entry of each of the ~40 feeds: an instance variable made the full parse run again in each.
   def has_amazon_associates_links?(content)
-    id = content.sys&.id
-    return scan_for_amazon_associates_links(content) if id.blank?
-
-    store = memoize_by_collection(:amazon_associates_links, (data.articles if respond_to?(:data))) { {} }
-    return store[id] if store.key?(id)
-
-    store[id] = scan_for_amazon_associates_links(content)
+    memoize_entry(:amazon_associates_links, content.sys&.id, (data.articles if respond_to?(:data))) do
+      scan_for_amazon_associates_links(content)
+    end
   end
 
   # @see #has_amazon_associates_links?

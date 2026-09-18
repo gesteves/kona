@@ -28,15 +28,19 @@ module MemoizationHelpers
     value
   end
 
-  # Keeps the value of one entry in the current template context.
-  # @param ivar [Symbol] The instance variable that holds the hash of values.
-  # @param key [Object] The cache key. For a blank key, the code calculates the value again and keeps
-  #   nothing.
+  # Keeps the value of one entry, in a store by collection. Thus one value serves each page that
+  # renders the entry, and a data reload makes it again.
+  # @param name [Symbol] A name for the store. Each name must be different.
+  # @param key [Object] The key of the entry. For a blank key, the code calculates the value again
+  #   and keeps nothing.
+  # @param collections [Array<Object>] The collections that the value comes from.
   # @yieldreturn The value.
-  def memoize_by_key(ivar, key)
+  def memoize_entry(name, key, *collections)
     return yield if key.blank?
 
-    cache = instance_variable_get(ivar) || instance_variable_set(ivar, {})
-    cache.key?(key) ? cache[key] : cache[key] = yield
+    store = memoize_by_collection(name, *collections) { {} }
+    return store[key] if store.key?(key)
+
+    store[key] = yield
   end
 end

@@ -18,5 +18,5 @@ class WhoopCredentials
 
   # @param value [String, nil] A Redis value.
   # @return [String, nil] The token, or nil when the code cannot read the message.
-  def self.open(value) = decrypt(value)
+  def self.unseal(value) = decrypt(value)
 end

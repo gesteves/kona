@@ -9,12 +9,17 @@
     name, and the post must be able to say it. The action reads the shape and decides. An empty
     field posts the token with no "@". Thus no value here can ever tag the wrong account.
 %>
-<div class="social-mention" data-social-target="mention">
+<%# ⚠️ The row is a group that the token names. The three fields of each row have the same three
+    labels, thus without the group a screen reader hears "Bluesky, edit text" for each person and
+    cannot tell which one. The id comes from the token, and social_controller.js writes the same id
+    when it clones the template. A wrong name here tags a stranger. %>
+<% label_id = "mention-#{mention.token.to_s.delete_prefix('@').downcase}" %>
+<div class="social-mention" data-social-target="mention" role="group" aria-labelledby="<%= label_id %>">
   <%# ⚠️ The token is not editable here: the words of the post are where the owner writes it. The
       hidden field is what puts it in the form. %>
   <input type="hidden" name="mentions[][token]" value="<%= mention.token %>" data-mention-token>
 
-  <p class="social-mention__token" data-mention-label><%= mention.token %></p>
+  <p class="social-mention__token" id="<%= label_id %>" data-mention-label><%= mention.token %></p>
 
   <% networks.each do |network| %>
     <wa-input name="mentions[][<%= network.key %>]" label="<%= network.name %>"

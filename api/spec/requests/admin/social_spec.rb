@@ -131,7 +131,8 @@ RSpec.describe "Admin social media", type: :request do
 
         expect(response.body).to include(I18n.t("admin.social.account.named", account: "@me.bsky.social"))
         expect(response.body).to include('<wa-checkbox name="networks[]" value="mastodon" disabled>')
-        expect(response.body).to include(I18n.t("admin.social.show.not_connected"))
+        expect(response.body).to include("Not connected.")
+        expect(response.body).to include(I18n.t("admin.social.show.connect_link"))
       end
 
       it "names the account of each of the three networks" do

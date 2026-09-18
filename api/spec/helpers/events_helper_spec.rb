@@ -71,14 +71,14 @@ RSpec.describe EventsHelper, type: :helper do
         location: { time_zone: { time_zone_id: "Europe/Berlin" } },
         weather: { forecast_daily: { days: forecast_days("Europe/Berlin", "2026-06-04", "2026-06-05", "2026-06-06") } }
       )
-      expect(helper.event_forecast(berlin).condition_code).to eq("2026-06-05")
+      expect(helper.event_forecast_day(berlin).daytime_forecast.condition_code).to eq("2026-06-05")
 
       denver = build_event(
         date: "2026-06-05T09:00:00-06:00",
         location: { time_zone: { time_zone_id: "America/Denver" } },
         weather: { forecast_daily: { days: forecast_days("America/Denver", "2026-06-04", "2026-06-05", "2026-06-06") } }
       )
-      expect(helper.event_forecast(denver).condition_code).to eq("2026-06-05")
+      expect(helper.event_forecast_day(denver).daytime_forecast.condition_code).to eq("2026-06-05")
     end
 
     it "gives nil for an event with no weather, and for a day with no start" do

@@ -7,10 +7,12 @@ require "rails_helper"
 RSpec.describe "Admin JavaScript i18n keys" do
   # The scope that each view gives to the controller of a file. The location view also gives
   # `state: "admin.location.state"`, thus the `state.*` keys of that file are below admin.location.
+  # The two social views give `shared: "admin.js.shared"`, thus their `shared.*` keys are below
+  # admin.js.
   SCOPES = {
     "location_map_controller.js" => %w[admin.js.location admin.location],
-    "social_controller.js" => %w[admin.js.social],
-    "social_post_controller.js" => %w[admin.js.social_post],
+    "social_controller.js" => %w[admin.js.social admin.js],
+    "social_post_controller.js" => %w[admin.js.social_post admin.js],
     "republish_controller.js" => %w[admin.js.republish]
   }.freeze
 

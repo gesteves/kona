@@ -45,11 +45,6 @@ module EventsHelper
     Time.parse(sunrise)..Time.parse(sunset)
   end
 
-  # @return [OpenStruct, nil] The daytime forecast for the date of the event.
-  def event_forecast(event)
-    event_forecast_day(event)&.daytime_forecast
-  end
-
   # @return [OpenStruct, nil] The forecast day for the date of the event, which also has its
   #   sunrise and its sunset.
   #

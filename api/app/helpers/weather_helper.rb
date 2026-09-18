@@ -20,10 +20,6 @@ module WeatherHelper
     current_weather(weather).present? && todays_forecast(weather).present? && rest_of_day_forecast(weather, time_zone).present?
   end
 
-  def weather_data_is_stale?(weather, time_zone)
-    !weather_data_is_current?(weather, time_zone)
-  end
-
   def current_weather(weather)
     weather&.current_weather
   end

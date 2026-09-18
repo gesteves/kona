@@ -4,17 +4,19 @@ require "digest"
 # The base class for the external-API service objects. It has the read-through Redis cache, the
 # common HTTParty and JSON-parse code, the key transforms, and the shared retry and error code.
 class ApplicationService
+  include Retryable
   include UpstreamIsolation
 
   # The bang methods raise this when a response is not a success. It holds the status and the
   # body, thus a caller can select an action from the type of failure and does not compare
   # message text.
   class HttpError < StandardError
-    attr_reader :status, :body
+    attr_reader :status, :body, :url
 
     def initialize(status, body, url)
       @status = status
       @body = body
+      @url = url
       super("HTTP #{status} from #{url}")
     end
   end
@@ -238,38 +240,14 @@ class ApplicationService
     @latitude.present? && @longitude.present?
   end
 
-  # Runs the block. On an error it waits, then does the block again, and each wait is two times
-  # the last one.
-  #
-  # ⚠️ The wait occurs in the calling thread. The defaults (2s, then 4s, then 8s) are for the
-  # Sidekiq jobs, and together they are longer than the full 20s rack-timeout budget. Thus a
-  # caller in a **request path** must give a `deadline`. If it does not, the waits alone are
-  # longer than the request, and the widget gives a 500 instead of an empty fragment.
-  #
-  # There is no random change to the wait: the retry counts are small and each upstream has one
-  # tenant, thus there is no group of clients to separate in time.
-  # @param max [Integer] The maximum number of attempts after the first attempt.
-  # @param base_delay [Numeric] The seconds to wait before the second attempt. Each wait is two
-  #   times the last one.
-  # @param deadline [Numeric] The maximum seconds for this call, and this includes the waits. An
-  #   attempt does not occur if its wait would end after the deadline.
+  # Does a block again after a failure. Refer to Retryable. This gives nil, and reports the error,
+  # after the attempts or the deadline end: a service gives a smaller result and does not raise.
   # @return [Object, nil] The value from the block, or nil after the attempts or the deadline end.
-  def with_retries(max: 3, base_delay: 2, deadline: Float::INFINITY)
-    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    attempts = 0
-    begin
-      yield
-    rescue StandardError => e
-      attempts += 1
-      delay = base_delay * (2**(attempts - 1))
-      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
-      if attempts <= max && (elapsed + delay) < deadline
-        sleep(delay)
-        retry
-      end
-      report_upstream_error(e)
-      nil
-    end
+  def with_retries(**options, &block)
+    super
+  rescue StandardError => e
+    report_upstream_error(e)
+    nil
   end
 
   # Runs the block. It writes each error to the log and does not raise. It is a short form of

@@ -12,7 +12,7 @@
               class: "social wa-stack wa-gap-l",
               data: { controller: "social",
                       action: "submit->social#markBusy input->social#validate change->social#validate",
-                      admin_i18n: admin_i18n_data("admin.js.social"),
+                      admin_i18n: admin_i18n_data("admin.js.social", shared: "admin.js.shared"),
                       social_max_posts_value: @social.max_posts,
                       social_preview_url_value: social_preview_text_path } do %>
 
@@ -136,7 +136,8 @@
             row says why one of three names is not available. %>
         <wa-checkbox name="networks[]" value="<%= network.key %>" disabled>
           <%= network.name %>
-          <span slot="hint"><%= network.notice || t(".not_connected") %> <%= link_to t(".connect_it"), connected_apps_path %>.</span>
+          <% connect_link = link_to(t(".connect_link"), connected_apps_path) %>
+          <span slot="hint"><%= network.notice.present? ? t(".connect_hint_html", notice: network.notice, link: connect_link) : t(".not_connected_hint_html", link: connect_link) %></span>
         </wa-checkbox>
       <% end %>
 

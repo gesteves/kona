@@ -23,15 +23,14 @@ module MarkupHelpers
   def render_body(text, image_variant: :entry, first_image: nil)
     return render_body_now(text, image_variant: image_variant, first_image: first_image) if first_image
 
-    store = memoize_by_collection(:rendered_bodies, data.articles, data.assets) { {} }
-    key = [ text, image_variant ]
-    if store.key?(key)
-      # The icons of that body go in the sprite of this page as well.
-      record_icons_in(store[key])
-      return store[key]
+    rendered = false
+    html = memoize_entry(:rendered_bodies, [ text, image_variant ], data.articles, data.assets) do
+      rendered = true
+      render_body_now(text, image_variant: image_variant, first_image: nil)
     end
-
-    store[key] = render_body_now(text, image_variant: image_variant, first_image: nil)
+    # The icons of a body that another page rendered go in the sprite of this page as well.
+    record_icons_in(html) unless rendered
+    html
   end
 
   # @see #render_body
@@ -71,10 +70,7 @@ module MarkupHelpers
   # @param text [String] The Markdown text to render.
   # @return [String] The HTML after the transforms.
   def render_feed_body(text)
-    store = memoize_by_collection(:rendered_feed_bodies, data.articles, data.assets) { {} }
-    return store[text] if store.key?(text)
-
-    store[text] = render_feed_body_now(text)
+    memoize_entry(:rendered_feed_bodies, text, data.articles, data.assets) { render_feed_body_now(text) }
   end
 
   # @see #render_feed_body
@@ -701,10 +697,7 @@ module MarkupHelpers
     id = entry.sys&.id
     return parse_entry_fragment(entry) if id.blank? || !respond_to?(:data)
 
-    store = memoize_by_collection(:entry_fragments, data.articles, data.pages) { {} }
-    return store[id] if store.key?(id)
-
-    store[id] = parse_entry_fragment(entry)
+    memoize_entry(:entry_fragments, id, data.articles, data.pages) { parse_entry_fragment(entry) }
   end
 
   # @see #entry_fragment

@@ -8,6 +8,7 @@
 RSpec.configure do |config|
   config.before do
     keys = $redis.keys("#{AtProto::SESSION_KEY_PREFIX}*") +
+           $redis.keys("bluesky:did:*") +
            $redis.keys("#{BlueskyPostJob::ENQUEUE_LOCK_PREFIX}*") +
            $redis.keys("#{MastodonPostJob::ENQUEUE_LOCK_PREFIX}*") +
            $redis.keys("#{ThreadsPostJob::ENQUEUE_LOCK_PREFIX}*")
