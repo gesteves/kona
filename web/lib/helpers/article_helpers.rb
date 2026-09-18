@@ -357,8 +357,7 @@ module ArticleHelpers
 
   # @see #article_word_count
   def compute_article_word_count(article)
-    plain_text = sanitize([ article.intro, article.body ].reject(&:blank?).join("\n\n"), escape_html_entities: true)
-    plain_text.split(/\s+/).size
+    entry_fragment(article).text.split(/\s+/).reject(&:empty?).size
   end
 
   # The estimated reading time for an article, in full minutes. It rounds up.

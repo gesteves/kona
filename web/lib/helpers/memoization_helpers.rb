@@ -9,20 +9,22 @@ module MemoizationHelpers
     end
   end
 
-  # Keeps a value that comes from a Middleman data collection, for the life of that collection. Thus
-  # a data reload on the development server calculates the value again.
+  # Keeps a value that comes from one or more Middleman data collections, for the life of those
+  # collections. Thus a data reload on the development server calculates the value again.
   # @param name [Symbol] A name for the value. Each name must be different.
-  # @param collection [Object] The collection that the value comes from.
+  # @param collections [Array<Object>] The collections that the value comes from. A new object at
+  #   any one of them makes the value again.
   # @yieldreturn The value.
-  def memoize_by_collection(name, collection)
+  def memoize_by_collection(name, *collections)
     store = MemoizationHelpers.collection_store
     if store.key?(name)
-      cached_collection, value = store[name]
-      return value if cached_collection.equal?(collection)
+      cached_collections, value = store[name]
+      return value if cached_collections.size == collections.size &&
+                      cached_collections.zip(collections).all? { |cached, given| cached.equal?(given) }
     end
 
     value = yield
-    store[name] = [ collection, value ]
+    store[name] = [ collections, value ]
     value
   end
 

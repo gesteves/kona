@@ -19,5 +19,12 @@
         body, thus without it each page would bring a new region that already holds its text, and a
         screen reader does not announce such a region. It needs the id for that flag. %>
     <div id="route-announcer" class="sr-only" role="status" aria-live="polite" data-turbo-permanent></div>
+    <%# The symbols that each <use> on this page names: the wordmark and each icon that the page
+        rendered. It is at the END of the body, because icon_symbols knows the icons of the page
+        only after the page rendered them. A <use> can name a symbol that comes after it. %>
+    <svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+      <%= partial 'partials/logo_symbol.svg.erb' %>
+      <%= icon_symbols %>
+    </svg>
   </body>
 </html>

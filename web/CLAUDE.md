@@ -130,12 +130,14 @@ The blog index and each tag archive render **every** entry, and no page has pagi
 good for a crawler: each post is two clicks from the home page, there is no `rel=prev/next` to get
 incorrect, and there is no paginated-canonical trap. The cost is the size of the page.
 
-⚠️ **Known boundary, measured at 58 entries: `/blog/` is approximately 580KB of HTML.** The cover
-image of a card is approximately 20% of that, because each one holds six srcset candidates and an
-inline blurhash data URI. A Short also renders its full body in the list, because its intro *is* the
-post. This is acceptable at 58 entries and it will not be at 300. When it becomes a problem, the
-first step is to render the inline blurhash for the first cards only, and pagination is the last
-step, not the first.
+⚠️ **Known boundary: `/blog/` renders every entry, and its size grows with the archive.** The cover
+image of a card holds six srcset candidates and an inline blurhash data URI, and a Short also
+renders its full body in the list, because its intro *is* the post. The icons and the wordmark are
+**not** part of that cost: each icon is a `<use>` of one `<symbol>` in the sprite at the end of
+the body, and `IconHelpers#icon_symbols` writes the symbols of the icons that the page rendered.
+⚠️ Keep the sprite to the icons of the page. The full catalogue is approximately 90KB, and that
+is a net loss on the home page. When the size becomes a problem, the first step is to render the
+inline blurhash for the first cards only, and pagination is the last step, not the first.
 
 ⚠️ **The feeds are the larger cost, and they grow with the tags as well as with the entries.** Each
 tag has an Atom feed, and each entry of a feed renders its intro and its body through Markdown and

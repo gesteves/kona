@@ -31,12 +31,13 @@ module CspHelpers
   # iframe. Thus each script host is also a frame host.
   # @return [Hash{Symbol => Array<String>}] `:frame` and `:script`, each sorted.
   def embed_origins
-    memoize_by_collection(:embed_origins, data.articles) do
+    # ⚠️ Both collections are in the key. With the articles alone, an edit to a page on the
+    # development server kept the old frame-src.
+    memoize_by_collection(:embed_origins, data.articles, data.pages) do
       frames = Set.new
       scripts = Set.new
-      bodies = (Array(data.articles) + Array(data.pages)).flat_map { |entry| [ entry.body, entry.intro ] }.compact
-      bodies.each do |body|
-        doc = Nokogiri::HTML::DocumentFragment.parse(body)
+      (Array(data.articles) + Array(data.pages)).each do |entry|
+        doc = entry_fragment(entry)
         doc.css("iframe[src]").each { |node| frames << embed_origin(node["src"]) }
         doc.css("script[src]").each { |node| scripts << embed_origin(node["src"]) }
       end

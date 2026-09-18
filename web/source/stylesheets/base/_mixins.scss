@@ -61,12 +61,20 @@
   }
 }
 
-// Gives a new color to an inline SVG. It needs the two element names, because the icon set puts
-// each path in a group.
+// Gives a new color to an SVG. It needs the two element names, because the icon set puts each
+// path in a group.
+// ⚠️ An icon from the sprite is a <use>, and its paths are in a shadow tree that no selector can
+// reach. Those paths keep fill="currentColor", thus the `color` of the svg host is their fill.
+// The two element names stay for the inline SVGs: the api fragments render theirs inline.
 @mixin svg-fill($fill) {
   g,
   path {
     fill: $fill;
+  }
+
+  &:is(svg),
+  svg {
+    color: $fill;
   }
 }
 
@@ -112,6 +120,10 @@
   g,
   path {
     transition: fill var(--transition-duration);
+  }
+
+  svg {
+    transition: color var(--transition-duration);
   }
 }
 

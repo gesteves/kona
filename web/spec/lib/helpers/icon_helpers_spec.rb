@@ -15,7 +15,25 @@ RSpec.describe IconHelpers do
     it 'returns the icon marked decorative (hidden from assistive tech, not focusable)' do
       svg = icon_svg('classic', 'light', 'calendar')
       expect(svg).to start_with('<svg aria-hidden="true" focusable="false"')
-      expect(svg).to include('<path/>')
+      expect(svg).to include('viewBox="0 0 448 512"')
+    end
+
+    # ⚠️ The paths go in the sprite, one time for each icon of the page, and the icon is a <use>.
+    it 'draws the icon with a <use> of its symbol, and puts the paths in the sprite one time' do
+      2.times { icon_svg('classic', 'light', 'calendar') }
+
+      expect(icon_svg('classic', 'light', 'calendar')).to end_with('<use href="#icon-classic-light-calendar"></use></svg>')
+      expect(icon_symbols).to eq('<symbol id="icon-classic-light-calendar" viewBox="0 0 448 512"><path/></symbol>')
+    end
+
+    it 'has an empty sprite for a page with no icon' do
+      expect(icon_symbols).to eq('')
+    end
+
+    it 'records the icons of a body that another page rendered' do
+      record_icons_in('<p><svg><use href="#icon-classic-light-calendar"></use></svg></p>')
+
+      expect(icon_symbols).to include('id="icon-classic-light-calendar"')
     end
 
     it 'is nil for an unknown icon, style, or family' do

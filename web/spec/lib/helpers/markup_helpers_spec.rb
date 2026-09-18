@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'ostruct'
 require 'padrino-helpers'
 
 RSpec.describe MarkupHelpers do
@@ -199,6 +200,46 @@ RSpec.describe MarkupHelpers do
       result = units_tag('10', '6.2', title: '10 km | 6.2 mi')
       expect(result).to include('title="10 km | 6.2 mi"')
       expect(result).not_to include('title="10 | 6.2"')
+    end
+  end
+
+  describe '#render_body' do
+    before { MemoizationHelpers.collection_store.clear }
+
+    let(:articles) { [] }
+    let(:assets) { [] }
+
+    def data
+      OpenStruct.new(articles: articles, assets: assets,
+                     srcsets: { entry: OpenStruct.new(widths: [ 100 ], sizes: [ '100vw' ]) })
+    end
+
+    # ⚠️ A listing page renders the same intro many times, and each feed renders the same body.
+    it 'renders a body with no first image one time, and gives the same HTML again' do
+      allow(self).to receive(:render_body_now).and_call_original
+
+      first = render_body('Hello *there*.')
+      second = render_body('Hello *there*.')
+
+      expect(second).to eq(first)
+      expect(self).to have_received(:render_body_now).once
+    end
+
+    it 'renders a body with a first image each time, because the LCP mark is for one page' do
+      allow(self).to receive(:render_body_now).and_call_original
+
+      2.times { render_body('Hello.', first_image: :eager) }
+
+      expect(self).to have_received(:render_body_now).twice
+    end
+
+    it 'records the icons of a body that it gives again, for the sprite of this page' do
+      allow(self).to receive(:record_icons_in)
+
+      render_body('Hello.')
+      render_body('Hello.')
+
+      expect(self).to have_received(:record_icons_in).once
     end
   end
 

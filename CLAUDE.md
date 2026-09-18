@@ -176,8 +176,9 @@ same host, and the api opens each absolute link. The api assumes that a card bod
 another site. No test checks that assumption.
 
 The site **wordmark** and the **favicon** are also in two places.
-`web/source/partials/_logo.svg.erb` is a copy in `api/app/views/layouts/_logo.html.erb`, for the
-admin header, and `web/source/favicon.ico` is a copy in `api/public/favicon.ico`. Both are safe: the
+`web/source/partials/_logo_symbol.svg.erb` holds the paths of the mark, which each `<use>` in
+`_logo.svg.erb` draws, and `api/app/views/layouts/_logo.html.erb` is an inline copy of those paths,
+for the admin header, and `web/source/favicon.ico` is a copy in `api/public/favicon.ico`. Both are safe: the
 two copies never appear on the same page, and a difference gives only an old admin logo or an old
 tab icon. Copy the files again when the mark changes.
 

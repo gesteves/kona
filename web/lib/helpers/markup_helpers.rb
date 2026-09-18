@@ -12,10 +12,30 @@ module MarkupHelpers
   EMOJI_RUN_REGEX = /((?:#{EMOJI_REGEX.source}(?:\s*#{EMOJI_REGEX.source})*))/
 
   # Renders the body of an entry through the full transform pipeline.
+  #
+  # ⚠️ With no `first_image`, the result is a function of the text and the variant alone, and the
+  # code keeps it: each card of a listing page renders the intro of its entry, and the blog index
+  # and the tag archives render the same intro many times. With a `first_image` the result names
+  # the LCP image of THIS page, thus the code renders it each time.
   # @param text [String] The Markdown text to render.
   # @param image_variant [Symbol] The responsive-images configuration to use.
   # @return [String] The HTML after the transforms.
   def render_body(text, image_variant: :entry, first_image: nil)
+    return render_body_now(text, image_variant: image_variant, first_image: first_image) if first_image
+
+    store = memoize_by_collection(:rendered_bodies, data.articles, data.assets) { {} }
+    key = [ text, image_variant ]
+    if store.key?(key)
+      # The icons of that body go in the sprite of this page as well.
+      record_icons_in(store[key])
+      return store[key]
+    end
+
+    store[key] = render_body_now(text, image_variant: image_variant, first_image: nil)
+  end
+
+  # @see #render_body
+  def render_body_now(text, image_variant:, first_image:)
     srcset = data.srcsets[image_variant]
     render_markup(text) do |doc|
       open_external_links_in_new_tabs(doc)
@@ -44,9 +64,21 @@ module MarkupHelpers
 
   # Renders the body of an entry for the Atom feed. It does not do the transforms that a feed
   # reader cannot use.
+  #
+  # ⚠️ The result is a function of the text alone, and the code keeps it. Each tag has a feed, and
+  # each feed renders the same 25 entries: without the memo, one build rendered each body
+  # approximately forty times.
   # @param text [String] The Markdown text to render.
   # @return [String] The HTML after the transforms.
   def render_feed_body(text)
+    store = memoize_by_collection(:rendered_feed_bodies, data.articles, data.assets) { {} }
+    return store[text] if store.key?(text)
+
+    store[text] = render_feed_body_now(text)
+  end
+
+  # @see #render_feed_body
+  def render_feed_body_now(text)
     render_markup(text) do |doc|
       add_image_data_attributes(doc)
       add_figure_elements_to_images(doc)
@@ -656,6 +688,29 @@ module MarkupHelpers
     end
 
     parent["class"] = "#{base_class}__figure #{base_class}__figure--#{modifier}" if base_class.present?
+  end
+
+  # The intro and the body of an entry, rendered and parsed one time for each entry. The word
+  # count, the affiliate scan, and the CSP embed origins each read it, and none of them renders
+  # the Markdown again.
+  #
+  # ⚠️ Read it, and do not change it: the same fragment goes to each reader.
+  # @param entry [Object] An article or a page.
+  # @return [Nokogiri::HTML::DocumentFragment]
+  def entry_fragment(entry)
+    id = entry.sys&.id
+    return parse_entry_fragment(entry) if id.blank? || !respond_to?(:data)
+
+    store = memoize_by_collection(:entry_fragments, data.articles, data.pages) { {} }
+    return store[id] if store.key?(id)
+
+    store[id] = parse_entry_fragment(entry)
+  end
+
+  # @see #entry_fragment
+  def parse_entry_fragment(entry)
+    text = [ entry.intro, entry.body ].reject(&:blank?).join("\n\n")
+    Nokogiri::HTML::DocumentFragment.parse(markdown_to_html(text))
   end
 
   # The shared shape of the render_*_body pipelines: render the Markdown, parse it one time, give

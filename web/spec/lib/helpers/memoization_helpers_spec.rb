@@ -22,6 +22,17 @@ RSpec.describe MemoizationHelpers do
       expect(second).to eq('second') # equal contents, different identity
     end
 
+    it 'recomputes when any one of several collections is a different object' do
+      articles = [ 1 ]
+      pages = [ 2 ]
+      calls = 0
+
+      2.times { memoize_by_collection(:pair, articles, pages) { calls += 1 } }
+      memoize_by_collection(:pair, articles, [ 2 ]) { calls += 1 }
+
+      expect(calls).to eq(2)
+    end
+
     it 'keys memos independently by name' do
       collection = [ 1 ]
       expect(memoize_by_collection(:a, collection) { 'a' }).to eq('a')

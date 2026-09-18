@@ -63,6 +63,15 @@ svg {
   overflow: visible;
 }
 
+// The sprite of symbols at the end of the body. It takes no space and it paints nothing: each
+// <use> draws its symbol at its own place.
+.sprite {
+  height: 0;
+  overflow: hidden;
+  position: absolute;
+  width: 0;
+}
+
 // The defaults for the Web Awesome elements. Each token below keeps its light value on a black
 // page, because the dark values of Web Awesome need a `.wa-dark` class that the app never sets
 // (refer to the note at the top of base/_props.scss). These rules use the element name only, thus
