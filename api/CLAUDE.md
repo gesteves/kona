@@ -431,7 +431,9 @@ Thus that shared window is safe.
 - **`ActivityDescriptionJob`** does not know its source. It writes the stat lines with an emoji: the
   power, the heat, the Whoop strain, and the water temperature. It also writes two lines that
   Anthropic makes: a summary of the planned workout, which the code matches against the TrainerRoad
-  calendar, and a weather sentence. The prompts are in `app/prompts/`, and the job omits those two
+  calendar, and a weather sentence. ⚠️ `TrainerRoad#planned_workouts` omits a race leg, thus that
+  line is for a structured workout alone. `TrainerRoad#workouts`, which the widgets read for the
+  rest-day check, counts a race leg: race day must not read as a rest day. The prompts are in `app/prompts/`, and the job omits those two
   lines with no `ANTHROPIC_API_KEY`. It keeps the text that the user wrote above the stat block. A
   Redis lock stops a second job for the same activity. The same PUT also corrects a name from Rouvy
   (`ROUVY - <route> - <date>` becomes `Rouvy - <route>`), thus it can write even when the

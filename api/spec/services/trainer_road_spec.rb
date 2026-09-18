@@ -103,48 +103,18 @@ RSpec.describe TrainerRoad do
     end
   end
 
-  describe "#determine_discipline" do
-    it { expect(service.send(:determine_discipline, "Run - Easy")).to eq("Run") }
-    it { expect(service.send(:determine_discipline, "Swim Endurance")).to eq("Swim") }
-    it { expect(service.send(:determine_discipline, "Sweet Spot Base")).to eq("Bike") }
-    # A name with no discipline is a ride, thus the formatter never gets a nil.
-    it { expect(service.send(:determine_discipline, nil)).to eq("Bike") }
-  end
-
-  describe "#human_readable_summary" do
-    it "spells out durations up to 90 minutes" do
-      expect(service.send(:human_readable_summary, "1:00", "Bike")).to eq("60-minute ride")
-      expect(service.send(:human_readable_summary, "0:45", "Run")).to eq("45-minute run")
-      expect(service.send(:human_readable_summary, "1:30", "Swim")).to eq("90-minute swim")
-    end
-
-    it "keeps the H:MM form past 90 minutes and says 'ride' for Bike" do
-      expect(service.send(:human_readable_summary, "2:00", "Bike")).to eq("2:00 ride")
-    end
-  end
-
-  describe "#parse_workout" do
-    it "extracts duration, name, discipline, summary, and description" do
-      event = double(summary: "1:00 - Petit", description: "Workout of the Week. Description: Sixty minutes of fun.")
-      expect(service.send(:parse_workout, event)).to include(
-        duration: "1:00",
-        name: "Petit",
-        discipline: "Bike",
-        summary: "60-minute ride",
-        description: "Sixty minutes of fun."
-      )
-    end
-
-    it "returns nil for an event that isn't a workout" do
-      expect(service.send(:parse_workout, double(summary: "Rest Day", description: ""))).to be_nil
-    end
-
+  describe "the duration prefix" do
     # One grammar reads each summary, thus a dash that is not a hyphen reads the same everywhere.
-    it "reads an en dash and a summary with no space around the dash, as the planned reader does" do
-      expect(service.send(:parse_workout, double(summary: "1:00 – Petit", description: ""))).to include(duration: "1:00", name: "Petit")
-      expect(service.send(:parse_workout, double(summary: "1:00-Petit", description: ""))).to include(duration: "1:00", name: "Petit")
+    it "reads a hyphen, an en dash, and an em dash, with or without space around it" do
+      expect(service.send(:split_duration_prefix, "1:00 – Petit")).to eq([ "1:00", "Petit" ])
+      expect(service.send(:split_duration_prefix, "1:00-Petit")).to eq([ "1:00", "Petit" ])
       expect(service.send(:strip_duration_prefix, "1:00 – Petit")).to eq("Petit")
       expect(service.send(:parse_duration_prefix, "1:30 — Gibbs")).to eq(90)
+    end
+
+    it "gives nil for a summary with no duration at its start" do
+      expect(service.send(:split_duration_prefix, "Rest Day")).to be_nil
+      expect(service.send(:parse_duration_prefix, nil)).to be_nil
     end
   end
 
@@ -268,14 +238,35 @@ RSpec.describe TrainerRoad do
       expect($redis).to have_received(:get).with(a_string_starting_with("trainerroad:workouts:America/Denver:2026-07-10:"))
     end
 
-    it "returns today's workouts, sorted swim then bike then run" do
+    it "returns today's workouts, in the shape of the planned workouts" do
       stub_calendar([
         { all_day: true, date: "20260709", summary: "0:30 - Easy Run" },
-        { all_day: true, date: "20260709", summary: "1:00 - Petit" },
-        { all_day: true, date: "20260709", summary: "0:45 - Swim Endurance" }
+        { all_day: true, date: "20260709", summary: "1:00 - Petit", description: "TSS 60" }
       ])
 
-      expect(service.workouts.map { |w| w[:discipline] }).to eq(%w[Swim Bike Run])
+      expect(service.workouts).to eq([
+        { name: "Easy Run", sport: "Running", description: nil, duration_minutes: 30 },
+        { name: "Petit", sport: "Cycling", description: "TSS 60", duration_minutes: 60 }
+      ])
+    end
+
+    # ⚠️ Race day must not read as a rest day on the public site. The activity description is the
+    # opposite: its planned line is for a structured workout alone, thus the same leg is absent
+    # from #planned_workouts.
+    it "counts a race leg as a workout, which #planned_workouts does not" do
+      stub_calendar([
+        { all_day: true, date: "20260709", summary: "Escape from Alcatraz" },
+        { all_day: true, date: "20260709", summary: "0:45 - Escape from Alcatraz" }
+      ])
+
+      expect(service.workouts.map { |w| w[:name] }).to eq([ "Escape from Alcatraz" ])
+      expect(service.planned_workouts(Date.new(2026, 7, 9))).to eq([])
+    end
+
+    it "does not count an annotation, which is an all-day event with no duration" do
+      stub_calendar([ { all_day: true, date: "20260709", summary: "Rest Week" } ])
+
+      expect(service.workouts).to eq([])
     end
 
     it "excludes events on other days" do
