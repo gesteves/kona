@@ -57,6 +57,11 @@ RSpec.describe ConnectedAppPresenter do
   end
 
   # Bluesky uses this presenter and gives no error, thus a blank value must not become :error.
+  # A DOM id must never come from a translated word, thus it comes from the path.
+  it "names its confirmation dialog from the disconnect path" do
+    expect(app.disconnect_dialog_id).to eq("disconnect-connected-apps-whoop")
+  end
+
   it "ignores a blank error" do
     expect(described_class.new(**attrs.merge(error: "")).state).to eq(:connected)
   end

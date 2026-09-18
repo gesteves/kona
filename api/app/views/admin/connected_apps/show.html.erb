@@ -42,19 +42,31 @@
             <%# This is not an `elsif`: an app in the error state offers both actions, because a new
                 connection is the correction and a disconnect is the way out. %>
             <% if app.disconnectable? %>
-              <%# This is a same-origin POST that acts as a DELETE, thus Turbo does it in the usual
-                  way. It uses form_with with a <wa-button> that is part of the form, and not
-                  button_to, which writes a native button. %>
-              <%= form_with url: app.disconnect_path, method: :delete do %>
-                <wa-button type="submit" variant="danger" appearance="outlined">
-                  <%= slotted_icon_svg("classic", "light", "link-slash") %>
-                  <%= t(".disconnect") %>
-                </wa-button>
-              <% end %>
+              <%# The button opens the dialog below: wa-dialog listens on the full document for
+                  [data-dialog="open <id>"]. ⚠️ The stored credentials are the only copy, thus the
+                  delete needs a confirmation, as the Spam page and the Course maps page have. %>
+              <wa-button variant="danger" appearance="outlined" data-dialog="open <%= app.disconnect_dialog_id %>">
+                <%= slotted_icon_svg("classic", "light", "link-slash") %>
+                <%= t(".disconnect") %>
+              </wa-button>
             <% end %>
           </div>
         </div>
       </wa-card>
+
+      <% if app.disconnectable? %>
+        <wa-dialog id="<%= app.disconnect_dialog_id %>" label="<%= t(".disconnect_title", app: app.name) %>" data-controller="dialog">
+          <p><%= t(".disconnect_body", app: app.name) %></p>
+
+          <wa-button slot="footer" appearance="outlined" data-dialog="close"><%= t("admin.actions.cancel") %></wa-button>
+          <%# This is a same-origin POST that acts as a DELETE, thus Turbo does it in the usual
+              way. It uses form_with with a <wa-button> that is part of the form, and not
+              button_to, which writes a native button. %>
+          <%= form_with url: app.disconnect_path, method: :delete, html: { slot: "footer" } do %>
+            <wa-button type="submit" variant="danger" appearance="accent"><%= t(".disconnect") %></wa-button>
+          <% end %>
+        </wa-dialog>
+      <% end %>
     </li>
   <% end %>
 </ul>

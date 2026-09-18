@@ -117,7 +117,9 @@ export default class extends Controller {
       place: this.hasPlaceTarget ? this.placeTarget.textContent.trim() : "",
       status: this.hasStatusTarget ? this.statusTarget.textContent.trim() : "",
       label: this.hasStateTarget ? this.stateTarget.textContent.trim() : "",
-      variant: this.hasStateTarget ? this.stateTarget.variant : ""
+      // ⚠️ The attribute, and not the property. Before the upgrade of <wa-badge>, `variant` is
+      // undefined, and Undo would then write that into the badge.
+      variant: this.hasStateTarget ? (this.stateTarget.getAttribute("variant") ?? "") : ""
     };
 
     // The name of the stored location. The code keeps it, thus Undo can put the heading back with

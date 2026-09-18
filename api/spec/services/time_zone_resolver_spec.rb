@@ -21,15 +21,21 @@ RSpec.describe TimeZoneResolver do
   end
 
   describe ".default" do
+    before { allow(ENV).to receive(:[]).and_call_original }
+
     it "prefers the TIME_ZONE env var" do
-      allow(ENV).to receive(:fetch).and_call_original
-      allow(ENV).to receive(:fetch).with("TIME_ZONE", described_class::DEFAULT_TIME_ZONE).and_return("Europe/Paris")
+      allow(ENV).to receive(:[]).with("TIME_ZONE").and_return("Europe/Paris")
       expect(described_class.default).to eq("Europe/Paris")
     end
 
     it "falls back to America/Denver" do
-      allow(ENV).to receive(:fetch).and_call_original
-      allow(ENV).to receive(:fetch).with("TIME_ZONE", "America/Denver").and_return("America/Denver")
+      allow(ENV).to receive(:[]).with("TIME_ZONE").and_return(nil)
+      expect(described_class.default).to eq("America/Denver")
+    end
+
+    # A fly secret with no value arrives as an empty string, and `in_time_zone("")` raises.
+    it "falls back to America/Denver for a blank value" do
+      allow(ENV).to receive(:[]).with("TIME_ZONE").and_return("")
       expect(described_class.default).to eq("America/Denver")
     end
   end

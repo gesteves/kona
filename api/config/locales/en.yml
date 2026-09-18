@@ -107,6 +107,10 @@ en:
     connected_apps:
       show:
         disconnect: "Disconnect"
+        # The confirmation. ⚠️ The stored credentials are the only copy, thus a disconnect that
+        # a person did not mean costs a new authorization or a new app password.
+        disconnect_title: "Disconnect %{app}?"
+        disconnect_body: "This removes the stored credentials of %{app}. A new connection needs them again."
       # The badge, from ConnectedAppPresenter#status_label.
       status:
         connected: "Connected"

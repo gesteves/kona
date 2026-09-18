@@ -250,7 +250,10 @@ at the same ref as `web/Gemfile`. The rubygems release has `encode` only, and th
 
 ⚠️ **Set `IMAGES_URL` and `IMAGE_HOST` as fly secrets, then run `rake blurhash:backfill`.** Without
 the two variables the card renders no image at all. Without the backfill each card shows the flat
-colour until a person publishes its asset again.
+colour until the first render of that card asks for its placeholder: a read miss adds
+`AssetBlurhashJob`, one time each day for each asset, below a `blurhash:requested:*` marker. The
+entry has a TTL of 90 days, and the webhook makes it one time only, thus that self-heal is what
+keeps the placeholder of an asset that no publish touches.
 
 ### The article rankings
 
@@ -742,7 +745,9 @@ TrainerRoad, and disconnects them.
 `ConnectedAppPresenter` renders three states from `connected?` and an optional `error:` string. The
 third state, `:error`, means connected but broken, and it gives **both** Reconnect and Disconnect. A
 new authorization is the correction, and a rule to disconnect first would remove the one thing that
-makes this state different from a new setup.
+makes this state different from a new setup. ⚠️ Disconnect opens a confirmation dialog, as the
+Spam page and the Course maps page do: the stored credentials are the only copy, and a mis-click
+costs a new authorization or a new app password.
 
 ⚠️ **A card is on the page only when its integration can operate.** `#show` calls `valid_credentials?`
 and leaves out the card of an integration whose credentials are absent from the environment, thus

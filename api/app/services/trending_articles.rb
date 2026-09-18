@@ -19,20 +19,22 @@ class TrendingArticles < ApplicationService
   include ArticleRanking # candidates + payload, shared with RelatedArticles
 
   # The windows, in days. A short one finds a spike of one day, and a long one finds a ramp.
-  WINDOWS = ENV.fetch("TRENDING_WINDOWS", "2,7").split(",").map { |days| Integer(days.strip) }.freeze
+  # ⚠️ Each setting reads `presence`, and not `ENV.fetch`: a variable with no value arrives as an
+  # empty string, and `Integer("")` would stop the boot.
+  WINDOWS = (ENV["TRENDING_WINDOWS"].presence || "2,7").split(",").map { |days| Integer(days.strip) }.freeze
   # The length of the baseline, in days. It ends where the window starts.
-  BASELINE_DAYS = Integer(ENV.fetch("TRENDING_BASELINE_DAYS", 90))
+  BASELINE_DAYS = Integer(ENV["TRENDING_BASELINE_DAYS"].presence || 90)
   # An article with a shorter baseline cannot be a trend: its expected rate has no meaning.
   MIN_BASELINE_DAYS = 14
   # The visitors that a window needs before it can be a trend.
-  MIN_VISITORS = Integer(ENV.fetch("TRENDING_MIN_VISITORS", 3))
+  MIN_VISITORS = Integer(ENV["TRENDING_MIN_VISITORS"].presence || 3)
   # The prior on the daily rate: one visitor on one day.
   ALPHA = 1.0
   # The surprise that makes a trend. 2.0 is a probability of 1 in 100.
-  SIGNIFICANCE = ENV.fetch("TRENDING_SIGNIFICANCE", 2.0).to_f
+  SIGNIFICANCE = (ENV["TRENDING_SIGNIFICANCE"].presence || 2.0).to_f
   # The window of the fill: the articles below SIGNIFICANCE go in the order of their visitors in
   # these days.
-  FILL_DAYS = Integer(ENV.fetch("TRENDING_FILL_DAYS", 30))
+  FILL_DAYS = Integer(ENV["TRENDING_FILL_DAYS"].presence || 30)
   # The newest Articles, which the list never holds.
   # ⚠️ This must stay equal to the `count: 4` of `recent_articles` in
   # web/lib/helpers/article_helpers.rb, and no check compares the two.

@@ -181,7 +181,10 @@ class AssetMirror < ApplicationService
     source = uri.to_s
     file = nil
 
-    Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https") do |http|
+    # ⚠️ The timeouts go here. The defaults of config/initializers/http_timeouts.rb apply to
+    # HTTParty alone, and Net::HTTP waits 60 seconds by itself, for each read, on a Sidekiq thread.
+    Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https",
+                    open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT) do |http|
       http.request(Net::HTTP::Get.new(uri)) do |response|
         if response.is_a?(Net::HTTPRedirection) && redirects_left.positive? && response["location"].present?
           # ⚠️ The code resolves this and checks it against the same list. It does not use it as
@@ -204,9 +207,20 @@ class AssetMirror < ApplicationService
       end
     end
 
+    # ⚠️ A 2xx with no body must not go to R2. An empty object reads as present to #object_exists?,
+    # and the backfill could then never correct it.
+    if file.size.zero?
+      file.close!
+      raise ApplicationService::HttpError.new(200, "empty body", source)
+    end
+
     file.rewind
     file
   end
+
+  # The seconds that the connect and each read of a download can take.
+  OPEN_TIMEOUT = 5
+  READ_TIMEOUT = 30
 
   # Resolves one redirect of #download and makes sure that it is still an HTTPS fetch from
   # ctfassets.

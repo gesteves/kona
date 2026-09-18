@@ -109,7 +109,9 @@ class Whoop < ApplicationService
     cycles = []
     next_token = nil
 
-    loop do
+    # ⚠️ The loop has a limit, and it stops at a token that repeats. A Whoop that gives the same
+    # token for all time must not make this loop for all time inside a job.
+    MAX_CYCLE_PAGES.times do
       query = {
         start: "#{start_ymd}T00:00:00.000Z",
         end: "#{end_ymd}T23:59:59.999Z",
@@ -119,12 +121,17 @@ class Whoop < ApplicationService
 
       page = authed_get!("cycle", query)
       cycles.concat(Array(page[:records]))
+      return cycles if page[:next_token].blank? || page[:next_token] == next_token
+
       next_token = page[:next_token]
-      break if next_token.blank?
     end
 
+    report_upstream_error("The cycle list did not end after #{MAX_CYCLE_PAGES} pages", context: "Whoop cycles")
     cycles
   end
+
+  # The most pages of cycles that one read follows. A page holds 25 cycles of one day each.
+  MAX_CYCLE_PAGES = 40
 
   # @param state [String] A value with no meaning. The app checks it when Whoop redirects back.
   # @return [String, nil] The OAuth authorization URL, or nil if there are no credentials.
@@ -345,11 +352,14 @@ class Whoop < ApplicationService
   # @param cache_name [String] The end of the Redis key.
   # @param ttl [ActiveSupport::Duration] The time to keep it in the cache.
   # @return [Hash, nil] The parsed response, or nil if it is not available.
+  #
+  # ⚠️ The token read is INSIDE the cache block. Thus a warm cache touches no token, and a token
+  # that expired refreshes only when a call to Whoop needs it.
   def fetch_collection(path, cache_name, ttl)
-    access_token = get_access_token
-    return if access_token.blank?
-
     cached_json("whoop:#{@client_id}:#{cache_name}", expires_in: ttl) do
+      access_token = get_access_token
+      next if access_token.blank?
+
       get_json(
         "#{WHOOP_API_URL}/#{path}",
         headers: { "Authorization" => "Bearer #{access_token}" }
@@ -427,9 +437,14 @@ class Whoop < ApplicationService
     nil
   end
 
-  # Looks for the token that the holder of the lock gets, for a short time.
+  # Looks for the token that the holder of the lock gets.
+  #
+  # ⚠️ The wait covers a full refresh call: the open timeout and the read timeout of
+  # config/initializers/http_timeouts.rb, which is 15 seconds. The three collection reads of
+  # #stats run at the same time, thus on a cold cache two of them wait here for the third. A
+  # shorter wait gave those two nil, and the widget then rendered nothing at each token expiry.
   # @return [String, nil] The token, or nil if it does not come in time.
-  def wait_for_refreshed_token(attempts: 10, interval: 0.3)
+  def wait_for_refreshed_token(attempts: 30, interval: 0.5)
     attempts.times do
       sleep(interval)
       token = read_secret(access_token_key)

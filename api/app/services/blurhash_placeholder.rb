@@ -54,14 +54,24 @@ class BlurhashPlaceholder < ApplicationService
   OPEN_TIMEOUT = 5
   READ_TIMEOUT = 15
 
-  # Reads the placeholder of an asset. This is the request path, thus it is one Redis GET.
+  # How long a read miss waits before it asks for the placeholder again. An asset with no Images
+  # API host can never get one, thus without this each render of its card would add a job.
+  REQUEST_TTL = 24 * 60 * 60
+
+  # Reads the placeholder of an asset. This is the request path, thus a hit is one Redis GET.
+  #
+  # ⚠️ A miss adds `AssetBlurhashJob`, one time each day for each asset. The entry has a TTL, thus
+  # an asset that no publish touches for that time loses its placeholder, and the webhook makes it
+  # one time only. Without this, such a card would show the flat colour for all time.
   # @param asset_id [String, nil] The sys.id of the asset.
   # @param published_version [Integer, String, nil] The sys.publishedVersion of the asset.
   # @return [String, nil] The data URI, or nil when there is no entry.
   def read(asset_id, published_version)
     return if asset_id.blank? || published_version.blank?
 
-    $redis.get(cache_key(asset_id, published_version))
+    data_uri = $redis.get(cache_key(asset_id, published_version))
+    request_generation(asset_id, published_version) if data_uri.nil?
+    data_uri
   rescue StandardError => e
     # A card with no placeholder is correct. A card that raises is a 500 and an empty skeleton.
     Rails.logger.warn("blurhash: read failed for #{asset_id} (#{e.message})")
@@ -124,6 +134,21 @@ class BlurhashPlaceholder < ApplicationService
   end
 
   private
+
+  # Adds the job that makes the placeholder, unless a read of the last day did that already.
+  # @param asset_id [String]
+  # @param published_version [Integer, String]
+  # @return [void]
+  def request_generation(asset_id, published_version)
+    return unless $redis.set(request_key(asset_id, published_version), "1", nx: true, ex: REQUEST_TTL)
+
+    AssetBlurhashJob.perform_async(asset_id)
+  end
+
+  # @return [String] The Redis key of the marker that #request_generation sets.
+  def request_key(asset_id, published_version)
+    "blurhash:requested:#{asset_id}:#{published_version}"
+  end
 
   # @param asset_id [String] The sys.id of the asset.
   # @param published_version [Integer, String] The sys.publishedVersion of the asset.

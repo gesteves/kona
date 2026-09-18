@@ -19,15 +19,15 @@ class RelatedArticles < ApplicationService
   #
   # ⚠️ The taxonomy earns a large share here. A person assigned each concept, and it is the only
   # signal for a pair of articles that shares no words.
-  LEXICAL_WEIGHT = ENV.fetch("RELATED_LEXICAL_WEIGHT", 0.65).to_f
+  LEXICAL_WEIGHT = (ENV["RELATED_LEXICAL_WEIGHT"].presence || 0.65).to_f
   # The balance of MMR: 1.0 is relevance only, and 0.0 is diversity only.
-  MMR_LAMBDA = ENV.fetch("RELATED_MMR_LAMBDA", 0.7).to_f
+  MMR_LAMBDA = (ENV["RELATED_MMR_LAMBDA"].presence || 0.7).to_f
   # The addition for a link between the two entries, in either direction.
-  LINK_BONUS = ENV.fetch("RELATED_LINK_BONUS", 0.15).to_f
+  LINK_BONUS = (ENV["RELATED_LINK_BONUS"].presence || 0.15).to_f
   # The largest addition for the popularity of a candidate.
-  POPULARITY_WEIGHT = ENV.fetch("RELATED_POPULARITY_WEIGHT", 0.1).to_f
+  POPULARITY_WEIGHT = (ENV["RELATED_POPULARITY_WEIGHT"].presence || 0.1).to_f
   # The largest addition for a publish date near the date of the query article.
-  SEASON_WEIGHT = ENV.fetch("RELATED_SEASON_WEIGHT", 0.1).to_f
+  SEASON_WEIGHT = (ENV["RELATED_SEASON_WEIGHT"].presence || 0.1).to_f
   # The width of the season, in days. The addition is one half of SEASON_WEIGHT at 1.18 sigma.
   SEASON_SIGMA_DAYS = 120.0
   # The candidates that go into MMR. A larger pool gives MMR more to select from, and it costs one

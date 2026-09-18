@@ -80,6 +80,16 @@ RSpec.describe "Admin connected apps", type: :request do
         expect(response.body).not_to include("/whoop/auth")
       end
 
+      # ⚠️ The stored credentials are the only copy. The button opens a dialog, and the form that
+      # deletes is inside that dialog, as on the Spam page.
+      it "asks before it disconnects" do
+        get "/connected-apps"
+
+        expect(response.body).to include('data-dialog="open disconnect-connected-apps-whoop"')
+        expect(response.body).to include(I18n.t("admin.connected_apps.show.disconnect_title", app: "Whoop"))
+        expect(response.body).to match(%r{<wa-dialog id="disconnect-connected-apps-whoop".*<form[^>]*action="/connected-apps/whoop"}m)
+      end
+
       it "names the connected athlete" do
         allow_any_instance_of(Whoop).to receive(:account_email).and_return("athlete@example.com")
 

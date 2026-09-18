@@ -183,6 +183,20 @@ describe AssetMirror do
       expect { mirror.sync("asset1") }.to raise_error(ApplicationService::HttpError)
     end
 
+    # ⚠️ An empty object reads as present to #object_exists?, thus the backfill could never correct
+    # it. The raise makes Sidekiq do the job again.
+    it "raises, and uploads nothing, when a 2xx has no body" do
+      stub_download(body: "")
+      expect { mirror.sync("asset1") }.to raise_error(ApplicationService::HttpError)
+      expect(client).not_to have_received(:put_object)
+    end
+
+    it "gives Net::HTTP a connect timeout and a read timeout" do
+      stub_download
+      mirror.sync("asset1")
+      expect(Net::HTTP).to have_received(:start).with(anything, anything, hash_including(open_timeout: described_class::OPEN_TIMEOUT, read_timeout: described_class::READ_TIMEOUT))
+    end
+
     # ⚠️ The code writes the content that it gets to R2 at the key from ctfassets, and the public
     # image host serves it. Thus a redirect away from ctfassets would publish that content. A check
     # of the first URL only is not sufficient: the target of the redirect must also pass the same

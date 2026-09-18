@@ -35,6 +35,11 @@ module Admin
     MAX_HANDLE_CHECKS = 8
     HANDLE_CHECK_BUDGET = 8
 
+    # The seconds that the card reads of one request can take together. ⚠️ Refer to #card_for: the
+    # same rule as the handle check. A thread names as many as MAX_POSTS links, and each read of a
+    # page is a live HTTP call to another site.
+    CARD_READ_BUDGET = 8
+
     # The shape of the two schedule fields, as the browser sends them. ⚠️ `Time.zone.parse` reads
     # "garbage 09:00" as today at 09:00, thus the action must match the shape before it parses.
     DATE_PATTERN = /\A\d{4}-\d{2}-\d{2}\z/
@@ -562,11 +567,25 @@ module Admin
     # ⚠️ The length check, the panel, and the card below the link field all read it. `OpenGraph`
     # caches for 15 minutes as well, thus the check at the submit nearly always reads the copy that
     # the preview stored a moment before.
+    #
+    # ⚠️ **The reads of one request share CARD_READ_BUDGET.** Each read is a live HTTP call to
+    # another site, and several slow reads together pass the 20-second rack-timeout, which raises
+    # an exception that no rescue here catches. A 500 there loses the draft. Past the budget, a
+    # page gets a blank card: the link then goes in the words, which is the same answer that the
+    # job gives for a page with no tags.
     # @param url [String]
     # @return [OpenGraph::Card]
     def card_for(url)
       @card_for ||= {}
-      @card_for[url] ||= OpenGraph.new.fetch(url)
+      return @card_for[url] if @card_for.key?(url)
+
+      @card_deadline ||= Process.clock_gettime(Process::CLOCK_MONOTONIC) + CARD_READ_BUDGET
+      service = OpenGraph.new
+      @card_for[url] = if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= @card_deadline
+        service.blank_card(url)
+      else
+        service.fetch(url)
+      end
     end
 
     # The text that Bluesky will get for one post.

@@ -23,10 +23,15 @@ export default class extends Controller {
     this.formTarget.addEventListener("change", this.schedule);
   }
 
+  /**
+   * Stops the timer and the save that is out. ⚠️ Without the abort, a save that lands after a
+   * navigation still writes, and a later save can lose to an earlier one.
+   */
   disconnect() {
     this.formTarget.removeEventListener("input", this.schedule);
     this.formTarget.removeEventListener("change", this.schedule);
     if (this.timer) clearTimeout(this.timer);
+    this.aborter?.abort();
   }
 
   schedule() {
@@ -65,19 +70,28 @@ export default class extends Controller {
     return `${parsed.pathname}?${query}`;
   }
 
-  /** Stores the settings, thus this track has the same settings when you open it again. */
+  /**
+   * Stores the settings, thus this track has the same settings when you open it again.
+   *
+   * ⚠️ Each save stops the save before it. Two saves in flight can land in the other order, and
+   * the older settings would then stay. The last edit is the one to keep.
+   */
   save(query) {
     if (!this.hasSaveUrlValue) return;
 
+    this.aborter?.abort();
+    this.aborter = new AbortController();
     fetch(this.saveUrlValue, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         "X-CSRF-Token": document.querySelector("meta[name=csrf-token]")?.content ?? ""
       },
-      body: query
+      body: query,
+      signal: this.aborter.signal
     }).catch(() => {
-      // A settings save that fails is not important enough to stop the preview.
+      // A settings save that fails, or that a later save stopped, is not important enough to stop
+      // the preview.
     });
   }
 }

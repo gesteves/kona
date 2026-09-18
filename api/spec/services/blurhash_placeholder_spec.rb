@@ -94,6 +94,26 @@ describe BlurhashPlaceholder do
   end
 
   describe "#read" do
+    # ⚠️ The entry has a TTL and the webhook makes it one time only. A miss adds the job, one time
+    # each day, thus a card that lost its placeholder gets it again.
+    it "adds the job on a miss, one time each day" do
+      allow($redis).to receive(:get).and_return(nil)
+      allow($redis).to receive(:set).with("blurhash:requested:asset1:3", "1", nx: true, ex: described_class::REQUEST_TTL).and_return(true, false)
+      allow(AssetBlurhashJob).to receive(:perform_async)
+
+      expect(service.read("asset1", 3)).to be_nil
+      expect(service.read("asset1", 3)).to be_nil
+      expect(AssetBlurhashJob).to have_received(:perform_async).with("asset1").once
+    end
+
+    it "adds no job on a hit" do
+      allow($redis).to receive(:get).and_return("data:image/svg+xml;base64,AAAA")
+      allow(AssetBlurhashJob).to receive(:perform_async)
+
+      service.read("asset1", 3)
+      expect(AssetBlurhashJob).not_to have_received(:perform_async)
+    end
+
     it "reads one key" do
       allow($redis).to receive(:get).with("blurhash:svg:asset1:3").and_return("data:image/svg+xml,x")
 

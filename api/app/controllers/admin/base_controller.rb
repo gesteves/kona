@@ -9,7 +9,9 @@ module Admin
     layout "admin"
 
     before_action :require_owner!
-    before_action :load_quarantine_count
+    # ⚠️ HTML only. A JSON action and an image action render no layout, and the status poll of the
+    # Course maps page and the previews of the Social media page call those many times.
+    before_action :load_quarantine_count, if: -> { request.format.html? }
 
     private
 

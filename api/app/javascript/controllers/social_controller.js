@@ -562,6 +562,11 @@ export default class extends Controller {
       });
     }
 
+    // ⚠️ A new row seeds its own field, and the read at the top of this method ran before that
+    // row existed. Without this second read, the first count after a new mention is short by the
+    // "@" that the map puts back, and the server would count another number.
+    this.readMentionRows();
+
     this.mentionsTarget.hidden = wanted.size === 0 || !this.hasMentionFields;
     this.pushMentions();
     this.submitTarget.disabled = !this.canPost;

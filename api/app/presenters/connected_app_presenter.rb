@@ -22,6 +22,15 @@ class ConnectedAppPresenter
     @error = error
   end
 
+  # The DOM id of the Disconnect confirmation dialog of this card.
+  #
+  # ⚠️ It comes from the path, and not from the name: a DOM id must never come from a translated
+  # word.
+  # @return [String]
+  def disconnect_dialog_id
+    "disconnect-#{disconnect_path.to_s.parameterize}"
+  end
+
   # ⚠️ :error is the state that Redis cannot show: the credentials are there but the service
   # refuses them. Without it the page would show the integration as good for all time.
   #

@@ -407,6 +407,24 @@ RSpec.describe Whoop do
           hash_including(query: hash_including(nextToken: "page2"))
         ).once
       end
+
+      it "stops at a token that repeats, and does not loop for all time" do
+        page = { records: [ { id: 1 } ], next_token: "same" }
+        allow(service).to receive(:get_json!).and_return(page)
+
+        expect(service.raw_cycles("2026-07-08", "2026-07-10").length).to eq(2)
+        expect(service).to have_received(:get_json!).twice
+      end
+
+      it "stops at the page limit and reports it" do
+        counter = 0
+        allow(service).to receive(:get_json!) { counter += 1; { records: [], next_token: "page#{counter}" } }
+        allow(service).to receive(:report_upstream_error)
+
+        service.raw_cycles("2026-07-08", "2026-07-10")
+        expect(service).to have_received(:get_json!).exactly(Whoop::MAX_CYCLE_PAGES).times
+        expect(service).to have_received(:report_upstream_error).with(/did not end/, hash_including(context: "Whoop cycles"))
+      end
     end
   end
 end

@@ -1290,6 +1290,21 @@ RSpec.describe "Admin social media", type: :request do
       # This gives one post of every network, by key, which is how most of these read it.
       def rows(body, index = 0) = body["networks"].to_h { |row| [ row["key"], row["posts"][index] ] }
 
+      # ⚠️ Each card read is a live HTTP call to another site. Past the budget, a page gets a blank
+      # card and the request answers, and it does not pass the rack-timeout and lose the draft.
+      it "stops the card reads at the budget, and gives the rest a blank card" do
+        # A short budget and one slow read, on the true clock. The first read fits, and the second
+        # one comes after the deadline.
+        stub_const("Admin::SocialController::CARD_READ_BUDGET", 0.05)
+        allow_any_instance_of(OpenGraph).to receive(:fetch) { sleep 0.1; card }
+
+        body = preview(posts: [ { text: "One.", link: url }, { text: "Two.", link: "https://other.test/b/" } ])
+
+        expect(rows(body, 0)["bluesky"]["card"]).to be_present
+        expect(rows(body, 1)["bluesky"]["card"]).to be_nil
+        expect(rows(body, 1)["bluesky"]["text"]).to eq("Two.\n\nhttps://other.test/b/")
+      end
+
       it "gives each network its own text from one body" do
         body = preview(posts: [ { text: "Great ride with @tony.", link: "" } ],
                        mentions: [ { token: "@tony", bluesky: "tony.bsky.social",
