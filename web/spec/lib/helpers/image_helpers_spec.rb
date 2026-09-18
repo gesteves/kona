@@ -625,4 +625,30 @@ RSpec.describe ImageHelpers do
       expect(card_aspect_ratio).to eq("#{w} / #{h}")
     end
   end
+  describe '.warm_blurhashes!' do
+    before { ImageHelpers.warm_blurhashes.clear }
+    after { ImageHelpers.warm_blurhashes.clear }
+
+    def asset(id, version) = OpenStruct.new(sys: OpenStruct.new(id: id, published_version: version))
+
+    # ⚠️ The build renders in forked workers, and each one would ask Redis for each asset again.
+    # This reads every placeholder in one call, in the parent, before the fork.
+    it 'reads each placeholder in one call and keeps the hits by asset and width' do
+      redis = instance_double(Redis)
+      allow(redis).to receive(:mget).with('blurhash:jpeg:a1:3:32', 'blurhash:jpeg:a2:1:32').and_return([ 'data:image/jpeg;base64,AAAA', nil ])
+
+      found = ImageHelpers.warm_blurhashes!([ asset('a1', 3), asset('a2', 1) ], redis)
+
+      expect(found).to eq(1)
+      expect(ImageHelpers.warm_blurhashes).to eq([ 'a1', 32 ] => 'data:image/jpeg;base64,AAAA')
+    end
+
+    it 'skips an asset with no id or no published version, and asks nothing for an empty list' do
+      redis = instance_double(Redis)
+      allow(redis).to receive(:mget)
+
+      expect(ImageHelpers.warm_blurhashes!([ asset(nil, 3), asset('a3', nil) ], redis)).to eq(0)
+      expect(redis).not_to have_received(:mget)
+    end
+  end
 end

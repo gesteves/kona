@@ -36,4 +36,20 @@ RSpec.describe CspHelpers do
     expect(plausible_init_script_hash).to eq("'sha256-#{digest}'")
     expect(plausible_init_script).to include("endpoint: '/pa/event'")
   end
+
+  # ⚠️ The policy is Report-Only, thus a hash that the minifier of the build made wrong would
+  # report nothing at all. This runs the same compressor, with the options of the extension, over
+  # the script element as _analytics.html.erb writes it.
+  it 'names a hash that the HTML minifier of the build leaves correct' do
+    require 'middleman-minify-html/extension'
+    require 'htmlcompressor'
+    options = Middleman::MinifyHtmlExtension.config.to_h
+    page = "<html><head>\n  <script><%= x %></script>\n</head></html>".sub('<%= x %>', plausible_init_script)
+
+    minified = HtmlCompressor::Compressor.new(options).compress(page)
+    script = minified[%r{<script>(.*?)</script>}m, 1]
+
+    expect(script).to eq(plausible_init_script)
+    expect("'sha256-#{Digest::SHA256.base64digest(script)}'").to eq(plausible_init_script_hash)
+  end
 end

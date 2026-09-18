@@ -122,6 +122,23 @@ describe('handlePlausible', () => {
     expect(sent.get('x-forwarded-for')).toBe('203.0.113.9');
   });
 
+  it('413s an event body past the limit, without touching the upstream', async () => {
+    // There is no intercept. A request to the upstream would raise an unmocked-fetch error.
+    const res = await handlePlausible(
+      new Request('https://www.example.com/pa/event', {
+        method: 'POST',
+        headers: {
+          'content-type': 'text/plain',
+          'content-length': String(64 * 1024),
+        },
+        body: 'x',
+      }),
+      env,
+      makeCtx()
+    );
+    expect(res.status).toBe(413);
+  });
+
   it('answers a HEAD probe for the script without a body, still going through the cache', async () => {
     interceptFetch(
       'GET',

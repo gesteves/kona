@@ -83,6 +83,53 @@ RSpec.describe SiteHelpers do
 
   # page_title tests `content.is_a?(Hash)`, and each true proxied content object is a Middleman
   # Mash, which is a Hash subclass with dot access. Hashie::Mash replaces one here.
+  describe '#atom_tag' do
+    # ⚠️ An Atom id is permanent: a reader keeps each entry by it. A change here would show every
+    # entry as new.
+    it 'makes a tag URI from the host, the date, and the path' do
+      expect(atom_tag('https://example.com/2024/01/02/post/', Date.new(2024, 1, 2))).to eq('tag:example.com,2024-01-02:/2024/01/02/post')
+      expect(atom_tag('http://example.com/', Date.new(2024, 1, 2))).to eq('tag:example.com,2024-01-02:')
+    end
+  end
+
+  describe '#current_shortcut? and #normalize_menu_path' do
+    def current_page = OpenStruct.new(url: '/about/')
+
+    it 'marks the current page with or without the slash, and ignores a query and a fragment' do
+      expect(current_shortcut?('/about')).to be(true)
+      expect(current_shortcut?('/about/')).to be(true)
+      expect(current_shortcut?('/about/?ref=nav#top')).to be(true)
+      expect(current_shortcut?('/blog/')).to be(false)
+    end
+
+    # ⚠️ An absolute URL and a protocol-relative URL are never the current page.
+    it 'never marks an absolute or a protocol-relative destination, or a blank one' do
+      expect(current_shortcut?('https://example.com/about/')).to be(false)
+      expect(current_shortcut?('//example.com/about/')).to be(false)
+      expect(current_shortcut?('mailto:me@example.com')).to be(false)
+      expect(current_shortcut?('')).to be(false)
+      expect(current_shortcut?(nil)).to be(false)
+    end
+
+    it 'normalizes a path to one slash at the end, with no query and no fragment' do
+      expect(normalize_menu_path('/about')).to eq('/about/')
+      expect(normalize_menu_path('/about/?x=1#y')).to eq('/about/')
+      expect(normalize_menu_path('')).to eq('/')
+    end
+  end
+
+  describe '#footer_text' do
+    def data = OpenStruct.new(site: OpenStruct.new(copyright: 'Jane Doe'))
+    def copyright_start_year = 2020
+
+    it 'writes the copyright line with the last year in the element that the browser updates' do
+      html = footer_text
+
+      expect(html).to include("2020–<span data-controller=\"current-year\">#{Time.current.year}</span> Jane Doe")
+      expect(html).to include('©')
+    end
+  end
+
   describe '#content_summary' do
     def data = OpenStruct.new(site: OpenStruct.new(meta_description: 'Site'))
 

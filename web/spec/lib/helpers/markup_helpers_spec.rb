@@ -243,6 +243,49 @@ RSpec.describe MarkupHelpers do
     end
   end
 
+  describe '#render_feed_body' do
+    before { MemoizationHelpers.collection_store.clear }
+
+    let(:articles) { [] }
+    let(:assets) { [] }
+
+    def data
+      OpenStruct.new(articles: articles, assets: assets, srcsets: OpenStruct.new(entry: OpenStruct.new(widths: [ 100, 200 ])))
+    end
+
+    # A feed reader cannot use a permalink, a lazy iframe, or the responsive markup. It needs the
+    # figures and the affiliate marks, which say what a link is.
+    it 'renders the figures and the affiliate marks, and none of the page-only transforms' do
+      html = render_feed_body("## Hello\n\nRead [this](#{affiliate_link}).\n\n<iframe src=\"https://player.example/embed/1\"></iframe>")
+
+      expect(html).to include('<h2 id="hello">Hello</h2>')
+      expect(html).not_to include('entry__permalink')
+      expect(html).to include('rel="sponsored nofollow noopener"')
+      expect(html).to include('<figure><iframe src="https://player.example/embed/1"></iframe></figure>')
+      expect(html).not_to include('loading="lazy"')
+    end
+
+    it 'renders one text one time, and gives the same HTML again' do
+      allow(self).to receive(:render_feed_body_now).and_call_original
+
+      first = render_feed_body('Hello *there*.')
+      second = render_feed_body('Hello *there*.')
+
+      expect(second).to eq(first)
+      expect(self).to have_received(:render_feed_body_now).once
+    end
+  end
+
+  describe '#restore_list_semantics' do
+    # ⚠️ Safari removes the list semantics from VoiceOver for a list with `list-style: none`, and
+    # the body lists have that. The explicit role is what keeps a numbered list a list.
+    it 'gives each list an explicit list role' do
+      html = '<ul><li>a</li></ul><p>x</p><ol><li>b</li></ol>'
+
+      expect(restore_list_semantics(html)).to eq('<ul role="list"><li>a</li></ul><p>x</p><ol role="list"><li>b</li></ol>')
+    end
+  end
+
   describe '#render_markup' do
     # ⚠️ data-original-url names the Contentful host, which the image mirror keeps off the page.
     it 'removes the scratch attributes of the image transforms from the output' do
