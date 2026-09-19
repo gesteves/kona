@@ -36,7 +36,7 @@ RSpec.describe "Admin social photos", type: :request do
     context "when the owner is signed in" do
       before { sign_in_as(email: owner_email) }
 
-      it "stores the photo and answers with its id, its path, and its size" do
+      it "stores the photo and answers with its id, its two paths, and its size" do
         post "/social/photos", params: { photo: upload }, headers: { "Accept" => "application/json" }
 
         expect(response).to have_http_status(:ok)
@@ -44,6 +44,7 @@ RSpec.describe "Admin social photos", type: :request do
         id = remember(answer["id"])
         expect(id).to match(SocialPhotos::ID_PATTERN)
         expect(answer["path"]).to eq("/social/photos/#{id}")
+        expect(answer["alt_path"]).to eq("/social/photos/#{id}/alt")
         expect(answer["width"]).to eq(30)
         expect(answer["height"]).to eq(10)
         expect($redis.ttl("#{SocialPhotos::KEY_PREFIX}#{id}")).to be_within(5).of(SocialPhotos::DRAFT_TTL.to_i)
@@ -150,6 +151,83 @@ RSpec.describe "Admin social photos", type: :request do
         get "/social/photos/not-an-id"
 
         expect(response).to have_http_status(:not_found)
+      end
+    end
+  end
+
+  describe "POST /social/photos/:id/alt" do
+    let(:jpeg) { "\xFF\xD8\xFF\xE0jpeg".b }
+    let(:id) { remember(SocialPhotos.new.store(image: jpeg, width: 2, height: 1)) }
+
+    before do
+      allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return("key")
+      allow(AltText).to receive(:generate).and_return("A dog running on a beach.")
+    end
+
+    it "needs the owner session" do
+      post "/social/photos/#{id}/alt"
+
+      expect(response).to redirect_to("/signin")
+      expect(AltText).not_to have_received(:generate)
+    end
+
+    context "when the owner is signed in" do
+      before { sign_in_as(email: owner_email) }
+
+      # ⚠️ It sends the STORED bytes, which are the picture that Bluesky will show.
+      it "asks Claude about the stored photo and answers with the alt text" do
+        post "/social/photos/#{id}/alt", headers: { "Accept" => "application/json" }
+
+        expect(response).to have_http_status(:ok)
+        expect(JSON.parse(response.body)).to eq("alt" => "A dog running on a beach.")
+        expect(AltText).to have_received(:generate).with(image: jpeg)
+        expect(response.headers["Cache-Control"]).to include("no-store")
+      end
+
+      it "answers 404 for a photo that is gone, and asks nothing" do
+        post "/social/photos/#{'0' * 32}/alt", headers: { "Accept" => "application/json" }
+
+        expect(response).to have_http_status(:not_found)
+        expect(AltText).not_to have_received(:generate)
+      end
+
+      it "says when there is no API key, and asks nothing" do
+        allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return(nil)
+
+        post "/social/photos/#{id}/alt", headers: { "Accept" => "application/json" }
+
+        expect(response).to have_http_status(:service_unavailable)
+        expect(JSON.parse(response.body)["error"]).to eq(I18n.t("admin.social.photos.alt_not_configured"))
+        expect(AltText).not_to have_received(:generate)
+      end
+
+      it "says when Claude gave no answer" do
+        allow(AltText).to receive(:generate).and_return(nil)
+
+        post "/social/photos/#{id}/alt", headers: { "Accept" => "application/json" }
+
+        expect(response).to have_http_status(:bad_gateway)
+        expect(JSON.parse(response.body)["error"]).to eq(I18n.t("admin.social.photos.alt_failed"))
+      end
+
+      context "when the forgery protection is on" do
+        around do |example|
+          was = ActionController::Base.allow_forgery_protection
+          ActionController::Base.allow_forgery_protection = true
+          example.run
+          ActionController::Base.allow_forgery_protection = was
+        end
+
+        it "takes the token of the page in a header, and refuses the request without it" do
+          get "/social"
+          token = Nokogiri::HTML(response.body).at("meta[name=csrf-token]")&.[]("content")
+
+          post "/social/photos/#{id}/alt", headers: { "Accept" => "application/json", "X-CSRF-Token" => token }
+          expect(response).to have_http_status(:ok)
+
+          post "/social/photos/#{id}/alt", headers: { "Accept" => "application/json" }
+          expect(response).not_to have_http_status(:ok)
+        end
       end
     end
   end

@@ -62,6 +62,7 @@ edge serves a cached copy before it gets a new one.
 | GET | `/social/preview/image` | proxies the picture of that card. ⚠️ The parameter is the **page**, not the picture | `no-store` |
 | POST | `/social/photos` | stores ONE photo of a draft, as the JPEG that goes up as the blob; JSON `{id, path, width, height}`, or 422 `{error}` | `no-store` |
 | GET | `/social/photos/:id` | the stored JPEG, inline, for the tile of the composer and the preview | `no-store` |
+| POST | `/social/photos/:id/alt` | the alt text of that photo, from Claude; JSON `{alt}`, or 503 with no `ANTHROPIC_API_KEY`, or 502 with no answer | `no-store` |
 | POST | `/spam/:id/not-spam`; DELETE `/spam/:id`, `/connected-apps/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
 | GET/POST/DELETE | `/connected-apps/bluesky` | the Bluesky handle + app password form, and disconnect | `no-store` |
 | GET/POST/DELETE | `/connected-apps/mastodon`; GET `/connected-apps/mastodon/callback` | the Mastodon instance form, the OAuth callback, and disconnect | `no-store` |
@@ -1398,6 +1399,19 @@ alt text takes the width. The owner drags a tile or moves it with the arrow keys
   is past it, `social#canPost` keeps the submit off, and `#photo_error` refuses the request.
 - **The Preview panel shows the thumbnails on the Bluesky row**, from `#preview_photos`, thus the
   panel still shows what the network will render.
+- **A Generate control below the alt text field asks Claude for it.** `AltText` sends the STORED
+  JPEG, which is the picture that Bluesky will show, with the prompt in `app/prompts/alt-text.md`
+  and a plain text answer (`AnthropicStructuredOutput#text_call`). The model is `claude-sonnet-5`,
+  and `ANTHROPIC_ALT_TEXT_MODEL` replaces it. ⚠️ **The control renders with `ANTHROPIC_API_KEY`
+  alone**, as the two other Claude features stay silent without one; `SocialPresenter#alt_text?`
+  carries that flag from the controller. ⚠️ The answer REPLACES the field, and the controller
+  dispatches `input` on it, thus the count and the submit button follow. ⚠️ The button is
+  `loading` AND `disabled` while the request is out: `loading` draws the busy state and keeps the
+  width, and nothing says that it stops a click. The call runs in the request, inside the
+  20-second rack-timeout, thus `TIMEOUT_SECONDS` stays below it. It fails soft: a 502 with a
+  sentence, which the page shows in a toast, and the field keeps its text. Each tile carries
+  `data-photo-alt-url`, from the server or from the answer of the upload, thus the JavaScript
+  builds no path.
 - ⚠️ `social-post#connect` drops each tile with no id. A Turbo snapshot can hold a tile whose
   upload never finished, and nothing can finish it. `disconnect` aborts each upload that is out.
 
@@ -2223,8 +2237,8 @@ value is a secret of fly.io, and Rails also uses `config/credentials.yml.enc` an
   `TURNSTILE_SITE_KEY` of the web app; set both or set neither),
   `CSP_ENFORCE` (any value enforces the CSP for the owner; with no value the CSP is Report-Only),
   `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`, `ANTHROPIC_API_KEY` with
-  `ANTHROPIC_DESCRIPTION_MODEL` and `ANTHROPIC_CONTACT_SUBJECT_MODEL` (the default of both is
-  `claude-sonnet-5`), `PURPLEAIR_API_KEY`, `GOODSPEED_API_URL` (with no value the bay-conditions
+  `ANTHROPIC_DESCRIPTION_MODEL`, `ANTHROPIC_CONTACT_SUBJECT_MODEL`, and `ANTHROPIC_ALT_TEXT_MODEL`
+  (the default of all three is `claude-sonnet-5`), `PURPLEAIR_API_KEY`, `GOODSPEED_API_URL` (with no value the bay-conditions
   integration is off, and the app omits the sentence about the water temperature and the bay
   readings for a race day in SF), `LOCATION`, `TIME_ZONE`, `BLUESKY_PDS_URL` (⚠️ the handle and the
   app password of Bluesky are **not** environment variables: a person sets them on the Connected

@@ -402,6 +402,8 @@ en:
       # One tile of a photo.
       photo:
         photo_alt: "Alt text"
+        # The control below the alt text field, which asks Claude to write it.
+        generate_alt: "Generate alt text"
         remove_photo: "Remove this photo"
         reorder_photo: "Reorder this photo with the arrow keys"
       # The answers of the upload of one photo. The composer shows each one in a toast.
@@ -410,6 +412,9 @@ en:
         not_an_image: "That file is not a photo."
         too_large: "That file is %{size}. The limit is %{limit}."
         wont_fit: "That photo can't be made small enough for Bluesky."
+        # The answers of the Generate control.
+        alt_failed: "Claude couldn't describe that photo. Try again."
+        alt_not_configured: "Alt text generation needs an Anthropic API key."
       # The account line of a row of the "Post to" list.
       account:
         named: "Posts as %{account}."
@@ -515,6 +520,10 @@ en:
         unreachable: "Couldn't reach the server. Nothing was republished."
       social_post:
         alt_too_long: "Alt text is %{count} characters. The limit is %{limit}."
+        # The server refused the alt text and named no reason.
+        alt_failed: "The alt text couldn't be generated."
+        # The POST did not reach the server.
+        alt_unreachable: "Couldn't reach the server. The alt text wasn't generated."
         # The owner picked more files than the post has room for.
         too_many_photos: "A post takes at most %{limit} photos. The extra ones weren't added."
         # The server refused the photo and named no reason.

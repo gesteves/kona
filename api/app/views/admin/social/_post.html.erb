@@ -152,7 +152,7 @@
 
       <div class="social-post__tiles" data-social-post-target="tiles">
         <% post.photos.each do |photo| %>
-          <%= render "photo", photo: photo %>
+          <%= render "photo", photo: photo, alt_text: alt_text %>
         <% end %>
       </div>
     </div>
@@ -161,7 +161,7 @@
         thus its fields are not in the form. This template is inside the template of a post, and a
         clone of that one carries this one with it. %>
     <template data-social-post-target="photoTemplate">
-      <%= render "photo", photo: SocialPresenter::Photo.new %>
+      <%= render "photo", photo: SocialPresenter::Photo.new, alt_text: alt_text %>
     </template>
 
     <%# ⚠️ The link is OPTIONAL and it has no `required`: a post can be words alone. There is no

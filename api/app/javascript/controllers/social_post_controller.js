@@ -53,6 +53,8 @@ export default class extends Controller {
     this.photoState = IDLE;
     // The upload of each tile that is still out, by tile. `disconnect()` and a remove abort it.
     this.uploads = new Map();
+    // The alt text request of each tile that is still out, by tile, with the same rule.
+    this.generations = new Map();
     // ⚠️ It waits for the definitions: `value` is undefined on these components until the browser
     // upgrades them. A Turbo restoration visit, and a page that renders again after a refusal, both
     // hold values with no controller state.
@@ -87,6 +89,8 @@ export default class extends Controller {
     this.previewAborter?.abort();
     this.uploads.forEach((aborter) => aborter.abort());
     this.uploads.clear();
+    this.generations.forEach((aborter) => aborter.abort());
+    this.generations.clear();
     this.photoTargets.forEach((tile) => this.revokePreview(tile));
   }
 
@@ -306,6 +310,11 @@ export default class extends Controller {
     tile.classList.remove("social-photo--uploading");
     tile.querySelector("[data-photo-spinner]").hidden = true;
 
+    // The Generate control can run once the photo has an id and a path of its own.
+    tile.dataset.photoAltUrl = answer.alt_path ?? "";
+    const generate = tile.querySelector("[data-photo-generate]");
+    if (generate) generate.disabled = !answer.alt_path;
+
     const image = tile.querySelector("[data-photo-image]");
     const stored = new Image();
     const swap = () => {
@@ -340,6 +349,8 @@ export default class extends Controller {
   dropTile(tile) {
     this.uploads.get(tile)?.abort();
     this.uploads.delete(tile);
+    this.generations.get(tile)?.abort();
+    this.generations.delete(tile);
     this.revokePreview(tile);
     tile.remove();
   }
@@ -471,6 +482,63 @@ export default class extends Controller {
 
     // ⚠️ A node that moves loses the focus, thus the next arrow key would go to the document.
     tile.querySelector(".social-photo__grip")?.focus();
+  }
+
+  /**
+   * Asks Claude for the alt text of the photo of a tile, and writes the answer into its field.
+   *
+   * ⚠️ **The button is `loading` AND `disabled` while the request is out.** The `loading`
+   * attribute draws the busy state and keeps the width of the button, and the docs do not say
+   * that it stops a click, thus `disabled` does. The check at the top stops a second request
+   * for the moment between a click and the render.
+   *
+   * ⚠️ The answer REPLACES the field. A value that code writes fires no event, thus this
+   * dispatches `input` on the field: `countAlt` runs for the tile and `social#validate` runs for
+   * the form, exactly as a keystroke would. A refusal leaves the field as it was and says why in
+   * a toast.
+   */
+  async generateAlt(event) {
+    event.preventDefault();
+    const button = event.currentTarget;
+    if (button.loading) return;
+
+    const tile = button.closest(PHOTO);
+    const url = tile?.dataset.photoAltUrl;
+    if (!url) return;
+
+    button.loading = true;
+    button.disabled = true;
+    const aborter = new AbortController();
+    this.generations.set(tile, aborter);
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { Accept: "application/json", ...csrfHeader() },
+        signal: aborter.signal,
+      });
+      const answer = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        toast(answer.error || t(this.words, "alt_failed"), "danger");
+        return;
+      }
+
+      const field = tile.querySelector("[data-photo-alt]");
+      field.value = answer.alt ?? "";
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    } catch {
+      // A remove or a Turbo visit aborted it, and there is nothing to say.
+      if (aborter.signal.aborted) return;
+
+      toast(t(this.words, "alt_unreachable"), "danger");
+    } finally {
+      this.generations.delete(tile);
+      if (tile.isConnected) {
+        button.loading = false;
+        button.disabled = false;
+      }
+    }
   }
 
   /**

@@ -35,6 +35,11 @@ RSpec.describe SocialPresenter do
       expect(described_class::Post.new.photos).to eq([])
     end
 
+    it "renders no Generate control unless the caller says that Claude has a key" do
+      expect(presenter.alt_text?).to be(false)
+      expect(described_class.new(networks: [ network ], alt_text: true).alt_text?).to be(true)
+    end
+
     it "pins the most photos and the alt limit to the numbers of Bluesky" do
       expect(described_class::MAX_PHOTOS).to eq(Bluesky::MAX_IMAGES)
       expect(described_class::ALT_LIMIT).to eq(Bluesky::MAX_ALT_GRAPHEMES)

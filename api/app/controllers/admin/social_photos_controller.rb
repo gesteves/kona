@@ -27,7 +27,8 @@ module Admin
       photo = PhotoBlob.prepare(file.read)
       id = SocialPhotos.new.store(image: photo[:bytes], width: photo[:width], height: photo[:height])
 
-      render json: { id: id, path: social_photo_path(id), width: photo[:width], height: photo[:height] }
+      render json: { id: id, path: social_photo_path(id), alt_path: social_photo_alt_path(id),
+                     width: photo[:width], height: photo[:height] }
     rescue PhotoBlob::NotAnImageError
       refuse(t("admin.social.photos.not_an_image"))
     rescue PhotoBlob::WontFitError
@@ -45,11 +46,28 @@ module Admin
       send_data photo[:image], type: "image/jpeg", disposition: "inline"
     end
 
+    # POST /social/photos/:id/alt
+    #
+    # Writes the alt text of one photo with Claude, and answers `{ alt }`. ⚠️ It sends the stored
+    # JPEG, which is the picture that Bluesky will show. A 503 says that there is no API key, and
+    # a 502 says that Claude gave no answer; the page shows each one in a toast.
+    def alt
+      photo = SocialPhotos.new.fetch(params[:id].to_s)
+      return head :not_found if photo.nil?
+      return refuse(t("admin.social.photos.alt_not_configured"), status: :service_unavailable) unless AltText.configured?
+
+      text = AltText.generate(image: photo[:image])
+      return refuse(t("admin.social.photos.alt_failed"), status: :bad_gateway) if text.blank?
+
+      render json: { alt: text }
+    end
+
     private
 
     # @param message [String]
-    def refuse(message)
-      render json: { error: message }, status: :unprocessable_content
+    # @param status [Symbol]
+    def refuse(message, status: :unprocessable_content)
+      render json: { error: message }, status: status
     end
   end
 end

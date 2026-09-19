@@ -52,6 +52,26 @@ RSpec.describe AnthropicStructuredOutput do
     )
   end
 
+  it "makes a plain text call with no output config, and gives the first text block stripped" do
+    text_block = double("block", type: :text, text: "  A dog.\n")
+    allow(messages).to receive(:create).and_return(double("message", content: [ text_block ]))
+    content = [ { type: :image, source: { type: :base64, media_type: :"image/jpeg", data: "abc" } } ]
+
+    expect(host.text_call(system: "Describe.", content: content)).to eq("A dog.")
+
+    expect(messages).to have_received(:create).with(
+      model: "claude-default", max_tokens: 200, thinking: { type: :disabled },
+      system_: "Describe.", messages: [ { role: "user", content: content } ],
+      request_options: { timeout: 7 }
+    )
+  end
+
+  it "gives nil from a plain text call with no text block" do
+    allow(messages).to receive(:create).and_return(double("message", content: [ double("tool", type: :tool_use) ]))
+
+    expect(host.text_call(system: "s", content: "c")).to be_nil
+  end
+
   it "keeps one client across the calls" do
     allow(messages).to receive(:create).and_return(double("message", content: [ double("block", type: :text, text: "{}") ]))
 

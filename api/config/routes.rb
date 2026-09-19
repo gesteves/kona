@@ -164,6 +164,8 @@ Rails.application.routes.draw do
       # the image path below.
       post "social/photos"     => "social_photos#create", as: :social_photos
       get  "social/photos/:id" => "social_photos#show",   as: :social_photo, constraints: { id: /\h{32}/ }
+      # The alt text of one photo, from Claude. The Generate control of a tile posts here.
+      post "social/photos/:id/alt" => "social_photos#alt", as: :social_photo_alt, constraints: { id: /\h{32}/ }
       post "social/preview/text"  => "social#preview_text",  as: :social_preview_text
       get "social/preview/image" => "social#preview_image", as: :social_preview_image
       get "social/preview"       => "social#preview",       as: :social_preview

@@ -451,6 +451,11 @@
     min-width: 0;
   }
 
+  // The Generate control, below the alt text field and not as wide as it.
+  &__generate {
+    align-self: start;
+  }
+
   // The line below the alt text, for a text past its limit. The words in it say the number, and
   // `social#canPost` reads the class on the tile.
   &__alt-over {

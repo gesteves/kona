@@ -227,8 +227,10 @@ module Admin
     end
 
     # @return [SocialPresenter]
+    # ⚠️ `alt_text:` is one env read, and no HTTP request, for the reason that #social_networks
+    # gives.
     def presenter(**overrides)
-      SocialPresenter.new(networks: social_networks, **overrides)
+      SocialPresenter.new(networks: social_networks, alt_text: AltText.configured?, **overrides)
     end
 
     # The networks that the owner ticked, that this app can post to, **and that have an account**.

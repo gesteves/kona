@@ -47,7 +47,8 @@
             <%= render "post", post: post, limit: @social.body_limit, warn_at: @social.warn_at,
                                count: @social.bluesky_length(post),
                                mentions_json: @social.bluesky_values_json,
-                               max_photos: @social.max_photos, alt_limit: @social.alt_limit %>
+                               max_photos: @social.max_photos, alt_limit: @social.alt_limit,
+                               alt_text: @social.alt_text? %>
           <% end %>
         </div>
 
@@ -57,7 +58,8 @@
           <%= render "post", post: SocialPresenter::Post.new, limit: @social.body_limit,
                              warn_at: @social.warn_at, count: 0,
                              mentions_json: @social.bluesky_values_json,
-                             max_photos: @social.max_photos, alt_limit: @social.alt_limit %>
+                             max_photos: @social.max_photos, alt_limit: @social.alt_limit,
+                               alt_text: @social.alt_text? %>
         </template>
 
         <div class="wa-cluster wa-gap-s">

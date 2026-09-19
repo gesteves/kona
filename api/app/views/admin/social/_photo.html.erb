@@ -11,7 +11,12 @@
     ⚠️ The GRIP carries `draggable`, and never the tile: a draggable tile takes the pointer away
     from the alt field inside it. The grip is a button and it takes the arrow keys, because a drag
     needs a pointer and this page must work without one. %>
-<div class="social-photo" data-social-post-target="photo">
+<%# ⚠️ `data-photo-alt-url` is the path of the Generate control of THIS tile. The server writes it
+    here, and the answer of the upload writes it for a new tile, thus the JavaScript builds no
+    path. The control renders only when Claude has a key, and it is disabled while the tile has
+    no id. %>
+<div class="social-photo" data-social-post-target="photo"
+     data-photo-alt-url="<%= social_photo_alt_path(photo.id) if photo.id.present? %>">
   <%# The id that the upload answered with. It is empty while the upload is out, and the action
       drops such a pair with its alt text. It is first because it renders nothing. %>
   <input type="hidden" name="posts[][photos][]" value="<%= photo.id %>" data-photo-id>
@@ -41,6 +46,18 @@
                  data-photo-alt data-action="input->social-post#countAlt">
     </wa-textarea>
     <span class="social-photo__alt-over wa-caption-s" data-photo-alt-over hidden></span>
+
+    <%# ⚠️ `type="button"`, as each button of a dialog carries: a <wa-button> is form-associated,
+        and one with no type in a form could submit the draft. The controller sets `loading` and
+        `disabled` together while the request is out, thus a second click starts nothing. %>
+    <% if alt_text %>
+      <wa-button class="social-photo__generate" type="button" appearance="outlined" size="small"
+                 data-photo-generate data-action="click->social-post#generateAlt"
+                 <%= "disabled" if photo.id.blank? %>>
+        <%= slotted_icon_svg("classic", "light", "sparkles") %>
+        <%= t(".generate_alt") %>
+      </wa-button>
+    <% end %>
   </div>
 
   <wa-button class="social-photo__remove" appearance="plain" size="small"

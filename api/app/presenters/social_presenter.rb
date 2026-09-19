@@ -121,9 +121,12 @@ class SocialPresenter
   #   `[{ token:, values: { "bluesky" => … } }, …]`. ⚠️ Nil gives NO row, and not one empty row:
   #   a row for nothing would ask the owner to name a person that they did not write about. The
   #   browser adds a row when it finds a token.
+  # @param alt_text [Boolean] True when Claude can write the alt text of a photo, thus each tile
+  #   renders its Generate control. ⚠️ The caller reads the configuration, and this class does not.
   def initialize(networks:, posts: nil, mentions: nil, selected: nil,
-                 scheduled: false, date: nil, time: nil, topic: nil)
+                 scheduled: false, date: nil, time: nil, topic: nil, alt_text: false)
     @networks = networks
+    @alt_text = alt_text
     @posts = build_posts(posts)
     @mentions = Array(mentions).map { |row| Mention.new(token: row[:token], values: row[:values]) }
     @selected = selected.nil? ? networks.select(&:connected?).map(&:key) : Array(selected).map(&:to_s)
@@ -135,6 +138,9 @@ class SocialPresenter
 
   # @return [Boolean] True when the schedule fields are open.
   def scheduled? = @scheduled
+
+  # @return [Boolean] True when each tile renders its Generate control.
+  def alt_text? = @alt_text
 
   # @return [String] The date field, as YYYY-MM-DD.
   attr_reader :date

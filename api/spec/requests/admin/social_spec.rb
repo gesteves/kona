@@ -1670,6 +1670,26 @@ RSpec.describe "Admin social media", type: :request do
         expect(response.body).not_to include("<button")
       end
 
+      # ⚠️ The control renders with an Anthropic key alone, as the two other Claude features stay
+      # silent without one. The template renders it disabled: a new tile has no id yet.
+      it "renders the Generate control of a tile with an Anthropic key, disabled in the template" do
+        allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return("key")
+
+        get "/social"
+
+        expect(response.body).to include(ERB::Util.html_escape(I18n.t("admin.social.photo.generate_alt")))
+        expect(open_tag("wa-button", "social-photo__generate")).to include("disabled")
+        expect(open_tag("wa-button", "social-photo__generate")).to include(%(type="button"))
+      end
+
+      it "renders no Generate control without an Anthropic key" do
+        allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return(nil)
+
+        get "/social"
+
+        expect(response.body).not_to include("social-photo__generate")
+      end
+
       it "renders the hint line of a row that a photo turns off" do
         get "/social"
 
@@ -1788,6 +1808,7 @@ RSpec.describe "Admin social media", type: :request do
         expect(response.body).to include(%(name="posts[][photos][]" value="#{first}"))
         expect(response.body).to include(%(name="posts[][photos][]" value="#{second}"))
         expect(response.body).to include(%(src="/social/photos/#{first}"))
+        expect(response.body).to include(%(data-photo-alt-url="/social/photos/#{first}/alt"))
         expect(response.body).to include(ERB::Util.html_escape("A <cat>"))
         # The picker is open, its X is hidden while it holds a photo, and both buttons of the
         # toolbar are off: the link button because the picker is open, the photo button as well.
