@@ -3,6 +3,8 @@ import { i18nTable, t } from "../lib/i18n";
 import { render } from "../lib/markdown_links";
 import { blueskyText } from "../lib/social_mentions";
 import { applyLengthRules } from "../lib/typography";
+import { toast } from "../lib/toast";
+import { csrfHeader } from "../lib/csrf";
 
 // How long the link field must be quiet before this reads the card. Each preview is one request of
 // this app, which then reads the page of another host.
@@ -14,43 +16,70 @@ const IDLE = "idle";
 const EDITING = "editing";
 const ATTACHED = "attached";
 
+// One photo tile of the post.
+const PHOTO = "[data-social-post-target='photo']";
+
 /**
- * One post of the thread: its character count and the preview of its link.
+ * One post of the thread: its character count, the preview of its link, and its photos.
  *
  * ⚠️ Each block is its own controller, and the outer `social` controller never reaches into it.
  * One controller for each block is what keeps the count and the preview of one post away from the
  * others; a flat list of targets on the outer controller would need an index at every call.
+ *
+ * ⚠️ **The link and the photos are ONE state machine**, and that is why the photos are here and
+ * not in a controller of their own: a post takes photos OR a link, because Bluesky renders one
+ * embed. Each button of the toolbar is disabled while the other attachment has a value.
  */
 export default class extends Controller {
   static targets = [
     "body", "count", "countText", "ring", "link", "spinner", "preview", "previewImage",
     "previewHost", "previewTitle", "previewDescription", "previewKind", "linkButton", "countNotice",
+    "photoButton", "fileInput", "photos", "photoTemplate", "photo",
   ];
-  static values = { limit: Number, warnAt: Number, previewUrl: String };
+  static values = {
+    limit: Number, warnAt: Number, previewUrl: String,
+    uploadUrl: String, maxPhotos: Number, altLimit: Number,
+  };
 
   connect() {
     // ⚠️ The words come from the locale file, through the `data-admin-i18n` attribute.
     this.words = i18nTable(this.element);
     this.linkState = IDLE;
+    // The upload of each tile that is still out, by tile. `disconnect()` and a remove abort it.
+    this.uploads = new Map();
     // ⚠️ It waits for the definitions: `value` is undefined on these components until the browser
     // upgrades them. A Turbo restoration visit, and a page that renders again after a refusal, both
     // hold values with no controller state.
     Promise.all(
-      ["wa-textarea", "wa-input"].map((tag) => customElements.whenDefined(tag))
+      ["wa-textarea", "wa-input", "wa-button"].map((tag) => customElements.whenDefined(tag))
     ).then(() => {
+      // ⚠️ A snapshot of Turbo can hold a tile whose upload never finished: it has no id, and
+      // nothing can finish it now. It goes, before the state below reads the count of the tiles.
+      this.dropUnfinishedPhotos();
       // ⚠️ The state comes from the FIELD, thus it is the state that the server already rendered
       // and nothing moves. `preview()` below promotes it to ATTACHED when the page reads.
       this.linkState = this.linkTarget.value?.trim() ? EDITING : IDLE;
+      this.renderAttachmentState();
+      this.photoTargets.forEach((tile) => this.countAltOf(tile));
       this.count();
       this.preview();
     });
   }
 
-  /** Stops the preview timer and the request that is out. */
+  /**
+   * Stops the preview timer, the request that is out, and each upload that is out.
+   *
+   * ⚠️ A Turbo visit disconnects the controller, and an answer that lands after it would write
+   * into a page that is gone. The object URL of each tile goes as well: the browser keeps the
+   * bytes of one until the page revokes it.
+   */
   disconnect() {
     clearTimeout(this.previewTimer);
     this.previewSeq = (this.previewSeq ?? 0) + 1;
     this.previewAborter?.abort();
+    this.uploads.forEach((aborter) => aborter.abort());
+    this.uploads.clear();
+    this.photoTargets.forEach((tile) => this.revokePreview(tile));
   }
 
   /**
@@ -103,16 +132,28 @@ export default class extends Controller {
   }
 
   /**
-   * Shows the one control of this state, and disables the button of the toolbar outside IDLE.
+   * Shows the one control of the link state, and disables each button of the toolbar that can do
+   * nothing now.
    *
    * ⚠️ The field and the card take turns, and each one carries an X that goes back to IDLE.
    *
-   * ⚠️ **The button is DISABLED and never hidden.** It is a form control and it is taller than the
+   * ⚠️ **A post takes photos OR a link.** Thus the link button is off while the post holds a
+   * photo, and the photo button is off outside IDLE and at the most photos. The server renders
+   * the same states, thus a page that renders again after a refusal shows them before this runs.
+   *
+   * ⚠️ **A button is DISABLED and never hidden.** It is a form control and it is taller than the
    * count beside it, thus a button that goes away takes the height of the toolbar with it and the
    * count moves up at the click that opened the field.
+   *
+   * ⚠️ The list of the tiles is hidden while it holds none: it is a child of the grid of the
+   * block, and an empty row would still take a `row-gap`.
    */
-  renderLinkState() {
-    this.linkButtonTarget.disabled = this.linkState !== IDLE;
+  renderAttachmentState() {
+    const photos = this.photoCount;
+
+    this.linkButtonTarget.disabled = this.linkState !== IDLE || photos > 0;
+    this.photoButtonTarget.disabled = this.linkState !== IDLE || photos >= this.maxPhotosValue;
+    this.photosTarget.hidden = photos === 0;
     this.linkTarget.hidden = this.linkState !== EDITING;
     this.previewTarget.hidden = this.linkState !== ATTACHED;
   }
@@ -122,7 +163,317 @@ export default class extends Controller {
    */
   setLinkState(state) {
     this.linkState = state;
-    this.renderLinkState();
+    this.renderAttachmentState();
+  }
+
+  /** @returns {number} The tiles of the post, and that includes one whose upload is out. */
+  get photoCount() {
+    return this.photoTargets.length;
+  }
+
+  /**
+   * Opens the file picker. The button of the toolbar is the accessible control, and the native
+   * input below it is hidden and has no name.
+   */
+  pickPhotos(event) {
+    event.preventDefault();
+    this.fileInputTarget.click();
+  }
+
+  /**
+   * Uploads each file that the owner picked, up to the free slots of the post.
+   *
+   * ⚠️ It clears the input after the read, thus the same file can be picked again after a remove:
+   * a native input fires no `change` for a value that did not change.
+   */
+  filesPicked() {
+    const files = [ ...(this.fileInputTarget.files ?? []) ];
+    this.fileInputTarget.value = "";
+
+    const room = Math.max(0, this.maxPhotosValue - this.photoCount);
+    if (files.length > room) {
+      toast(t(this.words, "too_many_photos", { limit: this.maxPhotosValue }), "warning");
+    }
+    files.slice(0, room).forEach((file) => this.upload(file));
+  }
+
+  /**
+   * Adds a tile for one file and uploads it.
+   *
+   * ⚠️ The tile is on the page from the first moment, with the file itself as its picture: the CSP
+   * of the admin permits `blob:` in `img-src` for this. Its id stays empty until the server
+   * answers, and `social#canPost` keeps the submit button off while a tile is in that state.
+   *
+   * ⚠️ A refusal takes the tile away and says why in a toast. The server names the reason for a
+   * file that is not a photo or that is too large, and the toast shows those words.
+   * @param {File} file
+   */
+  async upload(file) {
+    const tile = this.buildTile(file);
+    this.photosTarget.appendChild(tile);
+    this.changed();
+
+    const aborter = new AbortController();
+    this.uploads.set(tile, aborter);
+    const body = new FormData();
+    body.append("photo", file, file.name);
+
+    try {
+      const response = await fetch(this.uploadUrlValue, {
+        method: "POST",
+        headers: { Accept: "application/json", ...csrfHeader() },
+        body,
+        signal: aborter.signal,
+      });
+      const answer = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        this.dropTile(tile);
+        toast(answer.error || t(this.words, "upload_failed"), "danger");
+        return;
+      }
+      this.fillTile(tile, answer);
+    } catch {
+      // A remove or a Turbo visit aborted it, and the tile is already gone.
+      if (aborter.signal.aborted) return;
+
+      this.dropTile(tile);
+      toast(t(this.words, "upload_unreachable"), "danger");
+    } finally {
+      this.uploads.delete(tile);
+      if (this.element.isConnected) this.changed();
+    }
+  }
+
+  /**
+   * One tile in its uploading state, from the template.
+   * @param {File} file
+   * @returns {HTMLElement}
+   */
+  buildTile(file) {
+    const tile = this.photoTemplateTarget.content.cloneNode(true).querySelector(PHOTO);
+    tile.classList.add("social-photo--uploading");
+    tile.querySelector("[data-photo-spinner]").hidden = false;
+
+    const image = tile.querySelector("[data-photo-image]");
+    image.src = URL.createObjectURL(file);
+    image.dataset.objectUrl = image.src;
+
+    return tile;
+  }
+
+  /**
+   * Writes the answer of the server into the tile.
+   *
+   * ⚠️ The picture changes to the path of our own store only after that copy has loaded, thus the
+   * tile never shows an empty box between the two. The object URL goes at that moment.
+   * @param {HTMLElement} tile
+   * @param {object} answer `{ id, path }`
+   */
+  fillTile(tile, answer) {
+    tile.querySelector("[data-photo-id]").value = answer.id ?? "";
+    tile.classList.remove("social-photo--uploading");
+    tile.querySelector("[data-photo-spinner]").hidden = true;
+
+    const image = tile.querySelector("[data-photo-image]");
+    const stored = new Image();
+    const swap = () => {
+      if (!tile.isConnected) return;
+      image.src = answer.path;
+      this.revokePreview(tile);
+    };
+    stored.addEventListener("load", swap);
+    stored.addEventListener("error", swap);
+    stored.src = answer.path;
+  }
+
+  /**
+   * Takes one photo off the post. It asks nothing: a photo is quick to add again, and the alt
+   * text of one is short.
+   */
+  removePhoto(event) {
+    event.preventDefault();
+    const tile = event.target.closest(PHOTO);
+    if (!tile) return;
+
+    this.dropTile(tile);
+    this.changed();
+    this.photoButtonTarget.focus();
+  }
+
+  /**
+   * Removes a tile, and stops its upload when one is out.
+   * @param {HTMLElement} tile
+   */
+  dropTile(tile) {
+    this.uploads.get(tile)?.abort();
+    this.uploads.delete(tile);
+    this.revokePreview(tile);
+    tile.remove();
+  }
+
+  /**
+   * Removes each tile whose upload never finished. ⚠️ It runs at connect, for a snapshot of Turbo
+   * that holds such a tile.
+   */
+  dropUnfinishedPhotos() {
+    const unfinished = this.photoTargets.filter((tile) => !tile.querySelector("[data-photo-id]")?.value);
+    unfinished.forEach((tile) => this.dropTile(tile));
+    if (unfinished.length > 0) this.changed();
+  }
+
+  /**
+   * Gives the browser back the bytes of the picture of a tile.
+   * @param {HTMLElement} tile
+   */
+  revokePreview(tile) {
+    const image = tile.querySelector("[data-photo-image]");
+    if (!image?.dataset.objectUrl) return;
+
+    URL.revokeObjectURL(image.dataset.objectUrl);
+    delete image.dataset.objectUrl;
+  }
+
+  /**
+   * Renders the toolbar again and tells the form.
+   *
+   * ⚠️ A tile that code adds or removes fires no event, and the form validates on `input`. Thus
+   * without this the submit button and the "Post to" rows would keep the state of the draft
+   * before the change. It is the rule of `removeLink`.
+   */
+  changed() {
+    this.renderAttachmentState();
+    this.element.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  /**
+   * Picks up the tile that owns the grip.
+   *
+   * ⚠️ Firefox starts no drag at all with no data on the transfer, thus the empty string is
+   * necessary and not decoration. It is the rule of `social#dragStart`.
+   */
+  dragStartPhoto(event) {
+    this.draggedPhoto = event.target.closest(PHOTO);
+    if (!this.draggedPhoto) return;
+
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", "");
+    this.draggedPhoto.classList.add("social-photo--dragging");
+  }
+
+  /**
+   * Moves the tile that the pointer holds to where the pointer is.
+   *
+   * ⚠️ It moves the tile itself and it never rewrites a field. The names carry no index, thus
+   * **the order of the tiles in the document IS the order of the photos**, and moving one is the
+   * whole change.
+   */
+  dragOverPhoto(event) {
+    if (!this.draggedPhoto) return;
+
+    // ⚠️ Without this the browser refuses the drop and the tile springs back.
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+
+    const slot = this.photoSlot(event.clientX, event.clientY);
+    if (!slot || slot.tile === this.draggedPhoto) return;
+
+    slot.before ? this.photosTarget.insertBefore(this.draggedPhoto, slot.tile)
+                : this.photosTarget.insertBefore(this.draggedPhoto, slot.tile.nextSibling);
+  }
+
+  /**
+   * `dragover` already moved the tile, thus this only stops the browser from its own default,
+   * which is to open the dragged data as a URL.
+   */
+  dropPhoto(event) {
+    event.preventDefault();
+  }
+
+  dragEndPhoto() {
+    this.draggedPhoto?.classList.remove("social-photo--dragging");
+    this.draggedPhoto = null;
+  }
+
+  /**
+   * The tile nearest to a point, and which side of it the point is on.
+   *
+   * ⚠️ The tiles wrap into rows, thus the test of the posts, which reads the middle of each block
+   * on one axis, cannot serve here. A point above the row of a tile, or left of its middle on
+   * that row, goes BEFORE it.
+   * @param {number} x
+   * @param {number} y
+   * @returns {{ tile: HTMLElement, before: boolean }|null} Null with no other tile.
+   */
+  photoSlot(x, y) {
+    let best = null;
+    let nearest = Infinity;
+
+    this.photoTargets.filter((tile) => tile !== this.draggedPhoto).forEach((tile) => {
+      const box = tile.getBoundingClientRect();
+      const centerX = box.left + box.width / 2;
+      const centerY = box.top + box.height / 2;
+      const distance = (centerX - x) ** 2 + (centerY - y) ** 2;
+      if (distance >= nearest) return;
+
+      nearest = distance;
+      best = { tile, before: y < box.top || (y <= box.bottom && x < centerX) };
+    });
+
+    return best;
+  }
+
+  /**
+   * Moves a tile with the arrow keys.
+   *
+   * ⚠️ A drag needs a pointer, and this page must work without one. The grip is a button and it
+   * takes the focus, thus the arrow keys are the way in. Left and Up go earlier, Right and Down
+   * go later.
+   */
+  movePhotoByKey(event) {
+    const earlier = event.key === "ArrowLeft" || event.key === "ArrowUp";
+    const later = event.key === "ArrowRight" || event.key === "ArrowDown";
+    if (!earlier && !later) return;
+
+    event.preventDefault();
+    const tile = event.target.closest(PHOTO);
+    const tiles = this.photoTargets;
+    const to = tiles.indexOf(tile) + (earlier ? -1 : 1);
+    if (to < 0 || to >= tiles.length) return;
+
+    earlier ? this.photosTarget.insertBefore(tile, tiles[to])
+            : this.photosTarget.insertBefore(tiles[to], tile);
+
+    // ⚠️ A node that moves loses the focus, thus the next arrow key would go to the document.
+    tile.querySelector(".social-photo__grip")?.focus();
+  }
+
+  /**
+   * Counts the alt text of the tile that holds the field.
+   */
+  countAlt(event) {
+    const tile = event.target.closest(PHOTO);
+    if (tile) this.countAltOf(tile);
+  }
+
+  /**
+   * Says when the alt text of a tile is past its limit, and marks the tile for `social#canPost`.
+   *
+   * ⚠️ It counts graphemes, as the count of the words does, and the field has no `maxlength`. The
+   * action counts the same way.
+   * @param {HTMLElement} tile
+   */
+  countAltOf(tile) {
+    const field = tile.querySelector("[data-photo-alt]");
+    const line = tile.querySelector("[data-photo-alt-over]");
+    if (!field || !line) return;
+
+    const length = this.graphemes(field.value ?? "");
+    const over = length > this.altLimitValue;
+
+    tile.classList.toggle("social-photo--alt-over", over);
+    line.hidden = !over;
+    line.textContent = over ? t(this.words, "alt_too_long", { count: length, limit: this.altLimitValue }) : "";
   }
 
   /**

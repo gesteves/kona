@@ -1626,4 +1626,200 @@ RSpec.describe "Admin social media", type: :request do
       end
     end
   end
+
+  # ⚠️ Only Bluesky takes a photo from this page. A post takes photos OR a link, because Bluesky
+  # renders one embed. The composer disables the one button while the other has a value, and
+  # these examples prove that a hand-written request is refused as well.
+  describe "the photos of a draft" do
+    let(:store) { SocialPhotos.new }
+    let(:jpeg) { "\xFF\xD8\xFF\xE0jpeg".b }
+    let!(:first) { store.store(image: jpeg, width: 4, height: 3) }
+    let!(:second) { store.store(image: jpeg, width: 3, height: 4) }
+    let(:url) { "https://example.test/2026/07/12/ironman-canada/" }
+
+    before do
+      sign_in_as(email: owner_email)
+      connect(bluesky: true, mastodon: true, threads: true)
+      allow_any_instance_of(OpenGraph).to receive(:fetch) do |_service, link|
+        OpenGraph::Card.new(url: link, title: "A title", description: "A summary.", image_url: nil)
+      end
+    end
+
+    after { store.discard([ first, second ]) }
+
+    def post_photos(photos:, alts:, text: "Two photos", link: "", networks: [ "bluesky" ], **rest)
+      post "/social", params: { posts: [ { text: text, link: link, photos: photos, alts: alts } ],
+                                networks: networks, **rest }
+    end
+
+    describe "GET /social" do
+      it "renders the photo button, the hidden native input with no name, and the tile template" do
+        get "/social"
+
+        expect(response.body).to include(ERB::Util.html_escape(I18n.t("admin.social.post.add_photos")))
+        expect(response.body).to match(/<input type="file" accept="image\/\*" multiple hidden[^>]*>/)
+        expect(response.body).not_to match(/<input type="file"[^>]*name=/)
+        expect(response.body).to include('data-social-post-target="photoTemplate"')
+        expect(response.body).to include('name="posts[][photos][]"')
+        expect(response.body).to include('name="posts[][alts][]"')
+        expect(response.body).to include(%(data-social-post-max-photos-value="#{SocialPresenter::MAX_PHOTOS}"))
+        expect(response.body).to include(%(data-social-post-alt-limit-value="#{SocialPresenter::ALT_LIMIT}"))
+        expect(response.body).not_to include("<button")
+      end
+
+      it "renders the hint line of a row that a photo turns off" do
+        get "/social"
+
+        expect(response.body).to include(ERB::Util.html_escape(I18n.t("admin.social.show.photos_disabled")))
+      end
+    end
+
+    describe "POST /social" do
+      it "gives the Bluesky job each photo of the post, in order, with its alt text" do
+        post_photos(photos: [ first, second ], alts: [ "A cat", "" ])
+
+        expect(response).to redirect_to(social_path)
+        payload = BlueskyPostJob.jobs.first["args"].first
+        expect(payload.first["photos"]).to eq([ { "id" => first, "alt" => "A cat" }, { "id" => second, "alt" => "" } ])
+      end
+
+      it "gives the Mastodon job no photos" do
+        post_photos(photos: [], alts: [], networks: %w[bluesky mastodon])
+        post_photos(photos: [ first ], alts: [ "A cat" ], networks: %w[bluesky])
+
+        expect(MastodonPostJob.jobs.first["args"].first.first).not_to have_key("photos")
+        expect(BlueskyPostJob.jobs.first["args"].first.first).not_to have_key("photos")
+      end
+
+      # ⚠️ The job can run a day after the submit, and a scheduled one can run months after it.
+      it "keeps each photo through the retry window of the job" do
+        post_photos(photos: [ first ], alts: [ "" ])
+
+        expect($redis.ttl("#{SocialPhotos::KEY_PREFIX}#{first}"))
+          .to be_within(10).of(Admin::SocialController::PHOTO_KEEP_MARGIN.to_i)
+      end
+
+      it "keeps each photo of a scheduled post until after the schedule" do
+        day = Date.current + 10
+        post_photos(photos: [ first ], alts: [ "" ], schedule: "1", date: day.to_fs(:iso8601), time: "09:00",
+                    time_zone: "UTC")
+
+        expect(response).to redirect_to(social_path)
+        wait = Time.use_zone("UTC") { Time.zone.parse("#{day} 09:00") } - Time.current
+        expect($redis.ttl("#{SocialPhotos::KEY_PREFIX}#{first}"))
+          .to be_within(10).of((wait + Admin::SocialController::PHOTO_KEEP_MARGIN).to_i)
+      end
+
+      it "reads no page for a post with photos" do
+        expect_any_instance_of(OpenGraph).not_to receive(:fetch)
+
+        post_photos(photos: [ first ], alts: [ "" ])
+
+        expect(response).to redirect_to(social_path)
+      end
+
+      it "refuses a network that takes no photo" do
+        post_photos(photos: [ first ], alts: [ "" ], networks: %w[bluesky mastodon threads])
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(flash[:alert]).to eq(I18n.t("admin.social.errors.photos_network", networks: "Mastodon and Threads"))
+        expect(BlueskyPostJob.jobs).to be_empty
+      end
+
+      it "refuses photos and a link on one post" do
+        post_photos(photos: [ first ], alts: [ "" ], link: url)
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(flash[:alert]).to eq(I18n.t("admin.social.errors.photos_and_link.single"))
+      end
+
+      it "refuses more photos than the most" do
+        ids = Array.new(SocialPresenter::MAX_PHOTOS + 1) { first }
+        post_photos(photos: ids, alts: ids.map { "" })
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(flash[:alert]).to eq(I18n.t("admin.social.errors.too_many_photos.single", limit: SocialPresenter::MAX_PHOTOS))
+      end
+
+      it "refuses an alt text past its limit, and counts graphemes" do
+        post_photos(photos: [ first ], alts: [ "👨‍👩‍👧‍👦" * (SocialPresenter::ALT_LIMIT + 1) ])
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(flash[:alert]).to eq(I18n.t("admin.social.errors.alt_too_long.single",
+                                           count: SocialPresenter::ALT_LIMIT + 1, limit: SocialPresenter::ALT_LIMIT))
+      end
+
+      it "refuses a photo that is gone, and names the post of a thread" do
+        store.discard([ second ])
+
+        post "/social", params: { posts: [ { text: "One", link: "" },
+                                           { text: "Two", link: "", photos: [ second ], alts: [ "" ] } ],
+                                  networks: [ "bluesky" ] }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(flash[:alert]).to eq(I18n.t("admin.social.errors.photo_missing.numbered", index: 2))
+      end
+
+      # ⚠️ The two arrays match by POSITION. A tile whose upload is still out sends an empty id,
+      # and a drop of the id alone would move each alt text after it by one.
+      it "drops an id with the wrong shape together with its own alt text" do
+        post_photos(photos: [ "", first ], alts: [ "not mine", "A cat" ])
+
+        expect(response).to redirect_to(social_path)
+        payload = BlueskyPostJob.jobs.first["args"].first
+        expect(payload.first["photos"]).to eq([ { "id" => first, "alt" => "A cat" } ])
+      end
+
+      it "counts a block with photos and no words as a post, and refuses it for its words" do
+        post_photos(photos: [ first ], alts: [ "" ], text: "")
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(flash[:alert]).to eq(I18n.t("admin.social.errors.text_missing.single"))
+      end
+
+      # ⚠️ A refused submit renders the page again, and the tiles must come back with it.
+      it "puts each tile back after a refusal, with the two buttons in their states" do
+        post_photos(photos: [ first, second ], alts: [ "A <cat>", "" ], link: url)
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.body).to include(%(name="posts[][photos][]" value="#{first}"))
+        expect(response.body).to include(%(name="posts[][photos][]" value="#{second}"))
+        expect(response.body).to include(%(src="/social/photos/#{first}"))
+        expect(response.body).to include(ERB::Util.html_escape("A <cat>"))
+        # The link button is off while the post has a photo.
+        expect(open_tag("wa-button", "social-post__tool")).to include("disabled")
+      end
+
+      it "renders the photo button disabled at the most photos" do
+        ids = Array.new(SocialPresenter::MAX_PHOTOS) { first }
+        post_photos(photos: ids, alts: ids.map { "" }, networks: [])
+
+        expect(response).to have_http_status(:unprocessable_content)
+        buttons = response.body.scan(/<wa-button class="social-post__tool"[^<]*>/m)
+        expect(buttons.length).to eq(4)
+        expect(buttons[1]).to include("disabled")
+      end
+    end
+
+    describe "POST /social/preview/text" do
+      it "gives the photos on the Bluesky row alone, and shows Bluesky alone" do
+        post "/social/preview/text", params: { posts: [ { text: "Two photos", link: "", photos: [ first, second ],
+                                                            alts: [ "A cat", "" ] } ] }
+
+        body = JSON.parse(response.body)
+        expect(body["networks"].map { |row| row["key"] }).to eq([ "bluesky" ])
+        photos = body["networks"].first["posts"].first["photos"]
+        expect(photos).to eq([ { "path" => "/social/photos/#{first}", "alt" => "A cat" },
+                               { "path" => "/social/photos/#{second}", "alt" => "" } ])
+      end
+
+      it "gives no photos on a post that has none" do
+        post "/social/preview/text", params: { posts: [ { text: "Words", link: "" } ] }
+
+        rows = JSON.parse(response.body)["networks"]
+        expect(rows.length).to eq(3)
+        expect(rows.flat_map { |row| row["posts"].map { |post| post["photos"] } }).to all(be_nil)
+      end
+    end
+  end
 end

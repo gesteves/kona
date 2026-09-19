@@ -10,8 +10,11 @@ class RequestBodyLimit
   # MAX_FILES GPX files of MAX_BYTES in total, and the other paths take a form or a small JSON.
   # ⚠️ Plain integers: this file loads before ActiveSupport adds `megabytes` to Integer.
   MEGABYTE = 1024 * 1024
+  # ⚠️ `/social/photos` is ABOVE `/social`: the first match wins, and a photo upload is one file of
+  # as much as 25MB where the draft itself is a small form.
   LIMITS = [
     [ "/course-maps", 32 * MEGABYTE ],
+    [ "/social/photos", 32 * MEGABYTE ],
     [ "/api/icons", MEGABYTE / 4 ],
     [ "/social", MEGABYTE / 4 ],
     [ "/webhooks/", MEGABYTE ]

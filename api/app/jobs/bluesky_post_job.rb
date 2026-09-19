@@ -9,7 +9,8 @@ class BlueskyPostJob < SocialPostJob
   # each example, thus a lock cannot go from one example to the next one.
   ENQUEUE_LOCK_PREFIX = "bluesky:thread:".freeze
 
-  # @param posts [Array<Hash>] `[{ "key" =>, "text" =>, "link" => }, …]`, the whole thread.
+  # @param posts [Array<Hash>] `[{ "key" =>, "text" =>, "link" =>, "photos" => }, …]`, the whole
+  #   thread. `photos` is `[{ "id" =>, "alt" => }, …]` and it is absent from a post with none.
   # @param index [Integer] Which post of that list this job writes.
   # @param reply [Hash, nil] `{ "root" =>, "parent" => }` of the post above, or nil for the first.
   def perform(posts, index = 0, reply = nil)
@@ -20,9 +21,12 @@ class BlueskyPostJob < SocialPostJob
     # names no post of the thread and a thread of five gives five reports that read alike.
     Rails.logger.info("BlueskyPostJob: posting #{index + 1}/#{posts.length}")
 
+    photos = load_photos(post, index, posts.length)
+
     # ⚠️ The card is for Bluesky only, and it reads the page. Mastodon and Threads each make their
-    # own preview from the same og: tags. A post with no link reads nothing.
-    card = OpenGraph.new.fetch(post["link"]) if post["link"].present?
+    # own preview from the same og: tags. A post with no link reads nothing, and a post with
+    # photos reads nothing either: Bluesky renders one embed, and the photos are it.
+    card = OpenGraph.new.fetch(post["link"]) if post["link"].present? && photos.empty?
 
     # ⚠️ **A page with no og: tags gets NO embed, and its link goes in the words**, as it does at
     # Mastodon. An embed from such a page is an empty box with a host name in it.
@@ -39,13 +43,45 @@ class BlueskyPostJob < SocialPostJob
       text = post["text"]
     end
 
-    written = Bluesky.new.post!(rkey: post["key"], text: text, card: embed, reply: reply)
+    written = Bluesky.new.post!(rkey: post["key"], text: text, card: embed, reply: reply, photos: photos)
     Rails.logger.info("BlueskyPostJob: posted #{index + 1}/#{posts.length} at #{written['url']}")
 
     enqueue_next(posts, index + 1, next_reply(reply, written))
+
+    # ⚠️ The photos go away LAST, after the next job is in the queue. A process that dies between
+    # the write and the acknowledgement does this post again, and with the photos gone that
+    # attempt would fail the post and never add the job below it. A second upload of the same
+    # bytes costs nothing: the PDS names a blob by its content.
+    SocialPhotos.new.discard(photo_ids(post))
   end
 
   private
+
+  # @param post [Hash]
+  # @return [Array<String>] The id of each photo of the post.
+  def photo_ids(post)
+    Array(post["photos"]).map { |photo| photo["id"].to_s }
+  end
+
+  # Reads the photos of the post from Redis.
+  #
+  # ⚠️ A photo that is gone fails the post for good, and it does not post the words alone. The
+  # owner asked for a post with photos, and `volatile-lru` can remove a key at the memory cap.
+  # The report names the post and the photo.
+  # @return [Array<Hash>] `[{ bytes:, width:, height:, alt: }, …]`, for `Bluesky#post!`.
+  def load_photos(post, index, count)
+    store = SocialPhotos.new
+
+    Array(post["photos"]).map do |photo|
+      stored = store.fetch(photo["id"].to_s)
+      if stored.nil?
+        raise ApplicationJob::PermanentError,
+              "BlueskyPostJob: post #{index + 1}/#{count} lost its photo #{photo['id']}"
+      end
+
+      { bytes: stored[:image], width: stored[:width], height: stored[:height], alt: photo["alt"].to_s }
+    end
+  end
 
   # ⚠️ The **root** of a thread is the first post, and the **parent** is the one just above. This
   # carries the root through the chain and never makes it again.

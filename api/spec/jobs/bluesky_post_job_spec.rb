@@ -33,7 +33,7 @@ RSpec.describe BlueskyPostJob do
 
     expect(open_graph).to have_received(:fetch).with(url)
     expect(bluesky).to have_received(:post!)
-      .with(rkey: "3kabc", text: "Read this", card: card, reply: nil)
+      .with(rkey: "3kabc", text: "Read this", card: card, reply: nil, photos: [])
   end
 
   # ⚠️ The link is optional. A post with none must read no page at all.
@@ -53,7 +53,7 @@ RSpec.describe BlueskyPostJob do
     described_class.new.perform([ post("3kabc", "Read this", url) ])
 
     expect(bluesky).to have_received(:post!)
-      .with(rkey: "3kabc", text: "Read this\n\n#{url}", card: nil, reply: nil)
+      .with(rkey: "3kabc", text: "Read this\n\n#{url}", card: nil, reply: nil, photos: [])
   end
 
   # ⚠️ A scheduled post runs days after the check on the page. A page that lost its og: tags puts
@@ -65,7 +65,7 @@ RSpec.describe BlueskyPostJob do
 
     described_class.new.perform([ post("3kabc", words, url) ])
 
-    expect(bluesky).to have_received(:post!).with(rkey: "3kabc", text: words, card: nil, reply: nil)
+    expect(bluesky).to have_received(:post!).with(rkey: "3kabc", text: words, card: nil, reply: nil, photos: [])
   end
 
   # A page that gives one of the three fields still draws a card, thus its link stays out of the
@@ -91,6 +91,72 @@ RSpec.describe BlueskyPostJob do
     allow(bluesky).to receive(:post!).and_raise("Bluesky refused the post")
 
     expect { described_class.new.perform([ post("3kabc", "Hi") ]) }.to raise_error(/refused/)
+  end
+
+  describe "the photos" do
+    let(:store) { SocialPhotos.new }
+    let(:jpeg) { "\xFF\xD8\xFF\xE0jpeg".b }
+    let!(:first) { store.store(image: jpeg, width: 4, height: 3) }
+    let!(:second) { store.store(image: jpeg, width: 3, height: 4) }
+    let(:with_photos) do
+      post("3kabc", "Two photos").merge("photos" => [ { "id" => first, "alt" => "A cat" },
+                                                       { "id" => second, "alt" => "" } ])
+    end
+
+    after { store.discard([ first, second ]) }
+
+    it "reads each photo from the store and gives it to the post, in order, with its alt text" do
+      described_class.new.perform([ with_photos ])
+
+      expect(bluesky).to have_received(:post!).with(
+        rkey: "3kabc", text: "Two photos", card: nil, reply: nil,
+        photos: [ { bytes: jpeg, width: 4, height: 3, alt: "A cat" },
+                  { bytes: jpeg, width: 3, height: 4, alt: "" } ]
+      )
+    end
+
+    # ⚠️ Bluesky renders ONE embed, and the photos are it. A hand-written payload with a link as
+    # well must not read the page.
+    it "reads no page for a post with photos, even with a link" do
+      described_class.new.perform([ with_photos.merge("link" => url) ])
+
+      expect(open_graph).not_to have_received(:fetch)
+      expect(bluesky).to have_received(:post!).with(hash_including(card: nil, text: "Two photos"))
+    end
+
+    it "discards the photos after the write" do
+      described_class.new.perform([ with_photos ])
+
+      expect(store.exists?(first)).to be(false)
+      expect(store.exists?(second)).to be(false)
+    end
+
+    # ⚠️ A post that promised photos must not go out as words alone, and no retry can bring a
+    # photo back.
+    it "fails the post for good when a photo is gone, and posts nothing" do
+      store.discard([ second ])
+
+      expect { described_class.new.perform([ with_photos ]) }
+        .to raise_error(ApplicationJob::PermanentError, /lost its photo #{second}/)
+      expect(bluesky).not_to have_received(:post!)
+    end
+
+    it "keeps the photos when the write fails, thus the retry finds them" do
+      allow(bluesky).to receive(:post!).and_raise("Bluesky refused the post")
+
+      expect { described_class.new.perform([ with_photos ]) }.to raise_error(/refused/)
+      expect(store.exists?(first)).to be(true)
+    end
+
+    # ⚠️ The discard is LAST. A retry after a failed enqueue does the post again, and the photos
+    # must still be there for it.
+    it "keeps the photos when the next job cannot be added" do
+      thread = [ with_photos, post("3kabd", "Second") ]
+      allow(described_class).to receive(:perform_async).and_raise("Redis is away")
+
+      expect { described_class.new.perform(thread) }.to raise_error(/Redis is away/)
+      expect(store.exists?(first)).to be(true)
+    end
   end
 
   describe "a thread" do

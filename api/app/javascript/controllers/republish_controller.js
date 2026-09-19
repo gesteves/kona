@@ -1,6 +1,7 @@
 import { Controller } from "@hotwired/stimulus";
 import { i18nTable, t } from "../lib/i18n";
 import { toast } from "../lib/toast";
+import { csrfHeader } from "../lib/csrf";
 
 /**
  * The Republish dialog: one delay in minutes, where zero is "now".
@@ -72,7 +73,7 @@ export default class extends Controller {
     try {
       const response = await fetch(this.formTarget.action, {
         method: "POST",
-        headers: { Accept: "application/json", ...this.csrfHeader },
+        headers: { Accept: "application/json", ...csrfHeader() },
         body: new FormData(this.formTarget),
       });
       const answer = await response.json().catch(() => ({}));
@@ -92,19 +93,6 @@ export default class extends Controller {
     this.element.open = false;
     this.minutesTarget.value = this.defaultMinutes;
     this.relabel();
-  }
-
-  /**
-   * The CSRF token of the page, as a header.
-   *
-   * ⚠️ `csrf_meta_tags` renders nothing where the forgery protection is off, which is the test
-   * environment. Thus this gives an empty object there and the header is absent.
-   * @returns {object}
-   */
-  get csrfHeader() {
-    const token = document.querySelector("meta[name='csrf-token']")?.content;
-
-    return token ? { "X-CSRF-Token": token } : {};
   }
 
   /**

@@ -19,6 +19,14 @@ RSpec.describe RequestBodyLimit do
     expect(status_for("/course-maps", length: 33.megabytes)).to eq(413)
   end
 
+  # ⚠️ The first prefix match wins, thus `/social/photos` must stay above `/social`.
+  it "gives the photo upload its own limit, and keeps the small one on the rest of the page" do
+    expect(status_for("/social/photos", length: 30.megabytes)).to eq(200)
+    expect(status_for("/social/photos", length: 33.megabytes)).to eq(413)
+    expect(status_for("/social", length: 300.kilobytes)).to eq(413)
+    expect(status_for("/social/preview/text", length: 300.kilobytes)).to eq(413)
+  end
+
   it "applies the default to a path with no entry" do
     expect(status_for("/api/contact", length: 64.kilobytes)).to eq(200)
     expect(status_for("/api/location", length: 64.kilobytes + 1)).to eq(413)

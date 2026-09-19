@@ -27,7 +27,22 @@ class Bluesky < ApplicationService
 
   # The largest blob that a PDS takes for a card thumbnail. A record with a larger one fails at
   # `putRecord` and not at the upload, thus the reason arrives late and reads as "blob too big".
+  # ⚠️ This is the `thumb` of `app.bsky.embed.external`, and not the limit of a photo. A photo
+  # is a different lexicon field with a limit of its own, MAX_IMAGE_BYTES below.
   MAX_BLOB_BYTES = 976_560
+
+  # The most photos on one post. `app.bsky.embed.gallery` takes 20 in its schema, and the clients
+  # of Bluesky enforce 10 in their authoring UI. ⚠️ `SocialPresenter::MAX_PHOTOS` is this number.
+  MAX_IMAGES = 10
+  # The most photos that `app.bsky.embed.images` takes. ⚠️ A post with more needs the gallery
+  # embed, and a post with this many or fewer keeps the images embed: a client from before the
+  # gallery embed renders that one and nothing for a gallery.
+  MAX_IMAGES_EMBED = 4
+  # The largest blob of one photo, from `app.bsky.embed.images#image` and
+  # `app.bsky.embed.gallery#image`.
+  MAX_IMAGE_BYTES = 2_000_000
+  # The limit of the alt text of one photo, from the client of Bluesky. The lexicon has none.
+  MAX_ALT_GRAPHEMES = 2000
   # The most bytes of an og:image that this class downloads. ⚠️ The picture belongs to a page that
   # the owner linked to, and the worker is a 512MB VM at concurrency 5. A picture past this limit
   # loses the thumbnail and never the post.
@@ -206,13 +221,18 @@ class Bluesky < ApplicationService
   # @param reply [Hash, nil] `{ "root" =>, "parent" => }`, each a reference from an earlier call.
   #   ⚠️ The **root** is the first post of the thread, and the **parent** is the one just above.
   #   The caller carries the root through the chain and never makes it again.
+  # @param photos [Array<Hash>] `[{ bytes:, width:, height:, alt: }, …]`, each a JPEG below
+  #   MAX_IMAGE_BYTES. ⚠️ **A post takes photos OR a card, and not both**: the record holds one
+  #   embed. The caller gives one of the two.
   # @return [Hash] `{ "uri" =>, "cid" =>, "url" => }`. The next post of a thread names this one with
   #   the `uri` and the `cid`.
-  # @raise [RuntimeError] When the credentials, the length, the session, or the write fails. It
-  #   raises on purpose: `BlueskyPostJob` then does the work again.
-  def post!(rkey:, text:, card: nil, reply: nil)
+  # @raise [RuntimeError] When the credentials, the length, the session, a photo upload, or the
+  #   write fails. It raises on purpose: `BlueskyPostJob` then does the work again.
+  def post!(rkey:, text:, card: nil, reply: nil, photos: [])
+    raise ArgumentError, "A post takes a card or photos, and not both" if card.present? && photos.present?
     raise ApplicationJob::PermanentError, "Bluesky is not connected" unless valid_credentials?
     raise ApplicationJob::PermanentError, "The post is empty or longer than #{MAX_GRAPHEMES} characters" unless self.class.valid_post_length?(text)
+    raise ApplicationJob::PermanentError, "A post takes at most #{MAX_IMAGES} photos" if photos.length > MAX_IMAGES
     raise "Could not open a Bluesky session" unless open_session(handle: @handle, app_password: @app_password)
 
     # ⚠️ **The Markdown is rendered HERE, and not in the action.** The record holds the plain words
@@ -235,7 +255,7 @@ class Bluesky < ApplicationService
     }
     facets = build_facets(post.text, links: post.links)
     record["facets"] = facets if facets.any?
-    embed = build_card(card)
+    embed = photos.present? ? build_images_embed(photos) : build_card(card)
     record["embed"] = embed if embed.present?
     record["reply"] = reply if reply.present?
 
@@ -333,6 +353,36 @@ class Bluesky < ApplicationService
     external["associatedRefs"] = refs if refs.any?
 
     { "$type" => "app.bsky.embed.external", "external" => external }
+  end
+
+  # Makes the embed of the photos.
+  #
+  # ⚠️ **Two embed types.** `app.bsky.embed.images` takes MAX_IMAGES_EMBED photos at the most, and
+  # `app.bsky.embed.gallery` takes more. A post that fits the first one keeps it: a client from
+  # before the gallery embed renders that one and nothing for a gallery. Each item of a gallery is
+  # a union member and carries its `$type`; an item of the images embed is a plain ref and does not.
+  #
+  # ⚠️ **It RAISES when one upload fails**, and the post then does not go out. A post with three
+  # of its four photos is not the post that the owner wrote, and the job does the work again.
+  # `AtProto#upload_blob` gives nil for a failure and raises for nothing but a 401 and a 429.
+  # @param photos [Array<Hash>] `[{ bytes:, width:, height:, alt: }, …]`
+  # @return [Hash] An app.bsky.embed.images or an app.bsky.embed.gallery.
+  def build_images_embed(photos)
+    items = photos.map do |photo|
+      blob = upload_blob(photo[:bytes], "image/jpeg")
+      raise "Could not upload a photo of the post" if blob.blank?
+
+      { "image" => blob,
+        "alt" => truncate_graphemes(photo[:alt].to_s, MAX_ALT_GRAPHEMES).to_s,
+        "aspectRatio" => { "width" => photo[:width].to_i, "height" => photo[:height].to_i } }
+    end
+
+    if items.length <= MAX_IMAGES_EMBED
+      { "$type" => "app.bsky.embed.images", "images" => items }
+    else
+      { "$type" => "app.bsky.embed.gallery",
+        "items" => items.map { |item| { "$type" => "app.bsky.embed.gallery#image" }.merge(item) } }
+    end
   end
 
   # The standard.site records of the page, as strongRefs.

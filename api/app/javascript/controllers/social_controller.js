@@ -2,6 +2,7 @@ import { Controller } from "@hotwired/stimulus";
 import { i18nTable, t } from "../lib/i18n";
 import { hasLinks } from "../lib/markdown_links";
 import { isBlueskyHandle, mentionKey, tokensOf } from "../lib/social_mentions";
+import { csrfHeader } from "../lib/csrf";
 
 // How long the words must be quiet before the rows are reconciled. ⚠️ A token churns while the
 // owner types it — "@t", "@to", "@ton" — and a row for each of those would take the focus.
@@ -10,6 +11,12 @@ const MENTION_DEBOUNCE = 250;
 // How long a change must be quiet before the open preview is read again. ⚠️ Only the mentions and
 // the topic can change while that panel is on screen, thus this is rare and it can be short.
 const PREVIEW_DEBOUNCE = 300;
+
+// The words of a post, and one photo tile of a post. ⚠️ The selector of the words names the
+// field: a tile holds a `wa-textarea` of its own for the alt text, and a bare tag name would
+// find that one in a post whose words come after it.
+const BODY = "wa-textarea[name='posts[][text]']";
+const PHOTO = "[data-social-post-target='photo']";
 
 /**
  * The Social media page: the posts of a thread, the schedule fields, the label of the submit
@@ -39,10 +46,11 @@ export default class extends Controller {
     // token that the owner deletes and writes again gets its handles back.
     this.mentionValues = new Map();
 
-    // ⚠️ It starts at false and not undefined, thus the first `validate()` of a draft with no
-    // Markdown does nothing at all. Without that the else branch below would run at connect and
-    // untick each row that the server rendered as ticked.
-    this.markdownOn = false;
+    // ⚠️ It starts at null and not undefined, thus the first `validate()` of a draft with no
+    // Markdown link and no photo does nothing at all. Without that the restore branch of
+    // `applyBlueskyOnly` would run at connect and untick each row that the server rendered as
+    // ticked.
+    this.blueskyOnlyReason = null;
 
     // ⚠️ The date and the time carry no zone. This is what gives them a meaning, and it is the
     // reason that a date field is safe here and was not safe in the Republish dialog. With no
@@ -105,7 +113,7 @@ export default class extends Controller {
     this.validate();
 
     // The words are the point of a new post, thus the caret goes there.
-    this.postTargets[this.postTargets.length - 1]?.querySelector("wa-textarea")?.focus();
+    this.postTargets[this.postTargets.length - 1]?.querySelector(BODY)?.focus();
   }
 
   /**
@@ -175,18 +183,19 @@ export default class extends Controller {
     const next = posts[Math.min(index, posts.length - 1)];
     const control =
       next?.querySelector("[data-social-target='handle']:not([hidden])") ||
-      next?.querySelector("wa-textarea") ||
+      next?.querySelector(BODY) ||
       this.addTarget;
     control?.focus();
   }
 
   /**
    * @param {HTMLElement} post
-   * @returns {boolean} True when that post holds words or a link.
+   * @returns {boolean} True when that post holds words, a link, or a photo.
    */
   hasContent(post) {
-    return !!(post.querySelector("wa-textarea")?.value?.trim() ||
-              post.querySelector("wa-input[type='url']")?.value?.trim());
+    return !!(post.querySelector(BODY)?.value?.trim() ||
+              post.querySelector("wa-input[type='url']")?.value?.trim() ||
+              post.querySelector(PHOTO));
   }
 
   /**
@@ -362,8 +371,8 @@ export default class extends Controller {
     this.pushMentions();
     this.scheduleMentionScan();
     // ⚠️ It runs BEFORE `canPost`, which reads the ticks that this method can change.
-    this.applyMarkdown();
-    // ⚠️ And AFTER it, because a Markdown link unticks and disables the Threads row.
+    this.applyBlueskyOnly();
+    // ⚠️ And AFTER it, because a Markdown link or a photo unticks and disables the Threads row.
     this.applyTopic();
 
     this.submitTarget.disabled = !this.canPost;
@@ -381,29 +390,32 @@ export default class extends Controller {
   }
 
   /**
-   * Turns the rows of Mastodon and Threads off while the draft holds a Markdown link.
+   * Turns the rows of Mastodon and Threads off while the draft holds a Markdown link or a photo.
    *
    * ⚠️ **Only Bluesky has rich text.** There a link is a facet: the words carry the address, and
    * the URL uses none of the 300 characters. The other two post plain words, thus the same draft
-   * would reach a reader as `[my post](https://…)`. `Admin::SocialController#markdown_network_error`
-   * refuses such a request as well, because a row that a browser cannot tick a hand-written request
-   * can.
+   * would reach a reader as `[my post](https://…)`. **And only Bluesky takes a photo** from this
+   * page. `Admin::SocialController#markdown_network_error` and `#photos_network_error` refuse
+   * such a request as well, because a row that a browser cannot tick a hand-written request can.
    *
-   * ⚠️ **It does nothing while the state has not changed**, and that is not only an optimisation:
+   * ⚠️ **It does nothing while the reason has not changed**, and that is not only an optimisation:
    * this runs at each keystroke, thus a restore at every one of them would put back a tick that the
-   * owner had just taken off.
+   * owner had just taken off. A change from one reason to the other only changes the hint line.
    *
    * ⚠️ It reads the `markdownNetwork` targets, which the view puts on the CONNECTED rows of those
    * two networks alone. A row with no account is disabled for its own reason, and it must never
    * come back on.
    */
-  applyMarkdown() {
-    const on = this.hasMarkdown;
-    if (on === this.markdownOn) return;
+  applyBlueskyOnly() {
+    const reason = this.hasMarkdown ? "markdown" : this.hasPhotos ? "photos" : null;
+    if (reason === this.blueskyOnlyReason) return;
 
-    this.markdownOn = on;
+    const on = !!reason;
+    const wasOn = !!this.blueskyOnlyReason;
+    this.blueskyOnlyReason = reason;
+
     this.markdownNetworkTargets.forEach((box) => {
-      if (on) {
+      if (on && !wasOn) {
         // ⚠️ It keeps the tick that the owner had, thus a link that they write and then remove
         // gives the draft its networks back. It keeps a value that is already there: Turbo puts
         // this attribute in its snapshot, and a fresh controller on a restoration visit would
@@ -412,17 +424,19 @@ export default class extends Controller {
           box.dataset.wasChecked = box.checked ? "true" : "false";
         }
         box.checked = false;
-      } else if ("wasChecked" in box.dataset) {
+      } else if (!on && "wasChecked" in box.dataset) {
         box.checked = box.dataset.wasChecked === "true";
         delete box.dataset.wasChecked;
       }
       box.disabled = on;
 
-      // The hint says why the row is off. One of the two lines shows at a time.
+      // The hint says why the row is off. One of the three lines shows at a time.
       const account = box.querySelector("[data-network-account]");
-      const reason = box.querySelector("[data-network-markdown]");
+      const markdown = box.querySelector("[data-network-markdown]");
+      const photos = box.querySelector("[data-network-photos]");
       if (account) account.hidden = on;
-      if (reason) reason.hidden = !on;
+      if (markdown) markdown.hidden = reason !== "markdown";
+      if (photos) photos.hidden = reason !== "photos";
     });
   }
 
@@ -430,7 +444,7 @@ export default class extends Controller {
    * Shows the topic field only while the Threads row can take a post and is ticked.
    *
    * ⚠️ **It reads `disabled` as well as `checked`.** A row with no account is disabled, and a
-   * Markdown link disables that row too, thus one rule covers both and `applyMarkdown` above runs
+   * Markdown link or a photo disables that row too, thus one rule covers both and `applyBlueskyOnly` above runs
    * first.
    *
    * ⚠️ It never clears the field. A topic that the owner wrote survives an untick and a tick
@@ -449,7 +463,16 @@ export default class extends Controller {
    * decides the whole draft. `Admin::SocialController#markdown?` reads it the same way.
    */
   get hasMarkdown() {
-    return this.postTargets.some((post) => hasLinks(post.querySelector("wa-textarea")?.value ?? ""));
+    return this.postTargets.some((post) => hasLinks(post.querySelector(BODY)?.value ?? ""));
+  }
+
+  /**
+   * @returns {boolean} True when any post of the thread holds a photo, and that includes one
+   *   whose upload is still out. It is THREAD-LEVEL, as `hasMarkdown` is, and
+   *   `Admin::SocialController#photos?` reads it the same way.
+   */
+  get hasPhotos() {
+    return this.postTargets.some((post) => post.querySelector(PHOTO));
   }
 
   /**
@@ -534,7 +557,7 @@ export default class extends Controller {
     // handle will show.
     const wanted = new Map();
     this.postTargets.forEach((post) => {
-      const words = post.querySelector("wa-textarea")?.value ?? "";
+      const words = post.querySelector(BODY)?.value ?? "";
       tokensOf(words).forEach((token) => {
         const key = mentionKey(token);
         if (!wanted.has(key)) wanted.set(key, token);
@@ -647,12 +670,16 @@ export default class extends Controller {
     // at all in it. A block that the owner added and left empty turns the button off instead, thus
     // the page never asks them to guess which post is the problem.
     const posts = this.postTargets;
-    if (posts.some((post) => !post.querySelector("wa-textarea")?.value?.trim())) return false;
+    if (posts.some((post) => !post.querySelector(BODY)?.value?.trim())) return false;
 
     // ⚠️ It reads the count line of each post in place of counting again. That line belongs to the
     // `social-post` controller, which writes it from the same `input` event: the field is the
     // target of that event and this form is above it, thus the count is already up to date here.
     if (posts.some((post) => post.querySelector(".social__count--over"))) return false;
+
+    // A photo whose upload is still out has no id yet, and an alt text past its limit is refused
+    // by the action. Both read from the tile, which the `social-post` controller marks.
+    if (posts.some((post) => post.querySelector(".social-photo--uploading, .social-photo--alt-over"))) return false;
 
     if (!this.networks.some((box) => box.checked && !box.disabled)) return false;
 
@@ -730,7 +757,8 @@ export default class extends Controller {
    * ⚠️ **It sends the CSRF token in a header of its own.** The admin does not skip the forgery
    * protection, thus this POST needs that token. The body of the form carries one as well, and the
    * header does not depend on it: neither the test environment nor a page that a spec renders has
-   * a token at all, thus no spec here can prove that the body alone would pass.
+   * a token at all, thus no spec here can prove that the body alone would pass. `lib/csrf.js`
+   * makes the header.
    */
   async preview() {
     this.previewBodyTarget.replaceChildren();
@@ -747,7 +775,7 @@ export default class extends Controller {
     try {
       const response = await fetch(this.previewUrlValue, {
         method: "POST",
-        headers: { Accept: "application/json", ...this.csrfHeader },
+        headers: { Accept: "application/json", ...csrfHeader() },
         body: new FormData(this.element),
         signal: this.previewAborter.signal,
       });
@@ -760,20 +788,6 @@ export default class extends Controller {
     } finally {
       if (seq === this.previewSeq) this.previewSpinnerTarget.hidden = true;
     }
-  }
-
-  /**
-   * The CSRF token of the page, as a header.
-   *
-   * ⚠️ `csrf_meta_tags` renders nothing where the forgery protection is off, which is the test
-   * environment. Thus this gives an empty object there and the header is absent, and the request
-   * still passes.
-   * @returns {object}
-   */
-  get csrfHeader() {
-    const token = document.querySelector("meta[name='csrf-token']")?.content;
-
-    return token ? { "X-CSRF-Token": token } : {};
   }
 
   /**
@@ -843,6 +857,19 @@ export default class extends Controller {
     // The website card that Bluesky renders for the link. ⚠️ Only that network carries one: this
     // app builds its embed, and Meta renders its own attachment for Threads.
     this.fillLinkCard(card, post.card);
+
+    // The photos of a Bluesky post, as thumbnails. ⚠️ Only that network carries them, thus the
+    // action sends them on its row alone. Each `src` is the path of our own store.
+    const photos = card.querySelector("[data-preview-photos]");
+    if (post.photos?.length) {
+      photos.replaceChildren(...post.photos.map((photo) => {
+        const image = document.createElement("img");
+        image.src = photo.path;
+        image.alt = photo.alt ?? "";
+        return image;
+      }));
+      photos.hidden = false;
+    }
 
     return card;
   }

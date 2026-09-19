@@ -4,7 +4,8 @@
     ⚠️ **Both fields must render for every block, in the same order.** The names are `posts[][text]`
     and `posts[][link]`, and Rails starts a new hash when a key repeats. A block that omits one
     field would move each pair below it by one. There is no index in the name, on purpose: an index
-    needs renumbering in the browser at each add and each remove.
+    needs renumbering in the browser at each add and each remove. The tiles of the photos come
+    AFTER those two fields, and `text` must stay the first field of a block.
 
     ⚠️ Each block is its own `social-post` controller. That is what keeps the count, the spinner,
     and the preview of one post away from the others.
@@ -16,8 +17,11 @@
      data-admin-i18n="<%= admin_i18n_data("admin.js.social_post", shared: "admin.js.shared") %>"
      data-social-post-bluesky-mentions="<%= mentions_json %>"
      data-social-post-preview-url-value="<%= social_preview_path %>"
+     data-social-post-upload-url-value="<%= social_photos_path %>"
      data-social-post-limit-value="<%= limit %>"
-     data-social-post-warn-at-value="<%= warn_at %>">
+     data-social-post-warn-at-value="<%= warn_at %>"
+     data-social-post-max-photos-value="<%= max_photos %>"
+     data-social-post-alt-limit-value="<%= alt_limit %>">
 
   <%# A line between two posts. It is on each block and the first one hides it, thus a block that
       the browser clones needs no extra markup. %>
@@ -76,10 +80,31 @@
       <wa-button class="social-post__tool" appearance="plain" size="small"
                  data-social-post-target="linkButton"
                  data-action="click->social-post#showLink"
-                 <%= "disabled" if post.link.present? %>>
+                 <%= "disabled" if post.link.present? || post.photos.any? %>>
         <%= raw icon_svg("classic", "light", "link") %>
         <span class="wa-visually-hidden"><%= t(".add_link") %></span>
       </wa-button>
+
+      <%# The photo button. ⚠️ **A post takes photos OR a link, and not both**: Bluesky renders one
+          embed. Thus this button is disabled while the post has a link, and the link button is
+          disabled while it has a photo. It is also disabled at the most photos. The server renders
+          both states, thus a page that renders again after a refusal shows them at once. %>
+      <wa-button class="social-post__tool" appearance="plain" size="small"
+                 data-social-post-target="photoButton"
+                 data-action="click->social-post#pickPhotos"
+                 <%= "disabled" if post.link.present? || post.photos.length >= max_photos %>>
+        <%= raw icon_svg("classic", "light", "images") %>
+        <span class="wa-visually-hidden"><%= t(".add_photos") %></span>
+      </wa-button>
+
+      <%# ⚠️ A native file input, on purpose, and the one exception to the rule that a Web Awesome
+          component takes the place of a native element. `wa-file-input` is a dropzone with a file
+          list of its own, and this page draws its own tiles. The button above is the accessible
+          control, and this input is hidden and has NO name: the files never go with the form. The
+          controller uploads each one at the moment the owner picks it. %>
+      <input type="file" accept="image/*" multiple hidden tabindex="-1"
+             data-social-post-target="fileInput"
+             data-action="change->social-post#filesPicked">
 
       <%# The server writes the first value, thus the line has its height before the JavaScript runs
           and the page does not move. The controller writes each value after that.
@@ -101,6 +126,26 @@
                           data-social-post-target="ring"></wa-progress-ring>
       </div>
     </div>
+
+    <%# The photos of the post, one tile for each. The controller adds a tile from the template
+        below at each upload, and the server renders the tiles of a draft that comes back after a
+        refusal. ⚠️ It is hidden while it holds nothing: it is a child of the grid above, and an
+        empty row would still take a `row-gap`. It needs a rule for `[hidden]`; refer to
+        _social.scss. The drop target of a drag, with the same rule as the list of the posts. %>
+    <div class="social-post__photos" data-social-post-target="photos"
+         data-action="dragover->social-post#dragOverPhoto drop->social-post#dropPhoto"
+         <%= "hidden" if post.photos.empty? %>>
+      <% post.photos.each do |photo| %>
+        <%= render "photo", photo: photo %>
+      <% end %>
+    </div>
+
+    <%# ⚠️ One empty tile, which the controller clones. The browser renders none of a <template>,
+        thus its fields are not in the form. This template is inside the template of a post, and a
+        clone of that one carries this one with it. %>
+    <template data-social-post-target="photoTemplate">
+      <%= render "photo", photo: SocialPresenter::Photo.new %>
+    </template>
 
     <%# ⚠️ The link is OPTIONAL and it has no `required`: a post can be words alone. There is no
         list of the articles here, on purpose: the card comes from the og: tags of whatever page

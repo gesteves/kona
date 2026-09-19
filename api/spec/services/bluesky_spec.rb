@@ -172,6 +172,97 @@ RSpec.describe Bluesky do
       expect(@sent).not_to have_key("validate")
     end
 
+    describe "the photos" do
+      # Captures each blob that uploadBlob sent, in order.
+      def stub_photo_uploads(fail_at: nil)
+        uploads = []
+        allow(HTTParty).to receive(:post)
+          .with(a_string_including("com.atproto.repo.uploadBlob"), anything) do |_url, options|
+            uploads << options
+            if uploads.length == fail_at
+              instance_double(HTTParty::Response, success?: false, code: 500, body: "")
+            else
+              instance_double(HTTParty::Response, success?: true, code: 200,
+                              body: { blob: { "$type" => "blob", "ref" => uploads.length } }.to_json)
+            end
+          end
+        uploads
+      end
+
+      def photo(alt = "A cat", width: 4, height: 3)
+        { bytes: "\xFF\xD8jpeg".b, width: width, height: height, alt: alt }
+      end
+
+      it "makes an app.bsky.embed.images for four photos or fewer, with the alt and the ratio" do
+        uploads = stub_photo_uploads
+
+        service.post!(rkey: "3kabc", text: "Photos", photos: [ photo("A cat"), photo("", width: 3, height: 4) ])
+
+        embed = @sent["record"]["embed"]
+        expect(embed["$type"]).to eq("app.bsky.embed.images")
+        expect(embed["images"].length).to eq(2)
+        expect(embed["images"].first).to eq("image" => { "$type" => "blob", "ref" => 1 }, "alt" => "A cat",
+                                            "aspectRatio" => { "width" => 4, "height" => 3 })
+        expect(embed["images"].last["alt"]).to eq("")
+        expect(embed["images"].last["aspectRatio"]).to eq("width" => 3, "height" => 4)
+        expect(embed["images"].first).not_to have_key("$type")
+        expect(uploads.length).to eq(2)
+        expect(uploads.first[:headers]["Content-Type"]).to eq("image/jpeg")
+        expect(uploads.first[:body]).to eq("\xFF\xD8jpeg".b)
+      end
+
+      it "keeps the images embed at exactly four photos" do
+        stub_photo_uploads
+
+        service.post!(rkey: "3kabc", text: "Photos", photos: Array.new(4) { photo })
+
+        expect(@sent["record"]["embed"]["$type"]).to eq("app.bsky.embed.images")
+      end
+
+      # ⚠️ Each item of a gallery is a union member, thus it carries its `$type`.
+      it "makes an app.bsky.embed.gallery for more than four photos" do
+        stub_photo_uploads
+
+        service.post!(rkey: "3kabc", text: "Photos", photos: Array.new(5) { photo })
+
+        embed = @sent["record"]["embed"]
+        expect(embed["$type"]).to eq("app.bsky.embed.gallery")
+        expect(embed["items"].length).to eq(5)
+        expect(embed["items"].map { |item| item["$type"] }).to all(eq("app.bsky.embed.gallery#image"))
+        expect(embed["items"].first).to include("image", "alt", "aspectRatio")
+      end
+
+      it "makes the alt text no longer than the limit" do
+        stub_photo_uploads
+
+        service.post!(rkey: "3kabc", text: "Photos", photos: [ photo("a" * 2100) ])
+
+        expect(@sent["record"]["embed"]["images"].first["alt"].length).to eq(described_class::MAX_ALT_GRAPHEMES)
+      end
+
+      # ⚠️ A post with three of its four photos is not the post that the owner wrote.
+      it "raises and writes no record when one upload fails" do
+        stub_photo_uploads(fail_at: 2)
+
+        expect { service.post!(rkey: "3kabc", text: "Photos", photos: Array.new(3) { photo }) }
+          .to raise_error(/upload a photo/)
+        expect(@sent).to be_nil
+      end
+
+      it "refuses a card and photos together" do
+        card = OpenGraph::Card.new(url: "https://example.test/post/", title: "A title",
+                                   description: nil, image_url: nil)
+
+        expect { service.post!(rkey: "3kabc", text: "Photos", card: card, photos: [ photo ]) }
+          .to raise_error(ArgumentError)
+      end
+
+      it "refuses more photos than the most, with an error that no retry can correct" do
+        expect { service.post!(rkey: "3kabc", text: "Photos", photos: Array.new(described_class::MAX_IMAGES + 1) { photo }) }
+          .to raise_error(ApplicationJob::PermanentError, /at most/)
+      end
+    end
+
     describe "the website card" do
       let(:card) do
         OpenGraph::Card.new(url: "https://example.test/post/", title: "A title",

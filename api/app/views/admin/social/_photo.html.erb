@@ -1,0 +1,45 @@
+<%# One photo of a post: its thumbnail, its two controls, its id, and its alt text.
+
+    ⚠️ **The fields render in THIS order in every tile.** The names are `posts[][photos][]` and
+    `posts[][alts][]`, and Rack reads the two arrays by position. A tile that omits one field
+    would move each alt text after it by one. The order of the tiles in the document IS the order
+    of the photos, thus a reorder moves the tile and rewrites nothing.
+
+    ⚠️ The GRIP carries `draggable`, and never the tile: a draggable tile takes the pointer away
+    from the alt field inside it. The grip is a button and it takes the arrow keys, because a drag
+    needs a pointer and this page must work without one. %>
+<div class="social-photo" data-social-post-target="photo">
+  <%# ⚠️ No handler on `error`. A thumbnail that fails to load must not take the photo off the
+      draft: the submit refuses a photo that is gone, with a message. %>
+  <img class="social-photo__image" alt=""
+       <% if photo.id.present? %>src="<%= social_photo_path(photo.id) %>"<% end %>
+       data-photo-image>
+  <%# It spins while the upload is out. It needs a rule for `[hidden]`; refer to _social.scss. %>
+  <wa-spinner class="social-photo__spinner" data-photo-spinner hidden></wa-spinner>
+
+  <div class="social-photo__controls">
+    <wa-button class="social-photo__grip" appearance="plain" size="small" draggable="true"
+               data-action="dragstart->social-post#dragStartPhoto dragend->social-post#dragEndPhoto
+                            keydown->social-post#movePhotoByKey">
+      <%= raw icon_svg("classic", "light", "grip-dots") %>
+      <span class="wa-visually-hidden"><%= t(".reorder_photo") %></span>
+    </wa-button>
+    <wa-button class="social-photo__remove" appearance="plain" size="small"
+               data-action="click->social-post#removePhoto">
+      <%= raw icon_svg("classic", "light", "xmark") %>
+      <span class="wa-visually-hidden"><%= t(".remove_photo") %></span>
+    </wa-button>
+  </div>
+
+  <%# The id that the upload answered with. It is empty while the upload is out, and the action
+      drops such a pair with its alt text. %>
+  <input type="hidden" name="posts[][photos][]" value="<%= photo.id %>" data-photo-id>
+
+  <%# ⚠️ No `maxlength`: it measures UTF-16 code units, and Bluesky counts graphemes. The line
+      below says when the text is past the limit, and the submit button then stays off. %>
+  <wa-textarea class="social-photo__alt" name="posts[][alts][]" label="<%= t(".photo_alt") %>"
+               rows="2" resize="auto" size="small" value="<%= photo.alt %>"
+               data-photo-alt data-action="input->social-post#countAlt">
+  </wa-textarea>
+  <span class="social-photo__alt-over wa-caption-s" data-photo-alt-over hidden></span>
+</div>

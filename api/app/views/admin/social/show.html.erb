@@ -46,7 +46,8 @@
           <% @social.posts.each do |post| %>
             <%= render "post", post: post, limit: @social.body_limit, warn_at: @social.warn_at,
                                count: @social.bluesky_length(post),
-                               mentions_json: @social.bluesky_values_json %>
+                               mentions_json: @social.bluesky_values_json,
+                               max_photos: @social.max_photos, alt_limit: @social.alt_limit %>
           <% end %>
         </div>
 
@@ -55,7 +56,8 @@
         <template data-social-target="template">
           <%= render "post", post: SocialPresenter::Post.new, limit: @social.body_limit,
                              warn_at: @social.warn_at, count: 0,
-                             mentions_json: @social.bluesky_values_json %>
+                             mentions_json: @social.bluesky_values_json,
+                             max_photos: @social.max_photos, alt_limit: @social.alt_limit %>
         </template>
 
         <div class="wa-cluster wa-gap-s">
@@ -115,9 +117,9 @@
   <wa-checkbox-group label="<%= t(".post_to") %>">
     <% @social.networks.each do |network| %>
       <% if network.connected? %>
-        <%# ⚠️ The hint is a SLOT and not the `hint` attribute, because a Markdown link REPLACES that
-            line. Only Bluesky can take one, thus the composer unticks and disables the other two
-            rows, and the second line below says why.
+        <%# ⚠️ The hint is a SLOT and not the `hint` attribute, because a Markdown link or a photo
+            REPLACES that line. Only Bluesky can take either one, thus the composer unticks and
+            disables the other two rows, and the line for the reason says why.
             ⚠️ The `markdownNetwork` target marks exactly those two rows. A row with no account is
             disabled in the branch below, and social#applyMarkdown must never turn one of those
             back on. %>
@@ -128,6 +130,7 @@
           <span slot="hint">
             <span class="social__hint-line" data-network-account><%= network.account_line %></span>
             <span class="social__hint-line" data-network-markdown hidden><%= t(".markdown_disabled") %></span>
+            <span class="social__hint-line" data-network-photos hidden><%= t(".photos_disabled") %></span>
           </span>
         </wa-checkbox>
       <% else %>
@@ -258,6 +261,9 @@
       <%# The link of a post that keeps it OUT of the text. ⚠️ It uses none of the characters of
           that network, thus the count beside it does not hold it. %>
       <p class="social-preview__link" data-preview-link hidden></p>
+
+      <%# The photos of a Bluesky post, as small thumbnails. ⚠️ Only that network carries them. %>
+      <div class="social-preview__photos" data-preview-photos hidden></div>
 
       <%# The website card that Bluesky will render for the link. ⚠️ `with-media` follows the
           picture and it is not in the markup: <wa-card> has no `:has-slotted` to read, thus a card

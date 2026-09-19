@@ -22,6 +22,24 @@ RSpec.describe SocialPresenter do
   end
 
   describe "the draft" do
+    # ⚠️ The order of the photos is the order of the tiles, and a failed submit renders them again.
+    it "puts the photos of each post back, in order" do
+      presenter = described_class.new(
+        networks: [ network ],
+        posts: [ { text: "One", link: "", photos: [ { id: "a" * 32, alt: "A cat" }, { id: "b" * 32, alt: "" } ] } ]
+      )
+
+      photos = presenter.posts.first.photos
+      expect(photos.map(&:id)).to eq([ "a" * 32, "b" * 32 ])
+      expect(photos.map(&:alt)).to eq([ "A cat", "" ])
+      expect(described_class::Post.new.photos).to eq([])
+    end
+
+    it "pins the most photos and the alt limit to the numbers of Bluesky" do
+      expect(described_class::MAX_PHOTOS).to eq(Bluesky::MAX_IMAGES)
+      expect(described_class::ALT_LIMIT).to eq(Bluesky::MAX_ALT_GRAPHEMES)
+    end
+
     # ⚠️ A failed submit renders the page again, thus the owner must not lose what they wrote.
     it "puts each submitted post back, in order" do
       presenter = described_class.new(

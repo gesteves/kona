@@ -318,6 +318,20 @@
     display: none;
   }
 
+  // The photos of the post, one tile for each, in rows that wrap.
+  &__photos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wa-space-s);
+    margin-block-start: var(--wa-space-2xs);
+
+    // ⚠️ The same rule as the schedule block: this sets a display, thus `[hidden]` needs a rule
+    // of its own. It is hidden while it holds no tile.
+    &[hidden] {
+      display: none;
+    }
+  }
+
   // The X inside the link field, which takes the owner back to the button of the toolbar.
   //
   // ⚠️ It is sized in `em` and not with `--wa-form-control-height`, which is the height of the
@@ -326,6 +340,79 @@
     aspect-ratio: 1;
     padding: 0;
     width: 1.5em;
+  }
+}
+
+// One photo of a post: its thumbnail, its two controls below it, and its alt text.
+.social-photo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wa-space-2xs);
+  position: relative;
+  width: 12rem;
+
+  &__image {
+    aspect-ratio: 1;
+    background: var(--wa-color-surface-lowered);
+    border-radius: var(--wa-border-radius-m);
+    display: block;
+    object-fit: cover;
+    width: 7rem;
+  }
+
+  // The upload is out: the picture is the file itself, dimmed, with the spinner over it.
+  &--uploading &__image {
+    opacity: 0.5;
+  }
+
+  &__spinner {
+    inset-block-start: calc(3.5rem - 0.5em);
+    inset-inline-start: calc(3.5rem - 0.5em);
+    position: absolute;
+
+    // ⚠️ The same rule as the spinner of a link: a rule of Web Awesome gives <wa-spinner> a
+    // display, and an author rule beats the `[hidden]` of the browser whatever its layer.
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  // The tile that the pointer holds. It stays in the flow, thus the others move around it.
+  &--dragging {
+    opacity: 0.4;
+  }
+
+  &__controls {
+    display: flex;
+    gap: var(--wa-space-2xs);
+  }
+
+  &__grip {
+    cursor: grab;
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  // ⚠️ <wa-button> makes a square icon button only for a <wa-icon> child, and this app never uses
+  // that element. Thus the square is here, as it is for each other icon button of this page.
+  &__grip::part(button),
+  &__remove::part(button) {
+    aspect-ratio: 1;
+    padding: 0;
+    width: 1.75em;
+  }
+
+  // The line below the alt text, for a text past its limit. The words in it say the number, and
+  // `social#canPost` reads the class on the tile.
+  &__alt-over {
+    color: var(--wa-color-danger-on-quiet);
+    font-weight: var(--wa-font-weight-semibold);
+
+    &[hidden] {
+      display: none;
+    }
   }
 }
 
@@ -452,6 +539,22 @@
     overflow-wrap: anywhere;
   }
 
+  // The photos of a Bluesky post, as small thumbnails below the words.
+  &__photos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wa-space-2xs);
+    margin-block-start: var(--wa-space-s);
+
+    img {
+      aspect-ratio: 1;
+      border-radius: var(--wa-border-radius-s);
+      display: block;
+      object-fit: cover;
+      width: 4rem;
+    }
+  }
+
   // ⚠️ **Each of these needs a rule of its own**, and the `hidden` attribute alone does nothing for
   // them. `[hidden] { display: none }` of the browser is at the same specificity as a class, and
   // our stylesheet comes after it. `&__group` sets a display above, thus `social#filterPreview`
@@ -464,7 +567,8 @@
   &__group[hidden],
   &__empty[hidden],
   &__topic[hidden],
-  &__link[hidden] {
+  &__link[hidden],
+  &__photos[hidden] {
     display: none;
   }
 }

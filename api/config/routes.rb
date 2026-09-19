@@ -159,6 +159,11 @@ Rails.application.routes.draw do
       # The image is a proxy, and not a link to the other host: the CSP of the admin has
       # `img-src :self`. Refer to **The Social media page** in CLAUDE.md.
       # ⚠️ It is a POST, and not a GET: a draft is much larger than a query string should carry.
+      # The photos of a draft. The composer uploads each one at the moment the owner picks it, and
+      # the form then carries the id. ⚠️ Both stay above `social/preview` for the same reason as
+      # the image path below.
+      post "social/photos"     => "social_photos#create", as: :social_photos
+      get  "social/photos/:id" => "social_photos#show",   as: :social_photo, constraints: { id: /\h{32}/ }
       post "social/preview/text"  => "social#preview_text",  as: :social_preview_text
       get "social/preview/image" => "social#preview_image", as: :social_preview_image
       get "social/preview"       => "social#preview",       as: :social_preview

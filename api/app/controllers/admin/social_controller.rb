@@ -40,6 +40,11 @@ module Admin
     # page is a live HTTP call to another site.
     CARD_READ_BUDGET = 8
 
+    # How much longer than its schedule a photo stays in Redis: the 24-hour retry window of the
+    # job and an hour more. ⚠️ Without this a post that waits more than a day would find its
+    # photos gone, and the job would then fail it.
+    PHOTO_KEEP_MARGIN = 25.hours
+
     # The shape of the two schedule fields, as the browser sends them. ⚠️ `Time.zone.parse` reads
     # "garbage 09:00" as today at 09:00, thus the action must match the shape before it parses.
     DATE_PATTERN = /\A\d{4}-\d{2}-\d{2}\z/
@@ -78,6 +83,7 @@ module Admin
       # carries the key of its own post, and that is what makes a retry safe.
       keys = posts.map { Bluesky.new_tid }
       at = scheduled_at
+      keep_photos(at)
 
       # ⚠️ Only the FIRST post of each network is scheduled. That job adds the job of the post below
       # it when it succeeds, thus the rest of a thread goes out with it and needs no time of its own.
@@ -89,6 +95,11 @@ module Admin
           # one topic for each post, and no documentation says that a reply inherits the topic of
           # its root. Thus the composer sends it with every post.
           entry["topic"] = topic if network == SocialPresenter::TOPIC_NETWORK && topic.present?
+          # ⚠️ The photos go to the ONE network that takes them, as the topic does. A draft with a
+          # photo can tick Bluesky alone, thus no other payload could use them.
+          if network == SocialPresenter::PHOTO_NETWORK && post[:photos].any?
+            entry["photos"] = post[:photos].map { |photo| { "id" => photo[:id], "alt" => photo[:alt] } }
+          end
           entry
         end
 
@@ -126,11 +137,11 @@ module Admin
     # ⚠️ It is a POST, and the two previews below are GET. A draft is as much as MAX_POSTS posts of
     # 300 characters and a mention map, thus a query string is the wrong shape for it.
     def preview_text
-      # ⚠️ A draft with a Markdown link shows BLUESKY alone, because it can go nowhere else. To
-      # render the other two would show a text that this app refuses to post. The composer turns
-      # their checkboxes off by the same rule, thus the page and the dialog agree.
+      # ⚠️ A draft with a Markdown link or a photo shows BLUESKY alone, because it can go nowhere
+      # else. To render the other two would show a text that this app refuses to post. The
+      # composer turns their checkboxes off by the same rule, thus the page and the dialog agree.
       networks = social_networks.select(&:connected?)
-      networks = networks.select { |network| network.markdown? } if markdown?
+      networks = networks.select { |network| network.markdown? } if bluesky_only?
 
       # ⚠️ It groups by NETWORK and not by post, thus the panel reads as the thread reads: each
       # network in turn, and its posts in the order that they go out.
@@ -246,13 +257,43 @@ module Admin
     #
     # A block with nothing at all in it is dropped: an empty block that the owner added and left
     # alone must not refuse the whole draft.
-    # @return [Array<Hash>] `[{ text:, link: }, …]`
+    # @return [Array<Hash>] `[{ text:, link:, photos: }, …]`
     def posts
       # ⚠️ A block that is not a hash is not a block, for the reason that #mention_rows gives.
       @posts ||= Array(params[:posts])
                  .select { |post| post.is_a?(ActionController::Parameters) || post.is_a?(Hash) }
-                 .map { |post| { text: post[:text].to_s.strip, link: post[:link].to_s.strip } }
-                 .reject { |post| post[:text].blank? && post[:link].blank? }
+                 .map { |post| { text: post[:text].to_s.strip, link: post[:link].to_s.strip, photos: photos_of(post) } }
+                 .reject { |post| post[:text].blank? && post[:link].blank? && post[:photos].empty? }
+    end
+
+    # The photos of one block, in order, each with its alt text.
+    #
+    # ⚠️ The form sends `posts[][photos][]` and `posts[][alts][]`, and the two arrays match by
+    # POSITION. Thus this pairs them first and drops a pair after that: a tile whose upload is
+    # still out sends an empty id, and a drop of the id alone would move each alt text after it
+    # by one. An id with the wrong shape is dropped the same way.
+    # @param post [ActionController::Parameters, Hash]
+    # @return [Array<Hash>] `[{ id:, alt: }, …]`
+    def photos_of(post)
+      ids = Array(post[:photos]).map(&:to_s)
+      alts = Array(post[:alts]).map(&:to_s)
+
+      ids.each_with_index.filter_map do |id, index|
+        next unless SocialPhotos.id?(id)
+
+        { id: id, alt: alts[index].to_s.strip }
+      end
+    end
+
+    # Gives each photo of the draft a TTL that outlasts the post and its retries.
+    # @param at [ActiveSupport::TimeWithZone, nil] The moment of the post, or nil for now.
+    # @return [void]
+    def keep_photos(at)
+      ids = posts.flat_map { |post| post[:photos].map { |photo| photo[:id] } }
+      return if ids.empty?
+
+      wait = at ? at - Time.current : 0
+      SocialPhotos.new.keep(ids, (wait + PHOTO_KEEP_MARGIN).to_i)
     end
 
     # The mention map of this draft, as the form sent it.
@@ -336,7 +377,7 @@ module Admin
 
       return t("admin.social.errors.no_network") if selected_networks.empty?
 
-      message = markdown_network_error
+      message = markdown_network_error || photos_network_error
       return message if message
 
       message = topic_error
@@ -375,11 +416,42 @@ module Admin
                             count: Bluesky.post_length(counted), limit: Bluesky::MAX_GRAPHEMES)
       end
 
-      message = network_length_error(post, index)
+      message = network_length_error(post, index) || photo_error(post, index)
       return message if message
 
       # ⚠️ The link is optional. It is only refused when it is there and it is not http or https.
       return post_message("bad_link", index) if post[:link].present? && !OpenGraph.http_url?(post[:link])
+
+      nil
+    end
+
+    # Refuses the photos of one post that Bluesky cannot take.
+    #
+    # ⚠️ **A post takes photos OR a link.** Bluesky renders one embed, thus the composer disables
+    # the one button while the other has a value, and this refuses a request that sends both.
+    # ⚠️ A photo that is gone is one that the 24-hour draft TTL removed. Without this check the job
+    # would fail the post after the owner left the page.
+    # @param post [Hash]
+    # @param index [Integer]
+    # @return [String, nil]
+    def photo_error(post, index)
+      photos = post[:photos]
+      return nil if photos.empty?
+
+      return post_message("photos_and_link", index) if post[:link].present?
+      if photos.length > SocialPresenter::MAX_PHOTOS
+        return post_message("too_many_photos", index, limit: SocialPresenter::MAX_PHOTOS)
+      end
+
+      photos.each do |photo|
+        count = SocialText.graphemes(photo[:alt])
+        next if count <= SocialPresenter::ALT_LIMIT
+
+        return post_message("alt_too_long", index, count: count, limit: SocialPresenter::ALT_LIMIT)
+      end
+
+      store = SocialPhotos.new
+      return post_message("photo_missing", index) unless photos.all? { |photo| store.exists?(photo[:id]) }
 
       nil
     end
@@ -478,6 +550,29 @@ module Admin
       @markdown = posts.any? { |post| MarkdownLinks.links?(post[:text]) }
     end
 
+    # @return [Boolean] True when any post of the draft holds a photo. It is THREAD-LEVEL, as
+    #   #markdown? is.
+    def photos?
+      posts.any? { |post| post[:photos].any? }
+    end
+
+    # @return [Boolean] True when the draft can go to Bluesky alone.
+    def bluesky_only? = markdown? || photos?
+
+    # Refuses a draft with a photo that goes to a network that takes none.
+    #
+    # ⚠️ The composer already unticks and disables those two rows, and this is not a repeat of
+    # that, for the reason that #markdown_network_error gives.
+    # @return [String, nil]
+    def photos_network_error
+      return nil unless photos?
+
+      others = selected_networks - [ SocialPresenter::PHOTO_NETWORK ]
+      return nil if others.empty?
+
+      t("admin.social.errors.photos_network", networks: to_sentence(others))
+    end
+
     # Refuses a draft with a Markdown link that goes to a network with no rich text.
     #
     # ⚠️ **The composer already unticks and disables those two rows, and this is not a repeat of
@@ -504,7 +599,16 @@ module Admin
 
       { text: text, segments: segments(text, links), length: length, limit: limit,
         over: length > limit, topic: preview_topic(network.key),
-        link: preview_link(network.key, post), card: preview_card(network.key, post) }
+        link: preview_link(network.key, post), card: preview_card(network.key, post),
+        photos: preview_photos(network.key, post) }
+    end
+
+    # The photos of a post, for the row of the one network that takes them.
+    # @return [Array<Hash>, nil] `[{ path:, alt: }, …]`, or nil for each other network.
+    def preview_photos(network, post)
+      return nil unless network == SocialPresenter::PHOTO_NETWORK && post[:photos].any?
+
+      post[:photos].map { |photo| { path: social_photo_path(photo[:id]), alt: photo[:alt] } }
     end
 
     # ⚠️ It is NOT part of the text and it uses none of the characters of that network: Threads

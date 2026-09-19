@@ -18,6 +18,17 @@ class SocialPresenter
   # refuses a request that ticks one anyway.
   MARKDOWN_NETWORK = "bluesky".freeze
 
+  # The one network that takes a photo. ⚠️ A photo is a Bluesky embed, and the other two networks
+  # would need an upload of their own. The composer unticks and disables those two rows, exactly
+  # as it does for a Markdown link, and `Admin::SocialController#photos_network_error` refuses a
+  # request that ticks one anyway.
+  PHOTO_NETWORK = "bluesky".freeze
+
+  # The most photos on one post, and the limit of one alt text. ⚠️ The view writes both into the
+  # markup and social_post_controller.js reads them there.
+  MAX_PHOTOS = Bluesky::MAX_IMAGES
+  ALT_LIMIT = Bluesky::MAX_ALT_GRAPHEMES
+
   # The one network that takes a topic. ⚠️ `topic_tag` is a parameter of Meta and it has no
   # equivalent at Bluesky or Mastodon, thus the field shows only while that row is ticked.
   TOPIC_NETWORK = "threads".freeze
@@ -26,9 +37,18 @@ class SocialPresenter
   # network: Bluesky and Mastodon set no limit, and the limit of Threads is a rate of 250 each day.
   MAX_POSTS = 25
 
-  # One post of the thread. `link` is optional, thus a post can be words alone.
-  Post = Data.define(:text, :link) do
-    def initialize(text: "", link: "") = super(text: text.to_s, link: link.to_s)
+  # One photo of a post: the id that `SocialPhotos` made, and its alt text.
+  Photo = Data.define(:id, :alt) do
+    def initialize(id: "", alt: "") = super(id: id.to_s, alt: alt.to_s)
+  end
+
+  # One post of the thread. `link` and `photos` are optional, thus a post can be words alone.
+  # ⚠️ A post takes a link OR photos, and not both: Bluesky renders one embed.
+  Post = Data.define(:text, :link, :photos) do
+    def initialize(text: "", link: "", photos: [])
+      super(text: text.to_s, link: link.to_s,
+            photos: Array(photos).map { |photo| photo.is_a?(Photo) ? photo : Photo.new(**photo.to_h.symbolize_keys) })
+    end
   end
 
   # The example that each mention field shows. ⚠️ It is an example of a HANDLE only. A field also
@@ -85,7 +105,7 @@ class SocialPresenter
   attr_reader :mentions
 
   # @param networks [Array<Network>] The rows that the controller made.
-  # @param posts [Array<Hash>, nil] The thread to put back, as `[{ text:, link: }, …]`. ⚠️ A failed
+  # @param posts [Array<Hash>, nil] The thread to put back, as `[{ text:, link:, photos: }, …]`. ⚠️ A failed
   #   submit renders this page again, thus the owner must not lose what they wrote. Nil, the first
   #   load, gives one empty post.
   # @param selected [Array<String>, nil] The network keys to tick. ⚠️ Nil, the first load, ticks
@@ -194,6 +214,12 @@ class SocialPresenter
   # @return [Integer]
   def max_posts = MAX_POSTS
 
+  # @return [Integer]
+  def max_photos = MAX_PHOTOS
+
+  # @return [Integer]
+  def alt_limit = ALT_LIMIT
+
   # @param key [String] A network key.
   # @return [Boolean] True when the row is ticked.
   def selected?(key) = @selected.include?(key.to_s)
@@ -211,7 +237,7 @@ class SocialPresenter
   # @param posts [Array<Hash>, nil]
   # @return [Array<Post>]
   def build_posts(posts)
-    built = Array(posts).map { |post| Post.new(text: post[:text], link: post[:link]) }
+    built = Array(posts).map { |post| Post.new(text: post[:text], link: post[:link], photos: post[:photos]) }
     built.presence || [ Post.new ]
   end
 end

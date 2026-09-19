@@ -360,6 +360,8 @@ en:
         # The hint of a row that a Markdown link turned off. It replaces the account line while a
         # link is in the draft.
         markdown_disabled: "Only Bluesky takes a Markdown link."
+        # The hint of a row that a photo turned off, for the same reason.
+        photos_disabled: "Only Bluesky takes photos."
         mentions: "Mentions"
         mentions_hint_html: "Each network writes a mention in its own way. Give the handle for each
           one, or a plain name where that person has no account. An empty field posts the name with
@@ -380,6 +382,8 @@ en:
       post:
         # The label of the link button of the toolbar, which is an icon alone.
         add_link: "Add a link"
+        # The label of the photo button of the toolbar, which is an icon alone.
+        add_photos: "Add photos"
         body: "Post"
         body_placeholder: "What do you want to say?"
         # The two controls in the footer of the card of a link, which are icons alone.
@@ -390,6 +394,17 @@ en:
         # The X in the corner of the card of a link.
         remove_link: "Remove the link"
         reorder: "Reorder this post with the arrow keys"
+      # One tile of a photo.
+      photo:
+        photo_alt: "Alt text"
+        remove_photo: "Remove this photo"
+        reorder_photo: "Reorder this photo with the arrow keys"
+      # The answers of the upload of one photo. The composer shows each one in a toast.
+      photos:
+        no_file: "Pick a photo first."
+        not_an_image: "That file is not a photo."
+        too_large: "That file is %{size}. The limit is %{limit}."
+        wont_fit: "That photo can't be made small enough for Bluesky."
       # The account line of a row of the "Post to" list.
       account:
         named: "Posts as %{account}."
@@ -418,6 +433,22 @@ en:
         empty: "Write something to post."
         markdown_network: "Only Bluesky takes a Markdown link. Remove the link, or do not post to
           %{networks}."
+        photos_network: "Only Bluesky takes photos. Remove the photos, or do not post to
+          %{networks}."
+        # ⚠️ Bluesky renders ONE embed, thus a post takes photos or a link and not both.
+        photos_and_link:
+          numbered: "Post %{index} has photos and a link. Bluesky takes one of the two."
+          single: "That post has photos and a link. Bluesky takes one of the two."
+        too_many_photos:
+          numbered: "Post %{index} has more than %{limit} photos."
+          single: "That post has more than %{limit} photos."
+        alt_too_long:
+          numbered: "An alt text of post %{index} is %{count} characters. The limit is %{limit}."
+          single: "An alt text is %{count} characters. The limit is %{limit}."
+        # A photo stays for a day before the owner posts the draft.
+        photo_missing:
+          numbered: "A photo of post %{index} is gone. Add it again."
+          single: "A photo of that post is gone. Add it again."
         mistaken_network: "The %{network} field of %{token} holds a %{other} handle. Move it, or
           write a name."
         no_moment: "Pick a date and a time to schedule it."
@@ -477,6 +508,14 @@ en:
           other: "Republish in %{count} minutes"
         # The POST did not reach the server, thus nothing started.
         unreachable: "Couldn't reach the server. Nothing was republished."
+      social_post:
+        alt_too_long: "Alt text is %{count} characters. The limit is %{limit}."
+        # The owner picked more files than the post has room for.
+        too_many_photos: "A post takes at most %{limit} photos. The extra ones weren't added."
+        # The server refused the photo and named no reason.
+        upload_failed: "That photo couldn't be added."
+        # The POST did not reach the server, thus nothing was stored.
+        upload_unreachable: "Couldn't reach the server. The photo wasn't added."
       social:
         # The two fields are not complete yet, thus the label cannot name a moment.
         incomplete: "Schedule"

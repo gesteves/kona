@@ -60,6 +60,8 @@ edge serves a cached copy before it gets a new one.
 | GET | `/social/preview` | the card of a link, as JSON, for the preview on the page | `no-store` |
 | POST | `/social/preview/text` | the draft as each connected network will receive it, as JSON, for the Preview dialog. ⚠️ A POST, because a draft is much larger than a query string should carry | `no-store` |
 | GET | `/social/preview/image` | proxies the picture of that card. ⚠️ The parameter is the **page**, not the picture | `no-store` |
+| POST | `/social/photos` | stores ONE photo of a draft, as the JPEG that goes up as the blob; JSON `{id, path, width, height}`, or 422 `{error}` | `no-store` |
+| GET | `/social/photos/:id` | the stored JPEG, inline, for the tile of the composer and the preview | `no-store` |
 | POST | `/spam/:id/not-spam`; DELETE `/spam/:id`, `/connected-apps/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
 | GET/POST/DELETE | `/connected-apps/bluesky` | the Bluesky handle + app password form, and disconnect | `no-store` |
 | GET/POST/DELETE | `/connected-apps/mastodon`; GET `/connected-apps/mastodon/callback` | the Mastodon instance form, the OAuth callback, and disconnect | `no-store` |
@@ -935,9 +937,9 @@ Threads, now or at a date and a time. All three post. Each post has an **optiona
   | `EDITING` | The **link field**, with an X in it | A URL that the app can read a page for; the X and the Escape key go back to `IDLE` |
   | `ATTACHED` | The **card** of that link, with Edit and Remove in its footer | Edit goes back to `EDITING`; Remove goes back to `IDLE` |
 
-  - ⚠️ **The toolbar is a ROW of controls and not one button.** A control for a photo, and each
-    other kind of attachment, goes beside the link button. The **count sits at the end of that same
-    line**, with `margin-inline-start: auto` and **not** `space-between`.
+  - ⚠️ **The toolbar is a ROW of controls and not one button.** The photo button is beside the
+    link button, and each other kind of attachment goes there as well. The **count sits at the end
+    of that same line**, with `margin-inline-start: auto` and **not** `space-between`.
   - ⚠️ **The link button is DISABLED outside `IDLE`, and it is NEVER hidden.** It is a form control
     and it is taller than the count beside it, thus a button that goes away takes the height of the
     row with it and the count moves up at the click that opened the field. There is one link for
@@ -1275,10 +1277,11 @@ the address in a **facet**, thus the words carry the link and the URL uses **non
 characters. Mastodon and Threads post plain words: the same draft would reach a reader as
 `[my post](https://…)`, with the address in the middle of the sentence.
 
-Thus **a Markdown link in any post turns the other two networks off**. `social_controller.js`
-unticks and disables those two rows at the keystroke that makes the first link, and their hint says
-why. ⚠️ **The action refuses such a request as well**, and that is not a repeat of the composer: a
-row that a browser cannot tick, a request that a person writes by hand can.
+Thus **a Markdown link in any post turns the other two networks off**, and a photo does the same
+(refer to **Photos**). `social#applyBlueskyOnly` unticks and disables those two rows at the
+keystroke that makes the first link, and their hint says why. ⚠️ **The action refuses such a
+request as well**, and that is not a repeat of the composer: a row that a browser cannot tick, a
+request that a person writes by hand can.
 
 - ⚠️ **It is THREAD-LEVEL.** A thread goes to a network as one unit, thus one link in one post
   decides the whole draft. The action and the composer read it the same way.
@@ -1320,6 +1323,72 @@ algorithm and not one regular expression. **Add a row to `DRAFTS` there for each
 UTF-16 code units: one emoji of a family is 5 and 8. An offset from that file would be a number that
 looks correct and is not, and nothing in the browser needs one.
 
+#### Photos
+
+A post takes as many as `Bluesky::MAX_IMAGES` (10) photos, from the photo button of the toolbar.
+Each tile has a thumbnail, a grip, a remove X, and an alt text field, and the owner drags a tile or
+moves it with the arrow keys of its grip. **Bluesky alone takes a photo** from this page.
+
+- ⚠️ **A post takes photos OR a link, and not both.** Bluesky renders ONE embed, and the photos and
+  the website card are two embeds. The composer disables the link button while the post holds a
+  photo and the photo button while it holds a link, the server renders both states, and
+  `#photo_error` refuses a request that sends both.
+- ⚠️ **A photo turns Mastodon and Threads off, thread-level, exactly as a Markdown link does.**
+  `social#applyBlueskyOnly` is the one rule for the two reasons, and it shows the hint line of
+  the reason. `#photos_network_error` refuses a hand-written request.
+- ⚠️ **Two embed types, and the count selects one.** `app.bsky.embed.images` takes
+  `MAX_IMAGES_EMBED` (4) photos at the most, and `app.bsky.embed.gallery` takes more. A post
+  that fits the first one keeps it: a client from before the gallery embed renders that one and
+  nothing for a gallery. `aspectRatio` goes on both, and each gallery item carries its `$type`
+  because the `items` of a gallery is a union.
+- **Each photo uploads at the moment the owner picks it**, to `POST /social/photos`, and the form
+  carries `posts[][photos][]` (the id) and `posts[][alts][]` (the alt text) for each tile, in the
+  order of the tiles. A file input cannot be refilled by the server, thus a 422 re-render would
+  lose every photo, and the draft is the expensive part of this page.
+  - ⚠️ **The two arrays match by POSITION**, and `#photos_of` pairs them before it drops a pair.
+    A tile whose upload is still out sends an empty id, and a drop of the id alone would move each
+    alt text after it by one. `text` stays the first field of a block.
+  - ⚠️ **The picker is a native `<input type="file">`, hidden, with NO name.** That is the one
+    exception to the rule that a Web Awesome component takes the place of a native element:
+    `wa-file-input` is a dropzone with a file list of its own, and this page draws its own tiles.
+    The `wa-button` of the toolbar is the accessible control.
+  - The server decodes the upload with libvips (`PhotoBlob`), and **the decode is the check that
+    the file is a picture**. It fits the picture in 4000×4000, which is the resolution limit of
+    the client of Bluesky, flattens an alpha channel, and
+    writes a JPEG below `Bluesky::MAX_IMAGE_BYTES` (2MB) with `strip: true`, which removes the
+    EXIF and the GPS position of a personal photo. ⚠️ That limit is NOT `MAX_BLOB_BYTES`, which
+    is the card thumbnail of a link: the two are different lexicon fields.
+  - ⚠️ `RequestBodyLimit` has `/social/photos` ABOVE `/social`: the first prefix wins, and the
+    draft itself is a small form.
+- **The bytes stage in Redis**, at `social:photo:<id>`, because `app` and `worker` are different
+  fly machines and the job cannot read a temporary file of the request. It is the reason that the
+  course-map upload has `maps:pending:*`.
+  - ⚠️ **One key for each photo, with a TTL.** A draft that the owner never posts must not keep
+    20MB for all time, thus the draft TTL is a day. `#keep_photos` makes it the schedule plus
+    `PHOTO_KEEP_MARGIN` (25 hours) at the submit, which is the retry window of the job and an
+    hour more. Thus a post that waits months keeps its photos.
+  - ⚠️ **`volatile-lru` can remove one of these keys at the memory cap.** The job then raises
+    `PermanentError` for that post and posts nothing: a post that promised photos never goes out as
+    words alone. 10 photos of 2MB on a 256MB instance with a 3MB dataset is far from that cap.
+  - ⚠️ **The job discards the photos LAST, after `enqueue_next`.** A process that dies between
+    the write and the acknowledgement does the post again, and with the photos gone that attempt
+    would fail the post and never add the job below it. A second upload of the same bytes costs
+    nothing: the PDS names a blob by its content.
+  - **There is no DELETE endpoint.** A removed tile leaves its key to the draft TTL. A delete from
+    the browser is not reliable, because a navigation cancels it, and the TTL already does the work.
+- ⚠️ **`Bluesky#build_images_embed` RAISES when one upload fails**, and the job then does the
+  work again. A post with three of its four photos is not the post that the owner wrote.
+  `AtProto#upload_blob` gives nil for a failure, thus the raise is in the caller.
+- **The photos ride in the Bluesky payload only** (`"photos" => [{ "id", "alt" }]`), as the topic
+  rides in the Threads payload. The other two jobs do not change.
+- **The alt text has no `maxlength`**, for the reason that the body has none, and `MAX_ALT_GRAPHEMES`
+  (2000) is the limit of the client of Bluesky: the lexicon has none. The tile says when the text
+  is past it, `social#canPost` keeps the submit off, and `#photo_error` refuses the request.
+- **The Preview panel shows the thumbnails on the Bluesky row**, from `#preview_photos`, thus the
+  panel still shows what the network will render.
+- ⚠️ `social-post#connect` drops each tile with no id. A Turbo snapshot can hold a tile whose
+  upload never finished, and nothing can finish it. `disconnect` aborts each upload that is out.
+
 #### The Threads topic
 
 A **Threads topic** field below the "Post to" list. Meta calls it `topic_tag`, and it is the
@@ -1352,8 +1421,8 @@ empty 500.
 
 ⚠️ **Bluesky and Mastodon have no equivalent**, thus the field shows only while the Threads row can
 take a post **and** is ticked. `social#applyTopic` reads `disabled` as well as `checked`, thus one
-rule covers a network with no account **and** a row that a Markdown link turned off. It runs after
-`applyMarkdown`, which is what disables that row.
+rule covers a network with no account **and** a row that a Markdown link or a photo turned off. It
+runs after `applyBlueskyOnly`, which is what disables that row.
 
 - **The server renders the field hidden when the rule says so** (`SocialPresenter#topic?`), thus it
   does not show for a moment before the Stimulus controller runs.
@@ -2025,7 +2094,8 @@ That one instance holds three kinds of data, and only the first kind comes back 
 1. **The cache.** `ApplicationService#cached_json` writes each key, and `font-awesome:icon:*` and
    `blurhash:svg:*` are the two large families. Each key has a TTL.
 2. **The locks and the idempotency records**, for example `build:trigger_lock`,
-   `threads:published:*`, and `mastodon:status:*`. Each key has a TTL.
+   `threads:published:*`, and `mastodon:status:*`, and the photos of a draft on the Social media
+   page, `social:photo:*`. Each key has a TTL.
 3. **The durable records. This Redis is their only copy**: `contact:spam`, `maps:tracks`, the four
    `*:credentials` hashes, `whoop:<client id>:refresh_token`, `location:current`,
    `standard_site:did`, and `standard_site:fingerprints`. **None of them has a TTL.**
