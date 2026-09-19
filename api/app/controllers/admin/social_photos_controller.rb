@@ -6,10 +6,16 @@ module Admin
   # names one file. The bytes go into Redis, because `app` and `worker` are different fly
   # machines and the job cannot read a temporary file of this request.
   class SocialPhotosController < BaseController
-    # The most bytes of one upload. ⚠️ The request reads that much into memory, on a 512MB machine
-    # with three Puma threads. RequestBodyLimit refuses a larger body before this code runs, and
-    # `PhotoBlob` shrinks at the decode, thus the pixels never take more than the file.
-    MAX_BYTES = 25.megabytes
+    # The most bytes of one upload. A camera JPEG is 20MB to 38MB, thus a smaller limit refuses the
+    # true photos of the owner.
+    #
+    # ⚠️ **Cloudflare Pro refuses a request body above 100MB**, at the edge, with a 413 that this
+    # app never sees and cannot write a message for. Thus this limit must stay well below that
+    # number, or a large upload fails with no words of ours.
+    # ⚠️ The file stays on the DISK: `PhotoBlob` reads the temporary file of Puma, thus neither
+    # this limit nor the size of the picture decides how much memory the request uses.
+    # `RequestBodyLimit` refuses a larger body before this code runs.
+    MAX_BYTES = 50.megabytes
 
     # POST /social/photos
     #
@@ -24,7 +30,8 @@ module Admin
                         limit: ActiveSupport::NumberHelper.number_to_human_size(MAX_BYTES)))
       end
 
-      photo = PhotoBlob.prepare(file.read)
+      # ⚠️ It gives the PATH and not `file.read`. Refer to the ⚠️ on MAX_BYTES above.
+      photo = PhotoBlob.prepare(file.tempfile.path)
       id = SocialPhotos.new.store(image: photo[:bytes], width: photo[:width], height: photo[:height])
 
       render json: { id: id, path: social_photo_path(id), alt_path: social_photo_alt_path(id),

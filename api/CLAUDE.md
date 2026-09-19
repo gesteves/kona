@@ -1365,6 +1365,14 @@ alt text takes the width. The owner drags a tile or moves it with the arrow keys
   - ⚠️ **The picker is a `<wa-file-input>` with NO name**, thus the files never go with the form.
     The controller uploads each file at the `change` and then empties the input, thus the
     component draws no file list of its own and the tiles are the one list.
+  - **One upload is as much as `Admin::SocialPhotosController::MAX_BYTES` (50MB)**, because a
+    camera JPEG is 20MB to 38MB. ⚠️ **Cloudflare Pro refuses a request body above 100MB** at the
+    edge, with a 413 that this app never sees and cannot write a message for; thus that number is
+    the ceiling of this limit, and not the memory of the machine.
+  - ⚠️ **The upload stays on the DISK.** Puma writes a large body to a temporary file, and
+    `PhotoBlob` reads that path; libvips shrinks at the decode. Thus the size of a photo does not
+    decide the memory of the request, and `File.read` of an upload must never come back: three
+    Puma threads on a 512MB machine is the same shape as the OOM kill of the first R2 backfill.
   - The server decodes the upload with libvips (`PhotoBlob`), and **the decode is the check that
     the file is a picture**. It fits the picture in 4000×4000, which is the resolution limit of
     the client of Bluesky, flattens an alpha channel, and

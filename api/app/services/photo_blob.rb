@@ -3,9 +3,13 @@
 # It fits the picture in a square of MAX_EDGE, and it makes the quality and the size lower until
 # the file is below the blob limit of Bluesky.
 #
-# ⚠️ The decode IS the check that the bytes are a picture. A content type from the browser is not
+# ⚠️ The decode IS the check that the file is a picture. A content type from the browser is not
 # one: a person can name any file with any extension.
 # ⚠️ `strip: true` removes each EXIF field, and that includes the GPS position of a personal photo.
+# ⚠️ **It reads the file from the DISK, and never from a String of the bytes.** Puma writes a large
+# body to a temporary file, thus the upload is already there, and libvips shrinks it at the decode.
+# A `File.read` of it would put the full file in the Ruby heap, three times over at three Puma
+# threads, on a 512MB machine. That is the failure that the first R2 backfill met.
 module PhotoBlob
   class Error < StandardError; end
   # The bytes are not a picture that libvips can read.
@@ -33,12 +37,12 @@ module PhotoBlob
     { edge: 1200, quality: 55 }
   ].freeze
 
-  # @param bytes [String] The upload.
+  # @param path [String] The upload, on the disk.
   # @return [Hash] `{ bytes:, width:, height: }`, a JPEG below LIMIT and its size in pixels.
-  # @raise [NotAnImageError] When libvips cannot read the bytes.
+  # @raise [NotAnImageError] When libvips cannot read the file.
   # @raise [WontFitError] When no step gives a file below LIMIT.
-  def self.prepare(bytes)
-    raise NotAnImageError, "The upload is empty" if bytes.blank?
+  def self.prepare(path)
+    raise NotAnImageError, "The upload is empty" if path.blank? || !File.exist?(path) || File.size(path).zero?
 
     # ⚠️ The require is here and not at the top of the file, as in AtProto#shrink_image. libvips
     # is a native library, and a require at the top would make each boot need it.
@@ -47,9 +51,10 @@ module PhotoBlob
 
     smallest = nil
     STEPS.each do |step|
-      # ⚠️ `thumbnail_buffer` shrinks at the decode and applies the EXIF orientation. A full decode
-      # of a camera file is more than 100MB of pixels on a 512MB machine.
-      image = Vips::Image.thumbnail_buffer(bytes, step[:edge], height: step[:edge], size: :down)
+      # ⚠️ `thumbnail` shrinks at the decode and applies the EXIF orientation. A full decode of a
+      # camera file is more than 100MB of pixels on a 512MB machine. It reads the path, thus the
+      # bytes never go into the Ruby heap; refer to the ⚠️ at the top of this file.
+      image = Vips::Image.thumbnail(path, step[:edge], height: step[:edge], size: :down)
       # A JPEG has no alpha channel: without this, a transparent PNG gets a black background.
       image = image.flatten(background: [ 255, 255, 255 ]) if image.has_alpha?
       image = image.colourspace(:srgb) unless image.interpretation == :srgb

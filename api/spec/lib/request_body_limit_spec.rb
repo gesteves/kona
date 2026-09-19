@@ -19,10 +19,12 @@ RSpec.describe RequestBodyLimit do
     expect(status_for("/course-maps", length: 33.megabytes)).to eq(413)
   end
 
-  # ⚠️ The first prefix match wins, thus `/social/photos` must stay above `/social`.
+  # ⚠️ The first prefix match wins, thus `/social/photos` must stay above `/social`. Its limit is
+  # above `Admin::SocialPhotosController::MAX_BYTES`, thus the action gives the message and this
+  # middleware catches only a body that is far larger.
   it "gives the photo upload its own limit, and keeps the small one on the rest of the page" do
-    expect(status_for("/social/photos", length: 30.megabytes)).to eq(200)
-    expect(status_for("/social/photos", length: 33.megabytes)).to eq(413)
+    expect(status_for("/social/photos", length: Admin::SocialPhotosController::MAX_BYTES)).to eq(200)
+    expect(status_for("/social/photos", length: 65.megabytes)).to eq(413)
     expect(status_for("/social", length: 300.kilobytes)).to eq(413)
     expect(status_for("/social/preview/text", length: 300.kilobytes)).to eq(413)
   end

@@ -70,6 +70,24 @@ RSpec.describe "Admin social photos", type: :request do
         expect(JSON.parse(response.body)["error"]).to eq(I18n.t("admin.social.photos.not_an_image"))
       end
 
+      # ⚠️ **The upload stays on the disk.** `PhotoBlob` reads the temporary file of Puma, thus a
+      # 50MB photo does not go into the Ruby heap of a 512MB machine at three Puma threads.
+      it "gives the image step the path of the file, and never its bytes" do
+        # ⚠️ It reads the argument DURING the call. Rack unlinks the temporary file of the upload
+        # at the end of the request, thus a check after it would find no file whatever the action
+        # gave.
+        seen = nil
+        allow(PhotoBlob).to receive(:prepare).and_wrap_original do |original, argument|
+          seen = { argument: argument, a_file: argument.is_a?(String) && File.exist?(argument) }
+          original.call(argument)
+        end
+
+        post "/social/photos", params: { photo: upload }, headers: { "Accept" => "application/json" }
+        remember(JSON.parse(response.body)["id"])
+
+        expect(seen[:a_file]).to be(true), "the action gave #{seen[:argument].class}, and not the path of the upload"
+      end
+
       it "refuses a file above the limit before it reads it" do
         allow_any_instance_of(ActionDispatch::Http::UploadedFile).to receive(:size)
           .and_return(Admin::SocialPhotosController::MAX_BYTES + 1)
