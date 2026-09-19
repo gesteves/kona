@@ -318,18 +318,50 @@
     display: none;
   }
 
-  // The photos of the post, one tile for each, in rows that wrap.
+  // The photos of the post: the picker, and the tiles below it.
   &__photos {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: var(--wa-space-s);
     margin-block-start: var(--wa-space-2xs);
 
     // ⚠️ The same rule as the schedule block: this sets a display, thus `[hidden]` needs a rule
-    // of its own. It is hidden while it holds no tile.
+    // of its own. It is hidden while the picker is closed.
     &[hidden] {
       display: none;
     }
+  }
+
+  // The file input and its X, on one row. ⚠️ The X sits at the top and not in the middle: the
+  // dropzone is tall and the hint sits below it.
+  &__picker {
+    align-items: start;
+    display: flex;
+    gap: var(--wa-space-2xs);
+  }
+
+  &__file-input {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  // ⚠️ It is sized in `em`, as the X of the link field is, and for the same reason.
+  &__picker-close::part(button) {
+    aspect-ratio: 1;
+    padding: 0;
+    width: 1.5em;
+  }
+
+  &__picker-close[hidden] {
+    // ⚠️ The same rule as the spinner: an author rule beats the `[hidden]` of the browser.
+    display: none;
+  }
+
+  // One tile for each photo, in rows that wrap.
+  &__tiles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wa-space-s);
   }
 
   // The X inside the link field, which takes the owner back to the button of the toolbar.

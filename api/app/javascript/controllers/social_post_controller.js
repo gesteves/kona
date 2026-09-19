@@ -16,6 +16,11 @@ const IDLE = "idle";
 const EDITING = "editing";
 const ATTACHED = "attached";
 
+// The two states of the photos of a post: nothing below the toolbar, or the picker with the
+// tiles below it. ⚠️ The picker stays OPEN while the post holds a photo, thus the owner can add
+// more. Its X shows while it is empty, and that X is the way back to IDLE.
+const OPEN = "open";
+
 // One photo tile of the post.
 const PHOTO = "[data-social-post-target='photo']";
 
@@ -34,7 +39,7 @@ export default class extends Controller {
   static targets = [
     "body", "count", "countText", "ring", "link", "spinner", "preview", "previewImage",
     "previewHost", "previewTitle", "previewDescription", "previewKind", "linkButton", "countNotice",
-    "photoButton", "fileInput", "photos", "photoTemplate", "photo",
+    "photoButton", "fileInput", "photos", "tiles", "pickerClose", "photoTemplate", "photo",
   ];
   static values = {
     limit: Number, warnAt: Number, previewUrl: String,
@@ -45,20 +50,23 @@ export default class extends Controller {
     // ⚠️ The words come from the locale file, through the `data-admin-i18n` attribute.
     this.words = i18nTable(this.element);
     this.linkState = IDLE;
+    this.photoState = IDLE;
     // The upload of each tile that is still out, by tile. `disconnect()` and a remove abort it.
     this.uploads = new Map();
     // ⚠️ It waits for the definitions: `value` is undefined on these components until the browser
     // upgrades them. A Turbo restoration visit, and a page that renders again after a refusal, both
     // hold values with no controller state.
     Promise.all(
-      ["wa-textarea", "wa-input", "wa-button"].map((tag) => customElements.whenDefined(tag))
+      ["wa-textarea", "wa-input", "wa-button", "wa-file-input"].map((tag) => customElements.whenDefined(tag))
     ).then(() => {
       // ⚠️ A snapshot of Turbo can hold a tile whose upload never finished: it has no id, and
       // nothing can finish it now. It goes, before the state below reads the count of the tiles.
       this.dropUnfinishedPhotos();
-      // ⚠️ The state comes from the FIELD, thus it is the state that the server already rendered
-      // and nothing moves. `preview()` below promotes it to ATTACHED when the page reads.
+      // ⚠️ Each state comes from the MARKUP, thus it is the state that the server already
+      // rendered and nothing moves. `preview()` below promotes the link to ATTACHED when the page
+      // reads, and the picker is open for a post that holds a photo.
       this.linkState = this.linkTarget.value?.trim() ? EDITING : IDLE;
+      this.photoState = this.photoCount > 0 || !this.photosTarget.hidden ? OPEN : IDLE;
       this.renderAttachmentState();
       this.photoTargets.forEach((tile) => this.countAltOf(tile));
       this.count();
@@ -132,28 +140,33 @@ export default class extends Controller {
   }
 
   /**
-   * Shows the one control of the link state, and disables each button of the toolbar that can do
+   * Shows the one control of each state, and disables each button of the toolbar that can do
    * nothing now.
    *
-   * ⚠️ The field and the card take turns, and each one carries an X that goes back to IDLE.
+   * ⚠️ The link field and the card take turns, and each one carries an X that goes back to IDLE.
+   * The picker works the same way: the photo button opens it, and its X closes it while it holds
+   * no photo.
    *
-   * ⚠️ **A post takes photos OR a link.** Thus the link button is off while the post holds a
-   * photo, and the photo button is off outside IDLE and at the most photos. The server renders
-   * the same states, thus a page that renders again after a refusal shows them before this runs.
+   * ⚠️ **A post takes photos OR a link.** Thus each button of the toolbar is off while the other
+   * attachment is open, and off outside its own IDLE state. The server renders the same states,
+   * thus a page that renders again after a refusal shows them before this runs.
    *
    * ⚠️ **A button is DISABLED and never hidden.** It is a form control and it is taller than the
    * count beside it, thus a button that goes away takes the height of the toolbar with it and the
    * count moves up at the click that opened the field.
    *
-   * ⚠️ The list of the tiles is hidden while it holds none: it is a child of the grid of the
-   * block, and an empty row would still take a `row-gap`.
+   * ⚠️ The file input is disabled at the most photos, and the X of the picker shows only while
+   * the picker holds none: a picker that closes with tiles in it would still send them.
    */
   renderAttachmentState() {
     const photos = this.photoCount;
+    const open = this.photoState === OPEN;
 
-    this.linkButtonTarget.disabled = this.linkState !== IDLE || photos > 0;
-    this.photoButtonTarget.disabled = this.linkState !== IDLE || photos >= this.maxPhotosValue;
-    this.photosTarget.hidden = photos === 0;
+    this.linkButtonTarget.disabled = this.linkState !== IDLE || open;
+    this.photoButtonTarget.disabled = this.linkState !== IDLE || open;
+    this.photosTarget.hidden = !open;
+    this.fileInputTarget.disabled = photos >= this.maxPhotosValue;
+    this.pickerCloseTarget.hidden = photos > 0;
     this.linkTarget.hidden = this.linkState !== EDITING;
     this.previewTarget.hidden = this.linkState !== ATTACHED;
   }
@@ -172,23 +185,41 @@ export default class extends Controller {
   }
 
   /**
-   * Opens the file picker. The button of the toolbar is the accessible control, and the native
-   * input below it is hidden and has no name.
+   * Opens the picker below the toolbar, as `showLink` opens the link field.
    */
-  pickPhotos(event) {
+  showPhotos(event) {
     event.preventDefault();
-    this.fileInputTarget.click();
+    this.photoState = OPEN;
+    this.changed();
+    this.fileInputTarget.focus();
+  }
+
+  /**
+   * Closes an empty picker and goes back to the button of the toolbar.
+   *
+   * ⚠️ It does nothing while the picker holds a tile. The X is hidden then, and the Escape key
+   * must not take a photo off the post: the X of each tile is the way back.
+   */
+  hidePhotos(event) {
+    if (this.photoCount > 0) return;
+
+    event.preventDefault();
+    this.photoState = IDLE;
+    this.changed();
+    this.photoButtonTarget.focus();
   }
 
   /**
    * Uploads each file that the owner picked, up to the free slots of the post.
    *
-   * ⚠️ It clears the input after the read, thus the same file can be picked again after a remove:
-   * a native input fires no `change` for a value that did not change.
+   * ⚠️ It empties the input after the read, thus the component draws no list of its own and the
+   * tiles are the one list. It also lets the same file be picked again after a remove: an input
+   * fires no `change` for a value that did not change.
    */
   filesPicked() {
     const files = [ ...(this.fileInputTarget.files ?? []) ];
-    this.fileInputTarget.value = "";
+    if (files.length === 0) return;
+    this.fileInputTarget.files = [];
 
     const room = Math.max(0, this.maxPhotosValue - this.photoCount);
     if (files.length > room) {
@@ -210,7 +241,7 @@ export default class extends Controller {
    */
   async upload(file) {
     const tile = this.buildTile(file);
-    this.photosTarget.appendChild(tile);
+    this.tilesTarget.appendChild(tile);
     this.changed();
 
     const aborter = new AbortController();
@@ -298,7 +329,8 @@ export default class extends Controller {
 
     this.dropTile(tile);
     this.changed();
-    this.photoButtonTarget.focus();
+    // The picker stays open, thus the focus goes to it and not to the button of the toolbar.
+    this.fileInputTarget.focus();
   }
 
   /**
@@ -378,8 +410,8 @@ export default class extends Controller {
     const slot = this.photoSlot(event.clientX, event.clientY);
     if (!slot || slot.tile === this.draggedPhoto) return;
 
-    slot.before ? this.photosTarget.insertBefore(this.draggedPhoto, slot.tile)
-                : this.photosTarget.insertBefore(this.draggedPhoto, slot.tile.nextSibling);
+    slot.before ? this.tilesTarget.insertBefore(this.draggedPhoto, slot.tile)
+                : this.tilesTarget.insertBefore(this.draggedPhoto, slot.tile.nextSibling);
   }
 
   /**
@@ -441,8 +473,8 @@ export default class extends Controller {
     const to = tiles.indexOf(tile) + (earlier ? -1 : 1);
     if (to < 0 || to >= tiles.length) return;
 
-    earlier ? this.photosTarget.insertBefore(tile, tiles[to])
-            : this.photosTarget.insertBefore(tiles[to], tile);
+    earlier ? this.tilesTarget.insertBefore(tile, tiles[to])
+            : this.tilesTarget.insertBefore(tiles[to], tile);
 
     // ⚠️ A node that moves loses the focus, thus the next arrow key would go to the document.
     tile.querySelector(".social-photo__grip")?.focus();

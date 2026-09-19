@@ -384,6 +384,11 @@ en:
         add_link: "Add a link"
         # The label of the photo button of the toolbar, which is an icon alone.
         add_photos: "Add photos"
+        # The X of the picker, which shows only while the picker holds no photo.
+        close_photos: "Close the photo picker"
+        # The label and the hint of the picker.
+        photos: "Photos"
+        photos_hint: "Up to %{count} photos. Only Bluesky takes them."
         body: "Post"
         body_placeholder: "What do you want to say?"
         # The two controls in the footer of the card of a link, which are icons alone.

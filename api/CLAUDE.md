@@ -1325,14 +1325,26 @@ looks correct and is not, and nothing in the browser needs one.
 
 #### Photos
 
-A post takes as many as `Bluesky::MAX_IMAGES` (10) photos, from the photo button of the toolbar.
-Each tile has a thumbnail, a grip, a remove X, and an alt text field, and the owner drags a tile or
-moves it with the arrow keys of its grip. **Bluesky alone takes a photo** from this page.
+A post takes as many as `Bluesky::MAX_IMAGES` (10) photos. The photo button of the toolbar opens
+a **picker** below it, exactly as the link button opens the link field, and each photo that the
+owner picks becomes a tile below the picker. Each tile has a thumbnail, a grip, a remove X, and an
+alt text field, and the owner drags a tile or moves it with the arrow keys of its grip. **Bluesky
+alone takes a photo** from this page.
+
+- **The picker has two states**, `IDLE` and `OPEN`, and `social_post_controller.js` holds them
+  beside the three states of the link. The photo button opens the picker and is disabled while
+  it is open. ⚠️ **The picker stays open while the post holds a photo**, thus the owner can add
+  more, and its file input is disabled at the most photos. ⚠️ **Its X shows only while the picker
+  holds no photo**: a picker that closes with tiles in it would still send them with the form.
+  With a tile, the X of each tile is the way back, and the last one leaves the picker open and
+  empty. The Escape key in the file input does what the X does. The server renders the picker
+  open for a post that already holds a photo, thus a page that renders again after a refusal
+  shows the tiles at once.
 
 - ⚠️ **A post takes photos OR a link, and not both.** Bluesky renders ONE embed, and the photos and
-  the website card are two embeds. The composer disables the link button while the post holds a
-  photo and the photo button while it holds a link, the server renders both states, and
-  `#photo_error` refuses a request that sends both.
+  the website card are two embeds. The composer disables the link button while the picker is
+  open and the photo button while the link field or the card is open, the server renders both
+  states, and `#photo_error` refuses a request that sends both.
 - ⚠️ **A photo turns Mastodon and Threads off, thread-level, exactly as a Markdown link does.**
   `social#applyBlueskyOnly` is the one rule for the two reasons, and it shows the hint line of
   the reason. `#photos_network_error` refuses a hand-written request.
@@ -1348,10 +1360,9 @@ moves it with the arrow keys of its grip. **Bluesky alone takes a photo** from t
   - ⚠️ **The two arrays match by POSITION**, and `#photos_of` pairs them before it drops a pair.
     A tile whose upload is still out sends an empty id, and a drop of the id alone would move each
     alt text after it by one. `text` stays the first field of a block.
-  - ⚠️ **The picker is a native `<input type="file">`, hidden, with NO name.** That is the one
-    exception to the rule that a Web Awesome component takes the place of a native element:
-    `wa-file-input` is a dropzone with a file list of its own, and this page draws its own tiles.
-    The `wa-button` of the toolbar is the accessible control.
+  - ⚠️ **The picker is a `<wa-file-input>` with NO name**, thus the files never go with the form.
+    The controller uploads each file at the `change` and then empties the input, thus the
+    component draws no file list of its own and the tiles are the one list.
   - The server decodes the upload with libvips (`PhotoBlob`), and **the decode is the check that
     the file is a picture**. It fits the picture in 4000×4000, which is the resolution limit of
     the client of Bluesky, flattens an alpha channel, and

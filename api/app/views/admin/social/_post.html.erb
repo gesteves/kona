@@ -85,26 +85,18 @@
         <span class="wa-visually-hidden"><%= t(".add_link") %></span>
       </wa-button>
 
-      <%# The photo button. ⚠️ **A post takes photos OR a link, and not both**: Bluesky renders one
+      <%# The photo button. It opens the picker below the toolbar, exactly as the link button opens
+          the link field. ⚠️ **A post takes photos OR a link, and not both**: Bluesky renders one
           embed. Thus this button is disabled while the post has a link, and the link button is
-          disabled while it has a photo. It is also disabled at the most photos. The server renders
-          both states, thus a page that renders again after a refusal shows them at once. %>
+          disabled while the picker is open. The server renders both states, thus a page that
+          renders again after a refusal shows them at once. %>
       <wa-button class="social-post__tool" appearance="plain" size="small"
                  data-social-post-target="photoButton"
-                 data-action="click->social-post#pickPhotos"
-                 <%= "disabled" if post.link.present? || post.photos.length >= max_photos %>>
+                 data-action="click->social-post#showPhotos"
+                 <%= "disabled" if post.link.present? || post.photos.any? %>>
         <%= raw icon_svg("classic", "light", "images") %>
         <span class="wa-visually-hidden"><%= t(".add_photos") %></span>
       </wa-button>
-
-      <%# ⚠️ A native file input, on purpose, and the one exception to the rule that a Web Awesome
-          component takes the place of a native element. `wa-file-input` is a dropzone with a file
-          list of its own, and this page draws its own tiles. The button above is the accessible
-          control, and this input is hidden and has NO name: the files never go with the form. The
-          controller uploads each one at the moment the owner picks it. %>
-      <input type="file" accept="image/*" multiple hidden tabindex="-1"
-             data-social-post-target="fileInput"
-             data-action="change->social-post#filesPicked">
 
       <%# The server writes the first value, thus the line has its height before the JavaScript runs
           and the page does not move. The controller writes each value after that.
@@ -127,17 +119,42 @@
       </div>
     </div>
 
-    <%# The photos of the post, one tile for each. The controller adds a tile from the template
-        below at each upload, and the server renders the tiles of a draft that comes back after a
-        refusal. ⚠️ It is hidden while it holds nothing: it is a child of the grid above, and an
-        empty row would still take a `row-gap`. It needs a rule for `[hidden]`; refer to
-        _social.scss. The drop target of a drag, with the same rule as the list of the posts. %>
+    <%# The photos of the post: the picker, and one tile for each photo. The photo button opens it
+        and the X closes it, exactly as the link field. ⚠️ **The X shows only while the picker
+        holds no photo**: a picker that closes with tiles in it would still send them with the
+        form. With a tile, the X of each tile is the way back, and the last one leaves the picker
+        open and empty. The server renders it open for a post that already holds a photo. It is
+        a child of the grid above, and it needs a rule for `[hidden]`; refer to _social.scss. %>
     <div class="social-post__photos" data-social-post-target="photos"
          data-action="dragover->social-post#dragOverPhoto drop->social-post#dropPhoto"
          <%= "hidden" if post.photos.empty? %>>
-      <% post.photos.each do |photo| %>
-        <%= render "photo", photo: photo %>
-      <% end %>
+      <div class="social-post__picker">
+        <%# ⚠️ It has NO name: the files never go with the form. The controller uploads each one at
+            the moment the owner picks it, then empties the input, thus the component draws no
+            list of its own and the tiles below are the one list. It is disabled at the most
+            photos. %>
+        <wa-file-input class="social-post__file-input" accept="image/*" multiple size="small"
+                       label="<%= t(".photos") %>" hint="<%= t(".photos_hint", count: max_photos) %>"
+                       data-social-post-target="fileInput"
+                       data-action="change->social-post#filesPicked keydown.esc->social-post#hidePhotos"
+                       <%= "disabled" if post.photos.length >= max_photos %>>
+        </wa-file-input>
+
+        <%# The way out of an empty picker, as the X of the link field. %>
+        <wa-button class="social-post__picker-close" appearance="plain" size="small"
+                   data-social-post-target="pickerClose"
+                   data-action="click->social-post#hidePhotos"
+                   <%= "hidden" if post.photos.any? %>>
+          <%= raw icon_svg("classic", "light", "xmark") %>
+          <span class="wa-visually-hidden"><%= t(".close_photos") %></span>
+        </wa-button>
+      </div>
+
+      <div class="social-post__tiles" data-social-post-target="tiles">
+        <% post.photos.each do |photo| %>
+          <%= render "photo", photo: photo %>
+        <% end %>
+      </div>
     </div>
 
     <%# ⚠️ One empty tile, which the controller clones. The browser renders none of a <template>,

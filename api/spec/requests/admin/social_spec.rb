@@ -1653,12 +1653,15 @@ RSpec.describe "Admin social media", type: :request do
     end
 
     describe "GET /social" do
-      it "renders the photo button, the hidden native input with no name, and the tile template" do
+      # ⚠️ The picker is CLOSED on a first load, and the photo button opens it, as the link field.
+      # The file input has no name, thus the files never go with the form.
+      it "renders the photo button, the closed picker with no name, and the tile template" do
         get "/social"
 
         expect(response.body).to include(ERB::Util.html_escape(I18n.t("admin.social.post.add_photos")))
-        expect(response.body).to match(/<input type="file" accept="image\/\*" multiple hidden[^>]*>/)
-        expect(response.body).not_to match(/<input type="file"[^>]*name=/)
+        expect(response.body).to match(/<wa-file-input class="social-post__file-input" accept="image\/\*" multiple[^>]*>/)
+        expect(response.body).not_to match(/<wa-file-input[^>]*name=/)
+        expect(open_tag("div", "social-post__photos")).to include("hidden")
         expect(response.body).to include('data-social-post-target="photoTemplate"')
         expect(response.body).to include('name="posts[][photos][]"')
         expect(response.body).to include('name="posts[][alts][]"')
@@ -1786,18 +1789,22 @@ RSpec.describe "Admin social media", type: :request do
         expect(response.body).to include(%(name="posts[][photos][]" value="#{second}"))
         expect(response.body).to include(%(src="/social/photos/#{first}"))
         expect(response.body).to include(ERB::Util.html_escape("A <cat>"))
-        # The link button is off while the post has a photo.
-        expect(open_tag("wa-button", "social-post__tool")).to include("disabled")
+        # The picker is open, its X is hidden while it holds a photo, and both buttons of the
+        # toolbar are off: the link button because the picker is open, the photo button as well.
+        expect(open_tag("div", "social-post__photos")).not_to include("hidden")
+        expect(open_tag("wa-button", "social-post__picker-close")).to include("hidden")
+        buttons = response.body.scan(/<wa-button class="social-post__tool"[^<]*>/m)
+        expect(buttons.first(2)).to all(include("disabled"))
       end
 
-      it "renders the photo button disabled at the most photos" do
+      it "renders the file input disabled at the most photos, and live below it" do
         ids = Array.new(SocialPresenter::MAX_PHOTOS) { first }
         post_photos(photos: ids, alts: ids.map { "" }, networks: [])
-
         expect(response).to have_http_status(:unprocessable_content)
-        buttons = response.body.scan(/<wa-button class="social-post__tool"[^<]*>/m)
-        expect(buttons.length).to eq(4)
-        expect(buttons[1]).to include("disabled")
+        expect(open_tag("wa-file-input", "social-post__file-input")).to include("disabled")
+
+        post_photos(photos: [ first ], alts: [ "" ], networks: [])
+        expect(open_tag("wa-file-input", "social-post__file-input")).not_to include("disabled")
       end
     end
 
