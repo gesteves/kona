@@ -1327,9 +1327,10 @@ looks correct and is not, and nothing in the browser needs one.
 
 A post takes as many as `Bluesky::MAX_IMAGES` (10) photos. The photo button of the toolbar opens
 a **picker** below it, exactly as the link button opens the link field, and each photo that the
-owner picks becomes a tile below the picker. Each tile has a thumbnail, a grip, a remove X, and an
-alt text field, and the owner drags a tile or moves it with the arrow keys of its grip. **Bluesky
-alone takes a photo** from this page.
+owner picks becomes a tile below the picker. A tile is a ROW, as a post of the thread is: the
+grip, the thumbnail, the alt text field, and the remove X, and the tiles stack in a column so the
+alt text takes the width. The owner drags a tile or moves it with the arrow keys of its grip.
+**Bluesky alone takes a photo** from this page.
 
 - **The picker has two states**, `IDLE` and `OPEN`, and `social_post_controller.js` holds them
   beside the three states of the link. The photo button opens the picker and is disabled while

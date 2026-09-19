@@ -428,39 +428,32 @@ export default class extends Controller {
   }
 
   /**
-   * The tile nearest to a point, and which side of it the point is on.
+   * The tile to insert before, and which side of it the point is on.
    *
-   * ⚠️ The tiles wrap into rows, thus the test of the posts, which reads the middle of each block
-   * on one axis, cannot serve here. A point above the row of a tile, or left of its middle on
-   * that row, goes BEFORE it.
-   * @param {number} x
+   * The tiles are a column, thus the test is the one of the posts: the first tile whose middle
+   * is below the point is the one to insert before, and with none the tile goes last.
+   * @param {number} _x
    * @param {number} y
    * @returns {{ tile: HTMLElement, before: boolean }|null} Null with no other tile.
    */
-  photoSlot(x, y) {
-    let best = null;
-    let nearest = Infinity;
+  photoSlot(_x, y) {
+    const others = this.photoTargets.filter((tile) => tile !== this.draggedPhoto);
+    if (others.length === 0) return null;
 
-    this.photoTargets.filter((tile) => tile !== this.draggedPhoto).forEach((tile) => {
+    const below = others.find((tile) => {
       const box = tile.getBoundingClientRect();
-      const centerX = box.left + box.width / 2;
-      const centerY = box.top + box.height / 2;
-      const distance = (centerX - x) ** 2 + (centerY - y) ** 2;
-      if (distance >= nearest) return;
-
-      nearest = distance;
-      best = { tile, before: y < box.top || (y <= box.bottom && x < centerX) };
+      return y < box.top + box.height / 2;
     });
 
-    return best;
+    return below ? { tile: below, before: true } : { tile: others[others.length - 1], before: false };
   }
 
   /**
    * Moves a tile with the arrow keys.
    *
    * ⚠️ A drag needs a pointer, and this page must work without one. The grip is a button and it
-   * takes the focus, thus the arrow keys are the way in. Left and Up go earlier, Right and Down
-   * go later.
+   * takes the focus, thus the arrow keys are the way in. Up goes earlier and Down goes later, as
+   * for a post; Left and Right do the same.
    */
   movePhotoByKey(event) {
     const earlier = event.key === "ArrowLeft" || event.key === "ArrowUp";
