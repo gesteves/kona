@@ -7,10 +7,6 @@
     margin-block-end: var(--wa-space-m);
   }
 
-  &__picker {
-    max-width: 40rem;
-  }
-
   &__tiles {
     display: flex;
     flex-direction: column;
@@ -90,8 +86,14 @@
   }
 }
 
-// The recent uploads, below the form.
+// The recent uploads, below the form. The heading and the list are one block, thus the space that
+// separates them from the form is one rule here.
 .media-list {
+  margin-block-start: var(--wa-space-2xl);
+
+  // The gap of the stack separates the heading from the list, thus the heading carries no margin
+  // of its own. A margin would add to that gap, because a flex item does not collapse one.
+  &__heading,
   &__name {
     margin: 0;
   }

@@ -345,11 +345,13 @@
     min-width: 0;
   }
 
-  // ⚠️ It is sized in `em`, as the X of the link field is, and for the same reason.
+  // ⚠️ It takes the size of the remove control of a post and of a photo tile, because it carries
+  // the same circled icon. The X *inside* the link field is sized in `em`, because that one sits
+  // in another control.
   &__picker-close::part(button) {
     aspect-ratio: 1;
     padding: 0;
-    width: 1.5em;
+    width: var(--wa-form-control-height);
   }
 
   &__picker-close[hidden] {

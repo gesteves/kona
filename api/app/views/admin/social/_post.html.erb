@@ -145,7 +145,10 @@
                    data-social-post-target="pickerClose"
                    data-action="click->social-post#hidePhotos"
                    <%= "hidden" if post.photos.any? %>>
-          <%= raw icon_svg("classic", "light", "xmark") %>
+          <%# ⚠️ `circle-xmark`, as the remove control of a post and of a photo tile has. The X
+              inside the link field, and the one on the link card, stay a plain `xmark`: those two
+              are inside another control. %>
+          <%= raw icon_svg("classic", "light", "circle-xmark") %>
           <span class="wa-visually-hidden"><%= t(".close_photos") %></span>
         </wa-button>
       </div>
