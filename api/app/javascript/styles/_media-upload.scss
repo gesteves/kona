@@ -1,0 +1,103 @@
+// The media uploader: the picker, the tiles of the picked files, and the list of the recent
+// uploads. It reads as the photo composer of the Social media page reads, and the one difference
+// is that a tile here has no grip: the order of the tiles means nothing to Contentful.
+
+.media-upload {
+  &__notice {
+    margin-block-end: var(--wa-space-m);
+  }
+
+  &__picker {
+    max-width: 40rem;
+  }
+
+  &__tiles {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-l);
+
+    // ⚠️ This block sets a display, and an author rule beats the `[hidden]` of the browser
+    // whatever its layer. An empty container has no tile, thus it needs no rule of its own, but
+    // a later `hidden` on it would do nothing without this one.
+    &[hidden] {
+      display: none;
+    }
+  }
+}
+
+// One picked file, as a ROW: the thumbnail, the words, and the remove control.
+.media-file {
+  align-items: start;
+  display: grid;
+  gap: var(--wa-space-xs);
+  grid-template-columns: auto 1fr auto;
+
+  // ⚠️ The remove control takes the offset of the same control on a photo tile, for the same
+  // reason: it is a form control and it is taller than the label of the field beside it.
+  &__remove {
+    margin-block-start: calc((1lh - var(--wa-form-control-height)) / 2);
+  }
+
+  // ⚠️ <wa-button> makes a square icon button only for a <wa-icon> child, and this app never uses
+  // that element. Thus the square is here.
+  &__remove::part(button) {
+    aspect-ratio: 1;
+    padding: 0;
+    width: var(--wa-form-control-height);
+  }
+
+  // The thumbnail, level with the field beside it and not with its label.
+  &__media {
+    margin-block-start: 1lh;
+    position: relative;
+  }
+
+  &__image {
+    aspect-ratio: 1;
+    background: var(--wa-color-surface-lowered);
+    border-radius: var(--wa-border-radius-m);
+    display: block;
+    object-fit: cover;
+    width: 6rem;
+  }
+
+  // The upload is out: the picture is the file itself, dimmed, with the spinner over it.
+  &--uploading &__image {
+    opacity: 0.5;
+  }
+
+  &__spinner {
+    inset-block-start: calc(50% - 0.5em);
+    inset-inline-start: calc(50% - 0.5em);
+    position: absolute;
+
+    // ⚠️ A rule of Web Awesome gives <wa-spinner> a display, and an author rule beats the
+    // `[hidden]` of the browser whatever its layer.
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  &__text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-2xs);
+    min-width: 0;
+  }
+
+  &__generate {
+    align-self: start;
+  }
+}
+
+// The recent uploads, below the form.
+.media-list {
+  &__name {
+    margin: 0;
+  }
+
+  &__file {
+    color: var(--wa-color-text-quiet);
+    margin: 0;
+  }
+}

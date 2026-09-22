@@ -170,6 +170,23 @@ Rails.application.routes.draw do
       get "social/preview/image" => "social#preview_image", as: :social_preview_image
       get "social/preview"       => "social#preview",       as: :social_preview
 
+      # The Contentful tools of the admin. Today there is one: the media uploader, which puts an
+      # image into the space as a published asset.
+      # ⚠️ `contentful/uploads/status` and `contentful/uploads/files` are static segments. Keep
+      # both above any `:id` route that a later tool draws here.
+      get  "contentful/uploads"        => "contentful_uploads#index",  as: :contentful_uploads
+      post "contentful/uploads"        => "contentful_uploads#create"
+      get  "contentful/uploads/status" => "contentful_uploads#status", as: :contentful_uploads_status
+
+      # One picked file, before the owner submits the form. The page uploads each one at the moment
+      # the owner picks it, and the form then carries the id.
+      post "contentful/uploads/files"         => "contentful_upload_files#create",
+           as: :contentful_upload_files
+      get  "contentful/uploads/files/:id"     => "contentful_upload_files#show",
+           as: :contentful_upload_file, constraints: { id: /\h{32}/ }
+      post "contentful/uploads/files/:id/alt" => "contentful_upload_files#alt",
+           as: :contentful_upload_file_alt, constraints: { id: /\h{32}/ }
+
       # The spam quarantine of the contact form. The name says what it holds. It is not `/contact`,
       # on purpose, because that is the path of the public form (POST /api/contact), and nothing
       # here takes a submission.

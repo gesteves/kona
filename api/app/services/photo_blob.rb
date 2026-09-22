@@ -68,4 +68,34 @@ module PhotoBlob
   rescue Vips::Error, LoadError => e
     raise NotAnImageError, e.message
   end
+
+  # The longest side of a thumbnail. It is large enough for Claude to describe the picture, and
+  # small enough that the base64 of it is a reasonable message.
+  THUMBNAIL_EDGE = 1600
+
+  # Makes the small JPEG that a tile of the media uploader shows, and that Claude reads for the
+  # alt text.
+  #
+  # ⚠️ This is NOT the picture that goes to Contentful: that one is the original file, unchanged.
+  # The decode here is still the check that the upload IS a picture, and it runs before the app
+  # sends one byte to Contentful.
+  # ⚠️ The same disk rule as `.prepare`: it reads the path, and never a String of the bytes.
+  #
+  # @param path [String] The upload, on the disk.
+  # @param edge [Integer] The longest side of the result.
+  # @return [Hash] `{ bytes:, width:, height: }`.
+  # @raise [NotAnImageError] When libvips cannot read the file.
+  def self.thumbnail(path, edge: THUMBNAIL_EDGE)
+    raise NotAnImageError, "The upload is empty" if path.blank? || !File.exist?(path) || File.size(path).zero?
+
+    require "vips"
+
+    image = Vips::Image.thumbnail(path, edge, height: edge, size: :down)
+    image = image.flatten(background: [ 255, 255, 255 ]) if image.has_alpha?
+    image = image.colourspace(:srgb) unless image.interpretation == :srgb
+
+    { bytes: image.jpegsave_buffer(Q: 80, strip: true), width: image.width, height: image.height }
+  rescue Vips::Error, LoadError => e
+    raise NotAnImageError, e.message
+  end
 end

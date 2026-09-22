@@ -9,6 +9,9 @@ RSpec.describe "Webhooks::Contentful", type: :request do
     allow(ENV).to receive(:[]).with("CONTENTFUL_WEBHOOK_SECRET").and_return(webhook_secret)
     # The webhook only adds a job to the queue. Each job runs in the fake mode, thus no code here
     # uses the PDS.
+    # ⚠️ The coalescing window of the asset build is a Redis key with a TTL of a minute. It stays
+    # between two examples, thus each one starts with it removed.
+    $redis.del(SiteBuildJob::ASSET_WINDOW_KEY)
   end
 
   def now_ms
@@ -157,10 +160,29 @@ RSpec.describe "Webhooks::Contentful", type: :request do
         expect(StandardSiteSyncJob.jobs).to be_empty
       end
 
-      it "enqueues a rebuild on an asset publish (no contentType)" do
+      it "schedules a rebuild on an asset publish (no contentType)" do
         post_webhook({ "sys" => { "id" => "asset1", "type" => "Asset" } }, topic: "ContentManagement.Asset.publish")
         expect(response).to have_http_status(:no_content)
         expect(SiteBuildJob).to have_enqueued_sidekiq_job
+      end
+
+      # ⚠️ An asset event joins a window, and an entry event does not. A bulk publish of assets —
+      # which the media uploader makes — would otherwise start one workflow run for each image.
+      it "makes one rebuild from a burst of asset publishes" do
+        3.times do |index|
+          post_webhook({ "sys" => { "id" => "asset#{index}", "type" => "Asset" } },
+                       topic: "ContentManagement.Asset.publish")
+        end
+
+        expect(SiteBuildJob.jobs.size).to eq(1)
+      end
+
+      it "does not put an entry publish in that window" do
+        3.times do
+          post_webhook(entry_payload("entry123", "article"), topic: "ContentManagement.Entry.publish")
+        end
+
+        expect(SiteBuildJob.jobs.size).to eq(3)
       end
 
       it "does not enqueue a rebuild on a draft auto_save" do

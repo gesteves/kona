@@ -26,6 +26,7 @@ en:
     pages:
       bluesky: "Bluesky"
       connected_apps: "Connected apps"
+      contentful_uploads: "Upload media"
       course_maps: "Course maps"
       home: "Home"
       location: "Location"
@@ -257,6 +258,52 @@ en:
         not_set: "Not set"
         saved: "Saved"
         unsaved: "Unsaved"
+
+    contentful_uploads:
+      index:
+        empty: "Nothing uploaded yet. Pick an image and it shows here once Contentful has
+          published it."
+        files: "Images"
+        files_hint: "Up to %{count} at a time. Each one goes to Contentful at full size, and it is
+          published as soon as it is ready."
+        file_title: "Title"
+        no_worker_html: "No Sidekiq worker is running, so nothing is publishing these images.
+          Locally, %{command} runs one; they'll pick up where they left off."
+        publish: "Upload to Contentful"
+        publishing: "Publishing to Contentful…"
+        recent: "Recent uploads"
+        unconfigured_html: "Set %{space} and %{token} in the environment to upload images."
+      # One tile of the form.
+      file:
+        file_alt: "Alt text"
+        file_alt_hint: "This becomes the description of the asset, which the site renders as the
+          alt text of the image."
+        file_title: "Title"
+        generate_alt: "Generate alt text"
+        remove_file: "Remove this image"
+      # The JSON answers of the per-file endpoints.
+      files:
+        alt_failed: "Claude couldn't describe that image. Try again."
+        alt_not_configured: "Alt text generation needs an Anthropic API key."
+        no_file: "Pick an image first."
+        not_an_image: "That file is not an image."
+        too_large: "That file is %{size}. The limit is %{limit}."
+        unconfigured: "Uploading needs a Contentful management token."
+        upload_refused: "Contentful refused that file. Try again."
+      # The status of one upload, from ContentfulUploadPresenter#status_label.
+      status:
+        failed: "Failed"
+        processing: "Processing"
+        published: "Published"
+      flash:
+        expired: "%{files} expired before it could be uploaded. Add it again."
+        no_files: "Pick at least one image."
+        # ⚠️ Two forms, because one name reads better than a count and a list of ten does not.
+        publishing:
+          one: "Uploading %{files} to Contentful. This takes a moment."
+          other: "Uploading %{count} images to Contentful. This takes a moment."
+        too_many: "Upload at most %{count} images at a time."
+        unconfigured: "Uploading needs a Contentful management token."
 
     course_maps:
       index:
@@ -509,6 +556,17 @@ en:
         searching: "Looking that up…"
         unreachable: "Couldn't reach the server."
         unreachable_save: "Couldn't reach the server. Nothing was saved."
+      media_upload:
+        # The server refused the alt text and named no reason.
+        alt_failed: "The alt text couldn't be generated."
+        # The POST did not reach the server.
+        alt_unreachable: "Couldn't reach the server. The alt text wasn't generated."
+        # The owner picked more files than the form has room for.
+        too_many_files: "This page takes at most %{limit} images. The extra ones weren't added."
+        # The server refused the file and named no reason.
+        upload_failed: "That image couldn't be added."
+        # The POST did not reach the server, thus nothing was stored.
+        upload_unreachable: "Couldn't reach the server. The image wasn't added."
       republish:
         now: "Republish now"
         # The value is outside the limits, thus the label says only what the button does.

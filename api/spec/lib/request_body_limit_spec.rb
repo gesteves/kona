@@ -29,6 +29,15 @@ RSpec.describe RequestBodyLimit do
     expect(status_for("/social/preview/text", length: 300.kilobytes)).to eq(413)
   end
 
+  # ⚠️ The same order rule as the photo upload: `/contentful/uploads/files` must stay above
+  # `/contentful`, or one picked image gets the small limit of the page and a bare 413.
+  it "gives the media upload its own limit, and keeps the small one on the rest of the page" do
+    expect(status_for("/contentful/uploads/files", length: Admin::ContentfulUploadFilesController::MAX_BYTES)).to eq(200)
+    expect(status_for("/contentful/uploads/files", length: 65.megabytes)).to eq(413)
+    expect(status_for("/contentful/uploads", length: 300.kilobytes)).to eq(413)
+    expect(status_for("/contentful/uploads", length: 200.kilobytes)).to eq(200)
+  end
+
   it "applies the default to a path with no entry" do
     expect(status_for("/api/contact", length: 64.kilobytes)).to eq(200)
     expect(status_for("/api/location", length: 64.kilobytes + 1)).to eq(413)

@@ -41,6 +41,30 @@ class SiteBuildJob < ApplicationJob
     !!$redis.set(TRIGGER_LOCK_KEY, "1", nx: true, ex: TRIGGER_LOCK_TTL.to_i)
   end
 
+  # The window that makes a burst of asset publishes ONE build. A publish of many assets — the
+  # media uploader sends one for each image — otherwise starts a workflow run for each one, and
+  # `cancel-in-progress` in web.yml then stops all but the last. Those runs cost Actions minutes
+  # and write a Slack line each.
+  ASSET_WINDOW_KEY = "build:asset_window".freeze
+  ASSET_WINDOW = 60.seconds
+
+  # Schedules a build for an asset publish, unless a window is open already.
+  #
+  # ⚠️ This is NOT `claim_trigger_lock` and NOT `schedule_in`. The trigger lock makes a publish
+  # inside its window go away with no message, which this caller must never do. `schedule_in` owns
+  # the one scheduled slot of the Republish dialog, and an asset publish must not cancel a
+  # republish that the owner asked for.
+  # ⚠️ It cancels nothing, thus no publish is lost: the build always runs AFTER the publish that
+  # opened the window and after each publish that joined it, and a steady stream of publishes
+  # cannot push the build back for all time.
+  # @return [Boolean] true when this call scheduled the build.
+  def self.coalesce_asset_build
+    return false unless $redis.set(ASSET_WINDOW_KEY, "1", nx: true, ex: ASSET_WINDOW.to_i)
+
+    perform_in(ASSET_WINDOW, CONTENTFUL_EVENT_TYPE)
+    true
+  end
+
   # Schedules a build, and cancels the build that is scheduled already.
   # @param delay [ActiveSupport::Duration] The time from now.
   # @param event_type [String] One of the three event types above.

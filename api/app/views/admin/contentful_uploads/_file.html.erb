@@ -1,0 +1,62 @@
+<%# One picked file: its thumbnail, its title, its alt text, and the remove X.
+
+    ⚠️ **The three fields render in THIS order in every tile.** The names are `files[ids][]`,
+    `files[titles][]`, and `files[alts][]`, and the action reads the three arrays by POSITION. A
+    tile that omits one field would move each value after it by one.
+
+    ⚠️ The tiles have no order that means anything: one asset does not know about another one.
+    Thus this partial has no grip and no drag, and the Social media tile has both.
+
+    ⚠️ Inside a tile the hooks are plain `data-` attributes and NOT Stimulus targets. Only the
+    root is a target. That is what lets the <template> of the page clone this markup without two
+    elements answering to the same target name. %>
+<%# ⚠️ `data-file-alt-url` is the path of the Generate control of THIS tile. The server writes it
+    here, and the answer of the upload writes it for a new tile, thus the JavaScript builds no
+    path. The control renders only when Claude has a key, and it is disabled while the tile has
+    no id. %>
+<div class="media-file" data-media-upload-target="file"
+     data-file-alt-url="<%= contentful_upload_file_alt_path(file.id) if file.id.present? %>">
+  <%# The id that the upload answered with. It is empty while the upload is out, and the action
+      drops such a triple. It is first because it renders nothing. %>
+  <input type="hidden" name="files[ids][]" value="<%= file.id %>" data-file-id>
+
+  <div class="media-file__media">
+    <%# ⚠️ No handler on `error`. A thumbnail that fails to load must not take the file off the
+        form: the submit refuses a file that is gone, with a message. %>
+    <img class="media-file__image" alt=""
+         <% if file.id.present? %>src="<%= contentful_upload_file_path(file.id) %>"<% end %>
+         data-file-image>
+    <%# It spins while the upload is out. It needs a rule for `[hidden]`; refer to
+        _media-upload.scss. %>
+    <wa-spinner class="media-file__spinner" data-file-spinner hidden></wa-spinner>
+  </div>
+
+  <div class="media-file__text">
+    <wa-input class="media-file__title" name="files[titles][]" label="<%= t(".file_title") %>"
+              size="small" value="<%= file.title %>" data-file-title>
+    </wa-input>
+
+    <wa-textarea class="media-file__alt" name="files[alts][]" label="<%= t(".file_alt") %>"
+                 hint="<%= t(".file_alt_hint") %>" rows="3" resize="auto" size="small"
+                 value="<%= file.alt %>" data-file-alt>
+    </wa-textarea>
+
+    <%# ⚠️ `type="button"`, as each button of a dialog carries: a <wa-button> is form-associated,
+        and one with no type in a form could submit the page. The controller sets `loading` and
+        `disabled` together while the request is out, thus a second click starts nothing. %>
+    <% if alt_text %>
+      <wa-button class="media-file__generate" type="button" appearance="outlined" size="small"
+                 data-file-generate data-action="click->media-upload#generateAlt"
+                 <%= "disabled" if file.id.blank? %>>
+        <%= slotted_icon_svg("classic", "light", "sparkles") %>
+        <%= t(".generate_alt") %>
+      </wa-button>
+    <% end %>
+  </div>
+
+  <wa-button class="media-file__remove" type="button" appearance="plain" size="small"
+             data-action="click->media-upload#removeFile">
+    <%= raw icon_svg("classic", "light", "circle-xmark") %>
+    <span class="wa-visually-hidden"><%= t(".remove_file") %></span>
+  </wa-button>
+</div>

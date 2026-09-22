@@ -16,6 +16,11 @@ class RequestBodyLimit
   LIMITS = [
     [ "/course-maps", 32 * MEGABYTE ],
     [ "/social/photos", 64 * MEGABYTE ],
+    # ⚠️ `/contentful/uploads/files` is ABOVE `/contentful` for the same reason: one picked file is
+    # as much as `Admin::ContentfulUploadFilesController::MAX_BYTES`, and the page itself is a
+    # small form of ids and text.
+    [ "/contentful/uploads/files", 64 * MEGABYTE ],
+    [ "/contentful", MEGABYTE / 4 ],
     [ "/api/icons", MEGABYTE / 4 ],
     [ "/social", MEGABYTE / 4 ],
     [ "/webhooks/", MEGABYTE ]

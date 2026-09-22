@@ -1915,6 +1915,99 @@ become different. `location_map_controller.js` holds the `variant` of each state
   with no coordinates in place of a button that cannot move the map. When Contentful is down, the
   page loses the shortcuts and nothing more.
 
+### The media uploader
+
+`/contentful/uploads` puts one or more images into Contentful as **published assets**. The owner
+picks the files, each one becomes a tile with a thumbnail, a title, and an alt-text field, a
+Generate control asks Claude for that text, and the submit makes the assets. The alt text becomes
+`fields.description`, which is the field that `web/` renders as the `alt` of an image.
+
+The page is a copy of the photo composer of the Social media page, with **no reorder**: the order
+of the tiles means nothing to Contentful, thus there is no grip and no drag code here.
+
+There are three services. `ContentfulManagement` speaks to the Content Management API,
+`StagedUpload` is the Redis record of one picked file, and `UploadLibrary` is the history of what
+went to Contentful.
+
+⚠️ **`ContentfulManagement` is the WRITE client, and `ContentfulClient` is the read one.** The two
+use different hosts and different tokens. `CONTENTFUL_TOKEN` is a delivery token and it cannot
+write; `CONTENTFUL_MANAGEMENT_TOKEN` is a separate, optional value. With no value, the page renders
+and says so, and no other part of the app changes.
+
+**Three steps, because the alt text arrives after the file does.**
+
+- **The pick** (`POST /contentful/uploads/files`, one file for each request). libvips makes the
+  thumbnail, and the **ORIGINAL bytes go to the Upload API of Contentful in that same request**.
+  Redis then holds the thumbnail and the id of that Upload.
+  - ⚠️ **Contentful gets the original file, unchanged**: the full resolution, the EXIF, the true
+    bytes. That is what the mirror already holds, and a resize here would lose the resolution that
+    a cover image needs. `PhotoBlob.thumbnail` makes the small JPEG for the tile and for Claude,
+    and it is not in the path of the asset.
+  - ⚠️ **The bytes go up at the PICK, and not in the job.** `app` and `worker` are different fly
+    machines, thus the job cannot read the temporary file of the request. The other way — the
+    bytes in Redis, as `SocialPhotos` does — would hold as much as 500MB of camera JPEG on a 256MB
+    instance, and `volatile-lru` would start to remove keys. The transfer happens while the owner
+    writes the alt text, thus it costs no waiting.
+  - ⚠️ **The upload stays on the DISK.** `PhotoBlob.thumbnail` reads the path, and
+    `#create_upload` streams from the path with a `Content-Length`. A `File.read` of a 38MB camera
+    JPEG, three times over at three Puma threads, is the failure that the first R2 backfill met.
+  - ⚠️ **The decode is the check that the file is a picture**, and it runs before the app sends one
+    byte to Contentful. A content type from the browser is not such a check.
+  - ⚠️ `RequestBodyLimit` has `/contentful/uploads/files` **above** `/contentful`: the first prefix
+    wins, and the page itself is a small form of ids and words.
+- **The alt text** (`POST /contentful/uploads/files/:id/alt`). It is the same `AltText` service as
+  the Social media page, with the same prompt and the same model. ⚠️ It sends the **thumbnail**: a
+  38MB camera JPEG as base64 is far past what the call should carry, and the description of a
+  picture does not change with the resolution.
+- **The submit** (`POST /contentful/uploads`). It records each tile and adds one
+  `ContentfulAssetJob`. ⚠️ The form sends **three flat arrays** — `files[ids][]`, `files[titles][]`,
+  and `files[alts][]` — and they match by POSITION. The action pairs them first and drops a whole
+  triple. They are three arrays and not `files[][id]`, because Rack makes a new hash for that shape
+  only when a key repeats: one field that a browser does not submit would join two tiles into one,
+  and no check would show it.
+
+**The job** creates the asset, processes its file, waits, and publishes it. Contentful processes a
+file asynchronously, thus this cannot run in a request with a 20-second budget.
+
+- ⚠️ **The record keeps the `asset_id` the moment the create answers**, before the next call. A
+  retry that ran the create again would leave a duplicate asset in the space, unpublished, with no
+  message.
+- ⚠️ **`ContentfulManagement#ensure_processed` reads the asset first.** That is the other half of
+  the same rule: a retry after a failed publish finds a file that has its URL and asks for no
+  second processing, and a retry after a failed process asks for it again.
+- ⚠️ **`sidekiq_retries_exhausted` writes `status: "failed"`**, and `#perform` does not, for the
+  same reason as `MapTilesetJob`.
+- A staged file that expired raises `PermanentError`: the Upload of Contentful is gone with it,
+  thus no later attempt can find the bytes.
+- ⚠️ **An Upload of Contentful is retained for 24 hours**, and `StagedUpload::TTL` is 12 hours.
+  Thus a stale tile fails on our side, with a message of ours.
+
+**The page polls**, as the Maps page does, and `job_status_controller.js` serves both. ⚠️ Its
+in-progress sentinel is the word **`processing`**, in that file and in each store that feeds it. A
+store that uses another word polls for all time. ⚠️ **This page needs the Sidekiq worker**: a file
+stays at "Processing" until the job publishes it, and the page says so when it finds no process.
+
+⚠️ **A publish of an asset starts the Contentful webhook**, thus each new image also gets its R2
+mirror copy and its blurhash placeholder, with no change to this code. It also builds the site, and
+that is the next section.
+
+#### The coalescing window of the asset build
+
+`Webhooks::ContentfulController` gives an **Asset** event to `SiteBuildJob.coalesce_asset_build`,
+and an Entry event still goes to `perform_async`. The first asset publish schedules a build 60
+seconds out, and each publish inside that window joins it. A batch of ten images would otherwise
+start ten workflow runs, of which `cancel-in-progress` in `web.yml` stops nine — after each one has
+already begun and written its Slack line.
+
+⚠️ **It is NOT `claim_trigger_lock` and NOT `schedule_in`.** The trigger lock makes a publish inside
+its window go away with no message, which this caller must never do, and `schedule_in` owns the one
+scheduled slot of the Republish dialog: an asset publish must not cancel a republish that the owner
+asked for. `ASSET_WINDOW_KEY` is its own key, and it cancels nothing. Thus no publish is lost: the
+build always runs **after** the publish that opened the window and after each publish that joined
+it, and a steady stream of publishes cannot push the build back for all time.
+
+⚠️ An **entry** publish still builds at once, on purpose. That is the one that the owner waits for.
+
 ### The course-map renderer
 
 `/course-maps` makes a static PNG cover image for a race report from a GPX track. It is a front end
@@ -2243,6 +2336,10 @@ value is a secret of fly.io, and Rails also uses `config/credentials.yml.enc` an
 - **Optional**: `AKISMET_API_KEY` (with no value the check is off and each message goes out with no
   check; with a value the check fails closed), `TURNSTILE_SECRET` (use it with the
   `TURNSTILE_SITE_KEY` of the web app; set both or set neither),
+  `CONTENTFUL_MANAGEMENT_TOKEN` (a Contentful **content management** token, for the media uploader
+  of the admin. ⚠️ It is not `CONTENTFUL_TOKEN`, which is a read-only delivery token, and it is the
+  strongest credential here: it can delete the full space. With no value that page renders and says
+  so) and `CONTENTFUL_ENVIRONMENT` (the default is `master`),
   `CSP_ENFORCE` (any value enforces the CSP for the owner; with no value the CSP is Report-Only),
   `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`, `ANTHROPIC_API_KEY` with
   `ANTHROPIC_DESCRIPTION_MODEL`, `ANTHROPIC_CONTACT_SUBJECT_MODEL`, and `ANTHROPIC_ALT_TEXT_MODEL`

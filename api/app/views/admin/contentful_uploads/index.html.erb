@@ -1,0 +1,99 @@
+<% content_for :title, t("admin.pages.contentful_uploads") %>
+
+<h1 class="admin-main__title"><%= t("admin.pages.contentful_uploads") %></h1>
+
+<% unless @configured %>
+  <wa-callout variant="warning" class="media-upload__notice">
+    <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
+    <%= t(".unconfigured_html", space: tag.code("CONTENTFUL_SPACE"), token: tag.code("CONTENTFUL_MANAGEMENT_TOKEN")) %>
+  </wa-callout>
+<% end %>
+
+<% if @worker_running == false %>
+  <wa-callout variant="warning" class="media-upload__notice">
+    <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
+    <%= t(".no_worker_html", command: tag.code("overmind start")) %>
+  </wa-callout>
+<% end %>
+
+<%# The picker uploads each file at the moment the owner picks it, and this form then carries the
+    id and the words of each tile. A file input cannot be refilled by the server, thus a page that
+    renders again would lose every file. %>
+<%= form_with url: contentful_uploads_path, method: :post,
+              class: "media-upload wa-stack wa-gap-l",
+              data: { controller: "media-upload",
+                      action: "input->media-upload#settle",
+                      admin_i18n: admin_i18n_data("admin.js.media_upload"),
+                      media_upload_url_value: contentful_upload_files_path,
+                      media_upload_max_files_value: Admin::ContentfulUploadsController::MAX_FILES } do %>
+
+  <%# ⚠️ The file input has NO `name`, on purpose: the files must never go with this form. The
+      controller uploads each one and then empties the input, thus the component draws no file
+      list of its own and the tiles are the one list. %>
+  <wa-file-input class="media-upload__picker" accept="image/*" multiple
+                 label="<%= t(".files") %>" hint="<%= t(".files_hint", count: Admin::ContentfulUploadsController::MAX_FILES) %>"
+                 data-media-upload-target="fileInput"
+                 data-action="change->media-upload#filesPicked"
+                 <%= "disabled" unless @configured %>>
+  </wa-file-input>
+
+  <div class="media-upload__tiles" data-media-upload-target="tiles"></div>
+
+  <%# The server renders the empty tile from the SAME partial that a stored tile uses, thus the
+      markup of a tile is in one place. %>
+  <template data-media-upload-target="fileTemplate">
+    <%= render "file", file: ContentfulUploadPresenter::File.new, alt_text: @alt_text %>
+  </template>
+
+  <div>
+    <wa-button type="submit" variant="brand" appearance="accent" disabled
+               data-media-upload-target="submit">
+      <%= slotted_icon_svg("classic", "light", "cloud-arrow-up") %>
+      <%= t(".publish") %>
+    </wa-button>
+  </div>
+<% end %>
+
+<h2 class="wa-heading-l"><%= t(".recent") %></h2>
+
+<% if @uploads.empty? %>
+  <wa-callout variant="neutral">
+    <%= slotted_icon_svg("classic", "light", "images", slot: "icon") %>
+    <%= t(".empty") %>
+  </wa-callout>
+<% else %>
+  <%# The list reads the status while a file publishes, and then it stops. Contentful processes a
+      file asynchronously, thus the server can send nothing to the page. %>
+  <ul class="media-list plain-list wa-stack wa-gap-s"
+      data-controller="job-status"
+      data-job-status-url-value="<%= contentful_uploads_status_path %>">
+    <% @uploads.each do |upload| %>
+      <li data-job-status-id="<%= upload.id %>" data-job-status-state="<%= upload.status %>">
+        <wa-card>
+          <div class="wa-stack wa-gap-s">
+            <div class="wa-cluster wa-gap-s">
+              <h3 class="media-list__name wa-heading-m"><%= upload.title %></h3>
+              <wa-badge variant="<%= upload.status_variant %>" appearance="outlined">
+                <%= upload.status_label %>
+              </wa-badge>
+              <wa-relative-time class="media-list__age wa-caption-s" date="<%= upload.uploaded_at %>" sync></wa-relative-time>
+            </div>
+
+            <p class="media-list__file wa-caption-s"><%= upload.file_name %></p>
+
+            <% if upload.failed? && upload.error %>
+              <wa-callout variant="danger"><%= upload.error %></wa-callout>
+            <% end %>
+
+            <% if upload.processing? %>
+              <span class="wa-cluster wa-gap-xs wa-caption-s">
+                <wa-spinner></wa-spinner>
+                <%= t(".publishing") %>
+              </span>
+            <% end %>
+          </div>
+        </wa-card>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

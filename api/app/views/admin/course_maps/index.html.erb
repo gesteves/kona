@@ -37,9 +37,9 @@
 <% else %>
   <%# The list reads the status while a track publishes, and then it stops. The tiling service of
       Mapbox is asynchronous, thus the server can send nothing to the page. %>
-  <ul class="track-list plain-list wa-grid wa-gap-m" data-controller="map-status" data-map-status-url-value="<%= course_maps_status_path %>">
+  <ul class="track-list plain-list wa-grid wa-gap-m" data-controller="job-status" data-job-status-url-value="<%= course_maps_status_path %>">
     <% @tracks.each do |track| %>
-      <li data-map-status-id="<%= track.id %>" data-map-status-state="<%= track.status %>">
+      <li data-job-status-id="<%= track.id %>" data-job-status-state="<%= track.status %>">
         <wa-card>
           <div class="wa-stack wa-gap-m">
             <div class="wa-cluster wa-gap-s">

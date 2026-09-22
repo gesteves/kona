@@ -75,6 +75,39 @@ RSpec.describe SiteBuildJob do
     end
   end
 
+  describe ".coalesce_asset_build" do
+    before { $redis.del(described_class::ASSET_WINDOW_KEY) }
+    after  { $redis.del(described_class::ASSET_WINDOW_KEY) }
+
+    it "schedules one build and opens a 60-second window" do
+      allow(described_class).to receive(:perform_in)
+
+      expect(described_class.coalesce_asset_build).to be(true)
+      expect(described_class).to have_received(:perform_in)
+        .with(described_class::ASSET_WINDOW, described_class::CONTENTFUL_EVENT_TYPE)
+      expect($redis.ttl(described_class::ASSET_WINDOW_KEY)).to be_between(1, 60)
+    end
+
+    it "schedules nothing while the window is open" do
+      allow(described_class).to receive(:perform_in)
+      described_class.coalesce_asset_build
+
+      expect(described_class.coalesce_asset_build).to be(false)
+      expect(described_class).to have_received(:perform_in).once
+    end
+
+    # ⚠️ The window is its own key. The trigger lock makes a publish go away with no message, and
+    # the scheduled jid belongs to the Republish dialog of the admin. An asset publish must touch
+    # neither one.
+    it "touches neither the trigger lock nor the scheduled republish" do
+      allow(described_class).to receive(:perform_in)
+      described_class.coalesce_asset_build
+
+      expect($redis.exists?(described_class::TRIGGER_LOCK_KEY)).to be(false)
+      expect($redis.exists?(described_class::SCHEDULED_JID_KEY)).to be(false)
+    end
+  end
+
   describe "the scheduled republish" do
     let(:scheduled_set) { instance_double(Sidekiq::ScheduledSet) }
     let(:scheduled_job) { instance_double(Sidekiq::SortedEntry) }

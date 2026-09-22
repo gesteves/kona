@@ -43,7 +43,13 @@ RSpec.describe "Public API host route constraints", type: :request do
     [ :patch, "/course-maps/abc123" ],
     [ :delete, "/course-maps/abc123" ],
     [ :get,  "/course-maps/abc123/preview" ],
-    [ :get,  "/course-maps/abc123/download" ]
+    [ :get,  "/course-maps/abc123/download" ],
+    [ :get,  "/contentful/uploads" ],
+    [ :post, "/contentful/uploads" ],
+    [ :get,  "/contentful/uploads/status" ],
+    [ :post, "/contentful/uploads/files" ],
+    [ :get,  "/contentful/uploads/files/#{'a' * 32}" ],
+    [ :post, "/contentful/uploads/files/#{'a' * 32}/alt" ]
   ]
 
   # One path for each namespace that the public host must continue to answer. Most of them need a

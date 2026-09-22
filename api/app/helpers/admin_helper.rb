@@ -42,8 +42,9 @@ module AdminHelper
   def admin_nav_groups(quarantine_count: 0)
     [
       { key: "tools", label: t("admin.nav.groups.tools"), items: [
-        { label: t("admin.pages.course_maps"), path: course_maps_path, icon: %w[classic light map] },
-        { label: t("admin.pages.social"),      path: social_path,      icon: %w[classic light paper-plane] }
+        { label: t("admin.pages.contentful_uploads"), path: contentful_uploads_path, icon: %w[classic light images] },
+        { label: t("admin.pages.course_maps"),        path: course_maps_path,        icon: %w[classic light map] },
+        { label: t("admin.pages.social"),             path: social_path,             icon: %w[classic light paper-plane] }
       ] },
       { key: "messages", label: t("admin.nav.groups.messages"), items: [
         { label: t("admin.pages.spam"), path: spam_path, icon: %w[classic light envelopes-bulk],

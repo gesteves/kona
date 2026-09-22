@@ -61,7 +61,14 @@ module Webhooks
       # Builds the static site again at each change to the published content. Only these three
       # actions change the site from the build: an automatic save of a draft must not start a
       # deploy.
-      SiteBuildJob.perform_async if %w[publish unpublish delete].include?(action)
+      #
+      # ⚠️ An ASSET event joins a 60-second window, and an entry event does not. The media uploader
+      # of the admin publishes one asset for each image, and a bulk publish in Contentful does the
+      # same. Each one would otherwise start its own workflow run. An entry publish is the thing
+      # that the owner waits for, thus it still builds at once.
+      if %w[publish unpublish delete].include?(action)
+        entity == ASSET_ENTITY ? SiteBuildJob.coalesce_asset_build : SiteBuildJob.perform_async
+      end
 
       Rails.logger.info("Contentful webhook handled: contentType=#{content_type} entry=#{entry_id} action=#{action} operation=#{operation || 'ignored'}")
       head :no_content

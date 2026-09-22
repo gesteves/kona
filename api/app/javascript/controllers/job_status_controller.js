@@ -4,11 +4,17 @@ import { visit } from "@hotwired/turbo";
 const INTERVAL = 5000;
 
 /**
- * Gets the Maps list again while Mapbox still publishes an upload.
+ * Gets a list again while a background job still works on one of its rows.
  *
- * The tiling service of Mapbox is asynchronous and the origin can send nothing to the page. Thus the
- * page asks. It reads a status-only endpoint and does not load the page again, and it renders again
- * only when a status changes. A publish takes one or two minutes, thus most reads find no change.
+ * The Maps page and the media uploader both use it: Mapbox and Contentful each publish
+ * asynchronously, and the origin can send nothing to the page. Thus the page asks. It reads a
+ * status-only endpoint and does not load the page again, and it renders again only when a status
+ * changes. A publish takes one or two minutes, thus most reads find no change.
+ *
+ * A row carries `data-job-status-id` and `data-job-status-state`, and the endpoint answers
+ * `{ id: state }`.
+ * ⚠️ **The in-progress state is the word `processing`**, in this file and in each store that
+ * feeds it. A store that uses another word polls for all time.
  */
 export default class extends Controller {
   static values = { url: String };
@@ -60,27 +66,27 @@ export default class extends Controller {
     this.poll();
   }
 
-  /** @returns {string[]} The ids of the rows that the server last rendered in the publish state. */
+  /** @returns {string[]} The ids of the rows that the server last rendered in the in-progress state. */
   pendingIds() {
     return this.rows()
-      .filter((row) => row.dataset.mapStatusState === "processing")
-      .map((row) => row.dataset.mapStatusId);
+      .filter((row) => row.dataset.jobStatusState === "processing")
+      .map((row) => row.dataset.jobStatusId);
   }
 
   /**
-   * Tells if a row that the server rendered in the publish state changed. This includes a row that
+   * Tells if a row that the server rendered in the in-progress state changed. This includes a row that
    * a person deleted in another tab, which is then absent from the response.
    * @returns {boolean}
    */
   changed(statuses) {
     return this.rows().some((row) => {
-      if (row.dataset.mapStatusState !== "processing") return false;
-      return statuses[row.dataset.mapStatusId] !== "processing";
+      if (row.dataset.jobStatusState !== "processing") return false;
+      return statuses[row.dataset.jobStatusId] !== "processing";
     });
   }
 
   rows() {
-    return Array.from(this.element.querySelectorAll("[data-map-status-id]"));
+    return Array.from(this.element.querySelectorAll("[data-job-status-id]"));
   }
 
   stop() {

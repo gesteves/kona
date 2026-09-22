@@ -42,7 +42,7 @@ import "@web.awesome.me/webawesome-pro/dist/components/color-picker/color-picker
 import "@web.awesome.me/webawesome-pro/dist/components/select/select.js";
 import "@web.awesome.me/webawesome-pro/dist/components/option/option.js";
 import "@web.awesome.me/webawesome-pro/dist/components/switch/switch.js";
-// The "Processing" state of a track on the Course maps page.
+// The "Processing" state of a track on the Course maps page, and of a file on the media uploader.
 import "@web.awesome.me/webawesome-pro/dist/components/spinner/spinner.js";
 // The messages of the admin, in the corner. wa-toast imports wa-toast-item.
 import "@web.awesome.me/webawesome-pro/dist/components/toast/toast.js";
@@ -64,13 +64,14 @@ import "@web.awesome.me/webawesome-pro/dist/components/time-input/time-input.js"
 
 import DialogController from "./controllers/dialog_controller";
 import LocationMapController from "./controllers/location_map_controller";
-import MapStatusController from "./controllers/map_status_controller";
+import JobStatusController from "./controllers/job_status_controller";
 import MapPreviewController from "./controllers/map_preview_controller";
 import LinkedSidesController from "./controllers/linked_sides_controller";
 import RepublishController from "./controllers/republish_controller";
 import ToastController from "./controllers/toast_controller";
 import SocialController from "./controllers/social_controller";
 import SocialPostController from "./controllers/social_post_controller";
+import MediaUploadController from "./controllers/media_upload_controller";
 
 // window.Stimulus stays available for a debug session in the console, but the code registers each
 // controller through the local variable, because a static analysis cannot see the global.
@@ -78,10 +79,11 @@ const application = Application.start();
 window.Stimulus = application;
 application.register("dialog", DialogController);
 application.register("location-map", LocationMapController);
-application.register("map-status", MapStatusController);
+application.register("job-status", JobStatusController);
 application.register("map-preview", MapPreviewController);
 application.register("linked-sides", LinkedSidesController);
 application.register("republish", RepublishController);
 application.register("toast", ToastController);
 application.register("social", SocialController);
 application.register("social-post", SocialPostController);
+application.register("media-upload", MediaUploadController);
