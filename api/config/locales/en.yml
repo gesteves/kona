@@ -270,10 +270,10 @@ en:
         file_title: "Title"
         no_worker_html: "No Sidekiq worker is running, so nothing is publishing these images.
           Locally, %{command} runs one; they'll pick up where they left off."
-        publish: "Upload to Contentful"
         publishing: "Publishing to Contentful…"
         recent: "Recent uploads"
         unconfigured_html: "Set %{space} and %{token} in the environment to upload images."
+        upload: "Upload"
       # One tile of the form.
       file:
         file_alt: "Alt text"

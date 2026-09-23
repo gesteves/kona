@@ -72,6 +72,7 @@ import ToastController from "./controllers/toast_controller";
 import SocialController from "./controllers/social_controller";
 import SocialPostController from "./controllers/social_post_controller";
 import MediaUploadController from "./controllers/media_upload_controller";
+import FileSubmitController from "./controllers/file_submit_controller";
 
 // window.Stimulus stays available for a debug session in the console, but the code registers each
 // controller through the local variable, because a static analysis cannot see the global.
@@ -87,3 +88,4 @@ application.register("toast", ToastController);
 application.register("social", SocialController);
 application.register("social-post", SocialPostController);
 application.register("media-upload", MediaUploadController);
+application.register("file-submit", FileSubmitController);
