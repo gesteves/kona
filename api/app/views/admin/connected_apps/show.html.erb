@@ -1,20 +1,18 @@
-<% content_for :title, t("admin.pages.connected_apps") %>
+<%= render "layouts/page_header", title: t("admin.pages.connected_apps") %>
 
-<h1 class="admin-main__title"><%= t("admin.pages.connected_apps") %></h1>
-
-<ul class="plain-list wa-stack wa-gap-m">
+<ul class="admin-card-list plain-list wa-grid wa-gap-m">
   <% @apps.each do |app| %>
     <li>
-      <wa-card>
+      <wa-card class="admin-card">
         <div class="wa-stack wa-gap-m">
           <div class="wa-cluster wa-gap-s">
-            <h2 class="connected-app__name wa-heading-l"><%= app.name %></h2>
+            <h2 class="admin-card__title wa-heading-m"><%= app.name %></h2>
             <wa-badge variant="<%= app.status_variant %>" appearance="outlined">
               <%= app.status_label %>
             </wa-badge>
           </div>
 
-          <p class="connected-app__description"><%= app.description %></p>
+          <p class="admin-card__summary"><%= app.description %></p>
 
           <%# A reader can miss the badge alone, and this is the one state that needs an action. %>
           <% if app.error.present? %>
@@ -35,6 +33,7 @@
                   load. %>
               <wa-button href="<%= app.connect_path %>" variant="brand" appearance="accent"
                          data-turbo="false">
+                <%= slotted_icon_svg("classic", "light", "link") %>
                 <%= app.connect_label %>
               </wa-button>
             <% end %>
@@ -44,8 +43,10 @@
             <% if app.disconnectable? %>
               <%# The button opens the dialog below: wa-dialog listens on the full document for
                   [data-dialog="open <id>"]. ⚠️ The stored credentials are the only copy, thus the
-                  delete needs a confirmation, as the Spam page and the Course maps page have. %>
-              <wa-button variant="danger" appearance="outlined" data-dialog="open <%= app.disconnect_dialog_id %>">
+                  delete needs a confirmation, as the Spam page and the Course maps page have.
+                  ⚠️ Use neutral and not danger: the brand colors here are red. Red is for the
+                  confirm button in the dialog only. %>
+              <wa-button variant="neutral" appearance="outlined" data-dialog="open <%= app.disconnect_dialog_id %>">
                 <%= slotted_icon_svg("classic", "light", "link-slash") %>
                 <%= t(".disconnect") %>
               </wa-button>

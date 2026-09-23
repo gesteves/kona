@@ -1,9 +1,5 @@
-<% content_for :title, @track.title %>
-
-<p class="map-editor__back"><%= link_to t(".back"), course_maps_path %></p>
-
-<h1 class="admin-main__title"><%= @track.title %></h1>
-<p class="map-editor__summary"><%= @track.summary %></p>
+<%= render "layouts/page_header", title: @track.title, back: [t(".back"), course_maps_path],
+                                  lead: @track.summary %>
 
 <%# In normal use the form never submits. The preview controller reads it and changes the image URL
     and the download URL in place. Thus a change to a value causes no navigation and the field that

@@ -610,6 +610,17 @@ appears to have no method for something, read its documentation before you make 
 than one difficult part here is documented behavior: the navigation slot of `<wa-page>`, the form
 association, and `::part(base)`.
 
+**Each admin page uses the same three parts.** Keep a new page the same:
+
+- `<main>` is a `wa-stack wa-gap-xl`. Thus a page sets no margin between its blocks.
+- `layouts/_page_header` makes the tab title, the back link, the `<h1>`, and the lead text.
+- A list of items is an `admin-card-list plain-list wa-grid wa-gap-m` of `admin-card` cards. Refer to
+  `_admin-card.scss`.
+
+A form is a `wa-stack wa-gap-l`, and its buttons go in a `wa-cluster wa-gap-s` at its end. Each
+button and each callout has an icon. A delete button on a card is `neutral`, and red is for the
+confirm button in its dialog only, because the brand color is red.
+
 ⚠️ **The package has its own documentation. Read it, and do not use an API from memory.** That
 documentation is the source of the examples of the vendor, and its version is the version that you
 installed:

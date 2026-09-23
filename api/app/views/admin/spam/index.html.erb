@@ -1,6 +1,4 @@
-<% content_for :title, t("admin.pages.spam") %>
-
-<h1 class="admin-main__title"><%= t("admin.pages.spam") %></h1>
+<%= render "layouts/page_header", title: t("admin.pages.spam") %>
 
 <%# ⚠️ Each field on these cards is input from an attacker, and no code removes anything from it.
     This is the one place in the app where that is true of rendered HTML. The escape that ERB does
@@ -14,18 +12,18 @@
     <%= t(".empty") %>
   </wa-callout>
 <% else %>
-  <ul class="spam-list plain-list wa-grid wa-gap-m">
+  <ul class="admin-card-list plain-list wa-grid wa-gap-m">
     <% @messages.each do |message| %>
       <li>
-        <wa-card>
+        <wa-card class="admin-card">
           <div class="wa-stack wa-gap-m">
             <div class="wa-cluster wa-gap-s">
-              <h2 class="spam__name wa-heading-l"><%= message.name %></h2>
+              <h2 class="admin-card__title wa-heading-m"><%= message.name %></h2>
               <wa-badge variant="danger" appearance="outlined"><%= t(".badge") %></wa-badge>
-              <wa-relative-time class="spam__age wa-caption-s" date="<%= message.received_at %>" sync></wa-relative-time>
+              <wa-relative-time class="admin-card__age wa-caption-s" date="<%= message.received_at %>" sync></wa-relative-time>
             </div>
 
-            <p class="spam__email"><%= message.email %></p>
+            <p class="admin-card__summary"><%= message.email %></p>
 
             <div class="spam__message wa-prose"><%= message.preview %></div>
 
@@ -69,7 +67,7 @@
                   decision. %>
               <wa-button variant="neutral" appearance="outlined" data-dialog="open <%= message.dialog_id %>">
                 <%= slotted_icon_svg("classic", "light", "trash") %>
-                <%= t("admin.actions.delete_forever") %>
+                <%= t("admin.actions.delete") %>
               </wa-button>
             </div>
           </div>

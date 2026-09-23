@@ -65,7 +65,8 @@ en:
     # The words that more than one page uses.
     actions:
       cancel: "Cancel"
-      delete_forever: "Delete forever"
+      delete: "Delete"                    # The button on a card, which opens the confirmation.
+      delete_forever: "Delete forever"    # The confirm button in that dialog.
 
     # The sign-in page, which uses layouts/auth.
     sign_in:
@@ -307,7 +308,6 @@ en:
 
     course_maps:
       index:
-        delete: "Delete"
         delete_body_html: "This deletes %{title} here and removes its tileset and source from
           Mapbox. It can't be undone."
         delete_title: "Delete this track?"

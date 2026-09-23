@@ -1,16 +1,14 @@
-<% content_for :title, t("admin.pages.location") %>
-
-<h1 class="admin-main__title"><%= t("admin.pages.location") %></h1>
+<%= render "layouts/page_header", title: t("admin.pages.location") %>
 
 <% unless @location.configured? %>
-  <wa-callout variant="warning" class="location__notice">
+  <wa-callout variant="warning">
     <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
     <%= t(".no_token_html", variable: tag.code("MAPBOX_ACCESS_TOKEN")) %>
   </wa-callout>
 <% end %>
 
 <% if @location.overridden? %>
-  <wa-callout variant="warning" class="location__notice">
+  <wa-callout variant="warning">
     <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
     <%= t(".overridden_html", variable: tag.code("LOCATION"), value: @location.override_summary) %>
   </wa-callout>

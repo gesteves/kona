@@ -1,6 +1,4 @@
-<% content_for :title, t("admin.pages.social") %>
-
-<h1 class="admin-main__title"><%= t("admin.pages.social") %></h1>
+<%= render "layouts/page_header", title: t("admin.pages.social") %>
 
 <%# ⚠️ A refused submit renders this page again and does not redirect, thus each field below puts
     its value back. To redirect would lose the words that the owner wrote.

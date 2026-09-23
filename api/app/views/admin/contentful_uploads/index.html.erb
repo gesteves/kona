@@ -1,16 +1,14 @@
-<% content_for :title, t("admin.pages.contentful_uploads") %>
-
-<h1 class="admin-main__title"><%= t("admin.pages.contentful_uploads") %></h1>
+<%= render "layouts/page_header", title: t("admin.pages.contentful_uploads") %>
 
 <% unless @configured %>
-  <wa-callout variant="warning" class="media-upload__notice">
+  <wa-callout variant="warning">
     <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
     <%= t(".unconfigured_html", space: tag.code("CONTENTFUL_SPACE"), token: tag.code("CONTENTFUL_MANAGEMENT_TOKEN")) %>
   </wa-callout>
 <% end %>
 
 <% if @worker_running == false %>
-  <wa-callout variant="warning" class="media-upload__notice">
+  <wa-callout variant="warning">
     <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
     <%= t(".no_worker_html", command: tag.code("overmind start")) %>
   </wa-callout>
@@ -45,7 +43,7 @@
     <%= render "file", file: ContentfulUploadPresenter::File.new, alt_text: @alt_text %>
   </template>
 
-  <div>
+  <div class="wa-cluster wa-gap-s">
     <wa-button type="submit" variant="brand" appearance="accent" disabled
                data-media-upload-target="submit">
       <%= slotted_icon_svg("classic", "light", "cloud-arrow-up") %>
@@ -54,10 +52,8 @@
   </div>
 <% end %>
 
-<%# The heading and the list are one block, thus the space above the heading is one rule and not a
-    margin that the form and the heading each carry a half of. %>
-<section class="media-list wa-stack wa-gap-m">
-  <h2 class="media-list__heading wa-heading-l"><%= t(".recent") %></h2>
+<section class="wa-stack wa-gap-m">
+  <h2 class="wa-heading-l"><%= t(".recent") %></h2>
 
   <% if @uploads.empty? %>
     <wa-callout variant="neutral">
@@ -67,25 +63,28 @@
   <% else %>
     <%# The list reads the status while a file publishes, and then it stops. Contentful processes a
         file asynchronously, thus the server can send nothing to the page. %>
-    <ul class="media-list__items plain-list wa-stack wa-gap-s"
+    <ul class="admin-card-list plain-list wa-grid wa-gap-m"
         data-controller="job-status"
         data-job-status-url-value="<%= contentful_uploads_status_path %>">
       <% @uploads.each do |upload| %>
         <li data-job-status-id="<%= upload.id %>" data-job-status-state="<%= upload.status %>">
-          <wa-card>
-            <div class="wa-stack wa-gap-s">
+          <wa-card class="admin-card">
+            <div class="wa-stack wa-gap-m">
               <div class="wa-cluster wa-gap-s">
-                <h3 class="media-list__name wa-heading-m"><%= upload.title %></h3>
+                <h3 class="admin-card__title wa-heading-m"><%= upload.title %></h3>
                 <wa-badge variant="<%= upload.status_variant %>" appearance="outlined">
                   <%= upload.status_label %>
                 </wa-badge>
-                <wa-relative-time class="media-list__age wa-caption-s" date="<%= upload.uploaded_at %>" sync></wa-relative-time>
+                <wa-relative-time class="admin-card__age wa-caption-s" date="<%= upload.uploaded_at %>" sync></wa-relative-time>
               </div>
 
-              <p class="media-list__file wa-caption-s"><%= upload.file_name %></p>
+              <p class="admin-card__summary"><%= upload.file_name %></p>
 
               <% if upload.failed? && upload.error %>
-                <wa-callout variant="danger"><%= upload.error %></wa-callout>
+                <wa-callout variant="danger">
+                  <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
+                  <%= upload.error %>
+                </wa-callout>
               <% end %>
 
               <% if upload.processing? %>

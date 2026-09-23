@@ -1,16 +1,14 @@
-<% content_for :title, t("admin.pages.course_maps") %>
-
-<h1 class="admin-main__title"><%= t("admin.pages.course_maps") %></h1>
+<%= render "layouts/page_header", title: t("admin.pages.course_maps") %>
 
 <% unless @configured %>
-  <wa-callout variant="warning" class="track-upload__notice">
+  <wa-callout variant="warning">
     <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
     <%= t(".unconfigured_html", username: tag.code("MAPBOX_USERNAME"), token: tag.code("MAPBOX_SECRET_TOKEN")) %>
   </wa-callout>
 <% end %>
 
 <% if @worker_running == false %>
-  <wa-callout variant="warning" class="track-upload__notice">
+  <wa-callout variant="warning">
     <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
     <%= t(".no_worker_html", command: tag.code("overmind start")) %>
   </wa-callout>
@@ -19,14 +17,17 @@
 <%# This uses form_with with a <wa-button> that is part of the form, and not button_to, which
     writes a native <button>. <wa-file-input> is also part of the form, thus the files go with the
     submission. %>
-<%= form_with url: course_maps_path, method: :post, multipart: true, class: "track-upload" do %>
+<%= form_with url: course_maps_path, method: :post, multipart: true, class: "wa-stack wa-gap-l" do %>
   <wa-file-input name="gpx_files[]" multiple accept=".gpx" label="<%= t(".files") %>"
                  hint="<%= t(".files_hint") %>">
   </wa-file-input>
-  <wa-button type="submit" variant="brand" appearance="accent">
-    <%= slotted_icon_svg("classic", "light", "arrow-up-from-bracket") %>
-    <%= t(".upload") %>
-  </wa-button>
+
+  <div class="wa-cluster wa-gap-s">
+    <wa-button type="submit" variant="brand" appearance="accent">
+      <%= slotted_icon_svg("classic", "light", "cloud-arrow-up") %>
+      <%= t(".upload") %>
+    </wa-button>
+  </div>
 <% end %>
 
 <% if @tracks.empty? %>
@@ -37,23 +38,26 @@
 <% else %>
   <%# The list reads the status while a track publishes, and then it stops. The tiling service of
       Mapbox is asynchronous, thus the server can send nothing to the page. %>
-  <ul class="track-list plain-list wa-grid wa-gap-m" data-controller="job-status" data-job-status-url-value="<%= course_maps_status_path %>">
+  <ul class="admin-card-list plain-list wa-grid wa-gap-m" data-controller="job-status" data-job-status-url-value="<%= course_maps_status_path %>">
     <% @tracks.each do |track| %>
       <li data-job-status-id="<%= track.id %>" data-job-status-state="<%= track.status %>">
-        <wa-card>
+        <wa-card class="admin-card">
           <div class="wa-stack wa-gap-m">
             <div class="wa-cluster wa-gap-s">
-              <h2 class="track__name wa-heading-l"><%= track.title %></h2>
+              <h2 class="admin-card__title wa-heading-m"><%= track.title %></h2>
               <wa-badge variant="<%= track.status_variant %>" appearance="outlined">
                 <%= track.status_label %>
               </wa-badge>
-              <wa-relative-time class="track__age wa-caption-s" date="<%= track.uploaded_at %>" sync></wa-relative-time>
+              <wa-relative-time class="admin-card__age wa-caption-s" date="<%= track.uploaded_at %>" sync></wa-relative-time>
             </div>
 
-            <p class="track__summary"><%= track.summary %></p>
+            <p class="admin-card__summary"><%= track.summary %></p>
 
             <% if track.failed? && track.error %>
-              <wa-callout variant="danger"><%= track.error %></wa-callout>
+              <wa-callout variant="danger">
+                <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
+                <%= track.error %>
+              </wa-callout>
             <% end %>
 
             <div class="wa-cluster wa-gap-s">
@@ -75,7 +79,7 @@
                   the dialog only. %>
               <wa-button variant="neutral" appearance="outlined" data-dialog="open <%= track.dialog_id %>">
                 <%= slotted_icon_svg("classic", "light", "trash") %>
-                <%= t(".delete") %>
+                <%= t("admin.actions.delete") %>
               </wa-button>
             </div>
           </div>

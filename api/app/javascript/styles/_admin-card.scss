@@ -1,0 +1,26 @@
+// The card lists of the admin: one card for each item, in as many columns as the width permits.
+// Use it with `plain-list wa-grid wa-gap-m` on the list. The body of a card is a `wa-stack`, and
+// its header is a `wa-cluster` with the title, the badge, and the age.
+// ⚠️ Those two utilities make the margins of their children zero. That is why no rule here sets a
+// margin to zero.
+
+.admin-card-list {
+  --min-column-size: 26rem;
+}
+
+.admin-card {
+  // This stops a long name with no space from a move of the badge off the card.
+  &__title {
+    overflow-wrap: anywhere;
+  }
+
+  // Moves the timestamp to the far edge, past the badge.
+  &__age {
+    margin-inline-start: auto;
+  }
+
+  &__summary {
+    color: var(--wa-color-text-quiet);
+    overflow-wrap: anywhere;
+  }
+}

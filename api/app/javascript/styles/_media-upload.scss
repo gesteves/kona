@@ -1,21 +1,16 @@
-// The media uploader: the picker, the tiles of the picked files, and the list of the recent
-// uploads. It reads as the photo composer of the Social media page reads, and the one difference
-// is that a tile here has no grip: the order of the tiles means nothing to Contentful.
+// The media uploader: the picker and the tiles of the picked files. It reads as the photo composer
+// of the Social media page reads, and the one difference is that a tile here has no grip: the order
+// of the tiles means nothing to Contentful. The list of the recent uploads uses `admin-card`.
 
 .media-upload {
-  &__notice {
-    margin-block-end: var(--wa-space-m);
-  }
-
   &__tiles {
     display: flex;
     flex-direction: column;
     gap: var(--wa-space-l);
 
-    // ⚠️ This block sets a display, and an author rule beats the `[hidden]` of the browser
-    // whatever its layer. An empty container has no tile, thus it needs no rule of its own, but
-    // a later `hidden` on it would do nothing without this one.
-    &[hidden] {
+    // ⚠️ With no tile, the container must not take part in the layout. The form is a
+    // `wa-stack`, thus an empty flex item adds a second gap between the picker and the button.
+    &:empty {
       display: none;
     }
   }
@@ -83,23 +78,5 @@
 
   &__generate {
     align-self: start;
-  }
-}
-
-// The recent uploads, below the form. The heading and the list are one block, thus the space that
-// separates them from the form is one rule here.
-.media-list {
-  margin-block-start: var(--wa-space-2xl);
-
-  // The gap of the stack separates the heading from the list, thus the heading carries no margin
-  // of its own. A margin would add to that gap, because a flex item does not collapse one.
-  &__heading,
-  &__name {
-    margin: 0;
-  }
-
-  &__file {
-    color: var(--wa-color-text-quiet);
-    margin: 0;
   }
 }

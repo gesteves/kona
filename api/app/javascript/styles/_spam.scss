@@ -1,30 +1,9 @@
-// The contact-form submissions in the quarantine, on the Contact page: a list of cards, with one
-// card for each message.
+// The contact-form submissions in the quarantine, on the Spam page. Each message is an
+// `admin-card`, and this block adds the body and the details of the message.
 // ⚠️ The body of the card is a `wa-stack` and its header is a `wa-cluster`, and those two make the
 // margins of their children zero. That is why no rule here sets a margin to zero.
 
-// The list is a `wa-grid`, thus this is the full layout: the cards go into as many columns as the
-// width permits, with one card for each message, and into one column in a narrow window.
-.spam-list {
-  --min-column-size: 28rem;
-}
-
 .spam {
-  // This stops a sender name with no space from a move of the badge off the card.
-  &__name {
-    overflow-wrap: anywhere;
-  }
-
-  // Moves the timestamp to the far edge, past the badge.
-  &__age {
-    margin-inline-start: auto;
-  }
-
-  &__email {
-    color: var(--wa-color-text-quiet);
-    overflow-wrap: anywhere;
-  }
-
   // ⚠️ `pre-wrap` is what shows the line breaks of the sender. The view does not use simple_format
   // on the body, on purpose, because this text is input from an attacker.
   // `anywhere` is also necessary: spam often has a URL of 200 characters with no break.

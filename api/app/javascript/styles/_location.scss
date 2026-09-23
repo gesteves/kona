@@ -13,10 +13,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  &__notice {
-    margin-block-end: var(--wa-space-m);
-  }
-
   &__controls {
     display: flex;
     flex-direction: column;

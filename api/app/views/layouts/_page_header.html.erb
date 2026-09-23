@@ -1,0 +1,16 @@
+<%# The header of each admin page: the title of the tab, an optional back link, the <h1>, and an
+    optional lead paragraph.
+    `title` is the name of the page. `back` is a pair of a label and a path, or nil. `lead` is
+    the text below the title, or nil. %>
+<% content_for :title, title %>
+<% back = local_assigns[:back] %>
+<% lead = local_assigns[:lead] %>
+<header class="admin-main__header wa-stack wa-gap-2xs">
+  <% if back %>
+    <p class="admin-main__back"><%= link_to back.first, back.last %></p>
+  <% end %>
+  <h1 class="admin-main__title"><%= title %></h1>
+  <% if lead.present? %>
+    <p class="admin-main__lead"><%= lead %></p>
+  <% end %>
+</header>
