@@ -46,7 +46,9 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
   end
 
   let(:weather) do
-    event_date = Time.now + 3.days
+    # ⚠️ The app finds the race day in the zone of the event. A date in the zone of the machine
+    # is a different day for part of each day, and the forecast then does not match.
+    event_date = (Time.now + 3.days).in_time_zone("America/Denver")
     DeepOstruct.wrap(
       forecast_daily: {
         days: [

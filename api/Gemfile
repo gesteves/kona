@@ -98,4 +98,6 @@ group :test do
   gem "rspec-rails"
   # Readable matchers for asserting enqueued Sidekiq jobs (have_enqueued_sidekiq_job)
   gem "rspec-sidekiq"
+  # An in-memory Redis for the specs, thus `rspec` needs no Redis server.
+  gem "mock_redis"
 end

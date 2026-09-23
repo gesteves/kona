@@ -2301,11 +2301,12 @@ The RSpec request specs are in `spec/requests/`, and there are also `spec/servic
 `allow_any_instance_of(SomeService).to receive(:method).and_return(...)`. A spec asserts the markup
 that the app rendered **and** the cache headers.
 
-⚠️ **The specs use the Redis of `.env.test`, which is database 1 of the local Redis.** The specs
-write and delete real keys with no namespace, and this includes `bluesky:credentials`,
-`mastodon:credentials`, and `threads:credentials`. With the `REDIS_URL` of `.env`, each `rspec` run
-disconnected the accounts that you connected in the admin on your own machine. dotenv reads
-`.env.test` before `.env`, and CI sets `REDIS_URL` in the environment, which wins over both.
+⚠️ **The specs need no Redis server.** `spec/support/mock_redis.rb` replaces `$redis` with
+MockRedis, and it empties that store before each example. Sidekiq runs in the fake mode of
+rspec-sidekiq, and Rack::Attack uses a memory store in the test environment. Thus a new Redis client
+that does not go through `$redis` needs its own mock. CI has no Redis service, thus such a client
+fails there. `.env.test` still points `REDIS_URL` at database 1 of the local Redis. It is a safety
+net: without it, a client that the mock misses could delete the connected accounts in database 0.
 `spec/support/streamed_get.rb` stubs `HTTParty.get` for the code that reads a body through
 `ApplicationService#download`: that method reads in fragments, thus a plain `and_return` gives it
 nothing.
