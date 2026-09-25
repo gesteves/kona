@@ -11,6 +11,31 @@ class SocialPostJob < ApplicationJob
 
   private
 
+  # Reads the photos of the post from Redis.
+  #
+  # ⚠️ No job discards the photos. Bluesky and Mastodon read the same keys, in no known order, thus
+  # the TTL that `Admin::SocialController#keep_photos` sets removes them.
+  # ⚠️ A photo that is gone fails the post for good, and it does not post the words alone. The
+  # owner asked for a post with photos, and `volatile-lru` can remove a key at the memory cap.
+  # The report names the post and the photo.
+  # @param post [Hash] One post of the payload. `photos` is `[{ "id" =>, "alt" => }, …]` or absent.
+  # @param index [Integer]
+  # @param count [Integer] The number of posts of the thread.
+  # @return [Array<Hash>] `[{ bytes:, width:, height:, alt: }, …]`.
+  def load_photos(post, index, count)
+    store = SocialPhotos.new
+
+    Array(post["photos"]).map do |photo|
+      stored = store.fetch(photo["id"].to_s)
+      if stored.nil?
+        raise ApplicationJob::PermanentError,
+              "#{self.class.name}: post #{index + 1}/#{count} lost its photo #{photo['id']}"
+      end
+
+      { bytes: stored[:image], width: stored[:width], height: stored[:height], alt: photo["alt"].to_s }
+    end
+  end
+
   # Adds the job of the next post, one time only.
   #
   # ⚠️ This enqueue is INSIDE the job of the post above it. When the process dies after the enqueue

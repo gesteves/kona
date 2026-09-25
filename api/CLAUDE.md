@@ -851,8 +851,8 @@ hangs gives a 500 in place of the message of the page, and a disconnect never re
     Whoop, Mastodon, and Threads share that concern.
   - ⚠️ **The instance ties the scope to the token that it gives.** Thus a change to
     `Mastodon::SCOPES` needs a new registration and a new authorization, and the owner must connect
-    the account again. `write:statuses` is what `Mastodon#post!` needs; refer to **Posting to
-    Mastodon**.
+    the account again. `write:statuses` and `write:media` are what `Mastodon#post!` needs; refer
+    to **Posting to Mastodon**.
   - **`disconnect!` tells the instance to revoke the token, then clears the store.** ⚠️ It clears
     the store whether the revoke works or not: the instance can be away, and a disconnect that the
     owner asked for must not depend on that. The clear is in an `ensure`, thus a rack-timeout
@@ -1342,7 +1342,7 @@ a **picker** below it, exactly as the link button opens the link field, and each
 owner picks becomes a tile below the picker. A tile is a ROW, as a post of the thread is: the
 grip, the thumbnail, the alt text field, and the remove X, and the tiles stack in a column so the
 alt text takes the width. The owner drags a tile or moves it with the arrow keys of its grip.
-**Bluesky alone takes a photo** from this page.
+**Bluesky and Mastodon take photos** from this page, and Threads takes none.
 
 - **The picker has two states**, `IDLE` and `OPEN`, and `social_post_controller.js` holds them
   beside the three states of the link. The photo button opens the picker and is disabled while
@@ -1358,9 +1358,13 @@ alt text takes the width. The owner drags a tile or moves it with the arrow keys
   the website card are two embeds. The composer disables the link button while the picker is
   open and the photo button while the link field or the card is open, the server renders both
   states, and `#photo_error` refuses a request that sends both.
-- ⚠️ **A photo turns Mastodon and Threads off, thread-level, exactly as a Markdown link does.**
-  `social#applyBlueskyOnly` is the one rule for the two reasons, and it shows the hint line of
-  the reason. `#photos_network_error` refuses a hand-written request.
+- ⚠️ **Each network has a photo limit for each post**, in `SocialPresenter::PHOTO_LIMITS`:
+  Bluesky 10, Mastodon 4 (`Mastodon::MAX_MEDIA_ATTACHMENTS`), and Threads 0. The check is
+  thread-level, as for a Markdown link: the post with the most photos decides the full draft. A
+  photo turns Threads off, and a fifth photo on one post turns Mastodon off.
+  `social#applyBlueskyOnly` is the one rule for the two reasons. It reads the `data-max-photos` of
+  each row, and it shows the hint line of the reason. `#photos_network_error` refuses a
+  hand-written request.
 - ⚠️ **Two embed types, and the count selects one.** `app.bsky.embed.images` takes
   `MAX_IMAGES_EMBED` (4) photos at the most, and `app.bsky.embed.gallery` takes more. A post
   that fits the first one keeps it: a client from before the gallery embed renders that one and
@@ -1402,21 +1406,21 @@ alt text takes the width. The owner drags a tile or moves it with the arrow keys
   - ⚠️ **`volatile-lru` can remove one of these keys at the memory cap.** The job then raises
     `PermanentError` for that post and posts nothing: a post that promised photos never goes out as
     words alone. 10 photos of 2MB on a 256MB instance with a 3MB dataset is far from that cap.
-  - ⚠️ **The job discards the photos LAST, after `enqueue_next`.** A process that dies between
-    the write and the acknowledgement does the post again, and with the photos gone that attempt
-    would fail the post and never add the job below it. A second upload of the same bytes costs
-    nothing: the PDS names a blob by its content.
+  - ⚠️ **No job discards the photos.** `BlueskyPostJob` and `MastodonPostJob` read the same keys,
+    in no known order, and a retry needs them again. Thus the TTL of `#keep_photos` removes them.
+    `SocialPostJob#load_photos` is the one reader.
   - **There is no DELETE endpoint.** A removed tile leaves its key to the draft TTL. A delete from
     the browser is not reliable, because a navigation cancels it, and the TTL already does the work.
 - ⚠️ **`Bluesky#build_images_embed` RAISES when one upload fails**, and the job then does the
   work again. A post with three of its four photos is not the post that the owner wrote.
   `AtProto#upload_blob` gives nil for a failure, thus the raise is in the caller.
-- **The photos ride in the Bluesky payload only** (`"photos" => [{ "id", "alt" }]`), as the topic
-  rides in the Threads payload. The other two jobs do not change.
-- **The alt text has no `maxlength`**, for the reason that the body has none, and `MAX_ALT_GRAPHEMES`
-  (2000) is the limit of the client of Bluesky: the lexicon has none. The tile says when the text
+- **The photos ride in the payload of each network in `PHOTO_LIMITS`**
+  (`"photos" => [{ "id", "alt" }]`), as the topic rides in the Threads payload.
+- **The alt text has no `maxlength`**, for the reason that the body has none. `ALT_LIMIT` is the
+  smaller of two limits: `MAX_ALT_GRAPHEMES` (2000), which is the limit of the client of Bluesky,
+  and `Mastodon::MAX_DESCRIPTION_CHARACTERS` (1500). One alt text goes to both networks. The tile says when the text
   is past it, `social#canPost` keeps the submit off, and `#photo_error` refuses the request.
-- **The Preview panel shows the thumbnails on the Bluesky row**, from `#preview_photos`, thus the
+- **The Preview panel shows the thumbnails on the Bluesky and Mastodon rows**, from `#preview_photos`, thus the
   panel still shows what the network will render.
 - **A Generate control below the alt text field asks Claude for it.** `AltText` sends the STORED
   JPEG, which is the picture that Bluesky will show, with the prompt in `app/prompts/alt-text.md`
@@ -1528,7 +1532,8 @@ Three things make the texts different, and the owner could see none of them befo
   the words there as well, and the Bluesky row then carries no card.
 - **A Markdown link.** The Bluesky row shows the **rendered** text, thus the owner reads the words
   that a post will hold. ⚠️ A draft that holds one shows **Bluesky alone**: to render the other two
-  would show a text that this app refuses to post. The dialog says nothing about that, on purpose —
+  would show a text that this app refuses to post. Photos remove a row by the same rule: the dialog
+  shows only the networks whose photo limit fits the draft. The dialog says nothing about that, on purpose —
   the two rows of "Post to" are already off, and their hint gives the reason.
 
 **Each link is a link in the dialog.** The action sends the text in `segments`
@@ -1757,7 +1762,7 @@ round trip are in the same class; refer to **Connected apps**.
 
 - ⚠️ **The URL goes in the TEXT here, and Bluesky puts it in an embed.** Mastodon renders a link
   inline and makes its own preview card from the `og:` tags of that page. Thus this class needs no
-  card and no image upload, and `MastodonPostJob` reads no `OpenGraph` card for it. **This is the
+  card, and `MastodonPostJob` reads no `OpenGraph` card for it. **This is the
   concrete reason that the Social media page keeps the link out of the body**: each network attaches one
   differently, thus the page holds the link beside the text and each service composes its own.
 - ⚠️ **`Idempotency-Key` is what makes a retry safe**, and it is the Mastodon answer to the
@@ -1769,10 +1774,13 @@ round trip are in the same class; refer to **Connected apps**.
   later attempt of the same job returns it and posts nothing. The header covers the quick retries,
   and the Redis key covers the late ones.
 - **Each post is `public` and `en`.** This blog has one author and one language.
-- ⚠️ **This class needs no length check.** Mastodon counts a URL as **23** characters whatever its
-  true length, and a default instance permits 500. The body of a draft is at most 300, which is the
-  Bluesky limit, thus 300 + 2 newlines + 23 is 325 and a post always fits. An instance with a limit
-  below that would refuse the post, and the job would then run again.
+- **The photos.** `post!` uploads each photo to `POST /api/v2/media`, with its alt text as the
+  `description`, then it sends the ids as `media_ids`. It uploads after the `mastodon:status:<key>`
+  check, thus a late retry uploads nothing. One failed upload raises, as `Bluesky` does.
+  ⚠️ **A 202 means that the instance still processes the photo**, and it refuses a status with such
+  a photo. Thus `#wait_for_media` asks `GET /api/v1/media/:id` until it gives a 200.
+  ⚠️ **The upload needs the `write:media` scope.** A token from before that scope gets a 403, and
+  `post!` raises `PermanentError` with a message to connect Mastodon again.
 - **`post!` raises at each failure**, as `Bluesky#post!` does, thus `MastodonPostJob` does the
   work again.
 

@@ -124,11 +124,12 @@ RSpec.describe BlueskyPostJob do
       expect(bluesky).to have_received(:post!).with(hash_including(card: nil, text: "Two photos"))
     end
 
-    it "discards the photos after the write" do
+    # ⚠️ Mastodon reads the same photos in its own job, in no known order. The TTL removes them.
+    it "keeps the photos after the write" do
       described_class.new.perform([ with_photos ])
 
-      expect(store.exists?(first)).to be(false)
-      expect(store.exists?(second)).to be(false)
+      expect(store.exists?(first)).to be(true)
+      expect(store.exists?(second)).to be(true)
     end
 
     # ⚠️ A post that promised photos must not go out as words alone, and no retry can bring a
@@ -145,16 +146,6 @@ RSpec.describe BlueskyPostJob do
       allow(bluesky).to receive(:post!).and_raise("Bluesky refused the post")
 
       expect { described_class.new.perform([ with_photos ]) }.to raise_error(/refused/)
-      expect(store.exists?(first)).to be(true)
-    end
-
-    # ⚠️ The discard is LAST. A retry after a failed enqueue does the post again, and the photos
-    # must still be there for it.
-    it "keeps the photos when the next job cannot be added" do
-      thread = [ with_photos, post("3kabd", "Second") ]
-      allow(described_class).to receive(:perform_async).and_raise("Redis is away")
-
-      expect { described_class.new.perform(thread) }.to raise_error(/Redis is away/)
       expect(store.exists?(first)).to be(true)
     end
   end

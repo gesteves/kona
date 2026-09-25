@@ -134,7 +134,7 @@
             list of its own and the tiles below are the one list. It is disabled at the most
             photos. %>
         <wa-file-input class="social-post__file-input" accept="image/*" multiple size="small"
-                       label="<%= t(".photos") %>" hint="<%= t(".photos_hint", count: max_photos) %>"
+                       label="<%= t(".photos") %>" hint="<%= t(".photos_hint", count: max_photos, mastodon: Mastodon::MAX_MEDIA_ATTACHMENTS) %>"
                        data-social-post-target="fileInput"
                        data-action="change->social-post#filesPicked keydown.esc->social-post#hidePhotos"
                        <%= "disabled" if post.photos.length >= max_photos %>>

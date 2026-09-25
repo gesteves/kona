@@ -9,7 +9,8 @@ class MastodonPostJob < SocialPostJob
   # example.
   ENQUEUE_LOCK_PREFIX = "mastodon:thread:".freeze
 
-  # @param posts [Array<Hash>] `[{ "key" =>, "text" =>, "link" => }, …]`, the whole thread.
+  # @param posts [Array<Hash>] `[{ "key" =>, "text" =>, "link" =>, "photos" => }, …]`, the whole
+  #   thread. `photos` is `[{ "id" =>, "alt" => }, …]` and it is absent from a post with none.
   # @param index [Integer] Which post of that list this job writes.
   # @param in_reply_to_id [String, nil] The id of the status above, or nil for the first.
   def perform(posts, index = 0, in_reply_to_id = nil)
@@ -20,10 +21,12 @@ class MastodonPostJob < SocialPostJob
     # names no post of the thread and a thread of five gives five reports that read alike.
     Rails.logger.info("MastodonPostJob: posting #{index + 1}/#{posts.length}")
 
+    photos = load_photos(post, index, posts.length)
+
     # ⚠️ Mastodon renders the link inline and makes its own preview card, thus this reads no og:
     # tags at all.
-    status = Mastodon.new.post!(text: post["text"], url: post["link"],
-                                idempotency_key: post["key"], in_reply_to_id: in_reply_to_id)
+    status = Mastodon.new.post!(text: post["text"], url: post["link"], idempotency_key: post["key"],
+                                in_reply_to_id: in_reply_to_id, photos: photos)
     Rails.logger.info("MastodonPostJob: posted #{index + 1}/#{posts.length} at #{status['url']}")
 
     return if posts[index + 1].blank?

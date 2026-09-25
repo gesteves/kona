@@ -14,7 +14,9 @@ class Mastodon < ApplicationService
 
   # ⚠️ The instance ties the scope to the token that it gives. Thus a change here needs a new
   # registration and a new authorization, and the owner must connect the account again.
-  SCOPES = "read:accounts write:statuses".freeze
+  # ⚠️ `write:media` is for the photos of the Social media page. A token from before it gets a 403
+  # from the media upload, and `#post!` then asks the owner to connect again.
+  SCOPES = "read:accounts write:statuses write:media".freeze
 
   # A plain hostname, with at least one dot and no port and no path.
   INSTANCE_PATTERN = /\A[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+\z/
@@ -33,6 +35,19 @@ class Mastodon < ApplicationService
   # An instance with a limit below this one would refuse the post, and the job would then run again.
   URL_WEIGHT = 23
   DEFAULT_MAX_CHARACTERS = 500
+
+  # The most photos in one status, on a default instance.
+  MAX_MEDIA_ATTACHMENTS = 4
+
+  # The most characters in the description (the alt text) of one photo.
+  MAX_DESCRIPTION_CHARACTERS = 1500
+
+  # The seconds that one photo upload can take.
+  UPLOAD_TIMEOUT = 30
+
+  # ⚠️ The instance can process a photo after it answers the upload (a 202), and it refuses a status
+  # with a photo that is not processed. Thus `#upload_media` asks again this many times, 1 s apart.
+  MEDIA_POLLS = 10
 
   # The seconds that each call to the instance can take. ⚠️ The registration, the token exchange,
   # and the revoke each run in a request with a 20-second rack-timeout, and the owner types the
@@ -150,7 +165,7 @@ class Mastodon < ApplicationService
   #
   # ⚠️ **The URL goes in the TEXT here, and Bluesky puts it in an embed.** Mastodon renders a link
   # inline and makes its own preview card from the og: tags of that page. Thus this class needs no
-  # card and no image upload, and `Bluesky` builds both.
+  # card, and `Bluesky` builds one.
   #
   # ⚠️ Two things make a retry safe, and each one covers a window that the other does not.
   # `idempotency_key` goes in the `Idempotency-Key` header: the instance keeps that key for
@@ -163,23 +178,29 @@ class Mastodon < ApplicationService
   # @param url [String, nil] The link to add below the body.
   # @param idempotency_key [String, nil] A value that is the same for each attempt.
   # @param in_reply_to_id [String, nil] The id of the status above this one, for a thread.
+  # @param photos [Array<Hash>] `[{ bytes:, alt: }, …]`, MAX_MEDIA_ATTACHMENTS at the most.
   # @return [Hash] `{ "id" =>, "url" => }`. The next post of a thread names this one with the `id`.
   # @raise [ApplicationService::HttpError, RuntimeError] It raises at each failure, thus
   #   MastodonPostJob does the work again.
-  def post!(text:, url: nil, idempotency_key: nil, in_reply_to_id: nil)
+  def post!(text:, url: nil, idempotency_key: nil, in_reply_to_id: nil, photos: [])
     raise ApplicationJob::PermanentError, "Mastodon is not connected" unless connected?
+    if photos.length > MAX_MEDIA_ATTACHMENTS
+      raise ApplicationJob::PermanentError, "Mastodon takes #{MAX_MEDIA_ATTACHMENTS} photos at the most"
+    end
 
     status = self.class.compose(text: text, url: url)
-    raise ApplicationJob::PermanentError, "The post is empty" if status.blank?
+    raise ApplicationJob::PermanentError, "The post is empty" if status.blank? && photos.empty?
 
     posted = posted_status(idempotency_key)
     return posted if posted.present?
 
-    headers = { "Authorization" => "Bearer #{@credentials.access_token}" }
-    headers["Idempotency-Key"] = idempotency_key if idempotency_key.present?
-
     body = { status: status, visibility: VISIBILITY, language: LANGUAGE }
     body[:in_reply_to_id] = in_reply_to_id if in_reply_to_id.present?
+    # ⚠️ One failed upload raises, thus a post never goes out with a part of its photos.
+    body[:media_ids] = photos.map { |photo| upload_media(photo) } if photos.any?
+
+    headers = auth_headers
+    headers["Idempotency-Key"] = idempotency_key if idempotency_key.present?
 
     response = post_json!(
       "https://#{@credentials.instance}/api/v1/statuses",
@@ -268,6 +289,53 @@ class Mastodon < ApplicationService
       )
     end
     nil
+  end
+
+  # @return [Hash]
+  def auth_headers = { "Authorization" => "Bearer #{@credentials.access_token}" }
+
+  # Uploads one photo with its alt text, and waits until the instance has processed it.
+  # @param photo [Hash] `{ bytes:, alt: }`. The bytes are a JPEG.
+  # @return [String] The id of the media attachment.
+  # @raise [ApplicationJob::PermanentError] If the token has no `write:media` scope.
+  # @raise [ApplicationService::HttpError, RuntimeError] At each other failure.
+  # @see https://docs.joinmastodon.org/methods/media/#v2
+  def upload_media(photo)
+    media = Tempfile.create([ "photo", ".jpg" ], binmode: true) do |file|
+      file.write(photo[:bytes])
+      file.rewind
+      post_json!(
+        "https://#{@credentials.instance}/api/v2/media",
+        body: { file: file, description: photo[:alt].to_s.strip[0, MAX_DESCRIPTION_CHARACTERS] },
+        multipart: true,
+        headers: auth_headers,
+        timeout: UPLOAD_TIMEOUT
+      )
+    end
+    id = media&.dig(:id).presence&.to_s
+    raise "Mastodon gave no id for a photo" if id.blank?
+
+    wait_for_media(id) if media[:url].blank?
+    id
+  rescue ApplicationService::HttpError => e
+    raise unless [ 401, 403 ].include?(e.status.to_i)
+
+    raise ApplicationJob::PermanentError,
+          "Mastodon refused the photo upload. Connect Mastodon again to give this app the write:media scope"
+  end
+
+  # Asks for a media attachment until the instance has processed it. A 206 means "not yet".
+  # @param id [String]
+  # @return [void]
+  # @raise [RuntimeError] If the photo is not processed after MEDIA_POLLS attempts.
+  def wait_for_media(id)
+    MEDIA_POLLS.times do
+      sleep 1
+      response = HTTParty.get("https://#{@credentials.instance}/api/v1/media/#{id}",
+                              headers: auth_headers, timeout: REQUEST_TIMEOUT)
+      return if response.code == 200
+    end
+    raise "Mastodon did not process the photo #{id} in time"
   end
 
   # @param key [String, nil] The idempotency key.

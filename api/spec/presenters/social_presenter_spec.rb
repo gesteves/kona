@@ -40,9 +40,10 @@ RSpec.describe SocialPresenter do
       expect(described_class.new(networks: [ network ], alt_text: true).alt_text?).to be(true)
     end
 
-    it "pins the most photos and the alt limit to the numbers of Bluesky" do
+    it "pins the most photos to Bluesky and the alt limit to the smaller of the two networks" do
       expect(described_class::MAX_PHOTOS).to eq(Bluesky::MAX_IMAGES)
-      expect(described_class::ALT_LIMIT).to eq(Bluesky::MAX_ALT_GRAPHEMES)
+      expect(described_class::ALT_LIMIT).to eq(Mastodon::MAX_DESCRIPTION_CHARACTERS)
+      expect(described_class::PHOTO_LIMITS).to eq("bluesky" => 10, "mastodon" => 4)
     end
 
     # ⚠️ A failed submit renders the page again, thus the owner must not lose what they wrote.

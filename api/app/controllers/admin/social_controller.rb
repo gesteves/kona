@@ -95,9 +95,9 @@ module Admin
           # one topic for each post, and no documentation says that a reply inherits the topic of
           # its root. Thus the composer sends it with every post.
           entry["topic"] = topic if network == SocialPresenter::TOPIC_NETWORK && topic.present?
-          # ⚠️ The photos go to the ONE network that takes them, as the topic does. A draft with a
-          # photo can tick Bluesky alone, thus no other payload could use them.
-          if network == SocialPresenter::PHOTO_NETWORK && post[:photos].any?
+          # ⚠️ The photos go only to a network that takes them. #photos_network_error already
+          # refused each other network that the owner ticked.
+          if SocialPresenter::PHOTO_LIMITS.key?(network) && post[:photos].any?
             entry["photos"] = post[:photos].map { |photo| { "id" => photo[:id], "alt" => photo[:alt] } }
           end
           entry
@@ -137,11 +137,13 @@ module Admin
     # ⚠️ It is a POST, and the two previews below are GET. A draft is as much as MAX_POSTS posts of
     # 300 characters and a mention map, thus a query string is the wrong shape for it.
     def preview_text
-      # ⚠️ A draft with a Markdown link or a photo shows BLUESKY alone, because it can go nowhere
-      # else. To render the other two would show a text that this app refuses to post. The
-      # composer turns their checkboxes off by the same rule, thus the page and the dialog agree.
+      # ⚠️ A draft with a Markdown link shows BLUESKY alone, and a draft with photos shows only the
+      # networks that take that many. To render another network would show a text that this app
+      # refuses to post. The composer turns the checkboxes off by the same rules, thus the page and
+      # the dialog agree.
       networks = social_networks.select(&:connected?)
-      networks = networks.select { |network| network.markdown? } if bluesky_only?
+      networks = networks.select { |network| network.markdown? } if markdown?
+      networks = networks.select { |network| takes_photos?(network.key) }
 
       # ⚠️ It groups by NETWORK and not by post, thus the panel reads as the thread reads: each
       # network in turn, and its posts in the order that they go out.
@@ -552,27 +554,27 @@ module Admin
       @markdown = posts.any? { |post| MarkdownLinks.links?(post[:text]) }
     end
 
-    # @return [Boolean] True when any post of the draft holds a photo. It is THREAD-LEVEL, as
-    #   #markdown? is.
-    def photos?
-      posts.any? { |post| post[:photos].any? }
+    # @return [Integer] The most photos on one post of the draft.
+    def most_photos = posts.map { |post| post[:photos].length }.max.to_i
+
+    # ⚠️ It is THREAD-LEVEL, as #markdown? is: a thread goes to a network as one unit, thus the
+    # largest post decides the whole draft. `social_controller.js` uses the same rule.
+    # @param network [String] A network key.
+    # @return [Boolean] True when each post of the draft fits the photo limit of that network.
+    def takes_photos?(network)
+      most_photos <= SocialPresenter::PHOTO_LIMITS.fetch(network, 0)
     end
 
-    # @return [Boolean] True when the draft can go to Bluesky alone.
-    def bluesky_only? = markdown? || photos?
-
-    # Refuses a draft with a photo that goes to a network that takes none.
+    # Refuses a draft with more photos on one post than a ticked network takes.
     #
-    # ⚠️ The composer already unticks and disables those two rows, and this is not a repeat of
-    # that, for the reason that #markdown_network_error gives.
+    # ⚠️ The composer already unticks and disables those rows, and this is not a repeat of that,
+    # for the reason that #markdown_network_error gives.
     # @return [String, nil]
     def photos_network_error
-      return nil unless photos?
+      refused = selected_networks.reject { |network| takes_photos?(network) }
+      return nil if refused.empty?
 
-      others = selected_networks - [ SocialPresenter::PHOTO_NETWORK ]
-      return nil if others.empty?
-
-      t("admin.social.errors.photos_network", networks: to_sentence(others))
+      t("admin.social.errors.photos_network", networks: to_sentence(refused))
     end
 
     # Refuses a draft with a Markdown link that goes to a network with no rich text.
@@ -605,10 +607,10 @@ module Admin
         photos: preview_photos(network.key, post) }
     end
 
-    # The photos of a post, for the row of the one network that takes them.
+    # The photos of a post, for the row of each network that takes them.
     # @return [Array<Hash>, nil] `[{ path:, alt: }, …]`, or nil for each other network.
     def preview_photos(network, post)
-      return nil unless network == SocialPresenter::PHOTO_NETWORK && post[:photos].any?
+      return nil unless SocialPresenter::PHOTO_LIMITS.key?(network) && post[:photos].any?
 
       post[:photos].map { |photo| { path: social_photo_path(photo[:id]), alt: photo[:alt] } }
     end

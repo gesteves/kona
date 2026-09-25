@@ -407,8 +407,10 @@ en:
         # The hint of a row that a Markdown link turned off. It replaces the account line while a
         # link is in the draft.
         markdown_disabled: "Only Bluesky takes a Markdown link."
-        # The hint of a row that a photo turned off, for the same reason.
-        photos_disabled: "Only Bluesky takes photos."
+        # The hint of a row that too many photos turned off, for each network.
+        photos_disabled:
+          mastodon: "Mastodon takes %{count} photos in a post at the most."
+          threads: "Threads takes no photos."
         mentions: "Mentions"
         mentions_hint_html: "Each network writes a mention in its own way. Give the handle for each
           one, or a plain name where that person has no account. An empty field posts the name with
@@ -435,7 +437,8 @@ en:
         close_photos: "Close the photo picker"
         # The label and the hint of the picker.
         photos: "Photos"
-        photos_hint: "Up to %{count} photos. Only Bluesky takes them."
+        photos_hint: "Up to %{count} photos. Mastodon takes %{mastodon} at the most, and Threads takes
+          none."
         body: "Post"
         body_placeholder: "What do you want to say?"
         # The two controls in the footer of the card of a link, which are icons alone.
@@ -490,8 +493,8 @@ en:
         empty: "Write something to post."
         markdown_network: "Only Bluesky takes a Markdown link. Remove the link, or do not post to
           %{networks}."
-        photos_network: "Only Bluesky takes photos. Remove the photos, or do not post to
-          %{networks}."
+        photos_network: "%{networks} can't take that many photos in a post. Remove some photos, or do not
+          post to %{networks}."
         # ⚠️ Bluesky renders ONE embed, thus a post takes photos or a link and not both.
         photos_and_link:
           numbered: "Post %{index} has photos and a link. Bluesky takes one of the two."

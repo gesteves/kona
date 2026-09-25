@@ -117,20 +117,23 @@
   <wa-checkbox-group label="<%= t(".post_to") %>">
     <% @social.networks.each do |network| %>
       <% if network.connected? %>
-        <%# ⚠️ The hint is a SLOT and not the `hint` attribute, because a Markdown link or a photo
-            REPLACES that line. Only Bluesky can take either one, thus the composer unticks and
-            disables the other two rows, and the line for the reason says why.
+        <%# ⚠️ The hint is a SLOT and not the `hint` attribute, because a Markdown link or too many
+            photos REPLACES that line. Only Bluesky takes a Markdown link, and each network takes
+            its own number of photos. Thus the composer unticks and disables the other two rows,
+            and the line for the reason says why.
             ⚠️ The `markdownNetwork` target marks exactly those two rows. A row with no account is
-            disabled in the branch below, and social#applyMarkdown must never turn one of those
-            back on. %>
+            disabled in the branch below, and social#applyBlueskyOnly must never turn one of those
+            back on. `data-max-photos` is the photo limit of the row. %>
         <wa-checkbox name="networks[]" value="<%= network.key %>"
-                     <% unless network.markdown? %>data-social-target="markdownNetwork"<% end %>
+                     <% unless network.markdown? %>data-social-target="markdownNetwork" data-max-photos="<%= network.max_photos %>"<% end %>
                      <%= "checked" if @social.selected?(network.key) %>>
           <%= network.name %>
           <span slot="hint">
             <span class="social__hint-line" data-network-account><%= network.account_line %></span>
             <span class="social__hint-line" data-network-markdown hidden><%= t(".markdown_disabled") %></span>
-            <span class="social__hint-line" data-network-photos hidden><%= t(".photos_disabled") %></span>
+            <% unless network.markdown? %>
+              <span class="social__hint-line" data-network-photos hidden><%= t(".photos_disabled.#{network.key}", count: network.max_photos) %></span>
+            <% end %>
           </span>
         </wa-checkbox>
       <% else %>

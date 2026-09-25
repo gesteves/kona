@@ -24,7 +24,7 @@ RSpec.describe MastodonPostJob do
     described_class.new.perform([ post("3kabc", "Read this", url) ])
 
     expect(mastodon).to have_received(:post!)
-      .with(text: "Read this", url: url, idempotency_key: "3kabc", in_reply_to_id: nil)
+      .with(text: "Read this", url: url, idempotency_key: "3kabc", in_reply_to_id: nil, photos: [])
     expect(open_graph).not_to have_received(:fetch)
   end
 
@@ -45,6 +45,34 @@ RSpec.describe MastodonPostJob do
     allow(mastodon).to receive(:post!).and_raise("the instance refused")
 
     expect { described_class.new.perform([ post("3kabc", "Hi") ]) }.to raise_error(/refused/)
+  end
+
+  describe "the photos" do
+    let(:store) { SocialPhotos.new }
+    let(:jpeg) { "\xFF\xD8\xFF\xE0jpeg".b }
+    let!(:first) { store.store(image: jpeg, width: 4, height: 3) }
+    let(:with_photos) { post("3kabc", "A photo").merge("photos" => [ { "id" => first, "alt" => "A cat" } ]) }
+
+    it "reads each photo from the store and gives it to the post with its alt text" do
+      described_class.new.perform([ with_photos ])
+
+      expect(mastodon).to have_received(:post!)
+        .with(hash_including(photos: [ { bytes: jpeg, width: 4, height: 3, alt: "A cat" } ]))
+    end
+
+    it "keeps the photos after the write, for the Bluesky job" do
+      described_class.new.perform([ with_photos ])
+
+      expect(store.exists?(first)).to be(true)
+    end
+
+    it "fails the post for good when a photo is gone, and posts nothing" do
+      store.discard([ first ])
+
+      expect { described_class.new.perform([ with_photos ]) }
+        .to raise_error(ApplicationJob::PermanentError, /MastodonPostJob: post 1\/1 lost its photo/)
+      expect(mastodon).not_to have_received(:post!)
+    end
   end
 
   describe "a thread" do

@@ -314,5 +314,103 @@ RSpec.describe Mastodon do
 
       expect { post! }.to raise_error(ApplicationService::HttpError)
     end
+
+    describe "the photos" do
+      let(:photo) { { bytes: "jpeg-bytes".b, alt: "A runner at the finish", width: 800, height: 600 } }
+      let(:media_url) { "https://mastodon.social/api/v2/media" }
+
+      before do
+        allow(HTTParty).to receive(:post).with(media_url, anything)
+          .and_return(http_response({ id: "m1", url: "https://files.example.test/m1.jpg" }))
+        allow_any_instance_of(described_class).to receive(:sleep)
+      end
+
+      it "uploads each photo with its alt text and attaches the ids to the status" do
+        post!(photos: [ photo, photo.merge(alt: "Second") ])
+
+        expect(HTTParty).to have_received(:post).with(
+          media_url, hash_including(multipart: true, body: hash_including(description: "A runner at the finish"))
+        )
+        expect(HTTParty).to have_received(:post).with(media_url, anything).twice
+        expect(HTTParty).to have_received(:post).with(
+          "https://mastodon.social/api/v1/statuses", hash_including(body: hash_including(media_ids: %w[m1 m1]))
+        )
+      end
+
+      it "cuts a long alt text to the limit of a description" do
+        post!(photos: [ photo.merge(alt: "a" * 2000) ])
+
+        expect(HTTParty).to have_received(:post).with(
+          media_url, hash_including(body: hash_including(description: "a" * described_class::MAX_DESCRIPTION_CHARACTERS))
+        )
+      end
+
+      it "sends no media ids for a post with no photo" do
+        post!
+
+        expect(HTTParty).not_to have_received(:post).with(media_url, anything)
+        expect(HTTParty).not_to have_received(:post).with(anything, hash_including(body: hash_including(:media_ids)))
+      end
+
+      # ⚠️ The instance refuses a status with a photo that it has not processed.
+      it "waits for a photo that the instance still processes" do
+        allow(HTTParty).to receive(:post).with(media_url, anything)
+          .and_return(http_response({ id: "m1", url: nil }, code: 202))
+        pending_media = instance_double(HTTParty::Response, code: 206)
+        ready_media = instance_double(HTTParty::Response, code: 200)
+        allow(HTTParty).to receive(:get).and_return(pending_media, ready_media)
+
+        post!(photos: [ photo ])
+
+        expect(HTTParty).to have_received(:get).with("https://mastodon.social/api/v1/media/m1", anything).twice
+      end
+
+      it "raises when the instance never processes the photo" do
+        allow(HTTParty).to receive(:post).with(media_url, anything)
+          .and_return(http_response({ id: "m1", url: nil }, code: 202))
+        allow(HTTParty).to receive(:get).and_return(instance_double(HTTParty::Response, code: 206))
+
+        expect { post!(photos: [ photo ]) }.to raise_error(/did not process/)
+      end
+
+      # ⚠️ A post with a part of its photos is not the post of the owner.
+      it "raises and posts nothing when an upload fails" do
+        allow(HTTParty).to receive(:post).with(media_url, anything)
+          .and_return(http_response({ error: "no" }, success: false, code: 500))
+
+        expect { post!(photos: [ photo ]) }.to raise_error(ApplicationService::HttpError)
+        expect(HTTParty).not_to have_received(:post).with("https://mastodon.social/api/v1/statuses", anything)
+      end
+
+      # ⚠️ A token from before the `write:media` scope cannot upload.
+      it "asks the owner to connect again when the token has no media scope" do
+        allow(HTTParty).to receive(:post).with(media_url, anything)
+          .and_return(http_response({ error: "scope" }, success: false, code: 403))
+
+        expect { post!(photos: [ photo ]) }.to raise_error(ApplicationJob::PermanentError, /Connect Mastodon again/)
+      end
+
+      it "uploads nothing for a post that an earlier attempt made" do
+        $redis.set(status_key, { "id" => "1", "url" => "https://mastodon.social/@me/1" }.to_json)
+
+        post!(photos: [ photo ])
+
+        expect(HTTParty).not_to have_received(:post)
+      end
+
+      it "refuses more photos than a status takes" do
+        photos = Array.new(described_class::MAX_MEDIA_ATTACHMENTS + 1) { photo }
+
+        expect { post!(photos: photos) }.to raise_error(ApplicationJob::PermanentError, /at the most/)
+      end
+
+      it "posts photos with no words" do
+        post!(text: "", url: nil, photos: [ photo ])
+
+        expect(HTTParty).to have_received(:post).with(
+          "https://mastodon.social/api/v1/statuses", hash_including(body: hash_including(media_ids: %w[m1]))
+        )
+      end
+    end
   end
 end

@@ -46,11 +46,11 @@ export default class extends Controller {
     // token that the owner deletes and writes again gets its handles back.
     this.mentionValues = new Map();
 
-    // ⚠️ It starts at null and not undefined, thus the first `validate()` of a draft with no
-    // Markdown link and no photo does nothing at all. Without that the restore branch of
-    // `applyBlueskyOnly` would run at connect and untick each row that the server rendered as
-    // ticked.
-    this.blueskyOnlyReason = null;
+    // The reason that `applyBlueskyOnly` turned each row off, by network key. ⚠️ A row with no
+    // entry counts as null, thus the first `validate()` of a draft with no Markdown link and no
+    // photo does nothing at all. Without that the restore branch would run at connect and untick
+    // each row that the server rendered as ticked.
+    this.offReasons = new Map();
 
     // ⚠️ The date and the time carry no zone. This is what gives them a meaning, and it is the
     // reason that a date field is safe here and was not safe in the Republish dialog. With no
@@ -394,27 +394,33 @@ export default class extends Controller {
    *
    * ⚠️ **Only Bluesky has rich text.** There a link is a facet: the words carry the address, and
    * the URL uses none of the 300 characters. The other two post plain words, thus the same draft
-   * would reach a reader as `[my post](https://…)`. **And only Bluesky takes a photo** from this
-   * page. `Admin::SocialController#markdown_network_error` and `#photos_network_error` refuse
-   * such a request as well, because a row that a browser cannot tick a hand-written request can.
+   * would reach a reader as `[my post](https://…)`. **And each row takes its own number of
+   * photos in a post**, from its `data-max-photos`: Mastodon 4, Threads none.
+   * `Admin::SocialController#markdown_network_error` and `#photos_network_error` refuse such a
+   * request as well, because a row that a browser cannot tick a hand-written request can.
    *
-   * ⚠️ **It does nothing while the reason has not changed**, and that is not only an optimisation:
-   * this runs at each keystroke, thus a restore at every one of them would put back a tick that the
-   * owner had just taken off. A change from one reason to the other only changes the hint line.
+   * ⚠️ **It does nothing to a row while the reason of that row has not changed**, and that is not
+   * only an optimisation: this runs at each keystroke, thus a restore at every one of them would put
+   * back a tick that the owner had just taken off. A change from one reason to the other only
+   * changes the hint line.
    *
    * ⚠️ It reads the `markdownNetwork` targets, which the view puts on the CONNECTED rows of those
    * two networks alone. A row with no account is disabled for its own reason, and it must never
    * come back on.
    */
   applyBlueskyOnly() {
-    const reason = this.hasMarkdown ? "markdown" : this.hasPhotos ? "photos" : null;
-    if (reason === this.blueskyOnlyReason) return;
-
-    const on = !!reason;
-    const wasOn = !!this.blueskyOnlyReason;
-    this.blueskyOnlyReason = reason;
+    const markdown = this.hasMarkdown;
+    const most = this.mostPhotos;
 
     this.markdownNetworkTargets.forEach((box) => {
+      const reason = markdown ? "markdown" : most > Number(box.dataset.maxPhotos ?? 0) ? "photos" : null;
+      const wasReason = this.offReasons.get(box.value) ?? null;
+      if (reason === wasReason) return;
+
+      const on = !!reason;
+      const wasOn = !!wasReason;
+      this.offReasons.set(box.value, reason);
+
       if (on && !wasOn) {
         // ⚠️ It keeps the tick that the owner had, thus a link that they write and then remove
         // gives the draft its networks back. It keeps a value that is already there: Turbo puts
@@ -432,10 +438,10 @@ export default class extends Controller {
 
       // The hint says why the row is off. One of the three lines shows at a time.
       const account = box.querySelector("[data-network-account]");
-      const markdown = box.querySelector("[data-network-markdown]");
+      const markdownLine = box.querySelector("[data-network-markdown]");
       const photos = box.querySelector("[data-network-photos]");
       if (account) account.hidden = on;
-      if (markdown) markdown.hidden = reason !== "markdown";
+      if (markdownLine) markdownLine.hidden = reason !== "markdown";
       if (photos) photos.hidden = reason !== "photos";
     });
   }
@@ -467,12 +473,12 @@ export default class extends Controller {
   }
 
   /**
-   * @returns {boolean} True when any post of the thread holds a photo, and that includes one
-   *   whose upload is still out. It is THREAD-LEVEL, as `hasMarkdown` is, and
-   *   `Admin::SocialController#photos?` reads it the same way.
+   * @returns {number} The most photos on one post of the thread, and that includes a photo whose
+   *   upload is still out. It is THREAD-LEVEL, as `hasMarkdown` is, and
+   *   `Admin::SocialController#most_photos` reads it the same way.
    */
-  get hasPhotos() {
-    return this.postTargets.some((post) => post.querySelector(PHOTO));
+  get mostPhotos() {
+    return Math.max(0, ...this.postTargets.map((post) => post.querySelectorAll(PHOTO).length));
   }
 
   /**
@@ -858,8 +864,8 @@ export default class extends Controller {
     // app builds its embed, and Meta renders its own attachment for Threads.
     this.fillLinkCard(card, post.card);
 
-    // The photos of a Bluesky post, as thumbnails. ⚠️ Only that network carries them, thus the
-    // action sends them on its row alone. Each `src` is the path of our own store.
+    // The photos of a post, as thumbnails. ⚠️ The action sends them only on the row of a network
+    // that takes photos. Each `src` is the path of our own store.
     const photos = card.querySelector("[data-preview-photos]");
     if (post.photos?.length) {
       photos.replaceChildren(...post.photos.map((photo) => {
