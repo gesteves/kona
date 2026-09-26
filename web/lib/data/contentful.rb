@@ -160,8 +160,9 @@ class Contentful
   # @param entry_type [String, nil] A fixed entry type, or nil to make one for each item.
   def process_collection(key, path_setter, entry_type: nil)
     @content[key].map! do |item|
-      set_entry_type(item, entry_type)
+      # set_entry_type reads the draft flag, thus set_draft_status runs first.
       set_draft_status(item)
+      set_entry_type(item, entry_type)
       set_timestamps(item)
       send(path_setter, item)
       set_template(item)
@@ -212,15 +213,16 @@ class Contentful
   end
 
   # Sets the entry type of an item: the given type, or Article if the item has a body and Short
-  # if it does not.
-  # @param item [Hash] The item to change.
+  # if it does not. A draft with a body and no intro is an Article.
+  # @param item [Hash] The item to change. set_draft_status must run on it first.
   # @param type [String, nil] A fixed type.
   # @return [Hash] The item.
   #
-  # ⚠️ An entry with a body and no intro is not an Article and not a Short. Such an entry got no
-  # type, went to the page template, and rendered an empty card in the blog list, the feed, and the
-  # sitemap. The build is the gate, thus it stops here and names the entry.
-  # @raise [ArgumentError] For an entry with no fixed type, a body, and no intro.
+  # ⚠️ A published entry with a body and no intro is not an Article and not a Short. It would render
+  # an empty card in the blog list, the feed, and the sitemap. Thus the build stops and names it.
+  # A draft is not in those lists, and an intro is often the last part of a draft that an author
+  # writes. Thus a draft gets a preview and does not stop the build.
+  # @raise [ArgumentError] For a published entry with no fixed type, a body, and no intro.
   def set_entry_type(item, type = nil)
     item[:entry_type] = if type.present?
       type
@@ -228,6 +230,8 @@ class Contentful
       "Article"
     elsif item[:intro].present?
       "Short"
+    elsif item[:body].present? && item[:draft]
+      "Article"
     elsif item[:body].present?
       raise ArgumentError, "The entry #{item[:slug].inspect} has a body and no intro. Give it an intro, or remove the body."
     end
