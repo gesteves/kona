@@ -38,9 +38,13 @@ RSpec.describe Contentful do
 
     # The build is the gate: such an entry rendered an empty card in the list, the feed, and the
     # sitemap, with no message.
-    it 'stops the build for an entry with a body and no intro, and names the entry' do
-      expect { transform(:set_entry_type, { slug: 'no-intro', intro: nil, body: 'b' }) }
+    it 'stops the build for a published entry with a body and no intro, and names the entry' do
+      expect { transform(:set_entry_type, { slug: 'no-intro', draft: false, intro: nil, body: 'b' }) }
         .to raise_error(ArgumentError, /"no-intro"/)
+    end
+
+    it 'derives Article for a draft with a body and no intro' do
+      expect(transform(:set_entry_type, { slug: 'no-intro', draft: true, intro: nil, body: 'b' })[:entry_type]).to eq('Article')
     end
 
     it 'uses an explicit type when given' do
@@ -121,6 +125,15 @@ RSpec.describe Contentful do
       expect(processed.map { |a| a[:slug] }).to eq(%w[newer older])
       expect(processed.first).to include(entry_type: 'Article', draft: false, template: '/article.html')
       expect(processed.first[:path]).to eq('/2026/01/01/newer/index.html')
+    end
+
+    it 'does not stop the build for a draft with a body and no intro' do
+      articles = [ { intro: nil, body: 'b', slug: 'draft', sys: { id: 'd1', published_version: nil } } ]
+      instance = importer(articles: articles)
+      instance.send(:process_collection, :articles, :set_article_path)
+
+      processed = instance.instance_variable_get(:@content)[:articles]
+      expect(processed.first).to include(entry_type: 'Article', draft: true, template: '/article.html', path: '/id/d1/index.html')
     end
   end
 
