@@ -9,7 +9,7 @@
 # ⚠️ The build needs WEBAWESOME_NPM_TOKEN — the admin UI's Web Awesome Pro package comes from a
 # private registry. CI passes it with `flyctl deploy --build-secret`.
 
-ARG RUBY_VERSION=4.0.6
+ARG RUBY_VERSION=4.0.7
 # ⚠️ Keep this in step with .nvmrc (`lts/*`), which is what CI and local dev resolve.
 ARG NODE_VERSION=24
 

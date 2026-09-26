@@ -1,6 +1,6 @@
 # web/ — Kona static site
 
-The Middleman 4 static site generator (Ruby 4.0.6). It builds a blog whose content comes from
+The Middleman 4 static site generator (Ruby 4.0.7). It builds a blog whose content comes from
 **Contentful**, and it deploys to the **`kona-web` Cloudflare Worker**, which serves the build as
 static assets. esbuild makes a bundle of the JavaScript (Stimulus and Turbo) and of the **Web
 Awesome Pro** theme CSS, through the external pipeline of Middleman. Sass compiles the other

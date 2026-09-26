@@ -1,5 +1,5 @@
 source "https://rubygems.org"
-ruby "4.0.6"
+ruby "4.0.7"
 
 gem "middleman", "~> 4.6"
 gem "tzinfo-data", platforms: [ :mswin, :mingw, :jruby ]

@@ -1,6 +1,6 @@
 # api/ — Kona widget API
 
-The Rails 8.1 API (Ruby 4.0.6). It serves small **HTML fragments** ("widgets") for the static `web/`
+The Rails 8.1 API (Ruby 4.0.7). It serves small **HTML fragments** ("widgets") for the static `web/`
 site, and it also has the structured-data endpoints and the inbound webhooks. It deploys to
 **fly.io** as `kona-api`, with an `app` process and a `worker` process, and **Cloudflare** is in
 front of the origin. Redis holds the cache, and there is **no database**.
