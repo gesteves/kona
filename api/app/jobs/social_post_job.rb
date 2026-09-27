@@ -27,13 +27,28 @@ class SocialPostJob < ApplicationJob
 
     Array(post["photos"]).map do |photo|
       stored = store.fetch(photo["id"].to_s)
-      if stored.nil?
-        raise ApplicationJob::PermanentError,
-              "#{self.class.name}: post #{index + 1}/#{count} lost its photo #{photo['id']}"
-      end
+      raise lost_photo(photo, index, count) if stored.nil?
 
       { bytes: stored[:image], width: stored[:width], height: stored[:height], alt: photo["alt"].to_s }
     end
+  end
+
+  # Checks that each photo of the post is still in Redis, and does not read the bytes. It is for a
+  # network that GETs each photo from its URL. The rules of #load_photos apply.
+  # @return [Array<Hash>] `[{ id:, alt: }, …]`.
+  def photo_refs(post, index, count)
+    store = SocialPhotos.new
+
+    Array(post["photos"]).map do |photo|
+      raise lost_photo(photo, index, count) unless store.exists?(photo["id"].to_s)
+
+      { id: photo["id"].to_s, alt: photo["alt"].to_s }
+    end
+  end
+
+  # @return [ApplicationJob::PermanentError]
+  def lost_photo(photo, index, count)
+    ApplicationJob::PermanentError.new("#{self.class.name}: post #{index + 1}/#{count} lost its photo #{photo['id']}")
   end
 
   # Adds the job of the next post, one time only.

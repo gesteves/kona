@@ -544,7 +544,7 @@ RSpec.describe Threads do
 
         expect(HTTParty).to have_received(:get).with(
           "https://graph.threads.net/v1.0/container-1",
-          hash_including(query: hash_including(fields: "status"))
+          hash_including(query: hash_including(fields: "status,error_message"))
         )
       end
 
@@ -618,6 +618,106 @@ RSpec.describe Threads do
         .and_return(http_response({ error: { message: "bad token" } }, success: false, code: 401))
 
       expect { post! }.to raise_error(/bad token/)
+    end
+
+    describe "the photos" do
+      let(:containers_url) { "https://graph.threads.net/v1.0/12345/threads" }
+      let(:photos) do
+        [ { url: "https://api.example.test/api/social-photos/a/1", alt: "A cat" },
+          { url: "https://api.example.test/api/social-photos/b/2", alt: "" },
+          { url: "https://api.example.test/api/social-photos/c/3", alt: "A dog" } ]
+      end
+
+      before do
+        count = 0
+        allow(HTTParty).to receive(:post) do |endpoint, _options|
+          if endpoint.end_with?("/threads")
+            count += 1
+            http_response({ id: "container-#{count}" })
+          else
+            http_response({ id: "post-1" })
+          end
+        end
+      end
+
+      # @return [Array<Hash>] The body of each container request, in order, with no token.
+      def container_bodies
+        bodies = []
+        expect(HTTParty).to have_received(:post).with(containers_url, anything).at_least(:once) do |_url, options|
+          bodies << options[:body].except(:access_token)
+        end
+        bodies
+      end
+
+      it "makes one IMAGE container for one photo, with its alt text and no link" do
+        post!(url: nil, photos: [ photos.first ], topic: "Running", reply_to_id: "99")
+
+        expect(container_bodies).to eq([
+          { media_type: "IMAGE", image_url: photos.first[:url], alt_text: "A cat", text: "Read this",
+            topic_tag: "Running", reply_to_id: "99" }
+        ])
+      end
+
+      it "makes an item for each photo, then a CAROUSEL with the text, the topic, and the reply" do
+        post!(url: nil, photos: photos, topic: "Running", reply_to_id: "99")
+
+        bodies = container_bodies
+        expect(bodies.first(3)).to eq([
+          { media_type: "IMAGE", image_url: photos[0][:url], alt_text: "A cat", is_carousel_item: true },
+          { media_type: "IMAGE", image_url: photos[1][:url], is_carousel_item: true },
+          { media_type: "IMAGE", image_url: photos[2][:url], alt_text: "A dog", is_carousel_item: true }
+        ])
+        expect(bodies.last).to eq(media_type: "CAROUSEL", children: "container-1,container-2,container-3",
+                                  text: "Read this", topic_tag: "Running", reply_to_id: "99")
+        expect(HTTParty).to have_received(:post)
+          .with(a_string_ending_with("threads_publish"), hash_including(body: hash_including(creation_id: "container-4")))
+      end
+
+      it "waits for the items before it makes the carousel" do
+        post!(url: nil, photos: photos)
+
+        %w[container-1 container-2 container-3].each do |id|
+          expect(HTTParty).to have_received(:get).with("https://graph.threads.net/v1.0/#{id}", anything)
+        end
+      end
+
+      it "posts photos with no text" do
+        post!(text: "", url: nil, photos: [ photos.first ])
+
+        expect(container_bodies.first).not_to have_key(:text)
+      end
+
+      it "cuts the alt text to the limit of Meta" do
+        post!(url: nil, photos: [ photos.first.merge(alt: "a" * 1200) ])
+
+        expect(container_bodies.first[:alt_text].length).to eq(described_class::MAX_ALT_TEXT_CHARACTERS)
+      end
+
+      it "refuses more photos than a carousel takes" do
+        too_many = Array.new(described_class::MAX_CAROUSEL_ITEMS + 1) { photos.first }
+
+        expect { post!(url: nil, photos: too_many) }.to raise_error(ApplicationJob::PermanentError, /at the most/)
+      end
+
+      it "makes no items for a retry that finds the stored container" do
+        $redis.set(container_key, "container-9")
+
+        post!(url: nil, photos: photos)
+
+        expect(HTTParty).not_to have_received(:post).with(containers_url, anything)
+      end
+
+      # ⚠️ An item is not below the idempotency key. Its failure must not remove the key.
+      it "keeps the stored key when an item fails, and names the reason of Meta" do
+        allow(HTTParty).to receive(:get)
+          .and_return(http_response({ status: "ERROR", error_message: "Could not fetch the image" }))
+        $redis.set(container_key, "unrelated")
+        allow($redis).to receive(:get).and_call_original
+        allow($redis).to receive(:get).with(container_key).and_return(nil)
+
+        expect { post!(url: nil, photos: photos) }.to raise_error(/could not process.*Could not fetch the image/)
+        expect($redis.exists?(container_key)).to be(true)
+      end
     end
   end
 end

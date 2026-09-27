@@ -22,7 +22,7 @@ RSpec.describe ThreadsPostJob do
     described_class.new.perform([ post("3kabc", "Read this", url) ])
 
     expect(threads).to have_received(:post!)
-      .with(text: "Read this", url: url, idempotency_key: "3kabc", reply_to_id: nil, topic: nil)
+      .with(text: "Read this", url: url, idempotency_key: "3kabc", reply_to_id: nil, topic: nil, photos: [])
     expect(open_graph).not_to have_received(:fetch)
   end
 
@@ -38,6 +38,42 @@ RSpec.describe ThreadsPostJob do
     described_class.new.perform([ post("3kabc", "Read this") ])
 
     expect(threads).to have_received(:post!).with(hash_including(topic: nil))
+  end
+
+  describe "the photos" do
+    let(:store) { SocialPhotos.new }
+    let!(:first) { store.store(image: "\xFF\xD8jpeg".b, width: 4, height: 3) }
+    let(:with_photos) { post("3kabc", "A photo").merge("photos" => [ { "id" => first, "alt" => "A cat" } ]) }
+
+    before { allow(ENV).to receive(:[]).and_call_original }
+
+    it "gives Threads the signed public URL and the alt text of each photo, and reads no bytes" do
+      allow(ENV).to receive(:[]).with("API_HOST").and_return("api.example.test")
+      expect_any_instance_of(SocialPhotos).not_to receive(:fetch)
+
+      described_class.new.perform([ with_photos ])
+
+      expect(threads).to have_received(:post!).with(hash_including(photos: [
+        { url: "https://api.example.test/api/social-photos/#{first}/#{SocialPhotos.signature(first)}", alt: "A cat" }
+      ]))
+    end
+
+    it "fails the post for good when a photo is gone, and posts nothing" do
+      allow(ENV).to receive(:[]).with("API_HOST").and_return("api.example.test")
+      store.discard([ first ])
+
+      expect { described_class.new.perform([ with_photos ]) }
+        .to raise_error(ApplicationJob::PermanentError, %r{ThreadsPostJob: post 1/1 lost its photo})
+      expect(threads).not_to have_received(:post!)
+    end
+
+    # ⚠️ Meta cannot GET a local URL.
+    it "fails the post for good with no API_HOST" do
+      allow(ENV).to receive(:[]).with("API_HOST").and_return(nil)
+
+      expect { described_class.new.perform([ with_photos ]) }
+        .to raise_error(ApplicationJob::PermanentError, /API_HOST/)
+    end
   end
 
   it "posts with no link at all" do

@@ -10,8 +10,9 @@ class ThreadsPostJob < SocialPostJob
   # a second post below a key.
   ENQUEUE_LOCK_PREFIX = "threads:thread:".freeze
 
-  # @param posts [Array<Hash>] `[{ "key" =>, "text" =>, "link" => }, …]`, the whole thread. ⚠️ Each holds the
-  #   same `"topic"`, when the owner gave one.
+  # @param posts [Array<Hash>] `[{ "key" =>, "text" =>, "link" =>, "photos" => }, …]`, the whole
+  #   thread. ⚠️ Each holds the same `"topic"`, when the owner gave one. `photos` is
+  #   `[{ "id" =>, "alt" => }, …]` and it is absent from a post with none.
   # @param index [Integer] Which post of that list this job writes.
   # @param reply_to_id [String, nil] The media id of the post above, or nil for the first.
   def perform(posts, index = 0, reply_to_id = nil)
@@ -22,10 +23,15 @@ class ThreadsPostJob < SocialPostJob
     # names no post of the thread and a thread of five gives five reports that read alike.
     Rails.logger.info("ThreadsPostJob: posting #{index + 1}/#{posts.length}")
 
+    # ⚠️ Meta GETs each photo from its URL, thus this reads no bytes.
+    photos = photo_refs(post, index, posts.length).map do |photo|
+      { url: SocialPhotos.public_url(photo[:id]), alt: photo[:alt] }
+    end
+
     # ⚠️ Threads attaches the link itself, thus this reads no og: tags either.
     posted = Threads.new.post!(text: post["text"], url: post["link"],
                                idempotency_key: post["key"], reply_to_id: reply_to_id,
-                               topic: post["topic"])
+                               topic: post["topic"], photos: photos)
     Rails.logger.info("ThreadsPostJob: posted #{index + 1}/#{posts.length} as #{posted}")
 
     # ⚠️ It adds the next post at once. A delay of 30 seconds went in here for a `500` on a reply

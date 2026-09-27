@@ -21,6 +21,41 @@ class SocialPhotos
   # The shape of an id, which `#store` makes.
   ID_PATTERN = /\A\h{32}\z/
 
+  # The salt of the key that signs a public URL.
+  SIGNATURE_SALT = "social photo url".freeze
+
+  # The shape of a signature, which `.signature` makes.
+  SIGNATURE_PATTERN = /\A\h{64}\z/
+
+  # The public URL of a photo, for a network that GETs the image itself (Threads).
+  #
+  # ⚠️ It is on the PUBLIC API host, because Meta cannot pass the bot protection of the admin host.
+  # The signature is the permission, and the TTL of the photo ends the URL.
+  # @param id [String]
+  # @return [String]
+  # @raise [ApplicationJob::PermanentError] When `API_HOST` is blank. Meta cannot GET a local URL.
+  def self.public_url(id)
+    host = ENV["API_HOST"].presence
+    raise ApplicationJob::PermanentError, "API_HOST is blank, thus Threads cannot get the photo" if host.nil?
+
+    "https://#{host}/api/social-photos/#{id}/#{signature(id)}"
+  end
+
+  # @param id [String]
+  # @return [String] The HMAC of the id, in hex.
+  def self.signature(id)
+    key = Rails.application.key_generator.generate_key(SIGNATURE_SALT, 32)
+    OpenSSL::HMAC.hexdigest("SHA256", key, id.to_s)
+  end
+
+  # @param id [String]
+  # @param signature [String]
+  # @return [Boolean] True when the signature is the one that `.public_url` gives for that id.
+  def self.valid_signature?(id, signature)
+    id?(id) && signature.is_a?(String) && signature.match?(SIGNATURE_PATTERN) &&
+      ActiveSupport::SecurityUtils.secure_compare(signature, signature(id))
+  end
+
   # @param value [Object]
   # @return [Boolean] True when the value has the shape of an id.
   def self.id?(value)

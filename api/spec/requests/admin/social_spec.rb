@@ -1696,9 +1696,9 @@ RSpec.describe "Admin social media", type: :request do
         expect(response.body).to include(ERB::Util.html_escape(
           I18n.t("admin.social.show.photos_disabled.mastodon", count: Mastodon::MAX_MEDIA_ATTACHMENTS)
         ))
-        expect(response.body).to include(ERB::Util.html_escape(I18n.t("admin.social.show.photos_disabled.threads")))
         expect(response.body).to match(/value="mastodon"\s+data-social-target="markdownNetwork" data-max-photos="4"/)
-        expect(response.body).to match(/value="threads"\s+data-social-target="markdownNetwork" data-max-photos="0"/)
+        expect(response.body).to match(/value="threads"\s+data-social-target="markdownNetwork" data-max-photos="20"/)
+        expect(response.body.scan("data-network-photos").length).to eq(1)
       end
     end
 
@@ -1772,12 +1772,20 @@ RSpec.describe "Admin social media", type: :request do
         expect(response).to redirect_to(social_path)
       end
 
-      it "refuses a network that takes no photo" do
-        post_photos(photos: [ first ], alts: [ "" ], networks: %w[bluesky mastodon threads])
+      it "gives each network the photos, up to the most that the composer takes" do
+        ids = Array.new(SocialPresenter::MAX_PHOTOS) { first }
+        post_photos(photos: ids, alts: ids.map { "" }, networks: %w[bluesky threads])
 
-        expect(response).to have_http_status(:unprocessable_content)
-        expect(flash[:alert]).to eq(I18n.t("admin.social.errors.photos_network", networks: "Threads"))
-        expect(BlueskyPostJob.jobs).to be_empty
+        expect(response).to redirect_to(social_path)
+        expect(ThreadsPostJob.jobs.first["args"].first.first["photos"].length).to eq(SocialPresenter::MAX_PHOTOS)
+      end
+
+      it "gives the Threads job the photos and the topic" do
+        post_photos(photos: [ first, second ], alts: [ "A cat", "" ], networks: %w[threads], topic: "Running")
+
+        entry = ThreadsPostJob.jobs.first["args"].first.first
+        expect(entry["photos"]).to eq([ { "id" => first, "alt" => "A cat" }, { "id" => second, "alt" => "" } ])
+        expect(entry["topic"]).to eq("Running")
       end
 
       it "refuses photos and a link on one post" do
@@ -1861,23 +1869,23 @@ RSpec.describe "Admin social media", type: :request do
     end
 
     describe "POST /social/preview/text" do
-      it "gives the photos on the Bluesky and Mastodon rows, and shows no Threads row" do
+      it "gives the photos on each row" do
         post "/social/preview/text", params: { posts: [ { text: "Two photos", link: "", photos: [ first, second ],
                                                             alts: [ "A cat", "" ] } ] }
 
         body = JSON.parse(response.body)
-        expect(body["networks"].map { |row| row["key"] }).to eq(%w[bluesky mastodon])
+        expect(body["networks"].map { |row| row["key"] }).to eq(%w[bluesky mastodon threads])
         body["networks"].each do |row|
           expect(row["posts"].first["photos"]).to eq([ { "path" => "/social/photos/#{first}", "alt" => "A cat" },
                                                        { "path" => "/social/photos/#{second}", "alt" => "" } ])
         end
       end
 
-      it "shows Bluesky alone for a post with more photos than Mastodon takes" do
+      it "shows no Mastodon row for a post with more photos than Mastodon takes" do
         ids = Array.new(Mastodon::MAX_MEDIA_ATTACHMENTS + 1) { first }
         post "/social/preview/text", params: { posts: [ { text: "Five", link: "", photos: ids, alts: ids.map { "" } } ] }
 
-        expect(JSON.parse(response.body)["networks"].map { |row| row["key"] }).to eq([ "bluesky" ])
+        expect(JSON.parse(response.body)["networks"].map { |row| row["key"] }).to eq(%w[bluesky threads])
       end
 
       it "gives no photos on a post that has none" do

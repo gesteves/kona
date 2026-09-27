@@ -49,6 +49,7 @@ edge serves a cached copy before it gets a new one.
 | POST | `/api/build` | enqueues `SiteBuildJob`; 202, or 429 inside the 60s dedupe lock, which `POST /republish` shares | — |
 | POST | `/api/icons` | resolves the web build's Font Awesome allowlist to SVGs | — |
 | GET | `/api/standard-site` | `{did, publication_uri}` for the build's verification markup | 1 hr |
+| GET | `/api/social-photos/:id/:signature` | one staged photo of the Social media page, for Meta to GET for a Threads post. Public; the HMAC signature is the permission, and a bad one gives a 404 | `no-store` |
 | GET | `/api/related` | `{contentful id => [related ids]}` from the BM25 index of the article text, the links between the entries, and the concepts, for the build's static "You May Also Like" section | — |
 | POST | `/webhooks/contentful` | enqueues PDS sync, asset-mirror, and site-build jobs; 204 | — |
 | POST | `/webhooks/whoop` | enqueues `WhoopWebhookJob`; 200 `{ok: true}` | — |
@@ -1342,7 +1343,7 @@ a **picker** below it, exactly as the link button opens the link field, and each
 owner picks becomes a tile below the picker. A tile is a ROW, as a post of the thread is: the
 grip, the thumbnail, the alt text field, and the remove X, and the tiles stack in a column so the
 alt text takes the width. The owner drags a tile or moves it with the arrow keys of its grip.
-**Bluesky and Mastodon take photos** from this page, and Threads takes none.
+**Each of the three networks takes photos** from this page.
 
 - **The picker has two states**, `IDLE` and `OPEN`, and `social_post_controller.js` holds them
   beside the three states of the link. The photo button opens the picker and is disabled while
@@ -1359,9 +1360,12 @@ alt text takes the width. The owner drags a tile or moves it with the arrow keys
   open and the photo button while the link field or the card is open, the server renders both
   states, and `#photo_error` refuses a request that sends both.
 - ⚠️ **Each network has a photo limit for each post**, in `SocialPresenter::PHOTO_LIMITS`:
-  Bluesky 10, Mastodon 4 (`Mastodon::MAX_MEDIA_ATTACHMENTS`), and Threads 0. The check is
-  thread-level, as for a Markdown link: the post with the most photos decides the full draft. A
-  photo turns Threads off, and a fifth photo on one post turns Mastodon off.
+  Bluesky 10, Mastodon 4 (`Mastodon::MAX_MEDIA_ATTACHMENTS`), and Threads 20
+  (`Threads::MAX_CAROUSEL_ITEMS`). The check is thread-level, as for a Markdown link: the post
+  with the most photos decides the full draft. A fifth photo on one post turns Mastodon off.
+  ⚠️ `MAX_PHOTOS` is the Bluesky limit, and NOT the largest limit: the Bluesky row has no
+  `data-max-photos`, thus the composer cannot turn it off. Threads never goes off for photos, and
+  its row has no photo hint line (`Network#photo_limited?`).
   `social#applyBlueskyOnly` is the one rule for the two reasons. It reads the `data-max-photos` of
   each row, and it shows the hint line of the reason. `#photos_network_error` refuses a
   hand-written request.
@@ -1417,10 +1421,10 @@ alt text takes the width. The owner drags a tile or moves it with the arrow keys
 - **The photos ride in the payload of each network in `PHOTO_LIMITS`**
   (`"photos" => [{ "id", "alt" }]`), as the topic rides in the Threads payload.
 - **The alt text has no `maxlength`**, for the reason that the body has none. `ALT_LIMIT` is the
-  smaller of two limits: `MAX_ALT_GRAPHEMES` (2000), which is the limit of the client of Bluesky,
-  and `Mastodon::MAX_DESCRIPTION_CHARACTERS` (1500). One alt text goes to both networks. The tile says when the text
-  is past it, `social#canPost` keeps the submit off, and `#photo_error` refuses the request.
-- **The Preview panel shows the thumbnails on the Bluesky and Mastodon rows**, from `#preview_photos`, thus the
+  smallest of three limits: `MAX_ALT_GRAPHEMES` (2000), which is the limit of the client of
+  Bluesky, `Mastodon::MAX_DESCRIPTION_CHARACTERS` (1500), and `Threads::MAX_ALT_TEXT_CHARACTERS`
+  (1000). One alt text goes to each network. The tile says when the text is past it, `social#canPost` keeps the submit off, and `#photo_error` refuses the request.
+- **The Preview panel shows the thumbnails on each row**, from `#preview_photos`, thus the
   panel still shows what the network will render.
 - **A Generate control below the alt text field asks Claude for it.** `AltText` sends the STORED
   JPEG, which is the picture that Bluesky will show, with the prompt in `app/prompts/alt-text.md`
@@ -1811,6 +1815,28 @@ container.
   Sidekiq redelivers a job whose process died between the publish and the acknowledgement, and
   that attempt answers with the id and makes no second post. Both TTLs are longer than the
   24-hour retry window, on purpose.
+- ⚠️ **Meta GETs each photo from a URL, and the API has no upload.** `ThreadsPostJob` gives
+  `SocialPhotos.public_url` for each photo: `/api/social-photos/:id/:signature` on the PUBLIC API
+  host, with an HMAC of the id from `secret_key_base`. The job checks that each photo exists, and it
+  reads no bytes.
+  - The route is outside the admin constraint, on purpose. The admin host has SBFM and the managed
+    rules, and Meta cannot pass a challenge. Zone rule 4 skips both on the public host.
+  - ⚠️ **`API_HOST` must have a value in the worker.** With no value the job raises
+    `PermanentError`, because Meta cannot GET a local URL. Thus a Threads post with photos cannot
+    go out from a development machine.
+  - The path has no `.jpg`, because zone rule 2 matches by extension.
+- **The container type follows the count**: TEXT with no photo, IMAGE with one, and CAROUSEL with
+  more, because a carousel needs 2 to 20 items. The text, the topic, and the reply go on the
+  container that gets published, and never on an item. `link_attachment` is for TEXT only.
+  - Each carousel item is its own container (`is_carousel_item`), and Meta GETs its image then.
+    `#wait_for_containers` polls all the items in ONE loop before the carousel, thus ten items cost
+    one wait and not ten.
+  - ⚠️ An item is not below `threads:container:<key>`, thus its wait gets `key: nil`: an item in
+    `ERROR` must not remove that key. A retry before the carousel exists makes new items, and Meta
+    expires the old ones.
+  - ⚠️ The status read asks for `status,error_message`, and an `ERROR` raise holds that message.
+    An image that Meta cannot GET shows only as `ERROR`, and the message is the one cause that the
+    report can name.
 - **`MAX_CHARACTERS` is 500 and this class checks nothing.** The body of a draft is at most 300,
   which is the Bluesky limit, thus a post always fits.
 - ⚠️ **`error_message` parses the body itself and does not use `parse_json`.** That helper returns

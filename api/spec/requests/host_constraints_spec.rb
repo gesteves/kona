@@ -101,6 +101,16 @@ RSpec.describe "Public API host route constraints", type: :request do
 
         expect(response).not_to have_http_status(:not_found)
       end
+
+    # ⚠️ A bad signature also gives a 404, thus only a true signed path proves that this route is
+    # on the public host. Meta GETs each Threads photo there.
+    it "serves a signed photo of the Social media page on the public API host" do
+      id = SocialPhotos.new.store(image: "\xFF\xD8jpeg".b, width: 4, height: 3)
+
+      get "http://#{api_host}/api/social-photos/#{id}/#{SocialPhotos.signature(id)}"
+
+      expect(response).to have_http_status(:ok)
+    end
     end
 
     # `/` is the one path where the two hosts give a different answer, and where neither one gives a

@@ -131,7 +131,7 @@
           <span slot="hint">
             <span class="social__hint-line" data-network-account><%= network.account_line %></span>
             <span class="social__hint-line" data-network-markdown hidden><%= t(".markdown_disabled") %></span>
-            <% unless network.markdown? %>
+            <% if network.photo_limited? %>
               <span class="social__hint-line" data-network-photos hidden><%= t(".photos_disabled.#{network.key}", count: network.max_photos) %></span>
             <% end %>
           </span>

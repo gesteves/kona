@@ -47,4 +47,34 @@ RSpec.describe SocialPhotos do
 
     expect(store.exists?(id)).to be(false)
   end
+
+  describe ".public_url" do
+    before { allow(ENV).to receive(:[]).and_call_original }
+
+    it "gives a signed URL on the public API host" do
+      allow(ENV).to receive(:[]).with("API_HOST").and_return("api.example.test")
+
+      expect(described_class.public_url(id))
+        .to eq("https://api.example.test/api/social-photos/#{id}/#{described_class.signature(id)}")
+    end
+
+    # ⚠️ Meta cannot GET a local URL, thus the job must fail for good and not retry for a day.
+    it "raises a permanent error with no API_HOST" do
+      allow(ENV).to receive(:[]).with("API_HOST").and_return(nil)
+
+      expect { described_class.public_url(id) }.to raise_error(ApplicationJob::PermanentError, /API_HOST/)
+    end
+  end
+
+  describe ".valid_signature?" do
+    it "accepts the signature of the id, and refuses each other value" do
+      signature = described_class.signature(id)
+
+      expect(signature).to match(described_class::SIGNATURE_PATTERN)
+      expect(described_class.valid_signature?(id, signature)).to be(true)
+      expect(described_class.valid_signature?(id, signature.reverse)).to be(false)
+      expect(described_class.valid_signature?(id, "")).to be(false)
+      expect(described_class.valid_signature?("../etc", signature)).to be(false)
+    end
+  end
 end

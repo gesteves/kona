@@ -372,7 +372,7 @@ export default class extends Controller {
     this.scheduleMentionScan();
     // ⚠️ It runs BEFORE `canPost`, which reads the ticks that this method can change.
     this.applyBlueskyOnly();
-    // ⚠️ And AFTER it, because a Markdown link or a photo unticks and disables the Threads row.
+    // ⚠️ And AFTER it, because a Markdown link unticks and disables the Threads row.
     this.applyTopic();
 
     this.submitTarget.disabled = !this.canPost;
@@ -395,7 +395,7 @@ export default class extends Controller {
    * ⚠️ **Only Bluesky has rich text.** There a link is a facet: the words carry the address, and
    * the URL uses none of the 300 characters. The other two post plain words, thus the same draft
    * would reach a reader as `[my post](https://…)`. **And each row takes its own number of
-   * photos in a post**, from its `data-max-photos`: Mastodon 4, Threads none.
+   * photos in a post**, from its `data-max-photos`: Mastodon 4, Threads 20.
    * `Admin::SocialController#markdown_network_error` and `#photos_network_error` refuse such a
    * request as well, because a row that a browser cannot tick a hand-written request can.
    *

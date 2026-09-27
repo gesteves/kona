@@ -99,6 +99,15 @@ class Threads < ApplicationService
   CONTAINER_POLL_SECONDS = 3
   CONTAINER_POLL_ATTEMPTS = 12
 
+  # The most images in one carousel. ⚠️ A carousel needs at least 2, thus one photo is an IMAGE
+  # container and not a carousel.
+  # @see https://developers.facebook.com/docs/threads/posts
+  MAX_CAROUSEL_ITEMS = 20
+
+  # The limit of the alt text of one image.
+  # @see https://developers.facebook.com/docs/threads/reference/publishing
+  MAX_ALT_TEXT_CHARACTERS = 1000
+
   # The seconds that each call to Meta can take. ⚠️ `connect!` runs in the OAuth callback, which is
   # a request with a 20-second rack-timeout. Without a limit, a Meta that hangs gives a 500 in place
   # of the message of the page.
@@ -263,14 +272,19 @@ class Threads < ApplicationService
   # @param reply_to_id [String, nil] The media id of the post above this one, for a thread.
   # @param topic [String, nil] The topic tag, with no "#". ⚠️ Meta takes one topic for each post,
   #   thus the composer sends the same one with every post of a thread.
+  # @param photos [Array<Hash>] `[{ url:, alt: }, …]`, MAX_CAROUSEL_ITEMS at the most. Meta GETs
+  #   each URL itself, thus each one must be public.
   # @return [String] The id of the post that Meta made.
   # @raise [RuntimeError] It raises at each failure, thus the job does the work again.
-  def post!(text:, url: nil, idempotency_key:, reply_to_id: nil, topic: nil)
+  def post!(text:, url: nil, idempotency_key:, reply_to_id: nil, topic: nil, photos: [])
     raise ApplicationJob::PermanentError, "Threads is not connected" unless connected?
     raise ApplicationJob::PermanentError, "The Threads token expired; connect the account again" if expired?
+    if photos.length > MAX_CAROUSEL_ITEMS
+      raise ApplicationJob::PermanentError, "Threads takes #{MAX_CAROUSEL_ITEMS} photos at the most"
+    end
 
     text = text.to_s.strip
-    raise ApplicationJob::PermanentError, "The post is empty" if text.blank?
+    raise ApplicationJob::PermanentError, "The post is empty" if text.blank? && photos.empty?
 
     # ⚠️ A retry can come AFTER the publish: Sidekiq redelivers a job whose process died before the
     # acknowledgement. The id of the published post is the answer, and no second post.
@@ -278,7 +292,7 @@ class Threads < ApplicationService
     return published if published.present?
 
     container_id = container_for(text: text, url: url, key: idempotency_key,
-                                 reply_to_id: reply_to_id, topic: topic)
+                                 reply_to_id: reply_to_id, topic: topic, photos: photos)
     wait_for_container(container_id, key: idempotency_key)
     published = publish_container(container_id)
 
@@ -345,25 +359,61 @@ class Threads < ApplicationService
 
   # Gets the container that a previous attempt made, or makes one.
   # @return [String] The container id.
-  def container_for(text:, url:, key:, reply_to_id: nil, topic: nil)
+  def container_for(text:, url:, key:, reply_to_id: nil, topic: nil, photos: [])
     stored = $redis.get(container_key(key))
     return stored if stored.present?
 
-    container_id = create_container(text: text, url: url, reply_to_id: reply_to_id, topic: topic)
+    container_id = create_container(text: text, url: url, reply_to_id: reply_to_id, topic: topic, photos: photos)
     $redis.set(container_key(key), container_id, ex: CONTAINER_TTL)
     container_id
   end
 
-  # Makes a TEXT media container.
+  # Makes the media container that gets published: TEXT with no photo, IMAGE with one, and
+  # CAROUSEL with more.
+  #
+  # ⚠️ The text, the topic, and the reply go on THIS container, and never on a carousel item.
+  # `link_attachment` is for a TEXT post only. The composer refuses photos and a link on one post.
   # @return [String] The container id.
-  def create_container(text:, url:, reply_to_id: nil, topic: nil)
-    body = { media_type: "TEXT", text: text }
-    body[:link_attachment] = url if url.present?
+  def create_container(text:, url:, reply_to_id: nil, topic: nil, photos: [])
+    body =
+      case photos.length
+      when 0 then { media_type: "TEXT" }
+      when 1 then image_fields(photos.first)
+      else { media_type: "CAROUSEL", children: carousel_items(photos).join(",") }
+      end
+    body[:text] = text if text.present?
+    body[:link_attachment] = url if url.present? && photos.empty?
     body[:topic_tag] = topic if topic.present?
     # ⚠️ The reply goes on the CONTAINER and not on the publish. Meta reads it only here.
     # @see https://developers.facebook.com/documentation/threads/reference/publishing
     body[:reply_to_id] = reply_to_id if reply_to_id.present?
 
+    make_container(body)
+  end
+
+  # @param photo [Hash] `{ url:, alt: }`.
+  # @return [Hash] The fields of one IMAGE container.
+  def image_fields(photo)
+    fields = { media_type: "IMAGE", image_url: photo[:url] }
+    alt = photo[:alt].to_s.strip[0, MAX_ALT_TEXT_CHARACTERS]
+    fields[:alt_text] = alt if alt.present?
+    fields
+  end
+
+  # Makes one item container for each photo, and waits until Meta has processed all of them.
+  # ⚠️ Meta GETs each image here. An image that it cannot get gives ERROR, and the raise names the
+  # `error_message` of Meta.
+  # @return [Array<String>] The item ids, in the order of the photos.
+  def carousel_items(photos)
+    ids = photos.map { |photo| make_container(image_fields(photo).merge(is_carousel_item: true)) }
+    wait_for_containers(ids)
+    ids
+  end
+
+  # POSTs one media container.
+  # @param body [Hash] The fields of the container, with no token.
+  # @return [String] The container id.
+  def make_container(body)
     # ⚠️ The token goes in the BODY, with each other field, and not in the query string. That is
     # the shape of the example of Meta and of the one Ruby client for this API. A container with a
     # `reply_to_id` answered `500` with an empty error body while the token was in the query, and
@@ -400,46 +450,72 @@ class Threads < ApplicationService
   # @param key [String] The idempotency key that holds the container.
   # @return [void]
   def wait_for_container(container_id, key:)
+    wait_for_containers([ container_id ], key: key)
+  end
+
+  # Waits until Meta has finished each container of the list. It polls all of them in one loop,
+  # thus ten carousel items cost one wait and not ten.
+  # @param ids [Array<String>]
+  # @param key [String, nil] The idempotency key that holds the FINAL container. ⚠️ Give nil for
+  #   carousel items: an item is not below that key, and its failure must not remove the key.
+  # @return [void]
+  def wait_for_containers(ids, key: nil)
+    pending = ids.dup
     failures = 0
     CONTAINER_POLL_ATTEMPTS.times do |attempt|
-      status = container_status(container_id)
-      case status
-      when "FINISHED", "PUBLISHED" then return
-      when "ERROR"
-        $redis.del(container_key(key))
-        raise "Threads could not process the container #{container_id}"
-      when "EXPIRED"
-        $redis.del(container_key(key))
-        raise "The Threads container #{container_id} expired"
+      read_failed = false
+      pending = pending.reject do |container_id|
+        container = container_status(container_id)
+        case container&.dig(:status)
+        when "FINISHED", "PUBLISHED" then true
+        when "ERROR"
+          $redis.del(container_key(key)) if key
+          raise "Threads could not process the container #{container_id}#{error_detail(container)}"
+        when "EXPIRED"
+          $redis.del(container_key(key)) if key
+          raise "The Threads container #{container_id} expired"
+        else
+          read_failed ||= container.nil?
+          false
+        end
       end
+      return if pending.empty?
 
       # ⚠️ A read that fails is not "not ready". Meta that is away must not cost the full poll of
       # 33 seconds at each attempt: three failures in a row end the poll, and the retry of the
       # job is the wait.
-      failures = status.nil? ? failures + 1 : 0
-      raise "Threads did not answer for the container #{container_id}" if failures >= MAX_STATUS_FAILURES
+      failures = read_failed ? failures + 1 : 0
+      raise "Threads did not answer for the container #{pending.first}" if failures >= MAX_STATUS_FAILURES
 
       sleep CONTAINER_POLL_SECONDS unless Rails.env.test? || attempt == CONTAINER_POLL_ATTEMPTS - 1
     end
 
-    raise "The Threads container #{container_id} is still not ready"
+    raise "The Threads container #{pending.first} is still not ready"
+  end
+
+  # @param container [Hash] What #container_status gives.
+  # @return [String] ": <message>" when Meta gave a reason, or an empty string.
+  def error_detail(container)
+    message = container[:error_message].presence
+    message ? ": #{message}" : ""
   end
 
   MAX_STATUS_FAILURES = 3
 
   # @param container_id [String]
-  # @return [String, nil] FINISHED, IN_PROGRESS, ERROR, EXPIRED, PUBLISHED, or nil when the read
-  #   fails. The caller counts the failures.
+  # @return [Hash, nil] `{ status:, error_message: }`, where the status is FINISHED, IN_PROGRESS,
+  #   ERROR, EXPIRED, or PUBLISHED. Nil when the read fails. The caller counts the failures.
   def container_status(container_id)
     response = HTTParty.get("#{API_URL}/#{container_id}",
-                            query: { fields: "status", access_token: @credentials.access_token },
+                            query: { fields: "status,error_message", access_token: @credentials.access_token },
                             timeout: REQUEST_TIMEOUT)
     unless response.success?
       report_upstream_error("HTTP #{response.code}", context: "Threads container status", status: response.code)
       return
     end
 
-    parse_json(response)&.dig(:status)
+    container = parse_json(response)
+    container.slice(:status, :error_message) if container.is_a?(Hash) && container[:status].present?
   rescue StandardError => e
     report_upstream_error(e, context: "Threads container status")
     nil

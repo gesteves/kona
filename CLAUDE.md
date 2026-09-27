@@ -506,7 +506,9 @@ The reason for the skip rule, for each host:
   machine" fingerprint. `/api/` also covers the callers at build time. `/webhooks/` takes POSTs with
   Contentful rich text, with no person present, and that text will start a managed injection rule at
   some time. An HMAC checks both, thus a managed rule adds nothing. ⚠️ A block there gives **no
-  message**: nothing shows an error, and the PDS sync simply stops.
+  message**: nothing shows an error, and the PDS sync simply stops. ⚠️ **Meta also GETs each photo
+  of a Threads post** from `/api/social-photos/*` on this host. A challenge there stops each Threads
+  post with photos, and the only sign is an `ERROR` container in the job report.
 - **The admin host** — the one host with the protection on, and the only one whose traffic is a true
   browser that one person controls: the Google sign-in, the admin UI at the root of the host, the
   Sidekiq UI, and the Whoop OAuth round trip. A managed challenge there is acceptable, and it is not

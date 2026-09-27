@@ -24,14 +24,19 @@ class SocialPresenter
   # `Admin::SocialController#photos_network_error` refuses a request that ticks one anyway.
   PHOTO_LIMITS = {
     "bluesky" => Bluesky::MAX_IMAGES,
-    "mastodon" => Mastodon::MAX_MEDIA_ATTACHMENTS
+    "mastodon" => Mastodon::MAX_MEDIA_ATTACHMENTS,
+    "threads" => Threads::MAX_CAROUSEL_ITEMS
   }.freeze
 
   # The most photos on one post, and the limit of one alt text. ⚠️ The view writes both into the
-  # markup and social_post_controller.js reads them there. One alt text goes to each network, thus
-  # its limit is the smallest one.
-  MAX_PHOTOS = PHOTO_LIMITS.values.max
-  ALT_LIMIT = [ Bluesky::MAX_ALT_GRAPHEMES, Mastodon::MAX_DESCRIPTION_CHARACTERS ].min
+  # markup and social_post_controller.js reads them there.
+  # ⚠️ MAX_PHOTOS is the limit of BLUESKY and not the largest limit. The Bluesky row has no
+  # `data-max-photos`, thus the composer could not turn it off for a count that it refuses.
+  # One alt text goes to each network, thus its limit is the smallest one.
+  MAX_PHOTOS = Bluesky::MAX_IMAGES
+  ALT_LIMIT = [
+    Bluesky::MAX_ALT_GRAPHEMES, Mastodon::MAX_DESCRIPTION_CHARACTERS, Threads::MAX_ALT_TEXT_CHARACTERS
+  ].min
 
   # The one network that takes a topic. ⚠️ `topic_tag` is a parameter of Meta and it has no
   # equivalent at Bluesky or Mastodon, thus the field shows only while that row is ticked.
@@ -90,6 +95,10 @@ class SocialPresenter
 
     # @return [Integer] The most photos on one post of this network.
     def max_photos = PHOTO_LIMITS.fetch(key, 0)
+
+    # @return [Boolean] True when too many photos can turn this row off, thus it needs a hint line
+    #   for that reason.
+    def photo_limited? = max_photos < MAX_PHOTOS
 
     # The line below the name, for a network that is connected. The view renders its own line, with
     # a link, for a network that is not connected.

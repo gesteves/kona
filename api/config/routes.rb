@@ -46,6 +46,11 @@ Rails.application.routes.draw do
     # the concepts. The web build renders them as the static "You May Also Like" section of each
     # article.
     get "related" => "related#show"
+
+    # A photo of a draft on the Social media page, for Meta to GET. This is public, and the
+    # signature is the permission. ⚠️ It has no extension, because zone rule 2 matches by extension.
+    get "social-photos/:id/:signature" => "social_photos#show", as: :social_photo,
+        constraints: { id: /\h{32}/, signature: /\h{64}/ }
   end
 
   # The inbound webhooks, with one controller for each service.
