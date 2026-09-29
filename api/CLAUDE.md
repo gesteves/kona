@@ -1428,7 +1428,7 @@ alt text takes the width. The owner drags a tile or moves it with the arrow keys
   panel still shows what the network will render.
 - **A Generate control below the alt text field asks Claude for it.** `AltText` sends the STORED
   JPEG, which is the picture that Bluesky will show, with the prompt in `app/prompts/alt-text.md`
-  and a plain text answer (`AnthropicStructuredOutput#text_call`). The model is `claude-sonnet-5`,
+  and a plain text answer (`AnthropicStructuredOutput#text_call`). The model is `claude-sonnet-5-5`,
   and `ANTHROPIC_ALT_TEXT_MODEL` replaces it. ⚠️ **The control renders with `ANTHROPIC_API_KEY`
   alone**, as the two other Claude features stay silent without one; `SocialPresenter#alt_text?`
   carries that flag from the controller. ⚠️ The answer REPLACES the field, and the controller
@@ -2389,7 +2389,7 @@ value is a secret of fly.io, and Rails also uses `config/credentials.yml.enc` an
   `CSP_ENFORCE` (any value enforces the CSP for the owner; with no value the CSP is Report-Only),
   `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`, `ANTHROPIC_API_KEY` with
   `ANTHROPIC_DESCRIPTION_MODEL`, `ANTHROPIC_CONTACT_SUBJECT_MODEL`, and `ANTHROPIC_ALT_TEXT_MODEL`
-  (the default of all three is `claude-sonnet-5`), `PURPLEAIR_API_KEY`, `GOODSPEED_API_URL` (with no value the bay-conditions
+  (the default of all three is `claude-sonnet-5-5`), `PURPLEAIR_API_KEY`, `GOODSPEED_API_URL` (with no value the bay-conditions
   integration is off, and the app omits the sentence about the water temperature and the bay
   readings for a race day in SF), `LOCATION`, `TIME_ZONE`, `BLUESKY_PDS_URL` (⚠️ the handle and the
   app password of Bluesky are **not** environment variables: a person sets them on the Connected

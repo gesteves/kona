@@ -9,7 +9,7 @@ module ContactSubject
 
   SYSTEM_PROMPT = Rails.root.join("app/prompts/contact-subject.md").read.freeze
 
-  DEFAULT_MODEL = "claude-sonnet-5".freeze
+  DEFAULT_MODEL = "claude-sonnet-5-5".freeze
   MAX_TOKENS = 128
   TIMEOUT_SECONDS = 15
 

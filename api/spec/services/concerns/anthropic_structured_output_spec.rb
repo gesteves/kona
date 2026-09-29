@@ -66,6 +66,18 @@ RSpec.describe AnthropicStructuredOutput do
     )
   end
 
+  it "turns the thinking off with between_tools on Claude Sonnet 5.5, and with disabled on each other model" do
+    allow(messages).to receive(:create).and_return(double("message", content: [ double("block", type: :text, text: "A.") ]))
+
+    allow(ENV).to receive(:[]).with("SPEC_ANTHROPIC_MODEL").and_return("claude-sonnet-5-5")
+    host.text_call(system: "s", content: "c")
+    expect(messages).to have_received(:create).with(hash_including(thinking: { type: :between_tools }))
+
+    allow(ENV).to receive(:[]).with("SPEC_ANTHROPIC_MODEL").and_return("claude-haiku-4-5")
+    host.text_call(system: "s", content: "c")
+    expect(messages).to have_received(:create).with(hash_including(thinking: { type: :disabled }))
+  end
+
   it "gives nil from a plain text call with no text block" do
     allow(messages).to receive(:create).and_return(double("message", content: [ double("tool", type: :tool_use) ]))
 

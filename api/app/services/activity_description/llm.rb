@@ -9,7 +9,7 @@ module ActivityDescription
     PLANNED_SUMMARY_PROMPT = Rails.root.join("app/prompts/planned-summary.md").read.freeze
     WEATHER_SENTENCE_PROMPT = Rails.root.join("app/prompts/weather-sentence.md").read.freeze
 
-    DEFAULT_MODEL = "claude-sonnet-5".freeze
+    DEFAULT_MODEL = "claude-sonnet-5-5".freeze
     MAX_TOKENS = 512
     # This is long for a one-sentence prompt. A longer time means that the call stopped. The app
     # already answered the webhook when these run, thus this limit only stops a large number of

@@ -25,7 +25,7 @@ RSpec.describe ActivityDescription::Llm do
       expect(client.messages).to have_received(:create).with(
         hash_including(
           max_tokens: 512,
-          thinking: { type: :disabled },
+          thinking: { type: :between_tools },
           system_: described_class::PLANNED_SUMMARY_PROMPT,
           output_config: hash_including(format: hash_including(type: :json_schema)),
           request_options: { timeout: 30 }
@@ -68,9 +68,9 @@ RSpec.describe ActivityDescription::Llm do
   end
 
   describe ".model" do
-    it "defaults to claude-sonnet-5 and honors the override" do
+    it "defaults to claude-sonnet-5-5 and honors the override" do
       allow(ENV).to receive(:[]).with("ANTHROPIC_DESCRIPTION_MODEL").and_return(nil)
-      expect(described_class.model).to eq("claude-sonnet-5")
+      expect(described_class.model).to eq("claude-sonnet-5-5")
 
       allow(ENV).to receive(:[]).with("ANTHROPIC_DESCRIPTION_MODEL").and_return("claude-opus-4-8")
       expect(described_class.model).to eq("claude-opus-4-8")

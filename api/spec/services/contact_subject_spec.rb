@@ -26,7 +26,7 @@ RSpec.describe ContactSubject do
       expect(client.messages).to have_received(:create).with(
         hash_including(
           max_tokens: 128,
-          thinking: { type: :disabled },
+          thinking: { type: :between_tools },
           system_: described_class::SYSTEM_PROMPT,
           output_config: hash_including(format: hash_including(type: :json_schema)),
           request_options: { timeout: 15 }
@@ -63,9 +63,9 @@ RSpec.describe ContactSubject do
   end
 
   describe ".model" do
-    it "defaults to claude-sonnet-5 and honors the override" do
+    it "defaults to claude-sonnet-5-5 and honors the override" do
       allow(ENV).to receive(:[]).with("ANTHROPIC_CONTACT_SUBJECT_MODEL").and_return(nil)
-      expect(described_class.model).to eq("claude-sonnet-5")
+      expect(described_class.model).to eq("claude-sonnet-5-5")
 
       allow(ENV).to receive(:[]).with("ANTHROPIC_CONTACT_SUBJECT_MODEL").and_return("claude-haiku-4-5")
       expect(described_class.model).to eq("claude-haiku-4-5")

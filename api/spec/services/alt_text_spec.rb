@@ -25,9 +25,9 @@ RSpec.describe AltText do
       expect(described_class.generate(image: jpeg)).to eq("A dog running on a beach.")
 
       expect(client.messages).to have_received(:create).with(
-        model: "claude-sonnet-5",
+        model: "claude-sonnet-5-5",
         max_tokens: 512,
-        thinking: { type: :disabled },
+        thinking: { type: :between_tools },
         system_: described_class::SYSTEM_PROMPT,
         messages: [ { role: "user", content: [
           { type: :image, source: { type: :base64, media_type: :"image/jpeg", data: Base64.strict_encode64(jpeg) } },

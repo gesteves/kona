@@ -10,7 +10,7 @@ module AltText
 
   SYSTEM_PROMPT = Rails.root.join("app/prompts/alt-text.md").read.freeze
 
-  DEFAULT_MODEL = "claude-sonnet-5".freeze
+  DEFAULT_MODEL = "claude-sonnet-5-5".freeze
   MAX_TOKENS = 512
   # ⚠️ This call runs in a REQUEST, inside the 20-second rack-timeout, and not in a job. A longer
   # timeout would give a 500 in place of a toast.

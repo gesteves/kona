@@ -64,7 +64,7 @@ module AnthropicStructuredOutput
       max_tokens: self::MAX_TOKENS,
       # This is off. These short tasks do not need reasoning, and where adaptive thinking is on by
       # default it would use the small token budget and could cut the answer.
-      thinking: { type: :disabled },
+      thinking: { type: thinking_off_type },
       system_: system,
       messages: [ { role: "user", content: content } ],
       request_options: { timeout: self::TIMEOUT_SECONDS }
@@ -72,6 +72,13 @@ module AnthropicStructuredOutput
     params[:output_config] = output_config if output_config
 
     anthropic_client.messages.create(**params)
+  end
+
+  # ⚠️ Claude Sonnet 5.5 gives a 400 for `disabled`, and each other model gives a 400 for
+  # `between_tools`. Thus an env override to a different model needs this check.
+  # @return [Symbol] The thinking type that turns the thinking off for `model`.
+  def thinking_off_type
+    model == "claude-sonnet-5-5" ? :between_tools : :disabled
   end
 
   # The code keeps this value. Both callers made a new client for each call, and that read the key
