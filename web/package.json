@@ -19,11 +19,11 @@
     "@hotwired/stimulus": "^3.2.2",
     "@hotwired/turbo": "^8.0.23",
     "@resvg/resvg-wasm": "^2.6.2",
-    "@web.awesome.me/webawesome-pro": "^3.13.0",
+    "@web.awesome.me/webawesome-pro": "^3.14.0",
     "esbuild": "^0.28.2",
     "pagefind": "^1.5.2",
     "satori": "^0.32.0",
-    "wrangler": "^4.136.3"
+    "wrangler": "^4.144.0"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.22.0",
