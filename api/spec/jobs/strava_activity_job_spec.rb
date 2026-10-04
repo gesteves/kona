@@ -28,13 +28,8 @@ RSpec.describe StravaActivityJob do
     expect(ActivityDescriptionJob.jobs).to be_empty
   end
 
-  # ⚠️ An activity that never reaches Intervals.icu must not retry for the 24 hours of ApplicationJob.
-  it "tries again after 1, 2, 3, 4, and 5 minutes, then stops out of the Dead set" do
-    options = described_class.get_sidekiq_options
-    expect(options).to include("retry" => 5, "retry_for" => nil, "dead" => false)
-
-    delays = (0..4).map { |count| described_class.sidekiq_retry_in_block.call(count, described_class::ActivityNotSynced.new) }
-    expect(delays).to eq([ 1, 2, 3, 4, 5 ].map(&:minutes))
-    expect(described_class.sidekiq_retry_in_block.call(0, RuntimeError.new)).to be_nil
+  it "tries again with the usual waits of Sidekiq, for the 24 hours of ApplicationJob" do
+    expect(described_class.get_sidekiq_options["retry_for"]).to eq(24.hours)
+    expect(described_class.sidekiq_retry_in_block.call(0, described_class::ActivityNotSynced.new)).to be_nil
   end
 end

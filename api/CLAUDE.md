@@ -400,8 +400,8 @@ event can then only start the description of one of our own activities again.
 - ⚠️ **It ignores an `athlete` deauthorization**, on purpose: a forged one would remove the
   connection. A true one shows on the Connected apps card at the next token refresh.
 - ⚠️ **Strava sends the event before Intervals.icu has the activity**, or before it knows the Strava
-  id. Thus `StravaActivityJob` tries again after 1, 2, 3, 4, and 5 minutes, then stops with a log
-  line and stays out of the Dead set. It does not use the 24-hour window of `ApplicationJob`.
+  id. Thus `StravaActivityJob` raises on a miss and tries again with the usual waits of Sidekiq,
+  which start at approximately 15 seconds, for the 24-hour window of `ApplicationJob`.
 - **`rake strava:subscribe` makes the subscription**, or finds the one that exists, and stores its id
   at `strava:subscription_id`. ⚠️ Strava permits ONE subscription for each app, and it GETs the
   callback with a challenge before it answers. Thus deploy `STRAVA_WEBHOOK_VERIFY_TOKEN` first. With
@@ -422,7 +422,7 @@ Thus that shared window is safe.
 | `AssetBlurhashJob(asset_id)` | Makes the blurhash placeholder of one image asset. It fails soft. |
 | `SiteBuildJob(event_type)` | fires a GitHub `repository_dispatch` to rebuild the web site. ⚠️ The one job that a caller schedules, with `perform_at` |
 | `WhoopWebhookJob(event_type, resource_id, trace_id)` | syncs Whoop metrics to Intervals.icu |
-| `StravaActivityJob(strava_id, event_time)` | finds the Intervals.icu activity of a new Strava activity, then adds its description job. ⚠️ Its own retry: 1 to 5 minutes, five times |
+| `StravaActivityJob(strava_id, event_time)` | finds the Intervals.icu activity of a new Strava activity, then adds its description job. A miss raises and retries |
 | `ActivityDescriptionJob(activity_id)` | (re)generates an activity's description and tidies its name, and PUTs both to Strava |
 | `LocationSyncJob(latitude, longitude)` | propagates the current location to Intervals.icu |
 | `BlueskyPostJob(posts, index, reply)` | posts one post of a thread to Bluesky, then adds the job of the next. ⚠️ The three post jobs inherit from `SocialPostJob`, which holds the enqueue lock: a retry after the enqueue must not add the next job a second time, and Threads has no idempotency on its side |
