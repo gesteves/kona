@@ -4,6 +4,11 @@ module ActivityDescription
   # track crosses, interpolates each sample in time, and then aggregates the samples by time.
   # WeatherSentence writes the words from the Hash that #summary gives. Each decision is here: the
   # condition, the rounded numbers, the units, and what the line omits.
+  #
+  # When WeatherKit has no data for the track, for example for an activity older than its history,
+  # the summary comes from the raw weather fields of the Intervals.icu activity. Those fields have no
+  # humidity and no time of precipitation, thus that summary has neither. ⚠️ An activity with no GPS
+  # track gets no weather from either source.
   class Weather
     # The time between two samples of the track.
     SAMPLE_SECONDS = 600
@@ -25,6 +30,13 @@ module ActivityDescription
     HEADWIND_MIN_KPH = 8
     # Below this share of the time, a headwind is not worth a word.
     HEADWIND_MIN_PERCENT = 50
+
+    # The cloud cover, in percent, below which each condition applies, for the Intervals.icu
+    # fallback, which has a cloud cover and no condition. Above the last step, it is Cloudy.
+    CLOUD_CONDITIONS = [ [ 13, "Clear" ], [ 38, "MostlyClear" ], [ 63, "PartlyCloudy" ], [ 88, "MostlyCloudy" ] ].freeze
+    # The sun is above the horizon above this elevation, in degrees: the refraction and the size of
+    # the sun move the true sunrise below zero.
+    SUNRISE_ELEVATION = -0.833
     # The summary gives the humidity only at or above both of these: the mean humidity, in percent,
     # and the highest temperature, in °C.
     HUMID_PERCENT = 70
@@ -53,8 +65,8 @@ module ActivityDescription
     end
 
     # @return [Hash, nil] The weather of the full activity, in the units of the athlete, for
-    #   WeatherSentence. Nil when the activity has no GPS track, or when WeatherKit gives no data for
-    #   most of the samples.
+    #   WeatherSentence. Nil when the activity has no GPS track, or when neither WeatherKit nor
+    #   Intervals.icu has its weather.
     def summary = report&.dig(:summary)
 
     # @return [String, nil] The emoji of the main condition, for its day or its night, from
@@ -71,10 +83,18 @@ module ActivityDescription
 
     def build_report
       start = start_time
+      return if start.nil?
+
       samples = track_samples
-      return if start.nil? || samples.empty?
+      return if samples.empty?
 
       weighted = add_weights(samples)
+      weathered_report(start, weighted) || intervals_report(start, weighted)
+    end
+
+    # The report from WeatherKit, over the full GPS track.
+    # @return [Hash, nil] Nil when WeatherKit gives no data for most of the samples.
+    def weathered_report(start, weighted)
       areas = group_into_areas(weighted)
       from = start.beginning_of_hour
       to = (start + weighted.last[:offset]).beginning_of_hour + 2.hours
@@ -96,6 +116,95 @@ module ActivityDescription
       summary = aggregate(weathered, runs, main)
       summary[:aqi] = highest_aqi(start, weighted)
       { summary: summary.compact, emoji: main && condition_emoji(main) }
+    end
+
+    # The report from the raw weather fields of the Intervals.icu activity: its temperatures, its
+    # average wind and gust, its prevailing wind, its headwind, its cloud cover, and its highest
+    # rain and snow. The condition comes from the cloud cover, or from the rain or the snow.
+    # ⚠️ The gust is an AVERAGE here, and not the highest one, and the wind has no range: Intervals.icu
+    # gives an average only.
+    # @return [Hash, nil] Nil when the activity has no weather in Intervals.icu either.
+    def intervals_report(start, weighted)
+      return unless @activity[:has_weather] && @activity[:min_weather_temp] && @activity[:max_weather_temp]
+
+      code = intervals_condition
+      temperatures = rounded_range(@activity[:min_weather_temp], @activity[:max_weather_temp]) { |value| temperature(value) }
+      feels_like = rounded_range(@activity[:min_feels_like], @activity[:max_feels_like]) { |value| temperature(value) }
+      wind = intervals_wind
+
+      summary = {
+        units: units,
+        condition: condition_phrase(code),
+        temperature: temperatures,
+        feels_like: (feels_like unless feels_like == temperatures),
+        wind: wind,
+        aqi: highest_aqi(start, weighted)
+      }
+      headwind = @activity[:headwind_percent].to_f.round
+      summary[:headwind_percent] = headwind if @headwind && wind && intervals_wind_kph >= HEADWIND_MIN_KPH && headwind >= HEADWIND_MIN_PERCENT
+
+      middle = weighted[weighted.size / 2]
+      daylight = daylight?(start + middle[:offset], middle[:latitude], middle[:longitude])
+      { summary: summary.compact, emoji: condition_emoji(code: code, daylight: daylight) }
+    end
+
+    # Snow and rain first, then the cloud cover. The rain and the snow are the highest rates of the
+    # activity, thus any amount names the condition.
+    # @return [String] A condition code of config/conditions.yml.
+    def intervals_condition
+      rain = @activity[:max_rain].to_f.positive?
+      snow = @activity[:max_snow].to_f.positive?
+      return "MixedRainAndSnow" if rain && snow
+      return "Snow" if snow
+      return "Rain" if rain
+
+      clouds = @activity[:average_clouds].to_f
+      CLOUD_CONDITIONS.find { |limit, _code| clouds < limit }&.last || "Cloudy"
+    end
+
+    # The average wind in km/h. Intervals.icu gives m/s.
+    def intervals_wind_kph = @activity[:average_wind_speed].to_f * 3.6
+
+    # The wind of the fallback, in the shape of #wind.
+    # @return [Hash, nil]
+    def intervals_wind
+      average = speed(intervals_wind_kph).round
+      return if average.zero?
+
+      gust = speed(@activity[:average_wind_gust].to_f * 3.6).round
+      degrees = @activity[:prevailing_wind_deg]
+      {
+        direction: (compass(degrees) if degrees),
+        speed: { min: average, max: average },
+        gust: (gust if gust > average)
+      }.compact
+    end
+
+    def rounded_range(min, max)
+      return if min.nil? || max.nil?
+
+      { min: yield(min.to_f).round, max: yield(max.to_f).round }
+    end
+
+    # Tells if the sun is above the horizon, from the NOAA approximation of the position of the sun.
+    # The fallback has no daylight flag, and the emoji of a clear night is not the emoji of a clear day.
+    # @see https://gml.noaa.gov/grad/solcalc/solareqns.PDF
+    # @return [Boolean]
+    def daylight?(time, latitude, longitude)
+      time = time.utc
+      hour = time.hour + (time.min / 60.0) + (time.sec / 3600.0)
+      gamma = 2 * Math::PI / 365 * (time.yday - 1 + ((hour - 12) / 24))
+      equation_of_time = 229.18 * (0.000075 + (0.001868 * Math.cos(gamma)) - (0.032077 * Math.sin(gamma)) -
+                                   (0.014615 * Math.cos(2 * gamma)) - (0.040849 * Math.sin(2 * gamma)))
+      declination = 0.006918 - (0.399912 * Math.cos(gamma)) + (0.070257 * Math.sin(gamma)) -
+                    (0.006758 * Math.cos(2 * gamma)) + (0.000907 * Math.sin(2 * gamma)) -
+                    (0.002697 * Math.cos(3 * gamma)) + (0.00148 * Math.sin(3 * gamma))
+      solar_minutes = (hour * 60) + equation_of_time + (4 * longitude)
+      hour_angle = ((solar_minutes / 4) - 180) * Math::PI / 180
+      lat = latitude * Math::PI / 180
+      cos_zenith = (Math.sin(lat) * Math.sin(declination)) + (Math.cos(lat) * Math.cos(declination) * Math.cos(hour_angle))
+      elevation = 90 - (Math.acos(cos_zenith.clamp(-1.0, 1.0)) * 180 / Math::PI)
+      elevation > SUNRISE_ELEVATION
     end
 
     # The highest AQI of three points: the start, the middle, and the end of the activity. Air
@@ -363,9 +472,12 @@ module ActivityDescription
       end
       return if x.abs < 1e-9 && y.abs < 1e-9
 
-      degrees = (Math.atan2(x, y) * 180 / Math::PI) % 360
-      COMPASS[((degrees + 11.25) / 22.5).floor % 16]
+      compass((Math.atan2(x, y) * 180 / Math::PI) % 360)
     end
+
+    # @param degrees [Numeric] A direction.
+    # @return [String] The point of the compass, for example "NNE".
+    def compass(degrees) = COMPASS[((degrees + 11.25) / 22.5).floor % 16]
 
     # The runs of one condition in time order, as { code:, seconds:, night:, first:, last: }. A run
     # shorter than MIN_CONDITION_SECONDS joins the run before it, or the run after it at the start.

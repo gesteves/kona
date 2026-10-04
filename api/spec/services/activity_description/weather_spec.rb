@@ -250,4 +250,68 @@ RSpec.describe ActivityDescription::Weather do
 
     expect(summary(streams_for(north(30)))).to be_nil
   end
+  # WeatherKit has no data, for example for an activity older than its history.
+  describe "the Intervals.icu fallback" do
+    # 1 PM in Richland, Washington.
+    let(:day) { Time.utc(2026, 9, 20, 20) }
+    let(:intervals_weather) do
+      {
+        has_weather: true, min_weather_temp: 17.2, max_weather_temp: 21.2, min_feels_like: 13.6, max_feels_like: 18.0,
+        average_wind_speed: 3.0, average_wind_gust: 5.0, prevailing_wind_deg: 22, headwind_percent: 62.4,
+        average_clouds: 0, max_rain: 0.0, max_snow: 0.0
+      }
+    end
+
+    before { allow(weather_kit).to receive(:hourly).and_return(nil) }
+
+    def fallback(at: day, streams: streams_for(north(30)), headwind: false, **fields)
+      described_class.new(
+        { start_date: at.iso8601 }.merge(intervals_weather).merge(fields), streams,
+        unit: :fahrenheit, headwind: headwind, weather_kit: weather_kit, air_quality: air_quality
+      )
+    end
+
+    it "uses the raw weather of the activity, with no humidity and no time of precipitation" do
+      allow(air_quality).to receive(:history).and_return(39)
+
+      expect(fallback.summary).to eq(
+        units: { temperature: "°F", wind: "mph" }, condition: "Clear",
+        temperature: { min: 63, max: 70 }, feels_like: { min: 56, max: 64 },
+        wind: { direction: "NNE", speed: { min: 7, max: 7 }, gust: 11 }, aqi: 39
+      )
+      expect(fallback.emoji).to eq("☀️")
+    end
+
+    it "derives the condition from the rain, the snow, and the cloud cover" do
+      expect(fallback(max_rain: 0.4).summary[:condition]).to eq("Rain")
+      expect(fallback(max_snow: 0.2).summary[:condition]).to eq("Snow")
+      expect(fallback(max_rain: 0.4, max_snow: 0.2).summary[:condition]).to eq("Mixed rain & snow")
+      expect([ 5, 20, 50, 70, 95 ].map { |clouds| fallback(average_clouds: clouds).summary[:condition] })
+        .to eq([ "Clear", "Mostly clear", "Partly cloudy", "Mostly cloudy", "Cloudy" ])
+    end
+
+    it "gives the night emoji after sunset" do
+      # 1 AM in Richland, Washington.
+      expect(fallback(at: Time.utc(2026, 9, 20, 8)).emoji).to eq("🌙")
+    end
+
+    it "gives the headwind of a bike ride from HEADWIND_MIN_PERCENT" do
+      expect(fallback(headwind: true).summary[:headwind_percent]).to eq(62)
+      expect(fallback(headwind_percent: 37.4, headwind: true).summary).not_to have_key(:headwind_percent)
+      expect(fallback.summary).not_to have_key(:headwind_percent)
+    end
+
+    it "gives no wind when the average rounds to zero" do
+      expect(fallback(average_wind_speed: 0.1).summary).not_to have_key(:wind)
+    end
+
+    # ⚠️ No GPS track means no WeatherKit, thus no weather from Intervals.icu either.
+    it "gives nil with no GPS track" do
+      expect(fallback(streams: []).summary).to be_nil
+    end
+
+    it "gives nil when Intervals.icu has no weather either" do
+      expect(fallback(has_weather: false).summary).to be_nil
+    end
+  end
 end

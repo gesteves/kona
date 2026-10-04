@@ -521,7 +521,13 @@ Thus that shared window is safe.
     mean wind of `HEADWIND_MIN_KPH`.
   - **The AQI is the highest of three points**: the start, the middle, and the end, from
     `GoogleAirQuality.history`, whatever its value. ⚠️ Google keeps 30 days, thus an older activity
-    gets no AQI.
+    gets no AQI, and the line then has no AQI part.
+  - **With no WeatherKit data, the raw weather fields of the Intervals.icu activity give the line**
+    (`min_weather_temp`, `average_wind_speed`, `prevailing_wind_deg`, `average_clouds`, `max_rain`,
+    and more). ⚠️ They have no condition, thus the code derives one from the rain, the snow, and the
+    cloud cover (`CLOUD_CONDITIONS`), and the day or night emoji from the position of the sun. The
+    wind is an average with no range, and the gust is an average too. There is no humidity and no
+    time of precipitation. ⚠️ An activity with no GPS track gets no weather from either source.
   - `rake "activity_weather:inspect[<ids>]"` prints the data and the line, and it writes nothing.
     WeatherKit keeps approximately four years of hours.
 - ⚠️ **Turnstile protects the JSON path only** (`request.format.json?`). Thus a POST from a script
