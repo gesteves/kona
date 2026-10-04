@@ -474,7 +474,7 @@ RSpec.describe ActivityDescription::Generator do
 
       generator.generate!("i1")
 
-      expect(strava).to have_received(:update_activity!).with("s1", description: "☀️ Clear with S winds of 5 km/h, 18°C\n⚡️ Avg 200 W")
+      expect(strava).to have_received(:update_activity!).with("s1", description: "☀️ Clear · 18°C · 5 km/h S wind\n⚡️ Avg 200 W")
     end
 
     it "measures the headwind of a bike ride only" do

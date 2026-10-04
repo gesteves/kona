@@ -1,7 +1,7 @@
 module ActivityDescription
   # Writes the weather line of an activity description from the summary of Weather, for example
-  # "Overcast with 25 minutes of rain, SSE winds of 12–18 km/h and 24 km/h gusts (62% headwind),
-  # and 11°C–13°C (feels like 8°C–10°C)". The emoji is not here: Weather#emoji gives it.
+  # "Cloudy with 25 minutes of rain · 11°C–13°C (feels like 8°C–10°C) · 12–18 km/h SSE wind with
+  # 24 km/h gusts (62% headwind) · AQI 54". The emoji is not here: Weather#emoji gives it.
   #
   # ⚠️ This writes words and decides nothing. Weather already selected each part and rounded each
   # number, thus a change to what the line holds goes there. These are functions with no I/O.
@@ -11,35 +11,37 @@ module ActivityDescription
 
     module_function
 
-    # The condition, then each part of the data joined with a serial comma. "with" joins the first
-    # part to the condition when that part is the precipitation or the wind: "Clear with W winds of
-    # 3 mph, 64°F–71°F, and AQI 39", but "Mostly clear, 52°F–54°F, and AQI 54".
+    # The separator of the parts, the same as in the other stat lines.
+    SEPARATOR = " · ".freeze
+
+    # The parts, in this order: the conditions, the temperature, the humidity, the wind, and the AQI.
     # @param summary [Hash] The summary of Weather.
-    # @return [String] The sentence, with no emoji and no period at the end.
+    # @return [String] The line, with no emoji and no period at the end.
     def call(summary)
       units = summary[:units] || {}
-      spell = summary[:precipitation]
-      opening = [
-        ("#{duration(spell[:minutes])} of #{spell[:condition]}" if spell),
-        (wind(summary[:wind], summary[:headwind_percent], units[:wind]) if summary[:wind])
-      ].compact
-      rest = [
+      [
+        conditions(summary),
         temperature(summary, units[:temperature]),
         ("#{summary[:humidity_percent]}% humidity" if summary[:humidity_percent]),
+        (wind(summary[:wind], summary[:headwind_percent], units[:wind]) if summary[:wind]),
         ("AQI #{summary[:aqi]}" if summary[:aqi])
-      ].compact
-
-      condition = summary[:condition].to_s
-      parts = opening.any? ? [ "#{condition} with #{opening.first}", *opening.drop(1), *rest ] : [ condition, *rest ]
-      parts.to_sentence(two_words_connector: ", ", last_word_connector: ", and ")
+      ].compact.join(SEPARATOR)
     end
 
-    # "WNW winds of 3–5 mph and 9 mph gusts (62% headwind)".
+    # "Cloudy", or "Cloudy with 25 minutes of rain" for precipitation during part of the activity.
+    # @return [String]
+    def conditions(summary)
+      spell = summary[:precipitation]
+      condition = summary[:condition].to_s
+      spell ? "#{condition} with #{duration(spell[:minutes])} of #{spell[:condition]}" : condition
+    end
+
+    # "3–5 mph W wind with 8 mph gusts (55% headwind)".
     # @return [String]
     def wind(wind, headwind_percent, unit)
       speed = wind[:speed]
-      text = [ wind[:direction], "winds of #{span(speed[:min], speed[:max])} #{unit}" ].compact.join(" ")
-      text += " and #{wind[:gust]} #{unit} gusts" if wind[:gust]
+      text = [ "#{span(speed[:min], speed[:max])} #{unit}", wind[:direction], "wind" ].compact.join(" ")
+      text += " with #{wind[:gust]} #{unit} gusts" if wind[:gust]
       text += " (#{headwind_percent}% headwind)" if headwind_percent
       text
     end

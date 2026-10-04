@@ -506,9 +506,10 @@ Thus that shared window is safe.
 - **The weather line comes from WeatherKit, and code writes it, with no LLM.**
   `ActivityDescription::Weather` takes a sample of the GPS track each 10 minutes, gets the past
   hours of each area, and makes each decision: the condition, the rounded numbers, the units, and
-  what to omit. `WeatherSentence` only writes the words, joined with a serial comma, for example
-  `Cloudy with 25 minutes of rain, SSE winds of 12–18 km/h and 24 km/h gusts (62% headwind),
-  11°C–13°C (feels like 8°C–10°C), and AQI 54`. A wind range that starts at zero gives its top
+  what to omit. `WeatherSentence` only writes the words: the conditions, the temperature, the
+  humidity, the wind, and the AQI, with a middot between them, as in the other stat lines. For
+  example `Cloudy with 25 minutes of rain · 11°C–13°C (feels like 8°C–10°C) · 12–18 km/h SSE wind
+  with 24 km/h gusts (62% headwind) · AQI 54`. A wind range that starts at zero gives its top
   alone, and the gust is the highest one alone. Put a change to what the line holds in `Weather`, and not in the sentence.
   - The main condition is the `simplified` phrase of `config/conditions.yml`, and its `emoji` is
     there too, with a day and a night variant from the `daylight` of WeatherKit.
