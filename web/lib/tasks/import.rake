@@ -222,7 +222,7 @@ end
 # "AI Data Scraper" is the family that takes the text of a page to train a model. The list of the
 # agents in that family changes, thus the build gets the rules again each time.
 KNOWN_AGENTS_API_URL = "https://api.knownagents.com/robots-txts".freeze
-KNOWN_AGENTS_AGENT_TYPES = [ "AI Data Scraper" ].freeze
+KNOWN_AGENTS_AGENT_TYPES = [ "AI Data Scraper", "Undocumented AI Agent" ].freeze
 
 # Gets the robots.txt rules of the AI scrapers from Known Agents and writes them to
 # data/known_agents.json. source/robots.txt.erb renders them between the rule for each other
