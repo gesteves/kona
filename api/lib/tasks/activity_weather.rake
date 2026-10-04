@@ -14,9 +14,9 @@ namespace :activity_weather do
 
     ids.each do |id|
       activity = intervals.activity!(id)
-      swim = ActivityMatcher.normalize_type(activity[:type]) == "Swimming"
+      cycling = ActivityMatcher.normalize_type(activity[:type]) == "Cycling"
       streams = intervals.activity_streams(id, types: %w[latlng time])
-      weather = ActivityDescription::Weather.new(activity, streams, unit: unit, headwind: !swim)
+      weather = ActivityDescription::Weather.new(activity, streams, unit: unit, headwind: cycling)
       summary = weather.summary
 
       puts

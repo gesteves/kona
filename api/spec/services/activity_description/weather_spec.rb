@@ -106,8 +106,10 @@ RSpec.describe ActivityDescription::Weather do
     expect(summary(streams_for(north(30) + south(30)))).not_to have_key(:headwind_percent)
   end
 
-  it "omits the headwind for a swim" do
+  it "measures no headwind unless the caller asks for it" do
     expect(summary(streams_for(north(30)), headwind: false)).not_to have_key(:headwind_percent)
+    expect(described_class.new(activity, streams_for(north(30)), unit: :celsius, weather_kit: weather_kit, air_quality: air_quality).summary)
+      .not_to have_key(:headwind_percent)
   end
 
   it "converts to °F and mph for an athlete who uses Fahrenheit" do

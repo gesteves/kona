@@ -516,8 +516,8 @@ Thus that shared window is safe.
     than the main condition, from `precipitation` in `config/conditions.yml` (rain, snow, ice,
     mixed). Thus "Rain with 25 minutes of snow", and never "Rain with 20 minutes of heavy rain".
     That flag is not `adverse_weather`, which also marks wind, haze, smoke, fog, and cold.
-  - The headwind shows only at `HEADWIND_MIN_PERCENT` (50) or more, and with a mean wind of
-    `HEADWIND_MIN_KPH`.
+  - The headwind shows on a bike ride only, at `HEADWIND_MIN_PERCENT` (50) or more, and with a
+    mean wind of `HEADWIND_MIN_KPH`.
   - **The AQI is the highest of three points**: the start, the middle, and the end, from
     `GoogleAirQuality.history`, whatever its value. ⚠️ Google keeps 30 days, thus an older activity
     gets no AQI.

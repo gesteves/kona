@@ -40,10 +40,10 @@ module ActivityDescription
     #   stream holds the latitudes in `data` and the longitudes in `data2`.
     # @param unit [Symbol] :celsius or :fahrenheit, from Intervals#temperature_unit. Fahrenheit
     #   also gives mph and inches.
-    # @param headwind [Boolean] False for a swim, where the wind direction is not a headwind.
+    # @param headwind [Boolean] True to measure the headwind, which is for a bike ride only.
     # @param weather_kit [#hourly] The source of the hours. The specs replace it.
     # @param air_quality [#history] The source of the past AQI. The specs replace it.
-    def initialize(activity, streams, unit:, headwind: true, weather_kit: WeatherKit, air_quality: GoogleAirQuality)
+    def initialize(activity, streams, unit:, headwind: false, weather_kit: WeatherKit, air_quality: GoogleAirQuality)
       @activity = activity
       @streams = Array(streams)
       @imperial = unit == :fahrenheit
