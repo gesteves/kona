@@ -1,5 +1,6 @@
 Blizzard:
   adverse_weather: true
+  precipitation: snow
   phrases:
     currently: there's a blizzard
     forecast: calls for blizzard conditions
@@ -18,6 +19,7 @@ BlowingDust:
 
 BlowingSnow:
   adverse_weather: true
+  precipitation: snow
   phrases:
     currently: there's blowing snow
     forecast: calls for blowing snow
@@ -58,6 +60,7 @@ Cloudy:
 
 Drizzle:
   adverse_weather: true
+  precipitation: rain
   phrases:
     currently: it's raining lightly
     forecast: calls for light rain
@@ -76,6 +79,7 @@ Dust:
 
 Flurries:
   adverse_weather: true
+  precipitation: snow
   phrases:
     currently: there are flurries
     forecast: calls for flurries
@@ -94,6 +98,7 @@ Fog:
 
 FreezingDrizzle:
   adverse_weather: true
+  precipitation: ice
   phrases:
     currently: there's a freezing drizzle
     forecast: calls for freezing drizzle
@@ -103,6 +108,7 @@ FreezingDrizzle:
 
 FreezingRain:
   adverse_weather: true
+  precipitation: ice
   phrases:
     currently: there's freezing rain
     forecast: calls for freezing rain
@@ -121,6 +127,7 @@ Frigid:
 
 Hail:
   adverse_weather: true
+  precipitation: ice
   phrases:
     currently: it's hailing
     forecast: calls for hail
@@ -139,6 +146,7 @@ Haze:
 
 HeavyRain:
   adverse_weather: true
+  precipitation: rain
   phrases:
     currently: it's raining heavily
     forecast: calls for heavy rain
@@ -148,6 +156,7 @@ HeavyRain:
 
 HeavySnow:
   adverse_weather: true
+  precipitation: snow
   phrases:
     currently: it's snowing heavily
     forecast: calls for heavy snow
@@ -157,6 +166,7 @@ HeavySnow:
 
 IsolatedThunderstorms:
   adverse_weather: true
+  precipitation: rain
   phrases:
     currently: there are isolated thunderstorms
     forecast: calls for isolated thunderstorms
@@ -166,6 +176,7 @@ IsolatedThunderstorms:
 
 MixedRainAndSleet:
   adverse_weather: true
+  precipitation: mixed
   phrases:
     currently: there's a mix of rain and sleet
     forecast: calls for mixed rain and sleet
@@ -175,6 +186,7 @@ MixedRainAndSleet:
 
 MixedRainAndSnow:
   adverse_weather: true
+  precipitation: mixed
   phrases:
     currently: there's a mix of rain and snow
     forecast: calls for mixed rain and snow
@@ -184,6 +196,7 @@ MixedRainAndSnow:
 
 MixedRainfall:
   adverse_weather: true
+  precipitation: mixed
   phrases:
     currently: there's mixed rainfall
     forecast: calls for mixed rainfall
@@ -193,6 +206,7 @@ MixedRainfall:
 
 MixedSnowAndSleet:
   adverse_weather: true
+  precipitation: mixed
   phrases:
     currently: there's a mix of snow and sleet
     forecast: calls for mixed snow and sleet
@@ -241,6 +255,7 @@ PartlyCloudy:
 
 Rain:
   adverse_weather: true
+  precipitation: rain
   phrases:
     currently: it's raining
     forecast: calls for rain
@@ -250,6 +265,7 @@ Rain:
 
 ScatteredShowers:
   adverse_weather: true
+  precipitation: rain
   phrases:
     currently: there are scattered showers
     forecast: calls for scattered showers
@@ -261,6 +277,7 @@ ScatteredShowers:
 
 ScatteredSnowShowers:
   adverse_weather: true
+  precipitation: snow
   phrases:
     currently: there are scattered snow showers
     forecast: calls for scattered snow showers
@@ -270,6 +287,7 @@ ScatteredSnowShowers:
 
 SevereThunderstorm:
   adverse_weather: true
+  precipitation: rain
   phrases:
     currently: there's a severe thunderstorm
     forecast: calls for severe thunderstorms
@@ -279,6 +297,7 @@ SevereThunderstorm:
 
 Sleet:
   adverse_weather: true
+  precipitation: ice
   phrases:
     currently: it's sleeting
     forecast: calls for sleet
@@ -297,6 +316,7 @@ Smoke:
 
 Snow:
   adverse_weather: true
+  precipitation: snow
   phrases:
     currently: it's snowing
     forecast: calls for snow
@@ -306,6 +326,7 @@ Snow:
 
 SnowShowers:
   adverse_weather: true
+  precipitation: snow
   phrases:
     currently: there are snow showers
     forecast: calls for snow showers
@@ -315,6 +336,7 @@ SnowShowers:
 
 SunFlurries:
   adverse_weather: true
+  precipitation: snow
   phrases:
     currently: it's sunny with snow flurries
     forecast: calls for sun and snow flurries
@@ -324,6 +346,7 @@ SunFlurries:
 
 SunShowers:
   adverse_weather: true
+  precipitation: rain
   phrases:
     currently: it's sunny and raining
     forecast: calls for sun and rain
@@ -333,6 +356,7 @@ SunShowers:
 
 Thunderstorms:
   adverse_weather: true
+  precipitation: rain
   phrases:
     currently: there are thunderstorms
     forecast: calls for thunderstorms
@@ -351,6 +375,7 @@ Tornado:
 
 TropicalStorm:
   adverse_weather: true
+  precipitation: rain
   phrases:
     currently: there's a tropical storm
     forecast: calls for a tropical storm

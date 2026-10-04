@@ -49,33 +49,6 @@ RSpec.describe ActivityDescription::Llm do
     end
   end
 
-  describe ".weather_sentence" do
-    let(:messages) { instance_double(Anthropic::Resources::Messages) }
-    let(:weather) { { condition: "Clear", temperature: { min: 10.0, max: 14.0 } } }
-
-    before { allow(client).to receive(:messages).and_return(messages) }
-
-    it "sends the summary as JSON and returns the sentence" do
-      allow(messages).to receive(:create).and_return(message_with(weather_sentence: "Clear, temps 10–14°C"))
-
-      expect(described_class.weather_sentence(weather)).to eq("Clear, temps 10–14°C")
-      expect(messages).to have_received(:create).with(
-        hash_including(messages: [ hash_including(content: "Weather data: #{weather.to_json}") ])
-      )
-    end
-
-    it "returns nil when the model declines" do
-      allow(messages).to receive(:create).and_return(message_with(weather_sentence: nil))
-
-      expect(described_class.weather_sentence(weather)).to be_nil
-    end
-
-    it "makes no call for an empty summary" do
-      expect(described_class.weather_sentence({})).to be_nil
-      expect(client).not_to have_received(:messages)
-    end
-  end
-
   describe ".model" do
     it "defaults to claude-sonnet-5-5 and honors the override" do
       allow(ENV).to receive(:[]).with("ANTHROPIC_DESCRIPTION_MODEL").and_return(nil)

@@ -1,13 +1,12 @@
 module ActivityDescription
-  # The two lines of an activity description that Anthropic writes: the planned-workout summary
-  # (🗓️) and the weather sentence. Both use a structured output, thus the first text block of the
-  # response is always correct JSON that agrees with the schema. When ANTHROPIC_API_KEY has no
-  # value, both methods return nil and the code makes the description without their lines.
+  # The one line of an activity description that Anthropic writes: the planned-workout summary
+  # (🗓️). It uses a structured output, thus the first text block of the response is always correct
+  # JSON that agrees with the schema. When ANTHROPIC_API_KEY has no value, it returns nil and the code
+  # makes the description without that line.
   module Llm
     extend AnthropicStructuredOutput
 
     PLANNED_SUMMARY_PROMPT = Rails.root.join("app/prompts/planned-summary.md").read.freeze
-    WEATHER_SENTENCE_PROMPT = Rails.root.join("app/prompts/weather-sentence.md").read.freeze
 
     DEFAULT_MODEL = "claude-sonnet-5-5".freeze
     MAX_TOKENS = 512
@@ -38,27 +37,6 @@ module ActivityDescription
         }
       )
       parsed[:planned_summary].presence
-    end
-
-    # Changes the weather summary of an activity into one sentence. The caller does the indoor
-    # check, and it selects the emoji: an indoor activity never gets a weather line.
-    # @param weather [Hash] The summary from ActivityDescription::Weather.
-    # @return [String, nil] The sentence, or nil when there is no configuration, when the input is
-    #   blank, and when the model refuses.
-    def weather_sentence(weather)
-      return if weather.blank? || !configured?
-
-      parsed = structured_call(
-        system: WEATHER_SENTENCE_PROMPT,
-        user: "Weather data: #{weather.to_json}",
-        schema: {
-          type: "object",
-          properties: { weather_sentence: { type: %w[string null] } },
-          required: [ "weather_sentence" ],
-          additionalProperties: false
-        }
-      )
-      parsed[:weather_sentence].presence
     end
 
     # @return [String] The env var that replaces the model for this caller.

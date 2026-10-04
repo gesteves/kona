@@ -20,6 +20,20 @@ RSpec.describe ActivityDescription::Composer do
       expect(described_class.headline(description)).to eq("Big day out.")
     end
 
+    # ⚠️ Only the emoji of a stat line mark it. A line that the owner wrote with another emoji stays.
+    it "keeps a line of the owner that starts with another emoji" do
+      description = "🏅 New PR!\n\n☀️ Clear, 64°F–71°F\n🔥 12.4 Whoop Strain"
+      expect(described_class.headline(description)).to eq("🏅 New PR!")
+    end
+
+    it "strips a stat line with or without the variation selector" do
+      expect(described_class.headline("Felt good.\n\n\u26A1 Avg 200 W\n\u26A1\uFE0F NP 210 W")).to eq("Felt good.")
+    end
+
+    it "strips the weather line of each condition, by day and by night" do
+      expect(described_class.headline("Night run.\n\n🌙 Clear, 50°F\n🌨️ Flurries, 30°F")).to eq("Night run.")
+    end
+
     it "collapses runs of blank lines left by stripped blocks" do
       description = "Line one.\n\n\n\n🔥 12.4 Whoop Strain\n\n\nLine two."
       expect(described_class.headline(description)).to eq("Line one.\n\nLine two.")
@@ -98,15 +112,15 @@ RSpec.describe ActivityDescription::Composer do
 
   describe ".water_temp_block" do
     it "formats celsius with one decimal" do
-      expect(described_class.water_temp_block(15.53, unit: :celsius)).to eq("💧 Water temperature 15.5 °C")
+      expect(described_class.water_temp_block(15.53, unit: :celsius)).to eq("💧 Water temperature 15.5°C")
     end
 
     it "converts to fahrenheit when preferred" do
-      expect(described_class.water_temp_block(15.0, unit: :fahrenheit)).to eq("💧 Water temperature 59 °F")
+      expect(described_class.water_temp_block(15.0, unit: :fahrenheit)).to eq("💧 Water temperature 59°F")
     end
 
     it "strips a trailing .0 so whole degrees read naturally" do
-      expect(described_class.water_temp_block(16.0, unit: :celsius)).to eq("💧 Water temperature 16 °C")
+      expect(described_class.water_temp_block(16.0, unit: :celsius)).to eq("💧 Water temperature 16°C")
     end
 
     it "returns nil without a temperature" do
@@ -119,7 +133,7 @@ RSpec.describe ActivityDescription::Composer do
       composed = described_class.compose(
         planned: "2 hours of sweet spot",
         weather: "🌤️ Mild and sunny",
-        water_temp: "💧 Water temperature 16 °C",
+        water_temp: "💧 Water temperature 16°C",
         power: "⚡️ Avg 200 W",
         heat: "🌡️ 72% heat adapted",
         whoop: "🔥 12.4 Whoop Strain"
@@ -128,7 +142,7 @@ RSpec.describe ActivityDescription::Composer do
       expect(composed).to eq(<<~TEXT.strip)
         🗓️ 2 hours of sweet spot
         🌤️ Mild and sunny
-        💧 Water temperature 16 °C
+        💧 Water temperature 16°C
         ⚡️ Avg 200 W
         🌡️ 72% heat adapted
         🔥 12.4 Whoop Strain

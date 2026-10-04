@@ -6,11 +6,15 @@ module ActivityDescription
   # temperature (💧), the power (⚡️), the heat (🌡️), and the Whoop strain (🔥). There is no I/O
   # here: the generator collects the data and gives it to these functions.
   module Composer
-    # The code point ranges for each emoji that this module writes and for each weather emoji that
-    # the LLM can select: Miscellaneous Symbols, Dingbats, and the main emoji blocks. The text of a
-    # headline, which the user writes, starts with a letter. Thus this only removes a line with the
-    # shape of a stat line.
-    EMOJI_RANGES = [ 0x2600..0x27BF, 0x1F300..0x1F6FF, 0x1F900..0x1F9FF, 0x1FA00..0x1FAFF ].freeze
+    # The emoji that start each stat line, with no U+FE0F. ⚠️ Only these mark a line that the code
+    # wrote, thus a line that the owner starts with another emoji, for example "🏅 New PR", stays.
+    # The set holds the emoji of each condition, and each weather emoji that the LLM selected in
+    # older descriptions.
+    VARIATION_SELECTOR = "\uFE0F".freeze
+    STAT_EMOJIS = (
+      %w[🗓️ 💧 ⚡️ 🌡️ 🔥 ☀️ 🌤️ ⛅ 🌥️ ☁️ 🌦️ 🌧️ ⛈️ 🌩️ 🌨️ ❄️ 🌬️ 🌫️ 🌪️ 🌙] +
+      CONDITIONS.values.flat_map { |condition| Array(condition[:emoji].is_a?(Hash) ? condition[:emoji].values : condition[:emoji]) }
+    ).compact.map { |emoji| emoji.delete(VARIATION_SELECTOR) }.uniq.freeze
 
     # Rouvy gives each upload the name "ROUVY - <route> - <YYYY-MM-DD>".
     ROUVY_PREFIX = /\AROUVY\b/
@@ -50,7 +54,7 @@ module ActivityDescription
       kept = description.split("\n", -1).map(&:strip).filter_map do |line|
         next "" if line.empty? # preserve paragraph boundaries; trailing blanks fall to strip
 
-        starts_with_emoji?(line) ? nil : line
+        stat_line?(line) ? nil : line
       end
 
       kept.join("\n").gsub(/\n{3,}/, "\n\n").strip.presence
@@ -112,8 +116,8 @@ module ActivityDescription
     end
 
     # The water-temperature line for an open-water swim, for example
-    # "💧 Water temperature 15.5 °C". A value with no fraction has no ".0" at the end: "59 °F", not
-    # "59.0 °F".
+    # "💧 Water temperature 15.5°C". A value with no fraction has no ".0" at the end: "59°F", not
+    # "59.0°F". There is no space before the unit, as in the weather line.
     # @param median_temp_celsius [Numeric, nil] The median of the temperature stream of the
     #   activity.
     # @param unit [Symbol] :celsius or :fahrenheit, which the athlete selects.
@@ -123,19 +127,18 @@ module ActivityDescription
 
       formatted =
         if unit == :fahrenheit
-          "#{format('%.1f', (median_temp_celsius * 9.0 / 5) + 32)} °F"
+          "#{format('%.1f', (median_temp_celsius * 9.0 / 5) + 32)}°F"
         else
-          "#{format('%.1f', median_temp_celsius)} °C"
+          "#{format('%.1f', median_temp_celsius)}°C"
         end
 
-      "💧 Water temperature #{formatted.sub(/\.0(?=\s|\z)/, '')}"
+      "💧 Water temperature #{formatted.sub(/\.0(?=°)/, '')}"
     end
 
-    # Tells if a line starts with an emoji: one of the stat emoji of this app, the weather emoji
-    # that the LLM selects, or the marker line of another tool.
-    def starts_with_emoji?(line)
-      codepoint = line.each_codepoint.first
-      codepoint.present? && EMOJI_RANGES.any? { |range| range.cover?(codepoint) }
+    # @return [Boolean] True when a line starts with one of STAT_EMOJIS.
+    def stat_line?(line)
+      plain = line.delete(VARIATION_SELECTOR)
+      STAT_EMOJIS.any? { |emoji| plain.start_with?(emoji) }
     end
   end
 end

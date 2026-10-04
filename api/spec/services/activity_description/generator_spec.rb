@@ -122,6 +122,15 @@ RSpec.describe ActivityDescription::Generator do
       )
     end
 
+    # ⚠️ The second run of an activity often makes the same text. Strava must not get it again.
+    it "does not write a description that Strava already has, whatever its line ends" do
+      allow(strava).to receive(:activity).and_return({ name: "Morning Ride", description: "⚡️ Avg 200 W\r\n" })
+
+      generator.generate!("i1")
+
+      expect(strava).not_to have_received(:update_activity!)
+    end
+
     it "skips the write when there's nothing to change" do
       allow(intervals).to receive(:activity!).and_return(activity.merge(icu_average_watts: nil))
       allow(strava).to receive(:activity).and_return({ name: nil, description: nil })
@@ -327,7 +336,6 @@ RSpec.describe ActivityDescription::Generator do
     before do
       allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return("key")
       allow(ActivityDescription::Llm).to receive(:planned_summary).and_return("2 hours of sweet spot")
-      allow(ActivityDescription::Llm).to receive(:weather_sentence).and_return(nil)
     end
 
     it "summarizes the single case-sensitive name match" do
@@ -439,11 +447,9 @@ RSpec.describe ActivityDescription::Generator do
     end
 
     before do
-      allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return("key")
-      allow(ActivityDescription::Llm).to receive(:planned_summary).and_return(nil)
-      allow(ActivityDescription::Llm).to receive(:weather_sentence).and_return("Clear and mild")
       allow(intervals).to receive(:activity_streams).with("i1", types: %w[latlng time]).and_return(streams)
       allow(WeatherKit).to receive(:hourly).and_return(hours)
+      allow(GoogleAirQuality).to receive(:history).and_return(nil)
     end
 
     it "never fetches weather for indoor activities" do
@@ -462,27 +468,28 @@ RSpec.describe ActivityDescription::Generator do
       expect(WeatherKit).not_to have_received(:hourly)
     end
 
-    it "renders the emoji of the WeatherKit condition and the LLM sentence for outdoor activities" do
+    # The weather line needs no LLM, thus it works with no ANTHROPIC_API_KEY.
+    it "writes the emoji and the sentence of the WeatherKit data for outdoor activities" do
       allow(intervals).to receive(:activity!).and_return(activity.merge(trainer: false))
 
       generator.generate!("i1")
 
-      expect(ActivityDescription::Llm).to have_received(:weather_sentence).with(hash_including(condition: "Clear"))
-      expect(strava).to have_received(:update_activity!).with("s1", description: a_string_including("☀️ Clear and mild"))
+      expect(strava).to have_received(:update_activity!).with("s1", description: "☀️ Clear with S winds of 5 km/h, 18°C\n⚡️ Avg 200 W")
     end
 
     it "gives no headwind for a swim" do
       swim = activity.merge(type: "OpenWaterSwim", trainer: false, icu_average_watts: nil)
       allow(intervals).to receive(:activity!).and_return(swim)
+      allow(ActivityDescription::Weather).to receive(:new).and_call_original
 
       generator.generate!("i1")
 
-      expect(ActivityDescription::Llm).to have_received(:weather_sentence).with(hash_excluding(:headwind_percent))
+      expect(ActivityDescription::Weather).to have_received(:new).with(swim, streams, unit: :celsius, headwind: false)
     end
 
-    it "loses only the weather line when that call fails" do
+    it "loses only the weather line when the sentence fails" do
       allow(intervals).to receive(:activity!).and_return(activity.merge(trainer: false))
-      allow(ActivityDescription::Llm).to receive(:weather_sentence).and_raise("timeout")
+      allow(ActivityDescription::WeatherSentence).to receive(:call).and_raise("boom")
 
       generator.generate!("i1")
 
@@ -495,7 +502,6 @@ RSpec.describe ActivityDescription::Generator do
 
       generator.generate!("i1")
 
-      expect(ActivityDescription::Llm).not_to have_received(:weather_sentence)
       expect(strava).to have_received(:update_activity!).with("s1", description: "⚡️ Avg 200 W")
     end
   end
@@ -510,7 +516,7 @@ RSpec.describe ActivityDescription::Generator do
 
       generator.generate!("i1")
 
-      expect(strava).to have_received(:update_activity!).with("s1", description: "💧 Water temperature 16 °C")
+      expect(strava).to have_received(:update_activity!).with("s1", description: "💧 Water temperature 16°C")
     end
 
     it "includes the heat-adaptation score from the wellness record" do

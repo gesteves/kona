@@ -2,8 +2,8 @@ module ActivityDescription
   # Makes a weather summary for the full track of an outdoor activity from the WeatherKit hours.
   # It takes a sample of the GPS track at a fixed interval, gets the hours for each area that the
   # track crosses, interpolates each sample in time, and then aggregates the samples by time.
-  # The LLM writes the weather sentence from the Hash that #summary gives. The condition and its
-  # emoji come from WeatherKit and config/conditions.yml, and the LLM does not select them.
+  # WeatherSentence writes the words from the Hash that #summary gives. Each decision is here: the
+  # condition, the rounded numbers, the units, and what the line omits.
   class Weather
     # The time between two samples of the track.
     SAMPLE_SECONDS = 600
@@ -23,15 +23,15 @@ module ActivityDescription
     # Below this mean wind speed, in km/h, the direction does not matter, and the summary has no
     # headwind.
     HEADWIND_MIN_KPH = 8
-    # The precipitation intensity, in mm/h, at which a sample counts as wet.
-    WET_MM_PER_HOUR = 0.1
+    # Below this share of the time, a headwind is not worth a word.
+    HEADWIND_MIN_PERCENT = 50
     # The summary gives the humidity only at or above both of these: the mean humidity, in percent,
     # and the highest temperature, in °C.
     HUMID_PERCENT = 70
     HUMID_CELSIUS = 24
 
     # The values that WeatherKit gives for each hour, and that the code interpolates in time.
-    LINEAR_FIELDS = %i[temperature temperatureApparent windSpeed windGust humidity precipitationIntensity].freeze
+    LINEAR_FIELDS = %i[temperature temperatureApparent windSpeed windGust humidity].freeze
     COMPASS = %w[N NNE NE ENE E ESE SE SSE S SSW SW WSW W WNW NW NNW].freeze
     EARTH_RADIUS_METERS = 6_371_000.0
 
@@ -42,17 +42,19 @@ module ActivityDescription
     #   also gives mph and inches.
     # @param headwind [Boolean] False for a swim, where the wind direction is not a headwind.
     # @param weather_kit [#hourly] The source of the hours. The specs replace it.
-    def initialize(activity, streams, unit:, headwind: true, weather_kit: WeatherKit)
+    # @param air_quality [#history] The source of the past AQI. The specs replace it.
+    def initialize(activity, streams, unit:, headwind: true, weather_kit: WeatherKit, air_quality: GoogleAirQuality)
       @activity = activity
       @streams = Array(streams)
       @imperial = unit == :fahrenheit
       @headwind = headwind
       @weather_kit = weather_kit
+      @air_quality = air_quality
     end
 
-    # @return [Hash, nil] The weather of the full activity, in the units of the athlete, for the
-    #   LLM. Nil when the activity has no GPS track, or when WeatherKit gives no data for most of
-    #   the samples.
+    # @return [Hash, nil] The weather of the full activity, in the units of the athlete, for
+    #   WeatherSentence. Nil when the activity has no GPS track, or when WeatherKit gives no data for
+    #   most of the samples.
     def summary = report&.dig(:summary)
 
     # @return [String, nil] The emoji of the main condition, for its day or its night, from
@@ -91,7 +93,24 @@ module ActivityDescription
 
       runs = condition_runs(weathered)
       main = main_condition(runs)
-      { summary: aggregate(weathered, runs, main), emoji: main && condition_emoji(main) }
+      summary = aggregate(weathered, runs, main)
+      summary[:aqi] = highest_aqi(start, weighted)
+      { summary: summary.compact, emoji: main && condition_emoji(main) }
+    end
+
+    # The highest AQI of three points: the start, the middle, and the end of the activity. Air
+    # quality changes slowly, thus three points are enough. A point that fails loses its reading only.
+    # @return [Integer, nil]
+    def highest_aqi(start, samples)
+      middle = (samples.first[:offset] + samples.last[:offset]) / 2.0
+      points = [ samples.first, samples.min_by { |sample| (sample[:offset] - middle).abs }, samples.last ].uniq
+
+      points.filter_map do |point|
+        @air_quality.history(point[:latitude], point[:longitude], start + point[:offset])
+      rescue StandardError => e
+        ErrorReporter.report_upstream(e, service: "GoogleAirQuality", context: "activity AQI")
+        nil
+      end.max
     end
 
     def start_time
@@ -241,8 +260,8 @@ module ActivityDescription
     end
 
     # The condition code with the most time in the runs, and whether most of that time was in
-    # daylight. ⚠️ It reads the runs and not the samples. Thus the main condition is always one of
-    # the entries of `conditions`.
+    # daylight. ⚠️ It reads the runs and not the samples, thus a short run that joined its neighbor
+    # cannot be the main condition.
     # @return [Hash, nil] { code:, daylight: }
     def main_condition(runs)
       return if runs.empty?
@@ -265,32 +284,27 @@ module ActivityDescription
 
     def aggregate(samples, runs, main)
       share = ->(sample) { sample[:seconds] }
-      total = samples.sum(&share)
-
       temperatures = range(samples, :temperature) { |value| temperature(value) }
       feels_like = range(samples, :temperatureApparent) { |value| temperature(value) }
 
       result = {
         units: units,
-        duration_minutes: (samples.last[:offset] - samples.first[:offset]).fdiv(60).round,
         condition: main && condition_phrase(main[:code]),
         temperature: temperatures,
         feels_like: (feels_like unless feels_like == temperatures),
         wind: wind(samples, share),
         humidity_percent: humidity_percent(samples, share),
-        precipitation: precipitation(samples, share, total),
-        conditions: (conditions(runs, samples.first[:offset]) if weather_changes?(runs))
+        precipitation: precipitation_spell(runs, main)
       }
-      result[:headwind_percent] = headwind_percent(samples, share) if headwind?(samples, share)
+      if headwind?(samples, share)
+        percent = headwind_percent(samples, share)
+        result[:headwind_percent] = percent if percent && percent >= HEADWIND_MIN_PERCENT
+      end
       result.compact
     end
 
     def units
-      if @imperial
-        { temperature: "°F", wind: "mph", precipitation: "in" }
-      else
-        { temperature: "°C", wind: "km/h", precipitation: "mm" }
-      end
+      @imperial ? { temperature: "°F", wind: "mph" } : { temperature: "°C", wind: "km/h" }
     end
 
     def temperature(celsius) = @imperial ? (celsius * 9.0 / 5) + 32 : celsius
@@ -328,9 +342,10 @@ module ActivityDescription
       # A wind that rounds to zero is not worth a word, thus the summary has no wind at all.
       return if speeds[:max].zero?
 
-      gusts = samples.filter_map { |sample| sample[:weather][:windGust] }
-      gust_max = speed(gusts.max).round if gusts.any?
-      { direction: mean_direction(samples, share), speed: speeds, gust_max: gust_max }.compact
+      # The highest gust only, and only when it is more than the top of the wind range.
+      gusts = range(samples, :windGust) { |value| speed(value) }
+      gust = gusts[:max] if gusts && gusts[:max] > speeds[:max]
+      { direction: mean_direction(samples, share), speed: speeds, gust: gust }.compact
     end
 
     # The direction of the vector mean of the wind, weighted by its speed and its time.
@@ -350,15 +365,6 @@ module ActivityDescription
 
       degrees = (Math.atan2(x, y) * 180 / Math::PI) % 360
       COMPASS[((degrees + 11.25) / 22.5).floor % 16]
-    end
-
-    def precipitation(samples, share, total)
-      wet = samples.select { |sample| sample[:weather][:precipitationIntensity].to_f >= WET_MM_PER_HOUR }
-      return if wet.empty?
-
-      millimeters = samples.sum { |sample| sample[:weather][:precipitationIntensity].to_f * sample[:seconds] / 3600.0 }
-      amount = @imperial ? (millimeters / 25.4).round(2) : millimeters.round(1)
-      { total: amount, percent_of_time: (wet.sum(&share) * 100.0 / total).round }
     end
 
     # The runs of one condition in time order, as { code:, seconds:, night:, first:, last: }. A run
@@ -400,29 +406,25 @@ module ActivityDescription
       run[:last] = last
     end
 
-    # A change of the weather is a change between adverse weather and no adverse weather, from
-    # `adverse_weather` in config/conditions.yml: clear to rain is a change, and clear to mostly
-    # clear is not.
-    # @return [Boolean]
-    def weather_changes?(runs)
-      runs.map { |run| adverse?(run) }.uniq.size > 1
+    # The precipitation of another TYPE than the main condition, for part of the activity, as
+    # { condition:, minutes: }. Its time is the total time of that type, and its word is the longest
+    # condition of that type. With more than one such type, the one with the most time.
+    # ⚠️ The type is what stops a repeat: rain with 20 minutes of drizzle is one type, thus the line
+    # says "Rain" alone. The type comes from `precipitation` in config/conditions.yml, and not from
+    # `adverse_weather`, which also marks wind, haze, smoke, fog, and cold.
+    # @return [Hash, nil]
+    def precipitation_spell(runs, main)
+      main_type = main && precipitation_type(main[:code])
+      by_type = runs.select { |run| precipitation_type(run[:code]) && precipitation_type(run[:code]) != main_type }
+                    .group_by { |run| precipitation_type(run[:code]) }
+      return if by_type.empty?
+
+      _type, spell = by_type.max_by { |_key, group| group.sum { |run| run[:seconds] } }
+      code, = spell.group_by { |run| run[:code] }.max_by { |_key, group| group.sum { |run| run[:seconds] } }
+      { condition: condition_phrase(code).downcase, minutes: (spell.sum { |run| run[:seconds] } / 60.0).round }
     end
 
-    def adverse?(run) = CONDITIONS.dig(run[:code].to_sym, :adverse_weather) == true
-
-    # Joins the next runs with the same adverse_weather value, thus each entry is one side of a
-    # change. The longest condition of each group names it.
-    # @return [Array<Hash>] The groups as { condition:, from_minute:, to_minute: }, in minutes from
-    #   the start of the track.
-    def conditions(runs, origin)
-      runs.chunk_while { |a, b| adverse?(a) == adverse?(b) }.map do |group|
-        {
-          condition: condition_phrase(group.max_by { |run| run[:seconds] }[:code]),
-          from_minute: ((group.first[:first] - origin) / 60.0).round,
-          to_minute: ((group.last[:last] - origin) / 60.0).round
-        }
-      end
-    end
+    def precipitation_type(code) = CONDITIONS.dig(code.to_sym, :precipitation)
 
     # @return [Boolean] True for an activity that is not a swim, with a mean wind of at least
     #   HEADWIND_MIN_KPH.

@@ -27,6 +27,37 @@ RSpec.describe GoogleAirQuality do
     end
   end
 
+  describe ".history" do
+    let(:hour) { 3.days.ago.utc.beginning_of_hour }
+
+    before do
+      allow(GoogleMaps).to receive(:new).with(latitude, longitude).and_return(instance_double(GoogleMaps, country_code: country))
+      allow(HTTParty).to receive(:post).and_return(
+        instance_double(HTTParty::Response, success?: true, body: { hoursInfo: [ { indexes: [ aqi_index ] } ] }.to_json, request: nil)
+      )
+    end
+
+    it "gives the AQI of the hour of a past time" do
+      expect(described_class.history(latitude, longitude, hour + 25.minutes)).to eq(42)
+      expect(HTTParty).to have_received(:post).with(
+        a_string_ending_with("history:lookup"),
+        hash_including(body: a_string_including(%("dateTime":"#{hour.iso8601}")))
+      )
+    end
+
+    it "asks nothing for an hour older than the 30 days that Google keeps" do
+      expect(described_class.history(latitude, longitude, 31.days.ago)).to be_nil
+      expect(HTTParty).not_to have_received(:post)
+    end
+
+    it "asks nothing for a location with no country" do
+      allow(GoogleMaps).to receive(:new).and_return(instance_double(GoogleMaps, country_code: nil))
+
+      expect(described_class.history(latitude, longitude, hour)).to be_nil
+      expect(HTTParty).not_to have_received(:post)
+    end
+  end
+
   describe "current conditions" do
     it "hits currentConditions:lookup when no datetime is given" do
       result = described_class.new(latitude, longitude, country).aqi

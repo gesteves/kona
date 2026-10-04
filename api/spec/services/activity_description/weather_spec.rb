@@ -4,6 +4,7 @@ RSpec.describe ActivityDescription::Weather do
   let(:start) { Time.utc(2026, 9, 20, 12) }
   let(:activity) { { start_date: start.iso8601 } }
   let(:weather_kit) { double("WeatherKit") }
+  let(:air_quality) { double("GoogleAirQuality", history: nil) }
 
   # A track with one point each minute. Each step moves the given degrees of latitude and longitude.
   def streams_for(steps)
@@ -30,12 +31,12 @@ RSpec.describe ActivityDescription::Weather do
     {
       forecastStart: (start + offset.hours).iso8601, temperature: 10.0, temperatureApparent: 10.0,
       windSpeed: 10.0, windGust: 15.0, windDirection: 0, cloudCover: 0.0, humidity: 0.5,
-      precipitationIntensity: 0.0, conditionCode: "Clear", daylight: true
+      conditionCode: "Clear", daylight: true
     }.merge(fields)
   end
 
   def weather(streams, unit: :celsius, headwind: true)
-    described_class.new(activity, streams, unit: unit, headwind: headwind, weather_kit: weather_kit)
+    described_class.new(activity, streams, unit: unit, headwind: headwind, weather_kit: weather_kit, air_quality: air_quality)
   end
 
   def summary(streams, **options) = weather(streams, **options).summary
@@ -76,11 +77,21 @@ RSpec.describe ActivityDescription::Weather do
     expect(result[:wind][:direction]).to eq("N")
   end
 
-  it "gives the headwind share for an out-and-back course" do
-    # The wind comes from the north: the way out is into the wind and the way back is not.
-    result = summary(streams_for(north(30) + south(30)))
+  # The wind comes from the north.
+  it "gives the headwind share of a course into the wind" do
+    expect(summary(streams_for(north(30)))[:headwind_percent]).to eq(100)
+  end
 
-    expect(result[:headwind_percent]).to be_between(40, 60)
+  it "omits a headwind below HEADWIND_MIN_PERCENT" do
+    expect(summary(streams_for(south(30)))).not_to have_key(:headwind_percent)
+  end
+
+  it "gives the highest gust, only when it is more than the top of the wind range" do
+    allow(weather_kit).to receive(:hourly).and_return([ hour(0, windGust: 20.0), hour(1, windGust: 30.0), hour(2, windGust: 30.0) ])
+    expect(summary(streams_for(north(61)))[:wind][:gust]).to eq(30)
+
+    allow(weather_kit).to receive(:hourly).and_return((0..2).map { |offset| hour(offset, windGust: 10.0) })
+    expect(summary(streams_for(north(61)))[:wind]).not_to have_key(:gust)
   end
 
   it "gives no wind at all when it rounds to zero" do
@@ -99,29 +110,78 @@ RSpec.describe ActivityDescription::Weather do
     expect(summary(streams_for(north(30)), headwind: false)).not_to have_key(:headwind_percent)
   end
 
-  it "converts to °F, mph, and inches for an athlete who uses Fahrenheit" do
-    allow(weather_kit).to receive(:hourly).and_return(
-      (0..2).map { |offset| hour(offset, precipitationIntensity: 25.4) }
-    )
-
+  it "converts to °F and mph for an athlete who uses Fahrenheit" do
     result = summary(streams_for(north(61)), unit: :fahrenheit)
 
-    expect(result[:units]).to eq(temperature: "°F", wind: "mph", precipitation: "in")
+    expect(result[:units]).to eq(temperature: "°F", wind: "mph")
     expect(result[:temperature]).to eq(min: 50.0, max: 50.0)
     expect(result[:wind][:speed]).to eq(min: 6, max: 6)
-    expect(result[:precipitation]).to eq(total: 1.0, percent_of_time: 100)
   end
 
-  it "gives the conditions in time order" do
-    allow(weather_kit).to receive(:hourly).and_return(
-      [ hour(0), hour(1), hour(2, conditionCode: "Rain"), hour(3, conditionCode: "Rain") ]
-    )
+  describe "the precipitation" do
+    # 150 minutes: about 90 minutes of the first condition, then about 60 of the second.
+    def spell(first, second)
+      allow(weather_kit).to receive(:hourly).and_return(
+        [ hour(0, conditionCode: first), hour(1, conditionCode: first), hour(2, conditionCode: second), hour(3, conditionCode: second) ]
+      )
+      summary(streams_for(north(150)))
+    end
 
-    result = summary(streams_for(north(150)))
+    it "gives the time of precipitation during part of the activity" do
+      result = spell("Cloudy", "Rain")
 
-    expect(result[:conditions].map { |entry| entry[:condition] }).to eq(%w[Clear Rain])
-    expect(result[:conditions].first[:from_minute]).to eq(0)
-    expect(result[:conditions].last[:to_minute]).to eq(149)
+      expect(result[:condition]).to eq("Cloudy")
+      expect(result[:precipitation]).to include(condition: "rain", minutes: be_within(10).of(60))
+    end
+
+    it "gives a precipitation of another type than the main condition" do
+      expect(spell("Rain", "Snow")[:precipitation]).to include(condition: "snow")
+    end
+
+    # ⚠️ Not "Rain with 60 minutes of heavy rain": the two are one type.
+    it "says nothing about a precipitation of the same type" do
+      result = spell("Rain", "HeavyRain")
+
+      expect(result[:condition]).to eq("Rain")
+      expect(result).not_to have_key(:precipitation)
+    end
+
+    it "says nothing about the dry part of a wet activity" do
+      expect(spell("Rain", "Cloudy")).not_to have_key(:precipitation)
+    end
+
+    # ⚠️ Haze is adverse weather, and it is not precipitation.
+    it "does not count haze, wind, or smoke as precipitation" do
+      expect(spell("Clear", "Haze")).not_to have_key(:precipitation)
+    end
+  end
+
+  describe "the air quality" do
+    it "gives the highest AQI of the start, the middle, and the end" do
+      allow(air_quality).to receive(:history) { |_lat, _lon, time| { 0 => 30, 30 => 80, 60 => 50 }[((time - start) / 60).round] }
+
+      expect(summary(streams_for(north(61)))[:aqi]).to eq(80)
+      expect(air_quality).to have_received(:history).with(46.0, -119.0, start)
+      expect(air_quality).to have_received(:history).exactly(3).times
+    end
+
+    it "gives a low AQI too" do
+      allow(air_quality).to receive(:history).and_return(12)
+
+      expect(summary(streams_for(north(61)))[:aqi]).to eq(12)
+    end
+
+    it "loses only the point that fails" do
+      allow(ErrorReporter).to receive(:report_upstream)
+      calls = 0
+      allow(air_quality).to receive(:history) { (calls += 1) == 2 ? raise("timeout") : 40 }
+
+      expect(summary(streams_for(north(61)))[:aqi]).to eq(40)
+    end
+
+    it "gives no AQI with no reading" do
+      expect(summary(streams_for(north(61)))).not_to have_key(:aqi)
+    end
   end
 
   it "omits feels like when it rounds to the same range as the temperature" do
@@ -137,24 +197,6 @@ RSpec.describe ActivityDescription::Weather do
     expect(summary(streams_for(north(61)))[:humidity_percent]).to eq(80)
   end
 
-  it "omits the conditions when the weather does not change between adverse and not adverse" do
-    allow(weather_kit).to receive(:hourly).and_return(
-      [ hour(0), hour(1), hour(2, conditionCode: "MostlyClear"), hour(3, conditionCode: "MostlyClear") ]
-    )
-
-    expect(summary(streams_for(north(150)))).not_to have_key(:conditions)
-  end
-
-  it "joins the next conditions on the same side of a change, and names each group by its longest one" do
-    allow(weather_kit).to receive(:hourly).and_return(
-      [ hour(0), hour(1, conditionCode: "MostlyClear"), hour(2, conditionCode: "MostlyClear"), hour(3, conditionCode: "Rain"), hour(4, conditionCode: "Rain") ]
-    )
-
-    result = summary(streams_for(north(240)))
-
-    expect(result[:conditions].map { |entry| entry[:condition] }).to eq([ "Mostly clear", "Rain" ])
-  end
-
   it "names the condition with the most time, with the phrase of config/conditions.yml" do
     allow(weather_kit).to receive(:hourly).and_return(
       [ hour(0, conditionCode: "MostlyCloudy"), hour(1, conditionCode: "MostlyCloudy"), hour(2, conditionCode: "Rain"), hour(3) ]
@@ -168,7 +210,7 @@ RSpec.describe ActivityDescription::Weather do
     allow(weather_kit).to receive(:hourly).and_return([ hour(0, conditionCode: "MostlyClear"), hour(1), hour(2) ])
     streams = [ { type: "time", data: [ 0, 1649, 1659 ] }, { type: "latlng", data: [ 46.0, 46.0, 46.0 ], data2: [ -119.0, -119.0, -119.0 ] } ]
 
-    result = described_class.new({ start_date: (start + 26.minutes).iso8601 }, streams, unit: :celsius, weather_kit: weather_kit).summary
+    result = described_class.new({ start_date: (start + 26.minutes).iso8601 }, streams, unit: :celsius, weather_kit: weather_kit, air_quality: air_quality).summary
 
     expect(result[:condition]).to eq("Mostly clear")
   end

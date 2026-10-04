@@ -90,7 +90,9 @@ module ActivityDescription
 
       fields = {}
       fields[:name] = name if name.present? && name != current[:name]
-      fields[:description] = description if description.present?
+      # ⚠️ No PUT of a text that Strava already has. The second run of an activity often makes the
+      # same description.
+      fields[:description] = description if description.present? && !same_text?(description, current[:description])
 
       if fields.empty?
         log_info("activity #{activity_id}: nothing to write — skipping")
@@ -149,6 +151,12 @@ module ActivityDescription
 
       key = "activity:race_pair:#{[ activity[:id], race_leg.partner_id ].map(&:to_s).sort.join(':')}"
       ActivityDescriptionJob.perform_async(race_leg.partner_id) if $redis.set(key, "1", nx: true, ex: 1.day.to_i)
+    end
+
+    # @return [Boolean] True when two texts are the same, with no regard to the line ends and to the
+    #   space at each end.
+    def same_text?(a, b)
+      a.to_s.gsub("\r\n", "\n").strip == b.to_s.gsub("\r\n", "\n").strip
     end
 
     # The strain of the Whoop workout that matches the activity, for the 🔥 line. The code asks
@@ -235,7 +243,8 @@ module ActivityDescription
     end
 
     # The weather line ("{emoji} {sentence}"), from WeatherKit over the full GPS track. The emoji
-    # comes from the condition, and the LLM writes the sentence. An indoor activity never gets one.
+    # comes from the condition, and WeatherSentence writes the words. An indoor activity never gets
+    # one.
     # @return [String, nil]
     def weather_line(activity, swim)
       return if indoor?(activity)
@@ -248,7 +257,7 @@ module ActivityDescription
       end
       return if summary.nil?
 
-      sentence = swallow("weather sentence") { Llm.weather_sentence(summary) }
+      sentence = swallow("weather sentence") { WeatherSentence.call(summary) }
       return if sentence.blank?
 
       [ weather.emoji, sentence ].compact.join(" ")

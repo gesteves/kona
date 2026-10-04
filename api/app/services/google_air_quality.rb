@@ -10,6 +10,20 @@ class GoogleAirQuality < ApplicationService
   # gives a 400 with "The specified time period is not supported". Stop before such a request.
   FORECAST_MAX_HORIZON = 96.hours
 
+  # The history endpoint of Google keeps the hours of the last 30 days.
+  HISTORY_MAX_AGE = 30.days
+
+  # The AQI of a past hour at a location, for the weather line of an activity description.
+  # @param latitude [Float]
+  # @param longitude [Float]
+  # @param time [Time]
+  # @return [Integer, nil] The US EPA AQI, or nil with no data, for an hour older than 30 days, or
+  #   for a location with no country.
+  def self.history(latitude, longitude, time)
+    country_code = GoogleMaps.new(latitude, longitude).country_code
+    new(latitude, longitude, country_code).history_aqi(time)
+  end
+
   def initialize(latitude, longitude, country_code, aqi_code = "usa_epa_nowcast", datetime = nil)
     @latitude = latitude
     @longitude = longitude
@@ -21,6 +35,32 @@ class GoogleAirQuality < ApplicationService
   def aqi
     return @aqi if defined?(@aqi)
     @aqi = get_aqi
+  end
+
+  # Refer to GoogleAirQuality.history. A past hour does not change, thus the cache holds it for a day.
+  # @see https://developers.google.com/maps/documentation/air-quality/reference/rest/v1/history/lookup
+  # @param time [Time]
+  # @return [Integer, nil]
+  def history_aqi(time)
+    return unless coordinates?
+    return if @country_code.blank?
+
+    hour = time.utc.beginning_of_hour
+    return if hour < HISTORY_MAX_AGE.ago
+
+    cache_key = "google:aqi:history:#{@latitude}:#{@longitude}:#{@country_code}:#{@aqi_code}:#{hour.iso8601}"
+    data = cached_json(cache_key, expires_in: 1.day) do
+      body = {
+        location: { latitude: @latitude, longitude: @longitude },
+        dateTime: hour.iso8601,
+        languageCode: "en",
+        extraComputations: [ "LOCAL_AQI" ],
+        customLocalAqis: [ { regionCode: @country_code, aqi: @aqi_code } ]
+      }
+      post_aqi("history:lookup", body)
+    end
+
+    data&.dig(:hoursInfo, 0, :indexes)&.find { |index| index[:code] == @aqi_code }&.dig(:aqi)
   end
 
   private

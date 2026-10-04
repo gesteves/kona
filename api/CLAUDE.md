@@ -455,12 +455,15 @@ Thus that shared window is safe.
     the scheduled build and start nothing. The jid can name a job that ran already, or one that a
     person deleted in `/sidekiq`; `find_job` gives nil for both, and the code then cancels nothing.
 - **`ActivityDescriptionJob`** does not know its source. It writes the stat lines with an emoji: the
-  power, the heat, the Whoop strain, and the water temperature. It also writes two lines that
-  Anthropic makes: a summary of the planned workout, which the code matches against the TrainerRoad
-  calendar, and a weather sentence. ⚠️ `TrainerRoad#planned_workouts` omits a race leg, thus that
-  line is for a structured workout alone. `TrainerRoad#workouts`, which the widgets read for the
-  rest-day check, counts a race leg: race day must not read as a rest day. The prompts are in `app/prompts/`, and the job omits those two
-  lines with no `ANTHROPIC_API_KEY`. It keeps the text that the user wrote above the stat block. A
+  power, the heat, the Whoop strain, the water temperature, and the weather. It also writes one line
+  that Anthropic makes: a summary of the planned workout, which the code matches against the
+  TrainerRoad calendar. ⚠️ `TrainerRoad#planned_workouts` omits a race leg, thus that line is for a
+  structured workout alone. `TrainerRoad#workouts`, which the widgets read for the rest-day check,
+  counts a race leg: race day must not read as a rest day. The prompt is in `app/prompts/`, and the
+  job omits that line with no `ANTHROPIC_API_KEY`. It keeps the text that the user wrote above the
+  stat block: ⚠️ `Composer.headline` removes only a line that starts with an emoji of
+  `Composer::STAT_EMOJIS`, thus a line of the owner that starts with another emoji stays. It writes
+  no description that Strava already has. A
   Redis lock stops a second job for the same activity, and that job runs again a minute later. The
   same PUT also corrects a name from Rouvy (`ROUVY - <route> - <date>` becomes `Rouvy - <route>`),
   thus it can write even when the description is empty.
@@ -500,14 +503,26 @@ Thus that shared window is safe.
   25%. With no distance, it is the longest run. ⚠️ Give the race its distance: without one, a
   warm-up that uploads before the race ends is the longest run at that moment, and it keeps the
   name.
-- **The weather line comes from WeatherKit, and not from Intervals.icu.**
+- **The weather line comes from WeatherKit, and code writes it, with no LLM.**
   `ActivityDescription::Weather` takes a sample of the GPS track each 10 minutes, gets the past
-  hours of each area, and aggregates them over the full activity. The LLM writes the sentence
-  only. ⚠️ The condition and the emoji come from the data: the main condition is the
-  `simplified` phrase of `config/conditions.yml`, and its `emoji` is there too, with a day and a
-  night variant from the `daylight` of WeatherKit. The LLM must not select either one.
-  `rake "activity_weather:inspect[<ids>]"` prints the data and the line, and it writes nothing.
-  WeatherKit keeps approximately four years of hours.
+  hours of each area, and makes each decision: the condition, the rounded numbers, the units, and
+  what to omit. `WeatherSentence` only writes the words, joined with a serial comma, for example
+  `Cloudy with 25 minutes of rain, SSE winds of 12–18 km/h and 24 km/h gusts (62% headwind),
+  11°C–13°C (feels like 8°C–10°C), and AQI 54`. A wind range that starts at zero gives its top
+  alone, and the gust is the highest one alone. Put a change to what the line holds in `Weather`, and not in the sentence.
+  - The main condition is the `simplified` phrase of `config/conditions.yml`, and its `emoji` is
+    there too, with a day and a night variant from the `daylight` of WeatherKit.
+  - ⚠️ **Precipitation for part of the activity gives only its time**, and only for a TYPE other
+    than the main condition, from `precipitation` in `config/conditions.yml` (rain, snow, ice,
+    mixed). Thus "Rain with 25 minutes of snow", and never "Rain with 20 minutes of heavy rain".
+    That flag is not `adverse_weather`, which also marks wind, haze, smoke, fog, and cold.
+  - The headwind shows only at `HEADWIND_MIN_PERCENT` (50) or more, and with a mean wind of
+    `HEADWIND_MIN_KPH`.
+  - **The AQI is the highest of three points**: the start, the middle, and the end, from
+    `GoogleAirQuality.history`, whatever its value. ⚠️ Google keeps 30 days, thus an older activity
+    gets no AQI.
+  - `rake "activity_weather:inspect[<ids>]"` prints the data and the line, and it writes nothing.
+    WeatherKit keeps approximately four years of hours.
 - ⚠️ **Turnstile protects the JSON path only** (`request.format.json?`). Thus a POST from a script
   with no `Accept: application/json` does not do that check. We read this and **accepted** it: the
   widget needs JavaScript, and a check on both paths would stop the path with no JavaScript. The
