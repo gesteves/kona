@@ -5,6 +5,13 @@ require "rails_helper"
 # counters to zero around each example, thus one example does not change another one through the
 # shared client IP of 127.0.0.1.
 RSpec.describe "Rack::Attack", type: :request do
+  include ActiveSupport::Testing::TimeHelpers
+
+  # ⚠️ A throttle counts in a window of the clock: the key holds Time.now / period. On a slow CI
+  # machine the 600 requests of the webhook example could cross a minute, and the count then
+  # started again. A fixed clock keeps each example inside one window.
+  around { |example| travel_to(Time.utc(2026, 1, 1, 12, 0, 0)) { example.run } }
+
   before do
     Rack::Attack.enabled = true
     Rack::Attack.cache.store.clear
