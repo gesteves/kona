@@ -9,6 +9,10 @@ module Webhooks
   # ⚠️ Strava waits 2 seconds for the answer, thus this only adds a job to the queue.
   # @see https://developers.strava.com/docs/webhooks/
   class StravaController < BaseController
+    # The wait before the job looks for the activity. Strava sends the event before Intervals.icu
+    # has the activity, thus a job at once would almost always miss and wait for a retry.
+    INTERVALS_DELAY = 30.seconds
+
     # GET /webhooks/strava — the challenge that Strava sends when `rake strava:subscribe` makes the
     # subscription.
     def show
@@ -33,7 +37,7 @@ module Webhooks
       # card at the next token refresh.
       if event["object_type"] == "activity" && event["aspect_type"] == "create"
         Rails.logger.info("Strava webhook: new activity #{event['object_id']}")
-        StravaActivityJob.perform_async(event["object_id"].to_s, event["event_time"])
+        StravaActivityJob.perform_in(INTERVALS_DELAY, event["object_id"].to_s, event["event_time"])
       end
 
       head :ok

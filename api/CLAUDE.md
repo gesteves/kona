@@ -389,8 +389,9 @@ The processor then adds a separate `ActivityDescriptionJob` to the queue. The tw
 on purpose: if the Whoop integration goes away, the metric sync stops but the descriptions continue
 to work, and only the 🔥 line is absent.
 
-`Webhooks::StravaController` takes the Strava events. A new activity adds `StravaActivityJob`, which
-finds the Intervals.icu activity with that `strava_id` and adds its `ActivityDescriptionJob`.
+`Webhooks::StravaController` takes the Strava events. A new activity adds `StravaActivityJob` 30
+seconds later (`INTERVALS_DELAY`), which finds the Intervals.icu activity with that `strava_id` and
+adds its `ActivityDescriptionJob`.
 ⚠️ **Strava does not sign an event.** Thus the controller accepts only our `subscription_id` and the
 `owner_id` of the connected athlete, and it uses only the id and the time of the event. A forged
 event can then only start the description of one of our own activities again.

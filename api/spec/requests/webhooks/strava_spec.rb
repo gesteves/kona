@@ -44,11 +44,12 @@ RSpec.describe "Strava webhook", type: :request do
   end
 
   describe "POST /webhooks/strava" do
-    it "adds the job for a new activity" do
+    # Strava sends the event before Intervals.icu has the activity.
+    it "adds the job for a new activity, 30 seconds later" do
       post_event(event)
 
       expect(response).to have_http_status(:ok)
-      expect(StravaActivityJob).to have_enqueued_sidekiq_job("123", 1_760_000_000)
+      expect(StravaActivityJob).to have_enqueued_sidekiq_job("123", 1_760_000_000).in(30.seconds)
     end
 
     # ⚠️ Our own PUT of the name and the description makes an update event. A handler would loop.
