@@ -19,12 +19,12 @@ Style:
 - Do not add a space before temperature units (55°F, not 55 °F).
 
 Examples:
-- Mostly clear with light W winds of 7–21 km/h gusting to 26, temps 10–14°C (feels like 5–9°C), and 34% headwind
-- Cloudy with light-to-moderate WSW winds of 14–23 km/h gusting to 31, temps 8–13°C (feels like 2–8°C), and 51% headwind
-- Cloudy with a light NNW breeze of 3–7 km/h gusting to 21, temps around 20°C (feels like 17°C)
+- Mostly clear with light W winds of 7–21 km/h gusting to 26 km/h, temps 10–14°C (feels like 5–9°C), and 34% headwind
+- Cloudy with light-to-moderate WSW winds of 14–23 km/h with gusts up to 31 km/h, temps 8–13°C (feels like 2–8°C), and 51% headwind
+- Cloudy with a light NNW breeze of 3–7 km/h gusting to 21 km/h, temps around 20°C (feels like 17°C)
 - Clear with SW winds of 1–5 mph and gusts up to 11 mph, temperatures ranging from 51–61°F with an average feel of 49°F
 - Windy with strong NW gusts of 28–42 km/h, temps 6–9°C (feels like 1–4°C), and 88% headwind
-- Drizzle with moderate SSE winds of 12–18 km/h gusting to 24, temps 11–13°C (feels like 8–10°C), and 25% headwind
+- Drizzle with moderate SSE winds of 12–18 km/h and gusts up to 24 km/h, temps 11–13°C (feels like 8–10°C), and 25% headwind
 - Snow with light N winds of 5–9 km/h, temps −4 to −1°C (feels like −9 to −5°C)
 - Partly cloudy, temps 15–19°C (feels like 14–18°C)
 - Cloudy with moderate S winds of 14–22 km/h, temps 9–11°C, and rain in the last 40 minutes
