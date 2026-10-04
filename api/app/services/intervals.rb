@@ -76,15 +76,6 @@ class Intervals < ApplicationService
     activity
   end
 
-  # @return [String, nil] The weather summary of the activity, with the Intervals.icu attribution
-  #   text removed from the start, or nil. Not each activity has weather data.
-  def activity_weather_summary(activity_id)
-    safely("Intervals.icu", context: "activity_weather_summary") do
-      response = get_json!("#{INTERVALS_ICU_API_URL}/activity/#{activity_id}/weather-summary", basic_auth: auth)
-      response&.dig(:description)&.sub(/\A-- Intervals icu --\n/i, "")&.strip.presence
-    end
-  end
-
   # Gets the activity streams by type. The code makes the query string itself, because
   # Intervals.icu needs more than one plain `types` parameter, and HTTParty would write `types[]`.
   # @param types [Array<String>] The stream types to get.

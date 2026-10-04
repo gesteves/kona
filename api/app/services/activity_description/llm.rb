@@ -40,29 +40,25 @@ module ActivityDescription
       parsed[:planned_summary].presence
     end
 
-    # Changes a raw weather description into one sentence with an emoji at the start. The caller
-    # does the indoor check: an indoor activity never gets a weather line.
-    # @return [Hash, nil] { emoji:, sentence: }, or nil when there is no configuration, when the
-    #   input is blank, and when the model refuses.
-    def weather_sentence(weather_description)
-      return if weather_description.blank? || !configured?
+    # Changes the weather summary of an activity into one sentence. The caller does the indoor
+    # check, and it selects the emoji: an indoor activity never gets a weather line.
+    # @param weather [Hash] The summary from ActivityDescription::Weather.
+    # @return [String, nil] The sentence, or nil when there is no configuration, when the input is
+    #   blank, and when the model refuses.
+    def weather_sentence(weather)
+      return if weather.blank? || !configured?
 
       parsed = structured_call(
         system: WEATHER_SENTENCE_PROMPT,
-        user: "Weather data: #{weather_description}",
+        user: "Weather data: #{weather.to_json}",
         schema: {
           type: "object",
-          properties: {
-            weather_emoji: { type: %w[string null] },
-            weather_sentence: { type: %w[string null] }
-          },
-          required: %w[weather_emoji weather_sentence],
+          properties: { weather_sentence: { type: %w[string null] } },
+          required: [ "weather_sentence" ],
           additionalProperties: false
         }
       )
-      return if parsed[:weather_emoji].blank? || parsed[:weather_sentence].blank?
-
-      { emoji: parsed[:weather_emoji], sentence: parsed[:weather_sentence] }
+      parsed[:weather_sentence].presence
     end
 
     # @return [String] The env var that replaces the model for this caller.

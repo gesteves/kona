@@ -58,7 +58,7 @@ module ActivityDescription
       description = Composer.compose(
         headline: Composer.headline(activity[:description]),
         planned: planned_summary_line(activity, sport),
-        weather: weather_line(activity),
+        weather: weather_line(activity, swim),
         water_temp: water_temp_line(activity, swim),
         power: Composer.power_block(activity),
         heat: heat_line(activity, swim),
@@ -142,19 +142,24 @@ module ActivityDescription
       end
     end
 
-    # The weather sentence from the LLM ("{emoji} {sentence}"). An indoor activity never gets
-    # one.
+    # The weather line ("{emoji} {sentence}"), from WeatherKit over the full GPS track. The emoji
+    # comes from the condition, and the LLM writes the sentence. An indoor activity never gets one.
     # @return [String, nil]
-    def weather_line(activity)
+    def weather_line(activity, swim)
       return if indoor?(activity)
 
-      text = swallow("weather summary") { @intervals.activity_weather_summary(activity[:id]) }
-      return if text.blank?
+      weather = nil
+      summary = swallow("weather summary") do
+        streams = @intervals.activity_streams(activity[:id], types: %w[latlng time])
+        weather = Weather.new(activity, streams, unit: @intervals.temperature_unit, headwind: !swim)
+        weather.summary
+      end
+      return if summary.nil?
 
-      result = swallow("weather sentence") { Llm.weather_sentence(text) }
-      return if result.nil?
+      sentence = swallow("weather sentence") { Llm.weather_sentence(summary) }
+      return if sentence.blank?
 
-      "#{result[:emoji]} #{result[:sentence]}"
+      [ weather.emoji, sentence ].compact.join(" ")
     end
 
     # The 💧 water-temperature line, for an open-water swim only, from the temperature stream of

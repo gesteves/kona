@@ -36,9 +36,50 @@ class WeatherKit < ApplicationService
     @budget_expires_at = Process.clock_gettime(Process::CLOCK_MONOTONIC) + REQUEST_BUDGET
   end
 
+  # The time that the cache holds an hourly range. A recent hour can still be forecast data, thus
+  # this TTL is short. It only stops a retry of a job from a second call.
+  HOURLY_TTL = 1.hour
+  # The timeout of one hourly call. That call runs in a job and not in a request.
+  HOURLY_HTTP_TIMEOUT = 10
+
+  # Gets the hours of a time range, which can be in the past, at one location.
+  # @param latitude [Float]
+  # @param longitude [Float]
+  # @param from [Time] The first hour. WeatherKit starts at the hour that contains it.
+  # @param to [Time] The end of the range. WeatherKit does not include this hour.
+  # @return [Array<Hash>, nil] The hours, with the camelCase keys of WeatherKit and metric units,
+  #   or nil on a failure.
+  def self.hourly(latitude, longitude, from:, to:)
+    new(latitude, longitude, nil, nil).hourly(from: from, to: to)
+  end
+
   # @return [OpenStruct, nil] The weather data, with snake_case keys and dot access, or nil.
   def data
     fetch_wrapped { underscore_keys(get_weather) }
+  end
+
+  # Refer to WeatherKit.hourly. ⚠️ It does not use the budget of the widget request: a job calls
+  # it. It also needs no country and no timezone, thus it does not call `availability`.
+  def hourly(from:, to:)
+    return unless coordinates?
+
+    start = from.utc.iso8601
+    finish = to.utc.iso8601
+    cache_key = "weatherkit:hourly:#{@latitude}:#{@longitude}:#{start}:#{finish}"
+    cached_json(cache_key, expires_in: HOURLY_TTL, empty_expires_in: EMPTY_TTL) do
+      with_retries do
+        jwt = token
+        next if jwt.blank?
+
+        response = get_json!(
+          "#{WEATHERKIT_API_URL}weather/en/#{@latitude}/#{@longitude}",
+          query: { dataSets: "forecastHourly", hourlyStart: start, hourlyEnd: finish },
+          headers: { "Authorization" => "Bearer #{jwt}" },
+          timeout: HOURLY_HTTP_TIMEOUT
+        )
+        response&.dig(:forecastHourly, :hours)
+      end
+    end
   end
 
   private

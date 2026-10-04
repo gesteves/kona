@@ -442,6 +442,14 @@ Thus that shared window is safe.
   Redis lock stops a second job for the same activity. The same PUT also corrects a name from Rouvy
   (`ROUVY - <route> - <date>` becomes `Rouvy - <route>`), thus it can write even when the
   description is empty.
+- **The weather line comes from WeatherKit, and not from Intervals.icu.**
+  `ActivityDescription::Weather` takes a sample of the GPS track each 10 minutes, gets the past
+  hours of each area, and aggregates them over the full activity. The LLM writes the sentence
+  only. ⚠️ The condition and the emoji come from the data: the main condition is the
+  `simplified` phrase of `config/conditions.yml`, and its `emoji` is there too, with a day and a
+  night variant from the `daylight` of WeatherKit. The LLM must not select either one.
+  `rake "activity_weather:inspect[<ids>]"` prints the data and the line, and it writes nothing.
+  WeatherKit keeps approximately four years of hours.
 - ⚠️ **Turnstile protects the JSON path only** (`request.format.json?`). Thus a POST from a script
   with no `Accept: application/json` does not do that check. We read this and **accepted** it: the
   widget needs JavaScript, and a check on both paths would stop the path with no JavaScript. The

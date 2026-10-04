@@ -111,4 +111,31 @@ RSpec.describe WeatherKit do
     expect(service).to have_received(:with_retries)
       .with(hash_including(deadline: a_value <= WeatherKit::REQUEST_BUDGET)).twice
   end
+  describe ".hourly" do
+    let(:from) { Time.utc(2026, 9, 20, 15) }
+    let(:to) { Time.utc(2026, 9, 20, 18) }
+    let(:hours) { [ { forecastStart: "2026-09-20T15:00:00Z", temperature: 12.5 } ] }
+
+    before do
+      allow(HTTParty).to receive(:get).and_return(response({ forecastHourly: { hours: hours } }.to_json))
+    end
+
+    it "asks for the hourly data set of the range, with no availability call" do
+      expect(described_class.hourly(46.21, -119.16, from: from, to: to)).to eq(hours)
+
+      expect(HTTParty).to have_received(:get).once.with(
+        "#{WeatherKit::WEATHERKIT_API_URL}weather/en/46.21/-119.16",
+        hash_including(query: { dataSets: "forecastHourly", hourlyStart: "2026-09-20T15:00:00Z", hourlyEnd: "2026-09-20T18:00:00Z" },
+                       timeout: WeatherKit::HOURLY_HTTP_TIMEOUT)
+      )
+    end
+
+    it "keeps the range in the cache for a short time, thus a retry of the job makes no second call" do
+      2.times { described_class.hourly(46.21, -119.16, from: from, to: to) }
+
+      expect(HTTParty).to have_received(:get).once
+      ttl = $redis.ttl("weatherkit:hourly:46.21:-119.16:2026-09-20T15:00:00Z:2026-09-20T18:00:00Z")
+      expect(ttl).to be_between(1, WeatherKit::HOURLY_TTL.to_i)
+    end
+  end
 end

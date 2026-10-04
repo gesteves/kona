@@ -50,20 +50,29 @@ RSpec.describe ActivityDescription::Llm do
   end
 
   describe ".weather_sentence" do
-    it "returns the emoji and sentence" do
-      allow(client).to receive(:messages).and_return(
-        instance_double(Anthropic::Resources::Messages, create: message_with(weather_emoji: "🌤️", weather_sentence: "Mild and sunny"))
-      )
+    let(:messages) { instance_double(Anthropic::Resources::Messages) }
+    let(:weather) { { condition: "Clear", temperature: { min: 10.0, max: 14.0 } } }
 
-      expect(described_class.weather_sentence("18°C, sunny")).to eq(emoji: "🌤️", sentence: "Mild and sunny")
+    before { allow(client).to receive(:messages).and_return(messages) }
+
+    it "sends the summary as JSON and returns the sentence" do
+      allow(messages).to receive(:create).and_return(message_with(weather_sentence: "Clear, temps 10–14°C"))
+
+      expect(described_class.weather_sentence(weather)).to eq("Clear, temps 10–14°C")
+      expect(messages).to have_received(:create).with(
+        hash_including(messages: [ hash_including(content: "Weather data: #{weather.to_json}") ])
+      )
     end
 
-    it "returns nil when the model declines either field" do
-      allow(client).to receive(:messages).and_return(
-        instance_double(Anthropic::Resources::Messages, create: message_with(weather_emoji: nil, weather_sentence: "x"))
-      )
+    it "returns nil when the model declines" do
+      allow(messages).to receive(:create).and_return(message_with(weather_sentence: nil))
 
-      expect(described_class.weather_sentence("sparse")).to be_nil
+      expect(described_class.weather_sentence(weather)).to be_nil
+    end
+
+    it "makes no call for an empty summary" do
+      expect(described_class.weather_sentence({})).to be_nil
+      expect(client).not_to have_received(:messages)
     end
   end
 

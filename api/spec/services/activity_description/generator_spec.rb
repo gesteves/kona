@@ -8,7 +8,6 @@ RSpec.describe ActivityDescription::Generator do
       Intervals,
       athlete_timezone: "America/Denver",
       temperature_unit: :celsius,
-      activity_weather_summary: nil,
       activity_streams: nil,
       wellness: nil,
       update_activity!: nil
@@ -239,16 +238,31 @@ RSpec.describe ActivityDescription::Generator do
   end
 
   describe "the weather line" do
+    let(:streams) do
+      [
+        { type: "time", data: (0..30).map { |minute| minute * 60 } },
+        { type: "latlng", data: (0..30).map { |minute| 40.0 + (minute * 0.001) }, data2: Array.new(31, -105.0) }
+      ]
+    end
+    let(:hours) do
+      (13..15).map do |hour|
+        { forecastStart: "2026-07-09T#{hour}:00:00Z", temperature: 18.0, temperatureApparent: 18.0, windSpeed: 5.0,
+          windDirection: 180, conditionCode: "Clear", daylight: true }
+      end
+    end
+
     before do
       allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return("key")
       allow(ActivityDescription::Llm).to receive(:planned_summary).and_return(nil)
-      allow(ActivityDescription::Llm).to receive(:weather_sentence).and_return({ emoji: "🌤️", sentence: "Mild and sunny" })
+      allow(ActivityDescription::Llm).to receive(:weather_sentence).and_return("Clear and mild")
+      allow(intervals).to receive(:activity_streams).with("i1", types: %w[latlng time]).and_return(streams)
+      allow(WeatherKit).to receive(:hourly).and_return(hours)
     end
 
     it "never fetches weather for indoor activities" do
       generator.generate!("i1") # trainer: true
 
-      expect(intervals).not_to have_received(:activity_weather_summary)
+      expect(WeatherKit).not_to have_received(:hourly)
     end
 
     it "treats virtual types and Zwift sources as indoor" do
@@ -258,25 +272,43 @@ RSpec.describe ActivityDescription::Generator do
       allow(intervals).to receive(:activity!).and_return(activity.merge(trainer: nil, source: "ZWIFT"))
       generator.generate!("i1")
 
-      expect(intervals).not_to have_received(:activity_weather_summary)
+      expect(WeatherKit).not_to have_received(:hourly)
     end
 
-    it "renders the LLM sentence with its emoji for outdoor activities" do
+    it "renders the emoji of the WeatherKit condition and the LLM sentence for outdoor activities" do
       allow(intervals).to receive(:activity!).and_return(activity.merge(trainer: false))
-      allow(intervals).to receive(:activity_weather_summary).with("i1").and_return("18°C, sunny")
 
       generator.generate!("i1")
 
-      expect(intervals).to have_received(:update_activity!).with("i1", description: a_string_including("🌤️ Mild and sunny"))
+      expect(ActivityDescription::Llm).to have_received(:weather_sentence).with(hash_including(condition: "Clear"))
+      expect(intervals).to have_received(:update_activity!).with("i1", description: a_string_including("☀️ Clear and mild"))
+    end
+
+    it "gives no headwind for a swim" do
+      swim = activity.merge(type: "OpenWaterSwim", trainer: false, icu_average_watts: nil)
+      allow(intervals).to receive(:activity!).and_return(swim)
+
+      generator.generate!("i1")
+
+      expect(ActivityDescription::Llm).to have_received(:weather_sentence).with(hash_excluding(:headwind_percent))
     end
 
     it "loses only the weather line when that call fails" do
       allow(intervals).to receive(:activity!).and_return(activity.merge(trainer: false))
-      allow(intervals).to receive(:activity_weather_summary).and_return("18°C, sunny")
       allow(ActivityDescription::Llm).to receive(:weather_sentence).and_raise("timeout")
 
       generator.generate!("i1")
 
+      expect(intervals).to have_received(:update_activity!).with("i1", description: "⚡️ Avg 200 W")
+    end
+
+    it "loses only the weather line when WeatherKit has no data" do
+      allow(intervals).to receive(:activity!).and_return(activity.merge(trainer: false))
+      allow(WeatherKit).to receive(:hourly).and_return(nil)
+
+      generator.generate!("i1")
+
+      expect(ActivityDescription::Llm).not_to have_received(:weather_sentence)
       expect(intervals).to have_received(:update_activity!).with("i1", description: "⚡️ Avg 200 W")
     end
   end
@@ -306,7 +338,6 @@ RSpec.describe ActivityDescription::Generator do
   describe "without an Anthropic key" do
     it "still composes the programmatic blocks" do
       allow(intervals).to receive(:activity!).and_return(activity.merge(trainer: false, name: "Gibbs"))
-      allow(intervals).to receive(:activity_weather_summary).and_return("18°C, sunny")
       allow(trainer_road).to receive(:planned_workouts)
         .and_return([ { name: "Gibbs", sport: "Cycling", description: "2x20" } ])
 

@@ -5,6 +5,7 @@ Blizzard:
     forecast: calls for blizzard conditions
     simplified: Blizzard
   icon: snow-blowing
+  emoji: "🌨️"
 
 BlowingDust:
   adverse_weather: true
@@ -13,6 +14,7 @@ BlowingDust:
     forecast: calls for blowing dust
     simplified: Blowing dust
   icon: sun-dust
+  emoji: "💨"
 
 BlowingSnow:
   adverse_weather: true
@@ -21,6 +23,7 @@ BlowingSnow:
     forecast: calls for blowing snow
     simplified: Blowing snow
   icon: snow-blowing
+  emoji: "🌨️"
 
 Breezy:
   adverse_weather: false
@@ -29,6 +32,7 @@ Breezy:
     forecast: is breezy
     simplified: Breezy
   icon: wind
+  emoji: "🍃"
 
 Clear:
   adverse_weather: false
@@ -39,6 +43,9 @@ Clear:
   icon:
     day: sun
     night: moon-stars
+  emoji:
+    day: "☀️"
+    night: "🌙"
 
 Cloudy:
   adverse_weather: false
@@ -47,6 +54,7 @@ Cloudy:
     forecast: is cloudy
     simplified: Cloudy
   icon: clouds
+  emoji: "☁️"
 
 Drizzle:
   adverse_weather: true
@@ -55,6 +63,7 @@ Drizzle:
     forecast: calls for light rain
     simplified: Drizzle
   icon: cloud-drizzle
+  emoji: "🌧️"
 
 Dust:
   adverse_weather: true
@@ -63,6 +72,7 @@ Dust:
     forecast: calls for dusty conditions
     simplified: Dust
   icon: sun-dust
+  emoji: "🌫️"
 
 Flurries:
   adverse_weather: true
@@ -71,6 +81,7 @@ Flurries:
     forecast: calls for flurries
     simplified: Flurries
   icon: cloud-snow
+  emoji: "🌨️"
 
 Fog:
   adverse_weather: true
@@ -79,6 +90,7 @@ Fog:
     forecast: is foggy
     simplified: Fog
   icon: cloud-fog
+  emoji: "🌫️"
 
 FreezingDrizzle:
   adverse_weather: true
@@ -87,6 +99,7 @@ FreezingDrizzle:
     forecast: calls for freezing drizzle
     simplified: Freezing drizzle
   icon: cloud-hail-mixed
+  emoji: "🌧️"
 
 FreezingRain:
   adverse_weather: true
@@ -95,6 +108,7 @@ FreezingRain:
     forecast: calls for freezing rain
     simplified: Freezing rain
   icon: cloud-sleet
+  emoji: "🌧️"
 
 Frigid:
   adverse_weather: true
@@ -103,6 +117,7 @@ Frigid:
     forecast: is extremely cold
     simplified: Frigid
   icon: temperature-snow
+  emoji: "🥶"
 
 Hail:
   adverse_weather: true
@@ -111,6 +126,7 @@ Hail:
     forecast: calls for hail
     simplified: Hail
   icon: cloud-hail
+  emoji: "🧊"
 
 Haze:
   adverse_weather: true
@@ -119,6 +135,7 @@ Haze:
     forecast: is hazy
     simplified: Haze
   icon: cloud-fog
+  emoji: "🌫️"
 
 HeavyRain:
   adverse_weather: true
@@ -127,6 +144,7 @@ HeavyRain:
     forecast: calls for heavy rain
     simplified: Heavy rain
   icon: cloud-showers-heavy
+  emoji: "🌧️"
 
 HeavySnow:
   adverse_weather: true
@@ -135,6 +153,7 @@ HeavySnow:
     forecast: calls for heavy snow
     simplified: Heavy snow
   icon: snowflakes
+  emoji: "❄️"
 
 IsolatedThunderstorms:
   adverse_weather: true
@@ -143,6 +162,7 @@ IsolatedThunderstorms:
     forecast: calls for isolated thunderstorms
     simplified: Isolated thunderstorms
   icon: cloud-bolt
+  emoji: "⛈️"
 
 MixedRainAndSleet:
   adverse_weather: true
@@ -151,6 +171,7 @@ MixedRainAndSleet:
     forecast: calls for mixed rain and sleet
     simplified: Mixed rain & sleet
   icon: cloud-sleet
+  emoji: "🌨️"
 
 MixedRainAndSnow:
   adverse_weather: true
@@ -159,6 +180,7 @@ MixedRainAndSnow:
     forecast: calls for mixed rain and snow
     simplified: Mixed rain & snow
   icon: cloud-sleet
+  emoji: "🌨️"
 
 MixedRainfall:
   adverse_weather: true
@@ -167,6 +189,7 @@ MixedRainfall:
     forecast: calls for mixed rainfall
     simplified: Mixed rainfall
   icon: cloud-sleet
+  emoji: "🌧️"
 
 MixedSnowAndSleet:
   adverse_weather: true
@@ -175,6 +198,7 @@ MixedSnowAndSleet:
     forecast: calls for mixed snow and sleet
     simplified: Mixed snow & sleet
   icon: cloud-hail-mixed
+  emoji: "🌨️"
 
 MostlyClear:
   adverse_weather: false
@@ -185,6 +209,9 @@ MostlyClear:
   icon:
     day: sun-cloud
     night: moon-cloud
+  emoji:
+    day: "🌤️"
+    night: "🌙"
 
 MostlyCloudy:
   adverse_weather: false
@@ -195,6 +222,9 @@ MostlyCloudy:
   icon:
     day: clouds-sun
     night: clouds-moon
+  emoji:
+    day: "🌥️"
+    night: "☁️"
 
 PartlyCloudy:
   adverse_weather: false
@@ -205,6 +235,9 @@ PartlyCloudy:
   icon:
     day: clouds-sun
     night: clouds-moon
+  emoji:
+    day: "⛅"
+    night: "☁️"
 
 Rain:
   adverse_weather: true
@@ -213,6 +246,7 @@ Rain:
     forecast: calls for rain
     simplified: Rain
   icon: cloud-rain
+  emoji: "🌧️"
 
 ScatteredShowers:
   adverse_weather: true
@@ -221,6 +255,9 @@ ScatteredShowers:
     forecast: calls for scattered showers
     simplified: Scattered showers
   icon: cloud-showers
+  emoji:
+    day: "🌦️"
+    night: "🌧️"
 
 ScatteredSnowShowers:
   adverse_weather: true
@@ -229,6 +266,7 @@ ScatteredSnowShowers:
     forecast: calls for scattered snow showers
     simplified: Scattered snow showers
   icon: cloud-snow
+  emoji: "🌨️"
 
 SevereThunderstorm:
   adverse_weather: true
@@ -237,6 +275,7 @@ SevereThunderstorm:
     forecast: calls for severe thunderstorms
     simplified: Severe thunderstorm
   icon: bolt-lightning
+  emoji: "⛈️"
 
 Sleet:
   adverse_weather: true
@@ -245,6 +284,7 @@ Sleet:
     forecast: calls for sleet
     simplified: Sleet
   icon: cloud-snow
+  emoji: "🌨️"
 
 Smoke:
   adverse_weather: true
@@ -253,6 +293,7 @@ Smoke:
     forecast: calls for smoky conditions
     simplified: Smoke
   icon: fire-smoke
+  emoji: "🌫️"
 
 Snow:
   adverse_weather: true
@@ -261,6 +302,7 @@ Snow:
     forecast: calls for snow
     simplified: Snow
   icon: snowflake
+  emoji: "❄️"
 
 SnowShowers:
   adverse_weather: true
@@ -269,6 +311,7 @@ SnowShowers:
     forecast: calls for snow showers
     simplified: Snow showers
   icon: cloud-hail-mixed
+  emoji: "🌨️"
 
 SunFlurries:
   adverse_weather: true
@@ -277,6 +320,7 @@ SunFlurries:
     forecast: calls for sun and snow flurries
     simplified: Sun flurries
   icon: cloud-snow
+  emoji: "🌨️"
 
 SunShowers:
   adverse_weather: true
@@ -285,6 +329,7 @@ SunShowers:
     forecast: calls for sun and rain
     simplified: Sun showers
   icon: cloud-sun-rain
+  emoji: "🌦️"
 
 Thunderstorms:
   adverse_weather: true
@@ -293,6 +338,7 @@ Thunderstorms:
     forecast: calls for thunderstorms
     simplified: Thunderstorms
   icon: cloud-bolt
+  emoji: "⛈️"
 
 Tornado:
   adverse_weather: true
@@ -301,6 +347,7 @@ Tornado:
     forecast: calls for tornado conditions
     simplified: Tornado
   icon: tornado
+  emoji: "🌪️"
 
 TropicalStorm:
   adverse_weather: true
@@ -309,6 +356,7 @@ TropicalStorm:
     forecast: calls for a tropical storm
     simplified: Tropical storm
   icon: hurricane
+  emoji: "🌀"
 
 Windy:
   adverse_weather: true
@@ -317,3 +365,4 @@ Windy:
     forecast: calls for windy conditions
     simplified: Windy
   icon: wind
+  emoji: "🌬️"

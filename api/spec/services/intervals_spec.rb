@@ -69,18 +69,6 @@ RSpec.describe Intervals do
     end
   end
 
-  describe "#activity_weather_summary" do
-    it "strips the Intervals.icu attribution prefix" do
-      allow(service).to receive(:get_json!).and_return({ description: "-- Intervals icu --\n18°C, sunny, light wind" })
-      expect(service.activity_weather_summary("a1")).to eq("18°C, sunny, light wind")
-    end
-
-    it "returns nil when weather isn't available" do
-      allow(service).to receive(:get_json!).and_raise(ApplicationService::HttpError.new(404, "", "url"))
-      expect(service.activity_weather_summary("a1")).to be_nil
-    end
-  end
-
   describe "#activity_streams" do
     it "requests repeated bare types params (not HTTParty's array form)" do
       allow(service).to receive(:get_json!).and_return([])
