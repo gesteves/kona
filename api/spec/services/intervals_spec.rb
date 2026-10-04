@@ -37,18 +37,6 @@ RSpec.describe Intervals do
     end
   end
 
-  describe "#athlete_timezone" do
-    it "reads the timezone from the nested profile endpoint" do
-      allow(service).to receive(:get_json!).and_return({ athlete: { id: "i1", timezone: "America/Denver" } })
-      expect(service.athlete_timezone).to eq("America/Denver")
-    end
-
-    it "falls back to UTC on any error" do
-      allow(service).to receive(:get_json!).and_raise(ApplicationService::HttpError.new(500, "boom", "url"))
-      expect(service.athlete_timezone).to eq("UTC")
-    end
-  end
-
   describe "#temperature_unit" do
     it "honors the explicit fahrenheit flag" do
       allow(service).to receive(:get_json!).and_return({ fahrenheit: true, measurement_preference: "meters" })
@@ -152,13 +140,6 @@ RSpec.describe Intervals do
         %r{/athlete/[^/]*/weather-config\z},
         hash_including(body: { forecasts: forecasts }.to_json)
       )
-    end
-
-    it "primes the timezone cache with the same JSON encoding and 1-hour TTL athlete_timezone reads" do
-      service.cache_athlete_timezone("America/Denver")
-
-      expect($redis).to have_received(:setex)
-        .with(a_string_matching(/\Aintervals\.icu:timezone:/), 3600, "America/Denver".to_json)
     end
   end
 end

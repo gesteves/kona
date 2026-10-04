@@ -62,23 +62,28 @@ module ActivityMatcher
   # Tells if a raw Intervals.icu activity matches a Whoop workout in the standard shape. The two
   # start times must be in MAX_START_DIFF_MINUTES, with no seconds, and the two types must agree. An
   # import from Strava only, which domestique gave no type, never matches.
-  # @param icu_activity [Hash] The raw Intervals.icu activity, with symbol keys.
+  # @param icu_activity [Hash] The raw Intervals.icu activity, with symbol keys. It needs the UTC
+  #   `start_date`, thus the match needs no timezone.
   # @param whoop_workout [Hash] The Whoop workout in the standard shape:
   #   ({activity_type:, start_time:, …}).
-  # @param timezone [String] The IANA timezone of the athlete, to read start_date_local.
-  def matches?(icu_activity, whoop_workout, timezone)
+  def matches?(icu_activity, whoop_workout)
     return false if strava_only?(icu_activity)
-    return false if icu_activity[:start_date_local].blank?
 
-    # A zone that Rails does not know, or a date that it cannot parse, is no match and no error.
-    zone = Time.find_zone(timezone)
-    icu_start = zone&.parse(icu_activity[:start_date_local])
+    icu_start = start_time(icu_activity)
     return false if icu_start.nil? || whoop_workout[:start_time].nil?
 
     minutes_apart = ((icu_start - whoop_workout[:start_time]).abs / 60).to_i
 
     minutes_apart <= MAX_START_DIFF_MINUTES &&
       compatible_types?(normalize_type(icu_activity[:type]), whoop_workout[:activity_type])
+  end
+
+  # @param icu_activity [Hash] The raw Intervals.icu activity.
+  # @return [Time, nil] Its UTC start, or nil when it has none or the code cannot parse it.
+  def start_time(icu_activity)
+    Time.iso8601(icu_activity[:start_date].to_s)
+  rescue ArgumentError
+    nil
   end
 
   # The Intervals.icu API cannot give an import from Strava only, because of the API terms of

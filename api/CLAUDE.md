@@ -53,6 +53,7 @@ edge serves a cached copy before it gets a new one.
 | GET | `/api/related` | `{contentful id => [related ids]}` from the BM25 index of the article text, the links between the entries, and the concepts, for the build's static "You May Also Like" section | — |
 | POST | `/webhooks/contentful` | enqueues PDS sync, asset-mirror, and site-build jobs; 204 | — |
 | POST | `/webhooks/whoop` | enqueues `WhoopWebhookJob`; 200 `{ok: true}` | — |
+| GET/POST | `/webhooks/strava` | GET answers the subscription challenge; POST enqueues `StravaActivityJob` for a new activity; 200 | — |
 | GET | `/whoop/auth`, `/whoop/callback` | Whoop OAuth (authorize is owner-gated) | — |
 | GET | `/signin`, `/auth/google_oauth2/callback`; POST `/signout` | owner session | `no-store` |
 | GET | `/`, `/spam`, `/location`, `/connected-apps`, `/course-maps`, `/course-maps/:id` | admin UI (owner-session gated) | `no-store` |
@@ -68,6 +69,7 @@ edge serves a cached copy before it gets a new one.
 | GET/POST/DELETE | `/connected-apps/bluesky` | the Bluesky handle + app password form, and disconnect | `no-store` |
 | GET/POST/DELETE | `/connected-apps/mastodon`; GET `/connected-apps/mastodon/callback` | the Mastodon instance form, the OAuth callback, and disconnect | `no-store` |
 | GET | `/connected-apps/threads/authorize`, `/connected-apps/threads/callback`; DELETE `/connected-apps/threads` | Threads OAuth, and disconnect | `no-store` |
+| GET | `/connected-apps/strava/authorize`, `/connected-apps/strava/callback`; DELETE `/connected-apps/strava` | Strava OAuth, and disconnect | `no-store` |
 | GET/POST/DELETE | `/connected-apps/trainerroad` | the TrainerRoad calendar-URL form, and disconnect | `no-store` |
 | GET | `/location/lookup` | resolves an `address` or a coordinate pair to `{latitude, longitude, place}`. ⚠️ **Never writes** | `no-store` |
 | POST | `/location` | same write as `POST /api/location`, coordinates only; answers with the coordinates and the geocoded place | `no-store` |
@@ -108,7 +110,8 @@ bearer token (`TokenAuthentication`), through a `before_action` for each action.
 request to the widget origin fails, with a fast 401 before any work. A new widget endpoint gets that
 check when it inherits from the base controller. `standard-site` does not use it: it is public and
 the build gets it. A webhook controller does not use the bearer token at all: a sender cannot have
-our token, thus each one uses the HMAC method of its own service.
+our token, thus each one uses the HMAC method of its own service. ⚠️ Strava signs nothing: refer to
+**Webhooks**.
 
 **The owner authentication.** A **Google OAuth** sign-in for one identity controls `/whoop/auth` and
 `/sidekiq`, and the bearer token does not. `SessionsController` does the OmniAuth flow and accepts a
@@ -123,7 +126,7 @@ mount.
 API: Intervals.icu, Apple WeatherKit (with an ES256 JWT), Google Maps (`GoogleMaps` finds an address
 from coordinates, and `GoogleGeocoder` finds coordinates from an address), Google Air Quality, Google
 Pollen, PurpleAir, Whoop (OAuth2), TrainerRoad (iCal), Contentful, Plausible, Font Awesome,
-Goodspeed, Akismet, Resend, Turnstile, Mastodon (OAuth2), Threads (OAuth2), `StandardSite`, `Bluesky`,
+Goodspeed, Akismet, Resend, Turnstile, Mastodon (OAuth2), Threads (OAuth2), Strava (OAuth2), `StandardSite`, `Bluesky`,
 `OpenGraph`,
 `AssetMirror`, and `BlurhashPlaceholder`.
 The two article rankings, `TrendingArticles` and `RelatedArticles`, share `ArticleRanking`. Four
@@ -131,11 +134,11 @@ more classes hold the parts of the "You May Also Like" score: `ArticleIndex` is 
 the article text, `ArticleTaxonomy` is the concept overlap, `ArticleLinks` is the links between
 the entries, and `RelatedInspector` makes the reports of `rake related:*`. `TrendingInspector`
 makes the reports of `rake trending:*`. Refer to **The article rankings**.
-Eight more are not subclasses of `ApplicationService`, because they are not cacheable reads:
+More classes are not subclasses of `ApplicationService`, because they are not cacheable reads:
 `SpamQuarantine`, `TrackLibrary`, `BlueskyCredentials`, `MastodonCredentials`,
-`ThreadsCredentials`, and `TrainerRoadCredentials` use Redis only and no HTTP; `GpxTrack` parses
+`ThreadsCredentials`, `StravaCredentials`, and `TrainerRoadCredentials` use Redis only and no HTTP; `GpxTrack` parses
 only; and `MapboxTileset` and `StaticMap` are different (refer to **The
-course-map renderer**). The four credential stores share the `EncryptedCredentials` concern,
+course-map renderer**). The five credential stores share the `EncryptedCredentials` concern,
 which encrypts each secret field, and `WhoopCredentials` gives the Whoop tokens, which keep their
 own keys with a TTL, the same encryption. ⚠️ **Never change the `ENCRYPTION_SALT` of a store**: the salt is
 part of the key, thus a new salt makes each stored secret unreadable and each card says "not
@@ -386,6 +389,24 @@ The processor then adds a separate `ActivityDescriptionJob` to the queue. The tw
 on purpose: if the Whoop integration goes away, the metric sync stops but the descriptions continue
 to work, and only the 🔥 line is absent.
 
+`Webhooks::StravaController` takes the Strava events. A new activity adds `StravaActivityJob`, which
+finds the Intervals.icu activity with that `strava_id` and adds its `ActivityDescriptionJob`.
+⚠️ **Strava does not sign an event.** Thus the controller accepts only our `subscription_id` and the
+`owner_id` of the connected athlete, and it uses only the id and the time of the event. A forged
+event can then only start the description of one of our own activities again.
+
+- ⚠️ **It acts on `aspect_type: create` only.** Our own PUT of the name and the description makes
+  an `update` event, and a handler of that event would loop.
+- ⚠️ **It ignores an `athlete` deauthorization**, on purpose: a forged one would remove the
+  connection. A true one shows on the Connected apps card at the next token refresh.
+- ⚠️ **Strava sends the event before Intervals.icu has the activity**, or before it knows the Strava
+  id. Thus `StravaActivityJob` tries again after 1, 2, 3, 4, and 5 minutes, then stops with a log
+  line and stays out of the Dead set. It does not use the 24-hour window of `ApplicationJob`.
+- **`rake strava:subscribe` makes the subscription**, or finds the one that exists, and stores its id
+  at `strava:subscription_id`. ⚠️ Strava permits ONE subscription for each app, and it GETs the
+  callback with a challenge before it answers. Thus deploy `STRAVA_WEBHOOK_VERIFY_TOKEN` first. With
+  no stored id, the controller refuses each event, thus run the task again after a Redis flush.
+
 ### Background jobs
 
 **Sidekiq** directly (`Sidekiq::Job`, and not ActiveJob), in `app/jobs/`. Each job inherits from
@@ -401,7 +422,8 @@ Thus that shared window is safe.
 | `AssetBlurhashJob(asset_id)` | Makes the blurhash placeholder of one image asset. It fails soft. |
 | `SiteBuildJob(event_type)` | fires a GitHub `repository_dispatch` to rebuild the web site. ⚠️ The one job that a caller schedules, with `perform_at` |
 | `WhoopWebhookJob(event_type, resource_id, trace_id)` | syncs Whoop metrics to Intervals.icu |
-| `ActivityDescriptionJob(activity_id, whoop_strain = nil)` | (re)generates an activity's Strava description and tidies its name |
+| `StravaActivityJob(strava_id, event_time)` | finds the Intervals.icu activity of a new Strava activity, then adds its description job. ⚠️ Its own retry: 1 to 5 minutes, five times |
+| `ActivityDescriptionJob(activity_id)` | (re)generates an activity's description and tidies its name, and PUTs both to Strava |
 | `LocationSyncJob(latitude, longitude)` | propagates the current location to Intervals.icu |
 | `BlueskyPostJob(posts, index, reply)` | posts one post of a thread to Bluesky, then adds the job of the next. ⚠️ The three post jobs inherit from `SocialPostJob`, which holds the enqueue lock: a retry after the enqueue must not add the next job a second time, and Threads has no idempotency on its side |
 | `MastodonPostJob(posts, index, in_reply_to_id)` | the same, for Mastodon |
@@ -439,9 +461,21 @@ Thus that shared window is safe.
   line is for a structured workout alone. `TrainerRoad#workouts`, which the widgets read for the
   rest-day check, counts a race leg: race day must not read as a rest day. The prompts are in `app/prompts/`, and the job omits those two
   lines with no `ANTHROPIC_API_KEY`. It keeps the text that the user wrote above the stat block. A
-  Redis lock stops a second job for the same activity. The same PUT also corrects a name from Rouvy
-  (`ROUVY - <route> - <date>` becomes `Rouvy - <route>`), thus it can write even when the
-  description is empty.
+  Redis lock stops a second job for the same activity, and that job runs again a minute later. The
+  same PUT also corrects a name from Rouvy (`ROUVY - <route> - <date>` becomes `Rouvy - <route>`),
+  thus it can write even when the description is empty.
+- **The description goes to STRAVA, and not to Intervals.icu.** Each line still comes from the
+  Intervals.icu activity, TrainerRoad, WeatherKit, and Whoop. The Intervals.icu activity gives
+  `strava_id`, and an activity with no Strava id yet gets nothing: the Strava webhook starts a run
+  when the copy arrives.
+  - ⚠️ **The headline and the name come from the Strava copy** (`Strava#activity`). The owner writes
+    there, and Intervals.icu gets that text only after a sync. ⚠️ No Strava data goes to the LLM,
+    and this integration shows no Strava data to another person.
+  - ⚠️ **The generator gets the Whoop strain from Whoop itself** (`Whoop#workouts_between`, then
+    `ActivityMatcher`), and not from an argument. Thus the Strava run and the Whoop run give the
+    same description, and the run that comes last has the 🔥 line.
+  - ⚠️ **A second run gives `:busy` and runs again, and it does not skip.** The two webhooks can
+    arrive close together, and the second run can be the one with the strain.
 - **The weather line comes from WeatherKit, and not from Intervals.icu.**
   `ActivityDescription::Weather` takes a sample of the GPS track each 10 minutes, gets the past
   hours of each area, and aggregates them over the full activity. The LLM writes the sentence
@@ -765,7 +799,7 @@ A group is only a caption above its own `<ul>` of those same links:
   `_base.scss` gives to each inline SVG. The viewBox of a Font Awesome icon is not always square,
   thus at an automatic width no two labels in the column start at the same x.
 
-**Connected apps** (`/connected-apps`) connects Whoop, Bluesky, Mastodon, Threads, and
+**Connected apps** (`/connected-apps`) connects Whoop, Bluesky, Mastodon, Threads, Strava, and
 TrainerRoad, and disconnects them.
 `ConnectedAppPresenter` renders three states from `connected?` and an optional `error:` string. The
 third state, `:error`, means connected but broken, and it gives **both** Reconnect and Disconnect. A
@@ -776,19 +810,20 @@ costs a new authorization or a new app password.
 
 ⚠️ **A card is on the page only when its integration can operate.** `#show` calls `valid_credentials?`
 and leaves out the card of an integration whose credentials are absent from the environment, thus
-there is no `:unconfigured` state and no card that offers no action. Today that applies to **Whoop**
-and **Threads**. Bluesky, Mastodon, and TrainerRoad have no such configuration — their credentials
+there is no `:unconfigured` state and no card that offers no action. Today that applies to **Whoop**,
+**Threads**, and **Strava**. Bluesky, Mastodon, and TrainerRoad have no such configuration — their credentials
 *are* the connection — thus their cards are always there and the page is never empty.
 
 **A card that is connected names its account** — "Connected as …" — and a card that is not connected
-says what the integration does. `#card_description` makes that one line for each of the five.
+says what the integration does. `#card_description` makes that one line for each of the six.
 TrainerRoad names none: a calendar feed has no account, thus its connected card says "Connected."
 ⚠️ **Each of those names comes from Redis, and no card makes a request to get one.** That page
 renders on each load of the admin, thus a fetch would put an upstream failure in the path of the
 navigation. `StandardSite#connected?` has the same rule, and its comment gives the reason.
 
 ⚠️ **Each call to another service from a connect or a disconnect action has a timeout**
-(`Mastodon::REQUEST_TIMEOUT`, `Threads::REQUEST_TIMEOUT`, and `AtProto::SESSION_TIMEOUT`). Those
+(`Mastodon::REQUEST_TIMEOUT`, `Threads::REQUEST_TIMEOUT`, `Strava::REQUEST_TIMEOUT`, and
+`AtProto::SESSION_TIMEOUT`). Those
 actions run in a request with a 20-second rack-timeout, and that timeout raises an exception that
 is **not** a `StandardError`, thus `rescue_with` does not catch it. Without the timeouts a host that
 hangs gives a 500 in place of the message of the page, and a disconnect never reaches its clear.
@@ -857,7 +892,7 @@ hangs gives a 500 in place of the message of the page, and a disconnect never re
   - ⚠️ **The callback is an admin page, thus the owner session controls it**, and the one-time state
     controls it a second time. The state is in the session (`OauthState`), thus only the browser
     that started the flow can complete it, and it goes away after a successful exchange only.
-    Whoop, Mastodon, and Threads share that concern.
+    Whoop, Mastodon, Threads, and Strava share that concern.
   - ⚠️ **The instance ties the scope to the token that it gives.** Thus a change to
     `Mastodon::SCOPES` needs a new registration and a new authorization, and the owner must connect
     the account again. `write:statuses` and `write:media` are what `Mastodon#post!` needs; refer
@@ -917,6 +952,21 @@ hangs gives a 500 in place of the message of the page, and a disconnect never re
     green badge and a post job that retried for 24 hours.
   - ⚠️ **A token response with no `expires_in` gets `DEFAULT_TOKEN_LIFETIME`.** With `nil.to_i`
     the token expired at once, and `refresh!` then never touched it.
+- **Strava** does the same OAuth round trip as Threads, with `STRAVA_CLIENT_ID` and
+  `STRAVA_CLIENT_SECRET` from the environment and the callback URL from the request.
+  `Admin::StravaController` has the three actions, and `StravaCredentials` keeps both tokens in the
+  Redis hash `strava:credentials`, encrypted. The card names the athlete.
+  - ⚠️ **The Authorization Callback Domain of the Strava app must be the admin host.** Strava checks
+    the host only, and an app has ONE domain. Thus use a second Strava app with `localhost` for
+    local work.
+  - ⚠️ **The scopes are `activity:read_all` and `activity:write`, and the callback checks both.**
+    Strava permits an edit only of an activity that the read scope can see, and the athlete can
+    clear a scope on the Strava screen. A token without both cannot do its one job.
+  - **The access token lasts 6 hours, and the code refreshes it when it needs one.** ⚠️ Strava can
+    give a new refresh token at each refresh, thus `StravaCredentials.store_tokens` replaces both,
+    and a Redis lock lets one refresh run at a time. An idle refresh token does not expire, thus
+    there is no scheduled refresh job. A refused refresh gives the `:error` state, as for Whoop.
+  - `disconnect!` revokes the access at Strava, then clears the store whether that call works or not.
 - **TrainerRoad** is a calendar feed and not an account: the iCalendar URL *is* the connection.
   Thus it connects with a form at `/connected-apps/trainerroad`, as Bluesky does, and
   `Admin::TrainerRoadController` has all three of its actions. `TrainerRoadCredentials` keeps the
@@ -2276,8 +2326,8 @@ That one instance holds three kinds of data, and only the first kind comes back 
 2. **The locks and the idempotency records**, for example `build:trigger_lock`,
    `threads:published:*`, and `mastodon:status:*`, and the photos of a draft on the Social media
    page, `social:photo:*`. Each key has a TTL.
-3. **The durable records. This Redis is their only copy**: `contact:spam`, `maps:tracks`, the four
-   `*:credentials` hashes, `whoop:<client id>:refresh_token`, `location:current`,
+3. **The durable records. This Redis is their only copy**: `contact:spam`, `maps:tracks`, the five
+   `*:credentials` hashes, `whoop:<client id>:refresh_token`, `strava:subscription_id`, `location:current`,
    `standard_site:did`, and `standard_site:fingerprints`. **None of them has a TTL.**
 
 ⚠️ **`maxmemory-policy` is `volatile-lru` for that reason**, and `redis/fly.toml` gives the full
@@ -2408,7 +2458,10 @@ value is a secret of fly.io, and Rails also uses `config/credentials.yml.enc` an
   of the Meta dashboard. ⚠️ There is no redirect-URI variable: the callback URL comes from the
   request, and the dashboard must list `https://<your-admin-host>/connected-apps/threads/callback`.
   ⚠️ The *account* is connected on the admin page, and its token lives 60 days and cannot be renewed
-  after it expires, thus `ThreadsTokenRefreshJob` needs the worker process to run), `BUGSNAG_API_KEY` (for production
+  after it expires, thus `ThreadsTokenRefreshJob` needs the worker process to run), `STRAVA_CLIENT_ID`,
+  `STRAVA_CLIENT_SECRET`, and `STRAVA_WEBHOOK_VERIFY_TOKEN` (the Strava API app, and a value of your
+  choice that `rake strava:subscribe` sends. With no client values the Strava card is off the page
+  and the descriptions write nothing), `BUGSNAG_API_KEY` (for production
   only), `ALLOWED_HOSTS` (a list of permitted `Host` values, separated by a comma; for production
   only. With no value the app accepts each host, thus it is safe to deploy before you set it, and
   `/up` is always exempt), `API_HOST` (the public API host name. With no value the app draws each

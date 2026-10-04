@@ -68,6 +68,19 @@ class Whoop < ApplicationService
     end
   end
 
+  # Gets the scored workouts that started in a time range. A workout with no score has no strain,
+  # thus the code leaves it out.
+  # @param from [Time] The start of the range.
+  # @param to [Time] The end of the range.
+  # @return [Array<Hash>] The workouts in the standard shape. Refer to #normalize_workout.
+  # @raise [StandardError] On a failure, as #get_workout does. The description generator catches it.
+  def workouts_between(from, to)
+    page = authed_get!("activity/workout", { start: from.utc.iso8601, end: to.utc.iso8601, limit: 25 })
+    Array(page&.dig(:records))
+      .select { |workout| workout[:score_state] == "SCORED" && workout[:score].present? }
+      .map { |workout| normalize_workout(workout) }
+  end
+
   # Gets one workout by UUID.
   # @return [Hash, nil] The workout in the standard shape, or nil if it is absent or has no
   #   score. A workout with no score has no strain.

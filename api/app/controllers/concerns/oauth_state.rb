@@ -1,6 +1,7 @@
 require "securerandom"
 
-# The one-time `state` of an OAuth round trip. The Whoop, Mastodon, and Threads flows all use it.
+# The one-time `state` of an OAuth round trip. The Whoop, Mastodon, Threads, and Strava flows all use
+# it.
 #
 # ⚠️ The state is in the session, and not in Redis. Thus only the browser that started the flow
 # can complete it, a second flow in another browser cannot cancel the first, and the callback of

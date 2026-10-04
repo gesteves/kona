@@ -9,8 +9,7 @@ RSpec.describe LocationSync do
       athlete_profile: profile,
       weather_config: forecasts,
       update_athlete_profile: nil,
-      update_weather_config: nil,
-      cache_athlete_timezone: nil
+      update_weather_config: nil
     )
   end
 
@@ -36,23 +35,21 @@ RSpec.describe LocationSync do
 
   before { allow(LocationContext).to receive(:new).with(39.7, -104.9).and_return(context) }
 
-  it "writes nothing (and primes nothing) when Intervals.icu already matches" do
+  it "writes nothing when Intervals.icu already matches" do
     sync.call(39.7, -104.9)
 
     expect(intervals).not_to have_received(:update_athlete_profile)
     expect(intervals).not_to have_received(:update_weather_config)
-    expect(intervals).not_to have_received(:cache_athlete_timezone)
   end
 
   context "when a profile field differs" do
     before { allow(intervals).to receive(:athlete_profile).and_return(profile.merge(city: "Boulder")) }
 
-    it "updates the profile with only the resolved fields and primes the timezone cache" do
+    it "updates the profile with only the resolved fields" do
       sync.call(39.7, -104.9)
 
       expect(intervals).to have_received(:update_athlete_profile)
         .with(city: "Denver", state: "Colorado", country: "United States", timezone: "America/Denver")
-      expect(intervals).to have_received(:cache_athlete_timezone).with("America/Denver")
     end
   end
 
@@ -66,12 +63,6 @@ RSpec.describe LocationSync do
         [ hash_including(id: 0, provider: "OPEN_WEATHER", location: "Denver, Colorado, United States",
                         label: "Denver, Colorado", lat: 39.7, lon: -104.9, enabled: true) ]
       )
-    end
-
-    it "does not prime the timezone cache when only the weather config changed" do
-      sync.call(39.7, -104.9)
-
-      expect(intervals).not_to have_received(:cache_athlete_timezone)
     end
   end
 
@@ -89,12 +80,11 @@ RSpec.describe LocationSync do
       allow(intervals).to receive(:athlete_profile).and_return(profile.merge(city: "Boulder"))
     end
 
-    it "omits the timezone from the write and does not prime the cache" do
+    it "omits the timezone from the write" do
       sync.call(39.7, -104.9)
 
       expect(intervals).to have_received(:update_athlete_profile)
         .with(city: "Denver", state: "Colorado", country: "United States")
-      expect(intervals).not_to have_received(:cache_athlete_timezone)
     end
   end
 

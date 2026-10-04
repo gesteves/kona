@@ -10,6 +10,17 @@ class Location
     @latitude, @longitude = self.class.override || self.class.stored
   end
 
+  # The IANA timezone id of this location. The widgets, the stats of Intervals.icu, the Whoop sync,
+  # and the activity description all read it, thus a trip changes each one at the same time.
+  # @return [String] It is never nil: with no coordinates, or when the geocode fails, it gives
+  #   TimeZoneResolver.default.
+  def time_zone
+    TimeZoneResolver.call(latitude, longitude)
+  rescue StandardError => e
+    ErrorReporter.report_upstream(e, service: "GoogleMaps", context: "Location#time_zone")
+    TimeZoneResolver.default
+  end
+
   # Checks a latitude and longitude pair.
   # @return [Boolean] True if the two coordinates are available and in the correct range.
   def self.valid_coordinates?(latitude, longitude)

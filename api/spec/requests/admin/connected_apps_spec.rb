@@ -10,12 +10,12 @@ RSpec.describe "Admin connected apps", type: :request do
     # Bluesky, Mastodon, and TrainerRoad each have their own card on this page. Remove their
     # credentials, thus the Whoop examples do not depend on the credentials that are available.
     $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY, ThreadsCredentials::REDIS_KEY,
-               TrainerRoadCredentials::REDIS_KEY)
+               TrainerRoadCredentials::REDIS_KEY, StravaCredentials::REDIS_KEY)
   end
 
   after do
     $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY, ThreadsCredentials::REDIS_KEY,
-               TrainerRoadCredentials::REDIS_KEY)
+               TrainerRoadCredentials::REDIS_KEY, StravaCredentials::REDIS_KEY)
   end
 
   def sign_in!
@@ -265,6 +265,56 @@ RSpec.describe "Admin connected apps", type: :request do
         get "/connected-apps"
 
         expect(response.body).not_to include("00000000-0000-4000-8000-000000000000")
+      end
+    end
+  end
+
+  describe "the Strava card" do
+    before do
+      sign_in!
+      allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(false)
+      allow(ENV).to receive(:[]).with("STRAVA_CLIENT_ID").and_return("client-id")
+      allow(ENV).to receive(:[]).with("STRAVA_CLIENT_SECRET").and_return("client-secret")
+    end
+
+    it "offers the authorize link when no athlete is connected" do
+      get "/connected-apps"
+
+      expect(response.body).to include(I18n.t("admin.networks.strava"))
+      expect(response.body).to include("/connected-apps/strava/authorize")
+    end
+
+    it "leaves the card off the page without the Strava app credentials" do
+      allow(ENV).to receive(:[]).with("STRAVA_CLIENT_ID").and_return(nil)
+
+      get "/connected-apps"
+
+      expect(response.body).not_to include("/connected-apps/strava/authorize")
+    end
+
+    context "when an athlete is connected" do
+      before do
+        StravaCredentials.store_athlete(
+          athlete_id: 42, athlete_name: "Jane Doe",
+          access_token: "an-access-token", refresh_token: "a-refresh-token", expires_at: 6.hours.from_now.to_i
+        )
+      end
+
+      it "names the athlete, offers Disconnect, and never renders a token" do
+        get "/connected-apps"
+
+        expect(response.body).to include(I18n.t("admin.connected_apps.account.named", account: "Jane Doe"))
+        expect(response.body).to match(%r{<form[^>]*action="/connected-apps/strava"}m)
+        expect(response.body).not_to include("an-access-token")
+        expect(response.body).not_to include("a-refresh-token")
+      end
+
+      it "says that a refused refresh needs attention" do
+        StravaCredentials.record_refresh_error(401)
+
+        get "/connected-apps"
+
+        expect(response.body).to include(ERB::Util.html_escape(I18n.t("admin.connected_apps.strava.consequence")))
       end
     end
   end

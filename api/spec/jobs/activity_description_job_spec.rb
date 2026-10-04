@@ -5,13 +5,8 @@ RSpec.describe ActivityDescriptionJob do
 
   before { allow(ActivityDescription::Generator).to receive(:new).and_return(generator) }
 
-  it "generates the description for the activity, passing the optional Whoop strain" do
-    expect(generator).to receive(:generate!).with("i1", whoop_strain: 12.4, lock_token: nil)
-    described_class.new.perform("i1", 12.4)
-  end
-
-  it "generates without a strain when none is supplied (e.g. a non-Whoop trigger)" do
-    expect(generator).to receive(:generate!).with("i1", whoop_strain: nil, lock_token: nil)
+  it "generates the description for the activity" do
+    expect(generator).to receive(:generate!).with("i1", lock_token: nil)
     described_class.new.perform("i1")
   end
 
@@ -19,8 +14,17 @@ RSpec.describe ActivityDescriptionJob do
   it "gives its jid to the generator as the lock token" do
     job = described_class.new
     job.jid = "job-1"
-    expect(generator).to receive(:generate!).with("i1", whoop_strain: nil, lock_token: "job-1")
+    expect(generator).to receive(:generate!).with("i1", lock_token: "job-1")
     job.perform("i1")
+  end
+
+  # ⚠️ The second of two close webhooks can be the run with the Whoop strain, thus it must not go away.
+  it "runs again later when another run holds the lock" do
+    allow(generator).to receive(:generate!).and_return(:busy)
+
+    described_class.new.perform("i1")
+
+    expect(described_class).to have_enqueued_sidekiq_job("i1").in(described_class::BUSY_DELAY)
   end
 
   it "retries failed jobs for up to 24 hours" do

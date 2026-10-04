@@ -1,7 +1,11 @@
 module ActivityDescription
-  # Makes a description for an Intervals.icu activity that Strava can show, corrects the name of
-  # the activity, then PUTs both back. It controls the collection of the data, the two lines that
-  # Anthropic writes, and the block functions of Composer.
+  # Makes the description of an activity from its Intervals.icu data, corrects its name, then PUTs
+  # both to the Strava copy of the activity. It controls the collection of the data, the two lines
+  # that Anthropic writes, and the block functions of Composer.
+  #
+  # ⚠️ It reads only the name and the description from Strava, to keep the words that the owner wrote
+  # there. Each line comes from Intervals.icu, TrainerRoad, WeatherKit, or Whoop, and no Strava data
+  # goes to the LLM.
   class Generator
     # This goes at the start of each log line from this generator, thus you can find them with
     # grep.
@@ -23,25 +27,33 @@ module ActivityDescription
     # worker that stops holds the lock.
     LOCK_TTL = 10.minutes
 
-    def initialize(intervals: Intervals.new, trainer_road: nil)
+    # The time before the start and after the end of an activity in which the code looks for its
+    # Whoop workout.
+    WHOOP_WINDOW = 1.hour
+
+    def initialize(intervals: Intervals.new, strava: Strava.new, whoop: Whoop.new, location: Location.new, trainer_road: nil)
       @intervals = intervals
+      @strava = strava
+      @whoop = whoop
+      @location = location
       @trainer_road = trainer_road
     end
 
-    # Makes the description for an activity and writes it.
+    # Makes the description for an activity and writes it to Strava.
     # @param activity_id [String, Integer] The Intervals.icu activity id.
-    # @param whoop_strain [Float, nil] The Whoop strain for the 🔥 line, which is optional, or nil.
-    #   The code then makes the description without that line, for example when the trigger is not
-    #   Whoop.
-    def generate!(activity_id, whoop_strain: nil, lock_token: nil)
+    # @param lock_token [String, nil] The token of the lock. Refer to #with_dedup_lock.
+    # @return [Symbol, nil] :busy when another run holds the lock of this activity. The job then
+    #   runs again later.
+    def generate!(activity_id, lock_token: nil)
       with_dedup_lock(activity_id, lock_token) do
-        run(activity_id, whoop_strain)
+        run(activity_id)
+        nil
       end
     end
 
     private
 
-    def run(activity_id, whoop_strain)
+    def run(activity_id)
       activity = @intervals.activity!(activity_id)
       sport = ActivityMatcher.normalize_type(activity[:type])
 
@@ -54,21 +66,37 @@ module ActivityDescription
         return
       end
 
+      # ⚠️ Stop before the LLM calls. An activity with no Strava copy cannot take a description, and
+      # the Strava webhook starts a new run when the copy arrives.
+      strava_id = activity[:strava_id].presence
+      if strava_id.nil?
+        log_info("activity #{activity_id} has no Strava id yet — skipping")
+        return
+      end
+      unless @strava.connected?
+        log_info("Strava is not connected — skipping activity #{activity_id}")
+        return
+      end
+
+      # The owner writes in Strava, and Intervals.icu gets that text only after a sync. Thus the
+      # headline and the name come from Strava.
+      current = @strava.activity(strava_id)
+
       swim = sport == "Swimming"
       description = Composer.compose(
-        headline: Composer.headline(activity[:description]),
+        headline: Composer.headline(current[:description]),
         planned: planned_summary_line(activity, sport),
         weather: weather_line(activity, swim),
         water_temp: water_temp_line(activity, swim),
         power: Composer.power_block(activity),
         heat: heat_line(activity, swim),
-        whoop: Composer.whoop_block(whoop_strain, swim: swim)
+        whoop: Composer.whoop_block(whoop_strain(activity, swim), swim: swim)
       )
 
-      name = Composer.clean_name(activity[:name])
+      name = Composer.clean_name(current[:name])
 
       fields = {}
-      fields[:name] = name if name.present? && name != activity[:name]
+      fields[:name] = name if name.present? && name != current[:name]
       fields[:description] = description if description.present?
 
       if fields.empty?
@@ -76,8 +104,25 @@ module ActivityDescription
         return
       end
 
-      @intervals.update_activity!(activity_id, **fields)
-      log_info("activity #{activity_id}: updated #{fields.keys.join(', ')}")
+      @strava.update_activity!(strava_id, **fields)
+      log_info("activity #{activity_id} (Strava #{strava_id}): updated #{fields.keys.join(', ')}")
+    end
+
+    # The strain of the Whoop workout that matches the activity, for the 🔥 line. The code asks
+    # Whoop at each run, thus the Strava trigger and the Whoop trigger give the same line.
+    # @return [Float, nil] Nil for a swim, with no Whoop connection, or with no match.
+    def whoop_strain(activity, swim)
+      return if swim
+      return unless @whoop.valid_credentials? && @whoop.connected?
+
+      start = ActivityMatcher.start_time(activity)
+      return if start.nil?
+
+      duration = (activity[:elapsed_time] || activity[:moving_time]).to_i.seconds
+      swallow("Whoop strain") do
+        workouts = @whoop.workouts_between(start - WHOOP_WINDOW, start + duration + WHOOP_WINDOW)
+        workouts.find { |workout| ActivityMatcher.matches?(activity, workout) }&.dig(:strain)
+      end
     end
 
     # The 🗓️ planned-workout summary: the one TrainerRoad workout whose name is in the name of the
@@ -137,7 +182,7 @@ module ActivityDescription
         date = activity_date(activity)
         next [] if date.nil?
 
-        trainer_road = @trainer_road || TrainerRoad.new(@intervals.athlete_timezone)
+        trainer_road = @trainer_road || TrainerRoad.new(@location.time_zone)
         trainer_road.planned_workouts(date) || []
       end
     end
@@ -240,16 +285,20 @@ module ActivityDescription
       fallback
     end
 
+    # Runs the block when no other run holds the lock of this activity.
+    #
+    # ⚠️ A second run gives :busy, and it does not skip. The Strava webhook and the Whoop webhook can
+    # arrive close together, and the run that comes second can be the one with the Whoop strain.
     # ⚠️ The token lets a RETRY of the same job enter its own lock. A process that dies leaves
     # the lock for LOCK_TTL, and the retry comes some seconds later: without the token it would
-    # read the lock as another run, skip with no error, and the activity would never get its
-    # description.
+    # read the lock as another run.
+    # @return [Object, Symbol] The value of the block, or :busy.
     def with_dedup_lock(activity_id, token)
       key = "activity:description_lock:#{activity_id}"
       token = token.presence || "1"
       unless $redis.set(key, token, nx: true, ex: LOCK_TTL.to_i) || $redis.get(key) == token
-        log_info("activity #{activity_id}: description already being generated — skipping duplicate")
-        return
+        log_info("activity #{activity_id}: another run holds the lock — trying again later")
+        return :busy
       end
 
       begin

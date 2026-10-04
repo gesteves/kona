@@ -24,18 +24,6 @@ class Intervals < ApplicationService
     summarize_activities(activities)
   end
 
-  # The IANA timezone of the athlete. The cache holds it for an hour. On an error it gives UTC.
-  # The cache does not hold a failure, thus the next call tries again.
-  # @return [String]
-  def athlete_timezone
-    cached_json("intervals.icu:timezone:#{@athlete_id}", expires_in: 1.hour) do
-      get_json!("#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/profile", basic_auth: auth)&.dig(:athlete, :timezone) || "UTC"
-    end
-  rescue StandardError => e
-    Rails.logger.warn("Intervals: failed to fetch athlete timezone, falling back to UTC: #{e.message}")
-    "UTC"
-  end
-
   # The temperature unit that the athlete prefers. The cache holds it for an hour. A fahrenheit
   # flag has the highest importance. In all other conditions a metric athlete gets celsius.
   # @return [Symbol] :celsius or :fahrenheit.
@@ -165,17 +153,6 @@ class Intervals < ApplicationService
     )
   end
 
-  # Replaces the athlete timezone in the cache, thus a value from a new PUT appears immediately
-  # and not after the TTL ends. It writes the value in the same shape as athlete_timezone, thus
-  # cached_json can read it. It does nothing in development, where the code does not use the
-  # cache.
-  # @param timezone [String] An IANA timezone id.
-  def cache_athlete_timezone(timezone)
-    return if Rails.env.development?
-
-    $redis.setex("intervals.icu:timezone:#{@athlete_id}", 1.hour.to_i, timezone.to_json)
-  end
-
   private
 
   # The HTTP Basic credentials: the user name is the text "API_KEY", and the password is the key.
@@ -189,9 +166,9 @@ class Intervals < ApplicationService
   def fetch_activities
     # The negative TTL is a delay: without it, an outage costs a full request on each page.
     cached_json("intervals.icu:stats:#{@athlete_id}", expires_in: 5.minutes, empty_expires_in: 1.minute, symbolize: false) do
-      # Use the zone of the athlete, not the zone of the server. If you do not, the limits of the
-      # window move by one day.
-      today = Time.current.in_time_zone(athlete_timezone).to_date
+      # Use the zone of the current location, not the zone of the server. If you do not, the limits
+      # of the window move by one day.
+      today = Time.current.in_time_zone(Location.new.time_zone).to_date
       newest = today.to_s
       oldest = (today << 1).to_s
 

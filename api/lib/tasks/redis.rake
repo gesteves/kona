@@ -20,6 +20,7 @@ namespace :redis do
       [ "course-map tracks",    TrackLibrary::REDIS_KEY ],
       [ "bluesky",              BlueskyCredentials::REDIS_KEY ],
       [ "mastodon",             MastodonCredentials::REDIS_KEY ],
+      [ "strava",               StravaCredentials::REDIS_KEY ],
       [ "threads",              ThreadsCredentials::REDIS_KEY ],
       [ "trainerroad",          TrainerRoadCredentials::REDIS_KEY ],
       [ "whoop (store)",        WhoopCredentials::REDIS_KEY ],
@@ -35,7 +36,8 @@ namespace :redis do
   durable_strings = lambda do
     keys = [
       [ "location",           Location::LOCATION_CACHE_KEY ],
-      [ "standard.site DID",  StandardSite::DID_CACHE_KEY ]
+      [ "standard.site DID",  StandardSite::DID_CACHE_KEY ],
+      [ "strava subscription", Strava::SUBSCRIPTION_KEY ]
     ]
 
     client_id = ENV["WHOOP_CLIENT_ID"].presence

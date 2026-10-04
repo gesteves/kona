@@ -15,9 +15,10 @@ class WhoopWebhookProcessor
   # Goes at the start of each log line from this processor, thus you can find them with grep.
   LOG_PREFIX = "Whoop webhook:"
 
-  def initialize(whoop: Whoop.new, intervals: Intervals.new)
+  def initialize(whoop: Whoop.new, intervals: Intervals.new, location: Location.new)
     @whoop = whoop
     @intervals = intervals
+    @location = location
   end
 
   # @param event_type [String] The Whoop webhook event type.
@@ -73,7 +74,7 @@ class WhoopWebhookProcessor
   # @return [Hash, nil] The activity, or nil if nothing matches.
   def matching_activity(workout, workout_date)
     candidates = @intervals.activities!(oldest: workout_date - 1, newest: workout_date + 1)
-    match = candidates.find { |candidate| ActivityMatcher.matches?(candidate, workout, timezone) }
+    match = candidates.find { |candidate| ActivityMatcher.matches?(candidate, workout) }
     log_info("workout.updated #{workout[:id]}: no matching Intervals.icu activity on #{workout_date} — skipping") if match.nil?
     match
   end
@@ -81,8 +82,8 @@ class WhoopWebhookProcessor
   # Adds the description job to the queue for an activity that matches, but only for a swim, a
   # bike ride, or a run. Each other sport keeps its WhoopWorkoutStrain and gets no description. The
   # job is separate from the metric sync, on purpose: it runs again by itself, and it continues to
-  # work without Whoop, with only the 🔥 line absent. Only the strain goes to the job. The
-  # generator makes each other value again and does the eligibility check.
+  # work without Whoop, with only the 🔥 line absent. Only the activity id goes to the job: the
+  # generator gets the strain from Whoop itself, thus the run from the Strava webhook gets it too.
   def enqueue_description(match, workout)
     match_type = ActivityMatcher.normalize_type(match[:type])
     unless ActivityDescription::Generator::ELIGIBLE_SPORTS.include?(match_type)
@@ -90,7 +91,7 @@ class WhoopWebhookProcessor
       return
     end
 
-    ActivityDescriptionJob.perform_async(match[:id], workout[:strain])
+    ActivityDescriptionJob.perform_async(match[:id])
   end
 
   # Writes the raw 0–21 cycle strain of each date to its Intervals.icu wellness record. The code
@@ -208,7 +209,7 @@ class WhoopWebhookProcessor
   end
 
   def timezone
-    @timezone ||= @intervals.athlete_timezone
+    @timezone ||= @location.time_zone
   end
 
   # The code keeps this value, thus one run has one "today". sleep.updated reads today and

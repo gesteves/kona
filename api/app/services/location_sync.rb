@@ -24,14 +24,8 @@ class LocationSync
   def call(latitude, longitude)
     context = LocationContext.new(latitude, longitude)
 
-    profile_written = sync_athlete_profile(context)
+    sync_athlete_profile(context)
     sync_weather_config(context)
-
-    # Put the value that this code just wrote into the timezone cache, thus athlete_timezone gives
-    # it immediately. The Whoop processor and the description generator put each date in a group by
-    # that value. Do this only when a profile write contained a timezone. A lookup that fails gives
-    # nil, and the code then does not change the cache.
-    @intervals.cache_athlete_timezone(context.timezone) if profile_written && context.timezone.present?
   end
 
   private
@@ -40,7 +34,6 @@ class LocationSync
   # different from the value in Intervals.icu. It sends only the fields with a value, thus a blank
   # never removes a value that exists. But, as domestique does, a blank field that is different from
   # a stored value still causes the write.
-  # @return [Boolean] True if the code did a profile write.
   def sync_athlete_profile(context)
     resolved = {
       city: context.city.presence,
@@ -49,15 +42,14 @@ class LocationSync
       timezone: context.timezone.presence
     }
     updates = resolved.compact
-    return false if updates.empty?
+    return if updates.empty?
 
     # An empty answer from Intervals.icu is a profile with no value in each field.
     current = @intervals.athlete_profile || {}
-    return false if resolved.all? { |field, value| value == current[field] }
+    return if resolved.all? { |field, value| value == current[field] }
 
     @intervals.update_athlete_profile(**updates)
     log_info("updated athlete profile #{updates.inspect}")
-    true
   end
 
   # Puts one forecast at the current location in place of the weather configuration. It does nothing

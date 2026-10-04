@@ -1,19 +1,25 @@
-# Makes the description of an Intervals.icu activity for Strava, and it can make it again.
+# Makes the description and the name of an activity from its Intervals.icu data, and writes them
+# to the Strava copy of the activity.
 #
-# It knows nothing about Whoop, on purpose. The Whoop workout path adds it to the queue today, but
-# each other webhook could do the same, and only the 🔥 line would go away. It is separate from
-# WhoopWebhookJob, thus the description work and the Whoop metric sync stay separate and each one
-# runs again by itself. The Redis lock of the generator, which is for one activity, removes a second
-# job at the same time. A second attempt makes the description again: the words can be different,
-# but the data is the same.
+# Two webhooks add it to the queue: the Strava webhook, through StravaActivityJob, when an activity
+# arrives, and the Whoop webhook when Whoop scores the workout. The generator gets the Whoop strain
+# itself, thus the two runs give the same description, and the one that comes last has the most
+# data. The Redis lock of the generator, which is for one activity, puts a second run of the same
+# moment back in the queue. A second attempt makes the description again: the words can be
+# different, but the data is the same.
 class ActivityDescriptionJob < ApplicationJob
+  # The wait before a run that found the lock of another run tries again.
+  BUSY_DELAY = 1.minute
+
   # @param activity_id [String, Integer] The Intervals.icu activity id.
-  # @param whoop_strain [Float, nil] The Whoop strain for the 🔥 line. Omit it when there is no Whoop
-  #   data, and the description then has no such line.
-  def perform(activity_id, whoop_strain = nil)
+  def perform(activity_id)
     # The jid is the token of the lock, thus a retry of this job can enter the lock that its own
     # attempt left.
-    ActivityDescription::Generator.new.generate!(activity_id, whoop_strain: whoop_strain, lock_token: jid)
+    if ActivityDescription::Generator.new.generate!(activity_id, lock_token: jid) == :busy
+      self.class.perform_in(BUSY_DELAY, activity_id)
+      return
+    end
+
     Rails.logger.info("Activity description generated for activity #{activity_id}")
   end
 end

@@ -34,39 +34,39 @@ RSpec.describe ActivityMatcher do
   end
 
   describe ".matches?" do
-    let(:timezone) { "America/Denver" }
     let(:workout) do
       { id: "w1", activity_type: "Cycling", start_time: Time.iso8601("2026-07-09T13:30:00Z"), strain: 10.0 }
     end
 
-    def icu_activity(start_local, type: "Ride", extra: {})
-      { id: "i1", type: type, start_date_local: start_local }.merge(extra)
+    def icu_activity(start, type: "Ride", extra: {})
+      { id: "i1", type: type, start_date: start }.merge(extra)
     end
 
     it "matches when start times are within 5 truncated minutes and types agree" do
-      # 13:30Z is 07:30 local time. A difference of 5:59 is still 5 minutes with no seconds.
-      expect(described_class.matches?(icu_activity("2026-07-09T07:35:59"), workout, timezone)).to be(true)
+      # A difference of 5:59 is still 5 minutes with no seconds.
+      expect(described_class.matches?(icu_activity("2026-07-09T13:35:59Z"), workout)).to be(true)
     end
 
     it "rejects a 6-minute gap" do
-      expect(described_class.matches?(icu_activity("2026-07-09T07:36:00"), workout, timezone)).to be(false)
+      expect(described_class.matches?(icu_activity("2026-07-09T13:36:00Z"), workout)).to be(false)
     end
 
     it "rejects incompatible types even at identical start times" do
-      expect(described_class.matches?(icu_activity("2026-07-09T07:30:00", type: "Run"), workout, timezone)).to be(false)
+      expect(described_class.matches?(icu_activity("2026-07-09T13:30:00Z", type: "Run"), workout)).to be(false)
     end
 
     it "lets an unknown ICU type (Other) match anything" do
-      expect(described_class.matches?(icu_activity("2026-07-09T07:30:00", type: "Yoga"), workout, timezone)).to be(true)
+      expect(described_class.matches?(icu_activity("2026-07-09T13:30:00Z", type: "Yoga"), workout)).to be(true)
     end
 
     it "never matches Strava-only imports" do
-      strava = icu_activity("2026-07-09T07:30:00", extra: { source: "STRAVA", _note: "unavailable" })
-      expect(described_class.matches?(strava, workout, timezone)).to be(false)
+      strava = icu_activity("2026-07-09T13:30:00Z", extra: { source: "STRAVA", _note: "unavailable" })
+      expect(described_class.matches?(strava, workout)).to be(false)
     end
 
-    it "rejects activities without a local start time" do
-      expect(described_class.matches?({ id: "i1", type: "Ride" }, workout, timezone)).to be(false)
+    it "rejects activities without a start time" do
+      expect(described_class.matches?({ id: "i1", type: "Ride" }, workout)).to be(false)
+      expect(described_class.matches?(icu_activity("not a time"), workout)).to be(false)
     end
   end
 end

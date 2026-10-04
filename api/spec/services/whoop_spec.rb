@@ -322,6 +322,27 @@ RSpec.describe Whoop do
       end
     end
 
+    describe "#workouts_between" do
+      it "gets the workouts of the range and keeps the scored ones" do
+        allow(service).to receive(:get_json!).and_return(
+          {
+            records: [
+              { id: "w1", sport_name: "cycling", start: "2026-07-09T13:30:00.000Z", score_state: "SCORED", score: { strain: 12.4 } },
+              { id: "w2", sport_name: "running", start: "2026-07-09T15:00:00.000Z", score_state: "PENDING_SCORE" }
+            ]
+          }
+        )
+
+        workouts = service.workouts_between(Time.utc(2026, 7, 9, 12), Time.utc(2026, 7, 9, 16))
+
+        expect(workouts).to contain_exactly(include(id: "w1", activity_type: "Cycling", strain: 12.4))
+        expect(service).to have_received(:get_json!).with(
+          "#{Whoop::WHOOP_API_URL}/activity/workout",
+          hash_including(query: { start: "2026-07-09T12:00:00Z", end: "2026-07-09T16:00:00Z", limit: 25 })
+        )
+      end
+    end
+
     describe "#get_workout" do
       it "normalizes a SCORED workout, mapping the sport name" do
         allow(service).to receive(:get_json!).and_return(

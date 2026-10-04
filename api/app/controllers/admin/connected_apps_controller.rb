@@ -4,13 +4,13 @@ module Admin
   class ConnectedAppsController < BaseController
     # GET /connected-apps
     #
-    # ⚠️ A card is on the page only when its integration can operate. Whoop and Threads need
+    # ⚠️ A card is on the page only when its integration can operate. Whoop, Threads, and Strava need
     # credentials in the environment, thus without those the page hides the card and does not offer
     # an action that cannot work. Bluesky, Mastodon, and TrainerRoad have no such configuration —
     # their credentials *are* the connection — thus they are always here and the list is never
     # empty.
     def show
-      @apps = [ bluesky_app, mastodon_app, threads_app, trainer_road_app, whoop_app ].compact
+      @apps = [ bluesky_app, mastodon_app, strava_app, threads_app, trainer_road_app, whoop_app ].compact
     end
 
     # DELETE /connected-apps/whoop
@@ -54,6 +54,27 @@ module Admin
         connected: service.connected?,
         connect_path: mastodon_connection_path,
         disconnect_path: mastodon_connection_path
+      )
+    end
+
+    # @return [ConnectedAppPresenter, nil] Nil without the Strava app credentials, thus the page
+    #   hides the card.
+    def strava_app
+      service = Strava.new
+      return unless service.valid_credentials?
+
+      ConnectedAppPresenter.new(
+        name: t("admin.networks.strava"),
+        description: card_description(
+          connected: service.connected?,
+          account: service.athlete_name,
+          summary: t("admin.connected_apps.summary.strava")
+        ),
+        connected: service.connected?,
+        connect_path: strava_authorize_path,
+        disconnect_path: strava_connection_path,
+        error: (refresh_error_message(service.refresh_error, name: t("admin.networks.strava"),
+                                      consequence: t("admin.connected_apps.strava.consequence")) if service.connected?)
       )
     end
 
@@ -163,7 +184,7 @@ module Admin
       end
     end
 
-    # Whoop and Threads both keep their tokens in Redis after the service refuses them, thus
+    # Whoop, Threads, and Strava each keep their tokens in Redis after the service refuses them, thus
     # `connected?` alone cannot show the difference between an integration that works and one that
     # does not. The scheduled refresh job would continue to fail below a green badge.
     # @param error [Hash, nil] The `{ code:, at: }` of the last refused refresh.

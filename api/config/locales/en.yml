@@ -102,6 +102,7 @@ en:
     networks:
       bluesky: "Bluesky"
       mastodon: "Mastodon"
+      strava: "Strava"
       threads: "Threads"
       trainer_road: "TrainerRoad"
       whoop: "Whoop"
@@ -132,6 +133,7 @@ en:
         bluesky: "Shares posts in Bluesky and publishes the site to the AT Protocol as
           Standard.site records."
         mastodon: "Shares posts in Mastodon."
+        strava: "Writes the name and the description of each activity."
         threads: "Shares posts in Threads."
         trainer_road: "Reads planned workouts from your TrainerRoad calendar."
         whoop: "Syncs strain, sleep, and recovery to Intervals.icu, and powers the Whoop widget."
@@ -144,6 +146,8 @@ en:
           post to Threads again."
         expired_on: "The Threads token expired on %{date}, and an expired token cannot be renewed.
           Reconnect to post to Threads again."
+      strava:
+        consequence: "Activity descriptions stop until you reconnect."
       whoop:
         consequence: "The widget and the Intervals.icu sync stay broken until you reconnect."
       refresh_error:
@@ -189,6 +193,16 @@ en:
         refused: "%{instance} didn't accept the app registration. Check the hostname and try
           again."
         unauthorized: "Mastodon didn't authorize the app (%{error})."
+
+    strava:
+      flash:
+        connected: "Strava connected."
+        disconnected: "Strava disconnected."
+        missing_scope: "Strava didn't grant permission to edit your activities. Connect again and keep
+          both permissions checked."
+        no_token: "Strava didn't give an access token. Connect the account again."
+        unconfigured: "Strava is not configured. Set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET."
+        unauthorized: "Strava didn't authorize the app (%{error})."
 
     threads:
       flash:

@@ -1,10 +1,11 @@
 require "rails_helper"
 
 RSpec.describe WhoopWebhookProcessor do
-  subject(:processor) { described_class.new(whoop: whoop, intervals: intervals) }
+  subject(:processor) { described_class.new(whoop: whoop, intervals: intervals, location: location) }
 
   let(:whoop) { instance_double(Whoop) }
-  let(:intervals) { instance_double(Intervals, athlete_timezone: timezone) }
+  let(:intervals) { instance_double(Intervals) }
+  let(:location) { instance_double(Location, time_zone: timezone) }
   let(:timezone) { "America/Denver" }
 
   before do
@@ -24,7 +25,7 @@ RSpec.describe WhoopWebhookProcessor do
 
   describe "workout.updated" do
     let(:workout_start) { "2026-07-09T13:30:00Z" } # 07:30 local in Denver
-    let(:activity) { { id: "i1", type: "Ride", start_date_local: "2026-07-09T07:31:00" } }
+    let(:activity) { { id: "i1", type: "Ride", start_date: "2026-07-09T13:31:00Z" } }
 
     before do
       allow(whoop).to receive(:get_workout).with("w1").and_return(whoop_workout(start_time: workout_start))
@@ -39,7 +40,7 @@ RSpec.describe WhoopWebhookProcessor do
       expect(intervals).to have_received(:update_wellness!).with("2026-07-09", WhoopStrain: 14.2)
       expect(intervals).to have_received(:activities!).with(oldest: Date.new(2026, 7, 8), newest: Date.new(2026, 7, 10))
       expect(intervals).to have_received(:update_activity!).with("i1", WhoopWorkoutStrain: 12.4)
-      expect(ActivityDescriptionJob).to have_enqueued_sidekiq_job("i1", 12.4)
+      expect(ActivityDescriptionJob).to have_enqueued_sidekiq_job("i1")
     end
 
     it "uses the workout's date in the athlete's timezone, not the UTC date" do
@@ -65,7 +66,7 @@ RSpec.describe WhoopWebhookProcessor do
     end
 
     it "refreshes wellness but skips the activity write when nothing matches" do
-      allow(intervals).to receive(:activities!).and_return([ { id: "i2", type: "Run", start_date_local: "2026-07-09T07:31:00" } ])
+      allow(intervals).to receive(:activities!).and_return([ { id: "i2", type: "Run", start_date: "2026-07-09T13:31:00Z" } ])
 
       processor.process("workout.updated", "w1")
 
@@ -77,7 +78,7 @@ RSpec.describe WhoopWebhookProcessor do
     it "writes strain but skips the description for non-swim/bike/run matches" do
       strength_workout = whoop_workout(start_time: workout_start, type: "Strength")
       allow(whoop).to receive(:get_workout).and_return(strength_workout)
-      allow(intervals).to receive(:activities!).and_return([ { id: "i3", type: "WeightTraining", start_date_local: "2026-07-09T07:31:00" } ])
+      allow(intervals).to receive(:activities!).and_return([ { id: "i3", type: "WeightTraining", start_date: "2026-07-09T13:31:00Z" } ])
 
       processor.process("workout.updated", "w1")
 
@@ -91,7 +92,7 @@ RSpec.describe WhoopWebhookProcessor do
 
       processor.process("workout.updated", "w1")
 
-      expect(ActivityDescriptionJob).to have_enqueued_sidekiq_job("i1", 12.4)
+      expect(ActivityDescriptionJob).to have_enqueued_sidekiq_job("i1")
     end
   end
 

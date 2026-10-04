@@ -505,8 +505,9 @@ The reason for the skip rule, for each host:
   because the cache entry must have the same bytes for each viewer. That gives the same "this is a
   machine" fingerprint. `/api/` also covers the callers at build time. `/webhooks/` takes POSTs with
   Contentful rich text, with no person present, and that text will start a managed injection rule at
-  some time. An HMAC checks both, thus a managed rule adds nothing. ⚠️ A block there gives **no
-  message**: nothing shows an error, and the PDS sync simply stops. ⚠️ **Meta also GETs each photo
+  some time. An HMAC checks both, thus a managed rule adds nothing. Strava also POSTs its events
+  there, with no signature and no browser: the app accepts only its own subscription and athlete.
+  ⚠️ A block there gives **no message**: nothing shows an error, and the PDS sync simply stops. ⚠️ **Meta also GETs each photo
   of a Threads post** from `/api/social-photos/*` on this host. A challenge there stops each Threads
   post with photos, and the only sign is an `ERROR` container in the job report.
 - **The admin host** — the one host with the protection on, and the only one whose traffic is a true

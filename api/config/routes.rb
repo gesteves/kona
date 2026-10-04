@@ -60,6 +60,11 @@ Rails.application.routes.draw do
 
     # Syncs the strain, the sleep, and the recovery to Intervals.icu. It needs an HMAC.
     post "whoop" => "whoop#create"
+
+    # A new Strava activity starts its description. The GET answers the subscription challenge.
+    # ⚠️ Strava does not sign an event: refer to Webhooks::StravaController.
+    get  "strava" => "strava#show"
+    post "strava" => "strava#create"
   end
 
   # Each route below is for the owner, and Rails draws it only off the public API hostname.
@@ -133,6 +138,11 @@ Rails.application.routes.draw do
       get    "connected-apps/threads/authorize" => "threads#authorize", as: :threads_authorize
       get    "connected-apps/threads/callback"  => "threads#callback",  as: :threads_callback
       delete "connected-apps/threads"           => "threads#destroy",   as: :threads_connection
+
+      # Strava does the same OAuth round trip as Threads, with app credentials from the environment.
+      get    "connected-apps/strava/authorize" => "strava#authorize", as: :strava_authorize
+      get    "connected-apps/strava/callback"  => "strava#callback",  as: :strava_callback
+      delete "connected-apps/strava"           => "strava#destroy",   as: :strava_connection
 
       # TrainerRoad is a calendar feed and not an account with an OAuth flow: the URL is the
       # connection. Thus it needs a form of its own, as Bluesky does.
