@@ -325,12 +325,11 @@ module ActivityDescription
     def wind(samples, share)
       speeds = range(samples, :windSpeed) { |value| speed(value) }
       return if speeds.nil?
+      # A wind that rounds to zero is not worth a word, thus the summary has no wind at all.
+      return if speeds[:max].zero?
 
       gusts = samples.filter_map { |sample| sample[:weather][:windGust] }
       gust_max = speed(gusts.max).round if gusts.any?
-      # A wind that rounds to zero has no direction and no range to give.
-      return { calm: true, gust_max: gust_max&.nonzero? }.compact if speeds[:max].zero?
-
       { direction: mean_direction(samples, share), speed: speeds, gust_max: gust_max }.compact
     end
 

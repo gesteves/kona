@@ -83,10 +83,10 @@ RSpec.describe ActivityDescription::Weather do
     expect(result[:headwind_percent]).to be_between(40, 60)
   end
 
-  it "marks a wind that rounds to zero as calm, with no direction and no range" do
+  it "gives no wind at all when it rounds to zero" do
     allow(weather_kit).to receive(:hourly).and_return((0..3).map { |offset| hour(offset, windSpeed: 0.4, windGust: 3.0) })
 
-    expect(summary(streams_for(north(61)))[:wind]).to eq(calm: true, gust_max: 3)
+    expect(summary(streams_for(north(61)))).not_to have_key(:wind)
   end
 
   it "omits the headwind when the mean wind is below HEADWIND_MIN_KPH" do
